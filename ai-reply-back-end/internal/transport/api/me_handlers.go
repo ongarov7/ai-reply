@@ -165,15 +165,23 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 	for _, c := range phone.Countries() {
 		countries = append(countries, countryDTO{ISO: c.ISO, Dial: "+" + c.Dial, Name: c.NameEN, Example: c.Example})
 	}
+	current := s.limits.Current(r.Context())
 	httpx.JSON(w, http.StatusOK, map[string]any{
-		"locales":                domain.Locales,
-		"default_locale":         "en",
-		"timezone":               s.cfg.App.Timezone,
-		"max_source_characters":  s.cfg.Limits.SourceTextChars,
-		"max_instruction_length": s.cfg.Limits.InstructionChars,
-		"demo_mode":              s.cfg.Auth.DemoMode,
-		"payment_mode":           s.payments.Mode(),
-		"countries":              countries,
+		"locales":        domain.Locales,
+		"default_locale": "en",
+		"timezone":       s.cfg.App.Timezone,
+		// Character limits the apps validate against before sending anything.
+		// The server enforces the same values; the admin panel changes them.
+		"max_source_characters":  current.SourceChars,
+		"max_instruction_length": current.InstructionChars,
+		// What this server understands, so a newer app never sends a field an
+		// older server would reject (request bodies disallow unknown fields).
+		"features": map[string]bool{
+			"reply_preferences": true,
+		},
+		"demo_mode":    s.cfg.Auth.DemoMode,
+		"payment_mode": s.payments.Mode(),
+		"countries":    countries,
 		"legal": map[string]string{
 			"terms_version":   legal.TermsVersion,
 			"privacy_version": legal.PrivacyVersion,

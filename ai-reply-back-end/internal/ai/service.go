@@ -7,25 +7,30 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aireply/ai-reply-back-end/config"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
+	"github.com/aireply/ai-reply-back-end/internal/limits"
 	"github.com/aireply/ai-reply-back-end/internal/repository"
 	"github.com/aireply/ai-reply-back-end/internal/subscriptions"
 	"github.com/aireply/ai-reply-back-end/internal/traits"
 )
+
+// LimitsSource — әкімші панелі басқаратын шектеулер (limits.Service).
+type LimitsSource interface {
+	Current(ctx context.Context) limits.Limits
+}
 
 // Service — AI шлюзі: квота → провайдер → есеп.
 type Service struct {
 	repo     *repository.Store
 	subs     *subscriptions.Service
 	provider Provider
-	limits   config.Limits
+	limits   LimitsSource
 	log      *slog.Logger
 	clock    traits.Clock
 }
 
 // New — шлюз.
-func New(repo *repository.Store, subs *subscriptions.Service, provider Provider, limits config.Limits, log *slog.Logger) *Service {
+func New(repo *repository.Store, subs *subscriptions.Service, provider Provider, limits LimitsSource, log *slog.Logger) *Service {
 	return &Service{repo: repo, subs: subs, provider: provider, limits: limits, log: log, clock: traits.SystemClock{}}
 }
 
@@ -59,6 +64,8 @@ type Result struct {
 	Remaining        int
 	ResetsAt         time.Time
 	LatencyMS        int
+	// SourceLimit — ErrSourceTooLong кезінде клиентке нақты шекті айту үшін.
+	SourceLimit int
 }
 
 // Reply — негізгі сценарий.
@@ -71,14 +78,18 @@ type Result struct {
 func (s *Service) Reply(ctx context.Context, req Request) (Result, error) {
 	started := s.clock.Now()
 
+	// One read per request: the whole call works against the same limits
+	// even if an administrator changes them while it is in flight.
+	lim := s.limits.Current(ctx)
+
 	source := strings.TrimSpace(req.SourceText)
 	if source == "" {
 		return Result{}, domain.ErrInvalidRequest
 	}
-	if traits.RuneLen(source) > s.limits.SourceTextChars {
-		return Result{}, domain.ErrInvalidRequest
+	if traits.RuneLen(source) > lim.SourceChars {
+		return Result{SourceLimit: lim.SourceChars}, domain.ErrSourceTooLong
 	}
-	req.Instruction = traits.Clamp(req.Instruction, s.limits.InstructionChars)
+	req.Instruction = traits.Clamp(req.Instruction, lim.InstructionChars)
 
 	entitlement, err := s.subs.Entitlement(ctx, req.User.ID)
 	if err != nil {
@@ -105,6 +116,7 @@ func (s *Service) Reply(ctx context.Context, req Request) (Result, error) {
 		Template:     req.Template,
 		WorkingHours: req.Business,
 	})
+	prompt.MaxOutputTokens = lim.MaxOutputTokens
 
 	completion, providerErr := s.provider.Generate(ctx, prompt)
 	latency := int(s.clock.Now().Sub(started).Milliseconds())

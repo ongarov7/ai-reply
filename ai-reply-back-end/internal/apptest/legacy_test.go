@@ -1,6 +1,7 @@
 package apptest
 
 import (
+	"context"
 	"net/http"
 	"strings"
 	"testing"
@@ -95,7 +96,7 @@ func TestLegacyMessageTooLong(t *testing.T) {
 	register := h.do(http.MethodPost, "/v1/auth/register",
 		map[string]any{"install_id": "DDDD1111-EEEE-2222-FFFF-333344445555"}, nil)
 
-	long := strings.Repeat("а", 301)
+	long := strings.Repeat("а", h.limits.Current(context.Background()).SourceChars+1)
 	res := h.do(http.MethodPost, "/v1/reply/generate",
 		map[string]any{"message": long}, h.auth(register.str("token")))
 	if res.status != http.StatusRequestEntityTooLarge {

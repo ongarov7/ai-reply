@@ -24,6 +24,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/config"
 	"github.com/aireply/ai-reply-back-end/internal/ai"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
+	"github.com/aireply/ai-reply-back-end/internal/limits"
 	"github.com/aireply/ai-reply-back-end/internal/plans"
 	"github.com/aireply/ai-reply-back-end/internal/repository"
 	"github.com/aireply/ai-reply-back-end/internal/subscriptions"
@@ -46,13 +47,14 @@ const (
 
 // Service — симулятор қабаты.
 type Service struct {
-	repo  *repository.Store
-	users *users.Service
-	subs  *subscriptions.Service
-	plans *plans.Service
-	ai    *ai.Service
-	cfg   config.Config
-	log   *slog.Logger
+	repo   *repository.Store
+	users  *users.Service
+	subs   *subscriptions.Service
+	plans  *plans.Service
+	ai     *ai.Service
+	limits *limits.Service
+	cfg    config.Config
+	log    *slog.Logger
 
 	// Демо тариф қабаты: тек жадта, процесс қайта қосылғанда жоғалады.
 	mu     sync.RWMutex
@@ -66,6 +68,7 @@ type Deps struct {
 	Subs   *subscriptions.Service
 	Plans  *plans.Service
 	AI     *ai.Service
+	Limits *limits.Service
 	Config config.Config
 	Log    *slog.Logger
 }
@@ -73,7 +76,7 @@ type Deps struct {
 // New — қызмет.
 func New(d Deps) *Service {
 	return &Service{
-		repo: d.Repo, users: d.Users, subs: d.Subs, plans: d.Plans, ai: d.AI,
+		repo: d.Repo, users: d.Users, subs: d.Subs, plans: d.Plans, ai: d.AI, limits: d.Limits,
 		cfg: d.Config, log: d.Log, drafts: map[string]PlanDraft{},
 	}
 }
@@ -456,6 +459,7 @@ func (s *Service) Health(ctx context.Context) Health {
 		dbOK = false
 	}
 	key := strings.TrimSpace(s.cfg.OpenAI.APIKey)
+	current := s.limits.Current(ctx)
 	return Health{
 		Database:           dbOK,
 		ProviderConfigured: key != "" && !strings.Contains(key, "REPLACE"),
@@ -465,8 +469,8 @@ func (s *Service) Health(ctx context.Context) Health {
 		PaymentMode:        s.cfg.Payments.Mode,
 		DemoAuth:           s.cfg.Auth.DemoMode,
 		LegacyAPI:          s.cfg.Auth.LegacyEnabled,
-		SourceTextChars:    s.cfg.Limits.SourceTextChars,
-		InstructionChars:   s.cfg.Limits.InstructionChars,
+		SourceTextChars:    current.SourceChars,
+		InstructionChars:   current.InstructionChars,
 		AIPerMinute:        s.cfg.Limits.AIPerMinute,
 		CheckedAt:          time.Now().UTC(),
 	}

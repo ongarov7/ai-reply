@@ -3,6 +3,7 @@ package domain
 
 import (
 	"errors"
+	"fmt"
 	"time"
 )
 
@@ -288,4 +289,9 @@ var (
 	ErrEmptyCompletion  = errors.New("empty completion")
 	ErrPaymentRequired  = errors.New("payment required")
 	ErrDemoDisabled     = errors.New("demo authentication disabled")
+
+	// ErrSourceTooLong — көшірілген хабарлама әкімші бекіткен шектен ұзын.
+	// ErrInvalidRequest-ті орайды: ескі клиенттер бұрынғыдай INVALID_REQUEST
+	// алады, жаңалары details ішінен нақты шекті оқиды.
+	ErrSourceTooLong = fmt.Errorf("%w: source text too long", ErrInvalidRequest)
 )

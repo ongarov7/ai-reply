@@ -75,9 +75,9 @@ func (s *Server) handleLegacyGenerate(w http.ResponseWriter, r *http.Request) {
 		legacyError(w, http.StatusBadRequest, "message_empty", nil)
 		return
 	}
-	if length := traits.RuneLen(body.Message); length > s.cfg.Limits.SourceTextChars {
+	if length, limit := traits.RuneLen(body.Message), s.limits.Current(r.Context()).SourceChars; length > limit {
 		legacyError(w, http.StatusRequestEntityTooLarge, "message_too_long", map[string]any{
-			"limit": s.cfg.Limits.SourceTextChars, "actual": length,
+			"limit": limit, "actual": length,
 		})
 		return
 	}

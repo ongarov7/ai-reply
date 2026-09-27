@@ -1,12 +1,14 @@
 package adminapi
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/aireply/ai-reply-back-end/internal/domain"
+	"github.com/aireply/ai-reply-back-end/internal/limits"
 	"github.com/aireply/ai-reply-back-end/internal/repository"
 	"github.com/aireply/ai-reply-back-end/internal/traits"
 	"github.com/aireply/ai-reply-back-end/internal/transport/httpx"
@@ -141,14 +143,76 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 			"effective_from": p.EffectiveFrom.In(loc).Format("2006-01-02"),
 		})
 	}
+	aiLimits, err := s.aiLimitsPayload(r)
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
 	httpx.JSON(w, http.StatusOK, map[string]any{
 		"env": s.cfg.App.Env, "timezone": s.cfg.App.Timezone,
 		"demo_mode": s.cfg.Auth.DemoMode, "payment_mode": s.cfg.Payments.Mode,
 		"model": s.cfg.OpenAI.Model, "legacy_api": s.cfg.Auth.LegacyEnabled,
 		"access_ttl": s.cfg.Auth.AccessTTL.String(), "refresh_ttl": s.cfg.Auth.RefreshTTL.String(),
-		"source_limit": s.cfg.Limits.SourceTextChars,
+		// Kept for any older admin bundle still open in a browser tab.
+		"source_limit": aiLimits.Current.SourceChars,
+		"ai_limits":    aiLimits,
 		"pricing":      rows,
 	})
+}
+
+// aiLimitsDTO — ағымдағы мәндер, әдепкілер, қайсысы әкімшіден және рұқсат ауқымы.
+type aiLimitsDTO struct {
+	Current    limits.Limits           `json:"current"`
+	Defaults   limits.Limits           `json:"defaults"`
+	Overridden map[string]bool         `json:"overridden"`
+	Ranges     map[string]limits.Range `json:"ranges"`
+}
+
+func (s *Server) aiLimitsPayload(r *http.Request) (aiLimitsDTO, error) {
+	overridden, err := s.limits.Overridden(r.Context())
+	if err != nil {
+		return aiLimitsDTO{}, err
+	}
+	return aiLimitsDTO{
+		Current:    s.limits.Current(r.Context()),
+		Defaults:   s.limits.Defaults(),
+		Overridden: overridden,
+		Ranges: map[string]limits.Range{
+			limits.KeySourceChars:      limits.SourceRange,
+			limits.KeyInstructionChars: limits.InstructionRange,
+			limits.KeyMaxOutputTokens:  limits.OutputTokenRange,
+		},
+	}, nil
+}
+
+// handleSaveLimits — AI шектеулерін өзгерту (аудитпен, ескі/жаңа мәндерімен).
+func (s *Server) handleSaveLimits(w http.ResponseWriter, r *http.Request) {
+	var body limits.Limits
+	if err := httpx.Decode(w, r, 1024, &body); err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	before := s.limits.Current(r.Context())
+	saved, err := s.limits.Update(r.Context(), body)
+	if err != nil {
+		var fieldErr *limits.FieldError
+		if errors.As(err, &fieldErr) {
+			httpx.Error(w, http.StatusBadRequest, httpx.CodeInvalidRequest, fieldErr.Error(), map[string]any{
+				"field": fieldErr.Field, "min": fieldErr.Range.Min, "max": fieldErr.Range.Max,
+			})
+			return
+		}
+		s.fail(w, err)
+		return
+	}
+	s.admin.Audit(r.Context(), adminFrom(r.Context()), s.ip(r), "settings.ai_limits.update", "system_settings", "ai_limits",
+		map[string]any{"before": before, "after": saved})
+	payload, err := s.aiLimitsPayload(r)
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, payload)
 }
 
 func (s *Server) handleSavePricing(w http.ResponseWriter, r *http.Request) {

@@ -82,6 +82,17 @@ type Profile struct {
 	Role          string
 	PreferredTone string
 	Business      Business
+	// ReplyLanguage — жауап тілі: "" / "auto" — келген хабарламаның тілі,
+	// әйтпесе kk | ru | en | uz. Тек тексерілген мән келеді (dto.go).
+	ReplyLanguage string
+}
+
+// ReplyLanguages — пайдаланушы тұрақты таңдай алатын жауап тілдері.
+var ReplyLanguages = map[string]string{
+	"kk": "Kazakh",
+	"ru": "Russian",
+	"en": "English",
+	"uz": "Uzbek",
 }
 
 // Template — таңдалған шаблон параметрлері.
@@ -120,6 +131,8 @@ type PromptInput struct {
 type Prompt struct {
 	Developer string
 	User      string
+	// MaxOutputTokens — әкімші бекіткен шек; 0 болса провайдердің өз мәні.
+	MaxOutputTokens int
 }
 
 // BuildPrompt — деректі блоктарға орап, нұсқаулықтан бөлек ұстайды.
@@ -240,7 +253,25 @@ func BuildPrompt(in PromptInput) Prompt {
 	parts = append(parts, "", block("incoming_message",
 		"The message to reply to, quoted verbatim.\n---\n"+in.Message+"\n---"))
 
-	return Prompt{Developer: developerInstructions, User: strings.Join(parts, "\n")}
+	return Prompt{Developer: developerMessage(in.Profile.ReplyLanguage), User: strings.Join(parts, "\n")}
+}
+
+// developerMessage — тұрақты ережелер, қажет болса тіл таңдауымен.
+//
+// The language preference is the one personal setting that has to override a
+// developer rule ("reply in the language of the incoming message"), so it is
+// stated at the developer level. That is safe only because the value is an
+// enum validated at the edge: the sentence is written here, never taken from
+// the client, and nothing a person typed can reach this message.
+func developerMessage(replyLanguage string) string {
+	name, ok := ReplyLanguages[replyLanguage]
+	if !ok {
+		return developerInstructions
+	}
+	return developerInstructions + "\n\nLANGUAGE PREFERENCE\n" +
+		"The user always wants replies in " + name + ". Write the reply in " + name +
+		" even when the incoming message is in another language. If <user_instruction> names a " +
+		"language for this particular reply, that request wins."
 }
 
 func block(name, content string) string {

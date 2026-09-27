@@ -9,6 +9,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/config"
 	"github.com/aireply/ai-reply-back-end/internal/ai"
 	"github.com/aireply/ai-reply-back-end/internal/auth"
+	"github.com/aireply/ai-reply-back-end/internal/limits"
 	"github.com/aireply/ai-reply-back-end/internal/middleware"
 	"github.com/aireply/ai-reply-back-end/internal/payments"
 	"github.com/aireply/ai-reply-back-end/internal/plans"
@@ -28,6 +29,7 @@ type Server struct {
 	plans    *plans.Service
 	subs     *subscriptions.Service
 	ai       *ai.Service
+	limits   *limits.Service
 	payments *payments.Service
 	limiter  *middleware.Limiter
 	ping     Pinger
@@ -42,6 +44,7 @@ type Deps struct {
 	Plans    *plans.Service
 	Subs     *subscriptions.Service
 	AI       *ai.Service
+	Limits   *limits.Service
 	Payments *payments.Service
 	Limiter  *middleware.Limiter
 	Ping     Pinger
@@ -52,7 +55,7 @@ type Deps struct {
 func New(d Deps) *Server {
 	return &Server{
 		cfg: d.Config, auth: d.Auth, users: d.Users, plans: d.Plans, subs: d.Subs,
-		ai: d.AI, payments: d.Payments, limiter: d.Limiter, ping: d.Ping, log: d.Log,
+		ai: d.AI, limits: d.Limits, payments: d.Payments, limiter: d.Limiter, ping: d.Ping, log: d.Log,
 	}
 }
 

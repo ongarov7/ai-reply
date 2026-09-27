@@ -20,6 +20,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/auth"
 	"github.com/aireply/ai-reply-back-end/internal/database"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
+	"github.com/aireply/ai-reply-back-end/internal/limits"
 	"github.com/aireply/ai-reply-back-end/internal/localization"
 	"github.com/aireply/ai-reply-back-end/internal/middleware"
 	"github.com/aireply/ai-reply-back-end/internal/notifications"
@@ -39,10 +40,12 @@ import (
 
 // fakeProvider — тестте нақты OpenAI орнына.
 type fakeProvider struct {
-	reply    string
-	err      error
-	calls    int
-	lastUser string
+	reply         string
+	err           error
+	calls         int
+	lastUser      string
+	lastDeveloper string
+	lastMaxTokens int
 }
 
 func (f *fakeProvider) Name() string  { return "fake" }
@@ -51,6 +54,8 @@ func (f *fakeProvider) Model() string { return "test-model" }
 func (f *fakeProvider) Generate(_ context.Context, prompt ai.Prompt) (ai.Completion, error) {
 	f.calls++
 	f.lastUser = prompt.User
+	f.lastDeveloper = prompt.Developer
+	f.lastMaxTokens = prompt.MaxOutputTokens
 	if f.err != nil {
 		return ai.Completion{}, f.err
 	}
@@ -71,6 +76,7 @@ type harness struct {
 	logs     *bytes.Buffer
 	dbPath   string
 	admin    *admin.Service
+	limits   *limits.Service
 }
 
 const (
@@ -133,12 +139,18 @@ func newHarness(t *testing.T) *harness {
 	userSvc := users.New(store)
 	authSvc := auth.New(store, cfg.Auth, auth.StubSender{Log: log}, subSvc, log).WithClock(clock)
 	provider := &fakeProvider{reply: "Сәлеметсіз бе! Бағаны нақтылап, бірер минуттан соң жазамын."}
-	aiSvc := ai.New(store, subSvc, provider, cfg.Limits, log).WithClock(clock)
+	limitSvc := limits.New(store, limits.Limits{
+		SourceChars:      cfg.Limits.SourceTextChars,
+		InstructionChars: cfg.Limits.InstructionChars,
+		MaxOutputTokens:  cfg.OpenAI.MaxOutputTokens,
+	}).WithTTL(0)
+	aiSvc := ai.New(store, subSvc, provider, limitSvc, log).WithClock(clock)
 	paymentSvc := payments.New(store, subSvc, payments.DemoProvider{}, cfg.Payments.Mode)
 	notifySvc := notifications.New(store)
 	adminSvc := admin.New(store, subSvc, planSvc, cfg, log)
 	simulatorSvc := simulator.New(simulator.Deps{
-		Repo: store, Users: userSvc, Subs: subSvc, Plans: planSvc, AI: aiSvc, Config: cfg, Log: log,
+		Repo: store, Users: userSvc, Subs: subSvc, Plans: planSvc, AI: aiSvc, Limits: limitSvc,
+		Config: cfg, Log: log,
 	})
 	if err := adminSvc.Bootstrap(context.Background()); err != nil {
 		t.Fatalf("admin bootstrap: %v", err)
@@ -152,9 +164,10 @@ func newHarness(t *testing.T) *harness {
 
 	mux := http.NewServeMux()
 	api.New(api.Deps{Config: cfg, Auth: authSvc, Users: userSvc, Plans: planSvc, Subs: subSvc,
-		AI: aiSvc, Payments: paymentSvc, Limiter: limiter, Log: log,
+		AI: aiSvc, Limits: limitSvc, Payments: paymentSvc, Limiter: limiter, Log: log,
 		Ping: func(ctx context.Context) error { return db.Reader().PingContext(ctx) }}).Register(mux)
-	adminapi.New(adminapi.Deps{Config: cfg, Admin: adminSvc, Notifications: notifySvc, Log: log}).Register(mux)
+	adminapi.New(adminapi.Deps{Config: cfg, Admin: adminSvc, Limits: limitSvc, Notifications: notifySvc,
+		Log: log}).Register(mux)
 	simulatorapi.New(simulatorapi.Deps{Config: cfg, Admin: adminSvc, Simulator: simulatorSvc,
 		Limiter: limiter, Log: log}).Register(mux)
 	webServer, err := web.New(web.Deps{Config: cfg, Admin: adminSvc, Plans: planSvc,
@@ -169,7 +182,7 @@ func newHarness(t *testing.T) *harness {
 	server := httptest.NewServer(handler)
 
 	h := &harness{t: t, cfg: cfg, server: server, store: store, db: db,
-		provider: provider, clock: clock, logs: logs, dbPath: dbPath, admin: adminSvc}
+		provider: provider, clock: clock, logs: logs, dbPath: dbPath, admin: adminSvc, limits: limitSvc}
 	t.Cleanup(func() {
 		server.Close()
 		_ = db.Close()

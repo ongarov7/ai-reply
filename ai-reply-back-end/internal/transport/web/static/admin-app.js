@@ -794,22 +794,65 @@
       </div>`
   };
 
+  var LIMIT_FIELDS = [
+    { key: "max_source_characters", label: "admin.settings.source_chars" },
+    { key: "max_instruction_length", label: "admin.settings.instruction_chars" },
+    { key: "max_output_tokens", label: "admin.settings.output_tokens" }
+  ];
+
   var Settings = {
     data: function () {
-      return { data: null, form: { model: "", input_per_1m: 0.15, output_per_1m: 0.6, effective_from: "" } };
+      return {
+        data: null,
+        form: { model: "", input_per_1m: 0.15, output_per_1m: 0.6, effective_from: "" },
+        limits: {}, limitFields: LIMIT_FIELDS, savingLimits: false
+      };
     },
     mounted: function () { this.load(); },
     methods: {
       t: t,
       async load() {
-        try { this.data = await api("/settings"); this.form.model = this.data.model; }
+        try {
+          this.data = await api("/settings");
+          this.form.model = this.data.model;
+          this.fillLimits(this.data.ai_limits);
+        }
         catch (e) { toast("danger", t("common.error")); }
+      },
+      fillLimits(ai) {
+        if (!ai) return;
+        var form = {};
+        LIMIT_FIELDS.forEach(function (f) { form[f.key] = ai.current[f.key]; });
+        this.limits = form;
+      },
+      range(key) { return this.data.ai_limits.ranges[key]; },
+      outOfRange(key) {
+        var value = this.limits[key], r = this.range(key);
+        return !(Number.isInteger(value) && value >= r.min && value <= r.max);
       },
       async save() {
         try {
           await api("/settings/pricing", { method: "POST", body: this.form });
           toast("ok", t("common.saved")); this.load();
         } catch (e) { toast("danger", t("common.error")); }
+      },
+      async saveLimits() {
+        var self = this;
+        if (LIMIT_FIELDS.some(function (f) { return self.outOfRange(f.key); })) {
+          toast("danger", t("admin.settings.limit_invalid"));
+          return;
+        }
+        this.savingLimits = true;
+        try {
+          var fresh = await api("/settings/limits", { method: "POST", body: this.limits });
+          this.data.ai_limits = fresh;
+          this.fillLimits(fresh);
+          toast("ok", t("common.saved"));
+        } catch (e) {
+          toast("danger", e.message === "INVALID_REQUEST" ? t("admin.settings.limit_invalid") : t("common.error"));
+        } finally {
+          this.savingLimits = false;
+        }
       }
     },
     template: `
@@ -829,6 +872,26 @@
                 {{ data.legacy_api ? 'on' : 'off' }}</span></dd>
               <dt>Access / Refresh TTL</dt><dd class="mono">{{ data.access_ttl }} · {{ data.refresh_ttl }}</dd>
             </dl>
+          </div>
+        </div>
+        <div class="card" v-if="data.ai_limits">
+          <div class="card-head"><h2>{{ t('admin.settings.limits') }}</h2></div>
+          <div class="card-body">
+            <p class="muted" style="margin-top:0">{{ t('admin.settings.limits_hint') }}</p>
+            <div class="form-grid">
+              <label class="field" v-for="f in limitFields" :key="f.key">
+                <span>{{ t(f.label) }}
+                  <span :class="'badge ' + (data.ai_limits.overridden[f.key] ? 'badge-brand' : 'badge-muted')">
+                    {{ data.ai_limits.overridden[f.key] ? t('admin.settings.limit_from_admin') : t('admin.settings.limit_from_default') }}</span>
+                </span>
+                <input type="number" step="1" :min="range(f.key).min" :max="range(f.key).max"
+                  v-model.number="limits[f.key]" :aria-invalid="outOfRange(f.key)">
+                <small class="muted">{{ t('admin.settings.limit_default') }}: {{ data.ai_limits.defaults[f.key] }} ·
+                  {{ t('admin.settings.limit_range') }}: {{ range(f.key).min }}–{{ range(f.key).max }}</small>
+              </label>
+            </div>
+            <p class="muted">{{ t('admin.settings.limits_plans_note') }}</p>
+            <button class="btn btn-primary" :disabled="savingLimits" @click="saveLimits">{{ t('common.save') }}</button>
           </div>
         </div>
         <div class="card">

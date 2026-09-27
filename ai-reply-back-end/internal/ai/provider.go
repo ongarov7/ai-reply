@@ -80,9 +80,13 @@ type responsesReply struct {
 
 // Generate — бір жауап. store=false: мәтін провайдерде де сақталмайды.
 func (o *OpenAI) Generate(ctx context.Context, prompt Prompt) (Completion, error) {
+	maxTokens := o.cfg.MaxOutputTokens
+	if prompt.MaxOutputTokens > 0 {
+		maxTokens = prompt.MaxOutputTokens
+	}
 	payload, err := json.Marshal(responsesRequest{
 		Model:           o.cfg.Model,
-		MaxOutputTokens: o.cfg.MaxOutputTokens,
+		MaxOutputTokens: maxTokens,
 		Temperature:     o.cfg.Temperature,
 		Store:           false,
 		Input: []responsesInput{

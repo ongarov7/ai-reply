@@ -274,3 +274,9 @@ tr.clickable { cursor: pointer; }
 .toast-danger { background: var(--danger); }
 
 button:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ---------------------------------------------------------------- AI limits */
+.muted { color: var(--muted); font-size: 13.5px; }
+label.field > span .badge { margin-left: 6px; vertical-align: 1px; }
+label.field > small { display: block; margin-top: 6px; font-size: 12px; color: var(--muted-2); }
+input[aria-invalid="true"] { border-color: var(--danger); }

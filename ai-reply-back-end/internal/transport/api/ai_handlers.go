@@ -1,10 +1,12 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
 	"github.com/aireply/ai-reply-back-end/internal/ai"
+	"github.com/aireply/ai-reply-back-end/internal/domain"
 	"github.com/aireply/ai-reply-back-end/internal/traits"
 	"github.com/aireply/ai-reply-back-end/internal/transport/httpx"
 )
@@ -27,6 +29,9 @@ type profileOverride struct {
 	Role          string       `json:"role"`
 	PreferredTone string       `json:"preferred_tone"`
 	Business      *businessDTO `json:"business"`
+	// ReplyLanguage — "auto" | kk | ru | en | uz. Жаңа клиенттер тек
+	// /api/v1/config ішінде features.reply_preferences=true болса жібереді.
+	ReplyLanguage string `json:"reply_language"`
 }
 
 type replyResponse struct {
@@ -74,6 +79,11 @@ func (s *Server) handleReply(w http.ResponseWriter, r *http.Request) {
 		if business := body.Profile.Business.toDomain(); !business.IsEmpty() {
 			promptProfile.Business = business
 		}
+		// Only a known language code gets through; anything else means "follow
+		// the incoming message", which is also what an old client gets.
+		if _, known := ai.ReplyLanguages[body.Profile.ReplyLanguage]; known {
+			promptProfile.ReplyLanguage = body.Profile.ReplyLanguage
+		}
 	}
 
 	result, err := s.ai.Reply(r.Context(), ai.Request{
@@ -96,6 +106,12 @@ func (s *Server) handleReply(w http.ResponseWriter, r *http.Request) {
 			details["daily_limit"] = result.DailyLimit
 			details["used_today"] = result.UsedToday
 			details["resets_at"] = result.ResetsAt.Format(time.RFC3339)
+		}
+		// Still INVALID_REQUEST for old clients; new ones read the real limit
+		// here instead of assuming the number they were built with.
+		if errors.Is(err, domain.ErrSourceTooLong) {
+			details["field"] = "source_text"
+			details["max_characters"] = result.SourceLimit
 		}
 		if len(details) == 0 {
 			details = nil

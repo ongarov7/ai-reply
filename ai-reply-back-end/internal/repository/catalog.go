@@ -164,6 +164,25 @@ func (s *Store) SetSetting(ctx context.Context, key, value string) error {
 	return err
 }
 
+// SetSettings — бірнеше параметрді бір транзакцияда жазу: не бәрі сақталады, не ешқайсысы.
+func (s *Store) SetSettings(ctx context.Context, values map[string]string) error {
+	tx, err := s.db.Writer().BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	now := ms(time.Now())
+	for key, value := range values {
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO system_settings (key, value, updated_at) VALUES (?,?,?)
+			ON CONFLICT (key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+			key, value, now); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
 // RecordAppVersion — қолданба нұсқасын белгілеу (аналитика үшін).
 func (s *Store) RecordAppVersion(ctx context.Context, platform, version, build string) error {
 	if platform == "" || version == "" {

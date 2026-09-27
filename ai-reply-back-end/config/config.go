@@ -172,7 +172,7 @@ func Load(envFile string) (Config, error) {
 		},
 		Payments: Payments{Mode: str("PAYMENT_MODE", "demo")},
 		Limits: Limits{
-			SourceTextChars:   num("LIMIT_SOURCE_TEXT_CHARS", 300),
+			SourceTextChars:   num("LIMIT_SOURCE_TEXT_CHARS", 400),
 			InstructionChars:  num("LIMIT_INSTRUCTION_CHARS", 400),
 			RequestBodyBytes:  int64(num("LIMIT_REQUEST_BODY_BYTES", 32*1024)),
 			OTPRequestPerHour: num("RATE_OTP_REQUEST_PER_HOUR", 5),

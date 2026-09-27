@@ -18,6 +18,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/ai"
 	"github.com/aireply/ai-reply-back-end/internal/auth"
 	"github.com/aireply/ai-reply-back-end/internal/database"
+	"github.com/aireply/ai-reply-back-end/internal/limits"
 	"github.com/aireply/ai-reply-back-end/internal/localization"
 	"github.com/aireply/ai-reply-back-end/internal/logging"
 	"github.com/aireply/ai-reply-back-end/internal/middleware"
@@ -83,12 +84,18 @@ func run(envFile string) error {
 	sender := auth.NewSender(cfg.Auth.OTPChannel, log)
 	authSvc := auth.New(store, cfg.Auth, sender, subSvc, log)
 	provider := ai.NewOpenAI(cfg.OpenAI)
-	aiSvc := ai.New(store, subSvc, provider, cfg.Limits, log)
+	limitSvc := limits.New(store, limits.Limits{
+		SourceChars:      cfg.Limits.SourceTextChars,
+		InstructionChars: cfg.Limits.InstructionChars,
+		MaxOutputTokens:  cfg.OpenAI.MaxOutputTokens,
+	})
+	aiSvc := ai.New(store, subSvc, provider, limitSvc, log)
 	paymentSvc := payments.New(store, subSvc, payments.DemoProvider{}, cfg.Payments.Mode)
 	notifySvc := notifications.New(store)
 	adminSvc := admin.New(store, subSvc, planSvc, cfg, log)
 	simulatorSvc := simulator.New(simulator.Deps{
-		Repo: store, Users: userSvc, Subs: subSvc, Plans: planSvc, AI: aiSvc, Config: cfg, Log: log,
+		Repo: store, Users: userSvc, Subs: subSvc, Plans: planSvc, AI: aiSvc, Limits: limitSvc,
+		Config: cfg, Log: log,
 	})
 
 	if err := adminSvc.Bootstrap(ctx); err != nil {
@@ -104,12 +111,12 @@ func run(envFile string) error {
 	mux := http.NewServeMux()
 	api.New(api.Deps{
 		Config: cfg, Auth: authSvc, Users: userSvc, Plans: planSvc, Subs: subSvc,
-		AI: aiSvc, Payments: paymentSvc, Limiter: limiter, Log: log,
+		AI: aiSvc, Limits: limitSvc, Payments: paymentSvc, Limiter: limiter, Log: log,
 		Ping: func(ctx context.Context) error { return db.Reader().PingContext(ctx) },
 	}).Register(mux)
 
 	adminapi.New(adminapi.Deps{
-		Config: cfg, Admin: adminSvc, Notifications: notifySvc, Log: log,
+		Config: cfg, Admin: adminSvc, Limits: limitSvc, Notifications: notifySvc, Log: log,
 	}).Register(mux)
 
 	simulatorapi.New(simulatorapi.Deps{

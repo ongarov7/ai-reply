@@ -13,6 +13,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/config"
 	"github.com/aireply/ai-reply-back-end/internal/admin"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
+	"github.com/aireply/ai-reply-back-end/internal/limits"
 	"github.com/aireply/ai-reply-back-end/internal/notifications"
 	"github.com/aireply/ai-reply-back-end/internal/repository"
 	"github.com/aireply/ai-reply-back-end/internal/traits"
@@ -30,6 +31,7 @@ const (
 type Server struct {
 	cfg    config.Config
 	admin  *admin.Service
+	limits *limits.Service
 	notify *notifications.Service
 	log    *slog.Logger
 }
@@ -38,13 +40,14 @@ type Server struct {
 type Deps struct {
 	Config        config.Config
 	Admin         *admin.Service
+	Limits        *limits.Service
 	Notifications *notifications.Service
 	Log           *slog.Logger
 }
 
 // New — сервер.
 func New(d Deps) *Server {
-	return &Server{cfg: d.Config, admin: d.Admin, notify: d.Notifications, log: d.Log}
+	return &Server{cfg: d.Config, admin: d.Admin, limits: d.Limits, notify: d.Notifications, log: d.Log}
 }
 
 // Register — маршруттар.
@@ -65,6 +68,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /api/v1/admin/audit", s.guard(s.handleAudit))
 	mux.Handle("GET /api/v1/admin/settings", s.guard(s.handleSettings))
 	mux.Handle("POST /api/v1/admin/settings/pricing", s.guard(s.handleSavePricing))
+	mux.Handle("POST /api/v1/admin/settings/limits", s.guard(s.handleSaveLimits))
 	mux.Handle("GET /api/v1/admin/notifications", s.guard(s.handleNotifications))
 }
 
