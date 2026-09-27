@@ -56,6 +56,9 @@ final class AccountModel {
         if let config = try? await service.serverConfig() {
             countries = config.countries
             legalConfig = config.legal ?? .production
+            // The limits the administrator set, for the app's own composer
+            // and - through the App Group - for the keyboard.
+            AILimits.apply(config)
         }
         hasAcceptedLegal = LegalConsentStore.hasAccepted(legalConfig)
     }

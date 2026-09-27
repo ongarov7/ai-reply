@@ -43,7 +43,9 @@ struct AIReplyService: Sendable {
 
     // MARK: Validation
 
-    /// The 300-character rule.
+    /// The message-length rule. The limit is the one the server published
+    /// (400 unless an administrator changed it); the server enforces the same
+    /// number, so checking here only saves the user a wasted request.
     ///
     /// It applies to the INCOMING MESSAGE ONLY. The profile, the template
     /// instructions and the developer rules are separate and are not counted
@@ -52,11 +54,14 @@ struct AIReplyService: Sendable {
     ///
     /// Counted in Unicode scalars, which is what the user sees as characters
     /// for these three languages and what the backend counts too.
-    static func validate(message: String) -> Result<String, AIReplyError> {
+    static func validate(
+        message: String,
+        limit: Int = AIConfiguration.maximumMessageCharacters
+    ) -> Result<String, AIReplyError> {
         let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return .failure(.noSourceMessage) }
-        guard trimmed.unicodeScalars.count <= AIConfiguration.maximumMessageCharacters else {
-            return .failure(.messageTooLong(limit: AIConfiguration.maximumMessageCharacters))
+        guard trimmed.unicodeScalars.count <= limit else {
+            return .failure(.messageTooLong(limit: limit))
         }
         return .success(trimmed)
     }
@@ -152,10 +157,32 @@ struct AIReplyService: Sendable {
                 templateWorkingHoursBehaviour: template.workingHoursBehaviour,
                 templateBusiness: template.effectiveBusiness,
                 appLanguage: request.uiLanguage.rawValue,
-                business: business
+                business: business,
+                profile: Self.profile(from: request.configuration.profile)
             ),
             onUsage: { usage in AccountUsageCache.store(usage) }
         )
+    }
+}
+
+extension AIReplyService {
+
+    /// The personalisation sent with a request: what the user entered in the
+    /// app, and nothing inferred.
+    static func profile(from profile: UserProfile) -> AccountReplyTransport.Profile? {
+        let result = AccountReplyTransport.Profile(
+            description: profile.promptDescription,
+            role: profile.role,
+            preferredTone: profile.preferredTone,
+            business: profile.business,
+            replyLanguage: profile.replyLanguage?.rawValue
+        )
+        let isEmpty = result.description.isEmpty
+            && result.role.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && result.business.isEmpty
+            && result.preferredTone == .natural
+            && result.replyLanguage == nil
+        return isEmpty ? nil : result
     }
 }
 

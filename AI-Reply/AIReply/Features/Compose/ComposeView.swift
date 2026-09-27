@@ -76,7 +76,7 @@ struct ComposeView: View {
             if viewModel.isOverLimit {
                 // The exact wording the keyboard shows, so the rule reads the
                 // same wherever the user meets it.
-                Text(AIReplyStrings.forLanguage(settings.effectiveLanguage).messageTooLong)
+                Text(AIReplyStrings.forLanguage(settings.effectiveLanguage).messageTooLong(limit: viewModel.characterLimit))
                     .font(.caption)
                     .foregroundStyle(Color.red)
             }

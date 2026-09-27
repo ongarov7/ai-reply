@@ -36,6 +36,9 @@ struct SharedSettings {
         static let keyboardFullAccess = "shared.keyboardFullAccess"
         static let keyboardHeight = "shared.keyboardHeight"
         static let keyboardWidth = "shared.keyboardWidth"
+        static let enabledKeyboardLanguages = "shared.enabledKeyboardLanguages"
+        static let lastTemplateID = "shared.lastTemplateID"
+        static let keyboardHaptics = "shared.keyboardHaptics"
 
         /// Where the keyboard stored its layout before the App Group existed.
         /// Read once so an existing install does not silently reset to English.
@@ -60,6 +63,46 @@ struct SharedSettings {
 
     func setKeyboardLanguageCode(_ code: String) {
         defaults.set(code, forKey: Key.keyboardLanguage)
+    }
+
+    /// Layout codes the language key cycles through. nil means "all of them",
+    /// which is also what an install from before this setting existed gets.
+    var enabledKeyboardLanguageCodes: [String]? {
+        defaults.stringArray(forKey: Key.enabledKeyboardLanguages)
+    }
+
+    func setEnabledKeyboardLanguageCodes(_ codes: [String]?) {
+        if let codes, !codes.isEmpty {
+            defaults.set(codes, forKey: Key.enabledKeyboardLanguages)
+        } else {
+            defaults.removeObject(forKey: Key.enabledKeyboardLanguages)
+        }
+    }
+
+    /// Key-press haptics. On by default; they only ever play with Full Access,
+    /// which is the only way a keyboard extension can use the Taptic Engine.
+    var keyboardHapticsEnabled: Bool {
+        defaults.object(forKey: Key.keyboardHaptics) as? Bool ?? true
+    }
+
+    func setKeyboardHapticsEnabled(_ enabled: Bool) {
+        defaults.set(enabled, forKey: Key.keyboardHaptics)
+    }
+
+    // MARK: Persona row
+
+    /// The template the user last replied with. Only an identifier - never
+    /// anything they wrote - so the row can show it selected next time.
+    var lastTemplateID: String? {
+        defaults.string(forKey: Key.lastTemplateID)
+    }
+
+    func setLastTemplateID(_ id: String?) {
+        if let id {
+            defaults.set(id, forKey: Key.lastTemplateID)
+        } else {
+            defaults.removeObject(forKey: Key.lastTemplateID)
+        }
     }
 
     // MARK: App interface

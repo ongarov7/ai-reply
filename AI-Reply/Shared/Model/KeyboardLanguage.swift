@@ -1,93 +1,75 @@
 import Foundation
 
-/// The three layouts this keyboard ships. The selected value drives BOTH the
-/// character layout and every piece of UI text, so the two can never drift
-/// apart (see `KeyboardStrings`).
-enum KeyboardLanguage: String, CaseIterable, Hashable {
+/// The three layouts this keyboard ships. The selected value drives the
+/// character keys and the key captions; product labels follow the APP language
+/// instead (see `AIReplyStrings`).
+///
+/// The character rows themselves live in `KeyboardLayout`, next to the numbers
+/// and symbols planes, so every layout is described - and tested - in one place.
+enum KeyboardLanguage: String, CaseIterable, Hashable, Sendable {
     case english = "en"
     case russian = "ru"
     case kazakh = "kk"
 
-    var next: KeyboardLanguage {
-        switch self {
-        case .english: return .russian
-        case .russian: return .kazakh
-        case .kazakh: return .english
+    /// The order the language key cycles through and the settings list shows.
+    /// Kazakh first: it is the layout this keyboard exists for.
+    static let cycleOrder: [KeyboardLanguage] = [.kazakh, .russian, .english]
+
+    /// The next layout among `enabled`, in `cycleOrder`. A language that is not
+    /// enabled (the user just turned it off in the app) still moves forward
+    /// rather than getting stuck.
+    func next(in enabled: [KeyboardLanguage]) -> KeyboardLanguage {
+        let usable = Self.cycleOrder.filter { enabled.contains($0) }
+        guard !usable.isEmpty else { return self }
+        guard let index = usable.firstIndex(of: self) else {
+            // Current layout was disabled: move to the first enabled one after it.
+            let order = Self.cycleOrder
+            let start = order.firstIndex(of: self) ?? 0
+            for step in 1...order.count {
+                let candidate = order[(start + step) % order.count]
+                if usable.contains(candidate) { return candidate }
+            }
+            return usable[0]
         }
+        return usable[(index + 1) % usable.count]
     }
 
-    /// Number of slots the widest row of this layout uses. Every row is sized
-    /// against this so the rows line up on a single grid.
-    var gridColumns: Int {
+    /// Kept for callers that do not care about the enabled set.
+    var next: KeyboardLanguage { next(in: Self.cycleOrder) }
+
+    /// The layout's own name, never translated into another language: the
+    /// space bar flashes it after a switch, the way iOS does.
+    var nativeName: String {
         switch self {
-        case .english: return 10
-        case .russian, .kazakh: return 12
+        case .english: return "English"
+        case .russian: return "Русский"
+        case .kazakh:  return "Қазақша"
         }
-    }
-
-    /// Rows of letters, top to bottom. The last row is rendered with shift in
-    /// front of it and delete after it.
-    ///
-    /// English: standard 10 / 9 / 7 QWERTY.
-    ///
-    /// Russian: 12 / 12 / 9. This is the standard iOS ЙЦУКЕН layout with one
-    /// deliberate change - `ё` sits at the end of the second row instead of
-    /// behind a long press on `е`. Every Cyrillic letter is therefore visible,
-    /// and the third row keeps only 9 letters so shift and delete stay wide
-    /// (~43pt) instead of shrinking to letter width.
-    ///
-    /// Kazakh: the Russian rows plus a dedicated top row carrying all nine
-    /// Kazakh-specific letters. Nothing is hidden behind a gesture.
-    var letterRows: [[String]] {
-        switch self {
-        case .english:
-            return [
-                ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"],
-                ["a", "s", "d", "f", "g", "h", "j", "k", "l"],
-                ["z", "x", "c", "v", "b", "n", "m"]
-            ]
-        case .russian:
-            return KeyboardLanguage.cyrillicRows
-        case .kazakh:
-            return [["ә", "ғ", "қ", "ң", "ө", "ұ", "ү", "һ", "і"]]
-                + KeyboardLanguage.cyrillicRows
-        }
-    }
-
-    private static let cyrillicRows: [[String]] = [
-        ["й", "ц", "у", "к", "е", "н", "г", "ш", "щ", "з", "х", "ъ"],
-        ["ф", "ы", "в", "а", "п", "р", "о", "л", "д", "ж", "э", "ё"],
-        ["я", "ч", "с", "м", "и", "т", "ь", "б", "ю"]
-    ]
-
-    /// Rows that should be stretched edge to edge rather than centred on the
-    /// grid. The Kazakh letter row has only nine keys; spreading it across the
-    /// full width gives comfortably wide keys instead of a narrow centred block.
-    func rowFillsWidth(at index: Int) -> Bool {
-        self == .kazakh && index == 0
     }
 }
 
 // MARK: - Persistence
 
-/// Remembers the chosen layout between keyboard sessions.
+/// Remembers the chosen layout, and which layouts are switched on, between
+/// keyboard sessions.
 ///
-/// Now stored in the App Group container rather than the extension's own one,
-/// so the containing app can show and change the keyboard's layout too. The
-/// previous value is migrated on first read (see `SharedSettings`), so an
-/// existing install does not reset to English.
+/// Stored in the App Group so the containing app can show and change both.
 enum KeyboardLanguageStore {
 
-    static func load() -> KeyboardLanguage {
-        guard let raw = SharedSettings.shared.keyboardLanguageCode,
-              let language = KeyboardLanguage(rawValue: raw) else {
-            return .english
+    static func load(settings: SharedSettings = .shared) -> KeyboardLanguage {
+        let enabled = enabledLanguages(settings: settings)
+        if let raw = settings.keyboardLanguageCode,
+           let language = KeyboardLanguage(rawValue: raw),
+           enabled.contains(language) {
+            return language
         }
-        return language
+        // First run: start on the layout that matches the app's language.
+        let preferred = settings.effectiveAppLanguage.keyboardLanguage
+        return enabled.contains(preferred) ? preferred : (enabled.first ?? .kazakh)
     }
 
-    static func save(_ language: KeyboardLanguage) {
-        SharedSettings.shared.setKeyboardLanguageCode(language.rawValue)
+    static func save(_ language: KeyboardLanguage, settings: SharedSettings = .shared) {
+        settings.setKeyboardLanguageCode(language.rawValue)
     }
 
     static func saveAsync(_ language: KeyboardLanguage) {
@@ -95,33 +77,18 @@ enum KeyboardLanguageStore {
             save(language)
         }
     }
-}
 
-// MARK: - Non-letter planes
-
-enum KeyboardPlane: Hashable {
-    case letters
-    case numbers
-    case symbols
-
-    var rows: [[String]] {
-        switch self {
-        case .letters:
-            return []
-        case .numbers:
-            return [
-                ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
-                ["-", "/", ":", ";", "(", ")", "₸", "&", "@", "\""],
-                [".", ",", "?", "!", "'"]
-            ]
-        case .symbols:
-            return [
-                ["[", "]", "{", "}", "#", "%", "^", "*", "+", "="],
-                ["_", "\\", "|", "~", "<", ">", "$", "€", "£", "¥"],
-                [".", ",", "?", "!", "'"]
-            ]
-        }
+    /// Layouts the language key cycles through, in `cycleOrder`. Never empty:
+    /// a keyboard with no layout cannot type, so an empty or unreadable value
+    /// means "all of them".
+    static func enabledLanguages(settings: SharedSettings = .shared) -> [KeyboardLanguage] {
+        let codes = Set(settings.enabledKeyboardLanguageCodes ?? [])
+        let enabled = KeyboardLanguage.cycleOrder.filter { codes.contains($0.rawValue) }
+        return enabled.isEmpty ? KeyboardLanguage.cycleOrder : enabled
     }
 
-    var gridColumns: Int { 10 }
+    static func setEnabledLanguages(_ languages: [KeyboardLanguage], settings: SharedSettings = .shared) {
+        let ordered = KeyboardLanguage.cycleOrder.filter { languages.contains($0) }
+        settings.setEnabledKeyboardLanguageCodes(ordered.isEmpty ? nil : ordered.map(\.rawValue))
+    }
 }

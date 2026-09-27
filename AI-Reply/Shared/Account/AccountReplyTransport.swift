@@ -24,9 +24,26 @@ struct AccountReplyTransport: ReplyTransport {
         var templateWorkingHoursBehaviour: WorkingHoursBehaviour
         var templateBusiness: BusinessContext?
         /// The app's language, used for logging and template naming only. The
-        /// reply's language follows the incoming message, always.
+        /// reply's language follows the incoming message unless the user set a
+        /// preference (`replyLanguage`).
         var appLanguage: String
         var business: WorkingHours.Context?
+        /// The user's own profile as edited in the app. Sent with every
+        /// request because the server copy is only written at registration:
+        /// without this, edits made later never reached a single reply.
+        var profile: Profile?
+    }
+
+    /// The personalisation a reply may use. Short, structured, and only what
+    /// the user entered in the app.
+    struct Profile: Sendable, Equatable {
+        var description: String
+        var role: String
+        var preferredTone: ReplyTone
+        var business: BusinessContext
+        /// "kk" / "ru" / "en" / "uz", or nil to answer in the language of the
+        /// incoming message. Only sent to a server that understands it.
+        var replyLanguage: String?
     }
 
     private let context: RequestContext
@@ -80,15 +97,51 @@ struct AccountReplyTransport: ReplyTransport {
         let weekly_schedule: String?
     }
 
+    private struct ProfileBlock: Encodable {
+        let description: String?
+        let role: String?
+        let preferred_tone: String
+        let business: Business?
+        let reply_language: String?
+    }
+
     private struct Request: Encodable {
         let source_text: String
         let instruction: String?
         let language: String
         let template_id: String
         let template: Template
+        let profile: ProfileBlock?
         let business_context: WorkingHoursBlock?
         let platform: String
         let app_version: String
+    }
+
+    /// The profile block, or nil when there is nothing personal to send.
+    /// `reply_language` is included only when the server has said it knows
+    /// the field: an older server rejects unknown fields outright.
+    static func profileBlock(_ profile: Profile?, serverSupportsPreferences: Bool) -> ProfileBlockSnapshot? {
+        guard let profile else { return nil }
+        let description = profile.description.trimmingCharacters(in: .whitespacesAndNewlines)
+        let role = profile.role.trimmingCharacters(in: .whitespacesAndNewlines)
+        let language = serverSupportsPreferences ? profile.replyLanguage : nil
+        return ProfileBlockSnapshot(
+            description: description.isEmpty ? nil : description,
+            role: role.isEmpty ? nil : role,
+            preferredTone: profile.preferredTone.rawValue,
+            hasBusiness: !profile.business.isEmpty,
+            replyLanguage: language
+        )
+    }
+
+    /// What `profileBlock` decided, in a form tests can inspect without
+    /// decoding JSON.
+    struct ProfileBlockSnapshot: Equatable {
+        let description: String?
+        let role: String?
+        let preferredTone: String
+        let hasBusiness: Bool
+        let replyLanguage: String?
     }
 
     // MARK: Call
@@ -118,6 +171,16 @@ struct AccountReplyTransport: ReplyTransport {
                 working_hours_behaviour: context.templateWorkingHoursBehaviour.rawValue,
                 business: Business(context.templateBusiness)
             ),
+            profile: Self.profileBlock(context.profile, serverSupportsPreferences: AILimits.serverSupportsReplyPreferences)
+                .map { snapshot in
+                    ProfileBlock(
+                        description: snapshot.description,
+                        role: snapshot.role,
+                        preferred_tone: snapshot.preferredTone,
+                        business: snapshot.hasBusiness ? Business(context.profile?.business) : nil,
+                        reply_language: snapshot.replyLanguage
+                    )
+                },
             business_context: context.business.map {
                 WorkingHoursBlock(
                     enabled: $0.isEnabled,
@@ -143,22 +206,34 @@ struct AccountReplyTransport: ReplyTransport {
             guard !text.isEmpty else { throw AIReplyError.emptyResponse }
             return GeneratedReply(text: text, detectedLanguage: response.detectedLanguage)
         } catch let error as APIError {
+            // The server states its real limit when it rejects a message as
+            // too long. Remember it, so the counter is right from now on.
+            if case .sourceTooLong(let limit) = error {
+                AILimits.storeSourceLimit(limit)
+            }
             throw Self.map(error)
         }
     }
 
     /// Backend failures become the closed set the UI already knows how to show.
-    /// The quota case keeps its own error so a screen can offer the plans page
-    /// instead of a generic "try again".
+    ///
+    /// A spent quota and a burst of requests are different problems with
+    /// different fixes - change plan or wait until tomorrow, versus wait a few
+    /// seconds - so they stay different errors. They used to share one, and a
+    /// user who tapped Regenerate twice was told their day's replies were gone.
     static func map(_ error: APIError) -> AIReplyError {
         switch error {
         case .offline:                 return .offline
         case .timedOut, .providerTimeout: return .timedOut
         case .cancelled:               return .cancelled
         case .unauthorized, .accountDisabled: return .authenticationFailed
-        case .dailyLimitReached, .rateLimited, .subscriptionExpired, .paymentRequired:
-            return .rateLimited
+        case .dailyLimitReached, .subscriptionExpired, .paymentRequired:
+            return .quotaExhausted
+        case .rateLimited:             return .rateLimited
         case .emptyResponse:           return .emptyResponse
+        case .sourceTooLong(let limit): return .messageTooLong(limit: limit)
+        // An older server says only INVALID_REQUEST. The one thing a user can
+        // get wrong in this request is the message length.
         case .invalidRequest:          return .messageTooLong(limit: AIConfiguration.maximumMessageCharacters)
         default:                       return .serviceUnavailable
         }

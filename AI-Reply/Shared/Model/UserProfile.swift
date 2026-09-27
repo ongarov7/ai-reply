@@ -39,6 +39,11 @@ struct UserProfile: Codable, Hashable, Sendable {
 
     var hasCompletedOnboarding: Bool
 
+    /// The language replies should be written in. nil - the default - means
+    /// "the language of the incoming message", which is what most people want
+    /// most of the time.
+    var replyLanguage: ReplyLanguagePreference?
+
     static let empty = UserProfile(
         descriptionText: "",
         role: "",
@@ -89,6 +94,7 @@ struct UserProfile: Codable, Hashable, Sendable {
         case activeRelationships
         case workingHours
         case hasCompletedOnboarding
+        case replyLanguage
     }
 
     init(
@@ -98,7 +104,8 @@ struct UserProfile: Codable, Hashable, Sendable {
         preferredTone: ReplyTone,
         activeRelationships: Set<RelationshipKind>,
         workingHours: WorkingHours,
-        hasCompletedOnboarding: Bool
+        hasCompletedOnboarding: Bool,
+        replyLanguage: ReplyLanguagePreference? = nil
     ) {
         self.descriptionText = descriptionText
         self.role = role
@@ -107,6 +114,7 @@ struct UserProfile: Codable, Hashable, Sendable {
         self.activeRelationships = activeRelationships
         self.workingHours = workingHours
         self.hasCompletedOnboarding = hasCompletedOnboarding
+        self.replyLanguage = replyLanguage
     }
 
     init(from decoder: Decoder) throws {
@@ -119,5 +127,20 @@ struct UserProfile: Codable, Hashable, Sendable {
             ?? Set(RelationshipKind.builtIns)
         workingHours = try container.decodeIfPresent(WorkingHours.self, forKey: .workingHours) ?? .default
         hasCompletedOnboarding = try container.decodeIfPresent(Bool.self, forKey: .hasCompletedOnboarding) ?? false
+        // A value this build does not know (a newer app wrote it) reads as
+        // "follow the message" rather than failing the whole profile.
+        replyLanguage = (try? container.decodeIfPresent(ReplyLanguagePreference.self, forKey: .replyLanguage)) ?? nil
     }
+}
+
+/// A fixed reply language. Structured on purpose: the server accepts only
+/// these codes and ignores anything else, so a preference can never smuggle
+/// free text into the prompt.
+enum ReplyLanguagePreference: String, Codable, CaseIterable, Identifiable, Sendable {
+    case kazakh = "kk"
+    case russian = "ru"
+    case english = "en"
+    case uzbek = "uz"
+
+    var id: String { rawValue }
 }

@@ -239,17 +239,29 @@ extension AccountAPI {
     struct ServerConfig: Decodable, Sendable {
         let locales: [String]
         let timezone: String
+        /// Set by the administrator; the server enforces it on every request.
         let maxSourceCharacters: Int
         let maxInstructionLength: Int
         let paymentMode: String
         let countries: [Country]
         let legal: LegalConfig?
+        /// What this server version understands. Absent on older servers.
+        let features: Features?
 
         enum CodingKeys: String, CodingKey {
-            case locales, timezone, countries, legal
+            case locales, timezone, countries, legal, features
             case maxSourceCharacters = "max_source_characters"
             case maxInstructionLength = "max_instruction_length"
             case paymentMode = "payment_mode"
+        }
+    }
+
+    struct Features: Decodable, Sendable, Equatable {
+        /// The reply request's `profile` block accepts `reply_language`.
+        let replyPreferences: Bool?
+
+        enum CodingKeys: String, CodingKey {
+            case replyPreferences = "reply_preferences"
         }
     }
 

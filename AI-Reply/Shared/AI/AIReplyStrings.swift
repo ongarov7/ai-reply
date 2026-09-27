@@ -64,6 +64,17 @@ struct AIReplyStrings: Sendable {
     /// Expand / collapse the quoted source message.
     let showFullMessage: String
     let hideFullMessage: String
+    /// Cancels a generation that is still running.
+    let stop: String
+    /// Leaves edit mode on the reply.
+    let doneEditing: String
+    /// Moving between the versions Regenerate produced.
+    let previousVersion: String
+    let nextVersion: String
+    /// VoiceOver: "Version 2 of 3". Takes the position and the count.
+    let versionPositionFormat: String
+    /// VoiceOver for the character counter: takes the count and the limit.
+    let characterCountFormat: String
 
     // Status
     let generating: String
@@ -78,7 +89,9 @@ struct AIReplyStrings: Sendable {
 
     // Errors
     let noSourceMessage: String
-    let messageTooLong: String
+    /// Takes the limit, which the server publishes and an administrator can
+    /// change: the sentence must never name a number the server no longer uses.
+    let messageTooLongFormat: String
     let fullAccessRequired: String
     let notConfigured: String
     let offline: String
@@ -112,18 +125,31 @@ struct AIReplyStrings: Sendable {
     /// actionable, and free of status codes, JSON and provider names.
     func message(for error: AIReplyError) -> String {
         switch error {
-        case .noSourceMessage:      return noSourceMessage
-        case .messageTooLong:       return messageTooLong
-        case .fullAccessRequired:   return fullAccessRequired
-        case .notConfigured:        return notConfigured
-        case .offline:              return offline
-        case .timedOut:             return timedOut
-        case .cancelled:            return ""
-        case .authenticationFailed: return signInRequired
-        case .rateLimited:          return quotaExhausted
-        case .emptyResponse:        return emptyResponse
-        case .serviceUnavailable:   return serviceUnavailable
+        case .noSourceMessage:            return noSourceMessage
+        case .messageTooLong(let limit):  return messageTooLong(limit: limit)
+        case .fullAccessRequired:         return fullAccessRequired
+        case .notConfigured:              return notConfigured
+        case .offline:                    return offline
+        case .timedOut:                   return timedOut
+        case .cancelled:                  return ""
+        case .authenticationFailed:       return signInRequired
+        case .rateLimited:                return rateLimited
+        case .quotaExhausted:             return quotaExhausted
+        case .emptyResponse:              return emptyResponse
+        case .serviceUnavailable:         return serviceUnavailable
         }
+    }
+
+    func messageTooLong(limit: Int) -> String {
+        String(format: messageTooLongFormat, limit)
+    }
+
+    func versionPosition(_ position: Int, of count: Int) -> String {
+        String(format: versionPositionFormat, position, count)
+    }
+
+    func characterCount(_ count: Int, limit: Int) -> String {
+        String(format: characterCountFormat, count, limit)
     }
 
     private static let english = AIReplyStrings(
@@ -144,6 +170,12 @@ struct AIReplyStrings: Sendable {
         moreActions: "More",
         showFullMessage: "Show full message",
         hideFullMessage: "Collapse message",
+        stop: "Stop",
+        doneEditing: "Done",
+        previousVersion: "Previous version",
+        nextVersion: "Next version",
+        versionPositionFormat: "Version %d of %d",
+        characterCountFormat: "%d of %d characters",
         generating: "Generating…",
         draftTitle: "Your reply",
         sourceTitle: "Reply to",
@@ -151,8 +183,7 @@ struct AIReplyStrings: Sendable {
         copiedMessage: "Copied message",
         instructionPlaceholder: "How should I reply?",
         noSourceMessage: "Copy a message first",
-        // Wording taken from the brief, verbatim.
-        messageTooLong: "Message is too long. Please select or copy up to 300 characters.",
+        messageTooLongFormat: "Message is too long. Copy up to %d characters.",
         fullAccessRequired: "Turn on Allow Full Access for this keyboard in iOS Settings to use a copied message.",
         notConfigured: "Open the AI Reply app and finish setup first.",
         offline: "No internet connection.",
@@ -194,6 +225,12 @@ struct AIReplyStrings: Sendable {
         moreActions: "Ещё",
         showFullMessage: "Показать полностью",
         hideFullMessage: "Свернуть сообщение",
+        stop: "Остановить",
+        doneEditing: "Готово",
+        previousVersion: "Предыдущий вариант",
+        nextVersion: "Следующий вариант",
+        versionPositionFormat: "Вариант %d из %d",
+        characterCountFormat: "%d из %d символов",
         generating: "Создаю ответ…",
         draftTitle: "Ваш ответ",
         sourceTitle: "Ответ на",
@@ -201,7 +238,7 @@ struct AIReplyStrings: Sendable {
         copiedMessage: "Скопированное сообщение",
         instructionPlaceholder: "Как ответить?",
         noSourceMessage: "Сначала скопируйте сообщение",
-        messageTooLong: "Сообщение слишком длинное. Скопируйте не более 300 символов.",
+        messageTooLongFormat: "Сообщение слишком длинное. Скопируйте не более %d символов.",
         fullAccessRequired: "Чтобы использовать скопированное сообщение, включите полный доступ для клавиатуры в настройках iOS.",
         notConfigured: "Откройте приложение AI Reply и завершите настройку.",
         offline: "Нет подключения к интернету.",
@@ -243,6 +280,12 @@ struct AIReplyStrings: Sendable {
         moreActions: "Тағы",
         showFullMessage: "Толық көрсету",
         hideFullMessage: "Хабарламаны жию",
+        stop: "Тоқтату",
+        doneEditing: "Дайын",
+        previousVersion: "Алдыңғы нұсқа",
+        nextVersion: "Келесі нұсқа",
+        versionPositionFormat: "%d-нұсқа, барлығы %d",
+        characterCountFormat: "%d / %d таңба",
         generating: "Жауап дайындалуда…",
         draftTitle: "Сіздің жауабыңыз",
         sourceTitle: "Хабарламаға жауап",
@@ -250,7 +293,7 @@ struct AIReplyStrings: Sendable {
         copiedMessage: "Көшірілген хабарлама",
         instructionPlaceholder: "Қалай жауап беру керек?",
         noSourceMessage: "Алдымен хабарламаны көшіріңіз",
-        messageTooLong: "Хабарлама тым ұзын. 300 таңбаға дейінгі мәтінді көшіріңіз.",
+        messageTooLongFormat: "Хабарлама тым ұзын. %d таңбаға дейінгі мәтінді көшіріңіз.",
         fullAccessRequired: "Көшірілген хабарламаны пайдалану үшін iOS баптауларында пернетақтаға толық рұқсат беріңіз.",
         notConfigured: "AI Reply қолданбасын ашып, баптауды аяқтаңыз.",
         offline: "Интернет байланысы жоқ.",
@@ -292,6 +335,12 @@ struct AIReplyStrings: Sendable {
         moreActions: "Yana",
         showFullMessage: "To‘liq ko‘rsatish",
         hideFullMessage: "Xabarni yig‘ish",
+        stop: "To‘xtatish",
+        doneEditing: "Tayyor",
+        previousVersion: "Oldingi variant",
+        nextVersion: "Keyingi variant",
+        versionPositionFormat: "%d-variant, jami %d",
+        characterCountFormat: "%d / %d belgi",
         generating: "Javob tayyorlanmoqda…",
         draftTitle: "Javobingiz",
         sourceTitle: "Xabarga javob",
@@ -299,7 +348,7 @@ struct AIReplyStrings: Sendable {
         copiedMessage: "Nusxalangan xabar",
         instructionPlaceholder: "Qanday javob beraman?",
         noSourceMessage: "Avval xabarni nusxalang",
-        messageTooLong: "Xabar juda uzun. 300 belgigacha matnni nusxalang.",
+        messageTooLongFormat: "Xabar juda uzun. %d belgigacha matnni nusxalang.",
         fullAccessRequired: "Nusxalangan xabardan foydalanish uchun iOS sozlamalarida klaviaturaga to‘liq ruxsat bering.",
         notConfigured: "AI Reply ilovasini ochib, sozlashni yakunlang.",
         offline: "Internet aloqasi yo‘q.",

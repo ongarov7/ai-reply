@@ -25,6 +25,10 @@ enum APIError: Error, Equatable, Sendable {
     case providerTimeout
     case emptyResponse
     case invalidRequest
+    /// The incoming message is longer than the server's limit, which the
+    /// server states. A plain `invalidRequest` from an older server carries no
+    /// number, and stays `invalidRequest`.
+    case sourceTooLong(limit: Int)
     case notFound
     case conflict
     case server
@@ -131,12 +135,18 @@ struct APIClient: Sendable {
             let usedToday: Int?
             let resetsAt: String?
             let retryAfterSeconds: Int?
+            /// Which request field an INVALID_REQUEST is about, when the
+            /// server says.
+            let field: String?
+            let maxCharacters: Int?
 
             enum CodingKeys: String, CodingKey {
                 case dailyLimit = "daily_limit"
                 case usedToday = "used_today"
                 case resetsAt = "resets_at"
                 case retryAfterSeconds = "retry_after_seconds"
+                case field
+                case maxCharacters = "max_characters"
             }
         }
         let error: Payload
@@ -163,7 +173,11 @@ struct APIClient: Sendable {
         case "AI_PROVIDER_UNAVAILABLE":         return .providerUnavailable
         case "AI_TIMEOUT":                      return .providerTimeout
         case "AI_EMPTY_RESPONSE":               return .emptyResponse
-        case "INVALID_REQUEST":                 return .invalidRequest
+        case "INVALID_REQUEST":
+            if details?.field == "source_text", let limit = details?.maxCharacters, limit > 0 {
+                return .sourceTooLong(limit: limit)
+            }
+            return .invalidRequest
         case "NOT_FOUND":                       return .notFound
         case "CONFLICT":                        return .conflict
         default: break

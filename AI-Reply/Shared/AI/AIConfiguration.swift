@@ -4,9 +4,11 @@ import Foundation
 struct AIConfiguration: Sendable {
 
     static let productionBaseURL = URL(string: "https://api.meily.kz")!
-    static let maxOutputTokens = 180
-    static let maximumMessageCharacters = 300
     static let requestTimeout: TimeInterval = 25
+
+    /// Longest incoming message, as the server last published it (see
+    /// `AILimits`). Not a constant: the administrator owns this number.
+    static var maximumMessageCharacters: Int { AILimits.current.sourceCharacters }
 
     static let shared = AIConfiguration()
 

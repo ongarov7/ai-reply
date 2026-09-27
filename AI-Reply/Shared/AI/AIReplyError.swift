@@ -9,7 +9,8 @@ import Foundation
 enum AIReplyError: Error, Equatable, Sendable {
     /// Nothing was copied, or the copied value held no text.
     case noSourceMessage
-    /// The copied message is longer than the 300-character limit.
+    /// The copied message is longer than the limit the server publishes
+    /// (400 characters unless an administrator changed it).
     case messageTooLong(limit: Int)
     /// The keyboard cannot read the clipboard without Full Access.
     case fullAccessRequired
@@ -23,8 +24,11 @@ enum AIReplyError: Error, Equatable, Sendable {
     case cancelled
     /// The account session is missing, expired or rejected.
     case authenticationFailed
-    /// The account limit or request rate limit has been reached.
+    /// Too many requests in a short time. Waiting a moment fixes it.
     case rateLimited
+    /// The plan's replies for today (or this period) are spent. Waiting a
+    /// moment does NOT fix it, which is why it is not `rateLimited`.
+    case quotaExhausted
     /// The service answered, but not with a usable reply.
     case emptyResponse
     /// Anything else: a 5xx, a malformed payload, an unreachable host.

@@ -25,11 +25,19 @@ enum ReplyInstruction {
 
     /// Client-side limit on the user's own text.
     ///
-    /// The backend clamps the whole `instruction` field at 400 characters and
-    /// the language rule below is appended AFTER the user's words, so the
-    /// user's share has to leave room for it. Otherwise the rule would be the
-    /// part that got cut, which is exactly the part that must survive.
-    static let maximumCharacters = 280
+    /// The backend clamps the whole `instruction` field at the limit it
+    /// publishes (400 by default) and the language rule below is appended
+    /// AFTER the user's words, so the user's share has to leave room for it.
+    /// Otherwise the rule would be the part that got cut, which is exactly the
+    /// part that must survive. Capped at 280 so the prompt stays short.
+    static var maximumCharacters: Int {
+        maximumCharacters(serverLimit: AILimits.current.instructionCharacters)
+    }
+
+    static func maximumCharacters(serverLimit: Int) -> Int {
+        let room = serverLimit - languageRule.unicodeScalars.count - 1
+        return max(40, min(280, room))
+    }
 
     /// Appended to every non-empty instruction.
     ///
