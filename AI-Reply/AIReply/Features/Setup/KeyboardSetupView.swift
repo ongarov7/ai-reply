@@ -142,10 +142,11 @@ struct KeyboardSetupView: View {
         DSSection(title: "setup.steps.title") {
             VStack(alignment: .leading, spacing: DS.Spacing.m) {
                 KeyboardSetupSteps()
-                // iOS allows an app to open its OWN settings page and nothing
-                // deeper. There is no public URL into General ▸ Keyboard, and
-                // this app does not ship a private one, so the written steps
-                // above are what gets the user the rest of the way.
+                // iOS lets an app open its OWN settings page and nothing
+                // deeper - but for a keyboard app that page lists its
+                // keyboards, with the Full Access switch. That is the short
+                // path the steps describe; the footer keeps the long one
+                // (General ▸ Keyboard) for anyone who does not see it.
                 Button("home.keyboard.openSettings") { openSystemSettings() }
                     .buttonStyle(.dsSecondary)
                 Text("setup.steps.footer")

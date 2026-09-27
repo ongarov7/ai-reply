@@ -1894,6 +1894,36 @@
         }
       }
     },
+    "home.setup.step.appKeyboards" : {
+      "comment" : "Setup step 2, on AI Reply's page in iOS Settings.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Keyboards"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«Пернетақталар» бөлімін ашыңыз"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Откройте «Клавиатуры»"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«Klaviaturalar» boʻlimini oching"
+          }
+        }
+      }
+    },
     "home.setup.step.choose" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1919,6 +1949,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Choose AI Reply"
+          }
+        }
+      }
+    },
+    "home.setup.step.enable" : {
+      "comment" : "Setup step 3.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on AI Reply"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply қосыңыз"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Включите AI Reply"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply ni yoqing"
           }
         }
       }
@@ -2035,6 +2095,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Keyboards"
+          }
+        }
+      }
+    },
+    "home.setup.step.openApp" : {
+      "comment" : "Setup step 1: the button opens AI Reply's own page in iOS Settings.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap Open iOS Settings below"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Төмендегі «iOS параметрлерін ашу» түймесін басыңыз"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нажмите «Открыть настройки iOS» ниже"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quyidagi «iOS sozlamalarini ochish» tugmasini bosing"
           }
         }
       }
@@ -5583,25 +5673,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Only you can turn it on, in Settings ▸ General ▸ Keyboard ▸ Keyboards ▸ AI Reply. No app can enable it for you."
+            "value" : "Only you can turn it on: Settings ▸ AI Reply ▸ Keyboards ▸ Allow Full Access. No app can enable it for you."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Оны тек өзіңіз қоса аласыз: «Баптаулар» ▸ «Негізгі» ▸ «Пернетақта» ▸ «Пернетақталар» ▸ AI Reply. Мұны ешбір қолданба сіздің орныңызға жасай алмайды."
+            "value" : "Оны тек өзіңіз қоса аласыз: «Параметрлер» ▸ AI Reply ▸ «Пернетақталар» ▸ «Толық рұқсат». Мұны ешбір қолданба сіздің орныңызға жасай алмайды."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Включить его можете только вы: «Настройки» ▸ «Основные» ▸ «Клавиатура» ▸ «Клавиатуры» ▸ AI Reply. Ни одно приложение не сделает это за вас."
+            "value" : "Включить его можете только вы: «Настройки» ▸ AI Reply ▸ «Клавиатуры» ▸ «Полный доступ». Ни одно приложение не сделает это за вас."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Buni faqat siz Sozlamalar ▸ Asosiy ▸ Klaviatura ▸ Klaviaturalar ▸ AI Reply boʻlimida yoqa olasiz."
+            "value" : "Buni faqat siz yoqa olasiz: Sozlamalar ▸ AI Reply ▸ Klaviaturalar ▸ Toʻliq ruxsat."
           }
         }
       }
@@ -5989,25 +6079,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iOS only lets an app open its own settings page, so the keyboard list has to be opened by hand."
+            "value" : "No Keyboards row on that page? Use Settings ▸ General ▸ Keyboard ▸ Keyboards ▸ Add New Keyboard ▸ AI Reply."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iOS тек қолданбаның өз бетін аша алады, сондықтан пернетақталар тізімін қолмен ашу керек."
+            "value" : "«Пернетақталар» жолы жоқ па? Онда: «Параметрлер» ▸ «Негізгі» ▸ «Пернетақта» ▸ «Пернетақталар» ▸ «Жаңа пернетақта қосу» ▸ AI Reply."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iOS позволяет открыть только страницу самого приложения, поэтому список клавиатур нужно открыть вручную."
+            "value" : "Нет строки «Клавиатуры»? Тогда: «Настройки» ▸ «Основные» ▸ «Клавиатура» ▸ «Клавиатуры» ▸ «Новые клавиатуры» ▸ AI Reply."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iOS faqat ilovaning oʻz sozlamalarini ocha oladi, shuning uchun klaviaturalar roʻyxatini qoʻlda ochish kerak."
+            "value" : "«Klaviaturalar» qatori yoʻqmi? Unda: Sozlamalar ▸ Asosiy ▸ Klaviatura ▸ Klaviaturalar ▸ Yangi klaviatura qoʻshish ▸ AI Reply."
           }
         }
       }

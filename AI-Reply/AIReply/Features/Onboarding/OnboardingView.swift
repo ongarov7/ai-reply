@@ -498,13 +498,13 @@ struct TimeOfDayPicker: View {
 
 /// The steps for adding the keyboard in iOS Settings.
 struct KeyboardSetupSteps: View {
+    /// The short path: iOS lists a keyboard app's own keyboards on the app's
+    /// page in Settings, which is the one page an app may open. The long
+    /// path through General ▸ Keyboard is in the footer as a fallback.
     private let steps: [LocalizedStringKey] = [
-        "home.setup.step.settings",
-        "home.setup.step.general",
-        "home.setup.step.keyboard",
-        "home.setup.step.keyboards",
-        "home.setup.step.addNew",
-        "home.setup.step.choose",
+        "home.setup.step.openApp",
+        "home.setup.step.appKeyboards",
+        "home.setup.step.enable",
         "home.setup.step.fullAccess"
     ]
 
