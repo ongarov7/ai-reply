@@ -25,12 +25,13 @@ Two things in one APK:
 
 ```
 you copy a message          →  long press, Copy, in any chat app
-switch to the AI keyboard   →  the copied text appears as context
+switch to the AI keyboard   →  the persona row sits above the keys
 tap who it is from          →  Friend · Client · Business · Work · your own
-say what to write           →  type it, or hold the microphone and say it
-Generate                    →  the model drafts the reply
-edit it                     →  it is your message now, not the model's
-Insert                      →  it goes into the field you were typing in
+say what to write           →  type it, tap a quick intent, or use the microphone
+Reply                       →  the model drafts the reply
+edit it                     →  tap anywhere in it; it is your message now
+Regenerate                  →  a new version; your edited one stays (‹ 1/2 ›)
+Insert                      →  exactly the text on screen goes into the field
 ```
 
 Nothing is ever sent for you. The messenger's own Send button stays under your
@@ -45,11 +46,10 @@ finger, and this project contains no accessibility service that could press it.
 | Opening the keyboard settings | can only open the app's own settings page | a public intent lands exactly where the user needs to be |
 | The "+" chip in the keyboard | shows a hint, because an extension cannot present an editor | opens the template editor |
 | Two string tables for two languages | two hand-written Swift tables | one `strings.xml`, read through a locale-configured `Context` |
-| Generating | tapping a chip generates immediately | tapping a chip opens the instruction field; **Generate** starts it |
+| Key layouts | Apple's keyboards | Gboard's: digits as hints on the QWERTY / ЙЦУКЕН row, `?123` and `=\<` pages |
 
-The last row is the one deliberate regression: one extra tap, in exchange for the
-instruction field and the microphone. `docs/IOS_ANDROID_PARITY.md` records every
-difference, with reasons.
+Everything else in the reply flow is the same on both, down to the state
+machine. `docs/IOS_ANDROID_PARITY.md` records every difference, with reasons.
 
 ---
 
@@ -143,8 +143,9 @@ questions:
 
 * **App language** — Settings ▸ Language, or the system default. Drives the
   screens, the template chips, Insert, Regenerate and every error message.
-* **Keyboard layout** — the `EN`/`РУ`/`ҚАЗ` key cycles it. Drives the character
-  keys and the space/return captions only.
+* **Keyboard layout** — the `ҚАЗ`/`РУС`/`ENG` key cycles the layouts switched on
+  in Settings ▸ Keyboard layouts; hold it for a list. Drives the character keys
+  and the space/return captions only.
 * **Reply language** — follows the incoming message, always. Russian in, Russian
   out. It is never the app's language, so a Kazakh interface can produce a
   Russian reply to a Russian message.
@@ -172,10 +173,14 @@ app/src/main/java/kz/yerek/aireply/
 ├── ai/                        AIReplyService, ReplyPromptBuilder, the two
 │                              transports, the closed error set
 │
-├── keyboard/                  ReplyKeyboardService (the IME), theme, metrics
+├── keyboard/                  ReplyKeyboardService (the IME), theme
+│   ├── layout/                layouts, key geometry, shift and auto-capitals —
+│   │                          pure Kotlin, unit-tested
 │   ├── input/                 clipboard, host field, local text fields, status
-│   ├── reply/                 the copy → instruction → AI → insert state machine
-│   └── ui/                    the key grid and the reply panel, in Compose
+│   ├── reply/                 ReplyComposerFlow (the state machine + versions)
+│   │                          and the session controller around it
+│   └── ui/                    the key surface (one Canvas, one touch handler)
+│                              and the reply panel, in Compose
 │
 ├── voice/                     SpeechRecognitionClient + the Android one
 ├── platform/                  logging that never carries message text
@@ -222,11 +227,13 @@ lines with no dependency and no upgrade risk.
 instead. This is the rule that keeps typing comfortable in every state, and the
 layout in `KeyboardRoot` is arranged so breaking it would take effort.
 
-**The key grid reads only `KeyGridState`.** Nothing in it changes while you type,
-so a keystroke recomposes nothing. A generation in flight — spinner, partial
-voice transcript, growing draft — touches only the panel. Callbacks handed to
-the grid are `remember`ed so their identity is stable; a method reference there
-would silently defeat the whole arrangement.
+**The keys are one Canvas with one touch handler.** `KeyboardGeometry` gives
+every key a hit box, and the hit boxes tile the whole key area — no gaps between
+keys, so no dead zones (a test checks every point). A letter is typed on
+release, which is what makes long press (`е` → `ё`) and sliding to the right key
+possible; a second finger commits the first letter at once, so fast typing does
+not wait. The surface reads only `KeySurfaceState`, so a generation in flight —
+spinner, partial voice transcript, growing draft — touches only the panel.
 
 ---
 
@@ -235,12 +242,15 @@ would silently defeat the whole arrangement.
 These are properties of the code, not intentions:
 
 * The clipboard is read in exactly one function, which runs only when you tap a
-  template. No polling, no timer, no read on appearance, no background access.
+  persona or Paste. No polling, no timer, no read on appearance, no background
+  access.
 * Clips another app has flagged sensitive — a password manager entry, say — are
   refused outright.
 * The AI panel is disabled entirely in password fields.
-* The copied message, your instruction and the draft exist only in memory, only
-  while the panel is open, and are dropped when the keyboard closes.
+* The copied message, your instruction and the draft versions exist only in
+  memory. When the keyboard closes with a reply unfinished they are kept — still
+  only in memory — for ten minutes, so you can copy one more message and come
+  back, and then dropped.
 * `ReplyLog` records lengths and outcomes, never text, and only in debug builds.
 * Requests carry the message, your profile and the selected template. They carry
   no device identifier, no contacts, no chat history, no location, no
@@ -260,37 +270,33 @@ These are properties of the code, not intentions:
 ./gradlew testDebugUnitTest
 ```
 
-Eight classes, covering: the 300-character rule and code-point counting, prompt
-construction (including that user text never reaches the developer message),
-working-hours derivation and weekday grouping, draft normalization with URLs
-preserved, configuration repair and tolerant decoding of older files, the three
-keyboard layouts, auto-shift, and **localization parity** — that every string
-exists in all three languages with matching format specifiers, which is the
+Thirteen classes, 115 tests, covering: the message limit (published by the
+server, 400 when it has not said) and code-point counting, backend error
+mapping, prompt construction (including that user text never reaches the
+developer message), working-hours derivation and weekday grouping, draft
+normalization with URLs preserved, configuration repair and tolerant decoding of
+older files, the three keyboard layouts and their geometry (no dead zones, one
+height for every page), shift, auto-capitals, the double-space full stop and word
+delete, the composer's state machine and its versions (Regenerate never loses an
+edit, Insert takes the edited text), and **localization parity** — that every
+string exists in every language with matching format specifiers, which is the
 failure that is otherwise silent until a Kazakh user sees an English sentence.
 
 ---
 
 ## Known limitations
 
-**No Gradle build has been run against this source tree.** The environment it
-was written in refuses `dl.google.com`, `maven.google.com`, `repo1.maven.org`,
-`plugins.gradle.org` and `services.gradle.org`, so neither the Android SDK nor
-any AGP or Compose artifact could be fetched, in either available sandbox. What
-*was* done instead:
+**Tried on an emulator, not yet on a phone.** `assembleDebug` and
+`testDebugUnitTest` pass on macOS, and the keyboard was used on a Pixel 6
+emulator (API 34) with the debug mock transport: Kazakh typing, the `?123` page,
+long press, and the whole Reply → edit → Regenerate → Insert flow. Not tried
+yet: multi-touch rollover, delete repeat, the space-bar trackpad, TalkBack, the
+dark theme and landscape.
 
-* every one of the 86 Kotlin files was parsed with the real Kotlin 2.0.21
-  compiler front end — 0 parse errors;
-* the domain models, `ReplyPromptBuilder`, `WorkingHours`, `ReplyDraftNormalizer`,
-  the layout tables and `AutoShift` were compiled and their **48 tests executed
-  — all passing**;
-* all 280 `R.string` references were checked against the 327 declared strings,
-  along with package/directory agreement and duplicate type names.
-
-That covers syntax and the logic-dense core. It does not cover Compose
-composition, the Android framework surface, or anything AGP does. Expect the
-first `assembleDebug` to surface ordinary compile errors — an import, a Compose
-API signature — and treat the version pins as the most likely place to need a
-nudge.
+**Debug builds can answer without the network.** Settings ▸ Developer ▸ Mock AI
+replies (debug builds only) returns canned Kazakh, Russian and English replies;
+`#offline`, `#quota` and `#slow` in the instruction simulate failures. Release
+builds neither show the switch nor use the mock.
 
 **Other gaps, deliberate:**
 

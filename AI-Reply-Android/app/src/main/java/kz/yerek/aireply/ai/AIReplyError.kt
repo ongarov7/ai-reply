@@ -38,8 +38,14 @@ sealed interface AIReplyError {
     /** The account session is missing, expired or rejected. */
     data object AuthenticationFailed : AIReplyError
 
-    /** The account limit or request rate limit has been reached. */
+    /** Too many requests in a short time. Waiting a moment fixes it. */
     data object RateLimited : AIReplyError
+
+    /**
+     * The plan's replies for today (or this period) are spent. Waiting a
+     * moment does NOT fix it, which is why it is not [RateLimited].
+     */
+    data object QuotaExhausted : AIReplyError
 
     /** The service answered, but not with a usable reply. */
     data object EmptyResponse : AIReplyError

@@ -34,7 +34,7 @@
     <string name="compose_template">Кімге жауап</string>
     <string name="compose_title">Жауапты байқау</string>
 
-    <string name="home_howitworks_body">WhatsApp, Telegram, Instagram немесе кез келген басқа қолданбада хабарламаны көшіріңіз, содан кейін AI Reply пернетақтасына ауысып, «Жауап беру» түймесін басыңыз.</string>
+    <string name="home_howitworks_body">WhatsApp, Telegram, Instagram немесе кез келген басқа қолданбада хабарламаны көшіріңіз, AI Reply пернетақтасына ауысып, кімге жауап беретініңізді таңдаңыз да, «Жауап беру» түймесін басыңыз.</string>
     <string name="home_howitworks_fullaccess">iOS-та кез келген бөгде пернетақта көшірілген мәтінді оқуы үшін «Толық рұқсат» қажет. Пернетақта алмасу буферін тек «Жауап беру» түймесін басқанда ғана оқиды — фонда ешқашан оқымайды.</string>
     <string name="home_howitworks_title">Қалай жұмыс істейді</string>
     <string name="home_keyboard_fullaccessoff">Толық рұқсат өшірулі — көшірілген хабарламалар оқылмайды</string>
@@ -161,7 +161,7 @@
     <string name="setup_paste_footer">Бұл сұрауды iOS өзі көрсетеді — тек үлгіні басқаннан кейін пернетақта алмасу буферін оқығанда.</string>
     <string name="setup_paste_title">Қою рұқсаты</string>
     <string name="setup_privacy_clipboard">Алмасу буфері фонда ешқашан бақыланбайды.</string>
-    <string name="setup_privacy_explicit">Көшірілген мәтін тек үлгіні басқаннан кейін оқылады, жауап та сол кезде ғана жасалады.</string>
+    <string name="setup_privacy_explicit">Көшірілген мәтін тек үлгіні немесе қою түймесін басқанда оқылады, ал жауап тек «Жауап беру» түймесін басқанда жасалады.</string>
     <string name="setup_privacy_nokeyinkeyboard">Кіру токендері қолданбаның қорғалған қоймасында сақталады және пернетақтада көрсетілмейді.</string>
     <string name="setup_privacy_securefields">Құпия сөздер мен қорғалған өрістер ешқашан өңделмейді.</string>
     <string name="setup_privacy_title">Құпиялылық</string>

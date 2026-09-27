@@ -1436,25 +1436,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Copy a message in WhatsApp, Telegram, Instagram or any other app, then switch to the AI Reply keyboard and tap Reply."
+            "value" : "Copy a message in WhatsApp, Telegram, Instagram or any other app, switch to the AI Reply keyboard, tap who you are replying to, then tap Reply."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "WhatsApp, Telegram, Instagram немесе кез келген басқа қолданбада хабарламаны көшіріңіз, содан кейін AI Reply пернетақтасына ауысып, «Жауап беру» түймесін басыңыз."
+            "value" : "WhatsApp, Telegram, Instagram немесе кез келген басқа қолданбада хабарламаны көшіріңіз, AI Reply пернетақтасына ауысып, кімге жауап беретініңізді таңдаңыз да, «Жауап беру» түймесін басыңыз."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Скопируйте сообщение в WhatsApp, Telegram, Instagram или любом другом приложении, переключитесь на клавиатуру AI Reply и нажмите «Ответить»."
+            "value" : "Скопируйте сообщение в WhatsApp, Telegram, Instagram или любом другом приложении, переключитесь на клавиатуру AI Reply, выберите, кому отвечаете, и нажмите «Ответить»."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "WhatsApp, Telegram, Instagram yoki boshqa ilovada xabarni nusxalang, AI Reply klaviaturasiga oʻting va Javob tugmasini bosing."
+            "value" : "WhatsApp, Telegram, Instagram yoki boshqa ilovada xabarni nusxalang, AI Reply klaviaturasiga oʻting, kimga javob berayotganingizni tanlang va «Javob berish»ni bosing."
           }
         }
       }
@@ -1465,25 +1465,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iOS requires Allow Full Access before any third-party keyboard can read copied text. The keyboard reads the clipboard only when you tap Reply — never in the background."
+            "value" : "iOS requires Allow Full Access before any third-party keyboard can read copied text. The keyboard reads the clipboard only when you tap a template or the paste button — never in the background."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iOS-та кез келген бөгде пернетақта көшірілген мәтінді оқуы үшін «Толық рұқсат» қажет. Пернетақта алмасу буферін тек «Жауап беру» түймесін басқанда ғана оқиды — фонда ешқашан оқымайды."
+            "value" : "iOS-та кез келген бөгде пернетақта көшірілген мәтінді оқуы үшін «Толық рұқсат» қажет. Пернетақта алмасу буферін тек үлгіні немесе қою түймесін басқанда ғана оқиды — фонда ешқашан оқымайды."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iOS требует «Полный доступ», чтобы сторонняя клавиатура могла читать скопированный текст. Клавиатура обращается к буферу обмена только после нажатия «Ответить» — и никогда в фоне."
+            "value" : "iOS требует «Полный доступ», чтобы сторонняя клавиатура могла читать скопированный текст. Клавиатура обращается к буферу обмена только когда вы нажимаете на шаблон или кнопку вставки — и никогда в фоне."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iOS requires Allow Full Access before any third-party keyboard can read copied text. The keyboard reads the clipboard only when you tap Reply — never in the background."
+            "value" : "iOS har qanday tashqi klaviatura nusxalangan matnni oʻqishi uchun «Toʻliq ruxsat»ni talab qiladi. Klaviatura buferni faqat shablonni yoki joylash tugmasini bosganingizda oʻqiydi — hech qachon fonda emas."
           }
         }
       }
@@ -2007,7 +2007,7 @@
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Turn on Allow Full Access"
+            "value" : "«Toʻliq ruxsat»ni yoqing"
           }
         }
       }
@@ -5876,25 +5876,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Copied text is read only after you tap a template, and a reply is generated only then."
+            "value" : "Copied text is read only when you tap a template or the paste button, and a reply is generated only when you tap Reply."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Көшірілген мәтін тек үлгіні басқаннан кейін оқылады, жауап та сол кезде ғана жасалады."
+            "value" : "Көшірілген мәтін тек үлгіні немесе қою түймесін басқанда оқылады, ал жауап тек «Жауап беру» түймесін басқанда жасалады."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Скопированный текст читается только после нажатия на шаблон — тогда же создаётся ответ."
+            "value" : "Скопированный текст читается только после нажатия на шаблон или кнопку вставки, а ответ создаётся только по кнопке «Ответить»."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nusxalangan matn faqat shablonni bosganingizdan keyin oʻqiladi va shundan keyingina javob yaratiladi."
+            "value" : "Nusxalangan matn faqat shablonni yoki joylash tugmasini bosganingizda oʻqiladi, javob esa faqat «Javob berish»ni bosganingizda yaratiladi."
           }
         }
       }

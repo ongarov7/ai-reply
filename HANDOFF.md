@@ -2,6 +2,7 @@
 
 Этот файл — всё, что нужно, чтобы продолжить работу в новой сессии без потери контекста.
 В конце есть **готовый промпт**: его можно просто скопировать.
+Итоговый отчёт по рефакторингу (11 разделов): `docs/keyboard-refactor-report.md`.
 
 ---
 
@@ -75,137 +76,78 @@ App Group (`group.kz.yerek.replykeyboard`) и конфиг расширения 
 **Для деплоя:** применить миграцию 0004 (идёт автоматически при старте). По желанию выставить в проде
 `LIMIT_SOURCE_TEXT_CHARS=400` (это только fallback, значение из админки главнее).
 
-### 2.2 iOS — В РАБОТЕ, ветка `wip/ios-keyboard-refactor` (ещё НЕ собирается)
+### 2.2 iOS — ГОТОВО, в `main` (`b54f5e4`, `def0515`), 138 тестов зелёные
 
-Аудит, найденные корневые причины:
+Проверено в Simulator (iOS 17, iPhone 15 Pro, мок-ответы `-AIReplyMockReplies`):
 
-- раскладки были придуманы, а не взяты у iOS: 12 колонок, `ъ`/`ё` на лице клавиатуры, растянутый казахский ряд;
-- UIButton в UIStackView дают «мёртвые зоны» в зазорах и по краям коротких рядов;
-- высота прыгает между 5-рядной казахской раскладкой и 4-рядными 123 / #+=;
-- «Изменить» зависит от `becomeFirstResponder` внутри extension (ненадёжно), в режиме результата клавиши
-  выбрасывались;
-- «Заново» перезаписывает отредактированный черновик;
-- персонализация (профиль) не уходит на сервер: серверный профиль пишется только при регистрации;
-- лимит 300 захардкожен в нескольких местах; квота и rate limit показывались одной и той же ошибкой;
-- «+» в панели персон только показывает тост; `¥` вместо `•` в символах.
+- ҚАЗ-раскладка совпадает с системной казахской клавиатурой Apple клавиша в клавишу (сравнивали бок о бок);
+  РУС 11/11/9, ENG QWERTY; 123 и #+= как в iOS, `₸` на клавише валюты для ҚАЗ/РУС.
+- Высота одинаковая на всех страницах всех раскладок; ҚАЗ→РУС→ENG и глобус работают.
+- Печать по-казахски с авто-заглавной, `?` и авто-Shift после предложения.
+- Композер: Reply → генерация (Stop, клавиши приглушены) → результат; тап в середину ответа ставит каретку и
+  правит текст; Regenerate даёт 2/2, правка в 1/2 цела; Insert → вопрос «в поле уже есть текст» (высота не
+  прыгает) → Replace вставляет отредактированный текст; Back; ошибка `#offline` (инструкция сохранилась,
+  кнопка «Try again»); Stop на `#slow`, поздний ответ не появился; парковка сессии при скрытии клавиатуры.
+- Тёмная/светлая тема переключается сразу (тема берётся из trait collection, `keyboardAppearance` прокси —
+  только запасной вариант: после смены темы системы он устаревает).
 
-Факты о нативной клавиатуре iOS 18.2 (проверено в Simulator):
+Исправлено после проверки: круглые кнопки композера рисуются вручную (`CircleIconButton`; Back был точкой),
+виды, появляющиеся во время анимации высоты, ставятся без анимации, вопрос о конфликте держит высоту
+композера, Back работает во время Regenerate (останавливает запрос), Shift следует тексту ответа и не
+прыгает во время генерации, короткий путь настройки: «Открыть настройки iOS» ▸ «Клавиатуры» ▸ AI Reply ▸
+«Полный доступ».
 
-- **KK**: верхний ряд `ә і ң ғ ү ұ қ ө һ` (9 клавиш по центру сетки из 11 колонок, того же размера, что остальные);
-  дальше `й ц у к е н г ш щ з х` / `ф ы в а п р о л д ж э` / `⇧ я ч с м и т ь б ю ⌫` (⇧ и ⌫ шириной в одну клавишу).
-- `ё` и `ъ` — долгим нажатием на `е` и `ь`.
-- Цифры: `1–0` / `- / : ; ( ) ₽ & @ "` / `#+= . , ? ! ' ⌫`.
-- Символы: `[ ] { } # % ^ * + =` / `_ \ | ~ < > $ € £ •`.
-- Кнопка букв: `АӘБ` (RU `АБВ`, EN `ABC`). Return для KK — иконка ⏎ («Қайтару»), RU «Ввод».
-  Пробел: «бос орын» / «Пробел» / «space».
-- Высота клавиатуры **одинаковая** на 5-рядной и 4-рядной страницах.
-- Светлая тема: фон `#D1D2D7`, буквы `#FFFFFF`, спец-клавиши `#ABAFBB`.
-- `₸` мы добавили первым вариантом в долгое нажатие на любой клавише валюты.
+Финальный коммит (проверено сборкой и тестами, UI руками не перепроверялся): Insert берёт текст с экрана как
+есть — нормализация теперь один раз, при получении ответа (раньше она шла на выходе и переписывала правки:
+`Рахмет :)` → `Рахмет:)`); тексты «Как это работает» и приватности: буфер читается при нажатии на шаблон или
+«Вставить», ответ создаётся только по «Ответить».
 
-Написано (файлы на ветке):
+Не проверено руками (только тестами): долгие нажатия, повтор delete, трекпад пробела — симулятор этими
+жестами отсюда не управляется. Нужна проверка на живом iPhone: хаптика, глобус на iPhone с кнопкой Home,
+запрос iOS «Разрешить вставку».
 
-| Файл | Что это |
-|---|---|
-| `Shared/Keyboard/KeyboardLayout.swift` | Модель (`KeyAction`, `KeySlot`, `KeyRow`, `KeyboardPageSpec`), раскладки EN/RU/KK, цифры/символы, нижний ряд (123, глобус, ҚАЗ/РУС/ENG, `@ .` для email, `/ .` для URL, `@ #` для social), альтернативы долгого нажатия, `KeyboardLabels` (подписи пробела/return/кнопок, a11y) |
-| `Shared/Keyboard/KeyboardGeometry.swift` | `KeyboardSizing` (размеры по ширине, landscape), постоянная высота (`keyAreaHeight(maximumRows:)`), раскладка в кадры + **hitFrame, покрывающие всю площадь** (без мёртвых зон), `keyIndex(at:)` |
-| `Shared/Keyboard/KeyboardTyping.swift` | `ShiftState` (один раз / caps по двойному тапу / авто без перебивания ручного), `AutoCapitalization`, двойной пробел → «. », `TextDeletion.wordLength` |
-| `Shared/AI/AILimits.swift` | Лимиты с сервера: кэш в App Group + память, fallback 400, самокоррекция по ответу сервера, флаг `features.reply_preferences`, `AILimitsRefresher` (клавиатура сама обновляет config раз в 6 ч при Full Access) |
-| `Shared/AI/ReplyDraftHistory.swift` | Версии ответа: «Заново» ДОБАВЛЯЕТ версию, правки сохраняются, навигация ‹ 1/2 › |
-| `Shared/AI/ReplyComposerFlow.swift` | **Явная state machine** композера: composing → generating(from) → result ⇄ editing → conflict; один запрос за раз, ошибка возвращает туда, откуда начали, Insert берёт текст с экрана |
-| `ReplyKeyboard/KeyboardKeysView.swift` | Новая поверхность клавиш: один view на все касания, буква на отпускании + пузырь, slide-to-correct, rollover второго пальца, альтернативы, delete с повтором → по словам, трекпад по долгому пробелу, пикер языка по долгому нажатию, форвардинг глобуса, VoiceOver-элементы, клик и хаптика |
-| `ReplyKeyboard/ComposerTextView.swift` | Поле, которое редактирует клавиатура **без first responder**: свой каретка, тап ставит каретку (TextKit 1), вставка/удаление/слово/сдвиг каретки |
-| `ReplyKeyboard/ReplyComposerView.swift` | Переписан: компактный (≈120 pt в режиме ввода, 140–175 с ответом), рендерит `ReplyComposerFlow`, счётчик «N / лимит» в шапке |
-| `ReplyKeyboard/ReplyContext.swift` | Координатор на `ReplyComposerFlow`: генерация с «тикетом» (поздний ответ не всплывает), stop, back, edit, версии, insert/conflict, **парковка сессии на 10 мин** в памяти при скрытии клавиатуры |
-| `Shared/AI/AIReplyError.swift` | `+ quotaExhausted` (квота ≠ rate limit) |
-| `Shared/Account/APIClient.swift` | `+ APIError.sourceTooLong(limit:)` из `details` |
-| `Shared/Account/AccountReplyTransport.swift` | Шлёт **локальный профиль** (description/role/tone/business, `reply_language` — только если сервер поддерживает), маппинг квота/лимит/длина, запоминает реальный лимит |
-| `Shared/Account/AccountModels.swift` | `ServerConfig.features` |
-| `Shared/AI/AIConfiguration.swift`, `AIReplyService.swift`, `AIReplyStrings.swift`, `ReplyPromptBuilder.swift` | Лимит из `AILimits`, строки с `%d`, новые строки (stop, done, версии, счётчик), лимит инструкции от серверного |
-| `Shared/Model/KeyboardLanguage.swift`, `SharedSettings.swift`, `UserProfile.swift` | Порядок ҚАЗ→РУС→ENG, включённые раскладки, последняя персона, хаптика, `replyLanguage` в профиле |
-| `AIReply/Features/Account/AccountModel.swift`, `Compose/ComposeView.swift` | Приложение сохраняет лимиты из config; текст ошибки с лимитом |
+### 2.3 Android — ГОТОВО, в `main` (`c22ae47`), 115 JVM-тестов зелёные
 
----
+Проверено на эмуляторе Pixel 6 API 34 (мок-ответы: Настройки ▸ Для разработчика ▸ «Тестовые ответы ИИ»,
+только в debug-сборке):
 
-## 3. Что осталось (по порядку)
+- ҚАЗ `ә і ң ғ ү ұ қ ө һ` над ЙЦУКЕН, РУС 11/11/9 (ё на е, ъ на ь), ENG QWERTY; цифры подсказкой в углу
+  верхнего ряда (как Gboard); страницы ?123 и =\< как в Gboard, `₸` на клавише валюты.
+- Одна высота для всех страниц; долгое нажатие `е` → `Ё`; 123-страница.
+- Весь поток: Client → Reply → результат → тап в середину ответа (каретка) → правка → Regenerate (2/2) →
+  ‹ 1/2 правка цела → Insert → Replace/Add/Cancel → вставлен отредактированный текст, выбранная персона
+  запомнилась.
 
-**Checkpoint 1 — клавиатура iOS (ветка `wip/ios-keyboard-refactor`):**
+Архитектура — как на iOS: чистые модули `keyboard/layout/` (KeyboardLayout, KeyboardGeometry, KeyboardTyping),
+`keyboard/reply/ReplyComposerFlow.kt` (state machine + версии), `ReplySessionController.kt`,
+`keyboard/ui/KeySurface.kt` + `KeySurfaceController.kt` (один Canvas и один обработчик касаний: hit-мозаика
+без мёртвых зон, буква на отпускании, slide-to-correct, rollover, delete → слова, трекпад, альтернативы,
+пикер раскладки, долгий пробел/глобус → системный выбор клавиатуры, TalkBack-узлы), `ReplyPanel.kt`
+(PersonaRow + ComposerPanel), `ai/AILimits.kt`, `ai/DebugReplyMock.kt`.
 
-1. **Переписать `ReplyKeyboard/KeyboardViewController.swift`** под новые компоненты:
-   - заменить кэш страниц / `KeyButton` / `KeyboardMetrics` на `KeyboardKeysView` +
-     `KeyboardGeometry.layout(page:sizing:areaHeight:)`;
-   - `areaHeight = sizing.keyAreaHeight(maximumRows: KeyboardLayout.maximumRowCount(languages: enabled))`,
-     одинаковая для всех страниц;
-   - `options.showsNextKeyboardKey = needsInputModeSwitchKey` (проверять в `viewWillAppear` / `viewWillLayoutSubviews`,
-     не в `viewDidLoad`); `showsLanguageKey = enabled.count > 1`; `field = KeyboardFieldKind(proxy.keyboardType)`;
-     цифровые типы полей стартуют на плоскости numbers;
-   - глобус: `handleInputModeList(from:with:)` из делегата; VoiceOver — `advanceToNextInputMode()`;
-   - Shift через `ShiftState` + `AutoCapitalization.shouldCapitalize(before:type:)`;
-     `KeyboardKeysView.setShiftMode`;
-   - ввод: host (`textDocumentProxy`) или поле композера. В стадии `.result` любая буква/delete сначала вызывает
-     `coordinator.beginEditingForTyping()`. Во время генерации `keysView.isInputDimmed = true`;
-   - delete `.word` → `TextDeletion.wordLength` по `documentContextBeforeInput`, затем N раз `deleteBackward()`;
-   - трекпад → `proxy.adjustTextPosition(byCharacterOffset:)` или `composer.moveCaret(by:)`;
-   - смена языка: `KeyboardLanguage.next(in: enabled)`, сохранить, на ~1.2 с показать `nativeName` на пробеле;
-   - return: `KeyboardLabels.returnKey(for:)`, prominent/disabled (`enablesReturnKeyAutomatically`);
-   - `keysView.headroom` = высота бара над клавишами, `hapticsEnabled = hasFullAccess && SharedSettings.keyboardHapticsEnabled`;
-   - `viewWillDisappear` → `coordinator.park()`; `viewWillAppear` → `ReplySessionParking.take()` → `coordinator.restore`;
-   - `viewWillAppear` → `AILimits.reload()`; `viewDidAppear` при Full Access → `AILimitsRefresher.refreshIfStale()`;
-   - реализовать новый `ReplyFlowCoordinatorDelegate` (`didOpen`, `coordinatorDidChange`) и отрисовку
-     `ReplyComposerView.render(Content)`; ошибки — через `AIReplyStrings.message(for:)`.
-2. **`KeyboardActionBar.swift`** — пробросить новый делегат композера
-   (`composerDidTapPersona / Stop / Edit / Reply / PreviousVersion / NextVersion / didEdit field` и т.д.).
-   Идея: паблик-API `render`, `insertText`, `deleteBackward`, `deleteWordBackward`, `moveCaret`,
-   `acceptsTextInput`, `textBeforeCursor`, `preferredHeight`.
-3. **`TemplateBarView.swift`** — выбранная персона (`SharedSettings.lastTemplateID`, писать при выборе);
-   «+» → `UIMenu`: скрытые персоны + подсказка «создать в приложении» (`addTemplateHint`).
-4. **Удалить `KeyButton.swift` и `KeyboardStrings.swift`** (заменены на `KeyCapView`/`KeySymbolCache` в
-   `KeyboardKeysView.swift` и `KeyboardLabels`); проверить `QuickActionRow.swift` (высота 30, pill 28).
-5. **`AIReply.xcodeproj/project.pbxproj`** (ручной, не XcodeGen) — добавить файлы Python-скриптом:
-   - `Shared/Keyboard/*.swift`, `Shared/AI/AILimits.swift`, `ReplyDraftHistory.swift`, `ReplyComposerFlow.swift`
-     → в Sources **приложения** (`C9FB49EBFCA504D0B6E3D1D2`) **и клавиатуры** (`8C5EA483B27D0C6DD74EFE06`);
-   - `ReplyKeyboard/KeyboardKeysView.swift`, `ComposerTextView.swift` → только клавиатура;
-   - новые тесты → `4A8B1311180674D57B80BB19`;
-   - убрать ссылки на удалённые файлы.
-6. **DEBUG-мок ответов для симулятора:** аргумент запуска `-AIReplyMockReplies` → флаг в App Group →
-   клавиатура в DEBUG создаёт `AIReplyService(transportOverride:)` с разными ответами (казахский + эмодзи +
-   перенос строки). В `AIReplyService.generate` пропускать `isReady`, если задан `transportOverride`.
-7. **Тесты** (XCTest, `@testable import AIReply`):
-   - обновить `AIReplyServiceTests` (300 → лимит из `AILimits`; clamp инструкции =
-     `ReplyInstruction.maximumCharacters(serverLimit:)`) и `AccountAPITests` (квота → `.quotaExhausted`,
-     `message(for: .quotaExhausted)`, `sourceTooLong`);
-   - новые: раскладки (ряды KK/RU/EN/цифры/символы равны нативным, альтернативы `е→ё`, `ь→ъ`), геометрия
-     (hitFrames покрывают всю площадь без дыр и пересечений на ширинах 320/375/390/402/430/landscape;
-     одинаковая высота всех страниц), `ShiftState` (tap / double-tap caps / авто / ручной не перебивается),
-     `AutoCapitalization`, `SpaceShortcut`, `TextDeletion`, `ReplyDraftHistory`, `ReplyComposerFlow`
-     (нет дублей, fail → origin, regenerate добавляет версию, конфликт, cancel, resume), `AILimits`
-     (fallback 400, мусор не принимается, `storeSourceLimit`), `AccountReplyTransport.profileBlock`
-     (без `reply_language` для старого сервера).
-8. **Собрать и прогнать** через watcher (раздел 5), исправить ошибки компиляции.
-9. **Проверить в симуляторе:** печать по-казахски (все 9 букв, ё/ъ, Shift/Caps, 123/#+=, delete с ускорением),
-   переключение ҚАЗ/РУС/ENG и глобус, высота не прыгает; Generate → Edit (правка в середине текста) →
-   Regenerate (версия 2, версия 1 с правкой цела) → Insert (вставлен отредактированный текст, Unicode/эмодзи/
-   многострочный), конфликт Replace/Add/Cancel, ошибки (офлайн, квота, слишком длинно).
-   Открытая проблема: в симуляторе вместо нашей клавиатуры иногда рисуется системный QWERTY с подписью
-   «AI Reply» на пробеле — разобраться (логи: `needsInputModeSwitchKey was called before a connection was
-   established`, падения нет).
+Финальный коммит: rate limit и квота — разные ошибки, как на iOS (раньше два быстрых Regenerate давали «ответы
+на сегодня закончились»); узбекская `ʻ` во всех строках; тексты приватности; README и
+`docs/IOS_ANDROID_PARITY.md` обновлены; unit-тесты перезапускаются, когда меняется только перевод.
 
-**Checkpoint 2:**
-
-10. Онбординг: прогрессивный, повторно открывается из Настроек/Помощи, актуальный путь в Настройках iOS.
-11. Анкета персонализации (коротко, опционально, редактируется) → `UserProfile` (`replyLanguage` уже есть)
-    → `AccountReplyTransport.Profile`.
-12. Настройки: включённые раскладки (`KeyboardLanguageStore.setEnabledLanguages`), хаптика.
-13. Проход по локализации RU/KK/EN/UZ (`Localizable.xcstrings` — сохранять через
-    `json.dumps(d, ensure_ascii=False, indent=2, separators=(',', ' : '))`, тогда файл совпадает побайтно),
-    производительность, доступность.
-
-**Checkpoint 3 — Android** (`AI-Reply-Android`): аудит, те же раскладки (эталон Gboard KK), без мёртвых зон,
-постоянная высота, лимиты с сервера, композер (версии/редактирование/вставка). Сборка — `.claude-android`.
-
-**Финал:** отчёт из 11 разделов (что было, корневые причины, что изменено, файлы, тесты, ручной QA,
-ограничения iOS, риски, деплой, рекомендации, что дальше).
+Не проверено руками: мультитач-rollover, повтор delete, трекпад, TalkBack, тёмная тема, landscape.
 
 ---
+
+## 3. Что осталось
+
+1. **Задеплоить бэкенд** (миграция 0004 применяется при старте). Пока `/api/v1/config` отдаёт 300, оба
+   клиента честно показывают «N / 300»; после деплоя станет 400 без релиза приложений.
+2. **Живые устройства**: iPhone (хаптика, глобус на iPhone с кнопкой Home, запрос «Разрешить вставку» в
+   WhatsApp/Telegram, тёмная клавиатура в Telegram при светлой системе) и Android-телефон (OEM-клавиатуры рядом,
+   вибрация по системной настройке, TalkBack, landscape).
+3. **Android-сборка через watcher**: Android Studio Electric Eel несёт JBR 11, а AGP 8.7 нужен 17+.
+   Сейчас в `AI-Reply-Android/gradle.properties` ЛОКАЛЬНО (skip-worktree, не в git) стоит
+   `org.gradle.java.home=/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home`.
+   Правильнее обновить Android Studio или поменять в `claude-build-watch.sh` порядок поиска JDK
+   (`/usr/libexec/java_home -v 17+` раньше JBR) и перезапустить watcher.
+4. По желанию: узбекский — около 20 строк iOS-приложения (онбординг, голос) ещё на английском, быстрые
+   намерения на Android вычитать носителем. `AI-Reply/README.md` — исторический документ (в шапке указано,
+   что устарело).
 
 ## 4. Ключевые решения (почему так)
 
@@ -245,7 +187,14 @@ cd ~/ai-reply && ./claude-build-watch.sh
 | `.claude-emu` | install / tap / swipe / text / key на эмуляторе | `android-shot.png` |
 
 - DEBUG-хук приложения: `-AIReplyDebugScreen keyboard` открывает сразу поле ввода с клавиатурой
-  (ещё: `setup`, `home`, `settings`, `profile`, `templates`).
+  (ещё: `setup`, `home`, `settings`, `profile`, `templates`). `-AIReplyMockReplies` — мок-ответы
+  (теги в инструкции: `#offline`, `#quota`, `#slow`).
+- Android: мок-ответы — Настройки ▸ Для разработчика (только debug). Эмулятор (Pixel 6, API 34) запускается
+  из Android Studio: проект `~/ai-sport-v2/android` ▸ Device Manager ▸ ▶. Для серии нажатий удобно
+  `emu.sh "tap X Y" "tap X Y" ...` в VM (каждая команда ждёт `.claude-emu-done`).
+- Синхронизация из облачного контейнера: git-патч с уникальным именем в `/mnt/user-data/outputs/` →
+  `device_commit_files` → `~/ai-reply/.claude-sync.patch` → `git apply --directory=AI-Reply` (или
+  `AI-Reply-Android`).
 - В симуляторе клики надёжнее через AX `element_index`, чем по координатам.
 - Go-тесты бэкенда: `cd ai-reply-back-end && go test ./...`. В облачном контейнере агента нужны
   `GOPROXY=direct GOSUMDB=off`.
@@ -255,25 +204,15 @@ cd ~/ai-reply && ./claude-build-watch.sh
 ## 6. Промпт для продолжения (скопировать в новую сессию)
 
 ```
-Продолжи рефакторинг AI Reply по файлу ~/ai-reply/HANDOFF.md — прочитай его целиком первым делом.
+Продолжи работу над AI Reply по файлу ~/ai-reply/HANDOFF.md — прочитай его целиком первым делом.
 
-Репозиторий: ~/ai-reply (GitHub yereke99/ai-reply). Бэкенд (лимиты из админки, 400 по умолчанию) уже в main.
-iOS-работа — в ветке wip/ios-keyboard-refactor, она ещё НЕ собирается.
-Переключись на неё (git checkout wip/ios-keyboard-refactor) и доведи Checkpoint 1 из раздела 3, по пунктам:
-перепиши KeyboardViewController под KeyboardKeysView/KeyboardGeometry/ShiftState, обнови KeyboardActionBar и
-TemplateBarView, удали KeyButton.swift и KeyboardStrings.swift, добавь новые файлы в project.pbxproj
-(Shared → приложение + клавиатура, ReplyKeyboard → клавиатура, тесты → test target), добавь DEBUG-мок ответов,
-обнови и допиши тесты, собери и прогони через watcher (раздел 5), проверь в симуляторе печать по-казахски и
-поток Generate → Edit → Regenerate → Insert.
+Репозиторий: ~/ai-reply (GitHub yereke99/ai-reply). Бэкенд (лимиты из админки, 400 по умолчанию),
+iOS-клавиатура и Android-клавиатура уже в main — раздел 2. Итоговый отчёт: docs/keyboard-refactor-report.md.
+Осталось — раздел 3: деплой бэкенда, проверка на живых iPhone и Android, JDK для Android-сборки в watcher.
 
-Нативные раскладки iOS уже проверены (раздел 2.2) — не выдумывай их заново.
+Нативные раскладки уже проверены — не выдумывай их заново.
 Не ломай needsInputModeSwitchKey/advanceToNextInputMode, bundle id, подпись и App Group.
 Не читай ai-reply-back-end/.env.
-Коммиты — без AI-подписей, коммить только когда я попрошу; в main сливать, только когда всё собирается и
-тесты зелёные.
-Потом Checkpoint 2 (онбординг, анкета персонализации, настройки раскладок, локализация) и
-Checkpoint 3 (Android по эталону Gboard), в конце — отчёт из 11 разделов.
-Не объявляй задачу готовой, пока клавиатурой нельзя удобно печатать по-казахски и пока поток
-Generate → Edit → Regenerate → Insert не проверен вживую.
+Коммиты — без AI-подписей; в main — только когда сборка и тесты зелёные; git push делаю я сам.
 Отвечай по-русски, коротко.
 ```

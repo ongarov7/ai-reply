@@ -179,16 +179,22 @@ class AccountReplyTransport(
 
         /**
          * Backend failures become the closed set the UI already knows how to
-         * show. The quota case keeps its own error so a screen can offer the
-         * plans page instead of a generic "try again".
+         * show.
+         *
+         * A spent quota and a burst of requests are different problems with
+         * different fixes - change plan or wait until tomorrow, versus wait a
+         * few seconds - so they stay different errors. They used to share one,
+         * and a user who tapped Regenerate twice was told their day's replies
+         * were gone.
          */
         fun map(error: ApiError): AIReplyError = when (error) {
             is ApiError.Offline -> AIReplyError.Offline
             is ApiError.TimedOut, is ApiError.ProviderTimeout -> AIReplyError.TimedOut
             is ApiError.Cancelled -> AIReplyError.Cancelled
             is ApiError.Unauthorized, is ApiError.AccountDisabled -> AIReplyError.AuthenticationFailed
-            is ApiError.DailyLimitReached, is ApiError.RateLimited,
-            is ApiError.SubscriptionExpired, is ApiError.PaymentRequired -> AIReplyError.RateLimited
+            is ApiError.DailyLimitReached, is ApiError.SubscriptionExpired,
+            is ApiError.PaymentRequired -> AIReplyError.QuotaExhausted
+            is ApiError.RateLimited -> AIReplyError.RateLimited
             is ApiError.EmptyResponse -> AIReplyError.EmptyResponse
             is ApiError.SourceTooLong -> {
                 // The server is the source of truth: remember its limit, so

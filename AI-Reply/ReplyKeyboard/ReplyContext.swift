@@ -314,7 +314,9 @@ final class ReplyFlowCoordinator {
             guard self.session != nil else { return }
             switch outcome {
             case .success(let reply):
-                self.session?.flow.receive(reply: reply.text)
+                // The model's formatting is tidied once, as it arrives. What
+                // the user then sees - and edits - is exactly what Insert uses.
+                self.session?.flow.receive(reply: self.normalizer.normalize(reply.text))
             case .failure(let error):
                 self.session?.flow.fail(error)
             }
@@ -385,14 +387,14 @@ final class ReplyFlowCoordinator {
 
     // MARK: Insert
 
-    /// What to do with the reply on screen. The text is normalised on the way
-    /// out; it is never the message and never the instruction.
+    /// What to do with the reply on screen: the text exactly as shown, edits
+    /// included - never the message and never the instruction.
     func requestInsert(hostHasText: Bool) -> ReplyComposerFlow.InsertDecision {
         guard session != nil else { return .nothing }
         let decision: ReplyComposerFlow.InsertDecision = session?.flow.requestInsert(hostHasText: hostHasText) ?? .nothing
         switch decision {
         case .insert(let text):
-            return normalized(text).map { .insert($0) } ?? .nothing
+            return outgoing(text).map { .insert($0) } ?? .nothing
         case .askAboutExistingText:
             delegate?.coordinatorDidChange(self)
             return .askAboutExistingText
@@ -406,18 +408,21 @@ final class ReplyFlowCoordinator {
         let resolution: ReplyComposerFlow.ConflictResolution = session?.flow.resolveConflict(choice) ?? .cancelled
         switch resolution {
         case .replace(let text):
-            return normalized(text).map { .replace($0) } ?? .cancelled
+            return outgoing(text).map { .replace($0) } ?? .cancelled
         case .append(let text):
-            return normalized(text).map { .append($0) } ?? .cancelled
+            return outgoing(text).map { .append($0) } ?? .cancelled
         case .cancelled:
             delegate?.coordinatorDidChange(self)
             return .cancelled
         }
     }
 
-    private func normalized(_ text: String) -> String? {
-        let draft = normalizer.normalize(text)
-        guard !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+    /// Only the whitespace around the reply goes. It is NOT normalised again:
+    /// that happened once, on arrival, and running it over the user's edits
+    /// would quietly rewrite them ("Рахмет :)" would become "Рахмет:)").
+    private func outgoing(_ text: String) -> String? {
+        let draft = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !draft.isEmpty else { return nil }
         ReplyLog.event("insert accepted, length \(draft.count)")
         return draft
     }

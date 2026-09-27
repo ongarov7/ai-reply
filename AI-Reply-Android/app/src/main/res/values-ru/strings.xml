@@ -34,7 +34,7 @@
     <string name="compose_template">Отвечаете</string>
     <string name="compose_title">Попробовать ответ</string>
 
-    <string name="home_howitworks_body">Скопируйте сообщение в WhatsApp, Telegram, Instagram или любом другом приложении, переключитесь на клавиатуру AI Reply и нажмите «Ответить».</string>
+    <string name="home_howitworks_body">Скопируйте сообщение в WhatsApp, Telegram, Instagram или любом другом приложении, переключитесь на клавиатуру AI Reply, выберите, кому отвечаете, и нажмите «Ответить».</string>
     <string name="home_howitworks_fullaccess">iOS требует «Полный доступ», чтобы сторонняя клавиатура могла читать скопированный текст. Клавиатура обращается к буферу обмена только после нажатия «Ответить» — и никогда в фоне.</string>
     <string name="home_howitworks_title">Как это работает</string>
     <string name="home_keyboard_fullaccessoff">Полный доступ выключен — скопированные сообщения недоступны</string>
@@ -161,7 +161,7 @@
     <string name="setup_paste_footer">Этот запрос показывает сама iOS — только когда клавиатура читает буфер обмена после нажатия на шаблон.</string>
     <string name="setup_paste_title">Разрешение на вставку</string>
     <string name="setup_privacy_clipboard">Буфер обмена никогда не отслеживается в фоне.</string>
-    <string name="setup_privacy_explicit">Скопированный текст читается только после нажатия на шаблон — тогда же создаётся ответ.</string>
+    <string name="setup_privacy_explicit">Скопированный текст читается только после нажатия на шаблон или кнопку вставки, а ответ создаётся только по кнопке «Ответить».</string>
     <string name="setup_privacy_nokeyinkeyboard">Токены входа хранятся в защищённом хранилище приложения и не показываются в клавиатуре.</string>
     <string name="setup_privacy_securefields">Пароли и защищённые поля никогда не обрабатываются.</string>
     <string name="setup_privacy_title">Конфиденциальность</string>

@@ -6,6 +6,18 @@
 > two disagree, **`MIGRATION.md` is newer**. Specifically now out of date here:
 > "no App Group was added" (§7), the language store's location, and the page
 > prewarm behaviour described in "Current PoC update".
+>
+> **Newer still — the keyboard refactor of September 2026.** The keys, the
+> reply composer and the message limit were rebuilt; `../HANDOFF.md` and
+> `../docs/keyboard-refactor-report.md` describe what the code does now. Out of
+> date here as a result: the 300-character limit (the server publishes the
+> limit now, 400 when it has not said), height and layouts (§3, §6: Russian is
+> 11 / 11 / 9 with `ё` and `ъ` on long press, and every page has one height),
+> the dark theme order (§4: the trait collection comes first now, because
+> `keyboardAppearance` goes stale after a system switch), key behaviour (§7:
+> letters are typed on release, the layout key reads `ENG` / `РУС` / `ҚАЗ`),
+> and the composer (§9: versions, editing without first responder, and an
+> Insert that takes the text on screen as it is).
 
 A local iOS proof of concept: a Custom Keyboard Extension that is comfortable to
 type on in EN / RU / KK and that can pick up "the message the user wants to act

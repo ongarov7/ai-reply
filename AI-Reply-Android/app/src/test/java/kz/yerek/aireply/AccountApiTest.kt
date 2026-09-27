@@ -91,10 +91,13 @@ class AccountApiTest {
         assertEquals(AIReplyError.Offline, AccountReplyTransport.map(ApiError.Offline))
         assertEquals(AIReplyError.AuthenticationFailed, AccountReplyTransport.map(ApiError.Unauthorized))
         assertEquals(AIReplyError.AuthenticationFailed, AccountReplyTransport.map(ApiError.AccountDisabled))
+        // A spent quota and a burst of requests have different fixes, so the
+        // user is told different things.
         assertEquals(
-            AIReplyError.RateLimited,
+            AIReplyError.QuotaExhausted,
             AccountReplyTransport.map(ApiError.DailyLimitReached(7, 7, null))
         )
+        assertEquals(AIReplyError.RateLimited, AccountReplyTransport.map(ApiError.RateLimited(30)))
         assertEquals(AIReplyError.TimedOut, AccountReplyTransport.map(ApiError.ProviderTimeout))
         assertEquals(AIReplyError.EmptyResponse, AccountReplyTransport.map(ApiError.EmptyResponse))
         assertEquals(AIReplyError.ServiceUnavailable, AccountReplyTransport.map(ApiError.Server))

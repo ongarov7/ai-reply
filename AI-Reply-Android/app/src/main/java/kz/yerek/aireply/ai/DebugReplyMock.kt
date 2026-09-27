@@ -20,7 +20,7 @@ class DebugReplyMock(private val instruction: String) : ReplyTransport {
         val tags = instruction.lowercase()
         delay(if ("#slow" in tags) 6_000L else 700L)
         if ("#offline" in tags) AIReplyError.Offline.raise()
-        if ("#quota" in tags) AIReplyError.RateLimited.raise()
+        if ("#quota" in tags) AIReplyError.QuotaExhausted.raise()
         val index = served.getAndIncrement() % REPLIES.size
         return GeneratedReply(text = REPLIES[index])
     }

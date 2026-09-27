@@ -77,6 +77,15 @@ android {
     }
 }
 
+// LocalizationParityTest reads the string resources straight from src/main/res,
+// which Gradle cannot see. Declared as an input, a change to a translation alone
+// re-runs the unit tests instead of reporting an up-to-date or cached pass.
+tasks.withType<Test>().configureEach {
+    inputs.dir("src/main/res")
+        .withPropertyName("stringResources")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

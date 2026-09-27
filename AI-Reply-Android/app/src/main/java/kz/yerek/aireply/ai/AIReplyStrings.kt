@@ -48,7 +48,8 @@ class AppStrings(private val context: Context) {
         // happened is noise, so this is the one error with no sentence.
         AIReplyError.Cancelled -> ""
         AIReplyError.AuthenticationFailed -> get(R.string.kb_err_sign_in_required)
-        AIReplyError.RateLimited -> get(R.string.kb_err_quota_exhausted)
+        AIReplyError.RateLimited -> get(R.string.kb_err_rate_limited)
+        AIReplyError.QuotaExhausted -> get(R.string.kb_err_quota_exhausted)
         AIReplyError.EmptyResponse -> get(R.string.kb_err_empty_response)
         AIReplyError.ServiceUnavailable -> get(R.string.kb_err_service_unavailable)
     }

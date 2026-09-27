@@ -34,7 +34,7 @@
     <string name="compose_template">Replying to</string>
     <string name="compose_title">Try a reply</string>
 
-    <string name="home_howitworks_body">Copy a message in WhatsApp, Telegram, Instagram or any other app, then switch to the AI Reply keyboard and tap Reply.</string>
+    <string name="home_howitworks_body">Copy a message in WhatsApp, Telegram, Instagram or any other app, switch to the AI Reply keyboard, tap who you are replying to, then tap Reply.</string>
     <string name="home_howitworks_fullaccess">iOS requires Allow Full Access before any third-party keyboard can read copied text. The keyboard reads the clipboard only when you tap Reply — never in the background.</string>
     <string name="home_howitworks_title">How it works</string>
     <string name="home_keyboard_fullaccessoff">Full Access is off — copied messages cannot be read</string>
@@ -161,7 +161,7 @@
     <string name="setup_paste_footer">iOS shows that prompt itself, and only when the keyboard reads the clipboard after you tap a template.</string>
     <string name="setup_paste_title">Paste permission</string>
     <string name="setup_privacy_clipboard">The clipboard is never monitored in the background.</string>
-    <string name="setup_privacy_explicit">Copied text is read only after you tap a template, and a reply is generated only then.</string>
+    <string name="setup_privacy_explicit">Copied text is read only when you tap a template or the paste button, and a reply is generated only when you tap Reply.</string>
     <string name="setup_privacy_nokeyinkeyboard">Your sign-in tokens are kept in protected app storage and are not shown in the keyboard.</string>
     <string name="setup_privacy_securefields">Passwords and secure fields are never processed.</string>
     <string name="setup_privacy_title">Privacy</string>

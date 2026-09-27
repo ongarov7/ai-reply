@@ -16,26 +16,16 @@ iOS sources before any Kotlin was written, and updated after implementation.
 | `BLOCKED` | Cannot be done in this environment; reason recorded |
 | `NOT_IMPLEMENTED` | Deliberately not ported; reason recorded |
 
-> **Session-wide build note.** No Gradle build ran in this session. `dl.google.com`,
-> `maven.google.com`, `repo1.maven.org`, `plugins.gradle.org` and `services.gradle.org`
-> are refused by the egress policy in both sandboxes available here (the cloud
-> container and the Linux VM on the Mac), so neither the Android SDK nor any AGP /
-> Compose artifact could be fetched.
+> **Status update, 27.09.2026 — keyboard refactor.** The project builds now:
+> AGP 8.7.3 on JDK 17+, `./gradlew assembleDebug testDebugUnitTest` — 115 JVM
+> tests in 13 classes, all green. The keyboard (§5) and the reply flow (§6) were
+> rebuilt to match the refactored iOS keyboard and exercised on an emulator
+> (Pixel 6, API 34) through the debug mock transport (Settings ▸ Developer ▸
+> Mock AI replies, debug builds only). Their rows say what was seen working and
+> what only tests cover.
 >
-> What was done instead, and what each status below is therefore worth:
->
-> * **All 86 Kotlin files** were parsed with the real Kotlin 2.0.21 compiler front
->   end (taken from the Gradle distribution) — **0 parse errors**.
-> * The domain model, `ReplyPromptBuilder`, `WorkingHours`, `ReplyDraftNormalizer`,
->   the layout tables and `AutoShift` were **compiled and their 48 tests executed —
->   48 passed, 0 failed.** Rows covered by those tests are marked
->   `IMPLEMENTED_AND_VERIFIED`.
-> * All 280 `R.string` references were resolved against the 327 declared strings;
->   package declarations checked against directories; no duplicate top-level types.
->
-> `IMPLEMENTED_NOT_DEVICE_VERIFIED` therefore means: written, parsed by the real
-> compiler, resource-checked — and not compiled against the Android framework or
-> run on a device. See `README.md` § Known limitations.
+> Rows this refactor did not touch keep the status they got when the app was
+> first ported: written and now compiled, but not re-checked on a device.
 
 ---
 
@@ -79,14 +69,14 @@ decoding that lets a configuration written by an older build still load.
 | Feature | iOS | Android | Status | Notes |
 |---|---|---|---|---|
 | Entry point | `AIReplyService.generate(Request)` | `AIReplyService.generate(Request)` | IMPLEMENTED_NOT_DEVICE_VERIFIED | Same responsibilities, same boundaries |
-| 300-char incoming-message rule | `AIReplyService.validate` before any request | same | IMPLEMENTED_NOT_DEVICE_VERIFIED | Enforced before the network call, so an over-long paste costs nothing |
+| Incoming-message limit | Published by the server (`max_source_characters`, set in the admin panel, fallback 400), cached in the App Group, checked by `AIReplyService.validate` before any request | `AILimits` over `SharedPreferences`: same fallback, refreshed from `/api/v1/config` when older than 6 h; a server rejection that names `source_text` stores the server's limit | IMPLEMENTED_AND_VERIFIED | `AILimitsTest`, `AIReplyServiceValidationTest`. Checked before the network call, so an over-long paste costs nothing; the composer counts `N / limit` |
 | Prompt construction | `ReplyPromptBuilder`: rules in the developer message, all user data in named blocks in the user message | same, byte-for-byte identical developer text **plus** one `INSTRUCTION` paragraph | IMPLEMENTED_AND_VERIFIED | 11 executed tests. The added paragraph is the only deliberate prompt delta; see §6 |
 | Prompt-injection posture | `<incoming_message>`, `<user_profile>`, `<business_context>`, `<user_rules>`, `<template_instructions>` introduced as data | same blocks + `<user_instruction>` | IMPLEMENTED_AND_VERIFIED | A test asserts that "Ignore previous instructions" reaches the user message and never the developer message |
 | Relationship guidance | Hard-coded per `RelationshipKind`, not stored per template | same | IMPLEMENTED_NOT_DEVICE_VERIFIED | Keeps it out of user data and migratable |
 | Transport abstraction | `protocol ReplyTransport` + Direct / Backend | `interface ReplyTransport` + Direct / Backend | IMPLEMENTED_NOT_DEVICE_VERIFIED | |
 | Direct OpenAI | `/v1/responses`, `store:false`, `max_output_tokens` 180, temp 0.7, 25 s | same, `HttpURLConnection` | IMPLEMENTED_NOT_DEVICE_VERIFIED | No OkHttp/Retrofit: fewer classes to load in the IME |
 | Backend transport | Structured JSON to a self-hosted service, bearer token | same wire format | IMPLEMENTED_NOT_DEVICE_VERIFIED | Field names preserved, including the legacy `keyboard_language` |
-| Error set | `AIReplyError`, 11 closed cases | same sealed interface | IMPLEMENTED_NOT_DEVICE_VERIFIED | No status codes or response bodies ever reach the UI |
+| Error set | `AIReplyError`, 12 closed cases; a burst of requests (`rateLimited`, wait a moment) and a spent plan (`quotaExhausted`, wait until tomorrow or change plan) are separate | same sealed interface, same split | IMPLEMENTED_AND_VERIFIED | `AccountApiTest` maps every backend error. No status codes or response bodies ever reach the UI |
 | Draft normalisation | `ReplyDraftNormalizer`, URL-preserving | same | IMPLEMENTED_AND_VERIFIED | 7 executed tests, including that a URL survives space collapsing |
 | Response unwrapping | `ReplyNetworking.unwrapQuotes` (`"`, `“”`, `«»`) | same | IMPLEMENTED_NOT_DEVICE_VERIFIED | |
 | Model / mode / backend URL settings | `AIConfiguration` in App Group defaults | `AIConfiguration` over `SettingsStore` | IMPLEMENTED_NOT_DEVICE_VERIFIED | `gpt-4o-mini` default named in exactly one place, as on iOS |
@@ -96,41 +86,42 @@ decoding that lets a configuration written by an older build still load.
 
 | Feature | iOS | Android | Status | Notes |
 |---|---|---|---|---|
-| Host | `UIInputViewController` extension | `ReplyKeyboardService : InputMethodService` | IMPLEMENTED_NOT_DEVICE_VERIFIED | Declared with `android.view.InputMethod` + `res/xml/method.xml` |
-| Layouts | QWERTY 10/9/7, ЙЦУКЕН 12/12/9 with visible `ё`, Kazakh = ЙЦУКЕН + 9-letter top row | identical tables, ported verbatim | IMPLEMENTED_AND_VERIFIED | Executed tests assert all 33 Cyrillic letters and all 9 Kazakh letters are present |
-| Number / symbol planes | `KeyboardPlane.numbers` / `.symbols`, `₸` included | same tables | IMPLEMENTED_NOT_DEVICE_VERIFIED | |
-| Metrics | Derived from live width + row count; 43/46/48 pt bands, ×0.855 for 5 rows | same formula in dp, plus a landscape clamp | IMPLEMENTED_NOT_DEVICE_VERIFIED | Landscape clamp is new; iOS is portrait-locked, Android is not |
-| Theme | Dark-first, resolved from `keyboardAppearance` then traits | Resolved from `EditorInfo.IME_FLAG_*`/`Configuration.uiMode` + the user's appearance override | IMPLEMENTED_NOT_DEVICE_VERIFIED | Android hosts do not advertise a keyboard appearance, so the system dark mode plus the app's own override is the closest honest signal |
-| Key colours | Exact RGB values from `KeyboardTheme` | same values | IMPLEMENTED_NOT_DEVICE_VERIFIED | |
-| Shift / caps lock | Tap toggles, double tap within 0.35 s locks | same, same threshold | IMPLEMENTED_NOT_DEVICE_VERIFIED | |
-| Auto-shift at sentence start | `isAtSentenceStart`, never turns shift *off* | same algorithm | IMPLEMENTED_AND_VERIFIED | 6 executed tests |
-| Double-space → `. ` | 0.35 s window, only after a letter/digit | same | IMPLEMENTED_NOT_DEVICE_VERIFIED | |
-| Delete repeat | 0.45 s delay then 0.085 s repeat | same, coroutine-driven | IMPLEMENTED_NOT_DEVICE_VERIFIED | |
-| Layout switch key | `EN`/`РУ`/`ҚАЗ` badge cycles layouts | same | IMPLEMENTED_NOT_DEVICE_VERIFIED | |
-| System keyboard switch | Globe key → `handleInputModeList`, shown only when `needsInputModeSwitchKey` | Globe key → `switchToNextInputMethod` / `showInputMethodPicker` on long press, shown when `shouldOfferSwitchingToNextInputMethod()` | IMPLEMENTED_NOT_DEVICE_VERIFIED | Same tap-advances / long-press-lists behaviour |
+| Host | `UIInputViewController` extension | `ReplyKeyboardService : InputMethodService` | IMPLEMENTED_AND_VERIFIED | Declared with `android.view.InputMethod` + `res/xml/method.xml`; enabled and used on the emulator |
+| Layouts | Apple's own layouts: QWERTY 10/9/7, ЙЦУКЕН 11/11/9 (`ё`, `ъ` on long press), Kazakh = 9-letter top row `ә і ң ғ ү ұ қ ө һ` + ЙЦУКЕН | Gboard's: the same letters, digits as corner hints on the QWERTY / ЙЦУКЕН row (long press types the digit) | IMPLEMENTED_AND_VERIFIED | `KeyboardLayoutTest` (every Kazakh letter typeable, rows pinned); Kazakh typing seen on the emulator |
+| Number / symbol pages | iOS `123` / `#+=` | Gboard `?123` / `=\<`; `₸` on the currency key for Kazakh and Russian, `$` for English | IMPLEMENTED_AND_VERIFIED | `KeyboardLayoutTest`; `?123` seen on the emulator |
+| Bottom row | Plane key, globe (when iOS asks for it), layout key, space, return; `@`, `.`, `/` or `#` in e-mail, URL and social fields | Plane key, comma (or `@` / `/` in e-mail / URL fields), layout key, space, `.` with alternates, return; the globe replaces the comma only when `shouldOfferSwitchingToNextInputMethod()` | IMPLEMENTED_AND_VERIFIED | `KeyboardLayoutTest` |
+| Metrics | Width-derived size table; every page of every enabled layout gets the height of the tallest (5 rows with Kazakh) | Same table in dp; the key area is capped at 45 % of the screen height in portrait, 50 % in landscape | IMPLEMENTED_AND_VERIFIED | `KeyboardGeometryTest`: one height for every page, keys ≥ 37 × 24 dp from 320 to 480 dp wide |
+| Touch model | One view, hit frames that tile the whole key area; the letter is typed on release | One `Canvas` + one pointer handler; the same tiling, typed on release | PARTIALLY_IMPLEMENTED | Tiling is tested (`KeyboardGeometryTest`: every point belongs to exactly one key). Slide-to-correct, rollover, long-press alternates (380 ms) and the space-bar trackpad are implemented; only long press was tried on the emulator, multi-touch needs a phone |
+| Theme | Trait collection first, `keyboardAppearance` only as a fallback (it goes stale after a system switch) | Resolved from `EditorInfo.IME_FLAG_*`/`Configuration.uiMode` + the user's appearance override | IMPLEMENTED_NOT_DEVICE_VERIFIED | Dark theme not tried on the emulator |
+| Shift / caps lock | Tap toggles, double tap within 0.32 s locks | same, same threshold | IMPLEMENTED_AND_VERIFIED | `KeyboardTypingTest` |
+| Auto-shift at sentence start | Follows the text before the caret, in the host and in the composer | same | IMPLEMENTED_AND_VERIFIED | `KeyboardTypingTest`; seen on the emulator |
+| Double-space → `. ` | 0.45 s window, only after a letter or digit | same | IMPLEMENTED_AND_VERIFIED | `KeyboardTypingTest` |
+| Delete repeat | 0.45 s, then 0.085 s; whole words after a while | 0.42 s, then 65 ms; whole words after 14 repeats | IMPLEMENTED_NOT_DEVICE_VERIFIED | Word length is tested (`KeyboardTypingTest`), the timing is not |
+| Layout switch key | `ҚАЗ` / `РУС` / `ENG`, cycles the layouts switched on in Settings | same; a long press opens a layout picker | IMPLEMENTED_AND_VERIFIED | `KeyboardLayoutTest` |
+| System keyboard switch | Globe → `handleInputModeList`, shown only when `needsInputModeSwitchKey` | Globe → `switchToNextInputMethod`; long press on the globe or the space bar → `showInputMethodPicker` | IMPLEMENTED_NOT_DEVICE_VERIFIED | |
 | Return key label + prominence | Follows `returnKeyType` (send/search/go/done) | Follows `EditorInfo.imeOptions` action | IMPLEMENTED_NOT_DEVICE_VERIFIED | Same word list per language |
 | Key click sound / haptics | `UIDevice.playInputClick()` | `AudioManager.playSoundEffect` + `performHapticFeedback`, both honouring the system settings | IMPLEMENTED_NOT_DEVICE_VERIFIED | Android exposes the user's own sound/vibrate-on-keypress settings; both are read, not assumed |
-| Page cache / prewarm | `pageCache` keyed by (language, plane, globe); one page per idle tick | **NOT_IMPLEMENTED** | NOT_IMPLEMENTED | The iOS cache exists because building ~40 `UIButton`s with SF Symbol lookups was measurably slow. Compose rebuilds a key grid from a data table with no per-key object graph, so the cache would add state without removing work. Recomposition scoping does the equivalent job — see §10 |
+| Accessibility | VoiceOver labels per key | One semantics node per key over the canvas, for TalkBack | IMPLEMENTED_NOT_DEVICE_VERIFIED | TalkBack not tried |
 
 ## 6. AI reply flow
 
 | Feature | iOS | Android | Status | Notes |
 |---|---|---|---|---|
-| Context acquisition | selection first (`proxy.selectedText`), then clipboard, only on template tap | `getSelectedText()` first, then `ClipboardManager`, only on template tap | IMPLEMENTED_NOT_DEVICE_VERIFIED | No polling, no read on appearance, no background access — identical posture |
-| Clipboard permission | Requires "Allow Full Access"; `fullAccessRequired` error | No equivalent gate; the current IME may read the clipboard | IMPLEMENTED_NOT_DEVICE_VERIFIED | The `fullAccessRequired` error case is kept in the model but is unreachable on Android; the setup UI shows "keyboard selected" instead |
+| Context acquisition | selection first (`proxy.selectedText`), then clipboard, only on a persona tap or Paste | `getSelectedText()` first, then `ClipboardManager`, only on a persona tap or Paste | IMPLEMENTED_AND_VERIFIED | No polling, no read on appearance, no background access — identical posture |
+| Clipboard permission | Requires "Allow Full Access"; `fullAccessRequired` error | No equivalent gate; the current IME may read the clipboard | IMPLEMENTED_NOT_DEVICE_VERIFIED | The error case is kept in the model but is unreachable on Android |
 | Sensitive clipboard | n/a | Clips flagged `EXTRA_IS_SENSITIVE` (API 33+) are refused | IMPLEMENTED_NOT_DEVICE_VERIFIED | Android-only hardening, matching iOS's "secure fields are never processed" promise |
 | Password fields | iOS keyboards are simply not shown a secure field's content | AI panel disabled when `EditorInfo.inputType` is any password variation | IMPLEMENTED_NOT_DEVICE_VERIFIED | Typing still works normally |
-| Generation trigger | **Only** a template tap or Regenerate | Template tap → ready state; **Generate** or Regenerate starts the request | IMPLEMENTED_NOT_DEVICE_VERIFIED | **Deliberate difference.** The brief requires a written-or-dictated instruction *before* generation, which iOS has no equivalent of. Cost: one extra tap versus iOS. Benefit: the instruction and the microphone, which are the point of the Android version |
-| User instruction | none | Free-text field + microphone, fed to the prompt as `<user_instruction>` | IMPLEMENTED_NOT_DEVICE_VERIFIED | Android addition, per brief §14–17 |
-| Source message display | Read-only, 2 lines, tap to expand to 4 | same | IMPLEMENTED_NOT_DEVICE_VERIFIED | Never seeded into the draft — the core rule is preserved |
-| Draft editing | Storage-based `insertText`/`deleteBackward`, own caret when first responder is refused | Storage-based `KeyboardTextFieldState`, own blinking caret always | IMPLEMENTED_NOT_DEVICE_VERIFIED | An IME cannot host a system-focused text field; the iOS fallback path becomes the only path, which removes a whole class of focus bugs |
-| Keys during generation | Dropped, never leak into the host | same (`InputTarget.DISCARDED`) | IMPLEMENTED_NOT_DEVICE_VERIFIED | |
-| Regenerate | Same message, same template, new answer; disabled in flight | same | IMPLEMENTED_NOT_DEVICE_VERIFIED | |
-| Insert | `commitText` into the host; never sends | `commitText(draft, 1)`; never sends | IMPLEMENTED_NOT_DEVICE_VERIFIED | No Accessibility service anywhere in the project |
-| Host field not empty | Replace / Add / Cancel sheet | same three choices | IMPLEMENTED_NOT_DEVICE_VERIFIED | Android clears with one `deleteSurroundingText` instead of iOS's `deleteBackward` loop |
+| Persona row | Compact chips, the selected one highlighted, the last one remembered, `+` at the end (more / create) | same | IMPLEMENTED_AND_VERIFIED | Selection and the remembered persona were seen on the emulator |
+| Composer | Persona, source preview or Paste, `N / limit` counter, close; instruction field with quick intents; Reply | same, plus a microphone | IMPLEMENTED_AND_VERIFIED | `ReplyComposerFlow` is the same state machine on both: composing → generating → result ⇄ editing → conflict |
+| Generation trigger | **Only** Reply, Regenerate or Try again | same | IMPLEMENTED_AND_VERIFIED | Opening the keyboard, copying text or picking a persona never starts a request |
+| Draft editing | The composer edits its own text view without becoming first responder; tap anywhere in the reply to put the caret there | `KeyboardTextFieldState` with its own caret; the same tap-to-place | IMPLEMENTED_AND_VERIFIED | Grapheme-safe (emoji, Kazakh letters); seen on the emulator |
+| Versions | Regenerate adds a version (up to 6) and never overwrites an edit; `‹ 1/2 ›` | same `ReplyDraftHistory` | IMPLEMENTED_AND_VERIFIED | `ReplyComposerFlowTest`; on the emulator an edited 1/2 survived a Regenerate to 2/2 |
+| Keys during generation | Dimmed and dropped, never leak into the host | same | IMPLEMENTED_AND_VERIFIED | |
+| Stop / Back / errors | Stop keeps everything and a late answer is ignored; Back returns to the instruction; a failure keeps the instruction and offers Try again | same | IMPLEMENTED_AND_VERIFIED | `ReplyComposerFlowTest`; `#offline`, `#quota`, `#slow` tags in the mock transport |
+| Insert | `insertText` of the text on screen, edits included, trimmed; never sends | `commitText` of the same; never sends | IMPLEMENTED_AND_VERIFIED | No Accessibility service anywhere in the project |
+| Host field not empty | Replace / Add / Cancel inside the composer, which keeps its height | same | IMPLEMENTED_AND_VERIFIED | Replace was seen inserting the edited text. Android clears with one `deleteSurroundingText` |
 | Append separator | Space unless the text already ends in whitespace | same | IMPLEMENTED_NOT_DEVICE_VERIFIED | |
-| Teardown | On `viewWillDisappear`: cancel request, drop message and draft | On `onFinishInputView`: same | IMPLEMENTED_NOT_DEVICE_VERIFIED | |
-| Toasts | 3.2 s transient line in the chip row, no geometry change | same duration, same no-resize rule | IMPLEMENTED_NOT_DEVICE_VERIFIED | |
+| Teardown | Keyboard hidden: the request stops, the session is kept in memory for 10 minutes, then dropped | same, in `onFinishInputView` / `onStartInputView` | IMPLEMENTED_NOT_DEVICE_VERIFIED | Nothing is written to disk |
 | "+" chip | Shows "create templates in the app" — an extension cannot present an editor | Opens the app's template editor directly | IMPLEMENTED_NOT_DEVICE_VERIFIED | **Android is better here**: an IME can start an Activity |
 
 ## 7. Localization
@@ -182,5 +173,5 @@ decoding that lets a configuration written by an older build still load.
 | Logging never carries message text | `ReplyLog`, lengths and outcomes only, DEBUG only | `ReplyLog`, same rule, `BuildConfig.DEBUG` only | IMPLEMENTED_NOT_DEVICE_VERIFIED | |
 | Secrets out of the repo | Key typed at runtime, nothing in the IPA | Same; nothing in the APK, `local.properties` untouched, `.gitignore` covers it | IMPLEMENTED_NOT_DEVICE_VERIFIED | |
 | Responsive layout | Portrait-locked, width-derived metrics | Portrait + landscape, width- and height-derived; `readableWidth` cap; font-scale respected in the app, pinned in the key grid | IMPLEMENTED_NOT_DEVICE_VERIFIED | Pinning the key grid's font scale stops a 2× accessibility font from breaking key geometry |
-| Unit tests | 7 test files (service, context, store, localization, normalizer, summary, hours) | 8 test classes | PARTIALLY_IMPLEMENTED | 48 of them were compiled and executed (48 passed). `ConfigurationTest`, `AIReplyServiceValidationTest` and `LocalizationParityTest` need the serialization runtime, the Android framework and the Gradle working directory respectively, so they await the first real `testDebugUnitTest` |
-| `./gradlew assembleDebug` | n/a | written, not run | BLOCKED | Egress policy blocks every Maven/Google/Gradle host in both sandboxes, and the Mac's Terminal is available to this session in click-only mode. `build-and-log.command` in the project root runs it and captures `build.log` |
+| Unit tests | XCTest, 138 tests | 13 JVM test classes, 115 tests | IMPLEMENTED_AND_VERIFIED | `./gradlew testDebugUnitTest`, all green |
+| `./gradlew assembleDebug` | n/a | builds on the Mac with JDK 17+ | IMPLEMENTED_AND_VERIFIED | AGP 8.7.3 needs JDK 17+; Android Studio Electric Eel's bundled JBR 11 is too old |

@@ -5,7 +5,8 @@ features. AI replies stay **simulated locally** — there is no backend and none
 was invented.
 
 `README.md` documents the previous (proof-of-concept) pass. Where the two
-disagree, this file is newer.
+disagree, this file is newer. The keyboard refactor of September 2026 is newer
+than both: see `../HANDOFF.md` and `../docs/keyboard-refactor-report.md`.
 
 ---
 

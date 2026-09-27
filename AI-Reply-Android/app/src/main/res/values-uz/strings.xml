@@ -21,7 +21,7 @@
     <string name="compose_template">Kimga javob</string>
     <string name="compose_title">Javobni sinash</string>
 
-    <string name="home_howitworks_body">WhatsApp, Telegram, Instagram yoki boshqa ilovada xabarni nusxalang, AI Reply klaviaturasiga oʻting va Javob tugmasini bosing.</string>
+    <string name="home_howitworks_body">WhatsApp, Telegram, Instagram yoki boshqa ilovada xabarni nusxalang, AI Reply klaviaturasiga oʻting, kimga javob berayotganingizni tanlang va «Javob berish»ni bosing.</string>
     <string name="home_howitworks_title">Qanday ishlaydi</string>
     <string name="home_keyboard_title">Klaviatura</string>
     <string name="home_privacy_title">Maxfiylik</string>
@@ -113,7 +113,7 @@
     <string name="setup_checklist_speech">Nutqni aniqlash</string>
     <string name="setup_paste_title">Nusxalangan matn</string>
     <string name="setup_privacy_clipboard">Bufer fonda hech qachon kuzatilmaydi.</string>
-    <string name="setup_privacy_explicit">Nusxalangan matn faqat shablonni bosganingizdan keyin oʻqiladi va shundan keyingina javob yaratiladi.</string>
+    <string name="setup_privacy_explicit">Nusxalangan matn faqat shablonni yoki joylash tugmasini bosganingizda oʻqiladi, javob esa faqat «Javob berish»ni bosganingizda yaratiladi.</string>
     <string name="setup_privacy_nokeyinkeyboard">Kirish tokenlari ilovaning himoyalangan xotirasida saqlanadi va klaviaturada koʻrsatilmaydi.</string>
     <string name="setup_privacy_securefields">Parollar va himoyalangan maydonlar qayta ishlanmaydi.</string>
     <string name="setup_privacy_title">Maxfiylik</string>
