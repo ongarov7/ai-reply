@@ -4,25 +4,30 @@ import UIKit
 
 /// Colour palette for the keyboard.
 ///
-/// The keyboard is dark-first, but it resolves correctly for light hosts too.
-/// The host application expresses the appearance it wants through
-/// `UITextDocumentProxy.keyboardAppearance`. Telegram, WhatsApp and Instagram
-/// all set `.dark` while they are in dark mode, so that value is the primary
-/// signal. When the host stays on `.default` we fall back to the trait
-/// collection.
+/// The keyboard follows the appearance the SYSTEM gives it, the way Apple's
+/// keyboards do. The extension's trait collection carries it: iOS derives
+/// it from the host field's `keyboardAppearance` (Telegram, WhatsApp and
+/// Instagram set `.dark` in their dark themes) and from the system's light /
+/// dark mode, and it is updated live.
+///
+/// `UITextDocumentProxy.keyboardAppearance` is only a fallback. It is the
+/// value the host set when the field became active and is NOT refreshed
+/// when the system switches between light and dark (automatic dark mode at
+/// sunset, Control Centre): trusting it left the keyboard dark on a light
+/// screen - and light on a dark one - until the extension restarted.
 ///
 /// No Apple assets are used. Every value is an approximation authored here.
 struct KeyboardTheme: Equatable {
     let isDark: Bool
 
     static func resolve(appearance: UIKeyboardAppearance, traits: UITraitCollection) -> KeyboardTheme {
-        switch appearance {
+        switch traits.userInterfaceStyle {
         case .dark:
             return KeyboardTheme(isDark: true)
         case .light:
             return KeyboardTheme(isDark: false)
         default:
-            return KeyboardTheme(isDark: traits.userInterfaceStyle == .dark)
+            return KeyboardTheme(isDark: appearance == .dark)
         }
     }
 

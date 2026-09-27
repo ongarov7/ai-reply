@@ -35,6 +35,18 @@ struct SettingsView: View {
                 Text("settings.setup.footer")
             }
 
+            Section {
+                ForEach(KeyboardLanguage.cycleOrder, id: \.self) { language in
+                    Toggle(language.nativeName, isOn: layoutBinding(language))
+                        .disabled(settings.keyboardLanguages == [language])
+                }
+                Toggle("settings.keyboard.haptics", isOn: hapticsBinding)
+            } header: {
+                Text("settings.keyboard")
+            } footer: {
+                Text("settings.keyboard.footer")
+            }
+
             Section("settings.appearance") {
                 Picker("settings.appearance", selection: appearanceBinding) {
                     ForEach(AppearancePreference.allCases, id: \.rawValue) { option in
@@ -90,6 +102,17 @@ struct SettingsView: View {
 
     private var appearanceBinding: Binding<AppearancePreference> {
         Binding(get: { settings.appearance }, set: { settings.setAppearance($0) })
+    }
+
+    private func layoutBinding(_ language: KeyboardLanguage) -> Binding<Bool> {
+        Binding(
+            get: { settings.keyboardLanguages.contains(language) },
+            set: { settings.setKeyboardLanguage(language, enabled: $0) }
+        )
+    }
+
+    private var hapticsBinding: Binding<Bool> {
+        Binding(get: { settings.keyboardHaptics }, set: { settings.setKeyboardHaptics($0) })
     }
 
     private var languageBinding: Binding<AppLanguage?> {

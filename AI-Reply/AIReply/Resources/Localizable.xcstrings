@@ -3495,25 +3495,54 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Edit the draft if you want, tap Insert, and send it yourself"
+            "value" : "Tap the reply to edit any part of it, ↻ for another version, then Insert - and send it yourself"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Қажет болса жауапты өңдеп, «Кірістіру» түймесін басыңыз да, өзіңіз жіберіңіз"
+            "value" : "Кез келген бөлігін түзету үшін жауаптың үстінен басыңыз, ↻ — басқа нұсқа, сосын «Кірістіру» — және өзіңіз жіберіңіз"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "При необходимости отредактируйте черновик, нажмите «Вставить» и отправьте сами"
+            "value" : "Нажмите на ответ, чтобы исправить любую часть, ↻ — другой вариант, затем «Вставить» — и отправьте сами"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Qoralamani tekshiring, Kiritish tugmasini bosing va oʻzingiz yuboring"
+            "value" : "Istalgan qismini tahrirlash uchun javobga bosing, ↻ — boshqa variant, soʻng «Kiritish» — va oʻzingiz yuboring"
+          }
+        }
+      }
+    },
+    "onboarding.usage.step.instruction" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Say how to answer, or pick a quick option such as Agree, then tap Reply"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Қалай жауап беру керегін жазыңыз немесе «Келісу» сияқты дайын нұсқаны таңдап, «Жауап беру» түймесін басыңыз"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Напишите, как ответить, или выберите быстрый вариант, например «Согласиться», и нажмите «Ответить»"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qanday javob berishni yozing yoki «Rozilik» kabi tezkor variantni tanlang va «Javob berish»ni bosing"
           }
         }
       }
@@ -3524,25 +3553,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Switch to Reply Keyboard with the globe key"
+            "value" : "Switch to AI Reply with the globe key under the keyboard"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Глобус пернесі арқылы Reply Keyboard-қа ауысыңыз"
+            "value" : "Пернетақта астындағы глобус пернесімен AI Reply-ға ауысыңыз"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Переключитесь на Reply Keyboard кнопкой с глобусом"
+            "value" : "Переключитесь на AI Reply кнопкой с глобусом под клавиатурой"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Klaviatura tugmasi orqali AI Replyga oʻting"
+            "value" : "Klaviatura ostidagi globus tugmasi orqali AI Replyga oʻting"
           }
         }
       }
@@ -3553,25 +3582,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tap the template that fits: Friend, Client, Business or Work"
+            "value" : "Tap who you are replying to: Friend, Client, Business or Work"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Қажетті үлгіні таңдаңыз: «Дос», «Клиент», «Бизнес» немесе «Жұмыс»"
+            "value" : "Кімге жауап беретініңізді таңдаңыз: «Дос», «Клиент», «Бизнес» немесе «Жұмыс»"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Нажмите подходящий шаблон: «Друг», «Клиент», «Бизнес» или «Работа»"
+            "value" : "Выберите, кому отвечаете: «Друг», «Клиент», «Бизнес» или «Работа»"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mos shablonni tanlang: Doʻst, Mijoz, Biznes yoki Ish"
+            "value" : "Kimga javob berayotganingizni tanlang: Doʻst, Mijoz, Biznes yoki Ish"
           }
         }
       }
@@ -4007,6 +4036,93 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Erkaklar va ayollar kiyimi"
+          }
+        }
+      }
+    },
+    "profile.replyLanguage" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reply language"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Жауап тілі"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Язык ответа"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Javob tili"
+          }
+        }
+      }
+    },
+    "profile.replyLanguage.auto" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Same as the message"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Хабарлама тілінде"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Как в сообщении"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xabar tilida"
+          }
+        }
+      }
+    },
+    "profile.replyLanguage.footer" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "By default the reply is written in the language of the message you are answering. An instruction such as “answer in Russian” always wins."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Әдепкі бойынша жауап сіз жауап беретін хабарламаның тілінде жазылады. «Орысша жауап бер» сияқты нұсқау әрқашан басым."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "По умолчанию ответ пишется на языке сообщения, на которое вы отвечаете. Просьба вроде «ответь по-казахски» всегда важнее."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Odatda javob siz javob berayotgan xabar tilida yoziladi. «Ruscha javob ber» kabi koʻrsatma doim ustun turadi."
           }
         }
       }
@@ -4877,6 +4993,93 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "The app and the keyboard cannot share settings yet. Rebuild the app so the App Group entitlement is applied."
+          }
+        }
+      }
+    },
+    "settings.keyboard" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keyboard"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пернетақта"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Клавиатура"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Klaviatura"
+          }
+        }
+      }
+    },
+    "settings.keyboard.footer" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The language key switches between the layouts that are on. At least one stays on. Vibration works when Full Access is on."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тіл пернесі қосулы тілдер арасында ауыстырады. Кемінде біреуі қосулы қалады. Діріл толық рұқсат қосулы болғанда жұмыс істейді."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Клавиша языка переключает включённые раскладки. Хотя бы одна остаётся включённой. Вибрация работает при включённом полном доступе."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Til tugmasi yoqilgan tartiblar orasida almashtiradi. Kamida bittasi yoqilgan qoladi. Tebranish toʻliq ruxsat yoqilganda ishlaydi."
+          }
+        }
+      }
+    },
+    "settings.keyboard.haptics" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibration on key press"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Басқанда діріл"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вибрация при нажатии"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bosganda tebranish"
           }
         }
       }

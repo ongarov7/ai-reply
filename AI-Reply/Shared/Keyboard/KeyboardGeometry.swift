@@ -145,7 +145,6 @@ enum KeyboardGeometry {
     static func layout(page: KeyboardPageSpec, sizing: KeyboardSizing, areaHeight: CGFloat) -> KeyboardPageLayout {
         let width = sizing.width
         let innerWidth = width - sizing.sideInset * 2
-        let gap = sizing.columnGap(columns: page.columns)
         let available = areaHeight - sizing.topInset - sizing.bottomInset
         let metrics = rowMetrics(rows: page.rows.count, available: available, sizing: sizing)
 
@@ -153,7 +152,10 @@ enum KeyboardGeometry {
         var rowTop = sizing.topInset
 
         for (rowIndex, row) in page.rows.enumerated() {
+            // A row on its own grid (the bottom row) also takes that grid's
+            // gap, so it is identical on every layout.
             let columns = max(row.unitColumns ?? page.columns, 1)
+            let gap = sizing.columnGap(columns: columns)
             let unit = (innerWidth - CGFloat(columns - 1) * gap) / CGFloat(columns)
 
             // Gaps sit only between two KEYS. A spacer is itself the space

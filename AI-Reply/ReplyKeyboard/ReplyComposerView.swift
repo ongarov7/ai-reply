@@ -88,8 +88,19 @@ final class ReplyComposerView: UIView {
     var draftText: String { draftView.currentText }
 
     /// True while the whole message is open, which the controller allows a
-    /// little more keyboard height for.
-    var wantsExpandedContext: Bool { isSourceExpanded && !isConflict }
+    /// little more keyboard height for. It stays true through the "field is
+    /// not empty" question, so the keyboard keeps its height there too.
+    var wantsExpandedContext: Bool { isSourceExpanded }
+
+    /// The composer's height when the "field is not empty" question appeared.
+    /// The question keeps it: the keys must not jump up for one question and
+    /// back down after it.
+    private var conflictHeight: CGFloat = 0
+
+    /// Views that were visible in the previous layout pass. Everything else
+    /// is placed without animation - see `place(_:_:)`.
+    private var visibleLastPass = Set<ObjectIdentifier>()
+    private var visibleThisPass = Set<ObjectIdentifier>()
 
     // MARK: Views
 
@@ -99,15 +110,15 @@ final class ReplyComposerView: UIView {
     private let personaChip = UIButton(type: .system)
     private let previewButton = UIButton(type: .system)
     private let counterLabel = UILabel()
-    private let closeButton = UIButton(type: .system)
+    private let closeButton = CircleIconButton(symbol: "xmark", pointSize: 12)
 
     // Full message
     private let sourceCard = UIView()
     private let quoteBar = UIView()
     private let sourceView = ComposerTextView(font: .systemFont(ofSize: 14), inset: UIEdgeInsets(top: 5, left: 0, bottom: 5, right: 0))
-    private let collapseButton = UIButton(type: .system)
-    private let pasteButton = UIButton(type: .system)
-    private let clearButton = UIButton(type: .system)
+    private let collapseButton = CircleIconButton(symbol: "chevron.up", pointSize: 11)
+    private let pasteButton = CircleIconButton(symbol: "doc.on.clipboard", pointSize: 11)
+    private let clearButton = CircleIconButton(symbol: "xmark.circle.fill", pointSize: 15, filled: false)
 
     // Instruction / reply
     private let instructionView = ComposerTextView(font: .systemFont(ofSize: 15.5), inset: UIEdgeInsets(top: 8, left: 10, bottom: 8, right: 10))
@@ -122,13 +133,18 @@ final class ReplyComposerView: UIView {
     private let primaryButton = UIButton(type: .system)
 
     // Result row
-    private let backButton = UIButton(type: .system)
-    private let regenerateButton = UIButton(type: .system)
-    private let editButton = UIButton(type: .system)
-    private let previousButton = UIButton(type: .system)
+    private let backButton = CircleIconButton(symbol: "chevron.left", pointSize: 14)
+    private let regenerateButton = CircleIconButton(symbol: "arrow.clockwise", pointSize: 13)
+    private let editButton = CircleIconButton(symbol: "pencil", pointSize: 13)
+    private let previousButton = CircleIconButton(symbol: "chevron.left", pointSize: 12, filled: false)
     private let versionLabel = UILabel()
-    private let nextButton = UIButton(type: .system)
+    private let nextButton = CircleIconButton(symbol: "chevron.right", pointSize: 12, filled: false)
     private let insertButton = UIButton(type: .system)
+
+    private var iconButtons: [CircleIconButton] {
+        [closeButton, collapseButton, pasteButton, clearButton, backButton, regenerateButton,
+         editButton, previousButton, nextButton]
+    }
 
     // Conflict row
     private let replaceButton = UIButton(type: .system)
@@ -177,7 +193,6 @@ final class ReplyComposerView: UIView {
         counterLabel.font = .monospacedDigitSystemFont(ofSize: 11, weight: .medium)
         counterLabel.textAlignment = .right
 
-        configureIcon(closeButton, symbol: "xmark", pointSize: 12)
         closeButton.addTarget(self, action: #selector(closeTapped), for: .touchUpInside)
 
         sourceCard.layer.cornerRadius = 9
@@ -185,9 +200,6 @@ final class ReplyComposerView: UIView {
         quoteBar.layer.cornerRadius = 1.5
         sourceCard.addSubview(quoteBar)
         sourceCard.addSubview(sourceView)
-        configureIcon(collapseButton, symbol: "chevron.up", pointSize: 11)
-        configureIcon(pasteButton, symbol: "doc.on.clipboard", pointSize: 11)
-        configureIcon(clearButton, symbol: "xmark.circle.fill", pointSize: 12)
         collapseButton.addTarget(self, action: #selector(collapseTapped), for: .touchUpInside)
         pasteButton.addTarget(self, action: #selector(pasteTapped), for: .touchUpInside)
         clearButton.addTarget(self, action: #selector(clearSourceTapped), for: .touchUpInside)
@@ -209,20 +221,17 @@ final class ReplyComposerView: UIView {
         errorLabel.adjustsFontSizeToFitWidth = true
         errorLabel.minimumScaleFactor = 0.8
 
-        conflictLabel.font = .systemFont(ofSize: 13, weight: .medium)
-        conflictLabel.numberOfLines = 2
+        conflictLabel.font = .systemFont(ofSize: 14, weight: .medium)
+        conflictLabel.numberOfLines = 3
         conflictLabel.textAlignment = .center
+        conflictLabel.adjustsFontSizeToFitWidth = true
+        conflictLabel.minimumScaleFactor = 0.8
 
         quickActions.delegate = self
 
         configurePill(primaryButton, symbol: nil, trailingImage: false)
         primaryButton.addTarget(self, action: #selector(primaryTapped), for: .touchUpInside)
 
-        configureIcon(backButton, symbol: "chevron.left", pointSize: 13)
-        configureIcon(regenerateButton, symbol: "arrow.clockwise", pointSize: 13)
-        configureIcon(editButton, symbol: "pencil", pointSize: 13)
-        configureIcon(previousButton, symbol: "chevron.left", pointSize: 11, filled: false)
-        configureIcon(nextButton, symbol: "chevron.right", pointSize: 11, filled: false)
         backButton.addTarget(self, action: #selector(backTapped), for: .touchUpInside)
         regenerateButton.addTarget(self, action: #selector(regenerateTapped), for: .touchUpInside)
         editButton.addTarget(self, action: #selector(editTapped), for: .touchUpInside)
@@ -263,16 +272,6 @@ final class ReplyComposerView: UIView {
         button.configuration = configuration
     }
 
-    private func configureIcon(_ button: UIButton, symbol: String, pointSize: CGFloat, filled: Bool = true) {
-        var configuration = UIButton.Configuration.plain()
-        configuration.contentInsets = .zero
-        configuration.background.cornerRadius = iconSize / 2
-        configuration.image = UIImage(systemName: symbol,
-                                      withConfiguration: UIImage.SymbolConfiguration(pointSize: pointSize, weight: .semibold))
-        button.configuration = configuration
-        button.tag = filled ? 1 : 0
-    }
-
     private func attachTap(to view: UIView, action: Selector) {
         let tap = UITapGestureRecognizer(target: self, action: action)
         view.addGestureRecognizer(tap)
@@ -307,7 +306,11 @@ final class ReplyComposerView: UIView {
     /// so rendering never moves the caret the user just placed.
     func render(_ content: Content) {
         let previous = flow
+        let wasConflict = Self.isConflictStage(previous.stage)
         flow = content.flow
+        if isConflict && !wasConflict {
+            conflictHeight = preferredHeight
+        }
         errorMessage = content.errorMessage
         sourceLimit = content.sourceLimit
         instructionLimit = content.instructionLimit
@@ -338,7 +341,6 @@ final class ReplyComposerView: UIView {
         case .generating, .result, .conflict:
             focus = .none
         }
-        if isConflict { isSourceExpanded = false }
         refresh()
         remeasure()
     }
@@ -349,6 +351,7 @@ final class ReplyComposerView: UIView {
         focus = .instruction
         errorMessage = nil
         isSourceExpanded = false
+        conflictHeight = 0
         sourceView.setText("")
         instructionView.setText("")
         draftView.setText("")
@@ -356,8 +359,10 @@ final class ReplyComposerView: UIView {
         remeasure()
     }
 
-    private var isConflict: Bool {
-        if case .conflict = flow.stage { return true }
+    private var isConflict: Bool { Self.isConflictStage(flow.stage) }
+
+    private static func isConflictStage(_ stage: ReplyComposerFlow.Stage) -> Bool {
+        if case .conflict = stage { return true }
         return false
     }
 
@@ -387,10 +392,12 @@ final class ReplyComposerView: UIView {
         conflictLabel.textColor = theme.primaryText
         versionLabel.textColor = theme.secondaryText
 
-        for button in [closeButton, collapseButton, pasteButton, clearButton, backButton, regenerateButton,
-                       editButton, previousButton, nextButton] {
-            styleIcon(button, highlighted: false)
+        for button in iconButtons {
+            button.fillColor = theme.fieldBackground
+            button.glyphColor = theme.primaryText
+            button.accentColor = theme.accent
         }
+        clearButton.glyphColor = theme.secondaryText
         for button in [replaceButton, appendButton] {
             button.configuration?.background.backgroundColor = theme.accent
             button.configuration?.baseForegroundColor = .white
@@ -398,14 +405,6 @@ final class ReplyComposerView: UIView {
         conflictCancelButton.configuration?.background.backgroundColor = theme.fieldBackground
         conflictCancelButton.configuration?.baseForegroundColor = theme.primaryText
         refreshBorders()
-    }
-
-    private func styleIcon(_ button: UIButton, highlighted: Bool) {
-        let filled = button.tag == 1
-        button.configuration?.background.backgroundColor = highlighted
-            ? theme.accent
-            : (filled ? theme.fieldBackground : .clear)
-        button.configuration?.baseForegroundColor = highlighted ? .white : theme.primaryText
     }
 
     private func applyText(_ title: String, to button: UIButton, size: CGFloat, weight: UIFont.Weight) {
@@ -468,9 +467,9 @@ final class ReplyComposerView: UIView {
         draftView.alpha = flow.generationOrigin == .result ? 0.55 : 1
         draftView.accessibilityLabel = strings.draftTitle
 
-        sourceView.isFocused = focus == .source && stage == .composing
-        instructionView.isFocused = focus == .instruction && stage == .composing
-        draftView.isFocused = focus == .draft && stage == .editing
+        sourceView.showsCaret = focus == .source && stage == .composing
+        instructionView.showsCaret = focus == .instruction && stage == .composing
+        draftView.showsCaret = focus == .draft && stage == .editing
         refreshBorders()
 
         // Error
@@ -515,23 +514,20 @@ final class ReplyComposerView: UIView {
         previousButton.accessibilityLabel = strings.previousVersion
         nextButton.accessibilityLabel = strings.nextVersion
 
+        // Back stays live while a new version is made: it stops the request.
         backButton.accessibilityLabel = strings.back
-        regenerateButton.accessibilityLabel = flow.isGenerating ? strings.stop : strings.regenerate
-        regenerateButton.configuration?.showsActivityIndicator = flow.generationOrigin == .result
-        regenerateButton.configuration?.image = flow.generationOrigin == .result ? nil : UIImage(
-            systemName: "arrow.clockwise",
-            withConfiguration: UIImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
-        )
-        regenerateButton.isEnabled = stage == .result || stage == .editing || flow.generationOrigin == .result
+        // While a new version is being made the same button stops it: a
+        // spinner in place of the arrow, and a tap cancels.
+        let regenerating = flow.generationOrigin == .result
+        regenerateButton.isBusy = regenerating
+        regenerateButton.accessibilityLabel = regenerating ? strings.stop : strings.regenerate
+        regenerateButton.isEnabled = stage == .result || stage == .editing || regenerating
 
         let editing = stage == .editing
-        editButton.configuration?.image = UIImage(
-            systemName: editing ? "checkmark" : "pencil",
-            withConfiguration: UIImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
-        )
+        editButton.setSymbol(editing ? "checkmark" : "pencil")
+        editButton.isSelectedStyle = editing
         editButton.accessibilityLabel = editing ? strings.doneEditing : strings.editReply
         editButton.isEnabled = stage == .result || stage == .editing
-        styleIcon(editButton, highlighted: editing)
 
         applyText(strings.insert, to: insertButton, size: 15, weight: .semibold)
         let canInsert = (stage == .result || stage == .editing)
@@ -556,9 +552,9 @@ final class ReplyComposerView: UIView {
     }
 
     private func refreshBorders() {
-        instructionView.layer.borderColor = (instructionView.isFocused ? theme.fieldBorderFocused : theme.fieldBorder).cgColor
-        draftView.layer.borderColor = (draftView.isFocused ? theme.fieldBorderFocused : theme.fieldBorder).cgColor
-        sourceCard.layer.borderWidth = sourceView.isFocused ? 1 : 0
+        instructionView.layer.borderColor = (instructionView.showsCaret ? theme.fieldBorderFocused : theme.fieldBorder).cgColor
+        draftView.layer.borderColor = (draftView.showsCaret ? theme.fieldBorderFocused : theme.fieldBorder).cgColor
+        sourceCard.layer.borderWidth = sourceView.showsCaret ? 1 : 0
         sourceCard.layer.borderColor = theme.fieldBorderFocused.cgColor
     }
 
@@ -590,13 +586,17 @@ final class ReplyComposerView: UIView {
     /// Measured on content EVENTS - a paste, a new version, a stage change, a
     /// width change - never on a keystroke: the field scrolls rather than
     /// growing under the user's fingers.
-    private func plan() -> Plan {
+    private func solveHeights() -> Plan {
         var plan = Plan()
         let width = contentWidth
         let chrome = 2 + innerInset / 2 + headerHeight + gap + gap + rowHeight + innerInset / 2 + 2 + 4
 
         if isConflict {
-            plan.total = 2 + innerInset / 2 + headerHeight + gap + 36 + gap + rowHeight + innerInset / 2 + 2 + 4
+            // The question takes the place of the reply, at the reply's
+            // height: the keys stay exactly where they were.
+            let minimum = chrome + 36
+            plan.total = max(minimum, conflictHeight).rounded(.up)
+            plan.field = plan.total - chrome
             return plan
         }
 
@@ -635,7 +635,7 @@ final class ReplyComposerView: UIView {
 
     private func remeasure() {
         guard layoutWidth > 0 else { return }
-        let height = plan().total
+        let height = solveHeights().total
         guard abs(height - preferredHeight) > 0.5 else {
             setNeedsLayout()
             return
@@ -649,45 +649,51 @@ final class ReplyComposerView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        let plan = plan()
+        let plan = solveHeights()
         panel.frame = CGRect(x: outerInset, y: 2, width: bounds.width - outerInset * 2, height: max(0, bounds.height - 6))
+        visibleThisPass.removeAll(keepingCapacity: true)
+        defer { visibleLastPass = visibleThisPass }
+
         let width = panel.bounds.width - innerInset * 2
         let left = innerInset
         var y = innerInset / 2
 
         // Header: persona, message preview, counter, close.
         let chipWidth = min(max(personaChip.intrinsicContentSize.width, 64), 140)
-        personaChip.frame = CGRect(x: left, y: y + 1, width: chipWidth, height: headerHeight - 2)
-        closeButton.frame = CGRect(x: left + width - 28, y: y + 1, width: 28, height: 28)
+        place(personaChip, CGRect(x: left, y: y + 1, width: chipWidth, height: headerHeight - 2))
+        place(closeButton, CGRect(x: left + width - 28, y: y + 1, width: 28, height: 28))
         var previewRight = closeButton.frame.minX - 6
         if !counterLabel.isHidden {
             let counterWidth = ceil(counterLabel.sizeThatFits(CGSize(width: 90, height: 20)).width)
-            counterLabel.frame = CGRect(x: previewRight - counterWidth, y: y, width: counterWidth, height: headerHeight)
+            place(counterLabel, CGRect(x: previewRight - counterWidth, y: y, width: counterWidth, height: headerHeight))
             previewRight = counterLabel.frame.minX - 6
         }
         let previewLeft = personaChip.frame.maxX + 6
-        previewButton.frame = CGRect(x: previewLeft, y: y + 2, width: max(0, previewRight - previewLeft), height: headerHeight - 4)
+        place(previewButton, CGRect(x: previewLeft, y: y + 2, width: max(0, previewRight - previewLeft), height: headerHeight - 4))
         y += headerHeight + gap
 
         if isConflict {
-            conflictLabel.frame = CGRect(x: left, y: y, width: width, height: 36)
-            y += 36 + gap
+            // The question sits where the reply was, the answers where the
+            // reply's buttons were.
+            let area = max(36, plan.field)
+            place(conflictLabel, CGRect(x: left + 4, y: y, width: width - 8, height: area))
+            y += area + gap
             let buttonWidth = (width - 12) / 3
             for (index, button) in [replaceButton, appendButton, conflictCancelButton].enumerated() {
-                button.frame = CGRect(x: left + CGFloat(index) * (buttonWidth + 6), y: y, width: buttonWidth, height: rowHeight)
+                place(button, CGRect(x: left + CGFloat(index) * (buttonWidth + 6), y: y, width: buttonWidth, height: rowHeight))
             }
             return
         }
 
         // Full message.
         if plan.sourceCard > 0 {
-            sourceCard.frame = CGRect(x: left, y: y, width: width, height: plan.sourceCard)
+            place(sourceCard, CGRect(x: left, y: y, width: width, height: plan.sourceCard))
             let buttonsX = sourceCard.bounds.width - 28
-            quoteBar.frame = CGRect(x: 8, y: 8, width: 3, height: max(0, plan.sourceCard - 16))
-            sourceView.frame = CGRect(x: 8 + 3 + 8, y: 2, width: max(0, buttonsX - 19 - 4), height: plan.sourceCard - 4)
+            place(quoteBar, CGRect(x: 8, y: 8, width: 3, height: max(0, plan.sourceCard - 16)))
+            place(sourceView, CGRect(x: 8 + 3 + 8, y: 2, width: max(0, buttonsX - 19 - 4), height: plan.sourceCard - 4))
             var buttonY: CGFloat = 4
             for button in [collapseButton, pasteButton, clearButton] where !button.isHidden {
-                button.frame = CGRect(x: buttonsX, y: buttonY, width: 24, height: 24)
+                place(button, CGRect(x: buttonsX, y: buttonY, width: 24, height: 24))
                 buttonY += 26
             }
             y += plan.sourceCard + gap
@@ -695,12 +701,12 @@ final class ReplyComposerView: UIView {
 
         // Instruction or reply.
         let field = CGRect(x: left, y: y, width: width, height: plan.field)
-        instructionView.frame = field
-        draftView.frame = field
+        place(instructionView, field)
+        place(draftView, field)
         y += plan.field + gap
 
         if plan.error > 0 {
-            errorLabel.frame = CGRect(x: left + 2, y: y - 2, width: width - 4, height: plan.error)
+            place(errorLabel, CGRect(x: left + 2, y: y - 2, width: width - 4, height: plan.error))
             y += plan.error + 4
         }
 
@@ -708,28 +714,48 @@ final class ReplyComposerView: UIView {
         if flow.showsReply {
             var x = left
             for button in [backButton, regenerateButton, editButton] {
-                button.frame = CGRect(x: x, y: y, width: iconSize, height: iconSize)
+                place(button, CGRect(x: x, y: y, width: iconSize, height: iconSize))
                 x += iconSize + 6
             }
             let insertWidth = max(96, ceil(insertButton.intrinsicContentSize.width))
-            insertButton.frame = CGRect(x: left + width - insertWidth, y: y, width: insertWidth, height: rowHeight)
+            place(insertButton, CGRect(x: left + width - insertWidth, y: y, width: insertWidth, height: rowHeight))
             if !versionLabel.isHidden {
-                let pagerWidth: CGFloat = 26 + 34 + 26
+                let pagerWidth: CGFloat = 28 + 34 + 28
                 let available = insertButton.frame.minX - x
                 let pagerX = x + max(0, (available - pagerWidth) / 2)
-                previousButton.frame = CGRect(x: pagerX, y: y + 3, width: 26, height: 26)
-                versionLabel.frame = CGRect(x: pagerX + 26, y: y, width: 34, height: rowHeight)
-                nextButton.frame = CGRect(x: pagerX + 60, y: y + 3, width: 26, height: 26)
+                place(previousButton, CGRect(x: pagerX, y: y + 2, width: 28, height: 28))
+                place(versionLabel, CGRect(x: pagerX + 28, y: y, width: 34, height: rowHeight))
+                place(nextButton, CGRect(x: pagerX + 62, y: y + 2, width: 28, height: 28))
             }
         } else {
             let primaryWidth = min(max(104, ceil(primaryButton.intrinsicContentSize.width)), width * 0.5)
-            primaryButton.frame = CGRect(x: left + width - primaryWidth, y: y, width: primaryWidth, height: rowHeight)
-            quickActions.frame = CGRect(x: left, y: y + 1, width: max(0, primaryButton.frame.minX - left - 8), height: rowHeight - 2)
+            place(primaryButton, CGRect(x: left + width - primaryWidth, y: y, width: primaryWidth, height: rowHeight))
+            place(quickActions, CGRect(x: left, y: y + 1, width: max(0, primaryButton.frame.minX - left - 8), height: rowHeight - 2))
         }
 
-        for view in [sourceView, instructionView, draftView] where view.isFocused {
+        for view in [sourceView, instructionView, draftView] where view.showsCaret {
             view.scrollCaretIntoView()
         }
+    }
+
+    /// Sets a frame. The keyboard animates height changes, and inside that
+    /// animation a view that was hidden until now would fly in from wherever
+    /// it last was - or grow out of a zero-size frame in the corner, which is
+    /// how the Back button once ended up a small dot at the left edge. Views
+    /// that are hidden, or were not visible in the previous pass, are placed
+    /// instantly; only views already on screen move smoothly.
+    private func place(_ view: UIView, _ frame: CGRect) {
+        let id = ObjectIdentifier(view)
+        let visible = !view.isHidden
+        if visible && visibleLastPass.contains(id) {
+            view.frame = frame
+        } else {
+            UIView.performWithoutAnimation {
+                view.frame = frame
+                view.layoutIfNeeded()
+            }
+        }
+        if visible { visibleThisPass.insert(id) }
     }
 
     // MARK: Keys
@@ -782,7 +808,15 @@ final class ReplyComposerView: UIView {
         focusedView?.moveCaret(by: offset)
     }
 
-    var textBeforeCursor: String? { focusedView?.textBeforeCaret }
+    /// The text the next keystroke would follow - for auto-capitalization and
+    /// the double-space period. With a reply on screen that is the reply: a
+    /// keystroke there starts editing it at its caret. Nil while nothing can
+    /// be typed (a request is running, or the "field is not empty" question).
+    var textBeforeCursor: String? {
+        if let view = focusedView { return view.textBeforeCaret }
+        if flow.stage == .result { return draftView.textBeforeCaret }
+        return nil
+    }
 
     private func textChanged(in view: ComposerTextView) {
         let field = focusedField
@@ -912,5 +946,101 @@ extension ReplyComposerView: QuickActionRowDelegate {
         instructionView.setText(clamped)
         refresh()
         delegate?.composer(self, didEdit: .instruction, text: clamped)
+    }
+}
+
+// MARK: - Round icon button
+
+/// The composer's round icon buttons: Close, Back, Regenerate, Edit, the
+/// version arrows and the full-message buttons.
+///
+/// Drawn by hand rather than with `UIButton.Configuration`, whose background
+/// is a separate view the button lays out itself - inside the keyboard's
+/// animated height changes that produced a misshapen Back button. Here the
+/// disc is the control's own layer: it is always exactly the frame.
+final class CircleIconButton: UIControl {
+
+    /// Filled buttons sit on a disc; the others are just the glyph.
+    let isFilled: Bool
+
+    var fillColor: UIColor = .white { didSet { refreshAppearance() } }
+    var glyphColor: UIColor = .label { didSet { refreshAppearance() } }
+    var accentColor: UIColor = .systemBlue { didSet { refreshAppearance() } }
+
+    /// "On": an accent disc with a white glyph - Edit while editing.
+    var isSelectedStyle = false { didSet { refreshAppearance() } }
+
+    /// A spinner in place of the glyph while a request runs.
+    var isBusy = false {
+        didSet {
+            guard isBusy != oldValue else { return }
+            imageView.isHidden = isBusy
+            if isBusy { spinner.startAnimating() } else { spinner.stopAnimating() }
+        }
+    }
+
+    override var isEnabled: Bool { didSet { refreshAppearance() } }
+    override var isHighlighted: Bool { didSet { refreshAppearance() } }
+
+    private let imageView = UIImageView()
+    private let spinner = UIActivityIndicatorView(style: .medium)
+    private let pointSize: CGFloat
+    private var symbolName = ""
+
+    init(symbol: String, pointSize: CGFloat, filled: Bool = true) {
+        self.pointSize = pointSize
+        self.isFilled = filled
+        super.init(frame: .zero)
+        imageView.contentMode = .center
+        imageView.isUserInteractionEnabled = false
+        spinner.hidesWhenStopped = true
+        spinner.isUserInteractionEnabled = false
+        addSubview(imageView)
+        addSubview(spinner)
+        isAccessibilityElement = true
+        accessibilityTraits = .button
+        setSymbol(symbol)
+        refreshAppearance()
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) is not used")
+    }
+
+    func setSymbol(_ name: String) {
+        guard name != symbolName else { return }
+        symbolName = name
+        imageView.image = UIImage(
+            systemName: name,
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: pointSize, weight: .semibold)
+        )?.withRenderingMode(.alwaysTemplate)
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        layer.cornerRadius = min(bounds.width, bounds.height) / 2
+        imageView.frame = bounds
+        spinner.center = CGPoint(x: bounds.midX, y: bounds.midY)
+    }
+
+    /// A little more than the drawn disc answers a touch. Neighbours are 6pt
+    /// apart, so 3pt to each side never reaches the next button.
+    override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+        bounds.insetBy(dx: -3, dy: -5).contains(point)
+    }
+
+    private func refreshAppearance() {
+        let selected = isSelectedStyle && isEnabled
+        let glyph = selected ? UIColor.white : glyphColor
+        imageView.tintColor = glyph
+        spinner.color = glyph
+        if selected {
+            backgroundColor = accentColor
+        } else {
+            backgroundColor = isFilled ? fillColor : .clear
+        }
+        alpha = !isEnabled ? 0.35 : (isHighlighted ? 0.55 : 1)
+        accessibilityTraits = isEnabled ? .button : [.button, .notEnabled]
     }
 }

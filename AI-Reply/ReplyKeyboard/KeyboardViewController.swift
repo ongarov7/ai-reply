@@ -1,55 +1,7 @@
 import UIKit
 
-private struct KeyboardPageIdentity: Hashable {
-    let language: KeyboardLanguage
-    let plane: KeyboardPlane
-    let includesInputModeSwitch: Bool
-
-    var contentRowCount: Int {
-        plane == .letters ? language.letterRows.count : plane.rows.count
-    }
-
-    var gridColumns: Int {
-        plane == .letters ? language.gridColumns : plane.gridColumns
-    }
-}
-
-private final class KeyboardPage {
-    let identity: KeyboardPageIdentity
-    let metrics: KeyboardMetrics
-    let stack: UIStackView
-
-    var characterButtons: [KeyButton] = []
-    var shiftButtons: [KeyButton] = []
-    var returnButtons: [KeyButton] = []
-    /// Every key on the page, so a theme change can restyle in place instead of
-    /// throwing the page away and rebuilding it.
-    var allButtons: [KeyButton] = []
-
-    /// Constraints pinning `stack` to the rows container, kept so the page can
-    /// be detached from the view hierarchy completely while it is not the
-    /// active one. `isHidden` excludes a view from DRAWING but not from Auto
-    /// Layout, so leaving every cached page installed made a single layout pass
-    /// solve every cached key rather than only the visible ones.
-    var pinConstraints: [NSLayoutConstraint] = []
-
-    var isInstalled: Bool { stack.superview != nil }
-
-    init(identity: KeyboardPageIdentity, metrics: KeyboardMetrics) {
-        self.identity = identity
-        self.metrics = metrics
-        self.stack = UIStackView()
-        stack.axis = .vertical
-        stack.alignment = .fill
-        stack.distribution = .fillEqually
-        stack.spacing = metrics.rowGap
-        stack.translatesAutoresizingMaskIntoConstraints = false
-    }
-}
-
 /// Opting the input view into system key-click feedback. This is the only
-/// reason `loadView()` is overridden; deleting both this type and `loadView()`
-/// disables the click sound and changes nothing else.
+/// reason `loadView()` is overridden.
 final class ReplyInputView: UIInputView, UIInputViewAudioFeedback {
     var enableInputClicksWhenVisible: Bool { true }
 }
@@ -58,67 +10,58 @@ final class KeyboardViewController: UIInputViewController {
 
     // MARK: State
 
-    /// The LAYOUT being typed on. Drives the character keys and their captions.
+    /// The LAYOUT being typed on.
     private var language = KeyboardLanguageStore.load()
+    private var enabledLanguages = KeyboardLanguageStore.enabledLanguages()
 
-    /// The APP's interface language. Drives every product label - chips,
-    /// Insert, Regenerate, statuses, errors - and nothing else.
-    ///
-    /// PERFORMANCE. Cached in memory and refreshed only when the keyboard
-    /// appears. It is never read from the App Group on a keypress; the typing
-    /// path does not touch `UserDefaults` at all.
+    /// The APP's interface language: every product label follows it. Read
+    /// when the keyboard appears, never on a keypress.
     private var uiLanguage: AppLanguage = SharedSettings.shared.effectiveAppLanguage
 
     private var plane: KeyboardPlane = .letters
-    private var isShifted = false
-    private var isCapsLocked = false
+    private var shift = ShiftState()
+    private var theme = KeyboardTheme(isDark: false)
 
-    private var theme = KeyboardTheme(isDark: true)
-    private var strings = KeyboardStrings.forLanguage(.english)
-    private var metrics = KeyboardMetrics(width: 375, contentRowCount: 3, gridColumns: 10)
+    /// Read after the keyboard is connected to its host; iOS logs a warning
+    /// and may answer wrongly before that.
+    private var showsGlobe = false
 
     // MARK: Views
 
     private let actionBar = KeyboardActionBar()
-    private let rowsContainer = UIView()
+    private let keysView = KeyboardKeysView()
 
     private var heightConstraint: NSLayoutConstraint?
-    private var actionBarHeightConstraint: NSLayoutConstraint?
-    private var rowsTopConstraint: NSLayoutConstraint?
-    private var rowsHeightConstraint: NSLayoutConstraint?
+    private var barHeightConstraint: NSLayoutConstraint?
+    private var keysHeightConstraint: NSLayoutConstraint?
 
-    private var pageCache: [KeyboardPageIdentity: KeyboardPage] = [:]
-    private var activePage: KeyboardPage?
-    private var characterButtons: [KeyButton] = []
-    private var shiftButtons: [KeyButton] = []
-    private var returnButtons: [KeyButton] = []
-    private var renderedWidth: CGFloat = 0
-    private var isUpdatingGeometry = false
-    private var prewarmWorkItem: DispatchWorkItem?
-    private var hasAppeared = false
+    private var sizing: KeyboardSizing?
+    private var shownPage: PageIdentity?
+    private var screenHeight: CGFloat = 812
+
+    private struct PageIdentity: Equatable {
+        let language: KeyboardLanguage
+        let plane: KeyboardPlane
+        let options: KeyboardPageOptions
+        let sizing: KeyboardSizing
+        let areaHeight: CGFloat
+    }
 
     // MARK: Collaborators
 
-    private let replyCoordinator = ReplyFlowCoordinator()
-    /// Draft waiting on a Replace / Add decision because the host field already
-    /// had text in it.
-    private var pendingInsertion: String?
-    /// Guards against reloading the configuration on every appearance when
-    /// nothing has changed.
-    private var configurationLoadedAt: TimeInterval = 0
-    private var deleteRepeatTimer: Timer?
-    private var lastShiftTap: TimeInterval = 0
-    private var lastSpaceTap: TimeInterval = 0
-    private var cachedHostContextBeforeInput: String?
-    private var cachedHostAutocapitalization: UITextAutocapitalizationType = .sentences
-    private var lastHostMutationTime: TimeInterval = 0
-    private var lastAppearanceProbe: TimeInterval = 0
+    private lazy var replyCoordinator = ReplyFlowCoordinator(service: Self.makeService())
 
-    /// Height of the screen this keyboard is on, cached because the composer's
-    /// ceiling is derived from it and `view.window` is nil before the first
-    /// appearance. The default is a mid-size iPhone; the first layout pass with
-    /// a window replaces it.
-    private var screenHeight: CGFloat = 812
+    private var configurationLoadedAt: TimeInterval = 0
+    private var lastSpaceTap: TimeInterval = 0
+    private var spaceCaptionReset: DispatchWorkItem?
+
+    /// The text before the host's caret, kept locally so auto-capitalisation
+    /// and the double-space full stop never need a cross-process read on a
+    /// keystroke. Re-read from the proxy only when the host changed it.
+    private var hostContext: String?
+    private var hostAutocapitalization: UITextAutocapitalizationType = .sentences
+    private var lastHostMutation: TimeInterval = 0
+    private var lastAppearanceProbe: TimeInterval = 0
 
     // MARK: Lifecycle
 
@@ -130,15 +73,15 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        strings = KeyboardStrings.forLanguage(language)
+        view.clipsToBounds = false
         replyCoordinator.delegate = self
         replyCoordinator.uiLanguage = uiLanguage
         actionBar.delegate = self
-        // Seeded from the compact App Group summary, which is a property-list
-        // read of a few hundred bytes, so the FIRST frame already shows this
-        // user's own templates in their own language. The full configuration
-        // still loads off the main thread a moment later for generation.
-        actionBar.setChips(cachedChips())
+        keysView.delegate = self
+
+        // The persona row from the small App Group summary, so the FIRST
+        // frame already shows this user's personas in their language.
+        applyChips(from: nil)
         buildHierarchy()
         seedHeightFromCache()
         registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (controller: KeyboardViewController, _) in
@@ -147,108 +90,49 @@ final class KeyboardViewController: UIInputViewController {
         applyTheme(KeyboardTheme.resolve(
             appearance: textDocumentProxy.keyboardAppearance ?? .default,
             traits: traitCollection
-        ), rerender: false)
+        ))
     }
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         lastAppearanceProbe = Date.timeIntervalSinceReferenceDate
         refreshScreenHeight()
-        refreshUILanguageIfNeeded()
+        reloadSettings()
+        AILimits.reload()
         refreshThemeIfNeeded()
-        refreshAutoShift(allowProxyRead: true)
-        refreshReturnKey()
+        showsGlobe = needsInputModeSwitchKey
+        plane = KeyboardFieldKind.startsOnNumbers(textDocumentProxy.keyboardType ?? .default) ? .numbers : .letters
+        refreshHostContext()
+        layoutKeyboard(force: true)
+        refreshAutoShift()
         loadConfigurationIfNeeded()
-    }
 
-    override func viewWillDisappear(_ animated: Bool) {
-        super.viewWillDisappear(animated)
-        // The host can take the keyboard away mid-touch, in which case the
-        // touch-up that would have stopped this never arrives. Left running,
-        // its next tick re-reads `inputTarget` - which by then says hostField -
-        // and it starts eating the user's message in WhatsApp.
-        deleteRepeatTimer?.invalidate()
-        deleteRepeatTimer = nil
-        // The keyboard is going away. Cancel any request in flight and drop the
-        // copied message and the draft with it - there is nothing left to show
-        // them in, and holding private text past the moment it is useful is
-        // exactly what this app promises not to do.
-        if replyCoordinator.session != nil {
-            replyCoordinator.clear()
-            pendingInsertion = nil
-            actionBar.endComposing()
-            updateGeometry()
+        if let parked = ReplySessionParking.take() {
+            replyCoordinator.restore(parked)
         }
-    }
-
-    /// PERFORMANCE. Profile and templates are read ONCE per appearance, off the
-    /// main thread, and never during a keypress. `ProfileStore` additionally
-    /// skips decoding when the file has not changed, so a keyboard that opens
-    /// and closes repeatedly inside one messenger session pays a `stat` rather
-    /// than a JSON decode.
-    private func loadConfigurationIfNeeded() {
-        let now = Date.timeIntervalSinceReferenceDate
-        guard now - configurationLoadedAt > 1.0 else { return }
-        configurationLoadedAt = now
-
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            let configuration = ProfileStore.shared.load()
-            DispatchQueue.main.async {
-                guard let self else { return }
-                self.replyCoordinator.configuration = configuration
-                self.actionBar.setChips(self.chips(for: configuration))
-            }
-        }
-    }
-
-    /// The template row as the app last saved it, or the defaults on a fresh
-    /// install. One small property-list read, only when the keyboard appears.
-    private func cachedChips() -> [TemplateChip] {
-        if let summaries = SharedSettings.shared.templateSummaries {
-            return summaries.map { TemplateChip(id: $0.id, name: $0.name(for: uiLanguage)) }
-        }
-        return chips(for: .initial)
-    }
-
-    private func chips(for configuration: ReplyConfiguration) -> [TemplateChip] {
-        configuration.visibleTemplates.map {
-            TemplateChip(id: $0.id, name: $0.displayName(appLanguage: uiLanguage))
-        }
-    }
-
-    /// Picks up a language the user changed in the containing app while this
-    /// keyboard was loaded but off screen.
-    ///
-    /// Only on appearance, and only when the value actually changed - relabelling
-    /// the chips is cheap, but doing it for nothing on every appearance is still
-    /// work the typing path would eventually pay for.
-    private func refreshUILanguageIfNeeded() {
-        let current = SharedSettings.shared.effectiveAppLanguage
-        guard current != uiLanguage else { return }
-        uiLanguage = current
-        replyCoordinator.uiLanguage = current
-        actionBar.configure(theme: theme, uiLanguage: current)
-        actionBar.setChips(chips(for: replyCoordinator.configuration))
     }
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        // Nothing optional runs before the keyboard is actually on screen.
-        hasAppeared = true
-        scheduleIdlePrewarm()
+        // Re-checked now that the host connection certainly exists.
+        if needsInputModeSwitchKey != showsGlobe {
+            showsGlobe = needsInputModeSwitchKey
+            layoutKeyboard(force: true)
+        }
+        keysView.hapticsEnabled = hasFullAccess && SharedSettings.shared.keyboardHapticsEnabled
         reportActivityToContainingApp()
+        if hasFullAccess { AILimitsRefresher.refreshIfStale() }
     }
 
-    /// Lets the containing app show a truthful keyboard status. Throttled and
-    /// off the main thread: it must never sit in the appearance path.
-    private func reportActivityToContainingApp() {
-        let fullAccess = hasFullAccess
-        let settings = SharedSettings.shared
-        let lastSeen = settings.keyboardLastSeen
-        let isStale = lastSeen.map { Date().timeIntervalSince($0) > 300 } ?? true
-        guard isStale || settings.keyboardHasFullAccess != fullAccess else { return }
-        DispatchQueue.global(qos: .utility).async {
-            settings.markKeyboardActive(hasFullAccess: fullAccess)
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        // An unfinished reply is kept in memory for a few minutes, so a trip
+        // to another chat to copy a message does not cost the instruction.
+        if replyCoordinator.session != nil {
+            replyCoordinator.park()
+            actionBar.endComposing()
+            keysView.isInputDimmed = false
+            updateGeometry(animated: false)
         }
     }
 
@@ -257,86 +141,141 @@ final class KeyboardViewController: UIInputViewController {
         refreshScreenHeight()
         let width = view.bounds.width
         guard width > 0 else { return }
-        if abs(width - renderedWidth) > 0.5 {
-            invalidateKeyboardPages()
-            renderedWidth = width
-            rebuild()
+        let landscape = KeyboardSizing.isLandscape(width: width, screenHeight: screenHeight)
+        let scale = view.window?.windowScene?.screen.scale ?? traitCollection.displayScale
+        let next = KeyboardSizing(width: width, isLandscape: landscape, scale: scale)
+        if next != sizing {
+            sizing = next
+            layoutKeyboard(force: false)
         }
     }
 
     override func textDidChange(_ textInput: UITextInput?) {
         super.textDidChange(textInput)
         let now = Date.timeIntervalSinceReferenceDate
-        let localMutationIsFresh = now - lastHostMutationTime < 0.45
-
-        // PERFORMANCE. Every `textDocumentProxy` property is a cross-process
-        // read. `textDidChange` fires after every single character, so probing
-        // the host's appearance here put an XPC round-trip in the typing hot
-        // path. Our own insertions can never change the host's appearance, and
-        // when the host does change it a probe within half a second is soon
-        // enough for a colour swap.
-        if !localMutationIsFresh, now - lastAppearanceProbe > 0.5 {
-            lastAppearanceProbe = now
-            refreshThemeIfNeeded()
+        // Our own keystrokes already updated `hostContext`. Anything else -
+        // the user moved the caret, the host cleared the field after sending
+        // - is re-read once.
+        let ownMutation = now - lastHostMutation < 0.45
+        if !ownMutation {
+            refreshHostContext()
+            if now - lastAppearanceProbe > 0.5 {
+                lastAppearanceProbe = now
+                refreshThemeIfNeeded()
+            }
         }
-
-        refreshAutoShift(allowProxyRead: !localMutationIsFresh)
-        if !localMutationIsFresh {
-            refreshReturnKey()
-        }
-    }
-
-    deinit {
-        deleteRepeatTimer?.invalidate()
-        prewarmWorkItem?.cancel()
+        refreshAutoShift()
+        refreshReturnKey()
     }
 
     // MARK: Hierarchy
 
     private func buildHierarchy() {
+        keysView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(actionBar)
-        rowsContainer.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(rowsContainer)
+        view.addSubview(keysView)
 
-        let barHeight = actionBar.heightAnchor.constraint(equalToConstant: metrics.actionBarHeight)
-        let rowsTop = rowsContainer.topAnchor.constraint(
-            equalTo: actionBar.bottomAnchor,
-            constant: metrics.actionBarGap + metrics.topPadding
-        )
-        let rowsHeight = rowsContainer.heightAnchor.constraint(equalToConstant: 200)
-
-        actionBarHeightConstraint = barHeight
-        rowsTopConstraint = rowsTop
-        rowsHeightConstraint = rowsHeight
+        let bar = actionBar.heightAnchor.constraint(equalToConstant: actionBar.compactHeight)
+        let keys = keysView.heightAnchor.constraint(equalToConstant: 216)
+        barHeightConstraint = bar
+        keysHeightConstraint = keys
 
         NSLayoutConstraint.activate([
             actionBar.topAnchor.constraint(equalTo: view.topAnchor),
             actionBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             actionBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            barHeight,
-            rowsTop,
-            rowsHeight,
-            rowsContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: metrics.sidePadding),
-            rowsContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -metrics.sidePadding)
+            bar,
+            keysView.topAnchor.constraint(equalTo: actionBar.bottomAnchor),
+            keysView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            keysView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            keys
         ])
     }
 
-    /// Installs the height constraint from the last measured idle height,
-    /// before anything has been laid out.
-    ///
-    /// PERFORMANCE. The height constraint used to be created inside the first
-    /// `updateGeometry()`, i.e. during the first layout pass. Until then the
-    /// system sizes the input view itself, so every appearance of this keyboard
-    /// began with a visible resize. A cached height makes the first frame
-    /// correct; if it is stale the first real layout overwrites it in the same
-    /// pass, so there is no case where this makes things worse.
+    /// Installs the height from the last idle layout before anything is laid
+    /// out, so the first frame is already the right size.
     private func seedHeightFromCache() {
-        guard heightConstraint == nil,
-              let cached = SharedSettings.shared.keyboardHeight else { return }
+        guard heightConstraint == nil, let cached = SharedSettings.shared.keyboardHeight else { return }
         let constraint = view.heightAnchor.constraint(equalToConstant: CGFloat(cached.height))
         constraint.priority = UILayoutPriority(999)
         constraint.isActive = true
         heightConstraint = constraint
+    }
+
+    // MARK: Settings
+
+    private func reloadSettings() {
+        let settings = SharedSettings.shared
+        let appLanguage = settings.effectiveAppLanguage
+        if appLanguage != uiLanguage {
+            uiLanguage = appLanguage
+            replyCoordinator.uiLanguage = appLanguage
+            actionBar.configure(theme: theme, uiLanguage: appLanguage)
+            applyChips(from: replyCoordinator.configuration)
+        }
+        enabledLanguages = KeyboardLanguageStore.enabledLanguages(settings: settings)
+        let stored = KeyboardLanguageStore.load(settings: settings)
+        if !enabledLanguages.contains(language) || stored != language {
+            language = stored
+        }
+    }
+
+    /// Profile and personas: read once per appearance, off the main thread,
+    /// never during a keypress.
+    private func loadConfigurationIfNeeded() {
+        let now = Date.timeIntervalSinceReferenceDate
+        guard now - configurationLoadedAt > 1.0 else { return }
+        configurationLoadedAt = now
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let configuration = ProfileStore.shared.load()
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.replyCoordinator.configuration = configuration
+                self.applyChips(from: configuration)
+            }
+        }
+    }
+
+    /// Row chips from the full configuration, or - before it has loaded - from
+    /// the compact summary the app keeps in the App Group.
+    private func applyChips(from configuration: ReplyConfiguration?) {
+        let selected = SharedSettings.shared.lastTemplateID
+        if let configuration {
+            let visible = configuration.visibleTemplates
+            let hidden = configuration.templates
+                .filter { !$0.isVisible }
+                .sorted { $0.sortIndex < $1.sortIndex }
+            actionBar.setChips(
+                visible.map { TemplateChip(id: $0.id, name: $0.displayName(appLanguage: uiLanguage)) },
+                more: hidden.map { TemplateChip(id: $0.id, name: $0.displayName(appLanguage: uiLanguage)) },
+                selectedID: selected
+            )
+        } else if let summaries = SharedSettings.shared.templateSummaries {
+            actionBar.setChips(
+                summaries.map { TemplateChip(id: $0.id, name: $0.name(for: uiLanguage)) },
+                more: [],
+                selectedID: selected
+            )
+        } else {
+            let defaults = ReplyConfiguration.initial.visibleTemplates
+            actionBar.setChips(
+                defaults.map { TemplateChip(id: $0.id, name: $0.displayName(appLanguage: uiLanguage)) },
+                more: [],
+                selectedID: selected
+            )
+        }
+    }
+
+    /// Lets the containing app show a truthful keyboard status. Throttled and
+    /// off the main thread.
+    private func reportActivityToContainingApp() {
+        let fullAccess = hasFullAccess
+        let settings = SharedSettings.shared
+        let isStale = settings.keyboardLastSeen.map { Date().timeIntervalSince($0) > 300 } ?? true
+        guard isStale || settings.keyboardHasFullAccess != fullAccess else { return }
+        DispatchQueue.global(qos: .utility).async {
+            settings.markKeyboardActive(hasFullAccess: fullAccess)
+        }
     }
 
     // MARK: Theme
@@ -347,785 +286,467 @@ final class KeyboardViewController: UIInputViewController {
             traits: traitCollection
         )
         guard resolved != theme else { return }
-        applyTheme(resolved, rerender: true)
+        applyTheme(resolved)
     }
 
-    private func applyTheme(_ newTheme: KeyboardTheme, rerender: Bool) {
+    private func applyTheme(_ newTheme: KeyboardTheme) {
         theme = newTheme
         view.backgroundColor = theme.background
         view.tintColor = theme.primaryText
         actionBar.configure(theme: theme, uiLanguage: uiLanguage)
-        guard rerender else { return }
-
-        // A colour change invalidates no geometry, so restyle the cached keys
-        // in place. Discarding the page cache and rebuilding every layout was a
-        // visible hitch whenever the host app flipped between light and dark
-        // while the keyboard was up.
-        UIView.performWithoutAnimation {
-            for page in pageCache.values {
-                for button in page.allButtons {
-                    configureAppearance(button, identity: page.identity, metrics: page.metrics)
-                }
-            }
-        }
+        keysView.configure(theme: theme)
     }
 
-    // MARK: Layout pipeline
+    // MARK: Layout
 
-    private var contentRowCount: Int {
-        plane == .letters ? language.letterRows.count : plane.rows.count
-    }
-
-    private var activePageIdentity: KeyboardPageIdentity {
-        KeyboardPageIdentity(
-            language: language,
-            plane: plane,
-            includesInputModeSwitch: needsInputModeSwitchKey
-        )
-    }
-
-    private func rebuild() {
-        metrics = KeyboardMetrics(
-            width: max(view.bounds.width, 1),
-            contentRowCount: contentRowCount,
-            gridColumns: activePageIdentity.gridColumns
-        )
-        displayActiveKeyboardPage()
-        updateGeometry()
-        scheduleIdlePrewarm()
-    }
-
-    /// Reads the screen this keyboard is actually on. No `UIScreen.main`: an
-    /// extension has a window scene, and the deprecated global is both wrong on
-    /// a second display and a build warning.
     private func refreshScreenHeight() {
         guard let bounds = view.window?.windowScene?.screen.bounds, bounds.height > 0 else { return }
         screenHeight = bounds.height
     }
 
-    /// The tallest the AI area is allowed to become.
-    ///
-    /// THE RULE: the keyboard may grow for the composer, but the conversation
-    /// above it must stay legible. Everything is derived from the live screen
-    /// height, so a 6.7" phone gets a four-line source message and an iPhone SE
-    /// gets a two-line one instead of both getting whichever number was
-    /// hard-coded. The composer fits itself inside this budget; when even its
-    /// minimum does not fit it returns that minimum rather than clipping, which
-    /// is the one case where this is a target and not a hard cap.
-    private func maximumActionBarHeight(rowsHeight: CGFloat) -> CGFloat {
-        var fraction: CGFloat
-        if screenHeight >= 850 {
-            fraction = 0.55
-        } else if screenHeight >= 800 {
-            fraction = 0.56
-        } else if screenHeight >= 700 {
-            fraction = 0.60
-        } else {
-            fraction = 0.64
-        }
-        // Reading the whole copied message is an explicit, momentary request
-        // for room, and the keyboard takes it straight back on collapse. At
-        // rest the composer now sits well under this ceiling, so the ordinary
-        // budget stays where it was.
-        if actionBar.wantsExpandedContext {
-            fraction = min(0.72, fraction + 0.09)
-        }
-        let fixed = metrics.actionBarGap + metrics.topPadding + rowsHeight + metrics.bottomPadding
-        return max(metrics.actionBarHeight, (screenHeight * fraction - fixed).rounded(.down))
+    /// One height for every page of every enabled layout: switching between
+    /// letters, 123 and #+=, or between ҚАЗ, РУС and ENG, never moves the
+    /// host app's content.
+    private var keyAreaHeight: CGFloat {
+        guard let sizing else { return 216 }
+        return sizing.keyAreaHeight(maximumRows: KeyboardLayout.maximumRowCount(languages: enabledLanguages))
     }
 
-    private func updateGeometry() {
-        isUpdatingGeometry = true
-        defer { isUpdatingGeometry = false }
+    private var pageOptions: KeyboardPageOptions {
+        KeyboardPageOptions(
+            showsNextKeyboardKey: showsGlobe,
+            showsLanguageKey: enabledLanguages.count > 1,
+            // The composer's fields are plain text whatever the host field is.
+            field: actionBar.isComposing ? .text : KeyboardFieldKind(textDocumentProxy.keyboardType ?? .default)
+        )
+    }
 
-        activePage?.stack.spacing = metrics.rowGap
-        rowsTopConstraint?.constant = metrics.actionBarGap + metrics.topPadding
+    private func layoutKeyboard(force: Bool) {
+        guard let sizing else { return }
+        let identity = PageIdentity(
+            language: language,
+            plane: plane,
+            options: pageOptions,
+            sizing: sizing,
+            areaHeight: keyAreaHeight
+        )
+        if force || identity != shownPage {
+            shownPage = identity
+            let spec = KeyboardLayout.page(language: language, plane: plane, options: identity.options)
+            let layout = KeyboardGeometry.layout(page: spec, sizing: sizing, areaHeight: identity.areaHeight)
+            UIView.performWithoutAnimation {
+                keysView.show(layout, labels: KeyboardLabels(language), languages: enabledLanguages, currentLanguage: language)
+            }
+        }
+        keysView.setShiftMode(plane == .letters ? shift.mode : .off)
+        refreshReturnKey()
+        updateGeometry(animated: false)
+    }
 
-        let rows = CGFloat(metrics.rowCount)
-        let rowsHeight = rows * metrics.keyHeight + (rows - 1) * metrics.rowGap
-        rowsHeightConstraint?.constant = rowsHeight
+    /// The tallest the AI area may become. The keys never give up height;
+    /// the keyboard grows instead, but the conversation above it must stay
+    /// legible, so the ceiling comes from the live screen height.
+    private func maximumComposerHeight(keysHeight: CGFloat) -> CGFloat {
+        var fraction: CGFloat
+        switch screenHeight {
+        case 850...: fraction = 0.56
+        case 800..<850: fraction = 0.57
+        case 700..<800: fraction = 0.61
+        default: fraction = 0.66
+        }
+        if actionBar.wantsExpandedContext { fraction = min(0.72, fraction + 0.08) }
+        return max(actionBar.compactHeight, (screenHeight * fraction - keysHeight).rounded(.down))
+    }
 
-        // Width first, then the ceiling, then read what the bar settled on:
-        // both of those can change the composer's answer, and asking before
-        // telling would install last frame's height.
-        actionBar.layout(forWidth: metrics.width)
-        actionBar.setMaximumComposerHeight(maximumActionBarHeight(rowsHeight: rowsHeight))
+    private func updateGeometry(animated: Bool) {
+        guard let sizing else { return }
+        let keysHeight = keyAreaHeight
+        keysHeightConstraint?.constant = keysHeight
 
-        // The keys never give up height: the keyboard grows for the composer.
-        let barHeight = max(metrics.actionBarHeight, actionBar.preferredHeight)
-        actionBarHeightConstraint?.constant = barHeight
+        // Width first, then the ceiling, then read what the bar settled on.
+        actionBar.layout(forWidth: sizing.width)
+        actionBar.setMaximumComposerHeight(maximumComposerHeight(keysHeight: keysHeight))
+        let barHeight = actionBar.preferredHeight
+        barHeightConstraint?.constant = barHeight
+        keysView.headroom = barHeight
 
-        let total = barHeight + metrics.actionBarGap + metrics.topPadding + rowsHeight + metrics.bottomPadding
-
-        // Only the IDLE height is cached. Seeding a future launch with the
-        // taller composing height would open the keyboard oversized.
+        let total = barHeight + keysHeight
         if !actionBar.isComposing {
+            // Only the idle height is cached: seeding a launch with the
+            // composer's height would open the keyboard oversized.
             let cached = SharedSettings.shared.keyboardHeight
-            if cached?.height != Double(total) || cached?.width != Double(metrics.width) {
-                // Off the main thread: nothing in this layout pass reads it
-                // back, and it only matters to the NEXT launch.
+            if cached?.height != Double(total) || cached?.width != Double(sizing.width) {
                 let height = Double(total)
-                let width = Double(metrics.width)
+                let width = Double(sizing.width)
                 DispatchQueue.global(qos: .utility).async {
                     SharedSettings.shared.setKeyboardHeight(height, width: width)
                 }
             }
         }
 
+        let changed: Bool
         if let constraint = heightConstraint {
-            if abs(constraint.constant - total) > 0.5 { constraint.constant = total }
+            changed = abs(constraint.constant - total) > 0.5
+            if changed { constraint.constant = total }
         } else {
             let constraint = view.heightAnchor.constraint(equalToConstant: total)
-            // The system installs its own height constraint on the input view;
-            // 999 wins against it without becoming unsatisfiable.
+            // The system installs its own height constraint on the input
+            // view; 999 wins against it without becoming unsatisfiable.
             constraint.priority = UILayoutPriority(999)
             constraint.isActive = true
             heightConstraint = constraint
+            changed = true
         }
 
-        ReplyLog.event(String(
-            format: "layout w=%.0f rows=%d key=%.0f total=%.0f typing=%.0f%%",
-            metrics.width, metrics.rowCount, metrics.keyHeight, total,
-            (metrics.typingHeight / max(total, 1)) * 100
-        ))
-    }
-
-    // MARK: Rendering
-
-    private func displayActiveKeyboardPage() {
-        let identity = activePageIdentity
-        let page = ensureKeyboardPage(for: identity, width: metrics.width)
-
-        if page !== activePage {
-            if let previous = activePage { detach(previous) }
-            install(page)
-        }
-
-        activePage = page
-        characterButtons = page.characterButtons
-        shiftButtons = page.shiftButtons
-        returnButtons = page.returnButtons
-
-        refreshCharacterTitles()
-        refreshShiftAppearance()
-        refreshReturnKey()
-    }
-
-    private func invalidateKeyboardPages() {
-        prewarmWorkItem?.cancel()
-        prewarmWorkItem = nil
-        for page in pageCache.values {
-            detach(page)
-        }
-        pageCache.removeAll()
-        activePage = nil
-        characterButtons.removeAll()
-        shiftButtons.removeAll()
-        returnButtons.removeAll()
-    }
-
-    private func ensureKeyboardPage(for identity: KeyboardPageIdentity, width: CGFloat) -> KeyboardPage {
-        if let cached = pageCache[identity] {
-            return cached
-        }
-
-        let pageMetrics = KeyboardMetrics(
-            width: max(width, 1),
-            contentRowCount: identity.contentRowCount,
-            gridColumns: identity.gridColumns
-        )
-        let page = makeKeyboardPage(for: identity, metrics: pageMetrics)
-        // Deliberately NOT added to the hierarchy here. A cached page that is
-        // not on screen must cost construction only; `install` puts it in when
-        // it becomes the active page.
-        pageCache[identity] = page
-        return page
-    }
-
-    private func install(_ page: KeyboardPage) {
-        guard page.stack.superview !== rowsContainer else { return }
-        page.stack.isHidden = false
-        rowsContainer.addSubview(page.stack)
-        let pins = [
-            page.stack.leadingAnchor.constraint(equalTo: rowsContainer.leadingAnchor),
-            page.stack.trailingAnchor.constraint(equalTo: rowsContainer.trailingAnchor),
-            page.stack.topAnchor.constraint(equalTo: rowsContainer.topAnchor),
-            page.stack.bottomAnchor.constraint(equalTo: rowsContainer.bottomAnchor)
-        ]
-        NSLayoutConstraint.activate(pins)
-        page.pinConstraints = pins
-    }
-
-    private func detach(_ page: KeyboardPage) {
-        guard page.isInstalled else { return }
-        NSLayoutConstraint.deactivate(page.pinConstraints)
-        page.pinConstraints = []
-        page.stack.removeFromSuperview()
-    }
-
-    private func makeKeyboardPage(for identity: KeyboardPageIdentity, metrics: KeyboardMetrics) -> KeyboardPage {
-        let page = KeyboardPage(identity: identity, metrics: metrics)
-        if identity.plane == .letters {
-            renderLetterRows(into: page, metrics: metrics)
-        } else {
-            renderPlaneRows(into: page, metrics: metrics)
-        }
-        page.stack.addArrangedSubview(makeBottomRow(for: identity, page: page, metrics: metrics))
-        return page
-    }
-
-    /// Builds at most ONE not-yet-cached letter page per idle tick, starting
-    /// with the language the language key will switch to next.
-    ///
-    /// PERFORMANCE. The previous version built all three language layouts in a
-    /// single `DispatchQueue.main.async` block scheduled from `rebuild()` -
-    /// roughly 120 `UIButton`s, their SF Symbol image lookups and their
-    /// constraints, on the main thread, at the exact moment the user had just
-    /// switched to this keyboard and was waiting to see it. That block is the
-    /// main reason switching to the keyboard stuttered. Now nothing is
-    /// prewarmed until the keyboard is actually on screen, and the work is
-    /// spread one page per runloop turn so no single turn is long enough to
-    /// drop a frame.
-    private func scheduleIdlePrewarm() {
-        guard hasAppeared else { return }
-        prewarmWorkItem?.cancel()
-        prewarmWorkItem = nil
-
-        let width = renderedWidth
-        guard width > 0 else { return }
-
-        let includesInputModeSwitch = needsInputModeSwitchKey
-        let order: [KeyboardLanguage] = [language.next, language.next.next, language]
-        let pending = order
-            .map {
-                KeyboardPageIdentity(
-                    language: $0,
-                    plane: .letters,
-                    includesInputModeSwitch: includesInputModeSwitch
-                )
-            }
-            .first { pageCache[$0] == nil }
-        guard let next = pending else { return }
-
-        let work = DispatchWorkItem { [weak self] in
-            guard let self else { return }
-            self.prewarmWorkItem = nil
-            guard abs(self.renderedWidth - width) <= 0.5 else { return }
-            if self.pageCache[next] == nil {
-                UIView.performWithoutAnimation {
-                    _ = self.ensureKeyboardPage(for: next, width: width)
-                }
-            }
-            self.scheduleIdlePrewarm()
-        }
-        prewarmWorkItem = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: work)
-    }
-
-    private func renderLetterRows(into page: KeyboardPage, metrics: KeyboardMetrics) {
-        let language = page.identity.language
-        let rows = language.letterRows
-        let columns = language.gridColumns
-        let unit = metrics.unitWidth(columns: columns)
-
-        for (index, row) in rows.enumerated() {
-            let keys = row.map { KeyboardKey.character($0) }
-            if language.rowFillsWidth(at: index) {
-                page.stack.addArrangedSubview(makeEvenRow(keys, page: page, metrics: metrics))
-            } else if index == rows.count - 1 {
-                page.stack.addArrangedSubview(makeShiftedRow(keys, unit: unit, page: page, metrics: metrics))
-            } else {
-                page.stack.addArrangedSubview(makeGridRow(keys, unit: unit, columns: columns, page: page, metrics: metrics))
-            }
-        }
-    }
-
-    private func renderPlaneRows(into page: KeyboardPage, metrics: KeyboardMetrics) {
-        let plane = page.identity.plane
-        let rows = plane.rows
-        let unit = metrics.unitWidth(columns: plane.gridColumns)
-
-        for (index, row) in rows.enumerated() {
-            let keys = row.map { KeyboardKey.character($0) }
-            if index == rows.count - 1 {
-                let alternate: KeyboardPlaneTarget = plane == .numbers ? .symbols : .numbers
-                let full: [KeyboardKey] = [.plane(alternate)] + keys + [.backspace]
-                page.stack.addArrangedSubview(makeEvenRow(full, page: page, metrics: metrics))
-            } else {
-                page.stack.addArrangedSubview(makeGridRow(keys, unit: unit, columns: plane.gridColumns, page: page, metrics: metrics))
-            }
-        }
-    }
-
-    /// Row whose keys sit on the shared grid, centred when it holds fewer keys
-    /// than the grid has columns.
-    private func makeGridRow(_ keys: [KeyboardKey], unit: CGFloat, columns: Int, page: KeyboardPage, metrics: KeyboardMetrics) -> UIStackView {
-        let row = makeRowStack(metrics: metrics)
-        let needsPadding = keys.count < columns
-
-        var leadingSpacer: KeyRowSpacer?
-        if needsPadding {
-            let spacer = KeyRowSpacer()
-            leadingSpacer = spacer
-            row.addArrangedSubview(spacer)
-        }
-
-        for key in keys {
-            let button = makeButton(for: key, page: page, metrics: metrics)
-            pin(button, width: unit)
-            row.addArrangedSubview(button)
-        }
-
-        if let leadingSpacer {
-            let trailingSpacer = KeyRowSpacer()
-            row.addArrangedSubview(trailingSpacer)
-            trailingSpacer.widthAnchor.constraint(equalTo: leadingSpacer.widthAnchor).isActive = true
-        }
-        return row
-    }
-
-    /// Last letter row: shift, the letters, delete. Shift and delete absorb the
-    /// leftover width so they stay comfortably wide.
-    private func makeShiftedRow(_ keys: [KeyboardKey], unit: CGFloat, page: KeyboardPage, metrics: KeyboardMetrics) -> UIStackView {
-        let row = makeRowStack(metrics: metrics)
-        let slots = keys.count + 2
-        let gaps = CGFloat(slots - 1) * metrics.columnGap
-        let leftover = metrics.availableRowWidth - gaps - CGFloat(keys.count) * unit
-        let sideWidth = max(unit, (leftover / 2).rounded(.down))
-
-        let shift = makeButton(for: .shift, page: page, metrics: metrics)
-        pin(shift, width: sideWidth)
-        if sideWidth < 40 { shift.touchInset = -3 }
-        row.addArrangedSubview(shift)
-
-        for key in keys {
-            let button = makeButton(for: key, page: page, metrics: metrics)
-            pin(button, width: unit)
-            row.addArrangedSubview(button)
-        }
-
-        let backspace = makeButton(for: .backspace, page: page, metrics: metrics)
-        pin(backspace, width: sideWidth)
-        if sideWidth < 40 { backspace.touchInset = -3 }
-        row.addArrangedSubview(backspace)
-        return row
-    }
-
-    /// Row that spreads its keys edge to edge (Kazakh letter row, symbol rows).
-    private func makeEvenRow(_ keys: [KeyboardKey], page: KeyboardPage, metrics: KeyboardMetrics) -> UIStackView {
-        let row = makeRowStack(metrics: metrics)
-        row.distribution = .fillEqually
-        keys.map { makeButton(for: $0, page: page, metrics: metrics) }.forEach(row.addArrangedSubview)
-        return row
-    }
-
-    private func makeBottomRow(for identity: KeyboardPageIdentity, page: KeyboardPage, metrics: KeyboardMetrics) -> UIStackView {
-        let row = makeRowStack(metrics: metrics)
-        let planeTarget: KeyboardPlaneTarget = identity.plane == .letters ? .numbers : .letters
-
-        let planeKey = makeButton(for: .plane(planeTarget), page: page, metrics: metrics)
-        pin(planeKey, width: metrics.controlKeyWidth)
-        row.addArrangedSubview(planeKey)
-
-        // Preserve system keyboard switching exactly as iOS expects it: tap
-        // advances, long press opens the system input-mode list.
-        if identity.includesInputModeSwitch {
-            let globe = makeButton(for: .globe, page: page, metrics: metrics)
-            pin(globe, width: metrics.controlKeyWidth)
-            row.addArrangedSubview(globe)
-        }
-
-        let languageKey = makeButton(for: .language, page: page, metrics: metrics)
-        pin(languageKey, width: metrics.controlKeyWidth)
-        row.addArrangedSubview(languageKey)
-
-        let space = makeButton(for: .space, page: page, metrics: metrics)
-        space.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        space.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        row.addArrangedSubview(space)
-
-        let returnKey = makeButton(for: .ret, page: page, metrics: metrics)
-        pin(returnKey, width: metrics.returnKeyWidth)
-        row.addArrangedSubview(returnKey)
-
-        return row
-    }
-
-    /// Key widths are pinned just below `required` so sub-point rounding can
-    /// never produce an unsatisfiable row.
-    private func pin(_ button: KeyButton, width: CGFloat) {
-        let constraint = button.widthAnchor.constraint(equalToConstant: width)
-        constraint.priority = UILayoutPriority(999)
-        constraint.isActive = true
-    }
-
-    private func makeRowStack(metrics: KeyboardMetrics) -> UIStackView {
-        let row = UIStackView()
-        row.axis = .horizontal
-        row.alignment = .fill
-        row.distribution = .fill
-        row.spacing = metrics.columnGap
-        return row
-    }
-
-    // MARK: Buttons
-
-    private func makeButton(for key: KeyboardKey, page: KeyboardPage, metrics: KeyboardMetrics) -> KeyButton {
-        let button = KeyButton(key: key)
-        configureAppearance(button, identity: page.identity, metrics: metrics)
-        attachActions(to: button)
-        page.allButtons.append(button)
-        if case .character = key { page.characterButtons.append(button) }
-        if case .shift = key { page.shiftButtons.append(button) }
-        if case .ret = key { page.returnButtons.append(button) }
-        return button
-    }
-
-    private func configureAppearance(_ button: KeyButton, identity: KeyboardPageIdentity? = nil, metrics: KeyboardMetrics? = nil) {
-        let identity = identity ?? activePageIdentity
-        let metrics = metrics ?? activePage?.metrics ?? self.metrics
-        let strings = KeyboardStrings.forLanguage(identity.language)
-
-        switch button.key {
-        case .character(let value):
-            let title = identity.plane == .letters ? displayed(value) : value
-            let compact = metrics.unitWidth(columns: identity.gridColumns) < 30
-            button.setText(title, size: metrics.fontSize(for: compact ? .compactCharacter : .character))
-            button.apply(style: .letter, theme: theme, metrics: metrics)
-
-        case .shift:
-            let symbol = isCapsLocked ? "capslock.fill" : (isShifted ? "shift.fill" : "shift")
-            button.setSymbol(symbol, pointSize: 17, weight: .light)
-            button.apply(style: (isShifted || isCapsLocked) ? .engaged : .special, theme: theme, metrics: metrics)
-
-        case .backspace:
-            button.setSymbol("delete.left", pointSize: 17, weight: .light)
-            button.apply(style: .special, theme: theme, metrics: metrics)
-
-        case .plane(let target):
-            button.setText(target.title, size: metrics.fontSize(for: .control), weight: .regular)
-            button.apply(style: .special, theme: theme, metrics: metrics)
-
-        case .globe:
-            button.setSymbol("globe", pointSize: 17, weight: .light)
-            button.apply(style: .special, theme: theme, metrics: metrics)
-
-        case .language:
-            button.setText(strings.languageBadge, size: 13, weight: .semibold)
-            button.apply(style: .special, theme: theme, metrics: metrics)
-
-        case .space:
-            button.setText(strings.spaceKey, size: metrics.fontSize(for: .space))
-            button.apply(style: .letter, theme: theme, metrics: metrics)
-
-        case .ret:
-            let type: UIReturnKeyType = isComposing ? .default : (textDocumentProxy.returnKeyType ?? .default)
-            button.setText(strings.returnLabel(for: type), size: metrics.fontSize(for: .control))
-            let prominent = KeyboardStrings.returnKeyIsProminent(type)
-            button.apply(style: prominent ? .prominent : .special, theme: theme, metrics: metrics)
-        }
-    }
-
-    private func attachActions(to button: KeyButton) {
-        switch button.key {
-        case .globe:
-            button.addTarget(
-                self,
-                action: #selector(handleInputModeList(from:with:)),
-                for: .allTouchEvents
-            )
-        case .backspace:
-            button.addTarget(self, action: #selector(backspaceDown(_:)), for: .touchDown)
-            button.addTarget(
-                self,
-                action: #selector(backspaceUp(_:)),
-                for: [.touchUpInside, .touchUpOutside, .touchCancel, .touchDragExit]
-            )
-        default:
-            let event: UIControl.Event = button.key.firesOnTouchDown ? .touchDown : .touchUpInside
-            button.addTarget(self, action: #selector(keyPressed(_:)), for: event)
+        if animated, changed {
+            UIView.animate(withDuration: 0.18) { self.view.layoutIfNeeded() }
         }
     }
 
     // MARK: Input routing
 
-    /// The keyboard has exactly two possible destinations for a key press and
-    /// never guesses between them: the host application's field, or the reply
-    /// draft inside the composer.
-    private var isComposing: Bool { actionBar.isComposing }
-
-    /// Where a keystroke goes. While the composer is open and a field is
-    /// focused, keys edit THAT FIELD - the instruction, the quoted source or
-    /// the generated draft - and never reach WhatsApp; while a request is in
-    /// flight, or the conflict prompt is up, they are dropped rather than
-    /// leaking into the host field.
-    private enum InputTarget {
-        case hostField
-        case composerField
-        case discarded
+    /// Where a keystroke goes. The keyboard never guesses between the host
+    /// field and the composer: while the composer is open the keys edit ITS
+    /// focused field, and while a request is running they go nowhere.
+    private enum Target {
+        case host
+        case composer
+        case nowhere
     }
 
-    private var inputTarget: InputTarget {
-        guard actionBar.isComposing else { return .hostField }
-        return actionBar.acceptsTextInput ? .composerField : .discarded
+    private var target: Target {
+        guard actionBar.isComposing else { return .host }
+        return actionBar.acceptsTextInput ? .composer : .nowhere
     }
 
-    private func targetInsert(_ text: String) {
-        switch inputTarget {
-        case .hostField:     insertIntoHost(text)
-        case .composerField: actionBar.insertText(text)
-        case .discarded:     break
-        }
+    /// With a reply on screen, typing means "let me change it": the reply
+    /// becomes editable and the key lands in it.
+    private func prepareComposerForTyping() {
+        guard actionBar.isComposing, !actionBar.acceptsTextInput else { return }
+        _ = replyCoordinator.beginEditingForTyping()
     }
 
-    private func targetDeleteBackward() {
-        switch inputTarget {
-        case .hostField:     deleteFromHost()
-        case .composerField: actionBar.deleteBackward()
-        case .discarded:     break
-        }
-    }
-
-    private func insertIntoHost(_ text: String) {
-        textDocumentProxy.insertText(text)
-        recordHostInsertion(text)
-    }
-
-    private func deleteFromHost() {
-        textDocumentProxy.deleteBackward()
-        recordHostDeletion()
-    }
-
-    private func targetTextBeforeCursor(allowProxyRead: Bool) -> String? {
-        if inputTarget != .hostField {
-            return actionBar.textBeforeCursor
-        }
-        if allowProxyRead || cachedHostContextBeforeInput == nil {
-            refreshCachedHostContextFromProxy()
-        }
-        return cachedHostContextBeforeInput
-    }
-
-    private var targetAutocapitalization: UITextAutocapitalizationType {
-        inputTarget == .hostField ? cachedHostAutocapitalization : .sentences
-    }
-
-    private func refreshCachedHostContextFromProxy() {
-        let context = textDocumentProxy.documentContextBeforeInput ?? ""
-        cachedHostContextBeforeInput = String(context.suffix(180))
-        cachedHostAutocapitalization = textDocumentProxy.autocapitalizationType ?? .sentences
-    }
-
-    private func recordHostInsertion(_ text: String) {
-        guard !text.isEmpty else { return }
-        var context = cachedHostContextBeforeInput ?? ""
-        context.append(text)
-        cachedHostContextBeforeInput = String(context.suffix(180))
-        lastHostMutationTime = Date.timeIntervalSinceReferenceDate
-    }
-
-    private func recordHostDeletion() {
-        guard var context = cachedHostContextBeforeInput, !context.isEmpty else {
-            lastHostMutationTime = Date.timeIntervalSinceReferenceDate
-            return
-        }
-        context.removeLast()
-        cachedHostContextBeforeInput = String(context.suffix(180))
-        lastHostMutationTime = Date.timeIntervalSinceReferenceDate
-    }
-
-    // MARK: Key handling
-
-    @objc private func keyPressed(_ sender: KeyButton) {
-        // Silence on a dropped key is the only signal the keyboard has that
-        // the key went nowhere. Clicking for input that is discarded - which
-        // is every key in the result and generating stages - reads as a broken
-        // keyboard rather than "tap Edit first".
-        if inputTarget != .discarded || !sender.key.editsText {
-            UIDevice.current.playInputClick()
-        }
-        switch sender.key {
-        case .character(let value):
-            insertCharacter(plane == .letters ? displayed(value) : value)
-        case .shift:
-            toggleShift()
-        case .space:
-            insertSpace()
-        case .ret:
-            targetInsert("\n")
-            refreshAutoShift()
-        case .plane(let target):
-            plane = target.plane
-            isShifted = false
-            isCapsLocked = false
-            UIView.performWithoutAnimation {
-                rebuild()
-                view.layoutIfNeeded()
-            }
-            refreshAutoShift()
-        case .language:
-            cycleLanguage()
-        case .globe, .backspace:
+    private func insert(_ text: String) {
+        switch target {
+        case .host:
+            textDocumentProxy.insertText(text)
+            var context = hostContext ?? ""
+            context.append(text)
+            hostContext = String(context.suffix(200))
+            lastHostMutation = Date.timeIntervalSinceReferenceDate
+        case .composer:
+            actionBar.insertText(text)
+        case .nowhere:
             break
         }
     }
 
-    private func displayed(_ value: String) -> String {
-        (isShifted || isCapsLocked) ? value.uppercased() : value
+    private func deleteCharacter() {
+        switch target {
+        case .host:
+            textDocumentProxy.deleteBackward()
+            if var context = hostContext, !context.isEmpty {
+                context.removeLast()
+                hostContext = context
+            } else {
+                hostContext = nil
+            }
+            lastHostMutation = Date.timeIntervalSinceReferenceDate
+        case .composer:
+            actionBar.deleteBackward()
+        case .nowhere:
+            break
+        }
     }
 
-    private func insertCharacter(_ value: String) {
-        targetInsert(value)
-        if plane == .letters, isShifted, !isCapsLocked {
-            isShifted = false
-            refreshCharacterTitles()
-            refreshShiftAppearance()
+    private func deleteWord() {
+        switch target {
+        case .host:
+            // One fresh read per word: holding delete is a rare, deliberate
+            // gesture, and deleting against a stale context would eat the
+            // wrong amount of text.
+            let context = textDocumentProxy.documentContextBeforeInput ?? ""
+            let count = TextDeletion.wordLength(before: context)
+            guard count > 0 else { return }
+            for _ in 0..<count { textDocumentProxy.deleteBackward() }
+            hostContext = String(context.dropLast(count).suffix(200))
+            lastHostMutation = Date.timeIntervalSinceReferenceDate
+        case .composer:
+            actionBar.deleteWordBackward()
+        case .nowhere:
+            break
+        }
+    }
+
+    private var textBeforeCursor: String? {
+        switch target {
+        case .host: return hostContext
+        // With a reply on screen the next keystroke starts editing it, so
+        // the reply's text decides the shift state, not "start of text".
+        case .composer, .nowhere: return actionBar.textBeforeCursor
+        }
+    }
+
+    private func refreshHostContext() {
+        hostContext = (textDocumentProxy.documentContextBeforeInput).map { String($0.suffix(200)) }
+        hostAutocapitalization = textDocumentProxy.autocapitalizationType ?? .sentences
+    }
+
+    // MARK: Shift and return
+
+    /// Auto-capitalisation: shift turns itself on at a sentence start and an
+    /// automatic shift turns itself off when the caret leaves one. A shift the
+    /// user set by hand is never overridden.
+    private func refreshAutoShift() {
+        guard plane == .letters else { return }
+        let before = textBeforeCursor
+        // While nothing can be typed (a request is running) the keys keep
+        // their case instead of flipping to capitals.
+        if target == .nowhere, before == nil { return }
+        let type: UITextAutocapitalizationType = target == .host ? hostAutocapitalization : .sentences
+        let should = AutoCapitalization.shouldCapitalize(before: before, type: type)
+        shift.applyAutomatic(should)
+        keysView.setShiftMode(shift.mode)
+    }
+
+    private func refreshReturnKey() {
+        let labels = KeyboardLabels(language)
+        if actionBar.isComposing {
+            keysView.setReturnKey(labels.returnKey(for: .default), prominent: false, enabled: target == .composer)
+            return
+        }
+        let type = textDocumentProxy.returnKeyType ?? .default
+        // `enablesReturnKeyAutomatically`: iOS greys return out while the
+        // field is empty, and so does this keyboard.
+        let enabled = !(textDocumentProxy.enablesReturnKeyAutomatically ?? false) || textDocumentProxy.hasText
+        keysView.setReturnKey(
+            labels.returnKey(for: type),
+            prominent: KeyboardLabels.returnKeyIsProminent(type),
+            enabled: enabled
+        )
+    }
+
+    // MARK: Layout switching
+
+    private func switchLanguage(to next: KeyboardLanguage) {
+        guard next != language || plane != .letters else { return }
+        language = next
+        KeyboardLanguageStore.saveAsync(next)
+        plane = .letters
+        shift.reset()
+        layoutKeyboard(force: true)
+        refreshAutoShift()
+        flashLanguageName()
+    }
+
+    /// The layout's own name on the space bar for a moment, the way iOS
+    /// confirms a switch.
+    private func flashLanguageName() {
+        spaceCaptionReset?.cancel()
+        keysView.setSpaceCaption(language.nativeName)
+        let reset = DispatchWorkItem { [weak self] in self?.keysView.setSpaceCaption(nil) }
+        spaceCaptionReset = reset
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2, execute: reset)
+    }
+
+    // MARK: Composer
+
+    private var aiStrings: AIReplyStrings { AIReplyStrings.forLanguage(uiLanguage) }
+
+    private func renderComposer() {
+        guard let session = replyCoordinator.session, replyCoordinator.isComposing else { return }
+        let flow = session.flow
+        let message = flow.error.map { aiStrings.message(for: $0) }
+        actionBar.render(ReplyComposerView.Content(
+            personaName: session.template.displayName(appLanguage: uiLanguage),
+            source: session.sourceMessage,
+            instruction: session.instruction,
+            flow: flow,
+            errorMessage: (message?.isEmpty ?? true) ? nil : message,
+            sourceLimit: AILimits.current.sourceCharacters,
+            instructionLimit: ReplyInstruction.maximumCharacters
+        ))
+        keysView.isInputDimmed = flow.isGenerating
+        refreshReturnKey()
+        updateGeometry(animated: true)
+    }
+
+    private func closeComposer() {
+        replyCoordinator.clear()
+        actionBar.endComposing()
+        keysView.isInputDimmed = false
+        layoutKeyboard(force: false)
+        updateGeometry(animated: true)
+        refreshHostContext()
+        refreshAutoShift()
+    }
+
+    private func insertReply() {
+        switch replyCoordinator.requestInsert(hostHasText: hostFieldHasText()) {
+        case .insert(let text):
+            finishInsert(text)
+        case .askAboutExistingText, .nothing:
+            break
+        }
+    }
+
+    private func resolveConflict(_ choice: ReplyComposerFlow.ConflictChoice) {
+        switch replyCoordinator.resolveConflict(choice) {
+        case .replace(let text):
+            clearHostField()
+            finishInsert(text)
+        case .append(let text):
+            finishInsert(separatorForAppend() + text)
+        case .cancelled:
+            break
+        }
+    }
+
+    /// The one place a reply reaches the host application. It is typed into
+    /// the field and nothing more: sending stays the user's decision.
+    private func finishInsert(_ text: String) {
+        textDocumentProxy.insertText(text)
+        lastHostMutation = Date.timeIntervalSinceReferenceDate
+        closeComposer()
+    }
+
+    /// Conservative: a host can legitimately report nothing, and treating
+    /// "no context" as "empty" only means inserting into a field that was
+    /// already empty.
+    private func hostFieldHasText() -> Bool {
+        let before = textDocumentProxy.documentContextBeforeInput ?? ""
+        let after = textDocumentProxy.documentContextAfterInput ?? ""
+        return !(before + after).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func separatorForAppend() -> String {
+        guard let last = (textDocumentProxy.documentContextBeforeInput ?? "").last else { return "" }
+        return last.isWhitespace ? "" : " "
+    }
+
+    /// Empties the host field for Replace.
+    ///
+    /// `deleteBackward()` is the only deletion a keyboard has, so the caret is
+    /// first moved to the end - otherwise the text after it would survive -
+    /// and the context is re-read once per batch, not once per character. The
+    /// round limit is deliberate: a runaway loop in another app's field is
+    /// worse than a few characters left behind.
+    private func clearHostField() {
+        let after = textDocumentProxy.documentContextAfterInput ?? ""
+        if !after.isEmpty {
+            textDocumentProxy.adjustTextPosition(byCharacterOffset: (after as NSString).length)
+        }
+        var rounds = 0
+        while rounds < 12 {
+            let before = textDocumentProxy.documentContextBeforeInput ?? ""
+            if before.isEmpty { break }
+            for _ in 0..<min(before.count, 500) { textDocumentProxy.deleteBackward() }
+            rounds += 1
+        }
+        hostContext = ""
+    }
+
+    // MARK: Debug
+
+    private static func makeService() -> AIReplyService {
+        #if DEBUG
+        if DebugReplyMock.isEnabled {
+            return AIReplyService(transportOverride: { request, _ in DebugReplyMock(instruction: request.instruction) })
+        }
+        #endif
+        return AIReplyService()
+    }
+}
+
+// MARK: - Keys
+
+extension KeyboardViewController: KeyboardKeysViewDelegate {
+
+    func keysView(_ view: KeyboardKeysView, didType text: String) {
+        prepareComposerForTyping()
+        let isLetter = plane == .letters && text.count == 1 && (text.first?.isLetter ?? false)
+        insert(isLetter ? shift.apply(to: text) : text)
+        if plane == .letters {
+            shift.characterTyped()
+        } else if text == "'" {
+            // As on iOS: an apostrophe from 123 goes back to letters, so
+            // "don't" does not need a second switch.
+            plane = .letters
+            layoutKeyboard(force: false)
         }
         refreshAutoShift()
     }
 
-    private func insertSpace() {
-        let now = Date.timeIntervalSinceReferenceDate
-        let before = targetTextBeforeCursor(allowProxyRead: false) ?? ""
-        let doubleTap = now - lastSpaceTap < 0.35
-        let previous = before.dropLast().last
+    func keysViewDidTapShift(_ view: KeyboardKeysView) {
+        guard plane == .letters else { return }
+        shift.tap(at: Date.timeIntervalSinceReferenceDate)
+        keysView.setShiftMode(shift.mode)
+    }
 
-        if doubleTap, before.hasSuffix(" "), let previous, previous.isLetter || previous.isNumber {
-            targetDeleteBackward()
-            targetInsert(". ")
+    func keysView(_ view: KeyboardKeysView, didDelete unit: KeyboardKeysView.DeleteUnit) {
+        prepareComposerForTyping()
+        switch unit {
+        case .character: deleteCharacter()
+        case .word: deleteWord()
+        }
+        refreshAutoShift()
+    }
+
+    func keysViewDidTapSpace(_ view: KeyboardKeysView) {
+        prepareComposerForTyping()
+        let now = Date.timeIntervalSinceReferenceDate
+        if SpaceShortcut.shouldInsertPeriod(before: textBeforeCursor, secondsSinceLastSpace: now - lastSpaceTap) {
+            deleteCharacter()
+            insert(". ")
             lastSpaceTap = 0
         } else {
-            targetInsert(" ")
+            insert(" ")
             lastSpaceTap = now
         }
         refreshAutoShift()
     }
 
-    private func toggleShift() {
-        let now = Date.timeIntervalSinceReferenceDate
-        if now - lastShiftTap < 0.35 {
-            isCapsLocked = true
-            isShifted = true
-        } else if isCapsLocked {
-            isCapsLocked = false
-            isShifted = false
-        } else {
-            isShifted.toggle()
-        }
-        lastShiftTap = now
-        refreshCharacterTitles()
-        refreshShiftAppearance()
-    }
-
-    private func cycleLanguage() {
-        language = language.next
-        KeyboardLanguageStore.saveAsync(language)
-        strings = KeyboardStrings.forLanguage(language)
-        plane = .letters
-        isShifted = false
-        isCapsLocked = false
-        actionBar.configure(theme: theme, uiLanguage: uiLanguage)
-        UIView.performWithoutAnimation {
-            rebuild()
-            view.layoutIfNeeded()
-        }
+    func keysViewDidTapReturn(_ view: KeyboardKeysView) {
+        prepareComposerForTyping()
+        insert("\n")
         refreshAutoShift()
     }
 
-    // MARK: Delete repeat
-
-    @objc private func backspaceDown(_ sender: KeyButton) {
-        // Nothing to delete from, so no click and - more importantly - no
-        // repeat timer for a key that will do nothing 12 times a second.
-        guard inputTarget != .discarded else { return }
-        UIDevice.current.playInputClick()
-        targetDeleteBackward()
-        deleteRepeatTimer?.invalidate()
-        let timer = Timer(timeInterval: 0.45, repeats: false) { [weak self] _ in
-            self?.startAcceleratedDelete()
-        }
-        RunLoop.main.add(timer, forMode: .common)
-        deleteRepeatTimer = timer
-    }
-
-    private func startAcceleratedDelete() {
-        deleteRepeatTimer?.invalidate()
-        let timer = Timer(timeInterval: 0.085, repeats: true) { [weak self] _ in
-            guard let self else { return }
-            self.targetDeleteBackward()
-        }
-        RunLoop.main.add(timer, forMode: .common)
-        deleteRepeatTimer = timer
-    }
-
-    @objc private func backspaceUp(_ sender: KeyButton) {
-        deleteRepeatTimer?.invalidate()
-        deleteRepeatTimer = nil
+    func keysView(_ view: KeyboardKeysView, didSelectPlane selected: KeyboardPlane) {
+        plane = selected
+        if selected != .letters { shift.reset() }
+        layoutKeyboard(force: false)
         refreshAutoShift()
     }
 
-    // MARK: Incremental refresh
-
-    private func refreshCharacterTitles() {
-        guard let activePage, activePage.identity.plane == .letters else { return }
-        let metrics = activePage.metrics
-        let compact = metrics.unitWidth(columns: activePage.identity.gridColumns) < 30
-        let size = metrics.fontSize(for: compact ? .compactCharacter : .character)
-        for button in characterButtons {
-            guard case .character(let value) = button.key else { continue }
-            button.setText(displayed(value), size: size)
-        }
+    func keysViewDidTapNextLanguage(_ view: KeyboardKeysView) {
+        switchLanguage(to: language.next(in: enabledLanguages))
     }
 
-    private func refreshShiftAppearance() {
-        let metrics = activePage?.metrics ?? self.metrics
-        for button in shiftButtons {
-            let symbol = isCapsLocked ? "capslock.fill" : (isShifted ? "shift.fill" : "shift")
-            button.setSymbol(symbol, pointSize: 17, weight: .light)
-            button.apply(
-                style: (isShifted || isCapsLocked) ? .engaged : .special,
-                theme: theme,
-                metrics: metrics
-            )
-        }
+    func keysView(_ view: KeyboardKeysView, didPickLanguage picked: KeyboardLanguage) {
+        switchLanguage(to: picked)
     }
 
-    private func refreshReturnKey() {
-        // Cheap enough: the return key is the only view that depends on the
-        // host's returnKeyType and it can change while the keyboard is up.
-        guard let activePage else { return }
-        for button in returnButtons {
-            configureAppearance(button, identity: activePage.identity, metrics: activePage.metrics)
-        }
+    /// The system globe: tap for the next keyboard, hold for the list. iOS
+    /// needs every touch event to tell the two apart.
+    func keysView(_ view: KeyboardKeysView, didSendNextKeyboardEvent event: UIEvent, from keyView: UIView) {
+        handleInputModeList(from: keyView, with: event)
     }
 
-    /// Turns shift on at sentence starts. It never turns shift off - that is
-    /// handled once, at insertion time - so a manual shift is never fought.
-    private func refreshAutoShift(allowProxyRead: Bool = false) {
-        guard plane == .letters, !isCapsLocked, !isShifted else { return }
-        guard targetAutocapitalization == .sentences else { return }
-        guard Self.isAtSentenceStart(targetTextBeforeCursor(allowProxyRead: allowProxyRead)) else { return }
-        isShifted = true
-        refreshCharacterTitles()
-        refreshShiftAppearance()
+    func keysViewDidRequestNextKeyboard(_ view: KeyboardKeysView) {
+        advanceToNextInputMode()
     }
 
-    private static func isAtSentenceStart(_ context: String?) -> Bool {
-        guard let context, !context.isEmpty else { return true }
-        var index = context.endIndex
-        var trailingSpaces = 0
-        while index > context.startIndex {
-            let previous = context.index(before: index)
-            guard context[previous] == " " else { break }
-            trailingSpaces += 1
-            index = previous
+    func keysView(_ view: KeyboardKeysView, moveCursorBy offset: Int) {
+        switch target {
+        case .host:
+            textDocumentProxy.adjustTextPosition(byCharacterOffset: offset)
+            lastHostMutation = 0
+        case .composer:
+            actionBar.moveCaret(by: offset)
+        case .nowhere:
+            break
         }
-        guard index > context.startIndex else { return true }
-        let lastIndex = context.index(before: index)
-        let last = context[lastIndex]
-        if last == "\n" { return true }
-        guard trailingSpaces > 0 else { return false }
-        return last == "." || last == "!" || last == "?"
     }
 }
 
@@ -1133,225 +754,75 @@ final class KeyboardViewController: UIInputViewController {
 
 extension KeyboardViewController: KeyboardActionBarDelegate {
 
-    /// Picking an audience OPENS THE COMPOSER. It is not a network request.
-    ///
-    /// This is the behavioural change at the heart of the redesign: a template
-    /// used to fire a generation straight away, which meant the only thing the
-    /// user could ever say about a reply was who it was for. Now the tap sets
-    /// up the composer, and the user gets to say HOW they want to answer before
-    /// anything is spent.
+    /// Picking a persona OPENS THE COMPOSER. It is not a network request.
     func actionBar(_ bar: KeyboardActionBar, didSelectTemplateID id: String) {
         guard let template = resolveTemplate(id: id) else { return }
-        replyCoordinator.open(
-            template: template,
-            proxy: textDocumentProxy,
-            hasFullAccess: hasFullAccess
-        )
+        DispatchQueue.global(qos: .utility).async {
+            SharedSettings.shared.setLastTemplateID(id)
+        }
+        replyCoordinator.open(template: template, proxy: textDocumentProxy, hasFullAccess: hasFullAccess)
     }
 
-    /// Turns a chip's identifier into the full template the request needs.
-    ///
-    /// Normally this is an in-memory lookup: the configuration was loaded when
-    /// the keyboard appeared. The fallback covers the narrow race where a user
-    /// taps a chip in the milliseconds before that load returns - a single file
-    /// read, on a tap, never on a keystroke.
     private func resolveTemplate(id: String) -> ReplyTemplate? {
         if let template = replyCoordinator.configuration.template(id: id) { return template }
+        // The narrow race where a chip is tapped before the configuration
+        // finished loading: one file read, on a tap, never on a keystroke.
         let configuration = ProfileStore.shared.load()
         replyCoordinator.configuration = configuration
         return configuration.template(id: id)
     }
 
-    /// A keyboard extension cannot present its own editor or reliably open its
-    /// containing app, so this says where templates are created rather than
-    /// pretending to create one here.
     func actionBarDidRequestNewTemplate(_ bar: KeyboardActionBar) {
         bar.showToast(aiStrings.addTemplateHint)
     }
 
-    /// THE one place a network request can start. Nothing else in this file
-    /// calls the AI service, and nothing starts one without this tap.
-    func actionBarDidTapGenerate(_ bar: KeyboardActionBar) {
-        syncComposerText(from: bar)
-        replyCoordinator.generate()
-    }
-
-    func actionBarDidTapRegenerate(_ bar: KeyboardActionBar) {
-        syncComposerText(from: bar)
-        replyCoordinator.regenerate()
-    }
-
-    /// The second and last place the clipboard is read, and like the first one
-    /// it only runs from a direct tap.
-    func actionBarDidTapPasteSource(_ bar: KeyboardActionBar) {
-        syncComposerText(from: bar)
-        replyCoordinator.pasteSource(proxy: textDocumentProxy, hasFullAccess: hasFullAccess)
-    }
-
-    func actionBarDidEditText(_ bar: KeyboardActionBar) {
-        syncComposerText(from: bar)
-    }
-
-    /// Back from the result. The source and the instruction are still in the
-    /// session and still on screen, so a disappointing answer costs one tap to
-    /// rephrase rather than a retype.
-    func actionBarDidTapBack(_ bar: KeyboardActionBar) {
-        bar.returnToComposing()
-        animateBarHeightChange()
-    }
-
-    /// Change the audience without losing the work: the session survives, the
-    /// template row comes back, and picking a chip resumes exactly where the
-    /// user was.
-    func actionBarDidRequestTemplateChange(_ bar: KeyboardActionBar) {
-        syncComposerText(from: bar)
-        pendingInsertion = nil
-        replyCoordinator.suspend()
-        bar.endComposing()
-        animateBarHeightChange()
-    }
-
-    /// The explicit discard. Everything goes: source, instruction and draft.
-    func actionBarDidTapClose(_ bar: KeyboardActionBar) {
-        closeComposer()
-    }
-
-    /// Mirrors the three texts into the session, so a request, a regeneration
-    /// or an insertion always uses exactly what is on screen.
-    private func syncComposerText(from bar: KeyboardActionBar) {
-        replyCoordinator.updateSource(bar.sourceText)
-        replyCoordinator.updateInstruction(bar.instructionText)
-        replyCoordinator.updateDraft(bar.draftText)
-    }
-
-    /// The one place the reply draft reaches the host application.
-    ///
-    /// The source message and the instruction are never what gets inserted, and
-    /// nothing is ever sent: the messenger's own Send button stays under the
-    /// user's control.
-    func actionBarDidTapInsert(_ bar: KeyboardActionBar) {
-        syncComposerText(from: bar)
-        guard let draft = replyCoordinator.draftForInsertion() else { return }
-
-        // Never destroy what the user already typed. If the field looks
-        // non-empty, ask before touching it.
-        if hostFieldAppearsToHaveText() {
-            pendingInsertion = draft
-            bar.showConflictChoice()
-            animateBarHeightChange()
-            return
-        }
-
-        insertIntoHost(draft)
-        closeComposer()
-        refreshAutoShift()
-    }
-
-    func actionBar(_ bar: KeyboardActionBar, didResolveConflictWith choice: HostTextChoice) {
-        guard let draft = pendingInsertion else {
-            closeComposer()
-            return
-        }
-        pendingInsertion = nil
-
-        switch choice {
-        case .cancel:
-            // Back to the result with the draft intact. Nothing was touched.
-            bar.returnToResult()
-            animateBarHeightChange()
-            return
-
-        case .append:
-            insertIntoHost(separatorForAppend() + draft)
-
-        case .replace:
-            clearHostField()
-            insertIntoHost(draft)
-        }
-
-        closeComposer()
-        refreshAutoShift()
-    }
-
     func actionBarDidChangeHeight(_ bar: KeyboardActionBar) {
-        guard !isUpdatingGeometry else { return }
-        animateBarHeightChange()
+        updateGeometry(animated: true)
     }
 
-    // MARK: Host field
-
-    /// Conservative check. `documentContextBeforeInput` and `...AfterInput` are
-    /// the only public view a keyboard has, and a host can legitimately return
-    /// nothing for either. Treating "no context" as "empty" is the safe
-    /// reading: the worst case is that we insert normally into a field that was
-    /// already empty.
-    private func hostFieldAppearsToHaveText() -> Bool {
-        let before = textDocumentProxy.documentContextBeforeInput ?? ""
-        let after = textDocumentProxy.documentContextAfterInput ?? ""
-        return !(before + after).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    /// A space unless the existing text already ends in whitespace, so Add does
-    /// not jam two sentences together or double-space them.
-    private func separatorForAppend() -> String {
-        let before = textDocumentProxy.documentContextBeforeInput ?? ""
-        guard let last = before.last else { return "" }
-        return last.isWhitespace ? "" : " "
-    }
-
-    /// Deletes the host field's contents.
-    ///
-    /// `deleteBackward()` is the only deletion `UITextDocumentProxy` offers, so
-    /// this is inherently a loop. What it does NOT do is re-read the document
-    /// context on every iteration: each context read is a cross-process call,
-    /// and doing one per deleted character made clearing a long draft take
-    /// visibly long. Instead the context is read once per batch, giving roughly
-    /// one read per 500 characters instead of one per character.
-    ///
-    /// The round limit is deliberate. A runaway loop inside another
-    /// application's input field is a far worse failure than leaving a few
-    /// characters behind, and twelve rounds is well past any realistic chat
-    /// draft.
-    private func clearHostField() {
-        var rounds = 0
-        while rounds < 12 {
-            let before = textDocumentProxy.documentContextBeforeInput ?? ""
-            if before.isEmpty { break }
-            for _ in 0..<min(before.count, 500) {
-                textDocumentProxy.deleteBackward()
+    func actionBar(_ bar: KeyboardActionBar, didSend event: ComposerEvent) {
+        switch event {
+        case .close:
+            closeComposer()
+        case .changePersona:
+            // Keep everything; show the persona row so another can be picked.
+            replyCoordinator.suspend()
+            actionBar.endComposing()
+            keysView.isInputDimmed = false
+            applyChips(from: replyCoordinator.configuration)
+            updateGeometry(animated: true)
+        case .paste:
+            replyCoordinator.pasteSource(proxy: textDocumentProxy, hasFullAccess: hasFullAccess)
+        case .generate, .regenerate:
+            replyCoordinator.generate()
+        case .stop:
+            replyCoordinator.cancelGeneration()
+        case .back:
+            replyCoordinator.back()
+        case .toggleEditing:
+            if replyCoordinator.flow.stage == .editing {
+                replyCoordinator.endEditing()
+            } else {
+                replyCoordinator.beginEditing()
             }
-            rounds += 1
+        case .tapReply:
+            replyCoordinator.beginEditing()
+        case .insert:
+            insertReply()
+        case .previousVersion:
+            replyCoordinator.showPreviousVersion()
+        case .nextVersion:
+            replyCoordinator.showNextVersion()
+        case .resolveConflict(let choice):
+            resolveConflict(choice)
+        case .edited(let field, let text):
+            switch field {
+            case .source: replyCoordinator.updateSource(text)
+            case .instruction: replyCoordinator.updateInstruction(text)
+            case .draft: replyCoordinator.updateDraft(text)
+            case .none: break
+            }
         }
-        // Anything after the caret cannot be reached by deleteBackward, so it
-        // is left alone rather than mangled.
-        cachedHostContextBeforeInput = ""
-        lastHostMutationTime = Date.timeIntervalSinceReferenceDate
-    }
-
-    // MARK: Composer lifecycle
-
-    private var aiStrings: AIReplyStrings { AIReplyStrings.forLanguage(uiLanguage) }
-
-    private func closeComposer() {
-        pendingInsertion = nil
-        actionBar.endComposing()
-        replyCoordinator.clear()
-        animateBarHeightChange()
-    }
-
-    /// Animates only when the keyboard's height actually moved.
-    ///
-    /// A stage change reaches here twice: once through the composer's own
-    /// height notification and once from the delegate method that caused it.
-    /// Both used to start a 0.18s animation on the same constraint, so every
-    /// transition ran two overlapping animations. The second call now finds
-    /// nothing to animate and returns; the constraint constants it did change
-    /// are picked up by the next ordinary layout pass.
-    private func animateBarHeightChange() {
-        let before = heightConstraint?.constant
-        updateGeometry()
-        guard heightConstraint?.constant != before else { return }
-        UIView.animate(withDuration: 0.18) { self.view.layoutIfNeeded() }
     }
 }
 
@@ -1360,50 +831,15 @@ extension KeyboardViewController: KeyboardActionBarDelegate {
 extension KeyboardViewController: ReplyFlowCoordinatorDelegate {
 
     func coordinator(_ coordinator: ReplyFlowCoordinator, didOpen session: ReplySession) {
-        actionBar.beginComposing(
-            sourceMessage: session.sourceMessage,
-            instruction: session.instruction,
-            // Reopening after an audience change: the reply the user already
-            // paid a generation for comes back with it.
-            draft: session.replyDraft,
-            templateName: session.template.displayName(appLanguage: uiLanguage)
-        )
-        animateBarHeightChange()
-    }
-
-    func coordinator(_ coordinator: ReplyFlowCoordinator, didUpdateSource text: String) {
-        actionBar.setSourceMessage(text)
-        animateBarHeightChange()
-    }
-
-    func coordinatorDidBeginGenerating(_ coordinator: ReplyFlowCoordinator) {
-        actionBar.beginGenerating()
-        animateBarHeightChange()
-    }
-
-    func coordinator(_ coordinator: ReplyFlowCoordinator, didProduce draft: String) {
-        actionBar.showResult(draft)
-        animateBarHeightChange()
+        actionBar.beginComposing()
+        shift.reset()
+        layoutKeyboard(force: false)
+        renderComposer()
         refreshAutoShift()
     }
 
-    /// A failure never costs the user their typing.
-    ///
-    /// With the composer open the message is shown INSIDE it, the source and
-    /// the instruction stay exactly where they were, and the primary button
-    /// becomes Retry. The old behaviour - tear the composer down and flash a
-    /// toast - threw away the one thing that was expensive to produce.
-    func coordinator(_ coordinator: ReplyFlowCoordinator, didFailWith error: AIReplyError) {
-        let message = aiStrings.message(for: error)
-        guard !message.isEmpty else { return }
-
-        if actionBar.isComposing {
-            actionBar.showError(message)
-            animateBarHeightChange()
-            return
-        }
-
-        closeComposer()
-        actionBar.showToast(message)
+    func coordinatorDidChange(_ coordinator: ReplyFlowCoordinator) {
+        renderComposer()
+        refreshAutoShift()
     }
 }

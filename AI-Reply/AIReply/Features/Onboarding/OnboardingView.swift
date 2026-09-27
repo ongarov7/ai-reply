@@ -210,7 +210,8 @@ struct OnboardingView: View {
                 DSStepRow(index: 1, text: "onboarding.usage.step.copy")
                 DSStepRow(index: 2, text: "onboarding.usage.step.open")
                 DSStepRow(index: 3, text: "onboarding.usage.step.template")
-                DSStepRow(index: 4, text: "onboarding.usage.step.insert")
+                DSStepRow(index: 4, text: "onboarding.usage.step.instruction")
+                DSStepRow(index: 5, text: "onboarding.usage.step.insert")
             }
             .dsCard()
 

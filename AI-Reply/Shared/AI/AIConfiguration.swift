@@ -72,6 +72,25 @@ struct AIConfiguration: Sendable {
 
     static var isUsingProductionBackend: Bool { resolvedBaseURL == productionBaseURL }
 
+    /// DEBUG ONLY. `-AIReplyMockReplies` on the app's launch arguments makes
+    /// the keyboard answer from canned replies instead of the backend, so the
+    /// whole Generate -> Edit -> Regenerate -> Insert flow can be exercised in
+    /// the Simulator without an account. Mirrored through the App Group
+    /// because the keyboard never sees the app's launch arguments; launching
+    /// without the argument switches it off again.
+    static let debugMockRepliesKey = "debug.mockReplies"
+
+    static var debugMockReplies: Bool {
+        AppGroup.defaults.bool(forKey: debugMockRepliesKey)
+    }
+
+    static func applyDebugLaunchArguments(_ arguments: [String] = CommandLine.arguments) {
+        let mock = arguments.contains("-AIReplyMockReplies")
+        if AppGroup.defaults.bool(forKey: debugMockRepliesKey) != mock {
+            AppGroup.defaults.set(mock, forKey: debugMockRepliesKey)
+        }
+    }
+
 #else
 
     static var resolvedBaseURL: URL { productionBaseURL }

@@ -83,7 +83,7 @@ final class KeyboardKeysView: UIView {
 
     // MARK: Touch state
 
-    private enum TouchMode {
+    fileprivate enum TouchMode {
         case key
         case alternates
         case languagePicker
@@ -94,7 +94,7 @@ final class KeyboardKeysView: UIView {
         case finished
     }
 
-    private final class Track {
+    fileprivate final class Track {
         var keyIndex: Int
         let startIndex: Int
         var mode: TouchMode

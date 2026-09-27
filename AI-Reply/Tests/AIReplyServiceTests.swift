@@ -1,35 +1,41 @@
 import XCTest
 @testable import AIReply
 
-/// The 300-character rule and the prompt's injection posture.
+/// The message-length rule and the prompt's injection posture.
+///
+/// The limit is the server's (400 unless an administrator changes it), so the
+/// tests pass it explicitly rather than depending on what the Simulator's App
+/// Group happens to have cached.
 final class AIReplyServiceTests: XCTestCase {
+
+    private let limit = AILimits.fallback.sourceCharacters
 
     // MARK: Message limit
 
     func testAcceptsMessageAtExactlyTheLimit() {
-        let message = String(repeating: "a", count: 300)
-        guard case .success(let value) = AIReplyService.validate(message: message) else {
-            return XCTFail("300 characters must be accepted")
+        let message = String(repeating: "a", count: limit)
+        guard case .success(let value) = AIReplyService.validate(message: message, limit: limit) else {
+            return XCTFail("\(limit) characters must be accepted")
         }
-        XCTAssertEqual(value.count, 300)
+        XCTAssertEqual(value.count, limit)
     }
 
     func testRejectsOneCharacterOverTheLimit() {
-        let message = String(repeating: "a", count: 301)
-        guard case .failure(.messageTooLong(let limit)) = AIReplyService.validate(message: message) else {
-            return XCTFail("301 characters must be rejected")
+        let message = String(repeating: "a", count: limit + 1)
+        guard case .failure(.messageTooLong(let reported)) = AIReplyService.validate(message: message, limit: limit) else {
+            return XCTFail("\(limit + 1) characters must be rejected")
         }
-        XCTAssertEqual(limit, 300)
+        XCTAssertEqual(reported, 400)
     }
 
     func testRejectsEmptyAndWhitespaceOnlyMessages() {
-        XCTAssertEqual(AIReplyService.validate(message: "").failureValue, .noSourceMessage)
-        XCTAssertEqual(AIReplyService.validate(message: "   \n\t ").failureValue, .noSourceMessage)
+        XCTAssertEqual(AIReplyService.validate(message: "", limit: limit).failureValue, .noSourceMessage)
+        XCTAssertEqual(AIReplyService.validate(message: "   \n\t ", limit: limit).failureValue, .noSourceMessage)
     }
 
     func testWhitespaceDoesNotCountTowardTheLimit() {
-        let message = "  " + String(repeating: "a", count: 300) + "  "
-        XCTAssertNil(AIReplyService.validate(message: message).failureValue)
+        let message = "  " + String(repeating: "a", count: limit) + "  "
+        XCTAssertNil(AIReplyService.validate(message: message, limit: limit).failureValue)
     }
 
     /// Cyrillic and Kazakh characters must count as one each. Counting UTF-16
@@ -37,9 +43,9 @@ final class AIReplyServiceTests: XCTestCase {
     /// app is for.
     func testCyrillicAndKazakhCountAsSingleCharacters() {
         XCTAssertEqual(AIReplyService.characterCount("Сәлеметсіз бе"), 13)
-        XCTAssertEqual(AIReplyService.characterCount(String(repeating: "ә", count: 300)), 300)
-        XCTAssertNil(AIReplyService.validate(message: String(repeating: "ә", count: 300)).failureValue)
-        XCTAssertNotNil(AIReplyService.validate(message: String(repeating: "ә", count: 301)).failureValue)
+        XCTAssertEqual(AIReplyService.characterCount(String(repeating: "ә", count: limit)), limit)
+        XCTAssertNil(AIReplyService.validate(message: String(repeating: "ә", count: limit), limit: limit).failureValue)
+        XCTAssertNotNil(AIReplyService.validate(message: String(repeating: "ә", count: limit + 1), limit: limit).failureValue)
     }
 
     /// The limit applies to the INCOMING MESSAGE only. A long profile and long
@@ -61,7 +67,7 @@ final class AIReplyServiceTests: XCTestCase {
             )
         )
         XCTAssertGreaterThan(prompt.user.count, 1600)
-        XCTAssertNil(AIReplyService.validate(message: "Short question?").failureValue)
+        XCTAssertNil(AIReplyService.validate(message: "Short question?", limit: limit).failureValue)
     }
 
     // MARK: Prompt safety
@@ -170,16 +176,17 @@ final class AIReplyServiceTests: XCTestCase {
         XCTAssertTrue(prepared.hasSuffix(ReplyInstruction.languageRule))
     }
 
-    /// The backend clamps `instruction` at 400 characters. If the user's own
-    /// text were allowed to fill all of it, the language rule - appended after
-    /// it - would be the part that got cut.
+    /// The backend clamps `instruction` at its published limit (400 by
+    /// default). If the user's own text were allowed to fill all of it, the
+    /// language rule - appended after it - would be the part that got cut.
     func testClampedInstructionStillLeavesRoomForTheLanguageRule() {
         let long = String(repeating: "я", count: 900)
         let prepared = ReplyInstruction.prepare(long)
 
         XCTAssertTrue(prepared.hasSuffix(ReplyInstruction.languageRule))
         XCTAssertLessThanOrEqual(prepared.unicodeScalars.count, 400)
-        XCTAssertEqual(ReplyInstruction.clamp(long).unicodeScalars.count, 280)
+        XCTAssertEqual(ReplyInstruction.clamp(long).unicodeScalars.count, ReplyInstruction.maximumCharacters)
+        XCTAssertLessThanOrEqual(ReplyInstruction.maximumCharacters, 280)
         XCTAssertEqual(ReplyInstruction.clamp("short").unicodeScalars.count, 5)
     }
 

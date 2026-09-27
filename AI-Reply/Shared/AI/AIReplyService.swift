@@ -79,7 +79,8 @@ struct AIReplyService: Sendable {
         case .failure(let error): throw error
         }
 
-        guard configuration.isReady else { throw AIReplyError.authenticationFailed }
+        // An injected transport (tests, the DEBUG mock) needs no account.
+        guard transportOverride != nil || configuration.isReady else { throw AIReplyError.authenticationFailed }
 
         let profile = request.configuration.profile
         let templateName = request.template.displayName(appLanguage: request.uiLanguage)

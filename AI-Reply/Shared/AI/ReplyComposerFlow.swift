@@ -42,7 +42,7 @@ struct ReplyComposerFlow: Equatable, Sendable {
         /// Ask Replace / Add / Cancel first.
         case askAboutExistingText
         /// Nothing to insert.
-        case none
+        case nothing
     }
 
     enum ConflictChoice: Equatable, Sendable {
@@ -215,10 +215,10 @@ struct ReplyComposerFlow: Equatable, Sendable {
         case .result, .editing:
             break
         default:
-            return .none
+            return .nothing
         }
         let text = drafts.currentText
-        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return .none }
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return .nothing }
         if hostHasText {
             stage = .conflict(returnTo: .result, wasEditing: stage == .editing)
             error = nil

@@ -139,9 +139,10 @@ struct KeyboardPageOptions: Hashable, Sendable {
 ///   Apple's order, `ә і ң ғ ү ұ қ ө һ`, centred on the same grid with keys the
 ///   same size as every other row.
 ///
-/// Numbers and symbols follow the iOS planes for each language, including the
-/// Russian and Kazakh currency key; `₸` is the first long-press alternate on
-/// every currency key.
+/// Numbers and symbols follow the iOS planes for each language, with one
+/// deliberate difference: the Kazakh and Russian currency key is `₸` rather
+/// than iOS's `₽` (the product decision for this market); `₽`, `$`, `€`, `£`
+/// and `¥` are its long-press alternates.
 enum KeyboardLayout {
 
     static let englishLetters: [[String]] = [
@@ -168,8 +169,11 @@ enum KeyboardLayout {
         }
     }
 
+    /// The currency key follows the market this keyboard is for: `₸` on the
+    /// Kazakh and Russian layouts (iOS itself puts `₽` there), `$` on the
+    /// English one. The others are one long press away.
     static func numbers(for language: KeyboardLanguage) -> [[String]] {
-        let currency = language == .english ? "$" : "₽"
+        let currency = language == .english ? "$" : "₸"
         return [
             ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
             ["-", "/", ":", ";", "(", ")", currency, "&", "@", "\""],
@@ -227,24 +231,24 @@ enum KeyboardLayout {
 
         switch language {
         case .english:
+            let edge = KeySlot.spacer(.flexible(1))
+            let shift = KeySlot.key(.shift, .units(latinModifierWidth))
+            let delete = KeySlot.key(.delete, .units(latinModifierWidth))
             result.append(KeyRow(characterSlots(rows[0], language: language)))
-            result.append(KeyRow([.spacer(.flexible(1))] + characterSlots(rows[1], language: language) + [.spacer(.flexible(1))]))
-            result.append(KeyRow(
-                [.key(.shift, .units(latinModifierWidth)), .spacer(.flexible(1))]
-                    + characterSlots(rows[2], language: language)
-                    + [.spacer(.flexible(1)), .key(.delete, .units(latinModifierWidth))]
-            ))
+            result.append(KeyRow([edge] + characterSlots(rows[1], language: language) + [edge]))
+            result.append(KeyRow([shift, edge] + characterSlots(rows[2], language: language) + [edge, delete]))
 
         case .russian, .kazakh:
             let last = rows.count - 1
+            let edge = KeySlot.spacer(.flexible(1))
             for (index, row) in rows.enumerated() {
                 let keys = characterSlots(row, language: language)
                 if index == last {
-                    result.append(KeyRow([.key(.shift)] + keys + [.key(.delete)]))
+                    result.append(KeyRow([KeySlot.key(.shift)] + keys + [KeySlot.key(.delete)]))
                 } else if row.count < 11 {
                     // The Kazakh row: nine keys centred on the eleven-column
                     // grid, the same size as the keys below them.
-                    result.append(KeyRow([.spacer(.flexible(1))] + keys + [.spacer(.flexible(1))]))
+                    result.append(KeyRow([edge] + keys + [edge]))
                 } else {
                     result.append(KeyRow(keys))
                 }
@@ -262,21 +266,26 @@ enum KeyboardLayout {
         options: KeyboardPageOptions
     ) -> KeyboardPageSpec {
         let toggle: KeyboardPlane = plane == .numbers ? .symbols : .numbers
+        let gap = KeySlot.spacer(.units(0.35))
+        let punctuation: [KeySlot] = rows[2].map { character in
+            KeySlot.key(.character(character), .flexible(1), alternates: alternates(for: character, language: language))
+        }
+        let thirdRow: [KeySlot] = [KeySlot.key(.plane(toggle), .units(latinModifierWidth)), gap]
+            + punctuation
+            + [gap, KeySlot.key(.delete, .units(latinModifierWidth))]
         let result: [KeyRow] = [
             KeyRow(characterSlots(rows[0], language: language)),
             KeyRow(characterSlots(rows[1], language: language)),
-            KeyRow(
-                [.key(.plane(toggle), .units(latinModifierWidth)), .spacer(.units(0.35))]
-                    + rows[2].map { .key(.character($0), .flexible(1), alternates: alternates(for: $0, language: language)) }
-                    + [.spacer(.units(0.35)), .key(.delete, .units(latinModifierWidth))]
-            ),
+            KeyRow(thirdRow),
             bottomRow(planeKey: .letters, options: options)
         ]
         return KeyboardPageSpec(language: language, plane: plane, columns: 10, rows: result)
     }
 
     private static func characterSlots(_ row: [String], language: KeyboardLanguage) -> [KeySlot] {
-        row.map { .key(.character($0), alternates: alternates(for: $0, language: language)) }
+        row.map { character in
+            KeySlot.key(.character(character), alternates: alternates(for: character, language: language))
+        }
     }
 
     /// 123 / ABC, the globe when iOS asks for one, the layout key, the field's
@@ -348,6 +357,7 @@ enum KeyboardLayout {
         "-": ["–", "—", "•"],
         "/": ["\\"],
         "$": ["₸", "₽", "€", "£", "¥", "¢", "₩"],
+        "₸": ["₽", "$", "€", "£", "¥"],
         "₽": ["₸", "$", "€", "£", "¥"],
         "€": ["₸", "$", "₽", "£", "¥"],
         "&": ["§"],

@@ -388,22 +388,22 @@ final class ReplyFlowCoordinator {
     /// What to do with the reply on screen. The text is normalised on the way
     /// out; it is never the message and never the instruction.
     func requestInsert(hostHasText: Bool) -> ReplyComposerFlow.InsertDecision {
-        guard session != nil else { return .none }
-        let decision = session?.flow.requestInsert(hostHasText: hostHasText) ?? .none
+        guard session != nil else { return .nothing }
+        let decision: ReplyComposerFlow.InsertDecision = session?.flow.requestInsert(hostHasText: hostHasText) ?? .nothing
         switch decision {
         case .insert(let text):
-            return normalized(text).map { .insert($0) } ?? .none
+            return normalized(text).map { .insert($0) } ?? .nothing
         case .askAboutExistingText:
             delegate?.coordinatorDidChange(self)
             return .askAboutExistingText
-        case .none:
-            return .none
+        case .nothing:
+            return .nothing
         }
     }
 
     func resolveConflict(_ choice: ReplyComposerFlow.ConflictChoice) -> ReplyComposerFlow.ConflictResolution {
         guard session != nil else { return .cancelled }
-        let resolution = session?.flow.resolveConflict(choice) ?? .cancelled
+        let resolution: ReplyComposerFlow.ConflictResolution = session?.flow.resolveConflict(choice) ?? .cancelled
         switch resolution {
         case .replace(let text):
             return normalized(text).map { .replace($0) } ?? .cancelled

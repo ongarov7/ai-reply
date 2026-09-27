@@ -14,6 +14,9 @@ final class AppSettings {
     private(set) var appearance: AppearancePreference
     /// `nil` means "follow the system language".
     private(set) var language: AppLanguage?
+    /// Layouts the keyboard's ҚАЗ / РУС / ENG key cycles through.
+    private(set) var keyboardLanguages: [KeyboardLanguage]
+    private(set) var keyboardHaptics: Bool
 
     @ObservationIgnored private let store: SharedSettings
 
@@ -21,6 +24,23 @@ final class AppSettings {
         self.store = store
         self.appearance = store.appearance
         self.language = store.appLanguage
+        self.keyboardLanguages = KeyboardLanguageStore.enabledLanguages(settings: store)
+        self.keyboardHaptics = store.keyboardHapticsEnabled
+    }
+
+    /// Turns one layout on or off. The last one cannot be turned off: a
+    /// keyboard with no layout could not type.
+    func setKeyboardLanguage(_ language: KeyboardLanguage, enabled: Bool) {
+        var next = keyboardLanguages.filter { $0 != language }
+        if enabled { next.append(language) }
+        guard !next.isEmpty else { return }
+        KeyboardLanguageStore.setEnabledLanguages(next, settings: store)
+        keyboardLanguages = KeyboardLanguageStore.enabledLanguages(settings: store)
+    }
+
+    func setKeyboardHaptics(_ enabled: Bool) {
+        keyboardHaptics = enabled
+        store.setKeyboardHapticsEnabled(enabled)
     }
 
     func setAppearance(_ value: AppearancePreference) {

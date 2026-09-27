@@ -15,9 +15,9 @@ final class ComposerTextView: UITextView {
     /// Caret position, in UTF-16 offsets of `text`.
     private(set) var caret = 0
 
-    var isFocused = false {
+    var showsCaret = false {
         didSet {
-            guard isFocused != oldValue else { return }
+            guard showsCaret != oldValue else { return }
             updateCaret()
         }
     }
@@ -247,7 +247,7 @@ final class ComposerTextView: UITextView {
     }
 
     private func updateCaret() {
-        guard isFocused else {
+        guard showsCaret else {
             caretView.isHidden = true
             caretView.layer.removeAllAnimations()
             return
@@ -268,7 +268,7 @@ final class ComposerTextView: UITextView {
     }
 
     func scrollCaretIntoView() {
-        guard isFocused else { return }
+        guard showsCaret else { return }
         let rect = caretRect().insetBy(dx: 0, dy: -4)
         scrollRectToVisible(rect, animated: false)
     }

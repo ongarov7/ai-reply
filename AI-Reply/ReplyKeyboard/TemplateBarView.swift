@@ -5,29 +5,28 @@ protocol TemplateBarViewDelegate: AnyObject {
     func templateBarDidRequestNewTemplate(_ bar: TemplateBarView)
 }
 
-/// The only thing the row needs to draw one template: an identifier to report
+/// The only thing the row needs to draw one persona: an identifier to report
 /// back and a name to show.
 ///
-/// Deliberately NOT a `ReplyTemplate`. The bar has no business holding a user's
-/// instructions, business description or rules, and keeping it to two strings is
-/// what lets the row be drawn from the App Group summary cache on the very first
-/// frame, before the full configuration file has been read.
+/// Deliberately NOT a `ReplyTemplate`: the row has no business holding a
+/// user's instructions or business rules, and two strings are what let it be
+/// drawn from the App Group summary on the very first frame.
 struct TemplateChip: Equatable {
     let id: String
     let name: String
 }
 
-/// The horizontal template selector that sits above the keys.
+/// The persona row above the keys: Дос | Клиент | Бизнес | Жұмыс | +
 ///
-/// SIZE IS THE POINT. It is 36pt tall and scrolls horizontally, so however many
-/// templates a user creates, the row's height never changes and the keys below
-/// never shrink. An earlier version of this keyboard let its own chrome eat the
-/// typing area; the geometry here makes that impossible rather than merely
-/// discouraged.
+/// * 36pt tall and horizontally scrolling, so however many personas a user
+///   has, the keys below never shrink.
+/// * The persona used last is shown selected, so the row says who the user
+///   was talking to a moment ago.
+/// * "+" opens a menu: the personas hidden from the row, then "Add persona",
+///   which says where personas are created - a keyboard extension cannot open
+///   an editor or its own app, and pretending otherwise would be a dead tap.
 ///
-/// PERFORMANCE. Pills are built once per template set and then reused. Nothing
-/// in this view is touched on a keypress: it is not in the typing path at all,
-/// and a keystroke never causes it to lay out.
+/// Not in the typing path: nothing here is touched on a keypress.
 final class TemplateBarView: UIView {
 
     weak var delegate: TemplateBarViewDelegate?
@@ -37,17 +36,19 @@ final class TemplateBarView: UIView {
     private let scrollView = UIScrollView()
     private let stack = UIStackView()
     private let hintLabel = UILabel()
+    private let addButton = UIButton(type: .system)
 
     private var theme = KeyboardTheme(isDark: true)
     private var strings = AIReplyStrings.forLanguage(.english)
     private var chips: [TemplateChip] = []
+    private var more: [TemplateChip] = []
+    private var selectedID: String?
     private var pills: [UIButton] = []
 
     // MARK: Init
 
     init() {
         super.init(frame: .zero)
-        translatesAutoresizingMaskIntoConstraints = false
         build()
     }
 
@@ -57,12 +58,11 @@ final class TemplateBarView: UIView {
     }
 
     private func build() {
-        scrollView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.showsHorizontalScrollIndicator = false
         scrollView.alwaysBounceHorizontal = true
         scrollView.contentInset = UIEdgeInsets(top: 0, left: 8, bottom: 0, right: 8)
-        // Otherwise a horizontal drag that starts on a pill is swallowed by the
-        // button and the row feels stuck.
+        // Otherwise a horizontal drag that starts on a pill is swallowed by
+        // the button and the row feels stuck.
         scrollView.delaysContentTouches = false
         scrollView.canCancelContentTouches = true
         addSubview(scrollView)
@@ -73,7 +73,6 @@ final class TemplateBarView: UIView {
         stack.spacing = 6
         scrollView.addSubview(stack)
 
-        hintLabel.translatesAutoresizingMaskIntoConstraints = false
         hintLabel.font = .systemFont(ofSize: 11.5, weight: .regular)
         hintLabel.textAlignment = .center
         hintLabel.adjustsFontSizeToFitWidth = true
@@ -81,62 +80,64 @@ final class TemplateBarView: UIView {
         hintLabel.isHidden = true
         addSubview(hintLabel)
 
-        NSLayoutConstraint.activate([
-            scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            scrollView.topAnchor.constraint(equalTo: topAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
+        var add = UIButton.Configuration.plain()
+        add.contentInsets = .zero
+        add.background.cornerRadius = 15
+        add.image = UIImage(systemName: "plus", withConfiguration: UIImage.SymbolConfiguration(pointSize: 13, weight: .semibold))
+        addButton.configuration = add
+        addButton.showsMenuAsPrimaryAction = true
+        addButton.widthAnchor.constraint(equalToConstant: 40).isActive = true
+        addButton.heightAnchor.constraint(equalToConstant: 30).isActive = true
 
+        NSLayoutConstraint.activate([
             stack.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
             stack.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
             stack.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
             stack.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
-            stack.heightAnchor.constraint(equalTo: scrollView.frameLayoutGuide.heightAnchor),
-
-            hintLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
-            hintLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
-            hintLabel.centerYAnchor.constraint(equalTo: centerYAnchor)
+            stack.heightAnchor.constraint(equalTo: scrollView.frameLayoutGuide.heightAnchor)
         ])
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        scrollView.frame = bounds
+        hintLabel.frame = bounds.insetBy(dx: 12, dy: 0)
     }
 
     // MARK: Configuration
 
-    /// - Parameter uiLanguage: the APP's language, which is what the product
-    ///   vocabulary follows. Changing the keyboard LAYOUT does not reach here,
-    ///   which is the point: the chips stay in the user's own language while
-    ///   they switch layouts to type.
+    /// - Parameter uiLanguage: the APP's language. Switching the keyboard
+    ///   layout does not reach here: the chips stay in the user's language
+    ///   while they switch layouts to type.
     func configure(theme: KeyboardTheme, uiLanguage: AppLanguage) {
         self.theme = theme
         self.strings = AIReplyStrings.forLanguage(uiLanguage)
         hintLabel.textColor = theme.secondaryText
         hintLabel.text = strings.chooseTemplate
-        if let addPill = pills.last, pills.count > chips.count {
-            addPill.accessibilityLabel = strings.addTemplate
-        }
+        addButton.accessibilityLabel = strings.moreActions
+        rebuildMenu()
         restyle()
     }
 
-    /// Replaces the row's contents. Only rebuilds when they actually differ, so
-    /// a keyboard reappearing with an unchanged configuration - or a layout
-    /// switch, which does not touch this row at all - does no work.
-    ///
-    /// When only the NAMES changed (an app-language switch), the existing
-    /// buttons are relabelled in place rather than thrown away: rebuilding the
-    /// row was a visible hitch.
-    func setChips(_ newChips: [TemplateChip]) {
-        guard newChips != chips else { return }
-
-        let sameSet = newChips.count == chips.count
-            && zip(newChips, chips).allSatisfy { $0.id == $1.id }
+    /// Replaces the row. Rebuilds only when the set of personas changed; a
+    /// rename (app language switch) or a new selection is applied in place.
+    func setChips(_ newChips: [TemplateChip], more newMore: [TemplateChip], selectedID newSelected: String?) {
+        let sameSet = newChips.count == chips.count && zip(newChips, chips).allSatisfy { $0.id == $1.id }
+        let changed = newChips != chips || newMore != more || newSelected != selectedID
         chips = newChips
+        more = newMore
+        selectedID = newSelected
+        guard changed else { return }
 
-        if sameSet {
+        if sameSet, !pills.isEmpty {
             for (index, pill) in pills.enumerated() where index < chips.count {
                 applyTitle(chips[index].name, to: pill)
             }
-            return
+        } else {
+            rebuildPills()
         }
-        rebuildPills()
+        rebuildMenu()
+        restyle()
     }
 
     private func rebuildPills() {
@@ -154,63 +155,70 @@ final class TemplateBarView: UIView {
             stack.addArrangedSubview(pill)
             pills.append(pill)
         }
-
-        let addPill = makePill()
-        applySymbol("plus", to: addPill)
-        addPill.accessibilityLabel = strings.addTemplate
-        addPill.widthAnchor.constraint(equalToConstant: 40).isActive = true
-        addPill.addTarget(self, action: #selector(addTapped), for: .touchUpInside)
-        stack.addArrangedSubview(addPill)
-        pills.append(addPill)
-
+        stack.addArrangedSubview(addButton)
         hintLabel.isHidden = !chips.isEmpty
-        restyle()
     }
 
     private func makePill() -> UIButton {
         let button = UIButton(type: .system)
-        button.translatesAutoresizingMaskIntoConstraints = false
-
         var configuration = UIButton.Configuration.plain()
-        configuration.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 13, bottom: 0, trailing: 13)
-        configuration.background.cornerRadius = 14
+        configuration.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 14, bottom: 0, trailing: 14)
+        configuration.background.cornerRadius = 15
         button.configuration = configuration
-
-        // Highlight is handled here rather than by swapping `backgroundColor`,
-        // because a configured button rewrites its own background on every
-        // state change and would undo a direct assignment.
+        // A configured button rewrites its background on every state change,
+        // so selection and highlight live in the update handler.
         button.configurationUpdateHandler = { [weak self] button in
             guard let self else { return }
-            button.configuration?.background.backgroundColor =
-                button.isHighlighted ? self.theme.specialKey : self.theme.letterKey
+            let selected = self.isSelected(button)
+            let background = selected ? self.theme.accent : self.theme.letterKey
+            button.configuration?.background.backgroundColor = button.isHighlighted
+                ? background.withAlphaComponent(0.6)
+                : background
+            button.configuration?.baseForegroundColor = selected ? .white : self.theme.primaryText
         }
-
-        button.heightAnchor.constraint(equalToConstant: 28).isActive = true
+        button.heightAnchor.constraint(equalToConstant: 30).isActive = true
         return button
+    }
+
+    private func isSelected(_ pill: UIButton) -> Bool {
+        guard chips.indices.contains(pill.tag), pills.contains(where: { $0 === pill }) else { return false }
+        return chips[pill.tag].id == selectedID
     }
 
     private func applyTitle(_ title: String, to button: UIButton) {
         var attributes = AttributeContainer()
-        attributes.font = .systemFont(ofSize: 13.5, weight: .medium)
-        button.configuration?.image = nil
+        attributes.font = .systemFont(ofSize: 14, weight: .medium)
         button.configuration?.attributedTitle = AttributedString(title, attributes: attributes)
-        button.titleLabel?.lineBreakMode = .byTruncatingTail
-    }
-
-    private func applySymbol(_ name: String, to button: UIButton) {
-        button.configuration?.attributedTitle = nil
-        button.configuration?.image = UIImage(
-            systemName: name,
-            withConfiguration: UIImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
-        )
+        button.accessibilityLabel = title
     }
 
     private func restyle() {
         for pill in pills {
-            pill.configuration?.background.backgroundColor = theme.letterKey
-            pill.configuration?.baseForegroundColor = theme.primaryText
-            pill.tintColor = theme.primaryText
+            pill.accessibilityTraits = isSelected(pill) ? [.button, .selected] : .button
+            pill.setNeedsUpdateConfiguration()
         }
+        addButton.configuration?.background.backgroundColor = theme.letterKey
+        addButton.configuration?.baseForegroundColor = theme.primaryText
+    }
+
+    /// "+" : the personas that are not on the row, then the way to add one.
+    private func rebuildMenu() {
+        let hidden = more.map { chip in
+            UIAction(title: chip.name) { [weak self] _ in
+                guard let self else { return }
+                self.delegate?.templateBar(self, didSelectTemplateID: chip.id)
+            }
+        }
+        let add = UIAction(title: strings.addTemplate, image: UIImage(systemName: "plus.circle")) { [weak self] _ in
+            guard let self else { return }
+            self.delegate?.templateBarDidRequestNewTemplate(self)
+        }
+        var children: [UIMenuElement] = []
+        if !hidden.isEmpty {
+            children.append(UIMenu(title: "", options: .displayInline, children: hidden))
+        }
+        children.append(add)
+        addButton.menu = UIMenu(title: strings.moreActions, children: children)
     }
 
     // MARK: Actions
@@ -218,9 +226,5 @@ final class TemplateBarView: UIView {
     @objc private func templateTapped(_ sender: UIButton) {
         guard chips.indices.contains(sender.tag) else { return }
         delegate?.templateBar(self, didSelectTemplateID: chips[sender.tag].id)
-    }
-
-    @objc private func addTapped() {
-        delegate?.templateBarDidRequestNewTemplate(self)
     }
 }

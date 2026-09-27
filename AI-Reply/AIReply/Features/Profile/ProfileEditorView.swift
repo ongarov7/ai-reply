@@ -20,6 +20,7 @@ struct ProfileEditorView: View {
     @State private var about: String = ""
     @State private var business: BusinessContext = .empty
     @State private var tone: ReplyTone = .natural
+    @State private var replyLanguage: ReplyLanguagePreference?
     @State private var isDictating = false
     @State private var suggestion: VoiceConfigurationParser.Suggestion?
     @FocusState private var isFocused: Bool
@@ -82,6 +83,17 @@ struct ProfileEditorView: View {
             Section("profile.tone") {
                 TonePicker(selection: $tone)
             }
+
+            Section {
+                Picker("profile.replyLanguage", selection: $replyLanguage) {
+                    Text("profile.replyLanguage.auto").tag(ReplyLanguagePreference?.none)
+                    ForEach(ReplyLanguagePreference.allCases) { language in
+                        Text(verbatim: language.nativeName).tag(ReplyLanguagePreference?.some(language))
+                    }
+                }
+            } footer: {
+                Text("profile.replyLanguage.footer")
+            }
         }
         .navigationTitle("profile.title")
         .navigationBarTitleDisplayMode(.inline)
@@ -136,6 +148,7 @@ struct ProfileEditorView: View {
         about = profile.descriptionText
         business = profile.business
         tone = profile.preferredTone
+        replyLanguage = profile.replyLanguage
     }
 
     private func save() {
@@ -144,6 +157,7 @@ struct ProfileEditorView: View {
             $0.setDescription(about)
             $0.business = business
             $0.preferredTone = tone
+            $0.replyLanguage = replyLanguage
         }
     }
 

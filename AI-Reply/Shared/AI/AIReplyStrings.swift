@@ -7,7 +7,7 @@ import Foundation
 /// answer different questions:
 ///
 /// * the KEYBOARD LAYOUT decides what the character keys type, and what the
-///   space and return keys are called - that is `KeyboardStrings`;
+///   space and return keys are called - that is `KeyboardLabels`;
 /// * the APP LANGUAGE decides what the PRODUCT says - template chips, Insert,
 ///   Regenerate, statuses and errors - which is this type.
 ///

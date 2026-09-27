@@ -7,6 +7,12 @@ struct AIReplyApp: App {
     @State private var configuration = ReplyConfigurationModel()
     @State private var account = AccountModel()
 
+    init() {
+        #if DEBUG
+        AIConfiguration.applyDebugLaunchArguments()
+        #endif
+    }
+
     var body: some Scene {
         WindowGroup {
             Group {

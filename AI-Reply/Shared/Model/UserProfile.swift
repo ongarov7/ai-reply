@@ -143,4 +143,14 @@ enum ReplyLanguagePreference: String, Codable, CaseIterable, Identifiable, Senda
     case uzbek = "uz"
 
     var id: String { rawValue }
+
+    /// Shown in its own language, like every language picker in the app.
+    var nativeName: String {
+        switch self {
+        case .kazakh:  return "Қазақша"
+        case .russian: return "Русский"
+        case .english: return "English"
+        case .uzbek:   return "O‘zbekcha"
+        }
+    }
 }

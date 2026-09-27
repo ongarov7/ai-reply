@@ -76,7 +76,8 @@ final class AccountAPITests: XCTestCase {
         XCTAssertEqual(AccountReplyTransport.map(.offline), .offline)
         XCTAssertEqual(AccountReplyTransport.map(.unauthorized), .authenticationFailed)
         XCTAssertEqual(AccountReplyTransport.map(.accountDisabled), .authenticationFailed)
-        XCTAssertEqual(AccountReplyTransport.map(.dailyLimitReached(limit: 7, usedToday: 7, resetsAt: nil)), .rateLimited)
+        XCTAssertEqual(AccountReplyTransport.map(.dailyLimitReached(limit: 7, usedToday: 7, resetsAt: nil)), .quotaExhausted)
+        XCTAssertEqual(AccountReplyTransport.map(.rateLimited(retryAfter: nil)), .rateLimited)
         XCTAssertEqual(AccountReplyTransport.map(.providerTimeout), .timedOut)
         XCTAssertEqual(AccountReplyTransport.map(.emptyResponse), .emptyResponse)
         XCTAssertEqual(AccountReplyTransport.map(.server), .serviceUnavailable)
@@ -86,7 +87,8 @@ final class AccountAPITests: XCTestCase {
         for language in AppLanguage.allCases {
             let strings = AIReplyStrings.forLanguage(language)
             XCTAssertEqual(strings.message(for: .authenticationFailed), strings.signInRequired)
-            XCTAssertEqual(strings.message(for: .rateLimited), strings.quotaExhausted)
+            XCTAssertEqual(strings.message(for: .quotaExhausted), strings.quotaExhausted)
+            XCTAssertEqual(strings.message(for: .rateLimited), strings.rateLimited)
             XCTAssertFalse(strings.signInRequired.isEmpty)
             XCTAssertFalse(strings.quotaExhausted.isEmpty)
         }
