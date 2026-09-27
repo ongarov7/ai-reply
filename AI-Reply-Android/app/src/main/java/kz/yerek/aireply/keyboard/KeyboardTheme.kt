@@ -58,8 +58,17 @@ data class KeyboardTheme(val isDark: Boolean) {
 
     // Reply panel
 
-    val panelBackground: Color get() = specialKey
+    val panelBackground: Color
+        get() = if (isDark) Color(0xFF2C2C30) else Color(0xFFBEC2CB)
     val panelField: Color get() = letterKey
+    val fieldBackground: Color
+        get() = if (isDark) Color(0xFF3A3A3E) else Color(0xFFFFFFFF)
+    val fieldBorder: Color
+        get() = if (isDark) Color.White.copy(alpha = 0.10f) else Color.Black.copy(alpha = 0.08f)
+    val quoteBackground: Color
+        get() = if (isDark) Color(0xFF38383C) else Color(0xFFE4E6EB)
+    val destructive: Color
+        get() = if (isDark) Color(0xFFFF6961) else Color(0xFFD70015)
     val divider: Color get() = secondaryText.copy(alpha = 0.22f)
 
     val keyShadow: Color

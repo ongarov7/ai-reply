@@ -112,4 +112,44 @@
     <string name="cd_switch_keyboard">Switch keyboard</string>
     <string name="cd_switch_layout">Switch layout</string>
 
+    <!-- Keyboard composer and settings (2026-09 refactor) -->
+    <string name="kb_back">Back</string>
+    <string name="kb_edit_reply">Edit reply</string>
+    <string name="kb_done_editing">Done</string>
+    <string name="kb_previous_version">Previous version</string>
+    <string name="kb_next_version">Next version</string>
+    <string name="kb_version_position">Version %1$d of %2$d</string>
+    <string name="kb_character_count">%1$d of %2$d characters</string>
+    <string name="kb_stop">Stop</string>
+    <string name="kb_retry">Try again</string>
+    <string name="kb_paste_message">Paste message</string>
+    <string name="kb_clear_source">Clear message</string>
+    <string name="kb_show_full_message">Show full message</string>
+    <string name="kb_hide_full_message">Collapse message</string>
+    <string name="kb_more_actions">More</string>
+    <string name="kb_copied_message">Copied message</string>
+    <string name="kb_ask_placeholder">How should I reply?</string>
+    <string name="kb_intent_agree">Agree</string>
+    <string name="kb_intent_agree_phrase">Reply that I agree.</string>
+    <string name="kb_intent_decline">Decline</string>
+    <string name="kb_intent_decline_phrase">Decline politely.</string>
+    <string name="kb_intent_details">Ask details</string>
+    <string name="kb_intent_details_phrase">Ask for more details.</string>
+    <string name="kb_intent_brief">Briefly</string>
+    <string name="kb_intent_brief_phrase">Keep the reply short.</string>
+    <string name="kb_intent_professional">Professional</string>
+    <string name="kb_intent_professional_phrase">Answer professionally.</string>
+    <string name="kb_intent_friendly">Friendly</string>
+    <string name="kb_intent_friendly_phrase">Answer in a warm, friendly way.</string>
+    <string name="kb_intent_thanks">Thank them</string>
+    <string name="kb_intent_thanks_phrase">Thank them.</string>
+    <string name="kb_intent_reschedule">Another time</string>
+    <string name="kb_intent_reschedule_phrase">Suggest a different time.</string>
+    <string name="kb_err_rate_limited">Too many requests. Wait a moment and try again.</string>
+    <string name="settings_keyboard_layouts">Keyboard layouts</string>
+    <string name="settings_keyboard_layouts_footer">The language key switches between the layouts that are on. At least one stays on.</string>
+    <string name="settings_developer">Developer</string>
+    <string name="settings_debug_mock_replies">Mock AI replies</string>
+    <string name="settings_debug_mock_replies_footer">Debug builds only. The keyboard answers with canned replies instead of the service, so nothing is spent. Tags in the instruction: #offline, #quota, #slow.</string>
+
 </resources>

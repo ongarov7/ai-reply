@@ -55,6 +55,63 @@ class HostField(private val connectionProvider: () -> InputConnection?) {
         connection.deleteSurroundingText(length, 0)
     }
 
+    /**
+     * Deletes the word before the caret (or the selection), as a held delete
+     * key does. One cross-process read, one delete.
+     */
+    fun deleteWordBackward() {
+        val connection = connection ?: return
+        val selected = connection.getSelectedText(0)
+        if (!selected.isNullOrEmpty()) {
+            connection.commitText("", 1)
+            return
+        }
+        val before = connection.getTextBeforeCursor(WORD_WINDOW, 0)?.toString().orEmpty()
+        val length = kz.yerek.aireply.keyboard.layout.TextDeletion.wordLength(before)
+        if (length > 0) connection.deleteSurroundingText(length, 0)
+    }
+
+    /**
+     * Moves the caret by whole characters (space-bar trackpad) from
+     * [position], the caret as `onUpdateSelection` last reported it. Reads
+     * just enough text either side to step over emoji rather than into them.
+     */
+    fun moveCursorBy(offset: Int, position: Int) {
+        val connection = connection ?: return
+        if (offset == 0 || position < 0) return
+        val window = kotlin.math.abs(offset) * 2 + 2
+        val before = connection.getTextBeforeCursor(window, 0)?.toString().orEmpty()
+        val after = connection.getTextAfterCursor(window, 0)?.toString().orEmpty()
+        var units = 0
+        if (offset < 0) {
+            var index = before.length
+            repeat(-offset) {
+                if (index <= 0) return@repeat
+                index = if (index >= 2 && Character.isSurrogatePair(before[index - 2], before[index - 1])) index - 2 else index - 1
+            }
+            units = index - before.length
+        } else {
+            var index = 0
+            repeat(offset) {
+                if (index >= after.length) return@repeat
+                index = if (index + 1 < after.length && Character.isSurrogatePair(after[index], after[index + 1])) index + 2 else index + 1
+            }
+            units = index
+        }
+        if (units == 0) return
+        val target = (position + units).coerceAtLeast(0)
+        connection.setSelection(target, target)
+    }
+
+    /** Puts the caret after the last character, so Add appends at the end. */
+    fun moveCaretToEnd() {
+        val connection = connection ?: return
+        val after = connection.getTextAfterCursor(MAX_CLEAR, 0)?.length ?: 0
+        if (after == 0) return
+        val before = connection.getTextBeforeCursor(MAX_CLEAR, 0)?.length ?: 0
+        connection.setSelection(before + after, before + after)
+    }
+
     fun sendReturn() {
         val connection = connection ?: return
         val action = editorInfo?.imeOptions?.and(EditorInfo.IME_MASK_ACTION) ?: EditorInfo.IME_ACTION_NONE
@@ -71,8 +128,8 @@ class HostField(private val connectionProvider: () -> InputConnection?) {
 
     // --------------------------------------------------------------- reading
 
-    fun textBeforeCursor(): String =
-        connection?.getTextBeforeCursor(contextWindow, 0)?.toString().orEmpty()
+    fun textBeforeCursor(limit: Int = contextWindow): String =
+        connection?.getTextBeforeCursor(limit, 0)?.toString().orEmpty()
 
     /**
      * Conservative check, matching iOS: a host can legitimately return nothing
@@ -163,5 +220,8 @@ class HostField(private val connectionProvider: () -> InputConnection?) {
          * bounded so a misbehaving host cannot make this allocate without limit.
          */
         const val MAX_CLEAR = 10_000
+
+        /** Enough to find the start of any real word. */
+        const val WORD_WINDOW = 64
     }
 }

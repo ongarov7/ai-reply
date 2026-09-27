@@ -21,6 +21,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -34,7 +35,9 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kz.yerek.aireply.BuildConfig
 import kz.yerek.aireply.R
+import kz.yerek.aireply.core.lang.KeyboardLanguage
 import kz.yerek.aireply.ui.feature.account.AccountSection
 import kz.yerek.aireply.core.lang.AppLanguage
 import kz.yerek.aireply.data.settings.AppearancePreference
@@ -59,6 +62,8 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
 
     var appearance by remember { mutableStateOf(services.settings.appearance) }
     var language by remember { mutableStateOf(services.settings.appLanguage) }
+    var layouts by remember { mutableStateOf(services.settings.enabledKeyboardLanguages) }
+    var mockReplies by remember { mutableStateOf(services.settings.debugMockReplies) }
 
     AppScreen(title = stringResource(R.string.settings_title), onBack = onBack) {
         ReadableColumn {
@@ -90,6 +95,26 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
                     ) { onOpen(Routes.KeyboardSetup) }
                 }
                 Footnote(stringResource(R.string.settings_setup_footer))
+            }
+
+            AppSection(stringResource(R.string.settings_keyboard_layouts)) {
+                RowGroup {
+                    KeyboardLanguage.CYCLE_ORDER.forEachIndexed { index, option ->
+                        if (index > 0) RowDividerIndented()
+                        val on = option in layouts
+                        // The last layout that is on cannot be switched off.
+                        SwitchRow(label = option.nativeName, checked = on, enabled = !(on && layouts.size == 1)) { checked ->
+                            val next = KeyboardLanguage.CYCLE_ORDER.filter {
+                                if (it == option) checked else it in layouts
+                            }
+                            if (next.isNotEmpty()) {
+                                layouts = next
+                                services.settings.enabledKeyboardLanguages = next
+                            }
+                        }
+                    }
+                }
+                Footnote(stringResource(R.string.settings_keyboard_layouts_footer))
             }
 
             AccountSection(onOpenSubscription = { onOpen(Routes.Subscription) })
@@ -175,6 +200,23 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
                 }
                 Footnote(stringResource(R.string.settings_setup_restart_footer))
             }
+
+            // Debug builds only: release builds do not have this section.
+            if (BuildConfig.DEBUG) {
+                AppSection(stringResource(R.string.settings_developer)) {
+                    RowGroup {
+                        SwitchRow(
+                            label = stringResource(R.string.settings_debug_mock_replies),
+                            checked = mockReplies,
+                            enabled = true
+                        ) { checked ->
+                            mockReplies = checked
+                            services.settings.debugMockReplies = checked
+                        }
+                    }
+                    Footnote(stringResource(R.string.settings_debug_mock_replies_footer))
+                }
+            }
         }
     }
 }
@@ -199,5 +241,20 @@ private fun LanguageRow(label: String, selected: Boolean, onClick: () -> Unit) {
                 modifier = Modifier.size(20.dp)
             )
         }
+    }
+}
+
+@Composable
+private fun SwitchRow(label: String, checked: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = enabled) { onChange(!checked) }
+            .padding(horizontal = Spacing.m, vertical = Spacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s)
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Switch(checked = checked, onCheckedChange = onChange, enabled = enabled)
     }
 }

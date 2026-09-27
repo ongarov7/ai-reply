@@ -8,6 +8,8 @@ import kz.yerek.aireply.ai.AIConfiguration
 import kz.yerek.aireply.ai.AIReplyService
 import kz.yerek.aireply.ai.AccountReplyTransport
 import kz.yerek.aireply.ai.AppStrings
+import kz.yerek.aireply.ai.DebugReplyMock
+import kz.yerek.aireply.ai.ReplyPromptBuilder
 import kz.yerek.aireply.ai.ReplyDraftNormalizer
 import kz.yerek.aireply.core.lang.AppLanguage
 import kz.yerek.aireply.core.lang.KeyboardLanguage
@@ -126,6 +128,15 @@ class ServiceLocator(context: Context) {
                     usageCache = usageCache,
                     context = context
                 )
+            },
+            // Canned replies exist only in debug builds, and only when the
+            // developer switched them on.
+            transportOverride = if (BuildConfig.DEBUG) {
+                { request: AIReplyService.Request, _: ReplyPromptBuilder.Prompt ->
+                    if (settings.debugMockReplies) DebugReplyMock(request.instruction) else null
+                }
+            } else {
+                null
             }
         )
     }

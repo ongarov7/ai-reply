@@ -182,8 +182,9 @@ data class CountryDto(
 data class ServerConfigDto(
     val locales: List<String> = emptyList(),
     val timezone: String = "",
-    @SerialName("max_source_characters") val maxSourceCharacters: Int = 300,
-    @SerialName("max_instruction_length") val maxInstructionLength: Int = 400,
+    /** Set by the administrator; the server enforces it on every request. Null on old servers. */
+    @SerialName("max_source_characters") val maxSourceCharacters: Int? = null,
+    @SerialName("max_instruction_length") val maxInstructionLength: Int? = null,
     @SerialName("payment_mode") val paymentMode: String = "",
     val countries: List<CountryDto> = emptyList(),
     val legal: LegalConfigDto? = null
@@ -228,5 +229,9 @@ data class ErrorDetailsDto(
     @SerialName("daily_limit") val dailyLimit: Int? = null,
     @SerialName("used_today") val usedToday: Int? = null,
     @SerialName("resets_at") val resetsAt: String? = null,
-    @SerialName("retry_after_seconds") val retryAfterSeconds: Int? = null
+    @SerialName("retry_after_seconds") val retryAfterSeconds: Int? = null,
+    /** Which request field was refused, e.g. `source_text`. */
+    val field: String? = null,
+    /** The limit that field has, when it was refused for length. */
+    @SerialName("max_characters") val maxCharacters: Int? = null
 )

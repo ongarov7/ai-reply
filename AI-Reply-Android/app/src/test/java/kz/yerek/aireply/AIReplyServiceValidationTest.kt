@@ -1,14 +1,17 @@
 package kz.yerek.aireply
 
-import kz.yerek.aireply.ai.AIConfiguration
 import kz.yerek.aireply.ai.AIReplyError
 import kz.yerek.aireply.ai.AIReplyService
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The 300-character rule, which is enforced before anything costs money. */
+/** The message-length rule, enforced before anything costs money, at the limit the server publishes. */
 class AIReplyServiceValidationTest {
+
+    private companion object {
+        const val LIMIT = 400
+    }
 
     @Test
     fun `blank message is rejected`() {
@@ -28,16 +31,16 @@ class AIReplyServiceValidationTest {
 
     @Test
     fun `message at the limit is accepted`() {
-        val message = "a".repeat(AIConfiguration.MAX_MESSAGE_CHARACTERS)
-        assertTrue(AIReplyService.validate(message) is AIReplyService.ValidationResult.Valid)
+        val message = "a".repeat(LIMIT)
+        assertTrue(AIReplyService.validate(message, LIMIT) is AIReplyService.ValidationResult.Valid)
     }
 
     @Test
     fun `message over the limit is rejected with the limit attached`() {
-        val message = "a".repeat(AIConfiguration.MAX_MESSAGE_CHARACTERS + 1)
-        val result = AIReplyService.validate(message)
+        val message = "a".repeat(LIMIT + 1)
+        val result = AIReplyService.validate(message, LIMIT)
         val error = (result as AIReplyService.ValidationResult.Invalid).error
-        assertEquals(AIReplyError.MessageTooLong(AIConfiguration.MAX_MESSAGE_CHARACTERS), error)
+        assertEquals(AIReplyError.MessageTooLong(LIMIT), error)
     }
 
     /**
@@ -47,9 +50,9 @@ class AIReplyServiceValidationTest {
      */
     @Test
     fun `emoji count as one character each`() {
-        val message = "🙂".repeat(AIConfiguration.MAX_MESSAGE_CHARACTERS)
-        assertTrue(AIReplyService.validate(message) is AIReplyService.ValidationResult.Valid)
-        assertEquals(AIConfiguration.MAX_MESSAGE_CHARACTERS, AIReplyService.characterCount(message))
+        val message = "🙂".repeat(LIMIT)
+        assertTrue(AIReplyService.validate(message, LIMIT) is AIReplyService.ValidationResult.Valid)
+        assertEquals(LIMIT, AIReplyService.characterCount(message))
     }
 
     @Test

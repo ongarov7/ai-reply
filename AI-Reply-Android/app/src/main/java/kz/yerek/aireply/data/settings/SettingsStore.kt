@@ -63,8 +63,18 @@ class SettingsStore(context: Context) {
      * layout tables just to read it.
      */
     var keyboardLanguage: KeyboardLanguage
-        get() = KeyboardLanguage.fromCode(prefs.getString(KEY_KEYBOARD_LANGUAGE, null))
-            ?: KeyboardLanguage.ENGLISH
+        get() {
+            val stored = KeyboardLanguage.fromCode(prefs.getString(KEY_KEYBOARD_LANGUAGE, null))
+            val enabled = enabledKeyboardLanguages
+            if (stored != null && stored in enabled) return stored
+            // First run: the layout of the app's own language, when it is on.
+            val preferred = when (effectiveAppLanguage) {
+                AppLanguage.KAZAKH -> KeyboardLanguage.KAZAKH
+                AppLanguage.RUSSIAN -> KeyboardLanguage.RUSSIAN
+                else -> KeyboardLanguage.ENGLISH
+            }
+            return if (preferred in enabled) preferred else enabled.first()
+        }
         set(value) = prefs.edit().putString(KEY_KEYBOARD_LANGUAGE, value.code).apply()
 
     // ------------------------------------------------------------- interface
@@ -196,6 +206,44 @@ class SettingsStore(context: Context) {
             .apply()
     }
 
+    // ------------------------------------------------------------ keyboard
+
+    /**
+     * The layouts the language key cycles through, in ҚАЗ → РУС → ENG order.
+     * Never empty: switching the last one off is refused by the setter.
+     */
+    var enabledKeyboardLanguages: List<KeyboardLanguage>
+        get() {
+            val codes = prefs.getStringSet(KEY_ENABLED_LAYOUTS, null) ?: return KeyboardLanguage.CYCLE_ORDER
+            return KeyboardLanguage.CYCLE_ORDER.filter { it.code in codes }.ifEmpty { KeyboardLanguage.CYCLE_ORDER }
+        }
+        set(value) {
+            if (value.isEmpty()) return
+            prefs.edit().putStringSet(KEY_ENABLED_LAYOUTS, value.map { it.code }.toSet()).apply()
+        }
+
+    /** The persona the user picked last, shown as selected on the chip row. */
+    var lastTemplateId: String?
+        get() = prefs.getString(KEY_LAST_TEMPLATE, null)
+        set(value) {
+            prefs.edit().apply {
+                if (value == null) remove(KEY_LAST_TEMPLATE) else putString(KEY_LAST_TEMPLATE, value)
+            }.apply()
+        }
+
+    /**
+     * DEBUG BUILDS ONLY: canned replies instead of the service, so the reply
+     * flow can be exercised on an emulator without spending the quota. The
+     * switch is in Settings ▸ Developer, which release builds do not have, and
+     * the keyboard ignores the value in a release build.
+     */
+    var debugMockReplies: Boolean
+        get() = prefs.getBoolean(KEY_DEBUG_MOCK, false)
+        set(value) = prefs.edit().putBoolean(KEY_DEBUG_MOCK, value).apply()
+
+    /** The backing file, for [kz.yerek.aireply.ai.AILimits]. */
+    val sharedPreferences: SharedPreferences get() = prefs
+
     // ------------------------------------------------------- onboarding hints
 
     /** Set once the setup guide has been completed, to stop re-nudging. */
@@ -211,6 +259,9 @@ class SettingsStore(context: Context) {
         const val KEY_APPEARANCE = "shared.appearance"
         const val KEY_TEMPLATE_SUMMARIES = "shared.templateSummaries"
         const val KEY_SEEN_SETUP = "shared.seenKeyboardSetup"
+        const val KEY_ENABLED_LAYOUTS = "shared.enabledKeyboardLanguages"
+        const val KEY_LAST_TEMPLATE = "shared.lastTemplateID"
+        const val KEY_DEBUG_MOCK = "debug.mockReplies"
 
         const val KEY_AI_MODE = "ai.transportMode"
         const val KEY_AI_MODEL = "ai.model"

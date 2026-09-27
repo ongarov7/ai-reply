@@ -190,8 +190,14 @@ class AccountReplyTransport(
             is ApiError.DailyLimitReached, is ApiError.RateLimited,
             is ApiError.SubscriptionExpired, is ApiError.PaymentRequired -> AIReplyError.RateLimited
             is ApiError.EmptyResponse -> AIReplyError.EmptyResponse
+            is ApiError.SourceTooLong -> {
+                // The server is the source of truth: remember its limit, so
+                // the counter and the next check use it.
+                AILimits.storeSourceLimit(error.limit)
+                AIReplyError.MessageTooLong(error.limit)
+            }
             is ApiError.InvalidRequest ->
-                AIReplyError.MessageTooLong(AIConfiguration.MAX_MESSAGE_CHARACTERS)
+                AIReplyError.MessageTooLong(AILimits.current.sourceCharacters)
             else -> AIReplyError.ServiceUnavailable
         }
     }

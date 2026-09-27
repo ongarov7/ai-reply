@@ -72,4 +72,45 @@
     <string name="cd_backspace">Oʻchirish</string>
     <string name="cd_switch_keyboard">Klaviaturani almashtirish</string>
     <string name="cd_switch_layout">Tartibni almashtirish</string>
+
+    <!-- Keyboard composer and settings (2026-09 refactor) -->
+    <string name="kb_back">Orqaga</string>
+    <string name="kb_edit_reply">Javobni tahrirlash</string>
+    <string name="kb_done_editing">Tayyor</string>
+    <string name="kb_previous_version">Oldingi variant</string>
+    <string name="kb_next_version">Keyingi variant</string>
+    <string name="kb_version_position">%1$d-variant, jami %2$d</string>
+    <string name="kb_character_count">%1$d / %2$d belgi</string>
+    <string name="kb_stop">To‘xtatish</string>
+    <string name="kb_retry">Qayta urinish</string>
+    <string name="kb_paste_message">Xabarni joylash</string>
+    <string name="kb_clear_source">Xabarni tozalash</string>
+    <string name="kb_show_full_message">To‘liq ko‘rsatish</string>
+    <string name="kb_hide_full_message">Xabarni yig‘ish</string>
+    <string name="kb_more_actions">Yana</string>
+    <string name="kb_copied_message">Nusxalangan xabar</string>
+    <string name="kb_ask_placeholder">Qanday javob beraman?</string>
+    <string name="kb_intent_agree">Rozilik</string>
+    <string name="kb_intent_agree_phrase">Rozi ekanimni yoz.</string>
+    <string name="kb_intent_decline">Rad etish</string>
+    <string name="kb_intent_decline_phrase">Muloyim rad et.</string>
+    <string name="kb_intent_details">Aniqlashtirish</string>
+    <string name="kb_intent_details_phrase">Batafsil so‘ra.</string>
+    <string name="kb_intent_brief">Qisqa</string>
+    <string name="kb_intent_brief_phrase">Qisqa javob ber.</string>
+    <string name="kb_intent_professional">Ishchan</string>
+    <string name="kb_intent_professional_phrase">Ishchan uslubda javob ber.</string>
+    <string name="kb_intent_friendly">Do‘stona</string>
+    <string name="kb_intent_friendly_phrase">Iliq, do‘stona javob ber.</string>
+    <string name="kb_intent_thanks">Minnatdorchilik</string>
+    <string name="kb_intent_thanks_phrase">Minnatdorchilik bildir.</string>
+    <string name="kb_intent_reschedule">Boshqa vaqt</string>
+    <string name="kb_intent_reschedule_phrase">Boshqa vaqt taklif qil.</string>
+    <string name="kb_err_rate_limited">So‘rovlar juda ko‘p. Biroz kutib qayta urinib ko‘ring.</string>
+    <string name="settings_keyboard_layouts">Klaviatura tartiblari</string>
+    <string name="settings_keyboard_layouts_footer">Til tugmasi yoqilgan tartiblar orasida almashtiradi. Kamida bittasi yoqiq qoladi.</string>
+    <string name="settings_developer">Dasturchi uchun</string>
+    <string name="settings_debug_mock_replies">Sinov AI javoblari</string>
+    <string name="settings_debug_mock_replies_footer">Faqat sinov yig‘masida. Klaviatura xizmat o‘rniga tayyor javob beradi — limit sarflanmaydi. Ko‘rsatmadagi teglar: #offline, #quota, #slow.</string>
+
 </resources>

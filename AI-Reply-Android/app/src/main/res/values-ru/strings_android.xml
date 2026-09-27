@@ -83,4 +83,44 @@
     <string name="cd_switch_keyboard">Сменить клавиатуру</string>
     <string name="cd_switch_layout">Сменить раскладку</string>
 
+    <!-- Keyboard composer and settings (2026-09 refactor) -->
+    <string name="kb_back">Назад</string>
+    <string name="kb_edit_reply">Изменить ответ</string>
+    <string name="kb_done_editing">Готово</string>
+    <string name="kb_previous_version">Предыдущий вариант</string>
+    <string name="kb_next_version">Следующий вариант</string>
+    <string name="kb_version_position">Вариант %1$d из %2$d</string>
+    <string name="kb_character_count">%1$d из %2$d символов</string>
+    <string name="kb_stop">Остановить</string>
+    <string name="kb_retry">Повторить</string>
+    <string name="kb_paste_message">Вставить сообщение</string>
+    <string name="kb_clear_source">Очистить сообщение</string>
+    <string name="kb_show_full_message">Показать полностью</string>
+    <string name="kb_hide_full_message">Свернуть сообщение</string>
+    <string name="kb_more_actions">Ещё</string>
+    <string name="kb_copied_message">Скопированное сообщение</string>
+    <string name="kb_ask_placeholder">Как ответить?</string>
+    <string name="kb_intent_agree">Согласиться</string>
+    <string name="kb_intent_agree_phrase">Ответь, что я согласен.</string>
+    <string name="kb_intent_decline">Отказать</string>
+    <string name="kb_intent_decline_phrase">Вежливо откажи.</string>
+    <string name="kb_intent_details">Уточнить</string>
+    <string name="kb_intent_details_phrase">Уточни детали.</string>
+    <string name="kb_intent_brief">Коротко</string>
+    <string name="kb_intent_brief_phrase">Ответь коротко.</string>
+    <string name="kb_intent_professional">По-деловому</string>
+    <string name="kb_intent_professional_phrase">Ответь по-деловому.</string>
+    <string name="kb_intent_friendly">Дружелюбно</string>
+    <string name="kb_intent_friendly_phrase">Ответь тепло и дружелюбно.</string>
+    <string name="kb_intent_thanks">Поблагодарить</string>
+    <string name="kb_intent_thanks_phrase">Поблагодари.</string>
+    <string name="kb_intent_reschedule">Другое время</string>
+    <string name="kb_intent_reschedule_phrase">Предложи другое время.</string>
+    <string name="kb_err_rate_limited">Слишком много запросов. Подождите немного.</string>
+    <string name="settings_keyboard_layouts">Раскладки клавиатуры</string>
+    <string name="settings_keyboard_layouts_footer">Клавиша языка переключает включённые раскладки. Хотя бы одна остаётся включённой.</string>
+    <string name="settings_developer">Для разработчика</string>
+    <string name="settings_debug_mock_replies">Тестовые ответы ИИ</string>
+    <string name="settings_debug_mock_replies_footer">Только в отладочной сборке. Клавиатура отвечает заготовками вместо сервиса — лимит не тратится. Теги в инструкции: #offline, #quota, #slow.</string>
+
 </resources>

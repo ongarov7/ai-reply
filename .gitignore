@@ -10,7 +10,7 @@ ios-run.log
 ios-simlog.txt
 android-build.log
 android-emu.log
-android-shot.png
+android-shot*.png
 verify.log
 
 # macOS

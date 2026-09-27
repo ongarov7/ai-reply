@@ -83,4 +83,44 @@
     <string name="cd_switch_keyboard">Пернетақтаны ауыстыру</string>
     <string name="cd_switch_layout">Раскладканы ауыстыру</string>
 
+    <!-- Keyboard composer and settings (2026-09 refactor) -->
+    <string name="kb_back">Артқа</string>
+    <string name="kb_edit_reply">Жауапты өңдеу</string>
+    <string name="kb_done_editing">Дайын</string>
+    <string name="kb_previous_version">Алдыңғы нұсқа</string>
+    <string name="kb_next_version">Келесі нұсқа</string>
+    <string name="kb_version_position">%1$d-нұсқа, барлығы %2$d</string>
+    <string name="kb_character_count">%1$d / %2$d таңба</string>
+    <string name="kb_stop">Тоқтату</string>
+    <string name="kb_retry">Қайталау</string>
+    <string name="kb_paste_message">Хабарламаны қою</string>
+    <string name="kb_clear_source">Хабарламаны тазалау</string>
+    <string name="kb_show_full_message">Толық көрсету</string>
+    <string name="kb_hide_full_message">Хабарламаны жию</string>
+    <string name="kb_more_actions">Тағы</string>
+    <string name="kb_copied_message">Көшірілген хабарлама</string>
+    <string name="kb_ask_placeholder">Қалай жауап беру керек?</string>
+    <string name="kb_intent_agree">Келісу</string>
+    <string name="kb_intent_agree_phrase">Келісетінімді жаз.</string>
+    <string name="kb_intent_decline">Бас тарту</string>
+    <string name="kb_intent_decline_phrase">Сыпайы түрде бас тарт.</string>
+    <string name="kb_intent_details">Нақтылау</string>
+    <string name="kb_intent_details_phrase">Толығырақ сұра.</string>
+    <string name="kb_intent_brief">Қысқа</string>
+    <string name="kb_intent_brief_phrase">Қысқа жауап бер.</string>
+    <string name="kb_intent_professional">Іскери</string>
+    <string name="kb_intent_professional_phrase">Іскери тілмен жауап бер.</string>
+    <string name="kb_intent_friendly">Достық</string>
+    <string name="kb_intent_friendly_phrase">Жылы, достық үнмен жауап бер.</string>
+    <string name="kb_intent_thanks">Алғыс айту</string>
+    <string name="kb_intent_thanks_phrase">Алғыс айт.</string>
+    <string name="kb_intent_reschedule">Басқа уақыт</string>
+    <string name="kb_intent_reschedule_phrase">Басқа уақыт ұсын.</string>
+    <string name="kb_err_rate_limited">Сұраныс тым көп. Сәл күте тұрыңыз.</string>
+    <string name="settings_keyboard_layouts">Пернетақта тілдері</string>
+    <string name="settings_keyboard_layouts_footer">Тіл пернесі қосулы тілдерді ауыстырады. Кемінде біреуі қосулы қалады.</string>
+    <string name="settings_developer">Әзірлеушіге</string>
+    <string name="settings_debug_mock_replies">Сынақ AI жауаптары</string>
+    <string name="settings_debug_mock_replies_footer">Тек жөндеу нұсқасында. Пернетақта қызметтің орнына дайын жауап береді — лимит жұмсалмайды. Нұсқаудағы тегтер: #offline, #quota, #slow.</string>
+
 </resources>

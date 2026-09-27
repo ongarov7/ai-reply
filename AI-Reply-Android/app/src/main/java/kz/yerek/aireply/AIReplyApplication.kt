@@ -1,6 +1,7 @@
 package kz.yerek.aireply
 
 import android.app.Application
+import kz.yerek.aireply.ai.AILimits
 
 /**
  * Holds the object graph.
@@ -22,6 +23,7 @@ class AIReplyApplication : Application() {
         // later — including the keyboard's first frame — is then an in-memory
         // map lookup rather than a disk read on whatever thread asked.
         services.settings.warmUp()
+        AILimits.install(services.settings.sharedPreferences)
         instance = this
     }
 

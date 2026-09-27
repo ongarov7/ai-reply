@@ -1,5 +1,6 @@
 package kz.yerek.aireply.ui.feature.account
 
+import kz.yerek.aireply.ai.AILimits
 import androidx.annotation.StringRes
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -87,6 +88,8 @@ class AccountController(
     /** Countries and current legal versions, needed before the first screen. */
     suspend fun loadServerConfig() {
         runCatching { service.serverConfig() }.getOrNull()?.let { config ->
+            // The administrator's character limits, for the keyboard too.
+            AILimits.apply(config)
             val legal = config.legal ?: LegalConfigDto.PRODUCTION
             _state.update {
                 it.copy(

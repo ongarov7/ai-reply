@@ -10,8 +10,12 @@ class AIConfiguration(private val isAccountSignedIn: () -> Boolean) {
     companion object {
         const val DEFAULT_BACKEND_BASE_URL = "https://api.meily.kz"
         const val MAX_OUTPUT_TOKENS = 180
-        const val MAX_MESSAGE_CHARACTERS = 300
-        const val MAX_INSTRUCTION_CHARACTERS = 400
         const val REQUEST_TIMEOUT_MS = 25_000
+
+        /** The message limit the server publishes, or its fallback. See [AILimits]. */
+        val maxMessageCharacters: Int get() = AILimits.current.sourceCharacters
+
+        /** The instruction limit the server publishes, or its fallback. */
+        val maxInstructionCharacters: Int get() = AILimits.current.instructionCharacters
     }
 }

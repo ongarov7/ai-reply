@@ -49,6 +49,8 @@ sealed interface ApiError {
     data object ProviderTimeout : ApiError
     data object EmptyResponse : ApiError
     data object InvalidRequest : ApiError
+    /** The incoming message is longer than the server's limit, which it sent. */
+    data class SourceTooLong(val limit: Int) : ApiError
     data object NotFound : ApiError
     data object Conflict : ApiError
     data object Server : ApiError
@@ -172,7 +174,14 @@ class ApiClient(
                 "AI_PROVIDER_UNAVAILABLE" -> return ApiError.ProviderUnavailable
                 "AI_TIMEOUT" -> return ApiError.ProviderTimeout
                 "AI_EMPTY_RESPONSE" -> return ApiError.EmptyResponse
-                "INVALID_REQUEST" -> return ApiError.InvalidRequest
+                "INVALID_REQUEST" -> {
+                    val limit = details?.maxCharacters
+                    return if (details?.field == "source_text" && limit != null) {
+                        ApiError.SourceTooLong(limit)
+                    } else {
+                        ApiError.InvalidRequest
+                    }
+                }
                 "NOT_FOUND" -> return ApiError.NotFound
                 "CONFLICT" -> return ApiError.Conflict
             }

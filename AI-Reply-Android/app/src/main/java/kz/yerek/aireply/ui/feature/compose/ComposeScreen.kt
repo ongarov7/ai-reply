@@ -89,7 +89,7 @@ fun ComposeScreen(onBack: () -> Unit) {
     DisposableEffect(Unit) { onDispose { job?.cancel() } }
 
     val count = AIReplyService.characterCount(message)
-    val overLimit = count > AIConfiguration.MAX_MESSAGE_CHARACTERS
+    val overLimit = count > AIConfiguration.maxMessageCharacters
     val canGenerate = !generating && !overLimit && count > 0 && templateId != null
 
     fun generate() {
@@ -148,7 +148,7 @@ fun ComposeScreen(onBack: () -> Unit) {
                             stringResource(
                                 R.string.compose_counter,
                                 count,
-                                AIConfiguration.MAX_MESSAGE_CHARACTERS
+                                AIConfiguration.maxMessageCharacters
                             ),
                             style = MaterialTheme.typography.labelSmall,
                             color = if (overLimit) {
@@ -185,7 +185,7 @@ fun ComposeScreen(onBack: () -> Unit) {
                         Text(
                             stringResource(
                                 R.string.kb_err_message_too_long,
-                                AIConfiguration.MAX_MESSAGE_CHARACTERS
+                                AIConfiguration.maxMessageCharacters
                             ),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.error

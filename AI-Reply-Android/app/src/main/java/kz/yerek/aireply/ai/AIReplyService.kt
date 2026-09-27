@@ -30,7 +30,11 @@ class AIReplyService(
      * constructed here so this class stays free of storage and DI concerns.
      */
     private val accountTransport: (String, AccountReplyTransport.RequestContext) -> ReplyTransport,
-    private val transportOverride: ((Request, ReplyPromptBuilder.Prompt) -> ReplyTransport)? = null
+    /**
+     * Replaces the account transport for a request, or returns null to use
+     * it. Tests use this, and so do DEBUG builds' canned replies.
+     */
+    private val transportOverride: ((Request, ReplyPromptBuilder.Prompt) -> ReplyTransport?)? = null
 ) {
 
     /**
@@ -62,13 +66,12 @@ class AIReplyService(
             is ValidationResult.Invalid -> result.error.raise()
         }
 
-        if (!configuration.isReady) AIReplyError.AuthenticationFailed.raise()
 
         val profile = request.configuration.profile
         val templateName = nameTemplate(request.template, request.uiLanguage)
         val instruction = request.instruction
             .trim()
-            .clampToCodePoints(AIConfiguration.MAX_INSTRUCTION_CHARACTERS)
+            .clampToCodePoints(AIConfiguration.maxInstructionCharacters)
 
         // The template's own schedule wins when it has one; otherwise the
         // profile's applies. Resolved HERE, deterministically, so the model is
@@ -94,7 +97,10 @@ class AIReplyService(
             )
         )
 
-        val transport = transportOverride?.invoke(request, prompt)
+        val override = transportOverride?.invoke(request, prompt)
+        // Only the real service needs an account; an override does not.
+        if (override == null && !configuration.isReady) AIReplyError.AuthenticationFailed.raise()
+        val transport = override
             ?: makeTransport(request, message, templateName, instruction, businessContext)
 
         return try {
@@ -146,7 +152,8 @@ class AIReplyService(
 
     companion object {
         /**
-         * The 300-character rule.
+         * The message-length rule, with the limit the server publishes
+         * ([AILimits]; 400 until the server says otherwise).
          *
          * It applies to the INCOMING MESSAGE ONLY. The profile, the template
          * instructions, the user's instruction and the developer rules are
@@ -156,13 +163,11 @@ class AIReplyService(
          * Counted in code points, which is what the user sees as characters for
          * these three languages and what the backend counts too.
          */
-        fun validate(message: String): ValidationResult {
+        fun validate(message: String, limit: Int = AIConfiguration.maxMessageCharacters): ValidationResult {
             val trimmed = message.trim()
             if (trimmed.isEmpty()) return ValidationResult.Invalid(AIReplyError.NoSourceMessage)
-            if (trimmed.codePointLength() > AIConfiguration.MAX_MESSAGE_CHARACTERS) {
-                return ValidationResult.Invalid(
-                    AIReplyError.MessageTooLong(AIConfiguration.MAX_MESSAGE_CHARACTERS)
-                )
+            if (trimmed.codePointLength() > limit) {
+                return ValidationResult.Invalid(AIReplyError.MessageTooLong(limit))
             }
             return ValidationResult.Valid(trimmed)
         }
