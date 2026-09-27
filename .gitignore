@@ -1,0 +1,17 @@
+# Build-watcher request/response files and logs (claude-build-watch.sh).
+.build-request
+.build-done
+.test-done
+.claude-*
+.watcher-v*
+ios-build.log
+ios-test.log
+ios-run.log
+ios-simlog.txt
+android-build.log
+android-emu.log
+android-shot.png
+verify.log
+
+# macOS
+.DS_Store
