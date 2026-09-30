@@ -130,10 +130,10 @@ Google Cloud Console → APIs & Services:
 ## 7. Проверка после деплоя
 
 ```bash
-curl -s https://api.meily.kz/api/v1/config | jq .features
+curl -s https://ai-reply.kz/api/v1/config | jq .features
 # {"reply_preferences":true,"email_otp":true,"google_sign_in":true,"apple_sign_in":true}
 
-curl -s -X POST https://api.meily.kz/api/v1/auth/email/otp/request \
+curl -s -X POST https://ai-reply.kz/api/v1/auth/email/otp/request \
   -H 'Content-Type: application/json' \
   -d '{"email":"you@example.com","locale":"ru"}'
 # {"masked_email":"y***u@example.com","expires_in":300,"resend_after":32,"code_length":4}

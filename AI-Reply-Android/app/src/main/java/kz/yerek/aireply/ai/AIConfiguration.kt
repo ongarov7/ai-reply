@@ -8,7 +8,7 @@ class AIConfiguration(private val isAccountSignedIn: () -> Boolean) {
     val isReady: Boolean get() = isAccountSignedIn()
 
     companion object {
-        const val DEFAULT_BACKEND_BASE_URL = "https://api.meily.kz"
+        const val DEFAULT_BACKEND_BASE_URL = "https://ai-reply.kz"
         const val MAX_OUTPUT_TOKENS = 180
         const val REQUEST_TIMEOUT_MS = 25_000
 

@@ -156,7 +156,7 @@ func Load(envFile string) (Config, error) {
 			Env:           str("APP_ENV", "development"),
 			Port:          num("APP_PORT", 0), // әдепкі жоқ: Docker порт картасы мен healthcheck те осы мәнді қолданады
 			Host:          str("APP_HOST", "0.0.0.0"),
-			PublicBaseURL: strings.TrimRight(str("PUBLIC_BASE_URL", "https://api.meily.kz"), "/"),
+			PublicBaseURL: strings.TrimRight(str("PUBLIC_BASE_URL", "https://ai-reply.kz"), "/"),
 			Timezone:      str("DEFAULT_TIMEZONE", "Asia/Almaty"),
 			CORSOrigins:   list("CORS_ORIGINS", ""),
 			TrustProxy:    boolean("TRUST_PROXY", false),

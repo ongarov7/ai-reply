@@ -23,3 +23,6 @@ android-shot*.png
 .claude-*
 .run-lint
 .watcher-v*
+
+# Files the Claude desktop app saves into this folder
+Claude outputs/

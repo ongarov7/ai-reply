@@ -220,7 +220,7 @@ docker run --rm --volumes-from "$(docker compose ps -aq backend)" -v "$PWD":/bac
 #       OTP_RESEND_COOLDOWN=32s, RATE_OTP_REQUEST_PER_DAY=10
 docker compose up -d --build
 docker compose logs --tail=50 backend    # строка старта: email_otp=email google_sign_in=… apple_sign_in=…
-curl -s https://api.meily.kz/api/v1/config | jq .features
+curl -s https://ai-reply.kz/api/v1/config | jq .features
 ```
 
 Приложения: iOS — задать `GOOGLE_IOS_CLIENT_ID` / `GOOGLE_IOS_REVERSED_CLIENT_ID`,

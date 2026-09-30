@@ -7,9 +7,9 @@ info:
     их только в памяти во время запроса.
 externalDocs:
   description: Публичная оферта
-  url: https://api.meily.kz/offer
+  url: https://ai-reply.kz/offer
 servers:
-  - url: https://api.meily.kz
+  - url: https://ai-reply.kz
     description: production
 paths:
   /healthz:
@@ -296,8 +296,8 @@ components:
       properties:
         terms_version: { type: string, example: "2026-09-19" }
         privacy_version: { type: string, example: "2026-09-19" }
-        terms_url: { type: string, format: uri, example: "https://api.meily.kz/offer" }
-        privacy_url: { type: string, format: uri, example: "https://api.meily.kz/privacy" }
+        terms_url: { type: string, format: uri, example: "https://ai-reply.kz/offer" }
+        privacy_url: { type: string, format: uri, example: "https://ai-reply.kz/privacy" }
     PublicConfig:
       type: object
       properties:

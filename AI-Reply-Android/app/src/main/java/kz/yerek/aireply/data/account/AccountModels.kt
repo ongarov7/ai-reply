@@ -170,8 +170,8 @@ data class LegalConfigDto(
         val PRODUCTION = LegalConfigDto(
             termsVersion = "2026-09-19",
             privacyVersion = "2026-09-19",
-            termsUrl = "https://api.meily.kz/offer",
-            privacyUrl = "https://api.meily.kz/privacy"
+            termsUrl = "https://ai-reply.kz/offer",
+            privacyUrl = "https://ai-reply.kz/privacy"
         )
     }
 }

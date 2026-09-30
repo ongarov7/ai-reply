@@ -3,7 +3,7 @@ import Foundation
 /// Fixed production configuration shared by the app and keyboard extension.
 struct AIConfiguration: Sendable {
 
-    static let productionBaseURL = URL(string: "https://api.meily.kz")!
+    static let productionBaseURL = URL(string: "https://ai-reply.kz")!
     static let requestTimeout: TimeInterval = 25
 
     /// Longest incoming message, as the server last published it (see
@@ -26,7 +26,7 @@ struct AIConfiguration: Sendable {
     ///
     /// WHY THIS EXISTS. The base URL used to be the production constant with no
     /// way past it, so there was no way to exercise the reply flow without
-    /// spending real requests against `api.meily.kz`. A release build cannot
+    /// spending real requests against `ai-reply.kz`. A release build cannot
     /// reach any of this - the whole block is compiled out - so production
     /// behaviour is unchanged and there is still no way to ship pointing
     /// somewhere else by accident.

@@ -52,7 +52,7 @@ func TestProductionRequiresEmailDelivery(t *testing.T) {
 	t.Setenv("APP_ENV", "production")
 	t.Setenv("AUTH_DEMO_MODE", "false")
 	t.Setenv("PAYMENT_MODE", "live")
-	t.Setenv("PUBLIC_BASE_URL", "https://api.meily.kz")
+	t.Setenv("PUBLIC_BASE_URL", "https://ai-reply.kz")
 	t.Setenv("RESEND_API_KEY", "")
 	t.Setenv("RESEND_FROM_EMAIL", "")
 

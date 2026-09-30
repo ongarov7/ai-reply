@@ -20,7 +20,7 @@
 байт в байт. Достаточно:
 
 1. `AIConfiguration.setMode(.backend)` / `AITransportMode.BACKEND`;
-2. base URL → адрес сервера (`https://api.meily.kz` для iOS и Android).
+2. base URL → адрес сервера (`https://ai-reply.kz` для iOS и Android).
 
 После этого приложения перестают ходить в OpenAI напрямую, а запросы начинают
 учитываться в квоте и статистике. Проверено тестами `TestLegacyEndpointsStayCompatible`,

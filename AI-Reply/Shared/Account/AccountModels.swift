@@ -236,8 +236,8 @@ extension AccountAPI {
         static let production = LegalConfig(
             termsVersion: "2026-09-19",
             privacyVersion: "2026-09-19",
-            termsURL: "https://api.meily.kz/offer",
-            privacyURL: "https://api.meily.kz/privacy"
+            termsURL: "https://ai-reply.kz/offer",
+            privacyURL: "https://ai-reply.kz/privacy"
         )
     }
 
