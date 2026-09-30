@@ -95,6 +95,31 @@ echo "sdk.dir=$HOME/Library/Android/sdk" > local.properties
 
 `build-and-log.command` does all of the above and writes `build.log`.
 
+### Sign-in (Google, e-mail)
+
+The account screen offers **Continue with Google** (Credential Manager,
+`GetSignInWithGoogleOption` with a fresh nonce) and **Continue with Email** (a
+4-digit code sent by the server through Resend). Phone-number sign-in was
+removed. The server verifies the Google ID token and the code; the app only
+forwards them. Setup, in full: `../ai-reply-back-end/docs/AUTH.md`.
+
+Google needs the OAuth client of type *Web application* at build time (it is
+not a secret, but it differs per environment, so it is not checked in):
+
+```bash
+# local.properties (git-ignored) or ~/.gradle/gradle.properties
+aireply.googleWebClientId=1234-abc.apps.googleusercontent.com
+# or: ./gradlew assembleRelease -Paireply.googleWebClientId=…
+# or: GOOGLE_WEB_CLIENT_ID=… ./gradlew assembleRelease
+```
+
+Google Cloud also needs an *Android* OAuth client for `kz.yerek.aireply` with
+the SHA-1 of every signing key (debug, upload, Play App Signing). Without a web
+client id, release builds hide the Google button.
+
+Keyboard vibration: Settings ▸ Keyboard ▸ *Vibration on key press* (on by
+default). The system's own keypress-vibration setting still applies on top.
+
 ---
 
 ## Setting the keyboard up

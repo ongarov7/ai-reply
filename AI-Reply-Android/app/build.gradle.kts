@@ -1,8 +1,34 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
+}
+
+/**
+ * "Continue with Google": the OAuth client of type *Web application* from
+ * Google Cloud Console. Not a secret (it ships in every APK), but it differs
+ * per environment, so it is not checked in. First match wins:
+ *   -Paireply.googleWebClientId=… · aireply.googleWebClientId in
+ *   local.properties or ~/.gradle/gradle.properties · GOOGLE_WEB_CLIENT_ID env.
+ * Empty builds fine and simply hides the Google button.
+ */
+val googleWebClientId: String = run {
+    val local = Properties().apply {
+        val file = rootProject.file("local.properties")
+        if (file.exists()) file.inputStream().use { load(it) }
+    }
+    val value = (findProperty("aireply.googleWebClientId") as String?)
+        ?: local.getProperty("aireply.googleWebClientId")
+        ?: System.getenv("GOOGLE_WEB_CLIENT_ID")
+        ?: ""
+    value.trim().also {
+        require(it.isEmpty() || Regex("[0-9A-Za-z._-]+\\.apps\\.googleusercontent\\.com").matches(it)) {
+            "aireply.googleWebClientId must look like <id>.apps.googleusercontent.com"
+        }
+    }
 }
 
 android {
@@ -22,6 +48,8 @@ android {
         // free of the ~70 locales AndroidX would otherwise drag in, and is what
         // res/xml/locales_config.xml declares to the system.
         resourceConfigurations += listOf("en", "ru", "kk", "uz")
+
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
     }
 
     buildTypes {
@@ -73,6 +101,11 @@ android {
         // explicit tap, so it is disabled here and the rule is enforced by
         // ContextTextProvider being the single place that touches it.
         disable += listOf("UnusedResources")
+        // Uzbek covers every production flow; older, rarely seen text falls
+        // back to English on purpose. LocalizationParityTest enforces full
+        // Russian and Kazakh coverage and the Uzbek entry points, so lint
+        // reports the remaining Uzbek gaps without failing the build.
+        warning += listOf("MissingTranslation")
         checkReleaseBuilds = true
     }
 }
@@ -105,6 +138,10 @@ dependencies {
 
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
+
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services.auth)
+    implementation(libs.googleid)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 

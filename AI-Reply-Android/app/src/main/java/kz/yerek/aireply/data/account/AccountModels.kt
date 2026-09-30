@@ -44,10 +44,19 @@ data class AccountUser(
     val email: String? = null,
     val status: String = "active",
     val locale: String = "en",
-    @SerialName("onboarding_completed") val onboardingCompleted: Boolean = false
+    @SerialName("onboarding_completed") val onboardingCompleted: Boolean = false,
+    /** How this account can sign in: `email`, `google`, `apple`, `phone`. Absent on older servers. */
+    @SerialName("auth_providers") val authProviders: List<String>? = null
 ) {
-    /** What the user recognises themselves by. */
-    val identifier: String get() = phone ?: email.orEmpty()
+    /** What the user recognises themselves by: the e-mail, else the old phone number. */
+    val identifier: String get() = email?.takeIf(String::isNotEmpty) ?: phone.orEmpty()
+
+    /**
+     * An account opened with a phone number and nothing else. Phone sign-in is
+     * gone, so without an e-mail it could not be reached again after signing out.
+     */
+    val needsEmail: Boolean get() = email.isNullOrEmpty()
+
     val isActive: Boolean get() = status == "active"
 }
 
@@ -127,13 +136,17 @@ data class AccountDto(
     @SerialName("legal_consent") val legalConsent: LegalConsentDto? = null
 )
 
-/** The OTP challenge. The code itself never travels back to the client. */
+/**
+ * An e-mail code is on its way. The code itself never travels back to the
+ * client; the defaults are the server's own, for an answer missing a field.
+ */
 @Serializable
-data class ChallengeDto(
-    val kind: String = "phone",
-    @SerialName("masked_identifier") val maskedIdentifier: String = "",
-    val channel: String = "",
-    @SerialName("expires_in") val expiresIn: Int = 0
+data class EmailChallengeDto(
+    @SerialName("masked_email") val maskedEmail: String = "",
+    @SerialName("expires_in") val expiresIn: Int = 300,
+    /** Seconds until the server accepts a request for a new code. */
+    @SerialName("resend_after") val resendAfter: Int = 32,
+    @SerialName("code_length") val codeLength: Int = 4
 )
 
 @Serializable
@@ -163,19 +176,13 @@ data class LegalConfigDto(
     }
 }
 
-/** A country the backend will accept a phone number from. */
+/** What this server can do. A missing flag means an older server: assume yes. */
 @Serializable
-data class CountryDto(
-    val iso: String,
-    @SerialName("dial_code") val dialCode: String,
-    val name: String = "",
-    val example: String = ""
-) {
-    /** 🇰🇿 from "KZ", without shipping a flag asset per country. */
-    val flag: String
-        get() = iso.uppercase().map { Character.toChars(0x1F1E6 - 'A'.code + it.code).concatToString() }
-            .joinToString("")
-}
+data class ServerFeaturesDto(
+    @SerialName("email_otp") val emailOtp: Boolean = true,
+    @SerialName("google_sign_in") val googleSignIn: Boolean = true,
+    @SerialName("apple_sign_in") val appleSignIn: Boolean = true
+)
 
 /** Non-secret server configuration the client is allowed to know. */
 @Serializable
@@ -186,7 +193,7 @@ data class ServerConfigDto(
     @SerialName("max_source_characters") val maxSourceCharacters: Int? = null,
     @SerialName("max_instruction_length") val maxInstructionLength: Int? = null,
     @SerialName("payment_mode") val paymentMode: String = "",
-    val countries: List<CountryDto> = emptyList(),
+    val features: ServerFeaturesDto? = null,
     val legal: LegalConfigDto? = null
 )
 
@@ -230,6 +237,8 @@ data class ErrorDetailsDto(
     @SerialName("used_today") val usedToday: Int? = null,
     @SerialName("resets_at") val resetsAt: String? = null,
     @SerialName("retry_after_seconds") val retryAfterSeconds: Int? = null,
+    /** Wrong-code answers: how many more tries this code allows. */
+    @SerialName("attempts_remaining") val attemptsRemaining: Int? = null,
     /** Which request field was refused, e.g. `source_text`. */
     val field: String? = null,
     /** The limit that field has, when it was refused for length. */

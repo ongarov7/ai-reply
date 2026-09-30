@@ -11,5 +11,11 @@
 }
 -keep,includedescriptorclasses class kz.yerek.aireply.domain.model.**$$serializer { *; }
 
+# Credential Manager finds its Google Play services provider by reflection.
+-if class androidx.credentials.CredentialManager
+-keep class androidx.credentials.playservices.** {
+  *;
+}
+
 # The IME is instantiated by the system from the manifest entry.
 -keep class kz.yerek.aireply.keyboard.ReplyKeyboardService { *; }

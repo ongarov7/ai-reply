@@ -117,8 +117,9 @@
     <string name="kb_intent_reschedule">Другое время</string>
     <string name="kb_intent_reschedule_phrase">Предложи другое время.</string>
     <string name="kb_err_rate_limited">Слишком много запросов. Подождите немного.</string>
-    <string name="settings_keyboard_layouts">Раскладки клавиатуры</string>
-    <string name="settings_keyboard_layouts_footer">Клавиша языка переключает включённые раскладки. Хотя бы одна остаётся включённой.</string>
+    <string name="settings_keyboard">Клавиатура</string>
+    <string name="settings_keyboard_layouts_footer">Клавиша языка переключает включённые раскладки. Хотя бы одна остаётся включённой. Вибрация также зависит от системной настройки вибрации при нажатии.</string>
+    <string name="settings_keyboard_haptics">Вибрация при нажатии</string>
     <string name="settings_developer">Для разработчика</string>
     <string name="settings_debug_mock_replies">Тестовые ответы ИИ</string>
     <string name="settings_debug_mock_replies_footer">Только в отладочной сборке. Клавиатура отвечает заготовками вместо сервиса — лимит не тратится. Теги в инструкции: #offline, #quota, #slow.</string>

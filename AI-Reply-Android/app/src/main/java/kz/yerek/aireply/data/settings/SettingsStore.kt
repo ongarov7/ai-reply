@@ -35,10 +35,11 @@ import kz.yerek.aireply.domain.model.TemplateSummary
  * Nothing secret belongs here — no tokens, no credentials, no message text.
  * The credential lives in [kz.yerek.aireply.data.secure.SecureCredentialStore].
  */
-class SettingsStore(context: Context) {
+class SettingsStore internal constructor(private val prefs: SharedPreferences) {
 
-    private val prefs: SharedPreferences =
+    constructor(context: Context) : this(
         context.applicationContext.getSharedPreferences(NAME, Context.MODE_PRIVATE)
+    )
 
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
@@ -222,6 +223,15 @@ class SettingsStore(context: Context) {
             prefs.edit().putStringSet(KEY_ENABLED_LAYOUTS, value.map { it.code }.toSet()).apply()
         }
 
+    /**
+     * "Vibration on key press", on unless the user switched it off. It can only
+     * silence the keyboard: the system's own touch-feedback setting still has
+     * the last word, so this never forces vibration on.
+     */
+    var keyboardHaptics: Boolean
+        get() = prefs.getBoolean(KEY_KEYBOARD_HAPTICS, true)
+        set(value) = prefs.edit().putBoolean(KEY_KEYBOARD_HAPTICS, value).apply()
+
     /** The persona the user picked last, shown as selected on the chip row. */
     var lastTemplateId: String?
         get() = prefs.getString(KEY_LAST_TEMPLATE, null)
@@ -261,6 +271,7 @@ class SettingsStore(context: Context) {
         const val KEY_SEEN_SETUP = "shared.seenKeyboardSetup"
         const val KEY_ENABLED_LAYOUTS = "shared.enabledKeyboardLanguages"
         const val KEY_LAST_TEMPLATE = "shared.lastTemplateID"
+        const val KEY_KEYBOARD_HAPTICS = "shared.keyboardHaptics"
         const val KEY_DEBUG_MOCK = "debug.mockReplies"
 
         const val KEY_AI_MODE = "ai.transportMode"

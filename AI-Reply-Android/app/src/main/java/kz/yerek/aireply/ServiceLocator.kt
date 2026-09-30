@@ -20,6 +20,7 @@ import kz.yerek.aireply.data.account.AccountService
 import kz.yerek.aireply.data.account.AccountSession
 import kz.yerek.aireply.data.account.AccountUsageCache
 import kz.yerek.aireply.data.account.DeviceDescriptor
+import kz.yerek.aireply.data.account.GoogleSignInClient
 import kz.yerek.aireply.data.legal.LegalConsentStore
 import kz.yerek.aireply.data.profile.ConfigurationRepository
 import kz.yerek.aireply.data.profile.ProfileStore
@@ -90,9 +91,24 @@ class ServiceLocator(context: Context) {
         )
     }
 
+    /**
+     * "Continue with Google". The OAuth web client id is baked in at build time
+     * (see app/build.gradle.kts); an empty one keeps the option hidden.
+     */
+    val googleSignIn: GoogleSignInClient by lazy {
+        GoogleSignInClient(appContext, BuildConfig.GOOGLE_WEB_CLIENT_ID)
+    }
+
     /** UI-facing account state; one instance for the app and the keyboard. */
     val account: AccountController by lazy {
-        AccountController(accountService, accountCredentials, usageCache, legalConsentStore)
+        AccountController(
+            service = accountService,
+            credentials = accountCredentials,
+            usageCache = usageCache,
+            legalConsentStore = legalConsentStore,
+            google = googleSignIn,
+            backgroundScope = scope
+        )
     }
 
     val accountService: AccountService by lazy {

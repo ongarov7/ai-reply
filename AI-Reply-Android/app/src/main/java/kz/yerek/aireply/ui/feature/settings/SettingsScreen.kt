@@ -63,6 +63,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
     var appearance by remember { mutableStateOf(services.settings.appearance) }
     var language by remember { mutableStateOf(services.settings.appLanguage) }
     var layouts by remember { mutableStateOf(services.settings.enabledKeyboardLanguages) }
+    var haptics by remember { mutableStateOf(services.settings.keyboardHaptics) }
     var mockReplies by remember { mutableStateOf(services.settings.debugMockReplies) }
 
     AppScreen(title = stringResource(R.string.settings_title), onBack = onBack) {
@@ -97,7 +98,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
                 Footnote(stringResource(R.string.settings_setup_footer))
             }
 
-            AppSection(stringResource(R.string.settings_keyboard_layouts)) {
+            AppSection(stringResource(R.string.settings_keyboard)) {
                 RowGroup {
                     KeyboardLanguage.CYCLE_ORDER.forEachIndexed { index, option ->
                         if (index > 0) RowDividerIndented()
@@ -112,6 +113,15 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
                                 services.settings.enabledKeyboardLanguages = next
                             }
                         }
+                    }
+                    RowDividerIndented()
+                    SwitchRow(
+                        label = stringResource(R.string.settings_keyboard_haptics),
+                        checked = haptics,
+                        enabled = true
+                    ) { checked ->
+                        haptics = checked
+                        services.settings.keyboardHaptics = checked
                     }
                 }
                 Footnote(stringResource(R.string.settings_keyboard_layouts_footer))

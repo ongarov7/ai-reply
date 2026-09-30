@@ -151,6 +151,7 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         viewHost.onCreate()
         hostField = HostField { currentInputConnection }
         feedback = KeyFeedback(this)
+        feedback.hapticsEnabled = services.settings.keyboardHaptics
         replies = ReplySessionController(scope, services.replyService, services.draftNormalizer)
         replies.onAsyncChange = { refreshAutoShift() }
         surface = KeySurfaceController(this)
@@ -909,6 +910,7 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
             chips = cachedChips()
         }
         appearance = services.settings.appearance
+        feedback.hapticsEnabled = services.settings.keyboardHaptics
         enabledLanguages = services.settings.enabledKeyboardLanguages
         val stored = services.settings.keyboardLanguage
         if (stored != this.language) this.language = stored

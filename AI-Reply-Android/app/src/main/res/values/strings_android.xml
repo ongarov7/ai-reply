@@ -146,8 +146,9 @@
     <string name="kb_intent_reschedule">Another time</string>
     <string name="kb_intent_reschedule_phrase">Suggest a different time.</string>
     <string name="kb_err_rate_limited">Too many requests. Wait a moment and try again.</string>
-    <string name="settings_keyboard_layouts">Keyboard layouts</string>
-    <string name="settings_keyboard_layouts_footer">The language key switches between the layouts that are on. At least one stays on.</string>
+    <string name="settings_keyboard">Keyboard</string>
+    <string name="settings_keyboard_layouts_footer">The language key switches between the layouts that are on. At least one stays on. Vibration also follows the phone\'s own keypress vibration setting.</string>
+    <string name="settings_keyboard_haptics">Vibration on key press</string>
     <string name="settings_developer">Developer</string>
     <string name="settings_debug_mock_replies">Mock AI replies</string>
     <string name="settings_debug_mock_replies_footer">Debug builds only. The keyboard answers with canned replies instead of the service, so nothing is spent. Tags in the instruction: #offline, #quota, #slow.</string>

@@ -117,8 +117,9 @@
     <string name="kb_intent_reschedule">Басқа уақыт</string>
     <string name="kb_intent_reschedule_phrase">Басқа уақыт ұсын.</string>
     <string name="kb_err_rate_limited">Сұраныс тым көп. Сәл күте тұрыңыз.</string>
-    <string name="settings_keyboard_layouts">Пернетақта тілдері</string>
-    <string name="settings_keyboard_layouts_footer">Тіл пернесі қосулы тілдерді ауыстырады. Кемінде біреуі қосулы қалады.</string>
+    <string name="settings_keyboard">Пернетақта</string>
+    <string name="settings_keyboard_layouts_footer">Тіл пернесі қосулы тілдерді ауыстырады. Кемінде біреуі қосулы қалады. Діріл телефонның өз баптауына да бағынады.</string>
+    <string name="settings_keyboard_haptics">Басқанда діріл</string>
     <string name="settings_developer">Әзірлеушіге</string>
     <string name="settings_debug_mock_replies">Сынақ AI жауаптары</string>
     <string name="settings_debug_mock_replies_footer">Тек жөндеу нұсқасында. Пернетақта қызметтің орнына дайын жауап береді — лимит жұмсалмайды. Нұсқаудағы тегтер: #offline, #quota, #slow.</string>

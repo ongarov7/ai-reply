@@ -1,26 +1,34 @@
 package kz.yerek.aireply.ui.feature.account
 
+import android.app.Activity
 import kz.yerek.aireply.ai.AILimits
 import androidx.annotation.StringRes
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kz.yerek.aireply.BuildConfig
 import kz.yerek.aireply.R
 import kz.yerek.aireply.data.account.AccountCredentials
 import kz.yerek.aireply.data.account.AccountService
+import kz.yerek.aireply.data.account.AccountSessionDto
 import kz.yerek.aireply.data.account.AccountUsageCache
 import kz.yerek.aireply.data.account.AccountUser
 import kz.yerek.aireply.data.account.ApiError
 import kz.yerek.aireply.data.account.ApiException
-import kz.yerek.aireply.data.account.CountryDto
+import kz.yerek.aireply.data.account.EmailAddress
+import kz.yerek.aireply.data.account.GoogleSignInClient
 import kz.yerek.aireply.data.account.LegalConfigDto
 import kz.yerek.aireply.data.account.LegalConsentDto
+import kz.yerek.aireply.data.account.OtpCode
 import kz.yerek.aireply.data.account.PlanDto
 import kz.yerek.aireply.data.account.ProfileUpdate
+import kz.yerek.aireply.data.account.ServerFeaturesDto
 import kz.yerek.aireply.data.account.SubscriptionDto
 import kz.yerek.aireply.data.account.UsageDto
+import kz.yerek.aireply.data.account.raise
 import kz.yerek.aireply.data.legal.LegalConsentStore
 import java.util.TimeZone
 
@@ -40,17 +48,37 @@ class AccountController(
     private val service: AccountService,
     private val credentials: AccountCredentials,
     private val usageCache: AccountUsageCache,
-    private val legalConsentStore: LegalConsentStore
+    private val legalConsentStore: LegalConsentStore,
+    private val google: GoogleSignInClient? = null,
+    /** Work that must outlive the screen that started it, such as device registration. */
+    private val backgroundScope: CoroutineScope? = null,
+    private val clock: () -> Long = System::currentTimeMillis
 ) {
 
-    /** Where the user is in the sign-in flow. */
+    /**
+     * Where the user is in the sign-in flow.
+     *
+     * Кіру: Google немесе пошта (4 таңбалы код). Телефонмен кіру жоқ.
+     */
     sealed interface Phase {
+        /** The choice of Google or e-mail. */
         data object SignedOut : Phase
+        /** The e-mail step of e-mail sign-in. */
+        data object EnteringEmail : Phase
+        /** A code went to [email]; a new one may be asked for from [resendAvailableAt] (epoch ms). */
         data class AwaitingCode(
-            val identifier: String,
-            val masked: String
+            val email: String,
+            val resendAvailableAt: Long
         ) : Phase
         data object SignedIn : Phase
+    }
+
+    /** How a sign-in attempt ended, for the screen that started it. */
+    sealed interface SignInOutcome {
+        data class SignedIn(val isNewUser: Boolean) : SignInOutcome
+        /** [clearCode]: the typed code can never work again, so the field empties. */
+        data class Failed(val clearCode: Boolean) : SignInOutcome
+        data object Cancelled : SignInOutcome
     }
 
     data class State(
@@ -59,7 +87,10 @@ class AccountController(
         val subscription: SubscriptionDto? = null,
         val usage: UsageDto = UsageDto.UNKNOWN,
         val plans: List<PlanDto> = emptyList(),
-        val countries: List<CountryDto> = emptyList(),
+        /** Null until the server answered; unknown means "offer everything". */
+        val features: ServerFeaturesDto? = null,
+        /** The address being signed in with, kept so Back and "Change e-mail" do not lose it. */
+        val pendingEmail: String = "",
         val legalConfig: LegalConfigDto = LegalConfigDto.PRODUCTION,
         val hasAcceptedLegal: Boolean = false,
         val bootstrapComplete: Boolean = false,
@@ -79,13 +110,26 @@ class AccountController(
     )
     val state: StateFlow<State> = _state.asStateFlow()
 
-    /** Masked phone or e-mail, for Settings. */
+    /** The e-mail (or, for an older account, the phone number) shown in Settings. */
     val displayIdentifier: String
-        get() = _state.value.user?.identifier ?: credentials.displayIdentifier.orEmpty()
+        get() = _state.value.user?.identifier?.takeIf(String::isNotEmpty)
+            ?: credentials.displayIdentifier.orEmpty()
+
+    /**
+     * "Continue with Google" needs this build's OAuth client id and a server
+     * that verifies Google tokens. Debug builds show it regardless so the
+     * screen can be reviewed before the client id exists; tapping it then says
+     * the option is unavailable.
+     */
+    val offersGoogle: Boolean
+        get() {
+            val configured = BuildConfig.DEBUG || google?.isConfigured == true
+            return configured && (_state.value.features?.googleSignIn ?: true)
+        }
 
     // ------------------------------------------------------------- loading
 
-    /** Countries and current legal versions, needed before the first screen. */
+    /** Sign-in methods and current legal versions, needed before the first screen. */
     suspend fun loadServerConfig() {
         runCatching { service.serverConfig() }.getOrNull()?.let { config ->
             // The administrator's character limits, for the keyboard too.
@@ -93,7 +137,7 @@ class AccountController(
             val legal = config.legal ?: LegalConfigDto.PRODUCTION
             _state.update {
                 it.copy(
-                    countries = config.countries,
+                    features = config.features,
                     legalConfig = legal,
                     hasAcceptedLegal = legalConsentStore.hasAccepted(legal)
                 )
@@ -166,63 +210,179 @@ class AccountController(
 
     // ------------------------------------------------------------- sign-in
 
-    suspend fun requestCode(identifier: String, locale: String) {
-        _state.update { it.copy(busy = true, errorMessage = null) }
-        try {
-            val challenge = service.requestCode(identifier, locale)
-            _state.update {
-                it.copy(
-                    phase = Phase.AwaitingCode(identifier, challenge.maskedIdentifier),
-                    busy = false
-                )
-            }
-        } catch (exception: Throwable) {
-            _state.update { it.copy(busy = false, errorMessage = messageFor(exception)) }
-        }
+    fun startEmailSignIn() {
+        _state.update { it.copy(phase = Phase.EnteringEmail, errorMessage = null) }
     }
 
-    /**
-     * Returns true when the account was created just now, so the caller can
-     * show the short profile step instead of dropping the user onto Home.
-     */
-    suspend fun verify(code: String): Boolean {
-        val phase = _state.value.phase as? Phase.AwaitingCode ?: return false
-        _state.update { it.copy(busy = true, errorMessage = null) }
-        return try {
-            val session = service.verifyCode(phase.identifier, code)
-            usageCache.store(session.usage)
-            usageCache.storePlanCode(session.subscription.plan.code)
-            applyLegalConsent(session.legalConsent)
-            _state.update {
-                it.copy(
-                    phase = Phase.SignedIn,
-                    user = session.user,
-                    subscription = session.subscription,
-                    usage = session.usage,
-                    busy = false
-                )
-            }
-            // Best effort: a failed device registration must not block sign-in.
-            runCatching { service.registerDevice() }
-            syncPendingLegalConsent()
-            session.isNewUser
-        } catch (exception: Throwable) {
-            _state.update { it.copy(busy = false, errorMessage = messageFor(exception)) }
-            false
-        }
-    }
-
-    suspend fun resendCode(locale: String) {
-        val phase = _state.value.phase as? Phase.AwaitingCode ?: return
-        requestCode(phase.identifier, locale)
-    }
-
-    fun cancelCodeEntry() {
+    /** Back from the e-mail step to the choice of methods. */
+    fun cancelEmailSignIn() {
         _state.update {
             it.copy(
                 phase = if (credentials.isSignedIn) Phase.SignedIn else Phase.SignedOut,
                 errorMessage = null
             )
+        }
+    }
+
+    /** "Change e-mail" on the code screen. */
+    fun editEmail() {
+        _state.update { it.copy(phase = Phase.EnteringEmail, errorMessage = null) }
+    }
+
+    /**
+     * Sends a code to [email] and moves to code entry. A cooldown refusal also
+     * moves there: a code for this address is already on its way.
+     */
+    suspend fun requestEmailCode(email: String, locale: String) {
+        val address = EmailAddress.normalized(email)
+        if (!EmailAddress.isPlausible(address)) {
+            _state.update { it.copy(errorMessage = R.string.account_error_invalid_email) }
+            return
+        }
+        _state.update { it.copy(busy = true, errorMessage = null, pendingEmail = address) }
+        try {
+            val challenge = service.requestEmailCode(address, locale)
+            awaitCode(address, challenge.resendAfter, errorMessage = null)
+        } catch (exception: Throwable) {
+            val error = (exception as? ApiException)?.error
+            if (error is ApiError.ResendCooldown) {
+                awaitCode(address, error.retryAfterSeconds ?: DEFAULT_RESEND_SECONDS, messageFor(exception))
+            } else {
+                _state.update { it.copy(busy = false, errorMessage = messageFor(exception)) }
+            }
+        }
+    }
+
+    /** "Resend code": a new code to the same address; the old one stops working. */
+    suspend fun resendEmailCode(locale: String) {
+        val phase = _state.value.phase as? Phase.AwaitingCode ?: return
+        _state.update { it.copy(busy = true, errorMessage = null) }
+        try {
+            val challenge = service.requestEmailCode(phase.email, locale)
+            awaitCode(phase.email, challenge.resendAfter, errorMessage = null)
+        } catch (exception: Throwable) {
+            val error = (exception as? ApiException)?.error
+            val retryAfter = (error as? ApiError.ResendCooldown)?.retryAfterSeconds
+            _state.update { state ->
+                val current = state.phase
+                state.copy(
+                    busy = false,
+                    errorMessage = messageFor(exception),
+                    phase = if (retryAfter != null && current is Phase.AwaitingCode) {
+                        current.copy(resendAvailableAt = clock() + retryAfter * 1000L)
+                    } else {
+                        current
+                    }
+                )
+            }
+        }
+    }
+
+    private fun awaitCode(email: String, resendAfterSeconds: Int, @StringRes errorMessage: Int?) {
+        _state.update {
+            it.copy(
+                phase = Phase.AwaitingCode(email, clock() + resendAfterSeconds.coerceAtLeast(0) * 1000L),
+                pendingEmail = email,
+                busy = false,
+                errorMessage = errorMessage
+            )
+        }
+    }
+
+    /** Checks the code; on success the account is signed in (and created if new). */
+    suspend fun verifyEmailCode(code: String): SignInOutcome {
+        val phase = _state.value.phase as? Phase.AwaitingCode ?: return SignInOutcome.Cancelled
+        val digits = OtpCode.sanitize(code)
+        if (digits.length != OtpCode.LENGTH) return SignInOutcome.Failed(clearCode = false)
+        _state.update { it.copy(busy = true, errorMessage = null) }
+        return try {
+            completeSignIn(service.verifyEmailCode(phase.email, digits))
+        } catch (exception: Throwable) {
+            _state.update { it.copy(busy = false, errorMessage = messageFor(exception)) }
+            SignInOutcome.Failed(clearCode = codeIsSpent(exception))
+        }
+    }
+
+    /** Google's account picker, then the server's check of the token it returned. */
+    suspend fun signInWithGoogle(activity: Activity): SignInOutcome {
+        val client = google
+        if (client == null || !client.isConfigured) {
+            _state.update { it.copy(errorMessage = R.string.account_error_provider_unavailable) }
+            return SignInOutcome.Failed(clearCode = false)
+        }
+        _state.update { it.copy(busy = true, errorMessage = null) }
+        val token = when (val result = client.requestIdToken(activity)) {
+            is GoogleSignInClient.Result.Success -> result
+            GoogleSignInClient.Result.Cancelled -> {
+                _state.update { it.copy(busy = false) }
+                return SignInOutcome.Cancelled
+            }
+            GoogleSignInClient.Result.NotConfigured, GoogleSignInClient.Result.Unavailable -> {
+                _state.update { it.copy(busy = false, errorMessage = R.string.account_error_provider_unavailable) }
+                return SignInOutcome.Failed(clearCode = false)
+            }
+            GoogleSignInClient.Result.Failed -> {
+                _state.update { it.copy(busy = false, errorMessage = R.string.account_error_provider_failed) }
+                return SignInOutcome.Failed(clearCode = false)
+            }
+        }
+        return try {
+            completeSignIn(service.signInWithGoogle(token.idToken, token.nonce))
+        } catch (exception: Throwable) {
+            _state.update { it.copy(busy = false, errorMessage = messageFor(exception)) }
+            SignInOutcome.Failed(clearCode = false)
+        }
+    }
+
+    /**
+     * The session is stored; the screens switch now. Device registration and
+     * the consent sync run on the background scope, because the screen that
+     * started the sign-in leaves the composition — and cancels its own scope —
+     * the moment the phase changes.
+     */
+    private fun completeSignIn(session: AccountSessionDto): SignInOutcome {
+        usageCache.store(session.usage)
+        usageCache.storePlanCode(session.subscription.plan.code)
+        applyLegalConsent(session.legalConsent)
+        _state.update {
+            it.copy(
+                phase = Phase.SignedIn,
+                user = session.user,
+                subscription = session.subscription,
+                usage = session.usage,
+                pendingEmail = "",
+                busy = false,
+                errorMessage = null
+            )
+        }
+        backgroundScope?.launch {
+            // Best effort: a failed device registration must not block sign-in.
+            runCatching { service.registerDevice() }
+            syncPendingLegalConsent()
+        }
+        return SignInOutcome.SignedIn(session.isNewUser)
+    }
+
+    // --------------------------------------------- adding an e-mail (Settings)
+
+    /**
+     * Sends a code to an address the signed-in user wants to sign in with.
+     * Returns when the next code may be asked for (epoch ms); throws
+     * [ApiException] with the reason otherwise.
+     */
+    suspend fun requestLinkEmailCode(email: String, locale: String): Long {
+        val address = EmailAddress.normalized(email)
+        if (!EmailAddress.isPlausible(address)) ApiError.InvalidEmail.raise()
+        val challenge = service.requestLinkEmailCode(address, locale)
+        return clock() + challenge.resendAfter.coerceAtLeast(0) * 1000L
+    }
+
+    /** Proves the address; the account can then be signed in to with it. */
+    suspend fun verifyLinkEmailCode(email: String, code: String) {
+        val account = service.verifyLinkEmailCode(EmailAddress.normalized(email), OtpCode.sanitize(code))
+        credentials.displayIdentifier = account.user.identifier
+        _state.update {
+            it.copy(user = account.user, subscription = account.subscription, usage = account.usage)
         }
     }
 
@@ -236,6 +396,7 @@ class AccountController(
         _state.update { it.copy(busy = true) }
         service.signOut()
         signOutLocally()
+        google?.signOut()
         _state.update { it.copy(busy = false) }
     }
 
@@ -334,6 +495,9 @@ class AccountController(
     }
 
     companion object {
+        /** The server's usual wait between codes, for an answer that did not say. */
+        const val DEFAULT_RESEND_SECONDS = 32
+
         /**
          * Maps a failure onto a string resource. The server's English message is
          * never shown to a user.
@@ -346,15 +510,32 @@ class AccountController(
                 is ApiError.TimedOut -> R.string.error_timed_out
                 is ApiError.InvalidOtp -> R.string.account_error_invalid_code
                 is ApiError.OtpExpired -> R.string.account_error_code_expired
+                is ApiError.OtpAlreadyUsed -> R.string.account_error_code_used
+                is ApiError.OtpAttemptsExceeded -> R.string.account_error_code_attempts
+                is ApiError.ResendCooldown -> R.string.account_error_resend_cooldown
                 is ApiError.RateLimited -> R.string.account_error_too_many_attempts
+                is ApiError.InvalidEmail -> R.string.account_error_invalid_email
+                is ApiError.EmailDeliveryFailed -> R.string.account_error_email_delivery
+                is ApiError.EmailInUse -> R.string.account_error_email_in_use
+                is ApiError.InvalidIdToken -> R.string.account_error_provider_failed
+                is ApiError.AuthProviderUnavailable -> R.string.account_error_provider_unavailable
                 is ApiError.Unauthorized -> R.string.account_error_session_expired
                 is ApiError.AccountDisabled -> R.string.account_error_disabled
-                is ApiError.InvalidRequest -> R.string.account_error_invalid_number
                 is ApiError.DailyLimitReached -> R.string.account_error_limit_reached
                 is ApiError.PaymentRequired, is ApiError.SubscriptionExpired ->
                     R.string.account_error_payment_required
                 else -> R.string.account_error_generic
             }
+        }
+
+        /**
+         * The typed code can never succeed now, so the field is emptied for the
+         * next one. A network failure keeps it: the same code may still work.
+         */
+        fun codeIsSpent(throwable: Throwable): Boolean = when ((throwable as? ApiException)?.error) {
+            is ApiError.InvalidOtp, is ApiError.OtpExpired,
+            is ApiError.OtpAlreadyUsed, is ApiError.OtpAttemptsExceeded -> true
+            else -> false
         }
     }
 }

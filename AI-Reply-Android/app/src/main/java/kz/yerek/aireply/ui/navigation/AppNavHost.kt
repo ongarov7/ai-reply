@@ -18,6 +18,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import kz.yerek.aireply.ui.LocalServices
 import kz.yerek.aireply.ui.feature.account.AccountController
+import kz.yerek.aireply.ui.feature.account.EmailSignInScreen
 import kz.yerek.aireply.ui.feature.account.RegistrationStepScreen
 import kz.yerek.aireply.ui.feature.account.LegalConsentScreen
 import kz.yerek.aireply.ui.feature.account.SignInScreen
@@ -64,13 +65,17 @@ fun AppNavHost(deepLink: String? = null) {
                 return
             }
             accountState.phase is AccountController.Phase.SignedOut -> {
-                SignInScreen()
+                SignInScreen(onSignedIn = { isNewUser -> completingRegistration = isNewUser })
+                return
+            }
+            accountState.phase is AccountController.Phase.EnteringEmail -> {
+                EmailSignInScreen()
                 return
             }
             accountState.phase is AccountController.Phase.AwaitingCode -> {
                 val phase = accountState.phase as AccountController.Phase.AwaitingCode
                 VerifyCodeScreen(
-                    masked = phase.masked,
+                    phase = phase,
                     onVerified = { isNewUser -> completingRegistration = isNewUser }
                 )
                 return

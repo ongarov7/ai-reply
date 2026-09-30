@@ -33,14 +33,24 @@ internal data class RefreshRequest(
 internal data class LogoutRequest(@SerialName("refresh_token") val refreshToken: String)
 
 @Serializable
-private data class RequestOtpRequest(val identifier: String, val locale: String)
+private data class EmailCodeRequest(val email: String, val locale: String)
 
 @Serializable
-private data class VerifyOtpRequest(
-    val identifier: String,
+private data class EmailCodeVerifyRequest(
+    val email: String,
     val code: String,
     val device: DeviceDescriptor
 )
+
+@Serializable
+private data class GoogleSignInRequest(
+    @SerialName("id_token") val idToken: String,
+    val nonce: String,
+    val device: DeviceDescriptor
+)
+
+@Serializable
+private data class LinkEmailVerifyRequest(val email: String, val code: String)
 
 /** Only the fields that changed; everything else is left alone server-side. */
 @Serializable
@@ -104,7 +114,7 @@ class AccountService(
 
     // ------------------------------------------------------ public endpoints
 
-    /** Countries, limits and current legal versions. Called before sign-in. */
+    /** Limits, sign-in methods and current legal versions. Called before sign-in. */
     suspend fun serverConfig(): ServerConfigDto {
         val client = client()
         return decode(ServerConfigDto.serializer(), client.request("GET", "api/v1/config"))
@@ -117,26 +127,45 @@ class AccountService(
 
     // -------------------------------------------------------------- sign-in
 
-    /** Asks for a code. The server decides how it is delivered. */
-    suspend fun requestCode(identifier: String, locale: String): ChallengeDto {
+    /**
+     * Sends a 4-digit code to [email]. The answer is the same whether or not an
+     * account exists, so it says nothing about who is registered.
+     */
+    suspend fun requestEmailCode(email: String, locale: String): EmailChallengeDto {
         val client = client()
-        val body = json.encodeToString(
-            RequestOtpRequest.serializer(), RequestOtpRequest(identifier, locale)
+        val body = json.encodeToString(EmailCodeRequest.serializer(), EmailCodeRequest(email, locale))
+        return decode(
+            EmailChallengeDto.serializer(),
+            client.request("POST", "api/v1/auth/email/otp/request", body)
         )
-        return decode(ChallengeDto.serializer(), client.request("POST", "api/v1/auth/request-otp", body))
     }
 
-    /** Verifies the code and stores the resulting session. */
-    suspend fun verifyCode(identifier: String, code: String): AccountSessionDto {
+    /** Checks the code, opening the account on first use, and stores the session. */
+    suspend fun verifyEmailCode(email: String, code: String): AccountSessionDto {
         val client = client()
         val body = json.encodeToString(
-            VerifyOtpRequest.serializer(),
-            VerifyOtpRequest(identifier, code, deviceDescriptor())
+            EmailCodeVerifyRequest.serializer(),
+            EmailCodeVerifyRequest(email, code, deviceDescriptor())
         )
-        val result = decode(
-            AccountSessionDto.serializer(),
-            client.request("POST", "api/v1/auth/verify-otp", body)
+        return adopt(client.request("POST", "api/v1/auth/email/otp/verify", body))
+    }
+
+    /**
+     * Trades a Google ID token for a session. The server checks the token's
+     * signature, audience, expiry and [nonce] against Google's keys; the app
+     * trusts none of it.
+     */
+    suspend fun signInWithGoogle(idToken: String, nonce: String): AccountSessionDto {
+        val client = client()
+        val body = json.encodeToString(
+            GoogleSignInRequest.serializer(),
+            GoogleSignInRequest(idToken, nonce, deviceDescriptor())
         )
+        return adopt(client.request("POST", "api/v1/auth/google", body))
+    }
+
+    private fun adopt(body: String): AccountSessionDto {
+        val result = decode(AccountSessionDto.serializer(), body)
         session.adopt(result)
         return result
     }
@@ -187,6 +216,23 @@ class AccountService(
             client().request("POST", "api/v1/devices", body, token)
         }
     }
+
+    /** Sends a code to an address the signed-in user wants to add for sign-in. */
+    suspend fun requestLinkEmailCode(email: String, locale: String): EmailChallengeDto =
+        session.authenticated { token ->
+            val body = json.encodeToString(EmailCodeRequest.serializer(), EmailCodeRequest(email, locale))
+            decode(
+                EmailChallengeDto.serializer(),
+                client().request("POST", "api/v1/me/email/otp/request", body, token)
+            )
+        }
+
+    /** Proves the address and attaches it to this account; answers with the updated account. */
+    suspend fun verifyLinkEmailCode(email: String, code: String): AccountDto =
+        session.authenticated { token ->
+            val body = json.encodeToString(LinkEmailVerifyRequest.serializer(), LinkEmailVerifyRequest(email, code))
+            decode(AccountDto.serializer(), client().request("POST", "api/v1/me/email/otp/verify", body, token))
+        }
 
     suspend fun recordLegalConsent(consent: StoredLegalConsent): LegalConsentDto =
         session.authenticated { token ->

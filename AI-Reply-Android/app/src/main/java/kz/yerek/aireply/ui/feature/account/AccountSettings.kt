@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.CreditCard
+import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -37,8 +38,9 @@ import kz.yerek.aireply.ui.design.AppSection
  * Баптаулардағы тіркелгі бөлімі: тариф, квота, шығу.
  *
  * Shows what the user needs to recognise their account and nothing more: the
- * masked identifier the server sent back, the plan, what is left today, and the
- * way out.
+ * e-mail it signs in with, the plan, what is left today, and the way out. An
+ * account opened with a phone number is offered to add an e-mail, because
+ * phone sign-in no longer exists.
  */
 @Composable
 fun AccountSection(onOpenSubscription: () -> Unit) {
@@ -47,6 +49,8 @@ fun AccountSection(onOpenSubscription: () -> Unit) {
     val state by account.state.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     var confirming by remember { mutableStateOf(false) }
+    var addingEmail by remember { mutableStateOf(false) }
+    val needsEmail = state.isSignedIn && state.user?.needsEmail == true
 
     LaunchedEffect(Unit) { account.refresh() }
 
@@ -71,6 +75,13 @@ fun AccountSection(onOpenSubscription: () -> Unit) {
             }
 
             RowGroup {
+                if (needsEmail) {
+                    NavigationRow(
+                        Icons.Outlined.Email,
+                        stringResource(R.string.settings_account_add_email)
+                    ) { addingEmail = true }
+                    RowDividerIndented()
+                }
                 NavigationRow(
                     Icons.Filled.CreditCard,
                     stringResource(R.string.settings_account_plan),
@@ -91,7 +102,15 @@ fun AccountSection(onOpenSubscription: () -> Unit) {
                 )
             }
         }
-        Footnote(stringResource(R.string.settings_account_footer))
+        Footnote(
+            stringResource(
+                if (needsEmail) R.string.settings_account_add_email_footer else R.string.settings_account_footer
+            )
+        )
+    }
+
+    if (addingEmail) {
+        LinkEmailDialog(onDismiss = { addingEmail = false })
     }
 
     if (confirming) {

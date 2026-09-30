@@ -17,6 +17,12 @@ import android.view.View
  */
 class KeyFeedback(context: Context) {
 
+    /**
+     * AI Reply's own "Vibration on key press" switch. On top of it, the
+     * system's keypress-vibration setting still applies (see below).
+     */
+    var hapticsEnabled: Boolean = true
+
     private val audio = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
     private val resolver = context.contentResolver
 
@@ -31,7 +37,7 @@ class KeyFeedback(context: Context) {
         }
         // No FLAG_IGNORE_GLOBAL_SETTING: if the user turned keypress haptics
         // off, this must stay silent.
-        view?.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+        if (hapticsEnabled) view?.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
     }
 
     private companion object {

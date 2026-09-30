@@ -107,8 +107,9 @@
     <string name="kb_intent_reschedule">Boshqa vaqt</string>
     <string name="kb_intent_reschedule_phrase">Boshqa vaqt taklif qil.</string>
     <string name="kb_err_rate_limited">Soʻrovlar juda koʻp. Biroz kutib qayta urinib koʻring.</string>
-    <string name="settings_keyboard_layouts">Klaviatura tartiblari</string>
-    <string name="settings_keyboard_layouts_footer">Til tugmasi yoqilgan tartiblar orasida almashtiradi. Kamida bittasi yoqiq qoladi.</string>
+    <string name="settings_keyboard">Klaviatura</string>
+    <string name="settings_keyboard_layouts_footer">Til tugmasi yoqilgan tartiblar orasida almashtiradi. Kamida bittasi yoqilgan qoladi. Tebranish telefonning oʻz sozlamasiga ham bogʻliq.</string>
+    <string name="settings_keyboard_haptics">Bosganda tebranish</string>
     <string name="settings_developer">Dasturchi uchun</string>
     <string name="settings_debug_mock_replies">Sinov AI javoblari</string>
     <string name="settings_debug_mock_replies_footer">Faqat sinov yigʻmasida. Klaviatura xizmat oʻrniga tayyor javob beradi — limit sarflanmaydi. Koʻrsatmadagi teglar: #offline, #quota, #slow.</string>

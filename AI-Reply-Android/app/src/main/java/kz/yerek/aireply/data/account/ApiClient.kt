@@ -32,8 +32,26 @@ sealed interface ApiError {
     /** The session is gone: the user has to sign in again. */
     data object Unauthorized : ApiError
     data object AccountDisabled : ApiError
-    data object InvalidOtp : ApiError
+
+    /** A wrong code. [attemptsRemaining] is how many more tries it allows, when the server says. */
+    data class InvalidOtp(val attemptsRemaining: Int? = null) : ApiError
     data object OtpExpired : ApiError
+    /** The code was used already, or a newer one replaced it. */
+    data object OtpAlreadyUsed : ApiError
+    /** Too many wrong tries: this code is dead and a new one is needed. */
+    data object OtpAttemptsExceeded : ApiError
+    /** A code was sent moments ago; the next may be asked for after [retryAfterSeconds]. */
+    data class ResendCooldown(val retryAfterSeconds: Int?) : ApiError
+    data object InvalidEmail : ApiError
+    /** The server could not hand the e-mail to its mail provider. */
+    data object EmailDeliveryFailed : ApiError
+    /** The address already belongs to another account. */
+    data object EmailInUse : ApiError
+    /** The server refused Google's ID token. Not a session problem: nothing to refresh. */
+    data object InvalidIdToken : ApiError
+    /** The server cannot check Google or Apple tokens right now. */
+    data object AuthProviderUnavailable : ApiError
+
     data class RateLimited(val retryAfterSeconds: Int?) : ApiError
 
     /** Daily quota is spent. [resetsAt] is ISO-8601 from the server. */
@@ -161,8 +179,17 @@ class ApiClient(
             when (payload?.code) {
                 "UNAUTHORIZED", "TOKEN_EXPIRED" -> return ApiError.Unauthorized
                 "ACCOUNT_DISABLED" -> return ApiError.AccountDisabled
-                "INVALID_OTP" -> return ApiError.InvalidOtp
+                "INVALID_OTP" -> return ApiError.InvalidOtp(details?.attemptsRemaining)
                 "OTP_EXPIRED" -> return ApiError.OtpExpired
+                "OTP_ALREADY_USED" -> return ApiError.OtpAlreadyUsed
+                "OTP_ATTEMPTS_EXCEEDED" -> return ApiError.OtpAttemptsExceeded
+                "OTP_RESEND_COOLDOWN" -> return ApiError.ResendCooldown(retryAfter)
+                "INVALID_EMAIL" -> return ApiError.InvalidEmail
+                "EMAIL_DELIVERY_FAILED" -> return ApiError.EmailDeliveryFailed
+                "EMAIL_ALREADY_IN_USE" -> return ApiError.EmailInUse
+                // A 401, but about Google's token, not ours: no refresh, no sign-out.
+                "INVALID_ID_TOKEN" -> return ApiError.InvalidIdToken
+                "AUTH_PROVIDER_UNAVAILABLE" -> return ApiError.AuthProviderUnavailable
                 "RATE_LIMITED" -> return ApiError.RateLimited(retryAfter)
                 "DAILY_LIMIT_REACHED", "MONTHLY_LIMIT_REACHED" -> return ApiError.DailyLimitReached(
                     limit = details?.dailyLimit ?: 0,

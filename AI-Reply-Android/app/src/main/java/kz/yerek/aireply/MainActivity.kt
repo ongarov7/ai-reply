@@ -11,6 +11,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.flow.map
@@ -61,9 +62,12 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            val appearance by services.settings.changes()
-                .map { services.settings.appearance }
-                .collectAsState(initial = services.settings.appearance)
+            // Built once: a Flow made during composition would be rebuilt, and
+            // re-subscribed, on every recomposition.
+            val appearanceChanges = remember {
+                services.settings.changes().map { services.settings.appearance }
+            }
+            val appearance by appearanceChanges.collectAsState(initial = services.settings.appearance)
             val systemDark = isSystemInDarkTheme()
             val dark = when (appearance) {
                 AppearancePreference.SYSTEM -> systemDark
