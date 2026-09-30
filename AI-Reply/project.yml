@@ -44,6 +44,7 @@ targets:
       path: AIReply/Info.plist
       properties:
         CFBundleDisplayName: AI Reply
+        AIReplySignInWithApple: $(AIREPLY_SIGN_IN_WITH_APPLE)
         # Google Sign-In: both values come from the build settings below.
         GIDClientID: $(GOOGLE_IOS_CLIENT_ID)
         CFBundleURLTypes:
@@ -65,19 +66,28 @@ targets:
         com.apple.security.application-groups:
           - group.kz.yerek.replykeyboard
     settings:
-      PRODUCT_BUNDLE_IDENTIFIER: kz.yerek.replykeyboard
-      PRODUCT_NAME: AIReply
-      DEVELOPMENT_TEAM: JXM8N66QWU
-      CODE_SIGN_STYLE: Automatic
-      CODE_SIGN_IDENTITY: "iPhone Developer"
-      ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-      TARGETED_DEVICE_FAMILY: "1"
-      # iOS OAuth client from Google Cloud Console (not a secret; it ships in
-      # the app). Empty keeps "Continue with Google" hidden in Release builds.
-      GOOGLE_IOS_CLIENT_ID: ""
-      # com.googleusercontent.apps.<id> - the client id reversed. Must match
-      # GOOGLE_IOS_CLIENT_ID or the button stays hidden.
-      GOOGLE_IOS_REVERSED_CLIENT_ID: $(PRODUCT_BUNDLE_IDENTIFIER).google-signin
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: kz.yerek.replykeyboard
+        PRODUCT_NAME: AIReply
+        DEVELOPMENT_TEAM: JXM8N66QWU
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_IDENTITY: "iPhone Developer"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        TARGETED_DEVICE_FAMILY: "1"
+        # Sign in with Apple needs a paid Apple Developer team. Debug builds leave
+        # it out so a free Personal Team can still install the app on a phone;
+        # set both lines to the Release values to test Apple sign-in in Debug.
+        AIREPLY_SIGN_IN_WITH_APPLE: "YES"
+        # iOS OAuth client from Google Cloud Console (not a secret; it ships in
+        # the app). Empty keeps "Continue with Google" hidden in Release builds.
+        GOOGLE_IOS_CLIENT_ID: ""
+        # com.googleusercontent.apps.<id> - the client id reversed. Must match
+        # GOOGLE_IOS_CLIENT_ID or the button stays hidden.
+        GOOGLE_IOS_REVERSED_CLIENT_ID: $(PRODUCT_BUNDLE_IDENTIFIER).google-signin
+      configs:
+        Debug:
+          AIREPLY_SIGN_IN_WITH_APPLE: "NO"
+          CODE_SIGN_ENTITLEMENTS: Config/AIReply-NoAppleSignIn.entitlements
     dependencies:
       - target: ReplyKeyboard
         embed: true

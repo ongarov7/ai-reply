@@ -44,6 +44,22 @@ enum AppleSignIn {
         let fullName: String
     }
 
+    /// Whether this build carries the Sign in with Apple entitlement.
+    ///
+    /// Release builds always do. Debug builds do not by default, because a
+    /// free (Personal Team) Apple account cannot sign the entitlement and the
+    /// app could not be installed on a phone at all. The build setting
+    /// AIREPLY_SIGN_IN_WITH_APPLE chooses the entitlements file and reaches
+    /// the app through Info.plist, so the button never appears in a build
+    /// that could not complete the sign-in.
+    static var isEnabledInThisBuild: Bool {
+        isEnabled(info: Bundle.main.infoDictionary ?? [:])
+    }
+
+    static func isEnabled(info: [String: Any]) -> Bool {
+        (info["AIReplySignInWithApple"] as? String)?.uppercased() == "YES"
+    }
+
     static func configure(_ request: ASAuthorizationAppleIDRequest, rawNonce: String) {
         request.requestedScopes = [.fullName, .email]
         request.nonce = SignInNonce.sha256(rawNonce)

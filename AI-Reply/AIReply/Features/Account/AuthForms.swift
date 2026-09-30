@@ -142,7 +142,7 @@ struct ResendCodeButton: View {
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
-            let remaining = ResendCountdown.secondsRemaining(until: availableAt, now: context.date)
+            let remaining: Int = ResendCountdown.secondsRemaining(until: availableAt, now: context.date)
             if remaining > 0 {
                 Text("account.code.resendIn \(remaining)")
                     .foregroundStyle(.secondary)

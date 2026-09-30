@@ -76,8 +76,9 @@ final class AccountModel {
 
     var remainingToday: Int { usage.remainingToday }
 
-    /// Apple is offered unless the server says it cannot verify Apple tokens.
-    var offersApple: Bool { features?.appleSignIn ?? true }
+    /// Apple is offered when this build is entitled to it and the server can
+    /// verify Apple tokens.
+    var offersApple: Bool { AppleSignIn.isEnabledInThisBuild && (features?.appleSignIn ?? true) }
 
     /// Google needs this build's client id and a server that verifies Google
     /// tokens. DEBUG builds show it regardless, so the screen can be reviewed

@@ -59,6 +59,14 @@ final class SignInTests: XCTestCase {
         }
     }
 
+    func testAppleIsOfferedOnlyInBuildsWithTheEntitlement() {
+        XCTAssertTrue(AppleSignIn.isEnabled(info: ["AIReplySignInWithApple": "YES"]))
+        XCTAssertFalse(AppleSignIn.isEnabled(info: ["AIReplySignInWithApple": "NO"]),
+                       "a Personal Team build has no entitlement, so no button")
+        XCTAssertFalse(AppleSignIn.isEnabled(info: [:]))
+        XCTAssertFalse(AppleSignIn.isEnabledInThisBuild, "Debug builds leave Sign in with Apple out by default")
+    }
+
     func testAppleFullNameIsFormattedOnlyWhenGiven() {
         var components = PersonNameComponents()
         components.givenName = "Aigerim"

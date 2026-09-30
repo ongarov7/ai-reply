@@ -599,9 +599,13 @@ The account screen offers **Continue with Apple**, **Continue with Google** and
 Phone-number sign-in was removed. The server verifies every token and code;
 the app only forwards them. Setup, in full: `ai-reply-back-end/docs/AUTH.md`.
 
-* **Apple** — the `com.apple.developer.applesignin` entitlement is in
-  `Config/AIReply.entitlements`; enable *Sign in with Apple* for the App ID
-  `kz.yerek.replykeyboard` in the developer portal.
+* **Apple** — needs a paid Apple Developer team. Release builds sign with
+  `Config/AIReply.entitlements` (includes `com.apple.developer.applesignin`);
+  Debug builds use `Config/AIReply-NoAppleSignIn.entitlements` and hide the
+  button, so a free Personal Team can still run the app on an iPhone. To test
+  Apple sign-in in Debug, set `AIREPLY_SIGN_IN_WITH_APPLE = YES` and
+  `CODE_SIGN_ENTITLEMENTS = Config/AIReply.entitlements` for Debug. Enable
+  *Sign in with Apple* for the App ID `kz.yerek.replykeyboard` in the portal.
 * **Google** — Swift Package `GoogleSignIn-iOS` (9.x, resolved in
   `Package.resolved`). Set two build settings on the `AIReply` target:
   `GOOGLE_IOS_CLIENT_ID` (`<id>.apps.googleusercontent.com`) and
