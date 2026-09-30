@@ -61,18 +61,62 @@ enum APIError: Error, Equatable, Sendable {
     }
 }
 
+/// A failed call together with what ties it to the server's log.
+///
+/// Сәтсіз сұраныс: қате, сұраныс идентификаторы және HTTP күйі.
+///
+/// `APIError` stays the value screens switch on; this wraps it with the
+/// request id (the `X-Request-ID` the server answered with, else the one this
+/// client sent) and the HTTP status, 0 when no response arrived at all.
+struct APIFailure: Error, Equatable, Sendable {
+    let error: APIError
+    let requestID: String
+    let status: Int
+    /// The server's stable code ("RATE_LIMITED"), when it sent an envelope.
+    let code: String?
+    /// Seconds the server asked the client to wait, from the envelope or
+    /// `Retry-After`.
+    let retryAfter: Int?
+
+    init(error: APIError, requestID: String, status: Int, code: String? = nil, retryAfter: Int? = nil) {
+        self.error = error
+        self.requestID = requestID
+        self.status = status
+        self.code = code
+        self.retryAfter = retryAfter
+    }
+
+    /// No HTTP response at all: offline, timed out, TLS, cancelled.
+    var isTransport: Bool { status == 0 }
+}
+
 /// Thin HTTP client for the AI Reply backend.
 ///
 /// No third-party dependency, no retry loops hidden inside, no shared mutable
 /// state: one method, one request, one decoded value.
+///
+/// Every request carries the client headers the server logs (`X-Platform`,
+/// `X-App-Version`, `X-App-Build`, `X-OS-Version`) and a fresh `X-Request-ID`.
+/// Only the containing app adds `X-Installation-ID` and `X-Session-ID`,
+/// through `APIClientHooks`; the keyboard never does.
 struct APIClient: Sendable {
 
     private let baseURL: URL
     private let session: URLSession
+    private let metadata: ClientMetadata
+    private let hooks: APIClientHooks
+    private let makeRequestID: @Sendable () -> String
 
-    init(baseURL: URL, session: URLSession? = nil) {
+    init(baseURL: URL,
+         session: URLSession? = nil,
+         metadata: ClientMetadata = .current,
+         hooks: APIClientHooks = .shared,
+         makeRequestID: @escaping @Sendable () -> String = { RequestID.make() }) {
         self.baseURL = baseURL
         self.session = session ?? ReplyNetworking.makeSession(timeout: AIConfiguration.requestTimeout)
+        self.metadata = metadata
+        self.hooks = hooks
+        self.makeRequestID = makeRequestID
     }
 
     /// Decoded response plus the bearer token that was used, so a caller that
@@ -80,39 +124,66 @@ struct APIClient: Sendable {
     struct Empty: Codable, Sendable {}
 
     // MARK: Requests
+    //
+    // These throw `APIError`, which is what every screen matches on. The
+    // `perform` family below throws `APIFailure` for callers that also need
+    // the request id.
 
     func get<Response: Decodable>(_ path: String, token: String? = nil) async throws -> Response {
-        try await send(path: path, method: "GET", body: Optional<Empty>.none, token: token)
+        try await unwrapped { try await perform("GET", path, body: Optional<Empty>.none, token: token) }
     }
 
     @discardableResult
     func post<Body: Encodable, Response: Decodable>(
         _ path: String, body: Body, token: String? = nil
     ) async throws -> Response {
-        try await send(path: path, method: "POST", body: body, token: token)
+        try await unwrapped { try await perform("POST", path, body: body, token: token) }
     }
 
     @discardableResult
     func patch<Body: Encodable, Response: Decodable>(
         _ path: String, body: Body, token: String? = nil
     ) async throws -> Response {
-        try await send(path: path, method: "PATCH", body: body, token: token)
+        try await unwrapped { try await perform("PATCH", path, body: body, token: token) }
+    }
+
+    @discardableResult
+    func put<Body: Encodable, Response: Decodable>(
+        _ path: String, body: Body, token: String? = nil
+    ) async throws -> Response {
+        try await unwrapped { try await perform("PUT", path, body: body, token: token) }
+    }
+
+    private func unwrapped<Response>(_ work: () async throws -> Response) async throws -> Response {
+        do {
+            return try await work()
+        } catch let failure as APIFailure {
+            throw failure.error
+        }
     }
 
     // MARK: Transport
 
-    private func send<Body: Encodable, Response: Decodable>(
-        path: String, method: String, body: Body?, token: String?
+    /// One request. Throws `APIFailure`, never anything else.
+    func perform<Body: Encodable, Response: Decodable>(
+        _ method: String, _ path: String, body: Body?, token: String?
     ) async throws -> Response {
+        let requestID = makeRequestID()
         var request = URLRequest(url: baseURL.appendingPathComponent(path))
         request.httpMethod = method
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        for (name, value) in headers(requestID: requestID) {
+            request.setValue(value, forHTTPHeaderField: name)
+        }
         if let token {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
         if let body {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.httpBody = try JSONEncoder().encode(body)
+            do {
+                request.httpBody = try JSONEncoder().encode(body)
+            } catch {
+                throw APIFailure(error: .invalidRequest, requestID: requestID, status: 0)
+            }
         }
 
         let data: Data
@@ -120,13 +191,27 @@ struct APIClient: Sendable {
         do {
             (data, response) = try await session.data(for: request)
         } catch {
-            throw Self.mapTransportError(error)
+            if let kind = Self.transportFailureKind(error) {
+                hooks.report(APITransportFailure(path: path, requestID: requestID, kind: kind))
+            }
+            throw APIFailure(error: Self.mapTransportError(error), requestID: requestID, status: 0)
         }
 
-        guard let http = response as? HTTPURLResponse else { throw APIError.malformedResponse }
+        guard let http = response as? HTTPURLResponse else {
+            throw APIFailure(error: .malformedResponse, requestID: requestID, status: 0)
+        }
+        let answeredID = Self.requestID(in: http, data: data) ?? requestID
 
         guard (200..<300).contains(http.statusCode) else {
-            throw Self.mapServerError(status: http.statusCode, data: data, headers: http)
+            let envelope = Self.envelope(from: data)
+            throw APIFailure(
+                error: Self.mapServerError(status: http.statusCode, data: data, headers: http),
+                requestID: answeredID,
+                status: http.statusCode,
+                code: envelope?.error.code,
+                retryAfter: envelope?.error.details?.retryAfterSeconds
+                    ?? Int(http.value(forHTTPHeaderField: "Retry-After") ?? "")
+            )
         }
 
         if Response.self == Empty.self { return Empty() as! Response }
@@ -134,18 +219,40 @@ struct APIClient: Sendable {
         do {
             return try JSONDecoder().decode(Response.self, from: data)
         } catch {
-            throw APIError.malformedResponse
+            throw APIFailure(error: .malformedResponse, requestID: answeredID, status: http.statusCode)
         }
+    }
+
+    /// Everything this client says about itself on one request.
+    func headers(requestID: String) -> [String: String] {
+        var headers = metadata.headers
+        headers["Accept"] = "application/json"
+        headers["X-Request-ID"] = requestID
+        if let identity = hooks.identity {
+            if let installationID = identity.installationID, !installationID.isEmpty {
+                headers["X-Installation-ID"] = installationID
+            }
+            if let sessionID = identity.sessionID, !sessionID.isEmpty {
+                headers["X-Session-ID"] = sessionID
+            }
+        }
+        return headers
     }
 
     // MARK: Error mapping
 
     /// The error envelope every endpoint uses.
-    private struct ErrorEnvelope: Decodable {
+    struct ErrorEnvelope: Decodable {
         struct Payload: Decodable {
             let code: String
             let message: String?
             let details: Details?
+            let requestID: String?
+
+            enum CodingKeys: String, CodingKey {
+                case code, message, details
+                case requestID = "request_id"
+            }
         }
         struct Details: Decodable {
             let dailyLimit: Int?
@@ -171,8 +278,24 @@ struct APIClient: Sendable {
         let error: Payload
     }
 
+    static func envelope(from data: Data) -> ErrorEnvelope? {
+        try? JSONDecoder().decode(ErrorEnvelope.self, from: data)
+    }
+
+    /// The id the server filed the request under: its `X-Request-ID` header,
+    /// else the envelope's `request_id`. Nil when neither is a valid id.
+    static func requestID(in response: HTTPURLResponse, data: Data) -> String? {
+        if let header = response.value(forHTTPHeaderField: "X-Request-ID"), RequestID.isValid(header) {
+            return header
+        }
+        if let fromBody = Self.envelope(from: data)?.error.requestID, RequestID.isValid(fromBody) {
+            return fromBody
+        }
+        return nil
+    }
+
     static func mapServerError(status: Int, data: Data, headers: HTTPURLResponse) -> APIError {
-        let envelope = try? JSONDecoder().decode(ErrorEnvelope.self, from: data)
+        let envelope = Self.envelope(from: data)
         let details = envelope?.error.details
         let retryAfter = details?.retryAfterSeconds
             ?? Int(headers.value(forHTTPHeaderField: "Retry-After") ?? "")
@@ -237,6 +360,40 @@ struct APIClient: Sendable {
              NSURLErrorInternationalRoamingOff:
             return .offline
         default: return .server
+        }
+    }
+
+    /// How a request that got no response at all failed, for the app's
+    /// `api_error` event. Nil for a cancellation, which is not a failure.
+    static func transportFailureKind(_ error: Error) -> APITransportFailure.Kind? {
+        if error is CancellationError { return nil }
+        let nsError = error as NSError
+        guard nsError.domain == NSURLErrorDomain else { return .io }
+        switch nsError.code {
+        case NSURLErrorCancelled:
+            return nil
+        case NSURLErrorTimedOut:
+            return .timeout
+        case NSURLErrorNotConnectedToInternet,
+             NSURLErrorNetworkConnectionLost,
+             NSURLErrorCannotFindHost,
+             NSURLErrorCannotConnectToHost,
+             NSURLErrorDNSLookupFailed,
+             NSURLErrorDataNotAllowed,
+             NSURLErrorInternationalRoamingOff,
+             NSURLErrorCallIsActive:
+            return .offline
+        case NSURLErrorSecureConnectionFailed,
+             NSURLErrorServerCertificateHasBadDate,
+             NSURLErrorServerCertificateUntrusted,
+             NSURLErrorServerCertificateHasUnknownRoot,
+             NSURLErrorServerCertificateNotYetValid,
+             NSURLErrorClientCertificateRejected,
+             NSURLErrorClientCertificateRequired,
+             NSURLErrorAppTransportSecurityRequiresSecureConnection:
+            return .tls
+        default:
+            return .io
         }
     }
 }
