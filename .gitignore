@@ -16,6 +16,7 @@
 *.log
 ios-simlog.txt
 android-shot*.png
+ios-shot*.png
 
 # Local build-watcher requests and markers (claude-build-watch.sh)
 .build-request
