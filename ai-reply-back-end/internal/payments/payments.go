@@ -71,13 +71,25 @@ func (DemoProvider) HandleWebhook(context.Context, []byte) (string, string, erro
 // RefundPayment — демо қайтарым.
 func (DemoProvider) RefundPayment(context.Context, domain.Payment) error { return nil }
 
+// Events — сәтті төлемнен кейінгі оқиғалар (мысалы, push хабарламасы).
+//
+// Payments do not know how the person is told: the notification layer
+// implements this. It must not fail the payment, so it returns nothing.
+type Events interface {
+	PaymentSucceeded(ctx context.Context, p domain.Payment, sub domain.Subscription)
+}
+
 // Service — төлем сценарийлері.
 type Service struct {
 	repo     *repository.Store
 	subs     *subscriptions.Service
 	provider Provider
 	mode     string
+	events   Events
 }
+
+// WithEvents — оқиға тыңдаушысы.
+func (s *Service) WithEvents(e Events) *Service { s.events = e; return s }
 
 // New — қызмет.
 func New(repo *repository.Store, subs *subscriptions.Service, provider Provider, mode string) *Service {
@@ -139,7 +151,12 @@ func (s *Service) Confirm(ctx context.Context, userID, paymentID string) (domain
 		return domain.Subscription{}, err
 	}
 	var expires *time.Time
-	return s.subs.Assign(ctx, userID, payment.PlanID, "payment", expires)
+	sub, err := s.subs.Assign(ctx, userID, payment.PlanID, "payment", expires)
+	if err == nil && s.events != nil {
+		payment.Status = "succeeded"
+		s.events.PaymentSucceeded(ctx, payment, sub)
+	}
+	return sub, err
 }
 
 // History — төлемдер тарихы.

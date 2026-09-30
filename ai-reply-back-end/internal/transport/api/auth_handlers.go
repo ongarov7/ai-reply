@@ -2,10 +2,13 @@ package api
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/aireply/ai-reply-back-end/internal/auth"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
+	"github.com/aireply/ai-reply-back-end/internal/phone"
+	"github.com/aireply/ai-reply-back-end/internal/reqctx"
 	"github.com/aireply/ai-reply-back-end/internal/traits"
 	"github.com/aireply/ai-reply-back-end/internal/transport/httpx"
 )
@@ -54,6 +57,8 @@ func (s *Server) handleRequestOTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	challenge, err := s.auth.RequestOTP(r.Context(), body.Identifier, body.Locale)
+	kind, subject := identitySubject(body.Identifier)
+	s.authEvent(r, domain.AuthOTPRequested, kind, "", kind, subject, nil, err)
 	if err != nil {
 		httpx.Fail(w, err)
 		return
@@ -96,6 +101,13 @@ func (s *Server) handleVerifyOTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	session, err := s.auth.VerifyOTP(r.Context(), body.Identifier, body.Code, body.Device.toInfo(r))
+	kind, subject := identitySubject(body.Identifier)
+	otpEvent := domain.AuthOTPVerified
+	if err != nil {
+		otpEvent = domain.AuthOTPFailed
+	}
+	s.authEvent(r, otpEvent, kind, session.User.ID, kind, subject, &body.Device, err)
+	s.loginOutcome(r, kind, session, kind, subject, &body.Device, err)
 	if err != nil {
 		httpx.Fail(w, err)
 		return
@@ -117,6 +129,9 @@ func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
 	}
 	session, err := s.auth.Refresh(r.Context(), body.RefreshToken, body.Device.toInfo(r))
 	if err != nil {
+		// Successful refreshes happen every few minutes for every active app and
+		// are visible as sessions; only the refusals belong in the security log.
+		s.authEvent(r, domain.AuthSessionExpired, "refresh", "", "", "", &body.Device, err)
 		httpx.Fail(w, err)
 		return
 	}
@@ -134,11 +149,33 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, err)
 		return
 	}
-	if err := s.auth.Logout(r.Context(), body.RefreshToken); err != nil {
+	userID, err := s.auth.LogoutSession(r.Context(), body.RefreshToken)
+	if err != nil {
 		httpx.Fail(w, err)
 		return
 	}
+	if userID != "" {
+		s.authEvent(r, domain.AuthLogout, "", userID, "", "", nil, nil)
+		// The app names its installation in X-Installation-ID: from this moment
+		// the account's notifications no longer go to this phone.
+		if installationID := reqctx.From(r.Context()).InstallationID; installationID != "" && s.installations != nil {
+			if _, err := s.installations.Detach(r.Context(), installationID, userID); err != nil {
+				s.log.Warn("installation detach on logout failed", "error", err.Error())
+			}
+		}
+	}
 	httpx.JSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// identitySubject — ескі ағындағы идентификатор: пошта не телефон (E.164, әкімші іздеуімен бірдей).
+func identitySubject(identifier string) (kind, value string) {
+	if strings.Contains(identifier, "@") {
+		return "email", strings.ToLower(strings.TrimSpace(identifier))
+	}
+	if number, err := phone.Parse(identifier); err == nil {
+		return "phone", number.E164
+	}
+	return "phone", strings.TrimSpace(identifier)
 }
 
 // writeSession — сессия жауабын жинау (профиль, тариф, квота бірден келеді).

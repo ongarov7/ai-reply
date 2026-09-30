@@ -3,9 +3,11 @@ package config
 
 import (
 	"bufio"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/mail"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -14,16 +16,18 @@ import (
 
 // Config — қолданбаның толық баптауы.
 type Config struct {
-	App      App
-	Database Database
-	Auth     Auth
-	Email    Email
-	OAuth    OAuth
-	OpenAI   OpenAI
-	Admin    Admin
-	Payments Payments
-	Limits   Limits
-	Log      Log
+	App       App
+	Database  Database
+	Auth      Auth
+	Email     Email
+	OAuth     OAuth
+	OpenAI    OpenAI
+	Admin     Admin
+	Payments  Payments
+	Limits    Limits
+	Log       Log
+	Push      Push
+	Telemetry Telemetry
 }
 
 type App struct {
@@ -143,6 +147,83 @@ type Log struct {
 	Format string // json | text
 }
 
+// Push — FCM (Android) мен APNs (iOS) арқылы хабарлама жіберу.
+//
+// Provider credentials exist only here, read from the environment; the apps
+// never see them. PUSH_NOTIFICATIONS_ENABLED=false (the default) keeps the
+// server fully working without any provider: installations are still
+// registered, nothing is sent.
+type Push struct {
+	Enabled          bool
+	WorkerEnabled    bool
+	MaxAttempts      int
+	BatchSize        int
+	Concurrency      int
+	CampaignsPerHour int
+	LinkHosts        []string
+	FCM              FCM
+	APNs             APNs
+}
+
+// FCM — Firebase Cloud Messaging HTTP v1 (қызметтік тіркелгі).
+type FCM struct {
+	ProjectID   string
+	ClientEmail string
+	PrivateKey  string // PEM; "\n" escapes in .env are turned into newlines
+}
+
+// Configured — үш мәннің бәрі берілген.
+func (f FCM) Configured() bool {
+	return f.ProjectID != "" && f.ClientEmail != "" && f.PrivateKey != ""
+}
+
+// partial — бірі берілген, бірі жоқ (қате баптау).
+func (f FCM) partial() bool {
+	set := 0
+	for _, v := range []string{f.ProjectID, f.ClientEmail, f.PrivateKey} {
+		if v != "" {
+			set++
+		}
+	}
+	return set > 0 && set < 3
+}
+
+// APNs — Apple Push Notification service, токен (.p8) арқылы.
+type APNs struct {
+	KeyID       string
+	TeamID      string
+	BundleID    string
+	PrivateKey  string // .p8 content (PEM)
+	Environment string // production | sandbox: for tokens whose build did not say
+}
+
+// Configured — кілт, команда, bundle id және кілт мазмұны берілген.
+func (a APNs) Configured() bool {
+	return a.KeyID != "" && a.TeamID != "" && a.BundleID != "" && a.PrivateKey != ""
+}
+
+func (a APNs) partial() bool {
+	set := 0
+	for _, v := range []string{a.KeyID, a.TeamID, a.PrivateKey} {
+		if v != "" {
+			set++
+		}
+	}
+	return set > 0 && set < 3
+}
+
+// Telemetry — қосымша оқиғалары және сақтау мерзімдері (күн; 0 — өшірмеу).
+type Telemetry struct {
+	Enabled                  bool
+	EventsPerMinute          int
+	RetentionAppEventsDays   int
+	RetentionAPIErrorsDays   int
+	RetentionAuthEventsDays  int
+	RetentionDeliveriesDays  int
+	RetentionAuditLogDays    int
+	RecordClientErrorsStatus int // record API errors from this status up (4xx noise below is skipped)
+}
+
 // Load — .env файлын (бар болса) оқып, ортадан баптауды жинайды.
 func Load(envFile string) (Config, error) {
 	if envFile != "" {
@@ -221,6 +302,36 @@ func Load(envFile string) (Config, error) {
 			GenericPerMinute:  num("RATE_GENERIC_PER_MINUTE", 60),
 		},
 		Log: Log{Level: str("LOG_LEVEL", "info"), Format: str("LOG_FORMAT", "json")},
+		Push: Push{
+			Enabled:          boolean("PUSH_NOTIFICATIONS_ENABLED", false),
+			WorkerEnabled:    boolean("PUSH_WORKER_ENABLED", true),
+			MaxAttempts:      num("PUSH_MAX_ATTEMPTS", 5),
+			BatchSize:        num("PUSH_BATCH_SIZE", 50),
+			Concurrency:      num("PUSH_WORKER_CONCURRENCY", 8),
+			CampaignsPerHour: num("RATE_PUSH_CAMPAIGNS_PER_HOUR", 10),
+			LinkHosts:        list("PUSH_LINK_HOSTS", hostOf(str("PUBLIC_BASE_URL", "https://ai-reply.kz"))),
+			FCM: FCM{
+				ProjectID:   str("FIREBASE_PROJECT_ID", ""),
+				ClientEmail: str("FIREBASE_CLIENT_EMAIL", ""),
+				PrivateKey:  PEM(str("FIREBASE_PRIVATE_KEY", "")),
+			},
+			APNs: APNs{
+				KeyID:       str("APNS_KEY_ID", ""),
+				TeamID:      str("APNS_TEAM_ID", ""),
+				BundleID:    str("APNS_BUNDLE_ID", ""),
+				PrivateKey:  PEM(str("APNS_PRIVATE_KEY", "")),
+				Environment: apnsEnvironment(str("APNS_ENVIRONMENT", "production")),
+			},
+		},
+		Telemetry: Telemetry{
+			Enabled:                 boolean("TELEMETRY_ENABLED", true),
+			EventsPerMinute:         num("RATE_EVENTS_PER_MINUTE", 30),
+			RetentionAppEventsDays:  days("RETENTION_APP_EVENTS_DAYS", 90),
+			RetentionAPIErrorsDays:  days("RETENTION_API_ERRORS_DAYS", 30),
+			RetentionAuthEventsDays: days("RETENTION_AUTH_EVENTS_DAYS", 365),
+			RetentionDeliveriesDays: days("RETENTION_NOTIFICATIONS_DAYS", 180),
+			RetentionAuditLogDays:   days("RETENTION_AUDIT_LOG_DAYS", 0),
+		},
 	}
 
 	loc, err := time.LoadLocation(cfg.App.Timezone)
@@ -288,7 +399,83 @@ func (c Config) Validate() []string {
 	if c.Admin.BootstrapEmail != "" && len(c.Admin.BootstrapPassword) < 10 {
 		problems = append(problems, "ADMIN_PASSWORD must be at least 10 characters")
 	}
+	problems = append(problems, c.Push.validate()...)
 	return problems
+}
+
+// validate — push баптауы. Толық бос провайдер жай ғана өшірулі; жартылай
+// толтырылғаны — қате (оператор бірдеңені ұмытқан).
+func (p Push) validate() []string {
+	var problems []string
+	if p.FCM.partial() {
+		problems = append(problems, "FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL and FIREBASE_PRIVATE_KEY must be set together")
+	}
+	if p.APNs.partial() {
+		problems = append(problems, "APNS_KEY_ID, APNS_TEAM_ID and APNS_PRIVATE_KEY must be set together")
+	}
+	if p.APNs.PrivateKey != "" && p.APNs.BundleID == "" {
+		problems = append(problems, "APNS_BUNDLE_ID must be set when APNs is configured (the app's bundle id, the apns-topic)")
+	}
+	if p.APNs.Environment == "" {
+		problems = append(problems, "APNS_ENVIRONMENT must be production or development")
+	}
+	if p.MaxAttempts < 1 || p.MaxAttempts > 10 {
+		problems = append(problems, "PUSH_MAX_ATTEMPTS must be between 1 and 10")
+	}
+	return problems
+}
+
+// PEM — .env-тегі бір жолды кілтті PEM-ге айналдырады.
+//
+// A .env line cannot hold newlines, so keys arrive as "-----BEGIN ...-----\n
+// MIIE...\n-----END ...-----" (exactly how the Firebase service-account JSON
+// stores private_key) or base64 of the whole PEM file. Both become a normal
+// multi-line PEM. The value is never logged.
+func PEM(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	if !strings.Contains(raw, "-----BEGIN") {
+		if decoded, err := base64.StdEncoding.DecodeString(raw); err == nil && strings.Contains(string(decoded), "-----BEGIN") {
+			raw = string(decoded)
+		}
+	}
+	raw = strings.ReplaceAll(raw, `\r\n`, "\n")
+	raw = strings.ReplaceAll(raw, `\n`, "\n")
+	raw = strings.ReplaceAll(raw, "\r\n", "\n")
+	return strings.TrimSpace(raw) + "\n"
+}
+
+func apnsEnvironment(v string) string {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "production", "prod":
+		return "production"
+	case "development", "sandbox", "dev":
+		return "sandbox"
+	default:
+		return ""
+	}
+}
+
+func hostOf(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil || u.Hostname() == "" {
+		return ""
+	}
+	return strings.ToLower(u.Hostname())
+}
+
+// days — сақтау мерзімі күнмен; 0 рұқсат (өшірмеу дегенді білдіреді).
+func days(key string, fallback int) int {
+	raw := str(key, "")
+	if raw == "" {
+		return fallback
+	}
+	if v, err := strconv.Atoi(raw); err == nil && v >= 0 {
+		return v
+	}
+	return fallback
 }
 
 // ---------------------------------------------------------------- env helpers

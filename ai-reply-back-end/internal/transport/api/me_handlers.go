@@ -197,6 +197,11 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 			"email_otp":      s.auth.EmailDelivery() != "off",
 			"google_sign_in": s.auth.GoogleEnabled(),
 			"apple_sign_in":  s.auth.AppleEnabled(),
+			// POST /api/v1/installations and /api/v1/events exist; push says
+			// whether this server can actually deliver (a provider is set up).
+			"installations":      s.installations != nil,
+			"push_notifications": s.notifications != nil && s.notifications.Ready(),
+			"telemetry":          s.telemetry != nil && s.telemetry.Enabled(),
 		},
 		"demo_mode":    s.cfg.Auth.DemoMode,
 		"payment_mode": s.payments.Mode(),

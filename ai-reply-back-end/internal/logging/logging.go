@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+
+	"github.com/aireply/ai-reply-back-end/internal/redact"
 )
 
 type ctxKey string
@@ -13,12 +15,13 @@ type ctxKey string
 const requestIDKey ctxKey = "request_id"
 
 // Тыйым салынған кілттер: мұндай өріс журналға түссе, мәні алмастырылады.
+//
+// Content keys are listed here (a message, a reply, a prompt never reaches a
+// log line); secrets — passwords, codes, tokens, keys, authorization, cookies
+// — are decided by redact.IsSensitiveKey, shared with every stored record.
 var forbidden = map[string]bool{
 	"message": true, "source_text": true, "instruction": true, "reply": true,
 	"prompt": true, "text": true, "body": true, "content": true,
-	"otp": true, "otp_code": true, "verification_code": true,
-	"password": true, "token": true, "access_token": true, "refresh_token": true,
-	"authorization": true, "api_key": true, "openai_api_key": true, "push_token": true,
 	"phone": true, "email": true,
 }
 
@@ -48,8 +51,8 @@ func New(level, format string) *slog.Logger {
 
 // scrub — соңғы қорғаныс шебі: құпия өріс кездейсоқ берілсе де жазылмайды.
 func scrub(_ []string, a slog.Attr) slog.Attr {
-	if forbidden[strings.ToLower(a.Key)] {
-		return slog.String(a.Key, "[redacted]")
+	if forbidden[strings.ToLower(a.Key)] || redact.IsSensitiveKey(a.Key) {
+		return slog.String(a.Key, redact.Placeholder)
 	}
 	return a
 }

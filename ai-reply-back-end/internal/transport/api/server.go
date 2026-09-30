@@ -9,11 +9,14 @@ import (
 	"github.com/aireply/ai-reply-back-end/config"
 	"github.com/aireply/ai-reply-back-end/internal/ai"
 	"github.com/aireply/ai-reply-back-end/internal/auth"
+	"github.com/aireply/ai-reply-back-end/internal/installations"
 	"github.com/aireply/ai-reply-back-end/internal/limits"
 	"github.com/aireply/ai-reply-back-end/internal/middleware"
+	"github.com/aireply/ai-reply-back-end/internal/notifications"
 	"github.com/aireply/ai-reply-back-end/internal/payments"
 	"github.com/aireply/ai-reply-back-end/internal/plans"
 	"github.com/aireply/ai-reply-back-end/internal/subscriptions"
+	"github.com/aireply/ai-reply-back-end/internal/telemetry"
 	"github.com/aireply/ai-reply-back-end/internal/transport/httpx"
 	"github.com/aireply/ai-reply-back-end/internal/users"
 )
@@ -23,39 +26,46 @@ type Pinger func(context.Context) error
 
 // Server — мобильді API.
 type Server struct {
-	cfg      config.Config
-	auth     *auth.Service
-	users    *users.Service
-	plans    *plans.Service
-	subs     *subscriptions.Service
-	ai       *ai.Service
-	limits   *limits.Service
-	payments *payments.Service
-	limiter  *middleware.Limiter
-	ping     Pinger
-	log      *slog.Logger
+	cfg           config.Config
+	auth          *auth.Service
+	users         *users.Service
+	plans         *plans.Service
+	subs          *subscriptions.Service
+	ai            *ai.Service
+	limits        *limits.Service
+	payments      *payments.Service
+	installations *installations.Service
+	notifications *notifications.Service
+	telemetry     *telemetry.Service
+	limiter       *middleware.Limiter
+	ping          Pinger
+	log           *slog.Logger
 }
 
 // Deps — сервер тәуелділіктері.
 type Deps struct {
-	Config   config.Config
-	Auth     *auth.Service
-	Users    *users.Service
-	Plans    *plans.Service
-	Subs     *subscriptions.Service
-	AI       *ai.Service
-	Limits   *limits.Service
-	Payments *payments.Service
-	Limiter  *middleware.Limiter
-	Ping     Pinger
-	Log      *slog.Logger
+	Config        config.Config
+	Auth          *auth.Service
+	Users         *users.Service
+	Plans         *plans.Service
+	Subs          *subscriptions.Service
+	AI            *ai.Service
+	Limits        *limits.Service
+	Payments      *payments.Service
+	Installations *installations.Service
+	Notifications *notifications.Service
+	Telemetry     *telemetry.Service
+	Limiter       *middleware.Limiter
+	Ping          Pinger
+	Log           *slog.Logger
 }
 
 // New — API сервері.
 func New(d Deps) *Server {
 	return &Server{
 		cfg: d.Config, auth: d.Auth, users: d.Users, plans: d.Plans, subs: d.Subs,
-		ai: d.AI, limits: d.Limits, payments: d.Payments, limiter: d.Limiter, ping: d.Ping, log: d.Log,
+		ai: d.AI, limits: d.Limits, payments: d.Payments, installations: d.Installations,
+		notifications: d.Notifications, telemetry: d.Telemetry, limiter: d.Limiter, ping: d.Ping, log: d.Log,
 	}
 }
 
@@ -118,9 +128,22 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /api/v1/plans", generic(http.HandlerFunc(s.handlePlans)))
 	mux.Handle("GET /api/v1/config", generic(http.HandlerFunc(s.handleConfig)))
 
-	// --- құрылғылар
+	// --- құрылғылар (ескі build-тер) және орнатулар (push, метадерек)
 	mux.Handle("POST /api/v1/devices", s.requireUser(http.HandlerFunc(s.handleRegisterDevice)))
 	mux.Handle("DELETE /api/v1/devices/{id}", s.requireUser(http.HandlerFunc(s.handleDeleteDevice)))
+	installationKey := func(r *http.Request) string {
+		return httpx.ClientIP(r, s.cfg.App.TrustProxy)
+	}
+	installationLimit := middleware.RateLimit(s.limiter, "installation", limits.GenericPerMinute, time.Minute, installationKey)
+	mux.Handle("POST /api/v1/installations", installationLimit(s.optionalUser(http.HandlerFunc(s.handleRegisterInstallation))))
+	mux.Handle("POST /api/v1/installations/{installation_id}/detach",
+		installationLimit(s.optionalUser(http.HandlerFunc(s.handleDetachInstallation))))
+	mux.Handle("GET /api/v1/me/notification-preferences", s.requireUser(http.HandlerFunc(s.handleNotificationPreferences)))
+	mux.Handle("PUT /api/v1/me/notification-preferences", s.requireUser(http.HandlerFunc(s.handleUpdateNotificationPreferences)))
+
+	// --- қосымша оқиғалары (рұқсат етілген тізім, топтап, шектеумен)
+	eventsLimit := middleware.RateLimit(s.limiter, "events", s.cfg.Telemetry.EventsPerMinute, time.Minute, installationKey)
+	mux.Handle("POST /api/v1/events", eventsLimit(s.optionalUser(http.HandlerFunc(s.handleEvents))))
 
 	// --- AI
 	mux.Handle("POST /api/v1/ai/reply", s.requireUser(aiLimit(http.HandlerFunc(s.handleReply))))

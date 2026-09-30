@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/aireply/ai-reply-back-end/internal/domain"
@@ -151,6 +152,10 @@ func (s *Store) RevokeAdminSession(ctx context.Context, id string) error {
 // ---------------------------------------------------------------- audit
 
 // WriteAudit — әрбір маңызды әкімші әрекеті (құпия мазмұнсыз).
+//
+// There is no update or delete for these rows anywhere in the API: the log
+// is append-only; only the retention job may remove rows, and by default it
+// keeps them forever.
 func (s *Store) WriteAudit(ctx context.Context, e domain.AuditEntry) error {
 	if e.ID == "" {
 		e.ID = traits.NewID()
@@ -162,21 +167,60 @@ func (s *Store) WriteAudit(ctx context.Context, e domain.AuditEntry) error {
 		}
 	}
 	_, err := s.db.Writer().ExecContext(ctx, `
-		INSERT INTO admin_audit_logs (id, admin_id, admin_email, action, entity_type, entity_id, metadata, ip, created_at)
-		VALUES (?,?,?,?,?,?,?,?,?)`,
-		e.ID, e.AdminID, e.AdminEmail, e.Action, e.EntityType, e.EntityID, meta, e.IP, ms(time.Now()))
+		INSERT INTO admin_audit_logs (id, admin_id, admin_email, action, entity_type, entity_id, metadata, ip,
+			request_id, created_at)
+		VALUES (?,?,?,?,?,?,?,?,?,?)`,
+		e.ID, e.AdminID, e.AdminEmail, e.Action, e.EntityType, e.EntityID, meta, e.IP, e.RequestID, ms(time.Now()))
 	return err
+}
+
+// AuditFilter — аудит журналының сүзгісі.
+type AuditFilter struct {
+	Action     string // exact, or a prefix ending with "." (e.g. "notification.")
+	Admin      string // admin id or e-mail
+	EntityType string
+	EntityID   string
+	Page       traits.Page
 }
 
 // AuditLog — соңғы жазбалар.
 func (s *Store) AuditLog(ctx context.Context, page traits.Page) ([]domain.AuditEntry, int, error) {
+	return s.AuditLogFiltered(ctx, AuditFilter{Page: page})
+}
+
+// AuditLogFiltered — сүзгімен.
+func (s *Store) AuditLogFiltered(ctx context.Context, f AuditFilter) ([]domain.AuditEntry, int, error) {
+	where, args := []string{"1=1"}, []any{}
+	if f.Action != "" {
+		if strings.HasSuffix(f.Action, ".") {
+			where = append(where, "action LIKE ?")
+			args = append(args, f.Action+"%")
+		} else {
+			where = append(where, "action = ?")
+			args = append(args, f.Action)
+		}
+	}
+	if f.Admin != "" {
+		where = append(where, "(admin_id = ? OR lower(admin_email) = lower(?))")
+		args = append(args, f.Admin, f.Admin)
+	}
+	if f.EntityType != "" {
+		where = append(where, "entity_type = ?")
+		args = append(args, f.EntityType)
+	}
+	if f.EntityID != "" {
+		where = append(where, "entity_id = ?")
+		args = append(args, f.EntityID)
+	}
+	clause := strings.Join(where, " AND ")
 	var total int
-	if err := s.db.Reader().QueryRowContext(ctx, `SELECT COUNT(*) FROM admin_audit_logs`).Scan(&total); err != nil {
+	if err := s.db.Reader().QueryRowContext(ctx, `SELECT COUNT(*) FROM admin_audit_logs WHERE `+clause, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 	rows, err := s.db.Reader().QueryContext(ctx, `
-		SELECT id, admin_id, admin_email, action, entity_type, entity_id, metadata, ip, created_at
-		FROM admin_audit_logs ORDER BY created_at DESC LIMIT ? OFFSET ?`, page.Limit, page.Offset)
+		SELECT id, admin_id, admin_email, action, entity_type, entity_id, metadata, ip, request_id, created_at
+		FROM admin_audit_logs WHERE `+clause+` ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+		append(args, f.Page.Limit, f.Page.Offset)...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -189,7 +233,7 @@ func (s *Store) AuditLog(ctx context.Context, page traits.Page) ([]domain.AuditE
 			created int64
 		)
 		if err := rows.Scan(&e.ID, &e.AdminID, &e.AdminEmail, &e.Action, &e.EntityType, &e.EntityID,
-			&meta, &e.IP, &created); err != nil {
+			&meta, &e.IP, &e.RequestID, &created); err != nil {
 			return nil, 0, err
 		}
 		_ = json.Unmarshal([]byte(meta), &e.Metadata)

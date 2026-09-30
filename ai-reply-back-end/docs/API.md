@@ -4,18 +4,38 @@
 
 ```json
 { "error": { "code": "DAILY_LIMIT_REACHED", "message": "Daily generation limit reached.",
-             "details": { "daily_limit": 7, "used_today": 7, "resets_at": "2026-03-11T19:00:00Z" } } }
+             "details": { "daily_limit": 7, "used_today": 7, "resets_at": "2026-03-11T19:00:00Z" },
+             "request_id": "req_4f1c2a9b7d3e5f60" } }
 ```
 
 Клиент реагирует на `code`, а не на текст: `message` — только для отладки,
-локализация живёт в приложении.
+локализация живёт в приложении. `request_id` совпадает с заголовком ответа
+`X-Request-ID` и строкой в журнале сервера — его стоит показывать в отчёте об ошибке.
+
+## Заголовки клиента
+
+Приложения описывают себя заголовками (все необязательные, старые сборки работают без них):
+
+| Заголовок | Пример | Зачем |
+|---|---|---|
+| `X-Request-ID` | `req_01J8Z6Q3W6Y8` | корреляция; `[A-Za-z0-9._:-]{8,64}`, иначе сервер выдаст свой |
+| `traceparent` | W3C Trace Context | `trace_id` в журнале и в записи об ошибке |
+| `X-Platform` | `ios` / `android` | журнал, диагностика, отчёт по версиям |
+| `X-App-Version` / `X-App-Build` | `1.3.2` / `142` | то же |
+| `X-OS-Version` | `17.5` | то же |
+| `X-Installation-ID` | UUID установки | обновляет «последний визит» установки; при выходе отвязывает её |
+| `X-Session-ID` | UUID сессии приложения | связывает ошибки API с сессией |
+
+Это только подсказки для журналов и аналитики: права доступа по ним не решаются никогда.
+Недопустимые значения молча отбрасываются.
 
 ## Коды ошибок
 
 `INVALID_REQUEST`, `INVALID_OTP`, `OTP_EXPIRED`, `UNAUTHORIZED`, `TOKEN_EXPIRED`,
 `ACCOUNT_DISABLED`, `DAILY_LIMIT_REACHED`, `MONTHLY_LIMIT_REACHED`,
 `SUBSCRIPTION_EXPIRED`, `RATE_LIMITED`, `AI_PROVIDER_UNAVAILABLE`, `AI_TIMEOUT`,
-`AI_EMPTY_RESPONSE`, `PAYMENT_REQUIRED`, `NOT_FOUND`, `CONFLICT`, `INTERNAL_ERROR`.
+`AI_EMPTY_RESPONSE`, `PAYMENT_REQUIRED`, `NOT_FOUND`, `CONFLICT`, `INTERNAL_ERROR`,
+`PUSH_DISABLED` (409: отправка push выключена на сервере или провайдер не настроен).
 
 Вход по почте и через Google/Apple:
 
@@ -119,6 +139,8 @@ HMAC, лимиты). Новые сборки их не вызывают.
 
 ### POST /api/v1/auth/logout
 `{ "refresh_token": "…" }` → `{ "ok": true }` (идемпотентно).
+Если пришёл заголовок `X-Installation-ID`, установка сразу отвязывается от аккаунта:
+на этот телефон больше не уходят push этого аккаунта.
 
 ## Профиль и лимиты
 
@@ -129,12 +151,74 @@ HMAC, лимиты). Новые сборки их не вызывают.
 | GET | `/api/v1/me/usage` | `daily_limit`, `used_today`, `remaining_today`, `resets_at` |
 | GET | `/api/v1/me/subscription` | текущий тариф и статус |
 | GET | `/api/v1/me/devices` | список устройств |
-| POST | `/api/v1/devices` | регистрация устройства и push-токена |
+| POST | `/api/v1/devices` | регистрация устройства (устаревшее; push-токен — через `/installations`) |
 | DELETE | `/api/v1/devices/{id}` | отозвать устройство |
 | GET | `/api/v1/plans` | активные тарифы (публично) |
-| GET | `/api/v1/config` | лимиты, языки, режимы, `features.email_otp` / `google_sign_in` / `apple_sign_in` (публично) |
+| GET | `/api/v1/config` | лимиты, языки, режимы, `features.email_otp` / `google_sign_in` / `apple_sign_in` / `installations` / `push_notifications` / `telemetry` (публично) |
 | POST | `/api/v1/me/email/otp/request` | код на почту, которую нужно добавить к аккаунту (для старых аккаунтов «только телефон») |
 | POST | `/api/v1/me/email/otp/verify` | `{ "email", "code" }` → почта привязана, ответ как у `GET /me`; `CONFLICT`, если почта у аккаунта уже есть; `EMAIL_ALREADY_IN_USE`, если адрес занят |
+
+## Установки и push-уведомления
+
+Полное описание — [docs/notifications.md](../../docs/notifications.md).
+
+### POST /api/v1/installations
+Регистрирует установку приложения (с входом и без). Вызывается при запуске, после
+входа, после выхода, при новом push-токене и при смене разрешения.
+```json
+{ "installation_id": "0b7c9a52-4f5e-4d0a-9c1e-1d2f3a4b5c6d", "platform": "android",
+  "app_version": "1.3.2", "app_build": "142", "os_name": "Android", "os_version": "15",
+  "device_model": "SM-S928B", "manufacturer": "samsung", "locale": "ru", "timezone": "Asia/Almaty",
+  "notification_permission": "authorized", "notifications_enabled": true,
+  "push": { "provider": "fcm", "token": "…", "environment": "production" } }
+```
+→ `{ "installation_id", "attached", "push_status", "push_available", "notifications_enabled", "preferences" }`
+
+- Аккаунт берётся **только** из access token: с токеном установка привязывается к аккаунту,
+  без токена — становится анонимной (и отвязывается от прежнего владельца телефона).
+  Недействительный токен → `401`, установка не меняется.
+- `notification_permission`: `authorized | provisional | ephemeral | denied | not_determined | unknown`.
+- `push.environment` (только iOS): `sandbox | production`; без него сервер берёт `APNS_ENVIRONMENT`.
+- Токен хранится зашифрованным (AES-256-GCM) и уникален: при повторе на другой установке
+  он переезжает на новую. В ответах и в админке его нет — только отпечаток `fcm:1a2b3c4d`.
+- `installation_id` генерирует приложение один раз (UUID) и хранит вне резервных копий.
+
+### POST /api/v1/installations/{installation_id}/detach
+Отвязать установку от аккаунта (выход, смена аккаунта). С токеном — только свою,
+без токена — как анонимная регистрация. → `{ "ok": true, "detached": true }`.
+
+### GET · PUT /api/v1/me/notification-preferences
+`{ "preferences": { "subscription": false, "marketing": false } }` →
+`{ "preferences": { "account": true, "subscription": false, "security": true, "system": true, "marketing": false },
+   "optional": ["account", "subscription", "system", "marketing"] }`.
+`security` отключить нельзя. Выключенная категория не создаёт доставок вовсе.
+
+Автоматические push: успешная оплата, подписка истекает через 3 дня, подписка истекла
+(категория `subscription`, каждый — не больше одного раза на событие).
+
+Данные push (`data`): `nid` (уведомление), `did` (доставка), `type`, `category`, `link`
+(`aireply://home|subscription|settings|notifications|templates|profile|keyboard|compose`
+или `https://` на разрешённом хосте). Приложение проверяет ссылку ещё раз.
+
+## События приложения
+
+### POST /api/v1/events
+Пакет до 50 событий, тело до 64 КБ, 202 Accepted (запись в фоне).
+```json
+{ "installation_id": "0b7c9a52-…", "session_id": "5e55a0b1-…",
+  "events": [ { "id": "c1f0…", "name": "notification_opened", "occurred_at": "2026-10-01T09:30:00Z",
+                "properties": { "notification_id": "…", "delivery_id": "…" } } ] }
+```
+→ `{ "accepted": 1, "rejected": 0 }` (при отказе — `rejections: [{ "index", "reason" }]`).
+
+Разрешены только события из списка (`app_opened`, `app_backgrounded`, `login_success`,
+`login_failed`, `registration_success`, `logout`, `push_permission_requested|granted|denied`,
+`push_token_registered|refreshed|registration_failed`, `notification_opened`,
+`payment_started|success|failed`, `api_error`, `unexpected_app_error`) с типизированными
+свойствами; остальное отклоняется, а не сохраняется. Текст сообщений, нажатия клавиш,
+содержимое буфера и любые введённые данные не принимаются в принципе. Повтор пакета с теми
+же `id` не создаёт дублей. `notification_opened` отмечает доставку открытой, только если
+пришёл с той же установки.
 
 ## Генерация ответа
 
@@ -194,6 +278,26 @@ HMAC, лимиты). Новые сборки их не вызывают.
 `/api/v1/admin/*` — cookie-сессия + заголовок `X-CSRF-Token` на любые изменения.
 `session`, `dashboard`, `users`, `users/{id}`, `users/{id}/status|plan|reset-quota|revoke-sessions`,
 `plans` (GET/POST/PATCH/archive), `audit`, `settings`, `settings/pricing`, `notifications`, `locale`.
+
+Права проверяются на сервере для каждого маршрута (`403 FORBIDDEN` + недостающее право);
+`GET /session` отдаёт список прав текущего администратора. Роль `admin` — все права,
+`viewer` — `dashboard.read`, `users.read`, `settings.read`, `notifications.read`.
+
+| Метод | Путь | Право |
+|---|---|---|
+| GET | `/notifications` | `notifications.read` — состояние push (провайдеры, воркер) |
+| POST | `/notifications/audience/preview` | `notifications.read` — число получателей по фильтру (считает сервер) |
+| GET · POST | `/notifications/campaigns` | `notifications.read` / `notifications.send`; POST требует `Idempotency-Key` |
+| GET | `/notifications/campaigns/{id}` | `notifications.read` — статистика и ошибки доставки |
+| POST | `/notifications/campaigns/{id}/send` · `/cancel` | `notifications.send` |
+| GET | `/notifications/deliveries` · `/notifications/devices` | `notifications.read` |
+| GET | `/users/{id}/diagnostics` | `users.diagnostics.read` (просмотр попадает в аудит) |
+| GET | `/logs/events` · `/logs/auth` · `/logs/errors` · `/logs/versions` · `/logs/meta` | `logs.read` |
+| GET | `/ops` | `dashboard.read` |
+| GET | `/audit?action=&admin=&entity_type=&entity_id=` | `audit_logs.read`; `action` с точкой на конце — префикс |
+
+Фильтр `?user=` в журналах принимает id (или его начало), почту или телефон; поиск по почте
+находит и неудачные попытки входа (по ключевому хэшу — сам адрес в журнале не хранится).
 
 Ни один admin-эндпоинт не отдаёт текст сообщений — такой функции нет.
 

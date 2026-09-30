@@ -295,6 +295,7 @@ type AuditEntry struct {
 	EntityID   string
 	Metadata   map[string]any
 	IP         string
+	RequestID  string
 	CreatedAt  time.Time
 }
 
@@ -388,3 +389,37 @@ func (e *OTPAttemptError) Unwrap() error { return ErrInvalidOTP }
 func (e *OTPAttemptError) Details() map[string]any {
 	return map[string]any{"attempts_remaining": e.Remaining}
 }
+
+// Push хабарламалары.
+var (
+	// ErrPushDisabled — PUSH_NOTIFICATIONS_ENABLED=false не бірде-бір провайдер бапталмаған.
+	ErrPushDisabled = errors.New("push notifications are not configured")
+)
+
+// FieldError — сұраныстың қай өрісі жарамсыз (400 INVALID_REQUEST + details.field).
+type FieldError struct {
+	Field  string
+	Reason string
+}
+
+func (e *FieldError) Error() string {
+	if e.Reason != "" {
+		return "invalid " + e.Field + ": " + e.Reason
+	}
+	return "invalid " + e.Field
+}
+
+// Unwrap — ErrInvalidRequest: ескі клиенттер бұрынғыдай INVALID_REQUEST алады.
+func (e *FieldError) Unwrap() error { return ErrInvalidRequest }
+
+// Details — клиентке қай өріс екені (мәннің өзі емес).
+func (e *FieldError) Details() map[string]any {
+	d := map[string]any{"field": e.Field}
+	if e.Reason != "" {
+		d["reason"] = e.Reason
+	}
+	return d
+}
+
+// InvalidField — FieldError жасайды.
+func InvalidField(field, reason string) error { return &FieldError{Field: field, Reason: reason} }

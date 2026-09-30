@@ -9,8 +9,11 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -20,15 +23,19 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/auth"
 	"github.com/aireply/ai-reply-back-end/internal/database"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
+	"github.com/aireply/ai-reply-back-end/internal/installations"
 	"github.com/aireply/ai-reply-back-end/internal/limits"
 	"github.com/aireply/ai-reply-back-end/internal/localization"
 	"github.com/aireply/ai-reply-back-end/internal/middleware"
 	"github.com/aireply/ai-reply-back-end/internal/notifications"
 	"github.com/aireply/ai-reply-back-end/internal/payments"
 	"github.com/aireply/ai-reply-back-end/internal/plans"
+	"github.com/aireply/ai-reply-back-end/internal/push"
 	"github.com/aireply/ai-reply-back-end/internal/repository"
+	"github.com/aireply/ai-reply-back-end/internal/reqctx"
 	"github.com/aireply/ai-reply-back-end/internal/simulator"
 	"github.com/aireply/ai-reply-back-end/internal/subscriptions"
+	"github.com/aireply/ai-reply-back-end/internal/telemetry"
 	"github.com/aireply/ai-reply-back-end/internal/traits"
 	"github.com/aireply/ai-reply-back-end/internal/transport/adminapi"
 	"github.com/aireply/ai-reply-back-end/internal/transport/api"
@@ -64,20 +71,68 @@ func (f *fakeProvider) Generate(_ context.Context, prompt ai.Prompt) (ai.Complet
 	}, nil
 }
 
+// fakePush — FCM/APNs орнына: не жіберілгенін жазады, жауапты тест таңдайды.
+type fakePush struct {
+	mu      sync.Mutex
+	name    string
+	sent    []fakeSent
+	results []push.Result
+}
+
+type fakeSent struct {
+	token       string
+	environment string
+	msg         push.Message
+}
+
+func (f *fakePush) Name() string { return f.name }
+
+func (f *fakePush) Send(_ context.Context, target push.Target, msg push.Message) push.Result {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.sent = append(f.sent, fakeSent{token: target.Token, environment: target.Environment, msg: msg})
+	if len(f.results) > 0 {
+		res := f.results[0]
+		f.results = f.results[1:]
+		return res
+	}
+	return push.Result{Outcome: push.Accepted, MessageID: f.name + "-" + strconv.Itoa(len(f.sent))}
+}
+
+// respond — келесі жіберулердің нәтижелері (реті бойынша), кейін — Accepted.
+func (f *fakePush) respond(results ...push.Result) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.results = append(f.results, results...)
+}
+
+func (f *fakePush) messages() []fakeSent {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]fakeSent(nil), f.sent...)
+}
+
 // harness — жинақталған қолданба.
 type harness struct {
-	t        *testing.T
-	cfg      config.Config
-	server   *httptest.Server
-	store    *repository.Store
-	db       *database.DB
-	provider *fakeProvider
-	clock    *traits.FixedClock
-	logs     *bytes.Buffer
-	dbPath   string
-	admin    *admin.Service
-	limits   *limits.Service
-	authSvc  *auth.Service
+	t             *testing.T
+	cfg           config.Config
+	server        *httptest.Server
+	store         *repository.Store
+	db            *database.DB
+	provider      *fakeProvider
+	clock         *traits.FixedClock
+	logs          *bytes.Buffer
+	dbPath        string
+	admin         *admin.Service
+	limits        *limits.Service
+	authSvc       *auth.Service
+	installations *installations.Service
+	notify        *notifications.Service
+	telemetry     *telemetry.Service
+	events        *notifications.BusinessEvents
+	fcm           *fakePush
+	apns          *fakePush
+	pushClock     *traits.FixedClock
 }
 
 // harnessOption — жекелеген тесттің баптауы (мысалы, лимитті азайту).
@@ -112,6 +167,7 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 		"LOG_LEVEL": "info", "LOG_FORMAT": "json", "RATE_AI_PER_MINUTE": "1000",
 		"RATE_OTP_REQUEST_PER_HOUR": "100", "RATE_OTP_VERIFY_PER_HOUR": "200",
 		"RATE_GENERIC_PER_MINUTE": "1000", "OTP_MAX_ATTEMPTS": "5",
+		"PUSH_NOTIFICATIONS_ENABLED": "true", "RATE_EVENTS_PER_MINUTE": "1000",
 	}
 	for _, opt := range opts {
 		opt(env)
@@ -157,9 +213,22 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 		MaxOutputTokens:  cfg.OpenAI.MaxOutputTokens,
 	}).WithTTL(0)
 	aiSvc := ai.New(store, subSvc, provider, limitSvc, log).WithClock(clock)
-	paymentSvc := payments.New(store, subSvc, payments.DemoProvider{}, cfg.Payments.Mode)
-	notifySvc := notifications.New(store)
-	adminSvc := admin.New(store, subSvc, planSvc, cfg, log)
+	installSvc := installations.New(store, cfg.Auth.AccessSecret, log)
+	telemetrySvc := telemetry.New(store, cfg.Telemetry, cfg.Auth.AccessSecret, log)
+	fcm, apns := &fakePush{name: "fcm"}, &fakePush{name: "apns"}
+	pushClock := &traits.FixedClock{T: time.Now().UTC()}
+	notifySvc := notifications.New(notifications.Deps{
+		Repo: store, Installations: installSvc, Config: cfg.Push, Location: cfg.App.Location(), Log: log,
+		Providers: map[string]push.Provider{domain.PlatformAndroid: fcm, domain.PlatformIOS: apns},
+		Clock:     pushClock,
+	})
+	bundleForEvents, err := localization.Load()
+	if err != nil {
+		t.Fatalf("localization: %v", err)
+	}
+	businessEvents := notifications.NewBusinessEvents(notifySvc, bundleForEvents)
+	paymentSvc := payments.New(store, subSvc, payments.DemoProvider{}, cfg.Payments.Mode).WithEvents(businessEvents)
+	adminSvc := admin.New(store, subSvc, planSvc, cfg, log).WithSubjectHasher(telemetrySvc)
 	simulatorSvc := simulator.New(simulator.Deps{
 		Repo: store, Users: userSvc, Subs: subSvc, Plans: planSvc, AI: aiSvc, Limits: limitSvc,
 		Config: cfg, Log: log,
@@ -176,10 +245,11 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 
 	mux := http.NewServeMux()
 	api.New(api.Deps{Config: cfg, Auth: authSvc, Users: userSvc, Plans: planSvc, Subs: subSvc,
-		AI: aiSvc, Limits: limitSvc, Payments: paymentSvc, Limiter: limiter, Log: log,
+		AI: aiSvc, Limits: limitSvc, Payments: paymentSvc, Installations: installSvc,
+		Notifications: notifySvc, Telemetry: telemetrySvc, Limiter: limiter, Log: log,
 		Ping: func(ctx context.Context) error { return db.Reader().PingContext(ctx) }}).Register(mux)
 	adminapi.New(adminapi.Deps{Config: cfg, Admin: adminSvc, Limits: limitSvc, Notifications: notifySvc,
-		Log: log}).Register(mux)
+		Limiter: limiter, Log: log}).Register(mux)
 	simulatorapi.New(simulatorapi.Deps{Config: cfg, Admin: adminSvc, Simulator: simulatorSvc,
 		Limiter: limiter, Log: log}).Register(mux)
 	webServer, err := web.New(web.Deps{Config: cfg, Admin: adminSvc, Plans: planSvc,
@@ -189,13 +259,20 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 	}
 	webServer.Register(mux)
 
-	handler := middleware.Chain(mux, middleware.RequestID, middleware.Recover(log), middleware.Logging(log),
+	handler := middleware.Chain(mux, middleware.RequestID, middleware.Recover(log),
+		middleware.AccessLog(log, middleware.AccessLogOptions{
+			RecordAPIError: telemetrySvc.RecordAPIError,
+			TouchInstallation: func(c reqctx.Client) {
+				installSvc.Touch(c.InstallationID, c.AppVersion, c.AppBuild, c.OSVersion)
+			},
+		}),
 		middleware.SecurityHeaders(cfg.App.IsProduction()))
 	server := httptest.NewServer(handler)
 
 	h := &harness{t: t, cfg: cfg, server: server, store: store, db: db,
 		provider: provider, clock: clock, logs: logs, dbPath: dbPath, admin: adminSvc, limits: limitSvc,
-		authSvc: authSvc}
+		authSvc: authSvc, installations: installSvc, notify: notifySvc, telemetry: telemetrySvc,
+		events: businessEvents, fcm: fcm, apns: apns, pushClock: pushClock}
 	t.Cleanup(func() {
 		server.Close()
 		_ = db.Close()
@@ -344,6 +421,12 @@ type adminSession struct {
 
 func (h *harness) signInAdmin() adminSession {
 	h.t.Helper()
+	return h.signInAdminAs(adminEmail, adminPassword)
+}
+
+// signInAdminAs — кез келген әкімші тіркелгісімен кіру (мысалы, viewer рөлі).
+func (h *harness) signInAdminAs(email, password string) adminSession {
+	h.t.Helper()
 	client := h.server.Client()
 	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 
@@ -363,7 +446,7 @@ func (h *harness) signInAdmin() adminSession {
 	}
 
 	req, _ := http.NewRequest(http.MethodPost, h.server.URL+"/admin/login",
-		bytes.NewReader([]byte("email="+adminEmail+"&password="+adminPassword+"&csrf="+csrfCookie)))
+		bytes.NewReader([]byte("email="+url.QueryEscape(email)+"&password="+url.QueryEscape(password)+"&csrf="+csrfCookie)))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.AddCookie(&http.Cookie{Name: "aireply_csrf", Value: csrfCookie})
 	res, err := client.Do(req)

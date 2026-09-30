@@ -66,12 +66,19 @@ func (s *Service) SetUserStatus(ctx context.Context, admin domain.AdminUser, ip,
 	if err := s.repo.UpdateUserStatus(ctx, userID, status); err != nil {
 		return err
 	}
+	meta := map[string]any{"status": status}
 	if status == domain.UserDisabled {
 		if _, err := s.repo.RevokeUserSessions(ctx, userID, "account_disabled"); err != nil {
 			return err
 		}
+		// A disabled account keeps no device: its notifications stop at once.
+		detached, err := s.repo.DetachUserInstallations(ctx, userID, s.clock.Now())
+		if err != nil {
+			return err
+		}
+		meta["devices_detached"] = detached
 	}
-	s.Audit(ctx, admin, ip, "user.status", "user", userID, map[string]any{"status": status})
+	s.Audit(ctx, admin, ip, "user.status", "user", userID, meta)
 	return nil
 }
 
@@ -113,7 +120,14 @@ func (s *Service) RevokeSessions(ctx context.Context, admin domain.AdminUser, ip
 	if err != nil {
 		return err
 	}
-	s.Audit(ctx, admin, ip, "sessions.revoke", "user", userID, map[string]any{"revoked": count})
+	// "Sign out everywhere" includes push: the phones stop receiving this
+	// account's notifications until the person signs in again.
+	detached, err := s.repo.DetachUserInstallations(ctx, userID, s.clock.Now())
+	if err != nil {
+		return err
+	}
+	s.Audit(ctx, admin, ip, "sessions.revoke", "user", userID,
+		map[string]any{"revoked": count, "devices_detached": detached})
 	return nil
 }
 

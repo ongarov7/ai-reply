@@ -121,3 +121,74 @@ func TestDemoOTPMustBeFourDigits(t *testing.T) {
 		}
 	}
 }
+
+// Push provider-сіз сервер жұмыс істейді: әдепкі баптау — өшірулі.
+func TestPushIsOffByDefaultAndNeedsNoCredentials(t *testing.T) {
+	setValidEnv(t)
+	cfg, err := Load("")
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Push.Enabled || cfg.Push.FCM.Configured() || cfg.Push.APNs.Configured() {
+		t.Fatalf("push must be off without configuration: %+v", cfg.Push)
+	}
+	if cfg.Push.APNs.Environment != "production" || cfg.Push.MaxAttempts != 5 {
+		t.Fatalf("defaults: %+v", cfg.Push)
+	}
+	if len(cfg.Push.LinkHosts) != 1 || cfg.Push.LinkHosts[0] != "ai-reply.kz" {
+		t.Fatalf("link hosts default to the public host: %v", cfg.Push.LinkHosts)
+	}
+	if !cfg.Telemetry.Enabled || cfg.Telemetry.RetentionAuditLogDays != 0 || cfg.Telemetry.RetentionAppEventsDays != 90 {
+		t.Fatalf("telemetry defaults: %+v", cfg.Telemetry)
+	}
+}
+
+// Жартылай толтырылған провайдер — баптау қатесі, сервер іске қосылмайды.
+func TestPushRejectsHalfConfiguredProviders(t *testing.T) {
+	setValidEnv(t)
+	t.Setenv("FIREBASE_PROJECT_ID", "ai-reply")
+	if _, err := Load(""); err == nil || !strings.Contains(err.Error(), "FIREBASE_CLIENT_EMAIL") {
+		t.Fatalf("half FCM config must fail, err = %v", err)
+	}
+
+	setValidEnv(t)
+	t.Setenv("FIREBASE_PROJECT_ID", "")
+	t.Setenv("APNS_KEY_ID", "ABC123DEFG")
+	t.Setenv("APNS_TEAM_ID", "JXM8N66QWU")
+	t.Setenv("APNS_PRIVATE_KEY", "-----BEGIN PRIVATE KEY-----\\nAAA\\n-----END PRIVATE KEY-----")
+	if _, err := Load(""); err == nil || !strings.Contains(err.Error(), "APNS_BUNDLE_ID") {
+		t.Fatalf("APNs without bundle id must fail, err = %v", err)
+	}
+
+	t.Setenv("APNS_BUNDLE_ID", "kz.yerek.replykeyboard")
+	t.Setenv("APNS_ENVIRONMENT", "staging")
+	if _, err := Load(""); err == nil || !strings.Contains(err.Error(), "APNS_ENVIRONMENT") {
+		t.Fatalf("unknown APNs environment must fail, err = %v", err)
+	}
+	t.Setenv("APNS_ENVIRONMENT", "development")
+	cfg, err := Load("")
+	if err != nil {
+		t.Fatalf("complete APNs config: %v", err)
+	}
+	if !cfg.Push.APNs.Configured() || cfg.Push.APNs.Environment != "sandbox" {
+		t.Fatalf("apns = %+v", cfg.Push.APNs)
+	}
+}
+
+// .env-те бір жолмен жазылған кілт қалыпты көп жолды PEM-ге айналады.
+func TestPEMNormalisesEscapedAndBase64Keys(t *testing.T) {
+	want := "-----BEGIN PRIVATE KEY-----\nMIIB\nAAAA\n-----END PRIVATE KEY-----\n"
+	for name, raw := range map[string]string{
+		"escaped":   `-----BEGIN PRIVATE KEY-----\nMIIB\nAAAA\n-----END PRIVATE KEY-----\n`,
+		"crlf":      "-----BEGIN PRIVATE KEY-----\r\nMIIB\r\nAAAA\r\n-----END PRIVATE KEY-----",
+		"multiline": "-----BEGIN PRIVATE KEY-----\nMIIB\nAAAA\n-----END PRIVATE KEY-----",
+		"base64":    "LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1JSUIKQUFBQQotLS0tLUVORCBQUklWQVRFIEtFWS0tLS0tCg==",
+	} {
+		if got := PEM(raw); got != want {
+			t.Errorf("%s: got %q", name, got)
+		}
+	}
+	if PEM("  ") != "" {
+		t.Error("empty stays empty")
+	}
+}

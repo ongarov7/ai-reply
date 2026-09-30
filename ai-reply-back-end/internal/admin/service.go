@@ -11,7 +11,9 @@ import (
 	"github.com/aireply/ai-reply-back-end/config"
 	"github.com/aireply/ai-reply-back-end/internal/auth"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
+	"github.com/aireply/ai-reply-back-end/internal/logging"
 	"github.com/aireply/ai-reply-back-end/internal/plans"
+	"github.com/aireply/ai-reply-back-end/internal/redact"
 	"github.com/aireply/ai-reply-back-end/internal/repository"
 	"github.com/aireply/ai-reply-back-end/internal/subscriptions"
 	"github.com/aireply/ai-reply-back-end/internal/traits"
@@ -19,12 +21,13 @@ import (
 
 // Service — әкімші әрекеттері.
 type Service struct {
-	repo  *repository.Store
-	subs  *subscriptions.Service
-	plans *plans.Service
-	cfg   config.Config
-	log   *slog.Logger
-	clock traits.Clock
+	repo   *repository.Store
+	subs   *subscriptions.Service
+	plans  *plans.Service
+	cfg    config.Config
+	log    *slog.Logger
+	clock  traits.Clock
+	hasher SubjectHasher
 }
 
 // New — қызмет.
@@ -131,10 +134,16 @@ func (s *Service) SetLocale(ctx context.Context, adminID, locale string) error {
 func (s *Service) Audit(ctx context.Context, admin domain.AdminUser, ip, action, entityType, entityID string, meta map[string]any) {
 	if err := s.repo.WriteAudit(ctx, domain.AuditEntry{
 		AdminID: admin.ID, AdminEmail: admin.Email, Action: action,
-		EntityType: entityType, EntityID: entityID, Metadata: meta, IP: ip,
+		EntityType: entityType, EntityID: entityID, Metadata: redact.Map(meta), IP: ip,
+		RequestID: logging.RequestID(ctx),
 	}); err != nil {
 		s.log.Error("audit write failed", "error", err.Error())
 	}
+}
+
+// AuditLogFiltered — сүзгімен аудит журналы.
+func (s *Service) AuditLogFiltered(ctx context.Context, f repository.AuditFilter) ([]domain.AuditEntry, int, error) {
+	return s.repo.AuditLogFiltered(ctx, f)
 }
 
 // Now — барлық қабат үшін ортақ уақыт көзі (тестте жалған сағат).

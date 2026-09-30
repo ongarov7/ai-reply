@@ -43,13 +43,20 @@ const (
 	CodeEmailInUse          = "EMAIL_ALREADY_IN_USE"
 	CodeInvalidIDToken      = "INVALID_ID_TOKEN"
 	CodeAuthProviderDown    = "AUTH_PROVIDER_UNAVAILABLE"
+
+	// Push хабарламалары.
+	CodePushDisabled = "PUSH_DISABLED"
 )
 
 // ErrorBody — қате конверті.
+//
+// RequestID repeats the X-Request-ID response header, so a mobile error
+// report can be matched with the server log line of the same request.
 type ErrorBody struct {
-	Code    string         `json:"code"`
-	Message string         `json:"message"`
-	Details map[string]any `json:"details,omitempty"`
+	Code      string         `json:"code"`
+	Message   string         `json:"message"`
+	Details   map[string]any `json:"details,omitempty"`
+	RequestID string         `json:"request_id,omitempty"`
 }
 
 type errorEnvelope struct {
@@ -69,7 +76,33 @@ func JSON(w http.ResponseWriter, status int, payload any) {
 
 // Error — тұрақты кодпен қате жауабы. Ішкі мәтін ешқашан клиентке кетпейді.
 func Error(w http.ResponseWriter, status int, code, message string, details map[string]any) {
-	JSON(w, status, errorEnvelope{Error: ErrorBody{Code: code, Message: message, Details: details}})
+	recordErrorCode(w, code)
+	JSON(w, status, errorEnvelope{Error: ErrorBody{
+		Code: code, Message: message, Details: details, RequestID: w.Header().Get("X-Request-ID"),
+	}})
+}
+
+// ErrorCodeRecorder — кіру журналының ResponseWriter-і осыны іске асырады.
+//
+// The access log wraps the router and cannot see which code a handler chose;
+// Error hands it over through the writer, so the log line and the stored API
+// error carry the same stable code the client received.
+type ErrorCodeRecorder interface {
+	RecordErrorCode(code string)
+}
+
+func recordErrorCode(w http.ResponseWriter, code string) {
+	for w != nil {
+		if rec, ok := w.(ErrorCodeRecorder); ok {
+			rec.RecordErrorCode(code)
+			return
+		}
+		inner, ok := w.(interface{ Unwrap() http.ResponseWriter })
+		if !ok {
+			return
+		}
+		w = inner.Unwrap()
+	}
 }
 
 // detailer — клиентке қосымша мәлімет беретін қате (мысалы, retry_after_seconds).
@@ -138,6 +171,8 @@ func Translate(err error) (int, string, string) {
 		return http.StatusNotFound, CodeNotFound, "Not found."
 	case errors.Is(err, domain.ErrConflict):
 		return http.StatusConflict, CodeConflict, "Already exists."
+	case errors.Is(err, domain.ErrPushDisabled):
+		return http.StatusConflict, CodePushDisabled, "Push notifications are not configured on this server."
 	case errors.Is(err, domain.ErrDemoDisabled):
 		return http.StatusForbidden, CodeDemoDisabled, "Demo authentication is disabled."
 	case errors.Is(err, domain.ErrInvalidRequest):

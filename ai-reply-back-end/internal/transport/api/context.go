@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/aireply/ai-reply-back-end/internal/domain"
+	"github.com/aireply/ai-reply-back-end/internal/reqctx"
 	"github.com/aireply/ai-reply-back-end/internal/transport/httpx"
 )
 
@@ -60,10 +61,27 @@ func (s *Server) requireUser(next http.Handler) http.Handler {
 			httpx.Fail(w, err)
 			return
 		}
+		reqctx.ObservedFrom(r.Context()).SetUser(user.ID)
 		ctx := WithUser(r.Context(), user)
 		ctx = context.WithValue(ctx, deviceKey, claims.DeviceID)
 		ctx = context.WithValue(ctx, platformKey, claims.Platform)
 		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// optionalUser — токен болса тексереді, болмаса сұраныс анонимді өтеді.
+//
+// A token that is present but no longer valid is refused with 401 rather
+// than treated as anonymous: for installation registration "anonymous"
+// means "signed out" and detaches the device, which an expired access token
+// must never do. The app refreshes and repeats the call.
+func (s *Server) optionalUser(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.TrimSpace(r.Header.Get("Authorization")) == "" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		s.requireUser(next).ServeHTTP(w, r)
 	})
 }
 
@@ -79,6 +97,7 @@ func (s *Server) requireLegacy(next http.Handler) http.Handler {
 		if err != nil {
 			// Жаңа access токенмен де жұмыс істей берсін (біртіндеп көшу).
 			if u, claims, err2 := s.auth.Authenticate(r.Context(), token); err2 == nil {
+				reqctx.ObservedFrom(r.Context()).SetUser(u.ID)
 				ctx := context.WithValue(WithUser(r.Context(), u), deviceKey, claims.DeviceID)
 				next.ServeHTTP(w, r.WithContext(ctx))
 				return
@@ -86,6 +105,7 @@ func (s *Server) requireLegacy(next http.Handler) http.Handler {
 			httpx.Fail(w, err)
 			return
 		}
+		reqctx.ObservedFrom(r.Context()).SetUser(user.ID)
 		next.ServeHTTP(w, r.WithContext(WithUser(r.Context(), user)))
 	})
 }

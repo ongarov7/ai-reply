@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/aireply/ai-reply-back-end/internal/admin"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
 	"github.com/aireply/ai-reply-back-end/internal/localization"
 )
@@ -31,6 +32,8 @@ func (s *Server) handleAdminApp(w http.ResponseWriter, r *http.Request) {
 		"csrf": sessionFrom(r.Context()).CSRFToken,
 		"admin": map[string]any{
 			"id": adminUser.ID, "email": adminUser.Email, "name": adminUser.Name, "role": adminUser.Role,
+			// Only hides what the role cannot use; every endpoint checks again.
+			"permissions": admin.Permissions(adminUser.Role),
 		},
 		"locale":       locale,
 		"locales":      domain.Locales,

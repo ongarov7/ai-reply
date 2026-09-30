@@ -14,6 +14,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/admin"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
 	"github.com/aireply/ai-reply-back-end/internal/limits"
+	"github.com/aireply/ai-reply-back-end/internal/middleware"
 	"github.com/aireply/ai-reply-back-end/internal/notifications"
 	"github.com/aireply/ai-reply-back-end/internal/repository"
 	"github.com/aireply/ai-reply-back-end/internal/traits"
@@ -29,11 +30,12 @@ const (
 
 // Server — әкімші API.
 type Server struct {
-	cfg    config.Config
-	admin  *admin.Service
-	limits *limits.Service
-	notify *notifications.Service
-	log    *slog.Logger
+	cfg     config.Config
+	admin   *admin.Service
+	limits  *limits.Service
+	notify  *notifications.Service
+	limiter *middleware.Limiter
+	log     *slog.Logger
 }
 
 // Deps — тәуелділіктер.
@@ -42,34 +44,52 @@ type Deps struct {
 	Admin         *admin.Service
 	Limits        *limits.Service
 	Notifications *notifications.Service
+	Limiter       *middleware.Limiter
 	Log           *slog.Logger
 }
 
 // New — сервер.
 func New(d Deps) *Server {
-	return &Server{cfg: d.Config, admin: d.Admin, limits: d.Limits, notify: d.Notifications, log: d.Log}
+	limiter := d.Limiter
+	if limiter == nil {
+		limiter = middleware.NewLimiter()
+	}
+	return &Server{cfg: d.Config, admin: d.Admin, limits: d.Limits, notify: d.Notifications, limiter: limiter, log: d.Log}
 }
 
-// Register — маршруттар.
+// Register — маршруттар. Әр маршрут рұқсатты серверде тексереді.
 func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /api/v1/admin/session", s.guard(s.handleSession))
 	mux.Handle("POST /api/v1/admin/locale", s.guard(s.handleSetLocale))
-	mux.Handle("GET /api/v1/admin/dashboard", s.guard(s.handleDashboard))
-	mux.Handle("GET /api/v1/admin/users", s.guard(s.handleUsers))
-	mux.Handle("GET /api/v1/admin/users/{id}", s.guard(s.handleUserDetail))
-	mux.Handle("POST /api/v1/admin/users/{id}/status", s.guard(s.handleUserStatus))
-	mux.Handle("POST /api/v1/admin/users/{id}/plan", s.guard(s.handleUserPlan))
-	mux.Handle("POST /api/v1/admin/users/{id}/reset-quota", s.guard(s.handleResetQuota))
-	mux.Handle("POST /api/v1/admin/users/{id}/revoke-sessions", s.guard(s.handleRevokeSessions))
-	mux.Handle("GET /api/v1/admin/plans", s.guard(s.handlePlans))
-	mux.Handle("POST /api/v1/admin/plans", s.guard(s.handlePlanCreate))
-	mux.Handle("PATCH /api/v1/admin/plans/{id}", s.guard(s.handlePlanUpdate))
-	mux.Handle("POST /api/v1/admin/plans/{id}/archive", s.guard(s.handlePlanArchive))
-	mux.Handle("GET /api/v1/admin/audit", s.guard(s.handleAudit))
-	mux.Handle("GET /api/v1/admin/settings", s.guard(s.handleSettings))
-	mux.Handle("POST /api/v1/admin/settings/pricing", s.guard(s.handleSavePricing))
-	mux.Handle("POST /api/v1/admin/settings/limits", s.guard(s.handleSaveLimits))
-	mux.Handle("GET /api/v1/admin/notifications", s.guard(s.handleNotifications))
+	mux.Handle("GET /api/v1/admin/dashboard", s.can(admin.PermDashboardRead, s.handleDashboard))
+	mux.Handle("GET /api/v1/admin/users", s.can(admin.PermUsersRead, s.handleUsers))
+	mux.Handle("GET /api/v1/admin/users/{id}", s.can(admin.PermUsersRead, s.handleUserDetail))
+	mux.Handle("POST /api/v1/admin/users/{id}/status", s.can(admin.PermUsersWrite, s.handleUserStatus))
+	mux.Handle("POST /api/v1/admin/users/{id}/plan", s.can(admin.PermUsersWrite, s.handleUserPlan))
+	mux.Handle("POST /api/v1/admin/users/{id}/reset-quota", s.can(admin.PermUsersWrite, s.handleResetQuota))
+	mux.Handle("POST /api/v1/admin/users/{id}/revoke-sessions", s.can(admin.PermUsersWrite, s.handleRevokeSessions))
+	mux.Handle("GET /api/v1/admin/plans", s.can(admin.PermDashboardRead, s.handlePlans))
+	mux.Handle("POST /api/v1/admin/plans", s.can(admin.PermPlansWrite, s.handlePlanCreate))
+	mux.Handle("PATCH /api/v1/admin/plans/{id}", s.can(admin.PermPlansWrite, s.handlePlanUpdate))
+	mux.Handle("POST /api/v1/admin/plans/{id}/archive", s.can(admin.PermPlansWrite, s.handlePlanArchive))
+	mux.Handle("GET /api/v1/admin/audit", s.can(admin.PermAuditRead, s.handleAudit))
+	mux.Handle("GET /api/v1/admin/settings", s.can(admin.PermSettingsRead, s.handleSettings))
+	mux.Handle("POST /api/v1/admin/settings/pricing", s.can(admin.PermSettingsWrite, s.handleSavePricing))
+	mux.Handle("POST /api/v1/admin/settings/limits", s.can(admin.PermSettingsWrite, s.handleSaveLimits))
+	s.registerNotifications(mux)
+	s.registerDiagnostics(mux)
+}
+
+// can — сессия + CSRF (guard) және рөлдің рұқсаты. Батырманы жасыру жеткіліксіз: тексеру осында.
+func (s *Server) can(permission string, next http.HandlerFunc) http.Handler {
+	return s.guard(func(w http.ResponseWriter, r *http.Request) {
+		if !admin.Can(adminFrom(r.Context()).Role, permission) {
+			httpx.Error(w, http.StatusForbidden, "FORBIDDEN", "This role cannot do that.",
+				map[string]any{"permission": permission})
+			return
+		}
+		next(w, r)
+	})
 }
 
 // guard — cookie сессиясы + күй өзгертетін сұраныстарда CSRF тақырыбы.
@@ -117,6 +137,7 @@ func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 		"admin": map[string]any{
 			"id": adminUser.ID, "email": adminUser.Email, "name": adminUser.Name,
 			"role": adminUser.Role, "locale": adminUser.Locale,
+			"permissions": admin.Permissions(adminUser.Role),
 		},
 		"csrf":         sessionFrom(r.Context()).CSRFToken,
 		"env":          s.cfg.App.Env,

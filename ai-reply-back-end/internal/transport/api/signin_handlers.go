@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/aireply/ai-reply-back-end/internal/auth"
+	"github.com/aireply/ai-reply-back-end/internal/domain"
 	"github.com/aireply/ai-reply-back-end/internal/traits"
 	"github.com/aireply/ai-reply-back-end/internal/transport/httpx"
 )
@@ -44,6 +45,7 @@ func (s *Server) handleEmailOTPRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	challenge, err := s.auth.RequestEmailOTP(r.Context(), body.Email, traits.Clamp(body.Locale, 8))
+	s.authEvent(r, domain.AuthOTPRequested, "email", "", "email", body.Email, nil, err)
 	if err != nil {
 		httpx.Fail(w, err)
 		return
@@ -65,6 +67,12 @@ func (s *Server) handleEmailOTPVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	session, err := s.auth.VerifyEmailOTP(r.Context(), body.Email, body.Code, body.Device.toInfo(r))
+	otpEvent := domain.AuthOTPVerified
+	if err != nil {
+		otpEvent = domain.AuthOTPFailed
+	}
+	s.authEvent(r, otpEvent, "email", session.User.ID, "email", body.Email, &body.Device, err)
+	s.loginOutcome(r, "email", session, "email", body.Email, &body.Device, err)
 	if err != nil {
 		httpx.Fail(w, err)
 		return
@@ -86,6 +94,12 @@ func (s *Server) handleGoogleSignIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	session, err := s.auth.SignInWithGoogle(r.Context(), body.IDToken, body.Nonce, body.Device.toInfo(r))
+	providerEvent := domain.AuthGoogleSuccess
+	if err != nil {
+		providerEvent = domain.AuthGoogleFailed
+	}
+	s.authEvent(r, providerEvent, "google", session.User.ID, "", "", &body.Device, err)
+	s.loginOutcome(r, "google", session, "", "", &body.Device, err)
 	if err != nil {
 		httpx.Fail(w, err)
 		return
@@ -109,6 +123,12 @@ func (s *Server) handleAppleSignIn(w http.ResponseWriter, r *http.Request) {
 	}
 	session, err := s.auth.SignInWithApple(r.Context(), body.IdentityToken, body.Nonce,
 		traits.Clamp(body.FullName, 120), body.Device.toInfo(r))
+	providerEvent := domain.AuthAppleSuccess
+	if err != nil {
+		providerEvent = domain.AuthAppleFailed
+	}
+	s.authEvent(r, providerEvent, "apple", session.User.ID, "", "", &body.Device, err)
+	s.loginOutcome(r, "apple", session, "", "", &body.Device, err)
 	if err != nil {
 		httpx.Fail(w, err)
 		return

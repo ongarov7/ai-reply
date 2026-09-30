@@ -102,12 +102,19 @@ func (s *Server) handlePlanArchive(w http.ResponseWriter, r *http.Request) {
 // ---------------------------------------------------------------- audit
 
 func (s *Server) handleAudit(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
 	page := 1
-	if v, err := strconv.Atoi(r.URL.Query().Get("page")); err == nil && v > 1 {
+	if v, err := strconv.Atoi(query.Get("page")); err == nil && v > 1 {
 		page = v
 	}
 	limit := 50
-	entries, total, err := s.admin.AuditLog(r.Context(), traits.NewPage(limit, (page-1)*limit))
+	entries, total, err := s.admin.AuditLogFiltered(r.Context(), repository.AuditFilter{
+		Action:     traits.Clamp(query.Get("action"), 64),
+		Admin:      traits.Clamp(query.Get("admin"), 120),
+		EntityType: traits.Clamp(query.Get("entity_type"), 32),
+		EntityID:   traits.Clamp(query.Get("entity_id"), 64),
+		Page:       traits.NewPage(limit, (page-1)*limit),
+	})
 	if err != nil {
 		s.fail(w, err)
 		return
@@ -118,7 +125,7 @@ func (s *Server) handleAudit(w http.ResponseWriter, r *http.Request) {
 		out = append(out, map[string]any{
 			"at": e.CreatedAt.In(loc).Format("2006-01-02 15:04"), "admin": e.AdminEmail,
 			"action": e.Action, "entity_type": e.EntityType, "entity_id": e.EntityID,
-			"ip": e.IP, "metadata": e.Metadata,
+			"ip": e.IP, "metadata": e.Metadata, "request_id": e.RequestID,
 		})
 	}
 	httpx.JSON(w, http.StatusOK, map[string]any{
@@ -244,15 +251,4 @@ func (s *Server) handleSavePricing(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, http.StatusOK, map[string]bool{"ok": true})
-}
-
-// ---------------------------------------------------------------- notifications
-
-func (s *Server) handleNotifications(w http.ResponseWriter, r *http.Request) {
-	status := s.notify.Status()
-	httpx.JSON(w, http.StatusOK, map[string]any{
-		"apns": status[domain.PlatformIOS],
-		"fcm":  status[domain.PlatformAndroid],
-		"note": "delivery_not_configured",
-	})
 }
