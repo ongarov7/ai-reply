@@ -1,0 +1,403 @@
+=== log show (last 4m) ===
+}
+2026-09-27 16:42:21.198 Df AIReply[1595:9bd65] [com.apple.UIKit:InputWindowController] Posted notifications (end): UIKeyboardDidShowNotification <UIInputViewSetNotificationInfo: 0x600003b31880> {
+    UIKeyboardAnimationCurveUserInfoKey = 7;
+    UIKeyboardAnimationDurationUserInfoKey = 0;
+    UIKeyboardBoundsUserInfoKey = "NSRect: {{0, 0}, {393, 373}}";
+    UIKeyboardCenterBeginUserInfoKey = "NSPoint: {196.5, 684}";
+    UIKeyboardCenterEndUserInfoKey = "NSPoint: {196.5, 665.5}";
+    UIKeyboardFrameBeginUserInfoKey = "NSRect: {{0, 516}, {393, 336}}";
+    UIKeyboardFrameEndUserInfoKey = "NSRect: {{0, 479}, {393, 373}}";
+    UIKeyboardIsLocalUserInfoKey = 1;
+}
+2026-09-27 16:42:21.200 Df pkd[80040:9bc75] [com.apple.PlugInKit:lifecycle] [u 5FD9F6D1-E8B0-4076-920B-70AB1F55D191] [kz.yerek.replykeyboard.keyboard(1.0)] will be managed by runningboard
+2026-09-27 16:42:21.200 Df pkd[80040:9bc75] [com.apple.PlugInKit:lifecycle] [u 5FD9F6D1-E8B0-4076-920B-70AB1F55D191] [kz.yerek.replykeyboard.keyboard(1.0)] Allowing host pid 1595 to use plugin [/Users/yerek/Library/Developer/CoreSimulator/Devices/34F3DAC7-CE23-4417-B7D9-9C94F52ECF29/data/Containers/Bundle/Application/E57A6DEB-BB85-4899-ACBF-963D1AA26938/AIReply.app/PlugIns/ReplyKeyboardExtension.appex]
+2026-09-27 16:42:21.200 Df runningboardd[79981:9c3fa] [com.apple.runningboard:process] Executing launch request for xpcservice<kz.yerek.replykeyboard.keyboard(no host)> (Launching extension kz.yerek.replykeyboard.keyboard(5FD9F6D1-E8B0-4076-920B-70AB1F55D191) for host 1595)
+2026-09-27 16:42:21.200 Df runningboardd[79981:9c3fa] [com.apple.runningboard:job] Creating and launching job for: xpcservice<kz.yerek.replykeyboard.keyboard(no host)>
+2026-09-27 16:42:21.201 Df runningboardd[79981:9bc15] [com.apple.runningboard:job_oversize] '(null)' Submitting extension overlay (host PID 1595, path /Users/yerek/Library/Developer/CoreSimulator/Devices/34F3DAC7-CE23-4417-B7D9-9C94F52ECF29/data/Containers/Bundle/Application/E57A6DEB-BB85-4899-ACBF-963D1AA26938/AIReply.app/PlugIns/ReplyKeyboardExtension.appex/ReplyKeyboardExtension):
+<dictionary: 0x6000026359e0> { count = 4, transaction: 0, voucher = 0x0, contents =
+	"_AdditionalProperties" => <dictionary: 0x6000026362e0> { count = 1, transaction: 0, voucher = 0x0, contents =
+		"RunningBoard" => <dictionary: 0x6000026340c0> { count = 3, transaction: 0, voucher = 0x0, contents =
+			"Managed" => <bool: 0x1b9b8cf00>: true
+			"RunningBoardLaunchedIdentity" => <dictionary: 0x600002637840> { count = 3, transaction: 0, voucher = 0x0, contents =
+				"TYPE" => <int64: 0xa935e225db5c0847>: 4
+				"i" => <string: 0x600000c0c8d0> { length = 31, contents = "kz.yerek.replykeyboard.keyboard" }
+				"r" => <int64: 0xa935e225db5c0877>: 2
+			}
+			"RunningBoardLaunched" => <bool: 0x1b9b8cf00>: true
+		}
+	}
+	"XPCService" => <dictionary: 0x600002635740> { count = 8, transaction: 0, voucher = 0x0, contents =
+		"Platform" => <int64: 0xa935e225db5c085f>: 7
+		"RunLoopType" => <string: 0x600000c0f1b0> { length = 18, contents = "_UIApplicationMain" }
+		"_RoleAccount" => <string: 0x600000c0f930> { length = 6, contents = "mobile" }
+		"_SandboxProfile" => <string: 0x600000c0c7b0> { length = 6, contents = "plugin" }
+		"_AdditionalSubServices" => <dictionary: 0x6000026369a0> { count = 2, transaction: 0, voucher = 0x0, contents =
+			"viewservice" => <bool: 0x1b9b8cf00>: true
+			"apple-extension-service" => <bool: 0x1b9b8cf00>: true
+		}
+		"EnvironmentVariables" => <dictionary: 0x6000026378a0> { count = 3, transaction: 0, voucher = 0x0, contents =
+			"TMPDIR" => <string: 0x600000c0f030> { length = 167, contents = "/Users/yerek/Library/Developer/CoreSimulator/Devices/34F3DAC7-CE23-4417-B7D9-9C94F52ECF29/data/Containers/Data/PluginKitPlugin/EA9C501E-1D22-4C1B-8A44-8EB62132A00C/tmp" }
+			"HOME" => <string: 0x600000c0ff60> { length = 163, contents = "/Users/yerek/Library/Developer/CoreSimulator/Devices/34F3DAC7-CE23-4417-B7D9-9C94F52ECF29/data/Containers/Data/PluginKitPlugin/EA9C501E-1D22-4C1B-8A44-8EB62132A00C" }
+			"CFFIXED_USER_HOME" => <string: 0x600000c0f450> { length = 163, contents = "/Users/yerek/Library/Developer/CoreSimulator/Devices/34F3DAC7-CE23-4417-B7D9-9C94F52ECF29/data/Containers/Data/PluginKitPlugin/EA9C501E-1D22-4C1B-8A44-8EB62132A00C" }
+		}
+		"_OmitSandboxParameters" => <bool: 0x1b9b8cf00>: true
+		"ServiceType" => <string: 0x600000c0ea30> { length = 6, contents = "System" }
+	}
+	"RunningBoard" => <dictionary: 0x6000026340c0> { count = 3, transaction: 0, voucher = 0x0, contents =
+		"Managed" => <bool: 0x1b9b8cf00>: true
+		"RunningBoardLaunchedIdentity" => <dictionary: 0x600002637840> { count = 3, transaction: 0, voucher = 0x0, contents =
+			"TYPE" => <int64: 0xa935e225db5c0847>: 4
+			"i" => <string: 0x600000c0c8d0> { length = 31, contents = "kz.yerek.replykeyboard.keyboard" }
+			"r" => <int64: 0xa935e225db5c0877>: 2
+		}
+		"RunningBoardLaunched" => <bool: 0x1b9b8cf00>: true
+	}
+	"CFBundlePackageType" => <string: 0x600000c0f690> { length = 4, contents = "XPC!" }
+}
+2026-09-27 16:42:21.201 Df AIReply[1595:9c1e0] [com.apple.PlugInKit:lifecycle] [u 5FD9F6D1-E8B0-4076-920B-70AB1F55D191:m (null)] [kz.yerek.replykeyboard.keyboard(1.0)] got pid from ready request: 1599
+2026-09-27 16:42:21.202 Df SpringBoard[79978:9bc0d] [com.apple.UIKit:KeyboardArbiter] active input destination is now <_UIKeyboardArbiterClientHandle: 0x6000039cbdc0; [app<kz.yerek.replykeyboard((null))>:1595] <<UIKBArbiterClientFocusContext: 0x6000003b3880; contextID = 9a86fc99; sceneIdentity = com.apple.frontboard.systemappservices::FBSceneManager:sceneID%3Akz.yerek.replykeyboard-default >>; hosting PIDs {(
+)}; level 5.000000; active YES [wants YES]; suppression 0; iav 0.000000; on screen YES; isAcquiringFocus: NO>; information: <<<_UIKeyboardChangedInformation: 0x13735abc0>; appId (null) bundleId (null) animation fence <BKSAnimationFenceHandle:0x600000005f80 -> <CAFenceHandle:0x6000029f0ee0 name=12d fence=1387c00000052 usable=YES>>; position {{0, 0}, {393, 298}}; animated YES; on screen YES; tracking NO; resizing NO; local NO, dock state: _UIKeyboardUIPositionUnknown, hasValidNotif: NO>; source canvas com.apple.frontboard.systemappservices::FBSceneManager:sceneID%3Akz.yerek.replykeyboard-default; source display Main; source bundle kz.yerek.replykeyboard; host bundle (null); animation fence <BKSAnimationFenceHandle:0x600000005f80 -> <CAFenceHandle:0x6000029f0ee0 name=12d fence=1387c00000052 usable=YES>>; position {{0, 0}, {393, 298}} (with IAV same); floating 0; on screen YES; intersectable YES; snapshot YES>
+2026-09-27 16:42:21.202 Df runningboardd[79981:9c3fa] [com.apple.runningboard:ttl] Acquiring assertion targeting [xpcservice<kz.yerek.replykeyboard.keyboard(no host)>:1599] from originator [app<kz.yerek.replykeyboard((null))>:1595] with description <RBSAssertionDescriptor| "com.apple.extension.session" ID:79981-1595-2158 target:1599 attributes:[
+	<RBSLegacyAttribute| requestedReason:ViewService reason:ViewService flags:( AllowIdleSleep PreventTaskSuspend PreventTaskThrottleDown )>,
+	<RBSAcquisitionCompletionAttribute| policy:AfterValidation>
+	]>
+2026-09-27 16:42:21.202 Df runningboardd[79981:9c3fa] [com.apple.runningboard:ttl] Assertion 79981-1595-2158 (target:[xpcservice<kz.yerek.replykeyboard.keyboard(no host)>:1599]) will be created as active
+2026-09-27 16:42:21.202 Df AIReply[1595:9c1e0] [com.apple.PlugInKit:lifecycle] [u 5FD9F6D1-E8B0-4076-920B-70AB1F55D191:m (null)] [kz.yerek.replykeyboard.keyboard(1.0)] acquired startup assertion
+2026-09-27 16:42:21.203 Df runningboardd[79981:9c3fa] [com.apple.runningboard:general] _predicatesMatchOnlyAllowedProcess denying predicate <RBSProcessPredicate <RBSProcessIdentifierPredicate| 1599>> for process [app<kz.yerek.replykeyboard((null))>:1595]
+2026-09-27 16:42:21.203 E  runningboardd[79981:9c3fa] [com.apple.runningboard:connection] [app<kz.yerek.replykeyboard((null))>:1595] client not entitled to get statesForPredicate: <Error Domain=RBSServiceErrorDomain Code=1 "Client not entitled" UserInfo={RBSEntitlement=com.apple.runningboard.process-state, NSLocalizedFailureReason=Client not entitled, RBSPermanent=false}>
+2026-09-27 16:42:21.203 E  AIReply[1595:9c1e0] [com.apple.PlugInKit:lifecycle] [u 5FD9F6D1-E8B0-4076-920B-70AB1F55D191:m (null)] [kz.yerek.replykeyboard.keyboard(1.0)] RB query for the extension process state failed with error: Error Domain=RBSServiceErrorDomain Code=1 "Client not entitled" UserInfo={RBSEntitlement=com.apple.runningboard.process-state, NSLocalizedFailureReason=Client not entitled, RBSPermanent=false}
+2026-09-27 16:42:21.204 Df AIReply[1595:9c1e0] [com.apple.xpc:connection] [0x600003e17f00] activating connection: mach=false listener=false peer=false name=kz.yerek.replykeyboard.keyboard
+2026-09-27 16:42:21.204 Df AIReply[1595:9c1e0] [com.apple.PlugInKit:lifecycle] [u 5FD9F6D1-E8B0-4076-920B-70AB1F55D191:m (null)] [kz.yerek.replykeyboard.keyboard(1.0)] Prepare using sent as euid = 501, uid = 501, (persona not available)
+2026-09-27 16:42:21.204 Df AIReply[1595:9c1e0] [com.apple.PlugInKit:lifecycle] [u 5FD9F6D1-E8B0-4076-920B-70AB1F55D191] [kz.yerek.replykeyboard.keyboard(1.0)] Sending prepareUsing to managed extension; this should launch it if not already running.
+2026-09-27 16:42:21.204 Df ReplyKeyboardExtension[1599:9c1df] [com.apple.xpc:connection] [0x102915be0] activating connection: mach=false listener=false peer=true name=kz.yerek.replykeyboard.keyboard.peer.0x102915be0
+2026-09-27 16:42:21.204 Df ReplyKeyboardExtension[1599:9c401] [com.apple.PlugInKit:lifecycle] [u 5FD9F6D1-E8B0-4076-920B-70AB1F55D191] [(null)((null))] Prepare received as euid = 501, uid = 501, (persona not available)
+2026-09-27 16:42:21.204 Df ReplyKeyboardExtension[1599:9c401] [com.apple.PlugInKit:lifecycle] [u 619D4217-C3B4-44F4-B4F9-65F289E2AEAC] [kz.yerek.replykeyboard.keyboard(1.0)] Set sole personality.
+2026-09-27 16:42:21.205 Df AIReply[1595:9c3f9] [com.apple.PlugInKit:lifecycle] [u 5FD9F6D1-E8B0-4076-920B-70AB1F55D191:m (null)] [kz.yerek.replykeyboard.keyboard(1.0)] Begin using sent as euid = 501, uid = 501, (persona not available)
+2026-09-27 16:42:21.205 Df ReplyKeyboardExtension[1599:9c401] [com.apple.PlugInKit:lifecycle] [u 619D4217-C3B4-44F4-B4F9-65F289E2AEAC] [kz.yerek.replykeyboard.keyboard(1.0)] Begin using received as euid = 501, uid = 501, (persona not available)
+2026-09-27 16:42:21.205 Df AIReply[1595:9c3f9] [com.apple.PlugInKit:lifecycle] [u 5FD9F6D1-E8B0-4076-920B-70AB1F55D191:m (null)] [kz.yerek.replykeyboard.keyboard(1.0)] plugin loaded and ready for host
+2026-09-27 16:42:21.205 Df AIReply[1595:9c3f9] [com.apple.PlugInKit:lifecycle] [u 5FD9F6D1-E8B0-4076-920B-70AB1F55D191:m (null)] [kz.yerek.replykeyboard.keyboard(1.0)] invalidating startup assertion
+2026-09-27 16:42:21.206 Df AIReply[1595:9c1e0] [com.apple.xpc:connection] [0x108a113e0] activating connection: mach=false listener=true peer=false name=(anonymous)
+2026-09-27 16:42:21.206 Df AIReply[1595:9c1e0] [com.apple.xpc:connection] [0x108a1bdf0] activating connection: mach=false listener=false peer=false name=kz.yerek.replykeyboard.keyboard.apple-extension-service
+2026-09-27 16:42:21.206 Df ReplyKeyboardExtension[1599:9c401] [com.apple.xpc:connection] [0x102a0d7c0] activating connection: mach=false listener=false peer=true name=kz.yerek.replykeyboard.keyboard.apple-extension-service.peer.0x102a0d7c0
+2026-09-27 16:42:21.206 A  ReplyKeyboardExtension[1599:9c401] (ExtensionFoundation) beginning extension request
+2026-09-27 16:42:21.206 Df runningboardd[79981:9c084] [com.apple.runningboard:ttl] Acquiring assertion targeting [app<kz.yerek.replykeyboard((null))>:1595] from originator [osservice<com.apple.SpringBoard>:79978] with description <RBSAssertionDescriptor| "com.apple.UIKit.KeyboardManagement.message" ID:79981-79978-2161 target:1595 attributes:[
+	<RBSDomainAttribute| domain:"com.apple.UIKit.KeyboardManagement.xpc" name:"Arbiter" sourceEnvironment:"(null)">
+	]>
+2026-09-27 16:42:21.206 Df ReplyKeyboardExtension[1599:9c401] [com.apple.xpc:connection] [0x100e057c0] activating connection: mach=false listener=false peer=false name=(anonymous)
+2026-09-27 16:42:21.206 Df AIReply[1595:9c1e0] [com.apple.xpc:connection] [0x103308c00] activating connection: mach=false listener=false peer=true name=com.apple.xpc.anonymous.0x108a113e0.peer.0x103308c00
+2026-09-27 16:42:21.206 Df runningboardd[79981:9c084] [com.apple.runningboard:ttl] Assertion 79981-79978-2161 (target:[app<kz.yerek.replykeyboard((null))>:1595]) will be created as active
+2026-09-27 16:42:21.206 Df ReplyKeyboardExtension[1599:9c1df] [com.apple.extensionkit:NSExtension] in _willPerformHostCallback: block ( UUID: 984A507B-D30C-487A-BC8E-B0C0058E8EAF error: (null) )
+2026-09-27 16:42:21.207 Df AIReply[1595:9bd65] [com.apple.UIKit:ViewServices] Request completed for extension: <EXConcreteExtension: 0x60000370b540> {id = kz.yerek.replykeyboard.keyboard}; contextToken: 984A507B-D30C-487A-BC8E-B0C0058E8EAF
+2026-09-27 16:42:21.207 Df AIReply[1595:9bd65] [com.apple.UIKit:ViewServices] Requesting remote view controller: _UIRemoteInputViewController; contextToken: 984A507B-D30C-487A-BC8E-B0C0058E8EAF; bundleId: (null)
+2026-09-27 16:42:21.207 A  AIReply[1595:9c3f9] (ExtensionFoundation) begin using plugin
+2026-09-27 16:42:21.208 Df runningboardd[79981:9c084] [com.apple.runningboard:ttl] Invalidating assertion 79981-1595-2158 (target:[xpcservice<kz.yerek.replykeyboard.keyboard(no host)>:1599]) from originator [app<kz.yerek.replykeyboard((null))>:1595]
+2026-09-27 16:42:21.208 Df runningboardd[79981:9c3fa] [com.apple.runningboard:monitor] Calculated state for app<kz.yerek.replykeyboard((null))>: running-active (role: UserInteractiveFocal)
+2026-09-27 16:42:21.209 Df mediaremoted[90744:9c173] [com.apple.runningboard:monitor] Received state update for 1595 (app<kz.yerek.replykeyboard((null))>, running-active-Visible
+2026-09-27 16:42:21.209 Df locationd[79999:9c07f] [com.apple.runningboard:monitor] Received state update for 1595 (app<kz.yerek.replykeyboard((null))>, running-active-Visible
+2026-09-27 16:42:21.209 Df SpringBoard[79978:9b21b] [com.apple.runningboard:monitor] Received state update for 1595 (app<kz.yerek.replykeyboard((null))>, running-active-Visible
+2026-09-27 16:42:21.210 Df runningboardd[79981:9c084] [com.apple.runningboard:ttl] Acquiring assertion targeting [xpcservice<kz.yerek.replykeyboard.keyboard(no host)>:1599] from originator [app<kz.yerek.replykeyboard((null))>:1595] with description <RBSAssertionDescriptor| "com.apple.extension.session" ID:79981-1595-2162 target:1599 attributes:[
+	<RBSLegacyAttribute| requestedReason:ViewService reason:ViewService flags:( AllowIdleSleep PreventTaskSuspend PreventTaskThrottleDown WantsForegroundResourcePriority )>,
+	<RBSAcquisitionCompletionAttribute| policy:AfterValidation>
+	]>
+2026-09-27 16:42:21.210 Df runningboardd[79981:9c084] [com.apple.runningboard:ttl] Assertion 79981-1595-2162 (target:[xpcservice<kz.yerek.replykeyboard.keyboard(no host)>:1599]) will be created as active
+2026-09-27 16:42:21.211 Df runningboardd[79981:9c084] [com.apple.runningboard:ttl] Invalidating assertion 79981-79978-2161 (target:[app<kz.yerek.replykeyboard((null))>:1595]) from originator [osservice<com.apple.SpringBoard>:79978]
+2026-09-27 16:42:21.212 Df AIReply[1595:9c3f9] [com.apple.extensionkit:NSExtension] Aquired asertion <BKSProcessAssertion: 0x60000214d4f0> for running extension with pid 1599
+2026-09-27 16:42:21.212 Df AIReply[1595:9c3f9] [com.apple.PlugInKit:lifecycle] [u 5FD9F6D1-E8B0-4076-920B-70AB1F55D191:m (null)] [kz.yerek.replykeyboard.keyboard(1.0)] plugin reference count incremented to 2, and ready for host.
+2026-09-27 16:42:21.212 Df AIReply[1595:9c1e0] [com.apple.UIKit:ViewServiceAssertion] Assertion created: identifier: kz.yerek.replykeyboard.keyboard; assertion: 0x600002136940
+2026-09-27 16:42:21.213 Df runningboardd[79981:9c079] [com.apple.runningboard:ttl] Invalidating assertion 79981-1595-2162 (target:[xpcservice<kz.yerek.replykeyboard.keyboard(no host)>:1599]) from originator [app<kz.yerek.replykeyboard((null))>:1595]
+2026-09-27 16:42:21.213 Df runningboardd[79981:9c079] [com.apple.runningboard:ttl] Acquiring assertion targeting [xpcservice<kz.yerek.replykeyboard.keyboard(no host)>:1599] from originator [app<kz.yerek.replykeyboard((null))>:1595] with description <RBSAssertionDescriptor| "com.apple.viewservice.session" ID:79981-1595-2163 target:1599 attributes:[
+	<RBSLegacyAttribute| requestedReason:ViewService reason:ViewService flags:( AllowIdleSleep PreventTaskSuspend PreventTaskThrottleDown WantsForegroundResourcePriority )>,
+	<RBSAcquisitionCompletionAttribute| policy:AfterValidation>
+	]>
+2026-09-27 16:42:21.213 Df runningboardd[79981:9c079] [com.apple.runningboard:ttl] Assertion 79981-1595-2163 (target:[xpcservice<kz.yerek.replykeyboard.keyboard(no host)>:1599]) will be created as active
+2026-09-27 16:42:21.213 Df AIReply[1595:9c1e0] [com.apple.xpc:connection] [0x108a175c0] activating connection: mach=false listener=false peer=false name=kz.yerek.replykeyboard.keyboard.viewservice
+2026-09-27 16:42:21.213 Df AIReply[1595:9c1e0] [com.apple.UIKit:ViewServiceAssertion] Did connect to service: identifier: kz.yerek.replykeyboard.keyboard; assertion: 0x600002136940
+2026-09-27 16:42:21.213 Df AIReply[1595:9c1e0] [com.apple.UIKit:ViewServiceAssertion] Initialized service interface: identifier: kz.yerek.replykeyboard.keyboard; assertion: 0x600002136940
+2026-09-27 16:42:21.214 Df AIReply[1595:9c1e0] [com.apple.UIKit:ViewServiceAssertion] Cancelled active service request: identifier: kz.yerek.replykeyboard.keyboard; assertion: 0x0
+2026-09-27 16:42:21.214 Df AIReply[1595:9c1e0] [com.apple.UIKit:ViewServiceAssertion] Invalidating assertion: identifier: kz.yerek.replykeyboard.keyboard; assertion: 0x0
+2026-09-27 16:42:21.214 Df AIReply[1595:9c1e0] [com.apple.UIKit:ViewServiceAssertion] Calling out to connection handler to cancel active service request: identifier: kz.yerek.replykeyboard.keyboard; assertion: 0x0
+2026-09-27 16:42:21.214 Df runningboardd[79981:9bc15] [com.apple.runningboard:monitor] Calculated state for xpcservice<kz.yerek.replykeyboard.keyboard(no host)>: running-active (role: UserInteractiveNonFocal)
+2026-09-27 16:42:21.214 Df ReplyKeyboardExtension[1599:9c1df] [com.apple.xpc:connection] [0x10281e6d0] activating connection: mach=false listener=false peer=true name=kz.yerek.replykeyboard.keyboard.viewservice.peer.0x10281e6d0
+2026-09-27 16:42:21.214 Df ReplyKeyboardExtension[1599:9c1df] [com.apple.coremedia:] -AVSystemController- +[AVSystemController sharedInstance]: Failed to allocate AVSystemController, numberOfAttempts=1
+2026-09-27 16:42:21.214 Df ReplyKeyboardExtension[1599:9c1df] [com.apple.coremedia:] -AVSystemController- +[AVSystemController sharedInstance]: Failed to allocate AVSystemController, numberOfAttempts=2
+2026-09-27 16:42:21.214 Df ReplyKeyboardExtension[1599:9c1df] [com.apple.coremedia:] -AVSystemController- +[AVSystemController sharedInstance]: Failed to allocate AVSystemController, numberOfAttempts=3
+2026-09-27 16:42:21.214 Df ReplyKeyboardExtension[1599:9c1df] (UIKitCore) Failed to inherit CoreMedia permissions from 1595: (null)
+2026-09-27 16:42:21.215 Df ReplyKeyboardExtension[1599:9bdeb] [com.apple.UIKit:ViewServices] Received request to create view controller: self: <_UIViewServiceViewControllerOperator: 0x102015000>; class: ReplyKeyboardExtension.KeyboardViewController; contextToken: 984A507B-D30C-487A-BC8E-B0C0058E8EAF
+2026-09-27 16:42:21.218 Df ReplyKeyboardExtension[1599:9bdeb] [com.apple.UIKit:_UIVisualStyleRegistry] Note: no default visual style class registered as fallback for stylable class UIActivityIndicatorView
+2026-09-27 16:42:21.218 Df ReplyKeyboardExtension[1599:9bdeb] [com.apple.UIKit:_UIVisualStyleRegistry] Note: no default visual style class registered as fallback for stylable class UIActivityIndicatorView
+2026-09-27 16:42:21.219 Df runningboardd[79981:9c079] [com.apple.runningboard:ttl] Invalidating assertion 79981-1595-2157 (target:[app<kz.yerek.replykeyboard((null))>:1595]) from originator [app<kz.yerek.replykeyboard((null))>:1595]
+2026-09-27 16:42:21.226 Df ReplyKeyboardExtension[1599:9bdeb] [com.apple.UIKit:_UIVisualStyleRegistry] Note: no default visual style class registered as fallback for stylable class UIActivityIndicatorView
+2026-09-27 16:42:21.226 Df ReplyKeyboardExtension[1599:9bdeb] [com.apple.UIKit:_UIVisualStyleRegistry] Note: no default visual style class registered as fallback for stylable class UIActivityIndicatorView
+2026-09-27 16:42:21.227 Df ReplyKeyboardExtension[1599:9bdeb] [com.apple.UIKit:_UIVisualStyleRegistry] Note: no default visual style class registered as fallback for stylable class UIActivityIndicatorView
+2026-09-27 16:42:21.227 Df ReplyKeyboardExtension[1599:9bdeb] [com.apple.UIKit:_UIVisualStyleRegistry] Note: no default visual style class registered as fallback for stylable class UIActivityIndicatorView
+2026-09-27 16:42:21.227 Df ReplyKeyboardExtension[1599:9bdeb] [com.apple.UIKit:_UIVisualStyleRegistry] Note: no default visual style class registered as fallback for stylable class UIActivityIndicatorView
+2026-09-27 16:42:21.227 Df ReplyKeyboardExtension[1599:9bdeb] [com.apple.UIKit:_UIVisualStyleRegistry] Note: no default visual style class registered as fallback for stylable class UIActivityIndicatorView
+2026-09-27 16:42:21.230 Df ReplyKeyboardExtension[1599:9bdeb] [com.apple.UIKit:_UIVisualStyleRegistry] Note: no default visual style class registered as fallback for stylable class UIActivityIndicatorView
+2026-09-27 16:42:21.230 Df ReplyKeyboardExtension[1599:9bdeb] [com.apple.UIKit:_UIVisualStyleRegistry] Note: no default visual style class registered as fallback for stylable class UIActivityIndicatorView
+2026-09-27 16:42:21.230 Df ReplyKeyboardExtension[1599:9bdeb] [com.apple.UIKit:_UIVisualStyleRegistry] Note: no default visual style class registered as fallback for stylable class UIActivityIndicatorView
+2026-09-27 16:42:21.230 Df ReplyKeyboardExtension[1599:9bdeb] [com.apple.UIKit:_UIVisualStyleRegistry] Note: no default visual style class registered as fallback for stylable class UIActivityIndicatorView
+2026-09-27 16:42:21.230 Df ReplyKeyboardExtension[1599:9bdeb] [com.apple.UIKit:_UIVisualStyleRegistry] Note: no default visual style class registered as fallback for stylable class UIActivityIndicatorView
+2026-09-27 16:42:21.230 Df ReplyKeyboardExtension[1599:9bdeb] [com.apple.UIKit:_UIVisualStyleRegistry] Note: no default visual style class registered as fallback for stylable class UIActivityIndicatorView
+2026-09-27 16:42:21.230 Df ReplyKeyboardExtension[1599:9bdeb] [com.apple.UIKit:_UIVisualStyleRegistry] Note: no default visual style class registered as fallback for stylable class UIActivityIndicatorView
+2026-09-27 16:42:21.230 Df ReplyKeyboardExtension[1599:9bdeb] [com.apple.UIKit:_UIVisualStyleRegistry] Note: no default visual style class registered as fallback for stylable class UIActivityIndicatorView
+2026-09-27 16:42:21.231 Df ReplyKeyboardExtension[1599:9bdeb] [com.apple.UIKit:_UIVisualStyleRegistry] Note: no default visual style class registered as fallback for stylable class UIActivityIndicatorView
+2026-09-27 16:42:21.231 Df ReplyKeyboardExtension[1599:9bdeb] [com.apple.UIKit:_UIVisualStyleRegistry] Note: no default visual style class registered as fallback for stylable class UIActivityIndicatorView
+2026-09-27 16:42:21.232 Df ReplyKeyboardExtension[1599:9bdeb] [com.apple.UIKit:InterfaceStyle] Should send trait collection or coordinate space update, interface style 2 -> 2, <_UIScreenBasedWindowScene: 0x10344c5e0> (EA6094AB-DF31-42CB-A430-550F36E3FA6D)
+2026-09-27 16:42:21.232 Df ReplyKeyboardExtension[1599:9bdeb] [com.apple.UIKit:InterfaceStyle] Should send trait collection or coordinate space update, interface style 2 -> 2, <_UIScreenBasedWindowScene: 0x10344c5e0> (EA6094AB-DF31-42CB-A430-550F36E3FA6D)
+2026-09-27 16:42:21.233 Df ReplyKeyboardExtension[1599:9bdeb] [com.apple.UIKit:EventDeferring] [0x60000294fd40] Initialized with scene: <_UIScreenBasedWindowScene: 0x10344c5e0>; behavior: <_UIEventDeferringBehavior_iOS: 0x600000209e60>; systemShellManagesKeyboardFocus: 0
+2026-09-27 16:42:21.235 Df ReplyKeyboardExtension[1599:9bdeb] [com.apple.UIKit:KeyWindow] _UIScreenBasedWindowScene: 0x10344c5e0: Window became key in scene: _UIHostedWindow: 0x10344c220; contextId: 0xC75F8181: reason: _UIScreenBasedWindowScene: 0x10344c5e0: Window requested to become key in scene: 0x10344c220
+2026-09-27 16:42:21.235 Df ReplyKeyboardExtension[1599:9bdeb] [com.apple.UIKit:KeyWindow] Key window needs update: 1; currentKeyWindowScene: 0x0; evaluatedKeyWindowScene: 0x10344c5e0; currentApplicationKeyWindow: 0x0; evaluatedApplicationKeyWindow: 0x10344c220; reason: _UIScreenBasedWindowScene: 0x10344c5e0: Window requested to become key in scene: 0x10344c220
+2026-09-27 16:42:21.235 Df ReplyKeyboardExtension[1599:9bdeb] [com.apple.UIKit:KeyWindow] Window did become application key: _UIHostedWindow: 0x10344c220; contextId: 0xC75F8181; scene identity: (nil)
+2026-09-27 16:42:21.236 Df ReplyKeyboardExtension[1599:9bdeb] [com.apple.UIKit:EventDeferring] [0x60000294fd40] Begin local event deferring requested for token: 0x600002131810; environments: 1; reason: _UIScreenBasedWindowScene: 0x10344c5e0: Begin event deferring in keyboardFocus for window: 0x10344c220
+2026-09-27 16:42:21.236 Df ReplyKeyboardExtension[1599:9bdeb] [com.apple.UIKit:PhysicalButtonInteraction] [0x60000300d320] Arbiter: set viewServices strategy; most active view service session: (null)
+2026-09-27 16:42:21.236 Df ReplyKeyboardExtension[1599:9bdeb] [com.apple.UIKit:PhysicalButtonInteraction] [0x60000300d320] Arbiter: registered view service observer: <_UIViewServiceViewControllerOperator: 0x102015000> with registrationToken: <BSSimpleAssertion: 0x600000c49140; identifier: _UIViewServiceViewControllerOperator-0x102015000-2; reason: Registering view service observer with: <_UIPhysicalButtonInteractionArbiter: 0x60000300d320>; valid: YES>
+2026-09-27 16:42:21.236 Df ReplyKeyboardExtension[1599:9bdeb] [com.apple.UIKit:ViewServiceSessionActivityTracking] Activity: connection; window: <_UIHostedWindow: 0x10344c220>; provider: <_UIViewServiceViewControllerOperator: 0x102015000>; session: EFA0DC56-3562-4195-80E1-0C097D9068BC
+2026-09-27 16:42:21.236 Df ReplyKeyboardExtension[1599:9bdeb] [com.apple.UIKit:PhysicalButtonInteraction] [0x60000300d320] Arbiter: received new most active view service session: <_UIViewServiceSessionActivityRecord: 0x600002131900; sessionIdentifier: EFA0DC56-3562-4195-80E1-0C097D9068BC; tracker: <_UIActiveViewServiceSessionTracker: 0x600000292ca0>; primaryHostedWindow: <_UIHostedWindow: 0x10344c220>>
+2026-09-27 16:42:21.248 E  ReplyKeyboardExtension[1599:9bdeb] [com.apple.UIKit:LayoutConstraints] Unable to simultaneously satisfy constraints.
+	Probably at least one of the constraints in the following list is one you don't want. 
+	Try this: 
+		(1) look at each constraint and try to figure out which you don't expect; 
+		(2) find the code that added the unwanted constraint or constraints and fix it. 
+	(Note: If you're seeing NSAutoresizingMaskLayoutConstraints that you don't understand, refer to the documentation for the UIView property translatesAutoresizingMaskIntoConstraints) 
+(
+    "<NSAutoresizingMaskLayoutConstraint:0x600002132cb0 h=--& v=--& UIScrollView:0x102013800.height == 0   (active)>",
+    "<NSLayoutConstraint:0x600002147430 UIButton:0x102829930.height == 30   (active)>",
+    "<NSLayoutConstraint:0x60000212caf0 UIStackView:0x10290f3b0.height == UILayoutGuide:0x600003b1f1e0'UIScrollView-frameLayoutGuide'.height   (active)>",
+    "<NSLayoutConstraint:0x60000212c960 'UIScrollView-frameLayoutGuide-height' UILayoutGuide:0x600003b1f1e0'UIScrollView-frameLayoutGuide'.height == UIScrollView:0x102013800.height   (active)>",
+    "<NSLayoutConstraint:0x6000021313b0 'UISV-canvas-connection' UIStackView:0x10290f3b0.top == _UILayoutSpacer:0x600003d1c2d0'UISV-alignment-spanner'.top   (active)>",
+    "<NSLayoutConstraint:0x600002131a40 'UISV-canvas-connection' UIStackView:0x10290f3b0.centerY == UIButton:0x102829930.centerY   (active)>",
+    "<NSLayoutConstraint:0x6000021314a0 'UISV-spanning-boundary' _UILayoutSpacer:0x600003d1c2d0'UISV-alignment-spanner'.top <= UIButton:0x102829930.top   (active)>"
+)
+
+Will attempt to recover by breaking constraint 
+<NSLayoutConstraint:0x600002147430 UIButton:0x102829930.height == 30   (active)>
+
+Make a symbolic breakpoint at UIViewAlertForUnsatisfiableConstraints to catch this in the debugger.
+The methods in the UIConstraintBasedLayoutDebugging category on UIView listed in <UIKitCore/UIView.h> may also be helpful.
+2026-09-27 16:42:21.248 E  ReplyKeyboardExtension[1599:9bdeb] [com.apple.UIKit:LayoutConstraints] Unable to simultaneously satisfy constraints.
+	Probably at least one of the constraints in the following list is one you don't want. 
+	Try this: 
+		(1) look at each constraint and try to figure out which you don't expect; 
+		(2) find the code that added the unwanted constraint or constraints and fix it. 
+	(Note: If you're seeing NSAutoresizingMaskLayoutConstraints that you don't understand, refer to the documentation for the UIView property translatesAutoresizingMaskIntoConstraints) 
+(
+    "<NSAutoresizingMaskLayoutConstraint:0x600002132cb0 h=--& v=--& UIScrollView:0x102013800.height == 0   (active)>",
+    "<NSLayoutConstraint:0x6000021474d0 UIButton:0x102831320.height == 30   (active)>",
+    "<NSLayoutConstraint:0x60000212caf0 UIStackView:0x10290f3b0.height == UILayoutGuide:0x600003b1f1e0'UIScrollView-frameLayoutGuide'.height   (active)>",
+    "<NSLayoutConstraint:0x60000212c960 'UIScrollView-frameLayoutGuide-height' UILayoutGuide:0x600003b1f1e0'UIScrollView-frameLayoutGuide'.height == UIScrollView:0x102013800.height   (active)>",
+    "<NSLayoutConstraint:0x600002132a80 'UISV-alignment' UIButton:0x102829930.centerY == UIButton:0x102831320.centerY   (active)>",
+    "<NSLayoutConstraint:0x600002131680 'UISV-canvas-connection' V:[_UILayoutSpacer:0x600003d1c2d0'UISV-alignment-spanner']-(0)-|   (active, names: '|':UIStackView:0x10290f3b0 )>",
+    "<NSLayoutConstraint:0x600002131a40 'UISV-canvas-connection' UIStackView:0x10290f3b0.centerY == UIButton:0x102829930.centerY   (active)>",
+    "<NSLayoutConstraint:0x600002131590 'UISV-spanning-boundary' _UILayoutSpacer:0x600003d1c2d0'UISV-alignment-spanner'.bottom >= UIButton:0x102831320.bottom   (active)>"
+)
+
+Will attempt to recover by breaking constraint 
+<NSLayoutConstraint:0x6000021474d0 UIButton:0x102831320.height == 30   (active)>
+
+Make a symbolic breakpoint at UIViewAlertForUnsatisfiableConstraints to catch this in the debugger.
+The methods in the UIConstraintBasedLayoutDebugging category on UIView listed in <UIKitCore/UIView.h> may also be helpful.
+2026-09-27 16:42:21.249 E  ReplyKeyboardExtension[1599:9bdeb] [com.apple.UIKit:LayoutConstraints] Unable to simultaneously satisfy constraints.
+	Probably at least one of the constraints in the following list is one you don't want. 
+	Try this: 
+		(1) look at each constraint and try to figure out which you don't expect; 
+		(2) find the code that added the unwanted constraint or constraints and fix it. 
+	(Note: If you're seeing NSAutoresizingMaskLayoutConstraints that you don't understand, refer to the documentation for the UIView property translatesAutoresizingMaskIntoConstraints) 
+(
+    "<NSAutoresizingMaskLayoutConstraint:0x600002132cb0 h=--& v=--& UIScrollView:0x102013800.height == 0   (active)>",
+    "<NSLayoutConstraint:0x6000021475c0 UIButton:0x102831900.height == 30   (active)>",
+    "<NSLayoutConstraint:0x60000212caf0 UIStackView:0x10290f3b0.height == UILayoutGuide:0x600003b1f1e0'UIScrollView-frameLayoutGuide'.height   (active)>",
+    "<NSLayoutConstraint:0x60000212c960 'UIScrollView-frameLayoutGuide-height' UILayoutGuide:0x600003b1f1e0'UIScrollView-frameLayoutGuide'.height == UIScrollView:0x102013800.height   (active)>",
+    "<NSLayoutConstraint:0x600002132ad0 'UISV-alignment' UIButton:0x102829930.centerY == UIButton:0x102831900.centerY   (active)>",
+    "<NSLayoutConstraint:0x600002131680 'UISV-canvas-connection' V:[_UILayoutSpacer:0x600003d1c2d0'UISV-alignment-spanner']-(0)-|   (active, names: '|':UIStackView:0x10290f3b0 )>",
+    "<NSLayoutConstraint:0x600002131a40 'UISV-canvas-connection' UIStackView:0x10290f3b0.centerY == UIButton:0x102829930.centerY   (active)>",
+    "<NSLayoutConstraint:0x600002131630 'UISV-spanning-boundary' _UILayoutSpacer:0x600003d1c2d0'UISV-alignment-spanner'.bottom >= UIButton:0x102831900.bottom   (active)>"
+)
+
+Will attempt to recover by breaking constraint 
+<NSLayoutConstraint:0x6000021475c0 UIButton:0x102831900.height == 30   (active)>
+
+Make a symbolic breakpoint at UIViewAlertForUnsatisfiableConstraints to catch this in the debugger.
+The methods in the UIConstraintBasedLayoutDebugging category on UIView listed in <UIKitCore/UIView.h> may also be helpful.
+2026-09-27 16:42:21.249 E  ReplyKeyboardExtension[1599:9bdeb] [com.apple.UIKit:LayoutConstraints] Unable to simultaneously satisfy constraints.
+	Probably at least one of the constraints in the following list is one you don't want. 
+	Try this: 
+		(1) look at each constraint and try to figure out which you don't expect; 
+		(2) find the code that added the unwanted constraint or constraints and fix it. 
+	(Note: If you're seeing NSAutoresizingMaskLayoutConstraints that you don't understand, refer to the documentation for the UIView property translatesAutoresizingMaskIntoConstraints) 
+(
+    "<NSAutoresizingMaskLayoutConstraint:0x600002132cb0 h=--& v=--& UIScrollView:0x102013800.height == 0   (active)>",
+    "<NSLayoutConstraint:0x6000021476b0 UIButton:0x102832700.height == 30   (active)>",
+    "<NSLayoutConstraint:0x60000212caf0 UIStackView:0x10290f3b0.height == UILayoutGuide:0x600003b1f1e0'UIScrollView-frameLayoutGuide'.height   (active)>",
+    "<NSLayoutConstraint:0x60000212c960 'UIScrollView-frameLayoutGuide-height' UILayoutGuide:0x600003b1f1e0'UIScrollView-frameLayoutGuide'.height == UIScrollView:0x102013800.height   (active)>",
+    "<NSLayoutConstraint:0x600002132b20 'UISV-alignment' UIButton:0x102829930.centerY == UIButton:0x102832700.centerY   (active)>",
+    "<NSLayoutConstraint:0x600002131680 'UISV-canvas-connection' V:[_UILayoutSpacer:0x600003d1c2d0'UISV-alignment-spanner']-(0)-|   (active, names: '|':UIStackView:0x10290f3b0 )>",
+    "<NSLayoutConstraint:0x600002131a40 'UISV-canvas-connection' UIStackView:0x10290f3b0.centerY == UIButton:0x102829930.centerY   (active)>",
+    "<NSLayoutConstraint:0x600002131720 'UISV-spanning-boundary' _UILayoutSpacer:0x600003d1c2d0'UISV-alignment-spanner'.bottom >= UIButton:0x102832700.bottom   (active)>"
+)
+
+Will attempt to recover by breaking constraint 
+<NSLayoutConstraint:0x6000021476b0 UIButton:0x102832700.height == 30   (active)>
+
+Make a symbolic breakpoint at UIViewAlertForUnsatisfiableConstraints to catch this in the debugger.
+The methods in the UIConstraintBasedLayoutDebugging category on UIView listed in <UIKitCore/UIView.h> may also be helpful.
+2026-09-27 16:42:21.249 E  ReplyKeyboardExtension[1599:9bdeb] [com.apple.UIKit:LayoutConstraints] Unable to simultaneously satisfy constraints.
+	Probably at least one of the constraints in the following list is one you don't want. 
+	Try this: 
+		(1) look at each constraint and try to figure out which you don't expect; 
+		(2) find the code that added the unwanted constraint or constraints and fix it. 
+	(Note: If you're seeing NSAutoresizingMaskLayoutConstraints that you don't understand, refer to the documentation for the UIView property translatesAutoresizingMaskIntoConstraints) 
+(
+    "<NSAutoresizingMaskLayoutConstraint:0x600002132cb0 h=--& v=--& UIScrollView:0x102013800.height == 0   (active)>",
+    "<NSLayoutConstraint:0x60000212c410 UIButton:0x10294df80.height == 30   (active)>",
+    "<NSLayoutConstraint:0x60000212caf0 UIStackView:0x10290f3b0.height == UILayoutGuide:0x600003b1f1e0'UIScrollView-frameLayoutGuide'.height   (active)>",
+    "<NSLayoutConstraint:0x60000212c960 'UIScrollView-frameLayoutGuide-height' UILayoutGuide:0x600003b1f1e0'UIScrollView-frameLayoutGuide'.height == UIScrollView:0x102013800.height   (active)>",
+    "<NSLayoutConstraint:0x600002132b70 'UISV-alignment' UIButton:0x102829930.centerY == UIButton:0x10294df80.centerY   (active)>",
+    "<NSLayoutConstraint:0x600002131680 'UISV-canvas-connection' V:[_UILayoutSpacer:0x600003d1c2d0'UISV-alignment-spanner']-(0)-|   (active, names: '|':UIStackView:0x10290f3b0 )>",
+    "<NSLayoutConstraint:0x600002131a40 'UISV-canvas-connection' UIStackView:0x10290f3b0.centerY == UIButton:0x102829930.centerY   (active)>",
+    "<NSLayoutConstraint:0x6000021319f0 'UISV-spanning-boundary' _UILayoutSpacer:0x600003d1c2d0'UISV-alignment-spanner'.bottom >= UIButton:0x10294df80.bottom   (active)>"
+)
+
+Will attempt to recover by breaking constraint 
+<NSLayoutConstraint:0x60000212c410 UIButton:0x10294df80.height == 30   (active)>
+
+Make a symbolic breakpoint at UIViewAlertForUnsatisfiableConstraints to catch this in the debugger.
+The methods in the UIConstraintBasedLayoutDebugging category on UIView listed in <UIKitCore/UIView.h> may also be helpful.
+2026-09-27 16:42:21.264 Df AIReply[1595:9bd65] [com.apple.UIKit:KBProxyForwarding] <StateMachine:0x600001743640> Created with presentation environment: <0x6000002d4180:<_UISceneKeyboardProxyLayerForwardingPresentationViewService: 0x6000002d4180> Tracking remote view controller: <_UIRemoteInputViewController: 0x10c877c00>>
+2026-09-27 16:42:21.265 Df ReplyKeyboardExtension[1599:9bdeb] (Foundation) [ReplyKeyboard] theme: appearance=1 vc=1 view=1 window=1 screen=2 -> dark=true
+2026-09-27 16:42:21.265 Df runningboardd[79981:9c079] [com.apple.runningboard:ttl] Acquiring assertion targeting [xpcservice<kz.yerek.replykeyboard.keyboard(no host)>:1599](UIHostedWindow:c75f8181) from originator [app<kz.yerek.replykeyboard((null))>:1595] with description <RBSAssertionDescriptor| "injecting inherited from "UIHostedWindow:16ab9190" to 1599<UIHostedWindow:c75f8181>" ID:79981-1595-2164 target:1599<UIHostedWindow:c75f8181> attributes:[
+	<RBSHereditaryGrant| endowmentNamespace:com.apple.boardservices.endpoint-injection UIHostedWindow:16ab9190>,
+	<RBSHereditaryGrant| endowmentNamespace:com.apple.frontboard.visibility UIHostedWindow:16ab9190>
+	]>
+2026-09-27 16:42:21.265 Df AIReply[1595:9bd65] [com.apple.UIKit:KBProxyForwarding] <ForwardingPresentationViewService:0x6000002d4180> Size tracking view moved to window: <UIRemoteKeyboardWindow: 0x10e828a00; frame = (0 0; 393 852); opaque = NO; autoresize = W+H; layer = <UIWindowLayer: 0x600000c6f210>>.
+2026-09-27 16:42:21.266 Df AIReply[1595:9bd65] [com.apple.UIKit:KBProxyForwarding] <StateMachine:0x600001743640> Unable to find an appropriate hosting environment for a scene that appears to be in a view service.
+2026-09-27 16:42:21.266 Df AIReply[1595:9bd65] [com.apple.UIKit:KBProxyForwarding] <StateMachine:0x600001743640> Hosting window did change to <UIRemoteKeyboardWindow: 0x10e828a00; frame = (0 0; 393 852); opaque = NO; autoresize = W+H; layer = <UIWindowLayer: 0x600000c6f210>>.
+2026-09-27 16:42:21.266 Df runningboardd[79981:9c079] [com.apple.runningboard:ttl] Assertion 79981-1595-2164 (target:[xpcservice<kz.yerek.replykeyboard.keyboard(no host)>:1599](UIHostedWindow:c75f8181)) will be created as active
+2026-09-27 16:42:21.266 Df runningboardd[79981:9c079] [com.apple.runningboard:ttl] Acquiring assertion targeting [app<kz.yerek.replykeyboard((null))>:1595] from originator [app<kz.yerek.replykeyboard((null))>:1595] with description <RBSAssertionDescriptor| "systemAnimationFence" ID:79981-1595-2165 target:1595 attributes:[
+	<RBSLegacyAttribute| requestedReason:FinishTask reason:FinishTask flags:( AllowIdleSleep PreventTaskSuspend PreventTaskThrottleDown )>,
+	<RBSAcquisitionCompletionAttribute| policy:AfterValidation>
+	]>
+2026-09-27 16:42:21.266 Df runningboardd[79981:9c07a] [com.apple.runningboard:monitor] Calculated state for xpcservice<kz.yerek.replykeyboard.keyboard(no host)>: running-active (role: UserInteractiveNonFocal)
+2026-09-27 16:42:21.266 Df runningboardd[79981:9bc15] [com.apple.runningboard:ttl] [xpcservice<kz.yerek.replykeyboard.keyboard(no host)>:1599] visiblity is yes
+2026-09-27 16:42:21.266 Df AIReply[1595:9bd65] [com.apple.UIKit:UIPeripheralHost] endPlacementForInputViewSet: <<UIInputViewSet: 0x600003301360>; view = <_UIKBCompatInputView: 0x108538ce0; frame = (0 0; 393 298); >; assistant = <TUISystemInputAssistantView: 0x108527ca0; frame = (0 0; 393 0); hidden = YES; >; accessory = <_UIRemoteKeyboardPlaceholderView: 0x10851d440; frame = (0 0; 393 0); >; usesKeyClicks = NO;  > windowScene: <_UIKeyboardWindowScene: 0x1085285a0; role: _UIScreenBasedSceneSession; persistentIdentifier: 4C1565AD-8B49-4DAF-A473-53F5651A8CA8; activationState: UISceneActivationStateForegroundActive>
+2026-09-27 16:42:21.266 Df AIReply[1595:9bd65] [com.apple.UIKit:UIPeripheralHost] endPlacementForInputViewSet, returning -> <UIInputViewSetPlacementOnScreenWithAccessory>
+2026-09-27 16:42:21.266 A  ReplyKeyboardExtension[1599:9c401] (RunningBoardServices) didChangeInheritances
+2026-09-27 16:42:21.266 Df runningboardd[79981:9c079] [com.apple.runningboard:ttl] Assertion 79981-1595-2165 (target:[app<kz.yerek.replykeyboard((null))>:1595]) will be created as inactive as start-time-defining assertions exist
+2026-09-27 16:42:21.266 Df SpringBoard[79978:9c202] [com.apple.runningboard:monitor] Received state update for 1599 (xpcservice<kz.yerek.replykeyboard.keyboard(no host)>, running-active-Visible
+2026-09-27 16:42:21.267 Df AIReply[1595:9bd65] [com.apple.UIKit:UIPeripheralHost] endPlacementForInputViewSet: <<UIInputViewSet: 0x600003301360>; view = <_UIKBCompatInputView: 0x108538ce0; frame = (0 0; 393 298); >; assistant = <TUISystemInputAssistantView: 0x108527ca0; frame = (0 0; 393 0); hidden = YES; >; accessory = <_UIRemoteKeyboardPlaceholderView: 0x10851d440; frame = (0 0; 393 0); >; usesKeyClicks = NO;  > windowScene: <_UIKeyboardWindowScene: 0x1085285a0; role: _UIScreenBasedSceneSession; persistentIdentifier: 4C1565AD-8B49-4DAF-A473-53F5651A8CA8; activationState: UISceneActivationStateForegroundActive>
+2026-09-27 16:42:21.267 Df AIReply[1595:9bd65] [com.apple.UIKit:UIPeripheralHost] endPlacementForInputViewSet, returning -> <UIInputViewSetPlacementOnScreenWithAccessory>
+2026-09-27 16:42:21.267 Df AIReply[1595:9bd65] [com.apple.UIKit:UIPeripheralHost] endPlacementForInputViewSet: <<UIInputViewSet: 0x600003301360>; view = <_UIKBCompatInputView: 0x108538ce0; frame = (0 0; 393 298); >; assistant = <TUISystemInputAssistantView: 0x108527ca0; frame = (0 0; 393 0); hidden = YES; >; accessory = <_UIRemoteKeyboardPlaceholderView: 0x10851d440; frame = (0 0; 393 0); >; usesKeyClicks = NO;  > windowScene: <_UIKeyboardWindowScene: 0x1085285a0; role: _UIScreenBasedSceneSession; persistentIdentifier: 4C1565AD-8B49-4DAF-A473-53F5651A8CA8; activationState: UISceneActivationStateForegroundActive>
+2026-09-27 16:42:21.267 Df AIReply[1595:9bd65] [com.apple.UIKit:UIPeripheralHost] endPlacementForInputViewSet, returning -> <UIInputViewSetPlacementOnScreenWithAccessory>
+2026-09-27 16:42:21.267 Df AIReply[1595:9bd65] [com.apple.UIKit:UIPeripheralHost] endPlacementForInputViewSet: <<UIInputViewSet: 0x600003301360>; view = <_UIKBCompatInputView: 0x108538ce0; frame = (0 0; 393 298); >; assistant = <TUISystemInputAssistantView: 0x108527ca0; frame = (0 0; 393 0); hidden = YES; >; accessory = <_UIRemoteKeyboardPlaceholderView: 0x10851d440; frame = (0 0; 393 0); >; usesKeyClicks = NO;  > windowScene: <_UIKeyboardWindowScene: 0x1085285a0; role: _UIScreenBasedSceneSession; persistentIdentifier: 4C1565AD-8B49-4DAF-A473-53F5651A8CA8; activationState: UISceneActivationStateForegroundActive>
+2026-09-27 16:42:21.267 Df AIReply[1595:9bd65] [com.apple.UIKit:UIPeripheralHost] endPlacementForInputViewSet, returning -> <UIInputViewSetPlacementOnScreenWithAccessory>
+2026-09-27 16:42:21.267 Df AIReply[1595:9bd65] [com.apple.UIKit:UIPeripheralHost] endPlacementForInputViewSet: <<UIInputViewSet: 0x600003301360>; view = <_UIKBCompatInputView: 0x108538ce0; frame = (0 0; 393 298); >; assistant = <TUISystemInputAssistantView: 0x108527ca0; frame = (0 0; 393 0); hidden = YES; >; accessory = <_UIRemoteKeyboardPlaceholderView: 0x10851d440; frame = (0 0; 393 0); >; usesKeyClicks = NO;  > windowScene: <_UIKeyboardWindowScene: 0x1085285a0; role: _UIScreenBasedSceneSession; persistentIdentifier: 4C1565AD-8B49-4DAF-A473-53F5651A8CA8; activationState: UISceneActivationStateForegroundActive>
+2026-09-27 16:42:21.267 Df AIReply[1595:9bd65] [com.apple.UIKit:UIPeripheralHost] endPlacementForInputViewSet, returning -> <UIInputViewSetPlacementOnScreenWithAccessory>
+2026-09-27 16:42:21.267 Df mediaremoted[90744:9bee9] [com.apple.runningboard:monitor] Received state update for 1599 (xpcservice<kz.yerek.replykeyboard.keyboard(no host)>, running-active-Visible
+2026-09-27 16:42:21.267 Df AIReply[1595:9bd65] [com.apple.UIKit:UIPeripheralHost] endPlacementForInputViewSet: <<UIInputViewSet: 0x600003301360>; view = <_UIKBCompatInputView: 0x108538ce0; frame = (0 0; 393 298); >; assistant = <TUISystemInputAssistantView: 0x108527ca0; frame = (0 0; 393 0); hidden = YES; >; accessory = <_UIRemoteKeyboardPlaceholderView: 0x10851d440; frame = (0 0; 393 0); >; usesKeyClicks = NO;  > windowScene: <_UIKeyboardWindowScene: 0x1085285a0; role: _UIScreenBasedSceneSession; persistentIdentifier: 4C1565AD-8B49-4DAF-A473-53F5651A8CA8; activationState: UISceneActivationStateForegroundActive>
+2026-09-27 16:42:21.267 Df AIReply[1595:9bd65] [com.apple.UIKit:UIPeripheralHost] endPlacementForInputViewSet, returning -> <UIInputViewSetPlacementOnScreenWithAccessory>
+2026-09-27 16:42:21.267 Df AIReply[1595:9bd65] [com.apple.UIKit:UIPeripheralHost] endPlacementForInputViewSet: <<UIInputViewSet: 0x600003301360>; view = <_UIKBCompatInputView: 0x108538ce0; frame = (0 0; 393 298); >; assistant = <TUISystemInputAssistantView: 0x108527ca0; frame = (0 0; 393 0); hidden = YES; >; accessory = <_UIRemoteKeyboardPlaceholderView: 0x10851d440; frame = (0 0; 393 0); >; usesKeyClicks = NO;  > windowScene: <_UIKeyboardWindowScene: 0x1085285a0; role: _UIScreenBasedSceneSession; persistentIdentifier: 4C1565AD-8B49-4DAF-A473-53F5651A8CA8; activationState: UISceneActivationStateForegroundActive>
+2026-09-27 16:42:21.268 Df AIReply[1595:9bd65] [com.apple.UIKit:UIPeripheralHost] endPlacementForInputViewSet, returning -> <UIInputViewSetPlacementOnScreenWithAccessory>
+2026-09-27 16:42:21.268 Df locationd[79999:9c171] [com.apple.runningboard:monitor] Received state update for 1599 (xpcservice<kz.yerek.replykeyboard.keyboard(no host)>, running-active-Visible
+2026-09-27 16:42:21.268 Df locationd[79999:9c171] [com.apple.locationd.Core:Core] {"msg":"invoking applicationStateChange handler", "StateChangeData":{
+    BKSApplicationStateAppIsFrontmost = 1;
+    BKSApplicationStateExtensionKey = 1;
+    SBApplicationStateDisplayIDKey = "kz.yerek.replykeyboard.keyboard";
+    SBApplicationStateKey = 8;
+    SBApplicationStateProcessIDKey = 1599;
+    SBApplicationStateRunningReasonsKey =     (
+                {
+            SBApplicationStateRunningReasonAssertionIdentifierKey = "com.apple.viewservice.session";
+            SBApplicationStateRunningReasonAssertionReasonKey = 13;
+        },
+                {
+            SBApplicationStateRunningReasonAssertionIdentifierKey = "com.apple.extension.session";
+            SBApplicationStateRunningReasonAssertionReasonKey = 13;
+        }
+    );
+    SBMostElevatedStateForProcessID = 8;
+}}
+2026-09-27 16:42:21.268 Df locationd[79999:9c171] [com.apple.locationd.Core:Core] {"msg":"Post Application State Change Notification", "notification":ForegroundRunning, "pid":1599, "bundleId":kz.yerek.replykeyboard.keyboard}
+2026-09-27 16:42:21.268 Df SpringBoard[79978:9bc0d] [com.apple.UserNotifications:Settings] [kz.yerek.replykeyboard.keyboard] Foreground app will not request ephemeral notifications isAppClip: NO wantsEphemeral notifications: NO
+2026-09-27 16:42:21.268 Df SpringBoard[79978:9bc0d] [com.apple.UserNotifications:RemoteNotifications] [kz.yerek.replykeyboard.keyboard] kz.yerek.replykeyboard.keyboard application state changed to ForegroundRunning
+2026-09-27 16:42:21.268 Df AIReply[1595:9bd65] [com.apple.UIKit:KeyboardArbiterClientLog] -[_UIRemoteKeyboardPlaceholderView refreshPlaceholder]  refreshPlaceholder: size={393, 298} [previous size={393, 298}]
+2026-09-27 16:42:21.268 Df locationd[79999:9c171] [com.apple.locationd.Core:Core] {"msg":"AppMonitor notification", "notification":ForegroundRunning, "pid":1599, "bundleId":kz.yerek.replykeyboard.keyboard, "numForegroundedApps":4}
+2026-09-27 16:42:21.269 Df SpringBoard[79978:9bc0d] [com.apple.UserNotifications:RemoteNotifications] [kz.yerek.replykeyboard.keyboard] Ignore becoming foreground for application without push registration
+2026-09-27 16:42:21.269 Df AIReply[1595:9bd65] [com.apple.UIKit:UIPeripheralHost] endPlacementForInputViewSet: <<UIInputViewSet: 0x6000033015e0>; view = <_UIRemoteKeyboardPlaceholderView: 0x108506d30; frame = (0 0; 393 298); >; accessory = <_TtGC7SwiftUIP10$10a7f2f8818InputAccessoryHostVS_P10$10a7f301c17InputAccessoryBar_: 0x10851c110; frame = (0 0; 393 0); >; usesKeyClicks = NO;  > windowScene: <UIWindowScene: 0x10850b110; role: UIWindowSceneSessionRoleApplication; persistentIdentifier: 0BC7CD9A-7731-484F-AA14-1D384B804551; activationState: UISceneActivationStateForegroundActive>
+2026-09-27 16:42:21.269 Df AIReply[1595:9bd65] [com.apple.UIKit:UIPeripheralHost] endPlacementForInputViewSet, returning -> <UIInputViewSetPlacementOnScreenWithAccessory>
+2026-09-27 16:42:21.269 Df ReplyKeyboardExtension[1599:9bdeb] (Foundation) [ReplyKeyboard] theme: appearance=1 vc=1 view=1 window=1 screen=2 -> dark=true
+2026-09-27 16:42:21.269 Df AIReply[1595:9bd65] [com.apple.UIKit:UIPeripheralHost] endPlacementForInputViewSet: <<UIInputViewSet: 0x6000033015e0>; view = <_UIRemoteKeyboardPlaceholderView: 0x108506d30; frame = (0 0; 393 298); >; accessory = <_TtGC7SwiftUIP10$10a7f2f8818InputAccessoryHostVS_P10$10a7f301c17InputAccessoryBar_: 0x10851c110; frame = (0 0; 393 0); >; usesKeyClicks = NO;  > windowScene: <UIWindowScene: 0x10850b110; role: UIWindowSceneSessionRoleApplication; persistentIdentifier: 0BC7CD9A-7731-484F-AA14-1D384B804551; activationState: UISceneActivationStateForegroundActive>
+2026-09-27 16:42:21.269 E  ReplyKeyboardExtension[1599:9bdeb] [com.apple.UIKit:External] -[UIInputViewController needsInputModeSwitchKey] was called before a connection was established to the host application. This will produce an inaccurate result. Please make sure to call this after your primary view controller has been initialized.
+2026-09-27 16:42:21.269 Df AIReply[1595:9bd65] [com.apple.UIKit:UIPeripheralHost] endPlacementForInputViewSet, returning -> <UIInputViewSetPlacementOnScreenWithAccessory>
+2026-09-27 16:42:21.271 Df locationd[79999:9c171] [com.apple.locationd.Core:Core] {"msg":"#CLIUA AppMonitor notification", "notification":4, "pid":1599, "bundleId":kz.yerek.replykeyboard.keyboard, "ClientKey":ikz.yerek.replykeyboard:}
+2026-09-27 16:42:21.271 Df locationd[79999:9c171] [com.apple.locationd.Core:Core] {"msg":"#CLIUA Marking change", "clientKey":ikz.yerek.replykeyboard:, "reason":Process state from RunningBoard, "assertionLevel":5, "coming":1}
+2026-09-27 16:42:21.271 Df locationd[79999:9c171] [com.apple.locationd.Core:Core] {"msg":"#CLIUA updating AssertionRecord", "ClientKey":ikz.yerek.replykeyboard:, "AssertionLevel":5}
+2026-09-27 16:42:21.271 Df locationd[79999:9c171] [com.apple.locationd.Core:Core] {"msg":"#CLIUA AssertionRecord updated", "ClientKey":ikz.yerek.replykeyboard:, "AssertionLevel":5}
+2026-09-27 16:42:21.275 Df runningboardd[79981:9c079] [com.apple.runningboard:ttl] Acquiring assertion targeting [xpcservice<kz.yerek.replykeyboard.keyboard(no host)>:1599] from originator [xpcservice<kz.yerek.replykeyboard.keyboard(no host)>:1599] with description <RBSAssertionDescriptor| "systemAnimationFence" ID:79981-1599-2166 target:1599 attributes:[
+	<RBSLegacyAttribute| requestedReason:FinishTask reason:FinishTask flags:( AllowIdleSleep PreventTaskSuspend PreventTaskThrottleDown )>,
+	<RBSAcquisitionCompletionAttribute| policy:AfterValidation>
+	]>
+2026-09-27 16:42:21.275 Df runningboardd[79981:9c079] [com.apple.runningboard:ttl] Assertion 79981-1599-2166 (target:[xpcservice<kz.yerek.replykeyboard.keyboard(no host)>:1599]) will be created as inactive as start-time-defining assertions exist
+2026-09-27 16:42:21.283 Df runningboardd[79981:9c07a] [com.apple.runningboard:ttl] Acquiring assertion targeting [xpcservice<kz.yerek.replykeyboard.keyboard(no host)>:1599] from originator [xpcservice<kz.yerek.replykeyboard.keyboard(no host)>:1599] with description <RBSAssertionDescriptor| "systemAnimationFence" ID:79981-1599-2167 target:1599 attributes:[
+	<RBSLegacyAttribute| requestedReason:FinishTask reason:FinishTask flags:( AllowIdleSleep PreventTaskSuspend PreventTaskThrottleDown )>,
+	<RBSAcquisitionCompletionAttribute| policy:AfterValidation>
+	]>
+2026-09-27 16:42:21.283 Df runningboardd[79981:9c07a] [com.apple.runningboard:ttl] Assertion 79981-1599-2167 (target:[xpcservice<kz.yerek.replykeyboard.keyboard(no host)>:1599]) will be created as inactive as start-time-defining assertions exist
+2026-09-27 16:42:21.284 E  ReplyKeyboardExtension[1599:9bdeb] [com.apple.UIKit:External] -[UIInputViewController needsInputModeSwitchKey] was called before a connection was established to the host application. This will produce an inaccurate result. Please make sure to call this after your primary view controller has been initialized.
+2026-09-27 16:42:21.284 A  ReplyKeyboardExtension[1599:9bdeb] (TCC) TCCAccessRequest() IPC
+2026-09-27 16:42:21.284 A  ReplyKeyboardExtension[1599:9bdeb] (TCC) TCCAccessRequest() IPC
+2026-09-27 16:42:21.284 A  ReplyKeyboardExtension[1599:9bdeb] (TCC) TCCAccessRequest() IPC
+2026-09-27 16:42:21.284 Df ReplyKeyboardExtension[1599:9bdeb] [com.apple.UIKit:ViewServiceSessionActivityTracking] Activity: viewControllerAppearance; appearState: appeared; window: <_UIHostedWindow: 0x10344c220>; provider: <_UIViewServiceViewControllerOperator: 0x102015000>; session: EFA0DC56-3562-4195-80E1-0C097D9068BC
+2026-09-27 16:42:21.284 Df runningboardd[79981:9c084] [com.apple.runningboard:ttl] Acquiring assertion targeting [app<kz.yerek.replykeyboard((null))>:1595] from originator [app<kz.yerek.replykeyboard((null))>:1595] with description <RBSAssertionDescriptor| "systemAnimationFence" ID:79981-1595-2168 target:1595 attributes:[
+	<RBSLegacyAttribute| requestedReason:FinishTask reason:FinishTask flags:( AllowIdleSleep PreventTaskSuspend PreventTaskThrottleDown )>,
+	<RBSAcquisitionCompletionAttribute| policy:AfterValidation>
+	]>
+2026-09-27 16:42:21.284 Df runningboardd[79981:9c084] [com.apple.runningboard:ttl] Assertion 79981-1595-2168 (target:[app<kz.yerek.replykeyboard((null))>:1595]) will be created as inactive as start-time-defining assertions exist
+2026-09-27 16:42:21.284 Df AIReply[1595:9bd65] [com.apple.UIKit:UIPeripheralHost] endPlacementForInputViewSet: <<UIInputViewSet: 0x600003301360>; view = <_UIKBCompatInputView: 0x108538ce0; frame = (0 0; 393 343); >; assistant = <TUISystemInputAssistantView: 0x108527ca0; frame = (0 0; 393 0); hidden = YES; >; accessory = <_UIRemoteKeyboardPlaceholderView: 0x10851d440; frame = (0 0; 393 0); >; usesKeyClicks = NO;  > windowScene: <_UIKeyboardWindowScene: 0x1085285a0; role: _UIScreenBasedSceneSession; persistentIdentifier: 4C1565AD-8B49-4DAF-A473-53F5651A8CA8; activationState: UISceneActivationStateForegroundActive>
+2026-09-27 16:42:21.284 Df AIReply[1595:9bd65] [com.apple.UIKit:UIPeripheralHost] endPlacementForInputViewSet, returning -> <UIInputViewSetPlacementOnScreenWithAccessory>
+2026-09-27 16:42:21.285 Df AIReply[1595:9bd65] [com.apple.UIKit:UIPeripheralHost] endPlacementForInputViewSet: <<UIInputViewSet: 0x600003301360>; view = <_UIKBCompatInputView: 0x108538ce0; frame = (0 0; 393 343); >; assistant = <TUISystemInputAssistantView: 0x108527ca0; frame = (0 0; 393 0); hidden = YES; >; accessory = <_UIRemoteKeyboardPlaceholderView: 0x10851d440; frame = (0 0; 393 0); >; usesKeyClicks = NO;  > windowScene: <_UIKeyboardWindowScene: 0x1085285a0; role: _UIScreenBasedSceneSession; persistentIdentifier: 4C1565AD-8B49-4DAF-A473-53F5651A8CA8; activationState: UISceneActivationStateForegroundActive>
+2026-09-27 16:42:21.285 Df AIReply[1595:9bd65] [com.apple.UIKit:UIPeripheralHost] endPlacementForInputViewSet, returning -> <UIInputViewSetPlacementOnScreenWithAccessory>
+2026-09-27 16:42:21.285 Df AIReply[1595:9bd65] [com.apple.UIKit:UIPeripheralHost] endPlacementForInputViewSet: <<UIInputViewSet: 0x600003301360>; view = <_UIKBCompatInputView: 0x108538ce0; frame = (0 0; 393 343); >; assistant = <TUISystemInputAssistantView: 0x108527ca0; frame = (0 0; 393 0); hidden = YES; >; accessory = <_UIRemoteKeyboardPlaceholderView: 0x10851d440; frame = (0 0; 393 0); >; usesKeyClicks = NO;  > windowScene: <_UIKeyboardWindowScene: 0x1085285a0; role: _UIScreenBasedSceneSession; persistentIdentifier: 4C1565AD-8B49-4DAF-A473-53F5651A8CA8; activationState: UISceneActivationStateForegroundActive>
+2026-09-27 16:42:21.285 Df AIReply[1595:9bd65] [com.apple.UIKit:UIPeripheralHost] endPlacementForInputViewSet, returning -> <UIInputViewSetPlacementOnScreenWithAccessory>
+2026-09-27 16:42:21.285 Df AIReply[1595:9bd65] [com.apple.UIKit:UIPeripheralHost] endPlacementForInputViewSet: <<UIInputViewSet: 0x600003301360>; view = <_UIKBCompatInputView: 0x108538ce0; frame = (0 0; 393 343); >; assistant = <TUISystemInputAssistantView: 0x108527ca0; frame = (0 0; 393 0); hidden = YES; >; accessory = <_UIRemoteKeyboardPlaceholderView: 0x10851d440; frame = (0 0; 393 0); >; usesKeyClicks = NO;  > windowScene: <_UIKeyboardWindowScene: 0x1085285a0; role: _UIScreenBasedSceneSession; persistentIdentifier: 4C1565AD-8B49-4DAF-A473-53F5651A8CA8; activationState: UISceneActivationStateForegroundActive>
+2026-09-27 16:42:21.285 Df AIReply[1595:9bd65] [com.apple.UIKit:UIPeripheralHost] endPlacementForInputViewSet, returning -> <UIInputViewSetPlacementOnScreenWithAccessory>
+2026-09-27 16:42:21.285 Df AIReply[1595:9bd65] [com.apple.UIKit:UIPeripheralHost] endPlacementForInputViewSet: <<UIInputViewSet: 0x600003301360>; view = <_UIKBCompatInputView: 0x108538ce0; frame = (0 0; 393 343); >; assistant = <TUISystemInputAssistantView: 0x108527ca0; frame = (0 0; 393 0); hidden = YES; >; accessory = <_UIRemoteKeyboardPlaceholderView: 0x10851d440; frame = (0 0; 393 0); >; usesKeyClicks = NO;  > windowScene: <_UIKeyboardWindowScene: 0x1085285a0; role: _UIScreenBasedSceneSession; persistentIdentifier: 4C1565AD-8B49-4DAF-A473-53F5651A8CA8; activationState: UISceneActivationStateForegroundActive>
+2026-09-27 16:42:21.285 Df AIReply[1595:9bd65] [com.apple.UIKit:UIPeripheralHost] endPlacementForInputViewSet, returning -> <UIInputViewSetPlacementOnScreenWithAccessory>
+2026-09-27 16:42:21.285 Df AIReply[1595:9bd65] [com.apple.UIKit:UIPeripheralHost] endPlacementForInputViewSet: <<UIInputViewSet: 0x6000033015e0>; view = <_UIRemoteKeyboardPlaceholderView: 0x108506d30; frame = (0 0; 393 298); >; accessory = <_TtGC7SwiftUIP10$10a7f2f8818InputAccessoryHostVS_P10$10a7f301c17InputAccessoryBar_: 0x10851c110; frame = (0 0; 393 0); >; usesKeyClicks = NO;  > windowScene: <UIWindowScene: 0x10850b110; role: UIWindowSceneSessionRoleApplication; persistentIdentifier: 0BC7CD9A-7731-484F-AA14-1D384B804551; activationState: UISceneActivationStateForegroundActive>
+2026-09-27 16:42:21.285 Df AIReply[1595:9bd65] [com.apple.UIKit:UIPeripheralHost] endPlacementForInputViewSet, returning -> <UIInputViewSetPlacementOnScreenWithAccessory>
+2026-09-27 16:42:21.285 Df AIReply[1595:9bd65] [com.apple.UIKit:UIPeripheralHost] endPlacementForInputViewSet: <<UIInputViewSet: 0x6000033015e0>; view = <_UIRemoteKeyboardPlaceholderView: 0x108506d30; frame = (0 0; 393 298); >; accessory = <_TtGC7SwiftUIP10$10a7f2f8818InputAccessoryHostVS_P10$10a7f301c17InputAccessoryBar_: 0x10851c110; frame = (0 0; 393 0); >; usesKeyClicks = NO;  > windowScene: <UIWindowScene: 0x10850b110; role: UIWindowSceneSessionRoleApplication; persistentIdentifier: 0BC7CD9A-7731-484F-AA14-1D384B804551; activationState: UISceneActivationStateForegroundActive>
+2026-09-27 16:42:21.285 Df AIReply[1595:9bd65] [com.apple.UIKit:UIPeripheralHost] endPlacementForInputViewSet, returning -> <UIInputViewSetPlacementOnScreenWithAccessory>
+2026-09-27 16:42:21.286 Df AIReply[1595:9bd65] [com.apple.UIKit:KeyboardArbiterClientLog] -[_UIRemoteKeyboardPlaceholderView refreshPlaceholder]  refreshPlaceholder: size={393, 298} [previous size={393, 298}]
+2026-09-27 16:42:21.286 Df runningboardd[79981:9c07a] [com.apple.runningboard:ttl] Acquiring assertion targeting [xpcservice<kz.yerek.replykeyboard.keyboard(no host)>:1599] from originator [xpcservice<kz.yerek.replykeyboard.keyboard(no host)>:1599] with description <RBSAssertionDescriptor| "systemAnimationFence" ID:79981-1599-2169 target:1599 attributes:[
+	<RBSLegacyAttribute| requestedReason:FinishTask reason:FinishTask flags:( AllowIdleSleep PreventTaskSuspend PreventTaskThrottleDown )>,
+	<RBSAcquisitionCompletionAttribute| policy:AfterValidation>
+	]>
+2026-09-27 16:42:21.286 Df runningboardd[79981:9c07a] [com.apple.runningboard:ttl] Assertion 79981-1599-2169 (target:[xpcservice<kz.yerek.replykeyboard.keyboard(no host)>:1599]) will be created as inactive as start-time-defining assertions exist
+2026-09-27 16:42:21.286 Df runningboardd[79981:9c079] [com.apple.runningboard:ttl] Acquiring assertion targeting [xpcservice<kz.yerek.replykeyboard.keyboard(no host)>:1599] from originator [xpcservice<kz.yerek.replykeyboard.keyboard(no host)>:1599] with description <RBSAssertionDescriptor| "systemAnimationFence" ID:79981-1599-2170 target:1599 attributes:[
+	<RBSLegacyAttribute| requestedReason:FinishTask reason:FinishTask flags:( AllowIdleSleep PreventTaskSuspend PreventTaskThrottleDown )>,
+	<RBSAcquisitionCompletionAttribute| policy:AfterValidation>
+	]>
+2026-09-27 16:42:21.286 Df runningboardd[79981:9c079] [com.apple.runningboard:ttl] Assertion 79981-1599-2170 (target:[xpcservice<kz.yerek.replykeyboard.keyboard(no host)>:1599]) will be created as inactive as start-time-defining assertions exist
+2026-09-27 16:42:21.287 Df runningboardd[79981:9c079] [com.apple.runningboard:ttl] Acquiring assertion targeting [xpcservice<kz.yerek.replykeyboard.keyboard(no host)>:1599] from originator [xpcservice<kz.yerek.replykeyboard.keyboard(no host)>:1599] with description <RBSAssertionDescriptor| "systemAnimationFence" ID:79981-1599-2171 target:1599 attributes:[
+	<RBSLegacyAttribute| requestedReason:FinishTask reason:FinishTask flags:( AllowIdleSleep PreventTaskSuspend PreventTaskThrottleDown )>,
+	<RBSAcquisitionCompletionAttribute| policy:AfterValidation>
+	]>
+2026-09-27 16:42:21.287 Df runningboardd[79981:9c079] [com.apple.runningboard:ttl] Assertion 79981-1599-2171 (target:[xpcservice<kz.yerek.replykeyboard.keyboard(no host)>:1599]) will be created as inactive as start-time-defining assertions exist
+2026-09-27 16:42:21.287 Df runningboardd[79981:9c079] [com.apple.runningboard:ttl] Acquiring assertion targeting [xpcservice<kz.yerek.replykeyboard.keyboard(no host)>:1599] from originator [xpcservice<kz.yerek.replykeyboard.keyboard(no host)>:1599] with description <RBSAssertionDescriptor| "systemAnimationFence" ID:79981-1599-2172 target:1599 attributes:[
+	<RBSLegacyAttribute| requestedReason:FinishTask reason:FinishTask flags:( AllowIdleSleep PreventTaskSuspend PreventTaskThrottleDown )>,
+	<RBSAcquisitionCompletionAttribute| policy:AfterValidation>
+	]>
+2026-09-27 16:42:21.288 Df runningboardd[79981:9c079] [com.apple.runningboard:ttl] Assertion 79981-1599-2172 (target:[xpcservice<kz.yerek.replykeyboard.keyboard(no host)>:1599]) will be created as inactive as start-time-defining assertions exist
+2026-09-27 16:42:21.288 Df runningboardd[79981:9c079] [com.apple.runningboard:ttl] Invalidating assertion 79981-1595-2168 (target:[app<kz.yerek.replykeyboard((null))>:1595]) from originator [app<kz.yerek.replykeyboard((null))>:1595]
+2026-09-27 16:42:21.288 Df runningboardd[79981:9c079] [com.apple.runningboard:ttl] Invalidating assertion 79981-1599-2166 (target:[xpcservice<kz.yerek.replykeyboard.keyboard(no host)>:1599]) from originator [xpcservice<kz.yerek.replykeyboard.keyboard(no host)>:1599]
+2026-09-27 16:42:21.288 Df runningboardd[79981:9c079] [com.apple.runningboard:ttl] Invalidating assertion 79981-1595-2165 (target:[app<kz.yerek.replykeyboard((null))>:1595]) from originator [app<kz.yerek.replykeyboard((null))>:1595]
+2026-09-27 16:42:21.289 Df runningboardd[79981:9c079] [com.apple.runningboard:ttl] Invalidating assertion 79981-1599-2167 (target:[xpcservice<kz.yerek.replykeyboard.keyboard(no host)>:1599]) from originator [xpcservice<kz.yerek.replykeyboard.keyboard(no host)>:1599]
+2026-09-27 16:42:21.289 Df runningboardd[79981:9c079] [com.apple.runningboard:ttl] Invalidating assertion 79981-1599-2170 (target:[xpcservice<kz.yerek.replykeyboard.keyboard(no host)>:1599]) from originator [xpcservice<kz.yerek.replykeyboard.keyboard(no host)>:1599]
+2026-09-27 16:42:21.289 Df runningboardd[79981:9c079] [com.apple.runningboard:ttl] Invalidating assertion 79981-1599-2169 (target:[xpcservice<kz.yerek.replykeyboard.keyboard(no host)>:1599]) from originator [xpcservice<kz.yerek.replykeyboard.keyboard(no host)>:1599]
+2026-09-27 16:42:21.289 Df runningboardd[79981:9c079] [com.apple.runningboard:ttl] Invalidating assertion 79981-1599-2171 (target:[xpcservice<kz.yerek.replykeyboard.keyboard(no host)>:1599]) from originator [xpcservice<kz.yerek.replykeyboard.keyboard(no host)>:1599]
+2026-09-27 16:42:21.289 Df runningboardd[79981:9c079] [com.apple.runningboard:ttl] Invalidating assertion 79981-1599-2172 (target:[xpcservice<kz.yerek.replykeyboard.keyboard(no host)>:1599]) from originator [xpcservice<kz.yerek.replykeyboard.keyboard(no host)>:1599]
+2026-09-27 16:42:21.314 Df runningboardd[79981:9c084] [com.apple.runningboard:monitor] Calculated state for app<kz.yerek.replykeyboard((null))>: running-active (role: UserInteractiveFocal)
+2026-09-27 16:42:21.315 Df SpringBoard[79978:9bc0d] [com.apple.runningboard:monitor] Received state update for 1595 (app<kz.yerek.replykeyboard((null))>, running-active-Visible
+2026-09-27 16:42:21.315 Df mediaremoted[90744:9c173] [com.apple.runningboard:monitor] Received state update for 1595 (app<kz.yerek.replykeyboard((null))>, running-active-Visible
+2026-09-27 16:42:21.315 Df locationd[79999:9c171] [com.apple.runningboard:monitor] Received state update for 1595 (app<kz.yerek.replykeyboard((null))>, running-active-Visible
+
+=== crash reports ===
