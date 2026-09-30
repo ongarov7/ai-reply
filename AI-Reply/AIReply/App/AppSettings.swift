@@ -53,6 +53,16 @@ final class AppSettings {
         store.setAppLanguage(value)
     }
 
+    #if DEBUG
+    /// DEBUG ONLY. `-AIReplyLanguage kk`: this launch shows the app in that
+    /// language without saving the choice, so each language can be
+    /// photographed through the build watcher, which strips the parentheses
+    /// `-AppleLanguages (kk)` needs.
+    func applyLanguageForThisLaunch(_ value: AppLanguage) {
+        language = value
+    }
+    #endif
+
     var effectiveLanguage: AppLanguage { language ?? .systemDefault }
 
     var locale: Locale { Locale(identifier: effectiveLanguage.localeIdentifier) }

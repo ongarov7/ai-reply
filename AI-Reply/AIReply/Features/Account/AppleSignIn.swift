@@ -84,6 +84,21 @@ enum AppleSignIn {
         (error as? ASAuthorizationError)?.code == .canceled
     }
 
+    /// A short machine code for a failure of Apple's sheet, for the
+    /// `login_failed` event. Never the error's text.
+    static func errorCode(for error: Error) -> String {
+        guard let code = (error as? ASAuthorizationError)?.code else { return "unknown_error" }
+        switch code {
+        case .canceled:        return "canceled"
+        case .failed:          return "failed"
+        case .invalidResponse: return "invalid_response"
+        case .notHandled:      return "not_handled"
+        case .notInteractive:  return "not_interactive"
+        case .unknown:         return "unknown"
+        default:               return "code_\(code.rawValue)"
+        }
+    }
+
     // MARK: Revocation
 
     /// Kept so the app can notice when the user stops using their Apple ID

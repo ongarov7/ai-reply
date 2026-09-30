@@ -2,14 +2,43 @@ import SwiftUI
 
 struct SettingsView: View {
 
+    /// A part of Settings a notification link can open directly.
+    enum Focus: Hashable {
+        case notifications
+    }
+
+    /// Scrolled into view when the screen appears.
+    var focus: Focus?
+
     @Environment(AppSettings.self) private var settings
     @Environment(ReplyConfigurationModel.self) private var model
     @Environment(AccountModel.self) private var account
+    @Environment(PushNotificationsModel.self) private var notifications
     @Environment(\.openURL) private var openURL
 
     var body: some View {
+        ScrollViewReader { proxy in
+            form
+                .task {
+                    guard let focus else { return }
+                    // After the push animation, so the row exists to scroll to.
+                    // Centred rather than at the top, where the section's header
+                    // would sit under the navigation bar.
+                    try? await Task.sleep(for: .milliseconds(350))
+                    withAnimation { proxy.scrollTo(focus, anchor: .center) }
+                }
+        }
+        .navigationTitle("settings.title")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var form: some View {
         Form {
             AccountSettingsSection()
+
+            if notifications.showsNotificationSettings {
+                NotificationSettingsSection()
+            }
 
             Section {
                 NavigationLink { ProfileEditorView() } label: {
@@ -72,6 +101,8 @@ struct SettingsView: View {
                 Text("settings.language.footer")
             }
 
+            DiagnosticsSettingsSection()
+
             Section {
                 Text("settings.privacy.body")
                     .font(.footnote)
@@ -96,8 +127,6 @@ struct SettingsView: View {
                 }
             }
         }
-        .navigationTitle("settings.title")
-        .navigationBarTitleDisplayMode(.inline)
     }
 
     private var appearanceBinding: Binding<AppearancePreference> {

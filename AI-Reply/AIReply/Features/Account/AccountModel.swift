@@ -55,6 +55,11 @@ final class AccountModel {
 
     @ObservationIgnored private let service: AccountService
 
+    /// Hears about a sign-out and about sign-in failures inside Apple's or
+    /// Google's own sheet, which the server never sees. The app turns these
+    /// into app events; this model knows nothing about telemetry.
+    @ObservationIgnored var onActivity: ((AccountActivity) -> Void)?
+
     init(service: AccountService = AccountService()) {
         self.service = service
         self.phase = AccountCredentials.isSignedIn ? .signedIn : .signedOut
@@ -267,9 +272,11 @@ final class AccountModel {
             return .cancelled
         } catch GoogleSignInProvider.Failure.notConfigured {
             errorKey = "account.error.providerUnavailable"
+            onActivity?(.providerSignInFailed(method: .google, errorCode: "not_configured"))
             return .failed(clearCode: false)
         } catch {
             errorKey = "account.error.providerFailed"
+            onActivity?(.providerSignInFailed(method: .google, errorCode: "sdk_error"))
             return .failed(clearCode: false)
         }
 
@@ -282,9 +289,11 @@ final class AccountModel {
         }
     }
 
-    /// Apple's own sheet failed before our server was involved.
-    func reportProviderFailure() {
+    /// Apple's own sheet failed before our server was involved. `errorCode`
+    /// is a short machine code (`AppleSignIn.errorCode(for:)`), never a message.
+    func reportProviderFailure(errorCode: String = "provider_error") {
         errorKey = "account.error.providerFailed"
+        onActivity?(.providerSignInFailed(method: .apple, errorCode: errorCode))
     }
 
     /// The session is stored and the screens switch now. Device registration
@@ -334,6 +343,10 @@ final class AccountModel {
 
     func signOut() async {
         isBusy = true
+        onActivity?(.signedOut)
+        // The logout request names this installation (X-Installation-ID), so
+        // the server stops sending this account's notifications to the phone
+        // at once; the app then registers it again without an account.
         await service.signOut()
         await signOutLocally()
         isBusy = false

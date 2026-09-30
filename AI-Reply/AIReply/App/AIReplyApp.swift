@@ -3,14 +3,34 @@ import SwiftUI
 @main
 struct AIReplyApp: App {
 
-    @State private var settings = AppSettings()
+    /// UIKit's push callbacks (device token, launch) have no SwiftUI
+    /// equivalent; the delegate hands them to `AppServices`.
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    @Environment(\.scenePhase) private var scenePhase
+
+    @State private var settings: AppSettings
     @State private var configuration = ReplyConfigurationModel()
-    @State private var account = AccountModel()
+    @State private var account: AccountModel
+
+    private let services = AppServices.shared
 
     init() {
         #if DEBUG
         AIConfiguration.applyDebugLaunchArguments()
         #endif
+        let settings = AppSettings()
+        #if DEBUG
+        if let language = DebugLaunchOptions.language {
+            settings.applyLanguageForThisLaunch(language)
+        }
+        #endif
+        let account = AccountModel()
+        // Sign-out and failures inside Apple's or Google's sheet become app
+        // events; the account model itself knows nothing about telemetry.
+        account.onActivity = { activity in AppServices.shared.accountActivity(activity) }
+        AppServices.shared.appLanguage = { settings.effectiveLanguage.rawValue }
+        _settings = State(initialValue: settings)
+        _account = State(initialValue: account)
     }
 
     var body: some Scene {
@@ -30,7 +50,7 @@ struct AIReplyApp: App {
                     // pointed at our service; see AccountGateView.
                     AccountGateView {
                         if configuration.hasCompletedOnboarding {
-                            NavigationStack { HomeView() }
+                            RootNavigationView()
                         } else {
                             OnboardingView()
                         }
@@ -42,7 +62,7 @@ struct AIReplyApp: App {
                 // the user back through it without losing their answers.
                 AccountGateView {
                     if configuration.hasCompletedOnboarding {
-                        NavigationStack { HomeView() }
+                        RootNavigationView()
                     } else {
                         OnboardingView()
                     }
@@ -54,12 +74,34 @@ struct AIReplyApp: App {
             .environment(settings)
             .environment(configuration)
             .environment(account)
+            .environment(services.router)
+            .environment(services.notifications)
             // Drives both the interface language and every localized string in
             // the subtree, so switching language takes effect without a restart.
             .environment(\.locale, settings.locale)
             .preferredColorScheme(settings.colorScheme)
             .tint(.accentColor)
+            // Sign-in, sign-out and the server's features decide whether and
+            // how this install is registered for notifications.
+            .onChange(of: accountState, initial: true) { _, state in
+                services.accountDidChange(state)
+            }
+            .onChange(of: settings.effectiveLanguage) { _, _ in
+                services.requestInstallationSync()
+            }
+            .onChange(of: scenePhase, initial: true) { _, phase in
+                services.scenePhaseDidChange(phase)
+            }
         }
+    }
+
+    private var accountState: AppServices.AccountState {
+        AppServices.AccountState(
+            isBootstrapComplete: account.isBootstrapComplete,
+            isSignedIn: account.isSignedIn,
+            userID: account.user?.id,
+            features: account.features
+        )
     }
 }
 
@@ -67,6 +109,8 @@ struct AIReplyApp: App {
 /// Which screen `-AIReplyDebugScreen <name>` should open.
 enum DebugScreen: String {
     case keyboard, setup, home, settings, profile, templates
+    /// Settings, scrolled to its notifications section.
+    case notifications
     /// The sign-in flow's three screens, for review in each language.
     case signIn, email, code
 
@@ -85,8 +129,10 @@ private struct DebugScreenHost: View {
         switch screen {
         case .keyboard:  DebugKeyboardHost()
         case .setup:     NavigationStack { KeyboardSetupView() }
-        case .home:      NavigationStack { HomeView() }
+        // The router's own stack, so `-AIReplyOpenLink` can be tried here.
+        case .home:      RootNavigationView()
         case .settings:  NavigationStack { SettingsView() }
+        case .notifications: NavigationStack { SettingsView(focus: .notifications) }
         case .profile:   NavigationStack { ProfileEditorView() }
         case .templates: NavigationStack { TemplateEditorView(templateID: "client") }
         case .signIn:    SignInView { _ in }

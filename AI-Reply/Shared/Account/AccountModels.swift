@@ -268,12 +268,22 @@ extension AccountAPI {
         let emailOTP: Bool?
         let googleSignIn: Bool?
         let appleSignIn: Bool?
+        /// `POST /api/v1/installations` exists. Missing on older servers,
+        /// which the app treats as "no": it then never calls the endpoint.
+        let installations: Bool?
+        /// The server can actually deliver a push (a provider is set up).
+        let pushNotifications: Bool?
+        /// `POST /api/v1/events` accepts app events.
+        let telemetry: Bool?
 
         enum CodingKeys: String, CodingKey {
             case replyPreferences = "reply_preferences"
             case emailOTP = "email_otp"
             case googleSignIn = "google_sign_in"
             case appleSignIn = "apple_sign_in"
+            case installations
+            case pushNotifications = "push_notifications"
+            case telemetry
         }
     }
 
