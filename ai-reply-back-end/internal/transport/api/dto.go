@@ -19,6 +19,8 @@ type userDTO struct {
 	Platform   string `json:"platform,omitempty"`
 	CreatedAt  string `json:"created_at"`
 	Onboarding bool   `json:"onboarding_completed"`
+	// AuthProviders — кіру тәсілдері: apple | email | google | phone.
+	AuthProviders []string `json:"auth_providers"`
 }
 
 func toUserDTO(u domain.User, p domain.Profile) userDTO {
@@ -31,6 +33,8 @@ func toUserDTO(u domain.User, p domain.Profile) userDTO {
 		Platform:   u.Platform,
 		CreatedAt:  u.CreatedAt.Format(time.RFC3339),
 		Onboarding: p.OnboardingCompleted,
+
+		AuthProviders: []string{},
 	}
 }
 

@@ -18,6 +18,11 @@ type Service struct{ repo *repository.Store }
 // New — қызмет.
 func New(repo *repository.Store) *Service { return &Service{repo: repo} }
 
+// SignInMethods — қолданушының кіру тәсілдері.
+func (s *Service) SignInMethods(ctx context.Context, userID string) ([]string, error) {
+	return s.repo.SignInMethods(ctx, userID)
+}
+
 // Profile — профильді оқу.
 func (s *Service) Profile(ctx context.Context, userID string) (domain.Profile, error) {
 	return s.repo.Profile(ctx, userID)

@@ -2,13 +2,16 @@ package auth
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
+	"io"
 	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/aireply/ai-reply-back-end/config"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
+	"github.com/aireply/ai-reply-back-end/internal/email"
 	"github.com/aireply/ai-reply-back-end/internal/repository"
 	"github.com/aireply/ai-reply-back-end/internal/traits"
 )
@@ -20,21 +23,62 @@ type Provisioner interface {
 
 // Service — кіру сценарийлері.
 type Service struct {
-	repo  *repository.Store
-	cfg   config.Auth
-	send  Sender
-	prov  Provisioner
-	log   *slog.Logger
-	clock traits.Clock
+	repo   *repository.Store
+	cfg    config.Auth
+	send   Sender
+	prov   Provisioner
+	log    *slog.Logger
+	clock  traits.Clock
+	random io.Reader
+	// otpKey — поштаға жіберілген кодтардың HMAC кілті (JWT құпиясынан туындатылған).
+	otpKey []byte
+	// mail — хат жеткізушісі (Resend); nil болса, тек демо режимде жұмыс істейді.
+	mail email.Sender
+	// google, apple — токен тексерушілері; nil болса, провайдер өшірулі.
+	google IDTokenVerifier
+	apple  IDTokenVerifier
 }
 
 // New — қызметті құрады.
 func New(repo *repository.Store, cfg config.Auth, sender Sender, prov Provisioner, log *slog.Logger) *Service {
-	return &Service{repo: repo, cfg: cfg, send: sender, prov: prov, log: log, clock: traits.SystemClock{}}
+	return &Service{
+		repo: repo, cfg: cfg, send: sender, prov: prov, log: log, clock: traits.SystemClock{},
+		random: rand.Reader, otpKey: deriveKey(cfg.AccessSecret, "ai-reply/email-otp/v1"),
+	}
 }
 
 // WithClock — тестте уақытты басқару үшін.
 func (s *Service) WithClock(c traits.Clock) *Service { s.clock = c; return s }
+
+// WithRandom — тестте код генераторын бекіту үшін.
+func (s *Service) WithRandom(r io.Reader) *Service { s.random = r; return s }
+
+// WithEmailSender — поштаға код жіберетін провайдер.
+func (s *Service) WithEmailSender(sender email.Sender) *Service { s.mail = sender; return s }
+
+// WithIdentityProviders — Google және Apple тексерушілері; nil — провайдер өшірулі.
+func (s *Service) WithIdentityProviders(google, apple IDTokenVerifier) *Service {
+	s.google, s.apple = google, apple
+	return s
+}
+
+// EmailDelivery — поштаға код қалай жетеді: "email" (провайдер), "demo" немесе "off".
+func (s *Service) EmailDelivery() string {
+	switch {
+	case s.mail != nil:
+		return "email"
+	case s.cfg.DemoMode:
+		return "demo"
+	default:
+		return "off"
+	}
+}
+
+// GoogleEnabled — Google арқылы кіру бапталған ба.
+func (s *Service) GoogleEnabled() bool { return s.google != nil }
+
+// AppleEnabled — Apple арқылы кіру бапталған ба.
+func (s *Service) AppleEnabled() bool { return s.apple != nil }
 
 // Challenge — OTP сұранысының нәтижесі.
 type Challenge struct {
@@ -74,6 +118,19 @@ func (s *Service) RequestOTP(ctx context.Context, rawIdentifier, locale string) 
 	if err != nil {
 		return Challenge{}, domain.ErrInvalidRequest
 	}
+	if identity.Kind == domain.IdentityEmail {
+		// Older builds reach e-mail through this endpoint: same flow, same limits.
+		challenge, err := s.RequestEmailOTP(ctx, identity.Value, locale)
+		if err != nil {
+			return Challenge{}, err
+		}
+		channel := "email"
+		if challenge.DemoMode {
+			channel = "stub"
+		}
+		return Challenge{Kind: identity.Kind, Masked: challenge.MaskedEmail, Channel: channel,
+			ExpiresIn: challenge.ExpiresIn, DemoMode: challenge.DemoMode}, nil
+	}
 
 	// Бір идентификаторға сағатына шектеу (brute-force және шығын қорғанысы).
 	since := s.clock.Now().Add(-time.Hour)
@@ -87,7 +144,7 @@ func (s *Service) RequestOTP(ctx context.Context, rawIdentifier, locale string) 
 
 	code := s.cfg.DemoOTP
 	if !s.cfg.DemoMode {
-		if code, err = GenerateCode(4); err != nil {
+		if code, err = NewOTPCode(s.random); err != nil {
 			return Challenge{}, err
 		}
 	}
@@ -130,6 +187,9 @@ func (s *Service) VerifyOTP(ctx context.Context, rawIdentifier, code string, inf
 	if err != nil {
 		return Session{}, domain.ErrInvalidRequest
 	}
+	if identity.Kind == domain.IdentityEmail {
+		return s.VerifyEmailOTP(ctx, identity.Value, code, info)
+	}
 	if strings.TrimSpace(code) == "" {
 		return Session{}, domain.ErrInvalidOTP
 	}
@@ -161,46 +221,26 @@ func (s *Service) VerifyOTP(ctx context.Context, rawIdentifier, code string, inf
 		return Session{}, err
 	}
 
-	user, isNew, err := s.findOrCreateUser(ctx, identity, info)
+	user, isNew, err := s.findOrCreatePhoneUser(ctx, identity, info)
 	if err != nil {
 		return Session{}, err
 	}
-	if user.Status == domain.UserDisabled {
-		return Session{}, domain.ErrAccountDisabled
-	}
-
-	session, err := s.issueSession(ctx, user, info, "")
-	if err != nil {
-		return Session{}, err
-	}
-	session.IsNewUser = isNew
-	return session, nil
+	return s.openSession(ctx, user, isNew, info)
 }
 
-func (s *Service) findOrCreateUser(ctx context.Context, identity Identity, info DeviceInfo) (domain.User, bool, error) {
+// findOrCreatePhoneUser — телефонмен кірген қолданушы (ескі build-тер үшін сақталған ағын).
+func (s *Service) findOrCreatePhoneUser(ctx context.Context, identity Identity, info DeviceInfo) (domain.User, bool, error) {
 	user, err := s.repo.UserByIdentity(ctx, identity.Kind, identity.Value)
 	switch {
 	case err == nil:
-		_ = s.repo.UpdateUserMeta(ctx, user.ID, info.Platform, info.AppVersion, info.OSVersion,
-			domain.NormalizeLocale(info.Locale), info.Timezone)
+		s.touchUser(ctx, user, info)
 		return user, false, nil
 	case !errors.Is(err, domain.ErrNotFound):
 		return domain.User{}, false, err
 	}
 
-	fresh := domain.User{
-		Status:     domain.UserActive,
-		Locale:     domain.NormalizeLocale(info.Locale),
-		Timezone:   info.Timezone,
-		Platform:   info.Platform,
-		AppVersion: info.AppVersion,
-		OSVersion:  info.OSVersion,
-	}
-	if identity.Kind == "phone" {
-		fresh.Phone = identity.Value
-	} else {
-		fresh.Email = identity.Value
-	}
+	fresh := s.newUser(info, "")
+	fresh.Phone = identity.Value
 	created, err := s.repo.CreateUser(ctx, fresh)
 	if err != nil {
 		return domain.User{}, false, err
@@ -208,13 +248,53 @@ func (s *Service) findOrCreateUser(ctx context.Context, identity Identity, info 
 	if err := s.repo.SaveIdentity(ctx, created.ID, identity.Kind, identity.Value, identity.Country); err != nil {
 		return domain.User{}, false, err
 	}
+	if err := s.provision(ctx, created, info); err != nil {
+		return domain.User{}, false, err
+	}
+	return created, true, nil
+}
+
+// newUser — жаңа тіркелгінің бастапқы мәндері (клиент жіберген метадерек бойынша).
+func (s *Service) newUser(info DeviceInfo, address string) domain.User {
+	return domain.User{
+		Status:     domain.UserActive,
+		Email:      address,
+		Locale:     domain.NormalizeLocale(info.Locale),
+		Timezone:   info.Timezone,
+		Platform:   info.Platform,
+		AppVersion: info.AppVersion,
+		OSVersion:  info.OSVersion,
+	}
+}
+
+// touchUser — платформа, нұсқа, тіл сияқты метадеректі жаңартады. Сәтсіздігі кіруге кедергі емес.
+func (s *Service) touchUser(ctx context.Context, user domain.User, info DeviceInfo) {
+	_ = s.repo.UpdateUserMeta(ctx, user.ID, info.Platform, info.AppVersion, info.OSVersion,
+		domain.NormalizeLocale(info.Locale), info.Timezone)
+}
+
+// provision — жаңа тіркелгіге бастапқы тариф береді және нұсқаны статистикаға жазады.
+func (s *Service) provision(ctx context.Context, user domain.User, info DeviceInfo) error {
 	if s.prov != nil {
-		if err := s.prov.EnsureSubscription(ctx, created.ID); err != nil {
-			return domain.User{}, false, err
+		if err := s.prov.EnsureSubscription(ctx, user.ID); err != nil {
+			return err
 		}
 	}
 	_ = s.repo.RecordAppVersion(ctx, info.Platform, info.AppVersion, "")
-	return created, true, nil
+	return nil
+}
+
+// openSession — өшірілген тіркелгіні тоқтатады, әйтпесе токендер жұбын береді.
+func (s *Service) openSession(ctx context.Context, user domain.User, isNew bool, info DeviceInfo) (Session, error) {
+	if user.Status == domain.UserDisabled {
+		return Session{}, domain.ErrAccountDisabled
+	}
+	session, err := s.issueSession(ctx, user, info, "")
+	if err != nil {
+		return Session{}, err
+	}
+	session.IsNewUser = isNew
+	return session, nil
 }
 
 // issueSession — құрылғыны тіркеп, токендер жұбын береді.

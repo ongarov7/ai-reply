@@ -167,7 +167,7 @@ func (s *Server) writeSession(w http.ResponseWriter, r *http.Request, session au
 		RefreshExpiresAt: session.RefreshExpiresAt.Format(time.RFC3339),
 		DeviceID:         session.DeviceID,
 		IsNewUser:        session.IsNewUser,
-		User:             toUserDTO(session.User, profile),
+		User:             s.userDTO(ctx, session.User, profile),
 		Profile:          toProfileDTO(profile),
 		Subscription:     s.subscriptionDTO(entitlement),
 		Usage:            toUsageDTO(entitlement, s.cfg.App.Timezone),

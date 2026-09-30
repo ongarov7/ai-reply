@@ -22,6 +22,29 @@ const (
 	SubPaymentPending = "payment_pending"
 )
 
+// Кіру тәсілдері (auth_identities.kind).
+const (
+	IdentityPhone  = "phone"
+	IdentityEmail  = "email"
+	IdentityGoogle = "google"
+	IdentityApple  = "apple"
+)
+
+// OTP мақсаттары (otp_codes.purpose).
+const (
+	OTPPurposeLogin     = "login"
+	OTPPurposeLinkEmail = "link_email"
+)
+
+// OTP жабылу себептері (otp_codes.consumed_reason).
+const (
+	OTPReasonVerified       = "verified"
+	OTPReasonSuperseded     = "superseded"
+	OTPReasonExpired        = "expired"
+	OTPReasonAttempts       = "attempts"
+	OTPReasonDeliveryFailed = "delivery_failed"
+)
+
 // Платформалар.
 const (
 	PlatformIOS     = "ios"
@@ -73,6 +96,24 @@ func (u User) Identifier() string {
 		return u.Email
 	}
 	return u.ID
+}
+
+// Identity — қолданушының бір кіру тәсілі.
+//
+// Value is the verified e-mail or phone for those kinds, and the provider's
+// immutable subject (`sub`) for Google and Apple — never their e-mail, which
+// can change or be a private relay.
+type Identity struct {
+	ID                    string
+	UserID                string
+	Kind                  string
+	Value                 string
+	Country               string
+	ProviderEmail         string
+	ProviderEmailVerified bool
+	VerifiedAt            *time.Time
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
 }
 
 // Profile — жауап дербестендіру үшін қажет ең аз мәлімет.
@@ -290,8 +331,60 @@ var (
 	ErrPaymentRequired  = errors.New("payment required")
 	ErrDemoDisabled     = errors.New("demo authentication disabled")
 
+	// Кіру: пошта, OTP, Google және Apple.
+	ErrInvalidEmail            = errors.New("invalid email")
+	ErrOTPAlreadyUsed          = errors.New("otp already used")
+	ErrOTPAttemptsExceeded     = errors.New("otp attempts exceeded")
+	ErrOTPCooldown             = errors.New("otp resend cooldown")
+	ErrEmailDelivery           = errors.New("email delivery failed")
+	ErrEmailInUse              = errors.New("email belongs to another account")
+	ErrInvalidIDToken          = errors.New("invalid identity token")
+	ErrAuthProviderUnavailable = errors.New("auth provider unavailable")
+
 	// ErrSourceTooLong — көшірілген хабарлама әкімші бекіткен шектен ұзын.
 	// ErrInvalidRequest-ті орайды: ескі клиенттер бұрынғыдай INVALID_REQUEST
 	// алады, жаңалары details ішінен нақты шекті оқиды.
 	ErrSourceTooLong = fmt.Errorf("%w: source text too long", ErrInvalidRequest)
 )
+
+// RetryAfterError — қатемен бірге қайта сұрауға болатын уақыт.
+//
+// The HTTP layer turns it into a Retry-After header and a
+// `retry_after_seconds` detail, so a client can count down without guessing.
+type RetryAfterError struct {
+	Err   error
+	After time.Duration
+}
+
+// RetryAfter — err-ді күту уақытымен орайды.
+func RetryAfter(err error, after time.Duration) error {
+	return &RetryAfterError{Err: err, After: after}
+}
+
+func (e *RetryAfterError) Error() string { return e.Err.Error() }
+func (e *RetryAfterError) Unwrap() error { return e.Err }
+
+// Seconds — жоғары қарай дөңгелектелген, кемінде 1 секунд.
+func (e *RetryAfterError) Seconds() int {
+	seconds := int((e.After + time.Second - 1) / time.Second)
+	if seconds < 1 {
+		return 1
+	}
+	return seconds
+}
+
+// Details — клиентке кететін қосымша мәлімет.
+func (e *RetryAfterError) Details() map[string]any {
+	return map[string]any{"retry_after_seconds": e.Seconds()}
+}
+
+// OTPAttemptError — код қате; қанша әрекет қалғаны айтылады.
+type OTPAttemptError struct{ Remaining int }
+
+func (e *OTPAttemptError) Error() string { return ErrInvalidOTP.Error() }
+func (e *OTPAttemptError) Unwrap() error { return ErrInvalidOTP }
+
+// Details — клиентке кететін қосымша мәлімет.
+func (e *OTPAttemptError) Details() map[string]any {
+	return map[string]any{"attempts_remaining": e.Remaining}
+}

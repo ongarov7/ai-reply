@@ -17,7 +17,9 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/admin"
 	"github.com/aireply/ai-reply-back-end/internal/ai"
 	"github.com/aireply/ai-reply-back-end/internal/auth"
+	"github.com/aireply/ai-reply-back-end/internal/auth/idtoken"
 	"github.com/aireply/ai-reply-back-end/internal/database"
+	"github.com/aireply/ai-reply-back-end/internal/email"
 	"github.com/aireply/ai-reply-back-end/internal/limits"
 	"github.com/aireply/ai-reply-back-end/internal/localization"
 	"github.com/aireply/ai-reply-back-end/internal/logging"
@@ -76,6 +78,11 @@ func run(envFile string) error {
 		}
 	}
 
+	bundle, err := localization.Load()
+	if err != nil {
+		return err
+	}
+
 	// ---------------------------------------------------------------- wiring
 	store := repository.New(db)
 	planSvc := plans.New(store)
@@ -83,6 +90,9 @@ func run(envFile string) error {
 	userSvc := users.New(store)
 	sender := auth.NewSender(cfg.Auth.OTPChannel, log)
 	authSvc := auth.New(store, cfg.Auth, sender, subSvc, log)
+	if err := configureSignIn(authSvc, cfg, bundle); err != nil {
+		return err
+	}
 	provider := ai.NewOpenAI(cfg.OpenAI)
 	limitSvc := limits.New(store, limits.Limits{
 		SourceChars:      cfg.Limits.SourceTextChars,
@@ -102,10 +112,6 @@ func run(envFile string) error {
 		return fmt.Errorf("admin bootstrap: %w", err)
 	}
 
-	bundle, err := localization.Load()
-	if err != nil {
-		return err
-	}
 	limiter := middleware.NewLimiter()
 
 	mux := http.NewServeMux()
@@ -156,7 +162,9 @@ func run(envFile string) error {
 		log.Info("server listening",
 			"addr", server.Addr, "env", cfg.App.Env, "timezone", cfg.App.Timezone,
 			"demo_mode", cfg.Auth.DemoMode, "payment_mode", cfg.Payments.Mode,
-			"legacy_api", cfg.Auth.LegacyEnabled, "model", cfg.OpenAI.Model)
+			"legacy_api", cfg.Auth.LegacyEnabled, "model", cfg.OpenAI.Model,
+			"email_otp", authSvc.EmailDelivery(), "google_sign_in", authSvc.GoogleEnabled(),
+			"apple_sign_in", authSvc.AppleEnabled())
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}
@@ -171,6 +179,46 @@ func run(envFile string) error {
 		defer cancel()
 		return server.Shutdown(shutdownCtx)
 	}
+}
+
+// configureSignIn — пошта жеткізушісі (Resend) мен Google/Apple тексерушілерін қосады.
+//
+// Everything comes from the environment. A provider without configuration is
+// simply off: its endpoint answers AUTH_PROVIDER_UNAVAILABLE and /api/v1/config
+// says so, which the apps use to hide the button.
+func configureSignIn(authSvc *auth.Service, cfg config.Config, bundle *localization.Bundle) error {
+	if cfg.Email.Enabled() {
+		mailer, err := email.NewResend(email.ResendConfig{
+			APIKey:    cfg.Email.ResendAPIKey,
+			FromEmail: cfg.Email.FromEmail,
+			FromName:  cfg.Email.FromName,
+			Translate: bundle.T,
+		})
+		if err != nil {
+			return fmt.Errorf("email: %w", err)
+		}
+		authSvc.WithEmailSender(mailer)
+	}
+
+	var google, apple auth.IDTokenVerifier
+	if len(cfg.OAuth.GoogleClientIDs) > 0 {
+		verifier, err := idtoken.NewGoogle(cfg.OAuth.GoogleClientIDs,
+			idtoken.NewRemoteKeys(idtoken.GoogleKeysURL, nil))
+		if err != nil {
+			return fmt.Errorf("google sign-in: %w", err)
+		}
+		google = verifier
+	}
+	if len(cfg.OAuth.AppleClientIDs) > 0 {
+		verifier, err := idtoken.NewApple(cfg.OAuth.AppleClientIDs,
+			idtoken.NewRemoteKeys(idtoken.AppleKeysURL, nil))
+		if err != nil {
+			return fmt.Errorf("apple sign-in: %w", err)
+		}
+		apple = verifier
+	}
+	authSvc.WithIdentityProviders(google, apple)
+	return nil
 }
 
 // expireSubscriptions — мерзімі өткен жазылымдарды белгілейтін фон тапсырмасы.

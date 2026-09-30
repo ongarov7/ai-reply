@@ -722,5 +722,10 @@
  "value.subtitle": "Kuniga oʻnlab xabar — bir xil savollar, har javobga 2–3 daqiqa.",
  "value.title": "Nima uchun kerak",
  "voice.body": "Koʻrsatmani yozib oʻtirish shart emas: mikrofonni bosib, nima deyishni ayting. Ovoz faqat koʻrsatmangizni aniqlash uchun ishlatiladi.",
- "voice.title": "Android'da ovoz bilan"
+ "voice.title": "Android'da ovoz bilan",
+ "email.otp.subject": "AI Reply tasdiqlash kodi",
+ "email.otp.intro": "Tasdiqlash kodingiz:",
+ "email.otp.expires": "Kod {minutes} daqiqa amal qiladi.",
+ "email.otp.never_share": "Bu kodni hech kimga bermang.",
+ "email.otp.ignore": "Agar bu kodni siz soʻramagan boʻlsangiz, ushbu xatni eʼtiborsiz qoldiring."
 }

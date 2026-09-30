@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"net/mail"
 	"os"
 	"strconv"
 	"strings"
@@ -16,6 +17,8 @@ type Config struct {
 	App      App
 	Database Database
 	Auth     Auth
+	Email    Email
+	OAuth    OAuth
 	OpenAI   OpenAI
 	Admin    Admin
 	Payments Payments
@@ -76,6 +79,31 @@ type Auth struct {
 	OTPChannel         string // stub | sms | whatsapp | email
 	LegacySecret       string // ескі мобильді build-тердің install-token қолтаңбасы
 	LegacyEnabled      bool
+	// Бір поштаға жаңа кодты қайта сұрауға болатын ең аз аралық (сервер тексереді).
+	OTPResendCooldown time.Duration
+	// Бір поштаға тәулігіне сұрауға болатын код саны.
+	OTPRequestsPerDay int
+}
+
+// Email — транзакциялық хаттар (Resend). Кілт тек ортадан келеді.
+type Email struct {
+	ResendAPIKey string
+	FromEmail    string
+	FromName     string
+}
+
+// Enabled — нақты хат жеткізу бапталған ба.
+func (e Email) Enabled() bool { return e.ResendAPIKey != "" && e.FromEmail != "" }
+
+// OAuth — Google және Apple арқылы кіру.
+//
+// Each list holds the values a provider's token may carry in `aud`: the iOS
+// OAuth client id and the Web client id Android passes to Credential Manager
+// for Google, the app's bundle id for Apple. An empty list switches that
+// provider off; nothing here is secret.
+type OAuth struct {
+	GoogleClientIDs []string
+	AppleClientIDs  []string
 }
 
 type OpenAI struct {
@@ -154,6 +182,17 @@ func Load(envFile string) (Config, error) {
 			OTPChannel:         str("OTP_CHANNEL", "stub"),
 			LegacySecret:       str("AUTH_SIGNING_SECRET", ""),
 			LegacyEnabled:      boolean("LEGACY_API_ENABLED", true),
+			OTPResendCooldown:  dur("OTP_RESEND_COOLDOWN", 32*time.Second),
+			OTPRequestsPerDay:  num("RATE_OTP_REQUEST_PER_DAY", 10),
+		},
+		Email: Email{
+			ResendAPIKey: str("RESEND_API_KEY", ""),
+			FromEmail:    strings.ToLower(str("RESEND_FROM_EMAIL", "")),
+			FromName:     str("RESEND_FROM_NAME", "AI Reply"),
+		},
+		OAuth: OAuth{
+			GoogleClientIDs: append(list("GOOGLE_CLIENT_ID_IOS", ""), list("GOOGLE_CLIENT_ID_WEB", "")...),
+			AppleClientIDs:  list("APPLE_CLIENT_ID", ""),
 		},
 		OpenAI: OpenAI{
 			APIKey:          str("OPENAI_API_KEY", ""),
@@ -230,8 +269,18 @@ func (c Config) Validate() []string {
 			problems = append(problems, "PUBLIC_BASE_URL must be https in production")
 		}
 	}
-	if c.Auth.DemoMode && len(c.Auth.DemoOTP) < 4 {
-		problems = append(problems, "AUTH_DEMO_OTP must be at least 4 digits")
+	if c.Auth.DemoMode && !isDigits(c.Auth.DemoOTP, 4) {
+		problems = append(problems, "AUTH_DEMO_OTP must be exactly 4 digits")
+	}
+	if c.Email.ResendAPIKey != "" || c.Email.FromEmail != "" {
+		if addr, err := mail.ParseAddress(c.Email.FromEmail); err != nil || addr.Name != "" || addr.Address != c.Email.FromEmail {
+			problems = append(problems, "RESEND_FROM_EMAIL must be a plain address on a domain verified in Resend, e.g. noreply@ai-reply.kz")
+		}
+	}
+	if c.App.IsProduction() && !c.Email.Enabled() {
+		// Sign-in codes go out by e-mail; production without a provider would
+		// accept sign-in requests it can never deliver.
+		problems = append(problems, "RESEND_API_KEY and RESEND_FROM_EMAIL must be set when APP_ENV=production")
 	}
 	if !contains([]string{"demo", "live"}, c.Payments.Mode) {
 		problems = append(problems, "PAYMENT_MODE must be demo or live")
@@ -327,6 +376,18 @@ func list(key, fallback string) []string {
 		}
 	}
 	return out
+}
+
+func isDigits(v string, length int) bool {
+	if len(v) != length {
+		return false
+	}
+	for _, r := range v {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 func contains(all []string, v string) bool {

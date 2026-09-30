@@ -12,16 +12,18 @@ import (
 
 // OTPRecord — жіберілген кодтың жазбасы (код тек хэш түрінде).
 type OTPRecord struct {
-	ID          string
-	Kind        string
-	Value       string
-	Channel     string
-	CodeHash    string
-	Attempts    int
-	MaxAttempts int
-	ExpiresAt   time.Time
-	ConsumedAt  *time.Time
-	CreatedAt   time.Time
+	ID             string
+	Kind           string
+	Value          string
+	Purpose        string
+	Channel        string
+	CodeHash       string
+	Attempts       int
+	MaxAttempts    int
+	ExpiresAt      time.Time
+	ConsumedAt     *time.Time
+	ConsumedReason string
+	CreatedAt      time.Time
 }
 
 // CreateOTP — жаңа код жазбасы; ескі белсенділер жабылады.

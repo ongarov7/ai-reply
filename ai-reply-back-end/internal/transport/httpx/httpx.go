@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/aireply/ai-reply-back-end/internal/domain"
@@ -32,6 +33,16 @@ const (
 	CodeConflict        = "CONFLICT"
 	CodeDemoDisabled    = "DEMO_AUTH_DISABLED"
 	CodeInternal        = "INTERNAL_ERROR"
+
+	// Кіру: пошта OTP, Google, Apple.
+	CodeInvalidEmail        = "INVALID_EMAIL"
+	CodeOTPAlreadyUsed      = "OTP_ALREADY_USED"
+	CodeOTPAttemptsExceeded = "OTP_ATTEMPTS_EXCEEDED"
+	CodeOTPResendCooldown   = "OTP_RESEND_COOLDOWN"
+	CodeEmailDelivery       = "EMAIL_DELIVERY_FAILED"
+	CodeEmailInUse          = "EMAIL_ALREADY_IN_USE"
+	CodeInvalidIDToken      = "INVALID_ID_TOKEN"
+	CodeAuthProviderDown    = "AUTH_PROVIDER_UNAVAILABLE"
 )
 
 // ErrorBody — қате конверті.
@@ -61,15 +72,44 @@ func Error(w http.ResponseWriter, status int, code, message string, details map[
 	JSON(w, status, errorEnvelope{Error: ErrorBody{Code: code, Message: message, Details: details}})
 }
 
+// detailer — клиентке қосымша мәлімет беретін қате (мысалы, retry_after_seconds).
+type detailer interface {
+	Details() map[string]any
+}
+
 // Fail — домендік қатені HTTP мәртебесі мен кодына айналдырады.
 func Fail(w http.ResponseWriter, err error) {
 	status, code, message := Translate(err)
-	Error(w, status, code, message, nil)
+	var details map[string]any
+	var d detailer
+	if errors.As(err, &d) {
+		details = d.Details()
+		if seconds, ok := details["retry_after_seconds"].(int); ok && seconds > 0 {
+			w.Header().Set("Retry-After", strconv.Itoa(seconds))
+		}
+	}
+	Error(w, status, code, message, details)
 }
 
 // Translate — қате → (мәртебе, код, хабар).
 func Translate(err error) (int, string, string) {
 	switch {
+	case errors.Is(err, domain.ErrInvalidEmail):
+		return http.StatusBadRequest, CodeInvalidEmail, "The e-mail address is not valid."
+	case errors.Is(err, domain.ErrOTPAlreadyUsed):
+		return http.StatusBadRequest, CodeOTPAlreadyUsed, "The code has already been used."
+	case errors.Is(err, domain.ErrOTPAttemptsExceeded):
+		return http.StatusTooManyRequests, CodeOTPAttemptsExceeded, "Too many attempts. Request a new code."
+	case errors.Is(err, domain.ErrOTPCooldown):
+		return http.StatusTooManyRequests, CodeOTPResendCooldown, "Wait before requesting a new code."
+	case errors.Is(err, domain.ErrEmailDelivery):
+		return http.StatusServiceUnavailable, CodeEmailDelivery, "The e-mail could not be sent."
+	case errors.Is(err, domain.ErrEmailInUse):
+		return http.StatusConflict, CodeEmailInUse, "This e-mail belongs to another account."
+	case errors.Is(err, domain.ErrInvalidIDToken):
+		return http.StatusUnauthorized, CodeInvalidIDToken, "The sign-in token is not valid."
+	case errors.Is(err, domain.ErrAuthProviderUnavailable):
+		return http.StatusServiceUnavailable, CodeAuthProviderDown, "The sign-in provider is unavailable."
 	case errors.Is(err, domain.ErrInvalidOTP):
 		return http.StatusBadRequest, CodeInvalidOTP, "The code is not correct."
 	case errors.Is(err, domain.ErrOTPExpired):

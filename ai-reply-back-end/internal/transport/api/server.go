@@ -88,7 +88,13 @@ func (s *Server) Register(mux *http.ServeMux) {
 		return httpx.ClientIP(r, s.cfg.App.TrustProxy)
 	})
 
-	// --- аутентификация
+	// --- аутентификация: пошта OTP (Resend), Google, Apple
+	mux.Handle("POST /api/v1/auth/email/otp/request", otpRequest(http.HandlerFunc(s.handleEmailOTPRequest)))
+	mux.Handle("POST /api/v1/auth/email/otp/verify", otpVerify(http.HandlerFunc(s.handleEmailOTPVerify)))
+	mux.Handle("POST /api/v1/auth/google", generic(http.HandlerFunc(s.handleGoogleSignIn)))
+	mux.Handle("POST /api/v1/auth/apple", generic(http.HandlerFunc(s.handleAppleSignIn)))
+
+	// Бұрынғы идентификатор ағыны: шыққан build-тер (телефон және пошта) үшін сақталған.
 	mux.Handle("POST /api/v1/auth/request-otp", otpRequest(http.HandlerFunc(s.handleRequestOTP)))
 	mux.Handle("POST /api/v1/auth/verify-otp", otpVerify(http.HandlerFunc(s.handleVerifyOTP)))
 	mux.Handle("POST /api/v1/auth/refresh", generic(http.HandlerFunc(s.handleRefresh)))
@@ -104,6 +110,9 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /api/v1/me/subscription", s.requireUser(http.HandlerFunc(s.handleSubscription)))
 	mux.Handle("GET /api/v1/me/devices", s.requireUser(http.HandlerFunc(s.handleListDevices)))
 	mux.Handle("POST /api/v1/me/consents", s.requireUser(http.HandlerFunc(s.handleSaveLegalConsent)))
+	// Поштасы жоқ тіркелгіге (телефонмен ашылған) пошта қосу — кейін сол поштамен кіру үшін.
+	mux.Handle("POST /api/v1/me/email/otp/request", s.requireUser(otpRequest(http.HandlerFunc(s.handleLinkEmailRequest))))
+	mux.Handle("POST /api/v1/me/email/otp/verify", s.requireUser(otpVerify(http.HandlerFunc(s.handleLinkEmailVerify))))
 
 	// --- каталог
 	mux.Handle("GET /api/v1/plans", generic(http.HandlerFunc(s.handlePlans)))

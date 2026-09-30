@@ -18,7 +18,7 @@ paths:
       responses: { "200": { description: OK } }
   /api/v1/config:
     get:
-      summary: Публичная конфигурация клиента (языки, лимиты, страны)
+      summary: Публичная конфигурация клиента (языки, лимиты, способы входа)
       responses:
         "200":
           description: OK
@@ -29,9 +29,92 @@ paths:
     get:
       summary: Активные тарифы
       responses: { "200": { description: OK } }
+  /api/v1/auth/email/otp/request:
+    post:
+      summary: Отправить 4-значный код на почту (Resend)
+      description: >
+        Ответ одинаков для известного и нового адреса. Новый код аннулирует
+        предыдущий; повторный запрос раньше OTP_RESEND_COOLDOWN отклоняется.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email, example: "aigerim@mail.kz" }
+                locale: { type: string, enum: [kk, ru, en, uz] }
+      responses:
+        "200":
+          description: Код отправлен
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EmailChallenge" }
+        "400": { description: INVALID_EMAIL }
+        "429": { description: "OTP_RESEND_COOLDOWN (details.retry_after_seconds, Retry-After) / RATE_LIMITED" }
+        "503": { description: EMAIL_DELIVERY_FAILED }
+  /api/v1/auth/email/otp/verify:
+    post:
+      summary: Проверить код и получить сессию (аккаунт создаётся при первом входе)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, code]
+              properties:
+                email: { type: string, format: email }
+                code: { type: string, pattern: "^[0-9]{4}$", example: "0384" }
+                device: { $ref: "#/components/schemas/Device" }
+      responses:
+        "200": { description: "access_token, refresh_token, user (auth_providers), profile, subscription, usage" }
+        "400": { description: "INVALID_OTP (details.attempts_remaining) / OTP_EXPIRED / OTP_ALREADY_USED / INVALID_EMAIL" }
+        "429": { description: OTP_ATTEMPTS_EXCEEDED / RATE_LIMITED }
+  /api/v1/auth/google:
+    post:
+      summary: Вход через Google (ID token проверяется сервером по JWKS)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id_token, nonce]
+              properties:
+                id_token: { type: string }
+                nonce: { type: string, description: "Тот же nonce, что передан в Google SDK / Credential Manager" }
+                device: { $ref: "#/components/schemas/Device" }
+      responses:
+        "200": { description: Сессия }
+        "401": { description: INVALID_ID_TOKEN — не истёкшая сессия, refresh не нужен }
+        "409": { description: EMAIL_ALREADY_IN_USE }
+        "503": { description: AUTH_PROVIDER_UNAVAILABLE }
+  /api/v1/auth/apple:
+    post:
+      summary: Вход через Apple (identity token проверяется сервером по JWKS)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [identity_token, nonce]
+              properties:
+                identity_token: { type: string }
+                nonce: { type: string, description: "Сырой nonce; Apple получил его SHA-256 (hex)" }
+                full_name: { type: string, maxLength: 120 }
+                device: { $ref: "#/components/schemas/Device" }
+      responses:
+        "200": { description: Сессия }
+        "401": { description: INVALID_ID_TOKEN }
+        "409": { description: EMAIL_ALREADY_IN_USE }
+        "503": { description: AUTH_PROVIDER_UNAVAILABLE }
   /api/v1/auth/request-otp:
     post:
-      summary: Запросить код подтверждения
+      summary: "Устаревший вход по identifier (старые сборки)"
+      deprecated: true
       requestBody:
         required: true
         content:
@@ -48,7 +131,8 @@ paths:
         "429": { description: RATE_LIMITED }
   /api/v1/auth/verify-otp:
     post:
-      summary: Подтвердить код и получить сессию
+      summary: "Устаревшая проверка кода по identifier (старые сборки)"
+      deprecated: true
       requestBody:
         required: true
         content:
@@ -90,6 +174,46 @@ paths:
       summary: Частичное обновление профиля
       security: [{ bearerAuth: [] }]
       responses: { "200": { description: OK } }
+  /api/v1/me/email/otp/request:
+    post:
+      summary: Код на почту, которую нужно добавить к аккаунту для входа
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+                locale: { type: string, enum: [kk, ru, en, uz] }
+      responses:
+        "200":
+          description: Код отправлен
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EmailChallenge" }
+        "409": { description: CONFLICT — у аккаунта уже есть почта / EMAIL_ALREADY_IN_USE }
+        "429": { description: OTP_RESEND_COOLDOWN / RATE_LIMITED }
+  /api/v1/me/email/otp/verify:
+    post:
+      summary: Подтвердить код — почта привязана к аккаунту
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, code]
+              properties:
+                email: { type: string, format: email }
+                code: { type: string, pattern: "^[0-9]{4}$" }
+      responses:
+        "200": { description: То же, что GET /api/v1/me }
+        "400": { description: INVALID_OTP / OTP_EXPIRED / OTP_ALREADY_USED }
+        "409": { description: EMAIL_ALREADY_IN_USE }
   /api/v1/me/usage:
     get:
       summary: Остаток генераций
@@ -183,7 +307,30 @@ components:
         timezone: { type: string, example: "Asia/Almaty" }
         max_source_characters: { type: integer, example: 300 }
         max_instruction_length: { type: integer, example: 400 }
+        features:
+          type: object
+          properties:
+            email_otp: { type: boolean, description: "Resend настроен (или демо-режим)" }
+            google_sign_in: { type: boolean }
+            apple_sign_in: { type: boolean }
         legal: { $ref: "#/components/schemas/LegalConfig" }
+    Device:
+      type: object
+      properties:
+        device_id: { type: string }
+        platform: { type: string, enum: [ios, android, web] }
+        app_version: { type: string }
+        os_version: { type: string }
+        locale: { type: string }
+        timezone: { type: string }
+    EmailChallenge:
+      type: object
+      required: [masked_email, expires_in, resend_after, code_length]
+      properties:
+        masked_email: { type: string, example: "a***m@mail.kz" }
+        expires_in: { type: integer, example: 300 }
+        resend_after: { type: integer, example: 32 }
+        code_length: { type: integer, example: 4 }
     LegalConsentRequest:
       type: object
       required: [terms_version, privacy_version, locale, platform]

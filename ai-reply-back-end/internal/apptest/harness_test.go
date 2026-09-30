@@ -77,6 +77,15 @@ type harness struct {
 	dbPath   string
 	admin    *admin.Service
 	limits   *limits.Service
+	authSvc  *auth.Service
+}
+
+// harnessOption — жекелеген тесттің баптауы (мысалы, лимитті азайту).
+type harnessOption func(env map[string]string)
+
+// withEnv — ортадағы бір мәнді ауыстырады.
+func withEnv(key, value string) harnessOption {
+	return func(env map[string]string) { env[key] = value }
 }
 
 const (
@@ -84,7 +93,7 @@ const (
 	adminPassword = "super-secret-admin-pass"
 )
 
-func newHarness(t *testing.T) *harness {
+func newHarness(t *testing.T, opts ...harnessOption) *harness {
 	t.Helper()
 
 	dir := t.TempDir()
@@ -103,6 +112,9 @@ func newHarness(t *testing.T) *harness {
 		"LOG_LEVEL": "info", "LOG_FORMAT": "json", "RATE_AI_PER_MINUTE": "1000",
 		"RATE_OTP_REQUEST_PER_HOUR": "100", "RATE_OTP_VERIFY_PER_HOUR": "200",
 		"RATE_GENERIC_PER_MINUTE": "1000", "OTP_MAX_ATTEMPTS": "5",
+	}
+	for _, opt := range opts {
+		opt(env)
 	}
 	for key, value := range env {
 		t.Setenv(key, value)
@@ -182,7 +194,8 @@ func newHarness(t *testing.T) *harness {
 	server := httptest.NewServer(handler)
 
 	h := &harness{t: t, cfg: cfg, server: server, store: store, db: db,
-		provider: provider, clock: clock, logs: logs, dbPath: dbPath, admin: adminSvc, limits: limitSvc}
+		provider: provider, clock: clock, logs: logs, dbPath: dbPath, admin: adminSvc, limits: limitSvc,
+		authSvc: authSvc}
 	t.Cleanup(func() {
 		server.Close()
 		_ = db.Close()

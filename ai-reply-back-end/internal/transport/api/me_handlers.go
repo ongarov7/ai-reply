@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
@@ -22,6 +23,11 @@ type meResponse struct {
 // handleMe — профиль, тариф және квота бір сұраныста.
 func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	user, _ := UserFrom(r.Context())
+	s.writeMe(w, r, user)
+}
+
+// writeMe — /me жауабын жинайды (пошта қосылғаннан кейін де осы пішін қайтады).
+func (s *Server) writeMe(w http.ResponseWriter, r *http.Request, user domain.User) {
 	profile, err := s.users.Profile(r.Context(), user.ID)
 	if err != nil {
 		httpx.Fail(w, err)
@@ -38,12 +44,21 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, http.StatusOK, meResponse{
-		User:         toUserDTO(user, profile),
+		User:         s.userDTO(r.Context(), user, profile),
 		Profile:      toProfileDTO(profile),
 		Subscription: s.subscriptionDTO(entitlement),
 		Usage:        toUsageDTO(entitlement, s.cfg.App.Timezone),
 		LegalConsent: consent,
 	})
+}
+
+// userDTO — қолданушы және оның кіру тәсілдері (email, google, apple, phone).
+func (s *Server) userDTO(ctx context.Context, user domain.User, profile domain.Profile) userDTO {
+	dto := toUserDTO(user, profile)
+	if methods, err := s.users.SignInMethods(ctx, user.ID); err == nil {
+		dto.AuthProviders = methods
+	}
+	return dto
 }
 
 func (s *Server) currentLegalConsent(r *http.Request, userID string) (*legalConsentDTO, error) {
@@ -178,6 +193,10 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 		// older server would reject (request bodies disallow unknown fields).
 		"features": map[string]bool{
 			"reply_preferences": true,
+			// Sign-in methods this server accepts right now.
+			"email_otp":      s.auth.EmailDelivery() != "off",
+			"google_sign_in": s.auth.GoogleEnabled(),
+			"apple_sign_in":  s.auth.AppleEnabled(),
 		},
 		"demo_mode":    s.cfg.Auth.DemoMode,
 		"payment_mode": s.payments.Mode(),

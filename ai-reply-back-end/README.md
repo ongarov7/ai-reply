@@ -63,9 +63,10 @@ open http://localhost:8080/admin     # админка
 open http://localhost:8080/simulator # интерактивный симулятор продукта
 ```
 
-Демо-вход в приложении: любой номер поддерживаемой страны + код **1111**
-(`AUTH_DEMO_MODE=true`). В production демо-режим не запускается — сервер
-откажется стартовать.
+Демо-вход в приложении (только разработка): «Продолжить с e-mail», любой адрес
+и код **1111** — если `AUTH_DEMO_MODE=true` и Resend не настроен. С настроенным
+Resend код всегда случайный и приходит письмом. В production демо-режим не
+запускается, а без `RESEND_API_KEY` / `RESEND_FROM_EMAIL` сервер откажется стартовать.
 
 ## Структура
 
@@ -100,13 +101,18 @@ internal/
 
 ## Что уже работает
 
-- регистрация по телефону (12 стран) или e-mail, демо-OTP `1111`;
+- вход: iOS — Apple / Google / почта, Android — Google / почта. Код на почту —
+  4 цифры, через Resend, в БД только HMAC, 5 минут, 5 попыток, повтор через 32 с;
+  Google и Apple ID-токены проверяются на сервере по JWKS (подпись, `iss`, `aud`,
+  `exp`, `sub`, `nonce`). Подробно — [docs/AUTH.md](docs/AUTH.md);
 - access (15 мин) + refresh с ротацией и детектом переиспользования;
 - профиль, устройства, тарифы, подписки, usage;
 - AI-ответ через сервер: квота → провайдер → учёт токенов и стоимости;
 - лимиты живут в БД: 30 → 50 в день меняется в админке без релиза приложения;
 - админка: дашборд с графиками, пользователи, CRUD тарифов, аудит, настройки;
 - лендинг на 4 языках с анимированной демонстрацией работы клавиатуры;
+- вход по телефону из приложений убран; эндпоинты `/auth/request-otp` и
+  `/auth/verify-otp` оставлены только для уже установленных сборок;
 - `/simulator` — интерактивный симулятор продукта для показа клиентам:
   iOS и Android, AI-клавиатура, голосовой ввод, архитектура, админ-демо;
   генерация идёт через настоящий бэкенд, вход — теми же логином и паролем,
@@ -140,11 +146,15 @@ make secrets     # сгенерировать JWT/legacy секреты
 
 ## Что осталось до продакшна
 
-- реальный провайдер OTP (SMS или WhatsApp Business) — один интерфейс `auth.Sender`;
+- Resend: подтвердить домен `ai-reply.kz` и прописать `RESEND_*` в `.env` сервера
+  (без них `APP_ENV=production` не стартует) — [docs/AUTH.md](docs/AUTH.md);
+- Google / Apple: client ID в `.env` (`GOOGLE_CLIENT_ID_IOS`, `GOOGLE_CLIENT_ID_WEB`,
+  `APPLE_CLIENT_ID`);
 - реальный эквайринг — один интерфейс `payments.Provider`;
 - APNs/FCM — интерфейс `notifications.Transport`;
 - rate limiter в памяти → Redis при нескольких инстансах;
 - `APP_ENV=production`, HTTPS, `ADMIN_SECURE_COOKIES=true`, `AUTH_DEMO_MODE=false`.
 
 Подробности: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md),
-[docs/API.md](docs/API.md), [docs/MOBILE_MIGRATION.md](docs/MOBILE_MIGRATION.md).
+[docs/API.md](docs/API.md), [docs/AUTH.md](docs/AUTH.md),
+[docs/MOBILE_MIGRATION.md](docs/MOBILE_MIGRATION.md).
