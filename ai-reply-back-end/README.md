@@ -20,15 +20,34 @@ Mobile (iOS / Android / клавиатура)
 ```bash
 cp .env.example .env
 # заполнить OPENAI_API_KEY и три секрета: make secrets
-make run           # http://localhost:8084
+make run           # http://localhost:8080 (порт = APP_PORT из .env)
 ```
 
 Или в Docker:
 
 ```bash
 cp .env.example .env
-docker compose up --build
+make docker        # = docker compose up -d --build
 ```
+
+### Порт и деплой за Caddy
+
+Единственный источник порта — `APP_PORT` в `.env`. Из него берутся:
+
+- адрес, который слушает Go-сервер (`APP_HOST:APP_PORT`; в контейнере `APP_HOST=0.0.0.0`);
+- проброс порта Docker — только на localhost: `127.0.0.1:APP_PORT → контейнер:APP_PORT`;
+- healthcheck контейнера — `http://127.0.0.1:$APP_PORT/healthz`.
+
+В Dockerfile, docker-compose.yml и коде порта нет; без `APP_PORT` сервер и
+`docker compose` не стартуют. Сменить порт: поправить `APP_PORT` в `.env` и
+пересоздать контейнер (`docker compose up -d`), затем обновить upstream в Caddy:
+
+```
+reverse_proxy 127.0.0.1:{APP_PORT}
+```
+
+База SQLite лежит в томе `aireply-data` (`/app/data/aireply.db`) и переживает
+`docker compose down` / `up -d`. Не запускайте `docker compose down -v` — это удалит базу.
 
 При старте автоматически применяются миграции, создаются тарифы
 (`free 7/день`, `standard 30/день`, `pro 50/день`) и администратор из
@@ -37,11 +56,11 @@ docker compose up --build
 Проверка:
 
 ```bash
-curl localhost:8084/healthz
-curl localhost:8084/api/v1/plans
-open http://localhost:8084/          # лендинг
-open http://localhost:8084/admin     # админка
-open http://localhost:8084/simulator # интерактивный симулятор продукта
+curl localhost:8080/healthz
+curl localhost:8080/api/v1/plans
+open http://localhost:8080/          # лендинг
+open http://localhost:8080/admin     # админка
+open http://localhost:8080/simulator # интерактивный симулятор продукта
 ```
 
 Демо-вход в приложении: любой номер поддерживаемой страны + код **1111**

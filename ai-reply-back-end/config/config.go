@@ -126,7 +126,7 @@ func Load(envFile string) (Config, error) {
 	cfg := Config{
 		App: App{
 			Env:           str("APP_ENV", "development"),
-			Port:          num("APP_PORT", 8084),
+			Port:          num("APP_PORT", 0), // әдепкі жоқ: Docker порт картасы мен healthcheck те осы мәнді қолданады
 			Host:          str("APP_HOST", "0.0.0.0"),
 			PublicBaseURL: strings.TrimRight(str("PUBLIC_BASE_URL", "https://api.meily.kz"), "/"),
 			Timezone:      str("DEFAULT_TIMEZONE", "Asia/Almaty"),
@@ -200,6 +200,9 @@ func Load(envFile string) (Config, error) {
 func (c Config) Validate() []string {
 	var problems []string
 
+	if c.App.Port < 1 || c.App.Port > 65535 {
+		problems = append(problems, "APP_PORT must be set to a port number between 1 and 65535")
+	}
 	if c.OpenAI.APIKey == "" {
 		problems = append(problems, "OPENAI_API_KEY is not set (the provider key lives only here)")
 	}

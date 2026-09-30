@@ -1,13 +1,23 @@
 # Жергілікті іске қосу: cp .env.example .env && docker compose up --build
+#
+# Порттың жалғыз көзі — .env ішіндегі APP_PORT. Compose оны осы файлдағы
+# ${APP_PORT} үшін де, контейнер ортасы үшін де сол .env-тен оқиды, сондықтан
+# Go сервері, порт картасы мен healthcheck әрқашан бір портта болады.
 services:
   backend:
     build: .
-    ports:
-      - "8084:8084"
     env_file: .env
     environment:
-      SQLITE_PATH: /app/data/aireply.db
+      # Порт картасымен бірдей мән контейнерге де беріледі.
+      APP_PORT: ${APP_PORT:?APP_PORT must be set in .env}
+      # Контейнер ішінде барлық интерфейсті тыңдау керек, әйтпесе Docker трафикті
+      # жеткізе алмайды. Сыртқа ашықтықты төмендегі 127.0.0.1 байланысы шектейді.
       APP_HOST: 0.0.0.0
+      # Дерекқор әрқашан тұрақты томда жатады (контейнер қабатында емес).
+      SQLITE_PATH: /app/data/aireply.db
+    ports:
+      # Тек localhost: сырттан кіру хосттағы Caddy арқылы ғана.
+      - "127.0.0.1:${APP_PORT:?APP_PORT must be set in .env}:${APP_PORT:?APP_PORT must be set in .env}"
     volumes:
       - aireply-data:/app/data
     restart: unless-stopped

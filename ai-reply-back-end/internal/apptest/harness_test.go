@@ -91,7 +91,7 @@ func newHarness(t *testing.T) *harness {
 	dbPath := filepath.Join(dir, "test.db")
 
 	env := map[string]string{
-		"APP_ENV": "development", "APP_PORT": "0", "PUBLIC_BASE_URL": "http://localhost:8084",
+		"APP_ENV": "development", "APP_PORT": "8084", "PUBLIC_BASE_URL": "http://localhost:8084",
 		"SQLITE_PATH": dbPath, "DEFAULT_TIMEZONE": "Asia/Almaty",
 		"JWT_ACCESS_SECRET":   "test-access-secret-that-is-long-enough-000",
 		"JWT_REFRESH_SECRET":  "test-refresh-secret-that-is-long-enough-0",

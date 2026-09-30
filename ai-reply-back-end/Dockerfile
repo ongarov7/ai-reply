@@ -20,10 +20,12 @@ COPY --from=build /out/server /app/server
 RUN mkdir -p /app/data && chown -R aireply:aireply /app
 
 USER aireply
-EXPOSE 8084
-ENV APP_HOST=0.0.0.0 APP_PORT=8084 SQLITE_PATH=/app/data/aireply.db
+# APP_PORT образға кірмейді: ол іске қосу кезінде .env-тен келеді (docker-compose.yml).
+# Сондықтан EXPOSE да жоқ — ол тек метадерек, ал порт әр ортада басқа болуы мүмкін.
+ENV APP_HOST=0.0.0.0 SQLITE_PATH=/app/data/aireply.db
 
+# ${APP_PORT} контейнер ішінде, тексеру сәтінде ашылады — сервер тыңдайтын портпен бірдей.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s \
-  CMD wget -qO- http://127.0.0.1:8084/healthz || exit 1
+  CMD wget -qO- "http://127.0.0.1:${APP_PORT}/healthz" || exit 1
 
 ENTRYPOINT ["/app/server"]

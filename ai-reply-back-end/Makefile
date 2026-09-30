@@ -29,7 +29,7 @@ secrets: ## Жаңа құпия кілттер генерациялау
 	@echo "JWT_REFRESH_SECRET=$$(openssl rand -hex 32)"
 	@echo "AUTH_SIGNING_SECRET=$$(openssl rand -hex 32)"
 
-docker: ## Docker арқылы көтеру
+docker: ## Docker арқылы көтеру (барлық порт .env ішіндегі APP_PORT-тан)
 	docker compose up -d --build
 
 clean:
