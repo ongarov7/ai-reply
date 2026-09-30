@@ -5,14 +5,16 @@ import SwiftUI
 /// Баптаулардағы тіркелгі бөлімі: тариф, квота, шығу.
 ///
 /// Shows what the user needs to recognise their account and nothing more: the
-/// masked identifier the server sent back, the current plan, what is left
-/// today, and the way out.
+/// address (or provider) it signs in with, the current plan, what is left
+/// today, and the way out. An account opened with a phone number is offered
+/// to add an e-mail, since phone sign-in is no longer available.
 struct AccountSettingsSection: View {
 
     @Environment(AppSettings.self) private var settings
     @Environment(AccountModel.self) private var account
 
     @State private var isConfirmingSignOut = false
+    @State private var isAddingEmail = false
 
     var body: some View {
         Section {
@@ -22,6 +24,15 @@ struct AccountSettingsSection: View {
                         .foregroundStyle(.secondary)
                 } label: {
                     Label("settings.account.identifier", systemImage: "person.crop.circle")
+                }
+
+                if account.user?.needsEmail == true {
+                    Button {
+                        isAddingEmail = true
+                    } label: {
+                        Label("settings.account.addEmail", systemImage: "envelope.badge")
+                    }
+                    .sheet(isPresented: $isAddingEmail) { LinkEmailView() }
                 }
 
                 NavigationLink {
@@ -54,7 +65,11 @@ struct AccountSettingsSection: View {
         } header: {
             Text("settings.account")
         } footer: {
-            Text("settings.account.footer")
+            if account.isSignedIn, account.user?.needsEmail == true {
+                Text("settings.account.addEmail.footer")
+            } else {
+                Text("settings.account.footer")
+            }
         }
         .task { await account.refresh() }
     }

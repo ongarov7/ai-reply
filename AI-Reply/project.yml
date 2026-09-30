@@ -19,6 +19,11 @@ options:
     iOS: "17.0"
   developmentLanguage: en
 
+packages:
+  GoogleSignIn:
+    url: https://github.com/google/GoogleSignIn-iOS
+    from: 9.2.0
+
 settings:
   base:
     SWIFT_VERSION: "5.0"
@@ -39,6 +44,13 @@ targets:
       path: AIReply/Info.plist
       properties:
         CFBundleDisplayName: AI Reply
+        # Google Sign-In: both values come from the build settings below.
+        GIDClientID: $(GOOGLE_IOS_CLIENT_ID)
+        CFBundleURLTypes:
+          - CFBundleTypeRole: Editor
+            CFBundleURLName: google-sign-in
+            CFBundleURLSchemes:
+              - $(GOOGLE_IOS_REVERSED_CLIENT_ID)
         NSMicrophoneUsageDescription: AI Reply uses the microphone only while you are dictating a reply, and only after you tap the voice button.
         NSSpeechRecognitionUsageDescription: AI Reply uses Apple speech recognition to turn your dictated reply into text.
         UILaunchScreen: {}
@@ -48,6 +60,8 @@ targets:
     entitlements:
       path: Config/AIReply.entitlements
       properties:
+        com.apple.developer.applesignin:
+          - Default
         com.apple.security.application-groups:
           - group.kz.yerek.replykeyboard
     settings:
@@ -58,9 +72,17 @@ targets:
       CODE_SIGN_IDENTITY: "iPhone Developer"
       ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
       TARGETED_DEVICE_FAMILY: "1"
+      # iOS OAuth client from Google Cloud Console (not a secret; it ships in
+      # the app). Empty keeps "Continue with Google" hidden in Release builds.
+      GOOGLE_IOS_CLIENT_ID: ""
+      # com.googleusercontent.apps.<id> - the client id reversed. Must match
+      # GOOGLE_IOS_CLIENT_ID or the button stays hidden.
+      GOOGLE_IOS_REVERSED_CLIENT_ID: $(PRODUCT_BUNDLE_IDENTIFIER).google-signin
     dependencies:
       - target: ReplyKeyboard
         embed: true
+      - package: GoogleSignIn
+        product: GoogleSignIn
 
   AIReplyTests:
     type: bundle.unit-test

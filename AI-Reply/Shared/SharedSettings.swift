@@ -89,6 +89,14 @@ struct SharedSettings {
         defaults.set(enabled, forKey: Key.keyboardHaptics)
     }
 
+    /// Whether a key press should play a haptic right now: the user's switch
+    /// in the app's Settings, AND Full Access, without which iOS gives a
+    /// keyboard extension no Taptic Engine at all. The one rule both the
+    /// keyboard and the tests read.
+    func keyboardHapticsActive(hasFullAccess: Bool) -> Bool {
+        hasFullAccess && keyboardHapticsEnabled
+    }
+
     // MARK: Persona row
 
     /// The template the user last replied with. Only an identifier - never

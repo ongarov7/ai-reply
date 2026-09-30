@@ -25,9 +25,11 @@ struct AccountGateView<Content: View>: View {
             } else {
                 switch account.phase {
                 case .signedOut:
-                    SignInView()
-                case let .awaitingCode(_, masked):
-                    VerifyCodeView(masked: masked) { isNewUser in
+                    SignInView { isNewUser in isCompletingRegistration = isNewUser }
+                case .enteringEmail:
+                    EmailSignInView()
+                case let .awaitingCode(challenge):
+                    VerifyCodeView(challenge: challenge) { isNewUser in
                         isCompletingRegistration = isNewUser
                     }
                 case .signedIn:

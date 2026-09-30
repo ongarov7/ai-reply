@@ -35,29 +35,68 @@ struct AccountService: Sendable {
     }
 
     // MARK: Sign-in
+    //
+    // The server verifies everything: the e-mail code itself, and the Google
+    // or Apple token against the provider's keys. The app sends only what the
+    // server needs to check; it never states who the user is.
 
-    /// Asks for a code. The server decides how it is delivered.
-    func requestCode(identifier: String, locale: String) async throws -> AccountAPI.Challenge {
+    /// Sends a 4-digit code to the address. Sign-up and sign-in are one flow.
+    func requestEmailCode(email: String, locale: String) async throws -> AccountAPI.EmailChallenge {
         struct Request: Encodable {
-            let identifier: String
+            let email: String
             let locale: String
         }
-        return try await client().post("api/v1/auth/request-otp",
-                                       body: Request(identifier: identifier, locale: locale))
+        return try await client().post("api/v1/auth/email/otp/request",
+                                       body: Request(email: email, locale: locale))
     }
 
-    /// Verifies the code and stores the resulting session.
+    /// Verifies the e-mail code and stores the resulting session.
     @discardableResult
-    func verifyCode(identifier: String, code: String) async throws -> AccountAPI.Session {
+    func verifyEmailCode(email: String, code: String) async throws -> AccountAPI.Session {
         struct Request: Encodable {
-            let identifier: String
+            let email: String
             let code: String
             let device: DeviceDescriptor
         }
-        let result: AccountAPI.Session = try await client().post(
-            "api/v1/auth/verify-otp",
-            body: Request(identifier: identifier, code: code, device: .current)
-        )
+        return try await adopt(client().post(
+            "api/v1/auth/email/otp/verify",
+            body: Request(email: email, code: code, device: .current)
+        ))
+    }
+
+    /// Exchanges a Google ID token for a session. `nonce` is the value the app
+    /// gave Google for this attempt; the server checks the token carries it.
+    @discardableResult
+    func signInWithGoogle(idToken: String, nonce: String) async throws -> AccountAPI.Session {
+        struct Request: Encodable {
+            let id_token: String
+            let nonce: String
+            let device: DeviceDescriptor
+        }
+        return try await adopt(client().post(
+            "api/v1/auth/google",
+            body: Request(id_token: idToken, nonce: nonce, device: .current)
+        ))
+    }
+
+    /// Exchanges an Apple identity token for a session. `rawNonce` is the
+    /// unhashed value; Apple's token carries its SHA-256. `fullName` is only
+    /// ever present on the first authorization.
+    @discardableResult
+    func signInWithApple(identityToken: String, rawNonce: String, fullName: String) async throws -> AccountAPI.Session {
+        struct Request: Encodable {
+            let identity_token: String
+            let nonce: String
+            let full_name: String
+            let device: DeviceDescriptor
+        }
+        return try await adopt(client().post(
+            "api/v1/auth/apple",
+            body: Request(identity_token: identityToken, nonce: rawNonce, full_name: fullName, device: .current)
+        ))
+    }
+
+    private func adopt(_ result: AccountAPI.Session) async -> AccountAPI.Session {
         await session.adopt(result)
         return result
     }
@@ -131,6 +170,31 @@ struct AccountService: Sendable {
         )
         let _: APIClient.Empty = try await session.authenticated { token in
             try await client().post("api/v1/devices", body: request, token: token)
+        }
+    }
+
+    /// Sends a code to an address the signed-in account wants to add, so an
+    /// account opened with a phone number keeps a way to sign in.
+    func requestLinkEmailCode(email: String, locale: String) async throws -> AccountAPI.EmailChallenge {
+        struct Request: Encodable, Sendable {
+            let email: String
+            let locale: String
+        }
+        let request = Request(email: email, locale: locale)
+        return try await session.authenticated { token in
+            try await client().post("api/v1/me/email/otp/request", body: request, token: token)
+        }
+    }
+
+    /// Verifies the code and attaches the address to the signed-in account.
+    func verifyLinkEmailCode(email: String, code: String) async throws -> AccountAPI.Account {
+        struct Request: Encodable, Sendable {
+            let email: String
+            let code: String
+        }
+        let request = Request(email: email, code: code)
+        return try await session.authenticated { token in
+            try await client().post("api/v1/me/email/otp/verify", body: request, token: token)
         }
     }
 

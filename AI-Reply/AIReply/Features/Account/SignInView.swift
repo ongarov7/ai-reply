@@ -1,66 +1,63 @@
+import AuthenticationServices
 import SwiftUI
 
+/// The first screen of the sign-in flow: Apple, Google, e-mail.
+///
+/// Кіру: Apple, Google немесе пошта. Құпиясөз жоқ.
 struct SignInView: View {
 
-    @Environment(AppSettings.self) private var settings
     @Environment(AccountModel.self) private var account
+    @Environment(\.colorScheme) private var colorScheme
 
-    private enum Method: String, CaseIterable {
-        case phone, email
-    }
+    /// Called with `true` when the account was created just now.
+    let onSignedIn: (Bool) -> Void
 
-    private enum Field: Hashable {
-        case phone, email
-    }
-
-    @State private var method: Method = .phone
-    @State private var country: AccountAPI.Country?
-    @State private var digits = ""
-    @State private var email = ""
-    @FocusState private var focusedField: Field?
+    /// The raw nonce of the Apple request in flight; Apple gets its hash.
+    @State private var appleNonce = SignInNonce.make()
 
     var body: some View {
         AuthScreen {
             VStack(alignment: .leading, spacing: DS.Spacing.l) {
                 header
 
-                Picker("account.method", selection: $method) {
-                    Text("account.method.phone").tag(Method.phone)
-                    Text("account.method.email").tag(Method.email)
+                VStack(spacing: DS.Spacing.s) {
+                    if account.offersApple {
+                        appleButton
+                    }
+                    if account.offersGoogle {
+                        Button {
+                            Task { finish(await account.signInWithGoogle()) }
+                        } label: {
+                            AuthButtonLabel(title: "account.continueWithGoogle", systemImage: "g.circle.fill")
+                        }
+                        .buttonStyle(AuthButtonStyle())
+                        .accessibilityIdentifier("signIn.google")
+                    }
+                    Button {
+                        account.startEmailSignIn()
+                    } label: {
+                        AuthButtonLabel(title: "account.continueWithEmail", systemImage: "envelope.fill")
+                    }
+                    .buttonStyle(AuthButtonStyle())
+                    .accessibilityIdentifier("signIn.email")
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
+                .disabled(account.isBusy)
 
-                if method == .phone { phoneField } else { emailField }
+                if account.isBusy {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                }
 
                 if let errorKey = account.errorKey {
-                    Label(LocalizedStringKey(errorKey), systemImage: "exclamationmark.triangle")
-                        .font(.footnote)
-                        .foregroundStyle(.red)
+                    AuthErrorLabel(key: errorKey)
                 }
-
-                Button {
-                    focusedField = nil
-                    Task { await submit() }
-                } label: {
-                    if account.isBusy { ProgressView().tint(.white) }
-                    else { Text("account.continue") }
-                }
-                .buttonStyle(.dsPrimary)
-                .disabled(account.isBusy || !isComplete)
 
                 Text("account.legal.footer")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
         }
-        .task {
-            await account.loadServerConfig()
-            if country == nil { country = defaultCountry }
-        }
-        .onChange(of: method) { _, value in
-            focusedField = value == .phone ? .phone : .email
-        }
+        .task { await account.loadServerConfig() }
     }
 
     private var header: some View {
@@ -73,112 +70,36 @@ struct SignInView: View {
         }
     }
 
-    private var phoneField: some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.xs) {
-            HStack(spacing: 0) {
-                Menu {
-                    ForEach(account.countries) { option in
-                        Button {
-                            country = option
-                        } label: {
-                            Text(verbatim: "\(option.flag) \(option.name) \(option.dialCode)")
-                        }
-                    }
-                } label: {
-                    HStack(spacing: DS.Spacing.xxs) {
-                        Text(verbatim: country.map { "\($0.flag) \($0.dialCode)" } ?? "+…")
-                            .font(.body.weight(.medium))
-                        Image(systemName: "chevron.down").font(.caption2)
-                    }
-                    .padding(.horizontal, DS.Spacing.s)
-                    .frame(minHeight: 54)
+    /// Apple's own button: its look and wording are Apple's to decide, and
+    /// App Review checks that they were not reinvented.
+    private var appleButton: some View {
+        SignInWithAppleButton(.continue) { request in
+            appleNonce = SignInNonce.make()
+            AppleSignIn.configure(request, rawNonce: appleNonce)
+        } onCompletion: { result in
+            switch result {
+            case .success(let authorization):
+                guard let credential = AppleSignIn.credential(from: authorization) else {
+                    account.reportProviderFailure()
+                    return
                 }
-                .disabled(account.countries.isEmpty)
-
-                Divider().frame(height: 30)
-
-                TextField("account.phone.placeholder", text: phoneBinding)
-                    .keyboardType(.numberPad)
-                    .textContentType(.telephoneNumber)
-                    .focused($focusedField, equals: .phone)
-                    .padding(.horizontal, DS.Spacing.s)
-                    .frame(minHeight: 54)
-            }
-            .background(
-                RoundedRectangle(cornerRadius: DS.Radius.large, style: .continuous)
-                    .fill(Color.dsSurface)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: DS.Radius.large, style: .continuous)
-                    .stroke(focusedField == .phone ? Color.accentColor : Color.clear, lineWidth: 2)
-            )
-
-            if let example = country?.example {
-                Text(verbatim: example)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                let nonce = appleNonce
+                Task { finish(await account.signInWithApple(credential, rawNonce: nonce)) }
+            case .failure(let error):
+                if !AppleSignIn.isCancellation(error) {
+                    account.reportProviderFailure()
+                }
             }
         }
+        .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+        .frame(height: AuthButton.height)
+        .clipShape(RoundedRectangle(cornerRadius: DS.Radius.medium, style: .continuous))
+        .accessibilityIdentifier("signIn.apple")
     }
 
-    private var emailField: some View {
-        TextField("account.email.placeholder", text: $email)
-            .keyboardType(.emailAddress)
-            .textContentType(.emailAddress)
-            .textInputAutocapitalization(.never)
-            .autocorrectionDisabled()
-            .focused($focusedField, equals: .email)
-            .padding(.horizontal, DS.Spacing.m)
-            .frame(minHeight: 54)
-            .background(
-                RoundedRectangle(cornerRadius: DS.Radius.large, style: .continuous)
-                    .fill(Color.dsSurface)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: DS.Radius.large, style: .continuous)
-                    .stroke(focusedField == .email ? Color.accentColor : Color.clear, lineWidth: 2)
-            )
-    }
-
-    private var phoneBinding: Binding<String> {
-        Binding(
-            get: { formattedPhone(digits) },
-            set: { digits = String($0.filter(\.isNumber).prefix(12)) }
-        )
-    }
-
-    private func formattedPhone(_ value: String) -> String {
-        var remaining = Array(value)
-        let sizes = [3, 3, 2, 2, 2]
-        var groups: [String] = []
-        for size in sizes where !remaining.isEmpty {
-            groups.append(String(remaining.prefix(size)))
-            remaining.removeFirst(min(size, remaining.count))
+    private func finish(_ outcome: AccountModel.SignInOutcome) {
+        if case let .signedIn(isNewUser) = outcome {
+            onSignedIn(isNewUser)
         }
-        return groups.joined(separator: " ")
-    }
-
-    private var defaultCountry: AccountAPI.Country? {
-        let regionCode = Locale.current.region?.identifier
-        return account.countries.first { $0.iso == regionCode }
-            ?? account.countries.first { $0.iso == "KZ" }
-            ?? account.countries.first
-    }
-
-    private var identifier: String {
-        method == .phone
-            ? (country?.dialCode ?? "+") + digits
-            : email.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private var isComplete: Bool {
-        method == .phone
-            ? digits.count >= 6 && country != nil
-            : email.contains("@") && email.count >= 6
-    }
-
-    @MainActor
-    private func submit() async {
-        await account.requestCode(identifier: identifier, locale: settings.effectiveLanguage.rawValue)
     }
 }

@@ -49,6 +49,8 @@ struct AIReplyApp: App {
                 }
                 #endif
             }
+            // Google Sign-In's redirect back into the app.
+            .onOpenURL { url in GoogleSignInProvider.handle(url) }
             .environment(settings)
             .environment(configuration)
             .environment(account)
@@ -65,6 +67,8 @@ struct AIReplyApp: App {
 /// Which screen `-AIReplyDebugScreen <name>` should open.
 enum DebugScreen: String {
     case keyboard, setup, home, settings, profile, templates
+    /// The sign-in flow's three screens, for review in each language.
+    case signIn, email, code
 
     static var requested: DebugScreen? {
         let arguments = CommandLine.arguments
@@ -85,6 +89,11 @@ private struct DebugScreenHost: View {
         case .settings:  NavigationStack { SettingsView() }
         case .profile:   NavigationStack { ProfileEditorView() }
         case .templates: NavigationStack { TemplateEditorView(templateID: "client") }
+        case .signIn:    SignInView { _ in }
+        case .email:     EmailSignInView()
+        case .code:
+            VerifyCodeView(challenge: .init(email: "aigerim@example.kz",
+                                            resendAvailableAt: Date().addingTimeInterval(32))) { _ in }
         }
     }
 }

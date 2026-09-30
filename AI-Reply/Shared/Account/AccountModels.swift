@@ -11,7 +11,7 @@ enum AccountAPI {}
 
 extension AccountAPI {
 
-    /// One authenticated session, as returned by verify-otp and refresh.
+    /// One authenticated session, as returned by every sign-in endpoint and refresh.
     struct Session: Decodable, Sendable {
         let accessToken: String
         let refreshToken: String
@@ -43,15 +43,22 @@ extension AccountAPI {
         let status: String
         let locale: String
         let onboardingCompleted: Bool
+        /// Ways this account signs in: "apple", "email", "google", "phone".
+        /// Absent on servers from before Google and Apple sign-in.
+        let authProviders: [String]?
 
         enum CodingKeys: String, CodingKey {
             case id, phone, email, status, locale
             case onboardingCompleted = "onboarding_completed"
+            case authProviders = "auth_providers"
         }
 
         /// What the user recognises themselves by.
-        var identifier: String { phone ?? email ?? "" }
+        var identifier: String { email ?? phone ?? "" }
         var isActive: Bool { status == "active" }
+        /// Accounts opened with a phone number have no address to sign in
+        /// with once phone sign-in is gone; Settings offers to add one.
+        var needsEmail: Bool { (email ?? "").isEmpty }
     }
 
     /// Server-side copy of the personalisation answers.
@@ -157,19 +164,42 @@ extension AccountAPI {
         let subscription: Subscription
         let usage: Usage
         let legalConsent: LegalConsent?
-    }
-
-    /// The OTP challenge. The code itself never travels back to the client.
-    struct Challenge: Decodable, Sendable {
-        let kind: String
-        let maskedIdentifier: String
-        let channel: String
-        let expiresIn: Int
 
         enum CodingKeys: String, CodingKey {
-            case kind, channel
-            case maskedIdentifier = "masked_identifier"
+            case user, profile, subscription, usage
+            case legalConsent = "legal_consent"
+        }
+    }
+
+    /// The e-mail code challenge. The code itself never travels back to the
+    /// client, and the answer is the same whether the address has an account.
+    struct EmailChallenge: Decodable, Sendable, Equatable {
+        let maskedEmail: String
+        let expiresIn: Int
+        /// Seconds until the server accepts a request for a new code.
+        let resendAfter: Int
+        let codeLength: Int
+
+        enum CodingKeys: String, CodingKey {
+            case maskedEmail = "masked_email"
             case expiresIn = "expires_in"
+            case resendAfter = "resend_after"
+            case codeLength = "code_length"
+        }
+
+        init(maskedEmail: String, expiresIn: Int, resendAfter: Int, codeLength: Int) {
+            self.maskedEmail = maskedEmail
+            self.expiresIn = expiresIn
+            self.resendAfter = resendAfter
+            self.codeLength = codeLength
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            maskedEmail = try container.decodeIfPresent(String.self, forKey: .maskedEmail) ?? ""
+            expiresIn = try container.decodeIfPresent(Int.self, forKey: .expiresIn) ?? 300
+            resendAfter = try container.decodeIfPresent(Int.self, forKey: .resendAfter) ?? 32
+            codeLength = try container.decodeIfPresent(Int.self, forKey: .codeLength) ?? 4
         }
     }
 
@@ -211,30 +241,6 @@ extension AccountAPI {
         )
     }
 
-    /// A country the backend will accept a phone number from.
-    struct Country: Decodable, Sendable, Identifiable, Equatable {
-        let iso: String
-        let dialCode: String
-        let name: String
-        let example: String
-
-        var id: String { iso }
-
-        enum CodingKeys: String, CodingKey {
-            case iso, name, example
-            case dialCode = "dial_code"
-        }
-
-        /// 🇰🇿 from "KZ", without shipping a flag asset per country.
-        var flag: String {
-            iso.unicodeScalars.reduce(into: "") { result, scalar in
-                if let flagScalar = UnicodeScalar(127_397 + scalar.value) {
-                    result.unicodeScalars.append(flagScalar)
-                }
-            }
-        }
-    }
-
     /// Non-secret server configuration the client is allowed to know.
     struct ServerConfig: Decodable, Sendable {
         let locales: [String]
@@ -243,13 +249,12 @@ extension AccountAPI {
         let maxSourceCharacters: Int
         let maxInstructionLength: Int
         let paymentMode: String
-        let countries: [Country]
         let legal: LegalConfig?
         /// What this server version understands. Absent on older servers.
         let features: Features?
 
         enum CodingKeys: String, CodingKey {
-            case locales, timezone, countries, legal, features
+            case locales, timezone, legal, features
             case maxSourceCharacters = "max_source_characters"
             case maxInstructionLength = "max_instruction_length"
             case paymentMode = "payment_mode"
@@ -259,9 +264,16 @@ extension AccountAPI {
     struct Features: Decodable, Sendable, Equatable {
         /// The reply request's `profile` block accepts `reply_language`.
         let replyPreferences: Bool?
+        /// Sign-in methods the server accepts right now. nil on older servers.
+        let emailOTP: Bool?
+        let googleSignIn: Bool?
+        let appleSignIn: Bool?
 
         enum CodingKeys: String, CodingKey {
             case replyPreferences = "reply_preferences"
+            case emailOTP = "email_otp"
+            case googleSignIn = "google_sign_in"
+            case appleSignIn = "apple_sign_in"
         }
     }
 

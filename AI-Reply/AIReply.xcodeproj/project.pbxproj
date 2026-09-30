@@ -126,6 +126,13 @@
 		127D5EAB9CA6C876FFCF7D0D /* KeyboardTypingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46D72A31038F46AE656C391A /* KeyboardTypingTests.swift */; };
 		6EE606B35D2E5FE5C9439D0E /* ReplyComposerFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92BBF6A438708D8B8E6BA758 /* ReplyComposerFlowTests.swift */; };
 		F9AA999AAC9390FC58AD7E43 /* AILimitsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B63EAE7C04E1450F83BA6DA /* AILimitsTests.swift */; };
+		E79A730E373D5A13DFE50D92 /* AppleSignIn.swift in Sources */ = {isa = PBXBuildFile; fileRef = C126E9E531F228B7FE38B085 /* AppleSignIn.swift */; };
+		44E89F0EEDD4310B0229DC48 /* AuthForms.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D98FF929C932F1EB43E5369 /* AuthForms.swift */; };
+		4F5D8477C134ECFEE8CAE1D5 /* EmailSignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 340CB19772AC7629C8D7DB24 /* EmailSignInView.swift */; };
+		3BFF79E2D2F5397DF9E2238A /* GoogleSignInProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F3D1436B67F4B8259A4A482 /* GoogleSignInProvider.swift */; };
+		51D0D7F6B04856285E9C6316 /* LinkEmailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D295D2FAB4EF7110A09463C /* LinkEmailView.swift */; };
+		CABDC14ECE4F0075FF636939 /* SignInTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF7BA3F5F2817FDF8AA035A9 /* SignInTests.swift */; };
+		22D0E588E147150FFC70C114 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 0FE31CC2D10285DD086AE45B /* GoogleSignIn */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -250,7 +257,24 @@
 		46D72A31038F46AE656C391A /* KeyboardTypingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardTypingTests.swift; sourceTree = "<group>"; };
 		92BBF6A438708D8B8E6BA758 /* ReplyComposerFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyComposerFlowTests.swift; sourceTree = "<group>"; };
 		3B63EAE7C04E1450F83BA6DA /* AILimitsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AILimitsTests.swift; sourceTree = "<group>"; };
+		C126E9E531F228B7FE38B085 /* AppleSignIn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSignIn.swift; sourceTree = "<group>"; };
+		4D98FF929C932F1EB43E5369 /* AuthForms.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthForms.swift; sourceTree = "<group>"; };
+		340CB19772AC7629C8D7DB24 /* EmailSignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmailSignInView.swift; sourceTree = "<group>"; };
+		3F3D1436B67F4B8259A4A482 /* GoogleSignInProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleSignInProvider.swift; sourceTree = "<group>"; };
+		0D295D2FAB4EF7110A09463C /* LinkEmailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkEmailView.swift; sourceTree = "<group>"; };
+		CF7BA3F5F2817FDF8AA035A9 /* SignInTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		256FC2270C6D03B4A4A8D406 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				22D0E588E147150FFC70C114 /* GoogleSignIn in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		086F381AE417B920A056E9AD /* Profile */ = {
@@ -357,6 +381,7 @@
 				46D72A31038F46AE656C391A /* KeyboardTypingTests.swift */,
 				92BBF6A438708D8B8E6BA758 /* ReplyComposerFlowTests.swift */,
 				3B63EAE7C04E1450F83BA6DA /* AILimitsTests.swift */,
+				CF7BA3F5F2817FDF8AA035A9 /* SignInTests.swift */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -507,6 +532,11 @@
 				B08920F36A544C71232F2D1E /* AccountGateView.swift */,
 				CD872E2E63C0E40E77B2872A /* AccountModel.swift */,
 				F6211FECA41BBA3BB21D75A6 /* AccountSettingsSection.swift */,
+				C126E9E531F228B7FE38B085 /* AppleSignIn.swift */,
+				4D98FF929C932F1EB43E5369 /* AuthForms.swift */,
+				340CB19772AC7629C8D7DB24 /* EmailSignInView.swift */,
+				3F3D1436B67F4B8259A4A482 /* GoogleSignInProvider.swift */,
+				0D295D2FAB4EF7110A09463C /* LinkEmailView.swift */,
 				D8CFE2DB3B3FB414D9B9391D /* RegistrationStepView.swift */,
 				C1653C6E99D9FBD3FDEBF65E /* SignInView.swift */,
 				FC968BF0552B92940DFCAD17 /* SubscriptionView.swift */,
@@ -550,6 +580,7 @@
 			buildConfigurationList = C6C52D69DEBF0EF61851FB12 /* Build configuration list for PBXNativeTarget "AIReply" */;
 			buildPhases = (
 				C9FB49EBFCA504D0B6E3D1D2 /* Sources */,
+				256FC2270C6D03B4A4A8D406 /* Frameworks */,
 				D6209F6A0088D381F6C59B09 /* Resources */,
 				F5EB05726054928BF5FDEC86 /* Embed Foundation Extensions */,
 			);
@@ -560,6 +591,7 @@
 			);
 			name = AIReply;
 			packageProductDependencies = (
+				0FE31CC2D10285DD086AE45B /* GoogleSignIn */,
 			);
 			productName = AIReply;
 			productReference = 9BD51094A5D0AE5A7214A53A /* AIReply.app */;
@@ -618,6 +650,9 @@
 			);
 			mainGroup = C01D820E515CFEC4C107AB49;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				8FA84A6856E71447AFD40330 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = FCC92F39FFA303C939DFD6B0 /* Products */;
 			projectDirPath = "";
@@ -648,6 +683,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				32CEFB20D93E4BC2E8611C77 /* AccountAPITests.swift in Sources */,
+				CABDC14ECE4F0075FF636939 /* SignInTests.swift in Sources */,
 				5EAD4456B8E90AC6EFC75B5B /* AIReplyServiceTests.swift in Sources */,
 				134C80FB69944994B2A072AC /* CommunicationContextTests.swift in Sources */,
 				81AAD389931DC5307FFD1117 /* ConfigurationStoreTests.swift in Sources */,
@@ -732,6 +768,11 @@
 				77A4B113A9D5D4589D6F18AB /* SignInView.swift in Sources */,
 				09D100248CA1D1225A03FC36 /* SubscriptionView.swift in Sources */,
 				9D75EFCC56DD369EAC19CB79 /* VerifyCodeView.swift in Sources */,
+				E79A730E373D5A13DFE50D92 /* AppleSignIn.swift in Sources */,
+				44E89F0EEDD4310B0229DC48 /* AuthForms.swift in Sources */,
+				4F5D8477C134ECFEE8CAE1D5 /* EmailSignInView.swift in Sources */,
+				3BFF79E2D2F5397DF9E2238A /* GoogleSignInProvider.swift in Sources */,
+				51D0D7F6B04856285E9C6316 /* LinkEmailView.swift in Sources */,
 				22F15C3C02F42E4098819624 /* AIConfiguration.swift in Sources */,
 				BDA7E6FFED3A5E6C18131F75 /* AIReplyApp.swift in Sources */,
 				CE9B6A3980A50D46C2C537FA /* AIReplyError.swift in Sources */,
@@ -804,6 +845,8 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = JXM8N66QWU;
+				GOOGLE_IOS_CLIENT_ID = "";
+				GOOGLE_IOS_REVERSED_CLIENT_ID = "$(PRODUCT_BUNDLE_IDENTIFIER).google-signin";
 				INFOPLIST_FILE = AIReply/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1011,6 +1054,8 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = JXM8N66QWU;
+				GOOGLE_IOS_CLIENT_ID = "";
+				GOOGLE_IOS_REVERSED_CLIENT_ID = "$(PRODUCT_BUNDLE_IDENTIFIER).google-signin";
 				INFOPLIST_FILE = AIReply/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1081,6 +1126,25 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		8FA84A6856E71447AFD40330 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 9.2.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		0FE31CC2D10285DD086AE45B /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 8FA84A6856E71447AFD40330 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 9BEE77F8F75DACB9233F22A5 /* Project object */;
 }

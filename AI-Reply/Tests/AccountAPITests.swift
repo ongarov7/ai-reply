@@ -47,7 +47,7 @@ final class AccountAPITests: XCTestCase {
             ("UNAUTHORIZED", 401, .unauthorized),
             ("TOKEN_EXPIRED", 401, .unauthorized),
             ("ACCOUNT_DISABLED", 403, .accountDisabled),
-            ("INVALID_OTP", 400, .invalidOTP),
+            ("INVALID_OTP", 400, .invalidOTP(attemptsRemaining: nil)),
             ("OTP_EXPIRED", 400, .otpExpired),
             ("AI_TIMEOUT", 504, .providerTimeout),
             ("AI_PROVIDER_UNAVAILABLE", 502, .providerUnavailable),
@@ -96,7 +96,7 @@ final class AccountAPITests: XCTestCase {
 
     @MainActor
     func testEveryFailureHasALocalizationKey() {
-        let errors: [APIError] = [.offline, .timedOut, .invalidOTP, .otpExpired,
+        let errors: [APIError] = [.offline, .timedOut, .invalidOTP(attemptsRemaining: nil), .otpExpired,
                                   .rateLimited(retryAfter: nil), .unauthorized, .accountDisabled,
                                   .invalidRequest, .dailyLimitReached(limit: 0, usedToday: 0, resetsAt: nil),
                                   .paymentRequired, .server, .malformedResponse]
@@ -120,12 +120,6 @@ final class AccountAPITests: XCTestCase {
         XCTAssertEqual(plan.localizedName("kk"), "Pro KK")
         XCTAssertEqual(plan.localizedName("ru"), "Pro", "a missing translation must not show a key")
         XCTAssertEqual(plan.localizedDescription("kk"), "Description")
-    }
-
-    func testCountryFlagComesFromTheISOCode() {
-        let kazakhstan = AccountAPI.Country(iso: "KZ", dialCode: "+7", name: "Kazakhstan", example: "+7 701 123 45 67")
-        XCTAssertEqual(kazakhstan.flag, "🇰🇿")
-        XCTAssertEqual(AccountAPI.Country(iso: "UZ", dialCode: "+998", name: "Uzbekistan", example: "").flag, "🇺🇿")
     }
 
     /// The session decoder has to accept exactly what the server sends, snake

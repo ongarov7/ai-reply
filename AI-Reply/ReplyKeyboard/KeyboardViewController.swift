@@ -119,7 +119,7 @@ final class KeyboardViewController: UIInputViewController {
             showsGlobe = needsInputModeSwitchKey
             layoutKeyboard(force: true)
         }
-        keysView.hapticsEnabled = hasFullAccess && SharedSettings.shared.keyboardHapticsEnabled
+        keysView.hapticsEnabled = SharedSettings.shared.keyboardHapticsActive(hasFullAccess: hasFullAccess)
         reportActivityToContainingApp()
         if hasFullAccess { AILimitsRefresher.refreshIfStale() }
     }

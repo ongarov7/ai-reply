@@ -592,6 +592,30 @@ xcodebuild -project AIReply.xcodeproj -scheme AIReply \
   -destination 'generic/platform=iOS' -allowProvisioningUpdates build
 ```
 
+### Sign-in (Apple, Google, e-mail)
+
+The account screen offers **Continue with Apple**, **Continue with Google** and
+**Continue with Email** (a 4-digit code sent by the server through Resend).
+Phone-number sign-in was removed. The server verifies every token and code;
+the app only forwards them. Setup, in full: `ai-reply-back-end/docs/AUTH.md`.
+
+* **Apple** — the `com.apple.developer.applesignin` entitlement is in
+  `Config/AIReply.entitlements`; enable *Sign in with Apple* for the App ID
+  `kz.yerek.replykeyboard` in the developer portal.
+* **Google** — Swift Package `GoogleSignIn-iOS` (9.x, resolved in
+  `Package.resolved`). Set two build settings on the `AIReply` target:
+  `GOOGLE_IOS_CLIENT_ID` (`<id>.apps.googleusercontent.com`) and
+  `GOOGLE_IOS_REVERSED_CLIENT_ID` (`com.googleusercontent.apps.<id>`). They
+  fill `GIDClientID` and the URL scheme in `Info.plist`. While they are empty
+  (or do not match), Release builds hide the Google button instead of letting
+  the SDK crash on a missing URL scheme; Debug builds show it and report it as
+  unavailable.
+* **Keyboard vibration** — Settings ▸ Keyboard ▸ *Vibration on key press*
+  (on by default). The value is shared with the keyboard through the App Group
+  and applies when Full Access is on.
+
+Debug screenshots: launch with `-AIReplyDebugScreen signIn`, `email` or `code`.
+
 Install:
 
 1. Run the `AIReply` app on the iPhone once.

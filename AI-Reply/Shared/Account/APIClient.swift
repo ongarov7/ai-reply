@@ -14,9 +14,25 @@ enum APIError: Error, Equatable, Sendable {
     /// The session is gone: the user has to sign in again.
     case unauthorized
     case accountDisabled
-    case invalidOTP
+    /// A wrong code. The server says how many tries this code has left.
+    case invalidOTP(attemptsRemaining: Int?)
     case otpExpired
+    /// The code already opened a session; a new one has to be requested.
+    case otpAlreadyUsed
+    /// Five wrong tries: this code is burnt, a new one has to be requested.
+    case otpAttemptsExceeded
+    /// A new code was asked for too soon. The server's wait, in seconds.
+    case resendCooldown(retryAfter: Int?)
     case rateLimited(retryAfter: Int?)
+    case invalidEmail
+    /// The code e-mail could not be sent (the mail provider refused or is down).
+    case emailDeliveryFailed
+    /// The address belongs to another account.
+    case emailInUse
+    /// Google or Apple returned a token the server did not accept.
+    case invalidIDToken
+    /// The sign-in provider is not configured on the server, or unreachable.
+    case authProviderUnavailable
     /// Daily quota is spent. `resetsAt` is ISO-8601 from the server.
     case dailyLimitReached(limit: Int, usedToday: Int, resetsAt: String?)
     case subscriptionExpired
@@ -38,7 +54,8 @@ enum APIError: Error, Equatable, Sendable {
     /// Whether retrying the same request could plausibly succeed.
     var isTransient: Bool {
         switch self {
-        case .offline, .timedOut, .providerUnavailable, .providerTimeout, .server: return true
+        case .offline, .timedOut, .providerUnavailable, .providerTimeout, .server,
+             .emailDeliveryFailed, .authProviderUnavailable: return true
         default: return false
         }
     }
@@ -139,6 +156,7 @@ struct APIClient: Sendable {
             /// server says.
             let field: String?
             let maxCharacters: Int?
+            let attemptsRemaining: Int?
 
             enum CodingKeys: String, CodingKey {
                 case dailyLimit = "daily_limit"
@@ -147,6 +165,7 @@ struct APIClient: Sendable {
                 case retryAfterSeconds = "retry_after_seconds"
                 case field
                 case maxCharacters = "max_characters"
+                case attemptsRemaining = "attempts_remaining"
             }
         }
         let error: Payload
@@ -161,9 +180,17 @@ struct APIClient: Sendable {
         switch envelope?.error.code {
         case "UNAUTHORIZED", "TOKEN_EXPIRED":   return .unauthorized
         case "ACCOUNT_DISABLED":                return .accountDisabled
-        case "INVALID_OTP":                     return .invalidOTP
+        case "INVALID_OTP":                     return .invalidOTP(attemptsRemaining: details?.attemptsRemaining)
         case "OTP_EXPIRED":                     return .otpExpired
+        case "OTP_ALREADY_USED":                return .otpAlreadyUsed
+        case "OTP_ATTEMPTS_EXCEEDED":           return .otpAttemptsExceeded
+        case "OTP_RESEND_COOLDOWN":             return .resendCooldown(retryAfter: retryAfter)
         case "RATE_LIMITED":                    return .rateLimited(retryAfter: retryAfter)
+        case "INVALID_EMAIL":                   return .invalidEmail
+        case "EMAIL_DELIVERY_FAILED":           return .emailDeliveryFailed
+        case "EMAIL_ALREADY_IN_USE":            return .emailInUse
+        case "INVALID_ID_TOKEN":                return .invalidIDToken
+        case "AUTH_PROVIDER_UNAVAILABLE":       return .authProviderUnavailable
         case "DAILY_LIMIT_REACHED", "MONTHLY_LIMIT_REACHED":
             return .dailyLimitReached(limit: details?.dailyLimit ?? 0,
                                       usedToday: details?.usedToday ?? 0,
