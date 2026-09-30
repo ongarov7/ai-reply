@@ -44,6 +44,7 @@ targets:
       path: AIReply/Info.plist
       properties:
         CFBundleDisplayName: AI Reply
+        AIReplyPushNotifications: $(AIREPLY_PUSH_NOTIFICATIONS)
         AIReplySignInWithApple: $(AIREPLY_SIGN_IN_WITH_APPLE)
         # Google Sign-In: both values come from the build settings below.
         GIDClientID: $(GOOGLE_IOS_CLIENT_ID)
@@ -61,6 +62,11 @@ targets:
     entitlements:
       path: Config/AIReply.entitlements
       properties:
+        # Push notifications. "development" here; exporting for the App Store
+        # (or TestFlight) re-signs it as "production". Release only, like
+        # Sign in with Apple: Debug signs with the file below, which has
+        # neither, so a free Personal Team can still install Debug builds.
+        aps-environment: development
         com.apple.developer.applesignin:
           - Default
         com.apple.security.application-groups:
@@ -78,6 +84,10 @@ targets:
         # it out so a free Personal Team can still install the app on a phone;
         # set both lines to the Release values to test Apple sign-in in Debug.
         AIREPLY_SIGN_IN_WITH_APPLE: "YES"
+        # Push notifications need the same paid team (aps-environment). The app
+        # asks APNs for a token only when this is YES; Debug leaves it out
+        # together with the entitlement (Config/AIReply-NoAppleSignIn.entitlements).
+        AIREPLY_PUSH_NOTIFICATIONS: "YES"
         # iOS OAuth client from Google Cloud Console (not a secret; it ships in
         # the app). Empty keeps "Continue with Google" hidden in Release builds.
         GOOGLE_IOS_CLIENT_ID: ""
@@ -87,6 +97,7 @@ targets:
       configs:
         Debug:
           AIREPLY_SIGN_IN_WITH_APPLE: "NO"
+          AIREPLY_PUSH_NOTIFICATIONS: "NO"
           CODE_SIGN_ENTITLEMENTS: Config/AIReply-NoAppleSignIn.entitlements
     dependencies:
       - target: ReplyKeyboard

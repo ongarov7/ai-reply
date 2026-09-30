@@ -4,6 +4,8 @@
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>AIReplyPushNotifications</key>
+	<string>$(AIREPLY_PUSH_NOTIFICATIONS)</string>
 	<key>AIReplySignInWithApple</key>
 	<string>$(AIREPLY_SIGN_IN_WITH_APPLE)</string>
 	<key>CFBundleDisplayName</key>

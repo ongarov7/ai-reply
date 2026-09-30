@@ -849,6 +849,7 @@
 		1457FE1659805A730703C1E0 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				AIREPLY_PUSH_NOTIFICATIONS = NO;
 				AIREPLY_SIGN_IN_WITH_APPLE = NO;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "Config/AIReply-NoAppleSignIn.entitlements";
@@ -1059,6 +1060,7 @@
 		D269CBEE892E1AA0BC917D9A /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				AIREPLY_PUSH_NOTIFICATIONS = YES;
 				AIREPLY_SIGN_IN_WITH_APPLE = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Config/AIReply.entitlements;
