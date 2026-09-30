@@ -182,6 +182,9 @@ HMAC, лимиты). Новые сборки их не вызывают.
 - Токен хранится зашифрованным (AES-256-GCM) и уникален: при повторе на другой установке
   он переезжает на новую. В ответах и в админке его нет — только отпечаток `fcm:1a2b3c4d`.
 - `installation_id` генерирует приложение один раз (UUID) и хранит вне резервных копий.
+- Лимит запросов к `/installations` и `/events` считается по установке (`X-Installation-ID`),
+  поверх — мягкий лимит на IP (×20): за операторским NAT много телефонов делят один адрес.
+  За reverse proxy нужен `TRUST_PROXY=true`, иначе все клиенты выглядят как один IP.
 
 ### POST /api/v1/installations/{installation_id}/detach
 Отвязать установку от аккаунта (выход, смена аккаунта). С токеном — только свою,
@@ -287,10 +290,10 @@ HMAC, лимиты). Новые сборки их не вызывают.
 |---|---|---|
 | GET | `/notifications` | `notifications.read` — состояние push (провайдеры, воркер) |
 | POST | `/notifications/audience/preview` | `notifications.read` — число получателей по фильтру (считает сервер) |
-| GET · POST | `/notifications/campaigns` | `notifications.read` / `notifications.send`; POST требует `Idempotency-Key` |
+| GET · POST | `/notifications/campaigns` | `notifications.read` / `notifications.send`; POST требует `Idempotency-Key` (повтор с тем же ключом → та же кампания, тот же ключ с другим содержимым → `409 CONFLICT`) |
 | GET | `/notifications/campaigns/{id}` | `notifications.read` — статистика и ошибки доставки |
 | POST | `/notifications/campaigns/{id}/send` · `/cancel` | `notifications.send` |
-| GET | `/notifications/deliveries` · `/notifications/devices` | `notifications.read` |
+| GET | `/notifications/deliveries` · `/notifications/devices` | `notifications.read`; устройства: `?platform=&push_status=&auth=authenticated\|anonymous&app_version=&user_id=&q=`, токен — только отпечаток, `installation_id` — только первые 8 символов |
 | GET | `/users/{id}/diagnostics` | `users.diagnostics.read` (просмотр попадает в аудит) |
 | GET | `/logs/events` · `/logs/auth` · `/logs/errors` · `/logs/versions` · `/logs/meta` | `logs.read` |
 | GET | `/ops` | `dashboard.read` |

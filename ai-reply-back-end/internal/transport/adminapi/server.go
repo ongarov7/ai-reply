@@ -407,9 +407,9 @@ func maskIdentifier(u domain.User) string {
 		return traits.MaskIdentifier(u.Email)
 	}
 	if u.LegacyClient != "" {
-		return "legacy:" + u.LegacyClient[:8]
+		return "legacy:" + domain.ShortID(u.LegacyClient)
 	}
-	return u.ID[:8]
+	return domain.ShortID(u.ID)
 }
 
 func optionalTime(t *time.Time, loc *time.Location) string {

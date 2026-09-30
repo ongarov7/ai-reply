@@ -423,3 +423,22 @@ func (e *FieldError) Details() map[string]any {
 
 // InvalidField — FieldError жасайды.
 func InvalidField(field, reason string) error { return &FieldError{Field: field, Reason: reason} }
+
+// ConflictError — сұраныс бұрынғы күйге қайшы (409 CONFLICT + details.field).
+type ConflictError struct {
+	Field  string
+	Reason string
+}
+
+func (e *ConflictError) Error() string { return "conflict on " + e.Field + ": " + e.Reason }
+
+// Unwrap — ErrConflict.
+func (e *ConflictError) Unwrap() error { return ErrConflict }
+
+// Details — қай өріс екені.
+func (e *ConflictError) Details() map[string]any {
+	return map[string]any{"field": e.Field, "reason": e.Reason}
+}
+
+// ConflictField — ConflictError жасайды.
+func ConflictField(field, reason string) error { return &ConflictError{Field: field, Reason: reason} }

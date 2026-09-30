@@ -173,7 +173,7 @@ func ValidateAudience(f domain.AudienceFilter) (domain.AudienceFilter, error) {
 	if f.Locales, err = enumList("audience.locales", f.Locales, domain.Locales...); err != nil {
 		return f, err
 	}
-	if !oneOf(f.Auth, []string{"", "authenticated", "anonymous"}) {
+	if !oneOf(f.Auth, []string{"", domain.AuthAuthenticated, domain.AuthAnonymous}) {
 		return f, domain.InvalidField("audience.auth", "unknown")
 	}
 	if !oneOf(f.Payment, []string{"", "paid", "unpaid"}) {
@@ -232,7 +232,7 @@ func ValidateAudience(f domain.AudienceFilter) (domain.AudienceFilter, error) {
 		}
 	}
 	f.UserIDs = ids
-	if f.Auth == "anonymous" && f.NeedsAccount() {
+	if f.Auth == domain.AuthAnonymous && f.NeedsAccount() {
 		return f, domain.InvalidField("audience.auth", "anonymous devices have no account, plan or registration date")
 	}
 	return f, nil

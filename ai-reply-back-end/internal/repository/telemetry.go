@@ -155,7 +155,7 @@ func inUsers(column string, ids []string, where []string, args []any) ([]string,
 // EventFilter — қосымша оқиғаларының сүзгісі.
 type EventFilter struct {
 	UserIDs        []string // nil: any; empty: nobody matched the user query
-	InstallationID string
+	InstallationID string   // prefix of the app-generated id
 	Name           string
 	Platform       string
 	AppVersion     string
@@ -172,13 +172,19 @@ func (s *Store) ListAppEvents(ctx context.Context, f EventFilter) ([]domain.AppE
 	where, args := []string{"1=1"}, []any{}
 	where, args = inUsers("user_id", f.UserIDs, where, args)
 	for column, value := range map[string]string{
-		"installation_id": f.InstallationID, "event_name": f.Name, "platform": f.Platform,
+		"event_name": f.Name, "platform": f.Platform,
 		"app_version": f.AppVersion, "app_build": f.AppBuild, "os_version": f.OSVersion, "outcome": f.Outcome,
 	} {
 		if value != "" {
 			where = append(where, column+" = ?")
 			args = append(args, value)
 		}
+	}
+	if f.InstallationID != "" {
+		// A prefix: the admin panel only ever shows the first characters.
+		// The handler admits [A-Za-z0-9-] only, so no GLOB metacharacters.
+		where = append(where, "installation_id GLOB ?")
+		args = append(args, f.InstallationID+"*")
 	}
 	if f.DeviceModel != "" {
 		where = append(where, "device_model LIKE ?")

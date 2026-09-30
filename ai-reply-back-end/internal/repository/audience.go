@@ -57,9 +57,9 @@ func matchClause(q AudienceQuery) (string, []any) {
 		}
 	}
 	switch f.Auth {
-	case "authenticated":
+	case domain.AuthAuthenticated:
 		where = append(where, "i.user_id IS NOT NULL")
-	case "anonymous":
+	case domain.AuthAnonymous:
 		where = append(where, "i.user_id IS NULL")
 	}
 	if f.NeedsAccount() {

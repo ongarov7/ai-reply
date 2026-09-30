@@ -237,6 +237,12 @@ type Delivery struct {
 	OpenedAt          *time.Time
 }
 
+// Орнатудың тіркелгіге байланысы (аудитория және құрылғылар тізімінің сүзгісі).
+const (
+	AuthAuthenticated = "authenticated"
+	AuthAnonymous     = "anonymous"
+)
+
 // AudienceFilter — науқан алушыларын таңдау. Барлық шарт ЖӘНЕ арқылы біріктіріледі.
 //
 // The backend turns it into SQL over installations, users and subscriptions;
@@ -259,7 +265,7 @@ type AudienceFilter struct {
 
 // NeedsAccount — сүзгі тек тіркелгісі бар орнатуларға қатысты ма.
 func (f AudienceFilter) NeedsAccount() bool {
-	return f.Auth == "authenticated" || f.Payment != "" || f.Subscription != "" ||
+	return f.Auth == AuthAuthenticated || f.Payment != "" || f.Subscription != "" ||
 		f.RegisteredFrom != "" || f.RegisteredTo != "" || len(f.UserIDs) > 0
 }
 
@@ -275,6 +281,7 @@ type Campaign struct {
 	Audience       AudienceFilter
 	Status         string
 	CreatedBy      string
+	CreatedByEmail string // resolved from admin_users when read
 	IdempotencyKey string
 	RecipientCount int
 	DeviceCount    int

@@ -15,6 +15,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/notifications"
 	"github.com/aireply/ai-reply-back-end/internal/payments"
 	"github.com/aireply/ai-reply-back-end/internal/plans"
+	"github.com/aireply/ai-reply-back-end/internal/reqctx"
 	"github.com/aireply/ai-reply-back-end/internal/subscriptions"
 	"github.com/aireply/ai-reply-back-end/internal/telemetry"
 	"github.com/aireply/ai-reply-back-end/internal/transport/httpx"
@@ -41,6 +42,10 @@ type Server struct {
 	ping          Pinger
 	log           *slog.Logger
 }
+
+// sharedAddressFactor — how many installations' worth of requests one IP address
+// may send to the installation and event endpoints (carrier NAT, office Wi-Fi).
+const sharedAddressFactor = 20
 
 // Deps — сервер тәуелділіктері.
 type Deps struct {
@@ -131,10 +136,23 @@ func (s *Server) Register(mux *http.ServeMux) {
 	// --- құрылғылар (ескі build-тер) және орнатулар (push, метадерек)
 	mux.Handle("POST /api/v1/devices", s.requireUser(http.HandlerFunc(s.handleRegisterDevice)))
 	mux.Handle("DELETE /api/v1/devices/{id}", s.requireUser(http.HandlerFunc(s.handleDeleteDevice)))
+	// Installation and event budgets are counted per installation (X-Installation-ID)
+	// when the app names one: behind carrier NAT many phones share one address, and
+	// a per-IP budget alone would throttle unrelated people together. A looser
+	// per-IP budget on top still stops a client that invents a new id per request.
 	installationKey := func(r *http.Request) string {
-		return httpx.ClientIP(r, s.cfg.App.TrustProxy)
+		if id := reqctx.From(r.Context()).InstallationID; id != "" {
+			return "installation:" + id
+		}
+		return "ip:" + ip(r)
 	}
-	installationLimit := middleware.RateLimit(s.limiter, "installation", limits.GenericPerMinute, time.Minute, installationKey)
+	perIP := func(bucket string, limit int) func(http.Handler) http.Handler {
+		return middleware.RateLimit(s.limiter, bucket+"_ip", limit*sharedAddressFactor, time.Minute, ip)
+	}
+	installationLimit := func(h http.Handler) http.Handler {
+		return perIP("installation", limits.GenericPerMinute)(
+			middleware.RateLimit(s.limiter, "installation", limits.GenericPerMinute, time.Minute, installationKey)(h))
+	}
 	mux.Handle("POST /api/v1/installations", installationLimit(s.optionalUser(http.HandlerFunc(s.handleRegisterInstallation))))
 	mux.Handle("POST /api/v1/installations/{installation_id}/detach",
 		installationLimit(s.optionalUser(http.HandlerFunc(s.handleDetachInstallation))))
@@ -142,7 +160,10 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("PUT /api/v1/me/notification-preferences", s.requireUser(http.HandlerFunc(s.handleUpdateNotificationPreferences)))
 
 	// --- қосымша оқиғалары (рұқсат етілген тізім, топтап, шектеумен)
-	eventsLimit := middleware.RateLimit(s.limiter, "events", s.cfg.Telemetry.EventsPerMinute, time.Minute, installationKey)
+	eventsLimit := func(h http.Handler) http.Handler {
+		return perIP("events", s.cfg.Telemetry.EventsPerMinute)(
+			middleware.RateLimit(s.limiter, "events", s.cfg.Telemetry.EventsPerMinute, time.Minute, installationKey)(h))
+	}
 	mux.Handle("POST /api/v1/events", eventsLimit(s.optionalUser(http.HandlerFunc(s.handleEvents))))
 
 	// --- AI

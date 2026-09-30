@@ -156,12 +156,20 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	}
 	if userID != "" {
 		s.authEvent(r, domain.AuthLogout, "", userID, "", "", nil, nil)
-		// The app names its installation in X-Installation-ID: from this moment
-		// the account's notifications no longer go to this phone.
-		if installationID := reqctx.From(r.Context()).InstallationID; installationID != "" && s.installations != nil {
-			if _, err := s.installations.Detach(r.Context(), installationID, userID); err != nil {
-				s.log.Warn("installation detach on logout failed", "error", err.Error())
-			}
+	}
+	// The app names its installation in X-Installation-ID: from this moment the
+	// account's notifications no longer go to this phone. An already expired
+	// refresh token still signs the phone out, exactly like the anonymous
+	// registration the app sends next.
+	if installationID := reqctx.From(r.Context()).InstallationID; installationID != "" && s.installations != nil {
+		var detachErr error
+		if userID != "" {
+			_, detachErr = s.installations.Detach(r.Context(), installationID, userID)
+		} else {
+			_, detachErr = s.installations.DetachAny(r.Context(), installationID)
+		}
+		if detachErr != nil {
+			s.log.Warn("installation detach on logout failed", "error", detachErr.Error())
 		}
 	}
 	httpx.JSON(w, http.StatusOK, map[string]bool{"ok": true})

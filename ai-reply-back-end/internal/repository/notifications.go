@@ -78,6 +78,7 @@ func (s *Store) CreateUserNotification(ctx context.Context, n domain.Notificatio
 // ---------------------------------------------------------------- campaigns
 
 const campaignColumns = `id, name, title, body, category, link, data, audience_filter, status, created_by,
+	COALESCE((SELECT a.email FROM admin_users a WHERE a.id = created_by), ''),
 	COALESCE(idempotency_key, ''), recipient_count, device_count, created_at, updated_at, queued_at,
 	started_at, completed_at, cancelled_at, final_stats`
 
@@ -89,7 +90,7 @@ func scanCampaign(row interface{ Scan(...any) error }) (domain.Campaign, error) 
 		queued, started, completed, cancelledAt sql.NullInt64
 	)
 	err := row.Scan(&c.ID, &c.Name, &c.Title, &c.Body, &c.Category, &c.Link, &data, &audience, &c.Status,
-		&c.CreatedBy, &c.IdempotencyKey, &c.RecipientCount, &c.DeviceCount, &created, &updated,
+		&c.CreatedBy, &c.CreatedByEmail, &c.IdempotencyKey, &c.RecipientCount, &c.DeviceCount, &created, &updated,
 		&queued, &started, &completed, &cancelledAt, &final)
 	if err != nil {
 		return domain.Campaign{}, err

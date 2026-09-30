@@ -129,7 +129,7 @@ func AccessLog(log *slog.Logger, opts AccessLogOptions) func(http.Handler) http.
 			}
 			logging.FromContext(r.Context(), log).Log(r.Context(), level, "http", attrs...)
 
-			if !strings.HasPrefix(r.URL.Path, "/api/") {
+			if !appAPI(r.URL.Path) {
 				return
 			}
 			if opts.TouchInstallation != nil && client.InstallationID != "" {
@@ -147,6 +147,13 @@ func AccessLog(log *slog.Logger, opts AccessLogOptions) func(http.Handler) http.
 			}
 		})
 	}
+}
+
+// appAPI — қосымшалар шақыратын API. Әкімші панелі мен симулятордың өз
+// қателері тек құрылымды журналда қалады: api_errors — қосымшалардың қателері.
+func appAPI(path string) bool {
+	return strings.HasPrefix(path, "/api/") && !strings.HasPrefix(path, "/api/v1/admin/") &&
+		!strings.HasPrefix(path, "/api/v1/simulator/")
 }
 
 // routeOf — сәйкескен маршрут үлгісі ("POST /api/v1/devices/{id}"), болмаса жол үлгісі.

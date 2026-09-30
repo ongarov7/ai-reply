@@ -11,10 +11,13 @@ package notifications
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
 	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -300,18 +303,45 @@ func (s *Service) CreateCampaign(ctx context.Context, adminID string, in Campaig
 	if send && !s.Ready() {
 		return domain.Campaign{}, false, domain.ErrPushDisabled
 	}
-	campaign, created, err := s.repo.CreateCampaign(ctx, domain.Campaign{
+	requested := domain.Campaign{
 		Name: name, Title: content.Title, Body: content.Body, Category: content.Category,
 		Link: content.Link, Data: content.Data, Audience: audience, Status: domain.CampaignDraft,
 		CreatedBy: adminID, IdempotencyKey: idempotencyKey, CreatedAt: s.clock.Now(),
-	})
+	}
+	campaign, created, err := s.repo.CreateCampaign(ctx, requested)
 	if err != nil {
 		return domain.Campaign{}, false, err
+	}
+	// A repeated key is a retry of the same form. A key reused for different
+	// content is a client bug: answering with the first campaign would hide it.
+	if !created && campaignFingerprint(campaign) != campaignFingerprint(requested) {
+		return domain.Campaign{}, false, domain.ConflictField("idempotency_key", "already used for a different campaign")
 	}
 	if send {
 		campaign, err = s.SendCampaign(ctx, campaign.ID)
 	}
 	return campaign, created, err
+}
+
+// campaignFingerprint — what a retried create must repeat exactly (content and audience).
+func campaignFingerprint(c domain.Campaign) string {
+	keys := make([]string, 0, len(c.Data))
+	for k := range c.Data {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	var b strings.Builder
+	for _, part := range []string{c.Name, c.Title, c.Body, c.Category, c.Link} {
+		b.WriteString(strconv.Quote(part))
+		b.WriteByte('|')
+	}
+	for _, k := range keys {
+		b.WriteString(strconv.Quote(k) + "=" + strconv.Quote(c.Data[k]) + ";")
+	}
+	audience, _ := json.Marshal(c.Audience) // every field is omitempty: nil and empty agree
+	b.WriteByte('|')
+	b.Write(audience)
+	return b.String()
 }
 
 // SendCampaign — draft → queued. Қайта шақыру зиянсыз: кезектегі не жіберілген науқан өзгермейді.

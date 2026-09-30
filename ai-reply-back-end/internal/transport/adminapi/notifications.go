@@ -227,7 +227,8 @@ func (s *Server) campaignDTO(v notifications.CampaignView) map[string]any {
 	return map[string]any{
 		"id": c.ID, "name": c.Name, "title": c.Title, "body": c.Body, "category": c.Category,
 		"link": c.Link, "data": data, "audience": c.Audience, "status": c.Status,
-		"created_by": c.CreatedBy, "recipient_count": c.RecipientCount, "device_count": c.DeviceCount,
+		"created_by": c.CreatedBy, "created_by_email": c.CreatedByEmail,
+		"recipient_count": c.RecipientCount, "device_count": c.DeviceCount,
 		"created_at":   c.CreatedAt.In(loc).Format("2006-01-02 15:04"),
 		"queued_at":    optionalTime(c.QueuedAt, loc),
 		"started_at":   optionalTime(c.StartedAt, loc),
@@ -287,10 +288,15 @@ func (s *Server) handleDevices(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, domain.InvalidField("push_status", "unknown"))
 		return
 	}
+	auth := query.Get("auth")
+	if !traits.OneOf(auth, "", domain.AuthAuthenticated, domain.AuthAnonymous) {
+		httpx.Fail(w, domain.InvalidField("auth", "authenticated or anonymous"))
+		return
+	}
 	rows, total, err := s.admin.Devices(r.Context(), repository.InstallationFilter{
 		Search: traits.Clamp(query.Get("q"), 64), UserID: traits.Clamp(query.Get("user_id"), 64),
 		Platform: platform, PushStatus: pushStatus, AppVersion: traits.Clamp(query.Get("app_version"), 32),
-		Page: traits.NewPage(limit, (page-1)*limit),
+		Auth: auth, Page: traits.NewPage(limit, (page-1)*limit),
 	})
 	if err != nil {
 		s.fail(w, err)
@@ -299,9 +305,9 @@ func (s *Server) handleDevices(w http.ResponseWriter, r *http.Request) {
 	out := make([]map[string]any, 0, len(rows))
 	for _, row := range rows {
 		dto := s.installationDTO(row.Installation)
-		dto["user"] = maskIdentifier(domain.User{ID: row.Installation.UserID, Email: row.UserEmail, Phone: row.UserPhone})
-		if row.Installation.UserID == "" {
-			dto["user"] = ""
+		dto["user"] = ""
+		if row.Installation.UserID != "" {
+			dto["user"] = maskIdentifier(domain.User{ID: row.Installation.UserID, Email: row.UserEmail, Phone: row.UserPhone})
 		}
 		out = append(out, dto)
 	}
@@ -312,7 +318,9 @@ func (s *Server) handleDevices(w http.ResponseWriter, r *http.Request) {
 func (s *Server) installationDTO(i domain.Installation) map[string]any {
 	loc := s.cfg.App.Location()
 	return map[string]any{
-		"id": i.ID, "installation_id": i.InstallationID, "user_id": i.UserID, "platform": i.Platform,
+		// The app-generated id is shown shortened: with the full value anyone
+		// could detach the phone through the anonymous detach endpoint.
+		"id": i.ID, "installation_id": domain.ShortID(i.InstallationID), "user_id": i.UserID, "platform": i.Platform,
 		"device":       admin.DeviceName(i.Platform, i.Manufacturer, i.DeviceModel),
 		"device_model": i.DeviceModel, "manufacturer": i.Manufacturer,
 		"os": strings.TrimSpace(i.OSName + " " + i.OSVersion), "app_version": i.AppVersion, "app_build": i.AppBuild,

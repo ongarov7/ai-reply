@@ -2,6 +2,7 @@ package adminapi
 
 import (
 	"net/http"
+	"regexp"
 	"strconv"
 	"time"
 
@@ -20,6 +21,9 @@ import (
 // no password hash, no message text. IP addresses are shortened. Full e-mail
 // and phone appear only in a person's diagnostics, which needs its own
 // permission and leaves an audit record.
+
+// installationPrefix — the shortened installation id the panel shows, or the whole id.
+var installationPrefix = regexp.MustCompile(`^[A-Za-z0-9-]{4,64}$`)
 
 func (s *Server) registerDiagnostics(mux *http.ServeMux) {
 	mux.Handle("GET /api/v1/admin/users/{id}/diagnostics", s.can(admin.PermDiagnosticsRead, s.handleUserDiagnostics))
@@ -131,9 +135,14 @@ func (s *Server) handleLogEvents(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, domain.InvalidField("outcome", "success or failure"))
 		return
 	}
+	installationID := query.Get("installation_id")
+	if installationID != "" && !installationPrefix.MatchString(installationID) {
+		httpx.Fail(w, domain.InvalidField("installation_id", "4-64 letters, digits or dashes"))
+		return
+	}
 	page, limit := pageParams(r, 50)
 	events, total, err := s.admin.AppEvents(r.Context(), repository.EventFilter{
-		UserIDs: userQuery.IDs, InstallationID: traits.Clamp(query.Get("installation_id"), 64),
+		UserIDs: userQuery.IDs, InstallationID: installationID,
 		Name: traits.Clamp(query.Get("name"), 64), Platform: traits.Clamp(query.Get("platform"), 16),
 		AppVersion: traits.Clamp(query.Get("app_version"), 32), AppBuild: traits.Clamp(query.Get("app_build"), 32),
 		OSVersion: traits.Clamp(query.Get("os_version"), 32), DeviceModel: traits.Clamp(query.Get("device_model"), 64),

@@ -169,7 +169,7 @@
     "audience.registered_to": "admin.push.audience.registered_to",
     "audience.user_ids": "admin.push.audience.user_ids",
     status: "admin.users.col_status", platform: "admin.users.col_platform",
-    push_status: "admin.push.device.push", outcome: "admin.logs.outcome",
+    push_status: "admin.push.device.push", auth: "admin.push.audience.auth", outcome: "admin.logs.outcome",
     from: "common.from", to: "common.to"
   };
 
@@ -320,7 +320,8 @@
   // pendingOf — әлі аяқталмаған жеткізулер (queued + sending + retrying).
   function pendingOf(stats) { return stats ? (stats.queued || 0) + (stats.sending || 0) + (stats.retrying || 0) : 0; }
 
-  function adminName(id) {
+  function adminName(id, email) {
+    if (email) return email;
     if (!id) return "—";
     return state.admin && id === state.admin.id ? state.admin.email : tf("admin.push.admin_id", { id: shortID(id) });
   }
@@ -1773,7 +1774,7 @@
               <tr v-else v-for="c in rows" :key="c.id" class="clickable" tabindex="0" @click="open(c)" @keydown.enter="open(c)">
                 <td><b>{{ c.name }}</b><div class="muted small">{{ c.title }}</div></td>
                 <td><span :class="'badge ' + campaignBadge(c.status)">{{ t('admin.push.campaign_status.' + c.status) }}</span></td>
-                <td class="nowrap"><span class="mono">{{ c.created_at }}</span><div class="muted small">{{ adminName(c.created_by) }}</div></td>
+                <td class="nowrap"><span class="mono">{{ c.created_at }}</span><div class="muted small">{{ adminName(c.created_by, c.created_by_email) }}</div></td>
                 <td class="nowrap">
                   <template v-if="c.started_at">{{ nf(c.recipient_count) }} / {{ nf(c.device_count) }}</template>
                   <span v-else class="muted">—</span></td>
@@ -2323,7 +2324,7 @@
                 <div class="card-head"><h2>{{ t('admin.push.timeline') }}</h2></div>
                 <div class="card-body">
                   <dl class="kv kv-tight">
-                    <dt>{{ t('admin.push.col.created') }}</dt><dd><span class="mono">{{ data.created_at }}</span><div class="muted small">{{ adminName(data.created_by) }}</div></dd>
+                    <dt>{{ t('admin.push.col.created') }}</dt><dd><span class="mono">{{ data.created_at }}</span><div class="muted small">{{ adminName(data.created_by, data.created_by_email) }}</div></dd>
                     <dt>{{ t('admin.push.time.queued') }}</dt><dd class="mono">{{ data.queued_at || '—' }}</dd>
                     <dt>{{ t('admin.push.time.started') }}</dt><dd class="mono">{{ data.started_at || '—' }}</dd>
                     <dt>{{ t('admin.push.time.completed') }}</dt><dd class="mono">{{ data.completed_at || '—' }}</dd>
@@ -2428,7 +2429,7 @@
 
   var DeviceList = {
     mixins: [listView({ endpoint: "/notifications/devices", rowsKey: "devices", limit: 50,
-      defaults: { q: "", user_id: "", platform: "", push_status: "", app_version: "" } })],
+      defaults: { q: "", user_id: "", platform: "", push_status: "", auth: "", app_version: "" } })],
     data: function () { return { statuses: PUSH_STATUSES }; },
     methods: Object.assign({}, helpers),
     template: `
@@ -2447,6 +2448,12 @@
             <select v-model="filters.push_status" @change="search">
               <option value="">{{ t('common.all') }}</option>
               <option v-for="s in statuses" :key="s" :value="s">{{ t('admin.push.push_status.' + s) }}</option>
+            </select></label>
+          <label><span>{{ t('admin.push.audience.auth') }}</span>
+            <select v-model="filters.auth" @change="search">
+              <option value="">{{ t('common.all') }}</option>
+              <option value="authenticated">{{ t('admin.push.auth.authenticated') }}</option>
+              <option value="anonymous">{{ t('admin.push.auth.anonymous') }}</option>
             </select></label>
           <label><span>{{ t('admin.push.device.app_version') }}</span>
             <input type="text" v-model.trim="filters.app_version" placeholder="1.3.2"></label>

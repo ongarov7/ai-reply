@@ -310,6 +310,7 @@ type InstallationFilter struct {
 	Platform   string
 	PushStatus string
 	AppVersion string
+	Auth       string // domain.AuthAuthenticated | domain.AuthAnonymous | ""
 	Page       traits.Page
 }
 
@@ -344,6 +345,12 @@ func (s *Store) ListInstallations(ctx context.Context, f InstallationFilter) ([]
 	if f.AppVersion != "" {
 		where = append(where, "i.app_version = ?")
 		args = append(args, f.AppVersion)
+	}
+	switch f.Auth {
+	case domain.AuthAuthenticated:
+		where = append(where, "i.user_id IS NOT NULL")
+	case domain.AuthAnonymous:
+		where = append(where, "i.user_id IS NULL")
 	}
 	clause := strings.Join(where, " AND ")
 	var total int

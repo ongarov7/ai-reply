@@ -9,6 +9,7 @@ import (
 
 	"github.com/aireply/ai-reply-back-end/internal/domain"
 	"github.com/aireply/ai-reply-back-end/internal/limits"
+	"github.com/aireply/ai-reply-back-end/internal/redact"
 	"github.com/aireply/ai-reply-back-end/internal/repository"
 	"github.com/aireply/ai-reply-back-end/internal/traits"
 	"github.com/aireply/ai-reply-back-end/internal/transport/httpx"
@@ -125,7 +126,7 @@ func (s *Server) handleAudit(w http.ResponseWriter, r *http.Request) {
 		out = append(out, map[string]any{
 			"at": e.CreatedAt.In(loc).Format("2006-01-02 15:04"), "admin": e.AdminEmail,
 			"action": e.Action, "entity_type": e.EntityType, "entity_id": e.EntityID,
-			"ip": e.IP, "metadata": e.Metadata, "request_id": e.RequestID,
+			"ip": redact.IP(e.IP), "metadata": e.Metadata, "request_id": e.RequestID,
 		})
 	}
 	httpx.JSON(w, http.StatusOK, map[string]any{
