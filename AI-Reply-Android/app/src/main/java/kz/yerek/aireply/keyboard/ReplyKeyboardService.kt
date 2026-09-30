@@ -39,6 +39,7 @@ import kz.yerek.aireply.core.lang.AppLanguage
 import kz.yerek.aireply.core.lang.KeyboardLanguage
 import kz.yerek.aireply.core.lang.KeyboardPlane
 import kz.yerek.aireply.core.lang.TemplateNaming
+import kz.yerek.aireply.data.account.HeaderScope
 import kz.yerek.aireply.data.settings.AppearancePreference
 import kz.yerek.aireply.domain.model.ReplyConfiguration
 import kz.yerek.aireply.domain.model.TemplateSummary
@@ -886,7 +887,8 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
     private fun refreshLimitsIfStale() {
         if (!AILimits.isStale() || !services.accountCredentials.isSignedIn) return
         scope.launch(Dispatchers.IO) {
-            runCatching { services.accountService.serverConfig() }.getOrNull()?.let { AILimits.apply(it) }
+            runCatching { services.accountService.serverConfig(HeaderScope.KEYBOARD) }
+                .getOrNull()?.let { AILimits.apply(it) }
         }
     }
 

@@ -13,9 +13,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import kz.yerek.aireply.ui.LocalServices
 import kz.yerek.aireply.ui.feature.account.AccountController
 import kz.yerek.aireply.ui.feature.account.EmailSignInScreen
@@ -35,11 +37,15 @@ import kz.yerek.aireply.ui.feature.templates.TemplateEditorScreen
 import kz.yerek.aireply.ui.feature.templates.TemplateListScreen
 
 /**
- * @param deepLink a route the keyboard asked for, pushed on top of Home once
- *   onboarding is done. The "+" chip uses it to open the template editor.
+ * The gates, then the graph.
+ *
+ * A screen asked for from outside — a tapped notification, the keyboard's "+"
+ * chip — waits in [PendingNavigation] while any gate (legal consent, sign-in,
+ * the registration step, onboarding) is showing, and is opened on top of Home
+ * once they are all behind. It never skips one.
  */
 @Composable
-fun AppNavHost(deepLink: String? = null) {
+fun AppNavHost() {
     val services = LocalServices.current
     val configuration by services.configuration.configuration.collectAsStateWithLifecycle()
     val navController = rememberNavController()
@@ -117,25 +123,42 @@ fun AppNavHost(deepLink: String? = null) {
             TemplateEditorScreen(templateId = id, onBack = navController::popBackStack)
         }
 
-        composable(Routes.Settings) {
+        composable(
+            route = Routes.SettingsPattern,
+            arguments = listOf(
+                navArgument(Routes.SettingsSectionArg) {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { entry ->
             SettingsScreen(
                 onBack = navController::popBackStack,
-                onOpen = { route -> navController.navigate(route) }
+                onOpen = { route -> navController.navigate(route) },
+                focusSection = entry.arguments?.getString(Routes.SettingsSectionArg)
             )
         }
     }
 
-    ApplyDeepLink(navController, deepLink, start)
+    // Reached only with every gate behind: a pending link opens now. During
+    // onboarding the start is not Home yet, and the link keeps waiting.
+    val pending by services.navigation.route.collectAsStateWithLifecycle()
+    LaunchedEffect(pending, start) {
+        val route = pending ?: return@LaunchedEffect
+        if (!PendingNavigation.canApply(start)) return@LaunchedEffect
+        if (services.navigation.consume(route)) navController.openFromOutside(route)
+    }
 }
 
-@Composable
-private fun ApplyDeepLink(
-    navController: NavHostController,
-    deepLink: String?,
-    start: String
-) {
-    androidx.compose.runtime.LaunchedEffect(deepLink, start) {
-        if (deepLink == null || start != Routes.Home) return@LaunchedEffect
-        navController.navigate(deepLink)
+/** Opens [route] on top of Home: the back button then leads to Home, never out of the app. */
+private fun NavHostController.openFromOutside(route: String) {
+    if (route == Routes.Home) {
+        popBackStack(Routes.Home, inclusive = false)
+        return
+    }
+    navigate(route) {
+        popUpTo(Routes.Home) { inclusive = false }
+        launchSingleTop = true
     }
 }

@@ -124,4 +124,39 @@
     <string name="settings_debug_mock_replies">Сынақ AI жауаптары</string>
     <string name="settings_debug_mock_replies_footer">Тек жөндеу нұсқасында. Пернетақта қызметтің орнына дайын жауап береді — лимит жұмсалмайды. Нұсқаудағы тегтер: #offline, #quota, #slow.</string>
 
+    <!-- Push notifications and diagnostics (2026-10). -->
+    <string name="push_channel_general">Жалпы</string>
+    <string name="push_channel_general_description">Сервис жаңалықтары мен еске салғыштар</string>
+    <string name="push_channel_important">Маңызды</string>
+    <string name="push_channel_important_description">Тіркелгі, төлем және қауіпсіздік</string>
+    <string name="push_prompt_title">Хабарламаларды қосыңыз</string>
+    <string name="push_prompt_body">Төлем өткенін және тарифтің аяқталатынын алдын ала біліп отырыңыз.</string>
+    <string name="push_prompt_enable">Қосу</string>
+    <string name="push_prompt_later">Қазір емес</string>
+    <string name="push_settings_title">Хабарламалар</string>
+    <string name="push_settings_system">Осы телефонда</string>
+    <string name="push_settings_status_allowed">Рұқсат етілген</string>
+    <string name="push_settings_status_blocked">Өшірулі</string>
+    <string name="push_settings_status_not_asked">Бапталмаған</string>
+    <string name="push_settings_allow">Хабарламаларға рұқсат беру</string>
+    <string name="push_settings_open_system">Телефон баптауларын ашу</string>
+    <string name="push_settings_enabled">AI Reply хабарламалары</string>
+    <string name="push_settings_footer">Төлемнің расталуы және тариф аяқталар алдындағы еске салғыштар.</string>
+    <string name="push_settings_unavailable">Бұл нұсқада хабарламалар әзірге қолжетімсіз.</string>
+    <string name="push_category_account">Тіркелгі</string>
+    <string name="push_category_subscription">Тариф және төлем</string>
+    <string name="push_category_security">Қауіпсіздік</string>
+    <string name="push_category_system">Сервис жаңалықтары</string>
+    <string name="push_category_marketing">Ұсыныстар</string>
+    <string name="push_categories_footer">Қауіпсіздік хабарламалары әрқашан қосулы.</string>
+    <string name="push_categories_loading">Жүктелуде…</string>
+    <string name="push_categories_failed">Жаңарту мүмкін болмады. Байланысты тексеріп, қайталап көріңіз.</string>
+    <string name="diagnostics_share">Диагностиканы жіберу</string>
+    <string name="diagnostics_share_footer">Анонимді оқиғалар — қосымшаның ашылуы, хабарламаны басу, байланыс қателері — ақауларды түзетуге көмектеседі. Хабарламаларыңыз, терген және көшірген мәтініңіз ешқашан жіберілмейді.</string>
+    <string name="settings_debug_simulate_push">Сынақ push-хабарламасы</string>
+    <string name="settings_debug_force_push_prompt">Хабарлама карточкасын әрқашан көрсету</string>
+    <string name="settings_debug_push_footer">Тек жөндеу нұсқасында. Үлгі 3 секундтан кейін ашық қосымшадағы нақты хабарламаның жолымен келеді және басқанда «Тарифті» ашады. Ауыстырғыш басты экрандағы карточканы және осы баптауларды Firebase болмаса да көрсетеді.</string>
+    <string name="debug_push_title">Төлем өтті</string>
+    <string name="debug_push_body">Сынақ хабарлама: тарифті ашу үшін басыңыз.</string>
+
 </resources>

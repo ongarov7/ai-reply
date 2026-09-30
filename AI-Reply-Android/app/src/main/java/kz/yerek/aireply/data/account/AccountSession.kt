@@ -4,6 +4,29 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
+ * The stored session as [AccountSession] needs it. [AccountCredentials] is the
+ * real one; tests use a map.
+ */
+interface SessionCredentials {
+    val accessToken: String?
+    val refreshToken: String?
+    val isSignedIn: Boolean
+    val isAccessTokenFresh: Boolean
+    var deviceId: String
+    var displayIdentifier: String?
+    fun store(accessToken: String, refreshToken: String, expiresInSeconds: Int)
+    fun clear()
+}
+
+/** Authenticated calls with one refresh-and-retry, for code outside this package. */
+interface SessionAuth {
+    val isSignedIn: Boolean
+
+    /** Runs [work] with a valid access token; a 401 refreshes once and retries once. */
+    suspend fun <T> authenticated(work: suspend (String) -> T): T
+}
+
+/**
  * Owns the token pair and hands out a usable access token.
  *
  * Access токен 15 минут жарамды; ескіргенде бір-ақ рет жаңартылады.
@@ -15,34 +38,49 @@ import kotlinx.coroutines.sync.withLock
  * that cannot happen.
  */
 class AccountSession(
-    private val credentials: AccountCredentials,
+    private val credentials: SessionCredentials,
     private val baseUrlProvider: () -> String?,
-    private val deviceDescriptor: () -> DeviceDescriptor
-) {
+    private val deviceDescriptor: () -> DeviceDescriptor,
+    /** How a request is sent; a test seam. */
+    private val clientFactory: (baseUrl: String, scope: HeaderScope) -> ApiClient =
+        { baseUrl, scope -> ApiClient(baseUrl, scope = scope) }
+) : SessionAuth {
 
     private val refreshMutex = Mutex()
 
-    val isSignedIn: Boolean get() = credentials.isSignedIn
+    override val isSignedIn: Boolean get() = credentials.isSignedIn
 
     /** A token that is valid right now, refreshing first when needed. */
     suspend fun accessToken(): String {
         credentials.accessToken?.let { token ->
             if (credentials.isAccessTokenFresh) return token
         }
-        return refreshAccessToken()
+        return refreshAccessToken(rejected = null)
     }
 
-    /** Forces a refresh — used after a 401 on a token we believed was fresh. */
-    suspend fun refreshAccessToken(): String = refreshMutex.withLock {
-        // Another coroutine may have refreshed while this one waited for the
-        // lock; taking its result is both correct and one fewer rotation.
+    /** The stored access token if it is still fresh; never refreshes. */
+    fun freshAccessTokenOrNull(): String? =
+        credentials.accessToken?.takeIf { credentials.isAccessTokenFresh }
+
+    /**
+     * A new access token.
+     *
+     * [rejected] is the token the server just answered 401 to. It must never be
+     * handed out again, however fresh its expiry says it is: returning it made
+     * the one retry in [authenticated] fail the same way. A different fresh
+     * token means another coroutine refreshed while this one waited for the
+     * lock, and taking its result is both correct and one fewer rotation.
+     */
+    suspend fun refreshAccessToken(rejected: String?): String = refreshMutex.withLock {
         credentials.accessToken?.let { token ->
-            if (credentials.isAccessTokenFresh) return@withLock token
+            if (credentials.isAccessTokenFresh && token != rejected) return@withLock token
         }
 
         val baseUrl = baseUrlProvider() ?: ApiError.InvalidRequest.raise()
         val refreshToken = credentials.refreshToken ?: ApiError.Unauthorized.raise()
-        val client = ApiClient(baseUrl)
+        // The keyboard refreshes too, so this carries no installation or
+        // session id.
+        val client = clientFactory(baseUrl, HeaderScope.KEYBOARD)
 
         val payload = client.json.encodeToString(
             RefreshRequest.serializer(),
@@ -76,6 +114,9 @@ class AccountSession(
     /**
      * Ends the session. The server call is best effort: the local tokens are
      * dropped either way, so a user on a plane can still sign out.
+     *
+     * The logout request carries `X-Installation-ID` (APP scope), which is how
+     * the server detaches this installation from the account at once.
      */
     suspend fun signOut() {
         val baseUrl = baseUrlProvider()
@@ -83,7 +124,7 @@ class AccountSession(
         credentials.clear()
 
         if (baseUrl == null || refreshToken == null) return
-        val client = ApiClient(baseUrl)
+        val client = clientFactory(baseUrl, HeaderScope.APP)
         runCatching {
             client.request(
                 "POST", "api/v1/auth/logout",
@@ -96,13 +137,13 @@ class AccountSession(
      * Runs an authenticated call, refreshing once if the server rejects the
      * token. One retry, never a loop.
      */
-    suspend fun <T> authenticated(work: suspend (String) -> T): T {
+    override suspend fun <T> authenticated(work: suspend (String) -> T): T {
         val token = accessToken()
         return try {
             work(token)
         } catch (exception: ApiException) {
             if (exception.error !is ApiError.Unauthorized) throw exception
-            work(refreshAccessToken())
+            work(refreshAccessToken(rejected = token))
         }
     }
 }

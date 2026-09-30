@@ -105,18 +105,21 @@ class AccountService(
     private val deviceDescriptor: () -> DeviceDescriptor
 ) {
 
-    private fun client(): ApiClient {
+    private fun client(scope: HeaderScope = HeaderScope.APP): ApiClient {
         val baseUrl = baseUrlProvider() ?: ApiError.InvalidRequest.raise()
-        return ApiClient(baseUrl)
+        return ApiClient(baseUrl, scope = scope)
     }
 
     private val json: Json get() = jsonCodec
 
     // ------------------------------------------------------ public endpoints
 
-    /** Limits, sign-in methods and current legal versions. Called before sign-in. */
-    suspend fun serverConfig(): ServerConfigDto {
-        val client = client()
+    /**
+     * Limits, sign-in methods, features and current legal versions. Called
+     * before sign-in. The keyboard passes [HeaderScope.KEYBOARD].
+     */
+    suspend fun serverConfig(scope: HeaderScope = HeaderScope.APP): ServerConfigDto {
+        val client = client(scope)
         return decode(ServerConfigDto.serializer(), client.request("GET", "api/v1/config"))
     }
 

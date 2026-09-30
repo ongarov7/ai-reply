@@ -1,5 +1,6 @@
 package kz.yerek.aireply.ui.feature.settings
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -7,6 +8,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Keyboard
@@ -14,6 +17,7 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.PersonOutline
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -25,6 +29,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,13 +57,28 @@ import kz.yerek.aireply.ui.design.AppSection
 import kz.yerek.aireply.ui.design.ReadableColumn
 import kz.yerek.aireply.ui.design.Spacing
 import kz.yerek.aireply.ui.navigation.Routes
+import kotlinx.coroutines.delay
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * @param focusSection a section to scroll to when opened from outside:
+ *   [Routes.SectionNotifications] for a notification's `aireply://notifications`.
+ */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
+fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit, focusSection: String? = null) {
     val services = LocalServices.current
     val uriHandler = LocalUriHandler.current
     val accountState by services.account.state.collectAsStateWithLifecycle()
+    val pushState by services.push.ui.collectAsStateWithLifecycle()
+    val notificationsSection = remember { BringIntoViewRequester() }
+
+    LaunchedEffect(focusSection) {
+        if (focusSection == Routes.SectionNotifications) {
+            // After the first layout pass, so there is somewhere to scroll to.
+            delay(FOCUS_DELAY_MS)
+            notificationsSection.bringIntoView()
+        }
+    }
 
     var appearance by remember { mutableStateOf(services.settings.appearance) }
     var language by remember { mutableStateOf(services.settings.appLanguage) }
@@ -128,6 +148,10 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
             }
 
             AccountSection(onOpenSubscription = { onOpen(Routes.Subscription) })
+
+            NotificationSettingsSection(
+                modifier = Modifier.bringIntoViewRequester(notificationsSection)
+            )
 
             AppSection(stringResource(R.string.settings_appearance)) {
                 SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
@@ -225,6 +249,19 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
                         }
                     }
                     Footnote(stringResource(R.string.settings_debug_mock_replies_footer))
+                    RowGroup {
+                        NavigationRow(
+                            Icons.Outlined.NotificationsActive,
+                            stringResource(R.string.settings_debug_simulate_push)
+                        ) { services.push.simulatePush(DEBUG_PUSH_DELAY_MS) }
+                        RowDividerIndented()
+                        SwitchRow(
+                            label = stringResource(R.string.settings_debug_force_push_prompt),
+                            checked = pushState.debugForced,
+                            enabled = true
+                        ) { checked -> services.push.setDebugForcePrompt(checked) }
+                    }
+                    Footnote(stringResource(R.string.settings_debug_push_footer))
                 }
             }
         }
@@ -254,8 +291,13 @@ private fun LanguageRow(label: String, selected: Boolean, onClick: () -> Unit) {
     }
 }
 
+private const val FOCUS_DELAY_MS = 300L
+
+/** Debug builds: time to leave the app, to see the notification arrive in the background too. */
+private const val DEBUG_PUSH_DELAY_MS = 3_000L
+
 @Composable
-private fun SwitchRow(label: String, checked: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit) {
+internal fun SwitchRow(label: String, checked: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()

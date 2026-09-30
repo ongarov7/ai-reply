@@ -153,4 +153,39 @@
     <string name="settings_debug_mock_replies">Mock AI replies</string>
     <string name="settings_debug_mock_replies_footer">Debug builds only. The keyboard answers with canned replies instead of the service, so nothing is spent. Tags in the instruction: #offline, #quota, #slow.</string>
 
+    <!-- Push notifications and diagnostics (2026-10). -->
+    <string name="push_channel_general">General</string>
+    <string name="push_channel_general_description">Service news and reminders</string>
+    <string name="push_channel_important">Important</string>
+    <string name="push_channel_important_description">Account, payments and security</string>
+    <string name="push_prompt_title">Turn on notifications</string>
+    <string name="push_prompt_body">Know when a payment goes through, and before your plan runs out.</string>
+    <string name="push_prompt_enable">Turn on</string>
+    <string name="push_prompt_later">Not now</string>
+    <string name="push_settings_title">Notifications</string>
+    <string name="push_settings_system">On this phone</string>
+    <string name="push_settings_status_allowed">Allowed</string>
+    <string name="push_settings_status_blocked">Off</string>
+    <string name="push_settings_status_not_asked">Not set up</string>
+    <string name="push_settings_allow">Allow notifications</string>
+    <string name="push_settings_open_system">Open phone settings</string>
+    <string name="push_settings_enabled">Notifications from AI Reply</string>
+    <string name="push_settings_footer">Payment confirmations and reminders before your plan ends.</string>
+    <string name="push_settings_unavailable">Notifications are not available in this version yet.</string>
+    <string name="push_category_account">Account</string>
+    <string name="push_category_subscription">Plan and payments</string>
+    <string name="push_category_security">Security</string>
+    <string name="push_category_system">Service updates</string>
+    <string name="push_category_marketing">Offers</string>
+    <string name="push_categories_footer">Security notifications are always on.</string>
+    <string name="push_categories_loading">Loading…</string>
+    <string name="push_categories_failed">Could not update. Check your connection and try again.</string>
+    <string name="diagnostics_share">Share diagnostics</string>
+    <string name="diagnostics_share_footer">Anonymous events such as app opens, notification taps and connection errors help us fix problems. Your messages, what you type and what you copy are never sent.</string>
+    <string name="settings_debug_simulate_push">Simulate a push notification</string>
+    <string name="settings_debug_force_push_prompt">Always show the notification card</string>
+    <string name="settings_debug_push_footer">Debug builds only. The sample arrives in 3 seconds through the same path as a real one in the foreground, and opens Plan when tapped. The switch shows the Home card and these settings even without Firebase.</string>
+    <string name="debug_push_title">Payment received</string>
+    <string name="debug_push_body">Sample notification: tap to open your plan.</string>
+
 </resources>

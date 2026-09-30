@@ -12,6 +12,7 @@ import kotlinx.coroutines.launch
 import kz.yerek.aireply.BuildConfig
 import kz.yerek.aireply.R
 import kz.yerek.aireply.data.account.AccountCredentials
+import kz.yerek.aireply.data.account.AccountObserver
 import kz.yerek.aireply.data.account.AccountService
 import kz.yerek.aireply.data.account.AccountSessionDto
 import kz.yerek.aireply.data.account.AccountUsageCache
@@ -52,7 +53,9 @@ class AccountController(
     private val google: GoogleSignInClient? = null,
     /** Work that must outlive the screen that started it, such as device registration. */
     private val backgroundScope: CoroutineScope? = null,
-    private val clock: () -> Long = System::currentTimeMillis
+    private val clock: () -> Long = System::currentTimeMillis,
+    /** Told about sign-in, sign-out and the server's features (the push installation). */
+    private val observer: AccountObserver? = null
 ) {
 
     /**
@@ -89,6 +92,8 @@ class AccountController(
         val plans: List<PlanDto> = emptyList(),
         /** Null until the server answered; unknown means "offer everything". */
         val features: ServerFeaturesDto? = null,
+        /** The server answered `GET /config` (its features may still be null: an old server). */
+        val featuresLoaded: Boolean = false,
         /** The address being signed in with, kept so Back and "Change e-mail" do not lose it. */
         val pendingEmail: String = "",
         val legalConfig: LegalConfigDto = LegalConfigDto.PRODUCTION,
@@ -138,10 +143,12 @@ class AccountController(
             _state.update {
                 it.copy(
                     features = config.features,
+                    featuresLoaded = true,
                     legalConfig = legal,
                     hasAcceptedLegal = legalConsentStore.hasAccepted(legal)
                 )
             }
+            observer?.onServerFeatures(config.features)
         }
     }
 
@@ -169,7 +176,10 @@ class AccountController(
     /** Profile, plan and quota in one call. Safe on every appearance. */
     suspend fun refresh() {
         if (!credentials.isSignedIn) {
+            // The session ended elsewhere (a refresh token the server revoked).
+            val wasSignedIn = _state.value.isSignedIn
             _state.update { it.copy(phase = Phase.SignedOut) }
+            if (wasSignedIn) observer?.onSignedOut(userInitiated = false)
             return
         }
         try {
@@ -187,11 +197,12 @@ class AccountController(
                     errorMessage = null
                 )
             }
+            observer?.onAccountLoaded(account.user.id)
         } catch (exception: ApiException) {
             when (exception.error) {
-                is ApiError.Unauthorized -> signOutLocally()
+                is ApiError.Unauthorized -> signOutLocally(userInitiated = false)
                 is ApiError.AccountDisabled -> {
-                    signOutLocally()
+                    signOutLocally(userInitiated = false)
                     _state.update { it.copy(errorMessage = R.string.account_error_disabled) }
                 }
                 // A refresh failing offline is no reason to sign anyone out.
@@ -318,10 +329,12 @@ class AccountController(
                 return SignInOutcome.Cancelled
             }
             GoogleSignInClient.Result.NotConfigured, GoogleSignInClient.Result.Unavailable -> {
+                observer?.onSignInFailedLocally(METHOD_GOOGLE, "google_unavailable")
                 _state.update { it.copy(busy = false, errorMessage = R.string.account_error_provider_unavailable) }
                 return SignInOutcome.Failed(clearCode = false)
             }
             GoogleSignInClient.Result.Failed -> {
+                observer?.onSignInFailedLocally(METHOD_GOOGLE, "google_credential_failed")
                 _state.update { it.copy(busy = false, errorMessage = R.string.account_error_provider_failed) }
                 return SignInOutcome.Failed(clearCode = false)
             }
@@ -355,6 +368,7 @@ class AccountController(
                 errorMessage = null
             )
         }
+        observer?.onSignedIn(session.user.id)
         backgroundScope?.launch {
             // Best effort: a failed device registration must not block sign-in.
             runCatching { service.registerDevice() }
@@ -392,15 +406,19 @@ class AccountController(
         syncPendingLegalConsent()
     }
 
+    /**
+     * Signs out. The logout request names this installation, so the server
+     * detaches it at once; the observer then registers it anonymously.
+     */
     suspend fun signOut() {
         _state.update { it.copy(busy = true) }
         service.signOut()
-        signOutLocally()
+        signOutLocally(userInitiated = true)
         google?.signOut()
         _state.update { it.copy(busy = false) }
     }
 
-    private fun signOutLocally() {
+    private fun signOutLocally(userInitiated: Boolean) {
         credentials.clear()
         _state.update {
             it.copy(
@@ -412,6 +430,7 @@ class AccountController(
                 busy = false
             )
         }
+        observer?.onSignedOut(userInitiated)
     }
 
     private fun applyLegalConsent(consent: LegalConsentDto?) {
@@ -497,6 +516,8 @@ class AccountController(
     companion object {
         /** The server's usual wait between codes, for an answer that did not say. */
         const val DEFAULT_RESEND_SECONDS = 32
+
+        private const val METHOD_GOOGLE = "google"
 
         /**
          * Maps a failure onto a string resource. The server's English message is

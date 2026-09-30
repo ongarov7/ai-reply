@@ -17,6 +17,12 @@
     <uses-permission android:name="android.permission.VIBRATE" />
 
     <!--
+        Push notifications (Android 13+). Never requested at launch: only from
+        the Home card after sign-in, or from Settings ▸ Notifications.
+    -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!--
         Android 11+ package visibility. Without this, SpeechRecognizer cannot
         see the on-device recognition service and every dictation fails with
         ERROR_CLIENT for no visible reason.
@@ -65,6 +71,32 @@
             android:noHistory="true"
             android:taskAffinity=""
             android:theme="@style/Theme.AIReply.Transparent" />
+
+        <!--
+            Firebase Cloud Messaging: a new token, and a push that arrives while
+            the app is in the foreground. Not exported: only Google Play
+            services' receiver starts it. In a build without
+            google-services.json Firebase never starts, and neither does this.
+        -->
+        <service
+            android:name=".push.AppMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!--
+            For a push the system shows while the app is in the background: our
+            icon, and the "general" channel when a message names none (the
+            server always names "general" or "important").
+        -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_notification" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="general" />
 
         <!--
             The keyboard. BIND_INPUT_METHOD is what stops any app other than the

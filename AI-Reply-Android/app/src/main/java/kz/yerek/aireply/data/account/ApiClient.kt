@@ -3,6 +3,7 @@ package kz.yerek.aireply.data.account
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import java.io.IOException
@@ -77,8 +78,21 @@ sealed interface ApiError {
     data object MalformedResponse : ApiError
 }
 
-/** Thrown across suspend boundaries; the payload is what the UI actually reads. */
-class ApiException(val error: ApiError) : Exception(error::class.simpleName)
+/**
+ * Thrown across suspend boundaries; the payload is what the UI actually reads.
+ *
+ * [requestId] is the server's id for the request (from the error envelope or
+ * the `X-Request-ID` response header), else the one this client sent: the
+ * value to quote in a bug report, since the server's log line carries it too.
+ * [httpStatus] is null for a failure that was not an HTTP exchange, and 0 when
+ * the request got no HTTP answer at all ([transport] then says why).
+ */
+class ApiException(
+    val error: ApiError,
+    val requestId: String? = null,
+    val httpStatus: Int? = null,
+    val transport: TransportFailure? = null
+) : Exception(error::class.simpleName)
 
 fun ApiError.raise(): Nothing = throw ApiException(this)
 
@@ -96,7 +110,13 @@ fun ApiError.raise(): Nothing = throw ApiException(this)
  */
 class ApiClient(
     private val baseUrl: String,
-    private val timeoutMs: Int = DEFAULT_TIMEOUT_MS
+    private val timeoutMs: Int = DEFAULT_TIMEOUT_MS,
+    /** Which metadata headers go out; see [HeaderScope]. */
+    private val scope: HeaderScope = HeaderScope.APP,
+    /** Null reads [RequestMetadata.installed] at request time. Tests pass their own. */
+    private val metadata: RequestMetadata? = null,
+    /** The connection factory; a test seam, never replaced in the app. */
+    private val openConnection: (URL) -> HttpURLConnection = { it.openConnection() as HttpURLConnection }
 ) {
 
     val json: Json = Json {
@@ -119,15 +139,28 @@ class ApiClient(
         token: String? = null
     ): String = withContext(Dispatchers.IO) {
         val url = baseUrl.trimEnd('/') + "/" + path.trimStart('/')
-        val connection = (URL(url).openConnection() as HttpURLConnection).apply {
-            requestMethod = method
-            connectTimeout = timeoutMs
-            readTimeout = timeoutMs
-            useCaches = false
-            setRequestProperty("Accept", "application/json")
-            if (body != null) setRequestProperty("Content-Type", "application/json; charset=utf-8")
-            if (token != null) setRequestProperty("Authorization", "Bearer $token")
-            doOutput = body != null
+        val requestId = RequestIds.next()
+        // Read here, on the IO dispatcher: the first read of the installation
+        // id touches a file.
+        val extraHeaders = runCatching { (metadata ?: RequestMetadata.installed).headers(scope) }
+            .getOrDefault(emptyMap())
+        val connection = try {
+            openConnection(URL(url)).apply {
+                requestMethod = method
+                connectTimeout = timeoutMs
+                readTimeout = timeoutMs
+                useCaches = false
+                setRequestProperty("Accept", "application/json")
+                if (body != null) setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                if (token != null) setRequestProperty("Authorization", "Bearer $token")
+                extraHeaders.forEach { (name, value) -> setRequestProperty(name, value) }
+                setRequestProperty(HEADER_REQUEST_ID, requestId)
+                doOutput = body != null
+            }
+        } catch (throwable: Exception) {
+            // A malformed URL or a header value the platform refuses: the
+            // request never left, which is a transport failure, not a crash.
+            throw transportFailure(path, throwable, requestId)
         }
 
         // Cancellation is real, not cooperative-only: the socket read is
@@ -147,7 +180,9 @@ class ApiClient(
 
             if (status !in 200..299) {
                 throw ApiException(
-                    mapServerError(status, text, connection.getHeaderField("Retry-After"))
+                    error = mapServerError(status, text, connection.getHeaderField("Retry-After")),
+                    requestId = requestIdOf(text) ?: connection.getHeaderField(HEADER_REQUEST_ID) ?: requestId,
+                    httpStatus = status
                 )
             }
             text
@@ -156,17 +191,58 @@ class ApiClient(
         } catch (api: ApiException) {
             throw api
         } catch (throwable: Throwable) {
-            throw ApiException(mapTransportError(throwable))
+            // A read unblocked by the cancellation above is not a network
+            // problem worth reporting.
+            throw transportFailure(path, throwable, requestId, report = coroutineContext.isActive)
         } finally {
             disconnectOnCancel?.dispose()
             runCatching { connection.disconnect() }
         }
     }
 
+    /**
+     * A request that got no HTTP answer. App-scope failures are reported to
+     * [RequestMetadata.transportFailureObserver]; the keyboard's never are.
+     */
+    private fun transportFailure(
+        path: String,
+        throwable: Throwable,
+        requestId: String,
+        report: Boolean = true
+    ): ApiException {
+        val kind = transportKind(throwable)
+        if (report && scope == HeaderScope.APP && throwable !is CancellationException) {
+            RequestMetadata.transportFailureObserver?.let { observer ->
+                runCatching { observer(TransportFailureReport(ApiRoutes.pattern(path), kind, requestId)) }
+            }
+        }
+        return ApiException(
+            error = mapTransportError(throwable),
+            requestId = requestId,
+            httpStatus = 0,
+            transport = kind
+        )
+    }
+
     companion object {
         const val DEFAULT_TIMEOUT_MS = 25_000
 
+        const val HEADER_REQUEST_ID = "X-Request-ID"
+
         private val envelopeJson = Json { ignoreUnknownKeys = true }
+
+        /** `error.request_id` from an error envelope, when it is one. */
+        fun requestIdOf(body: String): String? = runCatching {
+            envelopeJson.decodeFromString<ErrorEnvelopeDto>(body).error.requestId
+        }.getOrNull()?.takeIf { it.isNotBlank() && RequestIds.isValid(it) }
+
+        /** Why a request got no HTTP answer, as diagnostics name it. */
+        fun transportKind(throwable: Throwable): TransportFailure = when (throwable) {
+            is SocketTimeoutException -> TransportFailure.TIMEOUT
+            is UnknownHostException, is ConnectException, is NoRouteToHostException -> TransportFailure.OFFLINE
+            is SSLException -> TransportFailure.TLS
+            else -> TransportFailure.IO
+        }
 
         /** Stable server codes first; the HTTP status only as a fallback. */
         fun mapServerError(status: Int, body: String, retryAfterHeader: String? = null): ApiError {

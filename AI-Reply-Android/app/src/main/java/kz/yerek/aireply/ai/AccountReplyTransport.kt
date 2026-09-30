@@ -6,6 +6,7 @@ import kotlinx.serialization.json.Json
 import kz.yerek.aireply.data.account.ApiClient
 import kz.yerek.aireply.data.account.ApiError
 import kz.yerek.aireply.data.account.ApiException
+import kz.yerek.aireply.data.account.HeaderScope
 import kz.yerek.aireply.data.account.AccountSession
 import kz.yerek.aireply.data.account.AccountUsageCache
 import kz.yerek.aireply.data.account.ReplyResponseDto
@@ -65,7 +66,9 @@ class AccountReplyTransport(
     override suspend fun generate(prompt: ReplyPromptBuilder.Prompt): GeneratedReply {
         if (!session.isSignedIn) AIReplyError.AuthenticationFailed.raise()
 
-        val client = ApiClient(baseUrl, timeoutMs)
+        // Reply requests carry no installation or session id: typing in
+        // another app is never tied to this installation.
+        val client = ApiClient(baseUrl, timeoutMs, scope = HeaderScope.KEYBOARD)
         val body = json.encodeToString(
             ReplyRequest.serializer(),
             ReplyRequest(

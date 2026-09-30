@@ -18,13 +18,13 @@ import java.util.UUID
 class AccountCredentials(
     private val secure: SecureCredentialStore,
     private val settings: SettingsStore
-) {
+) : SessionCredentials {
 
-    val accessToken: String? get() = secure.accessToken()
-    val refreshToken: String? get() = secure.refreshToken()
+    override val accessToken: String? get() = secure.accessToken()
+    override val refreshToken: String? get() = secure.refreshToken()
 
     /** True when a session exists at all — checked before every network call. */
-    val isSignedIn: Boolean get() = refreshToken != null
+    override val isSignedIn: Boolean get() = refreshToken != null
 
     /**
      * Whether the access token is still comfortably valid.
@@ -32,7 +32,7 @@ class AccountCredentials(
      * A minute of headroom, because a token that expires while the request is
      * in flight costs the user a visible retry.
      */
-    val isAccessTokenFresh: Boolean
+    override val isAccessTokenFresh: Boolean
         get() {
             if (accessToken == null) return false
             val expiry = settings.accessTokenExpiry
@@ -40,20 +40,20 @@ class AccountCredentials(
         }
 
     /** Stores a freshly issued pair. Called from one place only. */
-    fun store(accessToken: String, refreshToken: String, expiresInSeconds: Int) {
+    override fun store(accessToken: String, refreshToken: String, expiresInSeconds: Int) {
         secure.setAccessToken(accessToken)
         secure.setRefreshToken(refreshToken)
         settings.accessTokenExpiry =
             System.currentTimeMillis() + maxOf(expiresInSeconds, 60) * 1000L
     }
 
-    fun clear() {
+    override fun clear() {
         secure.clearAccountTokens()
         settings.clearAccountState()
     }
 
     /** Random per-install id, replaced when the server returns a canonical one. */
-    var deviceId: String
+    override var deviceId: String
         get() {
             settings.accountDeviceId?.let { return it }
             return UUID.randomUUID().toString().also { settings.accountDeviceId = it }
@@ -63,7 +63,7 @@ class AccountCredentials(
         }
 
     /** Masked phone or e-mail, shown so the user knows which account they are on. */
-    var displayIdentifier: String?
+    override var displayIdentifier: String?
         get() = settings.accountIdentifier
         set(value) {
             settings.accountIdentifier = value

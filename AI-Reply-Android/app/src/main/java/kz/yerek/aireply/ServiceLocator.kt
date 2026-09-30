@@ -1,6 +1,7 @@
 package kz.yerek.aireply
 
 import android.content.Context
+import android.os.Build
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Dispatchers
@@ -16,17 +17,30 @@ import kz.yerek.aireply.core.lang.KeyboardLanguage
 import kz.yerek.aireply.core.lang.LocalizedContext
 import kz.yerek.aireply.core.lang.TemplateNaming
 import kz.yerek.aireply.data.account.AccountCredentials
+import kz.yerek.aireply.data.account.AccountObserver
 import kz.yerek.aireply.data.account.AccountService
 import kz.yerek.aireply.data.account.AccountSession
 import kz.yerek.aireply.data.account.AccountUsageCache
+import kz.yerek.aireply.data.account.ApiClient
 import kz.yerek.aireply.data.account.DeviceDescriptor
 import kz.yerek.aireply.data.account.GoogleSignInClient
+import kz.yerek.aireply.data.account.RequestMetadata
+import kz.yerek.aireply.data.account.ServerFeaturesDto
 import kz.yerek.aireply.data.legal.LegalConsentStore
 import kz.yerek.aireply.data.profile.ConfigurationRepository
 import kz.yerek.aireply.data.profile.ProfileStore
 import kz.yerek.aireply.data.secure.SecureCredentialStore
 import kz.yerek.aireply.data.settings.SettingsStore
+import kz.yerek.aireply.push.ClientContext
+import kz.yerek.aireply.push.HttpPushApi
+import kz.yerek.aireply.push.InstallationIdStore
+import kz.yerek.aireply.push.PushCoordinator
+import kz.yerek.aireply.push.PushStateStore
+import kz.yerek.aireply.telemetry.EventReporter
+import kz.yerek.aireply.telemetry.HttpEventsApi
+import kz.yerek.aireply.telemetry.SessionTracker
 import kz.yerek.aireply.ui.feature.account.AccountController
+import kz.yerek.aireply.ui.navigation.PendingNavigation
 import java.util.TimeZone
 
 /**
@@ -59,6 +73,10 @@ class ServiceLocator(context: Context) {
     init {
         settings.migrateToBackendOnly()
         credentials.removeLegacySecrets()
+        // Every ApiClient takes its metadata headers from here, and reports
+        // app requests that got no answer at all to diagnostics.
+        RequestMetadata.installed = RequestMetadata { headerScope -> clientContext.headers(headerScope) }
+        RequestMetadata.transportFailureObserver = { report -> events.apiError(report) }
     }
 
     private val profileStore: ProfileStore by lazy { ProfileStore(appContext) }
@@ -107,8 +125,19 @@ class ServiceLocator(context: Context) {
             usageCache = usageCache,
             legalConsentStore = legalConsentStore,
             google = googleSignIn,
-            backgroundScope = scope
+            backgroundScope = scope,
+            observer = accountObserver
         )
+    }
+
+    /** Hands account transitions to [push] without constructing it before it is needed. */
+    private val accountObserver = object : AccountObserver {
+        override fun onServerFeatures(features: ServerFeaturesDto?) = push.onServerFeatures(features)
+        override fun onSignedIn(userId: String) = push.onSignedIn(userId)
+        override fun onAccountLoaded(userId: String) = push.onAccountLoaded(userId)
+        override fun onSignedOut(userInitiated: Boolean) = push.onSignedOut(userInitiated)
+        override fun onSignInFailedLocally(method: String, errorCode: String) =
+            push.onSignInFailedLocally(method, errorCode)
     }
 
     val accountService: AccountService by lazy {
@@ -118,6 +147,81 @@ class ServiceLocator(context: Context) {
             deviceDescriptor = ::deviceDescriptor
         )
     }
+
+    // ------------------------------------------- push, installation, diagnostics
+
+    /**
+     * Installation id, versions, OS, model, language and time zone — the
+     * metadata headers of every request and the body of the installation
+     * registration. No hardware identifier.
+     */
+    val clientContext: ClientContext by lazy {
+        ClientContext(
+            installationIds = InstallationIdStore { appContext.noBackupFilesDir },
+            appVersion = BuildConfig.VERSION_NAME,
+            appBuild = BuildConfig.VERSION_CODE.toString(),
+            osVersion = Build.VERSION.RELEASE.orEmpty(),
+            manufacturer = Build.MANUFACTURER.orEmpty(),
+            deviceModel = Build.MODEL.orEmpty(),
+            language = { settings.effectiveAppLanguage.code },
+            sessionId = { sessionTracker.sessionId }
+        )
+    }
+
+    /** The app's foreground sessions; fed by AIReplyApplication from MainActivity only. */
+    val sessionTracker: SessionTracker by lazy {
+        SessionTracker(listener = object : SessionTracker.Listener {
+            override fun onForeground(coldStart: Boolean) {
+                events.appOpened(coldStart)
+            }
+
+            override fun onBackground(foregroundMillis: Long) {
+                events.appBackgrounded(foregroundMillis / 1000)
+            }
+        })
+    }
+
+    /** Minimal app diagnostics; see [EventReporter]. The keyboard never uses it. */
+    val events: EventReporter by lazy {
+        EventReporter(
+            api = HttpEventsApi { ApiClient(aiConfiguration.backendBaseUrl) },
+            installationId = { clientContext.installationId },
+            sessionId = { sessionTracker.sessionId },
+            userAllows = { settings.shareDiagnostics },
+            serverAllows = {
+                val state = account.state.value
+                if (state.featuresLoaded) state.features?.telemetry == true else null
+            },
+            token = { accountSession.freshAccessTokenOrNull() },
+            scope = scope
+        )
+    }
+
+    val pushState: PushStateStore by lazy { PushStateStore(appContext) }
+
+    /** Push notifications and the installation registration. */
+    val push: PushCoordinator by lazy {
+        PushCoordinator(
+            appContext = appContext,
+            settings = settings,
+            store = pushState,
+            client = clientContext,
+            session = accountSession,
+            api = HttpPushApi(client = { ApiClient(aiConfiguration.backendBaseUrl) }, session = accountSession),
+            events = events,
+            features = { account.state.value.features },
+            featuresLoaded = { account.state.value.featuresLoaded },
+            bootstrapped = { account.state.value.bootstrapComplete },
+            loadServerConfig = { account.loadServerConfig() },
+            // A fresh Context each time: these are read off the main thread
+            // (Firebase's service), where the shared cache below is not safe.
+            localized = { LocalizedContext.wrap(appContext, settings.effectiveAppLanguage) },
+            scope = scope
+        )
+    }
+
+    /** A screen asked for from outside the navigation graph: a notification, the keyboard. */
+    val navigation: PendingNavigation by lazy { PendingNavigation() }
 
     /** Platform, version, locale and time zone — nothing that identifies a person. */
     fun deviceDescriptor(): DeviceDescriptor = DeviceDescriptor(

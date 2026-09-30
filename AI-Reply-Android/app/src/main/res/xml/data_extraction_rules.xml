@@ -9,12 +9,19 @@
     was rejected" error. Excluding it means the user re-enters the key on a new
     device, which is the same outcome iOS gets from
     kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly.
+
+    aireply_push.xml (the FCM token and the installation's sync marks) is
+    excluded for the same reason: it describes this device only. The
+    installation id itself lives in noBackupFilesDir, which is never backed up,
+    so a restored or reinstalled app registers as a new installation.
 -->
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="sharedpref" path="aireply_secure.xml" />
+        <exclude domain="sharedpref" path="aireply_push.xml" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="sharedpref" path="aireply_secure.xml" />
+        <exclude domain="sharedpref" path="aireply_push.xml" />
     </device-transfer>
 </data-extraction-rules>

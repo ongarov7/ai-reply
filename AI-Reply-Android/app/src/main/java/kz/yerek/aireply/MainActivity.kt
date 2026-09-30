@@ -1,7 +1,9 @@
 package kz.yerek.aireply
 
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -19,6 +21,8 @@ import kotlinx.coroutines.launch
 import kz.yerek.aireply.core.lang.AppLanguage
 import kz.yerek.aireply.core.lang.LocalizedContext
 import kz.yerek.aireply.data.settings.AppearancePreference
+import kz.yerek.aireply.push.AppLink
+import kz.yerek.aireply.push.PushPayload
 import kz.yerek.aireply.ui.LocalServices
 import kz.yerek.aireply.ui.design.AIReplyTheme
 import kz.yerek.aireply.ui.navigation.AppNavHost
@@ -26,6 +30,14 @@ import kz.yerek.aireply.ui.navigation.Routes
 
 /**
  * The only Activity.
+ *
+ * WHAT OPENS IT. The launcher; the keyboard's "+" chip ([EXTRA_ROUTE]); and a
+ * tapped notification, whether the system showed it (the app was in the
+ * background: Firebase starts the launcher activity with the push data as
+ * String extras) or the app did (in the foreground: the same extras). It is
+ * singleTask, so a tap while it exists arrives in [onNewIntent] — handled
+ * exactly like a cold start. The destination goes to PendingNavigation, which
+ * holds it until every gate (consent, sign-in, onboarding) is behind.
  *
  * LANGUAGE. The interface language is applied in [attachBaseContext] by wrapping
  * the base Context, which is the mechanism that works identically on every API
@@ -55,11 +67,12 @@ class MainActivity : ComponentActivity() {
 
         observeLanguageChanges()
 
-        val start = when (intent?.getStringExtra(EXTRA_ROUTE)) {
-            ROUTE_TEMPLATES -> Routes.Templates
-            ROUTE_SETTINGS -> Routes.Settings
-            else -> null
-        }
+        // Channels in the current language, the push token, the installation.
+        services.push.onAppLaunched()
+
+        // A re-created Activity (restored state) must not replay the intent
+        // that opened it the first time; a new one arrives in onNewIntent.
+        if (savedInstanceState == null) handleExternalIntent(intent)
 
         setContent {
             // Built once: a Flow made during composition would be rebuilt, and
@@ -84,7 +97,7 @@ class MainActivity : ComponentActivity() {
 
             CompositionLocalProvider(LocalServices provides services) {
                 AIReplyTheme(appearance = appearance) {
-                    AppNavHost(deepLink = start)
+                    AppNavHost()
                 }
             }
         }
@@ -93,11 +106,52 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        handleExternalIntent(intent)
     }
 
     override fun onResume() {
         super.onResume()
-        AIReplyApplication.services(this).configuration.reload()
+        val services = AIReplyApplication.services(this)
+        services.configuration.reload()
+        // The notification permission may have changed in system settings.
+        services.push.onResume()
+    }
+
+    /**
+     * The keyboard's "+" chip or a tapped notification. Handled extras are
+     * removed, so a re-creation of this Activity cannot open them again.
+     */
+    private fun handleExternalIntent(intent: Intent?) {
+        if (intent == null) return
+        // Reopened from Recents: the extras are the ones already handled.
+        if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return
+        val services = AIReplyApplication.services(this)
+
+        when (intent.getStringExtra(EXTRA_ROUTE)) {
+            ROUTE_TEMPLATES -> services.navigation.open(Routes.Templates)
+            ROUTE_SETTINGS -> services.navigation.open(Routes.Settings)
+        }
+        intent.removeExtra(EXTRA_ROUTE)
+
+        val extras = intent.extras ?: return
+        if (!extras.containsKey(PushPayload.KEY_NOTIFICATION_ID)) return
+        val data = PushPayload.KEYS.associateWith { key -> extras.getString(key) }
+        PushPayload.KEYS.forEach { key -> intent.removeExtra(key) }
+        when (val link = services.push.onNotificationOpened(data)) {
+            is AppLink.Screen -> services.navigation.open(link.screen)
+            is AppLink.Web -> openInBrowser(link.url)
+            AppLink.None, null -> Unit
+        }
+    }
+
+    /** A validated https page on ai-reply.kz; see AppLinks. */
+    private fun openInBrowser(url: String) {
+        val view = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE)
+        try {
+            startActivity(view)
+        } catch (none: ActivityNotFoundException) {
+            // No browser: the app is open, which is the fallback anyway.
+        }
     }
 
     /**

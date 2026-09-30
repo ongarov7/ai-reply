@@ -176,12 +176,24 @@ data class LegalConfigDto(
     }
 }
 
-/** What this server can do. A missing flag means an older server: assume yes. */
+/**
+ * What this server can do.
+ *
+ * A missing sign-in flag means an older server: assume yes. A missing
+ * installations, push or telemetry flag means the opposite — an older server
+ * without those endpoints — so the app never calls them there.
+ */
 @Serializable
 data class ServerFeaturesDto(
     @SerialName("email_otp") val emailOtp: Boolean = true,
     @SerialName("google_sign_in") val googleSignIn: Boolean = true,
-    @SerialName("apple_sign_in") val appleSignIn: Boolean = true
+    @SerialName("apple_sign_in") val appleSignIn: Boolean = true,
+    /** `POST /api/v1/installations` and the notification preferences exist. */
+    val installations: Boolean = false,
+    /** The server can actually deliver pushes (a provider is configured). */
+    @SerialName("push_notifications") val pushNotifications: Boolean = false,
+    /** `POST /api/v1/events` accepts app events. */
+    val telemetry: Boolean = false
 )
 
 /** Non-secret server configuration the client is allowed to know. */
@@ -228,7 +240,9 @@ data class ErrorEnvelopeDto(val error: ErrorPayloadDto)
 data class ErrorPayloadDto(
     val code: String = "",
     val message: String = "",
-    val details: ErrorDetailsDto? = null
+    val details: ErrorDetailsDto? = null,
+    /** Repeats the `X-Request-ID` response header; the server's log line has it too. */
+    @SerialName("request_id") val requestId: String? = null
 )
 
 @Serializable

@@ -124,4 +124,39 @@
     <string name="settings_debug_mock_replies">Тестовые ответы ИИ</string>
     <string name="settings_debug_mock_replies_footer">Только в отладочной сборке. Клавиатура отвечает заготовками вместо сервиса — лимит не тратится. Теги в инструкции: #offline, #quota, #slow.</string>
 
+    <!-- Push notifications and diagnostics (2026-10). -->
+    <string name="push_channel_general">Общие</string>
+    <string name="push_channel_general_description">Новости сервиса и напоминания</string>
+    <string name="push_channel_important">Важные</string>
+    <string name="push_channel_important_description">Аккаунт, оплата и безопасность</string>
+    <string name="push_prompt_title">Включите уведомления</string>
+    <string name="push_prompt_body">Узнавайте, что оплата прошла, и заранее — что тариф заканчивается.</string>
+    <string name="push_prompt_enable">Включить</string>
+    <string name="push_prompt_later">Не сейчас</string>
+    <string name="push_settings_title">Уведомления</string>
+    <string name="push_settings_system">На этом телефоне</string>
+    <string name="push_settings_status_allowed">Разрешены</string>
+    <string name="push_settings_status_blocked">Выключены</string>
+    <string name="push_settings_status_not_asked">Не настроены</string>
+    <string name="push_settings_allow">Разрешить уведомления</string>
+    <string name="push_settings_open_system">Открыть настройки телефона</string>
+    <string name="push_settings_enabled">Уведомления AI Reply</string>
+    <string name="push_settings_footer">Подтверждения оплаты и напоминания перед окончанием тарифа.</string>
+    <string name="push_settings_unavailable">В этой версии уведомления пока недоступны.</string>
+    <string name="push_category_account">Аккаунт</string>
+    <string name="push_category_subscription">Тариф и оплата</string>
+    <string name="push_category_security">Безопасность</string>
+    <string name="push_category_system">Новости сервиса</string>
+    <string name="push_category_marketing">Предложения</string>
+    <string name="push_categories_footer">Уведомления о безопасности включены всегда.</string>
+    <string name="push_categories_loading">Загрузка…</string>
+    <string name="push_categories_failed">Не удалось обновить. Проверьте подключение и попробуйте снова.</string>
+    <string name="diagnostics_share">Отправлять диагностику</string>
+    <string name="diagnostics_share_footer">Анонимные события — запуск приложения, нажатие на уведомление, ошибки соединения — помогают нам исправлять проблемы. Ваши сообщения, набранный и скопированный текст не отправляются никогда.</string>
+    <string name="settings_debug_simulate_push">Тестовое push-уведомление</string>
+    <string name="settings_debug_force_push_prompt">Всегда показывать карточку уведомлений</string>
+    <string name="settings_debug_push_footer">Только в отладочной сборке. Пример придёт через 3 секунды тем же путём, что и настоящее уведомление в открытом приложении, и по нажатию откроет «Тариф». Переключатель показывает карточку на главном экране и эти настройки даже без Firebase.</string>
+    <string name="debug_push_title">Оплата прошла</string>
+    <string name="debug_push_body">Тестовое уведомление: нажмите, чтобы открыть тариф.</string>
+
 </resources>

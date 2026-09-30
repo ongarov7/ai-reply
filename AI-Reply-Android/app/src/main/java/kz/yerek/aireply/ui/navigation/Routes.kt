@@ -21,4 +21,14 @@ object Routes {
     fun templateEditor(id: String) = "$TemplateEditor/$id"
     const val TemplateEditorPattern = "$TemplateEditor/{id}"
     const val TemplateEditorArg = "id"
+
+    /**
+     * Settings takes an optional section to scroll to; plain [Settings] still
+     * matches, because the argument is optional.
+     */
+    const val SettingsSectionArg = "section"
+    const val SettingsPattern = "$Settings?$SettingsSectionArg={$SettingsSectionArg}"
+    const val SectionNotifications = "notifications"
+
+    fun settings(section: String) = "$Settings?$SettingsSectionArg=$section"
 }
