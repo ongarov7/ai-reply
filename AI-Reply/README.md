@@ -627,6 +627,65 @@ Install:
 3. For the Copy → Reply test only: open Reply Keyboard in that list and turn on
    **Allow Full Access**. Typing tests do not need it.
 
+### Push notifications, installation and app events
+
+Server side: `ai-reply-back-end/docs/API.md` («Заголовки клиента», «Установки и
+push-уведомления», «События приложения»). App side: `AIReply/Features/Notifications/`.
+
+* **Capability.** Like Sign in with Apple, push is Release-only: `aps-environment`
+  (`development` in the file; an App Store / TestFlight export re-signs it as
+  `production`) is in `Config/AIReply.entitlements`, while Debug signs with
+  `Config/AIReply-NoAppleSignIn.entitlements`, which has neither, so a free
+  Personal Team can still install Debug builds. `AIREPLY_PUSH_NOTIFICATIONS`
+  (Debug `NO`, Release `YES`) reaches the app as `AIReplyPushNotifications` in
+  Info.plist; the app asks APNs for a token only when it is `YES`. To try push
+  in Debug on a paid team, set it to `YES` and `CODE_SIGN_ENTITLEMENTS =
+  Config/AIReply.entitlements` for Debug. Enable *Push Notifications* for the App
+  ID `kz.yerek.replykeyboard` in the portal.
+* **Only with a server that offers it.** `GET /api/v1/config` → `features.installations`,
+  `push_notifications`, `telemetry`. A missing key is "no": against a server
+  without them the app never calls `/installations` or `/events`, shows no
+  notification card or section, and behaves exactly as before.
+* **Headers.** Every request (`APIClient`) carries `X-Platform`, `X-App-Version`,
+  `X-App-Build`, `X-OS-Version` and a fresh `X-Request-ID` (`req_` + 16
+  `[a-z0-9]`). Only the app adds `X-Installation-ID` and `X-Session-ID`; the
+  keyboard extension never does and sends no events. A failed call's
+  `APIFailure` carries the server's `request_id`.
+* **Installation id.** A random UUID made once, in the Keychain
+  (`kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`, the app's own access
+  group, not the App Group). Not the IDFA/IDFV and not a credential. iOS keeps
+  it when the app is deleted and reinstalled on the same iPhone; it is never
+  restored onto another device.
+* **Registration** (`POST /api/v1/installations`) after launch, sign-in, sign-out
+  (anonymous: detaches the phone from the account; logout also names the
+  installation), a new token, a permission change (re-read on every return to
+  the foreground), the in-app switch and a language change - sent only when
+  something differs from the last accepted registration, else once a day. A
+  401 refreshes the session once and retries once; failures back off.
+* **Permission.** Never asked at launch. Home shows a soft card to a signed-in
+  user while the permission is undetermined; *Turn on* shows the system prompt.
+  Settings ▸ Notifications: iOS status (with a way to iOS Settings when off),
+  the in-app switch, and the account's categories (security always on).
+* **Taps.** `aireply://<screen>` opens that screen (unknown → Home);
+  `https://ai-reply.kz/...` opens in an in-app browser; anything else just opens
+  the app. A destination that arrives while consent, sign-in or onboarding is
+  showing waits for it (15 minutes at most) and is never applied around it.
+* **Events** (Settings ▸ Diagnostics, on by default): `app_opened`,
+  `app_backgrounded`, `logout`, `login_failed` (only Apple/Google sheet failures
+  the server never saw), `push_permission_*`, `push_token_*`,
+  `notification_opened`, `api_error` (no response at all). Batched in memory,
+  at most 100, 50 per request, every minute and on backgrounding. Never message
+  text, keystrokes or the clipboard.
+
+Simulator checks (DEBUG only, nothing of it exists in Release):
+`-AIReplyForcePushCard YES` shows the card and the Settings sections whatever
+the state; `-AIReplyOpenLink subscription` (or a full link, or `web`) opens a
+link at launch like a tapped notification; `-AIReplyDebugProvisionalPush YES`
+gets provisional permission without an alert so `xcrun simctl push` is
+delivered, and `-AIReplyDebugAutoOpenPush YES` treats it as tapped;
+`-AIReplyLanguage kk` shows one launch in that language; `-AIReplyDebugScreen
+notifications` opens Settings at the notifications section.
+
 ---
 
 ## 14. Physical-device test protocol
