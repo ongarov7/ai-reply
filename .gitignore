@@ -1,0 +1,25 @@
+# macOS
+.DS_Store
+
+# Secrets stay on the machine that uses them. Only the *.env.example
+# templates are committed; real keys go into the server's .env.
+.env
+.env.*
+!.env.example
+*.pem
+*.p8
+*.p12
+*.jks
+*.keystore
+
+# Logs and local build/test output
+*.log
+ios-simlog.txt
+android-shot*.png
+
+# Local build-watcher requests and markers (claude-build-watch.sh)
+.build-request
+.build-done
+.claude-*
+.run-lint
+.watcher-v*
