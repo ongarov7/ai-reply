@@ -8,6 +8,20 @@ plugins {
 }
 
 /**
+ * Push notifications (Firebase Cloud Messaging).
+ *
+ * app/google-services.json holds the Firebase project's client configuration.
+ * It is environment-specific and git-ignored, so it is never committed. With
+ * the file present the Google Services plugin turns it into resources and
+ * FirebaseApp initialises at startup; without it the plugin is not applied,
+ * the build still succeeds, and push is simply unavailable at runtime
+ * (PushSupport checks FirebaseApp.getApps before touching FirebaseMessaging).
+ */
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
+/**
  * "Continue with Google": the OAuth client of type *Web application* from
  * Google Cloud Console. Not a secret (it ships in every APK), but it differs
  * per environment, so it is not checked in. First match wins:
@@ -142,6 +156,9 @@ dependencies {
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.googleid)
+
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 

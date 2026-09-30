@@ -11,6 +11,7 @@
 *.p12
 *.jks
 *.keystore
+AI-Reply-Android/app/google-services.json
 
 # Logs and local build/test output
 *.log
