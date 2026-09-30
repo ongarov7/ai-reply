@@ -112,6 +112,7 @@ class NotificationPreferencesTest {
         assertFalse("already allowed", eligible.copy(granted = true).showsPrompt)
         assertFalse("denied for good", eligible.copy(permanentlyDenied = true).showsPrompt)
         assertFalse("Not now", eligible.copy(promptDismissed = true).showsPrompt)
+        assertFalse("switched off in the app", eligible.copy(notificationsEnabled = false).showsPrompt)
         assertTrue(
             "debug builds can force it",
             eligible.copy(supportedInBuild = false, promptDismissed = true, debugForced = true).showsPrompt

@@ -1,6 +1,8 @@
 package kz.yerek.aireply.push
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -50,13 +52,13 @@ data class PushUiState(
 
     /**
      * The Home card: never at first launch, only after sign-in (Home comes
-     * after it), only where the system dialog can still be shown, and never
-     * again after "Not now" or a denial.
+     * after it), only where the system dialog can still be shown, never while
+     * the in-app switch is off, and never again after "Not now" or a denial.
      */
     val showsPrompt: Boolean
         get() = debugForced || (
             supportedInBuild && serverDelivers && runtimePermission && !granted &&
-                !permanentlyDenied && !promptDismissed
+                !permanentlyDenied && !promptDismissed && notificationsEnabled
             )
 
     /** The system dialog can still be shown; otherwise only system settings can help. */
@@ -126,6 +128,8 @@ class PushCoordinator(
     private var lastConfigAttempt = 0L
 
     private val reportedTokenFailures = HashSet<String>()
+
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     // --------------------------------------------------------------- app
 
@@ -230,7 +234,11 @@ class PushCoordinator(
      */
     fun onNotificationOpened(data: Map<String, String?>): AppLink? {
         val payload = PushPayload.from(data) ?: return null
-        payload.openedEventProperties()?.let(events::notificationOpened)
+        // Posted: on a cold start this runs in onCreate, before the session
+        // the tap opens has begun (it starts in onStart).
+        payload.openedEventProperties()?.let { properties ->
+            mainHandler.post { events.notificationOpened(properties) }
+        }
         return payload.link
     }
 

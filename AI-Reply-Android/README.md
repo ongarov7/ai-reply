@@ -120,6 +120,53 @@ client id, release builds hide the Google button.
 Keyboard vibration: Settings ▸ Keyboard ▸ *Vibration on key press* (on by
 default). The system's own keypress-vibration setting still applies on top.
 
+### Push notifications (Firebase)
+
+Pushes arrive through Firebase Cloud Messaging. The Firebase project's client
+configuration, `app/google-services.json`, is environment-specific and
+git-ignored — never commit it. Download it from the Firebase console for the
+Android app `kz.yerek.aireply` and drop it into `app/`; the build applies the
+Google Services plugin only when the file is there. Without it the app builds
+and runs exactly as before and push is simply unavailable (Settings ▸
+Notifications says so). The server's side — the service account, and turning
+push on — is in `../ai-reply-back-end/docs/API.md` (*Установки и
+push-уведомления*).
+
+What the app does, in order:
+
+* **Installation.** A random UUID in `noBackupFilesDir` (never a hardware id,
+  never backed up, so a reinstall or a restore is a new installation) is
+  registered with `POST /api/v1/installations` — with the access token when
+  signed in (the installation belongs to that account), without it when signed
+  out (anonymous, detached from whoever used the phone before). It is sent on
+  start, after sign-in and sign-out, on a new FCM token, and when the permission
+  or the in-app switch changes, but only if something differs from the last
+  accepted registration, else once a day. Only against a server whose
+  `GET /api/v1/config` announces `features.installations`; the production server
+  that does not is never called.
+* **Permission.** Never asked at first launch. After sign-in, on Android 13+,
+  Home shows a card (*Turn on* → the system dialog, *Not now* → gone for good);
+  Settings ▸ Notifications shows the system state, the way to system settings
+  when blocked, the in-app switch and, signed in, the categories (security
+  always on).
+* **Display and taps.** Channels `general` and `important`, as the server
+  names them. In the background the system shows the push; in the foreground
+  the app shows it the same way (tag = notification id). A tap opens the
+  `aireply://<screen>` it names — after the consent, sign-in and onboarding
+  gates, never around them — or an `https://ai-reply.kz` page in the browser;
+  anything else only opens the app.
+* **Diagnostics.** With *Share diagnostics* on (default) and
+  `features.telemetry`, a handful of events (`app_opened`, `app_backgrounded`,
+  the push permission and token, `notification_opened`, `logout`, a Google
+  sign-in that failed inside Google's SDK, and requests that got no HTTP answer
+  at all) are batched to `POST /api/v1/events`. Never message text, typing or
+  the clipboard, and nothing from the keyboard.
+
+Debug builds, Settings ▸ Developer: *Simulate a push notification* runs the
+real foreground path with a sample payload (it opens Plan), and *Always show
+the notification card* shows the Home card and the Settings controls without
+Firebase or a new server.
+
 ---
 
 ## Setting the keyboard up
@@ -208,6 +255,9 @@ app/src/main/java/kz/yerek/aireply/
 │                              and the reply panel, in Compose
 │
 ├── voice/                     SpeechRecognitionClient + the Android one
+├── push/                      installation id and registration, FCM service,
+│                              channels, notification links, permission
+├── telemetry/                 allow-listed diagnostics events, app sessions
 ├── platform/                  logging that never carries message text
 └── ui/                        design system, navigation, and the app screens
 ```
@@ -287,6 +337,18 @@ These are properties of the code, not intentions:
   another app's screen. The only way a message becomes context is that you
   copied it.
 
+Since push notifications (2026-10):
+
+* Every request carries metadata headers from one place (`ClientContext`):
+  platform, app version and build, OS version and a random request id. Requests
+  from the app's own screens add the installation id and the app session id;
+  requests the keyboard can make (replies, token refresh, limits) never do.
+* The installation registration sends the device model and manufacturer, the
+  interface language, the time zone, the notification permission and the FCM
+  token. The account is never in it: it comes from the access token.
+* Diagnostics are a closed list of events with short typed values (see *Push
+  notifications*), held in memory only, and off with one switch.
+
 ---
 
 ## Tests
@@ -295,7 +357,7 @@ These are properties of the code, not intentions:
 ./gradlew testDebugUnitTest
 ```
 
-Thirteen classes, 115 tests, covering: the message limit (published by the
+Twenty-one classes, 190 tests, covering: the message limit (published by the
 server, 400 when it has not said) and code-point counting, backend error
 mapping, prompt construction (including that user text never reaches the
 developer message), working-hours derivation and weekday grouping, draft
@@ -306,6 +368,11 @@ delete, the composer's state machine and its versions (Regenerate never loses an
 edit, Insert takes the edited text), and **localization parity** — that every
 string exists in every language with matching format specifiers, which is the
 failure that is otherwise silent until a Kazakh user sees an English sentence.
+Push and diagnostics: notification links (only `aireply://` screens and
+ai-reply.kz pages), push payload → destination and open event, the metadata
+headers and request ids, the installation id, the token refresh after a 401,
+when the installation is (re-)registered and how failures back off, the event
+allowlist and batching, app sessions, and the category switches' rollback.
 
 ---
 
@@ -337,6 +404,13 @@ builds neither show the switch nor use the mock.
   shipped secret.
 * The backend the production transport talks to does not exist yet. See
   `docs/AI_REPLY_PLATFORM_ARCHITECTURE.md`.
+
+**Push is built but dormant.** There is no Firebase project yet (no
+`google-services.json`), and https://ai-reply.kz still runs a backend without
+`features.installations` / `push_notifications` / `telemetry`, so today's builds
+register nothing and send no events. The debug switches above exercise the UI
+and the foreground path; a real FCM delivery, the background tap and the
+server's side need both pieces in place.
 
 ---
 

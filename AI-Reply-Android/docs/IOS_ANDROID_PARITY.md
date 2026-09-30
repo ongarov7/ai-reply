@@ -173,5 +173,22 @@ decoding that lets a configuration written by an older build still load.
 | Logging never carries message text | `ReplyLog`, lengths and outcomes only, DEBUG only | `ReplyLog`, same rule, `BuildConfig.DEBUG` only | IMPLEMENTED_NOT_DEVICE_VERIFIED | |
 | Secrets out of the repo | Key typed at runtime, nothing in the IPA | Same; nothing in the APK, `local.properties` untouched, `.gitignore` covers it | IMPLEMENTED_NOT_DEVICE_VERIFIED | |
 | Responsive layout | Portrait-locked, width-derived metrics | Portrait + landscape, width- and height-derived; `readableWidth` cap; font-scale respected in the app, pinned in the key grid | IMPLEMENTED_NOT_DEVICE_VERIFIED | Pinning the key grid's font scale stops a 2× accessibility font from breaking key geometry |
-| Unit tests | XCTest, 138 tests | 13 JVM test classes, 115 tests | IMPLEMENTED_AND_VERIFIED | `./gradlew testDebugUnitTest`, all green |
+| Unit tests | XCTest, 138 tests | 21 JVM test classes, 190 tests | IMPLEMENTED_AND_VERIFIED | `./gradlew testDebugUnitTest`, all green |
 | `./gradlew assembleDebug` | n/a | builds on the Mac with JDK 17+ | IMPLEMENTED_AND_VERIFIED | AGP 8.7.3 needs JDK 17+; Android Studio Electric Eel's bundled JBR 11 is too old |
+
+## 11. Push notifications, installation, diagnostics (2026-10)
+
+Both apps speak the same backend contract (`POST /api/v1/installations`,
+`/api/v1/events`, `/api/v1/me/notification-preferences`); iOS delivers through
+APNs, Android through FCM.
+
+| Feature | Android | Status | Notes |
+|---|---|---|---|
+| Installation id | Random UUID in `noBackupFilesDir`, created once | IMPLEMENTED_AND_VERIFIED | `ClientHeadersTest`; a restore or reinstall gets a new id |
+| Metadata headers | `ClientContext` → every `ApiClient` request; keyboard scope without installation/session id | IMPLEMENTED_AND_VERIFIED | `ClientHeadersTest` |
+| Installation sync | `InstallationRegistrar`: payload + account fingerprint, 24 h re-sync, backoff, 401 refresh-and-retry | IMPLEMENTED_AND_VERIFIED | `InstallationRegistrarTest`, `AccountSessionRefreshTest` |
+| FCM without a committed config | Google Services plugin only with `app/google-services.json`; `FirebaseApp.getApps` gate at runtime | IMPLEMENTED_NOT_DEVICE_VERIFIED | Builds and runs without the file |
+| Channels, foreground display, taps | `general` / `important`; tag = notification id; `MainActivity` handles `onCreate` and `onNewIntent` | IMPLEMENTED_NOT_DEVICE_VERIFIED | Debug "simulate push" runs the foreground path |
+| Links | `AppLinks`: `aireply://<screen>`, `https://ai-reply.kz` (+ subdomains), nothing else | IMPLEMENTED_AND_VERIFIED | `AppLinksTest`; pending through the gates via `PendingNavigation` |
+| Permission UX | Home card after sign-in (Android 13+), Settings ▸ Notifications | IMPLEMENTED_NOT_DEVICE_VERIFIED | Never at first launch |
+| Diagnostics | `EventReporter` (allow-list, ≤100 in memory, batches of 50, backoff), `SessionTracker` (30 min) | IMPLEMENTED_AND_VERIFIED | `EventReporterTest`; "Share diagnostics" on by default |
