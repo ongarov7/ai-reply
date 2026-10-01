@@ -45,6 +45,50 @@ final class EventReporterTests: XCTestCase {
         }
     }
 
+    /// Holds every request until released, the way a slow network would.
+    /// Like URLSession, a request whose task is cancelled fails as `cancelled`.
+    private final class HeldTransport: EventTransport, @unchecked Sendable {
+        private let lock = NSLock()
+        private var sent: [EventBatch] = []
+        private var held: [CheckedContinuation<Bool, Never>] = []
+        private var isReleased = false
+
+        var batches: [EventBatch] { lock.withLock { sent } }
+
+        /// Lets every request held so far, and every later one, complete.
+        func release() {
+            let waiting: [CheckedContinuation<Bool, Never>] = lock.withLock {
+                isReleased = true
+                defer { held = [] }
+                return held
+            }
+            waiting.forEach { $0.resume(returning: true) }
+        }
+
+        func send(_ batch: EventBatch, accessToken: String?) async throws -> EventBatchResult {
+            lock.withLock { sent.append(batch) }
+            let answered = await withTaskCancellationHandler {
+                await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+                    let now: Bool? = lock.withLock {
+                        if isReleased { return true }
+                        if Task.isCancelled { return false }
+                        held.append(continuation)
+                        return nil
+                    }
+                    if let now { continuation.resume(returning: now) }
+                }
+            } onCancel: {
+                let waiting: [CheckedContinuation<Bool, Never>] = lock.withLock {
+                    defer { held = [] }
+                    return held
+                }
+                waiting.forEach { $0.resume(returning: false) }
+            }
+            guard answered else { throw APIFailure(error: .cancelled, requestID: "req_cancelled00000001", status: 0) }
+            return EventBatchResult(accepted: batch.events.count, rejected: 0)
+        }
+    }
+
     /// The reporter's world: a clock, a session and a token the test moves.
     @MainActor
     private final class Harness {
@@ -67,6 +111,23 @@ final class EventReporterTests: XCTestCase {
                     return String(format: "event-%04d", self.counter)
                 }
             )
+        }
+    }
+
+    @MainActor
+    private func heldReporter(_ transport: HeldTransport) -> EventReporter {
+        let reporter = EventReporter(transport: transport, userAllows: true,
+                                     installationID: { "install-0001" }, sessionID: { "session-0001" },
+                                     accessToken: { "access-token" })
+        reporter.setServerSupport(true)
+        return reporter
+    }
+
+    @MainActor
+    private func waitUntil(_ condition: () -> Bool) async {
+        for _ in 0..<400 {
+            if condition() { return }
+            try? await Task.sleep(for: .milliseconds(5))
         }
     }
 
@@ -323,6 +384,64 @@ final class EventReporterTests: XCTestCase {
         XCTAssertFalse(reporter.isSending)
         reporter.record(.appOpened(coldStart: false))
         XCTAssertTrue(reporter.queue.isEmpty)
+    }
+
+    @MainActor
+    func testACancelledRequestKeepsTheBatchWithoutAPause() async {
+        let world = Harness()
+        let reporter = world.reporter()
+        reporter.setServerSupport(true)
+        reporter.record(.logout)
+        world.transport.answer([.failure(APIFailure(error: .cancelled, requestID: "req_cancelled00000001", status: 0))])
+        await reporter.flush()
+        XCTAssertEqual(reporter.queue.count, 1, "kept")
+        await reporter.flush()
+        XCTAssertEqual(world.transport.calls.count, 2, "sent again at once: a cancellation is not a failure")
+        XCTAssertTrue(reporter.queue.isEmpty)
+    }
+
+    // MARK: A send in progress
+
+    /// The background flush must not give up because the minute timer's send
+    /// is still on the wire: it waits, then sends what came since.
+    @MainActor
+    func testAFlushWaitsForTheSendInProgressThenSendsWhatCameMeanwhile() async {
+        let transport = HeldTransport()
+        let reporter = heldReporter(transport)
+        reporter.record(.appOpened(coldStart: true))
+        let timer = Task { await reporter.flush() }
+        await waitUntil { transport.batches.count == 1 }
+
+        reporter.record(.appBackgrounded(foregroundSeconds: 30))
+        let background = Task { await reporter.flush() }
+        try? await Task.sleep(for: .milliseconds(50))
+        XCTAssertEqual(transport.batches.count, 1, "no second request racing the first")
+
+        transport.release()
+        await timer.value
+        await background.value
+        XCTAssertEqual(transport.batches.map { $0.events.map(\.name) }, [["app_opened"], ["app_backgrounded"]])
+        XCTAssertTrue(reporter.queue.isEmpty)
+    }
+
+    /// Going to the background stops the timer; the request it started must
+    /// still finish, or its events stay behind with a failure pause.
+    @MainActor
+    func testStoppingTheTimerDoesNotCancelARequestOnTheWire() async {
+        let transport = HeldTransport()
+        let reporter = heldReporter(transport)
+        reporter.record(.appOpened(coldStart: true))
+        let timer = Task { await reporter.flush() }
+        await waitUntil { transport.batches.count == 1 }
+
+        timer.cancel()
+        transport.release()
+        await timer.value
+        XCTAssertTrue(reporter.queue.isEmpty, "the request finished and its events were delivered")
+
+        reporter.record(.appBackgrounded(foregroundSeconds: 1))
+        await reporter.flush()
+        XCTAssertEqual(transport.batches.count, 2, "and no failure pause holds the next send back")
     }
 
     @MainActor

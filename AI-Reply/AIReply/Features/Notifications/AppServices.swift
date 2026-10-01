@@ -335,9 +335,11 @@ final class AppServices {
     private func startSendingEvents() {
         guard flushTask == nil else { return }
         flushTask = Task { [weak self] in
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(60))
-                guard !Task.isCancelled, let self else { return }
+            while true {
+                // Stopping the timer only ever interrupts this wait. A send in
+                // progress belongs to the reporter and finishes on its own.
+                do { try await Task.sleep(for: .seconds(60)) } catch { return }
+                guard let self else { return }
                 await self.events.flush()
             }
         }
@@ -349,7 +351,8 @@ final class AppServices {
     }
 
     /// One last send when the app leaves the screen, inside the few seconds
-    /// iOS grants a background task.
+    /// iOS grants a background task. It waits for a send already in progress
+    /// and then sends what came since, `app_backgrounded` included.
     private func sendEventsInBackground() {
         guard events.isSending, !events.queue.isEmpty else { return }
         let task = BackgroundTask(name: "AIReply.events")

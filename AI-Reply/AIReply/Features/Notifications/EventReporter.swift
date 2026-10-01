@@ -45,11 +45,13 @@ protocol EventTransport: Sendable {
 ///   written to disk: events not sent before the app is killed are lost,
 ///   which is the right trade for diagnostics.
 /// - Up to 50 events per request, one session per request, every ~60 s and
-///   when the app goes to the background.
+///   when the app goes to the background. A send in progress is joined, never
+///   skipped, and runs in a task of its own, so stopping the timer as the app
+///   leaves the screen cannot cancel a request on the wire.
 /// - Network failures, 5xx and 429 keep the batch for later with a growing
-///   pause; any other 4xx means the server will never take it, so it is
-///   dropped. A 401 is retried once without the token, since the token is
-///   optional here.
+///   pause; a cancelled request keeps it with no pause; any other 4xx means
+///   the server will never take it, so it is dropped. A 401 is retried once
+///   without the token, since the token is optional here.
 @MainActor
 final class EventReporter {
 
@@ -86,7 +88,8 @@ final class EventReporter {
     private let now: () -> Date
     private let makeID: () -> String
 
-    private var isFlushing = false
+    /// The send in progress. A flush waits for it rather than racing it.
+    private var inFlight: Task<Void, Never>?
     private var retryNotBefore: Date?
     private var consecutiveFailures = 0
 
@@ -147,16 +150,30 @@ final class EventReporter {
     /// Sends what is queued, batch by batch, until the queue is empty or a
     /// batch has to wait. Never throws and never blocks the caller's UI.
     func flush() async {
-        guard isSending, !isFlushing, !queue.isEmpty else { return }
+        // A send already in progress (the minute timer's, say) is joined, not
+        // skipped: what was recorded meanwhile - app_backgrounded - still goes.
+        while let running = inFlight {
+            await running.value
+        }
+        guard isSending, !queue.isEmpty else { return }
         if let retryNotBefore, now() < retryNotBefore { return }
         guard let installationID = installationID() else { return }
 
-        isFlushing = true
-        defer { isFlushing = false }
+        // A task of its own: cancelling whoever called (the timer, as the app
+        // leaves the screen) must not cancel a request already on the wire.
+        let task = Task { [weak self] in
+            guard let self else { return }
+            await self.drain(installationID: installationID)
+            self.inFlight = nil
+        }
+        inFlight = task
+        await task.value
+    }
 
+    private func drain(installationID: String) async {
         while isSending, !queue.isEmpty {
             let (batch, ids) = nextBatch(installationID: installationID)
-            guard !ids.isEmpty else { break }
+            guard !ids.isEmpty else { return }
 
             switch await deliver(batch) {
             case .delivered(let disabled):
@@ -169,6 +186,9 @@ final class EventReporter {
                 }
             case .dropped:
                 queue.removeAll { ids.contains($0.id) }
+            case .interrupted:
+                // Cancelled, not refused: the batch stays, with no pause.
+                return
             case .retryLater(let after):
                 consecutiveFailures += 1
                 let backoff = min(configuration.baseRetryDelay * pow(2, Double(consecutiveFailures - 1)),
@@ -182,6 +202,7 @@ final class EventReporter {
     private enum Delivery {
         case delivered(disabled: Bool)
         case dropped
+        case interrupted
         case retryLater(after: Int?)
     }
 
@@ -192,12 +213,15 @@ final class EventReporter {
                 let result = try await transport.send(batch, accessToken: token)
                 return .delivered(disabled: result.disabled == true)
             } catch let failure as APIFailure {
+                if failure.error == .cancelled { return .interrupted }
                 if failure.status == 401, token != nil {
                     // The token is optional here; send the batch without it.
                     token = nil
                     continue
                 }
                 return Self.isRetryable(failure) ? .retryLater(after: failure.retryAfter) : .dropped
+            } catch is CancellationError {
+                return .interrupted
             } catch {
                 return .retryLater(after: nil)
             }
