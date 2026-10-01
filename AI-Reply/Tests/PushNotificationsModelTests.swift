@@ -121,6 +121,25 @@ final class PushNotificationsModelTests: XCTestCase {
                        "a forced launch does not remember the dismissal")
     }
 
+    // MARK: Diagnostics
+
+    /// Against a server without app events the switch would do nothing, so
+    /// it is not shown.
+    @MainActor
+    func testDiagnosticsShowOnlyWhereTheServerAcceptsEvents() {
+        let model = model()
+        XCTAssertFalse(model.showsDiagnosticsSettings, "the server has not answered yet")
+        model.setServerAcceptsTelemetry(false)
+        XCTAssertFalse(model.showsDiagnosticsSettings, "an older server without features.telemetry")
+        model.setServerAcceptsTelemetry(true)
+        XCTAssertTrue(model.showsDiagnosticsSettings)
+
+        let forced = PushNotificationsModel(authorizer: FakeAuthorizer(), preferencesService: FakePreferences(),
+                                            store: NotificationSettingsStore(defaults: defaults),
+                                            buildSupportsPush: false, forcesPushUI: true)
+        XCTAssertTrue(forced.showsDiagnosticsSettings, "the DEBUG flag shows it for review")
+    }
+
     // MARK: Asking
 
     @MainActor

@@ -111,6 +111,8 @@ enum DebugScreen: String {
     case keyboard, setup, home, settings, profile, templates
     /// Settings, scrolled to its notifications section.
     case notifications
+    /// Settings, scrolled to its last sections (Diagnostics, Privacy).
+    case settingsEnd
     /// The sign-in flow's three screens, for review in each language.
     case signIn, email, code
 
@@ -133,6 +135,7 @@ private struct DebugScreenHost: View {
         case .home:      RootNavigationView()
         case .settings:  NavigationStack { SettingsView() }
         case .notifications: NavigationStack { SettingsView(focus: .notifications) }
+        case .settingsEnd:   NavigationStack { SettingsView(focus: .end) }
         case .profile:   NavigationStack { ProfileEditorView() }
         case .templates: NavigationStack { TemplateEditorView(templateID: "client") }
         case .signIn:    SignInView { _ in }

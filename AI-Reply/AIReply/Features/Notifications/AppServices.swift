@@ -148,6 +148,7 @@ final class AppServices {
 
         // Unknown until the server answered; a missing key is a "no".
         let telemetry = state.features.map { $0.telemetry ?? false }
+        notifications.setServerAcceptsTelemetry(telemetry)
         events.setServerSupport(telemetry)
         if isStarted, telemetry == true, previous.features?.telemetry != true {
             Task { await events.flush() }

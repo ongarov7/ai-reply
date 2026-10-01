@@ -5,6 +5,8 @@ struct SettingsView: View {
     /// A part of Settings a notification link can open directly.
     enum Focus: Hashable {
         case notifications
+        /// The last sections (DEBUG screenshots of Diagnostics and Privacy).
+        case end
     }
 
     /// Scrolled into view when the screen appears.
@@ -25,7 +27,7 @@ struct SettingsView: View {
                     // Centred rather than at the top, where the section's header
                     // would sit under the navigation bar.
                     try? await Task.sleep(for: .milliseconds(350))
-                    withAnimation { proxy.scrollTo(focus, anchor: .center) }
+                    withAnimation { proxy.scrollTo(focus, anchor: focus == .end ? .bottom : .center) }
                 }
         }
         .navigationTitle("settings.title")
@@ -101,7 +103,9 @@ struct SettingsView: View {
                 Text("settings.language.footer")
             }
 
-            DiagnosticsSettingsSection()
+            if notifications.showsDiagnosticsSettings {
+                DiagnosticsSettingsSection()
+            }
 
             Section {
                 Text("settings.privacy.body")
@@ -115,6 +119,7 @@ struct SettingsView: View {
 
             Section {
                 Button("settings.setup.restart") { model.restartOnboarding() }
+                    .id(Focus.end)
             } footer: {
                 Text("settings.setup.restart.footer")
             }

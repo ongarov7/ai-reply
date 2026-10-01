@@ -126,6 +126,8 @@ final class PushNotificationsModel {
     private(set) var isSignedIn = false
     /// `features.push_notifications` from the server; nil until it answered.
     private(set) var serverDeliversPush: Bool?
+    /// `features.telemetry` from the server; nil until it answered.
+    private(set) var serverAcceptsTelemetry: Bool?
 
     let buildSupportsPush: Bool
     /// DEBUG `-AIReplyForcePushCard YES`: shows the card and the Settings
@@ -187,6 +189,12 @@ final class PushNotificationsModel {
         showsNotificationSettings && (isSignedIn || forcesPushUI)
     }
 
+    /// Settings ▸ Diagnostics: only where the switch does something, a server
+    /// that accepts app events.
+    var showsDiagnosticsSettings: Bool {
+        forcesPushUI || serverAcceptsTelemetry == true
+    }
+
     /// Categories to render: the server's, or everything on while it answers.
     var displayedPreferences: NotificationPreferences {
         preferences ?? .defaults
@@ -204,6 +212,10 @@ final class PushNotificationsModel {
 
     func setServerDeliversPush(_ value: Bool?) {
         serverDeliversPush = value
+    }
+
+    func setServerAcceptsTelemetry(_ value: Bool?) {
+        serverAcceptsTelemetry = value
     }
 
     /// Categories that arrived with an installation registration.
