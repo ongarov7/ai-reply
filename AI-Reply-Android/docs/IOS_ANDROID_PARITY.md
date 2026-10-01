@@ -173,7 +173,7 @@ decoding that lets a configuration written by an older build still load.
 | Logging never carries message text | `ReplyLog`, lengths and outcomes only, DEBUG only | `ReplyLog`, same rule, `BuildConfig.DEBUG` only | IMPLEMENTED_NOT_DEVICE_VERIFIED | |
 | Secrets out of the repo | Key typed at runtime, nothing in the IPA | Same; nothing in the APK, `local.properties` untouched, `.gitignore` covers it | IMPLEMENTED_NOT_DEVICE_VERIFIED | |
 | Responsive layout | Portrait-locked, width-derived metrics | Portrait + landscape, width- and height-derived; `readableWidth` cap; font-scale respected in the app, pinned in the key grid | IMPLEMENTED_NOT_DEVICE_VERIFIED | Pinning the key grid's font scale stops a 2× accessibility font from breaking key geometry |
-| Unit tests | XCTest, 138 tests | 21 JVM test classes, 189 tests | IMPLEMENTED_AND_VERIFIED | `./gradlew testDebugUnitTest`, all green |
+| Unit tests | XCTest, 138 tests | 21 JVM test classes, 204 tests | IMPLEMENTED_AND_VERIFIED | `./gradlew testDebugUnitTest`, all green |
 | `./gradlew assembleDebug` | n/a | builds on the Mac with JDK 17+ | IMPLEMENTED_AND_VERIFIED | AGP 8.7.3 needs JDK 17+; Android Studio Electric Eel's bundled JBR 11 is too old |
 
 ## 11. Push notifications, installation, diagnostics (2026-10)

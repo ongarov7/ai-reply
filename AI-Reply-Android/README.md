@@ -364,7 +364,7 @@ Since push notifications (2026-10):
 ./gradlew testDebugUnitTest
 ```
 
-Twenty-one classes, 189 tests, covering: the message limit (published by the
+Twenty-one classes, 204 tests, covering: the message limit (published by the
 server, 400 when it has not said) and code-point counting, backend error
 mapping, prompt construction (including that user text never reaches the
 developer message), working-hours derivation and weekday grouping, draft
