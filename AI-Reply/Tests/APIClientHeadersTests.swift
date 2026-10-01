@@ -89,6 +89,27 @@ final class APIClientHeadersTests: XCTestCase {
         hooks.report(APITransportFailure(path: "api/v1/me", requestID: "req_x", kind: .offline))
     }
 
+    /// The same rule as the Android app: no installation before the legal
+    /// consent, and the session only while "Share diagnostics" is on.
+    func testRequestsNameNoInstallationBeforeTheConsent() {
+        var wasRead = false
+        let identity = ClientIdentityHolder.identity(consentGiven: false, sharesDiagnostics: true,
+                                                     installationID: { wasRead = true; return "install-0001" },
+                                                     sessionID: "session-0001")
+        XCTAssertEqual(identity, APIClientHooks.Identity())
+        XCTAssertFalse(wasRead, "the installation id is not even read (or made) before the consent")
+    }
+
+    func testTheSessionGoesOnlyWithShareDiagnostics() {
+        XCTAssertEqual(ClientIdentityHolder.identity(consentGiven: true, sharesDiagnostics: false,
+                                                     installationID: { "install-0001" }, sessionID: "session-0001"),
+                       APIClientHooks.Identity(installationID: "install-0001", sessionID: nil),
+                       "the installation stays: logout and the server's limits rely on it")
+        XCTAssertEqual(ClientIdentityHolder.identity(consentGiven: true, sharesDiagnostics: true,
+                                                     installationID: { "install-0001" }, sessionID: "session-0001"),
+                       APIClientHooks.Identity(installationID: "install-0001", sessionID: "session-0001"))
+    }
+
     func testNoIdentityInstalledMeansNoIdentityHeaders() {
         let headers = client(hooks: APIClientHooks(allowsIdentity: true)).headers(requestID: "req_abcdefghij012345")
         XCTAssertNil(headers["X-Installation-ID"])

@@ -75,6 +75,55 @@ struct InstallationSnapshot: Equatable, Sendable {
     let accountID: String?
 }
 
+extension InstallationSnapshot {
+
+    /// What the app knows at the moment of a sync.
+    struct Inputs: Equatable {
+        var isBootstrapComplete: Bool
+        var hasAcceptedLegal: Bool
+        /// `features.installations`; nil until the server answered.
+        var serverOffersInstallations: Bool?
+        var hasReadPermission: Bool
+        var installationID: String?
+        var permission: NotificationPermission
+        var notificationsEnabled: Bool
+        /// Already checked to belong to `installationID`.
+        var deviceToken: String?
+        var environment: APNsEnvironment
+        var locale: String
+        /// A session in the Keychain: what the server will see.
+        var hasSession: Bool
+        var accountID: String?
+    }
+
+    /// The registration to send, or nil while the app may not or cannot
+    /// register yet: before the account bootstrap, before the legal consent,
+    /// against a server without installations, before iOS was first asked
+    /// about the permission, or without an installation id.
+    static func make(_ inputs: Inputs,
+                     metadata: ClientMetadata = .current,
+                     deviceModel: String = DeviceModel.identifier,
+                     timezone: String = TimeZone.current.identifier) -> InstallationSnapshot? {
+        guard inputs.isBootstrapComplete,
+              inputs.hasAcceptedLegal,
+              inputs.serverOffersInstallations == true,
+              inputs.hasReadPermission,
+              let installationID = inputs.installationID else { return nil }
+        let context = ClientContext(installationID: installationID, metadata: metadata,
+                                    deviceModel: deviceModel, locale: inputs.locale, timezone: timezone)
+        let push = inputs.deviceToken.map {
+            InstallationPayload.Push(provider: "apns", token: $0, environment: inputs.environment.rawValue)
+        }
+        return InstallationSnapshot(
+            payload: context.installationPayload(permission: inputs.permission,
+                                                 notificationsEnabled: inputs.notificationsEnabled,
+                                                 push: push),
+            isSignedIn: inputs.hasSession,
+            accountID: inputs.hasSession ? inputs.accountID : nil
+        )
+    }
+}
+
 /// Sends one registration. Throws `APIFailure`.
 protocol InstallationTransport: Sendable {
     func register(_ payload: InstallationPayload, accessToken: String?) async throws -> InstallationResponse

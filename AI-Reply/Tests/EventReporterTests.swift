@@ -89,21 +89,25 @@ final class EventReporterTests: XCTestCase {
         }
     }
 
-    /// The reporter's world: a clock, a session and a token the test moves.
+    /// The reporter's world: a clock, a session, an account and a token the
+    /// test moves.
     @MainActor
     private final class Harness {
         let transport = FakeTransport()
         var now = Date(timeIntervalSince1970: 1_800_000_000)
         var session = "session-0001"
+        var account = "user-1"
         var token: String? = "access-token"
         private var counter = 0
 
-        func reporter(userAllows: Bool = true, installationID: String? = "install-0001") -> EventReporter {
-            EventReporter(
+        func reporter(userAllows: Bool = true, installationID: String? = "install-0001",
+                      consent: Bool? = true) -> EventReporter {
+            let reporter = EventReporter(
                 transport: transport,
                 userAllows: userAllows,
                 installationID: { installationID },
                 sessionID: { [unowned self] in self.session },
+                accountKey: { [unowned self] in self.account },
                 accessToken: { [unowned self] in self.token },
                 now: { [unowned self] in self.now },
                 makeID: { [unowned self] in
@@ -111,6 +115,8 @@ final class EventReporterTests: XCTestCase {
                     return String(format: "event-%04d", self.counter)
                 }
             )
+            if let consent { reporter.setConsent(consent) }
+            return reporter
         }
     }
 
@@ -118,8 +124,9 @@ final class EventReporterTests: XCTestCase {
     private func heldReporter(_ transport: HeldTransport) -> EventReporter {
         let reporter = EventReporter(transport: transport, userAllows: true,
                                      installationID: { "install-0001" }, sessionID: { "session-0001" },
-                                     accessToken: { "access-token" })
+                                     accountKey: { "user-1" }, accessToken: { "access-token" })
         reporter.setServerSupport(true)
+        reporter.setConsent(true)
         return reporter
     }
 
@@ -231,6 +238,48 @@ final class EventReporterTests: XCTestCase {
         await reporter.flush()
         XCTAssertTrue(reporter.queue.isEmpty)
         XCTAssertTrue(world.transport.calls.isEmpty)
+    }
+
+    @MainActor
+    func testNothingIsKeptFromBeforeTheConsent() async {
+        let world = Harness()
+        let reporter = world.reporter(consent: nil)
+        reporter.setServerSupport(true)
+        reporter.record(.appOpened(coldStart: true))
+        XCTAssertEqual(reporter.queue.count, 1, "waits while the consent is not known yet")
+        await reporter.flush()
+        XCTAssertTrue(world.transport.calls.isEmpty, "nothing leaves before the consent")
+
+        reporter.setConsent(false)
+        XCTAssertTrue(reporter.queue.isEmpty, "dropped, not kept for later")
+        reporter.record(.logout)
+        XCTAssertTrue(reporter.queue.isEmpty)
+
+        reporter.setConsent(true)
+        await reporter.flush()
+        XCTAssertTrue(world.transport.calls.isEmpty, "what came before the consent never goes")
+        reporter.record(.appBackgrounded(foregroundSeconds: 3))
+        await reporter.flush()
+        XCTAssertEqual(world.transport.calls.map { $0.batch.events.map(\.name) }, [["app_backgrounded"]])
+    }
+
+    @MainActor
+    func testABatchCarriesOnlyTheTokenOfTheAccountItHappenedUnder() async {
+        let world = Harness()
+        let reporter = world.reporter()
+        reporter.setServerSupport(true)
+        world.account = EventReporter.anonymous
+        reporter.record(.appOpened(coldStart: true))
+        world.account = "user-1"
+        reporter.record(.logout)
+        world.account = "user-2"
+        reporter.record(.appBackgrounded(foregroundSeconds: 4))
+        await reporter.flush()
+
+        let calls = world.transport.calls
+        XCTAssertEqual(calls.map { $0.batch.events.map(\.name) }, [["app_opened"], ["logout"], ["app_backgrounded"]])
+        XCTAssertEqual(calls.map(\.token), [nil, nil, "access-token"],
+                       "user-1's events never go with user-2's token")
     }
 
     @MainActor

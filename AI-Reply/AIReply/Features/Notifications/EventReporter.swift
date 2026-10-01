@@ -37,17 +37,21 @@ protocol EventTransport: Sendable {
 ///
 /// Оқиғалар жадта жиналып, топпен жіберіледі; дискке ештеңе жазылмайды.
 ///
-/// - Only while the server offers telemetry (`features.telemetry`) AND the
-///   user's "Share diagnostics" switch is on. Until the server has answered,
-///   events wait in memory; a server without the feature gets nothing and the
-///   queue is dropped.
+/// - Nothing is recorded before the legal consent (what was recorded before
+///   it is dropped, never kept for later) or while the user's "Share
+///   diagnostics" switch is off, and nothing is sent unless the server offers
+///   telemetry (`features.telemetry`). Until the server and the consent are
+///   known, events wait in memory; a "no" drops them.
 /// - At most `maxQueue` events are kept; the oldest go first. Nothing is
 ///   written to disk: events not sent before the app is killed are lost,
 ///   which is the right trade for diagnostics.
-/// - Up to 50 events per request, one session per request, every ~60 s and
-///   when the app goes to the background. A send in progress is joined, never
-///   skipped, and runs in a task of its own, so stopping the timer as the app
-///   leaves the screen cannot cancel a request on the wire.
+/// - Up to 50 events per request, one session and one account per request,
+///   every ~60 s and when the app goes to the background. A send in progress
+///   is joined, never skipped, and runs in a task of its own, so stopping the
+///   timer as the app leaves the screen cannot cancel a request on the wire.
+/// - Each event remembers who was signed in when it happened. A batch carries
+///   the access token only while that account is still the signed-in one, so
+///   one account's events never land on another's.
 /// - Network failures, 5xx and 429 keep the batch for later with a growing
 ///   pause; a cancelled request keeps it with no pause; any other 4xx means
 ///   the server will never take it, so it is dropped. A 401 is retried once
@@ -70,15 +74,27 @@ final class EventReporter {
         let occurredAt: Date
         let properties: [String: EventValue]
         let sessionID: String
+        /// Who was signed in when it happened: a user id, `signedIn` while
+        /// the id is not known yet, `anonymous` for nobody.
+        let accountKey: String
     }
 
     enum ServerSupport: Equatable {
         case unknown, supported, unsupported
     }
 
+    /// `accountKey` values that are not a user id.
+    nonisolated static let anonymous = "anon"
+    nonisolated static let signedIn = "signed-in"
+
     private(set) var queue: [QueuedEvent] = []
     private(set) var serverSupport: ServerSupport = .unknown
     private(set) var userAllows: Bool
+    /// The legal consent: nil until the app has said, false drops everything.
+    private(set) var consent: Bool?
+
+    /// Who is signed in right now; see `QueuedEvent.accountKey`.
+    var accountKey: () -> String
 
     private let configuration: Configuration
     private let transport: EventTransport
@@ -97,6 +113,7 @@ final class EventReporter {
          userAllows: Bool,
          installationID: @escaping () -> String?,
          sessionID: @escaping () -> String,
+         accountKey: @escaping () -> String = { EventReporter.anonymous },
          accessToken: @escaping () -> String?,
          configuration: Configuration = Configuration(),
          now: @escaping () -> Date = Date.init,
@@ -105,6 +122,7 @@ final class EventReporter {
         self.userAllows = userAllows
         self.installationID = installationID
         self.sessionID = sessionID
+        self.accountKey = accountKey
         self.accessToken = accessToken
         self.configuration = configuration
         self.now = now
@@ -112,7 +130,7 @@ final class EventReporter {
     }
 
     /// Whether events actually leave the phone right now.
-    var isSending: Bool { serverSupport == .supported && userAllows }
+    var isSending: Bool { serverSupport == .supported && userAllows && consent == true }
 
     // MARK: Switches
 
@@ -134,12 +152,20 @@ final class EventReporter {
         if !allows { queue.removeAll() }
     }
 
+    /// The legal consent screen. Without it nothing is kept: events recorded
+    /// before it are dropped, not sent once it is given.
+    func setConsent(_ given: Bool) {
+        consent = given
+        if !given { queue.removeAll() }
+    }
+
     // MARK: Recording
 
     func record(_ event: AppEvent) {
-        guard userAllows, serverSupport != .unsupported else { return }
+        guard userAllows, consent != false, serverSupport != .unsupported else { return }
         queue.append(QueuedEvent(id: makeID(), name: event.name, occurredAt: now(),
-                                 properties: event.properties, sessionID: sessionID()))
+                                 properties: event.properties, sessionID: sessionID(),
+                                 accountKey: accountKey()))
         if queue.count > configuration.maxQueue {
             queue.removeFirst(queue.count - configuration.maxQueue)
         }
@@ -172,20 +198,20 @@ final class EventReporter {
 
     private func drain(installationID: String) async {
         while isSending, !queue.isEmpty {
-            let (batch, ids) = nextBatch(installationID: installationID)
-            guard !ids.isEmpty else { return }
+            let next = nextBatch(installationID: installationID)
+            guard !next.ids.isEmpty else { return }
 
-            switch await deliver(batch) {
+            switch await deliver(next.batch, accountKey: next.accountKey) {
             case .delivered(let disabled):
                 consecutiveFailures = 0
                 retryNotBefore = nil
-                queue.removeAll { ids.contains($0.id) }
+                queue.removeAll { next.ids.contains($0.id) }
                 if disabled {
                     serverSupport = .unsupported
                     queue.removeAll()
                 }
             case .dropped:
-                queue.removeAll { ids.contains($0.id) }
+                queue.removeAll { next.ids.contains($0.id) }
             case .interrupted:
                 // Cancelled, not refused: the batch stays, with no pause.
                 return
@@ -206,8 +232,9 @@ final class EventReporter {
         case retryLater(after: Int?)
     }
 
-    private func deliver(_ batch: EventBatch) async -> Delivery {
-        var token = accessToken()
+    private func deliver(_ batch: EventBatch, accountKey batchAccount: String) async -> Delivery {
+        // Attributed to an account only while it is still the one signed in.
+        var token = batchAccount != Self.anonymous && batchAccount == accountKey() ? accessToken() : nil
         for _ in 0..<2 {
             do {
                 let result = try await transport.send(batch, accessToken: token)
@@ -235,19 +262,21 @@ final class EventReporter {
         failure.status == 0 || failure.status == 408 || failure.status == 429 || failure.status >= 500
     }
 
-    /// The oldest events that share a session, up to 50 and under the body limit.
-    private func nextBatch(installationID: String) -> (EventBatch, [String]) {
-        guard let session = queue.first?.sessionID else {
-            return (EventBatch(installation_id: installationID, session_id: "", events: []), [])
+    /// The oldest events that share a session and an account, up to 50 and
+    /// under the body limit.
+    private func nextBatch(installationID: String) -> (batch: EventBatch, ids: [String], accountKey: String) {
+        guard let first = queue.first else {
+            return (EventBatch(installation_id: installationID, session_id: "", events: []), [], Self.anonymous)
         }
-        var picked = Array(queue.filter { $0.sessionID == session }.prefix(configuration.maxBatch))
-        var batch = Self.batch(picked, installationID: installationID, sessionID: session)
+        var picked = Array(queue.filter { $0.sessionID == first.sessionID && $0.accountKey == first.accountKey }
+            .prefix(configuration.maxBatch))
+        var batch = Self.batch(picked, installationID: installationID, sessionID: first.sessionID)
         while picked.count > 1,
               let size = try? JSONEncoder().encode(batch).count, size > configuration.maxBodyBytes {
             picked.removeLast(picked.count / 2)
-            batch = Self.batch(picked, installationID: installationID, sessionID: session)
+            batch = Self.batch(picked, installationID: installationID, sessionID: first.sessionID)
         }
-        return (batch, picked.map(\.id))
+        return (batch, picked.map(\.id), first.accountKey)
     }
 
     private static func batch(_ events: [QueuedEvent], installationID: String, sessionID: String) -> EventBatch {

@@ -272,9 +272,25 @@ final class ClientIdentityHolder: @unchecked Sendable {
         return identity
     }
 
-    func update(installationID: String?, sessionID: String?) {
+    func update(_ identity: APIClientHooks.Identity) {
         lock.lock()
-        identity = APIClientHooks.Identity(installationID: installationID, sessionID: sessionID)
+        self.identity = identity
         lock.unlock()
+    }
+
+    /// Which identity the app's requests may carry.
+    ///
+    /// Nothing before the legal consent: no request names the installation or
+    /// the session, and the installation id is not even read (or made) until
+    /// then. After it, the installation - logout detaches the phone by it, and
+    /// the server counts its limits per installation - and the session only
+    /// while "Share diagnostics" is on. The same rule as the Android app.
+    static func identity(consentGiven: Bool,
+                         sharesDiagnostics: Bool,
+                         installationID: () -> String?,
+                         sessionID: String) -> APIClientHooks.Identity {
+        guard consentGiven else { return APIClientHooks.Identity() }
+        return APIClientHooks.Identity(installationID: installationID(),
+                                       sessionID: sharesDiagnostics ? sessionID : nil)
     }
 }

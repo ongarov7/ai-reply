@@ -11,9 +11,11 @@ import UserNotifications
 /// screens never talk to it directly: they see `PushNotificationsModel` and
 /// `AppRouter` through the environment. What happens when:
 ///
-/// - Launch: the installation id is read (or made), `APIClient` starts adding
-///   the installation and session ids to the app's requests, the notification
-///   delegate is set so a tap that launched the app is not lost.
+/// - Launch: the notification delegate is set so a tap that launched the app
+///   is not lost, and `APIClient` learns which identity the app's requests
+///   carry (`ClientIdentityHolder.identity`: none before the legal consent).
+/// - Nothing is registered, asked of APNs or recorded as an event before the
+///   legal consent; right after it, the installation registers and events go.
 /// - After the account bootstrap, and on every sign-in, sign-out, token,
 ///   permission, switch or language change: the installation is registered if
 ///   the server offers it (`features.installations`) and the payload differs
@@ -32,6 +34,8 @@ final class AppServices {
     /// What `AccountModel` knows, mirrored in by the app's root view.
     struct AccountState: Equatable {
         var isBootstrapComplete = false
+        /// The legal consent screen was accepted (for the current versions).
+        var hasAcceptedLegal = false
         var isSignedIn = false
         var userID: String?
         var features: AccountAPI.Features?
@@ -94,10 +98,15 @@ final class AppServices {
             preferencesService: BackendNotificationPreferencesService(), store: store,
             forcesPushUI: forcesPushUI)
 
+        events.accountKey = { [weak self] in self?.currentAccountKey ?? EventReporter.anonymous }
         notifications.onStateChange = { [weak self] in self?.requestInstallationSync() }
         notifications.onPermissionAllowsDelivery = { [weak self] in self?.requestDeviceTokenIfPossible() }
         notifications.onEvent = { [weak self] event in self?.events.record(event) }
-        notifications.onShareDiagnosticsChange = { [weak self] allows in self?.events.setUserAllows(allows) }
+        notifications.onShareDiagnosticsChange = { [weak self] allows in
+            self?.events.setUserAllows(allows)
+            // The session id goes only with diagnostics on.
+            self?.refreshIdentity()
+        }
     }
 
     /// Unit tests run inside the app; they build their own instances and must
@@ -131,11 +140,24 @@ final class AppServices {
         Task { await notifications.refreshPermission() }
     }
 
-    /// What `APIClient` adds to the app's requests. The session id changes
-    /// after half an hour away; the installation id is read again here in case
-    /// the Keychain was still locked when the app launched.
+    /// What `APIClient` adds to the app's requests, by the rule in
+    /// `ClientIdentityHolder.identity`. Called whenever an input changes: the
+    /// consent, the diagnostics switch, a new session after half an hour away,
+    /// and on every return to the front in case the Keychain was still locked.
     private func refreshIdentity() {
-        identityHolder.update(installationID: identity.id, sessionID: sessionTracker.sessionID)
+        let identity = self.identity
+        identityHolder.update(ClientIdentityHolder.identity(
+            consentGiven: account.hasAcceptedLegal,
+            sharesDiagnostics: notifications.sharesDiagnostics,
+            installationID: { identity.id },
+            sessionID: sessionTracker.sessionID))
+    }
+
+    /// Who is signed in, for `EventReporter`: the user id, a placeholder while
+    /// the id is not known yet, or nobody.
+    private var currentAccountKey: String {
+        guard AccountCredentials.isSignedIn else { return EventReporter.anonymous }
+        return account.userID ?? EventReporter.signedIn
     }
 
     // MARK: Inputs from the app
@@ -150,11 +172,17 @@ final class AppServices {
         let telemetry = state.features.map { $0.telemetry ?? false }
         notifications.setServerAcceptsTelemetry(telemetry)
         events.setServerSupport(telemetry)
-        if isStarted, telemetry == true, previous.features?.telemetry != true {
+        // Before the legal consent nothing is kept; events from before it are dropped.
+        events.setConsent(state.hasAcceptedLegal)
+        refreshIdentity()
+
+        let consentJustGiven = state.hasAcceptedLegal && !previous.hasAcceptedLegal
+        if isStarted, telemetry == true, consentJustGiven || previous.features?.telemetry != true {
             Task { await events.flush() }
         }
 
         requestDeviceTokenIfPossible()
+        // Covers the consent too: the registration right after it is accepted.
         if state != previous { requestInstallationSync() }
     }
 
@@ -210,10 +238,11 @@ final class AppServices {
         router.open(payload.destination)
     }
 
-    /// Asks APNs for a token: once per launch, and only when this build can
-    /// receive pushes, the server can send them and iOS will show them.
+    /// Asks APNs for a token: once per launch, and only after the legal
+    /// consent, when this build can receive pushes, the server can send them
+    /// and iOS will show them.
     private func requestDeviceTokenIfPossible(again: Bool = false) {
-        guard isStarted, notifications.buildSupportsPush,
+        guard isStarted, account.hasAcceptedLegal, notifications.buildSupportsPush,
               account.features?.pushNotifications == true,
               notifications.permission.allowsDelivery,
               again || !hasRequestedDeviceToken else { return }
@@ -252,27 +281,28 @@ final class AppServices {
         } while syncAgain
     }
 
-    /// Everything the server should know right now, or nil while something
-    /// it depends on is not known yet.
+    /// Everything the server should know right now, or nil while the app may
+    /// not or cannot register yet (see `InstallationSnapshot.make`).
     private func installationSnapshot() -> InstallationSnapshot? {
-        guard account.isBootstrapComplete,
-              account.features?.installations == true,
-              notifications.hasReadPermission,
-              let installationID = identity.id else { return nil }
-        let context = ClientContext(installationID: installationID, locale: appLanguage())
-        let push = store.deviceToken(for: installationID).map {
-            InstallationPayload.Push(provider: "apns", token: $0, environment: APNsEnvironment.current.rawValue)
-        }
-        // The session in the Keychain decides, not the screen: it is what the
-        // server will see.
-        let isSignedIn = AccountCredentials.isSignedIn
-        return InstallationSnapshot(
-            payload: context.installationPayload(permission: notifications.permission,
-                                                 notificationsEnabled: notifications.isEnabledInApp,
-                                                 push: push),
-            isSignedIn: isSignedIn,
-            accountID: isSignedIn ? account.userID : nil
-        )
+        // The consent first: the installation id is not read (or made) before it.
+        guard account.hasAcceptedLegal else { return nil }
+        let installationID = identity.id
+        return InstallationSnapshot.make(InstallationSnapshot.Inputs(
+            isBootstrapComplete: account.isBootstrapComplete,
+            hasAcceptedLegal: account.hasAcceptedLegal,
+            serverOffersInstallations: account.features.map { $0.installations ?? false },
+            hasReadPermission: notifications.hasReadPermission,
+            installationID: installationID,
+            permission: notifications.permission,
+            notificationsEnabled: notifications.isEnabledInApp,
+            deviceToken: installationID.flatMap { store.deviceToken(for: $0) },
+            environment: APNsEnvironment.current,
+            locale: appLanguage(),
+            // The session in the Keychain decides, not the screen: it is what
+            // the server will see.
+            hasSession: AccountCredentials.isSignedIn,
+            accountID: account.userID
+        ))
     }
 
     private func handle(_ outcome: InstallationRegistrar.Outcome, for snapshot: InstallationSnapshot) {

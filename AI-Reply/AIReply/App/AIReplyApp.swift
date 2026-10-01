@@ -98,6 +98,7 @@ struct AIReplyApp: App {
     private var accountState: AppServices.AccountState {
         AppServices.AccountState(
             isBootstrapComplete: account.isBootstrapComplete,
+            hasAcceptedLegal: account.hasAcceptedLegal,
             isSignedIn: account.isSignedIn,
             userID: account.user?.id,
             features: account.features

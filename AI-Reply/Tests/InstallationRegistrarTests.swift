@@ -302,6 +302,61 @@ final class InstallationRegistrarTests: XCTestCase {
         XCTAssertEqual(calls.count, 1)
     }
 
+    // MARK: When to register at all
+
+    private func inputs() -> InstallationSnapshot.Inputs {
+        InstallationSnapshot.Inputs(
+            isBootstrapComplete: true, hasAcceptedLegal: true, serverOffersInstallations: true,
+            hasReadPermission: true, installationID: "0b7c9a52-4f5e-4d0a-9c1e-1d2f3a4b5c6d",
+            permission: .authorized, notificationsEnabled: true, deviceToken: String(repeating: "ab", count: 32),
+            environment: .sandbox, locale: "kk", hasSession: true, accountID: "user-1")
+    }
+
+    private func snapshot(_ inputs: InstallationSnapshot.Inputs) -> InstallationSnapshot? {
+        InstallationSnapshot.make(inputs, metadata: ClientMetadata(appVersion: "1.3.2", appBuild: "142", osVersion: "17.5"),
+                                  deviceModel: "iPhone17,1", timezone: "Asia/Almaty")
+    }
+
+    func testNothingIsRegisteredBeforeTheLegalConsent() {
+        var beforeConsent = inputs()
+        beforeConsent.hasAcceptedLegal = false
+        XCTAssertNil(snapshot(beforeConsent))
+    }
+
+    func testNothingIsRegisteredUntilWhatItNeedsIsKnown() {
+        var input = inputs()
+        input.isBootstrapComplete = false
+        XCTAssertNil(snapshot(input), "the account bootstrap has not finished")
+        input = inputs()
+        input.serverOffersInstallations = nil
+        XCTAssertNil(snapshot(input), "the server has not answered")
+        input.serverOffersInstallations = false
+        XCTAssertNil(snapshot(input), "an older server without installations")
+        input = inputs()
+        input.hasReadPermission = false
+        XCTAssertNil(snapshot(input), "iOS has not been asked about the permission yet")
+        input = inputs()
+        input.installationID = nil
+        XCTAssertNil(snapshot(input), "the Keychain is locked")
+    }
+
+    func testASnapshotCarriesTheTokenAndTheAccountFromTheSession() throws {
+        let signedIn = try XCTUnwrap(snapshot(inputs()))
+        XCTAssertEqual(signedIn.payload.push, .init(provider: "apns", token: String(repeating: "ab", count: 32),
+                                                    environment: "sandbox"))
+        XCTAssertEqual(signedIn.payload.notification_permission, "authorized")
+        XCTAssertTrue(signedIn.isSignedIn)
+        XCTAssertEqual(signedIn.accountID, "user-1")
+
+        var signedOutInputs = inputs()
+        signedOutInputs.hasSession = false
+        signedOutInputs.deviceToken = nil
+        let signedOut = try XCTUnwrap(snapshot(signedOutInputs))
+        XCTAssertFalse(signedOut.isSignedIn)
+        XCTAssertNil(signedOut.accountID, "no session: anonymous, whatever the screen still shows")
+        XCTAssertNil(signedOut.payload.push)
+    }
+
     // MARK: Retry policy
 
     func testWhichFailuresAreRetried() {
