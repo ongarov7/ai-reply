@@ -86,7 +86,12 @@ internal/
   subscriptions/     подписки и расчёт текущего лимита (entitlement)
   ai/                промпт, клиент OpenAI Responses API, шлюз с учётом токенов
   payments/          интерфейс эквайринга + demo-адаптер
-  notifications/     каркас APNs/FCM (честные заглушки, без фейкового «отправлено»)
+  installations/     реестр установок приложений, зашифрованные push-токены
+  push/              FCM HTTP v1 и APNs (.p8) без SDK, классификация ошибок
+  notifications/     уведомления, кампании, outbox-диспетчер, повторы, бизнес-события
+  telemetry/         события приложений, журнал входов, ошибки API, сроки хранения
+  reqctx/ redact/    метаданные клиента и request id; маскирование секретов и PII
+  admin/             права ролей, диагностика пользователя, названия устройств
   localization/      kk/ru/en/uz для веба и админки
   middleware/        request-id, логи, паника, CORS, заголовки, rate limit
   simulator/       демо-аккаунт, демо-данные и демо-слой тарифов для /simulator
@@ -110,6 +115,11 @@ internal/
 - AI-ответ через сервер: квота → провайдер → учёт токенов и стоимости;
 - лимиты живут в БД: 30 → 50 в день меняется в админке без релиза приложения;
 - админка: дашборд с графиками, пользователи, CRUD тарифов, аудит, настройки;
+- push-уведомления (Android — FCM, iOS — APNs): установки с аккаунтом и без, кампании
+  с серверным подсчётом аудитории и `Idempotency-Key`, outbox с повторами, автоматические
+  push об оплате и подписке, статистика без подмены «принято провайдером» на «прочитано»;
+- телеметрия: разрешённые события приложений, журнал входов, ошибки API с `request_id`,
+  журналы и диагностика в админке по правам — [../docs/notifications.md](../docs/notifications.md);
 - лендинг на 4 языках с анимированной демонстрацией работы клавиатуры;
 - вход по телефону из приложений убран; эндпоинты `/auth/request-otp` и
   `/auth/verify-otp` оставлены только для уже установленных сборок;
@@ -129,6 +139,8 @@ internal/
 | Текст сообщения в БД | НЕТ — в схеме нет такой колонки |
 | Текст виден администратору | НЕТ — в admin API нет таких полей |
 | Текст в логах | НЕТ — логируются только метаданные |
+| Push-токен в логах / админке | НЕТ — в БД зашифрован, наружу только отпечаток `fcm:1a2b3c4d` |
+| Ключи FCM / APNs в приложениях | НЕТ — только `.env` на сервере |
 
 Тест `TestMessageContentIsNeverPersisted` отправляет уникальную строку через
 `/api/v1/ai/reply` и ищет её в файле БД, WAL и логах — любой найденный след
@@ -151,7 +163,8 @@ make secrets     # сгенерировать JWT/legacy секреты
 - Google / Apple: client ID в `.env` (`GOOGLE_CLIENT_ID_IOS`, `GOOGLE_CLIENT_ID_WEB`,
   `APPLE_CLIENT_ID`);
 - реальный эквайринг — один интерфейс `payments.Provider`;
-- APNs/FCM — интерфейс `notifications.Transport`;
+- push: ключи FCM и APNs в `.env` и `PUSH_NOTIFICATIONS_ENABLED=true` —
+  [../docs/notifications.md](../docs/notifications.md) (разделы 8–10);
 - rate limiter в памяти → Redis при нескольких инстансах;
 - `APP_ENV=production`, HTTPS, `ADMIN_SECURE_COOKIES=true`, `AUTH_DEMO_MODE=false`.
 

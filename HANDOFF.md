@@ -6,6 +6,25 @@
 
 ---
 
+## 0a. Обновление 01.10.2026 — push-уведомления и телеметрия (ветка `notification`)
+
+- Ветка `notification` от `main`; в `main` не влита (ждёт ключей Firebase/APNs и проверки
+  на устройствах). Push делает владелец.
+- Бэкенд: установки (`/api/v1/installations`, анонимные и с аккаунтом), FCM HTTP v1 и APNs
+  (.p8) без SDK, outbox `notification_deliveries` с арендой и повторами, кампании с
+  `Idempotency-Key` и серверным подсчётом аудитории, автоматические push (оплата, подписка
+  истекает/истекла), события приложений, журнал входов, ошибки API, `X-Request-ID`,
+  маскирование, сроки хранения. Миграции `0006`–`0008` только добавляют.
+- Админка: «Уведомления», «Журналы», «Диагностика» пользователя, блок операций на дашборде,
+  фильтры аудита; права `notifications.*`, `users.diagnostics.read`, `logs.read`, `audit_logs.read`.
+- Android: Firebase Messaging (плагин только при наличии `app/google-services.json`, файл в
+  `.gitignore`), каналы `general`/`important`, карточка разрешения после входа, раздел в
+  настройках. iOS: `aps-environment` только в Release, Debug — Personal Team без push.
+- Всё описание, настройка Firebase/Apple, переменные и правки для политики:
+  `docs/notifications.md`. Ключи провайдеров — только в `.env` сервера.
+
+---
+
 ## 0. Обновление 30.09.2026 — новая аутентификация
 
 - Вход: iOS — Apple / Google / почта; Android — Google / почта. Вход по телефону

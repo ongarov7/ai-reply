@@ -242,9 +242,86 @@ paths:
         "409": { description: LEGAL_VERSION_MISMATCH — клиент должен обновить конфигурацию }
   /api/v1/devices:
     post:
-      summary: Регистрация устройства и push-токена
+      summary: Регистрация устройства (устаревшее; push-токен — через /api/v1/installations)
+      deprecated: true
       security: [{ bearerAuth: [] }]
       responses: { "200": { description: OK } }
+  /api/v1/installations:
+    post:
+      summary: Регистрация установки приложения (анонимной или с аккаунтом) и push-токена
+      description: >
+        Аккаунт берётся только из Bearer-токена: с токеном установка привязывается к
+        аккаунту, без него становится анонимной. Недействительный токен → 401, ничего не
+        меняется. Лимит — по X-Installation-ID. Токен в ответах не возвращается.
+      security: [{ bearerAuth: [] }, {}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InstallationRequest" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Installation" }
+        "400": { description: INVALID_REQUEST (details.field) }
+        "401": { description: недействительный access-токен }
+        "429": { description: RATE_LIMITED }
+  /api/v1/installations/{installation_id}/detach:
+    post:
+      summary: Отвязать установку от аккаунта (выход, смена аккаунта)
+      security: [{ bearerAuth: [] }, {}]
+      parameters:
+        - { name: installation_id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: "{ ok, detached }"
+  /api/v1/me/notification-preferences:
+    get:
+      summary: Категории уведомлений пользователя
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/NotificationPreferences" }
+    put:
+      summary: Включить/выключить категории (security выключить нельзя)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [preferences]
+              properties:
+                preferences:
+                  type: object
+                  additionalProperties: { type: boolean }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/NotificationPreferences" }
+        "400": { description: неизвестная категория или попытка выключить security }
+  /api/v1/events:
+    post:
+      summary: Пакет событий приложения (разрешённый список, до 50 событий, тело до 64 КБ)
+      security: [{ bearerAuth: [] }, {}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EventBatch" }
+      responses:
+        "202":
+          description: "{ accepted, rejected, rejections?, disabled? }"
+        "400": { description: INVALID_REQUEST }
+        "429": { description: RATE_LIMITED }
   /api/v1/devices/{id}:
     delete:
       summary: Отозвать устройство
@@ -313,6 +390,9 @@ components:
             email_otp: { type: boolean, description: "Resend настроен (или демо-режим)" }
             google_sign_in: { type: boolean }
             apple_sign_in: { type: boolean }
+            installations: { type: boolean, description: "есть /installations и /events" }
+            push_notifications: { type: boolean, description: "сервер может доставлять push" }
+            telemetry: { type: boolean, description: "сервер принимает события приложений" }
         legal: { $ref: "#/components/schemas/LegalConfig" }
     Device:
       type: object
@@ -323,6 +403,77 @@ components:
         os_version: { type: string }
         locale: { type: string }
         timezone: { type: string }
+    InstallationRequest:
+      type: object
+      required: [installation_id, platform]
+      additionalProperties: false
+      properties:
+        installation_id: { type: string, pattern: "^[A-Za-z0-9-]{8,64}$", description: "UUID, создаётся приложением" }
+        platform: { type: string, enum: [ios, android] }
+        app_version: { type: string }
+        app_build: { type: string }
+        os_name: { type: string }
+        os_version: { type: string }
+        device_model: { type: string, example: "iPhone17,1" }
+        manufacturer: { type: string }
+        locale: { type: string, enum: [kk, ru, en, uz] }
+        timezone: { type: string, example: "Asia/Almaty" }
+        notification_permission:
+          type: string
+          enum: [authorized, denied, not_determined, provisional, ephemeral, unknown]
+        notifications_enabled: { type: boolean }
+        push:
+          type: object
+          properties:
+            provider: { type: string, enum: [fcm, apns] }
+            token: { type: string, description: "FCM registration token или APNs device token (hex)" }
+            environment: { type: string, enum: [sandbox, production], description: "только APNs" }
+    Installation:
+      type: object
+      properties:
+        installation_id: { type: string }
+        attached: { type: boolean }
+        push_status: { type: string, enum: [none, active, invalid, replaced] }
+        push_available: { type: boolean }
+        notifications_enabled: { type: boolean }
+        preferences:
+          type: object
+          additionalProperties: { type: boolean }
+    NotificationPreferences:
+      type: object
+      properties:
+        preferences:
+          type: object
+          additionalProperties: { type: boolean }
+          example: { account: true, subscription: true, security: true, system: true, marketing: false }
+        optional:
+          type: array
+          items: { type: string }
+    EventBatch:
+      type: object
+      required: [installation_id, events]
+      properties:
+        installation_id: { type: string }
+        session_id: { type: string }
+        events:
+          type: array
+          maxItems: 50
+          items:
+            type: object
+            required: [name, occurred_at]
+            properties:
+              id: { type: string, description: "UUID события для защиты от повторов" }
+              name:
+                type: string
+                enum: [app_opened, app_backgrounded, login_success, login_failed, registration_success,
+                  logout, push_permission_requested, push_permission_granted, push_permission_denied,
+                  push_token_registered, push_token_refreshed, push_token_registration_failed,
+                  notification_opened, payment_started, payment_success, payment_failed, api_error,
+                  unexpected_app_error]
+              occurred_at: { type: string, format: date-time }
+              properties:
+                type: object
+                maxProperties: 8
     EmailChallenge:
       type: object
       required: [masked_email, expires_in, resend_after, code_length]
