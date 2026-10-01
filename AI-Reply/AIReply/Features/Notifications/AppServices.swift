@@ -194,7 +194,9 @@ final class AppServices {
     // MARK: Push
 
     func didRegisterForRemoteNotifications(deviceToken: Data) {
-        store.setDeviceToken(PushToken.hexString(deviceToken))
+        // Kept with the installation it was handed to (see NotificationSettingsStore).
+        guard let installationID = identity.id else { return }
+        store.setDeviceToken(PushToken.hexString(deviceToken), installationID: installationID)
         requestInstallationSync()
     }
 
@@ -258,7 +260,7 @@ final class AppServices {
               notifications.hasReadPermission,
               let installationID = identity.id else { return nil }
         let context = ClientContext(installationID: installationID, locale: appLanguage())
-        let push = store.deviceToken.map {
+        let push = store.deviceToken(for: installationID).map {
             InstallationPayload.Push(provider: "apns", token: $0, environment: APNsEnvironment.current.rawValue)
         }
         // The session in the Keychain decides, not the screen: it is what the
@@ -276,9 +278,11 @@ final class AppServices {
     private func handle(_ outcome: InstallationRegistrar.Outcome, for snapshot: InstallationSnapshot) {
         switch outcome {
         case .registered(let response):
-            if let token = snapshot.payload.push?.token, token != store.registeredToken {
-                events.record(store.registeredToken == nil ? .pushTokenRegistered : .pushTokenRefreshed)
-                store.setRegisteredToken(token)
+            let installationID = snapshot.payload.installation_id
+            let previous = store.registeredToken(for: installationID)
+            if let token = snapshot.payload.push?.token, token != previous {
+                events.record(previous == nil ? .pushTokenRegistered : .pushTokenRefreshed)
+                store.setRegisteredToken(token, installationID: installationID)
             }
             if let preferences = response.preferences {
                 notifications.adoptPreferences(preferences)

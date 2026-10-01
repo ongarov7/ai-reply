@@ -140,6 +140,25 @@ final class PushNotificationsModelTests: XCTestCase {
         XCTAssertTrue(forced.showsDiagnosticsSettings, "the DEBUG flag shows it for review")
     }
 
+    // MARK: Token
+
+    /// A backup restored onto another iPhone carries these defaults but not
+    /// the installation id; the old phone's token must not be registered there.
+    func testATokenIsReadOnlyForTheInstallationItWasHandedTo() {
+        let store = NotificationSettingsStore(defaults: defaults)
+        let token = String(repeating: "ab", count: 32)
+        store.setDeviceToken(token, installationID: "0b7c9a52-0000-4000-8000-000000000001")
+        XCTAssertEqual(store.deviceToken(for: "0b7c9a52-0000-4000-8000-000000000001"), token)
+        XCTAssertNil(store.deviceToken(for: "0b7c9a52-0000-4000-8000-000000000002"), "another installation")
+
+        store.setRegisteredToken(token, installationID: "0b7c9a52-0000-4000-8000-000000000001")
+        XCTAssertEqual(store.registeredToken(for: "0b7c9a52-0000-4000-8000-000000000001"), token)
+        XCTAssertNil(store.registeredToken(for: "0b7c9a52-0000-4000-8000-000000000002"))
+
+        store.setDeviceToken(nil, installationID: "0b7c9a52-0000-4000-8000-000000000001")
+        XCTAssertNil(store.deviceToken(for: "0b7c9a52-0000-4000-8000-000000000001"))
+    }
+
     // MARK: Asking
 
     @MainActor

@@ -8,6 +8,12 @@ import Foundation
 /// any of it. The push token is not a secret (it only works with the app's
 /// own APNs key on the server) and is kept so a launch can register with the
 /// token it already has instead of waiting for APNs to hand it over again.
+///
+/// Standard defaults travel in backups, the installation id does not (it is
+/// "this device only"). So a token is kept together with the installation it
+/// was handed to and read back only for that installation: a backup restored
+/// onto another iPhone - a new installation - never registers the old phone's
+/// token, which would make the two phones take it from each other.
 struct NotificationSettingsStore: @unchecked Sendable {
 
     let defaults: UserDefaults
@@ -20,8 +26,8 @@ struct NotificationSettingsStore: @unchecked Sendable {
         static let enabledInApp = "notifications.enabledInApp"
         static let sharesDiagnostics = "diagnostics.shareEnabled"
         static let cardDismissed = "notifications.permissionCardDismissed"
-        static let deviceToken = "push.deviceToken"
-        static let registeredToken = "push.registeredToken"
+        static let deviceToken = "push.deviceToken.v2"
+        static let registeredToken = "push.registeredToken.v2"
         static let lastSync = "installation.lastSync"
     }
 
@@ -52,23 +58,44 @@ struct NotificationSettingsStore: @unchecked Sendable {
         defaults.set(value, forKey: Key.cardDismissed)
     }
 
-    /// The APNs token iOS last handed over, lowercase hex.
-    var deviceToken: String? {
-        defaults.string(forKey: Key.deviceToken)
+    /// The APNs token iOS last handed to this installation, lowercase hex.
+    func deviceToken(for installationID: String) -> String? {
+        token(forKey: Key.deviceToken, installationID: installationID)
     }
 
-    func setDeviceToken(_ value: String?) {
-        defaults.set(value, forKey: Key.deviceToken)
+    func setDeviceToken(_ token: String?, installationID: String) {
+        setToken(token, forKey: Key.deviceToken, installationID: installationID)
     }
 
-    /// The token the server last accepted, to tell a first registration from
-    /// a refreshed one.
-    var registeredToken: String? {
-        defaults.string(forKey: Key.registeredToken)
+    /// The token the server last accepted from this installation, to tell a
+    /// first registration from a refreshed one.
+    func registeredToken(for installationID: String) -> String? {
+        token(forKey: Key.registeredToken, installationID: installationID)
     }
 
-    func setRegisteredToken(_ value: String?) {
-        defaults.set(value, forKey: Key.registeredToken)
+    func setRegisteredToken(_ token: String?, installationID: String) {
+        setToken(token, forKey: Key.registeredToken, installationID: installationID)
+    }
+
+    /// A token and the installation it belongs to.
+    private struct BoundToken: Codable {
+        let installationID: String
+        let token: String
+    }
+
+    private func token(forKey key: String, installationID: String) -> String? {
+        guard let data = defaults.data(forKey: key),
+              let bound = try? JSONDecoder().decode(BoundToken.self, from: data),
+              bound.installationID == installationID else { return nil }
+        return bound.token
+    }
+
+    private func setToken(_ token: String?, forKey key: String, installationID: String) {
+        guard let token, let data = try? JSONEncoder().encode(BoundToken(installationID: installationID, token: token)) else {
+            defaults.removeObject(forKey: key)
+            return
+        }
+        defaults.set(data, forKey: key)
     }
 }
 
