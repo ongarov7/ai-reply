@@ -642,20 +642,28 @@ push-уведомления», «События приложения»). App sid
   in Debug on a paid team, set it to `YES` and `CODE_SIGN_ENTITLEMENTS =
   Config/AIReply.entitlements` for Debug. Enable *Push Notifications* for the App
   ID `kz.yerek.replykeyboard` in the portal.
+* **Only after the legal consent.** Before the consent screen is accepted the app
+  registers nothing, asks APNs for no token, records no event (earlier ones are
+  dropped) and names no installation in any request; right after it, the
+  installation registers and waiting events go.
 * **Only with a server that offers it.** `GET /api/v1/config` → `features.installations`,
   `push_notifications`, `telemetry`. A missing key is "no": against a server
   without them the app never calls `/installations` or `/events`, shows no
-  notification card or section, and behaves exactly as before.
+  notification card, Notifications section or Diagnostics switch, and behaves
+  exactly as before.
 * **Headers.** Every request (`APIClient`) carries `X-Platform`, `X-App-Version`,
   `X-App-Build`, `X-OS-Version` and a fresh `X-Request-ID` (`req_` + 16
-  `[a-z0-9]`). Only the app adds `X-Installation-ID` and `X-Session-ID`; the
-  keyboard extension never does and sends no events. A failed call's
-  `APIFailure` carries the server's `request_id`.
+  `[a-z0-9]`). Only the app adds `X-Installation-ID` (after the consent; logout
+  and the server's per-installation limits rely on it) and `X-Session-ID` (only
+  while *Share diagnostics* is on); the keyboard extension never does and sends
+  no events. A failed call's `APIFailure` carries the server's `request_id`.
 * **Installation id.** A random UUID made once, in the Keychain
   (`kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`, the app's own access
   group, not the App Group). Not the IDFA/IDFV and not a credential. iOS keeps
   it when the app is deleted and reinstalled on the same iPhone; it is never
-  restored onto another device.
+  restored onto another device. The APNs token is kept with the installation
+  it was handed to, so a backup restored onto another iPhone never registers
+  the old phone's token.
 * **Registration** (`POST /api/v1/installations`) after launch, sign-in, sign-out
   (anonymous: detaches the phone from the account; logout also names the
   installation), a new token, a permission change (re-read on every return to
@@ -670,12 +678,16 @@ push-уведомления», «События приложения»). App sid
   `https://ai-reply.kz/...` opens in an in-app browser; anything else just opens
   the app. A destination that arrives while consent, sign-in or onboarding is
   showing waits for it (15 minutes at most) and is never applied around it.
-* **Events** (Settings ▸ Diagnostics, on by default): `app_opened`,
-  `app_backgrounded`, `logout`, `login_failed` (only Apple/Google sheet failures
-  the server never saw), `push_permission_*`, `push_token_*`,
-  `notification_opened`, `api_error` (no response at all). Batched in memory,
-  at most 100, 50 per request, every minute and on backgrounding. Never message
-  text, keystrokes or the clipboard.
+  When a gate comes back (sign-out, setup restarted) Home starts from its root.
+* **Events** (Settings ▸ Diagnostics, on by default; the switch appears only
+  when the server accepts events): `app_opened`, `app_backgrounded`, `logout`,
+  `login_failed` (only Apple/Google sheet failures the server never saw),
+  `push_permission_*`, `push_token_*`, `notification_opened`, `api_error` (no
+  response at all). Batched in memory, at most 100, 50 per request, every
+  minute and on backgrounding (a send in progress is finished, not cancelled).
+  Each batch carries the access token only of the account its events happened
+  under, while it is still signed in. Never message text, keystrokes or the
+  clipboard.
 
 Simulator checks (DEBUG only, nothing of it exists in Release):
 `-AIReplyForcePushCard YES` shows the card and the Settings sections whatever
@@ -684,7 +696,8 @@ link at launch like a tapped notification; `-AIReplyDebugProvisionalPush YES`
 gets provisional permission without an alert so `xcrun simctl push` is
 delivered, and `-AIReplyDebugAutoOpenPush YES` treats it as tapped;
 `-AIReplyLanguage kk` shows one launch in that language; `-AIReplyDebugScreen
-notifications` opens Settings at the notifications section.
+notifications` opens Settings at the notifications section, `settingsEnd` at
+its last sections (Diagnostics, Privacy).
 
 ---
 
