@@ -28,11 +28,18 @@ object PushSupport {
         data object Unsupported : TokenResult
     }
 
-    /** The current FCM registration token. */
+    /**
+     * The current FCM registration token. Called only after the legal consent:
+     * it also switches on Firebase's automatic token handling, which the
+     * manifest keeps off until then (`firebase_messaging_auto_init_enabled`).
+     */
     suspend fun fetchToken(context: Context): TokenResult {
         if (!isAvailable(context)) return TokenResult.Unsupported
-        val task = runCatching { FirebaseMessaging.getInstance().token }.getOrNull()
-            ?: return TokenResult.Failed
+        val task = runCatching {
+            val messaging = FirebaseMessaging.getInstance()
+            if (!messaging.isAutoInitEnabled) messaging.isAutoInitEnabled = true
+            messaging.token
+        }.getOrNull() ?: return TokenResult.Failed
         return suspendCancellableCoroutine { continuation ->
             task.addOnCompleteListener { completed ->
                 val token = if (completed.isSuccessful) completed.result?.takeIf(String::isNotBlank) else null

@@ -36,6 +36,8 @@ class EventReporterTest {
     private var serverAllows: Boolean? = true
     private var session: String? = "5e55a0b1-0000-4000-8000-000000000001"
     private var token: String? = null
+    private var account = EventReporter.ANONYMOUS
+    private var consent = true
     private var counter = 0
     private val api = RecordingEvents()
 
@@ -57,6 +59,8 @@ class EventReporterTest {
         userAllows = { userAllows },
         serverAllows = { serverAllows },
         token = { token },
+        consentGiven = { consent },
+        accountKey = { account },
         scope = CoroutineScope(Job().apply { cancel() }),
         clock = { now },
         newId = { "00000000-0000-4000-8000-" + (counter++).toString().padStart(12, '0') }
@@ -199,6 +203,7 @@ class EventReporterTest {
 
     @Test
     fun `a token the server refuses is dropped, not the events`() = runBlocking {
+        account = "user-a"
         token = "stale"
         api.answer = { batch, sentToken ->
             if (sentToken != null) throw ApiException(ApiError.Unauthorized, httpStatus = 401)
@@ -238,6 +243,72 @@ class EventReporterTest {
         now += 61_000
         reporter.apiError(offline)
         assertEquals(2, reporter.pending.size)
+    }
+
+    // ------------------------------------------------------------- accounts
+
+    @Test
+    fun `events go with the token only under the account they happened in`() = runBlocking {
+        account = "user-a"
+        token = "token-a"
+        reporter.notificationOpened(mapOf("notification_id" to "n-1"))
+        reporter.logout()
+        account = EventReporter.ANONYMOUS
+        token = null
+        reporter.appOpened(coldStart = false)
+        account = "user-b"
+        token = "token-b"
+        reporter.appOpened(coldStart = false)
+
+        reporter.flush()
+
+        assertEquals(
+            "user A's events are not attributed to user B",
+            listOf<String?>(null, null, "token-b"),
+            api.batches.map { it.second }
+        )
+        assertEquals(listOf(2, 1, 1), api.batches.map { it.first.events.size })
+    }
+
+    @Test
+    fun `a signed-in account goes with its token`() = runBlocking {
+        account = "user-a"
+        token = "token-a"
+        reporter.logout()
+        reporter.flush()
+        assertEquals("token-a", api.batches.single().second)
+    }
+
+    // -------------------------------------------------------------- consent
+
+    @Test
+    fun `nothing is recorded or sent before the terms are accepted`() = runBlocking {
+        consent = false
+        assertFalse(reporter.appOpened(coldStart = true))
+        assertTrue("dropped, not kept for later", reporter.pending.isEmpty())
+
+        consent = true
+        reporter.appOpened(coldStart = false)
+        consent = false
+        reporter.flush()
+        assertTrue("held while consent is missing", api.batches.isEmpty())
+
+        consent = true
+        reporter.flush()
+        assertEquals(1, api.batches.size)
+    }
+
+    @Test
+    fun `a retry time from a clock that ran ahead does not block sending`() = runBlocking {
+        api.answer = { _, _ -> throw ApiException(ApiError.Server, httpStatus = 503) }
+        now += 365L * 24 * 60 * 60 * 1000 // the clock runs a year ahead
+        reporter.logout()
+        reporter.flush() // fails: the retry time is stored a year ahead
+        api.answer = { batch, _ -> EventsResult(accepted = batch.events.size) }
+        now -= 365L * 24 * 60 * 60 * 1000 // the clock is corrected
+        reporter.flush()
+        assertEquals(2, api.batches.size)
+        assertTrue(reporter.pending.isEmpty())
     }
 
     // ------------------------------------------------------------- sessions

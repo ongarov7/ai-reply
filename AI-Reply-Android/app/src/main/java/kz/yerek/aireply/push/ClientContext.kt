@@ -27,7 +27,11 @@ class ClientContext(
     private val language: () -> String,
     private val timeZone: () -> String = { TimeZone.getDefault().id },
     /** The foreground session, or null before the app was first opened. */
-    private val sessionId: () -> String? = { null }
+    private val sessionId: () -> String? = { null },
+    /** The legal consent: before it, no request names the installation or the session. */
+    private val consentGiven: () -> Boolean = { true },
+    /** "Share diagnostics": the session id is diagnostics, and goes only while it is on. */
+    private val shareDiagnostics: () -> Boolean = { true }
 ) : RequestMetadata {
 
     val appVersion: String = headerSafe(appVersion)
@@ -52,9 +56,14 @@ class ClientContext(
         if (appVersion.isNotEmpty()) headers["X-App-Version"] = appVersion
         if (appBuild.isNotEmpty()) headers["X-App-Build"] = appBuild
         if (osVersion.isNotEmpty()) headers["X-OS-Version"] = osVersion
-        if (scope == HeaderScope.APP) {
+        // The installation id stays on even with diagnostics off: the logout
+        // detaches by it and the server counts its per-installation limits by
+        // it. The session id is diagnostics only.
+        if (scope == HeaderScope.APP && consentGiven()) {
             headers["X-Installation-ID"] = installationId
-            sessionId()?.takeIf(InstallationIdStore::isValid)?.let { headers["X-Session-ID"] = it }
+            if (shareDiagnostics()) {
+                sessionId()?.takeIf(InstallationIdStore::isValid)?.let { headers["X-Session-ID"] = it }
+            }
         }
         return headers
     }

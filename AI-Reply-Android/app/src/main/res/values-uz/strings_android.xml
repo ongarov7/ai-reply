@@ -142,7 +142,7 @@
     <string name="push_categories_loading">Yuklanmoqda…</string>
     <string name="push_categories_failed">Yangilab boʻlmadi. Internetni tekshirib, qayta urinib koʻring.</string>
     <string name="diagnostics_share">Diagnostikani yuborish</string>
-    <string name="diagnostics_share_footer">Anonim hodisalar — ilova ochilishi, bildirishnomaga bosish, ulanish xatolari — muammolarni tuzatishga yordam beradi. Xabarlaringiz, yozgan va nusxalagan matningiz hech qachon yuborilmaydi.</string>
+    <string name="diagnostics_share_footer">Muammolarni topish va tuzatishga yordam beradi: ilova ishga tushishi, bildirishnomaga bosish va ulanish xatolari. Xabarlaringiz, yozgan matningiz va almashuv buferi hech qachon yuborilmaydi.</string>
     <string name="settings_debug_simulate_push">Sinov push-bildirishnomasi</string>
     <string name="settings_debug_force_push_prompt">Bildirishnoma kartasini doim koʻrsatish</string>
     <string name="settings_debug_push_footer">Faqat sinov yigʻmasida. Namuna 3 soniyadan soʻng ochiq ilovadagi haqiqiy bildirishnoma yoʻli bilan keladi va bosilganda «Tarif»ni ochadi. Kalit bosh ekrandagi kartani va bu sozlamalarni Firebase boʻlmasa ham koʻrsatadi.</string>

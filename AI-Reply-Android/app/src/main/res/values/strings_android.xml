@@ -181,7 +181,7 @@
     <string name="push_categories_loading">Loading…</string>
     <string name="push_categories_failed">Could not update. Check your connection and try again.</string>
     <string name="diagnostics_share">Share diagnostics</string>
-    <string name="diagnostics_share_footer">Anonymous events such as app opens, notification taps and connection errors help us fix problems. Your messages, what you type and what you copy are never sent.</string>
+    <string name="diagnostics_share_footer">Helps us find and fix problems: app launches, notification taps and connection errors. Never your messages, what you type or your clipboard.</string>
     <string name="settings_debug_simulate_push">Simulate a push notification</string>
     <string name="settings_debug_force_push_prompt">Always show the notification card</string>
     <string name="settings_debug_push_footer">Debug builds only. The sample arrives in 3 seconds through the same path as a real one in the foreground, and opens Plan when tapped. The switch shows the Home card and these settings even without Firebase.</string>

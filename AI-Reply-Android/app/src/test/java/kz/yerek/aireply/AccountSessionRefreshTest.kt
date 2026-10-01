@@ -1,8 +1,11 @@
 package kz.yerek.aireply
 
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kz.yerek.aireply.data.account.AccountSession
 import kz.yerek.aireply.data.account.ApiClient
 import kz.yerek.aireply.data.account.ApiError
@@ -16,9 +19,13 @@ import kz.yerek.aireply.support.FakeServer
 import kz.yerek.aireply.support.sessionOn
 import kz.yerek.aireply.support.tokenPair
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 /**
  * A 401 on a token the app believed fresh: refresh once, retry once, with the
@@ -113,6 +120,87 @@ class AccountSessionRefreshTest {
         }
         assertNull(credentials.refresh)
         assertEquals(1, credentials.clears)
+    }
+
+    // ------------------------------------------------- sign-out vs refresh
+
+    @Test
+    fun `sign-out waits for a refresh in flight and logs out the rotated token`() = runBlocking {
+        val onTheWire = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val server = FakeServer { request ->
+            when (request.path) {
+                "/api/v1/auth/refresh" -> {
+                    onTheWire.countDown()
+                    release.await(5, TimeUnit.SECONDS)
+                    tokenPair("a2", "r2")
+                }
+                "/api/v1/auth/logout" -> FakeResponse(200, """{"ok":true}""")
+                else -> FakeResponse(404)
+            }
+        }
+        val credentials = FakeCredentials(access = "a1", refresh = "r1", fresh = false)
+        val session = sessionOn(server, credentials)
+
+        val refreshing = async(Dispatchers.Default) { runCatching { session.accessToken() } }
+        withContext(Dispatchers.IO) { onTheWire.await(5, TimeUnit.SECONDS) }
+        val signingOut = async(Dispatchers.Default) { session.signOut() }
+        delay(200)
+        assertFalse("sign-out waits for the refresh lock", signingOut.isCompleted)
+
+        release.countDown()
+        signingOut.await()
+        refreshing.await()
+
+        assertNull("nothing signed the app back in", credentials.refresh)
+        assertFalse(session.isSignedIn)
+        val logout = server.requests.single { it.path == "/api/v1/auth/logout" }
+        assertTrue("the logout names the rotated token: ${logout.body}", logout.body.contains("\"r2\""))
+    }
+
+    @Test
+    fun `a refresh that returns after the session was cleared stores nothing`() = runBlocking {
+        val onTheWire = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val server = FakeServer {
+            onTheWire.countDown()
+            release.await(5, TimeUnit.SECONDS)
+            tokenPair("a2", "r2")
+        }
+        val credentials = FakeCredentials(access = "a1", refresh = "r1", fresh = false)
+        val session = sessionOn(server, credentials)
+
+        val result = async(Dispatchers.Default) { runCatching { session.accessToken() } }
+        withContext(Dispatchers.IO) { onTheWire.await(5, TimeUnit.SECONDS) }
+        credentials.clear() // signed out elsewhere, without the lock
+        release.countDown()
+
+        val failure = result.await().exceptionOrNull() as ApiException
+        assertEquals(ApiError.Unauthorized, failure.error)
+        assertNull(credentials.refresh)
+        assertEquals(0, credentials.stores)
+    }
+
+    @Test
+    fun `a refused refresh does not clear a session stored meanwhile`() = runBlocking {
+        val onTheWire = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val server = FakeServer {
+            onTheWire.countDown()
+            release.await(5, TimeUnit.SECONDS)
+            FakeResponse(401, FakeServer.envelope("UNAUTHORIZED"))
+        }
+        val credentials = FakeCredentials(access = "a1", refresh = "r1", fresh = false)
+        val session = sessionOn(server, credentials)
+
+        val result = async(Dispatchers.Default) { runCatching { session.accessToken() } }
+        withContext(Dispatchers.IO) { onTheWire.await(5, TimeUnit.SECONDS) }
+        credentials.store("b1", "rb1", 900) // another account signed in meanwhile
+        release.countDown()
+
+        assertTrue(result.await().isFailure)
+        assertEquals("the new account's session is kept", "rb1", credentials.refresh)
+        assertEquals(0, credentials.clears)
     }
 
     @Test

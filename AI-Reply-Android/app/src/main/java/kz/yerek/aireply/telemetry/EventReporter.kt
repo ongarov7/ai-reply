@@ -18,10 +18,14 @@ import java.util.UUID
  *
  * Диагностика: тек рұқсат етілген оқиғалар, жадта, топтап жіберіледі.
  *
- * - Nothing is recorded unless the user leaves "Share diagnostics" on, and
+ * - Nothing is recorded before the terms are accepted (events from before
+ *   are dropped, not kept for later) or while "Share diagnostics" is off, and
  *   nothing is sent unless the server announced `features.telemetry`. Before
  *   the server has answered, events wait in memory; if it says no, they are
  *   dropped. Turning the switch off drops the queue too.
+ * - Each event is stamped with the account it happened under. A batch goes
+ *   with the bearer token only when that account is still the signed-in one;
+ *   otherwise it goes without, so one account's events never land on another.
  * - At most [MAX_QUEUE] events are held (the oldest go first) and nothing is
  *   written to disk: a killed process loses at most one minute of events.
  * - A batch goes out [FLUSH_INTERVAL_MS] after the first queued event and when
@@ -41,6 +45,10 @@ class EventReporter(
     private val serverAllows: () -> Boolean?,
     /** A fresh access token to attribute the batch to the account, or null. Never refreshes. */
     private val token: () -> String?,
+    /** The legal consent: nothing is recorded or sent before it. */
+    private val consentGiven: () -> Boolean = { true },
+    /** Who is signed in now: the user id, [SIGNED_IN] when not known yet, [ANONYMOUS] when nobody. */
+    private val accountKey: () -> String = { ANONYMOUS },
     private val scope: CoroutineScope,
     private val clock: () -> Long = System::currentTimeMillis,
     private val newId: () -> String = { UUID.randomUUID().toString() },
@@ -120,11 +128,11 @@ class EventReporter(
 
     // ------------------------------------------------------------- queue
 
-    /** Queues one event if the user and the server allow it. False when refused. */
+    /** Queues one event if consent, the user and the server allow it. False when refused. */
     fun record(name: String, properties: Map<String, Any> = emptyMap()): Boolean {
-        if (!userAllows() || disabledByServer || serverAllows() == false) return false
+        if (!consentGiven() || !userAllows() || disabledByServer || serverAllows() == false) return false
         if (!EventSchema.isValid(name, properties)) return false
-        val event = TelemetryEvent(newId(), name, clock(), properties, sessionId())
+        val event = TelemetryEvent(newId(), name, clock(), properties, sessionId(), accountKey())
         synchronized(lock) {
             queue.addLast(event)
             while (queue.size > MAX_QUEUE) queue.removeFirst()
@@ -144,6 +152,9 @@ class EventReporter(
 
     /** Sends what is queued as soon as possible (the app went to the background). */
     fun flushSoon() = scheduleFlush(0)
+
+    /** The terms were just accepted: anything recorded since may go out. */
+    fun onConsentGiven() = flushSoon()
 
     /** The server's features arrived; queued events may go out now, or be dropped. */
     fun onServerFeaturesChanged() {
@@ -178,6 +189,8 @@ class EventReporter(
                     clear()
                     return
                 }
+                // Consent withdrawn (new terms not accepted yet): hold, send nothing.
+                if (!consentGiven()) return
                 when (serverAllows()) {
                     null -> return
                     false -> {
@@ -187,7 +200,8 @@ class EventReporter(
                     true -> Unit
                 }
                 val now = clock()
-                if (now < retryAt) {
+                // A wait longer than any backoff dates from a clock that was far ahead.
+                if (now < retryAt && retryAt - now <= MAX_BACKOFF_MS) {
                     scheduleFlush(retryAt - now, replace = true)
                     return
                 }
@@ -219,7 +233,9 @@ class EventReporter(
     private enum class Outcome { SENT, DROP, RETRY, DISABLED }
 
     private suspend fun send(batch: EventBatch): Outcome {
-        val token = token()
+        // Attributed only to the account the events happened under, and only
+        // while it is still the one signed in.
+        val token = if (batch.accountKey != ANONYMOUS && batch.accountKey == accountKey()) token() else null
         return try {
             if (api.send(batch, token).disabled) Outcome.DISABLED else Outcome.SENT
         } catch (cancelled: CancellationException) {
@@ -260,11 +276,11 @@ class EventReporter(
             queue.removeAll { now - it.occurredAtMillis > MAX_AGE_MS }
             val first = queue.firstOrNull() ?: return null
             queue.asSequence()
-                .takeWhile { it.sessionId == first.sessionId }
+                .takeWhile { it.sessionId == first.sessionId && it.accountKey == first.accountKey }
                 .take(MAX_BATCH)
                 .toList()
         }
-        var batch = EventBatch(installationId(), events.first().sessionId, events)
+        var batch = EventBatch(installationId(), events.first().sessionId, events, events.first().accountKey)
         while (batch.events.size > 1 && batch.toJson().toByteArray(Charsets.UTF_8).size > MAX_BODY_BYTES) {
             batch = batch.copy(events = batch.events.take(batch.events.size / 2))
         }
@@ -277,6 +293,12 @@ class EventReporter(
     }
 
     companion object {
+        /** [accountKey] when nobody is signed in. */
+        const val ANONYMOUS = "anon"
+
+        /** [accountKey] when signed in but the user id is not known yet. */
+        const val SIGNED_IN = "signed-in"
+
         const val PROVIDER = "fcm"
         const val MAX_QUEUE = 100
         const val MAX_BATCH = 50
@@ -285,7 +307,7 @@ class EventReporter(
         const val FLUSH_INTERVAL_MS = 60_000L
         const val MAX_AGE_MS = 7L * 24 * 60 * 60 * 1000 - 60 * 60 * 1000
         const val API_ERROR_INTERVAL_MS = 60_000L
-        private const val MAX_BACKOFF_MS = 15L * 60 * 1000
+        const val MAX_BACKOFF_MS = 15L * 60 * 1000
 
         fun backoffMs(failures: Int): Long {
             val exponent = (failures - 1).coerceIn(0, 10)

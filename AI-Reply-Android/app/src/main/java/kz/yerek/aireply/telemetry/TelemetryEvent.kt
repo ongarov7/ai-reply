@@ -14,7 +14,12 @@ data class TelemetryEvent(
     val occurredAtMillis: Long,
     val properties: Map<String, Any>,
     /** The foreground session the event belongs to, if any. */
-    val sessionId: String?
+    val sessionId: String?,
+    /**
+     * The account it happened under (a user id, or EventReporter.ANONYMOUS).
+     * Never sent: it decides whether the batch may carry the bearer token.
+     */
+    val accountKey: String = EventReporter.ANONYMOUS
 )
 
 /**

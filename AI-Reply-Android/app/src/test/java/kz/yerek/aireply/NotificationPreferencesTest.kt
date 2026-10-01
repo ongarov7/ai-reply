@@ -6,6 +6,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.yield
 import kz.yerek.aireply.data.account.ApiError
 import kz.yerek.aireply.data.account.ApiException
+import kz.yerek.aireply.push.NotificationPermission
 import kz.yerek.aireply.push.NotificationPreferencesApi
 import kz.yerek.aireply.push.NotificationPreferencesDto
 import kz.yerek.aireply.push.NotificationPreferencesRepository
@@ -116,6 +117,28 @@ class NotificationPreferencesTest {
         assertTrue(
             "debug builds can force it",
             eligible.copy(supportedInBuild = false, promptDismissed = true, debugForced = true).showsPrompt
+        )
+    }
+
+    @Test
+    fun `a dismissed dialog is not a permanent denial`() {
+        fun permanent(before: Boolean, after: Boolean, deniedBefore: Boolean = false) =
+            NotificationPermission.isPermanentDenial(
+                granted = false, rationaleBefore = before, rationaleAfter = after, deniedBefore = deniedBefore
+            )
+
+        assertFalse("first request dismissed (tap outside, Back)", permanent(before = false, after = false))
+        assertFalse("first \"Don't allow\": Android will ask again", permanent(before = false, after = true))
+        assertFalse("dismissed after one denial", permanent(before = true, after = true))
+        assertTrue("second \"Don't allow\"", permanent(before = true, after = false))
+        assertTrue(
+            "blocked already: the dialog does not even show",
+            permanent(before = false, after = false, deniedBefore = true)
+        )
+        assertFalse(
+            NotificationPermission.isPermanentDenial(
+                granted = true, rationaleBefore = true, rationaleAfter = false, deniedBefore = true
+            )
         )
     }
 

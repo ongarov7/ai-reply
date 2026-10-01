@@ -11,6 +11,13 @@ interface AccountObserver {
     /** `GET /api/v1/config` answered; null features means an old server. */
     fun onServerFeatures(features: ServerFeaturesDto?) {}
 
+    /**
+     * The terms of use and the privacy policy became accepted (on this device,
+     * or restored from the account). Nothing about the installation is sent
+     * before this.
+     */
+    fun onLegalAccepted() {}
+
     /** A sign-in completed (e-mail code or Google). */
     fun onSignedIn(userId: String) {}
 

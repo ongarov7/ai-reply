@@ -11,11 +11,15 @@ import kz.yerek.aireply.data.account.ApiError
 import kz.yerek.aireply.data.account.raise
 import java.time.Instant
 
-/** One `POST /api/v1/events` request: events of one session, oldest first. */
+/**
+ * One `POST /api/v1/events` request: events of one session and one account,
+ * oldest first. [accountKey] is not part of the body.
+ */
 data class EventBatch(
     val installationId: String,
     val sessionId: String?,
-    val events: List<TelemetryEvent>
+    val events: List<TelemetryEvent>,
+    val accountKey: String = EventReporter.ANONYMOUS
 ) {
     /** The exact request body. */
     fun toJson(): String = buildJsonObject {

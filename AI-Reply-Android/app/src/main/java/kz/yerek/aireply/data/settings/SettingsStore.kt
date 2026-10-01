@@ -272,9 +272,11 @@ class SettingsStore internal constructor(private val prefs: SharedPreferences) {
         set(value) = prefs.edit().putBoolean(KEY_NOTIFICATIONS_ENABLED, value).apply()
 
     /**
-     * "Share diagnostics": the few anonymous app events (opens, notification
-     * taps, connection failures). On by default; never message text, typing
-     * or the clipboard, and never anything from the keyboard.
+     * "Share diagnostics": the few app events (launches, notification taps,
+     * connection failures), sent with the installation id and, when signed
+     * in, attributed to the account. On by default; never message text,
+     * typing or the clipboard, and never anything from the keyboard. Off also
+     * stops the session id header.
      */
     var shareDiagnostics: Boolean
         get() = prefs.getBoolean(KEY_SHARE_DIAGNOSTICS, true)

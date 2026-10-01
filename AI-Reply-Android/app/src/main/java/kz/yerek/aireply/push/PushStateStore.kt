@@ -103,6 +103,11 @@ class PushStateStore internal constructor(private val prefs: SharedPreferences) 
         get() = prefs.getBoolean(KEY_PERMISSION_REQUESTED, false)
         set(value) = prefs.edit().putBoolean(KEY_PERMISSION_REQUESTED, value).apply()
 
+    /** The user answered "Don't allow" at least once (a dismissed dialog does not count). */
+    var permissionDeniedOnce: Boolean
+        get() = prefs.getBoolean(KEY_PERMISSION_DENIED_ONCE, false)
+        set(value) = prefs.edit().putBoolean(KEY_PERMISSION_DENIED_ONCE, value).apply()
+
     /** Denied with "don't ask again" (or twice): only system settings can change it now. */
     var permissionPermanentlyDenied: Boolean
         get() = prefs.getBoolean(KEY_PERMISSION_BLOCKED, false)
@@ -135,6 +140,7 @@ class PushStateStore internal constructor(private val prefs: SharedPreferences) 
         private const val KEY_NEXT_ATTEMPT = "installation.nextAttemptAt"
         private const val KEY_PERMISSION_REQUESTED = "permission.requested"
         private const val KEY_PERMISSION_BLOCKED = "permission.permanentlyDenied"
+        private const val KEY_PERMISSION_DENIED_ONCE = "permission.deniedOnce"
         private const val KEY_PROMPT_DISMISSED = "prompt.dismissed"
     }
 }

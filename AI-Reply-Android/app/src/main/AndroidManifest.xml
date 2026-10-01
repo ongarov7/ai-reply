@@ -99,6 +99,15 @@
             android:value="general" />
 
         <!--
+            No token before the terms of use are accepted: the app switches
+            this on (FirebaseMessaging.isAutoInitEnabled) when it first asks
+            for the token after consent, and Firebase keeps it on from then.
+        -->
+        <meta-data
+            android:name="firebase_messaging_auto_init_enabled"
+            android:value="false" />
+
+        <!--
             The keyboard. BIND_INPUT_METHOD is what stops any app other than the
             system from binding to it.
         -->

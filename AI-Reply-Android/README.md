@@ -141,9 +141,12 @@ What the app does, in order:
   out (anonymous, detached from whoever used the phone before). It is sent on
   start, after sign-in and sign-out, on a new FCM token, and when the permission
   or the in-app switch changes, but only if something differs from the last
-  accepted registration, else once a day. Only against a server whose
-  `GET /api/v1/config` announces `features.installations`; the production server
-  that does not is never called.
+  accepted registration, else once a day. Only after the terms of use are
+  accepted (before that the app registers nothing, asks Firebase for no token
+  — auto-init is off in the manifest — and names no installation in any
+  request), and only against a server whose `GET /api/v1/config` announces
+  `features.installations`; the production server that does not is never
+  called.
 * **Permission.** Never asked at first launch. After sign-in, on Android 13+,
   Home shows a card (*Turn on* → the system dialog, *Not now* → gone for good);
   Settings ▸ Notifications shows the system state, the way to system settings
@@ -155,12 +158,14 @@ What the app does, in order:
   `aireply://<screen>` it names — after the consent, sign-in and onboarding
   gates, never around them — or an `https://ai-reply.kz` page in the browser;
   anything else only opens the app.
-* **Diagnostics.** With *Share diagnostics* on (default) and
-  `features.telemetry`, a handful of events (`app_opened`, `app_backgrounded`,
-  the push permission and token, `notification_opened`, `logout`, a Google
-  sign-in that failed inside Google's SDK, and requests that got no HTTP answer
-  at all) are batched to `POST /api/v1/events`. Never message text, typing or
-  the clipboard, and nothing from the keyboard.
+* **Diagnostics.** After the terms are accepted (earlier events are dropped),
+  with *Share diagnostics* on (default) and `features.telemetry`, a handful of
+  events (`app_opened`, `app_backgrounded`, the push permission and token,
+  `notification_opened`, `logout`, a Google sign-in that failed inside
+  Google's SDK, and requests that got no HTTP answer at all) are batched to
+  `POST /api/v1/events`. They carry the installation id and, while signed in,
+  the bearer token of the account they happened under — never another's.
+  Never message text, typing or the clipboard, and nothing from the keyboard.
 
 Debug builds, Settings ▸ Developer: *Simulate a push notification* runs the
 real foreground path with a sample payload (it opens Plan), and *Always show
@@ -341,13 +346,15 @@ Since push notifications (2026-10):
 
 * Every request carries metadata headers from one place (`ClientContext`):
   platform, app version and build, OS version and a random request id. Requests
-  from the app's own screens add the installation id and the app session id;
+  from the app's own screens add the installation id once the terms are
+  accepted, and the app session id only while *Share diagnostics* is on;
   requests the keyboard can make (replies, token refresh, limits) never do.
 * The installation registration sends the device model and manufacturer, the
   interface language, the time zone, the notification permission and the FCM
   token. The account is never in it: it comes from the access token.
 * Diagnostics are a closed list of events with short typed values (see *Push
-  notifications*), held in memory only, and off with one switch.
+  notifications*), held in memory only, attributed to the signed-in account
+  they happened under, and off with one switch. They are not anonymous.
 
 ---
 

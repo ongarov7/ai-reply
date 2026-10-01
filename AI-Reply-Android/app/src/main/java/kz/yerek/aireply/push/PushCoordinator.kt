@@ -89,6 +89,8 @@ class PushCoordinator(
     private val featuresLoaded: () -> Boolean,
     /** Whether the app's own start-up (which loads the config) has run. */
     private val bootstrapped: () -> Boolean,
+    /** The terms are accepted. Before that nothing is registered, fetched or sent. */
+    private val consentGiven: () -> Boolean,
     private val loadServerConfig: suspend () -> Unit,
     /** A Context in the app's interface language, for channel names and texts. */
     private val localized: () -> Context,
@@ -103,7 +105,7 @@ class PushCoordinator(
         session = session,
         store = store,
         snapshot = ::snapshot,
-        isEnabled = { features()?.installations == true },
+        isEnabled = { consentGiven() && features()?.installations == true },
         scope = scope,
         clock = clock,
         listener = object : InstallationRegistrar.Listener {
@@ -138,7 +140,8 @@ class PushCoordinator(
         refreshUi()
         scope.launch {
             NotificationChannels.ensure(appContext, localized())
-            if (isSupportedInBuild && !tokenFetched) fetchToken()
+            // Firebase is told about this install only once the terms are accepted.
+            if (isSupportedInBuild && !tokenFetched && consentGiven()) fetchToken()
             registrar.requestSync()
         }
     }
@@ -271,16 +274,26 @@ class PushCoordinator(
     }
 
     /**
-     * The dialog answered. [canAskAgain] is false once Android will not show
-     * it again; [fromPrompt]: it was the Home card, which then stays hidden.
+     * The dialog answered. [rationaleBefore] / [rationaleAfter] are
+     * `shouldShowRequestPermissionRationale` just before the request and
+     * right after it (see [NotificationPermission.isPermanentDenial]: a
+     * dismissed dialog is not a permanent denial). [fromPrompt]: it was the
+     * Home card, which then stays hidden either way.
      */
-    fun onPermissionResult(granted: Boolean, canAskAgain: Boolean, fromPrompt: Boolean) {
+    fun onPermissionResult(granted: Boolean, rationaleBefore: Boolean, rationaleAfter: Boolean, fromPrompt: Boolean) {
         if (granted) {
             store.permissionPermanentlyDenied = false
             events.pushPermissionGranted()
         } else {
             events.pushPermissionDenied()
-            if (!canAskAgain) store.permissionPermanentlyDenied = true
+            val permanent = NotificationPermission.isPermanentDenial(
+                granted = false,
+                rationaleBefore = rationaleBefore,
+                rationaleAfter = rationaleAfter,
+                deniedBefore = store.permissionDeniedOnce
+            )
+            if (permanent) store.permissionPermanentlyDenied = true
+            if (rationaleAfter) store.permissionDeniedOnce = true
             if (fromPrompt) store.promptDismissed = true
         }
         refreshUi()
@@ -316,6 +329,16 @@ class PushCoordinator(
     }
 
     // ----------------------------------------------------------- account
+
+    /** The terms were just accepted: register, fetch the token, send what diagnostics hold. */
+    override fun onLegalAccepted() {
+        refreshUi()
+        scope.launch {
+            if (isSupportedInBuild && !tokenFetched) fetchToken()
+            registrar.requestSync()
+        }
+        events.onConsentGiven()
+    }
 
     override fun onServerFeatures(features: ServerFeaturesDto?) {
         refreshUi()

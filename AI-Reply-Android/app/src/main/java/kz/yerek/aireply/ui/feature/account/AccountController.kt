@@ -140,13 +140,15 @@ class AccountController(
             // The administrator's character limits, for the keyboard too.
             AILimits.apply(config)
             val legal = config.legal ?: LegalConfigDto.PRODUCTION
-            _state.update {
-                it.copy(
-                    features = config.features,
-                    featuresLoaded = true,
-                    legalConfig = legal,
-                    hasAcceptedLegal = legalConsentStore.hasAccepted(legal)
-                )
+            trackingConsent {
+                _state.update {
+                    it.copy(
+                        features = config.features,
+                        featuresLoaded = true,
+                        legalConfig = legal,
+                        hasAcceptedLegal = legalConsentStore.hasAccepted(legal)
+                    )
+                }
             }
             observer?.onServerFeatures(config.features)
         }
@@ -159,11 +161,13 @@ class AccountController(
             refresh()
             syncPendingLegalConsent()
         }
-        _state.update {
-            it.copy(
-                hasAcceptedLegal = legalConsentStore.hasAccepted(it.legalConfig),
-                bootstrapComplete = true
-            )
+        trackingConsent {
+            _state.update {
+                it.copy(
+                    hasAcceptedLegal = legalConsentStore.hasAccepted(it.legalConfig),
+                    bootstrapComplete = true
+                )
+            }
         }
     }
 
@@ -402,7 +406,7 @@ class AccountController(
 
     suspend fun acceptLegal(locale: String) {
         legalConsentStore.accept(_state.value.legalConfig, locale, BuildConfig.VERSION_NAME)
-        _state.update { it.copy(hasAcceptedLegal = true) }
+        trackingConsent { _state.update { it.copy(hasAcceptedLegal = true) } }
         syncPendingLegalConsent()
     }
 
@@ -433,13 +437,24 @@ class AccountController(
         observer?.onSignedOut(userInitiated)
     }
 
+    /**
+     * Runs a state change and tells the observer if it is the moment the
+     * terms became accepted: the installation registration and diagnostics
+     * wait for exactly that.
+     */
+    private inline fun trackingConsent(change: () -> Unit) {
+        val before = _state.value.hasAcceptedLegal
+        change()
+        if (!before && _state.value.hasAcceptedLegal) observer?.onLegalAccepted()
+    }
+
     private fun applyLegalConsent(consent: LegalConsentDto?) {
         val config = _state.value.legalConfig
         if (consent == null || consent.termsVersion != config.termsVersion ||
             consent.privacyVersion != config.privacyVersion
         ) return
         legalConsentStore.restore(consent)
-        _state.update { it.copy(hasAcceptedLegal = true) }
+        trackingConsent { _state.update { it.copy(hasAcceptedLegal = true) } }
     }
 
     private suspend fun syncPendingLegalConsent() {

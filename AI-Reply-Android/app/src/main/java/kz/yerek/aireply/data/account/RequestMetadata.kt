@@ -1,7 +1,6 @@
 package kz.yerek.aireply.data.account
 
 import java.security.SecureRandom
-import java.util.Locale
 
 /**
  * Which metadata headers a request may carry.
@@ -103,12 +102,43 @@ object ApiRoutes {
 
 /**
  * A short machine code for diagnostics: the transport cause when no answer
- * came, else the error's name in snake_case (`rate_limited`, `server`).
+ * came, else [ApiError.code].
  */
-fun ApiException.diagnosticCode(): String {
-    transport?.let { return it.code }
-    val name = error::class.simpleName ?: return "unknown"
-    return CAMEL_BOUNDARY.replace(name, "$1_$2").lowercase(Locale.ROOT)
-}
+fun ApiException.diagnosticCode(): String = transport?.code ?: error.code
 
-private val CAMEL_BOUNDARY = Regex("([a-z0-9])([A-Z])")
+/**
+ * A stable machine code for each error, spelled out: release builds are
+ * minified, so a class name would arrive as "a" or "b". A new error case does
+ * not compile until it has a code here.
+ */
+val ApiError.code: String
+    get() = when (this) {
+        ApiError.Offline -> "offline"
+        ApiError.TimedOut -> "timeout"
+        ApiError.Cancelled -> "cancelled"
+        ApiError.Unauthorized -> "unauthorized"
+        ApiError.AccountDisabled -> "account_disabled"
+        is ApiError.InvalidOtp -> "invalid_otp"
+        ApiError.OtpExpired -> "otp_expired"
+        ApiError.OtpAlreadyUsed -> "otp_already_used"
+        ApiError.OtpAttemptsExceeded -> "otp_attempts_exceeded"
+        is ApiError.ResendCooldown -> "otp_resend_cooldown"
+        ApiError.InvalidEmail -> "invalid_email"
+        ApiError.EmailDeliveryFailed -> "email_delivery_failed"
+        ApiError.EmailInUse -> "email_in_use"
+        ApiError.InvalidIdToken -> "invalid_id_token"
+        ApiError.AuthProviderUnavailable -> "auth_provider_unavailable"
+        is ApiError.RateLimited -> "rate_limited"
+        is ApiError.DailyLimitReached -> "daily_limit_reached"
+        ApiError.SubscriptionExpired -> "subscription_expired"
+        ApiError.PaymentRequired -> "payment_required"
+        ApiError.ProviderUnavailable -> "provider_unavailable"
+        ApiError.ProviderTimeout -> "provider_timeout"
+        ApiError.EmptyResponse -> "empty_response"
+        ApiError.InvalidRequest -> "invalid_request"
+        is ApiError.SourceTooLong -> "source_too_long"
+        ApiError.NotFound -> "not_found"
+        ApiError.Conflict -> "conflict"
+        ApiError.Server -> "server"
+        ApiError.MalformedResponse -> "malformed_response"
+    }

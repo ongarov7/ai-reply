@@ -91,14 +91,25 @@ class AccountSession(
             client.request("POST", "api/v1/auth/refresh", payload)
         } catch (exception: ApiException) {
             // The refresh token is gone, rotated or revoked. Nothing local can
-            // fix that, so the session is cleared and the UI asks for sign-in.
-            if (exception.error is ApiError.Unauthorized) credentials.clear()
+            // fix that, so the session is cleared and the UI asks for sign-in —
+            // unless another session was stored meanwhile, which is not ours
+            // to clear.
+            if (exception.error is ApiError.Unauthorized && credentials.refreshToken == refreshToken) {
+                credentials.clear()
+            }
             throw exception
         }
 
         val tokens = runCatching {
             client.json.decodeFromString(TokenPairDto.serializer(), body)
         }.getOrElse { ApiError.MalformedResponse.raise() }
+
+        // The session ended or was replaced while the request was out (a
+        // sign-out, a revoked session, another account signing in). Storing
+        // the new pair now would sign a signed-out app back in, so it is
+        // dropped and the caller is told the session is gone. Nothing is
+        // cleared here: whatever is stored now is not this session's.
+        if (credentials.refreshToken != refreshToken) ApiError.Unauthorized.raise()
 
         credentials.store(tokens.accessToken, tokens.refreshToken, tokens.expiresIn)
         tokens.accessToken
@@ -115,13 +126,19 @@ class AccountSession(
      * Ends the session. The server call is best effort: the local tokens are
      * dropped either way, so a user on a plane can still sign out.
      *
+     * The tokens are read and cleared under the refresh lock: a refresh in
+     * flight finishes first, so the logout names the refresh token that is
+     * current (the rotated one, if it rotated), and nothing stores a new pair
+     * after the sign-out.
+     *
      * The logout request carries `X-Installation-ID` (APP scope), which is how
      * the server detaches this installation from the account at once.
      */
     suspend fun signOut() {
         val baseUrl = baseUrlProvider()
-        val refreshToken = credentials.refreshToken
-        credentials.clear()
+        val refreshToken = refreshMutex.withLock {
+            credentials.refreshToken.also { credentials.clear() }
+        }
 
         if (baseUrl == null || refreshToken == null) return
         val client = clientFactory(baseUrl, HeaderScope.APP)

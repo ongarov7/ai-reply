@@ -133,6 +133,7 @@ class ServiceLocator(context: Context) {
     /** Hands account transitions to [push] without constructing it before it is needed. */
     private val accountObserver = object : AccountObserver {
         override fun onServerFeatures(features: ServerFeaturesDto?) = push.onServerFeatures(features)
+        override fun onLegalAccepted() = push.onLegalAccepted()
         override fun onSignedIn(userId: String) = push.onSignedIn(userId)
         override fun onAccountLoaded(userId: String) = push.onAccountLoaded(userId)
         override fun onSignedOut(userInitiated: Boolean) = push.onSignedOut(userInitiated)
@@ -164,7 +165,9 @@ class ServiceLocator(context: Context) {
             manufacturer = Build.MANUFACTURER.orEmpty(),
             deviceModel = Build.MODEL.orEmpty(),
             language = { settings.effectiveAppLanguage.code },
-            sessionId = { sessionTracker.sessionId }
+            sessionId = { sessionTracker.sessionId },
+            consentGiven = { account.state.value.hasAcceptedLegal },
+            shareDiagnostics = { settings.shareDiagnostics }
         )
     }
 
@@ -193,6 +196,11 @@ class ServiceLocator(context: Context) {
                 if (state.featuresLoaded) state.features?.telemetry == true else null
             },
             token = { accountSession.freshAccessTokenOrNull() },
+            consentGiven = { account.state.value.hasAcceptedLegal },
+            accountKey = {
+                if (accountSession.isSignedIn) pushState.accountUserId ?: EventReporter.SIGNED_IN
+                else EventReporter.ANONYMOUS
+            },
             scope = scope
         )
     }
@@ -212,6 +220,7 @@ class ServiceLocator(context: Context) {
             features = { account.state.value.features },
             featuresLoaded = { account.state.value.featuresLoaded },
             bootstrapped = { account.state.value.bootstrapComplete },
+            consentGiven = { account.state.value.hasAcceptedLegal },
             loadServerConfig = { account.loadServerConfig() },
             // A fresh Context each time: these are read off the main thread
             // (Firebase's service), where the shared cache below is not safe.

@@ -10,9 +10,11 @@ import kz.yerek.aireply.data.account.RequestIds
 import kz.yerek.aireply.data.account.RequestMetadata
 import kz.yerek.aireply.data.account.TransportFailure
 import kz.yerek.aireply.data.account.TransportFailureReport
+import kz.yerek.aireply.data.account.code
 import kz.yerek.aireply.data.account.diagnosticCode
 import kz.yerek.aireply.push.ClientContext
 import kz.yerek.aireply.push.InstallationIdStore
+import kz.yerek.aireply.telemetry.EventSchema
 import kz.yerek.aireply.support.FakeResponse
 import kz.yerek.aireply.support.FakeServer
 import org.junit.After
@@ -43,18 +45,24 @@ class ClientHeadersTest {
         RequestMetadata.transportFailureObserver = null
     }
 
-    private fun context(directory: File = folder.root, session: String? = "5e55a0b1-0000-4000-8000-000000000001") =
-        ClientContext(
-            installationIds = InstallationIdStore { directory },
-            appVersion = "1.3.2",
-            appBuild = "142",
-            osVersion = "15",
-            manufacturer = "samsung",
-            deviceModel = "SM-S928B",
-            language = { "kk" },
-            timeZone = { "Asia/Almaty" },
-            sessionId = { session }
-        )
+    private fun context(
+        directory: File = folder.root,
+        session: String? = "5e55a0b1-0000-4000-8000-000000000001",
+        consent: Boolean = true,
+        diagnostics: Boolean = true
+    ) = ClientContext(
+        installationIds = InstallationIdStore { directory },
+        appVersion = "1.3.2",
+        appBuild = "142",
+        osVersion = "15",
+        manufacturer = "samsung",
+        deviceModel = "SM-S928B",
+        language = { "kk" },
+        timeZone = { "Asia/Almaty" },
+        sessionId = { session },
+        consentGiven = { consent },
+        shareDiagnostics = { diagnostics }
+    )
 
     private val ok = FakeServer { FakeResponse(200, "{}") }
 
@@ -95,6 +103,49 @@ class ClientHeadersTest {
         assertTrue(request.header("X-Request-ID")!!.startsWith("req_"))
         assertNull(request.header("X-Installation-ID"))
         assertNull(request.header("X-Session-ID"))
+    }
+
+    @Test
+    fun `with diagnostics off the session id goes, the installation id stays`() {
+        val headers = context(diagnostics = false).headers(HeaderScope.APP)
+        assertTrue("logout and the server's limits need it", headers.containsKey("X-Installation-ID"))
+        assertFalse(headers.containsKey("X-Session-ID"))
+    }
+
+    @Test
+    fun `before the terms are accepted no request names the installation or the session`() {
+        val headers = context(consent = false).headers(HeaderScope.APP)
+        assertEquals("android", headers["X-Platform"])
+        assertFalse(headers.containsKey("X-Installation-ID"))
+        assertFalse(headers.containsKey("X-Session-ID"))
+        assertFalse("and no id file is made for it", File(folder.root, InstallationIdStore.FILE_NAME).exists())
+    }
+
+    @Test
+    fun `every error has its own stable code, never a class name`() {
+        val all = listOf(
+            ApiError.Offline, ApiError.TimedOut, ApiError.Cancelled, ApiError.Unauthorized,
+            ApiError.AccountDisabled, ApiError.InvalidOtp(2), ApiError.OtpExpired, ApiError.OtpAlreadyUsed,
+            ApiError.OtpAttemptsExceeded, ApiError.ResendCooldown(30), ApiError.InvalidEmail,
+            ApiError.EmailDeliveryFailed, ApiError.EmailInUse, ApiError.InvalidIdToken,
+            ApiError.AuthProviderUnavailable, ApiError.RateLimited(null), ApiError.DailyLimitReached(5, 5, null),
+            ApiError.SubscriptionExpired, ApiError.PaymentRequired, ApiError.ProviderUnavailable,
+            ApiError.ProviderTimeout, ApiError.EmptyResponse, ApiError.InvalidRequest, ApiError.SourceTooLong(400),
+            ApiError.NotFound, ApiError.Conflict, ApiError.Server, ApiError.MalformedResponse
+        )
+        val codes = all.map { it.code }
+        assertEquals("one code per error", all.size, codes.toSet().size)
+        codes.forEach { code ->
+            assertTrue(code, Regex("^[a-z][a-z_]{2,40}$").matches(code))
+            assertTrue(EventSchema.isCode(code))
+        }
+        assertEquals("rate_limited", ApiError.RateLimited(30).code)
+        assertEquals("invalid_request", ApiException(ApiError.InvalidRequest, httpStatus = 400).diagnosticCode())
+        assertEquals(
+            "a request that got no answer names the cause",
+            "tls",
+            ApiException(ApiError.Server, httpStatus = 0, transport = TransportFailure.TLS).diagnosticCode()
+        )
     }
 
     @Test

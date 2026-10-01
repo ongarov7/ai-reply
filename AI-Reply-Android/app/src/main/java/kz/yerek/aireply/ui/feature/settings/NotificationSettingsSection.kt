@@ -1,7 +1,5 @@
 package kz.yerek.aireply.ui.feature.settings
 
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -23,7 +21,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.core.app.ActivityCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import kz.yerek.aireply.R
@@ -38,7 +35,6 @@ import kz.yerek.aireply.ui.design.AppCard
 import kz.yerek.aireply.ui.design.AppSection
 import kz.yerek.aireply.ui.design.LocalExtraColors
 import kz.yerek.aireply.ui.design.Spacing
-import kz.yerek.aireply.ui.feature.account.findActivity
 
 /**
  * Settings ▸ Notifications.
@@ -60,16 +56,7 @@ fun NotificationSettingsSection(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        val activity = context.findActivity()
-        val canAskAgain = granted || (
-            activity != null &&
-                ActivityCompat.shouldShowRequestPermissionRationale(activity, NotificationPermission.PERMISSION)
-            )
-        push.onPermissionResult(granted, canAskAgain, fromPrompt = false)
-    }
+    val requestPermission = rememberNotificationPermissionRequest(fromPrompt = false)
 
     val showsCategories = account.isSignedIn && ui.isAvailable && ui.notificationsEnabled &&
         (ui.serverHasInstallations || ui.debugForced)
@@ -91,10 +78,7 @@ fun NotificationSettingsSection(modifier: Modifier = Modifier) {
                         NavigationRow(
                             Icons.Outlined.Notifications,
                             stringResource(R.string.push_settings_allow)
-                        ) {
-                            push.onPermissionRequested()
-                            permissionLauncher.launch(NotificationPermission.PERMISSION)
-                        }
+                        ) { requestPermission() }
                     } else {
                         NavigationRow(
                             Icons.Outlined.Settings,

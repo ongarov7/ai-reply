@@ -1,7 +1,5 @@
 package kz.yerek.aireply.ui.feature.home
 
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,7 +17,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.core.app.ActivityCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kz.yerek.aireply.R
 import kz.yerek.aireply.push.NotificationPermission
@@ -29,7 +26,7 @@ import kz.yerek.aireply.ui.design.LocalExtraColors
 import kz.yerek.aireply.ui.design.PrimaryButton
 import kz.yerek.aireply.ui.design.SecondaryButton
 import kz.yerek.aireply.ui.design.Spacing
-import kz.yerek.aireply.ui.feature.account.findActivity
+import kz.yerek.aireply.ui.feature.settings.rememberNotificationPermissionRequest
 
 /**
  * The soft ask for notifications on Home.
@@ -49,15 +46,7 @@ fun NotificationPromptCard(modifier: Modifier = Modifier) {
     val ui by push.ui.collectAsStateWithLifecycle()
     val account by services.account.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
-
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        val activity = context.findActivity()
-        val canAskAgain = granted || (
-            activity != null &&
-                ActivityCompat.shouldShowRequestPermissionRationale(activity, NotificationPermission.PERMISSION)
-            )
-        push.onPermissionResult(granted, canAskAgain, fromPrompt = true)
-    }
+    val requestPermission = rememberNotificationPermissionRequest(fromPrompt = true)
 
     if (!account.isSignedIn || !ui.showsPrompt) return
 
@@ -100,8 +89,7 @@ fun NotificationPromptCard(modifier: Modifier = Modifier) {
                     modifier = Modifier.weight(1f),
                     onClick = {
                         if (ui.canAskSystem) {
-                            push.onPermissionRequested()
-                            launcher.launch(NotificationPermission.PERMISSION)
+                            requestPermission()
                         } else {
                             // Debug-forced on an older Android, or blocked for good.
                             NotificationPermission.openSystemSettings(context)

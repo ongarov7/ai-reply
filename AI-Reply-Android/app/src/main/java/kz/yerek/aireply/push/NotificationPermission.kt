@@ -64,6 +64,23 @@ object NotificationPermission {
         }
     }.getOrDefault(UNKNOWN)
 
+    /**
+     * Whether Android will not show the dialog again after this answer.
+     *
+     * The rationale flag is false before the first request, true after a first
+     * "Don't allow", and false again once Android stops asking. Dismissing the
+     * dialog (a tap outside, Back) is no answer at all: the flag stays as it
+     * was, so a first dismissal (false before, false after) is not permanent.
+     * [deniedBefore] remembers an earlier explicit denial, for a flag that
+     * reads false before the request although the user did say no once.
+     */
+    fun isPermanentDenial(
+        granted: Boolean,
+        rationaleBefore: Boolean,
+        rationaleAfter: Boolean,
+        deniedBefore: Boolean
+    ): Boolean = !granted && !rationaleAfter && (rationaleBefore || deniedBefore)
+
     /** The app's notification page in system settings (the only way back after "Don't allow"). */
     fun openSystemSettings(context: Context) {
         val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)

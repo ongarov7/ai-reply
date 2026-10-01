@@ -1,8 +1,11 @@
 package kz.yerek.aireply
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -33,6 +36,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * When the installation is registered, with which token, and what happens on
@@ -113,6 +117,20 @@ class InstallationRegistrarTest {
     fun `nothing is sent to a server without installations`() = runBlocking {
         assertEquals(Outcome.Disabled, registrar(SimpleSession(signedIn = true), enabled = false).syncOnce())
         assertTrue(api.calls.isEmpty())
+    }
+
+    @Test
+    fun `nothing is registered before the terms are accepted, then at once`() = runBlocking {
+        var consent = false
+        val registrar = InstallationRegistrar(
+            api = api, session = SimpleSession(signedIn = false), store = store, snapshot = { request },
+            isEnabled = { consent }, scope = idle, clock = { now }
+        )
+        assertEquals(Outcome.Disabled, registrar.syncOnce())
+        assertTrue(api.calls.isEmpty())
+
+        consent = true
+        assertTrue(registrar.syncOnce() is Outcome.Synced)
     }
 
     // --------------------------------------------------------------- account
@@ -205,6 +223,26 @@ class InstallationRegistrarTest {
     }
 
     @Test
+    fun `a wait stored while the clock ran ahead does not block retries`() = runBlocking {
+        api.answer = { _, _ -> throw ApiException(ApiError.Server, httpStatus = 503) }
+        val registrar = registrar(SimpleSession(signedIn = false))
+        now += 365L * 24 * HOUR
+        registrar.syncOnce() // fails: next attempt stored a year ahead of the real time
+        now -= 365L * 24 * HOUR
+        registrar.syncOnce()
+        assertEquals("the corrected clock retries at once", 2, api.calls.size)
+    }
+
+    @Test
+    fun `no wait is longer than an hour, whatever Retry-After says`() = runBlocking {
+        api.answer = { _, _ -> throw ApiException(ApiError.RateLimited(86_400), httpStatus = 429) }
+        assertEquals(
+            Outcome.RetryLater(InstallationRegistrar.MAX_RETRY_MS),
+            registrar(SimpleSession(signedIn = false)).syncOnce()
+        )
+    }
+
+    @Test
     fun `a success clears the backoff`() = runBlocking {
         var fail = true
         api.answer = { request, _ ->
@@ -271,6 +309,39 @@ class InstallationRegistrarTest {
             """{"features": {"installations": true, "push_notifications": true, "telemetry": true}}"""
         ).features!!
         assertTrue(current.installations && current.pushNotifications && current.telemetry)
+    }
+
+    @Test
+    fun `a sync asked for while the last pass is finishing is never lost`() = runBlocking {
+        val scope = CoroutineScope(Dispatchers.Default + Job())
+        val version = AtomicInteger(0)
+        val lastSent = AtomicInteger(-1)
+        val concurrentStore = PushStateStore(InMemoryPreferences())
+        val registrar = InstallationRegistrar(
+            api = { request, _ ->
+                lastSent.set(request.appBuild.toInt())
+                InstallationResponse(installationId = request.installationId)
+            },
+            session = SimpleSession(signedIn = false),
+            store = concurrentStore,
+            snapshot = { request.copy(appBuild = version.get().toString()) },
+            isEnabled = { true },
+            scope = scope,
+            clock = { now }
+        )
+        repeat(3_000) { round ->
+            version.incrementAndGet()
+            registrar.requestSync()
+            if (round % 64 == 0) delay(1)
+        }
+        try {
+            withTimeout(20_000) {
+                while (lastSent.get() != version.get()) delay(5)
+            }
+        } finally {
+            scope.coroutineContext[Job]?.cancel()
+        }
+        assertEquals("the newest state reached the server", version.get(), lastSent.get())
     }
 
     // ------------------------------------------------------------------ body

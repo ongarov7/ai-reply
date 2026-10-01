@@ -38,7 +38,10 @@ class InstallationRegistrar(
     private val store: PushStateStore,
     /** The current state, as it would be sent now. */
     private val snapshot: () -> InstallationRequest,
-    /** `features.installations`: false on servers without the endpoint. */
+    /**
+     * `features.installations` and the user's legal consent: false on servers
+     * without the endpoint, and before the terms are accepted nothing is sent.
+     */
     private val isEnabled: () -> Boolean,
     private val scope: CoroutineScope,
     private val clock: () -> Long = System::currentTimeMillis,
@@ -67,7 +70,10 @@ class InstallationRegistrar(
 
     /**
      * Asks for a sync; returns at once. Calls while one is running are folded
-     * into one more pass after it.
+     * into one more pass after it, and none is ever lost: the pass that
+     * decides to stop clears `running` in the same locked step in which it
+     * sees no further request, so a call either lands before that step (and
+     * gets its pass) or after it (and starts a new one).
      */
     fun requestSync() {
         synchronized(lock) {
@@ -79,23 +85,37 @@ class InstallationRegistrar(
             retryJob?.cancel()
             retryJob = null
         }
-        scope.launch {
-            try {
-                do {
-                    synchronized(lock) { rerun = false }
-                    val signedIn = session.isSignedIn
-                    val outcome = runCatching { syncOnce() }.getOrElse { failure ->
-                        if (failure is CancellationException) throw failure
-                        Outcome.RetryLater(backoffMillis(1))
-                    }
-                    if (outcome is Outcome.RetryLater) scheduleRetry(outcome.afterMillis)
-                    // Signed out in the meantime (a refresh token the server
-                    // revoked): register anonymously straight away.
-                    if (session.isSignedIn != signedIn) synchronized(lock) { rerun = true }
-                } while (synchronized(lock) { rerun })
-            } finally {
-                synchronized(lock) { running = false }
+        val job = scope.launch { runPasses() }
+        // Only a job that never ran or ended by an exception still holds
+        // `running` here; a normal end released it inside runPasses().
+        job.invokeOnCompletion { cause ->
+            if (cause == null) return@invokeOnCompletion
+            val again = synchronized(lock) {
+                running = false
+                rerun.also { rerun = false }
             }
+            if (again && cause !is CancellationException) requestSync()
+        }
+    }
+
+    private suspend fun runPasses() {
+        while (true) {
+            synchronized(lock) { rerun = false }
+            val signedIn = session.isSignedIn
+            val outcome = runCatching { syncOnce() }.getOrElse { failure ->
+                if (failure is CancellationException) throw failure
+                Outcome.RetryLater(backoffMillis(1))
+            }
+            if (outcome is Outcome.RetryLater) scheduleRetry(outcome.afterMillis)
+            // Signed out in the meantime (a refresh token the server revoked):
+            // register anonymously straight away.
+            val signedOutMeanwhile = session.isSignedIn != signedIn
+            val another = synchronized(lock) {
+                if (signedOutMeanwhile) rerun = true
+                if (!rerun) running = false
+                rerun
+            }
+            if (!another) return
         }
     }
 
@@ -123,8 +143,11 @@ class InstallationRegistrar(
         if (store.rejectedFingerprint == fingerprint && now - store.rejectedAt in 0 until RESYNC_INTERVAL_MS) {
             return Outcome.Rejected
         }
-        if (store.failedFingerprint == fingerprint && store.nextAttemptAt > now) {
-            return Outcome.RetryLater(store.nextAttemptAt - now)
+        // A wait longer than any backoff was stored while the clock was far
+        // ahead; it must not block retries until that date.
+        val wait = store.nextAttemptAt - now
+        if (store.failedFingerprint == fingerprint && wait > 0 && wait <= MAX_RETRY_MS) {
+            return Outcome.RetryLater(wait)
         }
 
         return try {
@@ -155,7 +178,7 @@ class InstallationRegistrar(
     private fun retryLater(fingerprint: String, now: Long, failure: ApiException?): Outcome.RetryLater {
         val attempts = if (store.failedFingerprint == fingerprint) store.failureCount + 1 else 1
         val retryAfter = ((failure?.error as? ApiError.RateLimited)?.retryAfterSeconds ?: 0) * 1000L
-        val wait = maxOf(backoffMillis(attempts), retryAfter)
+        val wait = maxOf(backoffMillis(attempts), retryAfter).coerceAtMost(MAX_RETRY_MS)
         store.recordFailure(fingerprint, now + wait)
         return Outcome.RetryLater(wait)
     }
@@ -165,7 +188,9 @@ class InstallationRegistrar(
         const val RESYNC_INTERVAL_MS = 24L * 60 * 60 * 1000
 
         private const val FIRST_RETRY_MS = 30_000L
-        private const val MAX_RETRY_MS = 60L * 60 * 1000
+
+        /** The longest wait between attempts, a Retry-After included. */
+        const val MAX_RETRY_MS = 60L * 60 * 1000
 
         const val ANONYMOUS = "anonymous"
         const val SIGNED_IN = "signed-in"
