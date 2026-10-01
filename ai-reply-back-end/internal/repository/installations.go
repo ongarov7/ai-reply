@@ -314,6 +314,14 @@ type InstallationFilter struct {
 	Page       traits.Page
 }
 
+// shortInstallationID — how many characters of an installation id admins see.
+const shortInstallationID = 8
+
+// escapeLike — the value matched literally inside LIKE … ESCAPE '\'.
+func escapeLike(v string) string {
+	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(v)
+}
+
 // InstallationRow — тізім жолы (қолданушының бүркемеленген идентификаторымен).
 type InstallationRow struct {
 	Installation domain.Installation
@@ -326,9 +334,17 @@ func (s *Store) ListInstallations(ctx context.Context, f InstallationFilter) ([]
 	where := []string{"1=1"}
 	args := []any{}
 	if q := strings.TrimSpace(f.Search); q != "" {
-		where = append(where, "(i.installation_id LIKE ? OR i.user_id LIKE ? OR i.device_model LIKE ? OR i.id LIKE ?)")
-		like := q + "%"
-		args = append(args, like, like, "%"+q+"%", like)
+		like := escapeLike(q)
+		conditions := []string{`i.user_id LIKE ? ESCAPE '\'`, `i.device_model LIKE ? ESCAPE '\'`, `i.id LIKE ? ESCAPE '\'`}
+		args = append(args, like+"%", "%"+like+"%", like+"%")
+		// The app-generated id is matched only by the short prefix the panel
+		// shows: a longer prefix would let someone recover the whole id one
+		// character at a time (and the whole id can detach the phone).
+		if len(q) <= shortInstallationID {
+			conditions = append(conditions, `i.installation_id LIKE ? ESCAPE '\'`)
+			args = append(args, like+"%")
+		}
+		where = append(where, "("+strings.Join(conditions, " OR ")+")")
 	}
 	if f.UserID != "" {
 		where = append(where, "i.user_id = ?")

@@ -53,7 +53,19 @@ type previewRequest struct {
 	Category string                `json:"category"`
 }
 
+// previewsPerMinute — audience previews one admin may run per minute.
+const previewsPerMinute = 30
+
 func (s *Server) handleAudiencePreview(w http.ResponseWriter, r *http.Request) {
+	// Each preview is a counting query over installations, users and
+	// subscriptions: generous for a person, a wall for a script.
+	if ok, retry := s.limiter.Allow("admin_audience_preview:"+adminFrom(r.Context()).ID, previewsPerMinute, time.Minute); !ok {
+		seconds := int(retry.Seconds())
+		w.Header().Set("Retry-After", strconv.Itoa(seconds))
+		httpx.Error(w, http.StatusTooManyRequests, httpx.CodeRateLimited, "Too many previews. Try again shortly.",
+			map[string]any{"retry_after_seconds": seconds})
+		return
+	}
 	var body previewRequest
 	if err := httpx.Decode(w, r, 32*1024, &body); err != nil {
 		httpx.Fail(w, err)
@@ -108,21 +120,24 @@ func (s *Server) handleCampaignCreate(w http.ResponseWriter, r *http.Request) {
 	if body.Send && !s.allowSend(w, adminUser) {
 		return
 	}
-	campaign, created, err := s.notify.CreateCampaign(r.Context(), adminUser.ID, notifications.CampaignInput{
+	result, err := s.notify.CreateCampaign(r.Context(), adminUser.ID, notifications.CampaignInput{
 		Name: body.Name, Title: body.Title, Body: body.Body, Category: body.Category, Link: body.Link,
 		Data: body.Data, Audience: body.Audience,
 	}, strings.TrimSpace(r.Header.Get("Idempotency-Key")), body.Send)
-	if err != nil {
-		httpx.Fail(w, err)
-		return
-	}
+	// The audit follows what actually happened: a retried create is not a new
+	// campaign, and a retry that queues a saved draft is a send.
+	campaign, created := result.Campaign, result.Created
 	if created {
 		s.admin.Audit(r.Context(), adminUser, s.ip(r), "notification.campaign.create", "notification_campaign",
 			campaign.ID, map[string]any{"category": campaign.Category, "audience": campaign.Audience,
 				"link": campaign.Link, "send": body.Send})
-		if body.Send {
-			s.auditSend(r, adminUser, campaign)
-		}
+	}
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	if result.Queued {
+		s.auditSend(r, adminUser, campaign)
 	}
 	view, err := s.notify.Campaign(r.Context(), campaign.ID)
 	if err != nil {
@@ -159,15 +174,15 @@ func (s *Server) handleCampaignSend(w http.ResponseWriter, r *http.Request) {
 	if before.Campaign.Status == domain.CampaignDraft && !s.allowSend(w, adminUser) {
 		return
 	}
-	campaign, err := s.notify.SendCampaign(r.Context(), before.Campaign.ID)
+	result, err := s.notify.SendCampaign(r.Context(), before.Campaign.ID)
 	if err != nil {
 		httpx.Fail(w, err)
 		return
 	}
-	if before.Campaign.Status == domain.CampaignDraft {
-		s.auditSend(r, adminUser, campaign)
+	if result.Queued {
+		s.auditSend(r, adminUser, result.Campaign)
 	}
-	view, err := s.notify.Campaign(r.Context(), campaign.ID)
+	view, err := s.notify.Campaign(r.Context(), result.Campaign.ID)
 	if err != nil {
 		httpx.Fail(w, err)
 		return
@@ -182,12 +197,12 @@ func (s *Server) handleCampaignCancel(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, err)
 		return
 	}
-	campaign, err := s.notify.CancelCampaign(r.Context(), before.Campaign.ID)
+	campaign, cancelled, err := s.notify.CancelCampaign(r.Context(), before.Campaign.ID)
 	if err != nil {
 		httpx.Fail(w, err)
 		return
 	}
-	if before.Campaign.Status != domain.CampaignCancelled {
+	if cancelled {
 		s.admin.Audit(r.Context(), adminUser, s.ip(r), "notification.campaign.cancel", "notification_campaign",
 			campaign.ID, map[string]any{"previous_status": before.Campaign.Status})
 	}
@@ -240,6 +255,12 @@ func (s *Server) campaignDTO(v notifications.CampaignView) map[string]any {
 
 func (s *Server) handleDeliveries(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
+	// One person's push history belongs to their diagnostics (audited, own permission).
+	personal := s.seesPersonalData(r)
+	if query.Get("user_id") != "" && !personal {
+		forbid(w, admin.PermDiagnosticsRead)
+		return
+	}
 	page, limit := pageParams(r, 50)
 	rows, total, err := s.notify.Deliveries(r.Context(), repository.DeliveryFilter{
 		CampaignID: traits.Clamp(query.Get("campaign_id"), 64), UserID: traits.Clamp(query.Get("user_id"), 64),
@@ -252,7 +273,11 @@ func (s *Server) handleDeliveries(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]map[string]any, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, s.deliveryDTO(row))
+		dto := s.deliveryDTO(row)
+		if !personal {
+			dto["user_id"] = ""
+		}
+		out = append(out, dto)
 	}
 	httpx.JSON(w, http.StatusOK, map[string]any{"deliveries": out, "total": total, "page": page, "limit": limit})
 }
@@ -288,6 +313,11 @@ func (s *Server) handleDevices(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, domain.InvalidField("push_status", "unknown"))
 		return
 	}
+	personal := s.seesPersonalData(r)
+	if query.Get("user_id") != "" && !personal {
+		forbid(w, admin.PermDiagnosticsRead)
+		return
+	}
 	auth := query.Get("auth")
 	if !traits.OneOf(auth, "", domain.AuthAuthenticated, domain.AuthAnonymous) {
 		httpx.Fail(w, domain.InvalidField("auth", "authenticated or anonymous"))
@@ -305,9 +335,12 @@ func (s *Server) handleDevices(w http.ResponseWriter, r *http.Request) {
 	out := make([]map[string]any, 0, len(rows))
 	for _, row := range rows {
 		dto := s.installationDTO(row.Installation)
-		dto["user"] = ""
+		dto["user"], dto["attached"] = "", row.Installation.UserID != ""
 		if row.Installation.UserID != "" {
-			dto["user"] = maskIdentifier(domain.User{ID: row.Installation.UserID, Email: row.UserEmail, Phone: row.UserPhone})
+			dto["user"] = s.identifierFor(r, domain.User{ID: row.Installation.UserID, Email: row.UserEmail, Phone: row.UserPhone})
+		}
+		if !personal {
+			dto["user_id"] = "" // the device list is not a per-person lookup for this role
 		}
 		out = append(out, dto)
 	}

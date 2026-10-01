@@ -16,6 +16,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/limits"
 	"github.com/aireply/ai-reply-back-end/internal/middleware"
 	"github.com/aireply/ai-reply-back-end/internal/notifications"
+	"github.com/aireply/ai-reply-back-end/internal/redact"
 	"github.com/aireply/ai-reply-back-end/internal/repository"
 	"github.com/aireply/ai-reply-back-end/internal/traits"
 	"github.com/aireply/ai-reply-back-end/internal/transport/httpx"
@@ -84,12 +85,17 @@ func (s *Server) Register(mux *http.ServeMux) {
 func (s *Server) can(permission string, next http.HandlerFunc) http.Handler {
 	return s.guard(func(w http.ResponseWriter, r *http.Request) {
 		if !admin.Can(adminFrom(r.Context()).Role, permission) {
-			httpx.Error(w, http.StatusForbidden, "FORBIDDEN", "This role cannot do that.",
-				map[string]any{"permission": permission})
+			forbid(w, permission)
 			return
 		}
 		next(w, r)
 	})
+}
+
+// forbid — 403 with the permission the role lacks (the panel names it).
+func forbid(w http.ResponseWriter, permission string) {
+	httpx.Error(w, http.StatusForbidden, "FORBIDDEN", "This role cannot do that.",
+		map[string]any{"permission": permission})
 }
 
 // guard — cookie сессиясы + күй өзгертетін сұраныстарда CSRF тақырыбы.
@@ -105,17 +111,23 @@ func (s *Server) guard(next http.HandlerFunc) http.Handler {
 			httpx.Error(w, http.StatusUnauthorized, httpx.CodeUnauthorized, "Sign in required.", nil)
 			return
 		}
-		if r.Method != http.MethodGet && r.Method != http.MethodHead {
-			if subtle.ConstantTimeCompare([]byte(r.Header.Get("X-CSRF-Token")), []byte(session.CSRFToken)) != 1 {
-				httpx.Error(w, http.StatusForbidden, "CSRF_MISMATCH", "CSRF token mismatch.", nil)
-				return
-			}
+		if r.Method != http.MethodGet && r.Method != http.MethodHead && !csrfMatches(r, session) {
+			httpx.Error(w, http.StatusForbidden, "CSRF_MISMATCH", "CSRF token mismatch.", nil)
+			return
 		}
 		ctx := context.WithValue(r.Context(), adminKey, adminUser)
 		ctx = context.WithValue(ctx, sessionKey, session)
 		next(w, r.WithContext(ctx))
 	})
 }
+
+func csrfMatches(r *http.Request, session repository.AdminSession) bool {
+	return session.CSRFToken != "" &&
+		subtle.ConstantTimeCompare([]byte(r.Header.Get("X-CSRF-Token")), []byte(session.CSRFToken)) == 1
+}
+
+// csrfOK — the panel's CSRF token came with this request (for reads with side effects).
+func (s *Server) csrfOK(r *http.Request) bool { return csrfMatches(r, sessionFrom(r.Context())) }
 
 func adminFrom(ctx context.Context) domain.AdminUser {
 	v, _ := ctx.Value(adminKey).(domain.AdminUser)
@@ -227,6 +239,20 @@ func (s *Server) handleUsers(w http.ResponseWriter, r *http.Request) {
 		SortBy:   query.Get("sort"),
 		SortDesc: query.Get("dir") != "asc",
 	}
+	// Roles that may not open a person's diagnostics search by exact e-mail,
+	// exact phone or user-id prefix only: a substring search would let them
+	// recover a masked address character by character.
+	if filter.Search != "" && !s.seesPersonalData(r) {
+		resolved, err := s.admin.ResolveUser(r.Context(), filter.Search)
+		if err != nil {
+			s.fail(w, err)
+			return
+		}
+		filter.Search, filter.UserIDs = "", resolved.IDs
+		if filter.UserIDs == nil {
+			filter.UserIDs = []string{}
+		}
+	}
 
 	rows, total, err := s.admin.Users(r.Context(), filter)
 	if err != nil {
@@ -238,7 +264,7 @@ func (s *Server) handleUsers(w http.ResponseWriter, r *http.Request) {
 	for _, row := range rows {
 		out = append(out, map[string]any{
 			"id":           row.User.ID,
-			"identifier":   maskIdentifier(row.User),
+			"identifier":   s.identifierFor(r, row.User),
 			"plan_code":    row.PlanCode,
 			"sub_status":   row.SubStatus,
 			"used_today":   row.UsedToday,
@@ -313,7 +339,7 @@ func (s *Server) handleUserDetail(w http.ResponseWriter, r *http.Request) {
 
 	httpx.JSON(w, http.StatusOK, map[string]any{
 		"user": map[string]any{
-			"id": detail.User.ID, "identifier": maskIdentifier(detail.User),
+			"id": detail.User.ID, "identifier": s.identifierFor(r, detail.User),
 			"status": detail.User.Status, "locale": detail.User.Locale,
 			"platform": detail.User.Platform, "app_version": detail.User.AppVersion,
 			"os_version":  detail.User.OSVersion,
@@ -397,6 +423,28 @@ func (s *Server) handleRevokeSessions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// seesPersonalData — the admin may open a person's diagnostics (full e-mail and phone, audited).
+func (s *Server) seesPersonalData(r *http.Request) bool {
+	return admin.Can(adminFrom(r.Context()).Role, admin.PermDiagnosticsRead)
+}
+
+// identifierFor — a masked e-mail or phone for lists. Roles without diagnostics
+// get a stricter mask (first letter / last four digits) so that exact-match
+// searches cannot fill in the hidden part.
+func (s *Server) identifierFor(r *http.Request, u domain.User) string {
+	if s.seesPersonalData(r) {
+		return maskIdentifier(u)
+	}
+	switch {
+	case u.Phone != "":
+		return redact.Phone(u.Phone)
+	case u.Email != "":
+		return redact.Email(u.Email)
+	default:
+		return maskIdentifier(u)
+	}
 }
 
 func maskIdentifier(u domain.User) string {

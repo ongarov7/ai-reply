@@ -319,14 +319,16 @@ func (s *Store) FanOutCampaign(ctx context.Context, id string, q AudienceQuery) 
 
 // CampaignStats — науқан жеткізулерінің күйі (live, жолдардан есептеледі).
 func (s *Store) CampaignStats(ctx context.Context, campaignID string) (domain.DeliveryStats, error) {
-	return s.deliveryStats(ctx, `campaign_id = ?`, campaignID)
+	return s.deliveryStats(ctx, `notification_deliveries`, `campaign_id = ?`, campaignID)
 }
 
-func (s *Store) deliveryStats(ctx context.Context, where string, args ...any) (domain.DeliveryStats, error) {
+// deliveryStats — counts by status and platform. from names the table (with an
+// index hint where the planner, lacking statistics, would scan the table).
+func (s *Store) deliveryStats(ctx context.Context, from, where string, args ...any) (domain.DeliveryStats, error) {
 	var stats domain.DeliveryStats
 	rows, err := s.db.Reader().QueryContext(ctx, `
 		SELECT status, platform, COUNT(*), COALESCE(SUM(CASE WHEN opened_at IS NOT NULL THEN 1 ELSE 0 END), 0)
-		FROM notification_deliveries WHERE `+where+` GROUP BY status, platform`, args...)
+		FROM `+from+` WHERE `+where+` GROUP BY status, platform`, args...)
 	if err != nil {
 		return stats, err
 	}
@@ -593,7 +595,8 @@ func (s *Store) ListDeliveries(ctx context.Context, f DeliveryFilter) ([]Deliver
 
 // DeliveryTotals — кезең ішіндегі жеткізу есебі (әкімші тақтасына).
 func (s *Store) DeliveryTotals(ctx context.Context, since time.Time) (domain.DeliveryStats, error) {
-	return s.deliveryStats(ctx, `created_at >= ?`, ms(since))
+	return s.deliveryStats(ctx, `notification_deliveries INDEXED BY idx_deliveries_created_stats`,
+		`created_at >= ?`, ms(since))
 }
 
 // ---------------------------------------------------------------- preferences

@@ -22,8 +22,9 @@ import (
 // and phone appear only in a person's diagnostics, which needs its own
 // permission and leaves an audit record.
 
-// installationPrefix — the shortened installation id the panel shows, or the whole id.
-var installationPrefix = regexp.MustCompile(`^[A-Za-z0-9-]{4,64}$`)
+// installationPrefix — the shortened installation id the panel shows (never longer:
+// a longer prefix would let an admin recover the whole id one character at a time).
+var installationPrefix = regexp.MustCompile(`^[A-Za-z0-9-]{4,8}$`)
 
 func (s *Server) registerDiagnostics(mux *http.ServeMux) {
 	mux.Handle("GET /api/v1/admin/users/{id}/diagnostics", s.can(admin.PermDiagnosticsRead, s.handleUserDiagnostics))
@@ -36,6 +37,12 @@ func (s *Server) registerDiagnostics(mux *http.ServeMux) {
 }
 
 func (s *Server) handleUserDiagnostics(w http.ResponseWriter, r *http.Request) {
+	// Opening diagnostics writes an audit record in the admin's name, so a
+	// cross-site link must not be able to trigger it: require the panel's token.
+	if !s.csrfOK(r) {
+		httpx.Error(w, http.StatusForbidden, "CSRF_MISMATCH", "CSRF token mismatch.", nil)
+		return
+	}
 	userID := r.PathValue("id")
 	d, err := s.admin.UserDiagnostics(r.Context(), userID)
 	if err != nil {
@@ -137,7 +144,7 @@ func (s *Server) handleLogEvents(w http.ResponseWriter, r *http.Request) {
 	}
 	installationID := query.Get("installation_id")
 	if installationID != "" && !installationPrefix.MatchString(installationID) {
-		httpx.Fail(w, domain.InvalidField("installation_id", "4-64 letters, digits or dashes"))
+		httpx.Fail(w, domain.InvalidField("installation_id", "the first 4-8 characters"))
 		return
 	}
 	page, limit := pageParams(r, 50)
@@ -246,11 +253,16 @@ func (s *Server) handleOps(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err)
 		return
 	}
+	// Individual error records (user, route, request id) are log data.
+	recent := []map[string]any{}
+	if admin.Can(adminFrom(r.Context()).Role, admin.PermLogsRead) {
+		recent = s.apiErrorDTOs(view.RecentErrors)
+	}
 	httpx.JSON(w, http.StatusOK, map[string]any{
 		"summary":       view.Summary,
 		"app_versions":  view.AppVersions,
 		"os_versions":   view.OSVersions,
-		"recent_errors": s.apiErrorDTOs(view.RecentErrors),
+		"recent_errors": recent,
 		"push":          s.notify.Status(),
 	})
 }

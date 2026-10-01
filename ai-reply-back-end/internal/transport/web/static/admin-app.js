@@ -95,12 +95,13 @@
     options = options || {};
     var init = {
       method: options.method || "GET",
-      headers: { "Accept": "application/json" },
+      // The token also goes with reads: a read that leaves an audit record
+      // (a person's diagnostics) must not be triggerable from another site.
+      headers: { "Accept": "application/json", "X-CSRF-Token": state.csrf },
       credentials: "same-origin"
     };
     if (options.body !== undefined) {
       init.headers["Content-Type"] = "application/json";
-      init.headers["X-CSRF-Token"] = state.csrf;
       init.body = JSON.stringify(options.body);
     }
     if (options.headers) {
@@ -2375,7 +2376,7 @@
               <option value="">{{ t('common.all') }}</option>
               <option v-for="c in campaignOptions" :key="c.id" :value="c.id">{{ c.name }}</option>
             </select></label>
-          <label><span>{{ t('admin.push.filter.user_id') }}</span>
+          <label v-if="can('users.diagnostics.read')"><span>{{ t('admin.push.filter.user_id') }}</span>
             <input type="text" v-model.trim="filters.user_id" spellcheck="false" placeholder="UUID"></label>
           <label><span>{{ t('admin.users.col_status') }}</span>
             <select v-model="filters.status" @change="search">
@@ -2438,7 +2439,7 @@
         <form class="filter-grid" @submit.prevent="search">
           <label><span>{{ t('common.search') }}</span>
             <input type="text" v-model.trim="filters.q" spellcheck="false" :placeholder="t('admin.push.filter.device_search')"></label>
-          <label><span>{{ t('admin.push.filter.user_id') }}</span>
+          <label v-if="can('users.diagnostics.read')"><span>{{ t('admin.push.filter.user_id') }}</span>
             <input type="text" v-model.trim="filters.user_id" spellcheck="false" placeholder="UUID"></label>
           <label><span>{{ t('admin.users.col_platform') }}</span>
             <select v-model="filters.platform" @change="search">
@@ -2487,6 +2488,7 @@
                 <td class="mono nowrap">{{ d.first_seen }}</td>
                 <td class="mono nowrap">{{ d.last_seen }}</td>
                 <td><a v-if="d.user_id" class="link" :href="userLink(d.user_id)" @click.prevent="go(userLink(d.user_id))">{{ d.user || shortID(d.user_id) }}</a>
+                  <span v-else-if="d.attached">{{ d.user }}</span>
                   <span v-else class="muted">{{ t('admin.push.anonymous') }}</span></td>
               </tr>
               <tr v-if="!loading && !rows.length"><td colspan="11" class="empty">

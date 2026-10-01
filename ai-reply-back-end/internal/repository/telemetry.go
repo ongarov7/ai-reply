@@ -467,12 +467,16 @@ func (s *Store) VersionReport(ctx context.Context, now time.Time) ([]VersionRow,
 		}
 		return rows.Err()
 	}
+	// Version strings in these two tables come from request headers, so only
+	// the most frequent combinations are merged (a client inventing versions
+	// cannot grow the report without bound).
 	if err := merge(`SELECT platform, app_version, app_build, COUNT(*) FROM api_errors
-		WHERE occurred_at >= ? AND platform <> '' GROUP BY 1, 2, 3`, func(r *VersionRow, n int) { r.APIErrors7d = n }); err != nil {
+		WHERE occurred_at >= ? AND platform <> '' GROUP BY 1, 2, 3 ORDER BY 4 DESC LIMIT 100`,
+		func(r *VersionRow, n int) { r.APIErrors7d = n }); err != nil {
 		return nil, err
 	}
 	if err := merge(`SELECT platform, app_version, app_build, COUNT(*) FROM app_events
-		WHERE occurred_at >= ? AND event_name = 'push_token_registration_failed' GROUP BY 1, 2, 3`,
+		WHERE occurred_at >= ? AND event_name = 'push_token_registration_failed' GROUP BY 1, 2, 3 ORDER BY 4 DESC LIMIT 100`,
 		func(r *VersionRow, n int) { r.PushRegFailures7d = n }); err != nil {
 		return nil, err
 	}

@@ -277,31 +277,40 @@ type CampaignInput struct {
 
 var idempotencyKeyPattern = regexp.MustCompile(`^[A-Za-z0-9_:.-]{8,128}$`)
 
+// CampaignResult — науқан және осы шақыру нақты не істегені (аудит үшін).
+type CampaignResult struct {
+	Campaign domain.Campaign
+	Created  bool // this call inserted the campaign
+	Queued   bool // this call moved it from draft to queued
+}
+
 // CreateCampaign — науқан жасайды (send=true болса, бірден кезекке қояды).
 //
 // The Idempotency-Key makes the command safe to repeat: a double click, a
 // retried request after a timeout, or a reload that re-sends the form all
-// return the campaign the first request created. created=false says so.
-func (s *Service) CreateCampaign(ctx context.Context, adminID string, in CampaignInput, idempotencyKey string, send bool) (domain.Campaign, bool, error) {
+// return the campaign the first request created (Created=false). When the
+// send step fails after the insert, the result still reports Created=true
+// together with the error, so the caller can record what did happen.
+func (s *Service) CreateCampaign(ctx context.Context, adminID string, in CampaignInput, idempotencyKey string, send bool) (CampaignResult, error) {
 	if !idempotencyKeyPattern.MatchString(idempotencyKey) {
-		return domain.Campaign{}, false, domain.InvalidField("idempotency_key", "send an Idempotency-Key header")
+		return CampaignResult{}, domain.InvalidField("idempotency_key", "send an Idempotency-Key header")
 	}
 	content, err := s.validateContent(Content{
 		Title: in.Title, Body: in.Body, Category: in.Category, Link: in.Link, Data: in.Data, Campaign: true,
 	})
 	if err != nil {
-		return domain.Campaign{}, false, err
+		return CampaignResult{}, err
 	}
 	audience, err := ValidateAudience(in.Audience)
 	if err != nil {
-		return domain.Campaign{}, false, err
+		return CampaignResult{}, err
 	}
 	name := traits.Clamp(traits.CollapseSpaces(in.Name), 120)
 	if name == "" {
 		name = traits.Clamp(content.Title, 120)
 	}
 	if send && !s.Ready() {
-		return domain.Campaign{}, false, domain.ErrPushDisabled
+		return CampaignResult{}, domain.ErrPushDisabled
 	}
 	requested := domain.Campaign{
 		Name: name, Title: content.Title, Body: content.Body, Category: content.Category,
@@ -310,17 +319,23 @@ func (s *Service) CreateCampaign(ctx context.Context, adminID string, in Campaig
 	}
 	campaign, created, err := s.repo.CreateCampaign(ctx, requested)
 	if err != nil {
-		return domain.Campaign{}, false, err
+		return CampaignResult{}, err
 	}
 	// A repeated key is a retry of the same form. A key reused for different
 	// content is a client bug: answering with the first campaign would hide it.
 	if !created && campaignFingerprint(campaign) != campaignFingerprint(requested) {
-		return domain.Campaign{}, false, domain.ConflictField("idempotency_key", "already used for a different campaign")
+		return CampaignResult{}, domain.ConflictField("idempotency_key", "already used for a different campaign")
 	}
-	if send {
-		campaign, err = s.SendCampaign(ctx, campaign.ID)
+	result := CampaignResult{Campaign: campaign, Created: created}
+	if !send {
+		return result, nil
 	}
-	return campaign, created, err
+	sent, err := s.SendCampaign(ctx, campaign.ID)
+	if err != nil {
+		return result, err
+	}
+	sent.Created = created
+	return sent, nil
 }
 
 // campaignFingerprint — what a retried create must repeat exactly (content and audience).
@@ -345,46 +360,70 @@ func campaignFingerprint(c domain.Campaign) string {
 }
 
 // SendCampaign — draft → queued. Қайта шақыру зиянсыз: кезектегі не жіберілген науқан өзгермейді.
-func (s *Service) SendCampaign(ctx context.Context, id string) (domain.Campaign, error) {
+//
+// Queued reports whether this call made the change; a repeated or concurrent
+// send of the same campaign answers with Queued=false.
+func (s *Service) SendCampaign(ctx context.Context, id string) (CampaignResult, error) {
 	campaign, err := s.repo.Campaign(ctx, id)
 	if err != nil {
-		return domain.Campaign{}, err
+		return CampaignResult{}, err
 	}
 	switch campaign.Status {
 	case domain.CampaignDraft:
 		if !s.Ready() {
-			return domain.Campaign{}, domain.ErrPushDisabled
+			return CampaignResult{}, domain.ErrPushDisabled
 		}
-		if _, err := s.repo.QueueCampaign(ctx, id, s.clock.Now()); err != nil {
-			return domain.Campaign{}, err
+		queued, err := s.repo.QueueCampaign(ctx, id, s.clock.Now())
+		if err != nil {
+			return CampaignResult{}, err
 		}
-		s.log.Info("campaign queued", "event", "push_campaign_queued", "campaign_id", id)
-		s.wake()
-		return s.repo.Campaign(ctx, id)
+		if queued {
+			s.log.Info("campaign queued", "event", "push_campaign_queued", "campaign_id", id)
+			s.wake()
+		}
+		current, err := s.repo.Campaign(ctx, id)
+		if err != nil {
+			return CampaignResult{}, err
+		}
+		if !queued && current.Status == domain.CampaignCancelled {
+			return CampaignResult{}, domain.ErrConflict // cancelled in the meantime
+		}
+		return CampaignResult{Campaign: current, Queued: queued}, nil
 	case domain.CampaignCancelled:
-		return domain.Campaign{}, domain.ErrConflict
+		return CampaignResult{}, domain.ErrConflict
 	default:
-		return campaign, nil
+		return CampaignResult{Campaign: campaign}, nil
 	}
 }
 
 // CancelCampaign — әлі жіберілмегенін тоқтатады. Аяқталған науқанды тоқтату — қақтығыс.
-func (s *Service) CancelCampaign(ctx context.Context, id string) (domain.Campaign, error) {
+// The bool reports whether this call cancelled it (false when it already was).
+func (s *Service) CancelCampaign(ctx context.Context, id string) (domain.Campaign, bool, error) {
 	campaign, err := s.repo.Campaign(ctx, id)
 	if err != nil {
-		return domain.Campaign{}, err
+		return domain.Campaign{}, false, err
 	}
 	switch campaign.Status {
 	case domain.CampaignCancelled:
-		return campaign, nil
+		return campaign, false, nil
 	case domain.CampaignDraft, domain.CampaignQueued, domain.CampaignProcessing:
-		if _, err := s.repo.CancelCampaign(ctx, id, s.clock.Now()); err != nil {
-			return domain.Campaign{}, err
+		cancelled, err := s.repo.CancelCampaign(ctx, id, s.clock.Now())
+		if err != nil {
+			return domain.Campaign{}, false, err
 		}
-		s.log.Info("campaign cancelled", "event", "push_campaign_cancelled", "campaign_id", id)
-		return s.repo.Campaign(ctx, id)
+		current, err := s.repo.Campaign(ctx, id)
+		if err != nil {
+			return domain.Campaign{}, false, err
+		}
+		if !cancelled && current.Status != domain.CampaignCancelled {
+			return domain.Campaign{}, false, domain.ErrConflict // finished in the meantime
+		}
+		if cancelled {
+			s.log.Info("campaign cancelled", "event", "push_campaign_cancelled", "campaign_id", id)
+		}
+		return current, cancelled, nil
 	default:
-		return domain.Campaign{}, domain.ErrConflict
+		return domain.Campaign{}, false, domain.ErrConflict
 	}
 }
 

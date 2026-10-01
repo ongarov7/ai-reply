@@ -216,6 +216,7 @@ func (s *Store) SaveIdentity(ctx context.Context, userID, kind, value, country s
 // UserFilter — әкімші тізімі үшін сүзгі.
 type UserFilter struct {
 	Search   string
+	UserIDs  []string // nil: no restriction; empty: nothing matched (exact-identity search)
 	Status   string
 	Platform string
 	PlanID   string
@@ -240,7 +241,16 @@ type UserRow struct {
 func (s *Store) ListUsers(ctx context.Context, f UserFilter, today, month string) ([]UserRow, int, error) {
 	where := []string{"u.deleted_at IS NULL"}
 	args := []any{}
-	if f.Search != "" {
+	if f.UserIDs != nil {
+		if len(f.UserIDs) == 0 {
+			where = append(where, "1 = 0")
+		} else {
+			where = append(where, "u.id IN ("+placeholders(len(f.UserIDs))+")")
+			for _, id := range f.UserIDs {
+				args = append(args, id)
+			}
+		}
+	} else if f.Search != "" {
 		where = append(where, "(u.phone LIKE ? OR u.email LIKE ? OR u.id LIKE ?)")
 		like := "%" + strings.TrimSpace(f.Search) + "%"
 		args = append(args, like, like, like)
