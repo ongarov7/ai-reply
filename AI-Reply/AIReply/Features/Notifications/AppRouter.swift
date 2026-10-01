@@ -85,9 +85,13 @@ final class AppRouter {
         apply(destination)
     }
 
-    /// A gate is back in front of Home (signed out, say).
+    /// A gate is back in front of Home: signed out, onboarding restarted.
+    /// Home starts from its root next time, whoever signs in; a destination
+    /// still waiting behind the gate stays.
     func mainInterfaceDidDisappear() {
         isMainInterfaceVisible = false
+        path = []
+        webPage = nil
     }
 
     private func apply(_ destination: DeepLinkDestination) {

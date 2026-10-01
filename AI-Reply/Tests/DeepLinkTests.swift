@@ -148,6 +148,39 @@ final class DeepLinkTests: XCTestCase {
         XCTAssertEqual(router.pending, .screen(.settings))
     }
 
+    /// Home → Settings, sign out, sign in again (or restart onboarding): Home
+    /// opens on Home, not on the screen the last session left.
+    @MainActor
+    func testAGateComingBackStartsHomeFromItsRootNextTime() throws {
+        let router = AppRouter()
+        router.mainInterfaceDidAppear()
+        router.path = [.settings]
+        router.webPage = AppRouter.WebPage(url: try XCTUnwrap(URL(string: "https://ai-reply.kz/offer")))
+
+        router.mainInterfaceDidDisappear()
+        XCTAssertEqual(router.path, [], "the next account must not land on the last one's screen")
+        XCTAssertNil(router.webPage)
+
+        router.mainInterfaceDidAppear()
+        XCTAssertEqual(router.path, [])
+    }
+
+    /// A notification tapped while the sign-in gate is up still opens its
+    /// screen once the gate is passed.
+    @MainActor
+    func testADestinationWaitingBehindTheGateSurvivesIt() {
+        let router = AppRouter()
+        router.mainInterfaceDidAppear()
+        router.path = [.settings]
+        router.mainInterfaceDidDisappear()
+        router.open(.screen(.subscription))
+        router.mainInterfaceDidDisappear()
+        XCTAssertEqual(router.pending, .screen(.subscription))
+
+        router.mainInterfaceDidAppear()
+        XCTAssertEqual(router.path, [.subscription])
+    }
+
     @MainActor
     func testAStaleDestinationIsDropped() {
         var now = Date(timeIntervalSince1970: 1_800_000_000)
