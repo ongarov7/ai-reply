@@ -60,7 +60,7 @@
     <string name="android_step_enable">Включите AI Reply в списке экранных клавиатур</string>
     <string name="android_step_select">Переключитесь на AI Reply кнопкой смены клавиатуры</string>
     <string name="android_step_test">Вернитесь сюда и попробуйте напечатать</string>
-    <string name="android_open_keyboard_settings">Открыть настройки клавиатур</string>
+    <string name="android_open_keyboard_settings">Открыть настройки клавиатуры</string>
     <string name="android_switch_keyboard">Сменить клавиатуру</string>
     <string name="android_keyboard_ready">Клавиатура AI Reply готова</string>
     <string name="android_keyboard_enabled_not_selected">AI Reply включена, но не выбрана</string>

@@ -21,6 +21,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import android.content.Context
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -35,6 +36,7 @@ import kz.yerek.aireply.ui.design.AppCard
 import kz.yerek.aireply.ui.design.AppSection
 import kz.yerek.aireply.ui.design.LocalExtraColors
 import kz.yerek.aireply.ui.design.ReadableColumn
+import kz.yerek.aireply.ui.design.PrimaryButton
 import kz.yerek.aireply.ui.design.SecondaryButton
 import kz.yerek.aireply.ui.design.Spacing
 import kz.yerek.aireply.ui.design.StepRow
@@ -125,16 +127,7 @@ fun KeyboardSetupScreen(onBack: (() -> Unit)? = null, showsTitle: Boolean = true
                         StepRow(3, stringResource(R.string.android_step_test))
                     }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
-                    SecondaryButton(
-                        text = stringResource(R.string.android_open_keyboard_settings),
-                        onClick = { KeyboardStatus.openKeyboardSettings(context) }
-                    )
-                    SecondaryButton(
-                        text = stringResource(R.string.android_switch_keyboard),
-                        onClick = { KeyboardStatus.showKeyboardPicker(context) }
-                    )
-                }
+                KeyboardSetupAction(status, context)
             }
 
             AppSection(stringResource(R.string.setup_paste_title)) {
@@ -184,6 +177,26 @@ private fun PrivacyPoint(text: String) {
             text,
             style = MaterialTheme.typography.bodySmall,
             color = LocalExtraColors.current.textSecondary
+        )
+    }
+}
+
+/**
+ * The single setup action for the step that is still missing: turn the
+ * keyboard on in system settings, or - once it is on - pick it. Nothing when
+ * both are done. Android reports both states reliably, and the screen
+ * re-reads them on every resume, so returning from Settings updates this.
+ */
+@Composable
+fun KeyboardSetupAction(status: KeyboardStatus.Snapshot, context: Context) {
+    when {
+        !status.isEnabled -> PrimaryButton(
+            text = stringResource(R.string.android_open_keyboard_settings),
+            onClick = { KeyboardStatus.openKeyboardSettings(context) }
+        )
+        !status.isSelected -> PrimaryButton(
+            text = stringResource(R.string.android_switch_keyboard),
+            onClick = { KeyboardStatus.showKeyboardPicker(context) }
         )
     }
 }
