@@ -273,6 +273,39 @@ paths:
         "429": { description: DAILY_LIMIT_REACHED }
         "502": { description: AI_PROVIDER_UNAVAILABLE }
         "504": { description: AI_TIMEOUT }
+  /api/v1/ai/compose:
+    post:
+      summary: Написать новое сообщение по инструкции (режим «Создать»)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [instruction]
+              properties:
+                instruction: { type: string, maxLength: 400, description: "max_instruction_length из /config" }
+                language: { type: string, enum: [kk, ru, en, uz], description: "язык интерфейса" }
+                regenerate: { type: boolean, description: "другая версия по той же инструкции" }
+                platform: { type: string }
+                app_version: { type: string }
+      responses:
+        "200":
+          description: text + usage
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  text: { type: string }
+                  detected_language: { type: string }
+                  usage: { type: object }
+        "400": { description: "INVALID_REQUEST (details.field = instruction)" }
+        "401": { description: UNAUTHORIZED }
+        "429": { description: DAILY_LIMIT_REACHED / RATE_LIMITED }
+        "502": { description: AI_PROVIDER_UNAVAILABLE }
+        "504": { description: AI_TIMEOUT }
   /v1/auth/register:
     post:
       summary: "Совместимость: install_id → токен (старые сборки)"
@@ -313,6 +346,7 @@ components:
             email_otp: { type: boolean, description: "Resend настроен (или демо-режим)" }
             google_sign_in: { type: boolean }
             apple_sign_in: { type: boolean }
+            compose: { type: boolean, description: "POST /api/v1/ai/compose доступен" }
         legal: { $ref: "#/components/schemas/LegalConfig" }
     Device:
       type: object

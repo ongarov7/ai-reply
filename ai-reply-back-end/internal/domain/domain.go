@@ -268,7 +268,9 @@ type UsageEvent struct {
 	AppVersion   string
 	Language     string
 	SourceChars  int
-	CreatedAt    time.Time
+	// Mode — reply | compose. Екеуі де бір квотаны жұмсайды.
+	Mode      string
+	CreatedAt time.Time
 }
 
 // AdminUser — әкімші тіркелгісі (мобильді қолданушыдан бөлек).
@@ -345,6 +347,11 @@ var (
 	// ErrInvalidRequest-ті орайды: ескі клиенттер бұрынғыдай INVALID_REQUEST
 	// алады, жаңалары details ішінен нақты шекті оқиды.
 	ErrSourceTooLong = fmt.Errorf("%w: source text too long", ErrInvalidRequest)
+
+	// ErrInstructionMissing / ErrInstructionTooLong — compose режимінің нұсқауы
+	// бос немесе әкімші бекіткен шектен ұзын. Екеуі де INVALID_REQUEST.
+	ErrInstructionMissing = fmt.Errorf("%w: instruction is empty", ErrInvalidRequest)
+	ErrInstructionTooLong = fmt.Errorf("%w: instruction too long", ErrInvalidRequest)
 )
 
 // RetryAfterError — қатемен бірге қайта сұрауға болатын уақыт.

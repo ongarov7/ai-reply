@@ -253,6 +253,8 @@ func (s *Server) handleUserDetail(w http.ResponseWriter, r *http.Request) {
 			"input_tokens": e.InputTokens, "output_tokens": e.OutputTokens,
 			"cost_usd": float64(e.CostMicros) / 1_000_000, "latency_ms": e.LatencyMS,
 			"platform": e.Platform, "language": e.Language,
+			// Only a flag: the privacy guard keeps words like "reply" out of this payload.
+			"compose": e.Mode == "compose",
 		})
 	}
 	devices := make([]map[string]any, 0, len(detail.Devices))

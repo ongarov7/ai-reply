@@ -133,6 +133,79 @@ func (s *Server) handleReply(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// composeRequest — «Create» режимі: пайдаланушы не жазу керегін сипаттайды.
+// source_text жоқ: бұл ешкімге жауап емес.
+type composeRequest struct {
+	Instruction string `json:"instruction"`
+	// Language — қолданбаның интерфейс тілі (метадерек және тілі анық емес
+	// нұсқауға арналған шешім). Хабарлама тілі нұсқаудың өз тілінен анықталады.
+	Language string `json:"language"`
+	// Regenerate — сол нұсқау бойынша басқа нұсқа сұралды.
+	Regenerate bool   `json:"regenerate"`
+	AppVersion string `json:"app_version"`
+	Platform   string `json:"platform"`
+}
+
+type composeResponse struct {
+	Text             string   `json:"text"`
+	DetectedLanguage string   `json:"detected_language,omitempty"`
+	Usage            usageDTO `json:"usage"`
+}
+
+// handleCompose — нұсқау бойынша жаңа хабарлама. Квота, токен есебі және
+// қате кодтары /ai/reply-мен бірдей.
+func (s *Server) handleCompose(w http.ResponseWriter, r *http.Request) {
+	user, _ := UserFrom(r.Context())
+	var body composeRequest
+	if err := httpx.Decode(w, r, s.cfg.Limits.RequestBodyBytes, &body); err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+
+	result, err := s.ai.Compose(r.Context(), ai.ComposeRequest{
+		User:        user,
+		DeviceID:    DeviceFrom(r.Context()),
+		Instruction: body.Instruction,
+		Language:    traits.Clamp(body.Language, 16),
+		Regenerate:  body.Regenerate,
+		Platform:    traits.Clamp(body.Platform, 16),
+		AppVersion:  traits.Clamp(body.AppVersion, 32),
+	})
+	if err != nil {
+		status, code, message := httpx.Translate(err)
+		details := map[string]any{}
+		if code == httpx.CodeDailyLimit || code == httpx.CodeMonthlyLimit {
+			details["daily_limit"] = result.DailyLimit
+			details["used_today"] = result.UsedToday
+			details["resets_at"] = result.ResetsAt.Format(time.RFC3339)
+		}
+		switch {
+		case errors.Is(err, domain.ErrInstructionMissing):
+			details["field"] = "instruction"
+		case errors.Is(err, domain.ErrInstructionTooLong):
+			details["field"] = "instruction"
+			details["max_characters"] = result.InstructionLimit
+		}
+		if len(details) == 0 {
+			details = nil
+		}
+		httpx.Error(w, status, code, message, details)
+		return
+	}
+
+	httpx.JSON(w, http.StatusOK, composeResponse{
+		Text:             result.Text,
+		DetectedLanguage: result.DetectedLanguage,
+		Usage: usageDTO{
+			DailyLimit:     result.DailyLimit,
+			UsedToday:      result.UsedToday,
+			RemainingToday: result.Remaining,
+			ResetsAt:       result.ResetsAt.Format(time.RFC3339),
+			Timezone:       s.cfg.App.Timezone,
+		},
+	})
+}
+
 type checkoutRequest struct {
 	PlanID string `json:"plan_id"`
 }

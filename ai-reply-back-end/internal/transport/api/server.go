@@ -124,6 +124,8 @@ func (s *Server) Register(mux *http.ServeMux) {
 
 	// --- AI
 	mux.Handle("POST /api/v1/ai/reply", s.requireUser(aiLimit(http.HandlerFunc(s.handleReply))))
+	// Нұсқау бойынша жаңа хабарлама («Create»). Сол квота, сол rate limit.
+	mux.Handle("POST /api/v1/ai/compose", s.requireUser(aiLimit(http.HandlerFunc(s.handleCompose))))
 
 	// --- төлемдер (демо адаптер)
 	mux.Handle("POST /api/v1/payments/checkout", s.requireUser(http.HandlerFunc(s.handleCheckout)))

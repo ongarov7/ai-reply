@@ -122,14 +122,17 @@ func (s *Store) InsertUsageEvent(ctx context.Context, e domain.UsageEvent) error
 	if e.CreatedAt.IsZero() {
 		e.CreatedAt = time.Now().UTC()
 	}
+	if e.Mode == "" {
+		e.Mode = "reply"
+	}
 	_, err := s.db.Writer().ExecContext(ctx, `
 		INSERT INTO ai_usage_events (id, user_id, device_id, plan_id, model, status, error_code,
 			input_tokens, output_tokens, total_tokens, cost_micros, latency_ms, provider_ms,
-			platform, app_version, language, source_chars, created_at)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			platform, app_version, language, source_chars, mode, created_at)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		e.ID, e.UserID, e.DeviceID, e.PlanID, e.Model, e.Status, e.ErrorCode,
 		e.InputTokens, e.OutputTokens, e.TotalTokens, e.CostMicros, e.LatencyMS, e.ProviderMS,
-		e.Platform, e.AppVersion, e.Language, e.SourceChars, ms(e.CreatedAt))
+		e.Platform, e.AppVersion, e.Language, e.SourceChars, e.Mode, ms(e.CreatedAt))
 	return err
 }
 
@@ -314,7 +317,7 @@ func (s *Store) UserEvents(ctx context.Context, userID string, limit int) ([]dom
 	rows, err := s.db.Reader().QueryContext(ctx, `
 		SELECT id, user_id, device_id, plan_id, model, status, error_code, input_tokens, output_tokens,
 		       total_tokens, cost_micros, latency_ms, provider_ms, platform, app_version, language,
-		       source_chars, created_at
+		       source_chars, mode, created_at
 		FROM ai_usage_events WHERE user_id = ? ORDER BY created_at DESC LIMIT ?`, userID, limit)
 	if err != nil {
 		return nil, err
@@ -326,7 +329,7 @@ func (s *Store) UserEvents(ctx context.Context, userID string, limit int) ([]dom
 		var created int64
 		if err := rows.Scan(&e.ID, &e.UserID, &e.DeviceID, &e.PlanID, &e.Model, &e.Status, &e.ErrorCode,
 			&e.InputTokens, &e.OutputTokens, &e.TotalTokens, &e.CostMicros, &e.LatencyMS, &e.ProviderMS,
-			&e.Platform, &e.AppVersion, &e.Language, &e.SourceChars, &created); err != nil {
+			&e.Platform, &e.AppVersion, &e.Language, &e.SourceChars, &e.Mode, &created); err != nil {
 			return nil, err
 		}
 		e.CreatedAt = timeFrom(created)

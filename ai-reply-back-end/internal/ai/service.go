@@ -66,6 +66,26 @@ type Result struct {
 	LatencyMS        int
 	// SourceLimit — ErrSourceTooLong кезінде клиентке нақты шекті айту үшін.
 	SourceLimit int
+	// InstructionLimit — compose нұсқауы шектен асқанда (ErrInstructionTooLong).
+	InstructionLimit int
+}
+
+// Сұраныс режимдері. Usage оқиғасында сақталады; квота екеуіне ортақ.
+const (
+	ModeReply   = "reply"
+	ModeCompose = "compose"
+)
+
+// call — генерацияның метадерегі: кім, қай режим, қай құрылғыдан. Мәтін емес.
+type call struct {
+	Mode       string
+	User       domain.User
+	DeviceID   string
+	Language   string
+	Platform   string
+	AppVersion string
+	// Chars — пайдаланушы мәтінінің ұзындығы (хабарлама не нұсқау), тек сан.
+	Chars int
 }
 
 // Reply — негізгі сценарий.
@@ -91,22 +111,6 @@ func (s *Service) Reply(ctx context.Context, req Request) (Result, error) {
 	}
 	req.Instruction = traits.Clamp(req.Instruction, lim.InstructionChars)
 
-	entitlement, err := s.subs.Entitlement(ctx, req.User.ID)
-	if err != nil {
-		return Result{}, err
-	}
-	date, month := s.subs.Keys(started)
-
-	if err := s.repo.ReserveQuota(ctx, req.User.ID, date, month,
-		entitlement.DailyLimit, entitlement.MonthlyLimit); err != nil {
-		s.record(ctx, req, entitlement, "error", errorCode(err), Completion{}, 0, source)
-		return Result{
-			DailyLimit: entitlement.DailyLimit,
-			UsedToday:  entitlement.UsedToday,
-			ResetsAt:   entitlement.ResetsAt,
-		}, err
-	}
-
 	prompt := BuildPrompt(PromptInput{
 		Message:      source,
 		Instruction:  req.Instruction,
@@ -118,25 +122,60 @@ func (s *Service) Reply(ctx context.Context, req Request) (Result, error) {
 	})
 	prompt.MaxOutputTokens = lim.MaxOutputTokens
 
+	return s.generate(ctx, call{
+		Mode:       ModeReply,
+		User:       req.User,
+		DeviceID:   req.DeviceID,
+		Language:   req.Language,
+		Platform:   req.Platform,
+		AppVersion: req.AppVersion,
+		Chars:      traits.RuneLen(source),
+	}, prompt, started)
+}
+
+// generate — екі режимге ортақ жол: квота брондау → провайдер → токен есебі → оқиға.
+func (s *Service) generate(ctx context.Context, c call, prompt Prompt, started time.Time) (Result, error) {
+	entitlement, err := s.subs.Entitlement(ctx, c.User.ID)
+	if err != nil {
+		return Result{}, err
+	}
+	date, month := s.subs.Keys(started)
+
+	if err := s.repo.ReserveQuota(ctx, c.User.ID, date, month,
+		entitlement.DailyLimit, entitlement.MonthlyLimit); err != nil {
+		s.record(ctx, c, entitlement, "error", errorCode(err), Completion{}, 0)
+		return Result{
+			DailyLimit: entitlement.DailyLimit,
+			UsedToday:  entitlement.UsedToday,
+			ResetsAt:   entitlement.ResetsAt,
+		}, err
+	}
+
 	completion, providerErr := s.provider.Generate(ctx, prompt)
 	latency := int(s.clock.Now().Sub(started).Milliseconds())
 
 	if providerErr != nil {
 		// Жауап алынбады — бронды қайтарамыз (қайталау кезінде екі рет есептелмейді).
-		if err := s.repo.RefundQuota(ctx, req.User.ID, date, month); err != nil {
-			s.log.Error("quota refund failed", "user_id", req.User.ID, "error", err.Error())
+		if err := s.repo.RefundQuota(ctx, c.User.ID, date, month); err != nil {
+			s.log.Error("quota refund failed", "user_id", c.User.ID, "error", err.Error())
 		}
-		s.record(ctx, req, entitlement, "error", errorCode(providerErr), Completion{ProviderMS: 0}, latency, source)
-		s.log.Warn("ai request failed", "user_id", req.User.ID, "code", errorCode(providerErr), "latency_ms", latency)
+		s.record(ctx, c, entitlement, "error", errorCode(providerErr), Completion{ProviderMS: 0}, latency)
+		s.log.Warn("ai request failed", "user_id", c.User.ID, "mode", c.Mode,
+			"code", errorCode(providerErr), "latency_ms", latency)
 		return Result{}, providerErr
 	}
 
 	cost := s.estimateCostMicros(ctx, completion)
-	if err := s.repo.AddTokens(ctx, req.User.ID, date, month,
+	if err := s.repo.AddTokens(ctx, c.User.ID, date, month,
 		completion.InputTokens, completion.OutputTokens, cost); err != nil {
-		s.log.Error("token accounting failed", "user_id", req.User.ID, "error", err.Error())
+		s.log.Error("token accounting failed", "user_id", c.User.ID, "error", err.Error())
 	}
-	s.record(ctx, req, entitlement, "success", "", completion, latency, source)
+	s.record(ctx, c, entitlement, "success", "", completion, latency)
+	if c.Mode == ModeCompose {
+		s.log.Info("ai_compose_generate_success", "user_id", c.User.ID, "platform", c.Platform,
+			"app_version", c.AppVersion, "latency_ms", latency,
+			"input_tokens", completion.InputTokens, "output_tokens", completion.OutputTokens)
+	}
 
 	usedToday := entitlement.UsedToday + 1
 	remaining := entitlement.DailyLimit - usedToday
@@ -158,16 +197,16 @@ func (s *Service) Reply(ctx context.Context, req Request) (Result, error) {
 	}, nil
 }
 
-// record — оқиға метадерегі. source_text те, жауап та жазылмайды: тек ұзындығы.
-func (s *Service) record(ctx context.Context, req Request, ent domain.Entitlement,
-	status, code string, completion Completion, latency int, source string) {
+// record — оқиға метадерегі. Пайдаланушы мәтіні де, жауап та жазылмайды: тек ұзындығы.
+func (s *Service) record(ctx context.Context, c call, ent domain.Entitlement,
+	status, code string, completion Completion, latency int) {
 	model := completion.Model
 	if model == "" {
 		model = s.provider.Model()
 	}
 	event := domain.UsageEvent{
-		UserID:       req.User.ID,
-		DeviceID:     req.DeviceID,
+		UserID:       c.User.ID,
+		DeviceID:     c.DeviceID,
 		PlanID:       ent.Plan.ID,
 		Model:        model,
 		Status:       status,
@@ -178,10 +217,11 @@ func (s *Service) record(ctx context.Context, req Request, ent domain.Entitlemen
 		CostMicros:   s.estimateCostMicros(ctx, completion),
 		LatencyMS:    latency,
 		ProviderMS:   completion.ProviderMS,
-		Platform:     req.Platform,
-		AppVersion:   req.AppVersion,
-		Language:     domain.NormalizeLocale(req.Language),
-		SourceChars:  traits.RuneLen(source),
+		Platform:     c.Platform,
+		AppVersion:   c.AppVersion,
+		Language:     domain.NormalizeLocale(c.Language),
+		SourceChars:  c.Chars,
+		Mode:         c.Mode,
 		CreatedAt:    s.clock.Now(),
 	}
 	if err := s.repo.InsertUsageEvent(ctx, event); err != nil {

@@ -61,7 +61,8 @@ func TestAuthProvidersMigrationKeepsExistingAccounts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
-	if len(applied) != 1 || applied[0] != "0005_auth_providers.sql" {
+	// Later migrations may follow it; 0005 must be the first one applied.
+	if len(applied) == 0 || applied[0] != "0005_auth_providers.sql" {
 		t.Fatalf("applied = %v", applied)
 	}
 

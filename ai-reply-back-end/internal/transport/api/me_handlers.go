@@ -193,6 +193,8 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 		// older server would reject (request bodies disallow unknown fields).
 		"features": map[string]bool{
 			"reply_preferences": true,
+			// POST /api/v1/ai/compose — writing a new message from an instruction.
+			"compose": true,
 			// Sign-in methods this server accepts right now.
 			"email_otp":      s.auth.EmailDelivery() != "off",
 			"google_sign_in": s.auth.GoogleEnabled(),
