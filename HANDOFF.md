@@ -6,7 +6,21 @@
 
 ---
 
-## 0. Обновление 30.09.2026 — новая аутентификация
+## 0. Обновление 04.10.2026 — режим «Создать» (AI Compose)
+
+- Второй AI-режим клавиатуры: ✨ рядом с «+» → пользователь описывает сообщение → сервер пишет →
+  «Вставить». Буфер не читается. iOS: `Shared/AI/ComposeFlow.swift`, `ComposeService.swift`,
+  `ComposeStrings.swift`, панель — `ReplyComposerView` в режиме `.compose`. Android:
+  `keyboard/reply/ComposeSessionController.kt`, `keyboard/ui/CreatePanel.kt`.
+- Бэкенд: `POST /api/v1/ai/compose` (`internal/ai/compose.go`), общий путь квоты/токенов с `/ai/reply`,
+  миграция `0006_usage_mode.sql` (колонка `mode`). **Не задеплоено.**
+- Карточка «Клавиатура» в приложениях: одна кнопка по ситуации вместо двух.
+- Отчёт: `docs/ai-compose-report.md`. Сборка и тесты теперь запускаются напрямую из Bash
+  (xcodebuild / gradlew / go), watcher не нужен; JDK — `/Applications/Android Studio.app/Contents/jbr/Contents/Home`.
+
+---
+
+## 0.1. Обновление 30.09.2026 — новая аутентификация
 
 - Вход: iOS — Apple / Google / почта; Android — Google / почта. Вход по телефону
   (WhatsApp/SMS) из приложений удалён; старые `/auth/request-otp|verify-otp`
