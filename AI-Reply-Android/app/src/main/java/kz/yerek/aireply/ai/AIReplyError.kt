@@ -52,6 +52,12 @@ sealed interface AIReplyError {
 
     /** Anything else: a 5xx, a malformed payload, an unreachable host. */
     data object ServiceUnavailable : AIReplyError
+
+    /** Create mode: Write was tapped with nothing described yet. */
+    data object NoInstruction : AIReplyError
+
+    /** Create mode: the description is longer than the server's limit. */
+    data class InstructionTooLong(val limit: Int) : AIReplyError
 }
 
 /** Thrown across suspend boundaries; the payload is what the UI actually reads. */

@@ -153,4 +153,30 @@
     <string name="settings_debug_mock_replies">Mock AI replies</string>
     <string name="settings_debug_mock_replies_footer">Debug builds only. The keyboard answers with canned replies instead of the service, so nothing is spent. Tags in the instruction: #offline, #quota, #slow.</string>
 
+    <!-- Keyboard: Create (write a new message from an instruction) -->
+    <string name="kb_compose_open">Write a new message with AI</string>
+    <string name="kb_compose_title">Write with AI</string>
+    <string name="kb_compose_placeholder">Describe the message, e.g. “Congratulate our director on his 55th birthday”</string>
+    <string name="kb_compose_write">Write</string>
+    <string name="kb_compose_new">New</string>
+    <string name="kb_compose_new_description">Start over</string>
+    <string name="kb_compose_edit_request">Edit request</string>
+    <string name="kb_compose_draft_title">Your message</string>
+    <string name="kb_compose_err_no_instruction">Describe what to write first.</string>
+    <string name="kb_compose_err_too_long">The request is too long. Use up to %1$d characters.</string>
+    <string name="kb_compose_intent_congratulate">Congratulate</string>
+    <string name="kb_compose_intent_congratulate_phrase">Write a congratulation.</string>
+    <string name="kb_compose_intent_short">Short</string>
+    <string name="kb_compose_intent_short_phrase">Keep it short.</string>
+    <string name="kb_compose_intent_formal">Formal</string>
+    <string name="kb_compose_intent_formal_phrase">Make it formal.</string>
+    <string name="kb_compose_intent_friendly">Friendly</string>
+    <string name="kb_compose_intent_friendly_phrase">Warm and friendly.</string>
+    <string name="kb_compose_intent_emoji">Add emoji</string>
+    <string name="kb_compose_intent_emoji_phrase">Add a few fitting emoji.</string>
+    <string name="kb_compose_intent_thanks">Thank you</string>
+    <string name="kb_compose_intent_thanks_phrase">Write a thank-you message.</string>
+    <string name="kb_compose_intent_decline">Decline politely</string>
+    <string name="kb_compose_intent_decline_phrase">Politely decline.</string>
+
 </resources>

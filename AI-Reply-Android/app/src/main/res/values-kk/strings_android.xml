@@ -124,4 +124,30 @@
     <string name="settings_debug_mock_replies">Сынақ AI жауаптары</string>
     <string name="settings_debug_mock_replies_footer">Тек жөндеу нұсқасында. Пернетақта қызметтің орнына дайын жауап береді — лимит жұмсалмайды. Нұсқаудағы тегтер: #offline, #quota, #slow.</string>
 
+    <!-- Keyboard: Create (write a new message from an instruction) -->
+    <string name="kb_compose_open">AI арқылы жаңа хабарлама жазу</string>
+    <string name="kb_compose_title">AI-мен жазу</string>
+    <string name="kb_compose_placeholder">Хабарламаны сипаттаңыз, мысалы: «Директорды 55 жасқа толуымен құттықта»</string>
+    <string name="kb_compose_write">Жазу</string>
+    <string name="kb_compose_new">Жаңа</string>
+    <string name="kb_compose_new_description">Басынан бастау</string>
+    <string name="kb_compose_edit_request">Сұранысты өзгерту</string>
+    <string name="kb_compose_draft_title">Сіздің хабарламаңыз</string>
+    <string name="kb_compose_err_no_instruction">Алдымен не жазу керегін сипаттаңыз.</string>
+    <string name="kb_compose_err_too_long">Сұраныс тым ұзын. %1$d таңбадан аспасын.</string>
+    <string name="kb_compose_intent_congratulate">Құттықтау</string>
+    <string name="kb_compose_intent_congratulate_phrase">Құттықтау жаз.</string>
+    <string name="kb_compose_intent_short">Қысқа</string>
+    <string name="kb_compose_intent_short_phrase">Қысқа жаз.</string>
+    <string name="kb_compose_intent_formal">Ресми</string>
+    <string name="kb_compose_intent_formal_phrase">Ресми үнмен жаз.</string>
+    <string name="kb_compose_intent_friendly">Жылы</string>
+    <string name="kb_compose_intent_friendly_phrase">Жылы, достық үнмен жаз.</string>
+    <string name="kb_compose_intent_emoji">Эмодзимен</string>
+    <string name="kb_compose_intent_emoji_phrase">Бірнеше орынды эмодзи қос.</string>
+    <string name="kb_compose_intent_thanks">Алғыс айту</string>
+    <string name="kb_compose_intent_thanks_phrase">Алғыс хат жаз.</string>
+    <string name="kb_compose_intent_decline">Сыпайы бас тарту</string>
+    <string name="kb_compose_intent_decline_phrase">Сыпайы түрде бас тарт.</string>
+
 </resources>

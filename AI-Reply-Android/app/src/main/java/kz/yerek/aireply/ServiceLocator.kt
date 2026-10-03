@@ -6,8 +6,11 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Dispatchers
 import kz.yerek.aireply.ai.AIConfiguration
 import kz.yerek.aireply.ai.AIReplyService
+import kz.yerek.aireply.ai.AccountComposeTransport
 import kz.yerek.aireply.ai.AccountReplyTransport
 import kz.yerek.aireply.ai.AppStrings
+import kz.yerek.aireply.ai.ComposeService
+import kz.yerek.aireply.ai.DebugComposeMock
 import kz.yerek.aireply.ai.DebugReplyMock
 import kz.yerek.aireply.ai.ReplyPromptBuilder
 import kz.yerek.aireply.ai.ReplyDraftNormalizer
@@ -151,6 +154,26 @@ class ServiceLocator(context: Context) {
                 { request: AIReplyService.Request, _: ReplyPromptBuilder.Prompt ->
                     if (settings.debugMockReplies) DebugReplyMock(request.instruction) else null
                 }
+            } else {
+                null
+            }
+        )
+    }
+
+    /** The keyboard's "Create" mode: a message from an instruction, no copied text. */
+    val composeService: ComposeService by lazy {
+        ComposeService(
+            configuration = aiConfiguration,
+            accountTransport = { baseUrl ->
+                AccountComposeTransport(
+                    baseUrl = baseUrl,
+                    session = accountSession,
+                    usageCache = usageCache,
+                    appVersion = BuildConfig.VERSION_NAME
+                )
+            },
+            transportOverride = if (BuildConfig.DEBUG) {
+                { _: ComposeService.Request -> if (settings.debugMockReplies) DebugComposeMock() else null }
             } else {
                 null
             }

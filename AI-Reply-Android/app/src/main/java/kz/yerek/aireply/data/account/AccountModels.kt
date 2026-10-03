@@ -205,6 +205,14 @@ data class ReplyResponseDto(
     val usage: UsageDto = UsageDto.UNKNOWN
 )
 
+/** `POST /api/v1/ai/compose`: a message written from the user's instruction. */
+@Serializable
+data class ComposeResponseDto(
+    val text: String,
+    @SerialName("detected_language") val detectedLanguage: String? = null,
+    val usage: UsageDto = UsageDto.UNKNOWN
+)
+
 /** Demo checkout. A real acquirer changes this shape, not the callers. */
 @Serializable
 data class CheckoutDto(

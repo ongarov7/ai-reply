@@ -124,4 +124,30 @@
     <string name="settings_debug_mock_replies">Тестовые ответы ИИ</string>
     <string name="settings_debug_mock_replies_footer">Только в отладочной сборке. Клавиатура отвечает заготовками вместо сервиса — лимит не тратится. Теги в инструкции: #offline, #quota, #slow.</string>
 
+    <!-- Keyboard: Create (write a new message from an instruction) -->
+    <string name="kb_compose_open">Написать новое сообщение с AI</string>
+    <string name="kb_compose_title">Написать с AI</string>
+    <string name="kb_compose_placeholder">Опишите сообщение, например: «Поздравь директора с 55-летием»</string>
+    <string name="kb_compose_write">Написать</string>
+    <string name="kb_compose_new">Новое</string>
+    <string name="kb_compose_new_description">Начать заново</string>
+    <string name="kb_compose_edit_request">Изменить запрос</string>
+    <string name="kb_compose_draft_title">Ваше сообщение</string>
+    <string name="kb_compose_err_no_instruction">Сначала опишите, что написать.</string>
+    <string name="kb_compose_err_too_long">Запрос слишком длинный. Не более %1$d символов.</string>
+    <string name="kb_compose_intent_congratulate">Поздравить</string>
+    <string name="kb_compose_intent_congratulate_phrase">Напиши поздравление.</string>
+    <string name="kb_compose_intent_short">Коротко</string>
+    <string name="kb_compose_intent_short_phrase">Коротко.</string>
+    <string name="kb_compose_intent_formal">Официально</string>
+    <string name="kb_compose_intent_formal_phrase">Официальным тоном.</string>
+    <string name="kb_compose_intent_friendly">Дружелюбно</string>
+    <string name="kb_compose_intent_friendly_phrase">Тепло и дружелюбно.</string>
+    <string name="kb_compose_intent_emoji">С эмодзи</string>
+    <string name="kb_compose_intent_emoji_phrase">Добавь несколько уместных эмодзи.</string>
+    <string name="kb_compose_intent_thanks">Поблагодарить</string>
+    <string name="kb_compose_intent_thanks_phrase">Напиши благодарность.</string>
+    <string name="kb_compose_intent_decline">Вежливый отказ</string>
+    <string name="kb_compose_intent_decline_phrase">Напиши вежливый отказ.</string>
+
 </resources>

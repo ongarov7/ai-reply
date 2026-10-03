@@ -114,4 +114,30 @@
     <string name="settings_debug_mock_replies">Sinov AI javoblari</string>
     <string name="settings_debug_mock_replies_footer">Faqat sinov yigʻmasida. Klaviatura xizmat oʻrniga tayyor javob beradi — limit sarflanmaydi. Koʻrsatmadagi teglar: #offline, #quota, #slow.</string>
 
+    <!-- Keyboard: Create (write a new message from an instruction) -->
+    <string name="kb_compose_open">AI bilan yangi xabar yozish</string>
+    <string name="kb_compose_title">AI bilan yozish</string>
+    <string name="kb_compose_placeholder">Xabarni tasvirlang, masalan: «Direktorni 55 yoshi bilan tabrikla»</string>
+    <string name="kb_compose_write">Yozish</string>
+    <string name="kb_compose_new">Yangi</string>
+    <string name="kb_compose_new_description">Boshidan boshlash</string>
+    <string name="kb_compose_edit_request">Soʻrovni oʻzgartirish</string>
+    <string name="kb_compose_draft_title">Xabaringiz</string>
+    <string name="kb_compose_err_no_instruction">Avval nima yozishni tasvirlang.</string>
+    <string name="kb_compose_err_too_long">Soʻrov juda uzun. %1$d belgigacha yozing.</string>
+    <string name="kb_compose_intent_congratulate">Tabriklash</string>
+    <string name="kb_compose_intent_congratulate_phrase">Tabrik yoz.</string>
+    <string name="kb_compose_intent_short">Qisqa</string>
+    <string name="kb_compose_intent_short_phrase">Qisqa yoz.</string>
+    <string name="kb_compose_intent_formal">Rasmiy</string>
+    <string name="kb_compose_intent_formal_phrase">Rasmiy ohangda yoz.</string>
+    <string name="kb_compose_intent_friendly">Doʻstona</string>
+    <string name="kb_compose_intent_friendly_phrase">Iliq va doʻstona yoz.</string>
+    <string name="kb_compose_intent_emoji">Emoji bilan</string>
+    <string name="kb_compose_intent_emoji_phrase">Bir nechta mos emoji qoʻsh.</string>
+    <string name="kb_compose_intent_thanks">Minnatdorchilik</string>
+    <string name="kb_compose_intent_thanks_phrase">Minnatdorchilik xabarini yoz.</string>
+    <string name="kb_compose_intent_decline">Muloyim rad</string>
+    <string name="kb_compose_intent_decline_phrase">Muloyim rad javobini yoz.</string>
+
 </resources>

@@ -69,6 +69,10 @@ sealed interface ApiError {
     data object InvalidRequest : ApiError
     /** The incoming message is longer than the server's limit, which it sent. */
     data class SourceTooLong(val limit: Int) : ApiError
+    /** Compose: the instruction is longer than the server's limit, which it states. */
+    data class InstructionTooLong(val limit: Int) : ApiError
+    /** Compose: the server found the instruction empty. */
+    data object InstructionMissing : ApiError
     data object NotFound : ApiError
     data object Conflict : ApiError
     data object Server : ApiError
@@ -203,10 +207,11 @@ class ApiClient(
                 "AI_EMPTY_RESPONSE" -> return ApiError.EmptyResponse
                 "INVALID_REQUEST" -> {
                     val limit = details?.maxCharacters
-                    return if (details?.field == "source_text" && limit != null) {
-                        ApiError.SourceTooLong(limit)
-                    } else {
-                        ApiError.InvalidRequest
+                    return when {
+                        details?.field == "source_text" && limit != null -> ApiError.SourceTooLong(limit)
+                        details?.field == "instruction" && limit != null -> ApiError.InstructionTooLong(limit)
+                        details?.field == "instruction" -> ApiError.InstructionMissing
+                        else -> ApiError.InvalidRequest
                     }
                 }
                 "NOT_FOUND" -> return ApiError.NotFound
