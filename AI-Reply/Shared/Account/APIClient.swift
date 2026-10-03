@@ -45,6 +45,11 @@ enum APIError: Error, Equatable, Sendable {
     /// server states. A plain `invalidRequest` from an older server carries no
     /// number, and stays `invalidRequest`.
     case sourceTooLong(limit: Int)
+    /// Compose: the instruction is longer than the server's limit, which the
+    /// server states.
+    case instructionTooLong(limit: Int)
+    /// Compose: the server found the instruction empty.
+    case instructionMissing
     case notFound
     case conflict
     case server
@@ -203,6 +208,10 @@ struct APIClient: Sendable {
         case "INVALID_REQUEST":
             if details?.field == "source_text", let limit = details?.maxCharacters, limit > 0 {
                 return .sourceTooLong(limit: limit)
+            }
+            if details?.field == "instruction" {
+                if let limit = details?.maxCharacters, limit > 0 { return .instructionTooLong(limit: limit) }
+                return .instructionMissing
             }
             return .invalidRequest
         case "NOT_FOUND":                       return .notFound

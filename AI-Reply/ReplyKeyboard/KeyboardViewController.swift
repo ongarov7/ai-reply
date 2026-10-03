@@ -50,6 +50,23 @@ final class KeyboardViewController: UIInputViewController {
     // MARK: Collaborators
 
     private lazy var replyCoordinator = ReplyFlowCoordinator(service: Self.makeService())
+    private lazy var composeCoordinator = ComposeFlowCoordinator(service: Self.makeComposeService())
+
+    /// Which AI flow owns the composer panel. At most one: Create drops any
+    /// reply session when it opens, and the persona row - the only way into a
+    /// reply - is hidden while Create is open. Derived, never stored, so it
+    /// cannot disagree with the coordinators.
+    private enum AIFlow {
+        case none
+        case reply
+        case compose
+    }
+
+    private var activeFlow: AIFlow {
+        if composeCoordinator.isActive { return .compose }
+        if replyCoordinator.isComposing { return .reply }
+        return .none
+    }
 
     private var configurationLoadedAt: TimeInterval = 0
     private var lastSpaceTap: TimeInterval = 0
@@ -76,6 +93,8 @@ final class KeyboardViewController: UIInputViewController {
         view.clipsToBounds = false
         replyCoordinator.delegate = self
         replyCoordinator.uiLanguage = uiLanguage
+        composeCoordinator.delegate = self
+        composeCoordinator.uiLanguage = uiLanguage
         actionBar.delegate = self
         keysView.delegate = self
 
@@ -109,6 +128,9 @@ final class KeyboardViewController: UIInputViewController {
 
         if let parked = ReplySessionParking.take() {
             replyCoordinator.restore(parked)
+        } else if let parked = ComposeSessionParking.take() {
+            composeCoordinator.restore(parked)
+            showComposePanel()
         }
     }
 
@@ -126,10 +148,12 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        // An unfinished reply is kept in memory for a few minutes, so a trip
-        // to another chat to copy a message does not cost the instruction.
-        if replyCoordinator.session != nil {
+        // An unfinished reply or Create is kept in memory for a few minutes,
+        // so a trip to another chat does not cost the instruction. A running
+        // request is stopped: no spinner survives the keyboard going away.
+        if replyCoordinator.session != nil || composeCoordinator.isActive {
             replyCoordinator.park()
+            composeCoordinator.park()
             actionBar.endComposing()
             keysView.isInputDimmed = false
             updateGeometry(animated: false)
@@ -210,6 +234,7 @@ final class KeyboardViewController: UIInputViewController {
         if appLanguage != uiLanguage {
             uiLanguage = appLanguage
             replyCoordinator.uiLanguage = appLanguage
+            composeCoordinator.uiLanguage = appLanguage
             actionBar.configure(theme: theme, uiLanguage: appLanguage)
             applyChips(from: replyCoordinator.configuration)
         }
@@ -423,7 +448,11 @@ final class KeyboardViewController: UIInputViewController {
     /// becomes editable and the key lands in it.
     private func prepareComposerForTyping() {
         guard actionBar.isComposing, !actionBar.acceptsTextInput else { return }
-        _ = replyCoordinator.beginEditingForTyping()
+        switch activeFlow {
+        case .compose: _ = composeCoordinator.beginEditingForTyping()
+        case .reply: _ = replyCoordinator.beginEditingForTyping()
+        case .none: break
+        }
     }
 
     private func insert(_ text: String) {
@@ -554,6 +583,10 @@ final class KeyboardViewController: UIInputViewController {
     private var aiStrings: AIReplyStrings { AIReplyStrings.forLanguage(uiLanguage) }
 
     private func renderComposer() {
+        if let compose = composeCoordinator.session {
+            renderCompose(compose)
+            return
+        }
         guard let session = replyCoordinator.session, replyCoordinator.isComposing else { return }
         let flow = session.flow
         let message = flow.error.map { aiStrings.message(for: $0) }
@@ -571,8 +604,40 @@ final class KeyboardViewController: UIInputViewController {
         updateGeometry(animated: true)
     }
 
+    /// Create: no persona and no message, only the instruction and the
+    /// versions - the same panel in its compose mode.
+    private func renderCompose(_ session: ComposeSession) {
+        let flow = session.flow
+        let message = flow.error.map { error in
+            // The reply sentence talks about a copied message; Create has none.
+            error == .fullAccessRequired ? aiStrings.compose.fullAccessRequired : aiStrings.message(for: error)
+        }
+        actionBar.render(ReplyComposerView.Content(
+            personaName: "",
+            source: "",
+            instruction: session.instruction,
+            flow: flow,
+            errorMessage: (message?.isEmpty ?? true) ? nil : message,
+            sourceLimit: AILimits.current.sourceCharacters,
+            instructionLimit: AILimits.current.instructionCharacters,
+            mode: .compose
+        ))
+        keysView.isInputDimmed = flow.isGenerating
+        refreshReturnKey()
+        updateGeometry(animated: true)
+    }
+
+    private func showComposePanel() {
+        actionBar.beginComposing()
+        shift.reset()
+        layoutKeyboard(force: false)
+        renderComposer()
+        refreshAutoShift()
+    }
+
     private func closeComposer() {
         replyCoordinator.clear()
+        composeCoordinator.clear()
         actionBar.endComposing()
         keysView.isInputDimmed = false
         layoutKeyboard(force: false)
@@ -582,7 +647,11 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func insertReply() {
-        switch replyCoordinator.requestInsert(hostHasText: hostFieldHasText()) {
+        let hostHasText = hostFieldHasText()
+        let decision = activeFlow == .compose
+            ? composeCoordinator.requestInsert(hostHasText: hostHasText)
+            : replyCoordinator.requestInsert(hostHasText: hostHasText)
+        switch decision {
         case .insert(let text):
             finishInsert(text)
         case .askAboutExistingText, .nothing:
@@ -591,7 +660,10 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func resolveConflict(_ choice: ReplyComposerFlow.ConflictChoice) {
-        switch replyCoordinator.resolveConflict(choice) {
+        let resolution = activeFlow == .compose
+            ? composeCoordinator.resolveConflict(choice)
+            : replyCoordinator.resolveConflict(choice)
+        switch resolution {
         case .replace(let text):
             clearHostField()
             finishInsert(text)
@@ -655,6 +727,24 @@ final class KeyboardViewController: UIInputViewController {
         }
         #endif
         return AIReplyService()
+    }
+
+    private static func makeComposeService() -> ComposeService {
+        #if DEBUG
+        if DebugReplyMock.isEnabled {
+            return ComposeService(transportOverride: { _ in DebugComposeMock() })
+        }
+        #endif
+        return ComposeService()
+    }
+
+    /// Without Full Access a keyboard has no network at all, so the request
+    /// would only fail as "offline". Said plainly instead, before any request.
+    private var composeCanReachNetwork: Bool {
+        #if DEBUG
+        if DebugReplyMock.isEnabled { return true }
+        #endif
+        return hasFullAccess
     }
 }
 
@@ -757,6 +847,7 @@ extension KeyboardViewController: KeyboardActionBarDelegate {
     /// Picking a persona OPENS THE COMPOSER. It is not a network request.
     func actionBar(_ bar: KeyboardActionBar, didSelectTemplateID id: String) {
         guard let template = resolveTemplate(id: id) else { return }
+        composeCoordinator.clear()
         DispatchQueue.global(qos: .utility).async {
             SharedSettings.shared.setLastTemplateID(id)
         }
@@ -776,11 +867,24 @@ extension KeyboardViewController: KeyboardActionBarDelegate {
         bar.showToast(aiStrings.addTemplateHint)
     }
 
+    /// Create: a fresh, empty composer for writing a new message. The
+    /// clipboard is not read, and a reply the user had put aside (persona
+    /// row over a suspended session) is dropped rather than carried over.
+    func actionBarDidRequestCompose(_ bar: KeyboardActionBar) {
+        replyCoordinator.clear()
+        composeCoordinator.open()
+        showComposePanel()
+    }
+
     func actionBarDidChangeHeight(_ bar: KeyboardActionBar) {
         updateGeometry(animated: true)
     }
 
     func actionBar(_ bar: KeyboardActionBar, didSend event: ComposerEvent) {
+        if activeFlow == .compose {
+            handleCompose(event)
+            return
+        }
         switch event {
         case .close:
             closeComposer()
@@ -822,6 +926,52 @@ extension KeyboardViewController: KeyboardActionBarDelegate {
             case .draft: replyCoordinator.updateDraft(text)
             case .none: break
             }
+        case .reset:
+            break
+        }
+    }
+
+    private func handleCompose(_ event: ComposerEvent) {
+        switch event {
+        case .close:
+            closeComposer()
+        case .reset:
+            composeCoordinator.reset()
+        case .generate, .regenerate:
+            guard composeCanReachNetwork else {
+                composeCoordinator.showError(.fullAccessRequired)
+                return
+            }
+            composeCoordinator.generate()
+        case .stop:
+            composeCoordinator.cancelGeneration()
+        case .back:
+            composeCoordinator.back()
+        case .toggleEditing:
+            if composeCoordinator.flow.stage == .editing {
+                composeCoordinator.endEditing()
+            } else {
+                composeCoordinator.beginEditing()
+            }
+        case .tapReply:
+            composeCoordinator.beginEditing()
+        case .insert:
+            insertReply()
+        case .previousVersion:
+            composeCoordinator.showPreviousVersion()
+        case .nextVersion:
+            composeCoordinator.showNextVersion()
+        case .resolveConflict(let choice):
+            resolveConflict(choice)
+        case .edited(let field, let text):
+            switch field {
+            case .instruction: composeCoordinator.updateInstruction(text)
+            case .draft: composeCoordinator.updateDraft(text)
+            case .source, .none: break
+            }
+        case .changePersona, .paste:
+            // Create has no persona and no copied message.
+            break
         }
     }
 }
@@ -839,6 +989,16 @@ extension KeyboardViewController: ReplyFlowCoordinatorDelegate {
     }
 
     func coordinatorDidChange(_ coordinator: ReplyFlowCoordinator) {
+        renderComposer()
+        refreshAutoShift()
+    }
+}
+
+// MARK: - Create flow
+
+extension KeyboardViewController: ComposeFlowCoordinatorDelegate {
+
+    func composeCoordinatorDidChange(_ coordinator: ComposeFlowCoordinator) {
         renderComposer()
         refreshAutoShift()
     }

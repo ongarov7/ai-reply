@@ -84,11 +84,19 @@ final class QuickActionRow: UIView {
 
     // MARK: Configuration
 
-    func configure(theme: KeyboardTheme, strings: AIReplyStrings) {
+    /// - Parameter intents: the set to show; the reply intents when nil.
+    func configure(theme: KeyboardTheme, strings: AIReplyStrings, intents: [QuickIntent]? = nil) {
         self.theme = theme
         self.moreLabel = strings.moreActions
         overflowButton.accessibilityLabel = strings.moreActions
-        setIntents(strings.quickIntents)
+        setIntents(intents ?? strings.quickIntents)
+        restyle()
+    }
+
+    /// Swaps the set - the Create panel shows occasions and tones instead of
+    /// reply intents.
+    func showIntents(_ newIntents: [QuickIntent]) {
+        setIntents(newIntents)
         restyle()
     }
 
@@ -105,6 +113,8 @@ final class QuickActionRow: UIView {
             let pill = makePill(title: intent.label)
             pill.tag = index
             pill.addTarget(self, action: #selector(pillTapped(_:)), for: .touchUpInside)
+            pill.isEnabled = isRowEnabled
+            pill.alpha = isRowEnabled ? 1 : 0.45
             addSubview(pill)
             pills.append(pill)
         }

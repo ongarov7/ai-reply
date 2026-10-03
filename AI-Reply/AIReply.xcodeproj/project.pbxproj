@@ -30,6 +30,7 @@
 		2D6803AA8619CD528E8D128B /* AccountModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD872E2E63C0E40E77B2872A /* AccountModel.swift */; };
 		32CEFB20D93E4BC2E8611C77 /* AccountAPITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17D0DD4F1BF29EDF8D47477 /* AccountAPITests.swift */; };
 		33511736BECB200BFCA4AB96 /* AIReplyStrings.swift in Sources */ = {isa = PBXBuildFile; fileRef = C79FF18FAD7464C6AEF28503 /* AIReplyStrings.swift */; };
+		6AF727AA7F9D2425CEAE391C /* ComposeStrings.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5FB3E5632D0A0AE019B8B5D /* ComposeStrings.swift */; };
 		39325F9CAB90B0BDF6FBAE0A /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 2E52AC5449FEDDEE2B8129A8 /* Localizable.xcstrings */; };
 		39A76347547C3E5641A67A21 /* VoiceConfigurationParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B460028095C479EDAD8B842 /* VoiceConfigurationParser.swift */; };
 		3BFF79E2D2F5397DF9E2238A /* GoogleSignInProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F3D1436B67F4B8259A4A482 /* GoogleSignInProvider.swift */; };
@@ -61,6 +62,7 @@
 		6E010A294B52EB5C86D9F5B1 /* KeyboardGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = A155FB12C15FFEB181DDBE0D /* KeyboardGeometry.swift */; };
 		6E7329536A731600E8ACE8AD /* KeyboardLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7152DD599FC715B6463595DC /* KeyboardLayout.swift */; };
 		6EE606B35D2E5FE5C9439D0E /* ReplyComposerFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92BBF6A438708D8B8E6BA758 /* ReplyComposerFlowTests.swift */; };
+		F8B02C43C4467CC82CA421AE /* ComposeFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 745609BA43F5F96E4D121ADA /* ComposeFlowTests.swift */; };
 		6F7F89531AD24EBC66706589 /* AppLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A267A633B481385E9F442940 /* AppLanguage.swift */; };
 		6FCA6398A7ED53E311C79C7D /* WorkingHours.swift in Sources */ = {isa = PBXBuildFile; fileRef = 875E5668A47AB6015133C237 /* WorkingHours.swift */; };
 		73136265574692ACA84C492F /* AccountUsageCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B57B456F7C9A894FDFA16E5 /* AccountUsageCache.swift */; };
@@ -72,6 +74,7 @@
 		79FC6362B27ADDE3E86E4F2F /* VoiceConfigurationParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B460028095C479EDAD8B842 /* VoiceConfigurationParser.swift */; };
 		7B5D2FA3251FECDC2FB97FBD /* AccountCredentials.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33E1AE3A5DC8A80EF7FAB51D /* AccountCredentials.swift */; };
 		7C226A5CD29188B4ABCBAFBC /* AIReplyStrings.swift in Sources */ = {isa = PBXBuildFile; fileRef = C79FF18FAD7464C6AEF28503 /* AIReplyStrings.swift */; };
+		A3418DDB4589852A96B16D60 /* ComposeStrings.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5FB3E5632D0A0AE019B8B5D /* ComposeStrings.swift */; };
 		8158BCDC98DA0C126BABC4E1 /* KeyboardLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E9E3BF06EBA0D0C9E753A97 /* KeyboardLanguage.swift */; };
 		81AAD389931DC5307FFD1117 /* ConfigurationStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BD0BC21D6B2D68157DE7739 /* ConfigurationStoreTests.swift */; };
 		81B9A426BF614963BABED511 /* AILimits.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B7380BC21ADC88B6BDEF78C /* AILimits.swift */; };
@@ -85,6 +88,9 @@
 		94C33D06956AAA22C07024B8 /* TemplateSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4764601C3E9C73FC93190203 /* TemplateSummary.swift */; };
 		9522131EF5822AB0AD243FB9 /* ComposeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EB79A48415511296E4E184A /* ComposeView.swift */; };
 		9593CD67B2ADA3E13B43F949 /* ReplyComposerFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49FEB48D426A26B0CBBBCD26 /* ReplyComposerFlow.swift */; };
+		0B765D0DBF1447BA7190C6A6 /* ReplyLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16427A1A7E7C086CD11F427E /* ReplyLog.swift */; };
+		3BD25C58D678587BA6FA4D43 /* ComposeFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C7808A38A1F6940CA5DDEAD /* ComposeFlow.swift */; };
+		FC29F58B0FC374610D197D7C /* ComposeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57B8A313F412207B35AFA0F6 /* ComposeService.swift */; };
 		984942122FD319CC5C825215 /* KeyboardLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7152DD599FC715B6463595DC /* KeyboardLayout.swift */; };
 		99307F9E2ABC5193C246DFB2 /* RegistrationStepView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8CFE2DB3B3FB414D9B9391D /* RegistrationStepView.swift */; };
 		9AD0972A3931DC45EB713C7C /* ReplyPromptBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCB330879C6D25E5994C95F0 /* ReplyPromptBuilder.swift */; };
@@ -95,14 +101,19 @@
 		A8F73103B522FDC9EBD2148A /* AppGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE4A424E566C435571650943 /* AppGroup.swift */; };
 		A91B032371106BB2F6916381 /* ReplyKeyboard.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B706BBF3211F06DE9C734E67 /* ReplyKeyboard.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		ABB392343340956522324197 /* AccountReplyTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A19AB507B24FEDDA51BB674 /* AccountReplyTransport.swift */; };
+		F95F884C5CFEE349F875468F /* AccountComposeTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2348FCCDAFC9AD95D2E74165 /* AccountComposeTransport.swift */; };
 		AD5DE35FBF494B15CA36765D /* AIReplyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53F7E07689CE9B522244F3DA /* AIReplyService.swift */; };
 		B3F9F8D93AF35D542DA859F5 /* VoiceReplyViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 999B24518017279B60BE8C60 /* VoiceReplyViewModel.swift */; };
 		B6EB09B2D4EA444198F2A0D0 /* ComposeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80A2221D0F2D6AFFE9BBA8AD /* ComposeViewModel.swift */; };
 		B89D40A24C499A96CDF9F341 /* AccountReplyTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A19AB507B24FEDDA51BB674 /* AccountReplyTransport.swift */; };
+		14034882A8B12D40993A6307 /* AccountComposeTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2348FCCDAFC9AD95D2E74165 /* AccountComposeTransport.swift */; };
 		B89E5E6DDCE4C88FC2B06E80 /* AILimits.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B7380BC21ADC88B6BDEF78C /* AILimits.swift */; };
 		B9065C0BA089C48F8C8CA4A5 /* VoiceConfigurationParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FED115EF950AFFD65FFF659 /* VoiceConfigurationParserTests.swift */; };
 		BDA7E6FFED3A5E6C18131F75 /* AIReplyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FA30E63832D85C25C68804F /* AIReplyApp.swift */; };
 		C1E4C551DBA2E0A7F2D2DD2D /* ReplyComposerFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49FEB48D426A26B0CBBBCD26 /* ReplyComposerFlow.swift */; };
+		E79F9777E323760343FEEA7D /* ReplyLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16427A1A7E7C086CD11F427E /* ReplyLog.swift */; };
+		D9C6B3902D566C8DC4370D74 /* ComposeFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C7808A38A1F6940CA5DDEAD /* ComposeFlow.swift */; };
+		3F4E354B5E26BDAD53BD5903 /* ComposeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57B8A313F412207B35AFA0F6 /* ComposeService.swift */; };
 		C36C9BC85980E51F67C9260F /* KeyboardTyping.swift in Sources */ = {isa = PBXBuildFile; fileRef = E219874BE11230086CDC26D6 /* KeyboardTyping.swift */; };
 		C8C24FAB428614EDCD4F9BB4 /* VoiceSuggestionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 135248855774C4608FCF805E /* VoiceSuggestionSheet.swift */; };
 		CABDC14ECE4F0075FF636939 /* SignInTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF7BA3F5F2817FDF8AA035A9 /* SignInTests.swift */; };
@@ -194,6 +205,9 @@
 		46D72A31038F46AE656C391A /* KeyboardTypingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardTypingTests.swift; sourceTree = "<group>"; };
 		4764601C3E9C73FC93190203 /* TemplateSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateSummary.swift; sourceTree = "<group>"; };
 		49FEB48D426A26B0CBBBCD26 /* ReplyComposerFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyComposerFlow.swift; sourceTree = "<group>"; };
+		16427A1A7E7C086CD11F427E /* ReplyLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyLog.swift; sourceTree = "<group>"; };
+		5C7808A38A1F6940CA5DDEAD /* ComposeFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposeFlow.swift; sourceTree = "<group>"; };
+		57B8A313F412207B35AFA0F6 /* ComposeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposeService.swift; sourceTree = "<group>"; };
 		4D98FF929C932F1EB43E5369 /* AuthForms.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthForms.swift; sourceTree = "<group>"; };
 		4DF5C58251599513C8873CED /* SecureCredentialStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecureCredentialStore.swift; sourceTree = "<group>"; };
 		50D232A0E7FFFC95C7AB549C /* KeyboardActionBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardActionBar.swift; sourceTree = "<group>"; };
@@ -217,6 +231,7 @@
 		7568CCC0B7DE4C2A07D45771 /* AppMarkView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppMarkView.swift; sourceTree = "<group>"; };
 		78D02DD76072C4DD2CAB2659 /* WorkingHoursTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkingHoursTests.swift; sourceTree = "<group>"; };
 		7A19AB507B24FEDDA51BB674 /* AccountReplyTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountReplyTransport.swift; sourceTree = "<group>"; };
+		2348FCCDAFC9AD95D2E74165 /* AccountComposeTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountComposeTransport.swift; sourceTree = "<group>"; };
 		7AED231CF6699F6F307BF79C /* VerifyCodeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifyCodeView.swift; sourceTree = "<group>"; };
 		7B2A3BF3800661B3D311B44C /* ReplyComposerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyComposerView.swift; sourceTree = "<group>"; };
 		7FED115EF950AFFD65FFF659 /* VoiceConfigurationParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceConfigurationParserTests.swift; sourceTree = "<group>"; };
@@ -226,6 +241,7 @@
 		8CC9F4025BCAB95F46B9FD35 /* AccountModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountModels.swift; sourceTree = "<group>"; };
 		90E39000C4ED61ADBA6BA9DB /* CommunicationTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommunicationTypes.swift; sourceTree = "<group>"; };
 		92BBF6A438708D8B8E6BA758 /* ReplyComposerFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyComposerFlowTests.swift; sourceTree = "<group>"; };
+		745609BA43F5F96E4D121ADA /* ComposeFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposeFlowTests.swift; sourceTree = "<group>"; };
 		999B24518017279B60BE8C60 /* VoiceReplyViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceReplyViewModel.swift; sourceTree = "<group>"; };
 		9B614C117924E8EC6A4EF32D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		9B7380BC21ADC88B6BDEF78C /* AILimits.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AILimits.swift; sourceTree = "<group>"; };
@@ -246,6 +262,7 @@
 		C126E9E531F228B7FE38B085 /* AppleSignIn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSignIn.swift; sourceTree = "<group>"; };
 		C1653C6E99D9FBD3FDEBF65E /* SignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInView.swift; sourceTree = "<group>"; };
 		C79FF18FAD7464C6AEF28503 /* AIReplyStrings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIReplyStrings.swift; sourceTree = "<group>"; };
+		F5FB3E5632D0A0AE019B8B5D /* ComposeStrings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposeStrings.swift; sourceTree = "<group>"; };
 		CA668DDBAAF0D31A17F73A7F /* ReplyDraftHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyDraftHistory.swift; sourceTree = "<group>"; };
 		CD872E2E63C0E40E77B2872A /* AccountModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountModel.swift; sourceTree = "<group>"; };
 		CF7BA3F5F2817FDF8AA035A9 /* SignInTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInTests.swift; sourceTree = "<group>"; };
@@ -334,6 +351,7 @@
 				33E1AE3A5DC8A80EF7FAB51D /* AccountCredentials.swift */,
 				8CC9F4025BCAB95F46B9FD35 /* AccountModels.swift */,
 				7A19AB507B24FEDDA51BB674 /* AccountReplyTransport.swift */,
+				2348FCCDAFC9AD95D2E74165 /* AccountComposeTransport.swift */,
 				29708E5897A096B71492D3FF /* AccountService.swift */,
 				65D25C0C1FBF7FA0DB3E1CA9 /* AccountSession.swift */,
 				6B57B456F7C9A894FDFA16E5 /* AccountUsageCache.swift */,
@@ -377,6 +395,7 @@
 				70C006DB419902D13BDBF374 /* AIReplyError.swift */,
 				53F7E07689CE9B522244F3DA /* AIReplyService.swift */,
 				C79FF18FAD7464C6AEF28503 /* AIReplyStrings.swift */,
+				F5FB3E5632D0A0AE019B8B5D /* ComposeStrings.swift */,
 				D7B4C8F95E060876BD02776E /* ReplyDraftNormalizer.swift */,
 				BCB330879C6D25E5994C95F0 /* ReplyPromptBuilder.swift */,
 				1180B013DC019C3D7F3C19B7 /* ReplyTransport.swift */,
@@ -384,6 +403,9 @@
 				9B7380BC21ADC88B6BDEF78C /* AILimits.swift */,
 				CA668DDBAAF0D31A17F73A7F /* ReplyDraftHistory.swift */,
 				49FEB48D426A26B0CBBBCD26 /* ReplyComposerFlow.swift */,
+				16427A1A7E7C086CD11F427E /* ReplyLog.swift */,
+				5C7808A38A1F6940CA5DDEAD /* ComposeFlow.swift */,
+				57B8A313F412207B35AFA0F6 /* ComposeService.swift */,
 			);
 			path = AI;
 			sourceTree = "<group>";
@@ -413,6 +435,7 @@
 				398C8882204746956568437B /* KeyboardGeometryTests.swift */,
 				46D72A31038F46AE656C391A /* KeyboardTypingTests.swift */,
 				92BBF6A438708D8B8E6BA758 /* ReplyComposerFlowTests.swift */,
+				745609BA43F5F96E4D121ADA /* ComposeFlowTests.swift */,
 				3B63EAE7C04E1450F83BA6DA /* AILimitsTests.swift */,
 				CF7BA3F5F2817FDF8AA035A9 /* SignInTests.swift */,
 			);
@@ -695,6 +718,7 @@
 				06375B2C00A28C468857A87F /* KeyboardGeometryTests.swift in Sources */,
 				127D5EAB9CA6C876FFCF7D0D /* KeyboardTypingTests.swift in Sources */,
 				6EE606B35D2E5FE5C9439D0E /* ReplyComposerFlowTests.swift in Sources */,
+				F8B02C43C4467CC82CA421AE /* ComposeFlowTests.swift in Sources */,
 				F9AA999AAC9390FC58AD7E43 /* AILimitsTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -707,6 +731,7 @@
 				7B5D2FA3251FECDC2FB97FBD /* AccountCredentials.swift in Sources */,
 				DF8C5C5873AA32EF1085AB67 /* AccountModels.swift in Sources */,
 				B89D40A24C499A96CDF9F341 /* AccountReplyTransport.swift in Sources */,
+				14034882A8B12D40993A6307 /* AccountComposeTransport.swift in Sources */,
 				5BE5560BF23634C47B8063B0 /* AccountService.swift in Sources */,
 				3F827A67EF36C9FF51A0176D /* AccountSession.swift in Sources */,
 				73136265574692ACA84C492F /* AccountUsageCache.swift in Sources */,
@@ -714,6 +739,7 @@
 				8DED530D35EE9DCCDFF88D66 /* AIReplyError.swift in Sources */,
 				AD5DE35FBF494B15CA36765D /* AIReplyService.swift in Sources */,
 				33511736BECB200BFCA4AB96 /* AIReplyStrings.swift in Sources */,
+				6AF727AA7F9D2425CEAE391C /* ComposeStrings.swift in Sources */,
 				CD7120FABE7D56C88B3A37AB /* AppGroup.swift in Sources */,
 				6F7F89531AD24EBC66706589 /* AppLanguage.swift in Sources */,
 				781ADFB2240543B236BB86C7 /* BusinessContext.swift in Sources */,
@@ -743,6 +769,9 @@
 				81B9A426BF614963BABED511 /* AILimits.swift in Sources */,
 				4B7A0785839F7BF185C172B2 /* ReplyDraftHistory.swift in Sources */,
 				9593CD67B2ADA3E13B43F949 /* ReplyComposerFlow.swift in Sources */,
+				0B765D0DBF1447BA7190C6A6 /* ReplyLog.swift in Sources */,
+				3BD25C58D678587BA6FA4D43 /* ComposeFlow.swift in Sources */,
+				FC29F58B0FC374610D197D7C /* ComposeService.swift in Sources */,
 				6DB8105DFE16B249C1901500 /* KeyboardKeysView.swift in Sources */,
 				2CC86666CCD6CB80E9437EBC /* ComposerTextView.swift in Sources */,
 				04B6E4174EC0FF924BB42DE2 /* DebugReplyMock.swift in Sources */,
@@ -757,6 +786,7 @@
 				6C62894DCD55DDFF50B7B883 /* AccountCredentials.swift in Sources */,
 				D01C8901F2D3D9DAAF9139E2 /* AccountModels.swift in Sources */,
 				ABB392343340956522324197 /* AccountReplyTransport.swift in Sources */,
+				F95F884C5CFEE349F875468F /* AccountComposeTransport.swift in Sources */,
 				13BC0B156FFD00B6367EBE6A /* AccountService.swift in Sources */,
 				121C380FECD50CF6D4922282 /* AccountSession.swift in Sources */,
 				6CE3F7715819453B284C3649 /* AccountUsageCache.swift in Sources */,
@@ -777,6 +807,7 @@
 				CE9B6A3980A50D46C2C537FA /* AIReplyError.swift in Sources */,
 				733EBA1001B06E01604AE508 /* AIReplyService.swift in Sources */,
 				7C226A5CD29188B4ABCBAFBC /* AIReplyStrings.swift in Sources */,
+				A3418DDB4589852A96B16D60 /* ComposeStrings.swift in Sources */,
 				A8F73103B522FDC9EBD2148A /* AppGroup.swift in Sources */,
 				0CBB838F77B32427AA943FC2 /* AppLanguage.swift in Sources */,
 				93B36735156F76E6DA11371F /* AppMarkView.swift in Sources */,
@@ -817,6 +848,9 @@
 				B89E5E6DDCE4C88FC2B06E80 /* AILimits.swift in Sources */,
 				03C008B41C15696F5EC1BB0A /* ReplyDraftHistory.swift in Sources */,
 				C1E4C551DBA2E0A7F2D2DD2D /* ReplyComposerFlow.swift in Sources */,
+				E79F9777E323760343FEEA7D /* ReplyLog.swift in Sources */,
+				D9C6B3902D566C8DC4370D74 /* ComposeFlow.swift in Sources */,
+				3F4E354B5E26BDAD53BD5903 /* ComposeService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

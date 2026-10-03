@@ -264,6 +264,10 @@ extension AccountAPI {
     struct Features: Decodable, Sendable, Equatable {
         /// The reply request's `profile` block accepts `reply_language`.
         let replyPreferences: Bool?
+        /// `POST /api/v1/ai/compose` exists (writing a message from an
+        /// instruction). Informational: the keyboard always offers Create and
+        /// a server without it answers with a plain error.
+        let compose: Bool?
         /// Sign-in methods the server accepts right now. nil on older servers.
         let emailOTP: Bool?
         let googleSignIn: Bool?
@@ -271,6 +275,7 @@ extension AccountAPI {
 
         enum CodingKeys: String, CodingKey {
             case replyPreferences = "reply_preferences"
+            case compose
             case emailOTP = "email_otp"
             case googleSignIn = "google_sign_in"
             case appleSignIn = "apple_sign_in"
@@ -285,6 +290,18 @@ extension AccountAPI {
 
         enum CodingKeys: String, CodingKey {
             case reply, usage
+            case detectedLanguage = "detected_language"
+        }
+    }
+
+    /// `POST /api/v1/ai/compose`.
+    struct ComposeResponse: Decodable, Sendable {
+        let text: String
+        let detectedLanguage: String?
+        let usage: Usage
+
+        enum CodingKeys: String, CodingKey {
+            case text, usage
             case detectedLanguage = "detected_language"
         }
     }

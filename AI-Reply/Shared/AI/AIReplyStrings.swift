@@ -112,6 +112,12 @@ struct AIReplyStrings: Sendable {
     // Quick intents
     let quickIntents: [QuickIntent]
 
+    /// Which table this is.
+    let appLanguage: AppLanguage
+
+    /// The "Create" mode: writing a new message from a description.
+    var compose: ComposeStrings { ComposeStrings.forLanguage(appLanguage) }
+
     static func forLanguage(_ language: AppLanguage) -> AIReplyStrings {
         switch language {
         case .english: return .english
@@ -137,6 +143,8 @@ struct AIReplyStrings: Sendable {
         case .quotaExhausted:             return quotaExhausted
         case .emptyResponse:              return emptyResponse
         case .serviceUnavailable:         return serviceUnavailable
+        case .noInstruction:              return compose.noInstruction
+        case .instructionTooLong(let limit): return compose.instructionTooLong(limit: limit)
         }
     }
 
@@ -204,7 +212,8 @@ struct AIReplyStrings: Sendable {
             QuickIntent(id: "friendly", label: "Friendly", phrase: "Answer in a warm, friendly way."),
             QuickIntent(id: "thanks", label: "Thank them", phrase: "Thank them."),
             QuickIntent(id: "reschedule", label: "Another time", phrase: "Suggest a different time.")
-        ]
+        ],
+        appLanguage: .english
     )
 
     private static let russian = AIReplyStrings(
@@ -259,7 +268,8 @@ struct AIReplyStrings: Sendable {
             QuickIntent(id: "friendly", label: "Дружелюбно", phrase: "Ответь тепло и дружелюбно."),
             QuickIntent(id: "thanks", label: "Поблагодарить", phrase: "Поблагодари."),
             QuickIntent(id: "reschedule", label: "Другое время", phrase: "Предложи другое время.")
-        ]
+        ],
+        appLanguage: .russian
     )
 
     private static let kazakh = AIReplyStrings(
@@ -314,7 +324,8 @@ struct AIReplyStrings: Sendable {
             QuickIntent(id: "friendly", label: "Достық", phrase: "Жылы, достық үнмен жауап бер."),
             QuickIntent(id: "thanks", label: "Алғыс айту", phrase: "Алғыс айт."),
             QuickIntent(id: "reschedule", label: "Басқа уақыт", phrase: "Басқа уақыт ұсын.")
-        ]
+        ],
+        appLanguage: .kazakh
     )
 
     private static let uzbek = AIReplyStrings(
@@ -369,6 +380,7 @@ struct AIReplyStrings: Sendable {
             QuickIntent(id: "friendly", label: "Do‘stona", phrase: "Iliq, do‘stona javob ber."),
             QuickIntent(id: "thanks", label: "Minnatdorchilik", phrase: "Minnatdorchilik bildir."),
             QuickIntent(id: "reschedule", label: "Boshqa vaqt", phrase: "Boshqa vaqt taklif qil.")
-        ]
+        ],
+        appLanguage: .uzbek
     )
 }

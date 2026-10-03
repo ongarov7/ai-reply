@@ -26,6 +26,18 @@ final class ComposerTextView: UITextView {
         didSet { placeholderLabel.text = placeholder }
     }
 
+    /// How many lines the placeholder may wrap to. One - shrinking to fit -
+    /// by default; the Create field's placeholder carries an example and
+    /// wraps instead of being cut.
+    var placeholderLines = 1 {
+        didSet {
+            guard placeholderLines != oldValue else { return }
+            placeholderLabel.numberOfLines = placeholderLines
+            placeholderLabel.adjustsFontSizeToFitWidth = placeholderLines == 1
+            setNeedsLayout()
+        }
+    }
+
     var caretColor: UIColor = .systemBlue {
         didSet { caretView.backgroundColor = caretColor }
     }
@@ -86,12 +98,15 @@ final class ComposerTextView: UITextView {
     override func layoutSubviews() {
         super.layoutSubviews()
         let inset = textContainerInset
-        placeholderLabel.frame = CGRect(
-            x: inset.left,
-            y: inset.top,
-            width: max(0, bounds.width - inset.left - inset.right),
-            height: (font ?? .systemFont(ofSize: 16)).lineHeight
-        )
+        let width = max(0, bounds.width - inset.left - inset.right)
+        let lineHeight = (font ?? .systemFont(ofSize: 16)).lineHeight
+        var height = lineHeight
+        if placeholderLines > 1 {
+            // Top-aligned with the caret: only as tall as the text it wraps to.
+            let room = min(lineHeight * CGFloat(placeholderLines), max(lineHeight, bounds.height - inset.top - inset.bottom))
+            height = min(room, ceil(placeholderLabel.sizeThatFits(CGSize(width: width, height: room)).height))
+        }
+        placeholderLabel.frame = CGRect(x: inset.left, y: inset.top, width: width, height: height)
         updateCaret()
     }
 

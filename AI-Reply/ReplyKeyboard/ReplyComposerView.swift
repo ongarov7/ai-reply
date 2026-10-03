@@ -23,6 +23,8 @@ protocol ReplyComposerViewDelegate: AnyObject {
     /// One of the three texts changed through the keys or a quick intent.
     func composer(_ composer: ReplyComposerView, didEdit field: ReplyComposerView.Field, text: String)
     func composerDidChangeHeight(_ composer: ReplyComposerView)
+    /// Create mode: discard the instruction and every version.
+    func composerDidTapNew(_ composer: ReplyComposerView)
 }
 
 /// The AI reply composer.
@@ -58,6 +60,19 @@ final class ReplyComposerView: UIView {
         case draft
     }
 
+    /// What the panel is for.
+    ///
+    /// * `reply` - answering a copied message: persona, message, instruction.
+    /// * `compose` - "Create": writing a new message from a description. No
+    ///   persona and no message; a title, New, and a roomier instruction.
+    ///
+    /// Same stages, same keys, same Insert; only the header, the field sizes,
+    /// the quick intents and the words differ.
+    enum Mode: Equatable {
+        case reply
+        case compose
+    }
+
     struct Content {
         var personaName: String
         var source: String
@@ -66,11 +81,13 @@ final class ReplyComposerView: UIView {
         var errorMessage: String?
         var sourceLimit: Int
         var instructionLimit: Int
+        var mode: Mode = .reply
     }
 
     // MARK: State
 
     private(set) var flow = ReplyComposerFlow()
+    private(set) var mode: Mode = .reply
     private(set) var focus: Field = .instruction
     private var errorMessage: String?
     private var sourceLimit = AILimits.fallback.sourceCharacters
@@ -90,12 +107,22 @@ final class ReplyComposerView: UIView {
     /// True while the whole message is open, which the controller allows a
     /// little more keyboard height for. It stays true through the "field is
     /// not empty" question, so the keyboard keeps its height there too.
-    var wantsExpandedContext: Bool { isSourceExpanded }
+    ///
+    /// A composed message is usually longer than a reply (a congratulation
+    /// runs to several lines), so its result asks for the same extra room.
+    var wantsExpandedContext: Bool { isSourceExpanded || (isCompose && flow.showsReply) }
+
+    private var isCompose: Bool { mode == .compose }
 
     /// The composer's height when the "field is not empty" question appeared.
     /// The question keeps it: the keys must not jump up for one question and
     /// back down after it.
     private var conflictHeight: CGFloat = 0
+
+    /// Create only: whether the instruction was empty at the last refresh.
+    /// Write and New depend on it, so the panel refreshes when it flips -
+    /// not on every keystroke.
+    private var instructionWasEmpty = true
 
     /// Views that were visible in the previous layout pass. Everything else
     /// is placed without animation - see `place(_:_:)`.
@@ -111,6 +138,11 @@ final class ReplyComposerView: UIView {
     private let previewButton = UIButton(type: .system)
     private let counterLabel = UILabel()
     private let closeButton = CircleIconButton(symbol: "xmark", pointSize: 12)
+
+    // Create header
+    private let titleIcon = UIImageView()
+    private let titleLabel = UILabel()
+    private let newButton = UIButton(type: .system)
 
     // Full message
     private let sourceCard = UIView()
@@ -195,6 +227,16 @@ final class ReplyComposerView: UIView {
 
         closeButton.addTarget(self, action: #selector(closeTapped), for: .touchUpInside)
 
+        titleIcon.image = UIImage(systemName: "sparkles",
+                                  withConfiguration: UIImage.SymbolConfiguration(pointSize: 13, weight: .semibold))
+        titleIcon.contentMode = .center
+        titleLabel.font = .systemFont(ofSize: 14, weight: .semibold)
+        titleLabel.adjustsFontSizeToFitWidth = true
+        titleLabel.minimumScaleFactor = 0.85
+        titleLabel.accessibilityTraits = .header
+        configurePill(newButton, symbol: "square.and.pencil", trailingImage: false)
+        newButton.addTarget(self, action: #selector(newTapped), for: .touchUpInside)
+
         sourceCard.layer.cornerRadius = 9
         sourceCard.layer.cornerCurve = .continuous
         quoteBar.layer.cornerRadius = 1.5
@@ -252,7 +294,8 @@ final class ReplyComposerView: UIView {
             button.addTarget(self, action: action, for: .touchUpInside)
         }
 
-        [personaChip, previewButton, counterLabel, closeButton, sourceCard, instructionView, draftView,
+        [personaChip, previewButton, counterLabel, closeButton, titleIcon, titleLabel, newButton,
+         sourceCard, instructionView, draftView,
          errorLabel, conflictLabel, quickActions, primaryButton, backButton, regenerateButton, editButton,
          previousButton, versionLabel, nextButton, insertButton, replaceButton, appendButton,
          conflictCancelButton].forEach(panel.addSubview)
@@ -282,9 +325,13 @@ final class ReplyComposerView: UIView {
     func configure(theme: KeyboardTheme, uiLanguage: AppLanguage) {
         self.theme = theme
         self.strings = AIReplyStrings.forLanguage(uiLanguage)
-        quickActions.configure(theme: theme, strings: strings)
+        quickActions.configure(theme: theme, strings: strings, intents: currentIntents)
         applyTheme()
         refresh()
+    }
+
+    private var currentIntents: [QuickIntent] {
+        isCompose ? strings.compose.intents : strings.quickIntents
     }
 
     func layout(forWidth width: CGFloat) {
@@ -307,6 +354,11 @@ final class ReplyComposerView: UIView {
     func render(_ content: Content) {
         let previous = flow
         let wasConflict = Self.isConflictStage(previous.stage)
+        if content.mode != mode {
+            mode = content.mode
+            isSourceExpanded = false
+            quickActions.showIntents(currentIntents)
+        }
         flow = content.flow
         if isConflict && !wasConflict {
             conflictHeight = preferredHeight
@@ -348,6 +400,10 @@ final class ReplyComposerView: UIView {
     /// Back to a clean slate when the composer closes.
     func reset() {
         flow = ReplyComposerFlow()
+        if mode != .reply {
+            mode = .reply
+            quickActions.showIntents(currentIntents)
+        }
         focus = .instruction
         errorMessage = nil
         isSourceExpanded = false
@@ -374,6 +430,10 @@ final class ReplyComposerView: UIView {
         previewButton.configuration?.baseForegroundColor = theme.quoteText
         previewButton.tintColor = theme.secondaryText
         counterLabel.textColor = theme.secondaryText
+        titleIcon.tintColor = theme.accent
+        titleLabel.textColor = theme.primaryText
+        newButton.configuration?.background.backgroundColor = theme.fieldBackground
+        newButton.configuration?.baseForegroundColor = theme.primaryText
 
         sourceCard.backgroundColor = theme.quoteBackground
         quoteBar.backgroundColor = theme.accent.withAlphaComponent(0.75)
@@ -458,14 +518,33 @@ final class ReplyComposerView: UIView {
         sourceView.placeholder = strings.noSourceMessage
         sourceView.accessibilityLabel = strings.copiedMessage
 
+        // Create: no persona and no message - a title, and New once there is
+        // something to clear.
+        let compose = strings.compose
+        let hasInstruction = !instructionText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        titleIcon.isHidden = !isCompose
+        titleLabel.isHidden = !isCompose
+        titleLabel.text = compose.title
+        newButton.isHidden = !isCompose || isConflict || (!hasInstruction && flow.drafts.isEmpty)
+        applyText(compose.newDraft, to: newButton, size: 13, weight: .semibold)
+        newButton.accessibilityLabel = compose.newDraftAccessibility
+        personaChip.isHidden = isCompose
+        if isCompose {
+            previewButton.isHidden = true
+            counterLabel.isHidden = true
+            sourceCard.isHidden = true
+        }
+        instructionWasEmpty = !hasInstruction
+
         // Fields
         instructionView.isHidden = !composingLike || isConflict
-        instructionView.placeholder = strings.instructionPlaceholder
-        instructionView.accessibilityLabel = strings.instructionPlaceholder
+        instructionView.placeholder = isCompose ? compose.placeholder : strings.instructionPlaceholder
+        instructionView.placeholderLines = isCompose ? 3 : 1
+        instructionView.accessibilityLabel = instructionView.placeholder
         instructionView.alpha = flow.isGenerating ? 0.6 : 1
         draftView.isHidden = !replyLike
         draftView.alpha = flow.generationOrigin == .result ? 0.55 : 1
-        draftView.accessibilityLabel = strings.draftTitle
+        draftView.accessibilityLabel = isCompose ? compose.draftTitle : strings.draftTitle
 
         sourceView.showsCaret = focus == .source && stage == .composing
         instructionView.showsCaret = focus == .instruction && stage == .composing
@@ -481,16 +560,22 @@ final class ReplyComposerView: UIView {
         quickActions.setEnabled(stage == .composing)
         primaryButton.isHidden = !composingLike || isConflict
         let overLimit = count > sourceLimit
-        let canGenerate = stage == .composing && hasSource && !overLimit
+        let canGenerate = isCompose
+            ? stage == .composing && hasInstruction
+            : stage == .composing && hasSource && !overLimit
         let primaryTitle: String
         if flow.isGenerating {
             primaryTitle = strings.stop
         } else if errorMessage != nil {
             primaryTitle = strings.retry
         } else {
-            primaryTitle = strings.generate
+            primaryTitle = isCompose ? compose.write : strings.generate
         }
         applyText(primaryTitle, to: primaryButton, size: 15, weight: .semibold)
+        primaryButton.configuration?.image = isCompose && !flow.isGenerating
+            ? UIImage(systemName: "sparkles", withConfiguration: UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold))
+            : nil
+        primaryButton.configuration?.imagePadding = 5
         primaryButton.configuration?.showsActivityIndicator = flow.isGenerating
         primaryButton.isEnabled = canGenerate || flow.isGenerating
         primaryButton.configuration?.background.backgroundColor = (canGenerate || flow.isGenerating)
@@ -515,7 +600,7 @@ final class ReplyComposerView: UIView {
         nextButton.accessibilityLabel = strings.nextVersion
 
         // Back stays live while a new version is made: it stops the request.
-        backButton.accessibilityLabel = strings.back
+        backButton.accessibilityLabel = isCompose ? compose.editRequest : strings.back
         // While a new version is being made the same button stops it: a
         // spinner in place of the arrow, and a tap cancels.
         let regenerating = flow.generationOrigin == .result
@@ -615,8 +700,10 @@ final class ReplyComposerView: UIView {
 
         if flow.showsReply {
             let natural = naturalLines(of: draftView, width: width)
-            let minimum = maximumHeight < 190 ? 2 : 3
-            let wanted = min(max(natural, minimum), 6)
+            // A composed message is read before it is sent, and is usually
+            // longer than a reply: it gets more lines when there is room.
+            let minimum = isCompose ? (maximumHeight < 190 ? 3 : 4) : (maximumHeight < 190 ? 2 : 3)
+            let wanted = min(max(natural, minimum), isCompose ? 8 : 6)
             var field = lines(draftView.font, wanted, inset: draftView.textContainerInset)
             let floor = lines(draftView.font, 2, inset: draftView.textContainerInset)
             let budget = maximumHeight - chrome - errorBlock - sourceBlock
@@ -626,7 +713,16 @@ final class ReplyComposerView: UIView {
             let two = lines(instructionView.font, 2, inset: instructionView.textContainerInset)
             let one = lines(instructionView.font, 1, inset: instructionView.textContainerInset)
             let budget = maximumHeight - chrome - errorBlock - sourceBlock
-            plan.field = budget >= two ? two : one
+            if isCompose {
+                // The instruction IS the request here - often two or three
+                // sentences - so it gets a real text area: four lines where
+                // the screen allows, three on a small one. It scrolls beyond.
+                let wanted = maximumHeight >= 200 ? 4 : 3
+                let candidates = (1...wanted).reversed().map { lines(instructionView.font, $0, inset: instructionView.textContainerInset) }
+                plan.field = candidates.first { $0 <= budget } ?? one
+            } else {
+                plan.field = budget >= two ? two : one
+            }
         }
 
         plan.total = (chrome + errorBlock + sourceBlock + plan.field).rounded(.up)
@@ -658,10 +754,16 @@ final class ReplyComposerView: UIView {
         let left = innerInset
         var y = innerInset / 2
 
-        // Header: persona, message preview, counter, close.
+        // Header: persona, message preview, counter, close - or, in Create,
+        // a title, New and close.
         let chipWidth = min(max(personaChip.intrinsicContentSize.width, 64), 140)
         place(personaChip, CGRect(x: left, y: y + 1, width: chipWidth, height: headerHeight - 2))
         place(closeButton, CGRect(x: left + width - 28, y: y + 1, width: 28, height: 28))
+        let newWidth = min(max(64, ceil(newButton.intrinsicContentSize.width)), width * 0.4)
+        place(newButton, CGRect(x: closeButton.frame.minX - 6 - newWidth, y: y + 1, width: newWidth, height: headerHeight - 2))
+        place(titleIcon, CGRect(x: left + 2, y: y, width: 20, height: headerHeight))
+        let titleRight = newButton.isHidden ? closeButton.frame.minX - 6 : newButton.frame.minX - 6
+        place(titleLabel, CGRect(x: titleIcon.frame.maxX + 5, y: y, width: max(0, titleRight - titleIcon.frame.maxX - 5), height: headerHeight))
         var previewRight = closeButton.frame.minX - 6
         if !counterLabel.isHidden {
             let counterWidth = ceil(counterLabel.sizeThatFits(CGSize(width: 90, height: 20)).width)
@@ -824,6 +926,11 @@ final class ReplyComposerView: UIView {
             // The counter follows the message as it is edited; nothing else
             // in the header does.
             refresh()
+        } else if field == .instruction, isCompose,
+                  view.currentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != instructionWasEmpty {
+            // Create: Write and New wake up with the first character and go
+            // quiet when the field is emptied again.
+            refresh()
         } else if field == .draft {
             let canInsert = !view.currentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             insertButton.isEnabled = canInsert
@@ -843,6 +950,7 @@ final class ReplyComposerView: UIView {
 
     @objc private func personaTapped() { delegate?.composerDidTapPersona(self) }
     @objc private func closeTapped() { delegate?.composerDidTapClose(self) }
+    @objc private func newTapped() { delegate?.composerDidTapNew(self) }
     @objc private func pasteTapped() { delegate?.composerDidTapPaste(self) }
     @objc private func backTapped() { delegate?.composerDidTapBack(self) }
     @objc private func editTapped() { delegate?.composerDidTapEdit(self) }

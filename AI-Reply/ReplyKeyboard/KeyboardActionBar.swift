@@ -17,21 +17,26 @@ enum ComposerEvent {
     case nextVersion
     case resolveConflict(ReplyComposerFlow.ConflictChoice)
     case edited(ReplyComposerView.Field, String)
+    /// Create mode: start over with an empty instruction.
+    case reset
 }
 
 protocol KeyboardActionBarDelegate: AnyObject {
     func actionBar(_ bar: KeyboardActionBar, didSelectTemplateID id: String)
     func actionBarDidRequestNewTemplate(_ bar: KeyboardActionBar)
+    /// "Create" on the persona row: write a new message with AI.
+    func actionBarDidRequestCompose(_ bar: KeyboardActionBar)
     func actionBar(_ bar: KeyboardActionBar, didSend event: ComposerEvent)
     func actionBarDidChangeHeight(_ bar: KeyboardActionBar)
 }
 
 /// The area above the keys. Two shapes:
 ///
-/// * PERSONAS - a 36pt row: Дос | Клиент | Бизнес | Жұмыс | + , plus a
-///   transient status line that changes no geometry. This is the keyboard at
-///   rest; its height is what gets cached for the next launch.
-/// * COMPOSER - the AI reply composer (`ReplyComposerView`).
+/// * PERSONAS - a 36pt row: Дос | Клиент | Бизнес | Жұмыс | + | ✨ Create,
+///   plus a transient status line that changes no geometry. This is the
+///   keyboard at rest; its height is what gets cached for the next launch.
+/// * COMPOSER - the AI composer (`ReplyComposerView`), answering a copied
+///   message or, after Create, writing a new one.
 ///
 /// Neither ever takes height from the keys: the keyboard grows instead, up to
 /// the ceiling the controller hands down.
@@ -191,6 +196,10 @@ extension KeyboardActionBar: TemplateBarViewDelegate {
     func templateBarDidRequestNewTemplate(_ bar: TemplateBarView) {
         delegate?.actionBarDidRequestNewTemplate(self)
     }
+
+    func templateBarDidTapCreate(_ bar: TemplateBarView) {
+        delegate?.actionBarDidRequestCompose(self)
+    }
 }
 
 // MARK: - Composer
@@ -202,6 +211,7 @@ extension KeyboardActionBar: ReplyComposerViewDelegate {
     }
 
     func composerDidTapClose(_ composer: ReplyComposerView) { send(.close) }
+    func composerDidTapNew(_ composer: ReplyComposerView) { send(.reset) }
     func composerDidTapPersona(_ composer: ReplyComposerView) { send(.changePersona) }
     func composerDidTapPaste(_ composer: ReplyComposerView) { send(.paste) }
     func composerDidTapGenerate(_ composer: ReplyComposerView) { send(.generate) }
