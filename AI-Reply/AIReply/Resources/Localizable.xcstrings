@@ -1929,25 +1929,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Open iOS Settings"
+            "value" : "Open Keyboard Settings"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iOS параметрлерін ашу"
+            "value" : "Пернетақта параметрлерін ашу"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Открыть настройки iOS"
+            "value" : "Открыть настройки клавиатуры"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iOS sozlamalarini ochish"
+            "value" : "Klaviatura sozlamalarini ochish"
           }
         }
       }
@@ -2425,25 +2425,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tap Open iOS Settings below"
+            "value" : "Tap Open Keyboard Settings below"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Төмендегі «iOS параметрлерін ашу» түймесін басыңыз"
+            "value" : "Төмендегі «Пернетақта параметрлерін ашу» түймесін басыңыз"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Нажмите «Открыть настройки iOS» ниже"
+            "value" : "Нажмите «Открыть настройки клавиатуры» ниже"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Quyidagi «iOS sozlamalarini ochish» tugmasini bosing"
+            "value" : "Quyidagi «Klaviatura sozlamalarini ochish» tugmasini bosing"
           }
         }
       }

@@ -147,8 +147,10 @@ struct KeyboardSetupView: View {
                 // keyboards, with the Full Access switch. That is the short
                 // path the steps describe; the footer keeps the long one
                 // (General ▸ Keyboard) for anyone who does not see it.
-                Button("home.keyboard.openSettings") { openSystemSettings() }
-                    .buttonStyle(.dsSecondary)
+                Button(action: openSystemSettings) {
+                    Label("home.keyboard.openSettings", systemImage: "keyboard")
+                }
+                .buttonStyle(.dsPrimary)
                 Text("setup.steps.footer")
                     .font(.footnote)
                     .foregroundStyle(.secondary)

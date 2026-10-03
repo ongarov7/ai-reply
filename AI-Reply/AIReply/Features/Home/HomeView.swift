@@ -7,9 +7,11 @@ struct HomeView: View {
     @Environment(ReplyConfigurationModel.self) private var model
     @Environment(AccountModel.self) private var account
 
-    /// Read once per appearance rather than polled: the keyboard writes this
-    /// flag when it runs, and it cannot change while this screen is in front.
+    /// Read on appearance and on every return to the foreground - typically
+    /// from iOS Settings, or from another app where the keyboard just ran and
+    /// reported in. Never polled.
     @State private var keyboardStatus = KeyboardStatus.current()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         ScrollView {
@@ -40,6 +42,9 @@ struct HomeView: View {
         }
         .onAppear {
             keyboardStatus = .current()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { keyboardStatus = .current() }
         }
         .task {
             await account.refresh()
@@ -150,30 +155,40 @@ struct HomeView: View {
 
                 if keyboardStatus.isConfigured {
                     Label {
-                        Text(fullAccessKey)
+                        Text(fullAccessKey).foregroundStyle(.primary)
                     } icon: {
-                        Image(systemName: keyboardStatus.hasFullAccess ? "lock.open" : "lock")
+                        Image(systemName: keyboardStatus.hasFullAccess ? "lock.open.fill" : "lock.fill")
+                            .foregroundStyle(keyboardStatus.hasFullAccess ? Color.green : Color.orange)
                     }
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .font(.subheadline)
                 }
 
                 if !keyboardStatus.isConfigured {
                     KeyboardSetupSteps().padding(.top, DS.Spacing.xxs)
                 }
 
-                HStack(spacing: DS.Spacing.s) {
-                    Button("home.keyboard.openSettings") { openSystemSettings() }
-                        .buttonStyle(.dsSecondary)
-                    NavigationLink { KeyboardSetupView() } label: {
-                        Text("settings.setup.guide")
+                // ONE action, and only while something is left to do. "Open
+                // iOS Settings" and "Keyboard setup" used to sit side by side
+                // and both ended on the same iOS page; the step-by-step guide
+                // stays in Settings ▸ Keyboard setup.
+                if needsKeyboardSetup {
+                    Button(action: openSystemSettings) {
+                        Label("home.keyboard.openSettings", systemImage: "keyboard")
                     }
-                    .buttonStyle(.dsSecondary)
+                    .buttonStyle(.dsPrimary)
+                    .padding(.top, DS.Spacing.xxs)
                 }
-                .padding(.top, DS.Spacing.xxs)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .dsCard()
         }
+    }
+
+    /// The keyboard has not reported in yet, or it runs without Full Access.
+    /// Both are only ever cleared by the keyboard itself writing its state,
+    /// so a "done" here is something it actually observed.
+    private var needsKeyboardSetup: Bool {
+        !keyboardStatus.isConfigured || !keyboardStatus.hasFullAccess
     }
 
     private var howItWorks: some View {
