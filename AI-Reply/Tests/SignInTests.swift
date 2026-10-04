@@ -87,7 +87,7 @@ final class SignInTests: XCTestCase {
 
         XCTAssertNil(GoogleSignInProvider.clientID(info: ["GIDClientID": id]),
                      "without the URL scheme the SDK would crash the app")
-        let placeholder: [String: Any] = ["CFBundleURLSchemes": ["kz.yerek.replykeyboard.google-signin"]]
+        let placeholder: [String: Any] = ["CFBundleURLSchemes": ["kz.ai-reply.reply.keyboard.keyboard.google-signin"]]
         XCTAssertNil(GoogleSignInProvider.clientID(info: ["GIDClientID": id, "CFBundleURLTypes": [placeholder]]))
         XCTAssertNil(GoogleSignInProvider.clientID(info: ["GIDClientID": "", "CFBundleURLTypes": [registered]]),
                      "an empty build setting keeps the button hidden")
