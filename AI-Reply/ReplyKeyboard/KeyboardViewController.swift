@@ -761,19 +761,17 @@ final class KeyboardViewController: UIInputViewController {
     /// versions - the same panel in its compose mode.
     private func renderCompose(_ session: ComposeSession) {
         let flow = session.flow
-        let message = flow.error.map { error in
-            // The reply sentence talks about a copied message; Create has none.
-            error == .fullAccessRequired ? aiStrings.compose.fullAccessRequired : aiStrings.message(for: error)
-        }
+        let notice = session.notice(aiStrings)
         actionBar.render(ReplyComposerView.Content(
             personaName: "",
             source: "",
             instruction: session.instruction,
             flow: flow,
-            errorMessage: (message?.isEmpty ?? true) ? nil : message,
+            errorMessage: notice?.text,
             sourceLimit: AILimits.current.sourceCharacters,
             instructionLimit: AILimits.current.instructionCharacters,
-            mode: .compose
+            mode: .compose,
+            errorOffersRetry: notice?.offersRetry ?? true
         ))
         keysView.isInputDimmed = flow.isGenerating
         if flow.stage != .composing { polisher.stop() }
@@ -1205,7 +1203,7 @@ extension KeyboardViewController: KeyboardActionBarDelegate {
             case .draft: replyCoordinator.updateDraft(text)
             case .none: break
             }
-        case .reset:
+        case .reset, .replyToCopied:
             break
         }
     }
@@ -1253,10 +1251,35 @@ extension KeyboardViewController: KeyboardActionBarDelegate {
             case .draft: composeCoordinator.updateDraft(text)
             case .source, .none: break
             }
+        case .replyToCopied:
+            replyToCopiedFromCreate()
         case .changePersona, .paste:
             // Create has no persona and no copied message.
             break
         }
+    }
+
+    /// "Reply to copied" in Create: the copied message is read now - this
+    /// tap is the user's gesture, as a persona tap is - and the panel
+    /// becomes the reply composer with it, the persona used last and the
+    /// instruction typed here. Nothing is generated: Reply is still the
+    /// user's tap. Nothing copied, or no Full Access: Create stays and
+    /// says so.
+    private func replyToCopiedFromCreate() {
+        let lastUsed = SharedSettings.shared.lastTemplateID
+        // A persona the configuration has not loaded yet is looked up
+        // once, on this tap.
+        if let lastUsed { _ = resolveTemplate(id: lastUsed) }
+        let persona = replyCoordinator.configuration.personaForCopiedReply(lastUsedID: lastUsed)
+        let proxy = textDocumentProxy
+        let fullAccess = hasFullAccess
+        guard let reply = composeCoordinator.replyToCopied(
+            persona: persona,
+            instructionLimit: ReplyInstruction.maximumCharacters,
+            read: { replyCoordinator.readCopiedMessage(proxy: proxy, hasFullAccess: fullAccess) }
+        ) else { return }
+        polisher.stop()
+        replyCoordinator.open(handedOff: reply)
     }
 }
 

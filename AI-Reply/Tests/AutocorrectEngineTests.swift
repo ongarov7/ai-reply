@@ -293,6 +293,48 @@ final class AutocorrectEngineTests: XCTestCase {
 
     // MARK: Helpers
 
+    // MARK: Instructions
+
+    /// What people type into ✨ Create (and a reply's instruction) to tell
+    /// the AI what to write - short requests, often one word - stays exactly
+    /// as typed: no word of it is changed by a space, a comma or Return, on
+    /// any layout, lower-case or capitalised at the start as the composer
+    /// types it. (Russian words on the Kazakh layout included.)
+    func testInstructionsAreLeftAsTyped() throws {
+        let cases: [(KeyboardLanguage, [String])] = [
+            (.russian, ["вежливо откажи", "да", "согласен", "скажи, что согласен", "ответь, что приду завтра",
+                        "поблагодари и откажи", "нет"]),
+            (.kazakh, ["иә", "жоқ", "сыпайы бас тарт", "келісемін", "келісетінімді айт", "рахмет айт",
+                       "вежливо откажи", "да", "скажи, что согласен"]),
+            (.english, ["yes", "no", "politely decline", "say I agree", "tell him I'm busy", "thank her and say no"])
+        ]
+        for (language, instructions) in cases {
+            let engine = try AutocorrectFixtures.engine(language)
+            for instruction in instructions {
+                for typed in [instruction, instruction.prefix(1).uppercased() + instruction.dropFirst()] {
+                    for end in Self.wordEnds(in: typed) {
+                        let before = String(typed[..<end])
+                        XCTAssertNil(correction(before, engine), "\(language.rawValue): «\(before)» in «\(typed)»")
+                    }
+                }
+            }
+        }
+    }
+
+    /// Where each word of `text` ends: where a separator would be typed.
+    private static func wordEnds(in text: String) -> [String.Index] {
+        var ends: [String.Index] = []
+        var index = text.startIndex
+        while index < text.endIndex {
+            let next = text.index(after: index)
+            if text[index].isLetter, next == text.endIndex || !(text[next].isLetter || text[next] == "'") {
+                ends.append(next)
+            }
+            index = next
+        }
+        return ends
+    }
+
     private func correction(_ text: String, _ engine: AutocorrectEngine, session: AutocorrectSession? = nil) -> String? {
         guard let word = TypedWord(before: text) else { return nil }
         return engine.correction(for: word, session: session)?.replacement

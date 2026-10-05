@@ -285,6 +285,267 @@ final class ComposeFlowTests: XCTestCase {
         try? await Task.sleep(for: .milliseconds(20))
         XCTAssertTrue(scripted.requests.isEmpty)
     }
+
+    // MARK: Reply to copied
+
+    private let copied = ReplyContext(text: "Придёшь завтра на встречу в 10?", source: .clipboard)
+    private let friend = ReplyTemplate.builtIn(.friend, sortIndex: 0)
+
+    /// The instruction typed in Create becomes the reply's instruction, the
+    /// copied message its source - and nothing is written: not in Create,
+    /// not in the reply. The reply composer opens in its first stage.
+    func testReplyToCopiedCarriesTheInstructionAndGeneratesNothing() async {
+        coordinator.open()
+        coordinator.updateInstruction("  вежливо откажи\n")
+        var reads = 0
+        let reply = coordinator.replyToCopied(persona: friend, instructionLimit: 280) {
+            reads += 1
+            return .success(copied)
+        }
+
+        XCTAssertEqual(reads, 1, "the copied message is read once, on the tap")
+        XCTAssertEqual(reply?.sourceMessage, copied.text)
+        XCTAssertEqual(reply?.source, .clipboard)
+        XCTAssertEqual(reply?.instruction, "вежливо откажи")
+        XCTAssertEqual(reply?.template, friend)
+        XCTAssertEqual(reply?.flow, ReplyComposerFlow(), "the reply composer's first stage: no request, no error")
+        XCTAssertFalse(coordinator.isActive, "Create closes: the panel is the reply now")
+        XCTAssertNil(ComposeSessionParking.take(), "and nothing of Create is kept")
+
+        try? await Task.sleep(for: .milliseconds(30))
+        XCTAssertTrue(scripted.requests.isEmpty, "nothing is written until the user taps Reply")
+    }
+
+    /// Short instructions are instructions too, in every language.
+    func testShortInstructionsAreCarriedAsTyped() {
+        for typed in ["да", "Иә", "yes", "скажи, что согласен", "келісемін де", "say I agree"] {
+            coordinator.open()
+            coordinator.updateInstruction(typed)
+            let reply = coordinator.replyToCopied(persona: friend, instructionLimit: 280) { .success(copied) }
+            XCTAssertEqual(reply?.instruction, typed)
+        }
+    }
+
+    /// No instruction is fine: it is then a plain reply to the copied
+    /// message, as after a persona tap.
+    func testReplyToCopiedWithoutAnInstruction() {
+        coordinator.open()
+        let reply = coordinator.replyToCopied(persona: friend, instructionLimit: 280) { .success(copied) }
+        XCTAssertEqual(reply?.instruction, "")
+        XCTAssertEqual(reply?.sourceMessage, copied.text)
+    }
+
+    /// Nothing copied: "Copy a message first" in Create, which stays as it
+    /// was, instruction and all. Write stays Write - Retry would write a new
+    /// message, which is not what was just tried.
+    func testEmptyClipboardKeepsCreateAndSaysCopyFirst() async {
+        coordinator.open()
+        coordinator.updateInstruction("да")
+        let reply = coordinator.replyToCopied(persona: friend, instructionLimit: 280) { .failure(.noSourceMessage) }
+
+        XCTAssertNil(reply)
+        XCTAssertTrue(coordinator.isActive)
+        XCTAssertEqual(coordinator.session?.instruction, "да")
+        XCTAssertEqual(coordinator.flow.stage, .composing)
+        XCTAssertEqual(coordinator.session?.copiedMessageError, .noSourceMessage)
+
+        let russian = AIReplyStrings.forLanguage(.russian)
+        let notice = coordinator.session?.notice(russian)
+        XCTAssertEqual(notice?.text, "Сначала скопируйте сообщение")
+        XCTAssertEqual(notice?.offersRetry, false)
+
+        coordinator.updateInstruction("да, приду")
+        XCTAssertNil(coordinator.session?.copiedMessageError, "typing clears it")
+        XCTAssertNil(coordinator.session?.notice(russian))
+
+        try? await Task.sleep(for: .milliseconds(20))
+        XCTAssertTrue(scripted.requests.isEmpty)
+    }
+
+    /// Without Full Access the clipboard cannot be read: the reply's
+    /// sentence, which says exactly that - not Create's, which is about the
+    /// internet.
+    func testNoFullAccessExplainsItInCreate() async {
+        coordinator.open()
+        coordinator.updateInstruction("вежливо откажи")
+        let reply = coordinator.replyToCopied(persona: friend, instructionLimit: 280) { .failure(.fullAccessRequired) }
+
+        XCTAssertNil(reply)
+        XCTAssertTrue(coordinator.isActive)
+        XCTAssertEqual(coordinator.session?.instruction, "вежливо откажи")
+        for language in AppLanguage.allCases {
+            let strings = AIReplyStrings.forLanguage(language)
+            XCTAssertEqual(coordinator.session?.notice(strings)?.text, strings.fullAccessRequired, language.rawValue)
+        }
+
+        // Write without Full Access still gets Create's own sentence.
+        coordinator.showError(.fullAccessRequired)
+        let english = AIReplyStrings.forLanguage(.english)
+        XCTAssertNil(coordinator.session?.copiedMessageError)
+        XCTAssertEqual(coordinator.session?.notice(english),
+                       ComposeSession.Notice(text: english.compose.fullAccessRequired, offersRetry: true))
+        try? await Task.sleep(for: .milliseconds(20))
+        XCTAssertTrue(scripted.requests.isEmpty)
+    }
+
+    /// A Create instruction can be longer than a reply instruction may be.
+    /// It is not cut (the user would send words they never saw): Create says
+    /// how long it may be, and the clipboard is not touched.
+    func testInstructionTooLongForAReplyIsRefusedBeforeReading() {
+        coordinator.open()
+        let long = String(repeating: "ә", count: 281)
+        coordinator.updateInstruction(long)
+        var reads = 0
+        let reply = coordinator.replyToCopied(persona: friend, instructionLimit: 280) {
+            reads += 1
+            return .success(copied)
+        }
+        XCTAssertNil(reply)
+        XCTAssertEqual(reads, 0)
+        XCTAssertEqual(coordinator.session?.instruction, long)
+        XCTAssertEqual(coordinator.session?.copiedMessageError, .instructionTooLong(limit: 280))
+        XCTAssertTrue(coordinator.session?.notice(.forLanguage(.kazakh))?.text.contains("280") ?? false)
+    }
+
+    /// Only from the instruction, and never while a message is being written
+    /// or shown: the clipboard is not read then.
+    func testReplyToCopiedOnlyFromTheInstruction() async {
+        var reads = 0
+        let read: () -> Result<ReplyContext, AIReplyError> = {
+            reads += 1
+            return .success(self.copied)
+        }
+        XCTAssertNil(coordinator.replyToCopied(persona: friend, instructionLimit: 280, read: read), "Create is closed")
+
+        coordinator.open()
+        coordinator.updateInstruction(instruction)
+        coordinator.generate()
+        await waitUntil { self.scripted.pending == 1 }
+        XCTAssertNil(coordinator.replyToCopied(persona: friend, instructionLimit: 280, read: read), "writing")
+        scripted.answer("Текст")
+        await waitUntil { self.coordinator.flow.stage == .result }
+        XCTAssertNil(coordinator.replyToCopied(persona: friend, instructionLimit: 280, read: read), "a result is shown")
+        XCTAssertEqual(reads, 0)
+        XCTAssertEqual(coordinator.flow.drafts.count, 1, "the message written stays")
+    }
+
+    /// "Copy a message first", then the user leaves to copy it and comes
+    /// back: the restored Create keeps the instruction but not the sentence,
+    /// which would now say the copy failed. The same for a too-long notice.
+    func testRestoredSessionDropsTheCopiedMessageError() async {
+        let russian = AIReplyStrings.forLanguage(.russian)
+        for (typed, error) in [("вежливо откажи", AIReplyError.noSourceMessage),
+                               (String(repeating: "ә", count: 281), .instructionTooLong(limit: 280))] {
+            coordinator.open()
+            coordinator.updateInstruction(typed)
+            _ = coordinator.replyToCopied(persona: friend, instructionLimit: 280) { .failure(.noSourceMessage) }
+            XCTAssertEqual(coordinator.session?.copiedMessageError, error)
+
+            coordinator.park()
+            guard let parked = ComposeSessionParking.take() else { return XCTFail("nothing parked") }
+            coordinator.restore(parked)
+
+            XCTAssertEqual(coordinator.session?.instruction, typed, "the instruction comes back")
+            XCTAssertNil(coordinator.session?.copiedMessageError)
+            XCTAssertNil(coordinator.session?.notice(russian), "no stale sentence under the field")
+            XCTAssertEqual(coordinator.flow.stage, .composing)
+        }
+        try? await Task.sleep(for: .milliseconds(20))
+        XCTAssertTrue(scripted.requests.isEmpty, "restoring writes nothing")
+    }
+
+    /// Writing after a failed "Reply to copied" is a fresh attempt: the old
+    /// sentence goes.
+    func testWriteClearsTheCopiedMessageError() async {
+        coordinator.open()
+        coordinator.updateInstruction(instruction)
+        _ = coordinator.replyToCopied(persona: friend, instructionLimit: 280) { .failure(.noSourceMessage) }
+        coordinator.generate()
+        XCTAssertNil(coordinator.session?.copiedMessageError)
+        await waitUntil { self.scripted.pending == 1 }
+        scripted.answer("Готово")
+        await waitUntil { self.coordinator.flow.stage == .result }
+    }
+}
+
+/// The reply side of "Reply to copied": who it is to, and that the
+/// instruction from Create reaches the reply request - when Reply is tapped.
+final class CopiedReplyHandoffTests: XCTestCase {
+
+    private func configuration(hidden: Set<String> = [], custom: ReplyTemplate? = nil) -> ReplyConfiguration {
+        var templates = ReplyTemplate.defaults
+        for index in templates.indices where hidden.contains(templates[index].id) {
+            templates[index].isVisible = false
+        }
+        if let custom { templates.append(custom) }
+        return ReplyConfiguration(profile: .empty, templates: templates)
+    }
+
+    func testPersonaIsTheLastUsedOne() {
+        XCTAssertEqual(configuration().personaForCopiedReply(lastUsedID: "work").id, "work")
+        let custom = ReplyTemplate.custom(name: "Поставщик", sortIndex: 4)
+        XCTAssertEqual(configuration(custom: custom).personaForCopiedReply(lastUsedID: custom.id), custom)
+    }
+
+    func testPersonaFallsBackToFriend() {
+        XCTAssertEqual(configuration().personaForCopiedReply(lastUsedID: nil).id, "friend")
+        XCTAssertEqual(configuration().personaForCopiedReply(lastUsedID: "deleted-persona").id, "friend")
+        XCTAssertEqual(configuration(hidden: ["client"]).personaForCopiedReply(lastUsedID: "client").id, "friend",
+                       "a persona the keyboard no longer shows is not used")
+        XCTAssertEqual(ReplyConfiguration.initial.personaForCopiedReply(lastUsedID: nil).displayName(appLanguage: .kazakh), "Дос")
+    }
+
+    func testPersonaWhenFriendIsHidden() {
+        XCTAssertEqual(configuration(hidden: ["friend"]).personaForCopiedReply(lastUsedID: nil).id, "client",
+                       "the first persona shown")
+        let none = configuration(hidden: ["friend", "client", "business", "work"])
+        XCTAssertEqual(none.personaForCopiedReply(lastUsedID: nil).id, "friend")
+    }
+
+    /// Reply, tapped in the composer Create switched to: the copied message
+    /// and the instruction typed in Create go out together, as from any
+    /// reply.
+    func testTheInstructionReachesTheReplyRequest() async throws {
+        let reply = ReplySession(sourceMessage: "Ертең кездесуге келесің бе?", source: .clipboard,
+                                 template: .builtIn(.friend, sortIndex: 0), instruction: "сыпайы бас тарт")
+        let captured = CapturedReply()
+        let service = AIReplyService(transportOverride: { request, prompt in
+            captured.store(request: request, prompt: prompt)
+            return FixedReplyTransport()
+        })
+        _ = try await service.generate(.init(
+            message: reply.sourceMessage,
+            template: reply.template,
+            configuration: .initial,
+            uiLanguage: .kazakh,
+            instruction: reply.instruction,
+            inputLanguage: .kazakh
+        ))
+        XCTAssertEqual(captured.request?.message, "Ертең кездесуге келесің бе?")
+        XCTAssertEqual(captured.request?.instruction, "сыпайы бас тарт")
+        XCTAssertTrue(captured.prompt?.user.contains("сыпайы бас тарт") ?? false)
+    }
+}
+
+private final class CapturedReply: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _request: AIReplyService.Request?
+    private var _prompt: ReplyPromptBuilder.Prompt?
+
+    var request: AIReplyService.Request? { lock.lock(); defer { lock.unlock() }; return _request }
+    var prompt: ReplyPromptBuilder.Prompt? { lock.lock(); defer { lock.unlock() }; return _prompt }
+
+    func store(request: AIReplyService.Request, prompt: ReplyPromptBuilder.Prompt) {
+        lock.lock(); defer { lock.unlock() }
+        _request = request
+        _prompt = prompt
+    }
+}
+
+private struct FixedReplyTransport: ReplyTransport {
+    func generate(prompt: ReplyPromptBuilder.Prompt) async throws -> GeneratedReply {
+        GeneratedReply(text: "Кешір, ертең келе алмаймын.", detectedLanguage: "kk")
+    }
 }
 
 /// Validation, wire format and error mapping - no coordinator involved.
@@ -296,6 +557,17 @@ final class ComposeServiceTests: XCTestCase {
         XCTAssertNil(ComposeService.validate(instruction: String(repeating: "ә", count: 400), limit: 400).composeFailure)
         XCTAssertEqual(ComposeService.validate(instruction: String(repeating: "ә", count: 401), limit: 400).composeFailure,
                        .instructionTooLong(limit: 400))
+    }
+
+    /// Create works like a chat box: a one-word instruction is a request
+    /// like any other, in every language.
+    func testShortInstructionsAreAccepted() {
+        for typed in ["да", "Иә", "yes", "ok", "вежливо откажи", "сыпайы бас тарт", "politely decline", "скажи, что согласен"] {
+            guard case .success(let value) = ComposeService.validate(instruction: " \(typed)\n", limit: 400) else {
+                return XCTFail("«\(typed)» must be accepted")
+            }
+            XCTAssertEqual(value, typed)
+        }
     }
 
     func testWireFormatCarriesTheInstructionOnly() throws {
@@ -377,6 +649,9 @@ final class ComposeServiceTests: XCTestCase {
         XCTAssertEqual(english.title, "Write with AI")
         XCTAssertEqual(ComposeStrings.forLanguage(.russian).title, "Написать с AI")
         XCTAssertEqual(ComposeStrings.forLanguage(.kazakh).title, "AI-мен жазу")
+        XCTAssertEqual(english.replyToCopied, "Reply to copied")
+        XCTAssertEqual(ComposeStrings.forLanguage(.russian).replyToCopied, "Ответить на скопированное")
+        XCTAssertEqual(ComposeStrings.forLanguage(.kazakh).replyToCopied, "Көшірілгенге жауап беру")
 
         for language in AppLanguage.allCases {
             let strings = ComposeStrings.forLanguage(language)
@@ -384,7 +659,7 @@ final class ComposeServiceTests: XCTestCase {
                            "AIReplyStrings.compose must follow its own language")
             let all = [strings.createButtonAccessibility, strings.title, strings.placeholder,
                        strings.write, strings.newDraft, strings.newDraftAccessibility, strings.editRequest,
-                       strings.draftTitle, strings.noInstruction, strings.fullAccessRequired,
+                       strings.draftTitle, strings.replyToCopied, strings.noInstruction, strings.fullAccessRequired,
                        strings.instructionTooLong(limit: 400)]
             for text in all { XCTAssertFalse(text.isEmpty, "empty Create string in \(language.rawValue)") }
             XCTAssertTrue(strings.instructionTooLong(limit: 350).contains("350"))
@@ -392,9 +667,13 @@ final class ComposeServiceTests: XCTestCase {
             for intent in strings.intents {
                 XCTAssertLessThanOrEqual(intent.label.count, 18, "\(intent.id) label is too long in \(language.rawValue)")
             }
+            // One line above the instruction, beside nothing: short enough
+            // for the narrowest keyboard.
+            XCTAssertLessThanOrEqual(strings.replyToCopied.count, 26, "\(language.rawValue) replyToCopied")
             if language != .english {
                 XCTAssertNotEqual(strings.placeholder, english.placeholder)
                 XCTAssertNotEqual(strings.write, english.write)
+                XCTAssertNotEqual(strings.replyToCopied, english.replyToCopied)
                 for (own, en) in zip(strings.intents, english.intents) {
                     XCTAssertNotEqual(own.phrase, en.phrase, "\(own.id) untranslated in \(language.rawValue)")
                 }

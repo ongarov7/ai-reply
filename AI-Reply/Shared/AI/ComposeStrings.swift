@@ -21,6 +21,9 @@ struct ComposeStrings: Sendable {
     let editRequest: String
     /// VoiceOver for the result field.
     let draftTitle: String
+    /// Under the instruction: the same instruction, as a reply to the
+    /// message the user copied - opens the reply composer with it.
+    let replyToCopied: String
 
     // Errors
     let noInstruction: String
@@ -55,6 +58,7 @@ struct ComposeStrings: Sendable {
         newDraftAccessibility: "Start over",
         editRequest: "Edit request",
         draftTitle: "Your message",
+        replyToCopied: "Reply to copied",
         noInstruction: "Describe what to write first.",
         fullAccessRequired: "Turn on Allow Full Access for this keyboard in iOS Settings: writing with AI needs the internet.",
         instructionTooLongFormat: "The request is too long. Use up to %d characters.",
@@ -78,6 +82,7 @@ struct ComposeStrings: Sendable {
         newDraftAccessibility: "Начать заново",
         editRequest: "Изменить запрос",
         draftTitle: "Ваше сообщение",
+        replyToCopied: "Ответить на скопированное",
         noInstruction: "Сначала опишите, что написать.",
         fullAccessRequired: "Включите полный доступ для клавиатуры в настройках iOS: для работы AI нужен интернет.",
         instructionTooLongFormat: "Запрос слишком длинный. Не более %d символов.",
@@ -101,6 +106,7 @@ struct ComposeStrings: Sendable {
         newDraftAccessibility: "Басынан бастау",
         editRequest: "Сұранысты өзгерту",
         draftTitle: "Сіздің хабарламаңыз",
+        replyToCopied: "Көшірілгенге жауап беру",
         noInstruction: "Алдымен не жазу керегін сипаттаңыз.",
         fullAccessRequired: "iOS баптауларында пернетақтаға толық рұқсат беріңіз: AI-ға интернет керек.",
         instructionTooLongFormat: "Сұраныс тым ұзын. %d таңбадан аспасын.",
@@ -124,6 +130,7 @@ struct ComposeStrings: Sendable {
         newDraftAccessibility: "Boshidan boshlash",
         editRequest: "So‘rovni o‘zgartirish",
         draftTitle: "Xabaringiz",
+        replyToCopied: "Nusxalanganga javob berish",
         noInstruction: "Avval nima yozishni tasvirlang.",
         fullAccessRequired: "iOS sozlamalarida klaviaturaga to‘liq ruxsat bering: AI uchun internet kerak.",
         instructionTooLongFormat: "So‘rov juda uzun. %d belgigacha yozing.",

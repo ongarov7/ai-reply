@@ -19,6 +19,8 @@ enum ComposerEvent {
     case edited(ReplyComposerView.Field, String)
     /// Create mode: start over with an empty instruction.
     case reset
+    /// Create mode: the same instruction, as a reply to the copied message.
+    case replyToCopied
 }
 
 protocol KeyboardActionBarDelegate: AnyObject {
@@ -229,6 +231,7 @@ extension KeyboardActionBar: ReplyComposerViewDelegate {
 
     func composerDidTapClose(_ composer: ReplyComposerView) { send(.close) }
     func composerDidTapNew(_ composer: ReplyComposerView) { send(.reset) }
+    func composerDidTapReplyToCopied(_ composer: ReplyComposerView) { send(.replyToCopied) }
     func composerDidTapPersona(_ composer: ReplyComposerView) { send(.changePersona) }
     func composerDidTapPaste(_ composer: ReplyComposerView) { send(.paste) }
     func composerDidTapGenerate(_ composer: ReplyComposerView) { send(.generate) }

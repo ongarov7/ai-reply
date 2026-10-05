@@ -25,6 +25,8 @@ protocol ReplyComposerViewDelegate: AnyObject {
     func composerDidChangeHeight(_ composer: ReplyComposerView)
     /// Create mode: discard the instruction and every version.
     func composerDidTapNew(_ composer: ReplyComposerView)
+    /// Create mode: reply to the copied message with this instruction.
+    func composerDidTapReplyToCopied(_ composer: ReplyComposerView)
     /// A word of the suggestion strip under the instruction.
     func composer(_ composer: ReplyComposerView, didPick suggestion: AutocorrectSuggestion)
     /// The suggested version of the instruction was tapped.
@@ -73,7 +75,9 @@ final class ReplyComposerView: UIView {
     ///
     /// * `reply` - answering a copied message: persona, message, instruction.
     /// * `compose` - "Create": writing a new message from a description. No
-    ///   persona and no message; a title, New, and a roomier instruction.
+    ///   persona and no message; a title, New, a roomier instruction, and
+    ///   "Reply to copied" under it, which turns the same instruction into a
+    ///   reply to the copied message (the panel switches to `reply`).
     ///
     /// Same stages, same keys, same Insert; only the header, the field sizes,
     /// the quick intents and the words differ.
@@ -91,6 +95,10 @@ final class ReplyComposerView: UIView {
         var sourceLimit: Int
         var instructionLimit: Int
         var mode: Mode = .reply
+        /// Whether the primary button turns into Retry while the error is
+        /// shown. Not when the error is about the copied message: Retry
+        /// would write a new message, which is not what was just tried.
+        var errorOffersRetry = true
     }
 
     // MARK: State
@@ -99,6 +107,7 @@ final class ReplyComposerView: UIView {
     private(set) var mode: Mode = .reply
     private(set) var focus: Field = .instruction
     private var errorMessage: String?
+    private var errorOffersRetry = true
     private var sourceLimit = AILimits.fallback.sourceCharacters
     private var instructionLimit = ReplyInstruction.maximumCharacters
     private var isSourceExpanded = false
@@ -166,6 +175,10 @@ final class ReplyComposerView: UIView {
     private let titleIcon = UIImageView()
     private let titleLabel = UILabel()
     private let newButton = UIButton(type: .system)
+    /// Create: "Reply to copied", on its own line under the instruction (as
+    /// on Android). The reply header's message-preview button, configured
+    /// the same way, with a reply arrow in front.
+    private let copiedButton = UIButton(type: .system)
 
     // Full message
     private let sourceCard = UIView()
@@ -216,6 +229,8 @@ final class ReplyComposerView: UIView {
     private let innerInset: CGFloat = 8
     private let gap: CGFloat = 6
     private let headerHeight: CGFloat = 30
+    /// The message preview's height in the header, and "Reply to copied"'s.
+    private var previewHeight: CGFloat { headerHeight - 4 }
     private let rowHeight: CGFloat = 32
     private let iconSize: CGFloat = 32
 
@@ -239,15 +254,11 @@ final class ReplyComposerView: UIView {
         configurePill(personaChip, symbol: "chevron.down", trailingImage: true)
         personaChip.addTarget(self, action: #selector(personaTapped), for: .touchUpInside)
 
-        var preview = UIButton.Configuration.plain()
-        preview.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 6)
-        preview.background.cornerRadius = 8
-        preview.imagePlacement = .trailing
-        preview.imagePadding = 5
-        preview.titleLineBreakMode = .byTruncatingTail
-        previewButton.configuration = preview
-        previewButton.contentHorizontalAlignment = .leading
+        configurePreview(previewButton)
         previewButton.addTarget(self, action: #selector(previewTapped), for: .touchUpInside)
+        configurePreview(copiedButton)
+        copiedButton.configuration?.imagePlacement = .leading
+        copiedButton.addTarget(self, action: #selector(copiedTapped), for: .touchUpInside)
 
         counterLabel.font = .monospacedDigitSystemFont(ofSize: 11, weight: .medium)
         counterLabel.textAlignment = .right
@@ -327,11 +338,24 @@ final class ReplyComposerView: UIView {
         }
 
         [personaChip, previewButton, counterLabel, closeButton, titleIcon, titleLabel, newButton,
-         sourceCard, instructionView, draftView,
+         copiedButton, sourceCard, instructionView, draftView,
          errorLabel, conflictLabel, quickActions, suggestionStrip, polishChip, primaryButton, backButton,
          regenerateButton, editButton,
          previousButton, versionLabel, nextButton, insertButton, replaceButton, appendButton,
          conflictCancelButton].forEach(panel.addSubview)
+    }
+
+    /// The quoted-message look: the reply header's message preview, and
+    /// Create's "Reply to copied".
+    private func configurePreview(_ button: UIButton) {
+        var preview = UIButton.Configuration.plain()
+        preview.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 6)
+        preview.background.cornerRadius = 8
+        preview.imagePlacement = .trailing
+        preview.imagePadding = 5
+        preview.titleLineBreakMode = .byTruncatingTail
+        button.configuration = preview
+        button.contentHorizontalAlignment = .leading
     }
 
     private func configurePill(_ button: UIButton, symbol: String?, trailingImage: Bool) {
@@ -399,6 +423,7 @@ final class ReplyComposerView: UIView {
             conflictHeight = preferredHeight
         }
         errorMessage = content.errorMessage
+        errorOffersRetry = content.errorOffersRetry
         sourceLimit = content.sourceLimit
         instructionLimit = content.instructionLimit
 
@@ -441,6 +466,7 @@ final class ReplyComposerView: UIView {
         }
         focus = .instruction
         errorMessage = nil
+        errorOffersRetry = true
         isSourceExpanded = false
         conflictHeight = 0
         suggestions = []
@@ -467,6 +493,9 @@ final class ReplyComposerView: UIView {
         previewButton.configuration?.background.backgroundColor = theme.quoteBackground
         previewButton.configuration?.baseForegroundColor = theme.quoteText
         previewButton.tintColor = theme.secondaryText
+        copiedButton.configuration?.background.backgroundColor = theme.quoteBackground
+        copiedButton.configuration?.baseForegroundColor = theme.quoteText
+        copiedButton.tintColor = theme.secondaryText
         counterLabel.textColor = theme.secondaryText
         titleIcon.tintColor = theme.accent
         titleLabel.textColor = theme.primaryText
@@ -567,6 +596,16 @@ final class ReplyComposerView: UIView {
         applyText(compose.newDraft, to: newButton, size: 13, weight: .semibold)
         newButton.accessibilityLabel = compose.newDraftAccessibility
         personaChip.isHidden = isCompose
+        var copiedAttributes = AttributeContainer()
+        copiedAttributes.font = .systemFont(ofSize: 13, weight: .medium)
+        copiedButton.configuration?.attributedTitle = AttributedString(compose.replyToCopied, attributes: copiedAttributes)
+        copiedButton.configuration?.image = UIImage(
+            systemName: "arrowshape.turn.up.left",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 10, weight: .semibold)
+        )
+        copiedButton.accessibilityLabel = compose.replyToCopied
+        copiedButton.isHidden = !showsCopiedAction
+        copiedButton.isEnabled = stage == .composing
         if isCompose {
             previewButton.isHidden = true
             counterLabel.isHidden = true
@@ -608,7 +647,7 @@ final class ReplyComposerView: UIView {
         let primaryTitle: String
         if flow.isGenerating {
             primaryTitle = strings.stop
-        } else if errorMessage != nil {
+        } else if errorMessage != nil, errorOffersRetry {
             primaryTitle = strings.retry
         } else {
             primaryTitle = isCompose ? compose.write : strings.generate
@@ -708,6 +747,11 @@ final class ReplyComposerView: UIView {
 
     private var contentWidth: CGFloat { max(0, layoutWidth - outerInset * 2 - innerInset * 2) }
 
+    /// Create shows "Reply to copied" while the instruction is on screen -
+    /// also while it is being written from, so the row does not jump away
+    /// under a running request.
+    private var showsCopiedAction: Bool { isCompose && !flow.showsReply }
+
     /// Solves the heights for the current stage within `maximumHeight`.
     ///
     /// Measured on content EVENTS - a paste, a new version, a stage change, a
@@ -739,6 +783,9 @@ final class ReplyComposerView: UIView {
                                     inset: sourceView.textContainerInset) + 4
         }
         let sourceBlock = plan.sourceCard > 0 ? plan.sourceCard + gap : 0
+        // Create's "Reply to copied" line: always there while the instruction
+        // is, so it never comes or goes with a keystroke.
+        let copiedBlock = showsCopiedAction ? previewHeight + gap : 0
 
         if flow.showsReply {
             let natural = naturalLines(of: draftView, width: width)
@@ -748,13 +795,13 @@ final class ReplyComposerView: UIView {
             let wanted = min(max(natural, minimum), isCompose ? 8 : 6)
             var field = lines(draftView.font, wanted, inset: draftView.textContainerInset)
             let floor = lines(draftView.font, 2, inset: draftView.textContainerInset)
-            let budget = maximumHeight - chrome - errorBlock - sourceBlock
+            let budget = maximumHeight - chrome - errorBlock - sourceBlock - copiedBlock
             if field > budget { field = max(floor, budget) }
             plan.field = field
         } else {
             let two = lines(instructionView.font, 2, inset: instructionView.textContainerInset)
             let one = lines(instructionView.font, 1, inset: instructionView.textContainerInset)
-            let budget = maximumHeight - chrome - errorBlock - sourceBlock
+            let budget = maximumHeight - chrome - errorBlock - sourceBlock - copiedBlock
             if isCompose {
                 // The instruction IS the request here - often two or three
                 // sentences - so it gets a real text area: four lines where
@@ -767,7 +814,7 @@ final class ReplyComposerView: UIView {
             }
         }
 
-        plan.total = (chrome + errorBlock + sourceBlock + plan.field).rounded(.up)
+        plan.total = (chrome + errorBlock + sourceBlock + copiedBlock + plan.field).rounded(.up)
         return plan
     }
 
@@ -813,7 +860,7 @@ final class ReplyComposerView: UIView {
             previewRight = counterLabel.frame.minX - 6
         }
         let previewLeft = personaChip.frame.maxX + 6
-        place(previewButton, CGRect(x: previewLeft, y: y + 2, width: max(0, previewRight - previewLeft), height: headerHeight - 4))
+        place(previewButton, CGRect(x: previewLeft, y: y + 2, width: max(0, previewRight - previewLeft), height: previewHeight))
         y += headerHeight + gap
 
         if isConflict {
@@ -852,6 +899,14 @@ final class ReplyComposerView: UIView {
         if plan.error > 0 {
             place(errorLabel, CGRect(x: left + 2, y: y - 2, width: width - 4, height: plan.error))
             y += plan.error + 4
+        }
+
+        // Create: "Reply to copied", as wide as its words - under the
+        // instruction and right after a sentence about it, when there is one.
+        if showsCopiedAction {
+            let copiedWidth = min(width, max(120, ceil(copiedButton.intrinsicContentSize.width)))
+            place(copiedButton, CGRect(x: left, y: y, width: copiedWidth, height: previewHeight))
+            y += previewHeight + gap
         }
 
         // Bottom row.
@@ -1089,6 +1144,10 @@ final class ReplyComposerView: UIView {
     @objc private func personaTapped() { delegate?.composerDidTapPersona(self) }
     @objc private func closeTapped() { delegate?.composerDidTapClose(self) }
     @objc private func newTapped() { delegate?.composerDidTapNew(self) }
+    @objc private func copiedTapped() {
+        guard flow.stage == .composing else { return }
+        delegate?.composerDidTapReplyToCopied(self)
+    }
     @objc private func pasteTapped() { delegate?.composerDidTapPaste(self) }
     @objc private func backTapped() { delegate?.composerDidTapBack(self) }
     @objc private func editTapped() { delegate?.composerDidTapEdit(self) }

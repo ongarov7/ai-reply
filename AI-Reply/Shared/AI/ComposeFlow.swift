@@ -14,13 +14,57 @@ import Foundation
 ///         │    ▼                              ▼                              │
 ///         └─ Back (versions kept) ◀── result ──Regenerate──▶ generating ─────┘
 ///     New: everything above is discarded, back to an empty instruction.
+///
+///     composing ──Reply to copied──▶ the reply composer, with the copied
+///         message and this instruction (nothing generated); nothing copied
+///         or no Full Access: an error here, and Create stays.
 struct ComposeSession: Equatable, Sendable {
     var instruction: String = ""
     var flow = ReplyComposerFlow()
+    /// "Reply to copied" could not start: nothing copied, no Full Access, or
+    /// an instruction too long for a reply. Kept apart from `flow.error`
+    /// because it is not a failure of writing - Write stays Write, not Retry.
+    var copiedMessageError: AIReplyError?
 
     /// Whether "New" has anything to clear.
     var hasContent: Bool {
         !instruction.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !flow.drafts.isEmpty
+    }
+
+    /// What the panel says under the field.
+    struct Notice: Equatable, Sendable {
+        let text: String
+        /// Whether the primary button offers Retry. Only for a failed
+        /// Write: after "Reply to copied" failed, Retry would write a new
+        /// message, which is not what was just tried.
+        let offersRetry: Bool
+    }
+
+    func notice(_ strings: AIReplyStrings) -> Notice? {
+        if let copied = copiedMessageError {
+            // The reply's sentences: they are about the copied message.
+            let text = strings.message(for: copied)
+            return text.isEmpty ? nil : Notice(text: text, offersRetry: false)
+        }
+        guard let error = flow.error else { return nil }
+        // The reply sentence for Full Access talks about a copied message;
+        // writing has none.
+        let text = error == .fullAccessRequired ? strings.compose.fullAccessRequired : strings.message(for: error)
+        return text.isEmpty ? nil : Notice(text: text, offersRetry: true)
+    }
+}
+
+extension ReplyConfiguration {
+
+    /// The persona a reply started from Create opens with: the one used
+    /// last, while the keyboard still shows it; otherwise Friend; otherwise
+    /// the first one shown. The chip in the reply header changes it.
+    func personaForCopiedReply(lastUsedID: String?) -> ReplyTemplate {
+        let visible = visibleTemplates
+        if let lastUsedID, let last = visible.first(where: { $0.id == lastUsedID }) { return last }
+        let friend = RelationshipKind.friend.rawValue
+        if let shown = visible.first(where: { $0.id == friend }) ?? visible.first { return shown }
+        return template(id: friend) ?? .builtIn(.friend, sortIndex: 0)
     }
 }
 
@@ -61,7 +105,10 @@ protocol ComposeFlowCoordinatorDelegate: AnyObject {
 /// stopped request never lands; a failure never loses the instruction.
 ///
 /// It has no access to the clipboard or the host field - by construction the
-/// only text it can send is the instruction the user typed here.
+/// only text it can send is the instruction the user typed here. "Reply to
+/// copied" is handed a reader for the copied message by the keyboard, uses it
+/// once on that tap, and passes what it read straight on to a reply session:
+/// it never sends it.
 @MainActor
 final class ComposeFlowCoordinator {
 
@@ -105,11 +152,14 @@ final class ComposeFlowCoordinator {
         ReplyLog.event("ai_compose_opened")
     }
 
-    /// A session parked when the keyboard last went away.
+    /// A session parked when the keyboard last went away. It comes back
+    /// without any error: the user usually left to copy the message that
+    /// "Copy a message first" asked for, so that sentence would now be wrong.
     func restore(_ parked: ComposeSession) {
         cancelTask()
         var restored = parked
         restored.flow.resume()
+        restored.copiedMessageError = nil
         session = restored
     }
 
@@ -119,6 +169,7 @@ final class ComposeFlowCoordinator {
     /// instruction, a NEW version.
     func generate() {
         guard var current = session, !current.flow.isGenerating, task == nil else { return }
+        current.copiedMessageError = nil
 
         if case .failure(let error) = ComposeService.validate(instruction: current.instruction) {
             current.flow.fail(error)
@@ -143,7 +194,61 @@ final class ComposeFlowCoordinator {
     /// A failure found before any request could start - Full Access off.
     func showError(_ error: AIReplyError) {
         guard session != nil, session?.flow.isGenerating == false else { return }
+        session?.copiedMessageError = nil
         session?.flow.fail(error)
+        delegate?.composeCoordinatorDidChange(self)
+    }
+
+    // MARK: Reply to copied
+
+    /// "Reply to copied": the same instruction, now for the message the
+    /// user copied. On success Create closes and the reply session to open
+    /// comes back - with the copied message, the persona given and this
+    /// instruction, in its first stage: NOTHING has been generated, and
+    /// nothing will be until the user taps Reply.
+    ///
+    /// On failure (nothing copied, no Full Access, an instruction longer
+    /// than a reply takes) Create stays as it was, saying why, and nil
+    /// comes back.
+    ///
+    /// - Parameters:
+    ///   - persona: who the reply is to; changeable in the reply header.
+    ///   - instructionLimit: the reply instruction's limit, which is shorter
+    ///     than Create's. A longer instruction is not cut - the user would
+    ///     send something they never saw - but refused here, before the
+    ///     clipboard is touched.
+    ///   - read: reads the copied message. Called at most once, and only
+    ///     from here, as part of the user's tap.
+    func replyToCopied(
+        persona: ReplyTemplate,
+        instructionLimit: Int,
+        read: () -> Result<ReplyContext, AIReplyError>
+    ) -> ReplySession? {
+        guard let current = session, current.flow.stage == .composing, task == nil else { return nil }
+
+        let instruction = current.instruction.trimmingCharacters(in: .whitespacesAndNewlines)
+        if instruction.unicodeScalars.count > instructionLimit {
+            refuseReplyToCopied(.instructionTooLong(limit: instructionLimit))
+            return nil
+        }
+
+        switch read() {
+        case .failure(let error):
+            refuseReplyToCopied(error)
+            return nil
+        case .success(let copied):
+            var reply = ReplySession(sourceMessage: copied.text, source: copied.source, template: persona)
+            reply.instruction = instruction
+            ReplyLog.event("ai_compose_reply_to_copied, instruction length \(instruction.count)")
+            clear()
+            return reply
+        }
+    }
+
+    private func refuseReplyToCopied(_ error: AIReplyError) {
+        session?.flow.clearError()
+        session?.copiedMessageError = error == .cancelled ? nil : error
+        ReplyLog.event("ai_compose_reply_to_copied_failed: \(error)")
         delegate?.composeCoordinatorDidChange(self)
     }
 
@@ -199,6 +304,7 @@ final class ComposeFlowCoordinator {
         guard session != nil, session?.instruction != text else { return }
         session?.instruction = text
         session?.flow.clearError()
+        session?.copiedMessageError = nil
     }
 
     func updateDraft(_ text: String) {

@@ -1,48 +1,5 @@
 import UIKit
 
-// MARK: - Model
-
-enum ReplyContextSource {
-    /// Text the host exposed through `UITextDocumentProxy.selectedText`, i.e. a
-    /// selection inside the ACTIVE EDITABLE INPUT.
-    case editableSelection
-    /// Text the user explicitly copied, read only in direct response to a user
-    /// gesture.
-    case clipboard
-    /// Text the user typed into the source field themselves.
-    case typed
-}
-
-/// The THREE texts a reply involves, deliberately kept apart.
-///
-/// `sourceMessage` is the incoming message. It is reference material: it is
-/// never seeded into `instruction` and never into the reply, because what the
-/// other person wrote must never silently become what this user sends.
-///
-/// `instruction` is what THIS user wants said - "ответь вежливо, что согласен".
-/// It is sent to the model as a separate, named block and is never inserted
-/// into the host application.
-///
-/// The reply versions live in `flow.drafts`. Only the one on screen can reach
-/// the host application's input field.
-struct ReplySession {
-    var sourceMessage: String
-    var source: ReplyContextSource?
-    var template: ReplyTemplate
-    var instruction: String = ""
-    var flow = ReplyComposerFlow()
-
-    var usableSource: String? {
-        let trimmed = sourceMessage.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
-    }
-}
-
-struct ReplyContext {
-    let text: String
-    let source: ReplyContextSource
-}
-
 // MARK: - Acquisition
 
 /// Resolves "the message the user wants to reply to" using only public,
@@ -61,8 +18,8 @@ final class ContextTextProvider {
 
     /// - Note: CLIPBOARD PRIVACY. The clipboard is touched ONLY from inside this
     ///   call, and this call only ever runs as the direct result of a user
-    ///   gesture: opening the composer from a persona chip, or tapping Paste
-    ///   inside it. There is no polling, no timer, no read on appearance, no
+    ///   gesture: opening the composer from a persona chip, tapping Paste
+    ///   inside it, or "Reply to copied" in Create. There is no polling, no timer, no read on appearance, no
     ///   read on regeneration and no background access. The acquired text is
     ///   then held in the session and reused, so a second generation never
     ///   touches the pasteboard again.
@@ -222,6 +179,24 @@ final class ReplyFlowCoordinator {
         session = opened
         isSuspended = false
         delegate?.coordinator(self, didOpen: opened)
+    }
+
+    /// "Reply to copied" from Create: the session Create built from the
+    /// message the user copied and the instruction they typed there. Like
+    /// `open`, it does NOT generate - the user still taps Reply.
+    func open(handedOff session: ReplySession) {
+        cancelTask()
+        ReplySessionParking.discard()
+        self.session = session
+        isSuspended = false
+        delegate?.coordinator(self, didOpen: session)
+    }
+
+    /// The copied message, for "Reply to copied" in Create. The same reader
+    /// and the same rules as a persona tap: only on that tap, selection
+    /// first, then the clipboard - with Full Access.
+    func readCopiedMessage(proxy: UITextDocumentProxy, hasFullAccess: Bool) -> Result<ReplyContext, AIReplyError> {
+        provider.acquire(proxy: proxy, hasFullAccess: hasFullAccess)
     }
 
     /// A session parked when the keyboard last went away.
