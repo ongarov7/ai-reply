@@ -4,8 +4,6 @@
     <string name="kb_regenerate">Qayta yaratish</string>
     <string name="kb_insert">Kiritish</string>
     <string name="kb_cancel">Bekor qilish</string>
-    <string name="kb_add_template">Shablon qoʻshish</string>
-    <string name="kb_add_template_hint">AI Reply ochilmoqda…</string>
     <string name="kb_replace_existing">Almashtirish</string>
     <string name="kb_append_existing">Qoʻshish</string>
     <string name="kb_keep_typing">Bekor qilish</string>

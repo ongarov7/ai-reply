@@ -1,6 +1,5 @@
 package kz.yerek.aireply.keyboard
 
-import android.content.Intent
 import android.inputmethodservice.InputMethodService
 import android.os.Build
 import android.os.SystemClock
@@ -26,13 +25,11 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kz.yerek.aireply.AIReplyApplication
 import kz.yerek.aireply.BuildConfig
-import kz.yerek.aireply.MainActivity
 import kz.yerek.aireply.R
 import kz.yerek.aireply.ServiceLocator
 import kz.yerek.aireply.ai.AILimits
@@ -144,7 +141,6 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
     private var speech: SpeechRecognitionClient? = null
     private var voiceJob: Job? = null
     private var permissionJob: Job? = null
-    private var noticeJob: Job? = null
 
     private var inputView: ComposeView? = null
 
@@ -168,7 +164,6 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
     private var isSecureField by mutableStateOf(false)
     private var returnFace by mutableStateOf(ReturnFace.NEWLINE)
     private var fieldKind by mutableStateOf(FieldKind.TEXT)
-    private var notice by mutableStateOf<String?>(null)
 
     private var hostCapitalization = Capitalization.SENTENCES
     private var smartCorrection = true
@@ -322,7 +317,6 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
 
     override fun onDestroy() {
         releaseSpeech()
-        noticeJob?.cancel()
         permissionJob?.cancel()
         polish.dismiss()
         autocorrect.clear()
@@ -438,11 +432,10 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
                             chips = chips,
                             languageCode = uiLanguage.code,
                             selectedId = selectedTemplateId,
-                            notice = notice ?: if (isSecureField) strings[R.string.kb_secure_field] else null,
+                            notice = if (isSecureField) strings[R.string.kb_secure_field] else null,
                             theme = theme,
                             strings = strings,
                             onSelect = ::startReply,
-                            onAdd = ::openTemplateEditor,
                             onCreate = ::startCompose,
                             suggestions = if (autocorrect.place == AutocorrectController.Place.HOST) {
                                 autocorrect.suggestions
@@ -1087,15 +1080,6 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         closeComposer()
     }
 
-    private fun showNotice(message: String) {
-        notice = message
-        noticeJob?.cancel()
-        noticeJob = scope.launch {
-            delay(NOTICE_MS)
-            notice = null
-        }
-    }
-
     // ------------------------------------------------------------------ voice
 
     private fun toggleMicrophone() {
@@ -1294,19 +1278,6 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
     }
 
     /**
-     * "+" opens the template editor in the app. An Android keyboard can start
-     * an Activity, so it does; the notice says what is happening meanwhile.
-     */
-    private fun openTemplateEditor() {
-        val intent = Intent(this, MainActivity::class.java)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            .putExtra(MainActivity.EXTRA_ROUTE, MainActivity.ROUTE_TEMPLATES)
-        runCatching { startActivity(intent) }
-            .onSuccess { showNotice(services.strings(uiLanguage)[R.string.kb_add_template_hint]) }
-            .onFailure { ReplyLog.warn(it) { "could not open the template editor" } }
-    }
-
-    /**
      * The instruction polish: the account's endpoint, or in DEBUG builds the
      * canned stand-in under the developer switch that serves canned replies.
      */
@@ -1323,7 +1294,6 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
     )
 
     private companion object {
-        const val NOTICE_MS = 3_200L
         const val CONFIG_RELOAD_MS = 1_000L
         /** Enough text to decide capitalization; each read crosses processes. */
         const val AUTOSHIFT_WINDOW = 48

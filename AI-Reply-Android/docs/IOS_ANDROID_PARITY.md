@@ -111,7 +111,7 @@ decoding that lets a configuration written by an older build still load.
 | Clipboard permission | Requires "Allow Full Access"; `fullAccessRequired` error | No equivalent gate; the current IME may read the clipboard | IMPLEMENTED_NOT_DEVICE_VERIFIED | The error case is kept in the model but is unreachable on Android |
 | Sensitive clipboard | n/a | Clips flagged `EXTRA_IS_SENSITIVE` (API 33+) are refused | IMPLEMENTED_NOT_DEVICE_VERIFIED | Android-only hardening, matching iOS's "secure fields are never processed" promise |
 | Password fields | iOS keyboards are simply not shown a secure field's content | AI panel disabled when `EditorInfo.inputType` is any password variation | IMPLEMENTED_NOT_DEVICE_VERIFIED | Typing still works normally |
-| Persona row | Compact chips, the selected one highlighted, the last one remembered, `+` at the end (more / create) | same | IMPLEMENTED_AND_VERIFIED | Selection and the remembered persona were seen on the emulator |
+| Persona row | `✨` (write a new message with AI) pinned at the leading edge, then compact chips filling the rest, the selected one highlighted, the last one remembered; while a word is typed the suggestions take exactly the chips' place and `✨` stays. No `+`: templates are created in the app | same | IMPLEMENTED_AND_VERIFIED | Selection and the remembered persona were seen on the emulator; `PersonaRowLayoutTest` pins the order and the chips' width |
 | Composer | Persona, source preview or Paste, `N / limit` counter, close; instruction field with quick intents; Reply | same, plus a microphone | IMPLEMENTED_AND_VERIFIED | `ReplyComposerFlow` is the same state machine on both: composing → generating → result ⇄ editing → conflict |
 | Generation trigger | **Only** Reply, Regenerate or Try again | same | IMPLEMENTED_AND_VERIFIED | Opening the keyboard, copying text or picking a persona never starts a request |
 | Draft editing | The composer edits its own text view without becoming first responder; tap anywhere in the reply to put the caret there | `KeyboardTextFieldState` with its own caret; the same tap-to-place | IMPLEMENTED_AND_VERIFIED | Grapheme-safe (emoji, Kazakh letters); seen on the emulator |
@@ -122,7 +122,6 @@ decoding that lets a configuration written by an older build still load.
 | Host field not empty | Replace / Add / Cancel inside the composer, which keeps its height | same | IMPLEMENTED_AND_VERIFIED | Replace was seen inserting the edited text. Android clears with one `deleteSurroundingText` |
 | Append separator | Space unless the text already ends in whitespace | same | IMPLEMENTED_NOT_DEVICE_VERIFIED | |
 | Teardown | Keyboard hidden: the request stops, the session is kept in memory for 10 minutes, then dropped | same, in `onFinishInputView` / `onStartInputView` | IMPLEMENTED_NOT_DEVICE_VERIFIED | Nothing is written to disk |
-| "+" chip | Shows "create templates in the app" — an extension cannot present an editor | Opens the app's template editor directly | IMPLEMENTED_NOT_DEVICE_VERIFIED | **Android is better here**: an IME can start an Activity |
 
 ## 7. Localization
 

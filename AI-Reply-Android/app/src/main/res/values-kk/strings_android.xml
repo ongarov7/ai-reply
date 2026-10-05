@@ -13,8 +13,6 @@
     <string name="kb_regenerate">Қайта жасау</string>
     <string name="kb_insert">Кірістіру</string>
     <string name="kb_cancel">Бас тарту</string>
-    <string name="kb_add_template">Үлгі қосу</string>
-    <string name="kb_add_template_hint">AI Reply ашылуда…</string>
     <string name="kb_replace_existing">Ауыстыру</string>
     <string name="kb_append_existing">Қосу</string>
     <string name="kb_keep_typing">Бас тарту</string>

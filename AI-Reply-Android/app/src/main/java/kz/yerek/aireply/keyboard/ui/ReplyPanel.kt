@@ -25,7 +25,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.Check
@@ -76,6 +75,7 @@ import kz.yerek.aireply.ai.AppStrings
 import kz.yerek.aireply.domain.model.TemplateSummary
 import kz.yerek.aireply.keyboard.KeyboardTheme
 import kz.yerek.aireply.keyboard.autocorrect.Suggestion
+import kz.yerek.aireply.keyboard.layout.PersonaRowLayout
 import kz.yerek.aireply.keyboard.reply.ReplyComposerFlow
 import kz.yerek.aireply.keyboard.reply.ReplySession
 import kz.yerek.aireply.voice.VoiceFailure
@@ -130,18 +130,18 @@ class ComposerActions(
 // ----------------------------------------------------------------- persona row
 
 /**
- * The strip above the keys while no reply is being written: one chip per
- * persona, the last one used marked, then "+" (create a persona in the app)
- * and "✨" (Create: write a new message with AI).
+ * The strip above the keys while no reply is being written: "✨" (Create:
+ * write a new message with AI) at the leading edge, then one chip per
+ * persona, the last one used marked. [PersonaRowLayout] holds its geometry.
  *
- * ADAPTIVE: "+" and "✨" are pinned at the end, so neither is ever cut off.
- * The personas share the rest of the row - stretched evenly when they fit,
- * with tighter padding when space is short, and scrolling (with a fade, never
- * a clipped label) only when even that does not fit.
+ * ADAPTIVE: "✨" is pinned at the start, so it is never cut off or scrolled
+ * away. The personas share the rest of the row - stretched evenly when they
+ * fit, with tighter padding when space is short, and scrolling (with a fade at
+ * the trailing edge, never a clipped label) only when even that does not fit.
  *
  * While a word is being typed and there is something to suggest, the word
- * suggestions take the personas' place - "+" and "✨" stay exactly where they
- * are, and the row keeps its height.
+ * suggestions take exactly the personas' place - "✨" stays where it is and
+ * stays tappable, and the row keeps its height.
  */
 @Composable
 fun PersonaRow(
@@ -152,7 +152,6 @@ fun PersonaRow(
     theme: KeyboardTheme,
     strings: AppStrings,
     onSelect: (String) -> Unit,
-    onAdd: () -> Unit,
     onCreate: () -> Unit,
     modifier: Modifier = Modifier,
     suggestions: List<Suggestion> = emptyList(),
@@ -162,7 +161,7 @@ fun PersonaRow(
         modifier = modifier
             .fillMaxWidth()
             .height(PERSONA_ROW_HEIGHT)
-            .padding(horizontal = 6.dp),
+            .padding(horizontal = PersonaRowLayout.SIDE_PADDING.dp),
         contentAlignment = Alignment.CenterStart
     ) {
         if (notice != null) {
@@ -182,45 +181,40 @@ fun PersonaRow(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Fades only when the strip comes or goes, never between keystrokes.
-            Crossfade(
-                targetState = suggestions.isNotEmpty(),
-                animationSpec = tween(SUGGESTIONS_FADE_MS),
-                modifier = Modifier.weight(1f),
-                label = "suggestions"
-            ) { typing ->
-                if (typing) {
-                    SuggestionStrip(suggestions, theme, strings, onPick, Modifier.fillMaxWidth().height(PERSONA_ROW_HEIGHT - 8.dp))
-                } else {
-                    PersonaChips(
-                        chips = chips,
-                        languageCode = languageCode,
-                        selectedId = selectedId,
+            PersonaRowLayout.order.forEachIndexed { index, slot ->
+                if (index > 0) Spacer(Modifier.width(PersonaRowLayout.SLOT_GAP.dp))
+                when (slot) {
+                    // A plain disc; only the glyph carries the accent.
+                    PersonaRowLayout.Slot.CREATE -> CircleIcon(
+                        icon = Icons.Filled.AutoAwesome,
+                        description = strings[R.string.kb_compose_open],
                         theme = theme,
-                        onSelect = onSelect
+                        size = PersonaRowLayout.CREATE_SIZE.dp,
+                        iconSize = 17.dp,
+                        tint = theme.accent,
+                        onClick = onCreate
                     )
+                    // Fades only when the strip comes or goes, never between keystrokes.
+                    PersonaRowLayout.Slot.CHIPS -> Crossfade(
+                        targetState = suggestions.isNotEmpty(),
+                        animationSpec = tween(SUGGESTIONS_FADE_MS),
+                        modifier = Modifier.weight(1f),
+                        label = "suggestions"
+                    ) { typing ->
+                        if (typing) {
+                            SuggestionStrip(suggestions, theme, strings, onPick, Modifier.fillMaxWidth().height(PERSONA_ROW_HEIGHT - 8.dp))
+                        } else {
+                            PersonaChips(
+                                chips = chips,
+                                languageCode = languageCode,
+                                selectedId = selectedId,
+                                theme = theme,
+                                onSelect = onSelect
+                            )
+                        }
+                    }
                 }
             }
-            Spacer(Modifier.width(6.dp))
-            CircleIcon(
-                icon = Icons.Filled.Add,
-                description = strings[R.string.kb_add_template],
-                theme = theme,
-                size = 30.dp,
-                iconSize = 18.dp,
-                onClick = onAdd
-            )
-            Spacer(Modifier.width(6.dp))
-            // Same disc as "+"; only the glyph carries the accent.
-            CircleIcon(
-                icon = Icons.Filled.AutoAwesome,
-                description = strings[R.string.kb_compose_open],
-                theme = theme,
-                size = 30.dp,
-                iconSize = 17.dp,
-                tint = theme.accent,
-                onClick = onCreate
-            )
         }
     }
 }
@@ -246,25 +240,15 @@ private fun PersonaChips(
         val widths = remember(names, available) {
             val text = names.map { name ->
                 with(density) {
-                    measurer.measure(name, TextStyle(fontSize = 14.sp, fontWeight = FontWeight.SemiBold)).size.width.toDp()
+                    measurer.measure(name, TextStyle(fontSize = 14.sp, fontWeight = FontWeight.SemiBold)).size.width.toDp().value
                 }
             }
-            val gaps = CHIP_GAP * (names.size - 1).coerceAtLeast(0)
-            val padding = CHIP_PADDINGS.firstOrNull { p -> text.sumOf { (it + p * 2).value.toDouble() }.dp + gaps <= available }
-                ?: CHIP_PADDINGS.last()
-            val natural = text.map { it + padding * 2 }
-            val used = natural.sumOf { it.value.toDouble() }.dp + gaps
-            if (used <= available && natural.isNotEmpty()) {
-                val extra = ((available - used) / natural.size).coerceAtMost(CHIP_MAX_STRETCH).value.toInt().dp
-                natural.map { it + extra }
-            } else {
-                natural
-            }
+            PersonaRowLayout.chipWidths(text, available.value).map { it.dp }
         }
         Box(Modifier.fillMaxWidth()) {
             Row(
                 modifier = Modifier.fillMaxWidth().horizontalScroll(scroll),
-                horizontalArrangement = Arrangement.spacedBy(CHIP_GAP),
+                horizontalArrangement = Arrangement.spacedBy(PersonaRowLayout.CHIP_GAP.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 chips.forEachIndexed { index, chip ->
@@ -290,7 +274,9 @@ private fun PersonaChips(
                     }
                 }
             }
-            // Fades the row out under "+" while there is more to scroll to.
+            // Fades the chips out at the trailing edge while there is more to
+            // scroll to. The scroll clips at the chips' own start, so nothing
+            // ever slides under "✨".
             if (scroll.canScrollForward) {
                 Box(
                     Modifier
@@ -997,12 +983,9 @@ private fun VoiceStatusLine(voice: VoiceState, strings: AppStrings, theme: Keybo
     )
 }
 
-val PERSONA_ROW_HEIGHT = 44.dp
+val PERSONA_ROW_HEIGHT = PersonaRowLayout.HEIGHT.dp
 internal val ROW_HEIGHT = 34.dp
 private val INSTRUCTION_HEIGHT = 56.dp
 internal const val LINE_HEIGHT_SP = 21
 private const val LINE_HEIGHT_DP = 21
-private val CHIP_GAP = 6.dp
-private val CHIP_PADDINGS = listOf(14.dp, 11.dp, 8.dp)
-private val CHIP_MAX_STRETCH = 28.dp
 private const val SUGGESTIONS_FADE_MS = 120

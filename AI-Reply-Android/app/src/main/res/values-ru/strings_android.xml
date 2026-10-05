@@ -13,8 +13,6 @@
     <string name="kb_regenerate">Сгенерировать заново</string>
     <string name="kb_insert">Вставить</string>
     <string name="kb_cancel">Отмена</string>
-    <string name="kb_add_template">Добавить шаблон</string>
-    <string name="kb_add_template_hint">Открываю AI Reply…</string>
     <string name="kb_replace_existing">Заменить</string>
     <string name="kb_append_existing">Добавить</string>
     <string name="kb_keep_typing">Отмена</string>

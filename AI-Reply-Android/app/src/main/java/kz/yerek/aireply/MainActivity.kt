@@ -22,7 +22,6 @@ import kz.yerek.aireply.data.settings.AppearancePreference
 import kz.yerek.aireply.ui.LocalServices
 import kz.yerek.aireply.ui.design.AIReplyTheme
 import kz.yerek.aireply.ui.navigation.AppNavHost
-import kz.yerek.aireply.ui.navigation.Routes
 
 /**
  * The only Activity.
@@ -55,11 +54,6 @@ class MainActivity : ComponentActivity() {
 
         observeLanguageChanges()
 
-        val start = when (intent?.getStringExtra(EXTRA_ROUTE)) {
-            ROUTE_TEMPLATES -> Routes.Templates
-            ROUTE_SETTINGS -> Routes.Settings
-            else -> null
-        }
         val debugOnboarding = BuildConfig.DEBUG &&
             intent?.getStringExtra(EXTRA_DEBUG_SCREEN) == DEBUG_SCREEN_ONBOARDING
 
@@ -86,7 +80,7 @@ class MainActivity : ComponentActivity() {
 
             CompositionLocalProvider(LocalServices provides services) {
                 AIReplyTheme(appearance = appearance) {
-                    AppNavHost(deepLink = start, debugOnboarding = debugOnboarding)
+                    AppNavHost(debugOnboarding = debugOnboarding)
                 }
             }
         }
@@ -126,10 +120,6 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
-        const val EXTRA_ROUTE = "kz.yerek.aireply.route"
-        const val ROUTE_TEMPLATES = "templates"
-        const val ROUTE_SETTINGS = "settings"
-
         /**
          * DEBUG builds only, for reviewing a screen on an emulator:
          * `adb shell am start -n kz.yerek.aireply/.MainActivity --es kz.yerek.aireply.debugScreen onboarding`.

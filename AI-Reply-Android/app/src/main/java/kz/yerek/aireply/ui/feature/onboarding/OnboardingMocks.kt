@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -229,39 +231,66 @@ internal fun MockAction(
     }
 }
 
+/**
+ * The real keyboard's row: "✨" (write with AI) at the leading edge, the
+ * personas to its right. "✨" is only a picture here - the onboarding is about
+ * replying - so screen readers skip it.
+ */
 @Composable
 private fun PersonaRow(selected: RelationshipKind?, onPersona: ((RelationshipKind) -> Unit)?) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        RelationshipKind.builtIns.forEach { kind ->
-            val isSelected = kind == selected
-            val chip = Modifier
+        Box(
+            modifier = Modifier
+                .size(MOCK_CHIP_HEIGHT)
                 .clip(CircleShape)
-                .background(
-                    if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
-                )
-            Box(
-                modifier = Modifier
-                    .then(if (onPersona != null) Modifier.minimumInteractiveComponentSize() else Modifier)
-                    .then(chip)
-                    .then(
-                        if (onPersona != null) {
-                            Modifier.clickable(role = Role.Button) { onPersona(kind) }
-                        } else {
-                            Modifier
-                        }
+                .background(MaterialTheme.colorScheme.surface)
+                .clearAndSetSemantics { },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Filled.AutoAwesome,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(17.dp)
+            )
+        }
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            RelationshipKind.builtIns.forEach { kind ->
+                val isSelected = kind == selected
+                val chip = Modifier
+                    .clip(CircleShape)
+                    .background(
+                        if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
                     )
-                    .padding(horizontal = Spacing.s, vertical = Spacing.xxs + 2.dp)
-            ) {
-                Text(
-                    stringResource(TemplateNaming.resource(kind)),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
-                )
+                Box(
+                    modifier = Modifier
+                        .then(if (onPersona != null) Modifier.minimumInteractiveComponentSize() else Modifier)
+                        .then(chip)
+                        .then(
+                            if (onPersona != null) {
+                                Modifier.clickable(role = Role.Button) { onPersona(kind) }
+                            } else {
+                                Modifier
+                            }
+                        )
+                        .padding(horizontal = Spacing.s, vertical = Spacing.xxs + 2.dp)
+                ) {
+                    Text(
+                        stringResource(TemplateNaming.resource(kind)),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                    )
+                }
             }
         }
     }
@@ -295,5 +324,7 @@ private fun MockKeys() {
     }
 }
 
+/** A chip's height: labelLarge's 20 dp line and 6 dp above and below. */
+private val MOCK_CHIP_HEIGHT = 32.dp
 private val KEY_ROWS = listOf(10, 9, 7)
 private val KEYS_HEIGHT = 84.dp

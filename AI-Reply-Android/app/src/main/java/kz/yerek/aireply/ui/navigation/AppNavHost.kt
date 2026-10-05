@@ -13,7 +13,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -39,13 +38,11 @@ import kz.yerek.aireply.ui.feature.templates.TemplateEditorScreen
 import kz.yerek.aireply.ui.feature.templates.TemplateListScreen
 
 /**
- * @param deepLink a route the keyboard asked for, pushed on top of Home once
- *   onboarding is done. The "+" chip uses it to open the template editor.
  * @param debugOnboarding DEBUG builds only: open the first run straight away,
  *   before sign-in, so it can be reviewed on an emulator without an account.
  */
 @Composable
-fun AppNavHost(deepLink: String? = null, debugOnboarding: Boolean = false) {
+fun AppNavHost(debugOnboarding: Boolean = false) {
     val services = LocalServices.current
     val navController = rememberNavController()
 
@@ -152,19 +149,5 @@ fun AppNavHost(deepLink: String? = null, debugOnboarding: Boolean = false) {
                 onOpen = { route -> navController.navigate(route) }
             )
         }
-    }
-
-    ApplyDeepLink(navController, deepLink, start)
-}
-
-@Composable
-private fun ApplyDeepLink(
-    navController: NavHostController,
-    deepLink: String?,
-    start: String
-) {
-    androidx.compose.runtime.LaunchedEffect(deepLink, start) {
-        if (deepLink == null || start != Routes.Home) return@LaunchedEffect
-        navController.navigate(deepLink)
     }
 }

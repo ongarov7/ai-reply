@@ -44,7 +44,6 @@ finger, and this project contains no accessibility service that could press it.
 | Dictating an instruction **inside the keyboard** | impossible — a keyboard extension cannot capture audio | **yes**, this is the headline addition |
 | Knowing whether the keyboard is enabled | no API; the keyboard writes a timestamp and the app infers | Android answers directly, so the setup checklist is a fact |
 | Opening the keyboard settings | can only open the app's own settings page | a public intent lands exactly where the user needs to be |
-| The "+" chip in the keyboard | shows a hint, because an extension cannot present an editor | opens the template editor |
 | Two string tables for two languages | two hand-written Swift tables | one `strings.xml`, read through a locale-configured `Context` |
 | Key layouts | Apple's keyboards | Gboard's: digits as hints on the QWERTY / ЙЦУКЕН row, `?123` and `=\<` pages |
 

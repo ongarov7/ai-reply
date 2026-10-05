@@ -36,8 +36,6 @@
     <string name="kb_regenerate">Regenerate</string>
     <string name="kb_insert">Insert</string>
     <string name="kb_cancel">Cancel</string>
-    <string name="kb_add_template">Add template</string>
-    <string name="kb_add_template_hint">Opening AI Reply…</string>
     <string name="kb_replace_existing">Replace</string>
     <string name="kb_append_existing">Add</string>
     <string name="kb_keep_typing">Cancel</string>
