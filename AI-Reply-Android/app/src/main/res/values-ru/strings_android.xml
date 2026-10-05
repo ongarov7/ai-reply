@@ -40,14 +40,19 @@
     <string name="kb_secure_field">В полях пароля AI Reply не работает.</string>
 
     <string name="voice_kb_start">Продиктовать инструкцию</string>
-    <string name="voice_kb_stop">Стоп</string>
+    <string name="voice_kb_stop">Остановить диктовку</string>
     <string name="voice_kb_listening">Слушаю…</string>
     <string name="voice_kb_processing">Распознаю…</string>
     <string name="voice_kb_permission_needed">Нажмите, чтобы разрешить доступ к микрофону</string>
     <string name="voice_kb_permission_denied">Доступ к микрофону выключен. Включите его в Настройках ▸ Приложения ▸ AI Reply ▸ Разрешения.</string>
-    <string name="voice_kb_no_speech">Ничего не услышал. Попробуйте ещё раз.</string>
+    <string name="voice_kb_no_speech">Ничего не распознано. Попробуйте ещё раз.</string>
     <string name="voice_kb_failed">Не удалось распознать. Попробуйте ещё раз.</string>
     <string name="voice_kb_unavailable">Распознавание речи на этом устройстве недоступно.</string>
+    <string name="voice_kb_stopped">Диктовка остановлена</string>
+    <string name="voice_kb_busy">Микрофон сейчас занят. Попробуйте ещё раз через пару секунд.</string>
+    <string name="voice_kb_language_unavailable_kk">Казахская речь на этом телефоне не распознаётся. Установите голосовой ввод Google или смените раскладку.</string>
+    <string name="voice_kb_language_unavailable_ru">Русская речь на этом телефоне не распознаётся. Установите голосовой ввод Google или смените раскладку.</string>
+    <string name="voice_kb_language_unavailable_en">Английская речь на этом телефоне не распознаётся. Установите голосовой ввод Google или смените раскладку.</string>
     <string name="voice_permission_title">Микрофон</string>
 
     <string name="android_setup_title">Настройка клавиатуры</string>
@@ -147,6 +152,10 @@
     <string name="kb_compose_intent_thanks_phrase">Напиши благодарность.</string>
     <string name="kb_compose_intent_decline">Вежливый отказ</string>
     <string name="kb_compose_intent_decline_phrase">Напиши вежливый отказ.</string>
+
+    <!-- Create: answer the copied message with the request written here -->
+    <string name="kb_reply_to_copied">Ответить на скопированное</string>
+    <string name="kb_reply_to_copied_description">Ответить на скопированное сообщение по этому запросу</string>
 
     <!-- Smart correction in the keyboard: the suggestion strip and the instruction polish chip -->
     <string name="kb_suggestions">Подсказки</string>

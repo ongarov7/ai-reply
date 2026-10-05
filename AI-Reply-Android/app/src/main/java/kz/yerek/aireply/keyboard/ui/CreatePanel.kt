@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.EditNote
@@ -37,10 +38,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kz.yerek.aireply.R
+import kz.yerek.aireply.ai.AIReplyError
 import kz.yerek.aireply.ai.AppStrings
 import kz.yerek.aireply.keyboard.KeyboardTheme
 import kz.yerek.aireply.keyboard.reply.ComposeSession
 import kz.yerek.aireply.keyboard.reply.ReplyComposerFlow
+import kz.yerek.aireply.keyboard.voice.DictationNotice
+import kz.yerek.aireply.keyboard.voice.VoiceStatusText
+import kz.yerek.aireply.voice.VoiceState
 
 /** Everything the Create panel draws, gathered by the service. */
 class CreateModel(
@@ -51,7 +56,18 @@ class CreateModel(
     /** The tallest the message field may be, from the screen the keyboard is on. */
     val maxFieldLines: Int,
     /** Suggestions and the polish chip, shown in the intents' place. */
-    val assist: TypingAssist = TypingAssist.NONE
+    val assist: TypingAssist = TypingAssist.NONE,
+    /** The microphone, shared with the reply composer. */
+    val voice: VoiceState = VoiceState.Idle,
+    /** The last dictation reached the request's limit. */
+    val voiceNotice: DictationNotice? = null,
+    /** Lines of the dictation status: fewer on a phone on its side. */
+    val voiceLines: Int = 2,
+    /**
+     * A short, wide window (a phone on its side): the line under the request
+     * moves up into the header, where there is width to spare.
+     */
+    val compact: Boolean = false
 )
 
 class CreateActions(
@@ -70,7 +86,11 @@ class CreateActions(
     val onPreviousVersion: () -> Unit,
     val onNextVersion: () -> Unit,
     val onConflict: (ReplyComposerFlow.ConflictChoice) -> Unit,
-    val assist: TypingAssistActions
+    val assist: TypingAssistActions,
+    /** The microphone: dictate the request. */
+    val onMic: () -> Unit = {},
+    /** Answer the copied message with this request instead. */
+    val onReplyToCopied: () -> Unit = {}
 )
 
 /**
@@ -79,8 +99,12 @@ class CreateActions(
  *
  * The same panel language as the reply composer - header, one field, one row
  * of actions - with no persona and no copied message: a title and New in the
- * header, a roomier instruction area, occasion/tone intents. Heights change on
- * content EVENTS (a stage, a new version), never on a keystroke.
+ * header, a roomier instruction area, occasion/tone intents, the same
+ * microphone. Heights change on content EVENTS (a stage, a new version, an
+ * error), never on a keystroke - and not when the microphone starts or stops:
+ * the line under the request is always there while it is written, holding
+ * "Reply to copied" or, while the microphone has something to say, the
+ * dictation status.
  */
 @Composable
 fun CreatePanel(
@@ -95,6 +119,10 @@ fun CreatePanel(
     val stage = flow.stage
     val generating = flow.isGenerating
     val errorMessage = flow.error?.let { strings.message(it) }?.takeIf { it.isNotEmpty() }
+    // "Copy a message first" is about Reply to copied, not a failed Write:
+    // the button keeps saying Write.
+    val writeFailed = errorMessage != null &&
+        flow.error != AIReplyError.NoSourceMessage && flow.error != AIReplyError.ClipboardUnavailable
 
     Column(
         modifier = modifier
@@ -172,6 +200,8 @@ fun CreatePanel(
             )
         }
 
+        if (!flow.showsReply && !flow.isConflict && !model.compact) CreateLine(model, actions, strings, theme)
+
         when {
             flow.isConflict -> ConflictRow(actions.onConflict, strings, theme)
             flow.showsReply -> ResultRow(
@@ -187,7 +217,7 @@ fun CreatePanel(
                 onNextVersion = actions.onNextVersion,
                 onInsert = actions.onInsert
             )
-            else -> CreateComposingRow(model, actions, strings, theme, failed = errorMessage != null)
+            else -> CreateComposingRow(model, actions, strings, theme, failed = writeFailed)
         }
     }
 }
@@ -201,6 +231,7 @@ private fun CreateHeader(model: CreateModel, actions: CreateActions, strings: Ap
     ) {
         Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = theme.accent, modifier = Modifier.padding(start = 2.dp).size(17.dp))
         Spacer(Modifier.width(6.dp))
+        val lineInHeader = model.compact && !flow.showsReply && !flow.isConflict
         Text(
             text = strings[R.string.kb_compose_title],
             fontSize = 14.sp,
@@ -208,8 +239,15 @@ private fun CreateHeader(model: CreateModel, actions: CreateActions, strings: Ap
             color = theme.primaryText,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f).semantics { heading() }
+            modifier = (if (lineInHeader) Modifier else Modifier.weight(1f)).semantics { heading() }
         )
+        if (lineInHeader) {
+            Spacer(Modifier.width(12.dp))
+            Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                CreateLineContent(model, actions, strings, theme)
+            }
+            Spacer(Modifier.width(6.dp))
+        }
         if (model.session.hasContent && !flow.isConflict) {
             Row(
                 modifier = Modifier
@@ -244,6 +282,42 @@ private fun CreateHeader(model: CreateModel, actions: CreateActions, strings: Ap
     }
 }
 
+/**
+ * The line under the request, at one height whatever it holds: the dictation
+ * status while the microphone is on or has something to say (exactly as in the
+ * reply composer), otherwise "Reply to copied".
+ */
+@Composable
+private fun CreateLine(model: CreateModel, actions: CreateActions, strings: AppStrings, theme: KeyboardTheme) {
+    // At least a pill's height, so swapping the status for the pill never moves anything.
+    val status = voiceLineHeight(model.voiceLines)
+    Box(
+        modifier = Modifier.fillMaxWidth().height(if (status > 28.dp) status else 28.dp),
+        contentAlignment = Alignment.CenterStart
+    ) {
+        CreateLineContent(model, actions, strings, theme)
+    }
+}
+
+/** The dictation status when there is one, otherwise "Reply to copied". */
+@Composable
+private fun CreateLineContent(model: CreateModel, actions: CreateActions, strings: AppStrings, theme: KeyboardTheme) {
+    if (VoiceStatusText.message(model.voice, model.voiceNotice) != null) {
+        VoiceStatusLine(model.voice, model.voiceNotice, strings, theme, lines = model.voiceLines)
+    } else {
+        AssistPill(
+            text = strings[R.string.kb_reply_to_copied],
+            description = strings[R.string.kb_reply_to_copied_description],
+            icon = {
+                Icon(Icons.AutoMirrored.Filled.Reply, null, tint = theme.primaryText, modifier = Modifier.size(15.dp))
+            },
+            theme = theme,
+            enabled = model.session.flow.stage == ReplyComposerFlow.Stage.Composing,
+            onClick = actions.onReplyToCopied
+        )
+    }
+}
+
 @Composable
 private fun CreateComposingRow(
     model: CreateModel,
@@ -254,7 +328,8 @@ private fun CreateComposingRow(
 ) {
     val flow = model.session.flow
     val generating = flow.isGenerating
-    val canWrite = !generating && model.session.instruction.text.isNotBlank()
+    // While the microphone is on, Write waits for the words being spoken.
+    val canWrite = !generating && model.session.instruction.text.isNotBlank() && !model.voice.isActive
     Row(
         modifier = Modifier.fillMaxWidth().height(ROW_HEIGHT),
         verticalAlignment = Alignment.CenterVertically,
@@ -270,6 +345,7 @@ private fun CreateComposingRow(
             onIntent = actions.onIntent,
             modifier = Modifier.weight(1f)
         )
+        MicButton(model.voice, strings, theme, enabled = !generating, onClick = actions.onMic)
         ActionPill(
             label = when {
                 generating -> strings[R.string.kb_stop]

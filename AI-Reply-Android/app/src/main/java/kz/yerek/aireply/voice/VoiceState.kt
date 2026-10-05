@@ -18,6 +18,13 @@ enum class VoiceFailure {
     /** No recognition service at all — some builds ship without one. */
     UNAVAILABLE,
 
+    /**
+     * The microphone or the recognition service is taken: another app is
+     * recording, a call is in progress, or the recogniser stayed busy after a
+     * fresh retry.
+     */
+    BUSY,
+
     /** Anything else. */
     GENERIC
 }
@@ -52,7 +59,11 @@ sealed interface VoiceState {
     /** Final text. The consumer takes it and returns the client to [Idle]. */
     data class Done(val text: String) : VoiceState
 
-    data class Failed(val reason: VoiceFailure) : VoiceState
+    /**
+     * [languageTag] is the language that was asked for, so "Kazakh is not
+     * available on this phone" can name the language the user actually spoke.
+     */
+    data class Failed(val reason: VoiceFailure, val languageTag: String? = null) : VoiceState
 
     val isActive: Boolean
         get() = this is Starting || this is Listening || this is Processing

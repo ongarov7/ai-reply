@@ -40,7 +40,7 @@
     <string name="kb_secure_field">Құпия сөз өрістерінде AI Reply өшірулі.</string>
 
     <string name="voice_kb_start">Нұсқауды айтып беру</string>
-    <string name="voice_kb_stop">Тоқтату</string>
+    <string name="voice_kb_stop">Айтып жазуды тоқтату</string>
     <string name="voice_kb_listening">Тыңдап тұрмын…</string>
     <string name="voice_kb_processing">Танып жатырмын…</string>
     <string name="voice_kb_permission_needed">Микрофонға рұқсат беру үшін түртіңіз</string>
@@ -48,6 +48,11 @@
     <string name="voice_kb_no_speech">Ештеңе естілмеді. Қайталап көріңіз.</string>
     <string name="voice_kb_failed">Тану мүмкін болмады. Қайталап көріңіз.</string>
     <string name="voice_kb_unavailable">Бұл құрылғыда сөзді тану қолжетімсіз.</string>
+    <string name="voice_kb_stopped">Айтып жазу тоқтатылды</string>
+    <string name="voice_kb_busy">Микрофон қазір бос емес. Сәлден соң қайталап көріңіз.</string>
+    <string name="voice_kb_language_unavailable_kk">Бұл телефон қазақша сөйлеуді танымайды. Google дауыспен енгізуін орнатыңыз немесе тілді ауыстырыңыз.</string>
+    <string name="voice_kb_language_unavailable_ru">Бұл телефон орысша сөйлеуді танымайды. Google дауыспен енгізуін орнатыңыз немесе тілді ауыстырыңыз.</string>
+    <string name="voice_kb_language_unavailable_en">Бұл телефон ағылшынша сөйлеуді танымайды. Google дауыспен енгізуін орнатыңыз немесе тілді ауыстырыңыз.</string>
     <string name="voice_permission_title">Микрофон</string>
 
     <string name="android_setup_title">Пернетақтаны баптау</string>
@@ -147,6 +152,10 @@
     <string name="kb_compose_intent_thanks_phrase">Алғыс хат жаз.</string>
     <string name="kb_compose_intent_decline">Сыпайы бас тарту</string>
     <string name="kb_compose_intent_decline_phrase">Сыпайы түрде бас тарт.</string>
+
+    <!-- Create: answer the copied message with the request written here -->
+    <string name="kb_reply_to_copied">Көшірілгенге жауап беру</string>
+    <string name="kb_reply_to_copied_description">Көшірілген хабарламаға осы сұраныс бойынша жауап беру</string>
 
     <!-- Smart correction in the keyboard: the suggestion strip and the instruction polish chip -->
     <string name="kb_suggestions">Ұсыныстар</string>

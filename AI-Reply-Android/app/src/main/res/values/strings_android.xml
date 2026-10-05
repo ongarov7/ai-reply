@@ -66,7 +66,7 @@
 
     <!-- Dictation from inside the keyboard. -->
     <string name="voice_kb_start">Dictate the instruction</string>
-    <string name="voice_kb_stop">Stop</string>
+    <string name="voice_kb_stop">Stop dictation</string>
     <string name="voice_kb_listening">Listening…</string>
     <string name="voice_kb_processing">Recognising…</string>
     <string name="voice_kb_permission_needed">Tap to allow microphone access</string>
@@ -74,6 +74,11 @@
     <string name="voice_kb_no_speech">Nothing was heard. Try again.</string>
     <string name="voice_kb_failed">Could not recognise that. Try again.</string>
     <string name="voice_kb_unavailable">Speech recognition is unavailable on this device.</string>
+    <string name="voice_kb_stopped">Dictation stopped</string>
+    <string name="voice_kb_busy">The microphone is busy right now. Try again in a moment.</string>
+    <string name="voice_kb_language_unavailable_kk">This phone does not recognise Kazakh speech. Install Google voice typing or switch the layout.</string>
+    <string name="voice_kb_language_unavailable_ru">This phone does not recognise Russian speech. Install Google voice typing or switch the layout.</string>
+    <string name="voice_kb_language_unavailable_en">This phone does not recognise English speech. Install Google voice typing or switch the layout.</string>
     <string name="voice_permission_title">Microphone</string>
 
     <!-- Android keyboard setup. Android, unlike iOS, tells the app the truth. -->
@@ -176,6 +181,10 @@
     <string name="kb_compose_intent_thanks_phrase">Write a thank-you message.</string>
     <string name="kb_compose_intent_decline">Decline politely</string>
     <string name="kb_compose_intent_decline_phrase">Politely decline.</string>
+
+    <!-- Create: answer the copied message with the request written here -->
+    <string name="kb_reply_to_copied">Reply to copied</string>
+    <string name="kb_reply_to_copied_description">Reply to the copied message with this request</string>
 
     <!-- Smart correction in the keyboard: the suggestion strip and the instruction polish chip -->
     <string name="kb_suggestions">Suggestions</string>

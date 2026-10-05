@@ -20,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -189,22 +190,24 @@ private fun PolishChip(
     }
 }
 
-/** A pill like the intents', with a leading icon. */
+/** A pill like the intents', with a leading icon. Dimmed like them when disabled. */
 @Composable
-private fun AssistPill(
+internal fun AssistPill(
     text: String,
     description: String,
     icon: @Composable () -> Unit,
     theme: KeyboardTheme,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
 ) {
     Row(
         modifier = modifier
             .height(28.dp)
+            .alpha(if (enabled) 1f else 0.45f)
             .clip(RoundedCornerShape(14.dp))
             .background(theme.fieldBackground)
-            .clickable(role = Role.Button, onClick = onClick)
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
             .semantics { contentDescription = description }
             .padding(start = 9.dp, end = 11.dp),
         verticalAlignment = Alignment.CenterVertically,

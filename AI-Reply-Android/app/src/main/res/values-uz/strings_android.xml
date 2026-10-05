@@ -31,7 +31,7 @@
     <string name="kb_secure_field">Parol maydonlarida AI Reply ishlamaydi.</string>
 
     <string name="voice_kb_start">Koʻrsatmani aytib yozish</string>
-    <string name="voice_kb_stop">Toʻxtatish</string>
+    <string name="voice_kb_stop">Aytib yozishni toʻxtatish</string>
     <string name="voice_kb_listening">Tinglanmoqda…</string>
     <string name="voice_kb_processing">Aniqlanmoqda…</string>
     <string name="voice_kb_permission_needed">Mikrofonga ruxsat berish uchun bosing</string>
@@ -39,6 +39,11 @@
     <string name="voice_kb_no_speech">Hech narsa eshitilmadi. Qayta urinib koʻring.</string>
     <string name="voice_kb_failed">Nutqni aniqlab boʻlmadi. Qayta urinib koʻring.</string>
     <string name="voice_kb_unavailable">Bu qurilmada nutqni aniqlash mavjud emas.</string>
+    <string name="voice_kb_stopped">Aytib yozish toʻxtatildi</string>
+    <string name="voice_kb_busy">Mikrofon hozir band. Birozdan soʻng qayta urinib koʻring.</string>
+    <string name="voice_kb_language_unavailable_kk">Bu telefon qozoqcha nutqni tanimaydi. Google ovozli yozishni oʻrnating yoki tilni almashtiring.</string>
+    <string name="voice_kb_language_unavailable_ru">Bu telefon ruscha nutqni tanimaydi. Google ovozli yozishni oʻrnating yoki tilni almashtiring.</string>
+    <string name="voice_kb_language_unavailable_en">Bu telefon inglizcha nutqni tanimaydi. Google ovozli yozishni oʻrnating yoki tilni almashtiring.</string>
     <string name="voice_permission_title">Mikrofon</string>
 
     <string name="android_setup_title">Klaviaturani sozlash</string>
@@ -137,6 +142,10 @@
     <string name="kb_compose_intent_thanks_phrase">Minnatdorchilik xabarini yoz.</string>
     <string name="kb_compose_intent_decline">Muloyim rad</string>
     <string name="kb_compose_intent_decline_phrase">Muloyim rad javobini yoz.</string>
+
+    <!-- Create: answer the copied message with the request written here -->
+    <string name="kb_reply_to_copied">Nusxalanganga javob berish</string>
+    <string name="kb_reply_to_copied_description">Nusxalangan xabarga shu soʻrov boʻyicha javob berish</string>
 
     <!-- Smart correction in the keyboard: the suggestion strip and the instruction polish chip -->
     <string name="kb_suggestions">Takliflar</string>

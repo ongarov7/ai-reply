@@ -78,7 +78,9 @@ import kz.yerek.aireply.keyboard.autocorrect.Suggestion
 import kz.yerek.aireply.keyboard.layout.PersonaRowLayout
 import kz.yerek.aireply.keyboard.reply.ReplyComposerFlow
 import kz.yerek.aireply.keyboard.reply.ReplySession
-import kz.yerek.aireply.voice.VoiceFailure
+import kz.yerek.aireply.keyboard.voice.DictationNotice
+import kz.yerek.aireply.keyboard.voice.VoiceMessage
+import kz.yerek.aireply.keyboard.voice.VoiceStatusText
 import kz.yerek.aireply.voice.VoiceState
 
 /** Which of the composer's fields the keys are editing. */
@@ -99,7 +101,11 @@ class ComposerModel(
     /** The tallest the reply field may be, from the screen the keyboard is on. */
     val maxFieldLines: Int,
     /** Suggestions and the polish chip, shown in the intents' place. */
-    val assist: TypingAssist = TypingAssist.NONE
+    val assist: TypingAssist = TypingAssist.NONE,
+    /** The last dictation reached the instruction's limit. */
+    val voiceNotice: DictationNotice? = null,
+    /** Lines of the dictation status: fewer on a phone on its side. */
+    val voiceLines: Int = 2
 )
 
 class ComposerActions(
@@ -400,7 +406,9 @@ fun ComposerPanel(
             )
         }
 
-        if (composingLike && !flow.isConflict) VoiceStatusLine(model.voice, strings, theme)
+        if (composingLike && !flow.isConflict) {
+            VoiceStatusLine(model.voice, model.voiceNotice, strings, theme, lines = model.voiceLines)
+        }
 
         when {
             flow.isConflict -> ConflictRow(actions.onConflict, strings, theme)
@@ -618,7 +626,8 @@ private fun ComposingRow(
     val generating = flow.isGenerating
     val hasSource = model.session.source.text.isNotBlank()
     val overLimit = AIReplyService.characterCount(model.session.source.text) > model.sourceLimit
-    val canGenerate = !generating && hasSource && !overLimit
+    // While the microphone is on, Reply waits for the words being spoken.
+    val canGenerate = !generating && hasSource && !overLimit && !model.voice.isActive
 
     Row(
         modifier = Modifier.fillMaxWidth().height(ROW_HEIGHT),
@@ -930,8 +939,12 @@ internal fun CircleIcon(
     }
 }
 
+/**
+ * The microphone, the same in the reply composer and in Create: a mic to start,
+ * an accent Stop while listening, a spinner while the words are recognised.
+ */
 @Composable
-private fun MicButton(
+internal fun MicButton(
     voice: VoiceState,
     strings: AppStrings,
     theme: KeyboardTheme,
@@ -941,7 +954,11 @@ private fun MicButton(
     val listening = voice is VoiceState.Listening || voice is VoiceState.Starting
     CircleIcon(
         icon = if (listening) Icons.Filled.Stop else Icons.Filled.Mic,
-        description = if (listening) strings[R.string.voice_kb_stop] else strings[R.string.voice_kb_start],
+        description = when {
+            listening -> strings[R.string.voice_kb_stop]
+            voice is VoiceState.Processing -> strings[R.string.voice_kb_processing]
+            else -> strings[R.string.voice_kb_start]
+        },
         theme = theme,
         size = 32.dp,
         iconSize = 18.dp,
@@ -953,35 +970,63 @@ private fun MicButton(
 }
 
 /**
- * One line under the instruction while the microphone is doing anything: the
- * user must never be unsure whether they are being recorded.
+ * One line under the instruction while the microphone is doing anything, or
+ * has something to say: the user must never be unsure whether they are being
+ * recorded. While listening it shows the words as they are recognised - the
+ * newest ones, if they no longer fit.
+ *
+ * Its height is fixed at [lines] lines whenever it shows, so recognised words
+ * arriving never move the panel; the screen reader hears the state from the
+ * service's announcements, never the running transcript.
  */
 @Composable
-private fun VoiceStatusLine(voice: VoiceState, strings: AppStrings, theme: KeyboardTheme) {
-    val message = when (voice) {
-        is VoiceState.Starting -> strings[R.string.voice_kb_listening]
-        is VoiceState.Listening -> voice.partial.ifBlank { strings[R.string.voice_kb_listening] }
-        is VoiceState.Processing -> strings[R.string.voice_kb_processing]
-        is VoiceState.PermissionRequired -> strings[R.string.voice_kb_permission_needed]
-        is VoiceState.PermissionDenied -> strings[R.string.voice_kb_permission_denied]
-        is VoiceState.Failed -> when (voice.reason) {
-            VoiceFailure.NO_SPEECH -> strings[R.string.voice_kb_no_speech]
-            VoiceFailure.NETWORK -> strings[R.string.kb_err_offline]
-            VoiceFailure.LANGUAGE_UNAVAILABLE, VoiceFailure.UNAVAILABLE -> strings[R.string.voice_kb_unavailable]
-            VoiceFailure.GENERIC -> strings[R.string.voice_kb_failed]
+internal fun VoiceStatusLine(
+    voice: VoiceState,
+    notice: DictationNotice?,
+    strings: AppStrings,
+    theme: KeyboardTheme,
+    modifier: Modifier = Modifier,
+    lines: Int = 2
+) {
+    val message = VoiceStatusText.message(voice, notice) ?: return
+    val partial = (voice as? VoiceState.Listening)?.partial?.trim().orEmpty()
+    val style = TextStyle(fontSize = 11.5.sp, lineHeight = VOICE_LINE_SP.sp)
+    val measurer = rememberTextMeasurer()
+    BoxWithConstraints(
+        modifier = modifier.fillMaxWidth().height(voiceLineHeight(lines)),
+        contentAlignment = Alignment.CenterStart
+    ) {
+        val width = constraints.maxWidth
+        val text = if (partial.isEmpty()) {
+            strings.text(message)
+        } else {
+            remember(partial, width, lines) {
+                VoiceStatusText.tail(partial) { candidate ->
+                    measurer.measure(candidate, style, constraints = Constraints(maxWidth = width)).lineCount <= lines
+                }
+            }
         }
-        else -> null
-    } ?: return
-
-    Text(
-        text = message,
-        fontSize = 11.5.sp,
-        color = if (voice is VoiceState.Listening) theme.primaryText else theme.secondaryText,
-        maxLines = 2,
-        overflow = TextOverflow.Ellipsis,
-        modifier = Modifier.fillMaxWidth()
-    )
+        Text(
+            text = text,
+            style = style,
+            color = if (voice is VoiceState.Listening) theme.primaryText else theme.secondaryText,
+            maxLines = lines,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
 }
+
+/**
+ * [lines] status lines, in sp so a large font never clips them, plus a little
+ * headroom: a box exactly two lines tall rounds down a pixel and shows one.
+ */
+@Composable
+internal fun voiceLineHeight(lines: Int): Dp =
+    with(LocalDensity.current) { (lines * VOICE_LINE_SP).sp.toDp() } + VOICE_LINE_HEADROOM
+
+internal fun AppStrings.text(message: VoiceMessage): String =
+    message.argument?.let { get(message.id, it) } ?: get(message.id)
 
 val PERSONA_ROW_HEIGHT = PersonaRowLayout.HEIGHT.dp
 internal val ROW_HEIGHT = 34.dp
@@ -989,3 +1034,5 @@ private val INSTRUCTION_HEIGHT = 56.dp
 internal const val LINE_HEIGHT_SP = 21
 private const val LINE_HEIGHT_DP = 21
 private const val SUGGESTIONS_FADE_MS = 120
+private const val VOICE_LINE_SP = 14
+private val VOICE_LINE_HEADROOM = 2.dp
