@@ -10,11 +10,23 @@ import (
 // reply is written in (only when Confident) and reporting detected_language
 // to the client (always the best guess).
 //
+// PRECISION FIRST. A confident result makes the server name the reply
+// language in the prompt and repair a reply written in another one, so a
+// confidently wrong result forces a wrong-language reply. That is worse than
+// no result: without one the prompt asks the model to write in the language
+// of the incoming message, and the model mirrors it well. So a result is
+// confident only on real evidence: Latin text is confidently English only
+// with English function words or list words, confidently Uzbek only with oʻ/gʻ
+// or Uzbek words; Russian typed in Latin letters, unknown words and a lone
+// Kazakh word that may be a name are never enough.
+//
 // Kazakh comes first. People in Kazakhstan mix Russian words into Kazakh
 // messages far more often than the reverse, so a message with real Kazakh
 // words (not just a Kazakh name) is Kazakh as soon as its Kazakh evidence
-// reaches kazakhMixedShare of the Russian evidence. A message without any
-// Kazakh signal stays Russian.
+// reaches kazakhMixedShare of the Russian evidence. It is confidently Kazakh
+// only when two Kazakh words, or as much Kazakh as Russian evidence, back it
+// up; a lighter mix stays a best guess and the prompt's mixed-message rule
+// applies. A message without any Kazakh signal stays Russian.
 
 // Detection — мәтін тілінің бағасы.
 type Detection struct {
@@ -33,6 +45,10 @@ const (
 	// kazakhMixedShare — Kazakh words plus at least this share of the Russian
 	// evidence make a mixed message Kazakh.
 	kazakhMixedShare = 0.75
+	// minimumLatinEvidence — English or Uzbek is confident only with at least
+	// one marker (or two English list words) behind it: one Latin word in a
+	// list may as well be a Kazakh or a transliterated Russian word.
+	minimumLatinEvidence = markerWeight
 )
 
 // Detect — мәтін қай тілде жазылғанын бағалайды.
@@ -43,16 +59,38 @@ func Detect(text string) Detection {
 func (e evidence) decide() Detection {
 	latin := max(e.en, e.uz)
 	if e.kazakhWords && e.kk >= kazakhMixedShare*e.ru && e.kk >= latin {
-		return Detection{Lang: "kk", Confident: leads(e.kk, latin)}
+		return Detection{Lang: "kk", Confident: e.kazakhConfident(latin)}
 	}
-	ranked := []languageScore{{"kk", e.kk}, {"ru", e.ru}, {"en", e.en}, {"uz", e.uz}}
+	ranked := []languageScore{{"kk", e.kk, e.weakKK}, {"ru", e.ru, e.weakRU}, {"en", e.en, e.weakEN}, {"uz", e.uz, e.weakUZ}}
 	// Тұрақты сұрыптау: тең ұпайда тізімдегі рет шешеді.
 	sort.SliceStable(ranked, func(i, j int) bool { return ranked[i].score > ranked[j].score })
 	best, second := ranked[0], ranked[1]
 	if best.score == 0 {
 		return Detection{}
 	}
-	return Detection{Lang: best.lang, Confident: leads(best.score, second.score)}
+	strong := best.score - best.weak
+	confident := leads(strong, second.score)
+	switch best.lang {
+	case "en", "uz":
+		confident = confident && strong >= minimumLatinEvidence
+	case "kk":
+		confident = confident && e.kazakhConfident(second.score)
+	}
+	return Detection{Lang: best.lang, Confident: confident}
+}
+
+// kazakhConfident — the Kazakh evidence is real and backed up: not just one
+// word that may be a name («Айгүл!»), and against Russian words at least two
+// Kazakh words or as much Kazakh as Russian evidence («Сәлем, как дела?»,
+// «Түсіндім, спасибо»), and not only possible names.
+func (e evidence) kazakhConfident(runnerUp float64) bool {
+	if e.kazakhCount == 0 || !leads(e.kk-e.weakKK, runnerUp) {
+		return false
+	}
+	if e.russianCount == 0 {
+		return e.kazakhCount > 1 || e.kazakhNameLike == 0
+	}
+	return (e.kazakhCount >= 2 || e.kk >= e.ru) && (e.kazakhNameLike < e.kazakhCount || e.kazakhCount >= 3)
 }
 
 // leads — the best score is clearly ahead of the runner-up.
@@ -61,18 +99,22 @@ func leads(best, second float64) bool {
 }
 
 type languageScore struct {
-	lang  string
-	score float64
+	lang        string
+	score, weak float64
 }
 
 // DetectLanguage — мәтіннің ең ықтимал тілі (клиентке detected_language).
 func DetectLanguage(text string) string { return Detect(text).Lang }
 
-// MentionsLanguage — мәтін тілді атай ма («на казахском», «қазақша», "in
-// English"). Атаса, нұсқау жауап тілін өзі таңдайды: шығыс тілі тексерілмейді.
-// Ел атаулары (Казахстан, Uzbekistan) тіл атамайды.
+// MentionsLanguage — нұсқау тілді атай ма («на казахском», «қазақша», "in
+// English", «на англ», "in eng", "qazaqsha"). Атаса, нұсқау жауап тілін өзі
+// таңдайды: шығыс тілі тексерілмейді. Recall matters more than precision
+// here: a false match only switches the language check off, while a missed
+// request makes the repair rewrite the reply back into the other language.
+// Ел атаулары (Казахстан, Uzbekistan, Англия) мен тегтер (Казаков,
+// Орысбаев) тіл атамайды.
 func MentionsLanguage(text string) bool {
-	for _, t := range tokenize(text) {
+	for _, t := range tokenize(stripNonWords(text)) {
 		if namesLanguage(t.word) {
 			return true
 		}
@@ -81,17 +123,35 @@ func MentionsLanguage(text string) bool {
 }
 
 // languageStems — a word starting with one of these names a language:
-// казахский, на казахском, қазақша, казакша, по-русски, орысша, английский,
-// ағылшынша, in English, узбекский, o'zbekcha.
+// казахский, на казахском, қазақша, казакша, kazaksha, qazaqsha, по-русски,
+// орысша, orysha, английский, на англ, англиш, инглиш, english, ағылшынша,
+// ingliz, узбекский, o'zbekcha, өзбекше.
 var languageStems = []string{
-	"казах", "қазақ", "казак", "kazakh", "qozoq",
-	"русск", "орыс", "russian", "ruscha",
-	"английск", "англиск", "ағылшын", "агылшын", "english", "ingliz",
-	"узбек", "өзбек", "uzbek", "o'zbek", "oʻzbek", "ozbek",
+	"казах", "қазақ", "казак", "kazakh", "kazak", "kazah", "qazaq", "qozoq",
+	"русск", "орыс", "russian", "russk", "ruscha", "orys",
+	"англ", "ағылшын", "агылшын", "english", "engl", "ingliz", "inglish", "инглиш", "angli",
+	"узбек", "өзбек", "ўзбек", "uzbek", "o'zbek", "oʻzbek", "ozbek",
 }
 
+// languageAbbreviations — short names that count only as a whole word: «на
+// каз», «на рус», "in eng", "ru", "kz". As prefixes they would match казино,
+// русло or rust.
+var languageAbbreviations = wordSet("каз", "қаз", "кз", "рус", "анг", "узб", "eng", "kaz", "kz", "rus", "ru", "uzb", "uz")
+
+// notLanguageNames — words a stem matches that name a country, not a
+// language.
+var notLanguageNames = wordSet("англия", "англии", "англию", "англией", "england", "angliya", "anglia")
+
+// surnameEndings — «Казаков», «Казаковой», «Орысбаев»: a surname, not a
+// language.
+var surnameEndings = []string{"ов", "ова", "ову", "ове", "овой", "овым", "ев", "ева", "еву", "еве", "евой", "евым"}
+
 func namesLanguage(word string) bool {
-	if strings.Contains(word, "стан") || strings.Contains(word, "stan") {
+	if languageAbbreviations[word] {
+		return true
+	}
+	if strings.Contains(word, "стан") || strings.Contains(word, "stan") || notLanguageNames[word] ||
+		hasEnding(word, surnameEndings, 0) {
 		return false
 	}
 	for _, stem := range languageStems {

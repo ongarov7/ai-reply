@@ -122,6 +122,9 @@ type Quality struct {
 	// VerifyLanguage — шығыс тілі тексеріледі: мақсат анық, ал нұсқау басқа
 	// тілді атамаған.
 	VerifyLanguage bool
+	// Compose — «Create» хабарламасы: соңғы «Примечание:» абзацы хабардың
+	// бөлігі, тазартуда өшірілмейді.
+	Compose bool
 }
 
 // verifiedLanguage — Check тексеретін тіл; тексеру керек болмаса бос.
@@ -150,7 +153,8 @@ func BuildPrompt(in PromptInput) Prompt {
 	developer := strings.Join([]string{
 		replyRole,
 		productRules,
-		languageSection(replyLanguageLead(target), target.Lang, !target.Firm() || namesLanguage),
+		languageSection(replyLanguageLead(target)+instructionLanguageNote(in.Instruction, target, namesLanguage),
+			target.Lang, !target.Firm() || namesLanguage),
 		senderSection(gender, "the incoming message"),
 		replyStyle(in),
 		replyOutput,

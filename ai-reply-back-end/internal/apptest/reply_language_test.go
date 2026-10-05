@@ -124,3 +124,46 @@ func TestExplicitLanguageRequestIsNotRepaired(t *testing.T) {
 		t.Fatal("the developer message must allow an explicitly requested language")
 	}
 }
+
+// "ответь на англ" is an explicit request in short form: the English answer
+// stays, no repair call rewrites it back into Russian.
+func TestAbbreviatedLanguageRequestIsNotRepaired(t *testing.T) {
+	h := newHarness(t, withEnv("AI_REPAIR_ENABLED", "true"))
+	session := h.signIn("+7 707 610 20 05")
+	english := "Hey! I'm good, thanks. How about you?"
+	h.provider.replies = []string{english}
+
+	res := h.do(http.MethodPost, "/api/v1/ai/reply", replyBody("Привет! Как дела? Что делаешь сегодня вечером?",
+		map[string]any{"instruction": "ответь на англ"}), h.auth(session.access))
+	if res.status != http.StatusOK || res.str("reply") != english || h.provider.calls != 1 {
+		t.Fatalf("reply: %d %s, calls %d", res.status, res.raw, h.provider.calls)
+	}
+}
+
+// Kazakh typed in Latin letters is Kazakh; Russian typed in Latin letters is
+// left to the model (no language named, nothing verified or repaired).
+func TestLatinScriptMessagesOnARussianPhone(t *testing.T) {
+	h := newHarness(t, withEnv("AI_REPAIR_ENABLED", "true"))
+	session := h.signIn("+7 707 610 20 06")
+
+	res := h.do(http.MethodPost, "/api/v1/ai/reply", replyBody("Salem! Qalaisyn?", nil), h.auth(session.access))
+	if res.status != http.StatusOK ||
+		!strings.Contains(h.provider.lastDeveloper, "Write the reply in Kazakh, the language of the incoming message.") ||
+		!strings.Contains(h.provider.lastDeveloper, "Note: <user_instruction> is written in Russian, but the reply must be in Kazakh.") {
+		t.Fatalf("latin kazakh: %d %s", res.status, res.raw)
+	}
+
+	before := h.provider.calls
+	cyrillic := "Привет! Всё хорошо, спасибо."
+	h.provider.replies = []string{cyrillic}
+	res = h.do(http.MethodPost, "/api/v1/ai/reply", replyBody("Privet, kak dela?", map[string]any{
+		"language": "kk", "input_language": "kk", "instruction": ""}), h.auth(session.access))
+	if res.status != http.StatusOK || res.str("reply") != cyrillic || h.provider.calls != before+1 {
+		t.Fatalf("transliterated russian: %d %s, calls %d", res.status, res.raw, h.provider.calls-before)
+	}
+	developer := h.provider.lastDeveloper
+	if !strings.Contains(developer, "Write the reply in the language of the incoming message.") ||
+		strings.Contains(developer, "Write the reply in English") || strings.Contains(developer, "Write the reply in Uzbek") {
+		t.Fatal("transliterated Russian must be mirrored, never forced into English or Uzbek")
+	}
+}

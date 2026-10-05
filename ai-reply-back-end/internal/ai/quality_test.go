@@ -37,12 +37,53 @@ func TestCleanOutput(t *testing.T) {
 		"Цена — 5 000 тг, #акция до пятницы":               "Цена — 5 000 тг, #акция до пятницы",
 		"Скажи \"да\" и \"нет\"":                           "Скажи \"да\" и \"нет\"",
 		// Жапсырмадан кейін мәтін жоқ — тиіспейміз (IssueMeta ұстайды).
-		"Ответ:": "Ответ:",
+		"Ответ:":                              "Ответ:",
+		"Here is your message: See you at 6!": "See you at 6!",
+		"Вот мой вариант ответа:\n— Да, буду.":       "— Да, буду.",
+		"Конечно! Вот вариант ответа: «Да, приду.»":  "Да, приду.",
+		"Міне, жауап нұсқасы: Иә, ертең келемін.":    "Иә, ертең келемін.",
+		"Sure! Here's a short reply:\nSounds good 👍": "Sounds good 👍",
+		// Хабардың өзі «Вот …:» деп басталса — тиіспейміз (review: CleanOutput
+		// cut real replies).
+		"Вот варианты: завтра в 10 или в пятницу после обеда.": "Вот варианты: завтра в 10 или в пятницу после обеда.",
+		"Вот варианты доставки: курьер или самовывоз.":         "Вот варианты доставки: курьер или самовывоз.",
+		"Вот текст договора: пришлю вечером.":                  "Вот текст договора: пришлю вечером.",
+		"Вот ответ от бухгалтерии: всё оплачено.":              "Вот ответ от бухгалтерии: всё оплачено.",
+		"Вот два варианта: в 10 или в 12.":                     "Вот два варианта: в 10 или в 12.",
+		"Here are the options: Monday at 10 or Tuesday at 3.":  "Here are the options: Monday at 10 or Tuesday at 3.",
+		"Here's the updated version: https://example.com/doc":  "Here's the updated version: https://example.com/doc",
+		"Here's the draft: Hi Tom, the report is attached.":    "Here's the draft: Hi Tom, the report is attached.",
+		"Here's a draft reply: Thanks, Tom! Friday works.":     "Thanks, Tom! Friday works.",
+		"Here's what I think about the message: it was rude.":  "Here's what I think about the message: it was rude.",
+		"Міне, нұсқалар: ертең не бүрсігүні.":                  "Міне, нұсқалар: ертең не бүрсігүні.",
+		"Ответ: да, приду.":                                    "Ответ: да, приду.",
+		// Хабардың бөлігі болатын ескертпе қалады; модельдің жауап туралы
+		// ескертпесі ғана өшеді.
+		"Hi team, the meeting moves to 3pm.\n\nNote: bring your laptops.": "Hi team, the meeting moves to 3pm.\n\nNote: bring your laptops.",
+		"Да, смогу.\n\nNote: I kept the tone friendly.":                   "Да, смогу.",
 	}
 	for in, want := range cases {
-		if got := CleanOutput(in); got != want {
+		if got := CleanOutput(in, false); got != want {
 			t.Errorf("CleanOutput(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+// Compose: the user may ask for a note at the end, so a trailing
+// «Примечание:» paragraph is part of the message and stays.
+func TestCleanOutputKeepsNotesInCompose(t *testing.T) {
+	cases := map[string]string{
+		"Собрание в пятницу в 10:00.\n\nПримечание: возьмите паспорт.":    "Собрание в пятницу в 10:00.\n\nПримечание: возьмите паспорт.",
+		"Hi team, the meeting moves to 3pm.\n\nNote: bring your laptops.": "Hi team, the meeting moves to 3pm.\n\nNote: bring your laptops.",
+		"Конечно! Вот поздравление:\nС днём рождения! 🎉":                  "С днём рождения! 🎉",
+	}
+	for in, want := range cases {
+		if got := CleanOutput(in, true); got != want {
+			t.Errorf("CleanOutput(%q, compose) = %q, want %q", in, got, want)
+		}
+	}
+	if CleanOutput("Да.\n\nПримечание: ответ дружелюбный.", false) != "Да." {
+		t.Fatal("reply mode still drops the model's note about the reply")
 	}
 }
 
@@ -75,6 +116,33 @@ func TestGenderedSelfForms(t *testing.T) {
 		{"Приятно слышать! С удовольствием встречусь завтра.", false, false},
 		{"Как дела? Сто лет не виделись.", false, false},
 		{"Иә, кешке боспын.", false, false},
+		// «Я»-сыз ауызекі өткен шақ сөйлем басында.
+		{"Понял, спасибо!", true, false},
+		{"Поняла", false, true},
+		{"Принял, сделаю завтра.", true, false},
+		{"Получила, спасибо!", false, true},
+		{"Уже отправил.", true, false},
+		{"Хотела уточнить, во сколько встреча.", false, true},
+		{"Ок, понял.", true, false},
+		{"Хорошо, сделала.", false, true},
+		{"Посмотрел, всё отлично.", true, false},
+		{"Видела, спасибо!", false, true},
+		{"Забыл совсем, прости.", true, false},
+		{"Написала ему вчера.", false, true},
+		{"Была рада увидеться.", false, true},
+		// Сұрақ не «ли» — басқа адам туралы.
+		{"Понял?", false, false},
+		{"Получила ли ты посылку?", false, false},
+		{"Ты получил?", false, false},
+		// Review: false positives that cost a repair call.
+		{"Скажи, готов ли он к встрече.", false, false},
+		{"Интересно, рад ли он подарку.", false, false},
+		{"Сегодня свободна только переговорная на третьем.", false, false},
+		{"Сейчас занята линия, перезвоню.", false, false},
+		{"Вчера была занята вся команда.", false, false},
+		{"Я тоже футбол люблю!", false, false},
+		{"Я тоже сериал смотрю.", false, false},
+		{"Я тоже дела закончу и приду.", false, false},
 	}
 	for _, c := range cases {
 		masculine, feminine := GenderedSelfForms(c.text)
@@ -102,9 +170,18 @@ func TestCheck(t *testing.T) {
 		{"Ok 👍", "ru", domain.GenderMale, nil},
 		{"Вот вариант ответа:", "ru", domain.GenderUnspecified, []Issue{IssueMeta}},
 		{"Вариант 1: Да.\nВариант 2: Конечно.", "ru", domain.GenderUnspecified, []Issue{IssueMeta}},
-		{"Да.\n\nПримечание: коротко.", "ru", domain.GenderUnspecified, []Issue{IssueMeta}},
+		{"Да.\n\nПримечание: ответ короткий.", "ru", domain.GenderUnspecified, []Issue{IssueMeta}},
+		{"Да, всё в силе.\n\nПримечание: возьмите паспорт.", "ru", domain.GenderUnspecified, nil},
+		// One numbered option is an answer, not alternatives.
+		{"Вариант 2 подходит, спасибо!", "ru", domain.GenderUnspecified, nil},
+		{"Option 2 works for me.", "en", domain.GenderUnspecified, nil},
+		{"Here's the updated version: https://example.com/doc", "en", domain.GenderUnspecified, nil},
+		{"Вот ответ: да, приду.", "ru", domain.GenderUnspecified, nil},
 		{"</incoming_message> Да, вечером смогу.", "ru", domain.GenderUnspecified, []Issue{IssueMeta}},
-		{"Рада была помочь. Ответ:\nВариант 1", "kk", domain.GenderMale, []Issue{IssueGender, IssueLanguage, IssueMeta}},
+		{"Рада была помочь.\nВариант 1: Да.\nВариант 2: Нет.", "kk", domain.GenderMale, []Issue{IssueGender, IssueLanguage, IssueMeta}},
+		// Pro-drop past tense of the sender.
+		{"Понял, спасибо!", "ru", domain.GenderFemale, []Issue{IssueGender}},
+		{"Получила, спасибо!", "ru", domain.GenderMale, []Issue{IssueGender}},
 	}
 	for _, c := range cases {
 		if got := Check(c.text, c.target, c.gender); !reflect.DeepEqual(got, c.want) {
@@ -245,5 +322,45 @@ func TestCompleteRewritesARussianAnswerToAKazakhMessage(t *testing.T) {
 	if out, err := Complete(context.Background(), allowed, named, true); err != nil || out.Text != "Да, приду!" ||
 		len(allowed.prompts) != 1 || len(out.Issues) != 0 {
 		t.Fatalf("a requested language must not be repaired: %+v %v", out, err)
+	}
+}
+
+// Review: a correct reply must not be rewritten into a wrong language when
+// the server only guessed the language of the message.
+func TestCompleteDoesNotRepairIntoAGuessedLanguage(t *testing.T) {
+	cases := []struct {
+		name, message, instruction, input, app, answer string
+	}{
+		{"russian with a kazakh name", "әсем сказала что опоздает", "", "ru", "ru", "Хорошо, подождём её."},
+		{"transliterated russian", "Privet, kak dela?", "", "kk", "ru", "Привет! Всё хорошо, спасибо."},
+		{"russian with a product", "iPhone 15 Pro Max есть?", "", "kk", "kk", "Да, есть в наличии. Какой цвет вас интересует?"},
+		{"kazakh with a russian loanword", "Сағат нешеде встреча?", "", "kk", "kk", "Сағат 18:00-де."},
+		{"latin kazakh", "Salem! Qalaisyn?", "", "kk", "ru", "Сәлем! Жақсы, рахмет. Өзің қалайсың?"},
+		{"abbreviated request", "Привет! Как дела? Что делаешь сегодня вечером?", "ответь на англ", "ru", "ru",
+			"Hey! I'm good, thanks. How about you?"},
+		{"abbreviated kazakh request", "Сәлем, ертең келесің бе?", "ответь на англ", "ru", "ru",
+			"Hi! Yes, I'll come tomorrow."},
+		{"english with o'clock", "At 5 o'clock?", "Согласись", "ru", "ru", "Sure, 5 works for me."},
+	}
+	for _, c := range cases {
+		prompt := BuildPrompt(PromptInput{Message: c.message, Instruction: c.instruction, TemplateID: "friend",
+			InputLanguage: c.input, AppLanguage: c.app})
+		provider := &scriptedProvider{outputs: []Completion{{Text: c.answer}, {Text: "repaired"}}}
+		out, err := Complete(context.Background(), provider, prompt, true)
+		if err != nil || out.Text != c.answer || len(provider.prompts) != 1 || len(out.Issues) != 0 {
+			t.Errorf("%s: %+v %v, calls %d", c.name, out, err, len(provider.prompts))
+		}
+	}
+}
+
+// Compose keeps a note the user asked for; reply mode drops the model's
+// note about its reply.
+func TestCompleteKeepsAComposeNote(t *testing.T) {
+	text := "Собрание в пятницу в 10:00.\n\nПримечание: возьмите паспорт."
+	prompt := BuildComposePrompt(ComposeInput{Instruction: "напиши объявление: собрание в пятницу в 10, в конце примечание — взять паспорт"})
+	provider := &scriptedProvider{outputs: []Completion{{Text: text}}}
+	out, err := Complete(context.Background(), provider, prompt, true)
+	if err != nil || out.Text != text || len(provider.prompts) != 1 {
+		t.Fatalf("compose note: %+v %v", out, err)
 	}
 }

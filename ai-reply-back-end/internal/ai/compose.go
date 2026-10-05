@@ -69,6 +69,7 @@ func BuildComposePrompt(in ComposeInput) Prompt {
 			Target:         target,
 			Gender:         gender,
 			VerifyLanguage: target.Firm() && !namesLanguage,
+			Compose:        true,
 		},
 	}
 }

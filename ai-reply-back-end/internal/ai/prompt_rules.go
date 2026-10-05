@@ -168,6 +168,22 @@ func replyLanguageLead(t LanguageTarget) string {
 	return target + "\n" + replyLanguageDecision
 }
 
+// instructionLanguageNote — the instruction is confidently in another
+// language than a firm target and asks for none: the model is told so in
+// one server sentence, built from enum names only («Ответь согласием.» on a
+// Kazakh message → "written in Russian, but the reply must be in Kazakh").
+func instructionLanguageNote(instruction string, target LanguageTarget, namesLanguage bool) string {
+	if !target.Firm() || namesLanguage || strings.TrimSpace(instruction) == "" {
+		return ""
+	}
+	d := Detect(instruction)
+	from, to := ReplyLanguages[d.Lang], ReplyLanguages[target.Lang]
+	if !d.Confident || d.Lang == target.Lang || from == "" || to == "" {
+		return ""
+	}
+	return "\nNote: <user_instruction> is written in " + from + ", but the reply must be in " + to + "."
+}
+
 // composeLanguageLead — жаңа хабарлама тілінің сөйлемі.
 func composeLanguageLead(t LanguageTarget) string {
 	const named = ` ("на казахском", "қазақша", "in English")`

@@ -432,6 +432,116 @@
     }
   },
   {
+    "id": "kk-latin-ru-phone",
+    "mode": "reply",
+    "incoming": "Salem! Qalaisyn? Erten kelesin be?",
+    "instruction": "Ответь, что всё хорошо и завтра приду",
+    "template_id": "friend",
+    "gender": "male",
+    "input_language": "ru",
+    "app_language": "ru",
+    "expectations": {
+      "language": "kk", "no_meta": true, "max_sentences": 3, "max_chars": 160
+    }
+  },
+  {
+    "id": "ru-translit-kk-phone",
+    "mode": "reply",
+    "incoming": "Privet! Kak dela? Chto delaesh vecherom?",
+    "instruction": "",
+    "template_id": "friend",
+    "gender": "unspecified",
+    "input_language": "kk",
+    "app_language": "kk",
+    "mirror": true,
+    "expectations": {
+      "language": "ru", "gender_agreement": true, "no_meta": true, "max_sentences": 3, "max_chars": 160
+    }
+  },
+  {
+    "id": "ru-link-brand-kk-phone",
+    "mode": "reply",
+    "incoming": "Здравствуйте! iPhone 15 Pro Max есть в наличии? Вот ссылка https://kaspi.kz/shop/p/apple-iphone-15-pro-max-256gb",
+    "instruction": "Скажи, что есть, и спроси, какой цвет нужен",
+    "template_id": "client",
+    "gender": "female",
+    "input_language": "kk",
+    "app_language": "kk",
+    "expectations": {
+      "language": "ru", "gender_agreement": true, "no_meta": true, "max_sentences": 3, "max_chars": 220,
+      "must_include_any": ["есть", "в наличии"], "formality": "formal"
+    }
+  },
+  {
+    "id": "en-oclock-ru-phone",
+    "mode": "reply",
+    "incoming": "Who's coming at 7 o'clock?",
+    "instruction": "Скажи, что я приду",
+    "template_id": "friend",
+    "gender": "unspecified",
+    "input_language": "ru",
+    "app_language": "ru",
+    "expectations": {
+      "language": "en", "no_meta": true, "max_sentences": 2, "max_chars": 100,
+      "must_include_any": ["i'll", "i’ll", "i will", "i'm", "i’m", "me", "count me in", "yes"]
+    }
+  },
+  {
+    "id": "kk-capitalised-loanword-ru-phone",
+    "mode": "reply",
+    "incoming": "Сағат нешеде встреча?",
+    "instruction": "Скажи, что в 18:00",
+    "template_id": "work",
+    "gender": "female",
+    "input_language": "ru",
+    "app_language": "ru",
+    "expectations": {
+      "language": "kk", "kazakh_letters": true, "no_meta": true, "max_sentences": 2, "max_chars": 100,
+      "must_include_any": ["18:00", "18.00"]
+    }
+  },
+  {
+    "id": "ru-kazakh-name-kk-phone",
+    "mode": "reply",
+    "incoming": "әсем сказала что опоздает, подождём её?",
+    "instruction": "Согласись",
+    "template_id": "friend",
+    "gender": "male",
+    "input_language": "kk",
+    "app_language": "kk",
+    "expectations": {
+      "language": "ru", "gender_agreement": true, "no_meta": true, "max_sentences": 2, "max_chars": 120,
+      "must_include_any": ["да", "давай", "конечно", "подождём", "подождем", "хорошо", "ок", "окей"]
+    }
+  },
+  {
+    "id": "ru-abbreviated-request-en",
+    "mode": "reply",
+    "incoming": "Привет! Как дела? Что делаешь сегодня вечером?",
+    "instruction": "ответь на англ, что всё хорошо, вечером дома",
+    "template_id": "friend",
+    "gender": "unspecified",
+    "input_language": "ru",
+    "expectations": {
+      "language": "en", "no_meta": true, "max_sentences": 3, "max_chars": 160,
+      "must_include_any": ["home", "good", "fine", "great"]
+    }
+  },
+  {
+    "id": "kk-compose-abbreviated-request",
+    "mode": "compose",
+    "incoming": "",
+    "instruction": "Напиши поздравление коллеге с днём рождения на каз",
+    "template_id": "",
+    "gender": "female",
+    "input_language": "ru",
+    "app_language": "ru",
+    "expectations": {
+      "language": "kk", "kazakh_letters": true, "no_meta": true, "max_sentences": 5, "max_chars": 400,
+      "must_not_include": ["["]
+    }
+  },
+  {
     "id": "ru-compose-birthday-female",
     "mode": "compose",
     "incoming": "",

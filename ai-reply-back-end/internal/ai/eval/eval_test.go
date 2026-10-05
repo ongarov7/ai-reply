@@ -112,6 +112,23 @@ func TestChecksSeparateGoodOutputsFromBadOnes(t *testing.T) {
 		{"kk-plain-incoming-ru-instruction", "Жаксы, ертен келем.", []string{CheckKazakhLetters}},
 		{"kk-plain-incoming-ru-instruction", "Всё хорошо, завтра приду.", []string{CheckLanguage, CheckMustIncludeAny, CheckKazakhLetters}},
 		{"kk-incoming-explicit-ru", "Да, приду.", nil},
+		// Latin Kazakh, transliterated Russian, links, o'clock and Kazakh names.
+		{"kk-latin-ru-phone", "Sálem! Jaqsy, rahmet. Erteń kelemin.", nil},
+		{"kk-latin-ru-phone", "Сәлем! Жақсы, рахмет. Ертең келемін.", nil},
+		{"kk-latin-ru-phone", "Привет! Всё хорошо, завтра приду.", []string{CheckLanguage}},
+		{"ru-translit-kk-phone", "Привет! Всё хорошо, дома сижу. А ты?", nil},
+		{"ru-translit-kk-phone", "Privet! Vse horosho, doma sizhu.", nil},
+		{"ru-translit-kk-phone", "Сәлем! Жақсы, үйдемін.", []string{CheckLanguage}},
+		{"ru-link-brand-kk-phone", "Здравствуйте! Да, есть в наличии. Какой цвет Вам нужен?", nil},
+		{"ru-link-brand-kk-phone", "Hello! Yes, it is in stock. Which colour do you need?", []string{CheckLanguage, CheckMustIncludeAny}},
+		{"en-oclock-ru-phone", "Me! I'll be there at 7.", nil},
+		{"en-oclock-ru-phone", "Я приду к семи.", []string{CheckLanguage, CheckMustIncludeAny}},
+		{"kk-capitalised-loanword-ru-phone", "Сағат 18:00-де.", nil},
+		{"kk-capitalised-loanword-ru-phone", "В 18:00.", []string{CheckLanguage, CheckKazakhLetters}},
+		{"ru-kazakh-name-kk-phone", "Да, давай подождём.", nil},
+		{"ru-kazakh-name-kk-phone", "Иә, күтейік.", []string{CheckLanguage, CheckMustIncludeAny}},
+		{"ru-abbreviated-request-en", "Hey! All good, staying home tonight.", nil},
+		{"ru-abbreviated-request-en", "Привет! Всё хорошо, вечером дома.", []string{CheckLanguage, CheckMustIncludeAny}},
 		{"en-short-thanks", "Anytime! Glad it helped.", nil},
 		{"en-short-thanks", "You are very welcome! I am really glad that everything worked out for you in the end.", []string{CheckMaxChars}},
 	}
@@ -184,7 +201,9 @@ func TestLivePromptsAreBuiltForEveryCase(t *testing.T) {
 // The incoming message decides the language: every case's prompt targets the
 // language the output is checked for, whatever the app and keyboard are. A
 // case whose instruction names a language keeps the message's target and
-// skips the language check, so the requested language is allowed.
+// skips the language check, so the requested language is allowed. A mirror
+// case is one the server cannot tell for sure: its prompt names no language
+// from the message (the model mirrors it) and nothing is verified.
 func TestPromptsTargetTheExpectedLanguage(t *testing.T) {
 	cases, err := Cases()
 	if err != nil {
@@ -195,6 +214,13 @@ func TestPromptsTargetTheExpectedLanguage(t *testing.T) {
 		source, text := ai.SourceMessage, c.Incoming
 		if c.Mode == "compose" {
 			source, text = ai.SourceRequest, c.Instruction
+		}
+		if c.Mirror {
+			if p.Quality.Target.Firm() || p.Quality.VerifyLanguage ||
+				!strings.Contains(p.Developer, "Write the reply in the language of the incoming message.") {
+				t.Errorf("%s: quality %+v, the model must mirror the message unchecked", c.ID, p.Quality)
+			}
+			continue
 		}
 		want := ai.LanguageTarget{Lang: c.Expectations.Language, Source: source}
 		if ai.MentionsLanguage(c.Instruction) {

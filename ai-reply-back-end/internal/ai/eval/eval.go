@@ -41,7 +41,11 @@ type Case struct {
 	// InputLanguage — kk | ru | en не бос.
 	InputLanguage string `json:"input_language"`
 	// AppLanguage — қолданба тілі; бос болса InputLanguage-пен бірдей.
-	AppLanguage  string       `json:"app_language,omitempty"`
+	AppLanguage string `json:"app_language,omitempty"`
+	// Mirror — сервер хабарламаның тілін сенімді анықтай алмайды (мысалы,
+	// латынмен терілген орысша): промпт модельге хабарламаның тілінде жазуды
+	// айтады, тіл тексерілмейді. Expectations.Language — бәрібір күтілетін тіл.
+	Mirror       bool         `json:"mirror,omitempty"`
 	Expectations Expectations `json:"expectations"`
 }
 

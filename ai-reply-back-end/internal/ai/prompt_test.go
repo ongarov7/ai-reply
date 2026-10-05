@@ -282,3 +282,113 @@ func TestComposePromptV2(t *testing.T) {
 		t.Fatal("the request must stay in the user message")
 	}
 }
+
+// Review: the detector was confidently wrong on Latin-script Kazakh,
+// transliterated Russian, links, brand names, English contractions and
+// Kazakh names. With a Kazakh keyboard and a Russian app, the prompt names a
+// language only when the server is sure, and verifies only that language;
+// otherwise it asks the model to mirror the message and checks nothing.
+func TestReplyPromptNamesALanguageOnlyWhenSure(t *testing.T) {
+	cases := []struct {
+		name, message string
+		want          string // "" — the model mirrors the message
+	}{
+		{"latin kazakh", "Salem! Qalaisyn?", "kk"},
+		{"latin kazakh question", "Qashan kelesin?", "kk"},
+		{"latin kazakh thanks", "Jaqsy, rahmet!", "kk"},
+		{"latin kazakh with men", "Men keshke kelemin", "kk"},
+		{"kazakh 2021 alphabet", "Sálem! Qalaısyń?", "kk"},
+		{"latin kazakh with be", "Erten kelesin be?", "kk"},
+		{"transliterated russian", "Privet, kak dela?", ""},
+		{"transliterated russian request", "Napishi chto ya opozdayu", ""},
+		{"russian with a product", "iPhone 15 Pro Max есть?", "ru"},
+		{"russian with a link", "Смотри какое видео https://www.youtube.com/watch?v=dQw4w9WgXcQ&feature=share", "ru"},
+		{"russian with a kazakh name", "әсем сказала что опоздает", "ru"},
+		{"russian with a capitalised kazakh name", "Мұхтар, ты где?", "ru"},
+		{"kazakh with a russian loanword", "Сағат нешеде встреча?", "kk"},
+		{"english who's", "Who's coming?", "en"},
+		{"english o'clock", "At 5 o'clock?", "en"},
+	}
+	for _, c := range cases {
+		in := replyInput()
+		in.Message, in.InputLanguage, in.AppLanguage, in.Instruction = c.message, "kk", "ru", "Ответь согласием."
+		p := BuildPrompt(in)
+		for lang, name := range ReplyLanguages {
+			lead := "Write the reply in " + name + ", the language of the incoming message."
+			if strings.Contains(p.Developer, lead) != (lang == c.want) {
+				t.Errorf("%s: lead %q present = %v", c.name, lead, !(lang == c.want))
+			}
+		}
+		if c.want == "" {
+			if p.Quality.VerifyLanguage || p.Quality.Target.Firm() ||
+				!strings.Contains(p.Developer, "Write the reply in the language of the incoming message.") {
+				t.Errorf("%s: quality %+v, the model must mirror the message unchecked", c.name, p.Quality)
+			}
+			continue
+		}
+		if p.Quality.Target != (LanguageTarget{c.want, SourceMessage}) || !p.Quality.VerifyLanguage {
+			t.Errorf("%s: quality %+v, want a verified %s target", c.name, p.Quality, c.want)
+		}
+	}
+}
+
+// Review: abbreviated and Latin requests for a language were not
+// recognised, so the repair rewrote the requested language back.
+func TestAbbreviatedLanguageRequestsSkipTheLanguageCheck(t *testing.T) {
+	for _, instruction := range []string{"ответь на англ", "по англ ответь", "ответь на каз", "на инглише",
+		"in eng pls", "qazaqsha jaz", "kazaksha jaz", "otvet' na kazahskom", "на рус"} {
+		in := replyInput()
+		in.Message, in.Instruction = "Привет! Как дела? Что делаешь сегодня вечером?", instruction
+		p := BuildPrompt(in)
+		if p.Quality.VerifyLanguage || !strings.Contains(p.Developer, "Only an explicit request for a language") {
+			t.Errorf("%q: quality %+v, a requested language must not be verified", instruction, p.Quality)
+		}
+		if !strings.Contains(p.User, instruction) || strings.Contains(p.Developer, "Note: <user_instruction>") {
+			t.Errorf("%q: the request stays data in the user message, with no note", instruction)
+		}
+	}
+	compose := BuildComposePrompt(ComposeInput{Instruction: "напиши поздравление с днем рождения на англ"})
+	if compose.Quality.VerifyLanguage || compose.Quality.Target != (LanguageTarget{"ru", SourceRequest}) {
+		t.Fatalf("compose quality %+v", compose.Quality)
+	}
+}
+
+// When the instruction is confidently in another language than a firm
+// target, one server sentence says so; enum names only, never user text.
+func TestReplyPromptNotesTheInstructionLanguage(t *testing.T) {
+	cases := []struct {
+		name, message, instruction, preference, want string
+	}{
+		{"russian quick action on kazakh", "Ертең кездесуге уақытың бар ма?", "Ответь согласием.", "",
+			"Note: <user_instruction> is written in Russian, but the reply must be in Kazakh."},
+		{"english note on kazakh", "Ертең кездесуге уақытың бар ма?", "Say yes, I will come tomorrow", "",
+			"Note: <user_instruction> is written in English, but the reply must be in Kazakh."},
+		{"kazakh note on russian", "Привет! Ты сегодня придёшь?", "Келемін де", "",
+			"Note: <user_instruction> is written in Kazakh, but the reply must be in Russian."},
+		{"preference", "Привет! Ты сегодня придёшь?", "Скажи, что приду", "en",
+			"Note: <user_instruction> is written in Russian, but the reply must be in English."},
+	}
+	for _, c := range cases {
+		in := replyInput()
+		in.Message, in.Instruction, in.Profile.ReplyLanguage = c.message, c.instruction, c.preference
+		if p := BuildPrompt(in); !strings.Contains(p.Developer, c.want) {
+			t.Errorf("%s: developer message lacks %q", c.name, c.want)
+		}
+	}
+	for name, edit := range map[string]func(*PromptInput){
+		"same language":       func(in *PromptInput) { in.Instruction = "Скажи, что уточню" },
+		"no instruction":      func(in *PromptInput) { in.Instruction = "" },
+		"named language":      func(in *PromptInput) { in.Instruction = "Ответь на казахском" },
+		"unclear message":     func(in *PromptInput) { in.Message, in.Instruction = "👍", "Say thanks" },
+		"unclear instruction": func(in *PromptInput) { in.Message, in.Instruction = "Ертең келесің бе?", "ок 👍" },
+		"transliteration": func(in *PromptInput) {
+			in.Message, in.Instruction = "Ертең келесің бе?", "Privet, skazhi da"
+		},
+	} {
+		in := replyInput()
+		edit(&in)
+		if p := BuildPrompt(in); strings.Contains(p.Developer, "Note: <user_instruction>") {
+			t.Errorf("%s: unexpected note", name)
+		}
+	}
+}
