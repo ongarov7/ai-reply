@@ -138,9 +138,10 @@ struct MockCopiedBadge: View {
     }
 }
 
-/// AI Reply's persona row, with the real built-in names in the app's
-/// language. `onSelect` makes the pills tappable (practice); without it they
-/// are a picture (tutorial).
+/// AI Reply's persona row as the keyboard draws it: ✨ (write with AI) at
+/// the leading edge, then the real built-in names in the app's language.
+/// `onSelect` makes the pills tappable (practice); without it they are a
+/// picture (tutorial). ✨ is always a picture here: the steps teach replying.
 struct MockPersonaRow: View {
     let language: AppLanguage
     var highlighted: RelationshipKind?
@@ -148,10 +149,21 @@ struct MockPersonaRow: View {
 
     var body: some View {
         HStack(spacing: DS.Spacing.xxs) {
+            createButton
             ForEach(RelationshipKind.builtIns, id: \.self) { kind in
                 pill(kind)
             }
         }
+    }
+
+    /// The keyboard's ✨: a key-coloured disc with an accent glyph.
+    private var createButton: some View {
+        Image(systemName: "sparkles")
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(Color.accentColor)
+            .frame(width: 38, height: 30)
+            .background(Capsule().fill(MockStyle.key))
+            .accessibilityHidden(true)
     }
 
     @ViewBuilder

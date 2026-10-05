@@ -4944,25 +4944,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A chat with the AI Reply keyboard: Friend, Client, Business and Work buttons above the keys."
+            "value" : "A chat with the AI Reply keyboard. Above the keys: the Write with AI button on the left, then Friend, Client, Business and Work."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Reply пернетақтасы ашық тұрған чат: пернелердің үстінде «Дос», «Клиент», «Бизнес», «Жұмыс» түймелері."
+            "value" : "AI Reply пернетақтасы ашық тұрған чат. Пернелердің үстінде: сол жақта «AI-мен жазу» түймесі, одан кейін «Дос», «Клиент», «Бизнес», «Жұмыс»."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Чат с клавиатурой AI Reply: над клавишами кнопки «Друг», «Клиент», «Бизнес» и «Работа»."
+            "value" : "Чат с клавиатурой AI Reply. Над клавишами: слева кнопка «Написать с AI», за ней «Друг», «Клиент», «Бизнес» и «Работа»."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Reply klaviaturasi ochiq chat: tugmalar ustida «Doʻst», «Mijoz», «Biznes» va «Ish» tugmalari."
+            "value" : "AI Reply klaviaturasi ochiq chat. Tugmalar ustida: chapda «AI bilan yozish» tugmasi, keyin «Doʻst», «Mijoz», «Biznes» va «Ish»."
           }
         }
       }

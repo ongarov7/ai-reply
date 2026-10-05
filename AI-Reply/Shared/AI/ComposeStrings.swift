@@ -5,7 +5,8 @@ import Foundation
 /// the app, never the keyboard layout they happen to type on.
 struct ComposeStrings: Sendable {
 
-    /// VoiceOver for the toolbar's ✨ button next to "+", which is an icon only.
+    /// VoiceOver for the ✨ button at the leading edge of the persona row,
+    /// which is an icon only.
     let createButtonAccessibility: String
     /// Header of the Create panel.
     let title: String

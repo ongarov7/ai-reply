@@ -38,13 +38,15 @@ final class LocalizationTests: XCTestCase {
         XCTAssertEqual(kazakh.generating, "Жауап дайындалуда…")
         XCTAssertEqual(kazakh.noSourceMessage, "Алдымен хабарламаны көшіріңіз")
 
-        // Every language answers the "+" chip in its own words.
+        // The persona row's only action, ✨, is an icon: every language names
+        // it for VoiceOver in its own words.
         for language in AppLanguage.allCases {
-            XCTAssertFalse(AIReplyStrings.forLanguage(language).addTemplateHint.isEmpty)
+            XCTAssertFalse(AIReplyStrings.forLanguage(language).compose.createButtonAccessibility.isEmpty)
         }
-        XCTAssertNotEqual(russian.addTemplateHint, english.addTemplateHint)
-        XCTAssertNotEqual(kazakh.addTemplateHint, english.addTemplateHint)
-        XCTAssertNotEqual(AIReplyStrings.forLanguage(.uzbek).addTemplateHint, english.addTemplateHint)
+        XCTAssertNotEqual(russian.compose.createButtonAccessibility, english.compose.createButtonAccessibility)
+        XCTAssertNotEqual(kazakh.compose.createButtonAccessibility, english.compose.createButtonAccessibility)
+        XCTAssertNotEqual(AIReplyStrings.forLanguage(.uzbek).compose.createButtonAccessibility,
+                          english.compose.createButtonAccessibility)
     }
 
     func testTemplateNamesMatchTheBrief() {

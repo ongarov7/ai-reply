@@ -118,6 +118,82 @@ struct KeyboardPageLayout: Equatable, Sendable {
     }
 }
 
+/// The persona row above the keys:  ✨ | Дос | Клиент | Бизнес | Жұмыс
+///
+/// * ✨ (Create) is pinned at the LEADING edge, outside the personas, so it is
+///   never scrolled away, faded or covered - not even by the suggestion strip.
+/// * The personas take the rest of the width. A set that fits is stretched
+///   evenly (up to `maximumStretch` each); when space is short their padding
+///   tightens first; only when they still do not fit does the row scroll.
+///
+/// Pure geometry: the keyboard measures the names, this places everything.
+struct PersonaRowLayout: Equatable, Sendable {
+
+    static let height: CGFloat = 36
+    static let pillHeight: CGFloat = 30
+    /// The ✨ disc.
+    static let actionWidth: CGFloat = 38
+    static let spacing: CGFloat = 6
+    static let edgeInset: CGFloat = 8
+    /// Text padding per side: roomy when everything fits, tighter on a narrow
+    /// row, and never below the last value.
+    static let paddings: [CGFloat] = [14, 11, 8]
+    /// Widest extra a pill gets when the row stretches: two personas on a Max
+    /// phone should not become two slabs.
+    static let maximumStretch: CGFloat = 28
+
+    /// The ✨ (Create) button, in the row's coordinates.
+    let createFrame: CGRect
+    /// The personas' viewport (the scroll view) in the row's coordinates.
+    /// The suggestion strip covers exactly this while a word is typed.
+    let personasFrame: CGRect
+    /// Each pill, in the viewport's content coordinates, leading to trailing.
+    let pillFrames: [CGRect]
+    /// Width of the scrollable content: wider than the viewport only when the
+    /// pills do not fit.
+    let contentWidth: CGFloat
+
+    var scrolls: Bool { contentWidth > personasFrame.width + 0.5 }
+
+    /// - Parameter textWidths: each persona's measured title width, in order.
+    init(width: CGFloat, height: CGFloat = PersonaRowLayout.height, textWidths: [CGFloat]) {
+        let width = max(width, 0)
+        let y = ((height - Self.pillHeight) / 2).rounded()
+        createFrame = CGRect(x: Self.edgeInset, y: y, width: Self.actionWidth, height: Self.pillHeight)
+        let viewportX = createFrame.maxX + Self.spacing / 2
+        personasFrame = CGRect(x: viewportX, y: 0, width: max(0, width - viewportX), height: height)
+
+        // Half a gap inside the viewport puts the first pill one full gap
+        // after ✨; the last one keeps the row's edge inset.
+        let leading = Self.spacing / 2
+        let available = personasFrame.width - leading - Self.edgeInset
+        guard !textWidths.isEmpty, available > 0 else {
+            pillFrames = []
+            contentWidth = personasFrame.width
+            return
+        }
+        let texts = textWidths.map { max(0, ceil($0)) }
+        let gaps = Self.spacing * CGFloat(texts.count - 1)
+        let total = texts.reduce(0, +)
+        let padding = Self.paddings.first { total + $0 * 2 * CGFloat(texts.count) + gaps <= available }
+            ?? Self.paddings.last ?? 8
+        var widths = texts.map { $0 + padding * 2 }
+        let used = widths.reduce(0, +) + gaps
+        if used <= available {
+            let extra = min(Self.maximumStretch, ((available - used) / CGFloat(widths.count)).rounded(.down))
+            widths = widths.map { $0 + extra }
+        }
+        var frames: [CGRect] = []
+        var x = leading
+        for pillWidth in widths {
+            frames.append(CGRect(x: x, y: y, width: pillWidth, height: Self.pillHeight))
+            x += pillWidth + Self.spacing
+        }
+        pillFrames = frames
+        contentWidth = max(personasFrame.width, x - Self.spacing + Self.edgeInset)
+    }
+}
+
 enum KeyboardGeometry {
 
     /// Row metrics for `rows` rows in `available` points.

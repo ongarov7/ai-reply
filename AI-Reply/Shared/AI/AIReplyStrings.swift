@@ -46,11 +46,6 @@ struct AIReplyStrings: Sendable {
     let regenerate: String
     let insert: String
     let cancel: String
-    let addTemplate: String
-    /// Shown when the "+" chip is tapped. A keyboard extension cannot present
-    /// an editor or reliably open its containing app, so this says where
-    /// templates are made rather than pretending to make one.
-    let addTemplateHint: String
     let replaceExisting: String
     let appendToExisting: String
     let keepTyping: String
@@ -174,8 +169,6 @@ struct AIReplyStrings: Sendable {
         regenerate: "Regenerate",
         insert: "Insert",
         cancel: "Cancel",
-        addTemplate: "Add template",
-        addTemplateHint: "Create templates in the AI Reply app.",
         replaceExisting: "Replace",
         appendToExisting: "Add",
         keepTyping: "Cancel",
@@ -230,8 +223,6 @@ struct AIReplyStrings: Sendable {
         regenerate: "Сгенерировать заново",
         insert: "Вставить",
         cancel: "Отмена",
-        addTemplate: "Добавить шаблон",
-        addTemplateHint: "Шаблоны создаются в приложении AI Reply.",
         replaceExisting: "Заменить",
         appendToExisting: "Добавить",
         keepTyping: "Отмена",
@@ -286,8 +277,6 @@ struct AIReplyStrings: Sendable {
         regenerate: "Қайта жасау",
         insert: "Кірістіру",
         cancel: "Бас тарту",
-        addTemplate: "Үлгі қосу",
-        addTemplateHint: "Үлгілер AI Reply қолданбасында жасалады.",
         replaceExisting: "Ауыстыру",
         appendToExisting: "Қосу",
         keepTyping: "Бас тарту",
@@ -342,8 +331,6 @@ struct AIReplyStrings: Sendable {
         regenerate: "Qayta yaratish",
         insert: "Kiritish",
         cancel: "Bekor qilish",
-        addTemplate: "Andoza qo‘shish",
-        addTemplateHint: "Andozalar AI Reply ilovasida yaratiladi.",
         replaceExisting: "Almashtirish",
         appendToExisting: "Qo‘shish",
         keepTyping: "Bekor qilish",

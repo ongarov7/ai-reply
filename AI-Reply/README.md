@@ -61,7 +61,7 @@ copy a message in WhatsApp / Telegram / Instagram
         ↓
 open the AI Reply keyboard
         ↓
-tap a template:  Friend │ Client │ Business │ Work │ +
+tap a template:  ✨ │ Friend │ Client │ Business │ Work    (✨ writes a new message instead)
         ↓                         ← the ONLY thing that starts a request
 read clipboard  ·  check ≤ 300 characters  ·  build prompt
         ↓
@@ -151,7 +151,7 @@ of the keys.
 | `KeyboardStrings.swift` | Key captions, keyed by the **keyboard layout** |
 | `AIReplyStrings.swift` | Product wording, keyed by the **app language** |
 | `KeyButton.swift` | Key model, key button, row spacer |
-| `KeyboardActionBar.swift` | The single compact action row and the transient status line; hosts the composer |
+| `KeyboardActionBar.swift` | The single compact action row (✨ then the personas) and the suggestion strip over the personas; hosts the composer |
 | `ReplyComposerView.swift` | Read-only source message + editable reply draft + Insert |
 | `ReplyContext.swift` | `ContextTextProvider` + `ReplyActionCoordinator` + `ReplyLog` |
 | `ReplySimulator.swift` | Deterministic non-AI suggested-reply rules |

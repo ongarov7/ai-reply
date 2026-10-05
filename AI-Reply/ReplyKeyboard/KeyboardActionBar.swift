@@ -23,7 +23,6 @@ enum ComposerEvent {
 
 protocol KeyboardActionBarDelegate: AnyObject {
     func actionBar(_ bar: KeyboardActionBar, didSelectTemplateID id: String)
-    func actionBarDidRequestNewTemplate(_ bar: KeyboardActionBar)
     /// "Create" on the persona row: write a new message with AI.
     func actionBarDidRequestCompose(_ bar: KeyboardActionBar)
     func actionBar(_ bar: KeyboardActionBar, didSend event: ComposerEvent)
@@ -37,11 +36,10 @@ protocol KeyboardActionBarDelegate: AnyObject {
 
 /// The area above the keys. Two shapes:
 ///
-/// * PERSONAS - a 36pt row: Дос | Клиент | Бизнес | Жұмыс | + | ✨ Create,
-///   plus a transient status line that changes no geometry. This is the
-///   keyboard at rest; its height is what gets cached for the next launch.
-///   While a word is typed into the host app the suggestion strip takes the
-///   pills' place - only theirs: + and ✨ stay exactly where they are.
+/// * PERSONAS - a 36pt row: ✨ Create | Дос | Клиент | Бизнес | Жұмыс. This
+///   is the keyboard at rest; its height is what gets cached for the next
+///   launch. While a word is typed into the host app the suggestion strip
+///   takes the pills' place - only theirs: ✨ stays exactly where it is.
 /// * COMPOSER - the AI composer (`ReplyComposerView`), answering a copied
 ///   message or, after Create, writing a new one.
 ///
@@ -53,13 +51,11 @@ final class KeyboardActionBar: UIView {
 
     private let templateBar = TemplateBarView()
     private let suggestionStrip = SuggestionStripView()
-    private let toastLabel = UILabel()
     private let composer = ReplyComposerView()
 
     /// Whether the strip is over the persona pills right now.
     private var showsSuggestions = false
 
-    private var toastWorkItem: DispatchWorkItem?
     private let idleHeight: CGFloat = TemplateBarView.preferredHeight + 4
 
     private(set) var isComposing = false
@@ -89,13 +85,6 @@ final class KeyboardActionBar: UIView {
             self.delegate?.actionBar(self, didPick: suggestion)
         }
         addSubview(suggestionStrip)
-        toastLabel.textAlignment = .center
-        toastLabel.numberOfLines = 2
-        toastLabel.font = .systemFont(ofSize: 12, weight: .medium)
-        toastLabel.adjustsFontSizeToFitWidth = true
-        toastLabel.minimumScaleFactor = 0.75
-        toastLabel.isHidden = true
-        addSubview(toastLabel)
         composer.isHidden = true
         addSubview(composer)
     }
@@ -109,8 +98,8 @@ final class KeyboardActionBar: UIView {
         super.layoutSubviews()
         templateBar.frame = CGRect(x: 0, y: 2, width: bounds.width, height: TemplateBarView.preferredHeight)
         templateBar.layoutIfNeeded()
+        // Exactly the pills' viewport, right of ✨: the strip never covers it.
         suggestionStrip.frame = templateBar.personasFrame.offsetBy(dx: templateBar.frame.minX, dy: templateBar.frame.minY)
-        toastLabel.frame = CGRect(x: 14, y: 1, width: max(0, bounds.width - 28), height: TemplateBarView.preferredHeight + 2)
         composer.frame = bounds
     }
 
@@ -118,14 +107,13 @@ final class KeyboardActionBar: UIView {
 
     /// This whole area is product UI, so it follows the APP language.
     func configure(theme: KeyboardTheme, uiLanguage: AppLanguage) {
-        toastLabel.textColor = theme.secondaryText
         templateBar.configure(theme: theme, uiLanguage: uiLanguage)
         suggestionStrip.configure(theme: theme, uiLanguage: uiLanguage)
         composer.configure(theme: theme, uiLanguage: uiLanguage)
     }
 
-    func setChips(_ chips: [TemplateChip], more: [TemplateChip], selectedID: String?) {
-        templateBar.setChips(chips, more: more, selectedID: selectedID)
+    func setChips(_ chips: [TemplateChip], selectedID: String?) {
+        templateBar.setChips(chips, selectedID: selectedID)
     }
 
     func layout(forWidth width: CGFloat) {
@@ -139,7 +127,6 @@ final class KeyboardActionBar: UIView {
     // MARK: Composer
 
     func beginComposing() {
-        cancelToast()
         guard !isComposing else { return }
         setHostSuggestionsVisible(false, animated: false)
         isComposing = true
@@ -196,14 +183,14 @@ final class KeyboardActionBar: UIView {
         composer.showPolish(chip)
     }
 
-    /// Crossfades the strip and the persona pills, as the status line does.
+    /// Crossfades the strip and the persona pills; ✨ is not touched.
     private func setHostSuggestionsVisible(_ visible: Bool, animated: Bool) {
         guard visible != showsSuggestions else { return }
         showsSuggestions = visible
         suggestionStrip.isUserInteractionEnabled = visible
         suggestionStrip.accessibilityElementsHidden = !visible
         let apply = {
-            self.suggestionStrip.alpha = visible && self.toastWorkItem == nil ? 1 : 0
+            self.suggestionStrip.alpha = visible ? 1 : 0
             self.templateBar.setPersonasHidden(visible)
         }
         if animated, window != nil {
@@ -211,46 +198,6 @@ final class KeyboardActionBar: UIView {
         } else {
             apply()
         }
-    }
-
-    // MARK: Transient status
-
-    /// A short message on the persona row. It never changes the keyboard's
-    /// geometry. Failures with the composer open are shown inside it instead.
-    func showToast(_ message: String) {
-        guard !isComposing, !message.isEmpty else { return }
-        cancelToast()
-        toastLabel.text = message
-        toastLabel.alpha = 0
-        toastLabel.isHidden = false
-        UIView.animate(withDuration: 0.16) {
-            self.toastLabel.alpha = 1
-            self.templateBar.alpha = 0
-            self.suggestionStrip.alpha = 0
-        }
-        let work = DispatchWorkItem { [weak self] in
-            guard let self else { return }
-            self.toastWorkItem = nil
-            UIView.animate(withDuration: 0.2, animations: {
-                self.toastLabel.alpha = 0
-                self.templateBar.alpha = 1
-                self.suggestionStrip.alpha = self.showsSuggestions ? 1 : 0
-            }, completion: { _ in
-                self.toastLabel.isHidden = true
-            })
-        }
-        toastWorkItem = work
-        // Long enough to read a two-line sentence in Kazakh or Russian.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.2, execute: work)
-    }
-
-    private func cancelToast() {
-        toastWorkItem?.cancel()
-        toastWorkItem = nil
-        toastLabel.isHidden = true
-        toastLabel.alpha = 0
-        templateBar.alpha = 1
-        suggestionStrip.alpha = showsSuggestions ? 1 : 0
     }
 }
 
@@ -260,10 +207,6 @@ extension KeyboardActionBar: TemplateBarViewDelegate {
 
     func templateBar(_ bar: TemplateBarView, didSelectTemplateID id: String) {
         delegate?.actionBar(self, didSelectTemplateID: id)
-    }
-
-    func templateBarDidRequestNewTemplate(_ bar: TemplateBarView) {
-        delegate?.actionBarDidRequestNewTemplate(self)
     }
 
     func templateBarDidTapCreate(_ bar: TemplateBarView) {

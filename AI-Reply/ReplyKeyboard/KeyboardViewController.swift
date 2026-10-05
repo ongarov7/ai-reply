@@ -296,30 +296,24 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     /// Row chips from the full configuration, or - before it has loaded - from
-    /// the compact summary the app keeps in the App Group.
+    /// the compact summary the app keeps in the App Group. Only the personas
+    /// the user shows in the keyboard; hidden ones stay in the app.
     private func applyChips(from configuration: ReplyConfiguration?) {
         let selected = SharedSettings.shared.lastTemplateID
         if let configuration {
-            let visible = configuration.visibleTemplates
-            let hidden = configuration.templates
-                .filter { !$0.isVisible }
-                .sorted { $0.sortIndex < $1.sortIndex }
             actionBar.setChips(
-                visible.map { TemplateChip(id: $0.id, name: $0.displayName(appLanguage: uiLanguage)) },
-                more: hidden.map { TemplateChip(id: $0.id, name: $0.displayName(appLanguage: uiLanguage)) },
+                configuration.visibleTemplates.map { TemplateChip(id: $0.id, name: $0.displayName(appLanguage: uiLanguage)) },
                 selectedID: selected
             )
         } else if let summaries = SharedSettings.shared.templateSummaries {
             actionBar.setChips(
                 summaries.map { TemplateChip(id: $0.id, name: $0.name(for: uiLanguage)) },
-                more: [],
                 selectedID: selected
             )
         } else {
             let defaults = ReplyConfiguration.initial.visibleTemplates
             actionBar.setChips(
                 defaults.map { TemplateChip(id: $0.id, name: $0.displayName(appLanguage: uiLanguage)) },
-                more: [],
                 selectedID: selected
             )
         }
@@ -1010,10 +1004,6 @@ extension KeyboardViewController: KeyboardActionBarDelegate {
         let configuration = ProfileStore.shared.load()
         replyCoordinator.configuration = configuration
         return configuration.template(id: id)
-    }
-
-    func actionBarDidRequestNewTemplate(_ bar: KeyboardActionBar) {
-        bar.showToast(aiStrings.addTemplateHint)
     }
 
     /// Create: a fresh, empty composer for writing a new message. The
