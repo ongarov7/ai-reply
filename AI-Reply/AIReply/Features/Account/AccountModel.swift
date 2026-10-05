@@ -40,6 +40,8 @@ final class AccountModel {
 
     private(set) var phase: Phase
     private(set) var user: AccountAPI.User?
+    /// The server's copy of the profile, as of the last answer that carried it.
+    private(set) var profile: AccountAPI.Profile?
     private(set) var subscription: AccountAPI.Subscription?
     private(set) var usage: AccountAPI.Usage = .unknown
     private(set) var plans: [AccountAPI.Plan] = []
@@ -102,6 +104,7 @@ final class AccountModel {
             // The limits the administrator set, for the app's own composer
             // and - through the App Group - for the keyboard.
             AILimits.apply(config)
+            ProductEvents.storeServerSupport(config.features)
         }
         hasAcceptedLegal = LegalConsentStore.hasAccepted(legalConfig)
     }
@@ -138,6 +141,7 @@ final class AccountModel {
         do {
             let account = try await service.account()
             apply(user: account.user, subscription: account.subscription, usage: account.usage)
+            profile = account.profile
             applyLegalConsent(account.legalConsent)
             phase = .signedIn
         } catch APIError.unauthorized {
@@ -292,6 +296,7 @@ final class AccountModel {
     /// to the short profile step instead of flashing the home screen first.
     private func completeSignIn(_ session: AccountAPI.Session) -> SignInOutcome {
         apply(user: session.user, subscription: session.subscription, usage: session.usage)
+        profile = session.profile
         applyLegalConsent(session.legalConsent)
         phase = .signedIn
         pendingEmail = ""
@@ -322,6 +327,7 @@ final class AccountModel {
     func verifyLinkEmailCode(email: String, code: String) async throws {
         let account = try await service.verifyLinkEmailCode(email: email, code: code)
         apply(user: account.user, subscription: account.subscription, usage: account.usage)
+        profile = account.profile
     }
 
     // MARK: Legal and session
@@ -345,6 +351,7 @@ final class AccountModel {
         AppleSignIn.forget()
         GoogleSignInProvider.signOut()
         user = nil
+        profile = nil
         subscription = nil
         usage = .unknown
         phase = .signedOut
@@ -374,6 +381,26 @@ final class AccountModel {
             return true
         } catch {
             errorKey = Self.message(for: error)
+            return false
+        }
+    }
+
+    /// Sends the sender fields - the grammatical gender, the onboarding this
+    /// device finished - to a server that publishes `sender_profile`.
+    ///
+    /// Returns false when nothing reached the server: signed out, an older
+    /// server, or a failure. Nothing is shown for it; the caller keeps the
+    /// change pending and it is retried on the next foreground.
+    func updateSenderProfile(gender: GrammaticalGender? = nil, onboardingVersion: Int? = nil) async -> Bool {
+        guard AccountCredentials.isSignedIn, AILimits.serverSupportsSenderProfile else { return false }
+        var update = AccountService.ProfileUpdate()
+        update.grammatical_gender = gender?.rawValue
+        update.onboarding_version = onboardingVersion
+        do {
+            profile = try await service.updateProfile(update)
+            return true
+        } catch {
+            ReplyLog.event("profile sync failed: \(error)")
             return false
         }
     }

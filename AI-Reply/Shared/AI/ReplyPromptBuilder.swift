@@ -31,15 +31,19 @@ enum ReplyInstruction {
     /// Otherwise the rule would be the part that got cut, which is exactly the
     /// part that must survive. Capped at 280 so the prompt stays short.
     static var maximumCharacters: Int {
-        maximumCharacters(serverLimit: AILimits.current.instructionCharacters)
+        maximumCharacters(
+            serverLimit: AILimits.current.instructionCharacters,
+            reservesLanguageRule: appendsLanguageRule
+        )
     }
 
-    static func maximumCharacters(serverLimit: Int) -> Int {
-        let room = serverLimit - languageRule.unicodeScalars.count - 1
-        return max(40, min(280, room))
+    static func maximumCharacters(serverLimit: Int, reservesLanguageRule: Bool = true) -> Int {
+        let rule = reservesLanguageRule ? languageRule.unicodeScalars.count + 1 : 0
+        return max(40, min(280, serverLimit - rule))
     }
 
-    /// Appended to every non-empty instruction.
+    /// Appended to every non-empty instruction sent to a server that does not
+    /// resolve the reply language itself.
     ///
     /// WHY THIS EXISTS. The developer rules say "reply in the language of the
     /// incoming message", which is right by default and wrong the second the
@@ -47,7 +51,8 @@ enum ReplyInstruction {
     /// than useless - "скажи, что я не говорю по-английски" would trip any
     /// keyword match - so the question is handed to the model, and only when
     /// the user actually wrote an instruction. No instruction, no clarification,
-    /// and the language of the incoming message stands.
+    /// and the language of the incoming message stands. A server that publishes
+    /// `sender_profile` says the same in its own rules, so it is not sent there.
     ///
     /// WHY IT IS PHRASED IN THE FIRST PERSON. It travels inside
     /// `<user_instruction>`, which the developer message declares to be data
@@ -58,20 +63,28 @@ enum ReplyInstruction {
     static let languageRule =
         "(If I named a language above, write the reply in that language.)"
 
-    /// Trims, clamps and attaches the language rule. Returns "" for an empty
-    /// instruction, which every caller reads as "the user asked for nothing in
-    /// particular".
-    static func prepare(_ raw: String) -> String {
+    /// Whether the server still needs `languageRule` after the instruction.
+    static var appendsLanguageRule: Bool { !AILimits.serverSupportsSenderProfile }
+
+    /// Trims, clamps and, for an older server, attaches the language rule.
+    /// Returns "" for an empty instruction, which every caller reads as "the
+    /// user asked for nothing in particular".
+    static func prepare(_ raw: String, appendsLanguageRule: Bool = ReplyInstruction.appendsLanguageRule) -> String {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return "" }
-        return clamp(trimmed) + "\n" + languageRule
+        let limit = maximumCharacters(
+            serverLimit: AILimits.current.instructionCharacters,
+            reservesLanguageRule: appendsLanguageRule
+        )
+        let clamped = clamp(trimmed, limit: limit)
+        return appendsLanguageRule ? clamped + "\n" + languageRule : clamped
     }
 
     /// Cuts to the limit in Unicode scalars - the same unit the character
     /// counter in the composer and the backend both count in.
-    static func clamp(_ value: String) -> String {
-        guard value.unicodeScalars.count > maximumCharacters else { return value }
-        let head = String.UnicodeScalarView(value.unicodeScalars.prefix(maximumCharacters))
+    static func clamp(_ value: String, limit: Int = ReplyInstruction.maximumCharacters) -> String {
+        guard value.unicodeScalars.count > limit else { return value }
+        let head = String.UnicodeScalarView(value.unicodeScalars.prefix(limit))
         return String(head).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

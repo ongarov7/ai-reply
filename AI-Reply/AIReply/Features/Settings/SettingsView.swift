@@ -5,7 +5,10 @@ struct SettingsView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(ReplyConfigurationModel.self) private var model
     @Environment(AccountModel.self) private var account
+    @Environment(KeyboardStatusMonitor.self) private var keyboard
     @Environment(\.openURL) private var openURL
+
+    @State private var isShowingTutorial = false
 
     var body: some View {
         Form {
@@ -26,6 +29,8 @@ struct SettingsView: View {
             }
 
             Section {
+                KeyboardStatusRow(kind: .keyboard, status: keyboard.status)
+                KeyboardStatusRow(kind: .fullAccess, status: keyboard.status)
                 NavigationLink { KeyboardSetupView() } label: {
                     Label("settings.setup.guide", systemImage: "keyboard")
                 }
@@ -45,6 +50,12 @@ struct SettingsView: View {
                 Text("settings.keyboard")
             } footer: {
                 Text("settings.keyboard.footer")
+            }
+
+            Section {
+                Toggle("settings.smartCorrection", isOn: smartCorrectionBinding)
+            } footer: {
+                Text("settings.smartCorrection.footer")
             }
 
             Section("settings.appearance") {
@@ -82,10 +93,15 @@ struct SettingsView: View {
                 Text("settings.privacy.title")
             }
 
+            // The guide again, on top of everything: nothing is reset and the
+            // screen underneath is still here when it closes.
             Section {
-                Button("settings.setup.restart") { model.restartOnboarding() }
+                Button("settings.tutorial") {
+                    ProductEvents.track(.onboardingReopened)
+                    isShowingTutorial = true
+                }
             } footer: {
-                Text("settings.setup.restart.footer")
+                Text("settings.tutorial.footer")
             }
 
             if !AppGroup.isAvailable || !model.isPersistent {
@@ -98,6 +114,11 @@ struct SettingsView: View {
         }
         .navigationTitle("settings.title")
         .navigationBarTitleDisplayMode(.inline)
+        // The app re-reads it on every return to the foreground as well.
+        .onAppear { keyboard.refresh() }
+        .fullScreenCover(isPresented: $isShowingTutorial) {
+            OnboardingView(flow: OnboardingFlow(mode: .tutorial, asksGender: false))
+        }
     }
 
     private var appearanceBinding: Binding<AppearancePreference> {
@@ -113,6 +134,16 @@ struct SettingsView: View {
 
     private var hapticsBinding: Binding<Bool> {
         Binding(get: { settings.keyboardHaptics }, set: { settings.setKeyboardHaptics($0) })
+    }
+
+    private var smartCorrectionBinding: Binding<Bool> {
+        Binding(
+            get: { settings.smartCorrection },
+            set: { enabled in
+                settings.setSmartCorrection(enabled)
+                ProductEvents.track(enabled ? .autocorrectEnabled : .autocorrectDisabled)
+            }
+        )
     }
 
     private var languageBinding: Binding<AppLanguage?> {

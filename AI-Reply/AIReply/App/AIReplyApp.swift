@@ -6,11 +6,15 @@ struct AIReplyApp: App {
     @State private var settings = AppSettings()
     @State private var configuration = ReplyConfigurationModel()
     @State private var account = AccountModel()
+    @State private var keyboardStatus = KeyboardStatusMonitor()
+    @Environment(\.scenePhase) private var scenePhase
 
     init() {
         #if DEBUG
         AIConfiguration.applyDebugLaunchArguments()
         #endif
+        // Sends only for a signed-in user of a server that asks for events.
+        ProductEvents.sink = ProductEventReporter.shared
     }
 
     var body: some Scene {
@@ -26,27 +30,10 @@ struct AIReplyApp: App {
                 if let screen = DebugScreen.requested {
                     DebugScreenHost(screen: screen)
                 } else {
-                    // The account gate is transparent unless this build is
-                    // pointed at our service; see AccountGateView.
-                    AccountGateView {
-                        if configuration.hasCompletedOnboarding {
-                            NavigationStack { HomeView() }
-                        } else {
-                            OnboardingView()
-                        }
-                    }
+                    AccountGateView { root }
                 }
                 #else
-                // Onboarding runs once. `hasCompletedOnboarding` is stored with
-                // the profile, so it survives relaunches, and Settings can put
-                // the user back through it without losing their answers.
-                AccountGateView {
-                    if configuration.hasCompletedOnboarding {
-                        NavigationStack { HomeView() }
-                    } else {
-                        OnboardingView()
-                    }
-                }
+                AccountGateView { root }
                 #endif
             }
             // Google Sign-In's redirect back into the app.
@@ -54,6 +41,23 @@ struct AIReplyApp: App {
             .environment(settings)
             .environment(configuration)
             .environment(account)
+            .environment(keyboardStatus)
+            // A gender picked on another device arrives with /me; one picked
+            // here and not yet confirmed is retried on every return.
+            .onChange(of: account.profile) {
+                Task { await profileSync.reconcile() }
+            }
+            .onChange(of: scenePhase) { _, phase in
+                switch phase {
+                case .active:
+                    keyboardStatus.refresh()
+                    Task { await profileSync.reconcile() }
+                case .background:
+                    ProductEventReporter.shared.flushBeforeSuspension()
+                default:
+                    break
+                }
+            }
             // Drives both the interface language and every localized string in
             // the subtree, so switching language takes effect without a restart.
             .environment(\.locale, settings.locale)
@@ -61,12 +65,31 @@ struct AIReplyApp: App {
             .tint(.accentColor)
         }
     }
+
+    /// Signed in: the current onboarding once per device, then Home. The
+    /// completed version is stored with the profile, so it survives
+    /// relaunches, and an unfinished first run resumes where it stopped.
+    @ViewBuilder
+    private var root: some View {
+        if configuration.needsOnboarding {
+            OnboardingView(flow: .firstRun(profileHasGender: configuration.profile.grammaticalGender != nil))
+        } else {
+            NavigationStack { HomeView() }
+        }
+    }
+
+    private var profileSync: ProfileSync {
+        ProfileSync(configuration: configuration, account: account)
+    }
 }
 
 #if DEBUG
 /// Which screen `-AIReplyDebugScreen <name>` should open.
 enum DebugScreen: String {
     case keyboard, setup, home, settings, profile, templates
+    /// The first-run onboarding, whatever was completed: from its first step,
+    /// or from the one `-AIReplyDebugStep` names.
+    case onboarding
     /// The sign-in flow's three screens, for review in each language.
     case signIn, email, code
 
@@ -75,6 +98,14 @@ enum DebugScreen: String {
         guard let index = arguments.firstIndex(of: "-AIReplyDebugScreen") else { return nil }
         let value = index + 1 < arguments.count ? arguments[index + 1] : "keyboard"
         return DebugScreen(rawValue: value) ?? .keyboard
+    }
+
+    /// `-AIReplyDebugStep <step id>` next to `onboarding`: the step it opens
+    /// on, so each one can be reviewed in each language without tapping there.
+    static var onboardingStep: OnboardingFlow.Step? {
+        let arguments = CommandLine.arguments
+        guard let index = arguments.firstIndex(of: "-AIReplyDebugStep"), index + 1 < arguments.count else { return nil }
+        return OnboardingFlow.Step(rawValue: arguments[index + 1])
     }
 }
 
@@ -89,6 +120,9 @@ private struct DebugScreenHost: View {
         case .settings:  NavigationStack { SettingsView() }
         case .profile:   NavigationStack { ProfileEditorView() }
         case .templates: NavigationStack { TemplateEditorView(templateID: "client") }
+        case .onboarding:
+            OnboardingView(flow: OnboardingFlow(mode: .firstRun, asksGender: true,
+                                                resumingAt: DebugScreen.onboardingStep))
         case .signIn:    SignInView { _ in }
         case .email:     EmailSignInView()
         case .code:

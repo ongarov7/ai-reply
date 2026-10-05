@@ -4,8 +4,9 @@ import Foundation
 ///
 /// Хабарлама серверде жазылады: құрылғыда провайдер кілті жоқ.
 ///
-/// The body is the instruction and nothing else - no copied text, no profile,
-/// no contacts. The response carries quota state like a reply does.
+/// The body is the instruction - no copied text, no contacts, and of the
+/// profile only the grammatical gender, for a server that asked for it. The
+/// response carries quota state like a reply does.
 struct AccountComposeTransport: ComposeTransport {
 
     private let session: AccountSession
@@ -21,15 +22,30 @@ struct AccountComposeTransport: ComposeTransport {
         let instruction: String
         let language: String
         let regenerate: Bool
+        let input_language: String?
+        let profile: Profile?
         let platform: String
         let app_version: String
+
+        struct Profile: Encodable, Equatable {
+            let grammatical_gender: String
+        }
     }
 
-    static func body(for request: ComposeService.Request, descriptor: DeviceDescriptor = .current) -> Body {
-        Body(
+    /// `input_language` and `profile` only go to a server that publishes
+    /// `sender_profile`: an older one rejects unknown fields outright.
+    static func body(
+        for request: ComposeService.Request,
+        descriptor: DeviceDescriptor = .current,
+        serverSupportsSenderProfile: Bool = AILimits.serverSupportsSenderProfile
+    ) -> Body {
+        let gender = serverSupportsSenderProfile ? request.grammaticalGender : nil
+        return Body(
             instruction: request.instruction,
             language: request.uiLanguage.rawValue,
             regenerate: request.isRegeneration,
+            input_language: serverSupportsSenderProfile ? request.inputLanguage?.rawValue : nil,
+            profile: gender.map { Body.Profile(grammatical_gender: $0.rawValue) },
             platform: descriptor.platform,
             app_version: descriptor.app_version
         )

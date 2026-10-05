@@ -5,8 +5,10 @@ import Foundation
 ///
 /// * there is no incoming message: the clipboard is never read, nothing copied
 ///   is ever sent, and the reply prompt is not involved;
-/// * the request carries the instruction only, and the server writes the
-///   message with its own compose prompt (`POST /api/v1/ai/compose`);
+/// * the request carries the instruction - plus, for a server that knows
+///   them, the keyboard layout and the user's grammatical gender - and the
+///   server writes the message with its own compose prompt
+///   (`POST /api/v1/ai/compose`);
 /// * it spends the same daily quota as a reply, and fails with the same
 ///   closed set of `AIReplyError`s.
 struct ComposeService: Sendable {
@@ -19,6 +21,11 @@ struct ComposeService: Sendable {
         var uiLanguage: AppLanguage
         /// Another version of a message the user has already seen.
         var isRegeneration: Bool = false
+        /// The keyboard LAYOUT active when Write was tapped: the language hint
+        /// for an instruction too short to tell.
+        var inputLanguage: KeyboardLanguage? = nil
+        /// «Рад» or «рада» when the message speaks for the user in Russian.
+        var grammaticalGender: GrammaticalGender? = nil
     }
 
     private let configuration: AIConfiguration

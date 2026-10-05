@@ -50,6 +50,8 @@ extension AILimits {
         static let instruction = "ai.limits.instructionCharacters"
         static let syncedAt = "ai.limits.syncedAt"
         static let replyPreferences = "ai.features.replyPreferences"
+        static let senderProfile = "ai.features.senderProfile"
+        static let instructionPolish = "ai.features.instructionPolish"
     }
 
     private static let lock = NSLock()
@@ -118,8 +120,26 @@ extension AILimits {
         AppGroup.defaults.bool(forKey: Key.replyPreferences)
     }
 
-    static func storeFeatures(replyPreferences: Bool, defaults: UserDefaults = AppGroup.defaults) {
-        defaults.set(replyPreferences, forKey: Key.replyPreferences)
+    /// Whether the server accepts the sender fields: `grammatical_gender` in
+    /// the reply and compose `profile`, top-level `input_language`, and
+    /// `grammatical_gender` / `onboarding_version` on `PATCH /api/v1/me`. Such
+    /// a server also honours a language the instruction names by itself, so
+    /// the client stops appending `ReplyInstruction.languageRule`.
+    static var serverSupportsSenderProfile: Bool {
+        AppGroup.defaults.bool(forKey: Key.senderProfile)
+    }
+
+    /// Whether `POST /api/v1/ai/polish` exists and is switched on.
+    static var serverSupportsInstructionPolish: Bool {
+        AppGroup.defaults.bool(forKey: Key.instructionPolish)
+    }
+
+    /// Stores the request-shaping flags. Anything the server did not publish
+    /// is false: a field is only ever sent to a server that asked for it.
+    static func storeFeatures(_ features: AccountAPI.Features?, defaults: UserDefaults = AppGroup.defaults) {
+        defaults.set(features?.replyPreferences ?? false, forKey: Key.replyPreferences)
+        defaults.set(features?.senderProfile ?? false, forKey: Key.senderProfile)
+        defaults.set(features?.instructionPolish ?? false, forKey: Key.instructionPolish)
     }
 
     /// Everything `/api/v1/config` publishes that the reply flow uses.
@@ -129,7 +149,7 @@ extension AILimits {
             instructionCharacters: config.maxInstructionLength,
             defaults: defaults
         )
-        storeFeatures(replyPreferences: config.features?.replyPreferences ?? false, defaults: defaults)
+        storeFeatures(config.features, defaults: defaults)
     }
 }
 

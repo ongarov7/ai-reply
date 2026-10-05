@@ -79,6 +79,13 @@ final class ComposeFlowCoordinator {
     /// instruction's own language is unclear.
     var uiLanguage: AppLanguage = .systemDefault
 
+    /// The keyboard layout to report with the next request; the keyboard
+    /// sets it as Write is tapped.
+    var inputLanguage: KeyboardLanguage?
+
+    /// From the profile the keyboard loaded when it appeared.
+    var grammaticalGender: GrammaticalGender?
+
     init(service: ComposeService = ComposeService(), normalizer: ReplyDraftNormalizer = ReplyDraftNormalizer()) {
         self.service = service
         self.normalizer = normalizer
@@ -127,7 +134,9 @@ final class ComposeFlowCoordinator {
         run(ComposeService.Request(
             instruction: current.instruction,
             uiLanguage: uiLanguage,
-            isRegeneration: isRegeneration
+            isRegeneration: isRegeneration,
+            inputLanguage: inputLanguage,
+            grammaticalGender: grammaticalGender
         ))
     }
 

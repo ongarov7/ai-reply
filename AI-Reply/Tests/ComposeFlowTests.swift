@@ -108,6 +108,20 @@ final class ComposeFlowTests: XCTestCase {
         XCTAssertEqual(coordinator.session?.instruction, "  " + instruction + "\n", "the field keeps what was typed")
     }
 
+    /// The keyboard hands the coordinator the layout and the profile's gender;
+    /// both reach the request.
+    func testCoordinatorPassesLayoutAndGender() async {
+        coordinator.inputLanguage = .kazakh
+        coordinator.grammaticalGender = .male
+        coordinator.open()
+        coordinator.updateInstruction(instruction)
+        coordinator.generate()
+        await waitUntil { self.scripted.pending == 1 }
+        XCTAssertEqual(scripted.requests.first?.inputLanguage, .kazakh)
+        XCTAssertEqual(scripted.requests.first?.grammaticalGender, .male)
+        scripted.answer("Құттықтаймын!")
+    }
+
     func testEmptyInstructionNeverReachesTheNetwork() async {
         coordinator.open()
         coordinator.updateInstruction("   \n ")
@@ -285,8 +299,9 @@ final class ComposeServiceTests: XCTestCase {
     }
 
     func testWireFormatCarriesTheInstructionOnly() throws {
-        let request = ComposeService.Request(instruction: "Күлжан апайды құттықта", uiLanguage: .kazakh, isRegeneration: true)
-        let body = AccountComposeTransport.body(for: request)
+        let request = ComposeService.Request(instruction: "Күлжан апайды құттықта", uiLanguage: .kazakh, isRegeneration: true,
+                                             inputLanguage: .kazakh, grammaticalGender: .female)
+        let body = AccountComposeTransport.body(for: request, serverSupportsSenderProfile: false)
         XCTAssertEqual(body.instruction, "Күлжан апайды құттықта")
         XCTAssertEqual(body.language, "kk")
         XCTAssertTrue(body.regenerate)
@@ -294,8 +309,32 @@ final class ComposeServiceTests: XCTestCase {
 
         let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(body)) as? [String: Any]
         XCTAssertEqual(Set(json?.keys ?? [:].keys), ["instruction", "language", "regenerate", "platform", "app_version"],
-                       "no source_text, no profile: compose sends nothing copied")
+                       "no source_text, and nothing an older server does not know")
     }
+
+    /// A server that knows the sender fields gets the layout and the gender -
+    /// still never anything copied.
+    func testSenderFieldsGoOnlyToAServerThatKnowsThem() throws {
+        let request = ComposeService.Request(instruction: "Поздравь коллегу", uiLanguage: .english,
+                                             inputLanguage: .russian, grammaticalGender: .female)
+        let body = AccountComposeTransport.body(for: request, serverSupportsSenderProfile: true)
+        XCTAssertEqual(body.input_language, "ru")
+        XCTAssertEqual(body.profile, .init(grammatical_gender: "female"))
+
+        let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(body)) as? [String: Any]
+        XCTAssertEqual(Set(json?.keys ?? [:].keys),
+                       ["instruction", "language", "regenerate", "input_language", "profile", "platform", "app_version"])
+        XCTAssertEqual((json?["profile"] as? [String: Any])?["grammatical_gender"] as? String, "female")
+
+        // Never asked: no profile block at all, the layout still goes.
+        let neutral = AccountComposeTransport.body(
+            for: ComposeService.Request(instruction: "Поздравь коллегу", uiLanguage: .english, inputLanguage: .kazakh),
+            serverSupportsSenderProfile: true
+        )
+        XCTAssertNil(neutral.profile)
+        XCTAssertEqual(neutral.input_language, "kk")
+    }
+
 
     func testServerInstructionErrorsAreRecognised() {
         let headers = HTTPURLResponse(url: URL(string: "https://example.test")!, statusCode: 400, httpVersion: nil, headerFields: nil)!

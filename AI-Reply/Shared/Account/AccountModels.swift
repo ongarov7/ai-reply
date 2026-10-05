@@ -71,6 +71,13 @@ extension AccountAPI {
         let businessSummary: String
         let businessRules: [String]
         let onboardingCompleted: Bool
+        /// "male" / "female" / "unspecified". Kept as the raw string so a
+        /// value this build does not know cannot fail the whole account; read
+        /// it through `gender`. Absent on servers without `sender_profile`.
+        let grammaticalGender: String?
+        /// The newest onboarding any of the user's devices reported finishing.
+        /// Informational: onboarding itself is decided per device.
+        let onboardingVersion: Int?
 
         enum CodingKeys: String, CodingKey {
             case displayName = "display_name"
@@ -80,6 +87,12 @@ extension AccountAPI {
             case businessSummary = "business_summary"
             case businessRules = "business_rules"
             case onboardingCompleted = "onboarding_completed"
+            case grammaticalGender = "grammatical_gender"
+            case onboardingVersion = "onboarding_version"
+        }
+
+        var gender: GrammaticalGender? {
+            grammaticalGender.flatMap(GrammaticalGender.init(rawValue:))
         }
     }
 
@@ -268,6 +281,14 @@ extension AccountAPI {
         /// instruction). Informational: the keyboard always offers Create and
         /// a server without it answers with a plain error.
         let compose: Bool?
+        /// The sender fields: `grammatical_gender` and `input_language` on
+        /// reply and compose, `grammatical_gender` and `onboarding_version` on
+        /// `PATCH /api/v1/me`.
+        let senderProfile: Bool?
+        /// `POST /api/v1/ai/polish` exists and is switched on.
+        let instructionPolish: Bool?
+        /// `POST /api/v1/analytics/events` takes the app's product events.
+        let productEvents: Bool?
         /// Sign-in methods the server accepts right now. nil on older servers.
         let emailOTP: Bool?
         let googleSignIn: Bool?
@@ -276,6 +297,9 @@ extension AccountAPI {
         enum CodingKeys: String, CodingKey {
             case replyPreferences = "reply_preferences"
             case compose
+            case senderProfile = "sender_profile"
+            case instructionPolish = "instruction_polish"
+            case productEvents = "product_events"
             case emailOTP = "email_otp"
             case googleSignIn = "google_sign_in"
             case appleSignIn = "apple_sign_in"

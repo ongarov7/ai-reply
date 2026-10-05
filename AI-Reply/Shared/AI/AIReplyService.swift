@@ -25,6 +25,10 @@ struct AIReplyService: Sendable {
         /// вежливо, что согласен"). Raw as typed: `generate` prepares it. Empty
         /// for the plain one-tap flow.
         var instruction: String = ""
+        /// The keyboard LAYOUT active when Reply was tapped. A hint for the
+        /// server when the incoming message itself is too short to tell its
+        /// language; nil outside the keyboard.
+        var inputLanguage: KeyboardLanguage? = nil
         /// Injectable so working-hours behaviour is testable without waiting
         /// for 18:30.
         var now: Date = Date()
@@ -158,6 +162,7 @@ struct AIReplyService: Sendable {
                 templateWorkingHoursBehaviour: template.workingHoursBehaviour,
                 templateBusiness: template.effectiveBusiness,
                 appLanguage: request.uiLanguage.rawValue,
+                inputLanguage: request.inputLanguage?.rawValue,
                 business: business,
                 profile: Self.profile(from: request.configuration.profile)
             ),
@@ -176,13 +181,17 @@ extension AIReplyService {
             role: profile.role,
             preferredTone: profile.preferredTone,
             business: profile.business,
-            replyLanguage: profile.replyLanguage?.rawValue
+            replyLanguage: profile.replyLanguage?.rawValue,
+            grammaticalGender: profile.grammaticalGender
         )
+        // A gender alone is still worth a block: it is what makes a Russian
+        // reply say «рада» instead of «рад».
         let isEmpty = result.description.isEmpty
             && result.role.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && result.business.isEmpty
             && result.preferredTone == .natural
             && result.replyLanguage == nil
+            && result.grammaticalGender == nil
         return isEmpty ? nil : result
     }
 }

@@ -52,6 +52,26 @@ final class KeyboardViewController: UIInputViewController {
     private lazy var replyCoordinator = ReplyFlowCoordinator(service: Self.makeService())
     private lazy var composeCoordinator = ComposeFlowCoordinator(service: Self.makeComposeService())
 
+    /// Smart correction: the strip, the correction a separator applies, Undo.
+    private lazy var autocorrect: AutocorrectController = {
+        let controller = AutocorrectController(language: language)
+        controller.delegate = self
+        return controller
+    }()
+
+    /// The cleaner version of the instruction, offered after a pause.
+    private lazy var polisher: InstructionPolisher = {
+        let polisher = InstructionPolisher(service: Self.makePolishService())
+        polisher.onChange = { [weak self] chip in self?.actionBar.showPolish(chip) }
+        return polisher
+    }()
+
+    /// The smart-correction setting, read when the keyboard appears.
+    private var smartCorrectionEnabled = true
+    /// Whether the host field wants typing help (not an address, a code or
+    /// a password), from its text traits.
+    private var hostAllowsCorrection = true
+
     /// Which AI flow owns the composer panel. At most one: Create drops any
     /// reply session when it opens, and the persona row - the only way into a
     /// reply - is hidden while Create is open. Derived, never stored, so it
@@ -118,6 +138,9 @@ final class KeyboardViewController: UIInputViewController {
         refreshScreenHeight()
         reloadSettings()
         AILimits.reload()
+        smartCorrectionEnabled = SharedSettings.shared.smartCorrectionEnabled
+        autocorrect.keyboardWillAppear(settingEnabled: smartCorrectionEnabled, language: language)
+        polisher.reset()
         refreshThemeIfNeeded()
         showsGlobe = needsInputModeSwitchKey
         plane = KeyboardFieldKind.startsOnNumbers(textDocumentProxy.keyboardType ?? .default) ? .numbers : .letters
@@ -144,10 +167,17 @@ final class KeyboardViewController: UIInputViewController {
         keysView.hapticsEnabled = SharedSettings.shared.keyboardHapticsActive(hasFullAccess: hasFullAccess)
         reportActivityToContainingApp()
         if hasFullAccess { AILimitsRefresher.refreshIfStale() }
+        // Dictionaries load only now, in the background: the first frame
+        // never waits for them.
+        autocorrect.keyboardDidAppear(lexiconSource: self)
+        polisher.isEnabled = smartCorrectionEnabled && serverOffersPolish && canReachNetwork
+        refreshSuggestions()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
+        polisher.stop()
+        autocorrect.keepCorrection()
         // An unfinished reply or Create is kept in memory for a few minutes,
         // so a trip to another chat does not cost the instruction. A running
         // request is stopped: no spinner survives the keyboard going away.
@@ -183,6 +213,8 @@ final class KeyboardViewController: UIInputViewController {
         let ownMutation = now - lastHostMutation < 0.45
         if !ownMutation {
             refreshHostContext()
+            // The text moved under the correction: Undo no longer applies.
+            autocorrect.keepCorrection()
             if now - lastAppearanceProbe > 0.5 {
                 lastAppearanceProbe = now
                 refreshThemeIfNeeded()
@@ -190,6 +222,7 @@ final class KeyboardViewController: UIInputViewController {
         }
         refreshAutoShift()
         refreshReturnKey()
+        refreshSuggestions()
     }
 
     // MARK: Hierarchy
@@ -256,6 +289,7 @@ final class KeyboardViewController: UIInputViewController {
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.replyCoordinator.configuration = configuration
+                self.composeCoordinator.grammaticalGender = configuration.profile.grammaticalGender
                 self.applyChips(from: configuration)
             }
         }
@@ -291,15 +325,18 @@ final class KeyboardViewController: UIInputViewController {
         }
     }
 
-    /// Lets the containing app show a truthful keyboard status. Throttled and
-    /// off the main thread.
+    /// Lets the containing app show a truthful keyboard status: a throttled
+    /// App Group heartbeat (it only lands with Full Access), then a Darwin
+    /// notification, which gets through either way. Off the main thread, and
+    /// in that order, so the app reads the fresh heartbeat when it is woken.
     private func reportActivityToContainingApp() {
         let fullAccess = hasFullAccess
         let settings = SharedSettings.shared
         let isStale = settings.keyboardLastSeen.map { Date().timeIntervalSince($0) > 300 } ?? true
-        guard isStale || settings.keyboardHasFullAccess != fullAccess else { return }
+        let needsHeartbeat = isStale || settings.keyboardHasFullAccess != fullAccess
         DispatchQueue.global(qos: .utility).async {
-            settings.markKeyboardActive(hasFullAccess: fullAccess)
+            if needsHeartbeat { settings.markKeyboardActive(hasFullAccess: fullAccess) }
+            KeyboardPresence.post(hasFullAccess: fullAccess)
         }
     }
 
@@ -519,6 +556,69 @@ final class KeyboardViewController: UIInputViewController {
     private func refreshHostContext() {
         hostContext = (textDocumentProxy.documentContextBeforeInput).map { String($0.suffix(200)) }
         hostAutocapitalization = textDocumentProxy.autocapitalizationType ?? .sentences
+        hostAllowsCorrection = AutocorrectFieldPolicy.allowsCorrection(in: textDocumentProxy)
+    }
+
+    // MARK: Smart correction
+
+    /// Whether the keys are typing where smart correction may help: a host
+    /// field that is not an address, a code or a password, or the composer's
+    /// instruction and reply - never the copied message.
+    private var correctionAllowed: Bool {
+        switch target {
+        case .host: return hostAllowsCorrection
+        case .composer: return actionBar.correctsFocusedField
+        case .nowhere: return false
+        }
+    }
+
+    /// Asks for the strip of the word now before the caret. Cheap when that
+    /// word did not change; the dictionaries are searched off the main thread.
+    private func refreshSuggestions() {
+        autocorrect.textDidChange(before: textBeforeCursor, allowed: correctionAllowed)
+    }
+
+    /// At a separator: the word before the caret swapped for its correction,
+    /// when one is ready. Returns it, so a backspace can take it back.
+    private func correctWordBeforeSeparator() -> AutocorrectCorrection? {
+        guard let correction = autocorrect.correction(before: textBeforeCursor, allowed: correctionAllowed),
+              replaceBeforeCursor(correction.original, with: correction.replacement) else { return nil }
+        return correction
+    }
+
+    /// Replaces `old`, which ends right at the caret, with `new` - through
+    /// the same paths as typing, so the host mirror stays in step.
+    @discardableResult
+    private func replaceBeforeCursor(_ old: String, with new: String) -> Bool {
+        switch target {
+        case .host:
+            guard let context = hostContext, context.hasSuffix(old) else { return false }
+            for _ in 0..<old.count { textDocumentProxy.deleteBackward() }
+            textDocumentProxy.insertText(new)
+            hostContext = String((String(context.dropLast(old.count)) + new).suffix(200))
+            lastHostMutation = Date.timeIntervalSinceReferenceDate
+            return true
+        case .composer:
+            return actionBar.replaceBeforeCursor(length: (old as NSString).length, with: new)
+        case .nowhere:
+            return false
+        }
+    }
+
+    /// Typed after a word, these end it and apply its correction.
+    private static let wordSeparators: Set<String> = [".", ",", "!", "?", ";", ":"]
+
+    /// The flag the server published, or the Simulator's mock.
+    private var serverOffersPolish: Bool {
+        #if DEBUG
+        if DebugReplyMock.isEnabled { return true }
+        #endif
+        return AILimits.serverSupportsInstructionPolish
+    }
+
+    /// The instruction changed: the polish suggestion starts over.
+    private func instructionDidChange(_ text: String, limit: Int) {
+        polisher.instructionDidChange(text, inputLanguage: language, limit: limit)
     }
 
     // MARK: Shift and return
@@ -563,8 +663,10 @@ final class KeyboardViewController: UIInputViewController {
         KeyboardLanguageStore.saveAsync(next)
         plane = .letters
         shift.reset()
+        autocorrect.switchLanguage(to: next)
         layoutKeyboard(force: true)
         refreshAutoShift()
+        refreshSuggestions()
         flashLanguageName()
     }
 
@@ -600,8 +702,17 @@ final class KeyboardViewController: UIInputViewController {
             instructionLimit: ReplyInstruction.maximumCharacters
         ))
         keysView.isInputDimmed = flow.isGenerating
+        if flow.stage != .composing { polisher.stop() }
         refreshReturnKey()
         updateGeometry(animated: true)
+        restartSuggestions()
+    }
+
+    /// The field being typed into may have changed: the strip is asked for
+    /// again where the keys now type.
+    private func restartSuggestions() {
+        autocorrect.restart()
+        refreshSuggestions()
     }
 
     /// Create: no persona and no message, only the instruction and the
@@ -623,8 +734,10 @@ final class KeyboardViewController: UIInputViewController {
             mode: .compose
         ))
         keysView.isInputDimmed = flow.isGenerating
+        if flow.stage != .composing { polisher.stop() }
         refreshReturnKey()
         updateGeometry(animated: true)
+        restartSuggestions()
     }
 
     private func showComposePanel() {
@@ -636,6 +749,7 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func closeComposer() {
+        polisher.stop()
         replyCoordinator.clear()
         composeCoordinator.clear()
         actionBar.endComposing()
@@ -644,6 +758,7 @@ final class KeyboardViewController: UIInputViewController {
         updateGeometry(animated: true)
         refreshHostContext()
         refreshAutoShift()
+        restartSuggestions()
     }
 
     private func insertReply() {
@@ -738,9 +853,18 @@ final class KeyboardViewController: UIInputViewController {
         return ComposeService()
     }
 
-    /// Without Full Access a keyboard has no network at all, so the request
+    private static func makePolishService() -> PolishService {
+        #if DEBUG
+        if DebugReplyMock.isEnabled {
+            return PolishService(transportOverride: DebugPolishMock())
+        }
+        #endif
+        return PolishService()
+    }
+
+    /// Without Full Access a keyboard has no network at all, so a request
     /// would only fail as "offline". Said plainly instead, before any request.
-    private var composeCanReachNetwork: Bool {
+    private var canReachNetwork: Bool {
         #if DEBUG
         if DebugReplyMock.isEnabled { return true }
         #endif
@@ -754,8 +878,11 @@ extension KeyboardViewController: KeyboardKeysViewDelegate {
 
     func keysView(_ view: KeyboardKeysView, didType text: String) {
         prepareComposerForTyping()
+        autocorrect.keepCorrection()
         let isLetter = plane == .letters && text.count == 1 && (text.first?.isLetter ?? false)
+        let corrected = Self.wordSeparators.contains(text) ? correctWordBeforeSeparator() : nil
         insert(isLetter ? shift.apply(to: text) : text)
+        if let corrected { autocorrect.didApply(corrected, separator: text) }
         if plane == .letters {
             shift.characterTyped()
         } else if text == "'" {
@@ -765,6 +892,7 @@ extension KeyboardViewController: KeyboardKeysViewDelegate {
             layoutKeyboard(force: false)
         }
         refreshAutoShift()
+        refreshSuggestions()
     }
 
     func keysViewDidTapShift(_ view: KeyboardKeysView) {
@@ -775,31 +903,49 @@ extension KeyboardViewController: KeyboardKeysViewDelegate {
 
     func keysView(_ view: KeyboardKeysView, didDelete unit: KeyboardKeysView.DeleteUnit) {
         prepareComposerForTyping()
+        // Backspace right after a correction takes it back: the word returns
+        // as typed, without the separator, and is not corrected again.
+        if unit == .character, let applied = autocorrect.takeBackCorrection(before: textBeforeCursor),
+           replaceBeforeCursor(applied.correction.replacement + applied.separator, with: applied.restoredText) {
+            refreshAutoShift()
+            refreshSuggestions()
+            return
+        }
+        autocorrect.keepCorrection()
         switch unit {
         case .character: deleteCharacter()
         case .word: deleteWord()
         }
         refreshAutoShift()
+        refreshSuggestions()
     }
 
     func keysViewDidTapSpace(_ view: KeyboardKeysView) {
         prepareComposerForTyping()
+        autocorrect.keepCorrection()
         let now = Date.timeIntervalSinceReferenceDate
         if SpaceShortcut.shouldInsertPeriod(before: textBeforeCursor, secondsSinceLastSpace: now - lastSpaceTap) {
             deleteCharacter()
             insert(". ")
             lastSpaceTap = 0
         } else {
+            let corrected = correctWordBeforeSeparator()
             insert(" ")
+            if let corrected { autocorrect.didApply(corrected, separator: " ") }
             lastSpaceTap = now
         }
         refreshAutoShift()
+        refreshSuggestions()
     }
 
     func keysViewDidTapReturn(_ view: KeyboardKeysView) {
         prepareComposerForTyping()
+        autocorrect.keepCorrection()
+        let corrected = correctWordBeforeSeparator()
         insert("\n")
+        if let corrected { autocorrect.didApply(corrected, separator: "\n") }
         refreshAutoShift()
+        refreshSuggestions()
     }
 
     func keysView(_ view: KeyboardKeysView, didSelectPlane selected: KeyboardPlane) {
@@ -828,12 +974,15 @@ extension KeyboardViewController: KeyboardKeysViewDelegate {
     }
 
     func keysView(_ view: KeyboardKeysView, moveCursorBy offset: Int) {
+        autocorrect.keepCorrection()
         switch target {
         case .host:
+            // The strip follows once the host reports the move.
             textDocumentProxy.adjustTextPosition(byCharacterOffset: offset)
             lastHostMutation = 0
         case .composer:
             actionBar.moveCaret(by: offset)
+            refreshSuggestions()
         case .nowhere:
             break
         }
@@ -880,6 +1029,39 @@ extension KeyboardViewController: KeyboardActionBarDelegate {
         updateGeometry(animated: true)
     }
 
+    /// A word of the strip: it replaces the word being typed, then a space.
+    /// The quoted word keeps what was typed and teaches it to the keyboard.
+    func actionBar(_ bar: KeyboardActionBar, didPick suggestion: AutocorrectSuggestion) {
+        guard let word = textBeforeCursor.flatMap(TypedWord.init(before:)) else { return }
+        UIDevice.current.playInputClick()
+        autocorrect.keepCorrection()
+        switch suggestion.kind {
+        case .typed:
+            autocorrect.keep(word.text)
+        case .correction, .word:
+            guard replaceBeforeCursor(word.text, with: suggestion.text) else { return }
+        }
+        insert(" ")
+        // A space typed right after this is a space, not the full-stop shortcut.
+        lastSpaceTap = 0
+        refreshAutoShift()
+        refreshSuggestions()
+    }
+
+    func actionBarDidAcceptPolish(_ bar: KeyboardActionBar) {
+        guard let text = polisher.accept(replacing: bar.instructionText) else { return }
+        bar.replaceInstruction(with: text)
+        refreshAutoShift()
+        refreshSuggestions()
+    }
+
+    func actionBarDidUndoPolish(_ bar: KeyboardActionBar) {
+        guard let text = polisher.undo() else { return }
+        bar.replaceInstruction(with: text)
+        refreshAutoShift()
+        refreshSuggestions()
+    }
+
     func actionBar(_ bar: KeyboardActionBar, didSend event: ComposerEvent) {
         if activeFlow == .compose {
             handleCompose(event)
@@ -890,14 +1072,24 @@ extension KeyboardViewController: KeyboardActionBarDelegate {
             closeComposer()
         case .changePersona:
             // Keep everything; show the persona row so another can be picked.
+            polisher.stop()
             replyCoordinator.suspend()
             actionBar.endComposing()
             keysView.isInputDimmed = false
             applyChips(from: replyCoordinator.configuration)
             updateGeometry(animated: true)
+            restartSuggestions()
         case .paste:
             replyCoordinator.pasteSource(proxy: textDocumentProxy, hasFullAccess: hasFullAccess)
         case .generate, .regenerate:
+            // A selection can fill the message without Full Access, but the
+            // request still needs the network: say so, not "offline".
+            guard canReachNetwork else {
+                replyCoordinator.showError(.fullAccessRequired)
+                return
+            }
+            polisher.stop()
+            replyCoordinator.inputLanguage = language
             replyCoordinator.generate()
         case .stop:
             replyCoordinator.cancelGeneration()
@@ -922,7 +1114,9 @@ extension KeyboardViewController: KeyboardActionBarDelegate {
         case .edited(let field, let text):
             switch field {
             case .source: replyCoordinator.updateSource(text)
-            case .instruction: replyCoordinator.updateInstruction(text)
+            case .instruction:
+                replyCoordinator.updateInstruction(text)
+                instructionDidChange(text, limit: ReplyInstruction.maximumCharacters)
             case .draft: replyCoordinator.updateDraft(text)
             case .none: break
             }
@@ -936,12 +1130,15 @@ extension KeyboardViewController: KeyboardActionBarDelegate {
         case .close:
             closeComposer()
         case .reset:
+            polisher.stop()
             composeCoordinator.reset()
         case .generate, .regenerate:
-            guard composeCanReachNetwork else {
+            guard canReachNetwork else {
                 composeCoordinator.showError(.fullAccessRequired)
                 return
             }
+            polisher.stop()
+            composeCoordinator.inputLanguage = language
             composeCoordinator.generate()
         case .stop:
             composeCoordinator.cancelGeneration()
@@ -965,7 +1162,9 @@ extension KeyboardViewController: KeyboardActionBarDelegate {
             resolveConflict(choice)
         case .edited(let field, let text):
             switch field {
-            case .instruction: composeCoordinator.updateInstruction(text)
+            case .instruction:
+                composeCoordinator.updateInstruction(text)
+                instructionDidChange(text, limit: AILimits.current.instructionCharacters)
             case .draft: composeCoordinator.updateDraft(text)
             case .source, .none: break
             }
@@ -1001,5 +1200,14 @@ extension KeyboardViewController: ComposeFlowCoordinatorDelegate {
     func composeCoordinatorDidChange(_ coordinator: ComposeFlowCoordinator) {
         renderComposer()
         refreshAutoShift()
+    }
+}
+
+// MARK: - Smart correction
+
+extension KeyboardViewController: AutocorrectControllerDelegate {
+
+    func autocorrect(_ controller: AutocorrectController, didUpdate suggestions: [AutocorrectSuggestion]) {
+        actionBar.showSuggestions(suggestions)
     }
 }

@@ -15,12 +15,15 @@ struct ProfileEditorView: View {
 
     @Environment(ReplyConfigurationModel.self) private var model
     @Environment(AppSettings.self) private var settings
+    @Environment(AccountModel.self) private var account
 
     @State private var role: String = ""
     @State private var about: String = ""
     @State private var business: BusinessContext = .empty
     @State private var tone: ReplyTone = .natural
     @State private var replyLanguage: ReplyLanguagePreference?
+    /// "Never asked" shows as Not specified, which is how replies treat it.
+    @State private var gender: GrammaticalGender = .unspecified
     @State private var isDictating = false
     @State private var suggestion: VoiceConfigurationParser.Suggestion?
     @FocusState private var isFocused: Bool
@@ -94,6 +97,22 @@ struct ProfileEditorView: View {
             } footer: {
                 Text("profile.replyLanguage.footer")
             }
+
+            Section {
+                Picker("profile.gender", selection: $gender) {
+                    Text("profile.gender.male").tag(GrammaticalGender.male)
+                    Text("profile.gender.female").tag(GrammaticalGender.female)
+                    Text("profile.gender.unspecified").tag(GrammaticalGender.unspecified)
+                }
+                // Applied at once rather than on the way out: it is synced to
+                // the server, and nothing else on this screen is.
+                .onChange(of: gender) { _, value in
+                    guard value != (model.profile.grammaticalGender ?? .unspecified) else { return }
+                    ProfileSync(configuration: model, account: account).choose(value, source: .settings)
+                }
+            } footer: {
+                Text("profile.gender.footer")
+            }
         }
         .navigationTitle("profile.title")
         .navigationBarTitleDisplayMode(.inline)
@@ -149,6 +168,7 @@ struct ProfileEditorView: View {
         business = profile.business
         tone = profile.preferredTone
         replyLanguage = profile.replyLanguage
+        gender = profile.grammaticalGender ?? .unspecified
     }
 
     private func save() {

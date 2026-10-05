@@ -25,6 +25,12 @@ protocol ReplyComposerViewDelegate: AnyObject {
     func composerDidChangeHeight(_ composer: ReplyComposerView)
     /// Create mode: discard the instruction and every version.
     func composerDidTapNew(_ composer: ReplyComposerView)
+    /// A word of the suggestion strip under the instruction.
+    func composer(_ composer: ReplyComposerView, didPick suggestion: AutocorrectSuggestion)
+    /// The suggested version of the instruction was tapped.
+    func composerDidAcceptPolish(_ composer: ReplyComposerView)
+    /// Undo after a suggested version was used.
+    func composerDidUndoPolish(_ composer: ReplyComposerView)
 }
 
 /// The AI reply composer.
@@ -129,6 +135,17 @@ final class ReplyComposerView: UIView {
     private var visibleLastPass = Set<ObjectIdentifier>()
     private var visibleThisPass = Set<ObjectIdentifier>()
 
+    /// What the slot left of the primary button shows.
+    private enum Accessory {
+        case intents
+        case suggestions
+        case polish
+    }
+
+    private var suggestions: [AutocorrectSuggestion] = []
+    private var polish: InstructionPolisher.Chip = .none
+    private var shownAccessory: Accessory = .intents
+
     // MARK: Views
 
     private let panel = UIView()
@@ -163,6 +180,10 @@ final class ReplyComposerView: UIView {
     // Composing row
     private let quickActions = QuickActionRow()
     private let primaryButton = UIButton(type: .system)
+    /// In the quick intents' place while a word of the instruction is being
+    /// typed, or when a cleaner version of it is on offer.
+    private let suggestionStrip = SuggestionStripView()
+    private let polishChip = PolishChipView()
 
     // Result row
     private let backButton = CircleIconButton(symbol: "chevron.left", pointSize: 14)
@@ -270,6 +291,11 @@ final class ReplyComposerView: UIView {
         conflictLabel.minimumScaleFactor = 0.8
 
         quickActions.delegate = self
+        suggestionStrip.onPick = { [weak self] suggestion in
+            guard let self else { return }
+            self.delegate?.composer(self, didPick: suggestion)
+        }
+        polishChip.addTarget(self, action: #selector(polishTapped), for: .touchUpInside)
 
         configurePill(primaryButton, symbol: nil, trailingImage: false)
         primaryButton.addTarget(self, action: #selector(primaryTapped), for: .touchUpInside)
@@ -296,7 +322,8 @@ final class ReplyComposerView: UIView {
 
         [personaChip, previewButton, counterLabel, closeButton, titleIcon, titleLabel, newButton,
          sourceCard, instructionView, draftView,
-         errorLabel, conflictLabel, quickActions, primaryButton, backButton, regenerateButton, editButton,
+         errorLabel, conflictLabel, quickActions, suggestionStrip, polishChip, primaryButton, backButton,
+         regenerateButton, editButton,
          previousButton, versionLabel, nextButton, insertButton, replaceButton, appendButton,
          conflictCancelButton].forEach(panel.addSubview)
     }
@@ -326,6 +353,8 @@ final class ReplyComposerView: UIView {
         self.theme = theme
         self.strings = AIReplyStrings.forLanguage(uiLanguage)
         quickActions.configure(theme: theme, strings: strings, intents: currentIntents)
+        suggestionStrip.configure(theme: theme, uiLanguage: uiLanguage)
+        polishChip.configure(theme: theme, uiLanguage: uiLanguage)
         applyTheme()
         refresh()
     }
@@ -408,6 +437,9 @@ final class ReplyComposerView: UIView {
         errorMessage = nil
         isSourceExpanded = false
         conflictHeight = 0
+        suggestions = []
+        polish = .none
+        polishChip.show(.none)
         sourceView.setText("")
         instructionView.setText("")
         draftView.setText("")
@@ -556,8 +588,12 @@ final class ReplyComposerView: UIView {
         errorLabel.isHidden = errorMessage == nil || isConflict
 
         // Composing row
-        quickActions.isHidden = !composingLike || isConflict
+        let showsComposingRow = composingLike && !isConflict
+        for view in [quickActions, suggestionStrip, polishChip] as [UIView] {
+            view.isHidden = !showsComposingRow
+        }
         quickActions.setEnabled(stage == .composing)
+        updateAccessory(animated: false)
         primaryButton.isHidden = !composingLike || isConflict
         let overLimit = count > sourceLimit
         let canGenerate = isCompose
@@ -832,7 +868,10 @@ final class ReplyComposerView: UIView {
         } else {
             let primaryWidth = min(max(104, ceil(primaryButton.intrinsicContentSize.width)), width * 0.5)
             place(primaryButton, CGRect(x: left + width - primaryWidth, y: y, width: primaryWidth, height: rowHeight))
-            place(quickActions, CGRect(x: left, y: y + 1, width: max(0, primaryButton.frame.minX - left - 8), height: rowHeight - 2))
+            let slot = CGRect(x: left, y: y + 1, width: max(0, primaryButton.frame.minX - left - 8), height: rowHeight - 2)
+            place(quickActions, slot)
+            place(suggestionStrip, slot)
+            place(polishChip, slot.insetBy(dx: 0, dy: 1))
         }
 
         for view in [sourceView, instructionView, draftView] where view.showsCaret {
@@ -910,6 +949,95 @@ final class ReplyComposerView: UIView {
         focusedView?.moveCaret(by: offset)
     }
 
+    /// Replaces the `length` UTF-16 units before the caret of the focused
+    /// field - a typed word swapped for a correction. False when there is no
+    /// field, or the instruction would pass its limit.
+    @discardableResult
+    func replaceBeforeCaret(length: Int, with text: String) -> Bool {
+        guard let view = focusedView else { return false }
+        let replaced: Bool
+        if view === instructionView {
+            let limit = instructionLimit
+            replaced = view.replaceBeforeCaret(length: length, with: text) { $0.unicodeScalars.count <= limit }
+        } else {
+            replaced = view.replaceBeforeCaret(length: length, with: text)
+        }
+        if replaced { textChanged(in: view) }
+        return replaced
+    }
+
+    /// The whole instruction replaced - a suggested version used or undone -
+    /// with the caret at the end.
+    func replaceInstruction(with text: String) {
+        guard flow.stage == .composing, text.unicodeScalars.count <= instructionLimit else { return }
+        focus = .instruction
+        instructionView.setText(text)
+        refresh()
+        delegate?.composer(self, didEdit: .instruction, text: text)
+    }
+
+    /// Whether the keys are typing into a field smart correction looks after:
+    /// the instruction and the reply, never the copied message.
+    var focusedFieldAcceptsCorrection: Bool {
+        let field = focusedField
+        return field == .instruction || field == .draft
+    }
+
+    /// Whether the focused field is the instruction while it is being written.
+    var isEditingInstruction: Bool { focusedField == .instruction }
+
+    // MARK: Suggestions
+
+    /// The strip for the word being typed; empty hides it. Shown only under
+    /// the instruction, in place of the quick intents.
+    func showSuggestions(_ items: [AutocorrectSuggestion]) {
+        guard items != suggestions else { return }
+        suggestions = items
+        suggestionStrip.show(items)
+        updateAccessory(animated: true)
+    }
+
+    /// The suggested version of the instruction, or Undo after it was used.
+    /// It wins over the strip: it arrives after a pause, when the user has
+    /// stopped typing anyway.
+    func showPolish(_ chip: InstructionPolisher.Chip) {
+        guard chip != polish else { return }
+        polish = chip
+        if chip != .none { polishChip.show(chip) }
+        updateAccessory(animated: true)
+    }
+
+    private var wantedAccessory: Accessory {
+        guard flow.stage == .composing else { return .intents }
+        if polish != .none { return .polish }
+        if !suggestions.isEmpty, focus == .instruction { return .suggestions }
+        return .intents
+    }
+
+    /// Crossfades the slot's three occupants. Their frames never change, so
+    /// neither does the panel's height.
+    private func updateAccessory(animated: Bool) {
+        let wanted = wantedAccessory
+        let apply = {
+            self.quickActions.alpha = wanted == .intents ? 1 : 0
+            self.suggestionStrip.alpha = wanted == .suggestions ? 1 : 0
+            self.polishChip.alpha = wanted == .polish ? 1 : 0
+        }
+        quickActions.isUserInteractionEnabled = wanted == .intents
+        suggestionStrip.isUserInteractionEnabled = wanted == .suggestions
+        polishChip.isUserInteractionEnabled = wanted == .polish
+        quickActions.accessibilityElementsHidden = wanted != .intents
+        suggestionStrip.accessibilityElementsHidden = wanted != .suggestions
+        polishChip.accessibilityElementsHidden = wanted != .polish
+        let changed = wanted != shownAccessory
+        shownAccessory = wanted
+        if animated, changed, window != nil {
+            UIView.animate(withDuration: 0.16, delay: 0, options: [.beginFromCurrentState, .allowUserInteraction], animations: apply)
+        } else {
+            apply()
+        }
+    }
+
     /// The text the next keystroke would follow - for auto-capitalization and
     /// the double-space period. With a reply on screen that is the reply: a
     /// keystroke there starts editing it at its caret. Nil while nothing can
@@ -960,6 +1088,14 @@ final class ReplyComposerView: UIView {
     @objc private func replaceTapped() { delegate?.composer(self, didResolveConflictWith: .replace) }
     @objc private func appendTapped() { delegate?.composer(self, didResolveConflictWith: .append) }
     @objc private func conflictCancelTapped() { delegate?.composer(self, didResolveConflictWith: .cancel) }
+
+    @objc private func polishTapped() {
+        switch polishChip.chip {
+        case .suggestion: delegate?.composerDidAcceptPolish(self)
+        case .undo: delegate?.composerDidUndoPolish(self)
+        case .none: break
+        }
+    }
 
     @objc private func primaryTapped() {
         if flow.isGenerating {

@@ -151,5 +151,33 @@ final class AccountAPITests: XCTestCase {
         XCTAssertEqual(session.user.identifier, "+77011234567")
         XCTAssertEqual(session.subscription.plan.dailyLimit, 7)
         XCTAssertEqual(session.usage.remainingToday, 7)
+        XCTAssertNil(session.profile.gender, "a server without sender_profile sends none")
+        XCTAssertNil(session.profile.onboardingVersion)
+    }
+
+    /// The sender fields are optional, and a gender value this build does not
+    /// know must not fail the account.
+    func testProfileDecodesTheSenderFields() throws {
+        func profile(_ extra: String) throws -> AccountAPI.Profile {
+            try JSONDecoder().decode(AccountAPI.Profile.self, from: Data("""
+            {"display_name": "", "role": "", "description": "", "preferred_tone": "natural",
+             "business_offering": "", "business_summary": "", "business_rules": [],
+             "onboarding_completed": true\(extra)}
+            """.utf8))
+        }
+        let female = try profile(#", "grammatical_gender": "female", "onboarding_version": 2"#)
+        XCTAssertEqual(female.gender, .female)
+        XCTAssertEqual(female.onboardingVersion, 2)
+        XCTAssertNil(try profile(#", "grammatical_gender": "robot""#).gender)
+    }
+
+    /// Only what changed goes in an update; nil fields are left out entirely,
+    /// so an older server never sees a field it does not know.
+    func testProfileUpdateSendsOnlyWhatIsSet() throws {
+        var update = AccountService.ProfileUpdate()
+        update.grammatical_gender = "male"
+        let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(update)) as? [String: Any]
+        XCTAssertEqual(json?.count, 1)
+        XCTAssertEqual(json?["grammatical_gender"] as? String, "male")
     }
 }

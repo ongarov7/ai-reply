@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 
 struct HomeView: View {
 
@@ -7,10 +6,10 @@ struct HomeView: View {
     @Environment(ReplyConfigurationModel.self) private var model
     @Environment(AccountModel.self) private var account
 
-    /// Read on appearance and on every return to the foreground - typically
-    /// from iOS Settings, or from another app where the keyboard just ran and
-    /// reported in. Never polled.
-    @State private var keyboardStatus = KeyboardStatus.current()
+    /// Re-read on appearance and on every return to the foreground -
+    /// typically from iOS Settings, or from another app where the keyboard
+    /// just ran and reported in. Never polled here.
+    @Environment(KeyboardStatusMonitor.self) private var keyboard
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -41,10 +40,10 @@ struct HomeView: View {
             }
         }
         .onAppear {
-            keyboardStatus = .current()
+            keyboard.refresh()
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { keyboardStatus = .current() }
+            if phase == .active { keyboard.refresh() }
         }
         .task {
             await account.refresh()
@@ -148,22 +147,22 @@ struct HomeView: View {
                 Label {
                     Text(keyboardStateKey).foregroundStyle(.primary)
                 } icon: {
-                    Image(systemName: keyboardStatus.isConfigured ? "checkmark.circle.fill" : "keyboard")
-                        .foregroundStyle(keyboardStatus.isConfigured ? Color.green : Color.secondary)
+                    Image(systemName: keyboard.status.isEnabled ? "checkmark.circle.fill" : "keyboard")
+                        .foregroundStyle(keyboard.status.isEnabled ? Color.green : Color.secondary)
                 }
                 .font(.body.weight(.medium))
 
-                if keyboardStatus.isConfigured {
+                if keyboard.status.isEnabled {
                     Label {
                         Text(fullAccessKey).foregroundStyle(.primary)
                     } icon: {
-                        Image(systemName: keyboardStatus.hasFullAccess ? "lock.open.fill" : "lock.fill")
-                            .foregroundStyle(keyboardStatus.hasFullAccess ? Color.green : Color.orange)
+                        Image(systemName: hasFullAccess ? "lock.open.fill" : "lock.fill")
+                            .foregroundStyle(hasFullAccess ? Color.green : Color.orange)
                     }
                     .font(.subheadline)
                 }
 
-                if !keyboardStatus.isConfigured {
+                if !keyboard.status.isEnabled {
                     KeyboardSetupSteps().padding(.top, DS.Spacing.xxs)
                 }
 
@@ -172,11 +171,8 @@ struct HomeView: View {
                 // and both ended on the same iOS page; the step-by-step guide
                 // stays in Settings ▸ Keyboard setup.
                 if needsKeyboardSetup {
-                    Button(action: openSystemSettings) {
-                        Label("home.keyboard.openSettings", systemImage: "keyboard")
-                    }
-                    .buttonStyle(.dsPrimary)
-                    .padding(.top, DS.Spacing.xxs)
+                    OpenKeyboardSettingsButton()
+                        .padding(.top, DS.Spacing.xxs)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -185,11 +181,13 @@ struct HomeView: View {
     }
 
     /// The keyboard has not reported in yet, or it runs without Full Access.
-    /// Both are only ever cleared by the keyboard itself writing its state,
+    /// Both are only ever cleared by the keyboard itself reporting its state,
     /// so a "done" here is something it actually observed.
     private var needsKeyboardSetup: Bool {
-        !keyboardStatus.isConfigured || !keyboardStatus.hasFullAccess
+        !keyboard.status.isEnabled || !hasFullAccess
     }
+
+    private var hasFullAccess: Bool { keyboard.status.fullAccess == .on }
 
     private var howItWorks: some View {
         DSSection(title: "home.howItWorks.title") {
@@ -202,8 +200,9 @@ struct HomeView: View {
     }
 
     private var privacy: some View {
+        // The short version; Settings ▸ Privacy has the full one.
         DSSection(title: "home.privacy.title") {
-            Text("settings.privacy.body")
+            Text("home.privacy.body")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .dsCard()
@@ -214,28 +213,10 @@ struct HomeView: View {
     /// as `String` rather than `LocalizedStringKey`, which compiles happily and
     /// then ships the raw key to the user instead of the translation.
     private var keyboardStateKey: LocalizedStringKey {
-        keyboardStatus.isConfigured ? "home.keyboard.ready" : "home.keyboard.notReady"
+        keyboard.status.isEnabled ? "home.keyboard.ready" : "home.keyboard.notReady"
     }
 
     private var fullAccessKey: LocalizedStringKey {
-        keyboardStatus.hasFullAccess ? "home.keyboard.fullAccessOn" : "home.keyboard.fullAccessOff"
-    }
-
-    private func openSystemSettings() {
-        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
-        UIApplication.shared.open(url)
-    }
-}
-
-/// Snapshot of what the keyboard extension last reported about itself.
-struct KeyboardStatus {
-    let isConfigured: Bool
-    let hasFullAccess: Bool
-
-    static func current(store: SharedSettings = .shared) -> KeyboardStatus {
-        KeyboardStatus(
-            isConfigured: store.isKeyboardConfigured,
-            hasFullAccess: store.keyboardHasFullAccess
-        )
+        hasFullAccess ? "home.keyboard.fullAccessOn" : "home.keyboard.fullAccessOff"
     }
 }

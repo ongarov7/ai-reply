@@ -137,6 +137,23 @@ final class ComposerTextView: UITextView {
         return true
     }
 
+    /// Replaces the `length` UTF-16 units right before the caret with
+    /// `string` - a word swapped for its correction or a suggestion, in one
+    /// edit. `allow` sees the resulting text, as for `insert`.
+    @discardableResult
+    func replaceBeforeCaret(length: Int, with string: String, allow: ((String) -> Bool)? = nil) -> Bool {
+        let current = currentText as NSString
+        let location = clampedCaret(in: current)
+        guard length >= 0, length <= location else { return false }
+        let range = NSRange(location: location - length, length: length)
+        let next = current.replacingCharacters(in: range, with: string)
+        if let allow, !allow(next) { return false }
+        text = next
+        caret = range.location + (string as NSString).length
+        didEdit()
+        return true
+    }
+
     /// Deletes the character before the caret - a whole emoji or combined
     /// letter, never half of one.
     @discardableResult

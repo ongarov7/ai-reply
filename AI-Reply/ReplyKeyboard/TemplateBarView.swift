@@ -192,6 +192,22 @@ final class TemplateBarView: UIView {
         CATransaction.commit()
     }
 
+    // MARK: Suggestion strip
+
+    /// Where the persona pills are. The suggestion strip covers exactly this
+    /// while a word is typed, so "+" and "✨" never move or disappear.
+    var personasFrame: CGRect { scrollView.frame }
+
+    /// Fades the pills out for the suggestion strip, and back. Inside an
+    /// animation block the fade is animated.
+    func setPersonasHidden(_ hidden: Bool) {
+        scrollView.alpha = hidden ? 0 : 1
+        hintLabel.alpha = hidden ? 0 : 1
+        scrollView.isUserInteractionEnabled = !hidden
+        scrollView.accessibilityElementsHidden = hidden
+        hintLabel.accessibilityElementsHidden = hidden
+    }
+
     // MARK: Configuration
 
     /// - Parameter uiLanguage: the APP's language. Switching the keyboard

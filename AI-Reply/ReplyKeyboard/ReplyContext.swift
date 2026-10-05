@@ -174,6 +174,10 @@ final class ReplyFlowCoordinator {
     /// saw it on the chip.
     var uiLanguage: AppLanguage = .systemDefault
 
+    /// The keyboard layout to report with the next request; the keyboard
+    /// sets it as Reply is tapped.
+    var inputLanguage: KeyboardLanguage?
+
     init(
         provider: ContextTextProvider = ContextTextProvider(),
         normalizer: ReplyDraftNormalizer = ReplyDraftNormalizer(),
@@ -280,6 +284,13 @@ final class ReplyFlowCoordinator {
         run(current)
     }
 
+    /// A failure found before any request could start - Full Access off.
+    func showError(_ error: AIReplyError) {
+        guard session != nil, session?.flow.isGenerating == false else { return }
+        session?.flow.fail(error)
+        delegate?.coordinatorDidChange(self)
+    }
+
     /// Stop the request in flight. Everything typed stays.
     func cancelGeneration() {
         guard session?.flow.isGenerating == true else { return }
@@ -294,7 +305,8 @@ final class ReplyFlowCoordinator {
             template: snapshot.template,
             configuration: configuration,
             uiLanguage: uiLanguage,
-            instruction: snapshot.instruction
+            instruction: snapshot.instruction,
+            inputLanguage: inputLanguage
         )
         generation += 1
         let ticket = generation

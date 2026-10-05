@@ -25,7 +25,10 @@ final class ReplyConfigurationModel {
     var templates: [ReplyTemplate] { configuration.templates.sorted { $0.sortIndex < $1.sortIndex } }
     var visibleTemplates: [ReplyTemplate] { configuration.visibleTemplates }
 
-    var hasCompletedOnboarding: Bool { configuration.profile.hasCompletedOnboarding }
+    /// True until this device has been through the current onboarding.
+    var needsOnboarding: Bool {
+        OnboardingFlow.needsOnboarding(completedVersion: configuration.profile.completedOnboardingVersion)
+    }
 
     /// True when the store could not reach the App Group container, which means
     /// the keyboard will not see anything saved here. Surfaced in Settings
@@ -41,14 +44,10 @@ final class ReplyConfigurationModel {
         persist()
     }
 
-    func completeOnboarding() {
-        updateProfile { $0.hasCompletedOnboarding = true }
-    }
-
-    /// Lets the user run onboarding again from Settings without losing what
-    /// they already answered.
-    func restartOnboarding() {
-        updateProfile { $0.hasCompletedOnboarding = false }
+    /// Never lowers the version: a device that has seen a newer onboarding
+    /// keeps it.
+    func completeOnboarding(version: Int = OnboardingFlow.currentVersion) {
+        updateProfile { $0.completedOnboardingVersion = max($0.completedOnboardingVersion, version) }
     }
 
     func update(_ template: ReplyTemplate) {

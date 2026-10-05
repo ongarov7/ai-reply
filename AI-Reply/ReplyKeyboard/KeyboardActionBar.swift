@@ -28,6 +28,11 @@ protocol KeyboardActionBarDelegate: AnyObject {
     func actionBarDidRequestCompose(_ bar: KeyboardActionBar)
     func actionBar(_ bar: KeyboardActionBar, didSend event: ComposerEvent)
     func actionBarDidChangeHeight(_ bar: KeyboardActionBar)
+    /// A word of the suggestion strip - above the keys or under the instruction.
+    func actionBar(_ bar: KeyboardActionBar, didPick suggestion: AutocorrectSuggestion)
+    /// The suggested version of the instruction was tapped.
+    func actionBarDidAcceptPolish(_ bar: KeyboardActionBar)
+    func actionBarDidUndoPolish(_ bar: KeyboardActionBar)
 }
 
 /// The area above the keys. Two shapes:
@@ -35,6 +40,8 @@ protocol KeyboardActionBarDelegate: AnyObject {
 /// * PERSONAS - a 36pt row: Дос | Клиент | Бизнес | Жұмыс | + | ✨ Create,
 ///   plus a transient status line that changes no geometry. This is the
 ///   keyboard at rest; its height is what gets cached for the next launch.
+///   While a word is typed into the host app the suggestion strip takes the
+///   pills' place - only theirs: + and ✨ stay exactly where they are.
 /// * COMPOSER - the AI composer (`ReplyComposerView`), answering a copied
 ///   message or, after Create, writing a new one.
 ///
@@ -45,8 +52,12 @@ final class KeyboardActionBar: UIView {
     weak var delegate: KeyboardActionBarDelegate?
 
     private let templateBar = TemplateBarView()
+    private let suggestionStrip = SuggestionStripView()
     private let toastLabel = UILabel()
     private let composer = ReplyComposerView()
+
+    /// Whether the strip is over the persona pills right now.
+    private var showsSuggestions = false
 
     private var toastWorkItem: DispatchWorkItem?
     private let idleHeight: CGFloat = TemplateBarView.preferredHeight + 4
@@ -70,6 +81,14 @@ final class KeyboardActionBar: UIView {
         templateBar.delegate = self
 
         addSubview(templateBar)
+        suggestionStrip.alpha = 0
+        suggestionStrip.isUserInteractionEnabled = false
+        suggestionStrip.accessibilityElementsHidden = true
+        suggestionStrip.onPick = { [weak self] suggestion in
+            guard let self else { return }
+            self.delegate?.actionBar(self, didPick: suggestion)
+        }
+        addSubview(suggestionStrip)
         toastLabel.textAlignment = .center
         toastLabel.numberOfLines = 2
         toastLabel.font = .systemFont(ofSize: 12, weight: .medium)
@@ -89,6 +108,8 @@ final class KeyboardActionBar: UIView {
     override func layoutSubviews() {
         super.layoutSubviews()
         templateBar.frame = CGRect(x: 0, y: 2, width: bounds.width, height: TemplateBarView.preferredHeight)
+        templateBar.layoutIfNeeded()
+        suggestionStrip.frame = templateBar.personasFrame.offsetBy(dx: templateBar.frame.minX, dy: templateBar.frame.minY)
         toastLabel.frame = CGRect(x: 14, y: 1, width: max(0, bounds.width - 28), height: TemplateBarView.preferredHeight + 2)
         composer.frame = bounds
     }
@@ -99,6 +120,7 @@ final class KeyboardActionBar: UIView {
     func configure(theme: KeyboardTheme, uiLanguage: AppLanguage) {
         toastLabel.textColor = theme.secondaryText
         templateBar.configure(theme: theme, uiLanguage: uiLanguage)
+        suggestionStrip.configure(theme: theme, uiLanguage: uiLanguage)
         composer.configure(theme: theme, uiLanguage: uiLanguage)
     }
 
@@ -119,6 +141,7 @@ final class KeyboardActionBar: UIView {
     func beginComposing() {
         cancelToast()
         guard !isComposing else { return }
+        setHostSuggestionsVisible(false, animated: false)
         isComposing = true
         composer.isHidden = false
         templateBar.isHidden = true
@@ -147,6 +170,48 @@ final class KeyboardActionBar: UIView {
     func deleteWordBackward() { composer.deleteWordBackward() }
     func moveCaret(by offset: Int) { composer.moveCaret(by: offset) }
     var textBeforeCursor: String? { composer.textBeforeCursor }
+    @discardableResult
+    func replaceBeforeCursor(length: Int, with text: String) -> Bool { composer.replaceBeforeCaret(length: length, with: text) }
+    func replaceInstruction(with text: String) { composer.replaceInstruction(with: text) }
+    var instructionText: String { composer.instructionText }
+    /// The composer field being typed into is one smart correction looks after.
+    var correctsFocusedField: Bool { isComposing && composer.focusedFieldAcceptsCorrection }
+    var isEditingInstruction: Bool { isComposing && composer.isEditingInstruction }
+
+    // MARK: Suggestions
+
+    /// The strip for the word being typed: over the persona pills at rest,
+    /// under the instruction in the composer. Empty hides it.
+    func showSuggestions(_ items: [AutocorrectSuggestion]) {
+        if isComposing {
+            composer.showSuggestions(items)
+            return
+        }
+        suggestionStrip.show(items)
+        setHostSuggestionsVisible(!items.isEmpty, animated: true)
+    }
+
+    /// The suggested version of the instruction, in the composer.
+    func showPolish(_ chip: InstructionPolisher.Chip) {
+        composer.showPolish(chip)
+    }
+
+    /// Crossfades the strip and the persona pills, as the status line does.
+    private func setHostSuggestionsVisible(_ visible: Bool, animated: Bool) {
+        guard visible != showsSuggestions else { return }
+        showsSuggestions = visible
+        suggestionStrip.isUserInteractionEnabled = visible
+        suggestionStrip.accessibilityElementsHidden = !visible
+        let apply = {
+            self.suggestionStrip.alpha = visible && self.toastWorkItem == nil ? 1 : 0
+            self.templateBar.setPersonasHidden(visible)
+        }
+        if animated, window != nil {
+            UIView.animate(withDuration: 0.16, delay: 0, options: [.beginFromCurrentState, .allowUserInteraction], animations: apply)
+        } else {
+            apply()
+        }
+    }
 
     // MARK: Transient status
 
@@ -161,12 +226,15 @@ final class KeyboardActionBar: UIView {
         UIView.animate(withDuration: 0.16) {
             self.toastLabel.alpha = 1
             self.templateBar.alpha = 0
+            self.suggestionStrip.alpha = 0
         }
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
+            self.toastWorkItem = nil
             UIView.animate(withDuration: 0.2, animations: {
                 self.toastLabel.alpha = 0
                 self.templateBar.alpha = 1
+                self.suggestionStrip.alpha = self.showsSuggestions ? 1 : 0
             }, completion: { _ in
                 self.toastLabel.isHidden = true
             })
@@ -182,6 +250,7 @@ final class KeyboardActionBar: UIView {
         toastLabel.isHidden = true
         toastLabel.alpha = 0
         templateBar.alpha = 1
+        suggestionStrip.alpha = showsSuggestions ? 1 : 0
     }
 }
 
@@ -235,5 +304,17 @@ extension KeyboardActionBar: ReplyComposerViewDelegate {
     func composerDidChangeHeight(_ composer: ReplyComposerView) {
         guard isComposing else { return }
         delegate?.actionBarDidChangeHeight(self)
+    }
+
+    func composer(_ composer: ReplyComposerView, didPick suggestion: AutocorrectSuggestion) {
+        delegate?.actionBar(self, didPick: suggestion)
+    }
+
+    func composerDidAcceptPolish(_ composer: ReplyComposerView) {
+        delegate?.actionBarDidAcceptPolish(self)
+    }
+
+    func composerDidUndoPolish(_ composer: ReplyComposerView) {
+        delegate?.actionBarDidUndoPolish(self)
     }
 }

@@ -107,3 +107,109 @@ struct WorkingHoursView: View {
         return TimeOfDay(hour: components.hour ?? 0, minute: components.minute ?? 0)
     }
 }
+
+// MARK: - Shared editors
+
+/// Start and end time plus a weekday row, for the common case. The full
+/// per-day editor lives in Settings ▸ Working hours.
+struct QuickHoursEditor: View {
+
+    @Binding var hours: WorkingHours
+
+    private let weekdayOrder = [2, 3, 4, 5, 6, 7, 1]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DS.Spacing.m) {
+            HStack {
+                Text("hours.from").foregroundStyle(.secondary)
+                Spacer()
+                TimeOfDayPicker(time: startBinding)
+                Text("hours.to").foregroundStyle(.secondary)
+                TimeOfDayPicker(time: endBinding)
+            }
+
+            HStack(spacing: DS.Spacing.xxs) {
+                ForEach(weekdayOrder, id: \.self) { weekday in
+                    Button {
+                        toggle(weekday)
+                    } label: {
+                        Text(verbatim: symbol(weekday))
+                            .font(.footnote.weight(.medium))
+                            .frame(maxWidth: .infinity, minHeight: 34)
+                            .background(
+                                RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
+                                    .fill(isEnabled(weekday) ? Color.accentColor : Color.dsBackground)
+                            )
+                            .foregroundStyle(isEnabled(weekday) ? Color.white : Color.primary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .dsCard()
+    }
+
+    private func symbol(_ weekday: Int) -> String {
+        String(Calendar.current.shortStandaloneWeekdaySymbols[weekday - 1].prefix(2))
+    }
+
+    private func isEnabled(_ weekday: Int) -> Bool {
+        hours.schedule(for: weekday)?.isEnabled ?? false
+    }
+
+    private func toggle(_ weekday: Int) {
+        guard let index = hours.days.firstIndex(where: { $0.weekday == weekday }) else { return }
+        hours.days[index].isEnabled.toggle()
+    }
+
+    /// Editing one time applies it to every enabled day, which is what a
+    /// "from / to" control implies. Per-day differences stay possible in the
+    /// full editor.
+    private var startBinding: Binding<TimeOfDay> {
+        Binding(
+            get: { hours.days.first(where: \.isEnabled)?.start ?? TimeOfDay(hour: 10, minute: 0) },
+            set: { value in
+                for index in hours.days.indices where hours.days[index].isEnabled {
+                    hours.days[index].start = value
+                }
+            }
+        )
+    }
+
+    private var endBinding: Binding<TimeOfDay> {
+        Binding(
+            get: { hours.days.first(where: \.isEnabled)?.end ?? TimeOfDay(hour: 18, minute: 0) },
+            set: { value in
+                for index in hours.days.indices where hours.days[index].isEnabled {
+                    hours.days[index].end = value
+                }
+            }
+        )
+    }
+}
+
+/// Hour and minute wheels, kept as a `TimeOfDay` rather than a `Date` so the
+/// value stays a wall-clock fact (see `TimeOfDay`).
+struct TimeOfDayPicker: View {
+
+    @Binding var time: TimeOfDay
+
+    var body: some View {
+        DatePicker(
+            "",
+            selection: Binding(
+                get: {
+                    Calendar.current.date(
+                        bySettingHour: time.hour, minute: time.minute, second: 0, of: Date()
+                    ) ?? Date()
+                },
+                set: { date in
+                    let parts = Calendar.current.dateComponents([.hour, .minute], from: date)
+                    time = TimeOfDay(hour: parts.hour ?? 0, minute: parts.minute ?? 0)
+                }
+            ),
+            displayedComponents: .hourAndMinute
+        )
+        .labelsHidden()
+    }
+}

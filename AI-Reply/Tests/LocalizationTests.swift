@@ -137,6 +137,21 @@ final class LocalizationTests: XCTestCase {
         }
     }
 
+    /// One pill serves everyone, so no phrase may speak for the user in one
+    /// gender («согласен» / «согласна»); the reply's wording follows the
+    /// profile instead.
+    func testQuickIntentPhrasesAreGenderNeutral() {
+        let gendered = ["согласен", "согласна", "готов ", "готова", "рад ", "рада", "смог", "смогла",
+                        "занят", "занята", "сделал", "сделала", "должен", "должна"]
+        let russian = AIReplyStrings.forLanguage(.russian)
+        let phrases = (russian.quickIntents + russian.compose.intents).map { $0.phrase.lowercased() + " " }
+        for phrase in phrases {
+            for word in gendered {
+                XCTAssertFalse(phrase.contains(word), "\(phrase) speaks for the user as one gender")
+            }
+        }
+    }
+
     // MARK: Language resolution
 
     func testAppLanguageMapsToTheRightLayoutVocabulary() {
@@ -186,12 +201,32 @@ final class LocalizationTests: XCTestCase {
         }
     }
 
+    /// Strings built in code follow the language chosen in the app, not the
+    /// phone's: whatever the simulator runs in, each choice reads its own.
+    func testCodeBuiltStringsFollowTheChosenLanguage() {
+        let settings = AppSettings(store: SharedSettings(defaults: UserDefaults(suiteName: "LocalizationTests.\(UUID())")!))
+        let expected: [AppLanguage: String] = [.english: "Continue", .russian: "Далее", .kazakh: "Әрі қарай"]
+        for (language, value) in expected {
+            settings.setLanguage(language)
+            XCTAssertEqual(settings.localized("onboarding.next"), value, language.rawValue)
+        }
+        settings.setLanguage(.russian)
+        XCTAssertEqual(String(format: settings.localized("onboarding.step"), 2, 5), "Шаг 2 из 5")
+    }
+
     /// Catches a key that was added to ru/kk by copying the English value.
     func testUserFacingScreensAreActuallyTranslated() throws {
         let suspects = [
             "setup.title", "setup.paste.body", "setup.fullAccess.why",
             "onboarding.keyboard.title", "onboarding.usage.title",
-            "profile.role", "profile.rules", "templates.section.style"
+            "onboarding.gender.title", "onboarding.fullAccess.prompt", "onboarding.practice.title",
+            "onboarding.sample.practice.incoming", "setup.status.keyboard.unknown",
+            "settings.smartCorrection", "settings.smartCorrection.footer", "settings.tutorial",
+            "profile.gender", "profile.gender.footer",
+            "profile.role", "profile.rules", "templates.section.style",
+            "settings.privacy.body", "home.privacy.body", "onboarding.fullAccess.warning",
+            "profile.replyLanguage.auto", "profile.replyLanguage.footer",
+            "voice.suggestions.title", "voice.suggestions.rules.footer", "voice.status.failed"
         ]
 
         func value(_ key: String, _ language: String) throws -> String {

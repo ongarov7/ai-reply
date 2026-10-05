@@ -138,6 +138,10 @@ struct AccountService: Sendable {
         var locale: String?
         var timezone: String?
         var onboarding_completed: Bool?
+        /// Only for a server that publishes `sender_profile`; an older one
+        /// rejects the whole update over an unknown field.
+        var grammatical_gender: String?
+        var onboarding_version: Int?
     }
 
     @discardableResult

@@ -1,7 +1,6 @@
 import AVFoundation
 import Speech
 import SwiftUI
-import UIKit
 
 /// The keyboard setup guide.
 ///
@@ -12,18 +11,12 @@ import UIKit
 /// HONESTY IS THE DESIGN CONSTRAINT HERE. iOS gives a containing app no public
 /// API that reports whether its own keyboard extension has been added, enabled
 /// or granted Full Access. `UITextInputMode.activeInputModes` lists languages,
-/// not extension identifiers. So this screen does not guess: the keyboard
-/// itself writes a timestamp and a Full Access flag into the App Group the
-/// first time it runs, and the checklist reports exactly that, including
-/// "we cannot tell yet" as a real state.
+/// not extension identifiers. So this screen does not guess: it reports what
+/// the keyboard itself said when it last ran (`KeyboardStatusMonitor`),
+/// including "we cannot tell yet" as a real state.
 struct KeyboardSetupView: View {
 
-    /// Onboarding presents this inside its own step, where the navigation bar
-    /// is not showing the screen's name. Pushed from Settings the bar already
-    /// carries it, so the lead paragraph stands alone.
-    var showsTitle = true
-
-    @State private var status = KeyboardStatus.current()
+    @Environment(KeyboardStatusMonitor.self) private var keyboard
     @State private var microphoneStatus = AVCaptureDevice.authorizationStatus(for: .audio)
     @State private var speechStatus = SFSpeechRecognizer.authorizationStatus()
     @Environment(\.scenePhase) private var scenePhase
@@ -47,14 +40,14 @@ struct KeyboardSetupView: View {
             .frame(maxWidth: .infinity)
         }
         .background(Color.dsBackground)
-        .navigationTitle(showsTitle ? "setup.title" : "")
+        .navigationTitle("setup.title")
         .navigationBarTitleDisplayMode(.inline)
         // Re-read on return from Settings: the user has usually just enabled
         // something, and the keyboard may have reported in since.
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { status = .current() }
+            if phase == .active { keyboard.refresh() }
         }
-        .onAppear { status = .current() }
+        .onAppear { keyboard.refresh() }
     }
 
     // MARK: Checklist
@@ -64,7 +57,7 @@ struct KeyboardSetupView: View {
             VStack(alignment: .leading, spacing: DS.Spacing.s) {
                 ChecklistRow(
                     title: "setup.checklist.added",
-                    state: status.isConfigured ? .done : .unknown
+                    state: keyboard.status.isEnabled ? .done : .unknown
                 )
                 ChecklistRow(
                     title: "setup.checklist.fullAccess",
@@ -78,7 +71,7 @@ struct KeyboardSetupView: View {
                     title: "setup.checklist.speech",
                     state: permissionState(speechStatus)
                 )
-                if !status.isConfigured {
+                if !keyboard.status.isEnabled {
                     Text("setup.checklist.unknown.footer")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
@@ -95,8 +88,11 @@ struct KeyboardSetupView: View {
     /// Full Access is only knowable once the keyboard has run at least once.
     /// Before that the honest answer is "not known yet", not "off".
     private var fullAccessState: ChecklistRow.State {
-        guard status.isConfigured else { return .unknown }
-        return status.hasFullAccess ? .done : .missing
+        switch keyboard.status.fullAccess {
+        case .on:      return .done
+        case .off:     return .missing
+        case .unknown: return .unknown
+        }
     }
 
     private func permissionState(_ status: AVAuthorizationStatus) -> ChecklistRow.State {
@@ -132,7 +128,7 @@ struct KeyboardSetupView: View {
         microphoneStatus = AVCaptureDevice.authorizationStatus(for: .audio)
         speechStatus = SFSpeechRecognizer.authorizationStatus()
         if microphoneStatus == .denied || speechStatus == .denied {
-            openSystemSettings()
+            OpenKeyboardSettingsButton.openSystemSettings()
         }
     }
 
@@ -147,10 +143,7 @@ struct KeyboardSetupView: View {
                 // keyboards, with the Full Access switch. That is the short
                 // path the steps describe; the footer keeps the long one
                 // (General ▸ Keyboard) for anyone who does not see it.
-                Button(action: openSystemSettings) {
-                    Label("home.keyboard.openSettings", systemImage: "keyboard")
-                }
-                .buttonStyle(.dsPrimary)
+                OpenKeyboardSettingsButton()
                 Text("setup.steps.footer")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -190,11 +183,6 @@ struct KeyboardSetupView: View {
             }
             .dsCard()
         }
-    }
-
-    private func openSystemSettings() {
-        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
-        UIApplication.shared.open(url)
     }
 }
 
