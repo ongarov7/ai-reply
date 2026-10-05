@@ -143,8 +143,11 @@ func TestReplyLanguagePreferenceReachesThePrompt(t *testing.T) {
 		if res := send(value); res.status != http.StatusOK {
 			t.Fatalf("%q: %d %s", value, res.status, res.raw)
 		}
-		if strings.Contains(h.provider.lastDeveloper, "LANGUAGE PREFERENCE") {
+		if strings.Contains(h.provider.lastDeveloper, "always wants replies in") {
 			t.Fatalf("%q must fall back to the language of the incoming message", value)
+		}
+		if !strings.Contains(h.provider.lastDeveloper, "Write the reply in English, the language of the incoming message") {
+			t.Fatalf("%q: the reply must follow the incoming message", value)
 		}
 	}
 }

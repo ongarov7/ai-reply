@@ -152,12 +152,16 @@ func (s *Store) Profile(ctx context.Context, userID string) (domain.Profile, err
 	)
 	err := s.db.Reader().QueryRowContext(ctx, `
 		SELECT user_id, display_name, role, description, preferred_tone, business_offering,
-		       business_summary, business_rules, onboarding_completed, updated_at
+		       business_summary, business_rules, onboarding_completed, grammatical_gender,
+		       onboarding_version, updated_at
 		FROM user_profiles WHERE user_id = ?`, userID).
 		Scan(&p.UserID, &p.DisplayName, &p.Role, &p.Description, &p.PreferredTone,
-			&p.BusinessOffering, &p.BusinessSummary, &rules, &done, &updated)
+			&p.BusinessOffering, &p.BusinessSummary, &rules, &done, &p.GrammaticalGender,
+			&p.OnboardingVersion, &updated)
 	if errors.Is(err, sql.ErrNoRows) {
-		return domain.Profile{UserID: userID, PreferredTone: "natural"}, nil
+		// Кесте әдепкі мәндерімен бірдей.
+		return domain.Profile{UserID: userID, PreferredTone: "natural",
+			GrammaticalGender: domain.GenderUnspecified}, nil
 	}
 	if err != nil {
 		return domain.Profile{}, err
@@ -178,11 +182,17 @@ func (s *Store) SaveProfile(ctx context.Context, p domain.Profile) error {
 	if p.OnboardingCompleted {
 		done = 1
 	}
+	// Бағанда тек рұқсат етілген мән тұрады (бос профиль де 'unspecified').
+	gender := p.GrammaticalGender
+	if !domain.IsGrammaticalGender(gender) {
+		gender = domain.GenderUnspecified
+	}
 	_, err = s.db.Writer().ExecContext(ctx, `
 		INSERT INTO user_profiles (user_id, display_name, role, description, preferred_tone,
 		                           business_offering, business_summary, business_rules,
-		                           onboarding_completed, updated_at)
-		VALUES (?,?,?,?,?,?,?,?,?,?)
+		                           onboarding_completed, grammatical_gender, onboarding_version,
+		                           updated_at)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
 		ON CONFLICT (user_id) DO UPDATE SET
 			display_name = excluded.display_name,
 			role = excluded.role,
@@ -192,9 +202,11 @@ func (s *Store) SaveProfile(ctx context.Context, p domain.Profile) error {
 			business_summary = excluded.business_summary,
 			business_rules = excluded.business_rules,
 			onboarding_completed = excluded.onboarding_completed,
+			grammatical_gender = excluded.grammatical_gender,
+			onboarding_version = excluded.onboarding_version,
 			updated_at = excluded.updated_at`,
 		p.UserID, p.DisplayName, p.Role, p.Description, p.PreferredTone, p.BusinessOffering,
-		p.BusinessSummary, string(rules), done, ms(time.Now()))
+		p.BusinessSummary, string(rules), done, gender, p.OnboardingVersion, ms(time.Now()))
 	return err
 }
 

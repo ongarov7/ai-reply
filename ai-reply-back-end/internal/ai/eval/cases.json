@@ -1,0 +1,565 @@
+[
+  {
+    "id": "ru-friend-decline-male",
+    "mode": "reply",
+    "incoming": "Привет! Идём в субботу на футбол?",
+    "instruction": "Скажи что в субботу не могу, работаю",
+    "template_id": "friend",
+    "gender": "male",
+    "input_language": "ru",
+    "expectations": {
+      "language": "ru", "gender_agreement": true, "no_meta": true, "max_sentences": 3, "max_chars": 200,
+      "must_include_any": ["не смогу", "не могу", "не получится", "не выйдет", "никак"],
+      "must_not_include": ["являться", "иметь возможность"], "no_digits": true, "formality": "informal"
+    }
+  },
+  {
+    "id": "ru-client-price-unknown",
+    "mode": "reply",
+    "incoming": "Здравствуйте! Сколько стоит доставка в Караганду?",
+    "instruction": "",
+    "template_id": "client",
+    "gender": "unspecified",
+    "input_language": "ru",
+    "expectations": {
+      "language": "ru", "gender_agreement": true, "no_meta": true, "max_sentences": 3, "max_chars": 260,
+      "must_include_any": ["уточн", "провер", "узна", "сообщ", "напиш", "подскаж"],
+      "no_digits": true, "formality": "formal"
+    }
+  },
+  {
+    "id": "ru-business-reschedule-female",
+    "mode": "reply",
+    "incoming": "Добрый день! Можем перенести встречу на четверг?",
+    "instruction": "Согласись, удобно в четверг после 15:00",
+    "template_id": "business",
+    "gender": "female",
+    "input_language": "ru",
+    "expectations": {
+      "language": "ru", "gender_agreement": true, "no_meta": true, "max_sentences": 3, "max_chars": 220,
+      "must_include_any": ["15:00"], "must_not_include": ["являться", "в настоящее время"], "formality": "formal"
+    }
+  },
+  {
+    "id": "ru-work-decline-male",
+    "mode": "reply",
+    "incoming": "Сможешь сегодня задержаться и доделать отчёт?",
+    "instruction": "Откажи, сегодня никак, завтра утром доделаю",
+    "template_id": "work",
+    "gender": "male",
+    "input_language": "ru",
+    "expectations": {
+      "language": "ru", "gender_agreement": true, "no_meta": true, "max_sentences": 3, "max_chars": 220,
+      "must_include_any": ["не смогу", "не получится", "не могу", "никак", "не выйдет", "к сожалению"],
+      "no_digits": true, "formality": "informal", "no_question_if_decline": true
+    }
+  },
+  {
+    "id": "ru-friend-agree-female",
+    "mode": "reply",
+    "incoming": "Пойдём завтра в кино на 19:30?",
+    "instruction": "Согласись",
+    "template_id": "friend",
+    "gender": "female",
+    "input_language": "ru",
+    "expectations": {
+      "language": "ru", "gender_agreement": true, "no_meta": true, "max_sentences": 2, "max_chars": 140,
+      "must_include_any": ["да", "давай", "конечно", "с удовольствием", "пойдём", "пойдем", "идём", "идем", "отлично", "супер"],
+      "formality": "informal"
+    }
+  },
+  {
+    "id": "ru-client-question-male",
+    "mode": "reply",
+    "incoming": "Подскажите, вы работаете в воскресенье?",
+    "instruction": "Скажи что в воскресенье выходной, работаем с понедельника с 10:00",
+    "template_id": "client",
+    "gender": "male",
+    "input_language": "ru",
+    "expectations": {
+      "language": "ru", "gender_agreement": true, "no_meta": true, "max_sentences": 3, "max_chars": 220,
+      "must_include_any": ["10:00"], "formality": "formal"
+    }
+  },
+  {
+    "id": "ru-friend-thanks-unspecified",
+    "mode": "reply",
+    "incoming": "Спасибо огромное, всё получилось!",
+    "instruction": "",
+    "template_id": "friend",
+    "gender": "unspecified",
+    "input_language": "ru",
+    "expectations": {
+      "language": "ru", "gender_agreement": true, "no_meta": true, "max_sentences": 2, "max_chars": 120,
+      "no_digits": true
+    }
+  },
+  {
+    "id": "ru-business-confirm-unspecified",
+    "mode": "reply",
+    "incoming": "Подтвердите, пожалуйста, что получили документы.",
+    "instruction": "Подтверди что получил",
+    "template_id": "business",
+    "gender": "unspecified",
+    "input_language": "ru",
+    "expectations": {
+      "language": "ru", "gender_agreement": true, "no_meta": true, "max_sentences": 2, "max_chars": 160,
+      "must_include_any": ["получ", "да", "подтвержд"], "no_digits": true, "formality": "formal"
+    }
+  },
+  {
+    "id": "ru-friend-weekend-male",
+    "mode": "reply",
+    "incoming": "Ну что, как выходные прошли?",
+    "instruction": "Скажи что отлично съездил на озеро",
+    "template_id": "friend",
+    "gender": "male",
+    "input_language": "ru",
+    "expectations": {
+      "language": "ru", "gender_agreement": true, "no_meta": true, "max_sentences": 3, "max_chars": 180,
+      "must_include_any": ["озер"], "formality": "informal"
+    }
+  },
+  {
+    "id": "ru-client-order-female",
+    "mode": "reply",
+    "incoming": "Добрый вечер. Можно ли оформить заказ на завтра?",
+    "instruction": "Да, можно, оформлю сама",
+    "template_id": "client",
+    "gender": "female",
+    "input_language": "ru",
+    "expectations": {
+      "language": "ru", "gender_agreement": true, "no_meta": true, "max_sentences": 3, "max_chars": 200,
+      "must_include_any": ["да", "конечно", "можно"], "no_digits": true, "formality": "formal"
+    }
+  },
+  {
+    "id": "ru-word-order-photo",
+    "mode": "reply",
+    "incoming": "Ты сможешь завтра прислать фото?",
+    "instruction": "Обязательно пришлю завтра утром",
+    "template_id": "friend",
+    "gender": "unspecified",
+    "input_language": "ru",
+    "expectations": {
+      "language": "ru", "gender_agreement": true, "no_meta": true, "max_sentences": 2, "max_chars": 120,
+      "must_include_any": ["пришлю", "отправлю", "скину"],
+      "must_not_include": ["являться", "иметь возможность", "осуществ", "в настоящее время", "данный"],
+      "no_digits": true, "formality": "informal"
+    }
+  },
+  {
+    "id": "ru-business-discount-officialese",
+    "mode": "reply",
+    "incoming": "Здравствуйте! Есть ли у вас возможность сделать скидку при заказе от 10 штук?",
+    "instruction": "Скажи что скидку дадим, процент уточню",
+    "template_id": "business",
+    "gender": "male",
+    "input_language": "ru",
+    "expectations": {
+      "language": "ru", "gender_agreement": true, "no_meta": true, "max_sentences": 3, "max_chars": 240,
+      "must_include_any": ["скидк"],
+      "must_not_include": ["иметь возможность", "имеем возможность", "являться", "является", "осуществ", "данный", "%"],
+      "formality": "formal"
+    }
+  },
+  {
+    "id": "ru-friend-time-female",
+    "mode": "reply",
+    "incoming": "Во сколько завтра встречаемся?",
+    "instruction": "В 18:00 у входа в ТРЦ",
+    "template_id": "friend",
+    "gender": "female",
+    "input_language": "ru",
+    "expectations": {
+      "language": "ru", "gender_agreement": true, "no_meta": true, "max_sentences": 2, "max_chars": 120,
+      "must_include_any": ["18:00"], "formality": "informal"
+    }
+  },
+  {
+    "id": "kk-friend-agree",
+    "mode": "reply",
+    "incoming": "Сәлем! Бүгін кешке кинотеатрға барамыз ба?",
+    "instruction": "Келісемін де",
+    "template_id": "friend",
+    "gender": "male",
+    "input_language": "kk",
+    "expectations": {
+      "language": "kk", "kazakh_letters": true, "no_meta": true, "max_sentences": 2, "max_chars": 140,
+      "must_include_any": ["иә", "әрине", "жарайды", "барамыз", "келісемін", "болады", "кеттік"],
+      "formality": "informal"
+    }
+  },
+  {
+    "id": "kk-client-delivery-formal",
+    "mode": "reply",
+    "incoming": "Сәлеметсіз бе! Тапсырысым қашан жетеді?",
+    "instruction": "Ертең түске дейін жеткіземіз деп айт",
+    "template_id": "client",
+    "gender": "female",
+    "input_language": "kk",
+    "expectations": {
+      "language": "kk", "kazakh_letters": true, "no_meta": true, "max_sentences": 3, "max_chars": 200,
+      "must_include_any": ["ертең"], "no_digits": true, "formality": "formal"
+    }
+  },
+  {
+    "id": "kk-business-meeting-time",
+    "mode": "reply",
+    "incoming": "Қайырлы күн! Келісімшартты бүгін талқылай аламыз ба?",
+    "instruction": "Бүгін болмайды, ертең сағат 11:00-де ыңғайлы",
+    "template_id": "business",
+    "gender": "unspecified",
+    "input_language": "kk",
+    "expectations": {
+      "language": "kk", "kazakh_letters": true, "no_meta": true, "max_sentences": 3, "max_chars": 220,
+      "must_include_any": ["11:00"], "must_not_include": ["болып табыл", "жүзеге асыр"], "formality": "formal"
+    }
+  },
+  {
+    "id": "kk-short-thanks",
+    "mode": "reply",
+    "incoming": "Рақмет!",
+    "instruction": "",
+    "template_id": "friend",
+    "gender": "unspecified",
+    "input_language": "kk",
+    "expectations": {
+      "language": "kk", "kazakh_letters": true, "no_meta": true, "max_sentences": 2, "max_chars": 60, "no_digits": true
+    }
+  },
+  {
+    "id": "kk-work-suffixes",
+    "mode": "reply",
+    "incoming": "Ертең жұмысқа келесің бе?",
+    "instruction": "Иә, келемін, бірақ сәл кешігемін",
+    "template_id": "work",
+    "gender": "male",
+    "input_language": "kk",
+    "expectations": {
+      "language": "kk", "kazakh_letters": true, "no_meta": true, "max_sentences": 2, "max_chars": 140,
+      "must_include_any": ["келем", "барам"], "formality": "informal"
+    }
+  },
+  {
+    "id": "kk-typed-without-letters",
+    "mode": "reply",
+    "incoming": "Калайсын? Ертен келесин бе?",
+    "instruction": "",
+    "template_id": "friend",
+    "gender": "female",
+    "input_language": "kk",
+    "expectations": {
+      "language": "kk", "kazakh_letters": true, "no_meta": true, "max_sentences": 3, "max_chars": 160
+    }
+  },
+  {
+    "id": "kk-business-decline-formal",
+    "mode": "reply",
+    "incoming": "Сәлеметсіз бе, бүгін кездесуге келе аласыз ба?",
+    "instruction": "Бүгін келе алмаймын деп сыпайы айт",
+    "template_id": "business",
+    "gender": "female",
+    "input_language": "kk",
+    "expectations": {
+      "language": "kk", "kazakh_letters": true, "no_meta": true, "max_sentences": 3, "max_chars": 200,
+      "must_include_any": ["алмаймын", "мүмкіндігім жоқ", "болмайды", "өкінішке"],
+      "formality": "formal", "no_question_if_decline": true
+    }
+  },
+  {
+    "id": "en-friend-dinner",
+    "mode": "reply",
+    "incoming": "Hey! Want to grab dinner this weekend?",
+    "instruction": "Say yes, Saturday works",
+    "template_id": "friend",
+    "gender": "male",
+    "input_language": "en",
+    "expectations": {
+      "language": "en", "no_meta": true, "max_sentences": 2, "max_chars": 140,
+      "must_include_any": ["saturday"],
+      "must_not_include": ["I hope this message finds you well", "Certainly!", "don't hesitate"]
+    }
+  },
+  {
+    "id": "en-business-proposal",
+    "mode": "reply",
+    "incoming": "Hi, could you send the updated proposal by Friday?",
+    "instruction": "Yes, will send by Friday afternoon",
+    "template_id": "business",
+    "gender": "female",
+    "input_language": "en",
+    "expectations": {
+      "language": "en", "no_meta": true, "max_sentences": 3, "max_chars": 200,
+      "must_include_any": ["friday"],
+      "must_not_include": ["I hope this message finds you well", "don't hesitate", "Certainly!"], "no_digits": true
+    }
+  },
+  {
+    "id": "en-short-thanks",
+    "mode": "reply",
+    "incoming": "Thanks a lot!",
+    "instruction": "",
+    "template_id": "friend",
+    "gender": "unspecified",
+    "input_language": "en",
+    "expectations": {
+      "language": "en", "no_meta": true, "max_sentences": 2, "max_chars": 60, "no_digits": true
+    }
+  },
+  {
+    "id": "en-work-decline",
+    "mode": "reply",
+    "incoming": "Can you cover my shift tomorrow?",
+    "instruction": "Decline, I have plans",
+    "template_id": "work",
+    "gender": "male",
+    "input_language": "en",
+    "expectations": {
+      "language": "en", "no_meta": true, "max_sentences": 2, "max_chars": 160,
+      "must_include_any": ["can't", "cannot", "can’t", "won't be able", "unable", "sorry"],
+      "no_digits": true, "no_question_if_decline": true
+    }
+  },
+  {
+    "id": "en-client-agree",
+    "mode": "reply",
+    "incoming": "Is it possible to deliver the order on Monday?",
+    "instruction": "Agree",
+    "template_id": "client",
+    "gender": "female",
+    "input_language": "en",
+    "expectations": {
+      "language": "en", "no_meta": true, "max_sentences": 2, "max_chars": 160,
+      "must_include_any": ["yes", "sure", "of course", "absolutely", "monday works"], "no_digits": true
+    }
+  },
+  {
+    "id": "kk-incoming-ru-quick-action",
+    "mode": "reply",
+    "incoming": "Бүгін кешке кездесеміз бе?",
+    "instruction": "Ответь согласием.",
+    "template_id": "friend",
+    "gender": "unspecified",
+    "input_language": "ru",
+    "app_language": "ru",
+    "expectations": {
+      "language": "kk", "kazakh_letters": true, "no_meta": true, "max_sentences": 2, "max_chars": 120,
+      "must_include_any": ["иә", "әрине", "болады", "жарайды", "келістік", "кездесеміз", "кездесейік", "келісемін"]
+    }
+  },
+  {
+    "id": "kk-plain-incoming-ru-instruction",
+    "mode": "reply",
+    "incoming": "Калайсын? Ертен жумыска келесин бе?",
+    "instruction": "Скажи, что всё хорошо и завтра приду",
+    "template_id": "work",
+    "gender": "male",
+    "input_language": "ru",
+    "app_language": "ru",
+    "expectations": {
+      "language": "kk", "kazakh_letters": true, "no_meta": true, "max_sentences": 3, "max_chars": 160,
+      "must_include_any": ["жақсы", "ертең", "келем", "барам"]
+    }
+  },
+  {
+    "id": "kk-short-plain-ru-phone",
+    "mode": "reply",
+    "incoming": "Кайдасын?",
+    "instruction": "Скажи, что уже еду",
+    "template_id": "friend",
+    "gender": "female",
+    "input_language": "ru",
+    "app_language": "ru",
+    "expectations": {
+      "language": "kk", "kazakh_letters": true, "no_meta": true, "max_sentences": 2, "max_chars": 80,
+      "must_include_any": ["жолда", "келе жатырмын", "барамын", "барам", "шықтым", "келем"]
+    }
+  },
+  {
+    "id": "kk-mixed-with-russian",
+    "mode": "reply",
+    "incoming": "Сәлем, как дела? Ертең келесің бе?",
+    "instruction": "",
+    "template_id": "friend",
+    "gender": "male",
+    "input_language": "ru",
+    "app_language": "ru",
+    "expectations": {
+      "language": "kk", "kazakh_letters": true, "no_meta": true, "max_sentences": 3, "max_chars": 160
+    }
+  },
+  {
+    "id": "ru-incoming-kk-phone",
+    "mode": "reply",
+    "incoming": "Привет! Ты сегодня придёшь на ужин?",
+    "instruction": "Келемін де",
+    "template_id": "friend",
+    "gender": "male",
+    "input_language": "kk",
+    "app_language": "kk",
+    "expectations": {
+      "language": "ru", "gender_agreement": true, "no_meta": true, "max_sentences": 2, "max_chars": 120,
+      "must_include_any": ["приду", "буду", "да", "конечно", "обязательно"], "formality": "informal"
+    }
+  },
+  {
+    "id": "en-incoming-ru-phone",
+    "mode": "reply",
+    "incoming": "Hey, are you coming to the party tonight?",
+    "instruction": "Согласись",
+    "template_id": "friend",
+    "gender": "unspecified",
+    "input_language": "ru",
+    "app_language": "ru",
+    "expectations": {
+      "language": "en", "no_meta": true, "max_sentences": 2, "max_chars": 120,
+      "must_include_any": ["yes", "yeah", "sure", "of course", "definitely", "count me in", "i'll be there", "i’ll be there"]
+    }
+  },
+  {
+    "id": "kk-incoming-explicit-ru",
+    "mode": "reply",
+    "incoming": "Ертең жиналысқа келесің бе?",
+    "instruction": "Ответь на русском, что приду",
+    "template_id": "work",
+    "gender": "female",
+    "input_language": "kk",
+    "app_language": "kk",
+    "expectations": {
+      "language": "ru", "gender_agreement": true, "no_meta": true, "max_sentences": 2, "max_chars": 100,
+      "must_include_any": ["приду", "буду"]
+    }
+  },
+  {
+    "id": "ru-compose-birthday-female",
+    "mode": "compose",
+    "incoming": "",
+    "instruction": "Поздравь коллегу Айгерим с днём рождения, тепло и коротко",
+    "template_id": "",
+    "gender": "female",
+    "input_language": "ru",
+    "expectations": {
+      "language": "ru", "gender_agreement": true, "no_meta": true, "max_sentences": 5, "max_chars": 400,
+      "must_include_any": ["айгерим"], "must_not_include": ["[", "являться"]
+    }
+  },
+  {
+    "id": "kk-compose-teacher-thanks",
+    "mode": "compose",
+    "incoming": "",
+    "instruction": "Мұғалімге алғыс жаз, қысқа әрі сыпайы",
+    "template_id": "",
+    "gender": "unspecified",
+    "input_language": "kk",
+    "expectations": {
+      "language": "kk", "kazakh_letters": true, "no_meta": true, "max_sentences": 5, "max_chars": 400,
+      "formality": "formal", "no_digits": true
+    }
+  },
+  {
+    "id": "en-compose-announcement",
+    "mode": "compose",
+    "incoming": "",
+    "instruction": "Tell the team the meeting moves to 3 pm on Thursday",
+    "template_id": "",
+    "gender": "unspecified",
+    "input_language": "en",
+    "expectations": {
+      "language": "en", "no_meta": true, "max_sentences": 4, "max_chars": 300,
+      "must_include_any": ["3 pm", "3pm", "3:00", "15:00", "3 p.m."],
+      "must_not_include": ["I hope this message finds you well", "[", "Certainly!"]
+    }
+  },
+  {
+    "id": "ru-compose-decline-male",
+    "mode": "compose",
+    "incoming": "",
+    "instruction": "Вежливо откажись от приглашения на свадьбу, я буду в командировке",
+    "template_id": "",
+    "gender": "male",
+    "input_language": "ru",
+    "expectations": {
+      "language": "ru", "gender_agreement": true, "no_meta": true, "max_sentences": 5, "max_chars": 450,
+      "must_include_any": ["командировк"], "must_not_include": ["являться", "иметь возможность"], "no_digits": true
+    }
+  },
+  {
+    "id": "acc-a-ru-hope-female",
+    "mode": "reply",
+    "incoming": "Надеюсь, теперь будем чаще общаться",
+    "instruction": "",
+    "template_id": "friend",
+    "gender": "female",
+    "input_language": "ru",
+    "expectations": {
+      "language": "ru", "gender_agreement": true, "no_meta": true, "max_sentences": 2, "max_chars": 120,
+      "must_not_include": ["иметь возможность", "являться", "более часто"], "no_digits": true
+    }
+  },
+  {
+    "id": "acc-b-ru-free-male",
+    "mode": "reply",
+    "incoming": "Ты завтра свободен?",
+    "instruction": "Скажи что вечером свободен",
+    "template_id": "friend",
+    "gender": "male",
+    "input_language": "ru",
+    "expectations": {
+      "language": "ru", "gender_agreement": true, "no_meta": true, "max_sentences": 2, "max_chars": 100,
+      "must_include_any": ["вечер"], "must_not_include": ["являться", "являюсь", "иметь возможность"],
+      "no_digits": true, "formality": "informal"
+    }
+  },
+  {
+    "id": "acc-c-ru-thanks-female",
+    "mode": "reply",
+    "incoming": "Спасибо за помощь!",
+    "instruction": "",
+    "template_id": "friend",
+    "gender": "female",
+    "input_language": "ru",
+    "expectations": {
+      "language": "ru", "gender_agreement": true, "no_meta": true, "max_sentences": 2, "max_chars": 80, "no_digits": true
+    }
+  },
+  {
+    "id": "acc-c-ru-thanks-male",
+    "mode": "reply",
+    "incoming": "Спасибо за помощь!",
+    "instruction": "",
+    "template_id": "friend",
+    "gender": "male",
+    "input_language": "ru",
+    "expectations": {
+      "language": "ru", "gender_agreement": true, "no_meta": true, "max_sentences": 2, "max_chars": 80, "no_digits": true
+    }
+  },
+  {
+    "id": "acc-d-kk-evening",
+    "mode": "reply",
+    "incoming": "Ертең кездесуге уақытың бар ма?",
+    "instruction": "Кешке бос екенімді айт",
+    "template_id": "friend",
+    "gender": "unspecified",
+    "input_language": "kk",
+    "expectations": {
+      "language": "kk", "kazakh_letters": true, "no_meta": true, "max_sentences": 2, "max_chars": 100,
+      "must_include_any": ["кешке", "кеште"], "must_not_include": ["болып табыл", "жүзеге асыр"], "formality": "informal"
+    }
+  },
+  {
+    "id": "acc-e-en-meeting",
+    "mode": "reply",
+    "incoming": "Can we move the meeting to tomorrow?",
+    "instruction": "",
+    "template_id": "business",
+    "gender": "unspecified",
+    "input_language": "en",
+    "expectations": {
+      "language": "en", "no_meta": true, "max_sentences": 2, "max_chars": 140,
+      "must_include_any": ["yes", "sure", "tomorrow works", "works for me", "of course"],
+      "must_not_include": ["I hope this message finds you well", "Certainly", "don't hesitate"], "no_digits": true
+    }
+  }
+]

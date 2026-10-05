@@ -80,19 +80,33 @@ func (s *Store) RefundQuota(ctx context.Context, userID, date, month string) err
 }
 
 // AddTokens — сәтті сұраныстың токен/құн метадерегі.
+//
+// Upsert, not UPDATE: a polish request reserves no quota, so the day's row
+// may not exist yet, and its tokens must still be counted. `used` is never
+// touched here — only ReserveQuota and RefundQuota move it.
 func (s *Store) AddTokens(ctx context.Context, userID, date, month string, in, out int, costMicros int64) error {
 	now := ms(time.Now())
 	return s.db.Tx(ctx, func(tx *sql.Tx) error {
 		if _, err := tx.ExecContext(ctx, `
-			UPDATE usage_daily SET input_tokens = input_tokens + ?, output_tokens = output_tokens + ?,
-			       cost_micros = cost_micros + ?, updated_at = ?
-			WHERE user_id = ? AND usage_date = ?`, in, out, costMicros, now, userID, date); err != nil {
+			INSERT INTO usage_daily (user_id, usage_date, used, input_tokens, output_tokens, cost_micros, updated_at)
+			VALUES (?, ?, 0, ?, ?, ?, ?)
+			ON CONFLICT (user_id, usage_date) DO UPDATE SET
+				input_tokens = input_tokens + excluded.input_tokens,
+				output_tokens = output_tokens + excluded.output_tokens,
+				cost_micros = cost_micros + excluded.cost_micros,
+				updated_at = excluded.updated_at`,
+			userID, date, in, out, costMicros, now); err != nil {
 			return err
 		}
 		_, err := tx.ExecContext(ctx, `
-			UPDATE usage_monthly SET input_tokens = input_tokens + ?, output_tokens = output_tokens + ?,
-			       cost_micros = cost_micros + ?, updated_at = ?
-			WHERE user_id = ? AND usage_month = ?`, in, out, costMicros, now, userID, month)
+			INSERT INTO usage_monthly (user_id, usage_month, used, input_tokens, output_tokens, cost_micros, updated_at)
+			VALUES (?, ?, 0, ?, ?, ?, ?)
+			ON CONFLICT (user_id, usage_month) DO UPDATE SET
+				input_tokens = input_tokens + excluded.input_tokens,
+				output_tokens = output_tokens + excluded.output_tokens,
+				cost_micros = cost_micros + excluded.cost_micros,
+				updated_at = excluded.updated_at`,
+			userID, month, in, out, costMicros, now)
 		return err
 	})
 }
@@ -128,11 +142,11 @@ func (s *Store) InsertUsageEvent(ctx context.Context, e domain.UsageEvent) error
 	_, err := s.db.Writer().ExecContext(ctx, `
 		INSERT INTO ai_usage_events (id, user_id, device_id, plan_id, model, status, error_code,
 			input_tokens, output_tokens, total_tokens, cost_micros, latency_ms, provider_ms,
-			platform, app_version, language, source_chars, mode, created_at)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			platform, app_version, language, source_chars, mode, prompt_version, created_at)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		e.ID, e.UserID, e.DeviceID, e.PlanID, e.Model, e.Status, e.ErrorCode,
 		e.InputTokens, e.OutputTokens, e.TotalTokens, e.CostMicros, e.LatencyMS, e.ProviderMS,
-		e.Platform, e.AppVersion, e.Language, e.SourceChars, e.Mode, ms(e.CreatedAt))
+		e.Platform, e.AppVersion, e.Language, e.SourceChars, e.Mode, e.PromptVersion, ms(e.CreatedAt))
 	return err
 }
 
@@ -193,13 +207,15 @@ func (s *Store) Stats(ctx context.Context, from, to time.Time, today string) (St
 		`SELECT COALESCE(SUM(used),0) FROM usage_daily WHERE usage_date = ?`, today).Scan(&st.RequestsToday); err != nil {
 		return st, err
 	}
+	// Polish (нұсқауды түзету) — генерация емес: санға да, кідіріске де
+	// кірмейді, бірақ токен мен құн шынайы шығын болғандықтан есептеледі.
 	if err := r.QueryRowContext(ctx, `
-		SELECT COUNT(*),
+		SELECT COALESCE(SUM(CASE WHEN mode <> 'polish' THEN 1 ELSE 0 END),0),
 		       COALESCE(SUM(input_tokens),0), COALESCE(SUM(output_tokens),0),
 		       COALESCE(SUM(total_tokens),0), COALESCE(SUM(cost_micros),0),
-		       COALESCE(SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END),0),
-		       COALESCE(SUM(CASE WHEN status <> 'success' THEN 1 ELSE 0 END),0),
-		       COALESCE(CAST(AVG(latency_ms) AS INTEGER),0)
+		       COALESCE(SUM(CASE WHEN mode <> 'polish' AND status = 'success' THEN 1 ELSE 0 END),0),
+		       COALESCE(SUM(CASE WHEN mode <> 'polish' AND status <> 'success' THEN 1 ELSE 0 END),0),
+		       COALESCE(CAST(AVG(CASE WHEN mode <> 'polish' THEN latency_ms END) AS INTEGER),0)
 		FROM ai_usage_events WHERE created_at BETWEEN ? AND ?`, ms(from), ms(to)).
 		Scan(&st.RequestsMonth, &st.InputTokens, &st.OutputTokens, &st.TotalTokens, &st.CostMicros,
 			&st.Succeeded, &st.Failed, &st.AvgLatencyMS); err != nil {
@@ -228,11 +244,12 @@ func (s *Store) SeriesRegistrations(ctx context.Context, from, to time.Time) ([]
 		GROUP BY 1 ORDER BY 1`, from, to)
 }
 
-// SeriesGenerations — күндік генерация саны.
+// SeriesGenerations — күндік генерация саны (жауап пен жаңа хабарлама; polish емес).
 func (s *Store) SeriesGenerations(ctx context.Context, from, to time.Time) ([]Point, error) {
 	return s.series(ctx, `
 		SELECT strftime('%Y-%m-%d', created_at/1000, 'unixepoch'), COUNT(*)
-		FROM ai_usage_events WHERE created_at BETWEEN ? AND ? AND status = 'success'
+		FROM ai_usage_events
+		WHERE created_at BETWEEN ? AND ? AND status = 'success' AND mode <> 'polish'
 		GROUP BY 1 ORDER BY 1`, from, to)
 }
 
@@ -317,7 +334,7 @@ func (s *Store) UserEvents(ctx context.Context, userID string, limit int) ([]dom
 	rows, err := s.db.Reader().QueryContext(ctx, `
 		SELECT id, user_id, device_id, plan_id, model, status, error_code, input_tokens, output_tokens,
 		       total_tokens, cost_micros, latency_ms, provider_ms, platform, app_version, language,
-		       source_chars, mode, created_at
+		       source_chars, mode, prompt_version, created_at
 		FROM ai_usage_events WHERE user_id = ? ORDER BY created_at DESC LIMIT ?`, userID, limit)
 	if err != nil {
 		return nil, err
@@ -329,7 +346,7 @@ func (s *Store) UserEvents(ctx context.Context, userID string, limit int) ([]dom
 		var created int64
 		if err := rows.Scan(&e.ID, &e.UserID, &e.DeviceID, &e.PlanID, &e.Model, &e.Status, &e.ErrorCode,
 			&e.InputTokens, &e.OutputTokens, &e.TotalTokens, &e.CostMicros, &e.LatencyMS, &e.ProviderMS,
-			&e.Platform, &e.AppVersion, &e.Language, &e.SourceChars, &e.Mode, &created); err != nil {
+			&e.Platform, &e.AppVersion, &e.Language, &e.SourceChars, &e.Mode, &e.PromptVersion, &created); err != nil {
 			return nil, err
 		}
 		e.CreatedAt = timeFrom(created)

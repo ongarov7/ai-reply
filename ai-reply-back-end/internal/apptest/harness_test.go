@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -26,6 +27,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/notifications"
 	"github.com/aireply/ai-reply-back-end/internal/payments"
 	"github.com/aireply/ai-reply-back-end/internal/plans"
+	"github.com/aireply/ai-reply-back-end/internal/productevents"
 	"github.com/aireply/ai-reply-back-end/internal/repository"
 	"github.com/aireply/ai-reply-back-end/internal/simulator"
 	"github.com/aireply/ai-reply-back-end/internal/subscriptions"
@@ -40,9 +42,13 @@ import (
 
 // fakeProvider — тестте нақты OpenAI орнына.
 type fakeProvider struct {
-	reply         string
+	mu    sync.Mutex
+	reply string
+	// replies — кезекпен қайтарылатын жауаптар; біткенде reply қолданылады.
+	replies       []string
 	err           error
 	calls         int
+	prompts       []ai.Prompt
 	lastUser      string
 	lastDeveloper string
 	lastMaxTokens int
@@ -52,15 +58,22 @@ func (f *fakeProvider) Name() string  { return "fake" }
 func (f *fakeProvider) Model() string { return "test-model" }
 
 func (f *fakeProvider) Generate(_ context.Context, prompt ai.Prompt) (ai.Completion, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.calls++
+	f.prompts = append(f.prompts, prompt)
 	f.lastUser = prompt.User
 	f.lastDeveloper = prompt.Developer
 	f.lastMaxTokens = prompt.MaxOutputTokens
 	if f.err != nil {
 		return ai.Completion{}, f.err
 	}
+	text := f.reply
+	if len(f.replies) > 0 {
+		text, f.replies = f.replies[0], f.replies[1:]
+	}
 	return ai.Completion{
-		Text: f.reply, Model: "test-model", InputTokens: 120, OutputTokens: 40, ProviderMS: 12,
+		Text: text, Model: "test-model", InputTokens: 120, OutputTokens: 40, ProviderMS: 12,
 	}, nil
 }
 
@@ -112,6 +125,9 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 		"LOG_LEVEL": "info", "LOG_FORMAT": "json", "RATE_AI_PER_MINUTE": "1000",
 		"RATE_OTP_REQUEST_PER_HOUR": "100", "RATE_OTP_VERIFY_PER_HOUR": "200",
 		"RATE_GENERIC_PER_MINUTE": "1000", "OTP_MAX_ATTEMPTS": "5",
+		// The fake provider answers the same text to every prompt, so the
+		// language check would "repair" most of them. Repair tests switch it on.
+		"AI_REPAIR_ENABLED": "false",
 	}
 	for _, opt := range opts {
 		opt(env)
@@ -156,8 +172,9 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 		InstructionChars: cfg.Limits.InstructionChars,
 		MaxOutputTokens:  cfg.OpenAI.MaxOutputTokens,
 	}).WithTTL(0)
-	aiSvc := ai.New(store, subSvc, provider, limitSvc, log).WithClock(clock)
+	aiSvc := ai.New(store, subSvc, provider, limitSvc, log).WithClock(clock).WithRepair(cfg.AI.RepairEnabled)
 	paymentSvc := payments.New(store, subSvc, payments.DemoProvider{}, cfg.Payments.Mode)
+	eventSvc := productevents.New(store, log).WithClock(clock)
 	notifySvc := notifications.New(store)
 	adminSvc := admin.New(store, subSvc, planSvc, cfg, log)
 	simulatorSvc := simulator.New(simulator.Deps{
@@ -176,7 +193,7 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 
 	mux := http.NewServeMux()
 	api.New(api.Deps{Config: cfg, Auth: authSvc, Users: userSvc, Plans: planSvc, Subs: subSvc,
-		AI: aiSvc, Limits: limitSvc, Payments: paymentSvc, Limiter: limiter, Log: log,
+		AI: aiSvc, Limits: limitSvc, Payments: paymentSvc, Events: eventSvc, Limiter: limiter, Log: log,
 		Ping: func(ctx context.Context) error { return db.Reader().PingContext(ctx) }}).Register(mux)
 	adminapi.New(adminapi.Deps{Config: cfg, Admin: adminSvc, Limits: limitSvc, Notifications: notifySvc,
 		Log: log}).Register(mux)

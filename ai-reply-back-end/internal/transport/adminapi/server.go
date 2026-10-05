@@ -181,6 +181,8 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 			"errors":        dashboard.Errors,
 			"app_versions":  dashboard.AppVersions,
 			"top_cost":      dashboard.TopCost,
+			// Onboarding and settings events by name (counts only).
+			"product_events": dashboard.ProductEvents,
 		},
 	})
 }
@@ -253,8 +255,9 @@ func (s *Server) handleUserDetail(w http.ResponseWriter, r *http.Request) {
 			"input_tokens": e.InputTokens, "output_tokens": e.OutputTokens,
 			"cost_usd": float64(e.CostMicros) / 1_000_000, "latency_ms": e.LatencyMS,
 			"platform": e.Platform, "language": e.Language,
-			// Only a flag: the privacy guard keeps words like "reply" out of this payload.
+			// Only flags: the privacy guard keeps words like "reply" out of this payload.
 			"compose": e.Mode == "compose",
+			"polish":  e.Mode == "polish",
 		})
 	}
 	devices := make([]map[string]any, 0, len(detail.Devices))

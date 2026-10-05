@@ -19,7 +19,7 @@ type LimitsSource interface {
 	Current(ctx context.Context) limits.Limits
 }
 
-// Service — AI шлюзі: квота → провайдер → есеп.
+// Service — AI шлюзі: квота → провайдер → сапа → есеп.
 type Service struct {
 	repo     *repository.Store
 	subs     *subscriptions.Service
@@ -27,15 +27,20 @@ type Service struct {
 	limits   LimitsSource
 	log      *slog.Logger
 	clock    traits.Clock
+	repair   bool
 }
 
-// New — шлюз.
+// New — шлюз. Тексеруден өтпеген жауапты түзету әдепкіде қосулы.
 func New(repo *repository.Store, subs *subscriptions.Service, provider Provider, limits LimitsSource, log *slog.Logger) *Service {
-	return &Service{repo: repo, subs: subs, provider: provider, limits: limits, log: log, clock: traits.SystemClock{}}
+	return &Service{repo: repo, subs: subs, provider: provider, limits: limits, log: log,
+		clock: traits.SystemClock{}, repair: true}
 }
 
 // WithClock — тестке.
 func (s *Service) WithClock(c traits.Clock) *Service { s.clock = c; return s }
+
+// WithRepair — бір реттік түзету сұранысы (AI_REPAIR_ENABLED).
+func (s *Service) WithRepair(enabled bool) *Service { s.repair = enabled; return s }
 
 // Request — бір жауап сұранысы. Мәтін тек жадта, тек осы шақыру ішінде болады.
 type Request struct {
@@ -44,12 +49,14 @@ type Request struct {
 	SourceText  string
 	Instruction string
 	Language    string
-	TemplateID  string
-	Profile     Profile
-	Template    Template
-	Business    WorkingHours
-	Platform    string
-	AppVersion  string
+	// InputLanguage — тексерілген пернетақта коды не бос.
+	InputLanguage string
+	TemplateID    string
+	Profile       Profile
+	Template      Template
+	Business      WorkingHours
+	Platform      string
+	AppVersion    string
 }
 
 // Result — клиентке қайтатын нәтиже.
@@ -70,10 +77,12 @@ type Result struct {
 	InstructionLimit int
 }
 
-// Сұраныс режимдері. Usage оқиғасында сақталады; квота екеуіне ортақ.
+// Сұраныс режимдері. Usage оқиғасында сақталады; reply мен compose бір
+// квотаны жұмсайды, polish квотаға кірмейді.
 const (
 	ModeReply   = "reply"
 	ModeCompose = "compose"
+	ModePolish  = "polish"
 )
 
 // call — генерацияның метадерегі: кім, қай режим, қай құрылғыдан. Мәтін емес.
@@ -112,13 +121,14 @@ func (s *Service) Reply(ctx context.Context, req Request) (Result, error) {
 	req.Instruction = traits.Clamp(req.Instruction, lim.InstructionChars)
 
 	prompt := BuildPrompt(PromptInput{
-		Message:      source,
-		Instruction:  req.Instruction,
-		TemplateID:   req.TemplateID,
-		AppLanguage:  req.Language,
-		Profile:      req.Profile,
-		Template:     req.Template,
-		WorkingHours: req.Business,
+		Message:       source,
+		Instruction:   req.Instruction,
+		TemplateID:    req.TemplateID,
+		AppLanguage:   req.Language,
+		InputLanguage: req.InputLanguage,
+		Profile:       req.Profile,
+		Template:      req.Template,
+		WorkingHours:  req.Business,
 	})
 	prompt.MaxOutputTokens = lim.MaxOutputTokens
 
@@ -133,7 +143,9 @@ func (s *Service) Reply(ctx context.Context, req Request) (Result, error) {
 	}, prompt, started)
 }
 
-// generate — екі режимге ортақ жол: квота брондау → провайдер → токен есебі → оқиға.
+// generate — reply мен compose-қа ортақ жол: квота брондау → провайдер, тазарту,
+// тексеру, қажет болса түзету (Complete) → токен есебі → оқиға → журнал.
+// Түзету болса да квота бір рет жұмсалады, ал екі шақырудың токені есептеледі.
 func (s *Service) generate(ctx context.Context, c call, prompt Prompt, started time.Time) (Result, error) {
 	entitlement, err := s.subs.Entitlement(ctx, c.User.ID)
 	if err != nil {
@@ -143,7 +155,7 @@ func (s *Service) generate(ctx context.Context, c call, prompt Prompt, started t
 
 	if err := s.repo.ReserveQuota(ctx, c.User.ID, date, month,
 		entitlement.DailyLimit, entitlement.MonthlyLimit); err != nil {
-		s.record(ctx, c, entitlement, "error", errorCode(err), Completion{}, 0)
+		s.record(ctx, c, entitlement, "error", errorCode(err), prompt.Version, Completion{}, 0)
 		return Result{
 			DailyLimit: entitlement.DailyLimit,
 			UsedToday:  entitlement.UsedToday,
@@ -151,7 +163,7 @@ func (s *Service) generate(ctx context.Context, c call, prompt Prompt, started t
 		}, err
 	}
 
-	completion, providerErr := s.provider.Generate(ctx, prompt)
+	outcome, providerErr := Complete(ctx, s.provider, prompt, s.repair)
 	latency := int(s.clock.Now().Sub(started).Milliseconds())
 
 	if providerErr != nil {
@@ -159,23 +171,27 @@ func (s *Service) generate(ctx context.Context, c call, prompt Prompt, started t
 		if err := s.repo.RefundQuota(ctx, c.User.ID, date, month); err != nil {
 			s.log.Error("quota refund failed", "user_id", c.User.ID, "error", err.Error())
 		}
-		s.record(ctx, c, entitlement, "error", errorCode(providerErr), Completion{ProviderMS: 0}, latency)
-		s.log.Warn("ai request failed", "user_id", c.User.ID, "mode", c.Mode,
-			"code", errorCode(providerErr), "latency_ms", latency)
+		s.record(ctx, c, entitlement, "error", errorCode(providerErr), prompt.Version, Completion{}, latency)
+		s.logFailure(c, prompt.Version, errorCode(providerErr), latency)
 		return Result{}, providerErr
 	}
+	if outcome.RepairAttempted {
+		s.log.Info("ai_reply_repaired", "user_id", c.User.ID, "mode", c.Mode,
+			"issues", issueCodes(outcome.Issues), "accepted", outcome.Repaired, "code", outcome.RepairError)
+	}
 
-	cost := s.estimateCostMicros(ctx, completion)
-	if err := s.repo.AddTokens(ctx, c.User.ID, date, month,
-		completion.InputTokens, completion.OutputTokens, cost); err != nil {
+	completion := Completion{Model: outcome.Model, InputTokens: outcome.InputTokens,
+		OutputTokens: outcome.OutputTokens, ProviderMS: outcome.ProviderMS}
+	if err := s.repo.AddTokens(ctx, c.User.ID, date, month, completion.InputTokens,
+		completion.OutputTokens, s.estimateCostMicros(ctx, completion)); err != nil {
 		s.log.Error("token accounting failed", "user_id", c.User.ID, "error", err.Error())
 	}
-	s.record(ctx, c, entitlement, "success", "", completion, latency)
-	if c.Mode == ModeCompose {
-		s.log.Info("ai_compose_generate_success", "user_id", c.User.ID, "platform", c.Platform,
-			"app_version", c.AppVersion, "latency_ms", latency,
-			"input_tokens", completion.InputTokens, "output_tokens", completion.OutputTokens)
-	}
+	s.record(ctx, c, entitlement, "success", "", outcome.Version, completion, latency)
+	s.log.Info("ai_reply_generated", "user_id", c.User.ID, "mode", c.Mode, "prompt_version", outcome.Version,
+		"target_language", prompt.Quality.Target.Lang, "language_source", prompt.Quality.Target.Source,
+		"platform", c.Platform, "app_version", c.AppVersion, "latency_ms", latency,
+		"input_tokens", completion.InputTokens, "output_tokens", completion.OutputTokens,
+		"repaired", outcome.Repaired, "truncated", outcome.Truncated)
 
 	usedToday := entitlement.UsedToday + 1
 	remaining := entitlement.DailyLimit - usedToday
@@ -184,11 +200,11 @@ func (s *Service) generate(ctx context.Context, c call, prompt Prompt, started t
 	}
 
 	return Result{
-		Text:             completion.Text,
-		DetectedLanguage: DetectLanguage(completion.Text),
-		Model:            completion.Model,
-		InputTokens:      completion.InputTokens,
-		OutputTokens:     completion.OutputTokens,
+		Text:             outcome.Text,
+		DetectedLanguage: DetectLanguage(outcome.Text),
+		Model:            outcome.Model,
+		InputTokens:      outcome.InputTokens,
+		OutputTokens:     outcome.OutputTokens,
 		DailyLimit:       entitlement.DailyLimit,
 		UsedToday:        usedToday,
 		Remaining:        remaining,
@@ -197,32 +213,39 @@ func (s *Service) generate(ctx context.Context, c call, prompt Prompt, started t
 	}, nil
 }
 
+// logFailure — сәтсіз генерация: тек режим, нұсқа, код және кідіріс.
+func (s *Service) logFailure(c call, version, code string, latency int) {
+	s.log.Warn("ai_reply_failed", "user_id", c.User.ID, "mode", c.Mode, "prompt_version", version,
+		"code", code, "latency_ms", latency)
+}
+
 // record — оқиға метадерегі. Пайдаланушы мәтіні де, жауап та жазылмайды: тек ұзындығы.
 func (s *Service) record(ctx context.Context, c call, ent domain.Entitlement,
-	status, code string, completion Completion, latency int) {
+	status, code, version string, completion Completion, latency int) {
 	model := completion.Model
 	if model == "" {
 		model = s.provider.Model()
 	}
 	event := domain.UsageEvent{
-		UserID:       c.User.ID,
-		DeviceID:     c.DeviceID,
-		PlanID:       ent.Plan.ID,
-		Model:        model,
-		Status:       status,
-		ErrorCode:    code,
-		InputTokens:  completion.InputTokens,
-		OutputTokens: completion.OutputTokens,
-		TotalTokens:  completion.InputTokens + completion.OutputTokens,
-		CostMicros:   s.estimateCostMicros(ctx, completion),
-		LatencyMS:    latency,
-		ProviderMS:   completion.ProviderMS,
-		Platform:     c.Platform,
-		AppVersion:   c.AppVersion,
-		Language:     domain.NormalizeLocale(c.Language),
-		SourceChars:  c.Chars,
-		Mode:         c.Mode,
-		CreatedAt:    s.clock.Now(),
+		UserID:        c.User.ID,
+		DeviceID:      c.DeviceID,
+		PlanID:        ent.Plan.ID,
+		Model:         model,
+		Status:        status,
+		ErrorCode:     code,
+		InputTokens:   completion.InputTokens,
+		OutputTokens:  completion.OutputTokens,
+		TotalTokens:   completion.InputTokens + completion.OutputTokens,
+		CostMicros:    s.estimateCostMicros(ctx, completion),
+		LatencyMS:     latency,
+		ProviderMS:    completion.ProviderMS,
+		Platform:      c.Platform,
+		AppVersion:    c.AppVersion,
+		Language:      domain.NormalizeLocale(c.Language),
+		SourceChars:   c.Chars,
+		Mode:          c.Mode,
+		PromptVersion: version,
+		CreatedAt:     s.clock.Now(),
 	}
 	if err := s.repo.InsertUsageEvent(ctx, event); err != nil {
 		s.log.Error("usage event insert failed", "error", err.Error())

@@ -102,11 +102,13 @@ func (s *Server) handleLegacyGenerate(w http.ResponseWriter, r *http.Request) {
 		SourceText:  body.Message,
 		Instruction: body.UserInstruction,
 		Language:    language,
-		TemplateID:  traits.Clamp(body.TemplateID, 64),
-		Profile:     profile,
-		Template:    body.Template.toDomain(profile.PreferredTone),
-		Business:    body.BusinessContext.toDomain(),
-		Platform:    user.Platform,
+		// keyboard_language — ескі клиенттегі пернетақта: тіл анық болмаса шешеді.
+		InputLanguage: ai.InputLanguage(body.KeyboardLang),
+		TemplateID:    traits.Clamp(body.TemplateID, 64),
+		Profile:       profile,
+		Template:      body.Template.toDomain(profile.PreferredTone),
+		Business:      body.BusinessContext.toDomain(),
+		Platform:      user.Platform,
 	})
 	if err != nil {
 		status, code := legacyCode(err)

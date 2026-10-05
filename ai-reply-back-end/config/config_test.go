@@ -1,6 +1,7 @@
 package config
 
 import (
+	"os"
 	"strings"
 	"testing"
 )
@@ -119,5 +120,62 @@ func TestDemoOTPMustBeFourDigits(t *testing.T) {
 		if _, err := Load(""); err == nil || !strings.Contains(err.Error(), "AUTH_DEMO_OTP") {
 			t.Fatalf("AUTH_DEMO_OTP=%q accepted", code)
 		}
+	}
+}
+
+// OPENAI_TEMPERATURE: орнатылмаса не бос болса 0.7 (бұрынғыдай), "none" — өріс жіберілмейді.
+func TestOpenAITemperatureIsOptional(t *testing.T) {
+	setValidEnv(t)
+	t.Setenv("OPENAI_TEMPERATURE", "") // restores the original value afterwards
+	if err := os.Unsetenv("OPENAI_TEMPERATURE"); err != nil {
+		t.Fatal(err)
+	}
+	if cfg, err := Load(""); err != nil || cfg.OpenAI.Temperature == nil || *cfg.OpenAI.Temperature != 0.7 {
+		t.Fatalf("unset: %v %v", cfg.OpenAI.Temperature, err)
+	}
+	for raw, want := range map[string]float64{"0.3": 0.3, " 1 ": 1, "warm": 0.7, "": 0.7, "  ": 0.7} {
+		t.Setenv("OPENAI_TEMPERATURE", raw)
+		if cfg, err := Load(""); err != nil || cfg.OpenAI.Temperature == nil || *cfg.OpenAI.Temperature != want {
+			t.Fatalf("%q: %v %v", raw, cfg.OpenAI.Temperature, err)
+		}
+	}
+	for _, raw := range []string{"none", "None", " NONE "} {
+		t.Setenv("OPENAI_TEMPERATURE", raw)
+		if cfg, err := Load(""); err != nil || cfg.OpenAI.Temperature != nil {
+			t.Fatalf("%q must omit the temperature: %v %v", raw, cfg.OpenAI.Temperature, err)
+		}
+	}
+}
+
+func TestAIQualityDefaults(t *testing.T) {
+	setValidEnv(t)
+	cfg, err := Load("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.AI.RepairEnabled || !cfg.AI.PolishEnabled || cfg.Limits.PolishPerMinute != 20 {
+		t.Fatalf("defaults = %+v, polish %d/min", cfg.AI, cfg.Limits.PolishPerMinute)
+	}
+	t.Setenv("AI_REPAIR_ENABLED", "false")
+	t.Setenv("AI_POLISH_ENABLED", "0")
+	t.Setenv("RATE_POLISH_PER_MINUTE", "5")
+	if cfg, _ := Load(""); cfg.AI.RepairEnabled || cfg.AI.PolishEnabled || cfg.Limits.PolishPerMinute != 5 {
+		t.Fatalf("overrides = %+v, polish %d/min", cfg.AI, cfg.Limits.PolishPerMinute)
+	}
+}
+
+func TestProductEventDefaults(t *testing.T) {
+	setValidEnv(t)
+	cfg, err := Load("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.Analytics.ProductEventsEnabled || cfg.Limits.EventsPerMinute != 30 {
+		t.Fatalf("defaults = %+v, events %d/min", cfg.Analytics, cfg.Limits.EventsPerMinute)
+	}
+	t.Setenv("PRODUCT_EVENTS_ENABLED", "false")
+	t.Setenv("RATE_EVENTS_PER_MINUTE", "10")
+	if cfg, _ := Load(""); cfg.Analytics.ProductEventsEnabled || cfg.Limits.EventsPerMinute != 10 {
+		t.Fatalf("overrides = %+v, events %d/min", cfg.Analytics, cfg.Limits.EventsPerMinute)
 	}
 }

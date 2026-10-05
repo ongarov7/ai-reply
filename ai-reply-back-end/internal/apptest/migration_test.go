@@ -100,3 +100,69 @@ func TestAuthProvidersMigrationKeepsExistingAccounts(t *testing.T) {
 		t.Fatalf("second run applied %v (%v)", again, err)
 	}
 }
+
+// 0009 бар профильдерге қолданылады: жыныс 'unspecified', онбординг нұсқасы
+// аяқталғандарда 1, ескі usage оқиғаларында prompt_version бос.
+func TestSenderProfileMigrationKeepsExistingProfiles(t *testing.T) {
+	ctx := context.Background()
+	db, err := database.Open(database.Options{Path: filepath.Join(t.TempDir(), "old.db"), MaxReadConns: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+
+	before := fstest.MapFS{}
+	entries, err := fs.ReadDir(migrations.FS, ".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".sql") && e.Name() < "0009" {
+			body, _ := fs.ReadFile(migrations.FS, e.Name())
+			before[e.Name()] = &fstest.MapFile{Data: body}
+		}
+	}
+	if _, err := database.Migrate(ctx, db, before); err != nil {
+		t.Fatalf("old migrations: %v", err)
+	}
+
+	seed := []string{
+		`INSERT INTO users (id, email, status, created_at, updated_at) VALUES ('u-done', 'done@example.com', 'active', 1000, 1000)`,
+		`INSERT INTO user_profiles (user_id, role, onboarding_completed, updated_at) VALUES ('u-done', 'сатушы', 1, 1000)`,
+		`INSERT INTO users (id, email, status, created_at, updated_at) VALUES ('u-new', 'new@example.com', 'active', 2000, 2000)`,
+		`INSERT INTO user_profiles (user_id, onboarding_completed, updated_at) VALUES ('u-new', 0, 2000)`,
+		`INSERT INTO ai_usage_events (id, user_id, device_id, plan_id, status, mode, created_at)
+		 VALUES ('e-1', 'u-done', '', '', 'success', 'reply', 3000)`,
+	}
+	for _, stmt := range seed {
+		if _, err := db.Writer().ExecContext(ctx, stmt); err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+	}
+
+	applied, err := database.Migrate(ctx, db, migrations.FS)
+	if err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	if len(applied) == 0 || applied[0] != "0009_sender_profile.sql" {
+		t.Fatalf("applied = %v", applied)
+	}
+
+	store := repository.New(db)
+	done, err := store.Profile(ctx, "u-done")
+	if err != nil || done.GrammaticalGender != domain.GenderUnspecified || done.OnboardingVersion != 1 || done.Role != "сатушы" {
+		t.Fatalf("finished profile = %+v (%v)", done, err)
+	}
+	fresh, err := store.Profile(ctx, "u-new")
+	if err != nil || fresh.GrammaticalGender != domain.GenderUnspecified || fresh.OnboardingVersion != 0 {
+		t.Fatalf("unfinished profile = %+v (%v)", fresh, err)
+	}
+	events, err := store.UserEvents(ctx, "u-done", 5)
+	if err != nil || len(events) != 1 || events[0].PromptVersion != "" || events[0].Mode != "reply" {
+		t.Fatalf("old event = %+v (%v)", events, err)
+	}
+
+	if again, err := database.Migrate(ctx, db, migrations.FS); err != nil || len(again) != 0 {
+		t.Fatalf("second run applied %v (%v)", again, err)
+	}
+}

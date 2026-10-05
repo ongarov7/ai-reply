@@ -42,7 +42,8 @@ func TestComposeWritesAStandaloneMessage(t *testing.T) {
 	if !strings.Contains(h.provider.lastUser, composeInstruction) {
 		t.Fatal("the instruction did not reach the provider")
 	}
-	for _, reply := range []string{"<incoming_message>", "relationship_context", "single short messaging reply"} {
+	for _, reply := range []string{"<incoming_message>", "<user_instruction>", "as a reply to the incoming message",
+		"Match the length of the incoming message"} {
 		if strings.Contains(h.provider.lastUser+h.provider.lastDeveloper, reply) {
 			t.Fatalf("compose prompt contains the reply-mode part %q", reply)
 		}
@@ -50,11 +51,11 @@ func TestComposeWritesAStandaloneMessage(t *testing.T) {
 	if !strings.Contains(h.provider.lastDeveloper, "there is no incoming message") {
 		t.Fatal("compose did not use its own developer rules")
 	}
-	if !strings.Contains(h.provider.lastDeveloper, "write in Russian, the language of the user's app") {
-		t.Fatal("the app language tie-breaker is missing")
+	if !strings.Contains(h.provider.lastDeveloper, "Write the message in Russian, the language of the request") {
+		t.Fatal("the message language is missing from the developer rules")
 	}
-	if strings.Contains(h.provider.lastUser, "language of the user's app") {
-		t.Fatal("the tie-breaker leaked into the user part of the prompt")
+	if strings.Contains(h.provider.lastUser, "Write the message in") {
+		t.Fatal("the language rule leaked into the user part of the prompt")
 	}
 	if h.provider.lastMaxTokens < 700 {
 		t.Fatalf("compose max_output_tokens = %d, want at least 700", h.provider.lastMaxTokens)
@@ -206,7 +207,7 @@ func TestComposeContentIsNeverPersisted(t *testing.T) {
 			t.Fatalf("logs contain %q", needle)
 		}
 	}
-	if !strings.Contains(h.logs.String(), "ai_compose_generate_success") {
+	if !strings.Contains(h.logs.String(), `"msg":"ai_reply_generated","user_id":"`+session.userID+`","mode":"compose"`) {
 		t.Fatal("no structured success event in the log")
 	}
 

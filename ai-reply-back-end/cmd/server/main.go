@@ -27,6 +27,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/notifications"
 	"github.com/aireply/ai-reply-back-end/internal/payments"
 	"github.com/aireply/ai-reply-back-end/internal/plans"
+	"github.com/aireply/ai-reply-back-end/internal/productevents"
 	"github.com/aireply/ai-reply-back-end/internal/repository"
 	"github.com/aireply/ai-reply-back-end/internal/simulator"
 	"github.com/aireply/ai-reply-back-end/internal/subscriptions"
@@ -99,8 +100,9 @@ func run(envFile string) error {
 		InstructionChars: cfg.Limits.InstructionChars,
 		MaxOutputTokens:  cfg.OpenAI.MaxOutputTokens,
 	})
-	aiSvc := ai.New(store, subSvc, provider, limitSvc, log)
+	aiSvc := ai.New(store, subSvc, provider, limitSvc, log).WithRepair(cfg.AI.RepairEnabled)
 	paymentSvc := payments.New(store, subSvc, payments.DemoProvider{}, cfg.Payments.Mode)
+	eventSvc := productevents.New(store, log)
 	notifySvc := notifications.New(store)
 	adminSvc := admin.New(store, subSvc, planSvc, cfg, log)
 	simulatorSvc := simulator.New(simulator.Deps{
@@ -117,7 +119,7 @@ func run(envFile string) error {
 	mux := http.NewServeMux()
 	api.New(api.Deps{
 		Config: cfg, Auth: authSvc, Users: userSvc, Plans: planSvc, Subs: subSvc,
-		AI: aiSvc, Limits: limitSvc, Payments: paymentSvc, Limiter: limiter, Log: log,
+		AI: aiSvc, Limits: limitSvc, Payments: paymentSvc, Events: eventSvc, Limiter: limiter, Log: log,
 		Ping: func(ctx context.Context) error { return db.Reader().PingContext(ctx) },
 	}).Register(mux)
 

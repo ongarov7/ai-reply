@@ -14,16 +14,18 @@ import (
 
 // Config — қолданбаның толық баптауы.
 type Config struct {
-	App      App
-	Database Database
-	Auth     Auth
-	Email    Email
-	OAuth    OAuth
-	OpenAI   OpenAI
-	Admin    Admin
-	Payments Payments
-	Limits   Limits
-	Log      Log
+	App       App
+	Database  Database
+	Auth      Auth
+	Email     Email
+	OAuth     OAuth
+	OpenAI    OpenAI
+	AI        AI
+	Analytics Analytics
+	Admin     Admin
+	Payments  Payments
+	Limits    Limits
+	Log       Log
 }
 
 type App struct {
@@ -112,7 +114,23 @@ type OpenAI struct {
 	BaseURL         string
 	MaxOutputTokens int
 	Timeout         time.Duration
-	Temperature     float64
+	// Temperature — nil болса өріс сұранысқа мүлде қосылмайды: reasoning
+	// модельдері оны қабылдамайды (OPENAI_TEMPERATURE=none).
+	Temperature *float64
+}
+
+// AI — генерация сапасы мен қосымша AI мүмкіндіктері.
+type AI struct {
+	// RepairEnabled — тексеруден өтпеген жауапқа бір рет түзету сұранысы.
+	RepairEnabled bool
+	// PolishEnabled — POST /api/v1/ai/polish (нұсқауды түзету ұсынысы).
+	PolishEnabled bool
+}
+
+// Analytics — қолданбалардың өнім оқиғалары.
+type Analytics struct {
+	// ProductEventsEnabled — POST /api/v1/analytics/events; өшірулі болса 404.
+	ProductEventsEnabled bool
 }
 
 type Admin struct {
@@ -134,6 +152,8 @@ type Limits struct {
 	OTPRequestPerHour int
 	OTPVerifyPerHour  int
 	AIPerMinute       int
+	PolishPerMinute   int
+	EventsPerMinute   int
 	AdminLoginPerHour int
 	GenericPerMinute  int
 }
@@ -194,14 +214,12 @@ func Load(envFile string) (Config, error) {
 			GoogleClientIDs: append(list("GOOGLE_CLIENT_ID_IOS", ""), list("GOOGLE_CLIENT_ID_WEB", "")...),
 			AppleClientIDs:  list("APPLE_CLIENT_ID", ""),
 		},
-		OpenAI: OpenAI{
-			APIKey:          str("OPENAI_API_KEY", ""),
-			Model:           str("OPENAI_MODEL", "gpt-4o-mini"),
-			BaseURL:         strings.TrimRight(str("OPENAI_BASE_URL", "https://api.openai.com/v1"), "/"),
-			MaxOutputTokens: num("OPENAI_MAX_OUTPUT_TOKENS", 180),
-			Timeout:         dur("OPENAI_TIMEOUT", 20*time.Second),
-			Temperature:     flt("OPENAI_TEMPERATURE", 0.7),
+		OpenAI: OpenAIFromEnv(),
+		AI: AI{
+			RepairEnabled: boolean("AI_REPAIR_ENABLED", true),
+			PolishEnabled: boolean("AI_POLISH_ENABLED", true),
 		},
+		Analytics: Analytics{ProductEventsEnabled: boolean("PRODUCT_EVENTS_ENABLED", true)},
 		Admin: Admin{
 			BootstrapEmail:    strings.ToLower(strings.TrimSpace(str("ADMIN_EMAIL", ""))),
 			BootstrapPassword: str("ADMIN_PASSWORD", ""),
@@ -217,6 +235,8 @@ func Load(envFile string) (Config, error) {
 			OTPRequestPerHour: num("RATE_OTP_REQUEST_PER_HOUR", 5),
 			OTPVerifyPerHour:  num("RATE_OTP_VERIFY_PER_HOUR", 10),
 			AIPerMinute:       num("RATE_AI_PER_MINUTE", 12),
+			PolishPerMinute:   num("RATE_POLISH_PER_MINUTE", 20),
+			EventsPerMinute:   num("RATE_EVENTS_PER_MINUTE", 30),
 			AdminLoginPerHour: num("RATE_ADMIN_LOGIN_PER_HOUR", 10),
 			GenericPerMinute:  num("RATE_GENERIC_PER_MINUTE", 60),
 		},
@@ -233,6 +253,19 @@ func Load(envFile string) (Config, error) {
 		return Config{}, fmt.Errorf("configuration is incomplete:\n  - %s", strings.Join(problems, "\n  - "))
 	}
 	return cfg, nil
+}
+
+// OpenAIFromEnv — провайдер баптауы. Load те, сапа бағалауының тірі тесті де
+// (internal/ai/eval) осыны оқиды: әдепкі мәндердің бір ғана көзі бар.
+func OpenAIFromEnv() OpenAI {
+	return OpenAI{
+		APIKey:          str("OPENAI_API_KEY", ""),
+		Model:           str("OPENAI_MODEL", "gpt-4o-mini"),
+		BaseURL:         strings.TrimRight(str("OPENAI_BASE_URL", "https://api.openai.com/v1"), "/"),
+		MaxOutputTokens: num("OPENAI_MAX_OUTPUT_TOKENS", 180),
+		Timeout:         dur("OPENAI_TIMEOUT", 20*time.Second),
+		Temperature:     temperature("OPENAI_TEMPERATURE", 0.7),
+	}
 }
 
 // Validate — іске қосылу алдындағы қатаң тексеру: құпиясыз сервер көтерілмейді.
@@ -335,11 +368,19 @@ func num(key string, fallback int) int {
 	return fallback
 }
 
-func flt(key string, fallback float64) float64 {
-	if v, err := strconv.ParseFloat(str(key, ""), 64); err == nil {
-		return v
+// temperature — орнатылмаса әдепкі мән; бос не "none" болса nil (өріс
+// жіберілмейді). Танылмаған мән әдепкіге түседі, үнсіз өзгеріс болмасын.
+func temperature(key string, fallback float64) *float64 {
+	// An empty value keeps the default, exactly as before; only an explicit
+	// "none" leaves the field out.
+	raw := strings.ToLower(str(key, ""))
+	if raw == "none" {
+		return nil
 	}
-	return fallback
+	if v, err := strconv.ParseFloat(raw, 64); err == nil {
+		return &v
+	}
+	return &fallback
 }
 
 func boolean(key string, fallback bool) bool {

@@ -102,6 +102,8 @@ func (s *Server) handleSaveLegalConsent(w http.ResponseWriter, r *http.Request) 
 	httpx.JSON(w, http.StatusOK, toLegalConsentDTO(consent))
 }
 
+// updateMeRequest — users.ProfileUpdate-ке тікелей айналады: өрістері мен
+// олардың реті бірдей болуы керек.
 type updateMeRequest struct {
 	DisplayName      *string   `json:"display_name"`
 	Role             *string   `json:"role"`
@@ -113,6 +115,9 @@ type updateMeRequest struct {
 	Locale           *string   `json:"locale"`
 	Timezone         *string   `json:"timezone"`
 	Completed        *bool     `json:"onboarding_completed"`
+	// Жаңа клиенттер тек features.sender_profile=true болса жібереді.
+	GrammaticalGender *string `json:"grammatical_gender"`
+	OnboardingVersion *int    `json:"onboarding_version"`
 }
 
 // handleUpdateMe — тіркеуді аяқтау немесе профильді өңдеу.
@@ -195,6 +200,13 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 			"reply_preferences": true,
 			// POST /api/v1/ai/compose — writing a new message from an instruction.
 			"compose": true,
+			// profile.grammatical_gender and input_language on /ai/reply and
+			// /ai/compose; grammatical_gender and onboarding_version on /me.
+			"sender_profile": true,
+			// POST /api/v1/ai/polish — a cleaner version of the user's own note.
+			"instruction_polish": s.cfg.AI.PolishEnabled,
+			// POST /api/v1/analytics/events — onboarding and settings events.
+			"product_events": s.cfg.Analytics.ProductEventsEnabled,
 			// Sign-in methods this server accepts right now.
 			"email_otp":      s.auth.EmailDelivery() != "off",
 			"google_sign_in": s.auth.GoogleEnabled(),

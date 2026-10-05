@@ -171,9 +171,19 @@ paths:
       security: [{ bearerAuth: [] }]
       responses: { "200": { description: OK } }
     patch:
-      summary: Частичное обновление профиля
+      summary: Частичное обновление профиля (POST /api/v1/me — то же для Android)
       security: [{ bearerAuth: [] }]
-      responses: { "200": { description: OK } }
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProfileUpdate" }
+      responses:
+        "200":
+          description: Обновлённый профиль
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Profile" }
+        "400": { description: "INVALID_REQUEST — неизвестное поле, неверный grammatical_gender или onboarding_version вне 0…1000" }
   /api/v1/me/email/otp/request:
     post:
       summary: Код на почту, которую нужно добавить к аккаунту для входа
@@ -255,6 +265,11 @@ paths:
   /api/v1/ai/reply:
     post:
       summary: Сгенерировать ответ
+      description: >-
+        Язык ответа решает входящее сообщение (source_text), а не язык интерфейса,
+        раскладка или язык instruction: profile.reply_language → уверенно определённый
+        язык сообщения → input_language → language. Другой язык даёт только явная
+        просьба в instruction («ответь на русском»).
       security: [{ bearerAuth: [] }]
       requestBody:
         required: true
@@ -264,12 +279,27 @@ paths:
               type: object
               required: [source_text]
               properties:
-                source_text: { type: string, maxLength: 300 }
+                source_text: { type: string, maxLength: 400, description: "max_source_characters из /config" }
                 instruction: { type: string, maxLength: 400 }
-                language: { type: string, enum: [kk, ru, en, uz] }
+                language: { type: string, enum: [kk, ru, en, uz], description: "язык интерфейса; язык ответа решает, только если язык сообщения не ясен" }
+                input_language: { type: string, enum: [kk, ru, en], description: "раскладка при нажатии Reply (features.sender_profile); решает, только если язык сообщения не ясен; неизвестное значение игнорируется" }
                 template_id: { type: string }
+                template: { type: object }
+                business_context: { type: object }
+                profile:
+                  type: object
+                  properties:
+                    description: { type: string }
+                    role: { type: string }
+                    preferred_tone: { type: string, enum: [natural, friendly, professional, formal, short] }
+                    business: { type: object }
+                    reply_language: { type: string, enum: [auto, kk, ru, en, uz], description: "features.reply_preferences" }
+                    grammatical_gender: { type: string, enum: [male, female, unspecified], description: "features.sender_profile; иначе — сохранённое значение" }
+                platform: { type: string }
+                app_version: { type: string }
       responses:
         "200": { description: reply + usage }
+        "400": { description: "INVALID_REQUEST (details.field = source_text) или неизвестное поле" }
         "429": { description: DAILY_LIMIT_REACHED }
         "502": { description: AI_PROVIDER_UNAVAILABLE }
         "504": { description: AI_TIMEOUT }
@@ -287,6 +317,12 @@ paths:
               properties:
                 instruction: { type: string, maxLength: 400, description: "max_instruction_length из /config" }
                 language: { type: string, enum: [kk, ru, en, uz], description: "язык интерфейса" }
+                input_language: { type: string, enum: [kk, ru, en], description: "features.sender_profile" }
+                profile:
+                  type: object
+                  description: "features.sender_profile; других полей нет"
+                  properties:
+                    grammatical_gender: { type: string, enum: [male, female, unspecified] }
                 regenerate: { type: boolean, description: "другая версия по той же инструкции" }
                 platform: { type: string }
                 app_version: { type: string }
@@ -306,6 +342,79 @@ paths:
         "429": { description: DAILY_LIMIT_REACHED / RATE_LIMITED }
         "502": { description: AI_PROVIDER_UNAVAILABLE }
         "504": { description: AI_TIMEOUT }
+  /api/v1/ai/polish:
+    post:
+      summary: Подсказка — исправленный текст инструкции (квота не тратится)
+      description: Работает, когда features.instruction_polish = true; иначе 404 NOT_FOUND.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text: { type: string, maxLength: 400, description: "max_instruction_length из /config" }
+                input_language: { type: string, enum: [kk, ru, en] }
+                platform: { type: string }
+                app_version: { type: string }
+      responses:
+        "200":
+          description: "changed = false — подсказки нет, text равен исходному"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [text, changed]
+                properties:
+                  text: { type: string }
+                  changed: { type: boolean }
+        "400": { description: "INVALID_REQUEST (details.field = text, details.max_characters)" }
+        "401": { description: UNAUTHORIZED }
+        "404": { description: NOT_FOUND — polish выключен (AI_POLISH_ENABLED=false) }
+        "429": { description: RATE_LIMITED — отдельный лимит RATE_POLISH_PER_MINUTE }
+        "502": { description: AI_PROVIDER_UNAVAILABLE }
+        "504": { description: AI_TIMEOUT }
+  /api/v1/analytics/events:
+    post:
+      summary: События онбординга и настроек (только из приложений, только счётчики)
+      description: >-
+        Работает, когда features.product_events = true; иначе 404 NOT_FOUND. Каждое
+        событие проверяется отдельно по закрытому списку (имя, ключи props, типы и
+        значения); неподходящее отклоняется, остальные сохраняются. Свободный текст
+        не сохраняется. Список событий и props — docs/API.md.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [platform, events]
+              properties:
+                platform: { type: string, enum: [ios, android] }
+                app_version: { type: string, pattern: '^[0-9]{1,4}(\.[0-9]{1,4}){0,3}( \([0-9]{1,6}\))?$', example: "2.0.1" }
+                events:
+                  type: array
+                  minItems: 1
+                  maxItems: 20
+                  items: { $ref: "#/components/schemas/ProductEvent" }
+      responses:
+        "200":
+          description: Сколько событий сохранено и сколько отклонено
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [accepted, rejected]
+                properties:
+                  accepted: { type: integer }
+                  rejected: { type: integer }
+        "400": { description: "INVALID_REQUEST (details.field = platform | app_version | events; для events — details.max_events)" }
+        "401": { description: UNAUTHORIZED }
+        "404": { description: NOT_FOUND — приём выключен (PRODUCT_EVENTS_ENABLED=false) }
+        "429": { description: RATE_LIMITED — отдельный лимит RATE_EVENTS_PER_MINUTE }
   /v1/auth/register:
     post:
       summary: "Совместимость: install_id → токен (старые сборки)"
@@ -347,7 +456,58 @@ components:
             google_sign_in: { type: boolean }
             apple_sign_in: { type: boolean }
             compose: { type: boolean, description: "POST /api/v1/ai/compose доступен" }
+            reply_preferences: { type: boolean, description: "profile.reply_language в /ai/reply" }
+            sender_profile: { type: boolean, description: "grammatical_gender и input_language в /ai/*, grammatical_gender и onboarding_version в /me" }
+            instruction_polish: { type: boolean, description: "POST /api/v1/ai/polish доступен" }
+            product_events: { type: boolean, description: "POST /api/v1/analytics/events доступен" }
         legal: { $ref: "#/components/schemas/LegalConfig" }
+    ProductEvent:
+      type: object
+      required: [name]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          enum: [onboarding_started, onboarding_step_viewed, onboarding_keyboard_step_viewed,
+                 keyboard_enabled_detected, full_access_enabled_detected, paste_tutorial_viewed,
+                 onboarding_practice_completed, onboarding_completed, onboarding_reopened,
+                 gender_selected, autocorrect_enabled, autocorrect_disabled]
+        ts: { type: string, format: date-time, description: "время на устройстве, RFC 3339" }
+        props:
+          type: object
+          description: "Только ключи, разрешённые для этого события: целые 0…1000, bool или код из закрытого списка"
+          additionalProperties:
+            oneOf: [{ type: integer, minimum: 0, maximum: 1000 }, { type: boolean }, { type: string }]
+    Profile:
+      type: object
+      properties:
+        display_name: { type: string }
+        role: { type: string }
+        description: { type: string }
+        preferred_tone: { type: string }
+        business_offering: { type: string }
+        business_summary: { type: string }
+        business_rules: { type: array, items: { type: string } }
+        onboarding_completed: { type: boolean }
+        grammatical_gender: { type: string, enum: [male, female, unspecified] }
+        onboarding_version: { type: integer, minimum: 0, maximum: 1000 }
+        updated_at: { type: string, format: date-time }
+    ProfileUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        display_name: { type: string }
+        role: { type: string }
+        description: { type: string }
+        preferred_tone: { type: string, enum: [natural, friendly, professional, formal, short] }
+        business_offering: { type: string }
+        business_summary: { type: string }
+        business_rules: { type: array, items: { type: string }, maxItems: 8 }
+        locale: { type: string, enum: [kk, ru, en, uz] }
+        timezone: { type: string }
+        onboarding_completed: { type: boolean }
+        grammatical_gender: { type: string, enum: [male, female, unspecified], description: "features.sender_profile" }
+        onboarding_version: { type: integer, minimum: 0, maximum: 1000, description: "features.sender_profile; хранится максимум" }
     Device:
       type: object
       properties:

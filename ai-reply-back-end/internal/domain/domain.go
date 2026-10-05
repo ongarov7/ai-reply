@@ -53,6 +53,23 @@ const (
 	PlatformLegacy  = "legacy"
 )
 
+// Жіберушінің грамматикалық жынысы (user_profiles.grammatical_gender).
+// Тек орыс тіліндегі септеу үшін: есімнен, поштадан не хат-хабардан ешқашан
+// болжанбайды, пайдаланушы өзі таңдайды.
+const (
+	GenderMale        = "male"
+	GenderFemale      = "female"
+	GenderUnspecified = "unspecified"
+)
+
+// IsGrammaticalGender — рұқсат етілген мән бе.
+func IsGrammaticalGender(v string) bool {
+	return v == GenderMale || v == GenderFemale || v == GenderUnspecified
+}
+
+// MaxOnboardingVersion — клиент жібере алатын онбординг нұсқасының шегі.
+const MaxOnboardingVersion = 1000
+
 // Қолдау көрсетілетін тілдер.
 var Locales = []string{"kk", "ru", "en", "uz"}
 
@@ -127,7 +144,12 @@ type Profile struct {
 	BusinessSummary     string
 	BusinessRules       []string
 	OnboardingCompleted bool
-	UpdatedAt           time.Time
+	// GrammaticalGender — male | female | unspecified. Жеке дерек: журналға,
+	// usage оқиғасына және әкімші JSON-ына түспейді.
+	GrammaticalGender string
+	// OnboardingVersion — аяқталған онбордингтің ең жоғары нұсқасы (тек өседі).
+	OnboardingVersion int
+	UpdatedAt         time.Time
 }
 
 // LegalConsent records the exact public document versions accepted by an account.
@@ -268,9 +290,12 @@ type UsageEvent struct {
 	AppVersion   string
 	Language     string
 	SourceChars  int
-	// Mode — reply | compose. Екеуі де бір квотаны жұмсайды.
-	Mode      string
-	CreatedAt time.Time
+	// Mode — reply | compose | polish. Reply мен compose бір квотаны жұмсайды,
+	// polish квотаға кірмейді.
+	Mode string
+	// PromptVersion — reply_v2, reply_v2+repair_v1, compose_v2, polish_v1 …
+	PromptVersion string
+	CreatedAt     time.Time
 }
 
 // AdminUser — әкімші тіркелгісі (мобильді қолданушыдан бөлек).

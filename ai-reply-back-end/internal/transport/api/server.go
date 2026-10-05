@@ -13,6 +13,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/middleware"
 	"github.com/aireply/ai-reply-back-end/internal/payments"
 	"github.com/aireply/ai-reply-back-end/internal/plans"
+	"github.com/aireply/ai-reply-back-end/internal/productevents"
 	"github.com/aireply/ai-reply-back-end/internal/subscriptions"
 	"github.com/aireply/ai-reply-back-end/internal/transport/httpx"
 	"github.com/aireply/ai-reply-back-end/internal/users"
@@ -31,6 +32,7 @@ type Server struct {
 	ai       *ai.Service
 	limits   *limits.Service
 	payments *payments.Service
+	events   *productevents.Service
 	limiter  *middleware.Limiter
 	ping     Pinger
 	log      *slog.Logger
@@ -46,6 +48,7 @@ type Deps struct {
 	AI       *ai.Service
 	Limits   *limits.Service
 	Payments *payments.Service
+	Events   *productevents.Service
 	Limiter  *middleware.Limiter
 	Ping     Pinger
 	Log      *slog.Logger
@@ -55,7 +58,7 @@ type Deps struct {
 func New(d Deps) *Server {
 	return &Server{
 		cfg: d.Config, auth: d.Auth, users: d.Users, plans: d.Plans, subs: d.Subs,
-		ai: d.AI, limits: d.Limits, payments: d.Payments, limiter: d.Limiter, ping: d.Ping, log: d.Log,
+		ai: d.AI, limits: d.Limits, payments: d.Payments, events: d.Events, limiter: d.Limiter, ping: d.Ping, log: d.Log,
 	}
 }
 
@@ -81,12 +84,17 @@ func (s *Server) Register(mux *http.ServeMux) {
 	otpRequest := middleware.RateLimit(s.limiter, "otp_request", limits.OTPRequestPerHour, time.Hour, ip)
 	otpVerify := middleware.RateLimit(s.limiter, "otp_verify", limits.OTPVerifyPerHour, time.Hour, ip)
 	generic := middleware.RateLimit(s.limiter, "generic", limits.GenericPerMinute, time.Minute, ip)
-	aiLimit := middleware.RateLimit(s.limiter, "ai", limits.AIPerMinute, time.Minute, func(r *http.Request) string {
+	perUser := func(r *http.Request) string {
 		if u, ok := UserFrom(r.Context()); ok {
 			return u.ID
 		}
 		return httpx.ClientIP(r, s.cfg.App.TrustProxy)
-	})
+	}
+	aiLimit := middleware.RateLimit(s.limiter, "ai", limits.AIPerMinute, time.Minute, perUser)
+	// Polish үзіліс сайын шақырылады: жеке шелек, генерация лимитін жемейді.
+	polishLimit := middleware.RateLimit(s.limiter, "polish", limits.PolishPerMinute, time.Minute, perUser)
+	// Өнім оқиғалары: өз шелегі, басқа сұраныстардың лимитін жемейді.
+	eventsLimit := middleware.RateLimit(s.limiter, "events", limits.EventsPerMinute, time.Minute, perUser)
 
 	// --- аутентификация: пошта OTP (Resend), Google, Apple
 	mux.Handle("POST /api/v1/auth/email/otp/request", otpRequest(http.HandlerFunc(s.handleEmailOTPRequest)))
@@ -126,6 +134,11 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /api/v1/ai/reply", s.requireUser(aiLimit(http.HandlerFunc(s.handleReply))))
 	// Нұсқау бойынша жаңа хабарлама («Create»). Сол квота, сол rate limit.
 	mux.Handle("POST /api/v1/ai/compose", s.requireUser(aiLimit(http.HandlerFunc(s.handleCompose))))
+	// Нұсқауды түзету ұсынысы. Квотасыз; өшірулі болса 404 NOT_FOUND.
+	mux.Handle("POST /api/v1/ai/polish", s.requireUser(polishLimit(http.HandlerFunc(s.handlePolish))))
+
+	// --- өнім оқиғалары (тек қолданбадан; пернетақта ештеңе жібермейді)
+	mux.Handle("POST /api/v1/analytics/events", s.requireUser(eventsLimit(http.HandlerFunc(s.handleProductEvents))))
 
 	// --- төлемдер (демо адаптер)
 	mux.Handle("POST /api/v1/payments/checkout", s.requireUser(http.HandlerFunc(s.handleCheckout)))

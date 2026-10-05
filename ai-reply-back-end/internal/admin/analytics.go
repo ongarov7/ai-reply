@@ -53,6 +53,8 @@ type Dashboard struct {
 	Errors        []repository.Point
 	TopCost       []repository.Point
 	AppVersions   []repository.Point
+	// ProductEvents — қолданба оқиғаларының саны атауы бойынша.
+	ProductEvents []repository.Point
 	CostUSD       float64
 }
 
@@ -93,6 +95,9 @@ func (s *Service) Dashboard(ctx context.Context, rng Range) (Dashboard, error) {
 		return Dashboard{}, err
 	}
 	if d.AppVersions, err = s.repo.AppVersionBreakdown(ctx); err != nil {
+		return Dashboard{}, err
+	}
+	if d.ProductEvents, err = s.repo.ProductEventCounts(ctx, rng.From, rng.To); err != nil {
 		return Dashboard{}, err
 	}
 	return d, nil

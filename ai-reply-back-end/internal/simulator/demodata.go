@@ -56,7 +56,7 @@ func DemoUsers() []DemoUser {
 			ID: "d1a2", Label: "Aigerim S.", Identifier: "+7 701 •••• 42", PlanCode: "pro",
 			SubStatus: "active", UsedToday: 31, DailyLimit: 50, TokensMonth: 184_200,
 			Platform: "ios", AppVersion: "1.4.2", Locale: "kk", Tone: "friendly",
-			Business: "Cosmetics store, delivery across Kazakhstan",
+			Business:   "Cosmetics store, delivery across Kazakhstan",
 			Registered: "2026-02-11", LastActive: "2026-09-21 10:42", Status: "active",
 			Events: []DemoEvent{
 				{At: "10:42", Status: "success", Platform: "ios", Language: "kk", Tokens: 168, LatencyMS: 940},
@@ -68,7 +68,7 @@ func DemoUsers() []DemoUser {
 			ID: "d2b7", Label: "Daniyar T.", Identifier: "+7 777 •••• 08", PlanCode: "standard",
 			SubStatus: "active", UsedToday: 12, DailyLimit: 30, TokensMonth: 71_400,
 			Platform: "android", AppVersion: "1.4.0", Locale: "ru", Tone: "professional",
-			Business: "Auto parts, wholesale and retail",
+			Business:   "Auto parts, wholesale and retail",
 			Registered: "2026-04-03", LastActive: "2026-09-21 09:15", Status: "active",
 			Events: []DemoEvent{
 				{At: "09:15", Status: "success", Platform: "android", Language: "ru", Tokens: 205, LatencyMS: 1310},
@@ -79,7 +79,7 @@ func DemoUsers() []DemoUser {
 			ID: "d3c1", Label: "Madina K.", Identifier: "+7 705 •••• 77", PlanCode: "free",
 			SubStatus: "active", UsedToday: 7, DailyLimit: 7, TokensMonth: 9_800,
 			Platform: "ios", AppVersion: "1.4.2", Locale: "ru", Tone: "natural",
-			Business: "Handmade jewellery, Instagram orders",
+			Business:   "Handmade jewellery, Instagram orders",
 			Registered: "2026-09-02", LastActive: "2026-09-21 08:03", Status: "active",
 			Events: []DemoEvent{
 				{At: "08:03", Status: "error", Platform: "ios", Language: "ru", ErrorCode: "DAILY_LIMIT_REACHED"},
@@ -90,7 +90,7 @@ func DemoUsers() []DemoUser {
 			ID: "d4e9", Label: "Olim R.", Identifier: "+998 90 •••• 31", PlanCode: "standard",
 			SubStatus: "payment_pending", UsedToday: 4, DailyLimit: 30, TokensMonth: 33_150,
 			Platform: "android", AppVersion: "1.3.9", Locale: "uz", Tone: "professional",
-			Business: "Language school, group enrolment",
+			Business:   "Language school, group enrolment",
 			Registered: "2026-06-19", LastActive: "2026-09-20 19:27", Status: "active",
 			Events: []DemoEvent{
 				{At: "19:27", Status: "success", Platform: "android", Language: "uz", Tokens: 176, LatencyMS: 1180},
@@ -100,7 +100,7 @@ func DemoUsers() []DemoUser {
 			ID: "d5f4", Label: "Sergey B.", Identifier: "+7 702 •••• 19", PlanCode: "pro",
 			SubStatus: "expired", UsedToday: 0, DailyLimit: 7, TokensMonth: 2_400,
 			Platform: "ios", AppVersion: "1.2.7", Locale: "ru", Tone: "formal",
-			Business: "Legal consulting for SMEs",
+			Business:   "Legal consulting for SMEs",
 			Registered: "2026-01-08", LastActive: "2026-09-12 14:05", Status: "disabled",
 			Events: []DemoEvent{
 				{At: "14:05", Status: "error", Platform: "ios", Language: "ru", ErrorCode: "SUBSCRIPTION_EXPIRED"},
