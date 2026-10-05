@@ -135,6 +135,14 @@ data class ReplyComposerFlow(
 
     val isEditingDraft: Boolean get() = stage == Stage.Editing
 
+    /**
+     * Smart correction in the panel's own fields: only while the instruction
+     * (or the copied message) is being written. Never in a reply being
+     * edited - the reply has no strip to preview a correction, so it would be
+     * silent; the iOS keyboard does the same.
+     */
+    val correctsTyping: Boolean get() = stage == Stage.Composing
+
     val isConflict: Boolean get() = stage is Stage.Conflict
 
     /** Stages that show the reply rather than the instruction. */

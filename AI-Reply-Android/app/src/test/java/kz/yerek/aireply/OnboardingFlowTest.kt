@@ -163,6 +163,23 @@ class OnboardingFlowTest {
     }
 
     @Test
+    fun `a first run that comes back after a restart is not started again`() {
+        val file = InMemoryPreferences()
+        assertTrue(
+            "a fresh first run starts",
+            OnboardingFlow.startsRun(OnboardingMode.FIRST_RUN, DeviceStateStore(file).onboardingResumeStep)
+        )
+        // The run saved its step, then the process was killed.
+        DeviceStateStore(file).onboardingResumeStep = "keyboard"
+        assertFalse(OnboardingFlow.startsRun(OnboardingMode.FIRST_RUN, DeviceStateStore(file).onboardingResumeStep))
+
+        assertTrue("the tutorial starts every time", OnboardingFlow.startsRun(OnboardingMode.TUTORIAL, "keyboard"))
+
+        DeviceStateStore(file).completeOnboarding(2)
+        assertTrue("a finished run left nothing to resume", OnboardingFlow.startsRun(OnboardingMode.FIRST_RUN, DeviceStateStore(file).onboardingResumeStep))
+    }
+
+    @Test
     fun `an unsent profile change stays marked until it is cleared`() {
         val file = InMemoryPreferences()
         DeviceStateStore(file).profilePendingSync = true

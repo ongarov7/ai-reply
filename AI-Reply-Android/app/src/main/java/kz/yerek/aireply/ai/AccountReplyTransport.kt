@@ -265,6 +265,8 @@ class AccountReplyTransport(
             }
             is ApiError.InvalidRequest ->
                 AIReplyError.MessageTooLong(AILimits.current.sourceCharacters)
+            // The instruction, not the message: say so, with the server's limit.
+            is ApiError.InstructionTooLong -> AIReplyError.InstructionTooLong(error.limit)
             else -> AIReplyError.ServiceUnavailable
         }
     }

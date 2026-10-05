@@ -182,11 +182,14 @@ class AutocorrectEngine(
     /**
      * A word known only as the plain spelling of a Kazakh one, on the Kazakh
      * layout: the Kazakh spelling, offered first and never applied by itself.
+     * Not for a word the Kazakh or the Russian list has as typed: a listed
+     * Russian word (`был`, `куда`, `они`) is meant as written.
      */
     private fun kazakhHint(lookup: Lookup): String? {
         if (!lookup.known || lookup.learned || lookup.language != KeyboardLanguage.KAZAKH || lookup.key in lookup.words) {
             return null
         }
+        if (isListedInOtherLanguage(lookup.key, lookup.language)) return null
         val rank = CandidateSearch.kazakhSpelling(lookup.words, lookup.key)
         return if (rank >= 0) transferCase(lookup.word, lookup.words.display(rank)) else null
     }
@@ -211,6 +214,12 @@ class AutocorrectEngine(
         if (!confident || isRejected(lookup, lookupKey(best.word))) return null
         return transferCase(lookup.word, best.word)
     }
+
+    /** Whether a list [language] draws candidates from besides its own has [key] as typed (§10.4). */
+    private fun isListedInOtherLanguage(key: String, language: KeyboardLanguage): Boolean =
+        AutocorrectDictionaries.candidateOrder(language)
+            .filter { it != language }
+            .any { other -> dictionaries.wordList(other)?.contains(key) == true }
 
     private fun isRejected(lookup: Lookup, correctionKey: String): Boolean =
         RejectedCorrection(lookup.language, lookup.key, correctionKey) in rejected

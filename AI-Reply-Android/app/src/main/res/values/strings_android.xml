@@ -195,9 +195,8 @@
     <string name="onboarding_keyboard_step_enable">Turn on AI\u00A0Reply in the list of keyboards</string>
     <string name="onboarding_keyboard_step_confirm">Confirm the system notice</string>
     <string name="onboarding_keyboard_step_choose">Come back here and choose AI\u00A0Reply</string>
-    <string name="onboarding_keyboard_notice">Android warns that a keyboard “may be able to collect all the text you type”. Every keyboard gets this standard notice. AI\u00A0Reply sends text only when you tap %1$s or %2$s.</string>
     <string name="onboarding_switch_note">To switch keyboards, tap the keyboard icon in the navigation bar, or press and hold the space bar or the language key — it depends on the phone.</string>
-    <string name="onboarding_clipboard_note">AI\u00A0Reply reads the message you copied only when you tap a template. Some Android versions then briefly show a notice that the clipboard was read — that\'s normal.</string>
+    <string name="onboarding_clipboard_note">AI\u00A0Reply reads the message you copied only when you tap a template or Paste message. Some Android versions then briefly show a notice that the clipboard was read — that\'s normal.</string>
     <string name="cd_tutorial_next">Show the next step</string>
     <string name="settings_smart_correction">Smart correction</string>
     <string name="settings_smart_correction_footer">Typos are fixed and words suggested on your phone: nothing you type in other apps is sent anywhere. While you write an instruction in AI\u00A0Reply\'s own field, that text may be sent to suggest a cleaner version.</string>

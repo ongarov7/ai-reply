@@ -97,6 +97,53 @@ class AutocorrectEngineTest {
         assertNull("only on the Kazakh layout", engine.analyze("кайда", "", russian).suggestions.firstOrNull { it.kind == Suggestion.Kind.HINT })
     }
 
+    /**
+     * Regression: a Russian word the Kazakh list lacks got a Kazakh hint in
+     * the first slot (был → біл, куда → құда, они → өңі). A word the Russian
+     * list has is meant as written.
+     */
+    @Test
+    fun `a listed Russian word gets no Kazakh hint`() {
+        val wrong = setOf("біл", "Біл", "құда", "өңі", "іх", "тұт", "көму")
+        listOf("был", "Был", "куда", "они", "их", "тут", "кому").forEach { word ->
+            val analysis = engine.analyze(word, "", kazakh)
+            assertNull(word, analysis.correction)
+            assertTrue("$word: ${analysis.suggestions}", analysis.suggestions.none { it.kind == Suggestion.Kind.HINT || it.text in wrong })
+        }
+    }
+
+    /**
+     * Kazakh typed with plain letters keeps its hint, even when a Russian web
+     * text once had that spelling (the Russian known filter has кайда and
+     * биз): only the Russian word list takes the hint away.
+     */
+    @Test
+    fun `Kazakh plain spellings keep their hint`() {
+        mapOf("кайда" to "қайда", "калайсын" to "қалайсың", "бугин" to "бүгін", "биз" to "біз", "сиз" to "сіз").forEach { (typed, hint) ->
+            val analysis = engine.analyze(typed, "", kazakh)
+            assertNull(typed, analysis.correction)
+            assertEquals(typed, Suggestion(hint, Suggestion.Kind.HINT), analysis.suggestions.first())
+        }
+    }
+
+    /**
+     * A word typed with a Kazakh letter is Kazakh: the Russian list is not
+     * searched for it, so no Russian word can replace a typed Kazakh letter
+     * or crowd out the Kazakh fix (the iOS engine used to: қном → гном,
+     * душі → душу, үрену left alone because of арену).
+     */
+    @Test
+    fun `a word with a Kazakh letter gets no Russian candidates`() {
+        assertEquals("үйрену", corrected("үрену", kazakh))
+        mapOf(
+            "қном" to "гном", "душі" to "душу", "бғды" to "беды", "кағое" to "какое", "важғости" to "важности", "үрену" to "арену"
+        ).forEach { (typed, russian) ->
+            assertFalse("$typed → $russian", engine.candidates(typed, kazakh, limit = 10).any { it.word == russian })
+        }
+        listOf("қном", "душі", "бғды", "кағое", "важғости").forEach { assertNull(it, corrected(it, kazakh)) }
+        assertTrue("plain letters still search Russian", engine.candidates("превет", kazakh).any { it.word == "привет" })
+    }
+
     @Test
     fun `Kazakh typos are corrected`() {
         val analysis = engine.analyze("қалайсын", "", kazakh)

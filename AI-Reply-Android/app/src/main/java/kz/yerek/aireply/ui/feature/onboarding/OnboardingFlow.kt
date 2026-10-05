@@ -90,5 +90,14 @@ data class OnboardingFlow(val mode: OnboardingMode, val asksGender: Boolean) {
          */
         fun asksGender(mode: OnboardingMode, genderAnswered: Boolean, startedAsking: Boolean?): Boolean =
             mode == OnboardingMode.FIRST_RUN && (startedAsking ?: !genderAnswered)
+
+        /**
+         * Whether opening the screen starts a run, for `onboarding_started`.
+         * A first run with a saved resume point ([savedStep]) is the same run
+         * coming back after the process was killed, not a new start; the
+         * tutorial starts every time. The iOS rule, so both funnels count alike.
+         */
+        fun startsRun(mode: OnboardingMode, savedStep: String?): Boolean =
+            mode == OnboardingMode.TUTORIAL || savedStep == null
     }
 }

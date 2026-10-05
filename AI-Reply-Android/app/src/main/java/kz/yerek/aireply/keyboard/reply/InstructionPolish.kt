@@ -7,9 +7,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kz.yerek.aireply.ai.AILimits
 import kz.yerek.aireply.ai.AIReplyException
 import kz.yerek.aireply.ai.PolishService
 import kz.yerek.aireply.core.lang.KeyboardLanguage
+import kz.yerek.aireply.core.text.codePointLength
 import kz.yerek.aireply.keyboard.input.KeyboardTextFieldState
 import kz.yerek.aireply.platform.ReplyLog
 
@@ -27,7 +29,10 @@ import kz.yerek.aireply.platform.ReplyLog
  * cancels whatever was pending, and a late answer for older text is dropped
  * (the same ticket pattern as the reply controllers). Failures are never
  * shown; after [MAX_FAILURES] in a row the keyboard stops asking until it is
- * shown again ([reset]).
+ * shown again ([reset]). A suggestion longer than the instruction may be
+ * ([limit]) is never offered or taken: the request would only be refused.
+ * The chip belongs to its instruction and goes when typing moves to another
+ * field ([focusMoved]).
  */
 class InstructionPolish(
     private val scope: CoroutineScope,
@@ -54,8 +59,14 @@ class InstructionPolish(
     /** The layout on screen, sent as a language hint. */
     var inputLanguage: () -> KeyboardLanguage? = { null }
 
+    /** The instruction's character limit, the one the server enforces on Reply and Write. */
+    var limit: () -> Int = { AILimits.current.instructionCharacters }
+
     private var job: Job? = null
     private var undoJob: Job? = null
+
+    /** The field the pending request is for; null when nothing is pending. */
+    private var asking: KeyboardTextFieldState? = null
 
     /** Bumped by every edit, so an answer for older text never lands. */
     private var ticket = 0
@@ -69,13 +80,15 @@ class InstructionPolish(
         dismiss()
         if (failures >= MAX_FAILURES) return
         val mine = ticket
+        asking = field
         job = scope.launch {
             delay(pauseMs)
             val text = field.text.trim()
-            if (text == settled || !PolishService.qualifies(text) || !isAllowed() || !service.isAvailable) return@launch
+            val maxLength = limit()
+            if (text == settled || !PolishService.qualifies(text, maxLength) || !isAllowed() || !service.isAvailable) return@launch
             settled = text
             val polished = try {
-                service.polish(PolishService.Request(text, inputLanguage()))
+                service.polish(PolishService.Request(text, inputLanguage()), maxLength)
             } catch (failure: AIReplyException) {
                 // Never shown: the user asked for nothing. Counted, so a dead
                 // connection does not cost a request after every pause.
@@ -85,8 +98,25 @@ class InstructionPolish(
             }
             failures = 0
             if (mine != ticket || polished == null || field.text.trim() != text) return@launch
+            asking = null
             offer = Offer(field, field.text, polished)
         }
+    }
+
+    /** The polished text to show while [field] is the one being typed in: only its own offer. */
+    fun offerFor(field: KeyboardTextFieldState?): String? = offer?.takeIf { field != null && it.field === field }?.text
+
+    /** Whether Undo shows while [field] is the one being typed in. */
+    fun canUndo(field: KeyboardTextFieldState?): Boolean = field != null && taken?.field === field
+
+    /**
+     * Typing moved to [field] (null: no field). An offer, its Undo and a
+     * request still pending all belong to one instruction; typing anywhere
+     * else - the copied message, a reply - drops them.
+     */
+    fun focusMoved(field: KeyboardTextFieldState?) {
+        val owner = offer?.field ?: taken?.field ?: asking ?: return
+        if (owner !== field) dismiss()
     }
 
     /**
@@ -97,7 +127,7 @@ class InstructionPolish(
     fun accept(): KeyboardTextFieldState? {
         val current = offer ?: return null
         dismiss()
-        if (current.field.text != current.original) return null
+        if (current.field.text != current.original || current.text.codePointLength() > limit()) return null
         current.field.set(current.text)
         settled = current.text.trim()
         taken = Taken(current.field, current.original, current.text)
@@ -124,6 +154,7 @@ class InstructionPolish(
         ticket++
         job?.cancel()
         job = null
+        asking = null
         undoJob?.cancel()
         undoJob = null
         offer = null

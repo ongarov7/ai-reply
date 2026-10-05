@@ -75,7 +75,11 @@ fun OnboardingScreen(mode: OnboardingMode, onFinished: () -> Unit) {
     }
     var gender by rememberSaveable { mutableStateOf(profileGender?.takeIf { it.isSpecified }) }
 
-    var started by rememberSaveable { mutableStateOf(false) }
+    // Read before the first step is saved: a run that comes back after the
+    // process was killed was started already.
+    var started by rememberSaveable {
+        mutableStateOf(!OnboardingFlow.startsRun(mode, services.deviceState.onboardingResumeStep))
+    }
     var viewed by rememberSaveable { mutableStateOf<OnboardingStep?>(null) }
     LaunchedEffect(Unit) {
         if (started) return@LaunchedEffect

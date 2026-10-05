@@ -229,6 +229,74 @@ class PolishTest {
     }
 
     @Test
+    fun `a suggestion longer than the instruction may be is never offered`() {
+        // The server lets a polish grow a little; at the limit that is too much.
+        polish.limit = { note.length }
+        write(note)
+        pause()
+        assertEquals("the instruction itself fits", 1, transport.requests.size)
+        transport.answer(polished)
+        scope.runCurrent()
+        assertTrue(polished.length > note.length)
+        assertNull(polish.offer)
+    }
+
+    @Test
+    fun `a suggestion that no longer fits the limit cannot be taken`() {
+        write(note)
+        pause()
+        transport.answer(polished)
+        scope.runCurrent()
+        assertEquals(polished, polish.offer?.text)
+
+        polish.limit = { polished.length - 1 }
+        assertNull(polish.accept())
+        assertEquals(note, field.text)
+    }
+
+    // ------------------------------------------------------------ focus
+
+    @Test
+    fun `the chip shows only while its instruction is the field being typed in`() {
+        val message = KeyboardTextFieldState("скопированное сообщение")
+        write(note)
+        pause()
+        transport.answer(polished)
+        scope.runCurrent()
+
+        assertEquals(polished, polish.offerFor(field))
+        assertNull("the copied message has its own strip", polish.offerFor(message))
+        assertNull(polish.offerFor(null))
+
+        polish.focusMoved(field)
+        assertEquals("still typing in the instruction", polished, polish.offer?.text)
+        polish.focusMoved(message)
+        assertNull("typing in the copied message drops it", polish.offer)
+        polish.focusMoved(field)
+        assertNull("and it does not come back by itself", polish.offerFor(field))
+    }
+
+    @Test
+    fun `moving to another field drops a pending request and the Undo`() {
+        val message = KeyboardTextFieldState("скопированное сообщение")
+        write(note)
+        polish.focusMoved(message)
+        pause()
+        assertTrue(transport.requests.isEmpty())
+
+        write(note)
+        pause()
+        transport.answer(polished)
+        scope.runCurrent()
+        polish.accept()
+        assertTrue(polish.canUndo(field))
+        assertFalse(polish.canUndo(message))
+        polish.focusMoved(message)
+        assertNull(polish.taken)
+        assertEquals("the taken text stays", polished, field.text)
+    }
+
+    @Test
     fun `a stale suggestion cannot be taken`() {
         write(note)
         pause()

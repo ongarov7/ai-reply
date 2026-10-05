@@ -136,6 +136,8 @@ class AccountApiTest {
         assertEquals(AIReplyError.TimedOut, AccountReplyTransport.map(ApiError.ProviderTimeout))
         assertEquals(AIReplyError.EmptyResponse, AccountReplyTransport.map(ApiError.EmptyResponse))
         assertEquals(AIReplyError.ServiceUnavailable, AccountReplyTransport.map(ApiError.Server))
+        // An instruction past the server's limit is said to be one, not "service unavailable".
+        assertEquals(AIReplyError.InstructionTooLong(400), AccountReplyTransport.map(ApiError.InstructionTooLong(400)))
     }
 
     // ------------------------------------------------------------ decoding

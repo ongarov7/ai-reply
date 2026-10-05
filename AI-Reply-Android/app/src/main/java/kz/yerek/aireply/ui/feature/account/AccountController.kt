@@ -410,6 +410,7 @@ class AccountController(
 
     private fun signOutLocally() {
         credentials.clear()
+        profileSync?.signedOut()
         onSignedOut()
         _state.update {
             it.copy(

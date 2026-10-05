@@ -463,6 +463,7 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
                 autocorrect.clear()
                 sourceExpanded = !sourceExpanded
                 if (!sourceExpanded && focus == PanelFocus.SOURCE) focus = PanelFocus.INSTRUCTION
+                polish.focusMoved(activeField)
                 refreshAutoShift()
             },
             onClearSource = {
@@ -563,13 +564,18 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
 
     /**
      * What replaces the intents while [instruction]'s panel is composing: the
-     * word suggestions, or the polish chip / its Undo for that instruction.
+     * word suggestions, or the polish chip / its Undo for that instruction -
+     * only while the instruction is the field being typed in, so editing the
+     * copied message shows that field's own suggestions.
      */
-    private fun typingAssist(instruction: KeyboardTextFieldState): TypingAssist = TypingAssist(
-        suggestions = if (autocorrect.place == AutocorrectController.Place.COMPOSER) autocorrect.suggestions else emptyList(),
-        polished = polish.offer?.takeIf { it.field === instruction }?.text,
-        canUndoPolish = polish.taken?.field === instruction
-    )
+    private fun typingAssist(instruction: KeyboardTextFieldState): TypingAssist {
+        val typingIn = activeField?.takeIf { it === instruction }
+        return TypingAssist(
+            suggestions = if (autocorrect.place == AutocorrectController.Place.COMPOSER) autocorrect.suggestions else emptyList(),
+            polished = polish.offerFor(typingIn),
+            canUndoPolish = polish.canUndo(typingIn)
+        )
+    }
 
     /** Leaving the fields for an action (a request, a stage change): no strip, no chip, nothing pending. */
     private fun leaveFields() {
@@ -792,7 +798,7 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
      */
     private fun correctsField(field: KeyboardTextFieldState): Boolean =
         autocorrect.correctsFields && field !== compose.session?.draft && field !== replies.session?.draft &&
-            activeFlow.stage == ReplyComposerFlow.Stage.Composing
+            activeFlow.correctsTyping
 
     /**
      * A composer field changed. [byUser]: typed, dictated or an intent - which
@@ -814,6 +820,9 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
     private fun pickSuggestion(suggestion: Suggestion) {
         val field = if (autocorrect.place == AutocorrectController.Place.COMPOSER) activeField else null
         if (autocorrect.pick(suggestion) && field != null) fieldEdited(field)
+        // The space after the picked word is the keyboard's: a space typed
+        // next is not the start of the double-space full stop (as on iOS).
+        lastSpaceTap = 0
         refreshAutoShift()
     }
 
@@ -981,6 +990,8 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
                 }
                 PanelFocus.SOURCE -> return
             }
+            // A polish offer belongs to the instruction: it goes when typing moves elsewhere.
+            polish.focusMoved(activeField)
             refreshAutoShift()
             return
         }
@@ -1001,6 +1012,8 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
                 session.draft.moveCursor(offset)
             }
         }
+        // Typing in the copied message or the reply: the instruction's polish offer goes.
+        polish.focusMoved(activeField)
         refreshAutoShift()
     }
 

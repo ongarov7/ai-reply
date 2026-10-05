@@ -59,12 +59,23 @@ class ImeComposingTest {
         scope.runCurrent()
     }
 
-    /** Types [keys] one character at a time; the app's selection reports arrive right away unless [late]. */
+    /**
+     * Types [keys] one character at a time, each word's analysis landing
+     * before the next key as it does at human speed; the app's selection
+     * reports arrive right away unless [late].
+     */
     private fun type(keys: String, late: Boolean = false) {
         keys.forEach { key ->
             controller.typeInHost(key.toString())
             if (!late) deliverReports()
+            scope.runCurrent()
         }
+    }
+
+    /** Taps the strip's [text], the app's report arriving right away. */
+    private fun pick(text: String) {
+        assertTrue("$text is on the strip", controller.pick(controller.suggestions.first { it.text == text }))
+        deliverReports()
         scope.runCurrent()
     }
 
@@ -106,6 +117,22 @@ class ImeComposingTest {
         assertEquals("Ну, Привет,", connection.toString())
         type(" сегодян.")
         assertEquals("Ну, Привет, сегодня.", connection.toString())
+    }
+
+    @Test
+    fun `a separator typed before the word's analysis lands ends it as typed`() {
+        start()
+        // Faster than the background analysis: nothing has landed for this word.
+        "сегодян ".forEach { key ->
+            controller.typeInHost(key.toString())
+            deliverReports()
+        }
+        assertEquals("never searched on the key press itself", "сегодян ", connection.toString())
+        scope.runCurrent()
+
+        type("сегодян")
+        type(" ")
+        assertEquals("once the analysis is there, the space corrects", "сегодян сегодня ", connection.toString())
     }
 
     @Test
@@ -286,6 +313,77 @@ class ImeComposingTest {
     }
 
     @Test
+    fun `punctuation after a picked word takes the space's place`() {
+        start()
+        type("сего")
+        pick("сегодня")
+        assertEquals("сегодня ", connection.toString())
+
+        type(",")
+        assertEquals("Gboard's «слово, », not «слово ,»", "сегодня, ", connection.toString())
+        assertEquals(9, connection.selectionEnd)
+        type("и")
+        assertEquals("сегодня, и", connection.toString())
+    }
+
+    @Test
+    fun `every mark that follows a word replaces the picked word's space`() {
+        listOf(".", ",", "!", "?", ";", ":").forEach { mark ->
+            start()
+            type("сего")
+            pick("сегодня")
+            type(mark)
+            assertEquals("сегодня$mark ", connection.toString())
+            type(mark)
+            assertEquals("a second mark follows the first", "сегодня$mark$mark ", connection.toString())
+        }
+    }
+
+    @Test
+    fun `a space after a picked word is not doubled`() {
+        start()
+        type("сего")
+        pick("сегодня")
+        type(" ")
+        assertEquals("сегодня ", connection.toString())
+        type("и")
+        assertEquals("сегодня и", connection.toString())
+
+        // After a mark that took the space's place, too.
+        type(" сего")
+        pick("сегодня")
+        type(", ")
+        assertEquals("сегодня и сегодня, ", connection.toString())
+    }
+
+    @Test
+    fun `only the very next key finds the picked word's space`() {
+        start()
+        type("сего")
+        pick("сегодня")
+        type("и,")
+        assertEquals("сегодня и,", connection.toString())
+
+        start()
+        type("сего")
+        pick("сегодня")
+        assertFalse("backspace deletes the space as usual", backspace())
+        type(",")
+        assertEquals("сегодня,", connection.toString())
+    }
+
+    @Test
+    fun `a caret moved after the pick leaves the space before it alone`() {
+        start(ImeFakeInputConnection("Ну "))
+        type("сего")
+        pick("сегодня")
+        connection.moveCaretExternally(3)
+        deliverReports()
+        type(",")
+        assertEquals("Ну ,сегодня ", connection.toString())
+    }
+
+    @Test
     fun `tapping what was typed keeps it and learns it`() {
         start()
         type("сегодян")
@@ -346,8 +444,10 @@ class ImeComposingTest {
     fun `the keyboard's own fields are corrected and undone the same way`() {
         start()
         val field = KeyboardTextFieldState()
-        "Ответь что сегодян ".forEach { controller.typeInField(field, it.toString(), limit = 400) }
-        scope.runCurrent()
+        "Ответь что сегодян ".forEach {
+            controller.typeInField(field, it.toString(), limit = 400)
+            scope.runCurrent()
+        }
         assertEquals("Ответь что сегодня ", field.text)
 
         assertTrue(controller.deleteInField(field, limit = 400))
@@ -360,8 +460,38 @@ class ImeComposingTest {
         start()
         val field = KeyboardTextFieldState()
         "спасиб".forEach { controller.typeInField(field, it.toString(), limit = 7) }
+        scope.runCurrent()
         assertTrue("the space still fits", controller.typeInField(field, " ", limit = 7))
         assertEquals("спасиб ", field.text)
+    }
+
+    @Test
+    fun `the keyboard's own fields take punctuation after a picked word the same way`() {
+        start()
+        val field = KeyboardTextFieldState()
+        "Скажи сего".forEach { controller.typeInField(field, it.toString(), limit = 400) }
+        scope.runCurrent()
+        assertTrue(controller.pick(controller.suggestions.first { it.text == "сегодня" }))
+        assertEquals("Скажи сегодня ", field.text)
+
+        assertTrue(controller.typeInField(field, ".", limit = 400))
+        assertEquals("Скажи сегодня. ", field.text)
+        assertFalse("the space is there already", controller.typeInField(field, " ", limit = 400))
+        assertEquals("Скажи сегодня. ", field.text)
+        assertEquals(field.text.length, field.cursor)
+    }
+
+    @Test
+    fun `at the field's limit the mark still replaces the picked word's space`() {
+        start()
+        val field = KeyboardTextFieldState()
+        "Скажи сего".forEach { controller.typeInField(field, it.toString(), limit = 14) }
+        scope.runCurrent()
+        assertTrue(controller.pick(controller.suggestions.first { it.text == "сегодня" }))
+        assertEquals(14, field.text.length)
+
+        assertTrue(controller.typeInField(field, ",", limit = 14))
+        assertEquals("Скажи сегодня,", field.text)
     }
 
     private companion object {

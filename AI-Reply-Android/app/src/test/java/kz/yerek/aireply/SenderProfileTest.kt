@@ -14,6 +14,7 @@ import kz.yerek.aireply.core.lang.KeyboardLanguage
 import kz.yerek.aireply.data.account.ServerConfigDto
 import kz.yerek.aireply.data.account.ServerFeaturesDto
 import kz.yerek.aireply.data.profile.ProfileSync
+import kz.yerek.aireply.data.settings.DeviceStateStore
 import kz.yerek.aireply.domain.model.BusinessContext
 import kz.yerek.aireply.domain.model.EmojiPolicy
 import kz.yerek.aireply.domain.model.GrammaticalGender
@@ -207,5 +208,21 @@ class SenderProfileTest {
         assertNull("already the same", ProfileSync.adoptedGender(GrammaticalGender.MALE, "male", pendingSync = false))
         assertNull("an older server", ProfileSync.adoptedGender(null, null, pendingSync = false))
         assertNull("a value this build does not know", ProfileSync.adoptedGender(null, "other", pendingSync = false))
+    }
+
+    @Test
+    fun `an unsent choice is dropped at sign-out and the next account's own is taken over`() {
+        val device = DeviceStateStore(InMemoryPreferences())
+        // Account A chose Female offline: the change waits for the server.
+        device.profilePendingSync = true
+        assertNull(ProfileSync.adoptedGender(GrammaticalGender.FEMALE, "male", device.profilePendingSync))
+
+        device.accountSignedOut()
+        assertFalse("nothing left to send to the next account", device.profilePendingSync)
+        assertEquals(
+            "account B's Male comes back with its session",
+            GrammaticalGender.MALE,
+            ProfileSync.adoptedGender(GrammaticalGender.FEMALE, "male", device.profilePendingSync)
+        )
     }
 }

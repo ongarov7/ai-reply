@@ -64,6 +64,8 @@ class AutocorrectParityTest {
     fun `every case of the shared table gets the same answer`() {
         val cases = expectations()
         assertTrue("the table covers every layout", cases.map { it.layout }.toSet() == KeyboardLanguage.entries.toSet())
+        val rows = cases.map { Triple(it.layout, it.typed, it.before) }
+        assertEquals("no row twice: a later row would hide an earlier one", rows.size, rows.toSet().size)
         val mismatches = cases.mapNotNull { case ->
             val analysis = engine.analyze(case.typed, case.before, case.layout)
             val strip = analysis.suggestions.map { it.kind.shared() to it.text }

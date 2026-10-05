@@ -37,12 +37,14 @@ class PolishService(
 
     /**
      * The polished instruction, or null when there is nothing to suggest:
-     * the text is too short to bother, or the server found it fine. Throws
+     * the text is too short to bother, the server found it fine, or its
+     * version would not fit the instruction's [limit] (the server allows a
+     * little growth, and taking it would only make Reply fail). Throws
      * [AIReplyException] when the request failed.
      */
-    suspend fun polish(request: Request): String? {
+    suspend fun polish(request: Request, limit: Int = AILimits.current.instructionCharacters): String? {
         val text = request.text.trim()
-        if (!qualifies(text)) return null
+        if (!qualifies(text, limit)) return null
 
         val override = transportOverride?.invoke()
         if (override == null && !configuration.isReady) AIReplyError.AuthenticationFailed.raise()
@@ -59,7 +61,7 @@ class PolishService(
         } catch (throwable: Throwable) {
             throw AIReplyException(ReplyNetworking.mapError(throwable))
         }
-        return polished?.trim()?.takeIf { it.isNotEmpty() && it != text }
+        return polished?.trim()?.takeIf { it.isNotEmpty() && it != text && it.codePointLength() <= limit }
     }
 
     companion object {

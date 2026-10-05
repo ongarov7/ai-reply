@@ -166,9 +166,8 @@
     <string name="onboarding_keyboard_step_enable">Включите AI\u00A0Reply в списке клавиатур</string>
     <string name="onboarding_keyboard_step_confirm">Подтвердите системное предупреждение</string>
     <string name="onboarding_keyboard_step_choose">Вернитесь сюда и выберите AI\u00A0Reply</string>
-    <string name="onboarding_keyboard_notice">Android предупреждает, что клавиатура «может собирать весь вводимый текст». Такое стандартное предупреждение показывается для любой клавиатуры. AI\u00A0Reply отправляет текст, только когда вы нажимаете «%1$s» или «%2$s».</string>
     <string name="onboarding_switch_note">Чтобы сменить клавиатуру, нажмите значок клавиатуры на панели навигации или удерживайте пробел либо клавишу языка — зависит от телефона.</string>
-    <string name="onboarding_clipboard_note">AI\u00A0Reply читает скопированное сообщение, только когда вы нажимаете шаблон. Некоторые версии Android в этот момент ненадолго показывают уведомление о чтении буфера обмена — это нормально.</string>
+    <string name="onboarding_clipboard_note">AI\u00A0Reply читает скопированное сообщение, только когда вы нажимаете шаблон или кнопку «Вставить сообщение». Некоторые версии Android в этот момент ненадолго показывают уведомление о чтении буфера обмена — это нормально.</string>
     <string name="cd_tutorial_next">Показать следующий шаг</string>
     <string name="settings_smart_correction">Умная коррекция</string>
     <string name="settings_smart_correction_footer">Опечатки исправляются, а слова подсказываются прямо на телефоне: ничего из того, что вы печатаете в других приложениях, никуда не отправляется. Когда вы пишете инструкцию в поле AI\u00A0Reply, этот текст может отправляться, чтобы предложить более аккуратный вариант.</string>

@@ -58,6 +58,11 @@ class ProfileSync(
         }
     }
 
+    /** The account signed out: its unsent change must not reach the next one ([DeviceStateStore.accountSignedOut]). */
+    fun signedOut() {
+        device.accountSignedOut()
+    }
+
     /** After `/me`: a choice made on another device of the same account is taken over. */
     fun adopt(server: AccountProfile) {
         val local = configuration.profile.grammaticalGender

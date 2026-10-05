@@ -68,6 +68,15 @@ class DeviceStateStore internal constructor(private val prefs: SharedPreferences
         get() = prefs.getBoolean(KEY_PENDING_SYNC, false)
         set(value) = prefs.edit().putBoolean(KEY_PENDING_SYNC, value).apply()
 
+    /**
+     * The account signed out: a profile change it never received is dropped,
+     * so it is never sent to the next account that signs in on this phone,
+     * and that account's own choice is taken over again.
+     */
+    fun accountSignedOut() {
+        prefs.edit().remove(KEY_PENDING_SYNC).apply()
+    }
+
     /** The backing file, for once-per-install flags such as [kz.yerek.aireply.analytics.ProductEvents]. */
     val sharedPreferences: SharedPreferences get() = prefs
 
