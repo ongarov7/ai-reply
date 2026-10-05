@@ -209,6 +209,15 @@ final class ComposerTextView: UITextView {
         return current.substring(to: clampedCaret(in: current))
     }
 
+    /// The character right after the caret, or nil at the end of the text.
+    /// Smart correction stays out of a word the caret sits inside.
+    var textAfterCaret: String? {
+        let current = currentText as NSString
+        let location = clampedCaret(in: current)
+        guard location < current.length else { return nil }
+        return current.substring(with: current.rangeOfComposedCharacterSequence(at: location))
+    }
+
     /// Puts the caret where the user tapped.
     func placeCaret(at point: CGPoint) {
         caret = characterIndex(at: point)

@@ -50,6 +50,11 @@ struct OnboardingView: View {
         .background(Color.dsBackground)
         .onAppear(perform: start)
         .onChange(of: flow.current) { _, step in show(step) }
+        // A choice that arrives from the account after the step was built -
+        // a slow `/me` - shows as selected instead of an empty question.
+        .onChange(of: model.profile.grammaticalGender) { _, new in
+            if gender == nil, let new, new != .unspecified { gender = new }
+        }
     }
 
     // MARK: Steps
@@ -216,10 +221,13 @@ struct OnboardingView: View {
         moveOn()
     }
 
-    /// Skip on the gender step is an answer too: neutral wording.
+    /// Skip on the gender step is an answer too: neutral wording - unless
+    /// the profile already holds a male or female answer (given before, or
+    /// brought from another device), which Skip never erases.
     private func skip() {
-        if flow.current == .gender {
-            ProfileSync(configuration: model, account: account).choose(.unspecified, source: .onboarding)
+        if flow.current == .gender,
+           let answer = ProfileSync.skippedAnswer(current: model.profile.grammaticalGender) {
+            ProfileSync(configuration: model, account: account).choose(answer, source: .onboarding)
         }
         moveOn()
     }

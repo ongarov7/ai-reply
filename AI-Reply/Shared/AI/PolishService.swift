@@ -225,6 +225,32 @@ final class InstructionPolisher {
     }
 }
 
+/// The slot under the instruction swaps what it shows in place: the quick
+/// intents, the suggested version, Undo. A tap aimed at what was there a
+/// moment ago must not land on what replaced it - a late tap on Undo choosing
+/// an intent once the window ended, a tap meant for an intent using a
+/// suggestion that just appeared, a double tap undoing what the first tap
+/// used. So for a moment after the chip appears, changes or leaves, the slot's
+/// intents and chip ignore taps. Typing never starts this pause, so the word
+/// suggestions there are never held back.
+struct PolishSlotTapGuard: Equatable {
+
+    static let interval: TimeInterval = 0.45
+
+    private var quietUntil: TimeInterval = -.infinity
+
+    /// The chip went from `old` to `new` at `time` (seconds, any monotonic clock).
+    mutating func chipChanged(from old: InstructionPolisher.Chip, to new: InstructionPolisher.Chip, at time: TimeInterval) {
+        guard old != new else { return }
+        quietUntil = time + Self.interval
+    }
+
+    /// Whether a tap on an intent or on the chip at `time` should count.
+    func acceptsTap(at time: TimeInterval) -> Bool {
+        time >= quietUntil
+    }
+}
+
 #if DEBUG
 /// DEBUG ONLY: a stand-in for the polish endpoint in the Simulator
 /// (`-AIReplyMockReplies`): a capital first letter and a closing full stop,

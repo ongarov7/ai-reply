@@ -30,6 +30,15 @@ final class TypingStringsTests: XCTestCase {
         }
     }
 
+    /// The typed word in the strip wears the language's own quotation marks,
+    /// as on Android: “…” in English, «…» in Russian, Kazakh and Uzbek.
+    func testTypedWordUsesTheLanguagesQuotationMarks() {
+        XCTAssertEqual(TypingStrings.forLanguage(.english).typed("teh"), "\u{201C}teh\u{201D}")
+        XCTAssertEqual(TypingStrings.forLanguage(.russian).typed("сегодян"), "«сегодян»")
+        XCTAssertEqual(TypingStrings.forLanguage(.kazakh).typed("қалайсын"), "«қалайсын»")
+        XCTAssertEqual(TypingStrings.forLanguage(.uzbek).typed("salom"), "«salom»")
+    }
+
     func testKazakhUsesKazakhLetters() {
         let kazakh = TypingStrings.forLanguage(.kazakh)
         let letters = Set("әғқңөұүһі")

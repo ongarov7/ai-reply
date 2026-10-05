@@ -1,8 +1,9 @@
 import UIKit
 
 /// The suggestion strip, drawn like the system's QuickType bar: three equal
-/// slots with hairlines between them, the typed word in quotes, the word a
-/// space would put in its place in bold on a raised background.
+/// slots with hairlines between them, the typed word in the app language's
+/// quotation marks (“…” or «…»), the word a space would put in its place in
+/// bold on a raised background.
 ///
 /// It only ever covers a slot that already exists - the persona pills, or the
 /// quick intents in the composer - so showing it never changes the
@@ -149,7 +150,7 @@ private final class SuggestionSlot: UIControl {
         label.font = .systemFont(ofSize: 16, weight: isDefault ? .semibold : .regular)
         switch item.kind {
         case .typed:
-            label.text = "“\(item.text)”"
+            label.text = strings.typed(item.text)
             accessibilityLabel = strings.keepTyped(item.text)
         case .correction:
             label.text = item.text

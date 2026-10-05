@@ -32,6 +32,8 @@ protocol KeyboardActionBarDelegate: AnyObject {
     /// The suggested version of the instruction was tapped.
     func actionBarDidAcceptPolish(_ bar: KeyboardActionBar)
     func actionBarDidUndoPolish(_ bar: KeyboardActionBar)
+    /// The composer's caret moved without typing: a tap, another field.
+    func actionBarDidMoveComposerCaret(_ bar: KeyboardActionBar)
 }
 
 /// The area above the keys. Two shapes:
@@ -163,6 +165,9 @@ final class KeyboardActionBar: UIView {
     var instructionText: String { composer.instructionText }
     /// The composer field being typed into is one smart correction looks after.
     var correctsFocusedField: Bool { isComposing && composer.focusedFieldAcceptsCorrection }
+    /// The character right after the composer's caret; nil at the end of the
+    /// text or when the composer is closed.
+    var textAfterCursor: String? { isComposing ? composer.textAfterCursor : nil }
     var isEditingInstruction: Bool { isComposing && composer.isEditingInstruction }
 
     // MARK: Suggestions
@@ -259,5 +264,10 @@ extension KeyboardActionBar: ReplyComposerViewDelegate {
 
     func composerDidUndoPolish(_ composer: ReplyComposerView) {
         delegate?.actionBarDidUndoPolish(self)
+    }
+
+    func composerDidMoveCaret(_ composer: ReplyComposerView) {
+        guard isComposing else { return }
+        delegate?.actionBarDidMoveComposerCaret(self)
     }
 }

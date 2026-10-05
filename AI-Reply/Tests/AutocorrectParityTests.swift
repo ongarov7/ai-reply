@@ -37,6 +37,9 @@ final class AutocorrectParityTests: XCTestCase {
         let table = try JSONDecoder().decode(Table.self, from: Data(contentsOf: Self.table))
         XCTAssertEqual(table.format, 1)
         XCTAssertFalse(table.cases.isEmpty)
+        XCTAssertEqual(Set(table.cases.map(\.layout)), Set(KeyboardLanguage.allCases.map(\.rawValue)), "the table covers every layout")
+        let rows = table.cases.map { "\($0.layout)|\($0.typed)|\($0.before)" }
+        XCTAssertEqual(Set(rows).count, rows.count, "no row twice: a later row would hide an earlier one")
 
         for entry in table.cases {
             let language = try XCTUnwrap(KeyboardLanguage(rawValue: entry.layout), entry.layout)

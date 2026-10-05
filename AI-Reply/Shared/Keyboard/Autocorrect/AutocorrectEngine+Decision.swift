@@ -123,13 +123,14 @@ extension AutocorrectEngine {
 
     /// The Kazakh spelling of a word typed with plain letters (`кайда` →
     /// `қайда`): offered first on the Kazakh layout, never applied by itself.
-    /// Only for a known word the Kazakh list does not have as typed, and only
-    /// a listed word that differs from it in plain letters standing for
-    /// Kazakh ones alone; the fewest such letters and the most frequent word
-    /// win (0.3 a letter plus the rank penalty).
+    /// Only for a known word that neither the Kazakh nor the Russian list has
+    /// as typed - a listed Russian word (`был`, `куда`, `они`) is meant as
+    /// written - and only a listed word that differs from it in plain letters
+    /// standing for Kazakh ones alone; the fewest such letters and the most
+    /// frequent word win (0.3 a letter plus the rank penalty).
     func kazakhLetterHint(for word: String) -> String? {
         let key = WordList.key(for: word)
-        guard language == .kazakh, words.rank(of: key) == nil else { return nil }
+        guard language == .kazakh, words.rank(of: key) == nil, !isListedInOtherLanguage(key) else { return nil }
         let typed = Array(key.utf16)
         let codes = words.encode(key)
         guard !codes.contains(words.unknownCode) else { return nil }

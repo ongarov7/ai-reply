@@ -4,8 +4,8 @@ import SwiftUI
 struct AIReplyApp: App {
 
     @State private var settings = AppSettings()
-    @State private var configuration = ReplyConfigurationModel()
-    @State private var account = AccountModel()
+    @State private var configuration: ReplyConfigurationModel
+    @State private var account: AccountModel
     @State private var keyboardStatus = KeyboardStatusMonitor()
     @Environment(\.scenePhase) private var scenePhase
 
@@ -15,6 +15,18 @@ struct AIReplyApp: App {
         #endif
         // Sends only for a signed-in user of a server that asks for events.
         ProductEvents.sink = ProductEventReporter.shared
+
+        let configuration = ReplyConfigurationModel()
+        let account = AccountModel()
+        // A gender chosen on another device is taken the moment the profile
+        // arrives, before the first-run onboarding decides its steps: a
+        // returning user is not asked again.
+        account.didReceiveProfile = { [weak configuration, weak account] profile in
+            guard let configuration, let account else { return }
+            ProfileSync(configuration: configuration, account: account).adoptServerChoice(profile?.gender)
+        }
+        _configuration = State(initialValue: configuration)
+        _account = State(initialValue: account)
     }
 
     var body: some Scene {
@@ -72,7 +84,10 @@ struct AIReplyApp: App {
     @ViewBuilder
     private var root: some View {
         if configuration.needsOnboarding {
-            OnboardingView(flow: .firstRun(profileHasGender: configuration.profile.grammaticalGender != nil))
+            OnboardingView(flow: .firstRun(profileHasGender: ProfileSync.knowsGender(
+                local: configuration.profile.grammaticalGender,
+                server: account.profile?.gender
+            )))
         } else {
             NavigationStack { HomeView() }
         }

@@ -71,6 +71,15 @@ final class KeyboardViewController: UIInputViewController {
     /// Whether the host field wants typing help (not an address, a code or
     /// a password), from its text traits.
     private var hostAllowsCorrection = true
+    /// Whether a word is being typed at the caret right now. The strip and a
+    /// separator's correction act only then - never on a word that was
+    /// already there when the keyboard appeared or the caret moved.
+    private var wordTyping = AutocorrectCaret()
+    /// A word character right after the host's caret: the caret is inside a
+    /// word, where smart correction stays out. Read together with
+    /// `hostContext`; the keyboard's own typing never changes what follows
+    /// the caret, so no keystroke has to read it.
+    private var hostCaretInsideWord = false
 
     /// Which AI flow owns the composer panel. At most one: Create drops any
     /// reply session when it opens, and the persona row - the only way into a
@@ -139,6 +148,9 @@ final class KeyboardViewController: UIInputViewController {
         reloadSettings()
         AILimits.reload()
         smartCorrectionEnabled = SharedSettings.shared.smartCorrectionEnabled
+        // A word already in the field is not being typed: no strip over the
+        // personas until the user types one.
+        wordTyping.reset()
         autocorrect.keyboardWillAppear(settingEnabled: smartCorrectionEnabled, language: language)
         polisher.reset()
         refreshThemeIfNeeded()
@@ -213,8 +225,10 @@ final class KeyboardViewController: UIInputViewController {
         let ownMutation = now - lastHostMutation < 0.45
         if !ownMutation {
             refreshHostContext()
-            // The text moved under the correction: Undo no longer applies.
+            // The text moved under the correction: Undo no longer applies,
+            // and no word is being typed at the new caret yet.
             autocorrect.keepCorrection()
+            wordTyping.reset()
             if now - lastAppearanceProbe > 0.5 {
                 lastAppearanceProbe = now
                 refreshThemeIfNeeded()
@@ -549,6 +563,7 @@ final class KeyboardViewController: UIInputViewController {
 
     private func refreshHostContext() {
         hostContext = (textDocumentProxy.documentContextBeforeInput).map { String($0.suffix(200)) }
+        hostCaretInsideWord = AutocorrectCaret.continuesWord(textDocumentProxy.documentContextAfterInput)
         hostAutocapitalization = textDocumentProxy.autocapitalizationType ?? .sentences
         hostAllowsCorrection = AutocorrectFieldPolicy.allowsCorrection(in: textDocumentProxy)
     }
@@ -557,12 +572,18 @@ final class KeyboardViewController: UIInputViewController {
 
     /// Whether the keys are typing where smart correction may help: a host
     /// field that is not an address, a code or a password, or the composer's
-    /// instruction and reply - never the copied message.
+    /// instruction - never the copied message or a reply being edited. And
+    /// only for a word being typed right now, with nothing of it after the
+    /// caret: correcting the half before the caret would split the word.
     private var correctionAllowed: Bool {
         switch target {
-        case .host: return hostAllowsCorrection
-        case .composer: return actionBar.correctsFocusedField
-        case .nowhere: return false
+        case .host:
+            return hostAllowsCorrection && wordTyping.allowsCorrection(caretInsideWord: hostCaretInsideWord)
+        case .composer:
+            return actionBar.correctsFocusedField
+                && wordTyping.allowsCorrection(caretInsideWord: AutocorrectCaret.continuesWord(actionBar.textAfterCursor))
+        case .nowhere:
+            return false
         }
     }
 
@@ -576,20 +597,27 @@ final class KeyboardViewController: UIInputViewController {
     /// when one is ready. Returns it, so a backspace can take it back.
     private func correctWordBeforeSeparator() -> AutocorrectCorrection? {
         guard let correction = autocorrect.correction(before: textBeforeCursor, allowed: correctionAllowed),
-              replaceBeforeCursor(correction.original, with: correction.replacement) else { return nil }
+              replaceBeforeCursor(correction.original, with: correction.replacement, endsWord: true) else { return nil }
         return correction
     }
 
     /// Replaces `old`, which ends right at the caret, with `new` - through
-    /// the same paths as typing, so the host mirror stays in step.
+    /// the same paths as typing, so the host mirror stays in step. With
+    /// `endsWord`, `old` is a word that must end at the caret.
+    ///
+    /// In another app's field the live text is read once more first: the
+    /// mirror can be a moment behind (a quick tap elsewhere, a field that
+    /// turned Return into an action), and deleting against it would delete
+    /// the wrong text. One read, only when a correction, an Undo or a strip
+    /// pick is about to change the text - never on a plain keystroke.
     @discardableResult
-    private func replaceBeforeCursor(_ old: String, with new: String) -> Bool {
+    private func replaceBeforeCursor(_ old: String, with new: String, endsWord: Bool) -> Bool {
         switch target {
         case .host:
-            guard let context = hostContext, context.hasSuffix(old) else { return false }
+            guard let live = confirmedHostText(endingWith: old, endsWord: endsWord) else { return false }
             for _ in 0..<old.count { textDocumentProxy.deleteBackward() }
             textDocumentProxy.insertText(new)
-            hostContext = String((String(context.dropLast(old.count)) + new).suffix(200))
+            hostContext = String((String(live.dropLast(old.count)) + new).suffix(200))
             lastHostMutation = Date.timeIntervalSinceReferenceDate
             return true
         case .composer:
@@ -597,6 +625,25 @@ final class KeyboardViewController: UIInputViewController {
         case .nowhere:
             return false
         }
+    }
+
+    /// The host's live text before the caret, when it still ends with
+    /// `expected` (and, for `endsWord`, no word character follows the
+    /// caret). Otherwise nil, and the keyboard catches up with what the user
+    /// did: the mirror is re-read, the pending Undo dropped, and no word is
+    /// being typed at this caret.
+    private func confirmedHostText(endingWith expected: String, endsWord: Bool) -> String? {
+        let before = textDocumentProxy.documentContextBeforeInput
+        let after = endsWord ? textDocumentProxy.documentContextAfterInput : nil
+        if AutocorrectCaret.liveText(before: before, after: after, endsWith: expected, requiresWordEnd: endsWord),
+           let before {
+            return before
+        }
+        refreshHostContext()
+        autocorrect.keepCorrection()
+        wordTyping.reset()
+        autocorrect.restart()
+        return nil
     }
 
     /// Typed after a word, these end it and apply its correction.
@@ -703,8 +750,9 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     /// The field being typed into may have changed: the strip is asked for
-    /// again where the keys now type.
+    /// again where the keys now type, once a word is typed there.
     private func restartSuggestions() {
+        wordTyping.reset()
         autocorrect.restart()
         refreshSuggestions()
     }
@@ -876,6 +924,7 @@ extension KeyboardViewController: KeyboardKeysViewDelegate {
         let isLetter = plane == .letters && text.count == 1 && (text.first?.isLetter ?? false)
         let corrected = Self.wordSeparators.contains(text) ? correctWordBeforeSeparator() : nil
         insert(isLetter ? shift.apply(to: text) : text)
+        if target != .nowhere { wordTyping.typed(text) }
         if let corrected { autocorrect.didApply(corrected, separator: text) }
         if plane == .letters {
             shift.characterTyped()
@@ -898,9 +947,14 @@ extension KeyboardViewController: KeyboardKeysViewDelegate {
     func keysView(_ view: KeyboardKeysView, didDelete unit: KeyboardKeysView.DeleteUnit) {
         prepareComposerForTyping()
         // Backspace right after a correction takes it back: the word returns
-        // as typed, without the separator, and is not corrected again.
-        if unit == .character, let applied = autocorrect.takeBackCorrection(before: textBeforeCursor),
-           replaceBeforeCursor(applied.correction.replacement + applied.separator, with: applied.restoredText) {
+        // as typed, without the separator, and is not corrected again. When
+        // the live text no longer ends with the correction - a single-line
+        // field that turned Return into an action, a caret moved a moment
+        // ago - it is an ordinary backspace.
+        if unit == .character, autocorrect.takeBackCorrection(before: textBeforeCursor, replace: { applied in
+            self.replaceBeforeCursor(applied.correction.replacement + applied.separator,
+                                     with: applied.restoredText, endsWord: false)
+        }) {
             refreshAutoShift()
             refreshSuggestions()
             return
@@ -969,11 +1023,14 @@ extension KeyboardViewController: KeyboardKeysViewDelegate {
 
     func keysView(_ view: KeyboardKeysView, moveCursorBy offset: Int) {
         autocorrect.keepCorrection()
+        wordTyping.reset()
         switch target {
         case .host:
-            // The strip follows once the host reports the move.
+            // The context is re-read once the host reports the move; the
+            // strip goes now - it was for the word at the old caret.
             textDocumentProxy.adjustTextPosition(byCharacterOffset: offset)
             lastHostMutation = 0
+            refreshSuggestions()
         case .composer:
             actionBar.moveCaret(by: offset)
             refreshSuggestions()
@@ -1021,16 +1078,40 @@ extension KeyboardViewController: KeyboardActionBarDelegate {
 
     /// A word of the strip: it replaces the word being typed, then a space.
     /// The quoted word keeps what was typed and teaches it to the keyboard.
+    ///
+    /// Only for the word the strip was offered for, still being typed at the
+    /// caret: a strip left over from before a caret move, or one a newer
+    /// answer is about to replace, must not replace another word.
     func actionBar(_ bar: KeyboardActionBar, didPick suggestion: AutocorrectSuggestion) {
-        guard let word = textBeforeCursor.flatMap(TypedWord.init(before:)) else { return }
-        UIDevice.current.playInputClick()
+        guard correctionAllowed,
+              let word = textBeforeCursor.flatMap(TypedWord.init(before:)),
+              autocorrect.offersSuggestions(for: word) else {
+            autocorrect.restart()
+            refreshSuggestions()
+            return
+        }
         autocorrect.keepCorrection()
         switch suggestion.kind {
         case .typed:
+            if target == .host {
+                // Nothing is replaced, but a word is learned and a space
+                // typed: only for the word really at the caret.
+                guard let live = confirmedHostText(endingWith: word.text, endsWord: true) else {
+                    refreshAutoShift()
+                    refreshSuggestions()
+                    return
+                }
+                hostContext = String(live.suffix(200))
+            }
             autocorrect.keep(word.text)
         case .correction, .word:
-            guard replaceBeforeCursor(word.text, with: suggestion.text) else { return }
+            guard replaceBeforeCursor(word.text, with: suggestion.text, endsWord: true) else {
+                refreshAutoShift()
+                refreshSuggestions()
+                return
+            }
         }
+        UIDevice.current.playInputClick()
         insert(" ")
         // A space typed right after this is a space, not the full-stop shortcut.
         lastSpaceTap = 0
@@ -1041,6 +1122,8 @@ extension KeyboardViewController: KeyboardActionBarDelegate {
     func actionBarDidAcceptPolish(_ bar: KeyboardActionBar) {
         guard let text = polisher.accept(replacing: bar.instructionText) else { return }
         bar.replaceInstruction(with: text)
+        // A whole new text, not a word being typed: no strip for its last word.
+        wordTyping.reset()
         refreshAutoShift()
         refreshSuggestions()
     }
@@ -1048,6 +1131,18 @@ extension KeyboardViewController: KeyboardActionBarDelegate {
     func actionBarDidUndoPolish(_ bar: KeyboardActionBar) {
         guard let text = polisher.undo() else { return }
         bar.replaceInstruction(with: text)
+        wordTyping.reset()
+        refreshAutoShift()
+        refreshSuggestions()
+    }
+
+    /// A tap put the composer's caret somewhere else (or in another field):
+    /// the strip was for the word at the old caret, and Undo for a correction
+    /// there no longer applies.
+    func actionBarDidMoveComposerCaret(_ bar: KeyboardActionBar) {
+        autocorrect.keepCorrection()
+        wordTyping.reset()
+        autocorrect.restart()
         refreshAutoShift()
         refreshSuggestions()
     }

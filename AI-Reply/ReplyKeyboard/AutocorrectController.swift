@@ -41,6 +41,8 @@ final class AutocorrectController {
     private var isActive: Bool { isSettingOn && isVisible }
 
     private var ticket = 0
+    /// Whether the last strip handed to the delegate had anything in it.
+    private var showsSuggestions = false
     private var requested: TypedWord?
     private var latest: (word: TypedWord, suggestions: AutocorrectSuggestions)?
     /// A correction just made; the very next key decides whether it stays.
@@ -66,7 +68,7 @@ final class AutocorrectController {
         forget()
         switchLanguage(to: language)
         // Whatever the strip showed last time belongs to another field.
-        delegate?.autocorrect(self, didUpdate: [])
+        publish([])
     }
 
     /// The keyboard is on screen: the dictionaries start loading in the
@@ -106,13 +108,15 @@ final class AutocorrectController {
     /// `allowed` false, means nothing should be suggested here.
     func textDidChange(before context: String?, allowed: Bool) {
         let word = isActive && allowed ? context.flatMap(TypedWord.init(before:)) : nil
-        guard word != requested else { return }
+        // The same word asks nothing new - except that a strip still on
+        // screen for no word at all (after `restart()`) must go.
+        guard word != requested || (word == nil && showsSuggestions) else { return }
         requested = word
         ticket += 1
         latestTicket.set(ticket)
         guard let word, let engine = Self.loader?.engine(for: language) else {
             latest = nil
-            delegate?.autocorrect(self, didUpdate: [])
+            publish([])
             return
         }
         let ticket = self.ticket
@@ -138,23 +142,33 @@ final class AutocorrectController {
         return latest.suggestions.correction
     }
 
+    /// Whether the strip on screen was worked out for exactly `word`. A tap
+    /// on the strip applies only to the word it was offered for: after a
+    /// caret move, or while a newer answer is on its way, the strip may still
+    /// show another word's suggestions for a moment.
+    func offersSuggestions(for word: TypedWord) -> Bool {
+        latest?.word == word
+    }
+
     /// The separator after `correction` was typed: keep it for one key.
     func didApply(_ correction: AutocorrectCorrection, separator: String) {
         applied = AppliedAutocorrection(correction: correction, separator: separator)
     }
 
-    /// Backspace right after a correction: what to put back, if the text
-    /// before the caret still ends with exactly what the correction left.
-    /// The correction is then taken back for this session and the word as
-    /// typed is learned.
-    func takeBackCorrection(before context: String?) -> AppliedAutocorrection? {
-        guard let applied else { return nil }
+    /// Backspace right after a correction. When the text before the caret
+    /// still ends with exactly what the correction left, `replace` is asked to
+    /// put the word as typed back; only if it did is the correction taken
+    /// back for this session and the word learned. False: nothing was taken
+    /// back, and the backspace is an ordinary one.
+    func takeBackCorrection(before context: String?, replace: (AppliedAutocorrection) -> Bool) -> Bool {
+        guard let applied else { return false }
         self.applied = nil
-        guard let context, context.hasSuffix(applied.correction.replacement + applied.separator) else { return nil }
+        guard let context, context.hasSuffix(applied.correction.replacement + applied.separator),
+              replace(applied) else { return false }
         session.undo(applied)
         saveLearnedWords()
         forget()
-        return applied
+        return true
     }
 
     /// The keys now type somewhere else (the composer opened or closed, a
@@ -183,7 +197,12 @@ final class AutocorrectController {
         guard ticket == self.ticket else { return }
         let checked = vetoed(suggestions, for: word)
         latest = (word, checked)
-        delegate?.autocorrect(self, didUpdate: checked.items)
+        publish(checked.items)
+    }
+
+    private func publish(_ items: [AutocorrectSuggestion]) {
+        showsSuggestions = !items.isEmpty
+        delegate?.autocorrect(self, didUpdate: items)
     }
 
     /// The system spell checker has the last word on Russian and English:

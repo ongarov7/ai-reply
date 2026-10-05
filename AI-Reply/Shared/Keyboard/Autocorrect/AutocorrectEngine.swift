@@ -90,15 +90,18 @@ final class AutocorrectEngine: Sendable {
     ///
     /// Never offered: a word that turns a typed Kazakh letter into its plain
     /// letter, and on the English layout a contraction typed without its
-    /// apostrophe (`dont`), which has its own fix.
+    /// apostrophe (`dont`), which has its own fix. A word typed with a Kazakh
+    /// letter is Kazakh, so only the layout's own list is searched for it -
+    /// the Russian list never competes (as on Android).
     func candidates(for word: String, limit: Int) -> [AutocorrectCandidate] {
         let key = WordList.key(for: word)
         let units = Array(key.utf16)
         guard limit > 0, !units.isEmpty else { return [] }
-        let found = pools.enumerated().flatMap { index, pool in
+        let searched = units.contains { Self.kazakhLetterUnits.contains($0) } ? Array(pools.prefix(1)) : pools
+        let found = searched.enumerated().flatMap { index, pool in
             nearest(units, in: pool, limit: limit).map { (pool: index, candidate: $0) }
         }
-        guard pools.count > 1 else { return found.map(\.candidate) }
+        guard searched.count > 1 else { return found.map(\.candidate) }
         // The same word may be listed in both languages: it counts once, at
         // its better score.
         var seen: Set<String> = []
@@ -140,6 +143,12 @@ final class AutocorrectEngine: Sendable {
     /// The furthest a candidate may be from a typed word of `length` units.
     static func searchRadius(length: Int) -> Int32 {
         length <= 3 ? 10 : length <= 5 ? 17 : 20
+    }
+
+    /// Whether a word list searched besides the layout's own has `key` as
+    /// typed: on the Kazakh layout, a listed Russian word (`был`, `куда`).
+    func isListedInOtherLanguage(_ key: String) -> Bool {
+        pools.dropFirst().contains { $0.words.rank(of: key) != nil }
     }
 
     /// A listed spelling with a fix of its own: `dont` is offered as `don't`.

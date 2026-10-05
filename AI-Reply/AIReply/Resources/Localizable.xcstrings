@@ -3465,25 +3465,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "This updates the next time the AI Reply keyboard opens."
+            "value" : "iOS doesn't tell apps about Full Access. This turns green once you open the AI Reply keyboard after turning it on — for example in the field at the bottom of this screen."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Күй AI Reply пернетақтасы келесі рет ашылғанда жаңарады."
+            "value" : "iOS қолданбаларға толық рұқсат туралы хабарламайды. Оны қосқаннан кейін AI Reply пернетақтасын ашқанда күй жасылға ауысады — мысалы, осы экранның төменгі жағындағы өрісте."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Статус обновится, когда клавиатура AI Reply откроется в следующий раз."
+            "value" : "iOS не сообщает приложениям о полном доступе. Статус станет зелёным, когда вы откроете клавиатуру AI Reply после его включения — например, в поле внизу этого экрана."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Holat AI Reply klaviaturasi keyingi safar ochilganda yangilanadi."
+            "value" : "iOS ilovalarga toʻliq ruxsat haqida xabar bermaydi. Uni yoqqaningizdan keyin AI Reply klaviaturasini ochganingizda holat yashil boʻladi — masalan, shu ekranning pastidagi maydonda."
           }
         }
       }
@@ -4747,7 +4747,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%2$d қадамның %1$d-сі"
+            "value" : "%1$d-қадам, барлығы %2$d"
           }
         },
         "ru" : {
@@ -4863,7 +4863,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Пернетақта өзіңіз көшірген хабарламаға жауап береді. Ол жазбаларыңызды оқи алмайды."
+            "value" : "Пернетақта өзіңіз көшірген хабарламаға жауап береді. Ол чаттарыңызды оқи алмайды."
           }
         },
         "ru" : {
@@ -6858,25 +6858,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Typos are fixed and words suggested on your phone — nothing you type in other apps is sent anywhere. While you write an instruction in AI Reply's own field, that text may be sent to suggest a correction. Word lists: Leipzig Corpora Collection (CC BY)."
+            "value" : "Typos are fixed and words suggested on your phone — nothing you type in other apps is sent anywhere. While you write an instruction in AI Reply's own field, that text may be sent to suggest a correction. Without Full Access, iOS may not pass this switch to the keyboard, and correction then stays on. Word lists: Leipzig Corpora Collection (CC BY)."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Қате сөздерді түзету мен сөз ұсыну телефонның өзінде жүреді — басқа қолданбаларда терген мәтініңіз ешқайда жіберілмейді. AI Reply-дың өз өрісіне нұсқау жазғанда, түзетілген нұсқасын ұсыну үшін бұл мәтін жіберілуі мүмкін. Сөздіктер: Leipzig Corpora Collection (CC BY)."
+            "value" : "Қате сөздерді түзету мен сөз ұсыну телефонның өзінде жүреді — басқа қолданбаларда терген мәтініңіз ешқайда жіберілмейді. AI Reply-дың өз өрісіне нұсқау жазғанда, түзетілген нұсқасын ұсыну үшін бұл мәтін жіберілуі мүмкін. Толық рұқсат болмаса, iOS бұл ауыстырғышты пернетақтаға жеткізбеуі мүмкін — онда түзету қосулы қалады. Сөздіктер: Leipzig Corpora Collection (CC BY)."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Опечатки исправляются, а слова подсказываются прямо на телефоне — то, что вы печатаете в других приложениях, никуда не отправляется. Когда вы пишете просьбу в поле самого AI Reply, её текст может отправляться, чтобы предложить исправление. Словари: Leipzig Corpora Collection (CC BY)."
+            "value" : "Опечатки исправляются, а слова подсказываются прямо на телефоне — то, что вы печатаете в других приложениях, никуда не отправляется. Когда вы пишете просьбу в поле самого AI Reply, её текст может отправляться, чтобы предложить исправление. Без полного доступа iOS может не передать этот переключатель клавиатуре — тогда коррекция останется включённой. Словари: Leipzig Corpora Collection (CC BY)."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Xatolarni tuzatish va soʻz takliflari telefonning oʻzida ishlaydi — boshqa ilovalarda yozganlaringiz hech qayerga yuborilmaydi. AI Replyning oʻz maydonida koʻrsatma yozayotganingizda, tuzatish taklif qilish uchun bu matn yuborilishi mumkin. Lugʻatlar: Leipzig Corpora Collection (CC BY)."
+            "value" : "Xatolarni tuzatish va soʻz takliflari telefonning oʻzida ishlaydi — boshqa ilovalarda yozganlaringiz hech qayerga yuborilmaydi. AI Replyning oʻz maydonida koʻrsatma yozayotganingizda, tuzatish taklif qilish uchun bu matn yuborilishi mumkin. Toʻliq ruxsat boʻlmasa, iOS bu kalitni klaviaturaga yetkazmasligi mumkin — unda tuzatish yoqilgan holda qoladi. Lugʻatlar: Leipzig Corpora Collection (CC BY)."
           }
         }
       }
@@ -7264,25 +7264,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "When you tap who you're replying to, AI Reply reads the message you copied. If iOS asks whether AI Reply may paste from WhatsApp, tap Allow Paste."
+            "value" : "When you pick who you're replying to or tap Paste message, AI Reply reads the message you copied. If iOS asks whether AI Reply may paste from WhatsApp, tap Allow Paste."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Кімге жауап беретініңізді таңдағанда, AI Reply көшірілген хабарламаны оқиды. iOS AI Reply-ға WhatsApp-тан қоюға рұқсат бересіз бе деп сұраса, «Қоюға рұқсат ету» түймесін басыңыз."
+            "value" : "Кімге жауап беретініңізді таңдағанда не «Хабарламаны қою» түймесін басқанда, AI Reply көшірілген хабарламаны оқиды. iOS AI Reply-ға WhatsApp-тан қоюға рұқсат бересіз бе деп сұраса, «Қоюға рұқсат ету» түймесін басыңыз."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Когда вы выбираете, кому отвечаете, AI Reply читает скопированное сообщение. Если iOS спросит, разрешить ли AI Reply вставку из WhatsApp, нажмите «Разрешить вставку»."
+            "value" : "Когда вы выбираете, кому отвечаете, или нажимаете «Вставить сообщение», AI Reply читает скопированное сообщение. Если iOS спросит, разрешить ли AI Reply вставку из WhatsApp, нажмите «Разрешить вставку»."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Kimga javob berayotganingizni tanlaganingizda AI Reply nusxalangan xabarni oʻqiydi. iOS AI Replyga WhatsAppdan joylashga ruxsat berasizmi deb soʻrasa, «Joylashga ruxsat berish»ni bosing."
+            "value" : "Kimga javob berayotganingizni tanlaganingizda yoki «Xabarni joylash»ni bosganingizda AI Reply nusxalangan xabarni oʻqiydi. iOS AI Replyga WhatsAppdan joylashga ruxsat berasizmi deb soʻrasa, «Joylashga ruxsat berish»ni bosing."
           }
         }
       }

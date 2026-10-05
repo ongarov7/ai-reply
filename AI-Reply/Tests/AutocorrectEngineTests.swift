@@ -54,9 +54,9 @@ final class AutocorrectEngineTests: XCTestCase {
     }
 
     /// The hint is for a word the Kazakh list does not have as typed, as on
-    /// Android (§10.5). A Russian word the Kazakh list has gets none; a
-    /// Russian word it lacks may get one ("был" → "біл") - offered, never
-    /// applied.
+    /// Android (§10.5). A word either list has gets none: "рахмет" is Kazakh
+    /// as typed, and a listed Russian word is meant as written ("был" is not
+    /// "біл", "куда" is not "құда", "они" is not "өңі").
     func testKazakhHintOnlyForWordsTheKazakhListLacks() throws {
         let kazakh = try AutocorrectFixtures.engine(.kazakh)
         for word in ["сегодня", "қайда", "рахмет"] {
@@ -69,6 +69,36 @@ final class AutocorrectEngineTests: XCTestCase {
         XCTAssertNil(try AutocorrectFixtures.engine(.russian).kazakhLetterHint(for: "кайда"), "only on the Kazakh layout")
     }
 
+    /// Regression: Russian words missing from kk.words used to get a Kazakh
+    /// hint in the first slot (был → біл, куда → құда, они → өңі).
+    func testListedRussianWordGetsNoKazakhHint() throws {
+        let kazakh = try AutocorrectFixtures.engine(.kazakh)
+        for word in ["был", "Был", "куда", "они", "их", "тут", "кому"] {
+            XCTAssertTrue(kazakh.isListedInOtherLanguage(WordList.key(for: word)), word)
+            XCTAssertNil(kazakh.kazakhLetterHint(for: word), word)
+            let strip = kazakh.suggestions(for: TypedWord(text: word))
+            XCTAssertNil(strip.correction, word)
+            for wrong in ["біл", "Біл", "құда", "өңі", "іх", "тұт", "көму"] {
+                XCTAssertFalse(strip.items.contains { $0.text == wrong }, "\(word) → \(wrong)")
+            }
+        }
+        XCTAssertFalse(try AutocorrectFixtures.engine(.russian).isListedInOtherLanguage("был"), "Russian searches one list")
+    }
+
+    /// Kazakh typed with plain letters keeps its hint, whether or not a
+    /// Russian web text ever contained that spelling: only the Russian word
+    /// list (not the Russian known filter, which has "кайда" and "биз")
+    /// takes the hint away.
+    func testKazakhPlainSpellingsKeepTheirHint() throws {
+        let kazakh = try AutocorrectFixtures.engine(.kazakh)
+        let expected = ["кайда": "қайда", "калайсын": "қалайсың", "бугин": "бүгін", "биз": "біз", "сиз": "сіз"]
+        for (typed, hint) in expected {
+            XCTAssertFalse(kazakh.isListedInOtherLanguage(typed), typed)
+            XCTAssertEqual(kazakh.suggestions(for: TypedWord(text: typed)).items.first, AutocorrectSuggestion(text: hint, kind: .word), typed)
+            XCTAssertNil(correction(typed, kazakh), typed)
+        }
+    }
+
     /// The Kazakh layout corrects Russian too (§10.4): its candidates come
     /// from both lists, each word with its own list's rank.
     func testKazakhLayoutCorrectsRussianWords() throws {
@@ -77,6 +107,24 @@ final class AutocorrectEngineTests: XCTestCase {
         XCTAssertEqual(correction("сегодян", kazakh), "сегодня")
         XCTAssertNil(correction("қнига", kazakh), "never қ → к, whichever list has the word")
         XCTAssertFalse(kazakh.candidates(for: "қнига", limit: 10).contains { $0.word == "книга" })
+    }
+
+    /// Regression (parity with Android): a word typed with a Kazakh letter
+    /// is Kazakh, so the Russian list is not searched for it at all. Before,
+    /// iOS let Russian words compete: "қном" became "гном", "душі" became
+    /// "душу", and Russian "арену" crowded out the fix "үрену" → "үйрену".
+    func testKazakhLetterWordsGetNothingFromTheRussianList() throws {
+        let kazakh = try AutocorrectFixtures.engine(.kazakh)
+        XCTAssertEqual(correction("үрену", kazakh), "үйрену")
+        let russianOnly: [String: String] = ["қном": "гном", "душі": "душу", "бғды": "беды", "кағое": "какое", "важғости": "важности", "үрену": "арену"]
+        for (typed, russian) in russianOnly {
+            XCTAssertFalse(kazakh.candidates(for: typed, limit: 10).contains { $0.word == russian }, "\(typed) → \(russian)")
+            XCTAssertNotEqual(correction(typed, kazakh), russian, typed)
+        }
+        for typed in ["қном", "душі", "бғды", "кағое", "важғости"] {
+            XCTAssertNil(correction(typed, kazakh), typed)
+        }
+        XCTAssertTrue(kazakh.candidates(for: "превет", limit: 3).contains { $0.word == "привет" }, "plain letters still search Russian")
     }
 
     func testKazakhTyposAreCorrected() throws {

@@ -216,6 +216,26 @@ final class LocalizationTests: XCTestCase {
         XCTAssertEqual(String(format: settings.localized("onboarding.step"), 2, 5), "Шаг 2 из 5")
     }
 
+    /// Copy kept in step with Android: the Kazakh step counter needs no
+    /// suffix that agrees with the number ("3-сі" was wrong for 1, 3, 4, 5),
+    /// the Kazakh copy-reply step says the keyboard cannot read your chats,
+    /// and the clipboard note names both ways the copied message is read.
+    func testOnboardingCopyMatchesAndroid() {
+        let settings = AppSettings(store: SharedSettings(defaults: UserDefaults(suiteName: "LocalizationTests.\(UUID())")!))
+        settings.setLanguage(.kazakh)
+        XCTAssertEqual(String(format: settings.localized("onboarding.step"), 1, 5), "1-қадам, барлығы 5")
+        XCTAssertEqual(String(format: settings.localized("onboarding.step"), 3, 4), "3-қадам, барлығы 4")
+        XCTAssertTrue(settings.localized("onboarding.usage.prompt").contains("чаттарыңызды"))
+        XCTAssertFalse(settings.localized("onboarding.usage.prompt").contains("жазбаларыңызды"))
+
+        for language in AppLanguage.allCases {
+            settings.setLanguage(language)
+            let note = settings.localized("setup.paste.body")
+            XCTAssertTrue(note.contains(AIReplyStrings.forLanguage(language).pasteMessage),
+                          "the clipboard note leaves out Paste message in \(language.rawValue)")
+        }
+    }
+
     /// Catches a key that was added to ru/kk by copying the English value.
     func testUserFacingScreensAreActuallyTranslated() throws {
         let suspects = [
@@ -228,7 +248,8 @@ final class LocalizationTests: XCTestCase {
             "profile.role", "profile.rules", "templates.section.style",
             "settings.privacy.body", "home.privacy.body", "onboarding.fullAccess.warning",
             "profile.replyLanguage.auto", "profile.replyLanguage.footer",
-            "voice.suggestions.title", "voice.suggestions.rules.footer", "voice.status.failed"
+            "voice.suggestions.title", "voice.suggestions.rules.footer", "voice.status.failed",
+            "onboarding.fullAccess.statusFooter"
         ]
 
         func value(_ key: String, _ language: String) throws -> String {

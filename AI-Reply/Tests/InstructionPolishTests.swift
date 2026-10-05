@@ -163,6 +163,38 @@ final class InstructionPolishTests: XCTestCase {
         XCTAssertEqual(polisher.chip, .none)
     }
 
+    // MARK: The shared slot
+
+    /// The Undo window ends and the quick intents fade back into the same
+    /// place: a tap that was meant for Undo and lands a moment late must not
+    /// pick an intent.
+    func testALateTapAfterUndoEndsDoesNotPickAnIntent() {
+        var guardian = PolishSlotTapGuard()
+        XCTAssertTrue(guardian.acceptsTap(at: 100), "nothing changed yet")
+        guardian.chipChanged(from: .undo, to: .none, at: 100)
+        XCTAssertFalse(guardian.acceptsTap(at: 100.1))
+        XCTAssertFalse(guardian.acceptsTap(at: 100.4))
+        XCTAssertTrue(guardian.acceptsTap(at: 100 + PolishSlotTapGuard.interval))
+    }
+
+    /// The same in the other directions: a suggestion appearing under a
+    /// finger on its way to an intent, and a double tap that would undo
+    /// what the first tap used.
+    func testEveryChipChangeHoldsTapsForAMoment() {
+        var guardian = PolishSlotTapGuard()
+        guardian.chipChanged(from: .none, to: .suggestion("Ответь вежливо."), at: 10)
+        XCTAssertFalse(guardian.acceptsTap(at: 10.2))
+        guardian.chipChanged(from: .suggestion("Ответь вежливо."), to: .undo, at: 20)
+        XCTAssertFalse(guardian.acceptsTap(at: 20.2))
+        XCTAssertTrue(guardian.acceptsTap(at: 21))
+    }
+
+    func testNoChangeNoPause() {
+        var guardian = PolishSlotTapGuard()
+        guardian.chipChanged(from: .none, to: .none, at: 5)
+        XCTAssertTrue(guardian.acceptsTap(at: 5))
+    }
+
     // MARK: Helpers
 
     private func waitUntil(timeout: TimeInterval = 2, _ condition: @MainActor () -> Bool) async throws {

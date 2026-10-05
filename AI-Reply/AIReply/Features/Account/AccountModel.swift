@@ -57,6 +57,12 @@ final class AccountModel {
 
     @ObservationIgnored private let service: AccountService
 
+    /// Runs the moment the server's profile arrives - sign-in, `/me`, adding
+    /// an e-mail - before the screens switch. The app takes a gender chosen
+    /// on another device here, so a returning user's onboarding never asks
+    /// the question again.
+    @ObservationIgnored var didReceiveProfile: (@MainActor (AccountAPI.Profile?) -> Void)?
+
     init(service: AccountService = AccountService()) {
         self.service = service
         self.phase = AccountCredentials.isSignedIn ? .signedIn : .signedOut
@@ -141,7 +147,7 @@ final class AccountModel {
         do {
             let account = try await service.account()
             apply(user: account.user, subscription: account.subscription, usage: account.usage)
-            profile = account.profile
+            receive(account.profile)
             applyLegalConsent(account.legalConsent)
             phase = .signedIn
         } catch APIError.unauthorized {
@@ -296,7 +302,9 @@ final class AccountModel {
     /// to the short profile step instead of flashing the home screen first.
     private func completeSignIn(_ session: AccountAPI.Session) -> SignInOutcome {
         apply(user: session.user, subscription: session.subscription, usage: session.usage)
-        profile = session.profile
+        // Before the phase flips: onboarding decides its steps from what the
+        // device knows at that moment.
+        receive(session.profile)
         applyLegalConsent(session.legalConsent)
         phase = .signedIn
         pendingEmail = ""
@@ -327,7 +335,7 @@ final class AccountModel {
     func verifyLinkEmailCode(email: String, code: String) async throws {
         let account = try await service.verifyLinkEmailCode(email: email, code: code)
         apply(user: account.user, subscription: account.subscription, usage: account.usage)
-        profile = account.profile
+        receive(account.profile)
     }
 
     // MARK: Legal and session
@@ -346,6 +354,9 @@ final class AccountModel {
     }
 
     private func signOutLocally() async {
+        // A gender change this account never received stays with it: it must
+        // not be sent to whoever signs in next on this phone.
+        ProfileSync.discardPendingChange()
         AccountCredentials.clear()
         AccountUsageCache.clear()
         AppleSignIn.forget()
@@ -433,6 +444,12 @@ final class AccountModel {
     }
 
     // MARK: Helpers
+
+    /// The server's copy of the profile arrived.
+    private func receive(_ profile: AccountAPI.Profile?) {
+        self.profile = profile
+        didReceiveProfile?(profile)
+    }
 
     private func apply(user: AccountAPI.User, subscription: AccountAPI.Subscription, usage: AccountAPI.Usage) {
         self.user = user

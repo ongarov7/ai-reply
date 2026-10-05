@@ -386,9 +386,13 @@ struct AIReplyStrings: Sendable {
 /// the cleaner version of an instruction offered after a pause.
 ///
 /// The strip itself shows words, not labels; these are what VoiceOver says
-/// about them and the two states of the instruction suggestion.
+/// about them, the quotation marks around the typed word, and the two states
+/// of the instruction suggestion.
 struct TypingStrings: Sendable {
 
+    /// The typed word in the strip, in the language's own quotation marks:
+    /// “…” in English, «…» in Russian, Kazakh and Uzbek - as on Android.
+    let typedFormat: String
     /// VoiceOver for the quoted word in the strip: tapping keeps it as typed.
     let keepTypedFormat: String
     /// VoiceOver for the word the next space will put in place of the typed one.
@@ -400,6 +404,7 @@ struct TypingStrings: Sendable {
     let undo: String
     let undoAccessibility: String
 
+    func typed(_ word: String) -> String { String(format: typedFormat, word) }
     func keepTyped(_ word: String) -> String { String(format: keepTypedFormat, word) }
     func correction(_ word: String) -> String { String(format: correctionFormat, word) }
     func polishSuggestion(_ text: String) -> String { String(format: polishSuggestionFormat, text) }
@@ -414,6 +419,7 @@ struct TypingStrings: Sendable {
     }
 
     private static let english = TypingStrings(
+        typedFormat: "\u{201C}%@\u{201D}",
         keepTypedFormat: "Keep as typed: %@",
         correctionFormat: "Autocorrection: %@",
         polishSuggestionFormat: "Suggested correction: %@",
@@ -423,6 +429,7 @@ struct TypingStrings: Sendable {
     )
 
     private static let russian = TypingStrings(
+        typedFormat: "«%@»",
         keepTypedFormat: "Оставить как есть: %@",
         correctionFormat: "Автоисправление: %@",
         polishSuggestionFormat: "Предлагаемое исправление: %@",
@@ -432,6 +439,7 @@ struct TypingStrings: Sendable {
     )
 
     private static let kazakh = TypingStrings(
+        typedFormat: "«%@»",
         keepTypedFormat: "Жазылғандай қалдыру: %@",
         correctionFormat: "Автотүзету: %@",
         polishSuggestionFormat: "Ұсынылған түзету: %@",
@@ -441,6 +449,7 @@ struct TypingStrings: Sendable {
     )
 
     private static let uzbek = TypingStrings(
+        typedFormat: "«%@»",
         keepTypedFormat: "Yozilganicha qoldirish: %@",
         correctionFormat: "Avtotuzatish: %@",
         polishSuggestionFormat: "Taklif etilgan tuzatish: %@",

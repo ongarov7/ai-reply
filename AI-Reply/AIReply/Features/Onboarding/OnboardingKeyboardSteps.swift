@@ -44,6 +44,9 @@ struct OnboardingKeyboardStep: View {
 struct OnboardingFullAccessStep: View {
 
     @Environment(KeyboardStatusMonitor.self) private var keyboard
+    /// Set once, while Full Access is not confirmed yet, and kept: the field
+    /// must not vanish under the keyboard the user just opened in it.
+    @State private var offersTestField = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.l) {
@@ -66,6 +69,17 @@ struct OnboardingFullAccessStep: View {
                     OpenKeyboardSettingsButton()
                 }
             }
+
+            // iOS tells no app when its keyboard got Full Access; the
+            // keyboard says so itself when it opens. This field is where to
+            // open it after turning the switch on, so the status can turn
+            // green on this step.
+            if offersTestField {
+                KeyboardTestField()
+            }
+        }
+        .onAppear {
+            if keyboard.status.fullAccess != .on { offersTestField = true }
         }
         .task { await keyboard.followLiveUpdates() }
     }

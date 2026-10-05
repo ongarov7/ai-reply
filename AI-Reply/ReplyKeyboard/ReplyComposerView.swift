@@ -31,6 +31,9 @@ protocol ReplyComposerViewDelegate: AnyObject {
     func composerDidAcceptPolish(_ composer: ReplyComposerView)
     /// Undo after a suggested version was used.
     func composerDidUndoPolish(_ composer: ReplyComposerView)
+    /// The caret moved without typing - a tap in a field, another field
+    /// focused, a quick intent: the word suggestions belong to the old place.
+    func composerDidMoveCaret(_ composer: ReplyComposerView)
 }
 
 /// The AI reply composer.
@@ -145,6 +148,9 @@ final class ReplyComposerView: UIView {
     private var suggestions: [AutocorrectSuggestion] = []
     private var polish: InstructionPolisher.Chip = .none
     private var shownAccessory: Accessory = .intents
+    /// A moment of ignored taps on the intents and the chip after the chip
+    /// changed in their shared place.
+    private var slotTapGuard = PolishSlotTapGuard()
 
     // MARK: Views
 
@@ -977,14 +983,17 @@ final class ReplyComposerView: UIView {
     }
 
     /// Whether the keys are typing into a field smart correction looks after:
-    /// the instruction and the reply, never the copied message.
-    var focusedFieldAcceptsCorrection: Bool {
-        let field = focusedField
-        return field == .instruction || field == .draft
-    }
+    /// the instruction only - the one field whose row has room for the strip.
+    /// A correction nobody could see coming is not made: never in the copied
+    /// message, and never in a reply being edited, where the result row has
+    /// no free slot to show what a space would do.
+    var focusedFieldAcceptsCorrection: Bool { focusedField == .instruction }
 
     /// Whether the focused field is the instruction while it is being written.
     var isEditingInstruction: Bool { focusedField == .instruction }
+
+    /// The character right after the focused field's caret, nil at its end.
+    var textAfterCursor: String? { focusedView?.textAfterCaret }
 
     // MARK: Suggestions
 
@@ -1002,6 +1011,7 @@ final class ReplyComposerView: UIView {
     /// stopped typing anyway.
     func showPolish(_ chip: InstructionPolisher.Chip) {
         guard chip != polish else { return }
+        slotTapGuard.chipChanged(from: polish, to: chip, at: ProcessInfo.processInfo.systemUptime)
         polish = chip
         if chip != .none { polishChip.show(chip) }
         updateAccessory(animated: true)
@@ -1090,6 +1100,7 @@ final class ReplyComposerView: UIView {
     @objc private func conflictCancelTapped() { delegate?.composer(self, didResolveConflictWith: .cancel) }
 
     @objc private func polishTapped() {
+        guard slotTapGuard.acceptsTap(at: ProcessInfo.processInfo.systemUptime) else { return }
         switch polishChip.chip {
         case .suggestion: delegate?.composerDidAcceptPolish(self)
         case .undo: delegate?.composerDidUndoPolish(self)
@@ -1129,6 +1140,7 @@ final class ReplyComposerView: UIView {
         if focus == .source { focus = .instruction }
         refresh()
         remeasure()
+        delegate?.composerDidMoveCaret(self)
     }
 
     @objc private func clearSourceTapped() {
@@ -1139,13 +1151,19 @@ final class ReplyComposerView: UIView {
         delegate?.composer(self, didEdit: .source, text: "")
         refresh()
         remeasure()
+        delegate?.composerDidMoveCaret(self)
     }
+
+    // A tap in a field only moves the caret, but the keyboard must hear of
+    // it: the word suggestions on screen were for the word at the old caret,
+    // and a pick would otherwise replace whatever is before the new one.
 
     @objc private func sourceTapped(_ recognizer: UITapGestureRecognizer) {
         guard flow.stage == .composing else { return }
         focus = .source
         sourceView.placeCaret(at: recognizer.location(in: sourceView))
         refresh()
+        delegate?.composerDidMoveCaret(self)
     }
 
     @objc private func instructionTapped(_ recognizer: UITapGestureRecognizer) {
@@ -1153,6 +1171,7 @@ final class ReplyComposerView: UIView {
         focus = .instruction
         instructionView.placeCaret(at: recognizer.location(in: instructionView))
         refresh()
+        delegate?.composerDidMoveCaret(self)
     }
 
     @objc private func draftTapped(_ recognizer: UITapGestureRecognizer) {
@@ -1160,11 +1179,15 @@ final class ReplyComposerView: UIView {
         switch flow.stage {
         case .editing:
             draftView.placeCaret(at: point)
+            delegate?.composerDidMoveCaret(self)
         case .result:
             // Tapping the reply means "let me change this": it becomes
             // editable with the caret where the finger was.
             delegate?.composerDidTapReply(self)
-            if flow.stage == .editing { draftView.placeCaret(at: point) }
+            if flow.stage == .editing {
+                draftView.placeCaret(at: point)
+                delegate?.composerDidMoveCaret(self)
+            }
         default:
             break
         }
@@ -1179,7 +1202,8 @@ extension ReplyComposerView: QuickActionRowDelegate {
     /// never become the reply: the user can read what was added, edit it, and
     /// add another intent on top.
     func quickActionRow(_ row: QuickActionRow, didSelect intent: QuickIntent) {
-        guard flow.stage == .composing else { return }
+        guard flow.stage == .composing,
+              slotTapGuard.acceptsTap(at: ProcessInfo.processInfo.systemUptime) else { return }
         focus = .instruction
         let current = instructionText.trimmingCharacters(in: .whitespacesAndNewlines)
         let combined = current.isEmpty ? intent.phrase : current + " " + intent.phrase
@@ -1190,6 +1214,8 @@ extension ReplyComposerView: QuickActionRowDelegate {
         instructionView.setText(clamped)
         refresh()
         delegate?.composer(self, didEdit: .instruction, text: clamped)
+        // The phrase was added, not typed: no word is in progress at the caret.
+        delegate?.composerDidMoveCaret(self)
     }
 }
 
