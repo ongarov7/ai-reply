@@ -9,12 +9,24 @@
     was rejected" error. Excluding it means the user re-enters the key on a new
     device, which is the same outcome iOS gets from
     kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly.
+
+    aireply_device.xml is this phone's own state: which onboarding it finished
+    and what has not reached the server yet. The keyboard is enabled per
+    device, so a new phone must run the onboarding again rather than inherit
+    "done" from the old one.
+
+    aireply_autocorrect.xml holds the words the user taught the keyboard -
+    words they typed - and stays on this phone: never synced, never sent.
 -->
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="sharedpref" path="aireply_secure.xml" />
+        <exclude domain="sharedpref" path="aireply_device.xml" />
+        <exclude domain="sharedpref" path="aireply_autocorrect.xml" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="sharedpref" path="aireply_secure.xml" />
+        <exclude domain="sharedpref" path="aireply_device.xml" />
+        <exclude domain="sharedpref" path="aireply_autocorrect.xml" />
     </device-transfer>
 </data-extraction-rules>

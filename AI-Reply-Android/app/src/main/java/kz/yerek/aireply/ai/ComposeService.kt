@@ -3,6 +3,7 @@ package kz.yerek.aireply.ai
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ensureActive
 import kz.yerek.aireply.core.lang.AppLanguage
+import kz.yerek.aireply.core.lang.KeyboardLanguage
 import kotlin.coroutines.coroutineContext
 
 /**
@@ -11,8 +12,10 @@ import kotlin.coroutines.coroutineContext
  *
  *  * there is no incoming message: the clipboard is never read, nothing copied
  *    is ever sent, and the reply prompt is not involved;
- *  * the request carries the instruction only, and the server writes the
- *    message with its own compose prompt (`POST /api/v1/ai/compose`);
+ *  * the request carries the instruction (plus, for a server that accepts
+ *    them, the sender's grammatical gender and the layout language), and the
+ *    server writes the message with its own compose prompt
+ *    (`POST /api/v1/ai/compose`);
  *  * it spends the same daily quota as a reply and fails with the same closed
  *    set of [AIReplyError]s.
  */
@@ -33,7 +36,12 @@ class ComposeService(
          */
         val uiLanguage: AppLanguage,
         /** Another version of a message the user has already seen. */
-        val isRegeneration: Boolean = false
+        val isRegeneration: Boolean = false,
+        /**
+         * The keyboard layout on screen when Write was tapped: the next hint
+         * after the instruction's own language. Null outside the keyboard.
+         */
+        val inputLanguage: KeyboardLanguage? = null
     )
 
     suspend fun compose(request: Request): GeneratedReply {

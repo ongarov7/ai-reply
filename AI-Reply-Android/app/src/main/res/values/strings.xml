@@ -75,14 +75,14 @@
     <string name="onboarding_conversations_footer">These appear in the keyboard\'s template bar. You can change them later.</string>
     <string name="onboarding_conversations_prompt">What kind of conversations will you use this keyboard for?</string>
     <string name="onboarding_conversations_title">Your conversations</string>
-    <string name="onboarding_done_body">Try the keyboard right here, then use it in WhatsApp, Telegram and Instagram.</string>
-    <string name="onboarding_done_title">You\'re set</string>
+    <string name="onboarding_done_body">Copy a message in any chat, switch to AI\u00A0Reply and tap a template. You always send the reply yourself.</string>
+    <string name="onboarding_done_title">You\'re ready to use AI\u00A0Reply</string>
     <string name="onboarding_finish">Finish</string>
     <string name="onboarding_hours_footer">Optional. When set, replies to clients and partners can take the time of day into account.</string>
     <string name="onboarding_hours_prompt">Do you have working or business hours?</string>
     <string name="onboarding_hours_title">Working hours</string>
-    <string name="onboarding_keyboard_prompt">Add the keyboard in iPhone Settings to generate contextual replies in messaging apps.</string>
-    <string name="onboarding_keyboard_title">Enable Reply Keyboard</string>
+    <string name="onboarding_keyboard_prompt">Two quick steps in Android settings, and AI\u00A0Reply is ready in every messaging app.</string>
+    <string name="onboarding_keyboard_title">Turn on the AI\u00A0Reply keyboard</string>
     <string name="onboarding_next">Continue</string>
     <string name="onboarding_profile_placeholder">I run a small logistics company and usually communicate with customers and partners.</string>
     <string name="onboarding_profile_prompt">Answer in your own words. The app turns this into context for your replies.</string>
@@ -92,17 +92,17 @@
     <string name="onboarding_step">Step %1$d of %2$d</string>
     <string name="onboarding_test_hint">Press and hold the globe key to switch keyboards.</string>
     <string name="onboarding_test_placeholder">Type something…</string>
-    <string name="onboarding_test_prompt">Try it here: switch to Reply Keyboard and type something.</string>
+    <string name="onboarding_test_prompt">Try it here: tap the field and switch to AI\u00A0Reply.</string>
     <string name="onboarding_tone_footer">A starting point. Each template can override it.</string>
     <string name="onboarding_tone_prompt">What tone do you prefer?</string>
     <string name="onboarding_tone_title">Your tone</string>
     <string name="onboarding_usage_prompt">The keyboard replies to the message you copied yourself. It cannot read your chats.</string>
     <string name="onboarding_usage_step_copy">Press and hold the message in WhatsApp, Telegram or Instagram and choose Copy</string>
     <string name="onboarding_usage_step_insert">Edit the draft if you want, tap Insert, and send it yourself</string>
-    <string name="onboarding_usage_step_open">Switch to Reply Keyboard with the globe key</string>
+    <string name="onboarding_usage_step_open">Tap the message field and switch to the AI\u00A0Reply keyboard</string>
     <string name="onboarding_usage_step_template">Tap the template that fits: Friend, Client, Business or Work</string>
     <string name="onboarding_usage_title">Copy, then reply</string>
-    <string name="onboarding_welcome_body">A few short steps to set up the keyboard. Copied text is processed only when you ask for a reply.</string>
+    <string name="onboarding_welcome_body">AI\u00A0Reply writes replies from your keyboard in WhatsApp, Telegram, Instagram, Messages and other apps. Copy a message, choose who you\'re replying to, and the reply is ready.</string>
     <string name="onboarding_welcome_point_copy">Copy a message in any chat app</string>
     <string name="onboarding_welcome_point_edit">Edit the reply before you send it yourself</string>
     <string name="onboarding_welcome_point_templates">Choose who you are replying to</string>
@@ -140,13 +140,11 @@
     <string name="settings_appgroup_unavailable">The app and the keyboard cannot share settings yet. Rebuild the app so the App Group entitlement is applied.</string>
     <string name="settings_language">Language</string>
     <string name="settings_language_footer">Changes the language of this app. The keyboard\'s own labels follow the layout you select on the keyboard itself.</string>
-    <string name="settings_privacy_body">Copied message text and generated replies are sent through the AI Reply server to the AI provider only when you request a reply. They are not stored in the database or written to logs.</string>
+    <string name="settings_privacy_body">Tapping %1$s sends the copied message and your instruction; %2$s sends only your instruction. With Smart correction on, an instruction you type in AI\u00A0Reply\'s own field may also be sent to suggest a correction. Text goes through the AI\u00A0Reply server to the AI provider and is not stored in the database or written to logs.</string>
     <string name="settings_privacy_title">Privacy</string>
     <string name="settings_setup">Setup</string>
-    <string name="settings_setup_footer">Step-by-step instructions, Full Access and paste permission explained.</string>
+    <string name="settings_setup_footer">Keyboard status, step-by-step setup and how AI\u00A0Reply reads what you copy.</string>
     <string name="settings_setup_guide">Keyboard setup</string>
-    <string name="settings_setup_restart">Run setup again</string>
-    <string name="settings_setup_restart_footer">Shows the first-run guide again. Your answers are kept.</string>
     <string name="settings_storage_unavailable">The shared container is unavailable, so the keyboard cannot see your profile. Rebuild the app with the App Group capability enabled.</string>
     <string name="settings_title">Settings</string>
 
@@ -326,4 +324,43 @@
     <string name="home_usage_left">of %1$d left</string>
     <string name="kb_err_sign_in_required">Open the AI Reply app and sign in to keep replying.</string>
     <string name="kb_err_quota_exhausted">You have used today\'s replies. They come back tomorrow, or change your plan in the app.</string>
+
+    <!-- Onboarding v2, the sender's grammatical gender, the tutorial row -->
+    <string name="onboarding_skip_tutorial">Skip tutorial</string>
+    <string name="onboarding_gender_title">How should replies speak for you?</string>
+    <string name="onboarding_gender_prompt">In Russian, some words change with gender: «рад» or «рада». Choose the form Russian replies use for you.</string>
+    <string name="onboarding_gender_skip_note">Skip it, and replies avoid these forms.</string>
+    <string name="onboarding_gender_footer">You can change this in Settings ▸ Profile.</string>
+    <string name="onboarding_usage_step_instruction">If you like, say what to answer, then tap Reply</string>
+    <string name="onboarding_mock_field">Message</string>
+    <string name="onboarding_tutorial_incoming">Hi! How much does your service cost?</string>
+    <string name="onboarding_tutorial_instruction">Politely say I\'m busy today but can call tomorrow.</string>
+    <string name="onboarding_tutorial_instruction_male">@string/onboarding_tutorial_instruction</string>
+    <string name="onboarding_tutorial_instruction_female">@string/onboarding_tutorial_instruction</string>
+    <string name="onboarding_tutorial_reply">Hi! Sorry, I can\'t talk today, but I\'d be happy to call tomorrow and go over the details.</string>
+    <string name="onboarding_tutorial_reply_male">@string/onboarding_tutorial_reply</string>
+    <string name="onboarding_tutorial_reply_female">@string/onboarding_tutorial_reply</string>
+    <string name="onboarding_practice_title">Try it yourself</string>
+    <string name="onboarding_practice_prompt">A practice run on this screen: nothing is sent and no replies are used up.</string>
+    <string name="onboarding_practice_hint_copy">Tap %1$s under the message.</string>
+    <string name="onboarding_practice_hint_open">Copied. Now open the AI\u00A0Reply keyboard.</string>
+    <string name="onboarding_practice_open">Open AI\u00A0Reply</string>
+    <string name="onboarding_practice_hint_persona">This is the AI\u00A0Reply keyboard. You\'re replying to a friend, so tap %1$s.</string>
+    <string name="onboarding_practice_hint_reply">The copied message is already here. Tap %1$s.</string>
+    <string name="onboarding_practice_hint_insert">Like it? Tap %1$s.</string>
+    <string name="onboarding_practice_incoming">Hey! It\'s been ages. How are you?</string>
+    <string name="onboarding_practice_reply">Hey! It really has been a while. So good to hear from you! How are you doing?</string>
+    <string name="onboarding_practice_reply_male">@string/onboarding_practice_reply</string>
+    <string name="onboarding_practice_reply_female">@string/onboarding_practice_reply</string>
+    <string name="profile_gender">Replies in Russian speak as</string>
+    <string name="profile_gender_male">Male</string>
+    <string name="profile_gender_female">Female</string>
+    <string name="profile_gender_unspecified">Not specified</string>
+    <string name="profile_gender_footer">Used only for Russian grammar: «рад/рада», «сделал/сделала». We never guess it from your name or account.</string>
+    <string name="settings_tutorial">How to use AI\u00A0Reply</string>
+    <string name="settings_tutorial_footer">A short walkthrough: copy a message, reply from the keyboard, practise. Nothing is reset.</string>
+    <string name="onboarding_keyboard_privacy">Android warns that a keyboard “may be able to collect all the text you type”. Every keyboard gets this standard notice. AI\u00A0Reply sends text when you tap %1$s or %2$s and, with Smart correction on, the instruction you type in its own field, to suggest a correction. Nothing else you type is sent.</string>
+    <string name="onboarding_gender_example_male" translatable="false">«Я рад помочь»</string>
+    <string name="onboarding_gender_example_female" translatable="false">«Я рада помочь»</string>
+
 </resources>

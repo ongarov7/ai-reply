@@ -30,6 +30,7 @@ import kz.yerek.aireply.data.account.SubscriptionDto
 import kz.yerek.aireply.data.account.UsageDto
 import kz.yerek.aireply.data.account.raise
 import kz.yerek.aireply.data.legal.LegalConsentStore
+import kz.yerek.aireply.data.profile.ProfileSync
 import java.util.TimeZone
 
 /**
@@ -52,6 +53,10 @@ class AccountController(
     private val google: GoogleSignInClient? = null,
     /** Work that must outlive the screen that started it, such as device registration. */
     private val backgroundScope: CoroutineScope? = null,
+    /** Takes over a choice made on another device when the account is read. */
+    private val profileSync: ProfileSync? = null,
+    /** Drops what was kept for the account that just signed out, such as unsent product events. */
+    private val onSignedOut: () -> Unit = {},
     private val clock: () -> Long = System::currentTimeMillis
 ) {
 
@@ -178,6 +183,7 @@ class AccountController(
             usageCache.storePlanCode(account.subscription.plan.code)
             credentials.displayIdentifier = account.user.identifier
             applyLegalConsent(account.legalConsent)
+            profileSync?.adopt(account.profile)
             _state.update {
                 it.copy(
                     phase = Phase.SignedIn,
@@ -344,6 +350,8 @@ class AccountController(
         usageCache.store(session.usage)
         usageCache.storePlanCode(session.subscription.plan.code)
         applyLegalConsent(session.legalConsent)
+        // Before onboarding asks: a returning user's choice comes back with the session.
+        profileSync?.adopt(session.profile)
         _state.update {
             it.copy(
                 phase = Phase.SignedIn,
@@ -402,6 +410,7 @@ class AccountController(
 
     private fun signOutLocally() {
         credentials.clear()
+        onSignedOut()
         _state.update {
             it.copy(
                 phase = Phase.SignedOut,

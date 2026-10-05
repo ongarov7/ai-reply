@@ -1,5 +1,7 @@
 package kz.yerek.aireply.keyboard.ui
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -73,6 +75,7 @@ import kz.yerek.aireply.ai.AIReplyService
 import kz.yerek.aireply.ai.AppStrings
 import kz.yerek.aireply.domain.model.TemplateSummary
 import kz.yerek.aireply.keyboard.KeyboardTheme
+import kz.yerek.aireply.keyboard.autocorrect.Suggestion
 import kz.yerek.aireply.keyboard.reply.ReplyComposerFlow
 import kz.yerek.aireply.keyboard.reply.ReplySession
 import kz.yerek.aireply.voice.VoiceFailure
@@ -94,7 +97,9 @@ class ComposerModel(
     val voice: VoiceState,
     val intents: List<QuickIntent>,
     /** The tallest the reply field may be, from the screen the keyboard is on. */
-    val maxFieldLines: Int
+    val maxFieldLines: Int,
+    /** Suggestions and the polish chip, shown in the intents' place. */
+    val assist: TypingAssist = TypingAssist.NONE
 )
 
 class ComposerActions(
@@ -118,7 +123,8 @@ class ComposerActions(
     val onPreviousVersion: () -> Unit,
     val onNextVersion: () -> Unit,
     val onConflict: (ReplyComposerFlow.ConflictChoice) -> Unit,
-    val onMic: () -> Unit
+    val onMic: () -> Unit,
+    val assist: TypingAssistActions
 )
 
 // ----------------------------------------------------------------- persona row
@@ -132,6 +138,10 @@ class ComposerActions(
  * The personas share the rest of the row - stretched evenly when they fit,
  * with tighter padding when space is short, and scrolling (with a fade, never
  * a clipped label) only when even that does not fit.
+ *
+ * While a word is being typed and there is something to suggest, the word
+ * suggestions take the personas' place - "+" and "✨" stay exactly where they
+ * are, and the row keeps its height.
  */
 @Composable
 fun PersonaRow(
@@ -144,7 +154,9 @@ fun PersonaRow(
     onSelect: (String) -> Unit,
     onAdd: () -> Unit,
     onCreate: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    suggestions: List<Suggestion> = emptyList(),
+    onPick: (Suggestion) -> Unit = {}
 ) {
     Box(
         modifier = modifier
@@ -170,14 +182,25 @@ fun PersonaRow(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            PersonaChips(
-                chips = chips,
-                languageCode = languageCode,
-                selectedId = selectedId,
-                theme = theme,
-                onSelect = onSelect,
-                modifier = Modifier.weight(1f)
-            )
+            // Fades only when the strip comes or goes, never between keystrokes.
+            Crossfade(
+                targetState = suggestions.isNotEmpty(),
+                animationSpec = tween(SUGGESTIONS_FADE_MS),
+                modifier = Modifier.weight(1f),
+                label = "suggestions"
+            ) { typing ->
+                if (typing) {
+                    SuggestionStrip(suggestions, theme, strings, onPick, Modifier.fillMaxWidth().height(PERSONA_ROW_HEIGHT - 8.dp))
+                } else {
+                    PersonaChips(
+                        chips = chips,
+                        languageCode = languageCode,
+                        selectedId = selectedId,
+                        theme = theme,
+                        onSelect = onSelect
+                    )
+                }
+            }
             Spacer(Modifier.width(6.dp))
             CircleIcon(
                 icon = Icons.Filled.Add,
@@ -616,11 +639,13 @@ private fun ComposingRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        IntentRow(
+        IntentSlot(
             intents = model.intents,
             enabled = flow.stage == ReplyComposerFlow.Stage.Composing,
+            assist = model.assist,
+            assistActions = actions.assist,
+            strings = strings,
             theme = theme,
-            moreLabel = strings[R.string.kb_more_actions],
             onIntent = actions.onIntent,
             modifier = Modifier.weight(1f)
         )
@@ -980,3 +1005,4 @@ private const val LINE_HEIGHT_DP = 21
 private val CHIP_GAP = 6.dp
 private val CHIP_PADDINGS = listOf(14.dp, 11.dp, 8.dp)
 private val CHIP_MAX_STRETCH = 28.dp
+private const val SUGGESTIONS_FADE_MS = 120

@@ -49,7 +49,9 @@ class CreateModel(
     /** Lines the instruction area shows before it scrolls. */
     val instructionLines: Int,
     /** The tallest the message field may be, from the screen the keyboard is on. */
-    val maxFieldLines: Int
+    val maxFieldLines: Int,
+    /** Suggestions and the polish chip, shown in the intents' place. */
+    val assist: TypingAssist = TypingAssist.NONE
 )
 
 class CreateActions(
@@ -67,7 +69,8 @@ class CreateActions(
     val onInsert: () -> Unit,
     val onPreviousVersion: () -> Unit,
     val onNextVersion: () -> Unit,
-    val onConflict: (ReplyComposerFlow.ConflictChoice) -> Unit
+    val onConflict: (ReplyComposerFlow.ConflictChoice) -> Unit,
+    val assist: TypingAssistActions
 )
 
 /**
@@ -257,11 +260,13 @@ private fun CreateComposingRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        IntentRow(
+        IntentSlot(
             intents = model.intents,
             enabled = flow.stage == ReplyComposerFlow.Stage.Composing,
+            assist = model.assist,
+            assistActions = actions.assist,
+            strings = strings,
             theme = theme,
-            moreLabel = strings[R.string.kb_more_actions],
             onIntent = actions.onIntent,
             modifier = Modifier.weight(1f)
         )

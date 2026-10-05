@@ -174,6 +174,8 @@ fun ProfileScreen(onBack: () -> Unit) {
                     }
                 }
             }
+
+            GenderSection()
         }
     }
 

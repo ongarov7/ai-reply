@@ -179,4 +179,30 @@
     <string name="kb_compose_intent_decline">Decline politely</string>
     <string name="kb_compose_intent_decline_phrase">Politely decline.</string>
 
+    <!-- Smart correction in the keyboard: the suggestion strip and the instruction polish chip -->
+    <string name="kb_suggestions">Suggestions</string>
+    <string name="kb_suggestion_typed">“%1$s”</string>
+    <string name="kb_suggestion_keep_description">Keep as typed: %1$s</string>
+    <string name="kb_suggestion_correction_description">Correct to %1$s</string>
+    <string name="kb_polish_suggestion_description">Suggested correction: %1$s</string>
+    <string name="kb_polish_undo">Undo</string>
+    <string name="kb_polish_undo_description">Undo the correction</string>
+
+    <!-- Onboarding v2 on Android: keyboard status and setup, switching, clipboard; smart correction -->
+    <string name="android_status_keyboard">AI\u00A0Reply keyboard</string>
+    <string name="android_status_enabled">Enabled</string>
+    <string name="android_status_not_enabled">Not enabled</string>
+    <string name="android_status_current">Current keyboard</string>
+    <string name="android_status_other_keyboard">Another one</string>
+    <string name="onboarding_keyboard_step_enable">Turn on AI\u00A0Reply in the list of keyboards</string>
+    <string name="onboarding_keyboard_step_confirm">Confirm the system notice</string>
+    <string name="onboarding_keyboard_step_choose">Come back here and choose AI\u00A0Reply</string>
+    <string name="onboarding_keyboard_notice">Android warns that a keyboard “may be able to collect all the text you type”. Every keyboard gets this standard notice. AI\u00A0Reply sends text only when you tap %1$s or %2$s.</string>
+    <string name="onboarding_switch_note">To switch keyboards, tap the keyboard icon in the navigation bar, or press and hold the space bar or the language key — it depends on the phone.</string>
+    <string name="onboarding_clipboard_note">AI\u00A0Reply reads the message you copied only when you tap a template. Some Android versions then briefly show a notice that the clipboard was read — that\'s normal.</string>
+    <string name="cd_tutorial_next">Show the next step</string>
+    <string name="settings_smart_correction">Smart correction</string>
+    <string name="settings_smart_correction_footer">Typos are fixed and words suggested on your phone: nothing you type in other apps is sent anywhere. While you write an instruction in AI\u00A0Reply\'s own field, that text may be sent to suggest a cleaner version.</string>
+    <string name="settings_smart_correction_attribution">Word lists: Leipzig Corpora Collection (CC BY).</string>
+
 </resources>

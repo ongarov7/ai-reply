@@ -114,8 +114,8 @@ fun ChecklistRow(
         horizontalArrangement = Arrangement.spacedBy(Spacing.s)
     ) {
         Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(22.dp))
-        Text(title, style = MaterialTheme.typography.bodyLarge)
-        Spacer(Modifier.weight(1f))
+        // The title wraps at large text sizes; the status beside it never gets squeezed out.
+        Text(title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
         Text(
             statusLabel,
             style = MaterialTheme.typography.bodySmall,

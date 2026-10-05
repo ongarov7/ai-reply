@@ -64,7 +64,11 @@ data class ProfileUpdate(
     @SerialName("business_rules") val businessRules: List<String>? = null,
     val locale: String? = null,
     val timezone: String? = null,
-    @SerialName("onboarding_completed") val onboardingCompleted: Boolean? = null
+    @SerialName("onboarding_completed") val onboardingCompleted: Boolean? = null,
+    /** Sent only to a server that announced `sender_profile`. */
+    @SerialName("grammatical_gender") val grammaticalGender: String? = null,
+    /** Sent only to a server that announced `sender_profile`; the server keeps the highest. */
+    @SerialName("onboarding_version") val onboardingVersion: Int? = null
 )
 
 @Serializable
@@ -196,6 +200,16 @@ class AccountService(
         val body = json.encodeToString(ProfileUpdate.serializer(), update)
         decode(AccountProfile.serializer(), client().request("POST", "api/v1/me", body, token))
     }
+
+    /** Product events, at most 20 per call. The server refuses unknown names and values one by one. */
+    suspend fun recordProductEvents(request: ProductEventsRequest): ProductEventsResultDto =
+        session.authenticated { token ->
+            val body = json.encodeToString(ProductEventsRequest.serializer(), request)
+            decode(
+                ProductEventsResultDto.serializer(),
+                client().request("POST", "api/v1/analytics/events", body, token)
+            )
+        }
 
     /** Registers this device so a push token has somewhere to live later. */
     suspend fun registerDevice(pushToken: String? = null) {

@@ -60,6 +60,8 @@ class MainActivity : ComponentActivity() {
             ROUTE_SETTINGS -> Routes.Settings
             else -> null
         }
+        val debugOnboarding = BuildConfig.DEBUG &&
+            intent?.getStringExtra(EXTRA_DEBUG_SCREEN) == DEBUG_SCREEN_ONBOARDING
 
         setContent {
             // Built once: a Flow made during composition would be rebuilt, and
@@ -84,7 +86,7 @@ class MainActivity : ComponentActivity() {
 
             CompositionLocalProvider(LocalServices provides services) {
                 AIReplyTheme(appearance = appearance) {
-                    AppNavHost(deepLink = start)
+                    AppNavHost(deepLink = start, debugOnboarding = debugOnboarding)
                 }
             }
         }
@@ -97,7 +99,16 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        AIReplyApplication.services(this).configuration.reload()
+        val services = AIReplyApplication.services(this)
+        services.configuration.reload()
+        // A profile change that could not reach the server is retried on every return.
+        lifecycleScope.launch { services.profileSync.pushPending() }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // The only Activity: stopping it is the app going to the background.
+        AIReplyApplication.services(this).productEvents.flush()
     }
 
     /**
@@ -118,5 +129,12 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_ROUTE = "kz.yerek.aireply.route"
         const val ROUTE_TEMPLATES = "templates"
         const val ROUTE_SETTINGS = "settings"
+
+        /**
+         * DEBUG builds only, for reviewing a screen on an emulator:
+         * `adb shell am start -n kz.yerek.aireply/.MainActivity --es kz.yerek.aireply.debugScreen onboarding`.
+         */
+        const val EXTRA_DEBUG_SCREEN = "kz.yerek.aireply.debugScreen"
+        const val DEBUG_SCREEN_ONBOARDING = "onboarding"
     }
 }

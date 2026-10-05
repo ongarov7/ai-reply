@@ -8,6 +8,8 @@ package kz.yerek.aireply.ui.navigation
  */
 object Routes {
     const val Onboarding = "onboarding"
+    /** The onboarding again, from Settings, without resetting anything. */
+    const val Tutorial = "tutorial"
     const val Home = "home"
     const val Compose = "compose"
     const val Profile = "profile"

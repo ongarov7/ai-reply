@@ -44,25 +44,25 @@
     <string name="hours_title">Ish vaqti</string>
 
     <string name="onboarding_back">Orqaga</string>
-    <string name="onboarding_done_body">Klaviaturani shu yerda sinab koʻring, keyin WhatsApp, Telegram va Instagramda ishlating.</string>
-    <string name="onboarding_done_title">Hammasi tayyor</string>
+    <string name="onboarding_done_body">Istalgan chatda xabarni nusxalang, AI\u00A0Replyga oʻting va shablonni bosing. Javobni har doim oʻzingiz yuborasiz.</string>
+    <string name="onboarding_done_title">Hammasi tayyor — AI\u00A0Replydan foydalaning</string>
     <string name="onboarding_finish">Tugatish</string>
     <string name="onboarding_keyboard_prompt">Messenjerlarda javob yaratish uchun Android sozlamalarida klaviaturani yoqing.</string>
-    <string name="onboarding_keyboard_title">AI Reply klaviaturasini yoqing</string>
+    <string name="onboarding_keyboard_title">AI\u00A0Reply klaviaturasini yoqing</string>
     <string name="onboarding_next">Davom etish</string>
     <string name="onboarding_profile_placeholder">Men kichik logistika kompaniyasini boshqaraman va mijozlar hamda hamkorlar bilan ishlayman.</string>
     <string name="onboarding_skip">Oʻtkazib yuborish</string>
     <string name="onboarding_start">Boshlash</string>
     <string name="onboarding_step">%2$d qadamdan %1$d-qadam</string>
     <string name="onboarding_test_placeholder">Biror narsa yozing…</string>
-    <string name="onboarding_test_prompt">Shu yerda sinang: AI Reply klaviaturasiga oʻting va matn kiriting.</string>
+    <string name="onboarding_test_prompt">Shu yerda sinang: AI\u00A0Reply klaviaturasiga oʻting va matn kiriting.</string>
     <string name="onboarding_usage_prompt">Klaviatura faqat siz nusxalagan xabarga javob beradi. U chatlaringizni oʻqiy olmaydi.</string>
     <string name="onboarding_usage_step_copy">WhatsApp, Telegram yoki Instagramda xabarni bosib turing va Nusxalashni tanlang</string>
     <string name="onboarding_usage_step_insert">Qoralamani tekshiring, Kiritish tugmasini bosing va oʻzingiz yuboring</string>
-    <string name="onboarding_usage_step_open">Klaviatura tugmasi orqali AI Replyga oʻting</string>
+    <string name="onboarding_usage_step_open">Xabar maydoniga bosing va AI\u00A0Reply klaviaturasiga oʻting</string>
     <string name="onboarding_usage_step_template">Mos shablonni tanlang: Doʻst, Mijoz, Biznes yoki Ish</string>
     <string name="onboarding_usage_title">Nusxalang va javob bering</string>
-    <string name="onboarding_welcome_body">Klaviaturani sozlash uchun bir nechta qisqa qadam. Nusxalangan matn faqat javob soʻraganingizda qayta ishlanadi.</string>
+    <string name="onboarding_welcome_body">AI\u00A0Reply javoblarni toʻgʻridan-toʻgʻri klaviaturadan yozadi — WhatsApp, Telegram, Instagram, Xabarlar va boshqa ilovalarda. Xabarni nusxalang, kimga javob berayotganingizni tanlang — javob tayyor.</string>
     <string name="onboarding_welcome_point_copy">Istalgan chat ilovasida xabarni nusxalang</string>
     <string name="onboarding_welcome_point_edit">Javobni yuborishdan oldin tahrirlang</string>
     <string name="onboarding_welcome_point_templates">Kimga javob berayotganingizni tanlang</string>
@@ -99,13 +99,11 @@
     <string name="settings_appearance_system">Tizim</string>
     <string name="settings_language">Til</string>
     <string name="settings_language_footer">Ilova tilini oʻzgartiradi. Klaviatura tugmalari tanlangan klaviatura tartibiga mos keladi.</string>
-    <string name="settings_privacy_body">Nusxalangan xabar va yaratilgan javob faqat javob soʻraganingizda AI Reply serveri orqali AI provayderiga yuboriladi. Ular bazada saqlanmaydi va jurnallarga yozilmaydi.</string>
+    <string name="settings_privacy_body">«%1$s» tugmasi nusxalangan xabar va koʻrsatmangizni, «%2$s» tugmasi esa faqat koʻrsatmani yuboradi. Aqlli tuzatish yoqilgan boʻlsa, AI\u00A0Reply maydoniga yozgan koʻrsatmangiz tuzatish taklif qilish uchun ham yuborilishi mumkin. Matn AI\u00A0Reply serveri orqali AI provayderiga uzatiladi, bazada saqlanmaydi va jurnallarga yozilmaydi.</string>
     <string name="settings_privacy_title">Maxfiylik</string>
     <string name="settings_setup">Sozlash</string>
     <string name="settings_setup_footer">Klaviatura, mikrofon va nusxalangan matn uchun bosqichma-bosqich yoʻriqnoma.</string>
     <string name="settings_setup_guide">Klaviaturani sozlash</string>
-    <string name="settings_setup_restart">Sozlashni qayta boshlash</string>
-    <string name="settings_setup_restart_footer">Birinchi ishga tushirish yoʻriqnomasini qayta koʻrsatadi. Javoblaringiz saqlanadi.</string>
     <string name="settings_title">Sozlamalar</string>
 
     <string name="setup_checklist_title">Holat</string>
@@ -248,4 +246,41 @@
     <string name="settings_account_footer">Klaviatura ham shu hisobdan foydalanadi. Chiqsangiz, qayta kirguningizcha javoblar ishlamaydi.</string>
     <string name="kb_err_sign_in_required">Javob berishni davom ettirish uchun AI Reply ilovasini ochib, hisobga kiring.</string>
     <string name="kb_err_quota_exhausted">Bugungi javoblaringiz tugadi. Ular ertaga yangilanadi yoki ilovada tarifni oʻzgartiring.</string>
+
+    <!-- Onboarding v2, the sender's grammatical gender, the tutorial row -->
+    <string name="onboarding_skip_tutorial">Qoʻllanmani oʻtkazib yuborish</string>
+    <string name="onboarding_gender_title">Javoblar siz nomingizdan qanday yozilsin?</string>
+    <string name="onboarding_gender_prompt">Rus tilida baʼzi soʻzlar jinsga qarab oʻzgaradi: «рад» yoki «рада», «сделал» yoki «сделала». Ruscha javoblarda qaysi shakl ishlatilishini tanlang.</string>
+    <string name="onboarding_gender_skip_note">Oʻtkazib yuborsangiz, javoblarda bunday shakllar ishlatilmaydi.</string>
+    <string name="onboarding_gender_footer">Buni Sozlamalar ▸ Profil boʻlimida oʻzgartirish mumkin.</string>
+    <string name="onboarding_usage_step_instruction">Xohlasangiz, nima deb javob berishni yozing va «Javob berish»ni bosing</string>
+    <string name="onboarding_mock_field">Xabar</string>
+    <string name="onboarding_tutorial_incoming">Assalomu alaykum! Xizmatingiz qancha turadi?</string>
+    <string name="onboarding_tutorial_instruction">Bugun bandligimni, lekin ertaga qoʻngʻiroq qila olishimni xushmuomalalik bilan ayt.</string>
+    <string name="onboarding_tutorial_instruction_male">@string/onboarding_tutorial_instruction</string>
+    <string name="onboarding_tutorial_instruction_female">@string/onboarding_tutorial_instruction</string>
+    <string name="onboarding_tutorial_reply">Assalomu alaykum! Afsuski, bugun gaplasha olmayman. Ertaga bogʻlanaylik — hammasini batafsil muhokama qilamiz.</string>
+    <string name="onboarding_tutorial_reply_male">@string/onboarding_tutorial_reply</string>
+    <string name="onboarding_tutorial_reply_female">@string/onboarding_tutorial_reply</string>
+    <string name="onboarding_practice_title">Oʻzingiz sinab koʻring</string>
+    <string name="onboarding_practice_prompt">Bu shu ekrandagi mashq: hech narsa yuborilmaydi va javoblar sarflanmaydi.</string>
+    <string name="onboarding_practice_hint_copy">Xabar ostidagi «%1$s»ni bosing.</string>
+    <string name="onboarding_practice_hint_open">Nusxalandi. Endi AI\u00A0Reply klaviaturasini oching.</string>
+    <string name="onboarding_practice_open">AI\u00A0Replyni ochish</string>
+    <string name="onboarding_practice_hint_persona">Bu — AI\u00A0Reply klaviaturasi. Siz doʻstingizga javob beryapsiz, shuning uchun «%1$s»ni bosing.</string>
+    <string name="onboarding_practice_hint_reply">Nusxalangan xabar shu yerda. «%1$s»ni bosing.</string>
+    <string name="onboarding_practice_hint_insert">Yoqdimi? «%1$s»ni bosing.</string>
+    <string name="onboarding_practice_incoming">Salom! Ancha vaqtdan beri gaplashmadik. Qalaysan?</string>
+    <string name="onboarding_practice_reply">Salom! Ha, rostdan ham ancha boʻldi. Sendan xabar kelganidan xursandman! Oʻzing qalaysan?</string>
+    <string name="onboarding_practice_reply_male">@string/onboarding_practice_reply</string>
+    <string name="onboarding_practice_reply_female">@string/onboarding_practice_reply</string>
+    <string name="profile_gender">Ruscha javoblarda jins</string>
+    <string name="profile_gender_male">Erkak</string>
+    <string name="profile_gender_female">Ayol</string>
+    <string name="profile_gender_unspecified">Koʻrsatilmagan</string>
+    <string name="profile_gender_footer">Faqat rus tili grammatikasi uchun kerak: «рад/рада», «сделал/сделала». Biz buni hech qachon ismingiz yoki akkauntingizdan taxmin qilmaymiz.</string>
+    <string name="settings_tutorial">AI\u00A0Replydan qanday foydalanish</string>
+    <string name="settings_tutorial_footer">Qisqa qoʻllanma: xabarni nusxalash, klaviaturadan javob berish, mashq. Hech qanday sozlama oʻzgarmaydi.</string>
+    <string name="onboarding_keyboard_privacy">Android klaviatura «siz yozgan barcha matnni yigʻishi mumkin» deb ogohlantiradi. Bu har qanday klaviatura uchun odatiy ogohlantirish. AI\u00A0Reply matnni «%1$s» yoki «%2$s»ni bosganingizda yuboradi. Aqlli tuzatish yoqilgan boʻlsa, AI\u00A0Reply maydoniga yozgan koʻrsatmangiz tuzatish taklif qilish uchun ham yuborilishi mumkin. Yozgan boshqa matningiz hech qayerga yuborilmaydi.</string>
+
 </resources>

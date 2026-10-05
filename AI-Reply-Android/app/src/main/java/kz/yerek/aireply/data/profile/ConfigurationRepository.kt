@@ -41,21 +41,11 @@ class ConfigurationRepository(
 
     val profile: UserProfile get() = current.profile
 
-    val hasCompletedOnboarding: Boolean get() = current.profile.hasCompletedOnboarding
-
     // ------------------------------------------------------------- mutations
 
     fun updateProfile(transform: (UserProfile) -> UserProfile) {
         persist(current.copy(profile = transform(current.profile)))
     }
-
-    fun completeOnboarding() = updateProfile { it.copy(hasCompletedOnboarding = true) }
-
-    /**
-     * Lets the user run onboarding again from Settings without losing what they
-     * already answered.
-     */
-    fun restartOnboarding() = updateProfile { it.copy(hasCompletedOnboarding = false) }
 
     fun update(template: ReplyTemplate) {
         val index = current.templates.indexOfFirst { it.id == template.id }

@@ -100,6 +100,22 @@ class LocalizationParityTest {
         }
     }
 
+    /**
+     * A quick intent is a phrase the user sends as their own instruction, so it
+     * must not say «согласен» for a woman or «согласна» for a man.
+     */
+    @Test
+    fun `russian quick intents do not assume the sender's gender`() {
+        val gendered = Regex(
+            """(?iU)(?<!\p{L})(согласен|согласна|рад|рада|готов|готова|занят|занята|смог|смогла|должен|должна)(?!\p{L})"""
+        )
+        val phrases = russian.filterKeys { it.startsWith("kb_") && it.contains("intent") }
+        assertTrue("expected the quick intents", phrases.size > 10)
+        phrases.forEach { (key, value) ->
+            assertTrue("$key: $value", gendered.find(value) == null)
+        }
+    }
+
     @Test
     fun `no translation is left as the untranslated english text`() {
         // Sanity check on the mechanical conversion: a handful of identical

@@ -5,6 +5,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Dispatchers
 import kz.yerek.aireply.ai.AIConfiguration
+import kz.yerek.aireply.ai.AILimits
 import kz.yerek.aireply.ai.AIReplyService
 import kz.yerek.aireply.ai.AccountComposeTransport
 import kz.yerek.aireply.ai.AccountReplyTransport
@@ -14,6 +15,8 @@ import kz.yerek.aireply.ai.DebugComposeMock
 import kz.yerek.aireply.ai.DebugReplyMock
 import kz.yerek.aireply.ai.ReplyPromptBuilder
 import kz.yerek.aireply.ai.ReplyDraftNormalizer
+import kz.yerek.aireply.analytics.ProductEventReporter
+import kz.yerek.aireply.analytics.ProductEventsTransport
 import kz.yerek.aireply.core.lang.AppLanguage
 import kz.yerek.aireply.core.lang.KeyboardLanguage
 import kz.yerek.aireply.core.lang.LocalizedContext
@@ -27,7 +30,9 @@ import kz.yerek.aireply.data.account.GoogleSignInClient
 import kz.yerek.aireply.data.legal.LegalConsentStore
 import kz.yerek.aireply.data.profile.ConfigurationRepository
 import kz.yerek.aireply.data.profile.ProfileStore
+import kz.yerek.aireply.data.profile.ProfileSync
 import kz.yerek.aireply.data.secure.SecureCredentialStore
+import kz.yerek.aireply.data.settings.DeviceStateStore
 import kz.yerek.aireply.data.settings.SettingsStore
 import kz.yerek.aireply.ui.feature.account.AccountController
 import java.util.TimeZone
@@ -51,11 +56,15 @@ class ServiceLocator(context: Context) {
 
     /**
      * Application-scoped work that must outlive any one screen or keyboard
-     * appearance — currently only refreshing the chip-row cache after a save.
+     * appearance: refreshing the chip-row cache after a save, sending a
+     * profile change to the server, and sending product events.
      */
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     val settings: SettingsStore by lazy { SettingsStore(appContext) }
+
+    /** This phone's own state: onboarding progress, unsent profile changes. Not backed up. */
+    val deviceState: DeviceStateStore by lazy { DeviceStateStore(appContext) }
 
     val credentials: SecureCredentialStore by lazy { SecureCredentialStore(appContext) }
 
@@ -110,7 +119,37 @@ class ServiceLocator(context: Context) {
             usageCache = usageCache,
             legalConsentStore = legalConsentStore,
             google = googleSignIn,
-            backgroundScope = scope
+            backgroundScope = scope,
+            profileSync = profileSync,
+            onSignedOut = { productEvents.discard() }
+        )
+    }
+
+    /**
+     * The app's product events, on their way to the server. In memory only,
+     * and only for a signed-in account on a server that announced them.
+     */
+    val productEvents: ProductEventReporter by lazy {
+        ProductEventReporter(
+            transport = ProductEventsTransport { request -> accountService.recordProductEvents(request) },
+            appVersion = BuildConfig.VERSION_NAME,
+            // The account state in memory: recording runs on the main thread,
+            // and reading the stored token would mean a Keystore decryption.
+            isSignedIn = { account.state.value.isSignedIn },
+            isEnabled = { AILimits.features.productEvents },
+            scope = scope
+        )
+    }
+
+    /** The grammatical gender across devices, and the server's copy of the onboarding version. */
+    val profileSync: ProfileSync by lazy {
+        ProfileSync(
+            service = accountService,
+            configuration = configuration,
+            device = deviceState,
+            isSignedIn = { accountCredentials.isSignedIn },
+            features = { AILimits.features },
+            scope = scope
         )
     }
 
@@ -169,7 +208,8 @@ class ServiceLocator(context: Context) {
                     baseUrl = baseUrl,
                     session = accountSession,
                     usageCache = usageCache,
-                    appVersion = BuildConfig.VERSION_NAME
+                    appVersion = BuildConfig.VERSION_NAME,
+                    grammaticalGender = { configuration.profile.grammaticalGender }
                 )
             },
             transportOverride = if (BuildConfig.DEBUG) {

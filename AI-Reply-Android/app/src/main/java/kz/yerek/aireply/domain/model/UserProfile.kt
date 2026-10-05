@@ -45,7 +45,19 @@ data class UserProfile(
 
     val workingHours: WorkingHours = WorkingHours.DEFAULT,
 
-    val hasCompletedOnboarding: Boolean = false
+    /**
+     * The first-run flag of builds before onboarding versions. No longer
+     * written: the completed version is device-local now
+     * ([kz.yerek.aireply.data.settings.DeviceStateStore]) and this is read only
+     * to migrate a profile that already finished the old onboarding.
+     */
+    val hasCompletedOnboarding: Boolean = false,
+
+    /**
+     * How Russian replies speak about the user. `null` until the user was
+     * asked; an unknown value from a newer build decodes to `null` too.
+     */
+    val grammaticalGender: GrammaticalGender? = null
 ) {
 
     fun withRole(value: String) = copy(role = value.clampToCodePoints(MAX_ROLE))

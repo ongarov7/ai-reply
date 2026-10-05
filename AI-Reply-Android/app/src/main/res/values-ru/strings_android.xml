@@ -101,7 +101,7 @@
     <string name="kb_copied_message">Скопированное сообщение</string>
     <string name="kb_ask_placeholder">Как ответить?</string>
     <string name="kb_intent_agree">Согласиться</string>
-    <string name="kb_intent_agree_phrase">Ответь, что я согласен.</string>
+    <string name="kb_intent_agree_phrase">Ответь согласием.</string>
     <string name="kb_intent_decline">Отказать</string>
     <string name="kb_intent_decline_phrase">Вежливо откажи.</string>
     <string name="kb_intent_details">Уточнить</string>
@@ -149,5 +149,31 @@
     <string name="kb_compose_intent_thanks_phrase">Напиши благодарность.</string>
     <string name="kb_compose_intent_decline">Вежливый отказ</string>
     <string name="kb_compose_intent_decline_phrase">Напиши вежливый отказ.</string>
+
+    <!-- Smart correction in the keyboard: the suggestion strip and the instruction polish chip -->
+    <string name="kb_suggestions">Подсказки</string>
+    <string name="kb_suggestion_typed">«%1$s»</string>
+    <string name="kb_suggestion_keep_description">Оставить как есть: %1$s</string>
+    <string name="kb_suggestion_correction_description">Исправить на «%1$s»</string>
+    <string name="kb_polish_suggestion_description">Предлагаемое исправление: %1$s</string>
+    <string name="kb_polish_undo">Отменить</string>
+    <string name="kb_polish_undo_description">Отменить исправление</string>
+
+    <!-- Onboarding v2 on Android: keyboard status and setup, switching, clipboard; smart correction -->
+    <string name="android_status_keyboard">Клавиатура AI\u00A0Reply</string>
+    <string name="android_status_enabled">Включена</string>
+    <string name="android_status_not_enabled">Не включена</string>
+    <string name="android_status_current">Текущая клавиатура</string>
+    <string name="android_status_other_keyboard">Другая</string>
+    <string name="onboarding_keyboard_step_enable">Включите AI\u00A0Reply в списке клавиатур</string>
+    <string name="onboarding_keyboard_step_confirm">Подтвердите системное предупреждение</string>
+    <string name="onboarding_keyboard_step_choose">Вернитесь сюда и выберите AI\u00A0Reply</string>
+    <string name="onboarding_keyboard_notice">Android предупреждает, что клавиатура «может собирать весь вводимый текст». Такое стандартное предупреждение показывается для любой клавиатуры. AI\u00A0Reply отправляет текст, только когда вы нажимаете «%1$s» или «%2$s».</string>
+    <string name="onboarding_switch_note">Чтобы сменить клавиатуру, нажмите значок клавиатуры на панели навигации или удерживайте пробел либо клавишу языка — зависит от телефона.</string>
+    <string name="onboarding_clipboard_note">AI\u00A0Reply читает скопированное сообщение, только когда вы нажимаете шаблон. Некоторые версии Android в этот момент ненадолго показывают уведомление о чтении буфера обмена — это нормально.</string>
+    <string name="cd_tutorial_next">Показать следующий шаг</string>
+    <string name="settings_smart_correction">Умная коррекция</string>
+    <string name="settings_smart_correction_footer">Опечатки исправляются, а слова подсказываются прямо на телефоне: ничего из того, что вы печатаете в других приложениях, никуда не отправляется. Когда вы пишете инструкцию в поле AI\u00A0Reply, этот текст может отправляться, чтобы предложить более аккуратный вариант.</string>
+    <string name="settings_smart_correction_attribution">Словари: Leipzig Corpora Collection (CC BY).</string>
 
 </resources>

@@ -12,6 +12,7 @@ import kz.yerek.aireply.ai.AIReplyException
 import kz.yerek.aireply.ai.ComposeService
 import kz.yerek.aireply.ai.ReplyDraftNormalizer
 import kz.yerek.aireply.core.lang.AppLanguage
+import kz.yerek.aireply.core.lang.KeyboardLanguage
 import kz.yerek.aireply.keyboard.input.KeyboardTextFieldState
 import kz.yerek.aireply.platform.ReplyLog
 
@@ -66,6 +67,9 @@ class ComposeSessionController(
     /** The APP's language, for the server when the instruction's own is unclear. */
     var uiLanguage: AppLanguage = AppLanguage.ENGLISH
 
+    /** The layout on screen, read when Write is tapped: a language hint for the server. */
+    var inputLanguage: () -> KeyboardLanguage? = { null }
+
     /** A change the user did not trigger directly (an answer, a failure). */
     var onAsyncChange: () -> Unit = {}
 
@@ -103,7 +107,8 @@ class ComposeSessionController(
         val request = ComposeService.Request(
             instruction = current.instruction.text,
             uiLanguage = uiLanguage,
-            isRegeneration = regenerating
+            isRegeneration = regenerating,
+            inputLanguage = inputLanguage()
         )
         job = scope.launch {
             try {

@@ -232,6 +232,16 @@ class SettingsStore internal constructor(private val prefs: SharedPreferences) {
         get() = prefs.getBoolean(KEY_KEYBOARD_HAPTICS, true)
         set(value) = prefs.edit().putBoolean(KEY_KEYBOARD_HAPTICS, value).apply()
 
+    /**
+     * "Smart correction": typo fixes and word suggestions on the phone, plus
+     * a cleaner-wording suggestion for an instruction typed inside AI Reply.
+     * On unless the user switched it off. The keyboard reads it when it starts
+     * on a field, never per keystroke.
+     */
+    var smartCorrection: Boolean
+        get() = prefs.getBoolean(KEY_SMART_CORRECTION, true)
+        set(value) = prefs.edit().putBoolean(KEY_SMART_CORRECTION, value).apply()
+
     /** The persona the user picked last, shown as selected on the chip row. */
     var lastTemplateId: String?
         get() = prefs.getString(KEY_LAST_TEMPLATE, null)
@@ -272,6 +282,7 @@ class SettingsStore internal constructor(private val prefs: SharedPreferences) {
         const val KEY_ENABLED_LAYOUTS = "shared.enabledKeyboardLanguages"
         const val KEY_LAST_TEMPLATE = "shared.lastTemplateID"
         const val KEY_KEYBOARD_HAPTICS = "shared.keyboardHaptics"
+        const val KEY_SMART_CORRECTION = "shared.smartCorrection"
         const val KEY_DEBUG_MOCK = "debug.mockReplies"
 
         const val KEY_AI_MODE = "ai.transportMode"

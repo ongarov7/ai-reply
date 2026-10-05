@@ -1,0 +1,32 @@
+package kz.yerek.aireply.keyboard.autocorrect
+
+import android.content.Context
+import android.content.SharedPreferences
+import kz.yerek.aireply.core.lang.KeyboardLanguage
+
+/**
+ * The words the user taught the keyboard, one preferences key per layout
+ * (`autocorrect.learned.<lang>`), in a file of their own.
+ *
+ * Үйретілген сөздер тек осы телефонда: сақтық көшірмеге де түспейді.
+ *
+ * They are words the user typed, so the file stays on this phone: it is
+ * excluded from Auto Backup and device transfer (`res/xml/backup_rules.xml`,
+ * `res/xml/data_extraction_rules.xml`), never synced and never sent.
+ */
+class PrefsLearnedWordsStore internal constructor(private val prefs: SharedPreferences) : LearnedWordsStore {
+
+    constructor(context: Context) : this(
+        context.applicationContext.getSharedPreferences(NAME, Context.MODE_PRIVATE)
+    )
+
+    override fun read(language: KeyboardLanguage): String? = prefs.getString(LearnedWordsStore.key(language), null)
+
+    override fun write(language: KeyboardLanguage, value: String) {
+        prefs.edit().putString(LearnedWordsStore.key(language), value).apply()
+    }
+
+    private companion object {
+        const val NAME = "aireply_autocorrect"
+    }
+}

@@ -34,6 +34,7 @@ import kz.yerek.aireply.ui.common.Footnote
 import kz.yerek.aireply.ui.common.NavigationRow
 import kz.yerek.aireply.ui.common.RowDividerIndented
 import kz.yerek.aireply.ui.common.RowGroup
+import kz.yerek.aireply.ui.common.privacyStatement
 import kz.yerek.aireply.ui.common.rememberKeyboardStatus
 import kz.yerek.aireply.ui.design.AppCard
 import kz.yerek.aireply.ui.design.AppMark
@@ -189,7 +190,7 @@ fun HomeScreen(onOpen: (String) -> Unit) {
             }
 
             AppSection(stringResource(R.string.home_privacy_title)) {
-                AppCard { Footnote(stringResource(R.string.settings_privacy_body)) }
+                AppCard { Footnote(privacyStatement()) }
             }
         }
     }

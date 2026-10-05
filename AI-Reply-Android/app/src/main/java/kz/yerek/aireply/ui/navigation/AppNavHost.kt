@@ -6,6 +6,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -16,6 +17,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import kz.yerek.aireply.BuildConfig
 import kz.yerek.aireply.ui.LocalServices
 import kz.yerek.aireply.ui.feature.account.AccountController
 import kz.yerek.aireply.ui.feature.account.EmailSignInScreen
@@ -27,6 +29,8 @@ import kz.yerek.aireply.ui.feature.account.VerifyCodeScreen
 import kz.yerek.aireply.ui.feature.compose.ComposeScreen
 import kz.yerek.aireply.ui.feature.home.HomeScreen
 import kz.yerek.aireply.ui.feature.hours.WorkingHoursScreen
+import kz.yerek.aireply.ui.feature.onboarding.OnboardingFlow
+import kz.yerek.aireply.ui.feature.onboarding.OnboardingMode
 import kz.yerek.aireply.ui.feature.onboarding.OnboardingScreen
 import kz.yerek.aireply.ui.feature.profile.ProfileScreen
 import kz.yerek.aireply.ui.feature.settings.SettingsScreen
@@ -37,17 +41,41 @@ import kz.yerek.aireply.ui.feature.templates.TemplateListScreen
 /**
  * @param deepLink a route the keyboard asked for, pushed on top of Home once
  *   onboarding is done. The "+" chip uses it to open the template editor.
+ * @param debugOnboarding DEBUG builds only: open the first run straight away,
+ *   before sign-in, so it can be reviewed on an emulator without an account.
  */
 @Composable
-fun AppNavHost(deepLink: String? = null) {
+fun AppNavHost(deepLink: String? = null, debugOnboarding: Boolean = false) {
     val services = LocalServices.current
-    val configuration by services.configuration.configuration.collectAsStateWithLifecycle()
     val navController = rememberNavController()
 
     val accountState by services.account.state.collectAsStateWithLifecycle()
     var completingRegistration by rememberSaveable { mutableStateOf(false) }
+    var reviewingOnboarding by rememberSaveable { mutableStateOf(BuildConfig.DEBUG && debugOnboarding) }
+
+    // Onboarding is per device: the keyboard is enabled per phone, so the
+    // version lives in device storage that is never restored from a backup.
+    // A profile that finished the old onboarding counts as version 1.
+    var needsOnboarding by remember {
+        mutableStateOf(
+            OnboardingFlow.needsOnboarding(
+                OnboardingFlow.completedVersion(
+                    stored = services.deviceState.completedOnboardingVersion,
+                    legacyCompleted = services.configuration.profile.hasCompletedOnboarding
+                )
+            )
+        )
+    }
 
     LaunchedEffect(Unit) { services.account.bootstrap() }
+
+    if (reviewingOnboarding) {
+        OnboardingScreen(mode = OnboardingMode.FIRST_RUN, onFinished = {
+            reviewingOnboarding = false
+            needsOnboarding = false
+        })
+        return
+    }
 
     when {
             !accountState.bootstrapComplete -> {
@@ -82,15 +110,16 @@ fun AppNavHost(deepLink: String? = null) {
             }
     }
 
-    // Onboarding runs once. `hasCompletedOnboarding` lives with the profile, so
-    // it survives relaunches, and Settings can put the user back through it
-    // without losing a single answer.
-    val start = if (configuration.profile.hasCompletedOnboarding) Routes.Home else Routes.Onboarding
+    val start = if (needsOnboarding) Routes.Onboarding else Routes.Home
 
     NavHost(navController = navController, startDestination = start) {
 
         composable(Routes.Onboarding) {
-            OnboardingScreen(onFinished = { services.configuration.completeOnboarding() })
+            OnboardingScreen(mode = OnboardingMode.FIRST_RUN, onFinished = { needsOnboarding = false })
+        }
+
+        composable(Routes.Tutorial) {
+            OnboardingScreen(mode = OnboardingMode.TUTORIAL, onFinished = navController::popBackStack)
         }
 
         composable(Routes.Home) {

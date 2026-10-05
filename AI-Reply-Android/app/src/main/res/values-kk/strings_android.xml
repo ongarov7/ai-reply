@@ -150,4 +150,30 @@
     <string name="kb_compose_intent_decline">Сыпайы бас тарту</string>
     <string name="kb_compose_intent_decline_phrase">Сыпайы түрде бас тарт.</string>
 
+    <!-- Smart correction in the keyboard: the suggestion strip and the instruction polish chip -->
+    <string name="kb_suggestions">Ұсыныстар</string>
+    <string name="kb_suggestion_typed">«%1$s»</string>
+    <string name="kb_suggestion_keep_description">Терілгендей қалдыру: %1$s</string>
+    <string name="kb_suggestion_correction_description">«%1$s» деп түзету</string>
+    <string name="kb_polish_suggestion_description">Ұсынылған түзету: %1$s</string>
+    <string name="kb_polish_undo">Болдырмау</string>
+    <string name="kb_polish_undo_description">Түзетуді болдырмау</string>
+
+    <!-- Onboarding v2 on Android: keyboard status and setup, switching, clipboard; smart correction -->
+    <string name="android_status_keyboard">AI\u00A0Reply пернетақтасы</string>
+    <string name="android_status_enabled">Қосулы</string>
+    <string name="android_status_not_enabled">Қосылмаған</string>
+    <string name="android_status_current">Ағымдағы пернетақта</string>
+    <string name="android_status_other_keyboard">Басқасы</string>
+    <string name="onboarding_keyboard_step_enable">Пернетақталар тізімінде AI\u00A0Reply-ды қосыңыз</string>
+    <string name="onboarding_keyboard_step_confirm">Жүйелік ескертуді растаңыз</string>
+    <string name="onboarding_keyboard_step_choose">Осында оралып, AI\u00A0Reply-ды таңдаңыз</string>
+    <string name="onboarding_keyboard_notice">Android пернетақта «сіз терген мәтіннің барлығын жинауы мүмкін» деп ескертеді. Бұл — кез келген пернетақтаға көрсетілетін стандартты ескерту. AI\u00A0Reply мәтінді тек «%1$s» не «%2$s» түймесін басқанда жібереді.</string>
+    <string name="onboarding_switch_note">Пернетақтаны ауыстыру үшін навигация панеліндегі пернетақта белгішесін басыңыз немесе бос орын не тіл пернесін басып тұрыңыз — бұл телефонға байланысты.</string>
+    <string name="onboarding_clipboard_note">AI\u00A0Reply көшірілген хабарламаны тек үлгіні басқанда оқиды. Android-тың кейбір нұсқалары сол сәтте буфер оқылғаны туралы қысқа хабарлама көрсетеді — бұл қалыпты жағдай.</string>
+    <string name="cd_tutorial_next">Келесі қадамды көрсету</string>
+    <string name="settings_smart_correction">Ақылды түзету</string>
+    <string name="settings_smart_correction_footer">Қателер телефонның өзінде түзетіліп, сөздер сонда ұсынылады: басқа қолданбаларда терген ештеңеңіз ешқайда жіберілмейді. AI\u00A0Reply өрісіне нұсқау жазғанда, тазарақ нұсқасын ұсыну үшін сол мәтін жіберілуі мүмкін.</string>
+    <string name="settings_smart_correction_attribution">Сөздіктер: Leipzig Corpora Collection (CC BY).</string>
+
 </resources>
