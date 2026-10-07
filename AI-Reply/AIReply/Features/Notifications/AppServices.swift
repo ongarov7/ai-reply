@@ -2,30 +2,31 @@ import SwiftUI
 import UIKit
 import UserNotifications
 
-/// Wires push notifications, the installation record, app events and deep
-/// links into the app's life.
+/// Wires push notifications, the installation record and deep links into the
+/// app's life.
 ///
-/// Push, орнату, оқиғалар және сілтемелер — қосымшаның өмір циклына осы жерде қосылады.
+/// Push, орнату және сілтемелер — қосымшаның өмір циклына осы жерде қосылады.
 ///
-/// One instance for the process, created by the app delegate at launch. The
+/// One instance for the process, started by the app delegate at launch. The
 /// screens never talk to it directly: they see `PushNotificationsModel` and
 /// `AppRouter` through the environment. What happens when:
 ///
-/// - Launch: the notification delegate is set so a tap that launched the app
-///   is not lost, and `APIClient` learns which identity the app's requests
-///   carry (`ClientIdentityHolder.identity`: none before the legal consent).
-/// - Nothing is registered, asked of APNs or recorded as an event before the
-///   legal consent; right after it, the installation registers and events go.
+/// - Launch: Firebase is configured when this build has its options, and the
+///   notification delegate is set so a tap that launched the app is not lost.
+/// - Nothing is registered and no token is asked for before the legal
+///   consent; right after it, the installation registers.
 /// - After the account bootstrap, and on every sign-in, sign-out, token,
 ///   permission, switch or language change: the installation is registered if
 ///   the server offers it (`features.installations`) and the payload differs
 ///   from the last accepted one, else at most once a day.
-/// - Foreground: `app_opened`, permission re-read, events sent every minute.
-/// - Background: `app_backgrounded` and one last send in a short background task.
+/// - The APNs token is asked for once per launch, only after the consent,
+///   with permission, and when the server can send pushes
+///   (`features.push_notifications`). FCM turns it into the token the server
+///   sends to.
+/// - Foreground: the permission is re-read and the registration checked.
 ///
-/// A server without these features (the production server until it is
-/// upgraded) sees none of it: no registration, no events, and the app works
-/// exactly as before.
+/// A server without these features sees none of it: no registration, no
+/// token, and the app works exactly as before.
 @MainActor
 final class AppServices {
 
@@ -43,16 +44,17 @@ final class AppServices {
 
     let router = AppRouter()
     let notifications: PushNotificationsModel
-    let events: EventReporter
 
     /// The app's interface language, from `AppSettings`.
     var appLanguage: () -> String = { SharedSettings.shared.effectiveAppLanguage.rawValue }
+    /// Runs after a tapped notification was handled; the app refreshes the
+    /// account, so a quota or plan notification opens on current numbers.
+    var onNotificationOpened: (() -> Void)?
 
     private let store: NotificationSettingsStore
     private let identity: InstallationIdentity
-    private let identityHolder: ClientIdentityHolder
-    private let sessionTracker: SessionTracker
     private let registrar: InstallationRegistrar
+    private let openedReporter: NotificationOpenedReporting
     private let notificationDelegate = NotificationCenterDelegate()
 
     private var isStarted = false
@@ -63,32 +65,23 @@ final class AppServices {
     private var retryTask: Task<Void, Never>?
     private var syncFailures = 0
 
-    private var flushTask: Task<Void, Never>?
     private var hasRequestedDeviceToken = false
-    private var hasRetriedInvalidToken = false
-    private var reportedTokenFailures: Set<String> = []
-    private var lastAPIErrorReport: [String: Date] = [:]
+    /// APNs handed over its token this launch: FCM can make one now.
+    private var hasAPNsToken = false
+    private var tokenTask: Task<Void, Never>?
+    /// The server said FCM no longer takes the current token.
+    private var replacesTokenOnNextFetch = false
+    private var hasReplacedInvalidToken = false
+    /// Delivery ids of tapped notifications, until the server can be told.
+    private var openedDeliveries: [String] = []
 
     private init() {
         let store = NotificationSettingsStore()
-        let identity = InstallationIdentity()
-        let identityHolder = ClientIdentityHolder()
-        let sessionTracker = SessionTracker()
         self.store = store
-        self.identity = identity
-        self.identityHolder = identityHolder
-        self.sessionTracker = sessionTracker
+        self.identity = InstallationIdentity()
         self.registrar = InstallationRegistrar(
             transport: BackendInstallationTransport(), tokens: AccountSession.shared, store: store)
-        self.events = EventReporter(
-            transport: BackendEventTransport(),
-            userAllows: store.sharesDiagnostics,
-            installationID: { identityHolder.current.installationID },
-            sessionID: { sessionTracker.sessionID },
-            // Attached when a fresh one is at hand; a refresh just for an
-            // event would be a waste, and the endpoint accepts none.
-            accessToken: { AccountCredentials.isAccessTokenFresh ? AccountCredentials.accessToken : nil }
-        )
+        self.openedReporter = BackendNotificationOpenedReporter()
         #if DEBUG
         let forcesPushUI = DebugLaunchOptions.forcesPushUI
         #else
@@ -98,19 +91,12 @@ final class AppServices {
             preferencesService: BackendNotificationPreferencesService(), store: store,
             forcesPushUI: forcesPushUI)
 
-        events.accountKey = { [weak self] in self?.currentAccountKey ?? EventReporter.anonymous }
         notifications.onStateChange = { [weak self] in self?.requestInstallationSync() }
         notifications.onPermissionAllowsDelivery = { [weak self] in self?.requestDeviceTokenIfPossible() }
-        notifications.onEvent = { [weak self] event in self?.events.record(event) }
-        notifications.onShareDiagnosticsChange = { [weak self] allows in
-            self?.events.setUserAllows(allows)
-            // The session id goes only with diagnostics on.
-            self?.refreshIdentity()
-        }
     }
 
     /// Unit tests run inside the app; they build their own instances and must
-    /// not find this one registering, sending or setting delegates.
+    /// not find this one configuring Firebase, registering or setting delegates.
     private static var isRunningUnitTests: Bool {
         ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
     }
@@ -122,42 +108,20 @@ final class AppServices {
         guard !isStarted, !Self.isRunningUnitTests else { return }
         isStarted = true
 
-        refreshIdentity()
-        let holder = identityHolder
-        APIClientHooks.shared.install(
-            identity: { holder.current },
-            transportFailures: { failure in
-                Task { @MainActor in AppServices.shared.requestFailedWithoutResponse(failure) }
-            }
-        )
         // Set here, not later: a tap that launched the app is delivered as
         // soon as launching finishes.
         UNUserNotificationCenter.current().delegate = notificationDelegate
+
+        let supportsPush = PushBuildConfiguration.isEnabledInThisBuild && FirebasePush.configureIfPossible()
+        notifications.setBuildSupportsPush(supportsPush)
+        if supportsPush {
+            FirebasePush.observeTokens { [weak self] token in self?.didReceivePushToken(token) }
+        }
 
         #if DEBUG
         applyDebugLaunchOptions()
         #endif
         Task { await notifications.refreshPermission() }
-    }
-
-    /// What `APIClient` adds to the app's requests, by the rule in
-    /// `ClientIdentityHolder.identity`. Called whenever an input changes: the
-    /// consent, the diagnostics switch, a new session after half an hour away,
-    /// and on every return to the front in case the Keychain was still locked.
-    private func refreshIdentity() {
-        let identity = self.identity
-        identityHolder.update(ClientIdentityHolder.identity(
-            consentGiven: account.hasAcceptedLegal,
-            sharesDiagnostics: notifications.sharesDiagnostics,
-            installationID: { identity.id },
-            sessionID: sessionTracker.sessionID))
-    }
-
-    /// Who is signed in, for `EventReporter`: the user id, a placeholder while
-    /// the id is not known yet, or nobody.
-    private var currentAccountKey: String {
-        guard AccountCredentials.isSignedIn else { return EventReporter.anonymous }
-        return account.userID ?? EventReporter.signedIn
     }
 
     // MARK: Inputs from the app
@@ -168,86 +132,117 @@ final class AppServices {
         notifications.setSignedIn(state.isSignedIn)
         notifications.setServerDeliversPush(state.features.map { $0.pushNotifications ?? false })
 
-        // Unknown until the server answered; a missing key is a "no".
-        let telemetry = state.features.map { $0.telemetry ?? false }
-        notifications.setServerAcceptsTelemetry(telemetry)
-        events.setServerSupport(telemetry)
-        // Before the legal consent nothing is kept; events from before it are dropped.
-        events.setConsent(state.hasAcceptedLegal)
-        refreshIdentity()
-
-        let consentJustGiven = state.hasAcceptedLegal && !previous.hasAcceptedLegal
-        if isStarted, telemetry == true, consentJustGiven || previous.features?.telemetry != true {
-            Task { await events.flush() }
-        }
-
         requestDeviceTokenIfPossible()
+        reportOpenedNotifications()
         // Covers the consent too: the registration right after it is accepted.
         if state != previous { requestInstallationSync() }
     }
 
-    func accountActivity(_ activity: AccountActivity) {
-        switch activity {
-        case .signedOut:
-            events.record(.logout)
-        case let .providerSignInFailed(method, errorCode):
-            events.record(.loginFailed(method: method, errorCode: errorCode))
-        }
+    func scenePhaseDidChange(_ phase: ScenePhase) {
+        guard isStarted, phase == .active else { return }
+        // The user may have changed the permission in iOS Settings; a change
+        // registers again on its own.
+        Task { await notifications.refreshPermission() }
+        // A token FCM could not make earlier (offline at launch) is tried again.
+        if hasAPNsToken, currentPushToken == nil { fetchPushToken() }
+        requestInstallationSync(routine: true)
     }
 
-    func scenePhaseDidChange(_ phase: ScenePhase) {
-        guard isStarted else { return }
-        switch phase {
-        case .active:
-            if case let .opened(coldStart, _)? = sessionTracker.didBecomeActive() {
-                events.record(.appOpened(coldStart: coldStart))
-            }
-            refreshIdentity()
-            // The user may have changed the permission in iOS Settings; a
-            // change registers again on its own.
-            Task { await notifications.refreshPermission() }
-            requestInstallationSync(routine: true)
-            startSendingEvents()
-        case .background:
-            if case let .backgrounded(seconds)? = sessionTracker.didEnterBackground() {
-                events.record(.appBackgrounded(foregroundSeconds: seconds))
-            }
-            stopSendingEvents()
-            sendEventsInBackground()
-        default:
-            break
-        }
+    /// The installation to name on the logout request, so the server detaches
+    /// it from the account at once. Nil when the server has no installations
+    /// or before the consent, when no id is ever made.
+    var installationIDForSignOut: String? {
+        guard account.hasAcceptedLegal, account.features?.installations == true else { return nil }
+        return identity.id
     }
 
     // MARK: Push
 
     func didRegisterForRemoteNotifications(deviceToken: Data) {
-        // Kept with the installation it was handed to (see NotificationSettingsStore).
-        guard let installationID = identity.id else { return }
-        store.setDeviceToken(PushToken.hexString(deviceToken), installationID: installationID)
-        requestInstallationSync()
+        FirebasePush.setAPNSToken(deviceToken)
+        hasAPNsToken = true
+        fetchPushToken()
     }
 
     func didFailToRegisterForRemoteNotifications(error: Error) {
-        events.record(.pushTokenRegistrationFailed(errorCode: "apns_\((error as NSError).code)", requestID: nil))
+        ReplyLog.event("push: APNs registration failed: \(error)")
     }
 
     /// A notification was tapped (or, in DEBUG with auto-open, arrived).
     func notificationOpened(_ payload: NotificationPayload) {
-        events.record(payload.openedEvent)
         router.open(payload.destination)
+        if let deliveryID = payload.deliveryID, !openedDeliveries.contains(deliveryID) {
+            // A handful at most; a tap arriving before the account is loaded waits for it.
+            openedDeliveries = Array((openedDeliveries + [deliveryID]).suffix(10))
+            reportOpenedNotifications()
+        }
+        onNotificationOpened?()
     }
 
     /// Asks APNs for a token: once per launch, and only after the legal
     /// consent, when this build can receive pushes, the server can send them
     /// and iOS will show them.
-    private func requestDeviceTokenIfPossible(again: Bool = false) {
+    private func requestDeviceTokenIfPossible() {
         guard isStarted, account.hasAcceptedLegal, notifications.buildSupportsPush,
               account.features?.pushNotifications == true,
               notifications.permission.allowsDelivery,
-              again || !hasRequestedDeviceToken else { return }
+              !hasRequestedDeviceToken else { return }
         hasRequestedDeviceToken = true
         UIApplication.shared.registerForRemoteNotifications()
+    }
+
+    /// Asks FCM for its token, which needs the APNs token first. `replacing`
+    /// drops the current one and makes a new one.
+    private func fetchPushToken(replacing: Bool = false) {
+        if replacing { replacesTokenOnNextFetch = true }
+        guard hasAPNsToken, tokenTask == nil else { return }
+        let replace = replacesTokenOnNextFetch
+        replacesTokenOnNextFetch = false
+        tokenTask = Task { [weak self] in
+            do {
+                let token = replace ? try await FirebasePush.replaceToken() : try await FirebasePush.token()
+                self?.didReceivePushToken(token)
+            } catch {
+                ReplyLog.event("push: no FCM token: \(error)")
+            }
+            self?.tokenTask = nil
+        }
+    }
+
+    private func didReceivePushToken(_ token: String) {
+        // A token only exists after the consent; the id is not made before it.
+        guard account.hasAcceptedLegal, let installationID = identity.id else { return }
+        guard store.pushToken(for: installationID) != token else { return }
+        // Kept with the installation it was handed to (see NotificationSettingsStore).
+        store.setPushToken(token, installationID: installationID)
+        requestInstallationSync()
+    }
+
+    private var currentPushToken: String? {
+        guard account.hasAcceptedLegal, let installationID = identity.id else { return nil }
+        return store.pushToken(for: installationID)
+    }
+
+    // MARK: Opened notifications
+
+    /// Best effort: the server marks the delivery opened. Sent once the
+    /// consent is given and the server offers installations; a failure is
+    /// not retried.
+    private func reportOpenedNotifications() {
+        guard isStarted, !openedDeliveries.isEmpty, account.hasAcceptedLegal,
+              account.features?.installations == true, let installationID = identity.id else { return }
+        let deliveries = openedDeliveries
+        openedDeliveries = []
+        let reporter = openedReporter
+        Task {
+            for deliveryID in deliveries {
+                do {
+                    try await reporter.reportOpened(installationID: installationID, deliveryID: deliveryID)
+                } catch {
+                    ReplyLog.event("push: opened report failed: \(error)")
+                }
+            }
+        }
     }
 
     // MARK: Installation
@@ -272,12 +267,19 @@ final class AppServices {
             syncAgain = false
             guard let snapshot = installationSnapshot() else { return }
             let outcome = await registrar.sync(snapshot)
-            handle(outcome, for: snapshot)
-            if case .failed(let failure) = outcome {
-                if InstallationRegistrar.isRetryable(failure) { scheduleSyncRetry(serverDelay: failure.retryAfter) }
+            switch outcome {
+            case .registered(let response):
+                syncFailures = 0
+                handle(response, for: snapshot)
+            case .unchanged:
+                syncFailures = 0
+            case .failed(let failure):
+                ReplyLog.event("push: installation registration failed: \(failure)")
+                if InstallationRegistrar.isRetryable(failure) {
+                    scheduleSyncRetry(serverDelay: InstallationRegistrar.retryAfter(failure))
+                }
                 return
             }
-            syncFailures = 0
         } while syncAgain
     }
 
@@ -295,8 +297,7 @@ final class AppServices {
             installationID: installationID,
             permission: notifications.permission,
             notificationsEnabled: notifications.isEnabledInApp,
-            deviceToken: installationID.flatMap { store.deviceToken(for: $0) },
-            environment: APNsEnvironment.current,
+            pushToken: installationID.flatMap { store.pushToken(for: $0) },
             locale: appLanguage(),
             // The session in the Keychain decides, not the screen: it is what
             // the server will see.
@@ -305,33 +306,14 @@ final class AppServices {
         ))
     }
 
-    private func handle(_ outcome: InstallationRegistrar.Outcome, for snapshot: InstallationSnapshot) {
-        switch outcome {
-        case .registered(let response):
-            let installationID = snapshot.payload.installation_id
-            let previous = store.registeredToken(for: installationID)
-            if let token = snapshot.payload.push?.token, token != previous {
-                events.record(previous == nil ? .pushTokenRegistered : .pushTokenRefreshed)
-                store.setRegisteredToken(token, installationID: installationID)
-            }
-            if let preferences = response.preferences {
-                notifications.adoptPreferences(preferences)
-            }
-            // APNs told the server this token is dead: ask for the current one.
-            if response.pushStatus == "invalid", !hasRetriedInvalidToken {
-                hasRetriedInvalidToken = true
-                requestDeviceTokenIfPossible(again: true)
-            }
-        case .failed(let failure):
-            // Reported once per token and error; no response at all is an
-            // `api_error`, and a 401 is the session's business.
-            guard let token = snapshot.payload.push?.token, failure.status != 0, failure.status != 401 else { return }
-            let code = failure.code ?? "http_\(failure.status)"
-            if reportedTokenFailures.insert("\(token.prefix(12))|\(code)").inserted {
-                events.record(.pushTokenRegistrationFailed(errorCode: code, requestID: failure.requestID))
-            }
-        case .unchanged:
-            break
+    private func handle(_ response: InstallationResponse, for snapshot: InstallationSnapshot) {
+        if let preferences = response.preferences {
+            notifications.adoptPreferences(preferences)
+        }
+        // FCM told the server this token is dead: make a new one, once a launch.
+        if response.pushStatus == "invalid", snapshot.payload.push != nil, !hasReplacedInvalidToken {
+            hasReplacedInvalidToken = true
+            fetchPushToken(replacing: true)
         }
     }
 
@@ -345,50 +327,6 @@ final class AppServices {
             guard !Task.isCancelled, let self else { return }
             self.retryTask = nil
             self.requestInstallationSync()
-        }
-    }
-
-    // MARK: Events
-
-    /// `APIClient` got no response at all: `api_error`, at most once per route
-    /// and kind every five minutes, and never about the events call itself.
-    private func requestFailedWithoutResponse(_ failure: APITransportFailure) {
-        let route = AppEvent.route(forPath: failure.path)
-        guard route != "/api/v1/events" else { return }
-        let key = route + "|" + failure.kind.rawValue
-        let now = Date()
-        if let last = lastAPIErrorReport[key], now.timeIntervalSince(last) < 5 * 60 { return }
-        lastAPIErrorReport[key] = now
-        events.record(.apiError(route: route, errorCode: failure.kind.rawValue, requestID: failure.requestID))
-    }
-
-    private func startSendingEvents() {
-        guard flushTask == nil else { return }
-        flushTask = Task { [weak self] in
-            while true {
-                // Stopping the timer only ever interrupts this wait. A send in
-                // progress belongs to the reporter and finishes on its own.
-                do { try await Task.sleep(for: .seconds(60)) } catch { return }
-                guard let self else { return }
-                await self.events.flush()
-            }
-        }
-    }
-
-    private func stopSendingEvents() {
-        flushTask?.cancel()
-        flushTask = nil
-    }
-
-    /// One last send when the app leaves the screen, inside the few seconds
-    /// iOS grants a background task. It waits for a send already in progress
-    /// and then sends what came since, `app_backgrounded` included.
-    private func sendEventsInBackground() {
-        guard events.isSending, !events.queue.isEmpty else { return }
-        let task = BackgroundTask(name: "AIReply.events")
-        Task {
-            await events.flush()
-            task.end()
         }
     }
 
@@ -408,32 +346,6 @@ final class AppServices {
         }
     }
     #endif
-}
-
-/// Account events other parts of the app hear about.
-enum AccountActivity: Equatable, Sendable {
-    /// The user signed out (not a session that expired on its own).
-    case signedOut
-    /// Apple's or Google's own sheet failed before our server was involved.
-    case providerSignInFailed(method: AppEvent.LoginMethod, errorCode: String)
-}
-
-/// A short background task that is ended exactly once.
-@MainActor
-private final class BackgroundTask {
-    private var identifier: UIBackgroundTaskIdentifier = .invalid
-
-    init(name: String) {
-        identifier = UIApplication.shared.beginBackgroundTask(withName: name) { [weak self] in
-            MainActor.assumeIsolated { self?.end() }
-        }
-    }
-
-    func end() {
-        guard identifier != .invalid else { return }
-        UIApplication.shared.endBackgroundTask(identifier)
-        identifier = .invalid
-    }
 }
 
 /// Receives notifications while the app is open and taps on them.

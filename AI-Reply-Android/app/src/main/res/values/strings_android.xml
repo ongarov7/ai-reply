@@ -36,8 +36,6 @@
     <string name="kb_regenerate">Regenerate</string>
     <string name="kb_insert">Insert</string>
     <string name="kb_cancel">Cancel</string>
-    <string name="kb_add_template">Add template</string>
-    <string name="kb_add_template_hint">Opening AI Reply…</string>
     <string name="kb_replace_existing">Replace</string>
     <string name="kb_append_existing">Add</string>
     <string name="kb_keep_typing">Cancel</string>
@@ -68,7 +66,7 @@
 
     <!-- Dictation from inside the keyboard. -->
     <string name="voice_kb_start">Dictate the instruction</string>
-    <string name="voice_kb_stop">Stop</string>
+    <string name="voice_kb_stop">Stop dictation</string>
     <string name="voice_kb_listening">Listening…</string>
     <string name="voice_kb_processing">Recognising…</string>
     <string name="voice_kb_permission_needed">Tap to allow microphone access</string>
@@ -76,6 +74,11 @@
     <string name="voice_kb_no_speech">Nothing was heard. Try again.</string>
     <string name="voice_kb_failed">Could not recognise that. Try again.</string>
     <string name="voice_kb_unavailable">Speech recognition is unavailable on this device.</string>
+    <string name="voice_kb_stopped">Dictation stopped</string>
+    <string name="voice_kb_busy">The microphone is busy right now. Try again in a moment.</string>
+    <string name="voice_kb_language_unavailable_kk">This phone does not recognise Kazakh speech. Install Google voice typing or switch the layout.</string>
+    <string name="voice_kb_language_unavailable_ru">This phone does not recognise Russian speech. Install Google voice typing or switch the layout.</string>
+    <string name="voice_kb_language_unavailable_en">This phone does not recognise English speech. Install Google voice typing or switch the layout.</string>
     <string name="voice_permission_title">Microphone</string>
 
     <!-- Android keyboard setup. Android, unlike iOS, tells the app the truth. -->
@@ -153,7 +156,62 @@
     <string name="settings_debug_mock_replies">Mock AI replies</string>
     <string name="settings_debug_mock_replies_footer">Debug builds only. The keyboard answers with canned replies instead of the service, so nothing is spent. Tags in the instruction: #offline, #quota, #slow.</string>
 
-    <!-- Push notifications and diagnostics (2026-10). -->
+    <!-- Keyboard: Create (write a new message from an instruction) -->
+    <string name="kb_compose_open">Write a new message with AI</string>
+    <string name="kb_compose_title">Write with AI</string>
+    <string name="kb_compose_placeholder">Describe the message, e.g. “Congratulate our director on his 55th birthday”</string>
+    <string name="kb_compose_write">Write</string>
+    <string name="kb_compose_new">New</string>
+    <string name="kb_compose_new_description">Start over</string>
+    <string name="kb_compose_edit_request">Edit request</string>
+    <string name="kb_compose_draft_title">Your message</string>
+    <string name="kb_compose_err_no_instruction">Describe what to write first.</string>
+    <string name="kb_compose_err_too_long">The request is too long. Use up to %1$d characters.</string>
+    <string name="kb_compose_intent_congratulate">Congratulate</string>
+    <string name="kb_compose_intent_congratulate_phrase">Write a congratulation.</string>
+    <string name="kb_compose_intent_short">Short</string>
+    <string name="kb_compose_intent_short_phrase">Keep it short.</string>
+    <string name="kb_compose_intent_formal">Formal</string>
+    <string name="kb_compose_intent_formal_phrase">Make it formal.</string>
+    <string name="kb_compose_intent_friendly">Friendly</string>
+    <string name="kb_compose_intent_friendly_phrase">Warm and friendly.</string>
+    <string name="kb_compose_intent_emoji">Add emoji</string>
+    <string name="kb_compose_intent_emoji_phrase">Add a few fitting emoji.</string>
+    <string name="kb_compose_intent_thanks">Thank you</string>
+    <string name="kb_compose_intent_thanks_phrase">Write a thank-you message.</string>
+    <string name="kb_compose_intent_decline">Decline politely</string>
+    <string name="kb_compose_intent_decline_phrase">Politely decline.</string>
+
+    <!-- Create: answer the copied message with the request written here -->
+    <string name="kb_reply_to_copied">Reply to copied</string>
+    <string name="kb_reply_to_copied_description">Reply to the copied message with this request</string>
+
+    <!-- Smart correction in the keyboard: the suggestion strip and the instruction polish chip -->
+    <string name="kb_suggestions">Suggestions</string>
+    <string name="kb_suggestion_typed">“%1$s”</string>
+    <string name="kb_suggestion_keep_description">Keep as typed: %1$s</string>
+    <string name="kb_suggestion_correction_description">Correct to %1$s</string>
+    <string name="kb_polish_suggestion_description">Suggested correction: %1$s</string>
+    <string name="kb_polish_undo">Undo</string>
+    <string name="kb_polish_undo_description">Undo the correction</string>
+
+    <!-- Onboarding v2 on Android: keyboard status and setup, switching, clipboard; smart correction -->
+    <string name="android_status_keyboard">AI\u00A0Reply keyboard</string>
+    <string name="android_status_enabled">Enabled</string>
+    <string name="android_status_not_enabled">Not enabled</string>
+    <string name="android_status_current">Current keyboard</string>
+    <string name="android_status_other_keyboard">Another one</string>
+    <string name="onboarding_keyboard_step_enable">Turn on AI\u00A0Reply in the list of keyboards</string>
+    <string name="onboarding_keyboard_step_confirm">Confirm the system notice</string>
+    <string name="onboarding_keyboard_step_choose">Come back here and choose AI\u00A0Reply</string>
+    <string name="onboarding_switch_note">To switch keyboards, tap the keyboard icon in the navigation bar, or press and hold the space bar or the language key — it depends on the phone.</string>
+    <string name="onboarding_clipboard_note">AI\u00A0Reply reads the message you copied only when you tap a template or Paste message. Some Android versions then briefly show a notice that the clipboard was read — that\'s normal.</string>
+    <string name="cd_tutorial_next">Show the next step</string>
+    <string name="settings_smart_correction">Smart correction</string>
+    <string name="settings_smart_correction_footer">Typos are fixed and words suggested on your phone: nothing you type in other apps is sent anywhere. While you write an instruction in AI\u00A0Reply\'s own field, that text may be sent to suggest a cleaner version.</string>
+    <string name="settings_smart_correction_attribution">Word lists: Leipzig Corpora Collection (CC BY).</string>
+
+    <!-- Push notifications (2026-10). -->
     <string name="push_channel_general">General</string>
     <string name="push_channel_general_description">Service news and reminders</string>
     <string name="push_channel_important">Important</string>
@@ -169,7 +227,7 @@
     <string name="push_settings_status_not_asked">Not set up</string>
     <string name="push_settings_allow">Allow notifications</string>
     <string name="push_settings_open_system">Open phone settings</string>
-    <string name="push_settings_enabled">Notifications from AI Reply</string>
+    <string name="push_settings_enabled">Notifications from AI\u00A0Reply</string>
     <string name="push_settings_footer">Payment confirmations and reminders before your plan ends.</string>
     <string name="push_settings_unavailable">Notifications are not available in this version yet.</string>
     <string name="push_category_account">Account</string>
@@ -180,8 +238,6 @@
     <string name="push_categories_footer">Security notifications are always on.</string>
     <string name="push_categories_loading">Loading…</string>
     <string name="push_categories_failed">Could not update. Check your connection and try again.</string>
-    <string name="diagnostics_share">Share diagnostics</string>
-    <string name="diagnostics_share_footer">Helps us find and fix problems: app launches, notification taps and connection errors. Never your messages, what you type or your clipboard.</string>
     <string name="settings_debug_simulate_push">Simulate a push notification</string>
     <string name="settings_debug_force_push_prompt">Always show the notification card</string>
     <string name="settings_debug_push_footer">Debug builds only. The sample arrives in 3 seconds through the same path as a real one in the foreground, and opens Plan when tapped. The switch shows the Home card and these settings even without Firebase.</string>

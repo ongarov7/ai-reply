@@ -2,6 +2,8 @@
 <!-- Pre-Android-12 equivalent of data_extraction_rules.xml. -->
 <full-backup-content>
     <exclude domain="sharedpref" path="aireply_secure.xml" />
+    <exclude domain="sharedpref" path="aireply_device.xml" />
+    <exclude domain="sharedpref" path="aireply_autocorrect.xml" />
     <!-- Push token and installation sync state belong to this device only. -->
     <exclude domain="sharedpref" path="aireply_push.xml" />
 </full-backup-content>

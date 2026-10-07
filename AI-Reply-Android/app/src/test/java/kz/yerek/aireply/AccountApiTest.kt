@@ -3,6 +3,7 @@ package kz.yerek.aireply
 import kotlinx.serialization.json.Json
 import kz.yerek.aireply.ai.AIReplyError
 import kz.yerek.aireply.ai.AccountReplyTransport
+import kz.yerek.aireply.data.account.AccountProfile
 import kz.yerek.aireply.data.account.AccountSessionDto
 import kz.yerek.aireply.data.account.ApiClient
 import kz.yerek.aireply.data.account.ApiError
@@ -135,6 +136,8 @@ class AccountApiTest {
         assertEquals(AIReplyError.TimedOut, AccountReplyTransport.map(ApiError.ProviderTimeout))
         assertEquals(AIReplyError.EmptyResponse, AccountReplyTransport.map(ApiError.EmptyResponse))
         assertEquals(AIReplyError.ServiceUnavailable, AccountReplyTransport.map(ApiError.Server))
+        // An instruction past the server's limit is said to be one, not "service unavailable".
+        assertEquals(AIReplyError.InstructionTooLong(400), AccountReplyTransport.map(ApiError.InstructionTooLong(400)))
     }
 
     // ------------------------------------------------------------ decoding
@@ -199,6 +202,32 @@ class AccountApiTest {
         assertTrue(encoded.contains("\"onboarding_completed\""))
         assertTrue("untouched fields must not be serialised", !encoded.contains("description"))
         assertTrue(!encoded.contains("business_rules"))
+    }
+
+    @Test
+    fun `profile update sends the gender and the onboarding version only when set`() {
+        val gender = json.encodeToString(ProfileUpdate.serializer(), ProfileUpdate(grammaticalGender = "female"))
+        assertEquals("""{"grammatical_gender":"female"}""", gender)
+        val version = json.encodeToString(ProfileUpdate.serializer(), ProfileUpdate(onboardingVersion = 2))
+        assertEquals("""{"onboarding_version":2}""", version)
+    }
+
+    /** An older server sends neither field; a newer one may send a value this build does not know. */
+    @Test
+    fun `the account profile decodes with or without the sender fields`() {
+        val older = json.decodeFromString(AccountProfile.serializer(), """{"role": "дизайнер"}""")
+        assertNull(older.grammaticalGender)
+        assertNull(older.onboardingVersion)
+
+        val current = json.decodeFromString(
+            AccountProfile.serializer(),
+            """{"grammatical_gender": "male", "onboarding_version": 2}"""
+        )
+        assertEquals("male", current.grammaticalGender)
+        assertEquals(2, current.onboardingVersion)
+
+        val unknown = json.decodeFromString(AccountProfile.serializer(), """{"grammatical_gender": "other"}""")
+        assertEquals("kept as text, never a decoding failure", "other", unknown.grammaticalGender)
     }
 
     // -------------------------------------------------------------- models

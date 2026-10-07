@@ -38,7 +38,7 @@ class NotificationPreferencesTest {
         override suspend fun update(changes: Map<String, Boolean>): NotificationPreferencesDto {
             updates += changes
             gate?.await()
-            if (fail) throw ApiException(ApiError.Offline, httpStatus = 0)
+            if (fail) throw ApiException(ApiError.Offline)
             server = server + changes
             return NotificationPreferencesDto(server, optional)
         }

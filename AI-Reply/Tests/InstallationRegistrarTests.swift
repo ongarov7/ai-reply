@@ -20,17 +20,16 @@ final class InstallationRegistrarTests: XCTestCase {
         private(set) var calls: [Call] = []
         /// Tokens the server rejects with 401.
         var rejectedTokens: Set<String> = []
-        var failure: APIFailure?
+        var failure: APIError?
 
         func reject(_ tokens: Set<String>) { rejectedTokens = tokens }
-        func fail(with failure: APIFailure?) { self.failure = failure }
+        func fail(with failure: APIError?) { self.failure = failure }
 
         func register(_ payload: InstallationPayload, accessToken: String?) async throws -> InstallationResponse {
             calls.append(Call(payload: payload, token: accessToken))
             if let failure { throw failure }
             if let accessToken, rejectedTokens.contains(accessToken) {
-                throw APIFailure(error: .unauthorized, requestID: "req_rejected000000001", status: 401,
-                                 code: "TOKEN_EXPIRED")
+                throw APIError.unauthorized
             }
             return InstallationResponse(installationID: payload.installation_id, attached: accessToken != nil,
                                         pushStatus: payload.push == nil ? "none" : "active",
@@ -106,14 +105,18 @@ final class InstallationRegistrarTests: XCTestCase {
         registrar = InstallationRegistrar(transport: server, tokens: tokens, store: store, now: { clock.now })
     }
 
+    /// Shaped like an FCM registration token, and plainly not a real one.
+    private static let fcmToken = "fcm-test-token:" + String(repeating: "Ab1_-", count: 30)
+    private static let otherFCMToken = "fcm-test-token:" + String(repeating: "Cd2.-", count: 30)
+
     private func payload(permission: NotificationPermission = .notDetermined,
                          enabled: Bool = true,
                          token: String? = nil) -> InstallationPayload {
         ClientContext(installationID: "0b7c9a52-4f5e-4d0a-9c1e-1d2f3a4b5c6d",
-                      metadata: ClientMetadata(appVersion: "1.3.2", appBuild: "142", osVersion: "17.5"),
+                      build: BuildInfo(appVersion: "1.3.2", appBuild: "142", osVersion: "17.5"),
                       deviceModel: "iPhone17,1", locale: "kk", timezone: "Asia/Almaty")
             .installationPayload(permission: permission, notificationsEnabled: enabled,
-                                 push: token.map { .init(provider: "apns", token: $0, environment: "sandbox") })
+                                 push: token.map(InstallationPayload.Push.fcm))
     }
 
     private func signedIn(_ payload: InstallationPayload, account: String? = "user-1") -> InstallationSnapshot {
@@ -129,7 +132,7 @@ final class InstallationRegistrarTests: XCTestCase {
     /// The server refuses unknown fields: exactly these keys, snake case.
     func testPayloadHasExactlyTheServersFields() throws {
         let json = try XCTUnwrap(JSONSerialization.jsonObject(
-            with: JSONEncoder().encode(payload(permission: .authorized, token: String(repeating: "ab", count: 32))))
+            with: JSONEncoder().encode(payload(permission: .authorized, token: Self.fcmToken)))
             as? [String: Any])
         XCTAssertEqual(Set(json.keys), [
             "installation_id", "platform", "app_version", "app_build", "os_name", "os_version", "device_model",
@@ -142,7 +145,13 @@ final class InstallationRegistrarTests: XCTestCase {
         XCTAssertEqual(json["notification_permission"] as? String, "authorized")
         XCTAssertEqual(json["notifications_enabled"] as? Bool, true)
         let push = try XCTUnwrap(json["push"] as? [String: String])
-        XCTAssertEqual(push, ["provider": "apns", "token": String(repeating: "ab", count: 32), "environment": "sandbox"])
+        XCTAssertEqual(push, ["provider": "fcm", "token": Self.fcmToken], "FCM picks the APNs host; no environment")
+    }
+
+    /// The server's own check on an FCM token: 20 to 4096 characters of
+    /// `[A-Za-z0-9_:.-]`.
+    func testTheFixtureLooksLikeAnFCMToken() {
+        XCTAssertNotNil(Self.fcmToken.range(of: "^[A-Za-z0-9_:.-]{20,4096}$", options: .regularExpression))
     }
 
     func testNoTokenMeansNoPushObjectAtAll() throws {
@@ -191,12 +200,13 @@ final class InstallationRegistrarTests: XCTestCase {
     func testAnyChangeIsSent() async {
         _ = await registrar.sync(signedIn(payload()))
         _ = await registrar.sync(signedIn(payload(permission: .authorized)))
-        _ = await registrar.sync(signedIn(payload(permission: .authorized, token: String(repeating: "0f", count: 32))))
-        _ = await registrar.sync(signedIn(payload(permission: .authorized, enabled: false,
-                                                  token: String(repeating: "0f", count: 32))))
+        _ = await registrar.sync(signedIn(payload(permission: .authorized, token: Self.fcmToken)))
+        _ = await registrar.sync(signedIn(payload(permission: .authorized, enabled: false, token: Self.fcmToken)))
+        _ = await registrar.sync(signedIn(payload(permission: .authorized, enabled: false, token: Self.otherFCMToken)))
         let calls = await server.calls
-        XCTAssertEqual(calls.count, 4)
+        XCTAssertEqual(calls.count, 5)
         XCTAssertEqual(calls.last?.payload.notifications_enabled, false)
+        XCTAssertEqual(calls.last?.payload.push?.token, Self.otherFCMToken, "a refreshed token is sent at once")
     }
 
     func testTheSameInstallationIsSentAgainAfterADay() async {
@@ -219,9 +229,9 @@ final class InstallationRegistrarTests: XCTestCase {
     }
 
     func testAFailureIsNotRememberedAsSent() async {
-        await server.fail(with: APIFailure(error: .offline, requestID: "req_offline000000001", status: 0))
+        await server.fail(with: .offline)
         let failed = await registrar.sync(signedIn(payload()))
-        XCTAssertEqual(failed, .failed(APIFailure(error: .offline, requestID: "req_offline000000001", status: 0)))
+        XCTAssertEqual(failed, .failed(.offline))
         await server.fail(with: nil)
         let retried = await registrar.sync(signedIn(payload()))
         guard case .registered = retried else { return XCTFail("expected the retry to register, got \(retried)") }
@@ -230,8 +240,7 @@ final class InstallationRegistrarTests: XCTestCase {
     }
 
     func testAnInvalidPayloadIsNotResentUntilItChanges() async {
-        await server.fail(with: APIFailure(error: .invalidRequest, requestID: "req_invalid000000001", status: 400,
-                                           code: "INVALID_REQUEST"))
+        await server.fail(with: .invalidRequest)
         _ = await registrar.sync(signedIn(payload()))
         let again = await registrar.sync(signedIn(payload()))
         XCTAssertEqual(again, .unchanged, "the same body would be refused again")
@@ -283,7 +292,7 @@ final class InstallationRegistrarTests: XCTestCase {
         await server.reject(["token-1", "token-2", "token-3"])
         let outcome = await registrar.sync(signedIn(payload()))
         guard case .failed(let failure) = outcome else { return XCTFail("expected a failure, got \(outcome)") }
-        XCTAssertEqual(failure.status, 401)
+        XCTAssertEqual(failure, .unauthorized)
         let calls = await server.calls
         XCTAssertEqual(calls.count, 2, "one retry, never more")
         let refreshes = await tokens.refreshes
@@ -297,7 +306,7 @@ final class InstallationRegistrarTests: XCTestCase {
         await tokens.failRefresh(with: .unauthorized)
         let outcome = await registrar.sync(signedIn(payload()))
         guard case .failed(let failure) = outcome else { return XCTFail("expected a failure, got \(outcome)") }
-        XCTAssertEqual(failure.error, .unauthorized)
+        XCTAssertEqual(failure, .unauthorized)
         let calls = await server.calls
         XCTAssertEqual(calls.count, 1)
     }
@@ -308,12 +317,12 @@ final class InstallationRegistrarTests: XCTestCase {
         InstallationSnapshot.Inputs(
             isBootstrapComplete: true, hasAcceptedLegal: true, serverOffersInstallations: true,
             hasReadPermission: true, installationID: "0b7c9a52-4f5e-4d0a-9c1e-1d2f3a4b5c6d",
-            permission: .authorized, notificationsEnabled: true, deviceToken: String(repeating: "ab", count: 32),
-            environment: .sandbox, locale: "kk", hasSession: true, accountID: "user-1")
+            permission: .authorized, notificationsEnabled: true, pushToken: Self.fcmToken,
+            locale: "kk", hasSession: true, accountID: "user-1")
     }
 
     private func snapshot(_ inputs: InstallationSnapshot.Inputs) -> InstallationSnapshot? {
-        InstallationSnapshot.make(inputs, metadata: ClientMetadata(appVersion: "1.3.2", appBuild: "142", osVersion: "17.5"),
+        InstallationSnapshot.make(inputs, build: BuildInfo(appVersion: "1.3.2", appBuild: "142", osVersion: "17.5"),
                                   deviceModel: "iPhone17,1", timezone: "Asia/Almaty")
     }
 
@@ -342,15 +351,16 @@ final class InstallationRegistrarTests: XCTestCase {
 
     func testASnapshotCarriesTheTokenAndTheAccountFromTheSession() throws {
         let signedIn = try XCTUnwrap(snapshot(inputs()))
-        XCTAssertEqual(signedIn.payload.push, .init(provider: "apns", token: String(repeating: "ab", count: 32),
-                                                    environment: "sandbox"))
+        XCTAssertEqual(signedIn.payload.push, .init(provider: "fcm", token: Self.fcmToken))
+        XCTAssertEqual(signedIn.payload.locale, "kk")
+        XCTAssertEqual(signedIn.payload.app_build, "142")
         XCTAssertEqual(signedIn.payload.notification_permission, "authorized")
         XCTAssertTrue(signedIn.isSignedIn)
         XCTAssertEqual(signedIn.accountID, "user-1")
 
         var signedOutInputs = inputs()
         signedOutInputs.hasSession = false
-        signedOutInputs.deviceToken = nil
+        signedOutInputs.pushToken = nil
         let signedOut = try XCTUnwrap(snapshot(signedOutInputs))
         XCTAssertFalse(signedOut.isSignedIn)
         XCTAssertNil(signedOut.accountID, "no session: anonymous, whatever the screen still shows")
@@ -360,13 +370,35 @@ final class InstallationRegistrarTests: XCTestCase {
     // MARK: Retry policy
 
     func testWhichFailuresAreRetried() {
-        func failure(_ status: Int) -> APIFailure { APIFailure(error: .server, requestID: "", status: status) }
-        XCTAssertTrue(InstallationRegistrar.isRetryable(failure(0)), "no response")
-        XCTAssertTrue(InstallationRegistrar.isRetryable(failure(429)))
-        XCTAssertTrue(InstallationRegistrar.isRetryable(failure(500)))
-        XCTAssertTrue(InstallationRegistrar.isRetryable(failure(503)))
-        XCTAssertFalse(InstallationRegistrar.isRetryable(failure(400)))
-        XCTAssertFalse(InstallationRegistrar.isRetryable(failure(404)))
-        XCTAssertFalse(InstallationRegistrar.isRetryable(failure(409)))
+        XCTAssertTrue(InstallationRegistrar.isRetryable(.offline), "no response")
+        XCTAssertTrue(InstallationRegistrar.isRetryable(.timedOut))
+        XCTAssertTrue(InstallationRegistrar.isRetryable(.rateLimited(retryAfter: 60)))
+        XCTAssertTrue(InstallationRegistrar.isRetryable(.server))
+        XCTAssertTrue(InstallationRegistrar.isRetryable(.providerTimeout), "a gateway timeout")
+        XCTAssertTrue(InstallationRegistrar.isRetryable(.unauthorized))
+        XCTAssertFalse(InstallationRegistrar.isRetryable(.invalidRequest))
+        XCTAssertFalse(InstallationRegistrar.isRetryable(.notFound))
+        XCTAssertFalse(InstallationRegistrar.isRetryable(.conflict))
+        XCTAssertFalse(InstallationRegistrar.isRetryable(.malformedResponse))
+    }
+
+    func testTheServersWaitIsKept() {
+        XCTAssertEqual(InstallationRegistrar.retryAfter(.rateLimited(retryAfter: 120)), 120)
+        XCTAssertNil(InstallationRegistrar.retryAfter(.rateLimited(retryAfter: nil)))
+        XCTAssertNil(InstallationRegistrar.retryAfter(.server))
+    }
+
+    /// The status codes behind those cases, as `APIClient` maps them.
+    func testStatusesMapToTheRetryPolicy() {
+        func failure(_ status: Int) -> APIError {
+            APIClient.mapServerError(status: status, data: Data(), headers: HTTPURLResponse(
+                url: URL(string: "https://example.test")!, statusCode: status, httpVersion: nil, headerFields: nil)!)
+        }
+        for status in [401, 429, 500, 503, 504] {
+            XCTAssertTrue(InstallationRegistrar.isRetryable(failure(status)), "\(status)")
+        }
+        for status in [400, 404, 409, 422] {
+            XCTAssertFalse(InstallationRegistrar.isRetryable(failure(status)), "\(status)")
+        }
     }
 }

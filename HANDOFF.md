@@ -6,26 +6,69 @@
 
 ---
 
-## 0a. Обновление 01.10.2026 — push-уведомления и телеметрия (ветка `notification`)
+## 0.00. Обновление 07.10.2026 — push-уведомления (ветка `notification-sync`)
 
-- Ветка `notification` от `main`; в `main` не влита (ждёт ключей Firebase/APNs и проверки
-  на устройствах). Push делает владелец.
-- Бэкенд: установки (`/api/v1/installations`, анонимные и с аккаунтом), FCM HTTP v1 и APNs
-  (.p8) без SDK, outbox `notification_deliveries` с арендой и повторами, кампании с
-  `Idempotency-Key` и серверным подсчётом аудитории, автоматические push (оплата, подписка
-  истекает/истекла), события приложений, журнал входов, ошибки API, `X-Request-ID`,
-  маскирование, сроки хранения. Миграции `0006`–`0008` только добавляют.
-- Админка: «Уведомления», «Журналы», «Диагностика» пользователя, блок операций на дашборде,
-  фильтры аудита; права `notifications.*`, `users.diagnostics.read`, `logs.read`, `audit_logs.read`.
-- Android: Firebase Messaging (плагин только при наличии `app/google-services.json`, файл в
-  `.gitignore`), каналы `general`/`important`, карточка разрешения после входа, раздел в
-  настройках. iOS: `aps-environment` только в Release, Debug — Personal Team без push.
-- Всё описание, настройка Firebase/Apple, переменные и правки для политики:
-  `docs/notifications.md`. Ключи провайдеров — только в `.env` сервера.
+Push заново собран поверх `main` (старая ветка `origin/notification` по-прежнему не вливается;
+из неё взяты только части push, без телеметрии, прямого APNs и ролей админов).
+Полное описание: `docs/notifications.md`, API — `ai-reply-back-end/docs/API.md`.
+
+- FCM на Android и iOS (iOS — через APNs-ключ, загруженный в Firebase). Установки
+  `POST /api/v1/installations`, отвязка при выходе (`X-Installation-ID`), категории в Настройках.
+- Автоматически: тариф подключён (push + письмо), тариф скоро закончится / закончился,
+  ответы почти закончились / закончились. Каждое событие — максимум одно уведомление.
+- Кампании в админке: тексты kk/ru/en (uz по желанию), язык каждому свой, аудитория по
+  сегменту, тарифу, подписке, платформе, языку, квоте и конкретным людям.
+- `users.preferred_language` — язык уведомлений и писем, приложения синхронизируют его.
+
+**Не задеплоено.** Порядок: проверить `SELECT name FROM schema_migrations` (не должно быть
+`0006_push_notifications.sql`), настроить Firebase (приложения `kz.yerek.aireply` и
+`kz.ai-reply.reply.keyboard.keyboard`, APNs-ключ, сервисный аккаунт) и `.env`
+(`PUSH_NOTIFICATIONS_ENABLED=true`, `FIREBASE_*`), выкатить бэкенд (миграция `0011`),
+потом приложения с конфигурацией Firebase. Без ключей всё работает, push просто выключен.
+
+**Нужна проверка:** живая доставка на реальные iPhone и Android после настройки Firebase.
 
 ---
 
-## 0. Обновление 30.09.2026 — новая аутентификация
+## 0.0. Обновление 05.10.2026 — онбординг v2, род, автокоррекция, качество ответов
+
+Полный отчёт: `docs/onboarding-gender-autocorrect-report.md`.
+
+**Сделано:**
+- Онбординг v2 на iOS и Android (версия на устройстве, возобновление, повторный показ из Настроек).
+- Род отправителя: `grammatical_gender` в профиле и в запросах.
+- Автокоррекция RU/KK/EN в обеих клавиатурах (словари `tools/dictionaries`, Leipzig CC BY).
+- Полировка инструкции: `POST /api/v1/ai/polish`.
+- Промпт v2 с версиями, проверкой и одним ремонтом ответа.
+- Язык ответа = язык скопированного сообщения (требование заказчика).
+- Аналитика: `POST /api/v1/analytics/events`.
+- Ряд персон: `[✨][Друг][Клиент][Бизнес][Работа]`, кнопка «+» удалена.
+- Микрофон в панели ✨ на Android.
+
+**Не задеплоено.** Порядок: сначала бэкенд (миграции 0009, 0010), потом приложения.
+
+**Нужна проверка:** живой прогон качества (`TestLiveEval` с ключом OpenAI на сервере), проверка на
+реальных iPhone и Android.
+
+Ветку `origin/notification` не вливать: это отдельная работа.
+
+---
+
+## 0. Обновление 04.10.2026 — режим «Создать» (AI Compose)
+
+- Второй AI-режим клавиатуры: ✨ (с 05.10 — в начале ряда персон) → пользователь описывает сообщение → сервер пишет →
+  «Вставить». Буфер не читается. iOS: `Shared/AI/ComposeFlow.swift`, `ComposeService.swift`,
+  `ComposeStrings.swift`, панель — `ReplyComposerView` в режиме `.compose`. Android:
+  `keyboard/reply/ComposeSessionController.kt`, `keyboard/ui/CreatePanel.kt`.
+- Бэкенд: `POST /api/v1/ai/compose` (`internal/ai/compose.go`), общий путь квоты/токенов с `/ai/reply`,
+  миграция `0006_usage_mode.sql` (колонка `mode`). **Не задеплоено.**
+- Карточка «Клавиатура» в приложениях: одна кнопка по ситуации вместо двух.
+- Отчёт: `docs/ai-compose-report.md`. Сборка и тесты теперь запускаются напрямую из Bash
+  (xcodebuild / gradlew / go), watcher не нужен; JDK — `/Applications/Android Studio.app/Contents/jbr/Contents/Home`.
+
+---
+
+## 0.1. Обновление 30.09.2026 — новая аутентификация
 
 - Вход: iOS — Apple / Google / почта; Android — Google / почта. Вход по телефону
   (WhatsApp/SMS) из приложений удалён; старые `/auth/request-otp|verify-otp`

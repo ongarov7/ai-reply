@@ -101,8 +101,8 @@ struct AccountService: Sendable {
         return result
     }
 
-    func signOut() async {
-        await session.signOut()
+    func signOut(installationID: String? = nil) async {
+        await session.signOut(installationID: installationID)
     }
 
     // MARK: Authenticated endpoints
@@ -138,6 +138,13 @@ struct AccountService: Sendable {
         var locale: String?
         var timezone: String?
         var onboarding_completed: Bool?
+        /// Only for a server that publishes `sender_profile`; an older one
+        /// rejects the whole update over an unknown field.
+        var grammatical_gender: String?
+        var onboarding_version: Int?
+        /// The language of the account's notifications. Only for a server that
+        /// publishes `preferred_language`.
+        var preferred_language: String?
     }
 
     @discardableResult

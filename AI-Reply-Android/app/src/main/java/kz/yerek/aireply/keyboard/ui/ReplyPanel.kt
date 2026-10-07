@@ -1,5 +1,7 @@
 package kz.yerek.aireply.keyboard.ui
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -23,7 +25,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronLeft
@@ -49,6 +51,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.Layout
@@ -71,9 +74,13 @@ import kz.yerek.aireply.ai.AIReplyService
 import kz.yerek.aireply.ai.AppStrings
 import kz.yerek.aireply.domain.model.TemplateSummary
 import kz.yerek.aireply.keyboard.KeyboardTheme
+import kz.yerek.aireply.keyboard.autocorrect.Suggestion
+import kz.yerek.aireply.keyboard.layout.PersonaRowLayout
 import kz.yerek.aireply.keyboard.reply.ReplyComposerFlow
 import kz.yerek.aireply.keyboard.reply.ReplySession
-import kz.yerek.aireply.voice.VoiceFailure
+import kz.yerek.aireply.keyboard.voice.DictationNotice
+import kz.yerek.aireply.keyboard.voice.VoiceMessage
+import kz.yerek.aireply.keyboard.voice.VoiceStatusText
 import kz.yerek.aireply.voice.VoiceState
 
 /** Which of the composer's fields the keys are editing. */
@@ -92,7 +99,13 @@ class ComposerModel(
     val voice: VoiceState,
     val intents: List<QuickIntent>,
     /** The tallest the reply field may be, from the screen the keyboard is on. */
-    val maxFieldLines: Int
+    val maxFieldLines: Int,
+    /** Suggestions and the polish chip, shown in the intents' place. */
+    val assist: TypingAssist = TypingAssist.NONE,
+    /** The last dictation reached the instruction's limit. */
+    val voiceNotice: DictationNotice? = null,
+    /** Lines of the dictation status: fewer on a phone on its side. */
+    val voiceLines: Int = 2
 )
 
 class ComposerActions(
@@ -116,14 +129,25 @@ class ComposerActions(
     val onPreviousVersion: () -> Unit,
     val onNextVersion: () -> Unit,
     val onConflict: (ReplyComposerFlow.ConflictChoice) -> Unit,
-    val onMic: () -> Unit
+    val onMic: () -> Unit,
+    val assist: TypingAssistActions
 )
 
 // ----------------------------------------------------------------- persona row
 
 /**
- * The strip above the keys while no reply is being written: one chip per
- * persona, the last one used marked, and "+" for creating another in the app.
+ * The strip above the keys while no reply is being written: "✨" (Create:
+ * write a new message with AI) at the leading edge, then one chip per
+ * persona, the last one used marked. [PersonaRowLayout] holds its geometry.
+ *
+ * ADAPTIVE: "✨" is pinned at the start, so it is never cut off or scrolled
+ * away. The personas share the rest of the row - stretched evenly when they
+ * fit, with tighter padding when space is short, and scrolling (with a fade at
+ * the trailing edge, never a clipped label) only when even that does not fit.
+ *
+ * While a word is being typed and there is something to suggest, the word
+ * suggestions take exactly the personas' place - "✨" stays where it is and
+ * stays tappable, and the row keeps its height.
  */
 @Composable
 fun PersonaRow(
@@ -134,14 +158,16 @@ fun PersonaRow(
     theme: KeyboardTheme,
     strings: AppStrings,
     onSelect: (String) -> Unit,
-    onAdd: () -> Unit,
-    modifier: Modifier = Modifier
+    onCreate: () -> Unit,
+    modifier: Modifier = Modifier,
+    suggestions: List<Suggestion> = emptyList(),
+    onPick: (Suggestion) -> Unit = {}
 ) {
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(PERSONA_ROW_HEIGHT)
-            .padding(horizontal = 6.dp),
+            .padding(horizontal = PersonaRowLayout.SIDE_PADDING.dp),
         contentAlignment = Alignment.CenterStart
     ) {
         if (notice != null) {
@@ -158,40 +184,114 @@ fun PersonaRow(
             return@Box
         }
         Row(
-            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            chips.forEach { chip ->
-                val selected = chip.id == selectedId
-                val name = chip.names[languageCode] ?: chip.id
-                Box(
-                    modifier = Modifier
-                        .height(30.dp)
-                        .clip(RoundedCornerShape(15.dp))
-                        .background(if (selected) theme.accent else theme.fieldBackground)
-                        .clickable(role = Role.Button) { onSelect(chip.id) }
-                        .semantics { contentDescription = name }
-                        .padding(horizontal = 14.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = name,
-                        fontSize = 14.sp,
-                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                        color = if (selected) Color.White else theme.primaryText,
-                        maxLines = 1
+            PersonaRowLayout.order.forEachIndexed { index, slot ->
+                if (index > 0) Spacer(Modifier.width(PersonaRowLayout.SLOT_GAP.dp))
+                when (slot) {
+                    // A plain disc; only the glyph carries the accent.
+                    PersonaRowLayout.Slot.CREATE -> CircleIcon(
+                        icon = Icons.Filled.AutoAwesome,
+                        description = strings[R.string.kb_compose_open],
+                        theme = theme,
+                        size = PersonaRowLayout.CREATE_SIZE.dp,
+                        iconSize = 17.dp,
+                        tint = theme.accent,
+                        onClick = onCreate
                     )
+                    // Fades only when the strip comes or goes, never between keystrokes.
+                    PersonaRowLayout.Slot.CHIPS -> Crossfade(
+                        targetState = suggestions.isNotEmpty(),
+                        animationSpec = tween(SUGGESTIONS_FADE_MS),
+                        modifier = Modifier.weight(1f),
+                        label = "suggestions"
+                    ) { typing ->
+                        if (typing) {
+                            SuggestionStrip(suggestions, theme, strings, onPick, Modifier.fillMaxWidth().height(PERSONA_ROW_HEIGHT - 8.dp))
+                        } else {
+                            PersonaChips(
+                                chips = chips,
+                                languageCode = languageCode,
+                                selectedId = selectedId,
+                                theme = theme,
+                                onSelect = onSelect
+                            )
+                        }
+                    }
                 }
             }
-            CircleIcon(
-                icon = Icons.Filled.Add,
-                description = strings[R.string.kb_add_template],
-                theme = theme,
-                size = 30.dp,
-                iconSize = 18.dp,
-                onClick = onAdd
-            )
+        }
+    }
+}
+
+@Composable
+private fun PersonaChips(
+    chips: List<TemplateSummary>,
+    languageCode: String,
+    selectedId: String?,
+    theme: KeyboardTheme,
+    onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val scroll = rememberScrollState()
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val names = chips.map { it.names[languageCode] ?: it.id }
+    BoxWithConstraints(modifier) {
+        // A little under the real width, so pixel rounding never leaves a
+        // set that fits one pixel short of the edge (and fading for nothing).
+        val available = maxWidth - 2.dp
+        // Text widths, then the roomiest padding at which the whole set fits.
+        val widths = remember(names, available) {
+            val text = names.map { name ->
+                with(density) {
+                    measurer.measure(name, TextStyle(fontSize = 14.sp, fontWeight = FontWeight.SemiBold)).size.width.toDp().value
+                }
+            }
+            PersonaRowLayout.chipWidths(text, available.value).map { it.dp }
+        }
+        Box(Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(scroll),
+                horizontalArrangement = Arrangement.spacedBy(PersonaRowLayout.CHIP_GAP.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                chips.forEachIndexed { index, chip ->
+                    val selected = chip.id == selectedId
+                    val name = names[index]
+                    Box(
+                        modifier = Modifier
+                            .height(30.dp)
+                            .width(widths.getOrElse(index) { 64.dp })
+                            .clip(RoundedCornerShape(15.dp))
+                            .background(if (selected) theme.accent else theme.fieldBackground)
+                            .clickable(role = Role.Button) { onSelect(chip.id) }
+                            .semantics { contentDescription = name },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = name,
+                            fontSize = 14.sp,
+                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                            color = if (selected) Color.White else theme.primaryText,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+            // Fades the chips out at the trailing edge while there is more to
+            // scroll to. The scroll clips at the chips' own start, so nothing
+            // ever slides under "✨".
+            if (scroll.canScrollForward) {
+                Box(
+                    Modifier
+                        .align(Alignment.CenterEnd)
+                        .width(24.dp)
+                        .height(30.dp)
+                        .background(Brush.horizontalGradient(listOf(Color.Transparent, theme.background)))
+                )
+            }
         }
     }
 }
@@ -239,7 +339,7 @@ fun ComposerPanel(
         }
 
         BoxWithConstraints(Modifier.fillMaxWidth()) {
-            val fieldHeight = replyFieldHeight(session, maxWidth, model.maxFieldLines)
+            val fieldHeight = draftFieldHeight(flow, maxWidth, model.maxFieldLines)
             when {
                 flow.isConflict -> Box(
                     modifier = Modifier.fillMaxWidth().height(fieldHeight).padding(horizontal = 8.dp),
@@ -306,11 +406,25 @@ fun ComposerPanel(
             )
         }
 
-        if (composingLike && !flow.isConflict) VoiceStatusLine(model.voice, strings, theme)
+        if (composingLike && !flow.isConflict) {
+            VoiceStatusLine(model.voice, model.voiceNotice, strings, theme, lines = model.voiceLines)
+        }
 
         when {
-            flow.isConflict -> ConflictRow(actions, strings, theme)
-            flow.showsReply -> ResultRow(model, actions, strings, theme)
+            flow.isConflict -> ConflictRow(actions.onConflict, strings, theme)
+            flow.showsReply -> ResultRow(
+                flow = flow,
+                draftText = model.session.draft.text,
+                strings = strings,
+                theme = theme,
+                backDescription = strings[R.string.kb_back],
+                onBack = actions.onBack,
+                onRegenerate = actions.onRegenerate,
+                onEdit = actions.onEdit,
+                onPreviousVersion = actions.onPreviousVersion,
+                onNextVersion = actions.onNextVersion,
+                onInsert = actions.onInsert
+            )
             else -> ComposingRow(model, actions, strings, theme, errorMessage != null)
         }
     }
@@ -321,24 +435,24 @@ fun ComposerPanel(
  * [maxLines], measured when the VERSION changes - not on every keystroke.
  */
 @Composable
-private fun replyFieldHeight(session: ReplySession, width: Dp, maxLines: Int): Dp {
+internal fun draftFieldHeight(flow: ReplyComposerFlow, width: Dp, maxLines: Int, minLines: Int = 2): Dp {
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
-    val drafts = session.flow.drafts
+    val drafts = flow.drafts
     val lines = remember(drafts.index, drafts.count, drafts.current?.generated, width) {
         val innerWidth = with(density) { (width - 16.dp).roundToPx() }.coerceAtLeast(1)
-        val text = session.flow.draftText.ifEmpty { " " }
+        val text = flow.draftText.ifEmpty { " " }
         measurer.measure(
             text,
             TextStyle(fontSize = 16.sp, lineHeight = LINE_HEIGHT_SP.sp),
             constraints = Constraints(maxWidth = innerWidth)
         ).lineCount
     }
-    val shown = lines.coerceIn(2, maxLines.coerceAtLeast(2))
+    val shown = lines.coerceIn(minLines, maxLines.coerceAtLeast(minLines))
     return (shown * LINE_HEIGHT_DP + 16).dp
 }
 
-private fun Modifier.fieldFrame(theme: KeyboardTheme, focused: Boolean): Modifier = this
+internal fun Modifier.fieldFrame(theme: KeyboardTheme, focused: Boolean): Modifier = this
     .clip(RoundedCornerShape(9.dp))
     .background(theme.fieldBackground)
     .border(1.dp, if (focused) theme.accent else theme.fieldBorder, RoundedCornerShape(9.dp))
@@ -512,18 +626,21 @@ private fun ComposingRow(
     val generating = flow.isGenerating
     val hasSource = model.session.source.text.isNotBlank()
     val overLimit = AIReplyService.characterCount(model.session.source.text) > model.sourceLimit
-    val canGenerate = !generating && hasSource && !overLimit
+    // While the microphone is on, Reply waits for the words being spoken.
+    val canGenerate = !generating && hasSource && !overLimit && !model.voice.isActive
 
     Row(
         modifier = Modifier.fillMaxWidth().height(ROW_HEIGHT),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        IntentRow(
+        IntentSlot(
             intents = model.intents,
             enabled = flow.stage == ReplyComposerFlow.Stage.Composing,
+            assist = model.assist,
+            assistActions = actions.assist,
+            strings = strings,
             theme = theme,
-            moreLabel = strings[R.string.kb_more_actions],
             onIntent = actions.onIntent,
             modifier = Modifier.weight(1f)
         )
@@ -543,20 +660,32 @@ private fun ComposingRow(
     }
 }
 
+/** Back, Regenerate, Edit, versions and Insert - for a reply and for Create alike. */
 @Composable
-private fun ResultRow(model: ComposerModel, actions: ComposerActions, strings: AppStrings, theme: KeyboardTheme) {
-    val flow = model.session.flow
+internal fun ResultRow(
+    flow: ReplyComposerFlow,
+    draftText: String,
+    strings: AppStrings,
+    theme: KeyboardTheme,
+    backDescription: String,
+    onBack: () -> Unit,
+    onRegenerate: () -> Unit,
+    onEdit: () -> Unit,
+    onPreviousVersion: () -> Unit,
+    onNextVersion: () -> Unit,
+    onInsert: () -> Unit
+) {
     val stage = flow.stage
     val editing = stage == ReplyComposerFlow.Stage.Editing
     val regenerating = flow.generationOrigin == ReplyComposerFlow.Origin.RESULT
     val drafts = flow.drafts
-    val canInsert = (stage == ReplyComposerFlow.Stage.Result || editing) && model.session.draft.text.isNotBlank()
+    val canInsert = (stage == ReplyComposerFlow.Stage.Result || editing) && draftText.isNotBlank()
 
     Row(
         modifier = Modifier.fillMaxWidth().height(ROW_HEIGHT),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        CircleIcon(Icons.AutoMirrored.Filled.ArrowBack, strings[R.string.kb_back], theme, onClick = actions.onBack)
+        CircleIcon(Icons.AutoMirrored.Filled.ArrowBack, backDescription, theme, onClick = onBack)
         Spacer(Modifier.width(6.dp))
         CircleIcon(
             icon = Icons.Filled.Refresh,
@@ -564,7 +693,7 @@ private fun ResultRow(model: ComposerModel, actions: ComposerActions, strings: A
             theme = theme,
             busy = regenerating,
             enabled = stage == ReplyComposerFlow.Stage.Result || editing || regenerating,
-            onClick = actions.onRegenerate
+            onClick = onRegenerate
         )
         Spacer(Modifier.width(6.dp))
         CircleIcon(
@@ -573,7 +702,7 @@ private fun ResultRow(model: ComposerModel, actions: ComposerActions, strings: A
             theme = theme,
             selected = editing,
             enabled = stage == ReplyComposerFlow.Stage.Result || editing,
-            onClick = actions.onEdit
+            onClick = onEdit
         )
 
         Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
@@ -582,7 +711,7 @@ private fun ResultRow(model: ComposerModel, actions: ComposerActions, strings: A
                     CircleIcon(
                         Icons.Filled.ChevronLeft, strings[R.string.kb_previous_version], theme, 28.dp, 20.dp,
                         filled = false, enabled = drafts.canSelectPrevious && !flow.isGenerating,
-                        onClick = actions.onPreviousVersion
+                        onClick = onPreviousVersion
                     )
                     Text(
                         text = "${drafts.position}/${drafts.count}",
@@ -596,7 +725,7 @@ private fun ResultRow(model: ComposerModel, actions: ComposerActions, strings: A
                     CircleIcon(
                         Icons.Filled.ChevronRight, strings[R.string.kb_next_version], theme, 28.dp, 20.dp,
                         filled = false, enabled = drafts.canSelectNext && !flow.isGenerating,
-                        onClick = actions.onNextVersion
+                        onClick = onNextVersion
                     )
                 }
             }
@@ -607,26 +736,30 @@ private fun ResultRow(model: ComposerModel, actions: ComposerActions, strings: A
             enabled = canInsert,
             theme = theme,
             modifier = Modifier.widthIn(min = 96.dp),
-            onClick = actions.onInsert
+            onClick = onInsert
         )
     }
 }
 
 @Composable
-private fun ConflictRow(actions: ComposerActions, strings: AppStrings, theme: KeyboardTheme) {
+internal fun ConflictRow(
+    onConflict: (ReplyComposerFlow.ConflictChoice) -> Unit,
+    strings: AppStrings,
+    theme: KeyboardTheme
+) {
     Row(
         modifier = Modifier.fillMaxWidth().height(ROW_HEIGHT),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         ActionPill(strings[R.string.kb_replace_existing], true, theme, Modifier.weight(1f)) {
-            actions.onConflict(ReplyComposerFlow.ConflictChoice.REPLACE)
+            onConflict(ReplyComposerFlow.ConflictChoice.REPLACE)
         }
         ActionPill(strings[R.string.kb_append_existing], true, theme, Modifier.weight(1f)) {
-            actions.onConflict(ReplyComposerFlow.ConflictChoice.APPEND)
+            onConflict(ReplyComposerFlow.ConflictChoice.APPEND)
         }
         ActionPill(strings[R.string.kb_keep_typing], true, theme, Modifier.weight(1f), quiet = true) {
-            actions.onConflict(ReplyComposerFlow.ConflictChoice.CANCEL)
+            onConflict(ReplyComposerFlow.ConflictChoice.CANCEL)
         }
     }
 }
@@ -639,7 +772,7 @@ private fun ConflictRow(actions: ComposerActions, strings: AppStrings, theme: Ke
  * does not fit is one tap on "…" away - it shows the next ones.
  */
 @Composable
-private fun IntentRow(
+internal fun IntentRow(
     intents: List<QuickIntent>,
     enabled: Boolean,
     theme: KeyboardTheme,
@@ -717,13 +850,14 @@ private class IntentPager {
 // -------------------------------------------------------------------- pieces
 
 @Composable
-private fun ActionPill(
+internal fun ActionPill(
     label: String,
     enabled: Boolean,
     theme: KeyboardTheme,
     modifier: Modifier = Modifier,
     quiet: Boolean = false,
     busy: Boolean = false,
+    icon: ImageVector? = null,
     onClick: () -> Unit
 ) {
     val background = when {
@@ -748,6 +882,9 @@ private fun ActionPill(
                 color = Color.White
             )
             Spacer(Modifier.width(6.dp))
+        } else if (icon != null) {
+            Icon(icon, contentDescription = null, tint = if (quiet) theme.primaryText else Color.White, modifier = Modifier.size(15.dp))
+            Spacer(Modifier.width(5.dp))
         }
         Text(
             text = label,
@@ -765,7 +902,7 @@ private fun ActionPill(
  * disc with a white glyph (Edit while editing); [busy] shows a spinner.
  */
 @Composable
-private fun CircleIcon(
+internal fun CircleIcon(
     icon: ImageVector,
     description: String,
     theme: KeyboardTheme,
@@ -775,6 +912,7 @@ private fun CircleIcon(
     selected: Boolean = false,
     busy: Boolean = false,
     enabled: Boolean = true,
+    tint: Color? = null,
     onClick: () -> Unit
 ) {
     val background = when {
@@ -782,7 +920,7 @@ private fun CircleIcon(
         filled -> theme.fieldBackground
         else -> Color.Transparent
     }
-    val tint = if (selected) Color.White else theme.primaryText
+    val glyph = if (selected) Color.White else tint ?: theme.primaryText
     Box(
         modifier = Modifier
             .size(size)
@@ -794,15 +932,19 @@ private fun CircleIcon(
         contentAlignment = Alignment.Center
     ) {
         if (busy) {
-            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = tint)
+            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = glyph)
         } else {
-            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(iconSize))
+            Icon(icon, contentDescription = null, tint = glyph, modifier = Modifier.size(iconSize))
         }
     }
 }
 
+/**
+ * The microphone, the same in the reply composer and in Create: a mic to start,
+ * an accent Stop while listening, a spinner while the words are recognised.
+ */
 @Composable
-private fun MicButton(
+internal fun MicButton(
     voice: VoiceState,
     strings: AppStrings,
     theme: KeyboardTheme,
@@ -812,7 +954,11 @@ private fun MicButton(
     val listening = voice is VoiceState.Listening || voice is VoiceState.Starting
     CircleIcon(
         icon = if (listening) Icons.Filled.Stop else Icons.Filled.Mic,
-        description = if (listening) strings[R.string.voice_kb_stop] else strings[R.string.voice_kb_start],
+        description = when {
+            listening -> strings[R.string.voice_kb_stop]
+            voice is VoiceState.Processing -> strings[R.string.voice_kb_processing]
+            else -> strings[R.string.voice_kb_start]
+        },
         theme = theme,
         size = 32.dp,
         iconSize = 18.dp,
@@ -824,38 +970,69 @@ private fun MicButton(
 }
 
 /**
- * One line under the instruction while the microphone is doing anything: the
- * user must never be unsure whether they are being recorded.
+ * One line under the instruction while the microphone is doing anything, or
+ * has something to say: the user must never be unsure whether they are being
+ * recorded. While listening it shows the words as they are recognised - the
+ * newest ones, if they no longer fit.
+ *
+ * Its height is fixed at [lines] lines whenever it shows, so recognised words
+ * arriving never move the panel; the screen reader hears the state from the
+ * service's announcements, never the running transcript.
  */
 @Composable
-private fun VoiceStatusLine(voice: VoiceState, strings: AppStrings, theme: KeyboardTheme) {
-    val message = when (voice) {
-        is VoiceState.Starting -> strings[R.string.voice_kb_listening]
-        is VoiceState.Listening -> voice.partial.ifBlank { strings[R.string.voice_kb_listening] }
-        is VoiceState.Processing -> strings[R.string.voice_kb_processing]
-        is VoiceState.PermissionRequired -> strings[R.string.voice_kb_permission_needed]
-        is VoiceState.PermissionDenied -> strings[R.string.voice_kb_permission_denied]
-        is VoiceState.Failed -> when (voice.reason) {
-            VoiceFailure.NO_SPEECH -> strings[R.string.voice_kb_no_speech]
-            VoiceFailure.NETWORK -> strings[R.string.kb_err_offline]
-            VoiceFailure.LANGUAGE_UNAVAILABLE, VoiceFailure.UNAVAILABLE -> strings[R.string.voice_kb_unavailable]
-            VoiceFailure.GENERIC -> strings[R.string.voice_kb_failed]
+internal fun VoiceStatusLine(
+    voice: VoiceState,
+    notice: DictationNotice?,
+    strings: AppStrings,
+    theme: KeyboardTheme,
+    modifier: Modifier = Modifier,
+    lines: Int = 2
+) {
+    val message = VoiceStatusText.message(voice, notice) ?: return
+    val partial = (voice as? VoiceState.Listening)?.partial?.trim().orEmpty()
+    val style = TextStyle(fontSize = 11.5.sp, lineHeight = VOICE_LINE_SP.sp)
+    val measurer = rememberTextMeasurer()
+    BoxWithConstraints(
+        modifier = modifier.fillMaxWidth().height(voiceLineHeight(lines)),
+        contentAlignment = Alignment.CenterStart
+    ) {
+        val width = constraints.maxWidth
+        val text = if (partial.isEmpty()) {
+            strings.text(message)
+        } else {
+            remember(partial, width, lines) {
+                VoiceStatusText.tail(partial) { candidate ->
+                    measurer.measure(candidate, style, constraints = Constraints(maxWidth = width)).lineCount <= lines
+                }
+            }
         }
-        else -> null
-    } ?: return
-
-    Text(
-        text = message,
-        fontSize = 11.5.sp,
-        color = if (voice is VoiceState.Listening) theme.primaryText else theme.secondaryText,
-        maxLines = 2,
-        overflow = TextOverflow.Ellipsis,
-        modifier = Modifier.fillMaxWidth()
-    )
+        Text(
+            text = text,
+            style = style,
+            color = if (voice is VoiceState.Listening) theme.primaryText else theme.secondaryText,
+            maxLines = lines,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
 }
 
-val PERSONA_ROW_HEIGHT = 44.dp
-private val ROW_HEIGHT = 34.dp
+/**
+ * [lines] status lines, in sp so a large font never clips them, plus a little
+ * headroom: a box exactly two lines tall rounds down a pixel and shows one.
+ */
+@Composable
+internal fun voiceLineHeight(lines: Int): Dp =
+    with(LocalDensity.current) { (lines * VOICE_LINE_SP).sp.toDp() } + VOICE_LINE_HEADROOM
+
+internal fun AppStrings.text(message: VoiceMessage): String =
+    message.argument?.let { get(message.id, it) } ?: get(message.id)
+
+val PERSONA_ROW_HEIGHT = PersonaRowLayout.HEIGHT.dp
+internal val ROW_HEIGHT = 34.dp
 private val INSTRUCTION_HEIGHT = 56.dp
-private const val LINE_HEIGHT_SP = 21
+internal const val LINE_HEIGHT_SP = 21
 private const val LINE_HEIGHT_DP = 21
+private const val SUGGESTIONS_FADE_MS = 120
+private const val VOICE_LINE_SP = 14
+private val VOICE_LINE_HEADROOM = 2.dp

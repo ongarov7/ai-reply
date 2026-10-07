@@ -151,5 +151,88 @@ final class AccountAPITests: XCTestCase {
         XCTAssertEqual(session.user.identifier, "+77011234567")
         XCTAssertEqual(session.subscription.plan.dailyLimit, 7)
         XCTAssertEqual(session.usage.remainingToday, 7)
+        XCTAssertNil(session.profile.gender, "a server without sender_profile sends none")
+        XCTAssertNil(session.profile.onboardingVersion)
+    }
+
+    /// The sender fields are optional, and a gender value this build does not
+    /// know must not fail the account.
+    func testProfileDecodesTheSenderFields() throws {
+        func profile(_ extra: String) throws -> AccountAPI.Profile {
+            try JSONDecoder().decode(AccountAPI.Profile.self, from: Data("""
+            {"display_name": "", "role": "", "description": "", "preferred_tone": "natural",
+             "business_offering": "", "business_summary": "", "business_rules": [],
+             "onboarding_completed": true\(extra)}
+            """.utf8))
+        }
+        let female = try profile(#", "grammatical_gender": "female", "onboarding_version": 2"#)
+        XCTAssertEqual(female.gender, .female)
+        XCTAssertEqual(female.onboardingVersion, 2)
+        XCTAssertNil(try profile(#", "grammatical_gender": "robot""#).gender)
+    }
+
+    /// Only what changed goes in an update; nil fields are left out entirely,
+    /// so an older server never sees a field it does not know.
+    func testProfileUpdateSendsOnlyWhatIsSet() throws {
+        var update = AccountService.ProfileUpdate()
+        update.grammatical_gender = "male"
+        let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(update)) as? [String: Any]
+        XCTAssertEqual(json?.count, 1)
+        XCTAssertEqual(json?["grammatical_gender"] as? String, "male")
+    }
+
+    // MARK: Push and language features
+
+    /// The push features are opt-in: a server that does not name them has
+    /// none of them.
+    func testPushFeaturesDecodeAndDefaultToOff() throws {
+        let current = try JSONDecoder().decode(AccountAPI.Features.self, from: Data("""
+        {"reply_preferences": true, "installations": true, "push_notifications": false,
+         "preferred_language": true}
+        """.utf8))
+        XCTAssertEqual(current.installations, true)
+        XCTAssertEqual(current.pushNotifications, false)
+        XCTAssertEqual(current.preferredLanguage, true)
+
+        let older = try JSONDecoder().decode(AccountAPI.Features.self, from: Data(#"{"reply_preferences": true}"#.utf8))
+        XCTAssertNil(older.installations)
+        XCTAssertNil(older.pushNotifications)
+        XCTAssertNil(older.preferredLanguage)
+    }
+
+    /// "" is an account without a language; a missing field is a server
+    /// without it.
+    func testUserDecodesThePreferredLanguage() throws {
+        func user(_ extra: String) throws -> AccountAPI.User {
+            try JSONDecoder().decode(AccountAPI.User.self, from: Data("""
+            {"id": "u1", "email": "a@example.kz", "status": "active", "locale": "ru",
+             "onboarding_completed": true\(extra)}
+            """.utf8))
+        }
+        XCTAssertEqual(try user(#", "preferred_language": "kk""#).preferredLanguage, "kk")
+        XCTAssertEqual(try user(", \"preferred_language\": \"\"").preferredLanguage, "")
+        XCTAssertNil(try user("").preferredLanguage)
+
+        let confirmed = try user(", \"preferred_language\": \"\"").withPreferredLanguage("uz")
+        XCTAssertEqual(confirmed.preferredLanguage, "uz")
+        XCTAssertEqual(confirmed.id, "u1")
+        XCTAssertEqual(confirmed.email, "a@example.kz")
+    }
+
+    /// The field goes out only when set: an older server refuses it.
+    func testProfileUpdateSendsThePreferredLanguageOnlyWhenSet() throws {
+        var update = AccountService.ProfileUpdate()
+        update.locale = "kk"
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(update)) as? [String: Any])
+        XCTAssertNil(json["preferred_language"])
+
+        update.preferred_language = "kk"
+        json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(update)) as? [String: Any])
+        XCTAssertEqual(json["preferred_language"] as? String, "kk")
+    }
+
+    /// The server is told one of the app's own languages, never "de".
+    func testDeviceLocaleIsOneOfTheAppsLanguages() {
+        XCTAssertNotNil(AppLanguage(rawValue: DeviceDescriptor.current.locale))
     }
 }

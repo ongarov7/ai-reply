@@ -39,12 +39,12 @@ import kz.yerek.aireply.ui.design.Spacing
 /**
  * Settings ▸ Notifications.
  *
- * Хабарламалар: жүйе рұқсаты, қосымшадағы ауыстырғыш, санаттар, диагностика.
+ * Хабарламалар: жүйе рұқсаты, қосымшадағы ауыстырғыш, санаттар.
  *
  * What the phone allows (with the way to change it), the app's own switch,
- * the categories of a signed-in account (security always on), and "Share
- * diagnostics". Where push cannot work — a build without Firebase, a server
- * without it — it says so instead of showing switches that do nothing.
+ * and the categories of a signed-in account (security always on). Where push
+ * cannot work — a build without Firebase, a server without it — it says so
+ * instead of showing switches that do nothing.
  */
 @Composable
 fun NotificationSettingsSection(modifier: Modifier = Modifier) {
@@ -128,15 +128,6 @@ fun NotificationSettingsSection(modifier: Modifier = Modifier) {
         } else {
             AppCard { Footnote(stringResource(R.string.push_settings_unavailable)) }
         }
-
-        RowGroup {
-            SwitchRow(
-                label = stringResource(R.string.diagnostics_share),
-                checked = ui.shareDiagnostics,
-                enabled = true
-            ) { checked -> push.setShareDiagnostics(checked) }
-        }
-        Footnote(stringResource(R.string.diagnostics_share_footer))
     }
 }
 

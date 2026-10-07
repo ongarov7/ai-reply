@@ -71,9 +71,6 @@ class FakeServer(private val handler: (RecordedRequest) -> FakeResponse) {
     }
 
     companion object {
-        fun envelope(code: String, requestId: String? = null): String {
-            val id = requestId?.let { ""","request_id":"$it"""" }.orEmpty()
-            return """{"error":{"code":"$code","message":"test"$id}}"""
-        }
+        fun envelope(code: String): String = """{"error":{"code":"$code","message":"test"}}"""
     }
 }

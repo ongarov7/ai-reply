@@ -46,11 +46,23 @@ extension AccountAPI {
         /// Ways this account signs in: "apple", "email", "google", "phone".
         /// Absent on servers from before Google and Apple sign-in.
         let authProviders: [String]?
+        /// The language of the account's notifications: kk, ru, en, uz, or
+        /// "" while none was chosen. Absent on servers without
+        /// `preferred_language`.
+        let preferredLanguage: String?
 
         enum CodingKeys: String, CodingKey {
             case id, phone, email, status, locale
             case onboardingCompleted = "onboarding_completed"
             case authProviders = "auth_providers"
+            case preferredLanguage = "preferred_language"
+        }
+
+        /// The same account after the server confirmed a new language.
+        func withPreferredLanguage(_ code: String) -> User {
+            User(id: id, phone: phone, email: email, status: status, locale: locale,
+                 onboardingCompleted: onboardingCompleted, authProviders: authProviders,
+                 preferredLanguage: code)
         }
 
         /// What the user recognises themselves by.
@@ -71,6 +83,13 @@ extension AccountAPI {
         let businessSummary: String
         let businessRules: [String]
         let onboardingCompleted: Bool
+        /// "male" / "female" / "unspecified". Kept as the raw string so a
+        /// value this build does not know cannot fail the whole account; read
+        /// it through `gender`. Absent on servers without `sender_profile`.
+        let grammaticalGender: String?
+        /// The newest onboarding any of the user's devices reported finishing.
+        /// Informational: onboarding itself is decided per device.
+        let onboardingVersion: Int?
 
         enum CodingKeys: String, CodingKey {
             case displayName = "display_name"
@@ -80,6 +99,12 @@ extension AccountAPI {
             case businessSummary = "business_summary"
             case businessRules = "business_rules"
             case onboardingCompleted = "onboarding_completed"
+            case grammaticalGender = "grammatical_gender"
+            case onboardingVersion = "onboarding_version"
+        }
+
+        var gender: GrammaticalGender? {
+            grammaticalGender.flatMap(GrammaticalGender.init(rawValue:))
         }
     }
 
@@ -264,26 +289,42 @@ extension AccountAPI {
     struct Features: Decodable, Sendable, Equatable {
         /// The reply request's `profile` block accepts `reply_language`.
         let replyPreferences: Bool?
+        /// `POST /api/v1/ai/compose` exists (writing a message from an
+        /// instruction). Informational: the keyboard always offers Create and
+        /// a server without it answers with a plain error.
+        let compose: Bool?
+        /// The sender fields: `grammatical_gender` and `input_language` on
+        /// reply and compose, `grammatical_gender` and `onboarding_version` on
+        /// `PATCH /api/v1/me`.
+        let senderProfile: Bool?
+        /// `POST /api/v1/ai/polish` exists and is switched on.
+        let instructionPolish: Bool?
+        /// `POST /api/v1/analytics/events` takes the app's product events.
+        let productEvents: Bool?
         /// Sign-in methods the server accepts right now. nil on older servers.
         let emailOTP: Bool?
         let googleSignIn: Bool?
         let appleSignIn: Bool?
-        /// `POST /api/v1/installations` exists. Missing on older servers,
-        /// which the app treats as "no": it then never calls the endpoint.
+        /// `POST /api/v1/installations` exists. A missing key is "no": the app
+        /// then never registers the installation.
         let installations: Bool?
-        /// The server can actually deliver a push (a provider is set up).
+        /// The server can deliver push notifications (FCM is set up).
         let pushNotifications: Bool?
-        /// `POST /api/v1/events` accepts app events.
-        let telemetry: Bool?
+        /// `PATCH /api/v1/me` takes `preferred_language`.
+        let preferredLanguage: Bool?
 
         enum CodingKeys: String, CodingKey {
             case replyPreferences = "reply_preferences"
+            case compose
+            case senderProfile = "sender_profile"
+            case instructionPolish = "instruction_polish"
+            case productEvents = "product_events"
             case emailOTP = "email_otp"
             case googleSignIn = "google_sign_in"
             case appleSignIn = "apple_sign_in"
             case installations
             case pushNotifications = "push_notifications"
-            case telemetry
+            case preferredLanguage = "preferred_language"
         }
     }
 
@@ -295,6 +336,18 @@ extension AccountAPI {
 
         enum CodingKeys: String, CodingKey {
             case reply, usage
+            case detectedLanguage = "detected_language"
+        }
+    }
+
+    /// `POST /api/v1/ai/compose`.
+    struct ComposeResponse: Decodable, Sendable {
+        let text: String
+        let detectedLanguage: String?
+        let usage: Usage
+
+        enum CodingKeys: String, CodingKey {
+            case text, usage
             case detectedLanguage = "detected_language"
         }
     }

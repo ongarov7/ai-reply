@@ -118,3 +118,31 @@ func TestAIRequiresAuthentication(t *testing.T) {
 		t.Fatalf("unauthenticated request accepted: %d", res.status)
 	}
 }
+
+// Polish: жазба да, түзетілген нұсқа да ешқайда сақталмайды.
+func TestPolishTextIsNeverPersisted(t *testing.T) {
+	h := newHarness(t)
+	session := h.signIn("+7 705 444 55 66")
+	note := "ҚҰПИЯ ЖАЗБА айгерімге айт тапсырыс ORDER-77412 дайын"
+	h.provider.reply = "ҚҰПИЯ ЖАЗБА: Айгерімге айт, тапсырыс ORDER-77412 дайын."
+
+	res := h.do(http.MethodPost, "/api/v1/ai/polish", map[string]any{"text": note, "input_language": "kk"},
+		h.auth(session.access))
+	if res.status != http.StatusOK {
+		t.Fatalf("polish: %d %s", res.status, res.raw)
+	}
+	if !strings.Contains(h.provider.lastUser, note) {
+		t.Fatal("the note did not reach the provider — the test would prove nothing")
+	}
+	for _, needle := range []string{note, h.provider.reply, "ORDER-77412", "ҚҰПИЯ ЖАЗБА"} {
+		if h.dbContains(needle) {
+			t.Fatalf("database contains %q", needle)
+		}
+		if strings.Contains(h.logs.String(), needle) {
+			t.Fatalf("logs contain %q", needle)
+		}
+	}
+	if !strings.Contains(h.logs.String(), `"mode":"polish"`) {
+		t.Fatal("no metadata-only log for polish")
+	}
+}

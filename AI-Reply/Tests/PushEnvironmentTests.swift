@@ -1,91 +1,12 @@
 import XCTest
 @testable import AIReply
 
-/// The push plumbing that has no network in it: the token's text, which APNs
-/// host it belongs to, whether the build may ask for one at all, and the ids
-/// that name the install and the session.
+/// The push plumbing that has no network in it: whether the build may ask
+/// for a token at all, which Firebase options are good enough to configure
+/// with, the id that names the install, and the one request that carries it.
 ///
-/// Push токені, APNs ортасы, орнату және сессия идентификаторлары.
+/// Push баптауы, Firebase параметрлері және орнату идентификаторы.
 final class PushEnvironmentTests: XCTestCase {
-
-    // MARK: Token
-
-    func testTokenIsLowercaseHexTwoDigitsPerByte() {
-        XCTAssertEqual(PushToken.hexString(Data([0x00, 0x0f, 0xab, 0xff])), "000fabff")
-        let token = PushToken.hexString(Data((0..<32).map { UInt8($0 * 7 % 256) }))
-        XCTAssertEqual(token.count, 64)
-        XCTAssertNotNil(token.range(of: "^[0-9a-f]{64}$", options: .regularExpression), token)
-    }
-
-    // MARK: embedded.mobileprovision
-
-    /// A profile as iOS stores it: a signed envelope around an XML plist. The
-    /// bytes around the plist stand in for the CMS signature.
-    private func profile(entitlements: String) -> Data {
-        var data = Data([0x30, 0x82, 0x2c, 0x5f, 0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x07, 0x02, 0xa0])
-        data.append(Data("""
-        <?xml version="1.0" encoding="UTF-8"?>
-        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-        <plist version="1.0">
-        <dict>
-            <key>AppIDName</key>
-            <string>AI Reply</string>
-            <key>Entitlements</key>
-            <dict>
-                <key>application-identifier</key>
-                <string>JXM8N66QWU.kz.yerek.replykeyboard</string>
-                \(entitlements)
-            </dict>
-            <key>Name</key>
-            <string>iOS Team Provisioning Profile: kz.yerek.replykeyboard</string>
-        </dict>
-        </plist>
-        """.utf8))
-        data.append(Data([0xa0, 0x82, 0x0e, 0x3e, 0x30, 0x82, 0x04, 0x34, 0x00, 0xff]))
-        return data
-    }
-
-    func testDevelopmentProfileMeansSandbox() {
-        let data = profile(entitlements: """
-            <key>aps-environment</key>
-            <string>development</string>
-            <key>get-task-allow</key>
-            <true/>
-            """)
-        XCTAssertEqual(ProvisioningProfile.entitlements(in: data)?["aps-environment"] as? String, "development")
-        XCTAssertEqual(APNsEnvironment.detect(provisioningProfile: data, isSimulator: false), .sandbox)
-    }
-
-    func testAdHocProfileMeansProduction() {
-        let data = profile(entitlements: """
-            <key>aps-environment</key>
-            <string>production</string>
-            <key>get-task-allow</key>
-            <false/>
-            """)
-        XCTAssertEqual(APNsEnvironment.detect(provisioningProfile: data, isSimulator: false), .production)
-    }
-
-    func testNoProfileIsTheAppStoreOrTestFlight() {
-        XCTAssertEqual(APNsEnvironment.detect(provisioningProfile: nil, isSimulator: false), .production)
-    }
-
-    func testTheSimulatorIsSandbox() {
-        XCTAssertEqual(APNsEnvironment.detect(provisioningProfile: nil, isSimulator: true), .sandbox)
-    }
-
-    func testAProfileWithoutPushFallsBackToHowTheBuildWasSigned() {
-        let debuggable = profile(entitlements: "<key>get-task-allow</key>\n<true/>")
-        XCTAssertEqual(APNsEnvironment.detect(provisioningProfile: debuggable, isSimulator: false), .sandbox)
-        let distribution = profile(entitlements: "<key>get-task-allow</key>\n<false/>")
-        XCTAssertEqual(APNsEnvironment.detect(provisioningProfile: distribution, isSimulator: false), .production)
-    }
-
-    func testAnUnreadableProfileIsNotACrash() {
-        XCTAssertNil(ProvisioningProfile.propertyList(in: Data([0x00, 0x01, 0x02])))
-        XCTAssertNil(ProvisioningProfile.propertyList(in: Data("<?xml broken".utf8)))
-        XCTAssertEqual(APNsEnvironment.detect(provisioningProfile: Data("garbage".utf8), isSimulator: false), .production)
-    }
 
     // MARK: Build flag
 
@@ -96,11 +17,77 @@ final class PushEnvironmentTests: XCTestCase {
         XCTAssertFalse(PushBuildConfiguration.isEnabled(info: ["AIReplyPushNotifications": "$(AIREPLY_PUSH_NOTIFICATIONS)"]))
     }
 
-    /// Tests run the Debug build, which leaves push out like Sign in with Apple.
-    func testThisDebugBuildLeavesPushOut() {
-        #if DEBUG
-        XCTAssertFalse(PushBuildConfiguration.isEnabledInThisBuild)
-        #endif
+    /// Both configurations sign with `aps-environment`, so both ask for push;
+    /// Firebase still stays off until it has options.
+    func testThisBuildAsksForPush() {
+        XCTAssertTrue(PushBuildConfiguration.isEnabledInThisBuild)
+    }
+
+    /// The tests run inside the app, which must never configure Firebase there.
+    @MainActor
+    func testTheTestHostNeverConfiguresFirebase() {
+        XCTAssertFalse(FirebasePush.isConfigured)
+    }
+
+    // MARK: Firebase options
+
+    /// The shape Firebase checks (39 URL-safe characters, starting with "A"),
+    /// and plainly not a real key.
+    private let apiKey = "A" + String(repeating: "test_key-", count: 4) + "xx"
+    private let appID = "1:123456789012:ios:0a1b2c3d4e5f6a7b8c9d0e"
+
+    private func info(appID: String? = nil, senderID: String? = "123456789012",
+                      apiKey: String? = nil, projectID: String? = "ai-reply-push") -> [String: Any] {
+        var info: [String: Any] = [:]
+        info["AIReplyFirebaseAppID"] = appID ?? self.appID
+        info["AIReplyFirebaseSenderID"] = senderID
+        info["AIReplyFirebaseAPIKey"] = apiKey ?? self.apiKey
+        info["AIReplyFirebaseProjectID"] = projectID
+        return info
+    }
+
+    func testTheFixtureKeyHasTheShapeFirebaseChecks() {
+        XCTAssertEqual(apiKey.count, 39)
+        XCTAssertTrue(FirebasePush.isAPIKey(apiKey))
+    }
+
+    func testAllFourValuesConfigureFirebase() throws {
+        let options = try XCTUnwrap(FirebasePush.options(info: info()))
+        XCTAssertEqual(options, FirebasePush.Options(googleAppID: appID, gcmSenderID: "123456789012",
+                                                     apiKey: apiKey, projectID: "ai-reply-push"))
+    }
+
+    /// Empty build settings - the default - leave push out instead of letting
+    /// the SDK raise an exception at launch.
+    func testEmptyOrMissingValuesLeavePushOut() {
+        XCTAssertNil(FirebasePush.options(info: [:]))
+        XCTAssertNil(FirebasePush.options(info: [
+            "AIReplyFirebaseAppID": "", "AIReplyFirebaseSenderID": "",
+            "AIReplyFirebaseAPIKey": "", "AIReplyFirebaseProjectID": ""
+        ]))
+        XCTAssertNil(FirebasePush.options(info: [
+            "AIReplyFirebaseAppID": "$(FIREBASE_GOOGLE_APP_ID)", "AIReplyFirebaseSenderID": "$(FIREBASE_GCM_SENDER_ID)",
+            "AIReplyFirebaseAPIKey": "$(FIREBASE_API_KEY)", "AIReplyFirebaseProjectID": "$(FIREBASE_PROJECT_ID)"
+        ]), "an unexpanded build setting")
+        XCTAssertNil(FirebasePush.options(info: info(senderID: nil)))
+        XCTAssertNil(FirebasePush.options(info: info(projectID: "")))
+        XCTAssertNil(FirebasePush.options(info: info(projectID: "   ")))
+    }
+
+    /// Firebase raises an exception for a key or id of the wrong shape; such
+    /// a value is refused here instead.
+    func testMalformedValuesLeavePushOut() {
+        XCTAssertNil(FirebasePush.options(info: info(apiKey: "Atest_short")), "too short")
+        XCTAssertNil(FirebasePush.options(info: info(apiKey: "B" + String(apiKey.dropFirst()))), "must start with A")
+        XCTAssertNil(FirebasePush.options(info: info(apiKey: String(apiKey.dropLast()) + "!")), "not URL-safe")
+        XCTAssertNil(FirebasePush.options(info: info(appID: "1:123:android:abc")), "an Android app id")
+        XCTAssertNil(FirebasePush.options(info: info(appID: "not-an-app-id")))
+        XCTAssertNil(FirebasePush.options(info: info(senderID: "12ab")))
+    }
+
+    func testOptionsAreTrimmed() throws {
+        let options = try XCTUnwrap(FirebasePush.options(info: info(projectID: " ai-reply-push \n")))
+        XCTAssertEqual(options.projectID, "ai-reply-push")
     }
 
     // MARK: Installation id
@@ -170,30 +157,58 @@ final class PushEnvironmentTests: XCTestCase {
         XCTAssertEqual(identity.id, "0b7c9a52-4f5e-4d0a-9c1e-1d2f3a4b5c6d")
     }
 
-    // MARK: Session
+    /// The app's own keychain group, never the one shared with the keyboard.
+    func testTheIDIsKeptInTheAppsOwnKeychainGroup() {
+        XCTAssertEqual(KeychainInstallationIDStorage.applicationIdentifier(
+            info: ["AIReplyAppIdentifierPrefix": "ABCDE12345."], bundleID: "kz.ai-reply.reply.keyboard.keyboard"),
+            "ABCDE12345.kz.ai-reply.reply.keyboard.keyboard")
+        XCTAssertNil(KeychainInstallationIDStorage.applicationIdentifier(
+            info: ["AIReplyAppIdentifierPrefix": ""], bundleID: "kz.ai-reply.reply.keyboard.keyboard"),
+            "an unsigned build has no prefix")
+        XCTAssertNil(KeychainInstallationIDStorage.applicationIdentifier(
+            info: ["AIReplyAppIdentifierPrefix": "$(AppIdentifierPrefix)"], bundleID: "kz.ai-reply.reply.keyboard.keyboard"))
+        XCTAssertNil(KeychainInstallationIDStorage.applicationIdentifier(info: [:], bundleID: nil))
+    }
 
-    @MainActor
-    func testSessionStartsAtLaunchAndAfterHalfAnHourAway() {
-        var now = Date(timeIntervalSince1970: 1_800_000_000)
-        var made = 0
-        let tracker = SessionTracker(now: { now }, makeID: {
-            made += 1
-            return "session-\(made)"
-        })
-        XCTAssertEqual(tracker.sessionID, "session-1")
-        XCTAssertEqual(tracker.didBecomeActive(), .opened(coldStart: true, newSession: true))
-        XCTAssertNil(tracker.didBecomeActive(), "inactive → active is not a new opening")
+    // MARK: Logout header
 
-        now = now.addingTimeInterval(95)
-        XCTAssertEqual(tracker.didEnterBackground(), .backgrounded(foregroundSeconds: 95))
-        now = now.addingTimeInterval(10 * 60)
-        XCTAssertEqual(tracker.didBecomeActive(), .opened(coldStart: false, newSession: false))
-        XCTAssertEqual(tracker.sessionID, "session-1")
+    /// Records the headers of every request and answers `{}`.
+    private final class RecordingProtocol: URLProtocol {
+        static var headers: [[String: String]] = []
 
-        now = now.addingTimeInterval(20)
-        XCTAssertEqual(tracker.didEnterBackground(), .backgrounded(foregroundSeconds: 20))
-        now = now.addingTimeInterval(SessionTracker.backgroundTimeout)
-        XCTAssertEqual(tracker.didBecomeActive(), .opened(coldStart: false, newSession: true))
-        XCTAssertEqual(tracker.sessionID, "session-2")
+        override class func canInit(with request: URLRequest) -> Bool { true }
+        override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+        override func startLoading() {
+            Self.headers.append(request.allHTTPHeaderFields ?? [:])
+            let response = HTTPURLResponse(url: request.url ?? URL(fileURLWithPath: "/"), statusCode: 200,
+                                           httpVersion: nil, headerFields: ["Content-Type": "application/json"])
+            if let response { client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed) }
+            client?.urlProtocol(self, didLoad: Data("{}".utf8))
+            client?.urlProtocolDidFinishLoading(self)
+        }
+
+        override func stopLoading() {}
+    }
+
+    /// Only the logout request names the installation; every other request
+    /// carries no client metadata at all.
+    func testOnlyTheClientMadeForLogoutNamesTheInstallation() async throws {
+        RecordingProtocol.headers = []
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [RecordingProtocol.self]
+        let session = URLSession(configuration: configuration)
+        let baseURL = try XCTUnwrap(URL(string: "https://example.test"))
+
+        let logout = APIClient(baseURL: baseURL, session: session,
+                               headers: ["X-Installation-ID": "0b7c9a52-4f5e-4d0a-9c1e-1d2f3a4b5c6d"])
+        let _: APIClient.Empty = try await logout.post("api/v1/auth/logout", body: ["refresh_token": "r"])
+        let plain = APIClient(baseURL: baseURL, session: session)
+        let _: APIClient.Empty = try await plain.post("api/v1/installations", body: ["installation_id": "x"])
+
+        XCTAssertEqual(RecordingProtocol.headers.count, 2)
+        XCTAssertEqual(RecordingProtocol.headers.first?["X-Installation-ID"], "0b7c9a52-4f5e-4d0a-9c1e-1d2f3a4b5c6d")
+        XCTAssertNil(RecordingProtocol.headers.last?["X-Installation-ID"])
+        XCTAssertEqual(RecordingProtocol.headers.last?["Accept"], "application/json")
     }
 }

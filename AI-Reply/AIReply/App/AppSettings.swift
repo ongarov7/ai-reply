@@ -17,6 +17,8 @@ final class AppSettings {
     /// Layouts the keyboard's ҚАЗ / РУС / ENG key cycles through.
     private(set) var keyboardLanguages: [KeyboardLanguage]
     private(set) var keyboardHaptics: Bool
+    /// Local typo fixes and suggestions in the keyboard.
+    private(set) var smartCorrection: Bool
 
     @ObservationIgnored private let store: SharedSettings
 
@@ -26,6 +28,7 @@ final class AppSettings {
         self.language = store.appLanguage
         self.keyboardLanguages = KeyboardLanguageStore.enabledLanguages(settings: store)
         self.keyboardHaptics = store.keyboardHapticsEnabled
+        self.smartCorrection = store.smartCorrectionEnabled
     }
 
     /// Turns one layout on or off. The last one cannot be turned off: a
@@ -43,6 +46,11 @@ final class AppSettings {
         store.setKeyboardHapticsEnabled(enabled)
     }
 
+    func setSmartCorrection(_ enabled: Bool) {
+        smartCorrection = enabled
+        store.setSmartCorrectionEnabled(enabled)
+    }
+
     func setAppearance(_ value: AppearancePreference) {
         appearance = value
         store.setAppearance(value)
@@ -53,16 +61,6 @@ final class AppSettings {
         store.setAppLanguage(value)
     }
 
-    #if DEBUG
-    /// DEBUG ONLY. `-AIReplyLanguage kk`: this launch shows the app in that
-    /// language without saving the choice, so each language can be
-    /// photographed through the build watcher, which strips the parentheses
-    /// `-AppleLanguages (kk)` needs.
-    func applyLanguageForThisLaunch(_ value: AppLanguage) {
-        language = value
-    }
-    #endif
-
     var effectiveLanguage: AppLanguage { language ?? .systemDefault }
 
     var locale: Locale { Locale(identifier: effectiveLanguage.localeIdentifier) }
@@ -71,12 +69,19 @@ final class AppSettings {
     ///
     /// `Text("key")` already follows `\.locale` from the environment, but
     /// `String(localized:)` called from code does not: it resolves against the
-    /// bundle's own preferred localization, which is the SYSTEM language. That
+    /// bundle's own preferred localization, which is the SYSTEM language - and
+    /// its `locale:` argument only formats, it does not pick the table. That
     /// difference is invisible until someone with an English phone switches the
     /// app to Kazakh and finds one counter still reading "%d of %d characters"
-    /// in English. Every format string built in code goes through here.
-    func localized(_ key: String.LocalizationValue) -> String {
-        String(localized: key, locale: locale)
+    /// in English. So the lookup goes to the chosen language's own `.lproj`.
+    /// Every string built in code goes through here.
+    func localized(_ key: String) -> String {
+        Self.bundle(for: effectiveLanguage).localizedString(forKey: key, value: nil, table: nil)
+    }
+
+    /// The app's table for one language; the main bundle if it is missing.
+    private static func bundle(for language: AppLanguage) -> Bundle {
+        Bundle.main.path(forResource: language.rawValue, ofType: "lproj").flatMap(Bundle.init(path:)) ?? .main
     }
 
     /// `nil` hands the decision back to Settings ▸ Display & Brightness.

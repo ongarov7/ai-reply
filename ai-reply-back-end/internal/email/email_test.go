@@ -229,3 +229,130 @@ func TestNewResendValidatesConfiguration(t *testing.T) {
 		}
 	}
 }
+
+// Хабарлама хаты OTP-пен бірдей жолмен кетеді, бірақ өз кілтімен және дайын мазмұнмен.
+func TestResendSendsANotificationEmail(t *testing.T) {
+	stub := newResendStub(t, http.StatusServiceUnavailable)
+	msg := Outgoing{
+		To:             "user@example.com",
+		Content:        Content{Subject: "Тариф қосылды", Text: "Pro тарифі қосылды.", HTML: "<p>Pro тарифі қосылды.</p>"},
+		IdempotencyKey: "notification-d-1",
+		Reference:      "d-1",
+	}
+	if err := newTestResend(t, stub.URL).Send(context.Background(), msg); err != nil {
+		t.Fatalf("send after one 503: %v", err)
+	}
+	first, second := <-stub.requests, <-stub.requests
+	if first.idempotency != "notification-d-1" || second.idempotency != first.idempotency {
+		t.Fatalf("idempotency keys = %q / %q", first.idempotency, second.idempotency)
+	}
+	body := second.body
+	if body.Subject != "Тариф қосылды" || body.Text != msg.Content.Text || body.HTML != msg.Content.HTML ||
+		len(body.To) != 1 || body.To[0] != "user@example.com" || body.Headers["X-Entity-Ref-ID"] != "d-1" {
+		t.Fatalf("body = %+v", body)
+	}
+	if err := newTestResend(t, stub.URL).Send(context.Background(), Outgoing{Content: msg.Content}); err == nil {
+		t.Fatal("a message without a recipient is refused before any request")
+	}
+}
+
+func TestNotificationTemplates(t *testing.T) {
+	keys := map[string]map[string]string{
+		"ru": {
+			"email.subscription_activated.subject": "Тариф {plan} подключён",
+			"email.subscription_activated.body":    "Спасибо!\n\nТариф {plan} действует до {date}. <b>",
+		},
+		"en": {
+			"email.subscription_activated.subject": "{plan} is active",
+			"email.subscription_activated.body":    "Thank you.",
+		},
+	}
+	translate := func(locale, key string) string {
+		if v, ok := keys[locale][key]; ok {
+			return v
+		}
+		if v, ok := keys["en"][key]; ok {
+			return v
+		}
+		return key // localization.Bundle answers a missing key with the key itself
+	}
+	templates := NotificationTemplates{Translate: translate, Brand: "AI Reply"}
+	content, err := templates.Render("subscription_activated", "ru-KZ", map[string]string{"plan": "Pro", "date": "01.11.2026"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if content.Subject != "Тариф Pro подключён" || !strings.Contains(content.Text, "Тариф Pro действует до 01.11.2026.") ||
+		!strings.Contains(content.HTML, "Спасибо!") || !strings.Contains(content.HTML, `lang="ru"`) {
+		t.Fatalf("content = %+v", content)
+	}
+	if strings.Contains(content.HTML, "<b>") {
+		t.Fatal("texts must be HTML-escaped")
+	}
+	if english, err := templates.Render("subscription_activated", "uz", map[string]string{"plan": "Pro"}); err != nil ||
+		english.Subject != "Pro is active" {
+		t.Fatalf("fallback = %+v, %v", english, err)
+	}
+	if _, err := templates.Render("quota_low", "ru", nil); !errors.Is(err, ErrTemplateMissing) {
+		t.Fatalf("a type without keys has no e-mail: %v", err)
+	}
+}
+
+// Қосымша жолдар: сәлемдесу, мерзім (тек күн берілсе), қосымшадағы орны, түсініктеме.
+func TestNotificationTemplatesOptionalLines(t *testing.T) {
+	keys := map[string]string{
+		"email.subscription_activated.subject":  "Тариф «{plan}» подключён",
+		"email.subscription_activated.greeting": "Здравствуйте!",
+		"email.subscription_activated.body":     "Тариф «{plan}» уже действует, дневной лимит ответов — {limit}.",
+		"email.subscription_activated.expires":  "Тариф действует до {date}.",
+		"email.subscription_activated.manage":   "Тариф можно посмотреть в приложении.",
+		"email.subscription_activated.footer":   "Вы получили это письмо, потому что в аккаунте подключён тариф.",
+	}
+	translate := func(_, key string) string {
+		if v, ok := keys[key]; ok {
+			return v
+		}
+		return key
+	}
+	templates := NotificationTemplates{Translate: translate, Brand: "AI Reply"}
+	params := map[string]string{"plan": "Pro <b>", "limit": "50", "date": "09.04.2026"}
+	content, err := templates.Render("subscription_activated", "ru", params)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "AI Reply\n\nТариф «Pro <b>» подключён\n\nЗдравствуйте!\n\nТариф «Pro <b>» уже действует, дневной лимит ответов — 50.\n\n" +
+		"Тариф действует до 09.04.2026.\n\nТариф можно посмотреть в приложении.\n\n--\nВы получили это письмо, потому что в аккаунте подключён тариф.\n"
+	if content.Text != want {
+		t.Fatalf("text part:\n%s", content.Text)
+	}
+	for _, part := range []string{"Здравствуйте!", "до 09.04.2026.", "посмотреть в приложении", "потому что", "Pro &lt;b&gt;"} {
+		if !strings.Contains(content.HTML, part) {
+			t.Fatalf("%q missing from the html", part)
+		}
+	}
+	if strings.Contains(content.HTML, "<b>") || strings.Contains(content.HTML, "{") {
+		t.Fatal("values are escaped and every placeholder is filled")
+	}
+
+	// A plan without an end date: the expiry line is left out, nothing else changes.
+	delete(params, "date")
+	open, err := templates.Render("subscription_activated", "ru", params)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(open.Text, "действует до") || strings.Contains(open.HTML, "действует до") ||
+		!strings.Contains(open.Text, "Здравствуйте!") {
+		t.Fatalf("without a date:\n%s", open.Text)
+	}
+
+	// A value is never read as another placeholder.
+	odd, err := templates.Render("subscription_activated", "ru", map[string]string{"plan": "{limit}", "limit": "7"})
+	if err != nil || !strings.Contains(odd.Subject, "«{limit}»") {
+		t.Fatalf("subject = %q, %v", odd.Subject, err)
+	}
+
+	// A required line without its value is an error, not an e-mail with "{plan}" in it.
+	if _, err := templates.Render("subscription_activated", "ru", map[string]string{"limit": "7"}); err == nil ||
+		errors.Is(err, ErrTemplateMissing) {
+		t.Fatalf("missing plan: %v", err)
+	}
+}

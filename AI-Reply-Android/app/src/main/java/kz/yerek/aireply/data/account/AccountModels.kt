@@ -2,6 +2,7 @@ package kz.yerek.aireply.data.account
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * Wire models for the AI Reply backend.
@@ -44,6 +45,12 @@ data class AccountUser(
     val email: String? = null,
     val status: String = "active",
     val locale: String = "en",
+    /**
+     * The language the server writes this account's notifications and e-mails
+     * in: kk, ru, en or uz, or empty when it was never set. Absent on servers
+     * without `features.preferred_language`.
+     */
+    @SerialName("preferred_language") val preferredLanguage: String? = null,
     @SerialName("onboarding_completed") val onboardingCompleted: Boolean = false,
     /** How this account can sign in: `email`, `google`, `apple`, `phone`. Absent on older servers. */
     @SerialName("auth_providers") val authProviders: List<String>? = null
@@ -70,7 +77,15 @@ data class AccountProfile(
     @SerialName("business_offering") val businessOffering: String = "",
     @SerialName("business_summary") val businessSummary: String = "",
     @SerialName("business_rules") val businessRules: List<String> = emptyList(),
-    @SerialName("onboarding_completed") val onboardingCompleted: Boolean = false
+    @SerialName("onboarding_completed") val onboardingCompleted: Boolean = false,
+    /**
+     * `male`, `female` or `unspecified`; absent on older servers. A string,
+     * not the enum, so a value this build does not know cannot fail the
+     * whole account response.
+     */
+    @SerialName("grammatical_gender") val grammaticalGender: String? = null,
+    /** The newest onboarding finished on any device. Informational only. */
+    @SerialName("onboarding_version") val onboardingVersion: Int? = null
 )
 
 /** A plan as the server defines it. Limits live there, never in the app. */
@@ -179,21 +194,31 @@ data class LegalConfigDto(
 /**
  * What this server can do.
  *
- * A missing sign-in flag means an older server: assume yes. A missing
- * installations, push or telemetry flag means the opposite — an older server
- * without those endpoints — so the app never calls them there.
+ * Two kinds of flag with opposite defaults. A missing SIGN-IN flag means an
+ * older server: assume yes, the button is harmless. A missing REQUEST-SHAPING
+ * or ENDPOINT flag means no: the server decodes bodies strictly, so a field it
+ * does not know turns a reply into a 400 that the keyboard would show as
+ * "message too long", and an endpoint it does not have is never called.
  */
 @Serializable
 data class ServerFeaturesDto(
     @SerialName("email_otp") val emailOtp: Boolean = true,
     @SerialName("google_sign_in") val googleSignIn: Boolean = true,
     @SerialName("apple_sign_in") val appleSignIn: Boolean = true,
+    /** `profile` on `/ai/reply` (description, role, tone, business). */
+    @SerialName("reply_preferences") val replyPreferences: Boolean = false,
+    /** `grammatical_gender` and `input_language` on the AI requests, gender and onboarding version on `/me`. */
+    @SerialName("sender_profile") val senderProfile: Boolean = false,
+    /** `POST /api/v1/ai/polish` exists and is switched on. */
+    @SerialName("instruction_polish") val instructionPolish: Boolean = false,
+    /** `POST /api/v1/analytics/events` exists and is switched on. */
+    @SerialName("product_events") val productEvents: Boolean = false,
     /** `POST /api/v1/installations` and the notification preferences exist. */
     val installations: Boolean = false,
-    /** The server can actually deliver pushes (a provider is configured). */
+    /** The server can actually deliver pushes (FCM is configured). */
     @SerialName("push_notifications") val pushNotifications: Boolean = false,
-    /** `POST /api/v1/events` accepts app events. */
-    val telemetry: Boolean = false
+    /** `preferred_language` on `/me` (read and update). */
+    @SerialName("preferred_language") val preferredLanguage: Boolean = false
 )
 
 /** Non-secret server configuration the client is allowed to know. */
@@ -215,6 +240,42 @@ data class ReplyResponseDto(
     val reply: String,
     @SerialName("detected_language") val detectedLanguage: String? = null,
     val usage: UsageDto = UsageDto.UNKNOWN
+)
+
+/** `POST /api/v1/ai/compose`: a message written from the user's instruction. */
+@Serializable
+data class ComposeResponseDto(
+    val text: String,
+    @SerialName("detected_language") val detectedLanguage: String? = null,
+    val usage: UsageDto = UsageDto.UNKNOWN
+)
+
+/**
+ * `POST /api/v1/analytics/events`: a batch of product events.
+ *
+ * Only names, short codes, small numbers and flags travel here; the server
+ * keeps an allow-list of both and refuses anything else per event.
+ */
+@Serializable
+data class ProductEventsRequest(
+    val platform: String,
+    @SerialName("app_version") val appVersion: String,
+    val events: List<ProductEventDto>
+)
+
+@Serializable
+data class ProductEventDto(
+    val name: String,
+    /** When it happened, RFC 3339 in UTC, to the second. */
+    val ts: String,
+    /** Each value is a JSON string, number or boolean. */
+    val props: Map<String, JsonPrimitive>
+)
+
+@Serializable
+data class ProductEventsResultDto(
+    val accepted: Int = 0,
+    val rejected: Int = 0
 )
 
 /** Demo checkout. A real acquirer changes this shape, not the callers. */
@@ -240,9 +301,7 @@ data class ErrorEnvelopeDto(val error: ErrorPayloadDto)
 data class ErrorPayloadDto(
     val code: String = "",
     val message: String = "",
-    val details: ErrorDetailsDto? = null,
-    /** Repeats the `X-Request-ID` response header; the server's log line has it too. */
-    @SerialName("request_id") val requestId: String? = null
+    val details: ErrorDetailsDto? = null
 )
 
 @Serializable

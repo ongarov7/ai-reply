@@ -232,6 +232,16 @@ class SettingsStore internal constructor(private val prefs: SharedPreferences) {
         get() = prefs.getBoolean(KEY_KEYBOARD_HAPTICS, true)
         set(value) = prefs.edit().putBoolean(KEY_KEYBOARD_HAPTICS, value).apply()
 
+    /**
+     * "Smart correction": typo fixes and word suggestions on the phone, plus
+     * a cleaner-wording suggestion for an instruction typed inside AI Reply.
+     * On unless the user switched it off. The keyboard reads it when it starts
+     * on a field, never per keystroke.
+     */
+    var smartCorrection: Boolean
+        get() = prefs.getBoolean(KEY_SMART_CORRECTION, true)
+        set(value) = prefs.edit().putBoolean(KEY_SMART_CORRECTION, value).apply()
+
     /** The persona the user picked last, shown as selected on the chip row. */
     var lastTemplateId: String?
         get() = prefs.getString(KEY_LAST_TEMPLATE, null)
@@ -265,22 +275,12 @@ class SettingsStore internal constructor(private val prefs: SharedPreferences) {
     /**
      * The in-app notifications switch (Settings ▸ Notifications), on until the
      * user turns it off. The server stops sending to this installation when it
-     * is off; the system permission is a separate matter.
+     * is off; the system permission is a separate matter. The user's own
+     * choice, so it travels with a backup.
      */
     var notificationsEnabled: Boolean
         get() = prefs.getBoolean(KEY_NOTIFICATIONS_ENABLED, true)
         set(value) = prefs.edit().putBoolean(KEY_NOTIFICATIONS_ENABLED, value).apply()
-
-    /**
-     * "Share diagnostics": the few app events (launches, notification taps,
-     * connection failures), sent with the installation id and, when signed
-     * in, attributed to the account. On by default; never message text,
-     * typing or the clipboard, and never anything from the keyboard. Off also
-     * stops the session id header.
-     */
-    var shareDiagnostics: Boolean
-        get() = prefs.getBoolean(KEY_SHARE_DIAGNOSTICS, true)
-        set(value) = prefs.edit().putBoolean(KEY_SHARE_DIAGNOSTICS, value).apply()
 
     /** The backing file, for [kz.yerek.aireply.ai.AILimits]. */
     val sharedPreferences: SharedPreferences get() = prefs
@@ -303,10 +303,10 @@ class SettingsStore internal constructor(private val prefs: SharedPreferences) {
         const val KEY_ENABLED_LAYOUTS = "shared.enabledKeyboardLanguages"
         const val KEY_LAST_TEMPLATE = "shared.lastTemplateID"
         const val KEY_KEYBOARD_HAPTICS = "shared.keyboardHaptics"
+        const val KEY_SMART_CORRECTION = "shared.smartCorrection"
         const val KEY_DEBUG_MOCK = "debug.mockReplies"
         const val KEY_DEBUG_FORCE_PUSH = "debug.forcePushPrompt"
         const val KEY_NOTIFICATIONS_ENABLED = "notifications.enabled"
-        const val KEY_SHARE_DIAGNOSTICS = "diagnostics.share"
 
         const val KEY_AI_MODE = "ai.transportMode"
         const val KEY_AI_MODEL = "ai.model"

@@ -40,8 +40,11 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.delay
 import kz.yerek.aireply.BuildConfig
 import kz.yerek.aireply.R
+import kz.yerek.aireply.analytics.ProductEvent
+import kz.yerek.aireply.analytics.ProductEvents
 import kz.yerek.aireply.core.lang.KeyboardLanguage
 import kz.yerek.aireply.ui.feature.account.AccountSection
 import kz.yerek.aireply.core.lang.AppLanguage
@@ -52,12 +55,14 @@ import kz.yerek.aireply.ui.common.Footnote
 import kz.yerek.aireply.ui.common.NavigationRow
 import kz.yerek.aireply.ui.common.RowDividerIndented
 import kz.yerek.aireply.ui.common.RowGroup
+import kz.yerek.aireply.ui.common.privacyStatement
+import kz.yerek.aireply.ui.common.rememberKeyboardStatus
 import kz.yerek.aireply.ui.design.AppCard
 import kz.yerek.aireply.ui.design.AppSection
 import kz.yerek.aireply.ui.design.ReadableColumn
 import kz.yerek.aireply.ui.design.Spacing
+import kz.yerek.aireply.ui.feature.setup.KeyboardStatusRows
 import kz.yerek.aireply.ui.navigation.Routes
-import kotlinx.coroutines.delay
 
 /**
  * @param focusSection a section to scroll to when opened from outside:
@@ -84,6 +89,8 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit, focusSection: S
     var language by remember { mutableStateOf(services.settings.appLanguage) }
     var layouts by remember { mutableStateOf(services.settings.enabledKeyboardLanguages) }
     var haptics by remember { mutableStateOf(services.settings.keyboardHaptics) }
+    var smartCorrection by remember { mutableStateOf(services.settings.smartCorrection) }
+    val keyboardStatus by rememberKeyboardStatus()
     var mockReplies by remember { mutableStateOf(services.settings.debugMockReplies) }
 
     AppScreen(title = stringResource(R.string.settings_title), onBack = onBack) {
@@ -109,6 +116,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit, focusSection: S
             }
 
             AppSection(stringResource(R.string.settings_setup)) {
+                AppCard { KeyboardStatusRows(keyboardStatus) }
                 RowGroup {
                     NavigationRow(
                         Icons.Filled.Keyboard,
@@ -145,6 +153,21 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit, focusSection: S
                     }
                 }
                 Footnote(stringResource(R.string.settings_keyboard_layouts_footer))
+                RowGroup {
+                    SwitchRow(
+                        label = stringResource(R.string.settings_smart_correction),
+                        checked = smartCorrection,
+                        enabled = true
+                    ) { checked ->
+                        smartCorrection = checked
+                        services.settings.smartCorrection = checked
+                        ProductEvents.track(
+                            if (checked) ProductEvent.AUTOCORRECT_ENABLED else ProductEvent.AUTOCORRECT_DISABLED
+                        )
+                    }
+                }
+                Footnote(stringResource(R.string.settings_smart_correction_footer))
+                Footnote(stringResource(R.string.settings_smart_correction_attribution))
             }
 
             AccountSection(onOpenSubscription = { onOpen(Routes.Subscription) })
@@ -187,16 +210,22 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit, focusSection: S
                         label = stringResource(R.string.common_system),
                         selected = language == null
                     ) {
-                        language = null
-                        services.settings.appLanguage = null
+                        if (language != null) {
+                            language = null
+                            services.settings.appLanguage = null
+                            services.profileSync.appLanguageChanged()
+                        }
                     }
                     AppLanguage.entries.forEach { option ->
                         RowDividerIndented()
                         // Always shown in its own language: a Kazakh speaker
                         // looking for Kazakh should see "Қазақша".
                         LanguageRow(label = option.nativeName, selected = language == option) {
-                            language = option
-                            services.settings.appLanguage = option
+                            if (language != option) {
+                                language = option
+                                services.settings.appLanguage = option
+                                services.profileSync.appLanguageChanged()
+                            }
                         }
                     }
                 }
@@ -204,7 +233,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit, focusSection: S
             }
 
             AppSection(stringResource(R.string.settings_privacy_title)) {
-                AppCard { Footnote(stringResource(R.string.settings_privacy_body)) }
+                AppCard { Footnote(privacyStatement()) }
                 RowGroup {
                     NavigationRow(
                         Icons.Outlined.Description,
@@ -226,13 +255,16 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit, focusSection: S
                 }
             }
 
-            AppSection(stringResource(R.string.settings_setup_restart)) {
+            AppSection(stringResource(R.string.settings_tutorial)) {
                 AppCard {
-                    TextButton(onClick = { services.configuration.restartOnboarding() }) {
-                        Text(stringResource(R.string.settings_setup_restart))
+                    TextButton(onClick = {
+                        ProductEvents.track(ProductEvent.ONBOARDING_REOPENED)
+                        onOpen(Routes.Tutorial)
+                    }) {
+                        Text(stringResource(R.string.settings_tutorial))
                     }
                 }
-                Footnote(stringResource(R.string.settings_setup_restart_footer))
+                Footnote(stringResource(R.string.settings_tutorial_footer))
             }
 
             // Debug builds only: release builds do not have this section.

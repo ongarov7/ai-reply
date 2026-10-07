@@ -111,7 +111,7 @@ decoding that lets a configuration written by an older build still load.
 | Clipboard permission | Requires "Allow Full Access"; `fullAccessRequired` error | No equivalent gate; the current IME may read the clipboard | IMPLEMENTED_NOT_DEVICE_VERIFIED | The error case is kept in the model but is unreachable on Android |
 | Sensitive clipboard | n/a | Clips flagged `EXTRA_IS_SENSITIVE` (API 33+) are refused | IMPLEMENTED_NOT_DEVICE_VERIFIED | Android-only hardening, matching iOS's "secure fields are never processed" promise |
 | Password fields | iOS keyboards are simply not shown a secure field's content | AI panel disabled when `EditorInfo.inputType` is any password variation | IMPLEMENTED_NOT_DEVICE_VERIFIED | Typing still works normally |
-| Persona row | Compact chips, the selected one highlighted, the last one remembered, `+` at the end (more / create) | same | IMPLEMENTED_AND_VERIFIED | Selection and the remembered persona were seen on the emulator |
+| Persona row | `✨` (write a new message with AI) pinned at the leading edge, then compact chips filling the rest, the selected one highlighted, the last one remembered; while a word is typed the suggestions take exactly the chips' place and `✨` stays. No `+`: templates are created in the app | same | IMPLEMENTED_AND_VERIFIED | Selection and the remembered persona were seen on the emulator; `PersonaRowLayoutTest` pins the order and the chips' width |
 | Composer | Persona, source preview or Paste, `N / limit` counter, close; instruction field with quick intents; Reply | same, plus a microphone | IMPLEMENTED_AND_VERIFIED | `ReplyComposerFlow` is the same state machine on both: composing → generating → result ⇄ editing → conflict |
 | Generation trigger | **Only** Reply, Regenerate or Try again | same | IMPLEMENTED_AND_VERIFIED | Opening the keyboard, copying text or picking a persona never starts a request |
 | Draft editing | The composer edits its own text view without becoming first responder; tap anywhere in the reply to put the caret there | `KeyboardTextFieldState` with its own caret; the same tap-to-place | IMPLEMENTED_AND_VERIFIED | Grapheme-safe (emoji, Kazakh letters); seen on the emulator |
@@ -122,7 +122,6 @@ decoding that lets a configuration written by an older build still load.
 | Host field not empty | Replace / Add / Cancel inside the composer, which keeps its height | same | IMPLEMENTED_AND_VERIFIED | Replace was seen inserting the edited text. Android clears with one `deleteSurroundingText` |
 | Append separator | Space unless the text already ends in whitespace | same | IMPLEMENTED_NOT_DEVICE_VERIFIED | |
 | Teardown | Keyboard hidden: the request stops, the session is kept in memory for 10 minutes, then dropped | same, in `onFinishInputView` / `onStartInputView` | IMPLEMENTED_NOT_DEVICE_VERIFIED | Nothing is written to disk |
-| "+" chip | Shows "create templates in the app" — an extension cannot present an editor | Opens the app's template editor directly | IMPLEMENTED_NOT_DEVICE_VERIFIED | **Android is better here**: an IME can start an Activity |
 
 ## 7. Localization
 
@@ -173,22 +172,24 @@ decoding that lets a configuration written by an older build still load.
 | Logging never carries message text | `ReplyLog`, lengths and outcomes only, DEBUG only | `ReplyLog`, same rule, `BuildConfig.DEBUG` only | IMPLEMENTED_NOT_DEVICE_VERIFIED | |
 | Secrets out of the repo | Key typed at runtime, nothing in the IPA | Same; nothing in the APK, `local.properties` untouched, `.gitignore` covers it | IMPLEMENTED_NOT_DEVICE_VERIFIED | |
 | Responsive layout | Portrait-locked, width-derived metrics | Portrait + landscape, width- and height-derived; `readableWidth` cap; font-scale respected in the app, pinned in the key grid | IMPLEMENTED_NOT_DEVICE_VERIFIED | Pinning the key grid's font scale stops a 2× accessibility font from breaking key geometry |
-| Unit tests | XCTest, 138 tests | 21 JVM test classes, 204 tests | IMPLEMENTED_AND_VERIFIED | `./gradlew testDebugUnitTest`, all green |
+| Unit tests | XCTest, 138 tests | 13 JVM test classes, 115 tests | IMPLEMENTED_AND_VERIFIED | `./gradlew testDebugUnitTest`, all green |
 | `./gradlew assembleDebug` | n/a | builds on the Mac with JDK 17+ | IMPLEMENTED_AND_VERIFIED | AGP 8.7.3 needs JDK 17+; Android Studio Electric Eel's bundled JBR 11 is too old |
 
-## 11. Push notifications, installation, diagnostics (2026-10)
+## 11. Push notifications and the installation (2026-10)
 
 Both apps speak the same backend contract (`POST /api/v1/installations`,
-`/api/v1/events`, `/api/v1/me/notification-preferences`); iOS delivers through
-APNs, Android through FCM.
+`/api/v1/me/notification-preferences`, `POST /api/v1/notifications/opened`,
+`X-Installation-ID` on the logout) and both deliver through FCM: Android
+natively, iOS through the Firebase Messaging SDK (APNs underneath).
 
-| Feature | Android | Status | Notes |
-|---|---|---|---|
-| Installation id | Random UUID in `noBackupFilesDir`, created once | IMPLEMENTED_AND_VERIFIED | `ClientHeadersTest`; a restore or reinstall gets a new id |
-| Metadata headers | `ClientContext` → every `ApiClient` request; keyboard scope without installation/session id | IMPLEMENTED_AND_VERIFIED | `ClientHeadersTest` |
-| Installation sync | `InstallationRegistrar`: payload + account fingerprint, 24 h re-sync, backoff, 401 refresh-and-retry | IMPLEMENTED_AND_VERIFIED | `InstallationRegistrarTest`, `AccountSessionRefreshTest` |
-| FCM without a committed config | Google Services plugin only with `app/google-services.json`; `FirebaseApp.getApps` gate at runtime | IMPLEMENTED_NOT_DEVICE_VERIFIED | Builds and runs without the file |
-| Channels, foreground display, taps | `general` / `important`; tag = notification id; `MainActivity` handles `onCreate` and `onNewIntent` | IMPLEMENTED_NOT_DEVICE_VERIFIED | Debug "simulate push" runs the foreground path |
-| Links | `AppLinks`: `aireply://<screen>`, `https://ai-reply.kz` (+ subdomains), nothing else | IMPLEMENTED_AND_VERIFIED | `AppLinksTest`; pending through the gates via `PendingNavigation` |
-| Permission UX | Home card after sign-in (Android 13+), Settings ▸ Notifications | IMPLEMENTED_NOT_DEVICE_VERIFIED | Never at first launch |
-| Diagnostics | `EventReporter` (allow-list, ≤100 in memory, batches of 50, backoff), `SessionTracker` (30 min) | IMPLEMENTED_AND_VERIFIED | `EventReporterTest`; "Share diagnostics" on by default |
+| Feature | iOS | Android | Status | Notes |
+|---|---|---|---|---|
+| Installation id | Random UUID, this device only | Random UUID in `noBackupFilesDir`, created once | IMPLEMENTED_AND_VERIFIED | `InstallationIdTest`; a restore or reinstall gets a new id |
+| Registration | `POST /api/v1/installations`, FCM token | `InstallationRegistrar`: body + account fingerprint, 24 h re-sync, backoff, 401 refresh-and-retry | IMPLEMENTED_AND_VERIFIED | `InstallationRegistrarTest`, `AccountSessionRefreshTest` |
+| Nothing before consent | Token and registration after the terms | `firebase_messaging_auto_init_enabled=false`; token and registration after the terms | IMPLEMENTED_NOT_DEVICE_VERIFIED | |
+| Sign-out | `X-Installation-ID` on the logout, then anonymous registration | Same | IMPLEMENTED_AND_VERIFIED | `AccountSessionRefreshTest` |
+| Builds without Firebase config | Firebase config supplied per environment | `google-services.json` git-ignored; plugin applied only when present, `FirebaseApp.getApps` gate at runtime | IMPLEMENTED_NOT_DEVICE_VERIFIED | Push then shows as unavailable |
+| Channels, foreground display | System presentation | `general` / `important`, named in the app language; tag = notification id | IMPLEMENTED_NOT_DEVICE_VERIFIED | Debug "simulate push" runs the foreground path |
+| Taps and links | `aireply://<screen>`, `https://ai-reply.kz` | `AppLinks` + `PendingNavigation` (waits for consent, sign-in, onboarding); `notifications/opened` when the push has a delivery id | IMPLEMENTED_AND_VERIFIED | `AppLinksTest` |
+| Permission UX | Home card after sign-in, Settings ▸ Notifications | Home card after sign-in (Android 13+), Settings ▸ Notifications with categories | IMPLEMENTED_NOT_DEVICE_VERIFIED | Never at first launch |
+| Notification language | `preferred_language` on `/me` | `PreferredLanguageSync`: on a Settings change, or once when the account has none; only with `features.preferred_language` | IMPLEMENTED_AND_VERIFIED | `PreferredLanguageTest` |

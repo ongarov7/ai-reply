@@ -32,13 +32,14 @@ object MicPermission {
 
     /**
      * Shows the system dialog. Safe to call from the keyboard service; the
-     * answer arrives on [results].
+     * answer arrives on [results]. False when the dialog could not be shown,
+     * in which case no answer will ever arrive.
      */
-    fun request(context: Context) {
+    fun request(context: Context): Boolean {
         val intent = Intent(context, VoicePermissionActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             .addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)
-        runCatching { context.startActivity(intent) }
+        return runCatching { context.startActivity(intent) }.isSuccess
     }
 
     internal fun publish(outcome: Outcome) {

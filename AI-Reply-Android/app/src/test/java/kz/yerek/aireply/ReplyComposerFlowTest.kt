@@ -9,6 +9,7 @@ import kz.yerek.aireply.keyboard.reply.ReplyComposerFlow.Origin
 import kz.yerek.aireply.keyboard.reply.ReplyComposerFlow.Stage
 import kz.yerek.aireply.keyboard.reply.ReplyDraftHistory
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -77,6 +78,15 @@ class ReplyComposerFlowTest {
     fun `typing on a reply starts editing, but not in the composer`() {
         assertEquals(Stage.Editing, withReply().beginningEditingForTyping()!!.stage)
         assertNull(ReplyComposerFlow().beginningEditingForTyping())
+    }
+
+    @Test
+    fun `smart correction is for the instruction, never for a reply being edited`() {
+        assertTrue(ReplyComposerFlow().correctsTyping)
+        val result = withReply()
+        assertFalse("a reply on screen", result.correctsTyping)
+        assertFalse("a reply being edited: no strip, so no silent corrections", result.beginningEditing().correctsTyping)
+        assertFalse("while a request runs", ReplyComposerFlow().startingGeneration()!!.correctsTyping)
     }
 
     @Test

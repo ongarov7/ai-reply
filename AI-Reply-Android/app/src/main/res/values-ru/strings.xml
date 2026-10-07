@@ -75,14 +75,14 @@
     <string name="onboarding_conversations_footer">Они появятся в панели шаблонов клавиатуры. Это можно изменить позже.</string>
     <string name="onboarding_conversations_prompt">Для каких разговоров вы будете использовать клавиатуру?</string>
     <string name="onboarding_conversations_title">Ваши разговоры</string>
-    <string name="onboarding_done_body">Попробуйте клавиатуру прямо здесь, а затем используйте её в WhatsApp, Telegram и Instagram.</string>
-    <string name="onboarding_done_title">Всё готово</string>
+    <string name="onboarding_done_body">Скопируйте сообщение в любом чате, переключитесь на AI\u00A0Reply и нажмите шаблон. Ответ всегда отправляете вы сами.</string>
+    <string name="onboarding_done_title">Всё готово — пользуйтесь AI\u00A0Reply</string>
     <string name="onboarding_finish">Готово</string>
     <string name="onboarding_hours_footer">Необязательно. Если задано, ответы клиентам и партнёрам учитывают время суток.</string>
     <string name="onboarding_hours_prompt">У вас есть рабочее время?</string>
     <string name="onboarding_hours_title">Рабочее время</string>
-    <string name="onboarding_keyboard_prompt">Чтобы быстро отвечать на сообщения, добавьте клавиатуру в настройках iPhone.</string>
-    <string name="onboarding_keyboard_title">Подключите AI-клавиатуру</string>
+    <string name="onboarding_keyboard_prompt">Два коротких шага в настройках Android — и AI\u00A0Reply готов в любом мессенджере.</string>
+    <string name="onboarding_keyboard_title">Включите клавиатуру AI\u00A0Reply</string>
     <string name="onboarding_next">Далее</string>
     <string name="onboarding_profile_placeholder">Я руковожу небольшой логистической компанией и обычно общаюсь с клиентами и партнёрами.</string>
     <string name="onboarding_profile_prompt">Отвечайте своими словами. Приложение само превратит это в контекст для ответов.</string>
@@ -92,17 +92,17 @@
     <string name="onboarding_step">Шаг %1$d из %2$d</string>
     <string name="onboarding_test_hint">Нажмите и удерживайте кнопку с глобусом, чтобы сменить клавиатуру.</string>
     <string name="onboarding_test_placeholder">Напишите что-нибудь…</string>
-    <string name="onboarding_test_prompt">Попробуйте здесь: переключитесь на Reply Keyboard и напишите что-нибудь.</string>
+    <string name="onboarding_test_prompt">Попробуйте здесь: нажмите на поле и переключитесь на AI\u00A0Reply.</string>
     <string name="onboarding_tone_footer">Отправная точка. Каждый шаблон может её изменить.</string>
     <string name="onboarding_tone_prompt">Какой тон вы предпочитаете?</string>
     <string name="onboarding_tone_title">Ваш тон</string>
     <string name="onboarding_usage_prompt">Клавиатура отвечает на сообщение, которое вы скопировали сами. Читать переписку она не может.</string>
     <string name="onboarding_usage_step_copy">Нажмите и удерживайте сообщение в WhatsApp, Telegram или Instagram и выберите «Копировать»</string>
     <string name="onboarding_usage_step_insert">При необходимости отредактируйте черновик, нажмите «Вставить» и отправьте сами</string>
-    <string name="onboarding_usage_step_open">Переключитесь на Reply Keyboard кнопкой с глобусом</string>
+    <string name="onboarding_usage_step_open">Нажмите на поле ввода и переключитесь на клавиатуру AI\u00A0Reply</string>
     <string name="onboarding_usage_step_template">Нажмите подходящий шаблон: «Друг», «Клиент», «Бизнес» или «Работа»</string>
     <string name="onboarding_usage_title">Скопируйте и ответьте</string>
-    <string name="onboarding_welcome_body">Несколько коротких шагов для настройки клавиатуры. Скопированный текст обрабатывается только когда вы просите ответ.</string>
+    <string name="onboarding_welcome_body">AI\u00A0Reply пишет ответы прямо с клавиатуры — в WhatsApp, Telegram, Instagram, «Сообщениях» и других приложениях. Скопируйте сообщение, выберите, кому отвечаете, — и ответ готов.</string>
     <string name="onboarding_welcome_point_copy">Скопируйте сообщение в любом мессенджере</string>
     <string name="onboarding_welcome_point_edit">Отредактируйте ответ и отправьте его сами</string>
     <string name="onboarding_welcome_point_templates">Выберите, кому вы отвечаете</string>
@@ -140,13 +140,11 @@
     <string name="settings_appgroup_unavailable">Приложение и клавиатура пока не могут обмениваться настройками. Пересоберите приложение, чтобы применился App Group.</string>
     <string name="settings_language">Язык</string>
     <string name="settings_language_footer">Меняет язык этого приложения. Надписи на самой клавиатуре следуют выбранной на ней раскладке.</string>
-    <string name="settings_privacy_body">Текст скопированного сообщения и созданный ответ передаются через сервер AI Reply AI-провайдеру только когда вы просите ответ. Они не сохраняются в базе и не записываются в логи.</string>
+    <string name="settings_privacy_body">Кнопка «%1$s» отправляет скопированное сообщение и вашу инструкцию, кнопка «%2$s» — только инструкцию. Когда включена умная коррекция, инструкция, которую вы пишете в поле AI\u00A0Reply, тоже может отправляться — чтобы предложить исправление. Текст передаётся через сервер AI\u00A0Reply AI-провайдеру, не хранится в базе и не попадает в логи.</string>
     <string name="settings_privacy_title">Конфиденциальность</string>
     <string name="settings_setup">Настройка</string>
-    <string name="settings_setup_footer">Пошаговая инструкция, полный доступ и разрешение на вставку.</string>
+    <string name="settings_setup_footer">Статус клавиатуры, пошаговая настройка и то, как AI\u00A0Reply читает скопированный текст.</string>
     <string name="settings_setup_guide">Настройка клавиатуры</string>
-    <string name="settings_setup_restart">Пройти настройку заново</string>
-    <string name="settings_setup_restart_footer">Покажет вводный экран заново. Ваши ответы сохранятся.</string>
     <string name="settings_storage_unavailable">Общий контейнер недоступен, клавиатура не видит ваш профиль. Пересоберите приложение с включённой возможностью App Group.</string>
     <string name="settings_title">Настройки</string>
 
@@ -326,4 +324,41 @@
     <string name="home_usage_left">осталось из %1$d</string>
     <string name="kb_err_sign_in_required">Откройте приложение AI Reply и войдите, чтобы продолжить.</string>
     <string name="kb_err_quota_exhausted">Ответы на сегодня закончились. Они обновятся завтра — или смените тариф в приложении.</string>
+
+    <!-- Onboarding v2, the sender's grammatical gender, the tutorial row -->
+    <string name="onboarding_skip_tutorial">Пропустить обучение</string>
+    <string name="onboarding_gender_title">Как писать от вашего имени?</string>
+    <string name="onboarding_gender_prompt">В русском языке некоторые слова меняются по роду: «рад» или «рада», «сделал» или «сделала». Выберите форму для ответов.</string>
+    <string name="onboarding_gender_skip_note">Если пропустите этот шаг, в ответах не будет таких форм.</string>
+    <string name="onboarding_gender_footer">Изменить это можно в разделе Настройки ▸ Профиль.</string>
+    <string name="onboarding_usage_step_instruction">При желании напишите, что ответить, и нажмите «Ответить»</string>
+    <string name="onboarding_mock_field">Сообщение</string>
+    <string name="onboarding_tutorial_incoming">Добрый день! Хотел узнать, сколько стоит ваша услуга?</string>
+    <string name="onboarding_tutorial_instruction">Вежливо скажи, что сегодня не получится, но могу созвониться завтра.</string>
+    <string name="onboarding_tutorial_instruction_male">Вежливо скажи, что сегодня я занят, но могу созвониться завтра.</string>
+    <string name="onboarding_tutorial_instruction_female">Вежливо скажи, что сегодня я занята, но могу созвониться завтра.</string>
+    <string name="onboarding_tutorial_reply">Добрый день! Сегодня, к сожалению, не получится созвониться. Давайте свяжемся завтра и всё обсудим.</string>
+    <string name="onboarding_tutorial_reply_male">Добрый день! Сегодня, к сожалению, не получится созвониться. Давайте свяжемся завтра — буду рад обсудить детали.</string>
+    <string name="onboarding_tutorial_reply_female">Добрый день! Сегодня, к сожалению, не получится созвониться. Давайте свяжемся завтра — буду рада обсудить детали.</string>
+    <string name="onboarding_practice_title">Попробуйте сами</string>
+    <string name="onboarding_practice_prompt">Это тренировка прямо на экране: ничего не отправляется, и ответы не расходуются.</string>
+    <string name="onboarding_practice_hint_copy">Нажмите «%1$s» под сообщением.</string>
+    <string name="onboarding_practice_hint_open">Скопировано. Теперь откройте клавиатуру AI\u00A0Reply.</string>
+    <string name="onboarding_practice_open">Открыть AI\u00A0Reply</string>
+    <string name="onboarding_practice_hint_persona">Это клавиатура AI\u00A0Reply. Вы отвечаете другу — нажмите «%1$s».</string>
+    <string name="onboarding_practice_hint_reply">Скопированное сообщение уже здесь. Нажмите «%1$s».</string>
+    <string name="onboarding_practice_hint_insert">Нравится? Нажмите «%1$s».</string>
+    <string name="onboarding_practice_incoming">Привет! Давно не общались. Как ты?</string>
+    <string name="onboarding_practice_reply">Привет! Да, действительно давно. Очень приятно тебя слышать! Как у тебя дела?</string>
+    <string name="onboarding_practice_reply_male">Привет! Да, действительно давно. Рад тебя слышать! Как у тебя дела?</string>
+    <string name="onboarding_practice_reply_female">Привет! Да, действительно давно. Рада тебя слышать! Как у тебя дела?</string>
+    <string name="profile_gender">Род в ответах на русском</string>
+    <string name="profile_gender_male">Мужской</string>
+    <string name="profile_gender_female">Женский</string>
+    <string name="profile_gender_unspecified">Не указан</string>
+    <string name="profile_gender_footer">Нужен только для русской грамматики: «рад/рада», «сделал/сделала». Мы никогда не угадываем его по имени или аккаунту.</string>
+    <string name="settings_tutorial">Как пользоваться AI\u00A0Reply</string>
+    <string name="settings_tutorial_footer">Короткое обучение: как скопировать сообщение, ответить с клавиатуры и потренироваться. Настройки при этом не сбрасываются.</string>
+    <string name="onboarding_keyboard_privacy">Android предупреждает, что клавиатура «может собирать весь вводимый текст». Такое стандартное предупреждение показывается для любой клавиатуры. AI\u00A0Reply отправляет текст, когда вы нажимаете «%1$s» или «%2$s», а при включённой умной коррекции — ещё и инструкцию из поля AI\u00A0Reply, чтобы предложить исправление. Больше ничего из того, что вы печатаете, не отправляется.</string>
+
 </resources>

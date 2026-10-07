@@ -16,6 +16,10 @@ import kz.yerek.aireply.data.account.ServerConfigDto
  * request, and when a request is refused for length the answer carries the
  * limit, which is stored here too. [FALLBACK] only covers a device that has
  * never reached the server.
+ *
+ * The same answer carries the request-shaping flags ([AIFeatures]); they are
+ * stored here as well, because the keyboard needs them on the same file and at
+ * the same moment.
  */
 data class AILimits(
     val sourceCharacters: Int,
@@ -45,12 +49,16 @@ data class AILimits(
         private var memory: AILimits? = null
 
         @Volatile
+        private var featuresMemory: AIFeatures? = null
+
+        @Volatile
         private var prefs: SharedPreferences? = null
 
         /** Called once by the Application, before anything reads [current]. */
         fun install(preferences: SharedPreferences) {
             prefs = preferences
             memory = null
+            featuresMemory = null
         }
 
         /** What the keyboard and the app enforce right now. */
@@ -64,8 +72,23 @@ data class AILimits(
         fun isStale(now: Long = System.currentTimeMillis()): Boolean =
             now - lastSyncedAt > REFRESH_INTERVAL_MS
 
+        /** Which optional request fields the server accepts. [AIFeatures.NONE] until it said. */
+        val features: AIFeatures
+            get() = featuresMemory ?: loadFeatures().also { featuresMemory = it }
+
         fun apply(config: ServerConfigDto, now: Long = System.currentTimeMillis()) {
             store(published(config.maxSourceCharacters, config.maxInstructionLength, current), now)
+            // A server that sent no features block supports none of them.
+            val announced = config.features
+            storeFeatures(
+                AIFeatures(
+                    replyPreferences = announced?.replyPreferences ?: false,
+                    senderProfile = announced?.senderProfile ?: false,
+                    instructionPolish = announced?.instructionPolish ?: false,
+                    productEvents = announced?.productEvents ?: false,
+                    preferredLanguage = announced?.preferredLanguage ?: false
+                )
+            )
         }
 
         /** The server refused a message and said what its limit is. */
@@ -83,6 +106,28 @@ data class AILimits(
                 ?.apply()
         }
 
+        private fun storeFeatures(features: AIFeatures) {
+            featuresMemory = features
+            prefs?.edit()
+                ?.putBoolean(KEY_REPLY_PREFERENCES, features.replyPreferences)
+                ?.putBoolean(KEY_SENDER_PROFILE, features.senderProfile)
+                ?.putBoolean(KEY_INSTRUCTION_POLISH, features.instructionPolish)
+                ?.putBoolean(KEY_PRODUCT_EVENTS, features.productEvents)
+                ?.putBoolean(KEY_PREFERRED_LANGUAGE, features.preferredLanguage)
+                ?.apply()
+        }
+
+        private fun loadFeatures(): AIFeatures {
+            val preferences = prefs ?: return AIFeatures.NONE
+            return AIFeatures(
+                replyPreferences = preferences.getBoolean(KEY_REPLY_PREFERENCES, false),
+                senderProfile = preferences.getBoolean(KEY_SENDER_PROFILE, false),
+                instructionPolish = preferences.getBoolean(KEY_INSTRUCTION_POLISH, false),
+                productEvents = preferences.getBoolean(KEY_PRODUCT_EVENTS, false),
+                preferredLanguage = preferences.getBoolean(KEY_PREFERRED_LANGUAGE, false)
+            )
+        }
+
         private fun load(): AILimits {
             val preferences = prefs ?: return FALLBACK
             val source = preferences.getInt(KEY_SOURCE, -1).takeIf { it > 0 }
@@ -93,5 +138,10 @@ data class AILimits(
         private const val KEY_SOURCE = "ai.limits.sourceCharacters"
         private const val KEY_INSTRUCTION = "ai.limits.instructionCharacters"
         private const val KEY_SYNCED_AT = "ai.limits.syncedAt"
+        private const val KEY_REPLY_PREFERENCES = "ai.features.replyPreferences"
+        private const val KEY_SENDER_PROFILE = "ai.features.senderProfile"
+        private const val KEY_INSTRUCTION_POLISH = "ai.features.instructionPolish"
+        private const val KEY_PRODUCT_EVENTS = "ai.features.productEvents"
+        private const val KEY_PREFERRED_LANGUAGE = "ai.features.preferredLanguage"
     }
 }

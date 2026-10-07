@@ -11,13 +11,17 @@ import (
 	"github.com/aireply/ai-reply-back-end/config"
 	"github.com/aireply/ai-reply-back-end/internal/auth"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
-	"github.com/aireply/ai-reply-back-end/internal/logging"
 	"github.com/aireply/ai-reply-back-end/internal/plans"
-	"github.com/aireply/ai-reply-back-end/internal/redact"
 	"github.com/aireply/ai-reply-back-end/internal/repository"
 	"github.com/aireply/ai-reply-back-end/internal/subscriptions"
 	"github.com/aireply/ai-reply-back-end/internal/traits"
 )
+
+// Events — әкімші әрекетінен кейінгі оқиғалар (хабарлама қабаты іске асырады).
+// The call never fails the admin action: the implementation logs its own errors.
+type Events interface {
+	PlanAssigned(ctx context.Context, sub domain.Subscription)
+}
 
 // Service — әкімші әрекеттері.
 type Service struct {
@@ -27,13 +31,16 @@ type Service struct {
 	cfg    config.Config
 	log    *slog.Logger
 	clock  traits.Clock
-	hasher SubjectHasher
+	events Events
 }
 
 // New — қызмет.
 func New(repo *repository.Store, subs *subscriptions.Service, planSvc *plans.Service, cfg config.Config, log *slog.Logger) *Service {
 	return &Service{repo: repo, subs: subs, plans: planSvc, cfg: cfg, log: log, clock: traits.SystemClock{}}
 }
+
+// WithEvents — тариф тағайындау оқиғаларын тыңдаушы (nil — жоқ).
+func (s *Service) WithEvents(e Events) *Service { s.events = e; return s }
 
 // Bootstrap — .env-тегі әкімшіні бір рет жасайды (құпиясөз бірден хэштеледі).
 func (s *Service) Bootstrap(ctx context.Context) error {
@@ -134,16 +141,10 @@ func (s *Service) SetLocale(ctx context.Context, adminID, locale string) error {
 func (s *Service) Audit(ctx context.Context, admin domain.AdminUser, ip, action, entityType, entityID string, meta map[string]any) {
 	if err := s.repo.WriteAudit(ctx, domain.AuditEntry{
 		AdminID: admin.ID, AdminEmail: admin.Email, Action: action,
-		EntityType: entityType, EntityID: entityID, Metadata: redact.Map(meta), IP: ip,
-		RequestID: logging.RequestID(ctx),
+		EntityType: entityType, EntityID: entityID, Metadata: meta, IP: ip,
 	}); err != nil {
 		s.log.Error("audit write failed", "error", err.Error())
 	}
-}
-
-// AuditLogFiltered — сүзгімен аудит журналы.
-func (s *Service) AuditLogFiltered(ctx context.Context, f repository.AuditFilter) ([]domain.AuditEntry, int, error) {
-	return s.repo.AuditLogFiltered(ctx, f)
 }
 
 // Now — барлық қабат үшін ортақ уақыт көзі (тестте жалған сағат).

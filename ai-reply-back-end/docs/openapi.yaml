@@ -164,16 +164,34 @@ paths:
   /api/v1/auth/logout:
     post:
       summary: Отозвать refresh-токен
+      parameters:
+        - name: X-Installation-ID
+          in: header
+          required: false
+          description: >-
+            Установка, с которой выходят: она сразу отвязывается от аккаунта (даже если
+            refresh-токен уже истёк). Единственный запрос, где клиент шлёт этот заголовок.
+          schema: { type: string, pattern: "^[A-Za-z0-9-]{8,64}$" }
       responses: { "200": { description: OK } }
   /api/v1/me:
     get:
-      summary: Профиль, тариф и квота
+      summary: Профиль, тариф и квота (user.preferred_language — kk | ru | en | uz | "")
       security: [{ bearerAuth: [] }]
       responses: { "200": { description: OK } }
     patch:
-      summary: Частичное обновление профиля
+      summary: Частичное обновление профиля (POST /api/v1/me — то же для Android)
       security: [{ bearerAuth: [] }]
-      responses: { "200": { description: OK } }
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProfileUpdate" }
+      responses:
+        "200":
+          description: Обновлённый профиль
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Profile" }
+        "400": { description: "INVALID_REQUEST — неизвестное поле, неверный grammatical_gender, onboarding_version вне 0…1000 или неизвестный preferred_language (details.field)" }
   /api/v1/me/email/otp/request:
     post:
       summary: Код на почту, которую нужно добавить к аккаунту для входа
@@ -242,17 +260,18 @@ paths:
         "409": { description: LEGAL_VERSION_MISMATCH — клиент должен обновить конфигурацию }
   /api/v1/devices:
     post:
-      summary: Регистрация устройства (устаревшее; push-токен — через /api/v1/installations)
+      summary: Регистрация устройства (старые сборки; push — через /api/v1/installations)
       deprecated: true
       security: [{ bearerAuth: [] }]
       responses: { "200": { description: OK } }
   /api/v1/installations:
     post:
-      summary: Регистрация установки приложения (анонимной или с аккаунтом) и push-токена
-      description: >
-        Аккаунт берётся только из Bearer-токена: с токеном установка привязывается к
-        аккаунту, без него становится анонимной. Недействительный токен → 401, ничего не
-        меняется. Лимит — по X-Installation-ID. Токен в ответах не возвращается.
+      summary: Регистрация установки приложения (анонимной или с аккаунтом) и FCM-токена
+      description: >-
+        features.installations. Аккаунт берётся только из Bearer-токена: с токеном установка
+        привязывается к аккаунту, без него становится анонимной; недействительный токен → 401,
+        ничего не меняется. Токен хранится зашифрованным и в ответах не возвращается. Лимит —
+        RATE_GENERIC_PER_MINUTE на установку и ×20 на IP.
       security: [{ bearerAuth: [] }, {}]
       requestBody:
         required: true
@@ -265,18 +284,26 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Installation" }
-        "400": { description: INVALID_REQUEST (details.field) }
+        "400": { description: "INVALID_REQUEST (details.field: installation_id, platform, push.provider, push.token, …) или неизвестное поле" }
         "401": { description: недействительный access-токен }
         "429": { description: RATE_LIMITED }
   /api/v1/installations/{installation_id}/detach:
     post:
-      summary: Отвязать установку от аккаунта (выход, смена аккаунта)
+      summary: Отвязать установку от аккаунта (с токеном — только свою)
       security: [{ bearerAuth: [] }, {}]
       parameters:
-        - { name: installation_id, in: path, required: true, schema: { type: string } }
+        - { name: installation_id, in: path, required: true, schema: { type: string, pattern: "^[A-Za-z0-9-]{8,64}$" } }
       responses:
         "200":
-          description: "{ ok, detached }"
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  detached: { type: boolean }
+        "400": { description: "INVALID_REQUEST (details.field = installation_id)" }
   /api/v1/me/notification-preferences:
     get:
       summary: Категории уведомлений пользователя
@@ -288,7 +315,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/NotificationPreferences" }
     put:
-      summary: Включить/выключить категории (security выключить нельзя)
+      summary: Включить или выключить категории (push и письма, кроме письма subscription_activated; security выключить нельзя)
       security: [{ bearerAuth: [] }]
       requestBody:
         required: true
@@ -297,31 +324,49 @@ paths:
             schema:
               type: object
               required: [preferences]
+              additionalProperties: false
               properties:
                 preferences:
                   type: object
+                  minProperties: 1
                   additionalProperties: { type: boolean }
+                  example: { marketing: false }
       responses:
         "200":
           description: OK
           content:
             application/json:
               schema: { $ref: "#/components/schemas/NotificationPreferences" }
-        "400": { description: неизвестная категория или попытка выключить security }
-  /api/v1/events:
+        "400": { description: "INVALID_REQUEST — пустой объект, неизвестная категория или security: false (details.field)" }
+  /api/v1/notifications/opened:
     post:
-      summary: Пакет событий приложения (разрешённый список, до 50 событий, тело до 64 КБ)
+      summary: Пользователь открыл push (по did из data)
+      description: >-
+        Отмечается, только если доставка ушла на эту установку. Вызов best-effort, без повторов.
+        Лимит — общий с /installations бюджет установки (по installation_id) и ×20 на IP.
       security: [{ bearerAuth: [] }, {}]
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/EventBatch" }
+            schema:
+              type: object
+              required: [installation_id, delivery_id]
+              additionalProperties: false
+              properties:
+                installation_id: { type: string, pattern: "^[A-Za-z0-9-]{8,64}$" }
+                delivery_id: { type: string }
       responses:
-        "202":
-          description: "{ accepted, rejected, rejections?, disabled? }"
-        "400": { description: INVALID_REQUEST }
-        "429": { description: RATE_LIMITED }
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  recorded: { type: boolean }
+        "400": { description: INVALID_REQUEST (details.field) }
   /api/v1/devices/{id}:
     delete:
       summary: Отозвать устройство
@@ -332,6 +377,11 @@ paths:
   /api/v1/ai/reply:
     post:
       summary: Сгенерировать ответ
+      description: >-
+        Язык ответа решает входящее сообщение (source_text), а не язык интерфейса,
+        раскладка или язык instruction: profile.reply_language → уверенно определённый
+        язык сообщения → input_language → language. Другой язык даёт только явная
+        просьба в instruction («ответь на русском»).
       security: [{ bearerAuth: [] }]
       requestBody:
         required: true
@@ -341,15 +391,249 @@ paths:
               type: object
               required: [source_text]
               properties:
-                source_text: { type: string, maxLength: 300 }
+                source_text: { type: string, maxLength: 400, description: "max_source_characters из /config" }
                 instruction: { type: string, maxLength: 400 }
-                language: { type: string, enum: [kk, ru, en, uz] }
+                language: { type: string, enum: [kk, ru, en, uz], description: "язык интерфейса; язык ответа решает, только если язык сообщения не ясен" }
+                input_language: { type: string, enum: [kk, ru, en], description: "раскладка при нажатии Reply (features.sender_profile); решает, только если язык сообщения не ясен; неизвестное значение игнорируется" }
                 template_id: { type: string }
+                template: { type: object }
+                business_context: { type: object }
+                profile:
+                  type: object
+                  properties:
+                    description: { type: string }
+                    role: { type: string }
+                    preferred_tone: { type: string, enum: [natural, friendly, professional, formal, short] }
+                    business: { type: object }
+                    reply_language: { type: string, enum: [auto, kk, ru, en, uz], description: "features.reply_preferences" }
+                    grammatical_gender: { type: string, enum: [male, female, unspecified], description: "features.sender_profile; иначе — сохранённое значение" }
+                platform: { type: string }
+                app_version: { type: string }
       responses:
         "200": { description: reply + usage }
+        "400": { description: "INVALID_REQUEST (details.field = source_text) или неизвестное поле" }
         "429": { description: DAILY_LIMIT_REACHED }
         "502": { description: AI_PROVIDER_UNAVAILABLE }
         "504": { description: AI_TIMEOUT }
+  /api/v1/ai/compose:
+    post:
+      summary: Написать новое сообщение по инструкции (режим «Создать»)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [instruction]
+              properties:
+                instruction: { type: string, maxLength: 400, description: "max_instruction_length из /config" }
+                language: { type: string, enum: [kk, ru, en, uz], description: "язык интерфейса" }
+                input_language: { type: string, enum: [kk, ru, en], description: "features.sender_profile" }
+                profile:
+                  type: object
+                  description: "features.sender_profile; других полей нет"
+                  properties:
+                    grammatical_gender: { type: string, enum: [male, female, unspecified] }
+                regenerate: { type: boolean, description: "другая версия по той же инструкции" }
+                platform: { type: string }
+                app_version: { type: string }
+      responses:
+        "200":
+          description: text + usage
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  text: { type: string }
+                  detected_language: { type: string }
+                  usage: { type: object }
+        "400": { description: "INVALID_REQUEST (details.field = instruction)" }
+        "401": { description: UNAUTHORIZED }
+        "429": { description: DAILY_LIMIT_REACHED / RATE_LIMITED }
+        "502": { description: AI_PROVIDER_UNAVAILABLE }
+        "504": { description: AI_TIMEOUT }
+  /api/v1/ai/polish:
+    post:
+      summary: Подсказка — исправленный текст инструкции (квота не тратится)
+      description: Работает, когда features.instruction_polish = true; иначе 404 NOT_FOUND.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text: { type: string, maxLength: 400, description: "max_instruction_length из /config" }
+                input_language: { type: string, enum: [kk, ru, en] }
+                platform: { type: string }
+                app_version: { type: string }
+      responses:
+        "200":
+          description: "changed = false — подсказки нет, text равен исходному"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [text, changed]
+                properties:
+                  text: { type: string }
+                  changed: { type: boolean }
+        "400": { description: "INVALID_REQUEST (details.field = text, details.max_characters)" }
+        "401": { description: UNAUTHORIZED }
+        "404": { description: NOT_FOUND — polish выключен (AI_POLISH_ENABLED=false) }
+        "429": { description: RATE_LIMITED — отдельный лимит RATE_POLISH_PER_MINUTE }
+        "502": { description: AI_PROVIDER_UNAVAILABLE }
+        "504": { description: AI_TIMEOUT }
+  /api/v1/analytics/events:
+    post:
+      summary: События онбординга и настроек (только из приложений, только счётчики)
+      description: >-
+        Работает, когда features.product_events = true; иначе 404 NOT_FOUND. Каждое
+        событие проверяется отдельно по закрытому списку (имя, ключи props, типы и
+        значения); неподходящее отклоняется, остальные сохраняются. Свободный текст
+        не сохраняется. Список событий и props — docs/API.md.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [platform, events]
+              properties:
+                platform: { type: string, enum: [ios, android] }
+                app_version: { type: string, pattern: '^[0-9]{1,4}(\.[0-9]{1,4}){0,3}( \([0-9]{1,6}\))?$', example: "2.0.1" }
+                events:
+                  type: array
+                  minItems: 1
+                  maxItems: 20
+                  items: { $ref: "#/components/schemas/ProductEvent" }
+      responses:
+        "200":
+          description: Сколько событий сохранено и сколько отклонено
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [accepted, rejected]
+                properties:
+                  accepted: { type: integer }
+                  rejected: { type: integer }
+        "400": { description: "INVALID_REQUEST (details.field = platform | app_version | events; для events — details.max_events)" }
+        "401": { description: UNAUTHORIZED }
+        "404": { description: NOT_FOUND — приём выключен (PRODUCT_EVENTS_ENABLED=false) }
+        "429": { description: RATE_LIMITED — отдельный лимит RATE_EVENTS_PER_MINUTE }
+  /api/v1/admin/notifications:
+    get:
+      tags: [admin]
+      summary: Состояние push и справочники формы кампании
+      security: [{ adminSession: [] }]
+      responses: { "200": { description: "status { enabled, worker, fcm, email, link_hosts }, categories, screens, content_locales, required_locales, fallback_locale, languages, segments, subscription, quota, platforms, channels, types, limits" } }
+  /api/v1/admin/notifications/audience/preview:
+    post:
+      tags: [admin]
+      summary: Сколько получателей у фильтра (ничего не отправляет; 30 в минуту на админа)
+      security: [{ adminSession: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                audience: { $ref: "#/components/schemas/AudienceFilter" }
+                category: { type: string, enum: [account, subscription, security, system, marketing], default: marketing }
+      responses:
+        "200": { description: "preview { users, devices, matched_devices, android, ios, by_language { kk|ru|en|uz: { users, devices } }, unresolved [emails] }, audience (нормализованный)" }
+        "400": { description: "INVALID_REQUEST (details.field = audience.segment, audience.plan_ids, …)" }
+        "429": { description: RATE_LIMITED (details.retry_after_seconds) }
+  /api/v1/admin/notifications/campaigns:
+    get:
+      tags: [admin]
+      summary: Кампании (status, page, limit)
+      security: [{ adminSession: [] }]
+      responses: { "200": { description: "{ campaigns: [Campaign], total, page, limit }" } }
+    post:
+      tags: [admin]
+      summary: Создать кампанию (send = true — сразу отправить)
+      security: [{ adminSession: [] }]
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: >-
+            Повтор с тем же ключом возвращает ту же кампанию (лимит отправок не тратит, если она уже
+            отправлена); тот же ключ с другим содержимым — 409.
+          schema: { type: string, pattern: "^[A-Za-z0-9_:.-]{8,128}$" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CampaignRequest" }
+      responses:
+        "201": { description: "Campaign + created: true" }
+        "200": { description: "повтор: Campaign + created: false" }
+        "400": { description: "INVALID_REQUEST (details.field = title.kk, body.ru, fallback_locale, link, data.<key>, category, audience.*, idempotency_key)" }
+        "409": { description: "CONFLICT (details.field = idempotency_key) / PUSH_DISABLED" }
+        "429": { description: "RATE_LIMITED — больше RATE_PUSH_CAMPAIGNS_PER_HOUR отправок в час" }
+  /api/v1/admin/notifications/campaigns/{id}:
+    get:
+      tags: [admin]
+      summary: Кампания, статистика (в т.ч. by_language) и errors [{ code, count }]
+      security: [{ adminSession: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses: { "200": { description: OK }, "404": { description: NOT_FOUND } }
+  /api/v1/admin/notifications/campaigns/{id}/send:
+    post:
+      tags: [admin]
+      summary: Отправить черновик (повтор безопасен)
+      security: [{ adminSession: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses: { "200": { description: Campaign }, "409": { description: "отменена / PUSH_DISABLED" }, "429": { description: RATE_LIMITED } }
+  /api/v1/admin/notifications/campaigns/{id}/cancel:
+    post:
+      tags: [admin]
+      summary: Отменить (неотправленные доставки отменяются, отправка «в полёте» не повторяется; завершённую — 409)
+      security: [{ adminSession: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses: { "200": { description: Campaign }, "409": { description: CONFLICT } }
+  /api/v1/admin/notifications/deliveries:
+    get:
+      tags: [admin]
+      summary: Журнал доставок push и писем
+      security: [{ adminSession: [] }]
+      parameters:
+        - { name: campaign_id, in: query, schema: { type: string } }
+        - { name: user_id, in: query, schema: { type: string } }
+        - { name: status, in: query, schema: { type: string, enum: [queued, sending, retrying, provider_accepted, provider_failed, invalid_token, skipped, cancelled] } }
+        - { name: platform, in: query, schema: { type: string, enum: [android, ios] } }
+        - { name: channel, in: query, schema: { type: string, enum: [push, email] } }
+        - { name: type, in: query, schema: { type: string } }
+        - { name: source, in: query, schema: { type: string, enum: [campaign, automatic] } }
+        - { name: locale, in: query, schema: { type: string, enum: [kk, ru, en, uz] } }
+        - { name: page, in: query, schema: { type: integer } }
+        - { name: limit, in: query, schema: { type: integer, maximum: 100 } }
+      responses: { "200": { description: "{ deliveries: [{ id, notification_id, campaign_id, campaign_name, title, type, category, channel, locale, user_id, installation_id, platform, provider, device, app_version, push, status, attempts, error_code, error_detail, created_at, sent_at, failed_at, opened_at }], total, page, limit }; push — отпечаток токена, на который ушла попытка" } }
+  /api/v1/admin/notifications/devices:
+    get:
+      tags: [admin]
+      summary: Реестр установок (токен — только отпечаток, installation_id — первые 8 символов)
+      security: [{ adminSession: [] }]
+      parameters:
+        - { name: q, in: query, schema: { type: string } }
+        - { name: user_id, in: query, schema: { type: string } }
+        - { name: platform, in: query, schema: { type: string, enum: [android, ios] } }
+        - { name: push_status, in: query, schema: { type: string, enum: [none, active, invalid, replaced] } }
+        - { name: auth, in: query, schema: { type: string, enum: [authenticated, anonymous] } }
+        - { name: app_version, in: query, schema: { type: string } }
+      responses: { "200": { description: "{ devices: [...], total, page, limit }" } }
   /v1/auth/register:
     post:
       summary: "Совместимость: install_id → токен (старые сборки)"
@@ -366,6 +650,11 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+    adminSession:
+      type: apiKey
+      in: cookie
+      name: aireply_admin
+      description: Cookie-сессия админ-панели (ADMIN_COOKIE_NAME); для POST нужен ещё заголовок X-CSRF-Token.
   schemas:
     LegalConfig:
       type: object
@@ -390,10 +679,63 @@ components:
             email_otp: { type: boolean, description: "Resend настроен (или демо-режим)" }
             google_sign_in: { type: boolean }
             apple_sign_in: { type: boolean }
-            installations: { type: boolean, description: "есть /installations и /events" }
-            push_notifications: { type: boolean, description: "сервер может доставлять push" }
-            telemetry: { type: boolean, description: "сервер принимает события приложений" }
+            compose: { type: boolean, description: "POST /api/v1/ai/compose доступен" }
+            reply_preferences: { type: boolean, description: "profile.reply_language в /ai/reply" }
+            sender_profile: { type: boolean, description: "grammatical_gender и input_language в /ai/*, grammatical_gender и onboarding_version в /me" }
+            instruction_polish: { type: boolean, description: "POST /api/v1/ai/polish доступен" }
+            product_events: { type: boolean, description: "POST /api/v1/analytics/events доступен" }
+            installations: { type: boolean, description: "POST /api/v1/installations и /notifications/opened доступны" }
+            push_notifications: { type: boolean, description: "push включён и FCM настроен (Android и iOS)" }
+            preferred_language: { type: boolean, description: "preferred_language в PATCH|POST /me и в user" }
         legal: { $ref: "#/components/schemas/LegalConfig" }
+    ProductEvent:
+      type: object
+      required: [name]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          enum: [onboarding_started, onboarding_step_viewed, onboarding_keyboard_step_viewed,
+                 keyboard_enabled_detected, full_access_enabled_detected, paste_tutorial_viewed,
+                 onboarding_practice_completed, onboarding_completed, onboarding_reopened,
+                 gender_selected, autocorrect_enabled, autocorrect_disabled]
+        ts: { type: string, format: date-time, description: "время на устройстве, RFC 3339" }
+        props:
+          type: object
+          description: "Только ключи, разрешённые для этого события: целые 0…1000, bool или код из закрытого списка"
+          additionalProperties:
+            oneOf: [{ type: integer, minimum: 0, maximum: 1000 }, { type: boolean }, { type: string }]
+    Profile:
+      type: object
+      properties:
+        display_name: { type: string }
+        role: { type: string }
+        description: { type: string }
+        preferred_tone: { type: string }
+        business_offering: { type: string }
+        business_summary: { type: string }
+        business_rules: { type: array, items: { type: string } }
+        onboarding_completed: { type: boolean }
+        grammatical_gender: { type: string, enum: [male, female, unspecified] }
+        onboarding_version: { type: integer, minimum: 0, maximum: 1000 }
+        updated_at: { type: string, format: date-time }
+    ProfileUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        display_name: { type: string }
+        role: { type: string }
+        description: { type: string }
+        preferred_tone: { type: string, enum: [natural, friendly, professional, formal, short] }
+        business_offering: { type: string }
+        business_summary: { type: string }
+        business_rules: { type: array, items: { type: string }, maxItems: 8 }
+        locale: { type: string, enum: [kk, ru, en, uz] }
+        timezone: { type: string }
+        onboarding_completed: { type: boolean }
+        grammatical_gender: { type: string, enum: [male, female, unspecified], description: "features.sender_profile" }
+        onboarding_version: { type: integer, minimum: 0, maximum: 1000, description: "features.sender_profile; хранится максимум" }
+        preferred_language: { type: string, enum: [kk, ru, en, uz], description: "features.preferred_language; ru-KZ → ru, иное → 400. Язык push и писем" }
     Device:
       type: object
       properties:
@@ -408,36 +750,39 @@ components:
       required: [installation_id, platform]
       additionalProperties: false
       properties:
-        installation_id: { type: string, pattern: "^[A-Za-z0-9-]{8,64}$", description: "UUID, создаётся приложением" }
+        installation_id: { type: string, pattern: "^[A-Za-z0-9-]{8,64}$", description: "UUID, создаётся приложением один раз" }
         platform: { type: string, enum: [ios, android] }
-        app_version: { type: string }
-        app_build: { type: string }
-        os_name: { type: string }
-        os_version: { type: string }
+        app_version: { type: string, example: "1.0" }
+        app_build: { type: string, example: "4" }
+        os_name: { type: string, example: "iOS" }
+        os_version: { type: string, example: "26.5" }
         device_model: { type: string, example: "iPhone17,1" }
-        manufacturer: { type: string }
+        manufacturer: { type: string, example: "Apple" }
         locale: { type: string, enum: [kk, ru, en, uz] }
         timezone: { type: string, example: "Asia/Almaty" }
         notification_permission:
           type: string
           enum: [authorized, denied, not_determined, provisional, ephemeral, unknown]
-        notifications_enabled: { type: boolean }
+        notifications_enabled: { type: boolean, description: "переключатель в приложении" }
         push:
           type: object
+          description: Нет токена — не присылать
+          required: [token]
+          additionalProperties: false
           properties:
-            provider: { type: string, enum: [fcm, apns] }
-            token: { type: string, description: "FCM registration token или APNs device token (hex)" }
-            environment: { type: string, enum: [sandbox, production], description: "только APNs" }
+            provider: { type: string, enum: [fcm], description: "на обеих платформах; можно не указывать" }
+            token: { type: string, minLength: 20, maxLength: 4096, pattern: "^[A-Za-z0-9_:.-]+$", description: "FCM registration token" }
     Installation:
       type: object
       properties:
         installation_id: { type: string }
         attached: { type: boolean }
-        push_status: { type: string, enum: [none, active, invalid, replaced] }
-        push_available: { type: boolean }
+        push_status: { type: string, enum: [none, active, invalid, replaced], description: "invalid — FCM отклонил токен; тот же токен остаётся invalid, нужен новый (кроме SENDER_ID_MISMATCH)" }
+        push_available: { type: boolean, description: "сервер сейчас может отправлять push" }
         notifications_enabled: { type: boolean }
         preferences:
           type: object
+          description: Только с входом
           additionalProperties: { type: boolean }
     NotificationPreferences:
       type: object
@@ -449,31 +794,33 @@ components:
         optional:
           type: array
           items: { type: string }
-    EventBatch:
+          example: [account, subscription, system, marketing]
+    AudienceFilter:
       type: object
-      required: [installation_id, events]
+      additionalProperties: false
+      description: Все условия через И; только установки активных обычных аккаунтов.
       properties:
-        installation_id: { type: string }
-        session_id: { type: string }
-        events:
-          type: array
-          maxItems: 50
-          items:
-            type: object
-            required: [name, occurred_at]
-            properties:
-              id: { type: string, description: "UUID события для защиты от повторов" }
-              name:
-                type: string
-                enum: [app_opened, app_backgrounded, login_success, login_failed, registration_success,
-                  logout, push_permission_requested, push_permission_granted, push_permission_denied,
-                  push_token_registered, push_token_refreshed, push_token_registration_failed,
-                  notification_opened, payment_started, payment_success, payment_failed, api_error,
-                  unexpected_app_error]
-              occurred_at: { type: string, format: date-time }
-              properties:
-                type: object
-                maxProperties: 8
+        segment: { type: string, enum: [all, free, paid, demo] }
+        plan_ids: { type: array, items: { type: string } }
+        subscription: { type: string, enum: [active, expired] }
+        platforms: { type: array, items: { type: string, enum: [android, ios] } }
+        languages: { type: array, items: { type: string, enum: [kk, ru, en, uz] }, description: язык уведомления }
+        quota: { type: string, enum: [has_remaining, near_exhaustion, exhausted] }
+        user_ids: { type: array, items: { type: string } }
+        emails: { type: array, items: { type: string }, description: "вместе с user_ids — не больше 500" }
+    CampaignRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string }
+        category: { type: string, enum: [account, subscription, security, system, marketing], default: marketing }
+        fallback_locale: { type: string, enum: [kk, ru, en, uz], default: ru }
+        title: { type: object, additionalProperties: { type: string, maxLength: 80 }, example: { kk: "Жаңалық", ru: "Новость", en: "News", uz: "" } }
+        body: { type: object, additionalProperties: { type: string, maxLength: 400 } }
+        link: { type: string, example: "aireply://compose" }
+        data: { type: object, maxProperties: 10, additionalProperties: { type: string }, description: "ключи ^[a-z][a-z0-9_]{0,31}$; служебные и начинающиеся с google или gcm — 400" }
+        audience: { $ref: "#/components/schemas/AudienceFilter" }
+        send: { type: boolean }
     EmailChallenge:
       type: object
       required: [masked_email, expires_in, resend_after, code_length]

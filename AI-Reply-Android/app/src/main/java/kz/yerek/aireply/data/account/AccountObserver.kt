@@ -2,9 +2,8 @@ package kz.yerek.aireply.data.account
 
 /**
  * Account transitions, for the parts of the app that follow them (the push
- * installation, diagnostics). Every method has a default, so an observer
- * implements only what it needs; all are called on the caller's thread and
- * must return quickly.
+ * installation). Every method has a default, so an observer implements only
+ * what it needs; all are called on the caller's thread and must return quickly.
  */
 interface AccountObserver {
 
@@ -29,10 +28,4 @@ interface AccountObserver {
      * to a session the server revoked.
      */
     fun onSignedOut(userInitiated: Boolean) {}
-
-    /**
-     * A sign-in failed inside the provider's own SDK, before anything reached
-     * the server. [errorCode] is a short machine code.
-     */
-    fun onSignInFailedLocally(method: String, errorCode: String) {}
 }

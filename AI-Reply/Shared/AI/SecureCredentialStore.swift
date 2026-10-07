@@ -22,7 +22,7 @@ enum LegacyCredentialMigration {
                 kSecClass as String: kSecClassGenericPassword,
                 kSecAttrService as String: service,
                 kSecAttrAccount as String: account,
-                kSecAttrAccessGroup as String: AppGroup.identifier
+                kSecAttrAccessGroup as String: KeychainGroup.identifier
             ]
             SecItemDelete(query as CFDictionary)
         }

@@ -1,22 +1,75 @@
 package api
 
 import (
-	"errors"
 	"net/http"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/aireply/ai-reply-back-end/internal/domain"
 	"github.com/aireply/ai-reply-back-end/internal/installations"
-	"github.com/aireply/ai-reply-back-end/internal/reqctx"
-	"github.com/aireply/ai-reply-back-end/internal/telemetry"
+	"github.com/aireply/ai-reply-back-end/internal/middleware"
+	"github.com/aireply/ai-reply-back-end/internal/notifications"
 	"github.com/aireply/ai-reply-back-end/internal/transport/httpx"
 )
 
-// Орнатулар, push баптаулары және қосымша оқиғалары.
+// Орнатулар, push баптаулары және хабарламаның ашылғаны.
+
+// installationIDHeader — шығу (logout) сұранысында қосымша өз орнатуын атайды.
+const installationIDHeader = "X-Installation-ID"
+
+// sharedAddressFactor — бір IP мекенжайы қанша орнатудың үлесін жібере алады
+// (оператордың NAT-ы, кеңсе Wi-Fi-ы).
+const sharedAddressFactor = 20
+
+// installationHeader — X-Installation-ID тақырыбы, пішімі дұрыс болса.
+func installationHeader(r *http.Request) string {
+	id := strings.TrimSpace(r.Header.Get(installationIDHeader))
+	if installations.ValidInstallationID(id) {
+		return id
+	}
+	return ""
+}
+
+// installationLimit — орнату сұраныстарының IP бойынша жұмсақ шегі.
+//
+// The real budget is per installation (allowInstallation): behind carrier
+// NAT many phones share one address, and a per-IP budget alone would
+// throttle unrelated people together. This looser per-IP budget on top still
+// stops a client that invents a new id per request.
+func (s *Server) installationLimit(next http.Handler) http.Handler {
+	limit := s.cfg.Limits.GenericPerMinute * sharedAddressFactor
+	return middleware.RateLimit(s.limiter, "installation_ip", limit, time.Minute,
+		func(r *http.Request) string { return httpx.ClientIP(r, s.cfg.App.TrustProxy) })(next)
+}
+
+// allowInstallation — бір орнатудың минуттық шегі; толса 429 жазады.
+//
+// The installation is known only once the handler has read it: from the
+// body for registration and "opened", from the path for detach. Apps send no
+// installation header on these requests. A malformed id is not counted: the
+// handler refuses it with 400.
+func (s *Server) allowInstallation(w http.ResponseWriter, installationID string) bool {
+	if !installations.ValidInstallationID(installationID) {
+		return true
+	}
+	ok, retry := s.limiter.Allow("installation:"+installationID, s.cfg.Limits.GenericPerMinute, time.Minute)
+	if ok {
+		return true
+	}
+	seconds := int(retry.Seconds())
+	if seconds < 1 {
+		seconds = 1
+	}
+	w.Header().Set("Retry-After", strconv.Itoa(seconds))
+	httpx.Error(w, http.StatusTooManyRequests, httpx.CodeRateLimited, "Too many requests. Try again shortly.",
+		map[string]any{"retry_after_seconds": seconds})
+	return false
+}
 
 type pushTokenRequest struct {
-	Provider    string `json:"provider"`
-	Token       string `json:"token"`
-	Environment string `json:"environment"`
+	Provider string `json:"provider"`
+	Token    string `json:"token"`
 }
 
 type installationRequest struct {
@@ -55,6 +108,9 @@ func (s *Server) handleRegisterInstallation(w http.ResponseWriter, r *http.Reque
 		httpx.Fail(w, err)
 		return
 	}
+	if !s.allowInstallation(w, strings.TrimSpace(body.InstallationID)) {
+		return
+	}
 	userID := ""
 	if user, ok := UserFrom(r.Context()); ok {
 		userID = user.ID
@@ -66,9 +122,7 @@ func (s *Server) handleRegisterInstallation(w http.ResponseWriter, r *http.Reque
 		Permission: body.NotificationPermission, NotificationsEnabled: body.NotificationsEnabled,
 	}
 	if body.Push != nil {
-		reg.Push = &installations.PushToken{
-			Provider: body.Push.Provider, Token: body.Push.Token, Environment: body.Push.Environment,
-		}
+		reg.Push = &installations.PushToken{Provider: body.Push.Provider, Token: body.Push.Token}
 	}
 	inst, err := s.installations.Register(r.Context(), reg, userID)
 	if err != nil {
@@ -80,9 +134,12 @@ func (s *Server) handleRegisterInstallation(w http.ResponseWriter, r *http.Reque
 		PushAvailable: s.notifications.Ready(), NotificationsEnabled: inst.NotificationsEnabled,
 	}
 	if userID != "" {
-		if prefs, err := s.notifications.Preferences(r.Context(), userID); err == nil {
-			res.Preferences = prefs
+		prefs, err := s.notifications.Preferences(r.Context(), userID)
+		if err != nil {
+			httpx.Fail(w, err)
+			return
 		}
+		res.Preferences = prefs
 	}
 	httpx.JSON(w, http.StatusOK, res)
 }
@@ -92,6 +149,9 @@ func (s *Server) handleDetachInstallation(w http.ResponseWriter, r *http.Request
 	installationID := r.PathValue("installation_id")
 	if !installations.ValidInstallationID(installationID) {
 		httpx.Fail(w, domain.InvalidField("installation_id", "format"))
+		return
+	}
+	if !s.allowInstallation(w, installationID) {
 		return
 	}
 	var detached bool
@@ -110,18 +170,29 @@ func (s *Server) handleDetachInstallation(w http.ResponseWriter, r *http.Request
 	httpx.JSON(w, http.StatusOK, map[string]bool{"ok": true, "detached": detached})
 }
 
-type preferencesRequest struct {
-	Preferences map[string]bool `json:"preferences"`
+// detachOnLogout — шыққан қосымшаның орнатуы тіркелгіден ажырайды (X-Installation-ID).
+//
+// An already expired refresh token still signs the phone out, exactly like
+// the anonymous registration the app sends next. A failure is only logged:
+// the logout itself has succeeded.
+func (s *Server) detachOnLogout(r *http.Request, userID string) {
+	installationID := installationHeader(r)
+	if installationID == "" || s.installations == nil {
+		return
+	}
+	var err error
+	if userID != "" {
+		_, err = s.installations.Detach(r.Context(), installationID, userID)
+	} else {
+		_, err = s.installations.DetachAny(r.Context(), installationID)
+	}
+	if err != nil {
+		s.log.Warn("installation detach on logout failed", "error", err.Error())
+	}
 }
 
-func optionalCategories() []string {
-	out := []string{}
-	for _, c := range domain.NotificationCategories {
-		if domain.CategoryOptional(c) {
-			out = append(out, c)
-		}
-	}
-	return out
+type preferencesRequest struct {
+	Preferences map[string]bool `json:"preferences"`
 }
 
 // handleNotificationPreferences — санаттар бойынша баптау.
@@ -132,7 +203,7 @@ func (s *Server) handleNotificationPreferences(w http.ResponseWriter, r *http.Re
 		httpx.Fail(w, err)
 		return
 	}
-	httpx.JSON(w, http.StatusOK, map[string]any{"preferences": prefs, "optional": optionalCategories()})
+	httpx.JSON(w, http.StatusOK, map[string]any{"preferences": prefs, "optional": notifications.OptionalCategories()})
 }
 
 // handleUpdateNotificationPreferences — санатты қосу/өшіру (қауіпсіздік хабарлары өшпейді).
@@ -152,64 +223,32 @@ func (s *Server) handleUpdateNotificationPreferences(w http.ResponseWriter, r *h
 		httpx.Fail(w, err)
 		return
 	}
-	httpx.JSON(w, http.StatusOK, map[string]any{"preferences": prefs, "optional": optionalCategories()})
+	httpx.JSON(w, http.StatusOK, map[string]any{"preferences": prefs, "optional": notifications.OptionalCategories()})
 }
 
-type eventRequest struct {
-	ID         string         `json:"id"`
-	Name       string         `json:"name"`
-	OccurredAt string         `json:"occurred_at"`
-	Properties map[string]any `json:"properties"`
+type openedRequest struct {
+	InstallationID string `json:"installation_id"`
+	DeliveryID     string `json:"delivery_id"`
 }
 
-type eventsRequest struct {
-	InstallationID string         `json:"installation_id"`
-	SessionID      string         `json:"session_id"`
-	Events         []eventRequest `json:"events"`
-}
-
-// maxEventsBody — бір топтың ең үлкен денесі (50 оқиға, әрқайсысы шектеулі қасиеттермен).
-const maxEventsBody = 64 * 1024
-
-// handleEvents — қосымша оқиғаларын қабылдайды (рұқсат етілген тізім, шектеулі қасиеттер).
+// handleNotificationOpened — адам push-ты басып ашты (did бар хабарлама).
 //
-// 202 means "taken": the events are written in the background, and a full
-// queue drops them rather than slowing the app down. Unknown events and
-// properties are refused one by one, never stored.
-func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
-	var body eventsRequest
-	if err := httpx.Decode(w, r, maxEventsBody, &body); err != nil {
+// Recorded only when the delivery went to that very installation, so one
+// app cannot mark another device's notifications as opened.
+func (s *Server) handleNotificationOpened(w http.ResponseWriter, r *http.Request) {
+	var body openedRequest
+	if err := httpx.Decode(w, r, 1024, &body); err != nil {
 		httpx.Fail(w, err)
 		return
 	}
-	client := reqctx.From(r.Context())
-	batch := telemetry.Batch{
-		InstallationID: body.InstallationID, SessionID: body.SessionID, Platform: client.Platform,
-		AppVersion: client.AppVersion, AppBuild: client.AppBuild, OSVersion: client.OSVersion,
-		RequestID: client.RequestID,
+	installationID := strings.TrimSpace(body.InstallationID)
+	if !s.allowInstallation(w, installationID) {
+		return
 	}
-	if user, ok := UserFrom(r.Context()); ok {
-		batch.UserID = user.ID
-	}
-	if installations.ValidInstallationID(body.InstallationID) {
-		if inst, err := s.installations.Lookup(r.Context(), body.InstallationID); err == nil {
-			batch.DeviceModel = inst.DeviceModel
-			if batch.Platform == "" {
-				batch.Platform = inst.Platform
-			}
-		} else if !errors.Is(err, domain.ErrNotFound) {
-			s.log.Warn("installation lookup failed", "error", err.Error())
-		}
-	}
-	for _, e := range body.Events {
-		batch.Events = append(batch.Events, telemetry.IncomingEvent{
-			ID: e.ID, Name: e.Name, OccurredAt: e.OccurredAt, Properties: e.Properties,
-		})
-	}
-	result, err := s.telemetry.Ingest(r.Context(), batch)
+	recorded, err := s.notifications.MarkOpened(r.Context(), installationID, strings.TrimSpace(body.DeliveryID))
 	if err != nil {
 		httpx.Fail(w, err)
 		return
 	}
-	httpx.JSON(w, http.StatusAccepted, result)
+	httpx.JSON(w, http.StatusOK, map[string]bool{"ok": true, "recorded": recorded})
 }

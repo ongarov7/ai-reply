@@ -26,6 +26,18 @@ final class ComposerTextView: UITextView {
         didSet { placeholderLabel.text = placeholder }
     }
 
+    /// How many lines the placeholder may wrap to. One - shrinking to fit -
+    /// by default; the Create field's placeholder carries an example and
+    /// wraps instead of being cut.
+    var placeholderLines = 1 {
+        didSet {
+            guard placeholderLines != oldValue else { return }
+            placeholderLabel.numberOfLines = placeholderLines
+            placeholderLabel.adjustsFontSizeToFitWidth = placeholderLines == 1
+            setNeedsLayout()
+        }
+    }
+
     var caretColor: UIColor = .systemBlue {
         didSet { caretView.backgroundColor = caretColor }
     }
@@ -86,12 +98,15 @@ final class ComposerTextView: UITextView {
     override func layoutSubviews() {
         super.layoutSubviews()
         let inset = textContainerInset
-        placeholderLabel.frame = CGRect(
-            x: inset.left,
-            y: inset.top,
-            width: max(0, bounds.width - inset.left - inset.right),
-            height: (font ?? .systemFont(ofSize: 16)).lineHeight
-        )
+        let width = max(0, bounds.width - inset.left - inset.right)
+        let lineHeight = (font ?? .systemFont(ofSize: 16)).lineHeight
+        var height = lineHeight
+        if placeholderLines > 1 {
+            // Top-aligned with the caret: only as tall as the text it wraps to.
+            let room = min(lineHeight * CGFloat(placeholderLines), max(lineHeight, bounds.height - inset.top - inset.bottom))
+            height = min(room, ceil(placeholderLabel.sizeThatFits(CGSize(width: width, height: room)).height))
+        }
+        placeholderLabel.frame = CGRect(x: inset.left, y: inset.top, width: width, height: height)
         updateCaret()
     }
 
@@ -118,6 +133,23 @@ final class ComposerTextView: UITextView {
         if let allow, !allow(next) { return false }
         text = next
         caret = location + (string as NSString).length
+        didEdit()
+        return true
+    }
+
+    /// Replaces the `length` UTF-16 units right before the caret with
+    /// `string` - a word swapped for its correction or a suggestion, in one
+    /// edit. `allow` sees the resulting text, as for `insert`.
+    @discardableResult
+    func replaceBeforeCaret(length: Int, with string: String, allow: ((String) -> Bool)? = nil) -> Bool {
+        let current = currentText as NSString
+        let location = clampedCaret(in: current)
+        guard length >= 0, length <= location else { return false }
+        let range = NSRange(location: location - length, length: length)
+        let next = current.replacingCharacters(in: range, with: string)
+        if let allow, !allow(next) { return false }
+        text = next
+        caret = range.location + (string as NSString).length
         didEdit()
         return true
     }
@@ -175,6 +207,15 @@ final class ComposerTextView: UITextView {
     var textBeforeCaret: String {
         let current = currentText as NSString
         return current.substring(to: clampedCaret(in: current))
+    }
+
+    /// The character right after the caret, or nil at the end of the text.
+    /// Smart correction stays out of a word the caret sits inside.
+    var textAfterCaret: String? {
+        let current = currentText as NSString
+        let location = clampedCaret(in: current)
+        guard location < current.length else { return nil }
+        return current.substring(with: current.rangeOfComposedCharacterSequence(at: location))
     }
 
     /// Puts the caret where the user tapped.

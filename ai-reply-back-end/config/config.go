@@ -4,6 +4,7 @@ package config
 import (
 	"bufio"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/mail"
@@ -22,12 +23,13 @@ type Config struct {
 	Email     Email
 	OAuth     OAuth
 	OpenAI    OpenAI
+	AI        AI
+	Analytics Analytics
 	Admin     Admin
 	Payments  Payments
 	Limits    Limits
 	Log       Log
 	Push      Push
-	Telemetry Telemetry
 }
 
 type App struct {
@@ -116,7 +118,23 @@ type OpenAI struct {
 	BaseURL         string
 	MaxOutputTokens int
 	Timeout         time.Duration
-	Temperature     float64
+	// Temperature — nil болса өріс сұранысқа мүлде қосылмайды: reasoning
+	// модельдері оны қабылдамайды (OPENAI_TEMPERATURE=none).
+	Temperature *float64
+}
+
+// AI — генерация сапасы мен қосымша AI мүмкіндіктері.
+type AI struct {
+	// RepairEnabled — тексеруден өтпеген жауапқа бір рет түзету сұранысы.
+	RepairEnabled bool
+	// PolishEnabled — POST /api/v1/ai/polish (нұсқауды түзету ұсынысы).
+	PolishEnabled bool
+}
+
+// Analytics — қолданбалардың өнім оқиғалары.
+type Analytics struct {
+	// ProductEventsEnabled — POST /api/v1/analytics/events; өшірулі болса 404.
+	ProductEventsEnabled bool
 }
 
 type Admin struct {
@@ -138,6 +156,8 @@ type Limits struct {
 	OTPRequestPerHour int
 	OTPVerifyPerHour  int
 	AIPerMinute       int
+	PolishPerMinute   int
+	EventsPerMinute   int
 	AdminLoginPerHour int
 	GenericPerMinute  int
 }
@@ -147,12 +167,12 @@ type Log struct {
 	Format string // json | text
 }
 
-// Push — FCM (Android) мен APNs (iOS) арқылы хабарлама жіберу.
+// Push — FCM арқылы хабарлама жіберу (Android те, iOS та) және хабарлама хаттары.
 //
 // Provider credentials exist only here, read from the environment; the apps
 // never see them. PUSH_NOTIFICATIONS_ENABLED=false (the default) keeps the
-// server fully working without any provider: installations are still
-// registered, nothing is sent.
+// server fully working without Firebase: installations are still registered,
+// automatic events are recorded as skipped, nothing is sent.
 type Push struct {
 	Enabled          bool
 	WorkerEnabled    bool
@@ -161,15 +181,24 @@ type Push struct {
 	Concurrency      int
 	CampaignsPerHour int
 	LinkHosts        []string
-	FCM              FCM
-	APNs             APNs
+	// QuotaLowPercent — «квота аяқталуға жақын» шегі, лимиттің пайызы (күндік және айлық).
+	QuotaLowPercent int
+	// RetentionDays — аяқталған жеткізулер мен хабарламалар қанша күн сақталады (0 — өшірілмейді).
+	RetentionDays int
+	// EmailsEnabled — хабарлама хаттары (тек Resend бапталса жұмыс істейді).
+	EmailsEnabled bool
+	FCM           FCM
+	// problems — FIREBASE_SERVICE_ACCOUNT_FILE оқылмады (Validate хабарлайды).
+	problems []string
 }
 
 // FCM — Firebase Cloud Messaging HTTP v1 (қызметтік тіркелгі).
 type FCM struct {
 	ProjectID   string
 	ClientEmail string
-	PrivateKey  string // PEM; "\n" escapes in .env are turned into newlines
+	PrivateKey  string // PEM; "\n" escapes and base64 in .env are turned into a normal key
+	// ServiceAccountFile — the JSON file the three values came from ("" — from the variables).
+	ServiceAccountFile string
 }
 
 // Configured — үш мәннің бәрі берілген.
@@ -186,42 +215,6 @@ func (f FCM) partial() bool {
 		}
 	}
 	return set > 0 && set < 3
-}
-
-// APNs — Apple Push Notification service, токен (.p8) арқылы.
-type APNs struct {
-	KeyID       string
-	TeamID      string
-	BundleID    string
-	PrivateKey  string // .p8 content (PEM)
-	Environment string // production | sandbox: for tokens whose build did not say
-}
-
-// Configured — кілт, команда, bundle id және кілт мазмұны берілген.
-func (a APNs) Configured() bool {
-	return a.KeyID != "" && a.TeamID != "" && a.BundleID != "" && a.PrivateKey != ""
-}
-
-func (a APNs) partial() bool {
-	set := 0
-	for _, v := range []string{a.KeyID, a.TeamID, a.PrivateKey} {
-		if v != "" {
-			set++
-		}
-	}
-	return set > 0 && set < 3
-}
-
-// Telemetry — қосымша оқиғалары және сақтау мерзімдері (күн; 0 — өшірмеу).
-type Telemetry struct {
-	Enabled                  bool
-	EventsPerMinute          int
-	RetentionAppEventsDays   int
-	RetentionAPIErrorsDays   int
-	RetentionAuthEventsDays  int
-	RetentionDeliveriesDays  int
-	RetentionAuditLogDays    int
-	RecordClientErrorsStatus int // record API errors from this status up (4xx noise below is skipped)
 }
 
 // Load — .env файлын (бар болса) оқып, ортадан баптауды жинайды.
@@ -275,14 +268,12 @@ func Load(envFile string) (Config, error) {
 			GoogleClientIDs: append(list("GOOGLE_CLIENT_ID_IOS", ""), list("GOOGLE_CLIENT_ID_WEB", "")...),
 			AppleClientIDs:  list("APPLE_CLIENT_ID", ""),
 		},
-		OpenAI: OpenAI{
-			APIKey:          str("OPENAI_API_KEY", ""),
-			Model:           str("OPENAI_MODEL", "gpt-4o-mini"),
-			BaseURL:         strings.TrimRight(str("OPENAI_BASE_URL", "https://api.openai.com/v1"), "/"),
-			MaxOutputTokens: num("OPENAI_MAX_OUTPUT_TOKENS", 180),
-			Timeout:         dur("OPENAI_TIMEOUT", 20*time.Second),
-			Temperature:     flt("OPENAI_TEMPERATURE", 0.7),
+		OpenAI: OpenAIFromEnv(),
+		AI: AI{
+			RepairEnabled: boolean("AI_REPAIR_ENABLED", true),
+			PolishEnabled: boolean("AI_POLISH_ENABLED", true),
 		},
+		Analytics: Analytics{ProductEventsEnabled: boolean("PRODUCT_EVENTS_ENABLED", true)},
 		Admin: Admin{
 			BootstrapEmail:    strings.ToLower(strings.TrimSpace(str("ADMIN_EMAIL", ""))),
 			BootstrapPassword: str("ADMIN_PASSWORD", ""),
@@ -298,40 +289,13 @@ func Load(envFile string) (Config, error) {
 			OTPRequestPerHour: num("RATE_OTP_REQUEST_PER_HOUR", 5),
 			OTPVerifyPerHour:  num("RATE_OTP_VERIFY_PER_HOUR", 10),
 			AIPerMinute:       num("RATE_AI_PER_MINUTE", 12),
+			PolishPerMinute:   num("RATE_POLISH_PER_MINUTE", 20),
+			EventsPerMinute:   num("RATE_EVENTS_PER_MINUTE", 30),
 			AdminLoginPerHour: num("RATE_ADMIN_LOGIN_PER_HOUR", 10),
 			GenericPerMinute:  num("RATE_GENERIC_PER_MINUTE", 60),
 		},
-		Log: Log{Level: str("LOG_LEVEL", "info"), Format: str("LOG_FORMAT", "json")},
-		Push: Push{
-			Enabled:          boolean("PUSH_NOTIFICATIONS_ENABLED", false),
-			WorkerEnabled:    boolean("PUSH_WORKER_ENABLED", true),
-			MaxAttempts:      num("PUSH_MAX_ATTEMPTS", 5),
-			BatchSize:        num("PUSH_BATCH_SIZE", 50),
-			Concurrency:      num("PUSH_WORKER_CONCURRENCY", 8),
-			CampaignsPerHour: num("RATE_PUSH_CAMPAIGNS_PER_HOUR", 10),
-			LinkHosts:        list("PUSH_LINK_HOSTS", hostOf(str("PUBLIC_BASE_URL", "https://ai-reply.kz"))),
-			FCM: FCM{
-				ProjectID:   str("FIREBASE_PROJECT_ID", ""),
-				ClientEmail: str("FIREBASE_CLIENT_EMAIL", ""),
-				PrivateKey:  PEM(str("FIREBASE_PRIVATE_KEY", "")),
-			},
-			APNs: APNs{
-				KeyID:       str("APNS_KEY_ID", ""),
-				TeamID:      str("APNS_TEAM_ID", ""),
-				BundleID:    str("APNS_BUNDLE_ID", ""),
-				PrivateKey:  PEM(str("APNS_PRIVATE_KEY", "")),
-				Environment: apnsEnvironment(str("APNS_ENVIRONMENT", "production")),
-			},
-		},
-		Telemetry: Telemetry{
-			Enabled:                 boolean("TELEMETRY_ENABLED", true),
-			EventsPerMinute:         num("RATE_EVENTS_PER_MINUTE", 30),
-			RetentionAppEventsDays:  days("RETENTION_APP_EVENTS_DAYS", 90),
-			RetentionAPIErrorsDays:  days("RETENTION_API_ERRORS_DAYS", 30),
-			RetentionAuthEventsDays: days("RETENTION_AUTH_EVENTS_DAYS", 365),
-			RetentionDeliveriesDays: days("RETENTION_NOTIFICATIONS_DAYS", 180),
-			RetentionAuditLogDays:   days("RETENTION_AUDIT_LOG_DAYS", 0),
-		},
+		Log:  Log{Level: str("LOG_LEVEL", "info"), Format: str("LOG_FORMAT", "json")},
+		Push: pushFromEnv(),
 	}
 
 	loc, err := time.LoadLocation(cfg.App.Timezone)
@@ -344,6 +308,19 @@ func Load(envFile string) (Config, error) {
 		return Config{}, fmt.Errorf("configuration is incomplete:\n  - %s", strings.Join(problems, "\n  - "))
 	}
 	return cfg, nil
+}
+
+// OpenAIFromEnv — провайдер баптауы. Load те, сапа бағалауының тірі тесті де
+// (internal/ai/eval) осыны оқиды: әдепкі мәндердің бір ғана көзі бар.
+func OpenAIFromEnv() OpenAI {
+	return OpenAI{
+		APIKey:          str("OPENAI_API_KEY", ""),
+		Model:           str("OPENAI_MODEL", "gpt-4o-mini"),
+		BaseURL:         strings.TrimRight(str("OPENAI_BASE_URL", "https://api.openai.com/v1"), "/"),
+		MaxOutputTokens: num("OPENAI_MAX_OUTPUT_TOKENS", 180),
+		Timeout:         dur("OPENAI_TIMEOUT", 20*time.Second),
+		Temperature:     temperature("OPENAI_TEMPERATURE", 0.7),
+	}
 }
 
 // Validate — іске қосылу алдындағы қатаң тексеру: құпиясыз сервер көтерілмейді.
@@ -403,24 +380,77 @@ func (c Config) Validate() []string {
 	return problems
 }
 
+func pushFromEnv() Push {
+	p := Push{
+		Enabled:          boolean("PUSH_NOTIFICATIONS_ENABLED", false),
+		WorkerEnabled:    boolean("PUSH_WORKER_ENABLED", true),
+		MaxAttempts:      num("PUSH_MAX_ATTEMPTS", 5),
+		BatchSize:        num("PUSH_BATCH_SIZE", 50),
+		Concurrency:      num("PUSH_WORKER_CONCURRENCY", 8),
+		CampaignsPerHour: num("RATE_PUSH_CAMPAIGNS_PER_HOUR", 10),
+		LinkHosts:        list("PUSH_LINK_HOSTS", hostOf(str("PUBLIC_BASE_URL", "https://ai-reply.kz"))),
+		QuotaLowPercent:  num("PUSH_QUOTA_LOW_PERCENT", 10),
+		RetentionDays:    days("RETENTION_NOTIFICATIONS_DAYS", 180),
+		EmailsEnabled:    boolean("NOTIFICATION_EMAILS_ENABLED", true),
+		FCM: FCM{
+			ProjectID:   str("FIREBASE_PROJECT_ID", ""),
+			ClientEmail: str("FIREBASE_CLIENT_EMAIL", ""),
+			PrivateKey:  PEM(str("FIREBASE_PRIVATE_KEY", "")),
+		},
+	}
+	if path := str("FIREBASE_SERVICE_ACCOUNT_FILE", ""); path != "" {
+		if p.FCM.ProjectID != "" || p.FCM.ClientEmail != "" || p.FCM.PrivateKey != "" {
+			p.problems = append(p.problems,
+				"set either FIREBASE_SERVICE_ACCOUNT_FILE or FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL and FIREBASE_PRIVATE_KEY, not both")
+			return p
+		}
+		fcm, err := readServiceAccount(path)
+		if err != nil {
+			p.problems = append(p.problems, err.Error())
+			return p
+		}
+		p.FCM = fcm
+	}
+	return p
+}
+
+// readServiceAccount — Firebase Console жүктеп берген JSON файлы. Қате мәтінінде
+// файлдың мазмұны (кілт) ешқашан болмайды.
+func readServiceAccount(path string) (FCM, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return FCM{}, fmt.Errorf("FIREBASE_SERVICE_ACCOUNT_FILE %q cannot be read", path)
+	}
+	var account struct {
+		Type        string `json:"type"`
+		ProjectID   string `json:"project_id"`
+		ClientEmail string `json:"client_email"`
+		PrivateKey  string `json:"private_key"`
+	}
+	if json.Unmarshal(raw, &account) != nil || account.ProjectID == "" || account.ClientEmail == "" ||
+		account.PrivateKey == "" || (account.Type != "" && account.Type != "service_account") {
+		return FCM{}, fmt.Errorf("FIREBASE_SERVICE_ACCOUNT_FILE %q is not a Firebase service-account JSON file", path)
+	}
+	return FCM{
+		ProjectID:          strings.TrimSpace(account.ProjectID),
+		ClientEmail:        strings.TrimSpace(account.ClientEmail),
+		PrivateKey:         PEM(account.PrivateKey),
+		ServiceAccountFile: path,
+	}, nil
+}
+
 // validate — push баптауы. Толық бос провайдер жай ғана өшірулі; жартылай
 // толтырылғаны — қате (оператор бірдеңені ұмытқан).
 func (p Push) validate() []string {
-	var problems []string
+	problems := append([]string(nil), p.problems...)
 	if p.FCM.partial() {
 		problems = append(problems, "FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL and FIREBASE_PRIVATE_KEY must be set together")
 	}
-	if p.APNs.partial() {
-		problems = append(problems, "APNS_KEY_ID, APNS_TEAM_ID and APNS_PRIVATE_KEY must be set together")
-	}
-	if p.APNs.PrivateKey != "" && p.APNs.BundleID == "" {
-		problems = append(problems, "APNS_BUNDLE_ID must be set when APNs is configured (the app's bundle id, the apns-topic)")
-	}
-	if p.APNs.Environment == "" {
-		problems = append(problems, "APNS_ENVIRONMENT must be production or development")
-	}
 	if p.MaxAttempts < 1 || p.MaxAttempts > 10 {
 		problems = append(problems, "PUSH_MAX_ATTEMPTS must be between 1 and 10")
+	}
+	if p.QuotaLowPercent < 1 || p.QuotaLowPercent > 100 {
+		problems = append(problems, "PUSH_QUOTA_LOW_PERCENT must be between 1 and 100")
 	}
 	return problems
 }
@@ -445,17 +475,6 @@ func PEM(raw string) string {
 	raw = strings.ReplaceAll(raw, `\n`, "\n")
 	raw = strings.ReplaceAll(raw, "\r\n", "\n")
 	return strings.TrimSpace(raw) + "\n"
-}
-
-func apnsEnvironment(v string) string {
-	switch strings.ToLower(strings.TrimSpace(v)) {
-	case "production", "prod":
-		return "production"
-	case "development", "sandbox", "dev":
-		return "sandbox"
-	default:
-		return ""
-	}
 }
 
 func hostOf(rawURL string) string {
@@ -522,11 +541,19 @@ func num(key string, fallback int) int {
 	return fallback
 }
 
-func flt(key string, fallback float64) float64 {
-	if v, err := strconv.ParseFloat(str(key, ""), 64); err == nil {
-		return v
+// temperature — орнатылмаса әдепкі мән; бос не "none" болса nil (өріс
+// жіберілмейді). Танылмаған мән әдепкіге түседі, үнсіз өзгеріс болмасын.
+func temperature(key string, fallback float64) *float64 {
+	// An empty value keeps the default, exactly as before; only an explicit
+	// "none" leaves the field out.
+	raw := strings.ToLower(str(key, ""))
+	if raw == "none" {
+		return nil
 	}
-	return fallback
+	if v, err := strconv.ParseFloat(raw, 64); err == nil {
+		return &v
+	}
+	return &fallback
 }
 
 func boolean(key string, fallback bool) bool {

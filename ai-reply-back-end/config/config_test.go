@@ -1,6 +1,7 @@
 package config
 
 import (
+	"os"
 	"strings"
 	"testing"
 )
@@ -122,56 +123,163 @@ func TestDemoOTPMustBeFourDigits(t *testing.T) {
 	}
 }
 
-// Push provider-сіз сервер жұмыс істейді: әдепкі баптау — өшірулі.
+// OPENAI_TEMPERATURE: орнатылмаса не бос болса 0.7 (бұрынғыдай), "none" — өріс жіберілмейді.
+func TestOpenAITemperatureIsOptional(t *testing.T) {
+	setValidEnv(t)
+	t.Setenv("OPENAI_TEMPERATURE", "") // restores the original value afterwards
+	if err := os.Unsetenv("OPENAI_TEMPERATURE"); err != nil {
+		t.Fatal(err)
+	}
+	if cfg, err := Load(""); err != nil || cfg.OpenAI.Temperature == nil || *cfg.OpenAI.Temperature != 0.7 {
+		t.Fatalf("unset: %v %v", cfg.OpenAI.Temperature, err)
+	}
+	for raw, want := range map[string]float64{"0.3": 0.3, " 1 ": 1, "warm": 0.7, "": 0.7, "  ": 0.7} {
+		t.Setenv("OPENAI_TEMPERATURE", raw)
+		if cfg, err := Load(""); err != nil || cfg.OpenAI.Temperature == nil || *cfg.OpenAI.Temperature != want {
+			t.Fatalf("%q: %v %v", raw, cfg.OpenAI.Temperature, err)
+		}
+	}
+	for _, raw := range []string{"none", "None", " NONE "} {
+		t.Setenv("OPENAI_TEMPERATURE", raw)
+		if cfg, err := Load(""); err != nil || cfg.OpenAI.Temperature != nil {
+			t.Fatalf("%q must omit the temperature: %v %v", raw, cfg.OpenAI.Temperature, err)
+		}
+	}
+}
+
+func TestAIQualityDefaults(t *testing.T) {
+	setValidEnv(t)
+	cfg, err := Load("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.AI.RepairEnabled || !cfg.AI.PolishEnabled || cfg.Limits.PolishPerMinute != 20 {
+		t.Fatalf("defaults = %+v, polish %d/min", cfg.AI, cfg.Limits.PolishPerMinute)
+	}
+	t.Setenv("AI_REPAIR_ENABLED", "false")
+	t.Setenv("AI_POLISH_ENABLED", "0")
+	t.Setenv("RATE_POLISH_PER_MINUTE", "5")
+	if cfg, _ := Load(""); cfg.AI.RepairEnabled || cfg.AI.PolishEnabled || cfg.Limits.PolishPerMinute != 5 {
+		t.Fatalf("overrides = %+v, polish %d/min", cfg.AI, cfg.Limits.PolishPerMinute)
+	}
+}
+
+func TestProductEventDefaults(t *testing.T) {
+	setValidEnv(t)
+	cfg, err := Load("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.Analytics.ProductEventsEnabled || cfg.Limits.EventsPerMinute != 30 {
+		t.Fatalf("defaults = %+v, events %d/min", cfg.Analytics, cfg.Limits.EventsPerMinute)
+	}
+	t.Setenv("PRODUCT_EVENTS_ENABLED", "false")
+	t.Setenv("RATE_EVENTS_PER_MINUTE", "10")
+	if cfg, _ := Load(""); cfg.Analytics.ProductEventsEnabled || cfg.Limits.EventsPerMinute != 10 {
+		t.Fatalf("overrides = %+v, events %d/min", cfg.Analytics, cfg.Limits.EventsPerMinute)
+	}
+}
+
+// Push провайдерсіз сервер жұмыс істейді: әдепкі баптау — өшірулі.
 func TestPushIsOffByDefaultAndNeedsNoCredentials(t *testing.T) {
 	setValidEnv(t)
 	cfg, err := Load("")
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if cfg.Push.Enabled || cfg.Push.FCM.Configured() || cfg.Push.APNs.Configured() {
-		t.Fatalf("push must be off without configuration: %+v", cfg.Push)
+	p := cfg.Push
+	if p.Enabled || p.FCM.Configured() || !p.WorkerEnabled || !p.EmailsEnabled {
+		t.Fatalf("push must be off without configuration: %+v", p)
 	}
-	if cfg.Push.APNs.Environment != "production" || cfg.Push.MaxAttempts != 5 {
-		t.Fatalf("defaults: %+v", cfg.Push)
+	if p.MaxAttempts != 5 || p.BatchSize != 50 || p.Concurrency != 8 || p.CampaignsPerHour != 10 ||
+		p.QuotaLowPercent != 10 || p.RetentionDays != 180 {
+		t.Fatalf("defaults: %+v", p)
 	}
-	if len(cfg.Push.LinkHosts) != 1 || cfg.Push.LinkHosts[0] != "ai-reply.kz" {
-		t.Fatalf("link hosts default to the public host: %v", cfg.Push.LinkHosts)
+	if len(p.LinkHosts) != 1 || p.LinkHosts[0] != "ai-reply.kz" {
+		t.Fatalf("link hosts default to the public host: %v", p.LinkHosts)
 	}
-	if !cfg.Telemetry.Enabled || cfg.Telemetry.RetentionAuditLogDays != 0 || cfg.Telemetry.RetentionAppEventsDays != 90 {
-		t.Fatalf("telemetry defaults: %+v", cfg.Telemetry)
+
+	t.Setenv("PUSH_QUOTA_LOW_PERCENT", "25")
+	t.Setenv("RETENTION_NOTIFICATIONS_DAYS", "0")
+	t.Setenv("NOTIFICATION_EMAILS_ENABLED", "false")
+	t.Setenv("PUSH_LINK_HOSTS", "ai-reply.kz, help.ai-reply.kz")
+	cfg, err = Load("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Push.QuotaLowPercent != 25 || cfg.Push.RetentionDays != 0 || cfg.Push.EmailsEnabled ||
+		len(cfg.Push.LinkHosts) != 2 {
+		t.Fatalf("overrides: %+v", cfg.Push)
 	}
 }
 
-// Жартылай толтырылған провайдер — баптау қатесі, сервер іске қосылмайды.
-func TestPushRejectsHalfConfiguredProviders(t *testing.T) {
+// Жартылай толтырылған провайдер не мағынасыз шек — баптау қатесі, сервер іске қосылмайды.
+func TestPushRejectsHalfConfiguredFirebaseAndBadLimits(t *testing.T) {
 	setValidEnv(t)
 	t.Setenv("FIREBASE_PROJECT_ID", "ai-reply")
 	if _, err := Load(""); err == nil || !strings.Contains(err.Error(), "FIREBASE_CLIENT_EMAIL") {
 		t.Fatalf("half FCM config must fail, err = %v", err)
 	}
+	t.Setenv("FIREBASE_CLIENT_EMAIL", "push@ai-reply.iam.gserviceaccount.com")
+	t.Setenv("FIREBASE_PRIVATE_KEY", `-----BEGIN PRIVATE KEY-----\nAAAA\n-----END PRIVATE KEY-----`)
+	cfg, err := Load("")
+	if err != nil || !cfg.Push.FCM.Configured() || !strings.Contains(cfg.Push.FCM.PrivateKey, "\nAAAA\n") {
+		t.Fatalf("complete FCM config: %v", err)
+	}
+
+	for key, value := range map[string]string{"PUSH_QUOTA_LOW_PERCENT": "101", "PUSH_MAX_ATTEMPTS": "11"} {
+		setValidEnv(t)
+		t.Setenv(key, value)
+		if _, err := Load(""); err == nil || !strings.Contains(err.Error(), key) {
+			t.Fatalf("%s=%s accepted (err %v)", key, value, err)
+		}
+	}
+}
+
+// Firebase қызметтік тіркелгісінің JSON файлы бір рет оқылады; қате мәтінінде кілт жоқ.
+func TestFirebaseServiceAccountFile(t *testing.T) {
+	dir := t.TempDir()
+	write := func(name, content string) string {
+		path := dir + "/" + name
+		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+	valid := write("sa.json", `{"type":"service_account","project_id":"ai-reply",
+		"client_email":"push@ai-reply.iam.gserviceaccount.com",
+		"private_key":"-----BEGIN PRIVATE KEY-----\nc2VjcmV0LWtleQ==\n-----END PRIVATE KEY-----\n"}`)
 
 	setValidEnv(t)
-	t.Setenv("FIREBASE_PROJECT_ID", "")
-	t.Setenv("APNS_KEY_ID", "ABC123DEFG")
-	t.Setenv("APNS_TEAM_ID", "JXM8N66QWU")
-	t.Setenv("APNS_PRIVATE_KEY", "-----BEGIN PRIVATE KEY-----\\nAAA\\n-----END PRIVATE KEY-----")
-	if _, err := Load(""); err == nil || !strings.Contains(err.Error(), "APNS_BUNDLE_ID") {
-		t.Fatalf("APNs without bundle id must fail, err = %v", err)
-	}
-
-	t.Setenv("APNS_BUNDLE_ID", "kz.yerek.replykeyboard")
-	t.Setenv("APNS_ENVIRONMENT", "staging")
-	if _, err := Load(""); err == nil || !strings.Contains(err.Error(), "APNS_ENVIRONMENT") {
-		t.Fatalf("unknown APNs environment must fail, err = %v", err)
-	}
-	t.Setenv("APNS_ENVIRONMENT", "development")
+	t.Setenv("FIREBASE_SERVICE_ACCOUNT_FILE", valid)
 	cfg, err := Load("")
 	if err != nil {
-		t.Fatalf("complete APNs config: %v", err)
+		t.Fatalf("Load: %v", err)
 	}
-	if !cfg.Push.APNs.Configured() || cfg.Push.APNs.Environment != "sandbox" {
-		t.Fatalf("apns = %+v", cfg.Push.APNs)
+	if !cfg.Push.FCM.Configured() || cfg.Push.FCM.ProjectID != "ai-reply" || cfg.Push.FCM.ServiceAccountFile != valid ||
+		!strings.HasPrefix(cfg.Push.FCM.PrivateKey, "-----BEGIN PRIVATE KEY-----\n") {
+		t.Fatalf("fcm = %+v", cfg.Push.FCM.ProjectID)
+	}
+
+	for name, path := range map[string]string{
+		"missing":    dir + "/nope.json",
+		"not json":   write("broken.json", `c2VjcmV0LWtleQ== not json`),
+		"no key":     write("nokey.json", `{"type":"service_account","project_id":"ai-reply","client_email":"a@b"}`),
+		"wrong kind": write("user.json", `{"type":"authorized_user","project_id":"p","client_email":"a@b","private_key":"c2VjcmV0LWtleQ=="}`),
+	} {
+		setValidEnv(t)
+		t.Setenv("FIREBASE_SERVICE_ACCOUNT_FILE", path)
+		_, err := Load("")
+		if err == nil || !strings.Contains(err.Error(), "FIREBASE_SERVICE_ACCOUNT_FILE") || strings.Contains(err.Error(), "c2VjcmV0") {
+			t.Fatalf("%s: err = %v", name, err)
+		}
+	}
+
+	setValidEnv(t)
+	t.Setenv("FIREBASE_SERVICE_ACCOUNT_FILE", valid)
+	t.Setenv("FIREBASE_PROJECT_ID", "other")
+	if _, err := Load(""); err == nil || !strings.Contains(err.Error(), "not both") {
+		t.Fatalf("file and variables together must fail, err = %v", err)
 	}
 }
 

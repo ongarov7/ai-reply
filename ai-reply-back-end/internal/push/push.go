@@ -1,21 +1,19 @@
-// Package push — провайдерге тәуелсіз хабарлама және оны жеткізушілер (FCM, APNs).
+// Package push — провайдерге тәуелсіз хабарлама және оны жеткізуші (FCM).
 //
-// Business code never talks to Firebase or Apple directly: it creates a
-// notification, the dispatcher turns each queued delivery into a Message and
-// hands it to the Provider of the installation's platform. A provider answers
-// with a classified Result, so the dispatcher can tell "try again later" from
-// "this token is dead" from "this message can never be sent" without knowing
-// any provider-specific status code.
+// Business code never talks to Firebase directly: it creates a notification,
+// the dispatcher turns each queued delivery into a Message and hands it to
+// the Provider. Android and iOS both go through FCM HTTP v1; for iOS the same
+// request carries an "apns" block and Firebase forwards it to APNs with the
+// project's APNs key. A provider answers with a classified Result, so the
+// dispatcher can tell "try again later" from "this token is dead" from "this
+// message can never be sent" without knowing any provider status code.
 //
-// Both providers use only the standard library: FCM HTTP v1 with a
-// service-account JWT exchanged for an OAuth access token, and APNs over
-// HTTP/2 with a token-based (.p8) provider JWT. No legacy FCM server keys, no
-// APNs certificates.
+// Only the standard library is used: a service-account JWT is exchanged for
+// an OAuth access token, no legacy server keys.
 package push
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
@@ -38,7 +36,7 @@ type Message struct {
 	// Data — the flat string payload the app reads: nid, did, type, category,
 	// link and any custom keys. Both platforms receive the same keys.
 	Data map[string]string
-	// Category — domain category; decides priority and the Android channel.
+	// Category — domain category; the iOS thread and the Android channel follow it.
 	Category string
 	// CollapseID — the notification id. APNs collapses and Android replaces a
 	// notification with the same id, so a delivery repeated after an unknown
@@ -53,9 +51,6 @@ type Message struct {
 // Target — бір құрылғы.
 type Target struct {
 	Token string
-	// Environment — APNs only: sandbox or production. Empty means the
-	// provider's configured default.
-	Environment string
 }
 
 // Outcome — жіберу нәтижесінің түрі.
@@ -68,7 +63,7 @@ const (
 	Retry
 	// InvalidToken — the token is dead for good: stop using it.
 	InvalidToken
-	// Rejected — this message can never be sent as is (payload, topic,
+	// Rejected — this message can never be sent as is (payload, project,
 	// credentials): do not retry, do not blame the token.
 	Rejected
 )
@@ -92,32 +87,47 @@ func (o Outcome) String() string {
 // Result — провайдердің жіктелген жауабы.
 type Result struct {
 	Outcome    Outcome
-	MessageID  string        // FCM message name / apns-id
-	Code       string        // provider error code, e.g. UNREGISTERED, BadDeviceToken
+	MessageID  string        // FCM message name
+	Code       string        // provider error code, e.g. UNREGISTERED
 	Detail     string        // short and safe: never a token, never a key
 	StatusCode int           // HTTP status, 0 for transport errors
 	RetryAfter time.Duration // provider hint, 0 when absent
 }
 
-// Provider — бір платформаның жеткізушісі.
+// Provider — хабарлама жеткізушісі.
 type Provider interface {
-	// Name — "fcm" or "apns".
+	// Name — "fcm".
 	Name() string
 	// Send — one message to one device. It never returns a raw error: every
 	// failure is classified into the Result.
 	Send(ctx context.Context, target Target, msg Message) Result
 }
 
-// Payload шектері: APNs 4096 байт, FCM 4000 байт. Кезекке қоймай тұрып тексеріледі.
+// Payload шектері: FCM HTTP v1 сұранысы 4000 байт, APNs-ке жететін бөлігі 4096 байт.
+// Кезекке қоймай тұрып тексеріледі.
 const (
-	MaxAPNsPayloadBytes = 4096
 	MaxFCMPayloadBytes  = 4000
+	MaxAPNsPayloadBytes = 4096
 )
 
-// PayloadSizes — хабарламаның әр провайдердегі өлшемі (токеннің ең ұзын түрімен).
+// PayloadSizes — хабарламаның FCM сұранысындағы және APNs-ке жететін өлшемі
+// (токеннің ең ұзын түрімен).
+//
+// The APNs part is what Firebase builds for the device: the "aps" dictionary
+// with the alert, sound and thread, plus every data key at the top level.
 func PayloadSizes(msg Message) (fcm, apns int) {
-	f, _ := json.Marshal(buildFCMMessage(strings.Repeat("x", 256), msg))
-	a, _ := json.Marshal(BuildAPNsPayload(msg))
+	request := buildFCMMessage(strings.Repeat("x", 256), msg, time.Now())
+	f, _ := json.Marshal(request)
+	device := map[string]any{}
+	for k, v := range msg.Data {
+		device[k] = v
+	}
+	aps := request.Message.APNs.Payload.APS
+	device["aps"] = map[string]any{
+		"alert": map[string]string{"title": msg.Title, "body": msg.Body},
+		"sound": aps.Sound, "thread-id": aps.ThreadID,
+	}
+	a, _ := json.Marshal(device)
 	return len(f), len(a)
 }
 
@@ -131,45 +141,19 @@ func TokenHash(token string) string {
 
 var errKey = errors.New("push: private key is not a valid PEM key of the expected type")
 
-func parsePEMBlock(raw string) ([]byte, error) {
+// parseRSAKey — Google қызметтік тіркелгісінің кілті (PKCS#8, кейде PKCS#1).
+func parseRSAKey(raw string) (*rsa.PrivateKey, error) {
 	block, _ := pem.Decode([]byte(strings.TrimSpace(raw)))
 	if block == nil {
 		return nil, errKey
 	}
-	return block.Bytes, nil
-}
-
-// parseRSAKey — Google қызметтік тіркелгісінің кілті (PKCS#8, кейде PKCS#1).
-func parseRSAKey(raw string) (*rsa.PrivateKey, error) {
-	der, err := parsePEMBlock(raw)
-	if err != nil {
-		return nil, err
-	}
-	if key, err := x509.ParsePKCS8PrivateKey(der); err == nil {
+	if key, err := x509.ParsePKCS8PrivateKey(block.Bytes); err == nil {
 		if rsaKey, ok := key.(*rsa.PrivateKey); ok {
 			return rsaKey, nil
 		}
 		return nil, errKey
 	}
-	if key, err := x509.ParsePKCS1PrivateKey(der); err == nil {
-		return key, nil
-	}
-	return nil, errKey
-}
-
-// parseECKey — Apple .p8 кілті (PKCS#8, P-256).
-func parseECKey(raw string) (*ecdsa.PrivateKey, error) {
-	der, err := parsePEMBlock(raw)
-	if err != nil {
-		return nil, err
-	}
-	if key, err := x509.ParsePKCS8PrivateKey(der); err == nil {
-		if ecKey, ok := key.(*ecdsa.PrivateKey); ok && ecKey.Curve.Params().BitSize == 256 {
-			return ecKey, nil
-		}
-		return nil, errKey
-	}
-	if key, err := x509.ParseECPrivateKey(der); err == nil && key.Curve.Params().BitSize == 256 {
+	if key, err := x509.ParsePKCS1PrivateKey(block.Bytes); err == nil {
 		return key, nil
 	}
 	return nil, errKey
@@ -209,14 +193,9 @@ func transportFailure(ctx context.Context, err error) Result {
 	return Result{Outcome: Retry, Code: code, Detail: safeDetail(err.Error())}
 }
 
-// safeDetail — қысқа, бір жолды мәтін (желі қатесінде URL ішіндегі токен болмауы үшін қиылады).
+// safeDetail — қысқа, бір жолды мәтін. FCM мекенжайында токен жоқ, токен тек денеде.
 func safeDetail(s string) string {
 	s = strings.Join(strings.Fields(s), " ")
-	// Transport errors quote the request URL, and an APNs URL ends with the
-	// device token: cut everything from the path on.
-	if i := strings.Index(s, "/3/device/"); i >= 0 {
-		s = s[:i] + "/3/device/…"
-	}
 	if r := []rune(s); len(r) > 160 {
 		s = string(r[:160])
 	}

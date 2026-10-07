@@ -21,6 +21,8 @@ type userDTO struct {
 	Onboarding bool   `json:"onboarding_completed"`
 	// AuthProviders — кіру тәсілдері: apple | email | google | phone.
 	AuthProviders []string `json:"auth_providers"`
+	// PreferredLanguage — kk | ru | en | uz, "" — қолданушы әлі таңдамаған.
+	PreferredLanguage string `json:"preferred_language"`
 }
 
 func toUserDTO(u domain.User, p domain.Profile) userDTO {
@@ -34,20 +36,23 @@ func toUserDTO(u domain.User, p domain.Profile) userDTO {
 		CreatedAt:  u.CreatedAt.Format(time.RFC3339),
 		Onboarding: p.OnboardingCompleted,
 
-		AuthProviders: []string{},
+		AuthProviders:     []string{},
+		PreferredLanguage: u.PreferredLanguage,
 	}
 }
 
 type profileDTO struct {
-	DisplayName      string   `json:"display_name"`
-	Role             string   `json:"role"`
-	Description      string   `json:"description"`
-	PreferredTone    string   `json:"preferred_tone"`
-	BusinessOffering string   `json:"business_offering"`
-	BusinessSummary  string   `json:"business_summary"`
-	BusinessRules    []string `json:"business_rules"`
-	Completed        bool     `json:"onboarding_completed"`
-	UpdatedAt        string   `json:"updated_at"`
+	DisplayName       string   `json:"display_name"`
+	Role              string   `json:"role"`
+	Description       string   `json:"description"`
+	PreferredTone     string   `json:"preferred_tone"`
+	BusinessOffering  string   `json:"business_offering"`
+	BusinessSummary   string   `json:"business_summary"`
+	BusinessRules     []string `json:"business_rules"`
+	Completed         bool     `json:"onboarding_completed"`
+	GrammaticalGender string   `json:"grammatical_gender"`
+	OnboardingVersion int      `json:"onboarding_version"`
+	UpdatedAt         string   `json:"updated_at"`
 }
 
 type legalConsentDTO struct {
@@ -76,15 +81,17 @@ func toProfileDTO(p domain.Profile) profileDTO {
 		rules = []string{}
 	}
 	return profileDTO{
-		DisplayName:      p.DisplayName,
-		Role:             p.Role,
-		Description:      p.Description,
-		PreferredTone:    p.PreferredTone,
-		BusinessOffering: p.BusinessOffering,
-		BusinessSummary:  p.BusinessSummary,
-		BusinessRules:    rules,
-		Completed:        p.OnboardingCompleted,
-		UpdatedAt:        p.UpdatedAt.Format(time.RFC3339),
+		DisplayName:       p.DisplayName,
+		Role:              p.Role,
+		Description:       p.Description,
+		PreferredTone:     p.PreferredTone,
+		BusinessOffering:  p.BusinessOffering,
+		BusinessSummary:   p.BusinessSummary,
+		BusinessRules:     rules,
+		Completed:         p.OnboardingCompleted,
+		GrammaticalGender: p.GrammaticalGender,
+		OnboardingVersion: p.OnboardingVersion,
+		UpdatedAt:         p.UpdatedAt.Format(time.RFC3339),
 	}
 }
 

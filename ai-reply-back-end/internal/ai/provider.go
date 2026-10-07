@@ -22,6 +22,9 @@ type Completion struct {
 	InputTokens  int
 	OutputTokens int
 	ProviderMS   int
+	// Truncated — жауап шекке жетіп үзілді (status "incomplete"); мәтін
+	// соңғы толық сөйлемге дейін қысқартылған.
+	Truncated bool
 }
 
 // Provider — AI провайдерінің келісімшарты. Тек сервер шақырады.
@@ -49,11 +52,12 @@ func (o *OpenAI) Name() string { return "openai" }
 func (o *OpenAI) Model() string { return o.cfg.Model }
 
 type responsesRequest struct {
-	Model           string           `json:"model"`
-	MaxOutputTokens int              `json:"max_output_tokens"`
-	Temperature     float64          `json:"temperature"`
-	Store           bool             `json:"store"`
-	Input           []responsesInput `json:"input"`
+	Model           string `json:"model"`
+	MaxOutputTokens int    `json:"max_output_tokens"`
+	// Temperature — nil болса өріс жіберілмейді (reasoning модельдері үшін).
+	Temperature *float64         `json:"temperature,omitempty"`
+	Store       bool             `json:"store"`
+	Input       []responsesInput `json:"input"`
 }
 
 type responsesInput struct {
@@ -135,7 +139,12 @@ func (o *OpenAI) Generate(ctx context.Context, prompt Prompt) (Completion, error
 	if err := json.Unmarshal(body, &parsed); err != nil {
 		return Completion{}, domain.ErrProviderDown
 	}
-	text := UnwrapQuotes(strings.TrimSpace(extractText(parsed)))
+	// Тазарту (тырнақша, кіріспе, markdown) — CleanOutput, бір жерде.
+	text := strings.TrimSpace(extractText(parsed))
+	truncated := parsed.Status == "incomplete"
+	if truncated {
+		text = trimToSentence(text)
+	}
 	if text == "" {
 		return Completion{}, domain.ErrEmptyCompletion
 	}
@@ -149,6 +158,7 @@ func (o *OpenAI) Generate(ctx context.Context, prompt Prompt) (Completion, error
 		InputTokens:  parsed.Usage.InputTokens,
 		OutputTokens: parsed.Usage.OutputTokens,
 		ProviderMS:   elapsed,
+		Truncated:    truncated,
 	}, nil
 }
 
@@ -168,18 +178,4 @@ func extractText(r responsesReply) string {
 		return out
 	}
 	return strings.TrimSpace(r.OutputText)
-}
-
-// UnwrapQuotes — модель кейде бүкіл жауапты тырнақшаға алады; соны ғана алып тастаймыз.
-func UnwrapQuotes(text string) string {
-	pairs := [][2]string{{`"`, `"`}, {"“", "”"}, {"«", "»"}}
-	for _, pair := range pairs {
-		if len([]rune(text)) > 2 && strings.HasPrefix(text, pair[0]) && strings.HasSuffix(text, pair[1]) {
-			inner := strings.TrimSuffix(strings.TrimPrefix(text, pair[0]), pair[1])
-			if !strings.Contains(inner, pair[1]) {
-				return strings.TrimSpace(inner)
-			}
-		}
-	}
-	return text
 }

@@ -1,10 +1,8 @@
 package kz.yerek.aireply.push
 
-import kz.yerek.aireply.telemetry.EventSchema
-
 /**
- * The data keys of one of our pushes, as the server sends them
- * (`internal/notifications/dispatcher.go`, `payloadData`).
+ * The data keys of one of our pushes, as the server sends them: `nid`, `did`,
+ * `type`, `category`, `link`.
  *
  * Push деректері: nid, did, type, category, link.
  *
@@ -27,16 +25,13 @@ data class PushPayload(
     val isImportant: Boolean get() = channelId == CHANNEL_IMPORTANT
 
     /**
-     * `notification_opened` properties, or null when the ids are not ones the
-     * server would accept (then no event is sent at all).
+     * The body that records this tap, or null when there is no delivery id the
+     * server could have sent (then nothing is sent at all).
      */
-    fun openedEventProperties(): Map<String, Any>? {
-        val nid = notificationId?.takeIf(EventSchema::isCode) ?: return null
-        val properties = LinkedHashMap<String, Any>()
-        properties["notification_id"] = nid
-        deliveryId?.takeIf(EventSchema::isCode)?.let { properties["delivery_id"] = it }
-        type?.takeIf(EventSchema::isCode)?.let { properties["type"] = it }
-        return properties
+    fun openedRequest(installationId: String): NotificationOpenedRequest? {
+        if (notificationId.isNullOrEmpty()) return null
+        val delivery = deliveryId?.takeIf(ID_PATTERN::matches) ?: return null
+        return NotificationOpenedRequest(installationId = installationId, deliveryId = delivery)
     }
 
     companion object {
@@ -53,6 +48,9 @@ data class PushPayload(
         const val CHANNEL_IMPORTANT = "important"
 
         private val IMPORTANT_CATEGORIES = setOf("account", "subscription", "security")
+
+        /** The server's ids are UUIDs; anything else is not worth a request. */
+        private val ID_PATTERN = Regex("^[A-Za-z0-9-]{1,64}$")
 
         fun channelFor(category: String?): String =
             if (category in IMPORTANT_CATEGORIES) CHANNEL_IMPORTANT else CHANNEL_GENERAL

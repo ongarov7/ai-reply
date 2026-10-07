@@ -49,14 +49,10 @@ const (
 )
 
 // ErrorBody — қате конверті.
-//
-// RequestID repeats the X-Request-ID response header, so a mobile error
-// report can be matched with the server log line of the same request.
 type ErrorBody struct {
-	Code      string         `json:"code"`
-	Message   string         `json:"message"`
-	Details   map[string]any `json:"details,omitempty"`
-	RequestID string         `json:"request_id,omitempty"`
+	Code    string         `json:"code"`
+	Message string         `json:"message"`
+	Details map[string]any `json:"details,omitempty"`
 }
 
 type errorEnvelope struct {
@@ -76,33 +72,7 @@ func JSON(w http.ResponseWriter, status int, payload any) {
 
 // Error — тұрақты кодпен қате жауабы. Ішкі мәтін ешқашан клиентке кетпейді.
 func Error(w http.ResponseWriter, status int, code, message string, details map[string]any) {
-	recordErrorCode(w, code)
-	JSON(w, status, errorEnvelope{Error: ErrorBody{
-		Code: code, Message: message, Details: details, RequestID: w.Header().Get("X-Request-ID"),
-	}})
-}
-
-// ErrorCodeRecorder — кіру журналының ResponseWriter-і осыны іске асырады.
-//
-// The access log wraps the router and cannot see which code a handler chose;
-// Error hands it over through the writer, so the log line and the stored API
-// error carry the same stable code the client received.
-type ErrorCodeRecorder interface {
-	RecordErrorCode(code string)
-}
-
-func recordErrorCode(w http.ResponseWriter, code string) {
-	for w != nil {
-		if rec, ok := w.(ErrorCodeRecorder); ok {
-			rec.RecordErrorCode(code)
-			return
-		}
-		inner, ok := w.(interface{ Unwrap() http.ResponseWriter })
-		if !ok {
-			return
-		}
-		w = inner.Unwrap()
-	}
+	JSON(w, status, errorEnvelope{Error: ErrorBody{Code: code, Message: message, Details: details}})
 }
 
 // detailer — клиентке қосымша мәлімет беретін қате (мысалы, retry_after_seconds).

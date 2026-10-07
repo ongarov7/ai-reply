@@ -12,6 +12,7 @@ import kz.yerek.aireply.ai.AIReplyException
 import kz.yerek.aireply.ai.AIReplyService
 import kz.yerek.aireply.ai.ReplyDraftNormalizer
 import kz.yerek.aireply.core.lang.AppLanguage
+import kz.yerek.aireply.core.lang.KeyboardLanguage
 import kz.yerek.aireply.domain.model.ReplyConfiguration
 import kz.yerek.aireply.domain.model.ReplyTemplate
 import kz.yerek.aireply.keyboard.input.KeyboardTextFieldState
@@ -77,6 +78,9 @@ class ReplySessionController(
 
     /** The APP's language: names the persona in the prompt as the chip did. */
     var uiLanguage: AppLanguage = AppLanguage.ENGLISH
+
+    /** The layout on screen, read when Reply is tapped: a language hint for the server. */
+    var inputLanguage: () -> KeyboardLanguage? = { null }
 
     /**
      * Called after a change the user did not trigger directly - a reply
@@ -169,7 +173,8 @@ class ReplySessionController(
             template = current.template,
             configuration = configuration,
             uiLanguage = uiLanguage,
-            instruction = current.instruction.text
+            instruction = current.instruction.text,
+            inputLanguage = inputLanguage()
         )
         job = scope.launch {
             try {

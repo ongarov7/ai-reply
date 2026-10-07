@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
 <title>AI Reply — {{call .T "admin.title"}}</title>
-<link rel="stylesheet" href="/static/admin.css">
+<link rel="stylesheet" href="/static/admin.css?v={{.Version}}">
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
 <script id="boot" type="application/json">{{.Boot}}</script>
 <script src="/static/vendor/vue.global.prod.js"></script>
-<script src="/static/admin-app.js" defer></script>
+<script src="/static/admin-app.js?v={{.Version}}" defer></script>
 </head>
 <body>
 <div id="app" class="app-loading">

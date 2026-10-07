@@ -11,10 +11,6 @@ import (
 )
 
 // UpsertDevice — құрылғыны тіркейді немесе жаңартады.
-//
-// A device row never changes owner: when the id already belongs to another
-// account the statement changes nothing and ErrConflict comes back, so one
-// account can never rewrite another account's device through a known id.
 func (s *Store) UpsertDevice(ctx context.Context, d domain.Device) (domain.Device, error) {
 	now := time.Now().UTC()
 	if d.ID == "" {
@@ -28,7 +24,7 @@ func (s *Store) UpsertDevice(ctx context.Context, d domain.Device) (domain.Devic
 	if d.PushOn {
 		push = 1
 	}
-	res, err := s.db.Writer().ExecContext(ctx, `
+	_, err := s.db.Writer().ExecContext(ctx, `
 		INSERT INTO devices (id, user_id, platform, app_version, os_version, model, locale,
 		                     push_token, push_enabled, created_at, last_seen_at)
 		VALUES (?,?,?,?,?,?,?,?,?,?,?)
@@ -41,24 +37,10 @@ func (s *Store) UpsertDevice(ctx context.Context, d domain.Device) (domain.Devic
 			push_token = COALESCE(excluded.push_token, devices.push_token),
 			push_enabled = excluded.push_enabled,
 			last_seen_at = excluded.last_seen_at,
-			revoked_at = NULL
-		WHERE devices.user_id = excluded.user_id`,
+			revoked_at = NULL`,
 		d.ID, d.UserID, d.Platform, d.AppVersion, d.OSVersion, d.Model, d.Locale,
 		nullText(d.PushToken), push, ms(d.CreatedAt), ms(d.LastSeenAt))
-	if err != nil {
-		if isUnique(err) {
-			// The legacy push_token column is unique too: another account's row
-			// holds this token. The token is not stored twice.
-			return domain.Device{}, domain.ErrConflict
-		}
-		return domain.Device{}, err
-	}
-	if n, err := res.RowsAffected(); err != nil {
-		return domain.Device{}, err
-	} else if n == 0 {
-		return domain.Device{}, domain.ErrConflict
-	}
-	return d, nil
+	return d, err
 }
 
 // Device — бір құрылғы.

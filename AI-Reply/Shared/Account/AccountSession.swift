@@ -95,7 +95,11 @@ actor AccountSession {
 
     /// Ends the session. The server call is best effort: the local tokens are
     /// dropped either way, so a user on a plane can still sign out.
-    func signOut() async {
+    ///
+    /// `installationID` names this phone's installation on the logout request
+    /// (and only there), so the server stops sending the account's
+    /// notifications to it at once.
+    func signOut(installationID: String? = nil) async {
         let refreshToken = AccountCredentials.refreshToken
         AccountCredentials.clear()
         refreshTask?.cancel()
@@ -103,7 +107,8 @@ actor AccountSession {
 
         guard let baseURL, let refreshToken else { return }
         struct Request: Encodable { let refresh_token: String }
-        let client = APIClient(baseURL: baseURL)
+        let headers = installationID.map { ["X-Installation-ID": $0] } ?? [:]
+        let client = APIClient(baseURL: baseURL, headers: headers)
         let _: APIClient.Empty? = try? await client.post("api/v1/auth/logout",
                                                          body: Request(refresh_token: refreshToken))
     }
@@ -142,7 +147,8 @@ struct DeviceDescriptor: Encodable, Sendable {
             platform: "ios",
             app_version: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "",
             os_version: "\(version.majorVersion).\(version.minorVersion).\(version.patchVersion)",
-            locale: SharedSettings.shared.appLanguage?.rawValue ?? Locale.current.language.languageCode?.identifier ?? "en",
+            // One of the app's own languages, never a code the server does not know.
+            locale: SharedSettings.shared.effectiveAppLanguage.rawValue,
             timezone: TimeZone.current.identifier
         )
     }

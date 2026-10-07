@@ -12,7 +12,7 @@ import (
 )
 
 const installationColumns = `id, installation_id, user_id, platform, app_version, app_build, os_name, os_version,
-	device_model, manufacturer, locale, timezone, push_provider, push_environment, push_token_hash,
+	device_model, manufacturer, locale, timezone, push_provider, push_token_hash,
 	push_permission, notifications_enabled, push_status, push_status_reason, token_updated_at,
 	push_disabled_at, attached_at, first_seen_at, last_seen_at, created_at, updated_at`
 
@@ -27,7 +27,7 @@ func scanInstallation(row interface{ Scan(...any) error }, extra ...any) (domain
 	)
 	dest := append([]any{&i.ID, &i.InstallationID, &userID, &i.Platform, &i.AppVersion, &i.AppBuild,
 		&i.OSName, &i.OSVersion, &i.DeviceModel, &i.Manufacturer, &i.Locale, &i.Timezone,
-		&i.PushProvider, &i.PushEnvironment, &tokenHash, &i.PushPermission, &enabled,
+		&i.PushProvider, &tokenHash, &i.PushPermission, &enabled,
 		&i.PushStatus, &i.PushStatusReason, &tokenUpdated, &disabled, &attached,
 		&firstSeen, &lastSeen, &created, &updtd}, extra...)
 	if err := row.Scan(dest...); err != nil {
@@ -59,13 +59,12 @@ type InstallationUpsert struct {
 	// Push token: only when the app sent one.
 	HasToken    bool
 	Provider    string
-	Environment string
 	TokenSealed string
 	TokenHash   string
 	Now         time.Time
 }
 
-// InstallationChange — тіркеу нәтижесінде не өзгерді (журнал мен оқиғалар үшін).
+// InstallationChange — тіркеу нәтижесінде не өзгерді (журнал үшін).
 type InstallationChange struct {
 	Created        bool
 	PreviousUserID string
@@ -79,7 +78,9 @@ type InstallationChange struct {
 // device that presents a token now is the one that owns it, so any other row
 // holding it (an old install of the same phone) loses it first. The user
 // association always comes from the caller's authentication, never from the
-// request body: UserID "" detaches the installation.
+// request body: UserID "" detaches the installation. A token the provider
+// reported dead stays invalid when the app registers it again: the app is
+// told to fetch a new one instead of having pushes queued that fail again.
 func (s *Store) UpsertInstallation(ctx context.Context, in InstallationUpsert) (domain.Installation, InstallationChange, error) {
 	var change InstallationChange
 	now := ms(in.Now)
@@ -88,11 +89,12 @@ func (s *Store) UpsertInstallation(ctx context.Context, in InstallationUpsert) (
 			id           string
 			prevUser     sql.NullString
 			prevHash     sql.NullString
+			prevStatus   string
 			prevAttached sql.NullInt64
 		)
 		err := tx.QueryRowContext(ctx, `
-			SELECT id, user_id, push_token_hash, attached_at FROM app_installations WHERE installation_id = ?`,
-			in.InstallationID).Scan(&id, &prevUser, &prevHash, &prevAttached)
+			SELECT id, user_id, push_token_hash, push_status, attached_at FROM app_installations WHERE installation_id = ?`,
+			in.InstallationID).Scan(&id, &prevUser, &prevHash, &prevStatus, &prevAttached)
 		exists := err == nil
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return err
@@ -113,7 +115,7 @@ func (s *Store) UpsertInstallation(ctx context.Context, in InstallationUpsert) (
 			change.TokenChanged = !exists || text(prevHash) != in.TokenHash
 		}
 
-		attachedAt := any(nil)
+		var attachedAt any
 		switch {
 		case in.UserID == "":
 			attachedAt = nil
@@ -130,32 +132,35 @@ func (s *Store) UpsertInstallation(ctx context.Context, in InstallationUpsert) (
 		if !exists {
 			id = traits.NewID()
 			change.Created = true
-			var sealed, hash, provider, env, tokenUpdated, status any = nil, nil, "", "", nil, domain.PushNone
+			var sealed, hash, tokenUpdated any
+			provider, status := domain.ProviderFCM, domain.PushNone
 			if in.HasToken {
-				sealed, hash, provider, env, tokenUpdated, status = in.TokenSealed, in.TokenHash, in.Provider, in.Environment, now, domain.PushActive
+				sealed, hash, provider, tokenUpdated, status = in.TokenSealed, in.TokenHash, in.Provider, now, domain.PushActive
 			}
 			_, err = tx.ExecContext(ctx, `
 				INSERT INTO app_installations (id, installation_id, user_id, platform, app_version, app_version_num,
 				    app_build, os_name, os_version, os_version_num, device_model, manufacturer, locale, timezone,
-				    push_provider, push_environment, push_token_sealed, push_token_hash, push_permission,
+				    push_provider, push_token_sealed, push_token_hash, push_permission,
 				    notifications_enabled, push_status, token_updated_at, attached_at, first_seen_at,
 				    last_seen_at, created_at, updated_at)
-				VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+				VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 				id, in.InstallationID, nullText(in.UserID), in.Platform, in.AppVersion, domain.VersionNumber(in.AppVersion),
 				in.AppBuild, in.OSName, in.OSVersion, domain.VersionNumber(in.OSVersion), in.DeviceModel,
-				in.Manufacturer, in.Locale, in.Timezone, provider, env, sealed, hash, in.Permission,
+				in.Manufacturer, in.Locale, in.Timezone, provider, sealed, hash, in.Permission,
 				enabled, status, tokenUpdated, attachedAt, now, now, now, now)
 			return err
 		}
 
-		if in.HasToken {
+		// The provider reported this very token dead (its hash was kept for that).
+		deadToken := prevStatus == domain.PushInvalid && text(prevHash) == in.TokenHash
+		if in.HasToken && !deadToken {
 			_, err = tx.ExecContext(ctx, `
 				UPDATE app_installations SET
-					push_provider = ?, push_environment = ?, push_token_sealed = ?, push_token_hash = ?,
+					push_provider = ?, push_token_sealed = ?, push_token_hash = ?,
 					token_updated_at = CASE WHEN push_token_hash IS ? THEN token_updated_at ELSE ? END,
 					push_status = 'active', push_status_reason = '', push_disabled_at = NULL
 				WHERE id = ?`,
-				in.Provider, in.Environment, in.TokenSealed, in.TokenHash, in.TokenHash, now, id)
+				in.Provider, in.TokenSealed, in.TokenHash, in.TokenHash, now, id)
 			if err != nil {
 				return err
 			}
@@ -193,35 +198,6 @@ func (s *Store) InstallationByClientID(ctx context.Context, installationID strin
 	return inst, err
 }
 
-// InstallationByID — сервердің идентификаторы бойынша.
-func (s *Store) InstallationByID(ctx context.Context, id string) (domain.Installation, error) {
-	inst, err := scanInstallation(s.db.Reader().QueryRowContext(ctx,
-		`SELECT `+installationColumns+` FROM app_installations WHERE id = ?`, id))
-	if errors.Is(err, sql.ErrNoRows) {
-		return domain.Installation{}, domain.ErrNotFound
-	}
-	return inst, err
-}
-
-// InstallationsByUser — қолданушыға қазір тіркелген орнатулар.
-func (s *Store) InstallationsByUser(ctx context.Context, userID string) ([]domain.Installation, error) {
-	rows, err := s.db.Reader().QueryContext(ctx,
-		`SELECT `+installationColumns+` FROM app_installations WHERE user_id = ? ORDER BY last_seen_at DESC`, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []domain.Installation
-	for rows.Next() {
-		inst, err := scanInstallation(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, inst)
-	}
-	return out, rows.Err()
-}
-
 // DetachInstallation — орнатуды қолданушыдан ажыратады (тек сол қолданушыныкі болса).
 func (s *Store) DetachInstallation(ctx context.Context, installationID, userID string, now time.Time) (bool, error) {
 	res, err := s.db.Writer().ExecContext(ctx, `
@@ -257,45 +233,18 @@ func (s *Store) DetachUserInstallations(ctx context.Context, userID string, now 
 	return res.RowsAffected()
 }
 
-// InstallationTouch — сұраныс тақырыптарынан келген метадерек.
-type InstallationTouch struct {
-	InstallationID string
-	AppVersion     string
-	AppBuild       string
-	OSVersion      string
-	Now            time.Time
-	MinInterval    time.Duration
-}
-
-// TouchInstallation — last_seen_at-ті сирек жаңартады (жазу көбеймеуі үшін).
-func (s *Store) TouchInstallation(ctx context.Context, t InstallationTouch) error {
-	_, err := s.db.Writer().ExecContext(ctx, `
-		UPDATE app_installations SET
-			last_seen_at = ?,
-			app_version = CASE WHEN ? <> '' THEN ? ELSE app_version END,
-			app_version_num = CASE WHEN ? <> '' THEN ? ELSE app_version_num END,
-			app_build = CASE WHEN ? <> '' THEN ? ELSE app_build END,
-			os_version = CASE WHEN ? <> '' THEN ? ELSE os_version END,
-			os_version_num = CASE WHEN ? <> '' THEN ? ELSE os_version_num END
-		WHERE installation_id = ? AND last_seen_at < ?`,
-		ms(t.Now),
-		t.AppVersion, t.AppVersion, t.AppVersion, domain.VersionNumber(t.AppVersion),
-		t.AppBuild, t.AppBuild,
-		t.OSVersion, t.OSVersion, t.OSVersion, domain.VersionNumber(t.OSVersion),
-		t.InstallationID, ms(t.Now.Add(-t.MinInterval)))
-	return err
-}
-
 // InvalidateInstallationToken — провайдер «өлі» деген токенді өшіреді.
 //
 // Only if the installation still holds that very token: the app may have
-// registered a fresh one while the failed message was in flight.
-func (s *Store) InvalidateInstallationToken(ctx context.Context, id, tokenHash, reason string, now time.Time) (bool, error) {
+// registered a fresh one while the failed message was in flight. With final
+// the token itself is dead: its hash stays on the row, so registering that
+// same token again keeps the installation invalid (UpsertInstallation).
+func (s *Store) InvalidateInstallationToken(ctx context.Context, id, tokenHash, reason string, final bool, now time.Time) (bool, error) {
 	res, err := s.db.Writer().ExecContext(ctx, `
 		UPDATE app_installations SET
-			push_token_sealed = NULL, push_token_hash = NULL, push_status = 'invalid',
-			push_status_reason = ?, push_disabled_at = ?, updated_at = ?
-		WHERE id = ? AND push_token_hash = ?`, reason, ms(now), ms(now), id, tokenHash)
+			push_token_sealed = NULL, push_token_hash = CASE WHEN ? = 1 THEN push_token_hash END,
+			push_status = 'invalid', push_status_reason = ?, push_disabled_at = ?, updated_at = ?
+		WHERE id = ? AND push_token_hash = ?`, boolInt(final), reason, ms(now), ms(now), id, tokenHash)
 	if err != nil {
 		return false, err
 	}
@@ -310,9 +259,15 @@ type InstallationFilter struct {
 	Platform   string
 	PushStatus string
 	AppVersion string
-	Auth       string // domain.AuthAuthenticated | domain.AuthAnonymous | ""
+	Auth       string // "authenticated" | "anonymous" | ""
 	Page       traits.Page
 }
+
+// Орнатудың тіркелгіге байланысы (құрылғылар тізімінің сүзгісі).
+const (
+	InstallationsAttached  = "authenticated"
+	InstallationsAnonymous = "anonymous"
+)
 
 // shortInstallationID — how many characters of an installation id admins see.
 const shortInstallationID = 8
@@ -322,7 +277,7 @@ func escapeLike(v string) string {
 	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(v)
 }
 
-// InstallationRow — тізім жолы (қолданушының бүркемеленген идентификаторымен).
+// InstallationRow — тізім жолы (қолданушының идентификаторымен бірге).
 type InstallationRow struct {
 	Installation domain.Installation
 	UserEmail    string
@@ -346,26 +301,18 @@ func (s *Store) ListInstallations(ctx context.Context, f InstallationFilter) ([]
 		}
 		where = append(where, "("+strings.Join(conditions, " OR ")+")")
 	}
-	if f.UserID != "" {
-		where = append(where, "i.user_id = ?")
-		args = append(args, f.UserID)
-	}
-	if f.Platform != "" {
-		where = append(where, "i.platform = ?")
-		args = append(args, f.Platform)
-	}
-	if f.PushStatus != "" {
-		where = append(where, "i.push_status = ?")
-		args = append(args, f.PushStatus)
-	}
-	if f.AppVersion != "" {
-		where = append(where, "i.app_version = ?")
-		args = append(args, f.AppVersion)
+	for column, value := range map[string]string{
+		"i.user_id": f.UserID, "i.platform": f.Platform, "i.push_status": f.PushStatus, "i.app_version": f.AppVersion,
+	} {
+		if value != "" {
+			where = append(where, column+" = ?")
+			args = append(args, value)
+		}
 	}
 	switch f.Auth {
-	case domain.AuthAuthenticated:
+	case InstallationsAttached:
 		where = append(where, "i.user_id IS NOT NULL")
-	case domain.AuthAnonymous:
+	case InstallationsAnonymous:
 		where = append(where, "i.user_id IS NULL")
 	}
 	clause := strings.Join(where, " AND ")
@@ -377,7 +324,7 @@ func (s *Store) ListInstallations(ctx context.Context, f InstallationFilter) ([]
 	rows, err := s.db.Reader().QueryContext(ctx, `
 		SELECT `+prefixColumns(installationColumns, "i.")+`, COALESCE(u.email, ''), COALESCE(u.phone, '')
 		FROM app_installations i LEFT JOIN users u ON u.id = i.user_id
-		WHERE `+clause+` ORDER BY i.last_seen_at DESC LIMIT ? OFFSET ?`,
+		WHERE `+clause+` ORDER BY i.last_seen_at DESC, i.id LIMIT ? OFFSET ?`,
 		append(args, f.Page.Limit, f.Page.Offset)...)
 	if err != nil {
 		return nil, 0, err
@@ -402,7 +349,6 @@ type SendTarget struct {
 	UserID               string
 	Platform             string
 	Provider             string
-	Environment          string
 	TokenSealed          string
 	TokenHash            string
 	PushStatus           string
@@ -419,10 +365,10 @@ func (s *Store) InstallationSendTarget(ctx context.Context, id string) (SendTarg
 		enabled        int
 	)
 	err := s.db.Reader().QueryRowContext(ctx, `
-		SELECT id, user_id, platform, push_provider, push_environment, push_token_sealed, push_token_hash,
+		SELECT id, user_id, platform, push_provider, push_token_sealed, push_token_hash,
 		       push_status, push_permission, notifications_enabled
 		FROM app_installations WHERE id = ?`, id).
-		Scan(&t.InstallationID, &userID, &t.Platform, &t.Provider, &t.Environment, &sealed, &hash,
+		Scan(&t.InstallationID, &userID, &t.Platform, &t.Provider, &sealed, &hash,
 			&t.PushStatus, &t.Permission, &enabled)
 	if errors.Is(err, sql.ErrNoRows) {
 		return SendTarget{}, domain.ErrNotFound

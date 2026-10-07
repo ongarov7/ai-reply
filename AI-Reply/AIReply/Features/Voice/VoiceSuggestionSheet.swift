@@ -122,3 +122,12 @@ struct VoiceSuggestionSheet: View {
             : "\(names) · \(start.formatted)-\(end.formatted)"
     }
 }
+
+/// `sheet(item:)` needs identity, and a suggestion is a value with no natural
+/// id. Conforming here rather than on the parser keeps that presentation detail
+/// out of the shared logic.
+extension VoiceConfigurationParser.Suggestion: Identifiable {
+    public var id: String {
+        "\(start?.minutes ?? -1)-\(end?.minutes ?? -1)-\(rules.count)-\(weekdays?.count ?? 0)"
+    }
+}

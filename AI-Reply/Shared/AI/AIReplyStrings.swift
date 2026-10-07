@@ -27,6 +27,10 @@ import Foundation
 /// stored per user and never become saved configuration: tapping one writes its
 /// `phrase` into the instruction field, where it can be edited, combined with
 /// another intent, or deleted. The source message is never touched.
+///
+/// Phrases never carry the sender's gender («согласен» / «согласна»): the
+/// same pill serves everyone, and the reply's own wording follows the
+/// profile instead.
 struct QuickIntent: Sendable, Equatable, Identifiable {
     let id: String
     /// What the pill says. Short enough to fit a keyboard-width row.
@@ -42,11 +46,6 @@ struct AIReplyStrings: Sendable {
     let regenerate: String
     let insert: String
     let cancel: String
-    let addTemplate: String
-    /// Shown when the "+" chip is tapped. A keyboard extension cannot present
-    /// an editor or reliably open its containing app, so this says where
-    /// templates are made rather than pretending to make one.
-    let addTemplateHint: String
     let replaceExisting: String
     let appendToExisting: String
     let keepTyping: String
@@ -92,6 +91,8 @@ struct AIReplyStrings: Sendable {
     /// Takes the limit, which the server publishes and an administrator can
     /// change: the sentence must never name a number the server no longer uses.
     let messageTooLongFormat: String
+    /// Without Full Access a keyboard can neither read the clipboard nor reach
+    /// the network, so this covers both - and is said before any request.
     let fullAccessRequired: String
     let notConfigured: String
     let offline: String
@@ -111,6 +112,15 @@ struct AIReplyStrings: Sendable {
 
     // Quick intents
     let quickIntents: [QuickIntent]
+
+    /// Which table this is.
+    let appLanguage: AppLanguage
+
+    /// The "Create" mode: writing a new message from a description.
+    var compose: ComposeStrings { ComposeStrings.forLanguage(appLanguage) }
+
+    /// The suggestion strip and the instruction suggestion.
+    var typing: TypingStrings { TypingStrings.forLanguage(appLanguage) }
 
     static func forLanguage(_ language: AppLanguage) -> AIReplyStrings {
         switch language {
@@ -137,6 +147,8 @@ struct AIReplyStrings: Sendable {
         case .quotaExhausted:             return quotaExhausted
         case .emptyResponse:              return emptyResponse
         case .serviceUnavailable:         return serviceUnavailable
+        case .noInstruction:              return compose.noInstruction
+        case .instructionTooLong(let limit): return compose.instructionTooLong(limit: limit)
         }
     }
 
@@ -157,8 +169,6 @@ struct AIReplyStrings: Sendable {
         regenerate: "Regenerate",
         insert: "Insert",
         cancel: "Cancel",
-        addTemplate: "Add template",
-        addTemplateHint: "Create templates in the AI Reply app.",
         replaceExisting: "Replace",
         appendToExisting: "Add",
         keepTyping: "Cancel",
@@ -184,7 +194,7 @@ struct AIReplyStrings: Sendable {
         instructionPlaceholder: "How should I reply?",
         noSourceMessage: "Copy a message first",
         messageTooLongFormat: "Message is too long. Copy up to %d characters.",
-        fullAccessRequired: "Turn on Allow Full Access for this keyboard in iOS Settings to use a copied message.",
+        fullAccessRequired: "Turn on Full Access for AI Reply in iOS Settings to read copied text and get replies.",
         notConfigured: "Open the AI Reply app and finish setup first.",
         offline: "No internet connection.",
         timedOut: "That took too long. Try again.",
@@ -204,7 +214,8 @@ struct AIReplyStrings: Sendable {
             QuickIntent(id: "friendly", label: "Friendly", phrase: "Answer in a warm, friendly way."),
             QuickIntent(id: "thanks", label: "Thank them", phrase: "Thank them."),
             QuickIntent(id: "reschedule", label: "Another time", phrase: "Suggest a different time.")
-        ]
+        ],
+        appLanguage: .english
     )
 
     private static let russian = AIReplyStrings(
@@ -212,8 +223,6 @@ struct AIReplyStrings: Sendable {
         regenerate: "Сгенерировать заново",
         insert: "Вставить",
         cancel: "Отмена",
-        addTemplate: "Добавить шаблон",
-        addTemplateHint: "Шаблоны создаются в приложении AI Reply.",
         replaceExisting: "Заменить",
         appendToExisting: "Добавить",
         keepTyping: "Отмена",
@@ -239,7 +248,7 @@ struct AIReplyStrings: Sendable {
         instructionPlaceholder: "Как ответить?",
         noSourceMessage: "Сначала скопируйте сообщение",
         messageTooLongFormat: "Сообщение слишком длинное. Скопируйте не более %d символов.",
-        fullAccessRequired: "Чтобы использовать скопированное сообщение, включите полный доступ для клавиатуры в настройках iOS.",
+        fullAccessRequired: "Включите полный доступ для AI Reply в настройках iOS, чтобы читать скопированный текст и получать ответы.",
         notConfigured: "Откройте приложение AI Reply и завершите настройку.",
         offline: "Нет подключения к интернету.",
         timedOut: "Слишком долго. Попробуйте ещё раз.",
@@ -251,7 +260,7 @@ struct AIReplyStrings: Sendable {
         quotaExhausted: "Ответы на сегодня закончились. Они обновятся завтра — или смените тариф в приложении.",
         hostFieldNotEmpty: "В этом поле уже есть текст.",
         quickIntents: [
-            QuickIntent(id: "agree", label: "Согласиться", phrase: "Ответь, что я согласен."),
+            QuickIntent(id: "agree", label: "Согласиться", phrase: "Ответь согласием."),
             QuickIntent(id: "decline", label: "Отказать", phrase: "Вежливо откажи."),
             QuickIntent(id: "details", label: "Уточнить", phrase: "Уточни детали."),
             QuickIntent(id: "brief", label: "Коротко", phrase: "Ответь коротко."),
@@ -259,7 +268,8 @@ struct AIReplyStrings: Sendable {
             QuickIntent(id: "friendly", label: "Дружелюбно", phrase: "Ответь тепло и дружелюбно."),
             QuickIntent(id: "thanks", label: "Поблагодарить", phrase: "Поблагодари."),
             QuickIntent(id: "reschedule", label: "Другое время", phrase: "Предложи другое время.")
-        ]
+        ],
+        appLanguage: .russian
     )
 
     private static let kazakh = AIReplyStrings(
@@ -267,8 +277,6 @@ struct AIReplyStrings: Sendable {
         regenerate: "Қайта жасау",
         insert: "Кірістіру",
         cancel: "Бас тарту",
-        addTemplate: "Үлгі қосу",
-        addTemplateHint: "Үлгілер AI Reply қолданбасында жасалады.",
         replaceExisting: "Ауыстыру",
         appendToExisting: "Қосу",
         keepTyping: "Бас тарту",
@@ -294,7 +302,7 @@ struct AIReplyStrings: Sendable {
         instructionPlaceholder: "Қалай жауап беру керек?",
         noSourceMessage: "Алдымен хабарламаны көшіріңіз",
         messageTooLongFormat: "Хабарлама тым ұзын. %d таңбаға дейінгі мәтінді көшіріңіз.",
-        fullAccessRequired: "Көшірілген хабарламаны пайдалану үшін iOS баптауларында пернетақтаға толық рұқсат беріңіз.",
+        fullAccessRequired: "Көшірілген мәтінді оқып, жауап алу үшін iOS баптауларында AI Reply пернетақтасына толық рұқсат беріңіз.",
         notConfigured: "AI Reply қолданбасын ашып, баптауды аяқтаңыз.",
         offline: "Интернет байланысы жоқ.",
         timedOut: "Тым ұзаққа созылды. Қайталап көріңіз.",
@@ -314,7 +322,8 @@ struct AIReplyStrings: Sendable {
             QuickIntent(id: "friendly", label: "Достық", phrase: "Жылы, достық үнмен жауап бер."),
             QuickIntent(id: "thanks", label: "Алғыс айту", phrase: "Алғыс айт."),
             QuickIntent(id: "reschedule", label: "Басқа уақыт", phrase: "Басқа уақыт ұсын.")
-        ]
+        ],
+        appLanguage: .kazakh
     )
 
     private static let uzbek = AIReplyStrings(
@@ -322,8 +331,6 @@ struct AIReplyStrings: Sendable {
         regenerate: "Qayta yaratish",
         insert: "Kiritish",
         cancel: "Bekor qilish",
-        addTemplate: "Andoza qo‘shish",
-        addTemplateHint: "Andozalar AI Reply ilovasida yaratiladi.",
         replaceExisting: "Almashtirish",
         appendToExisting: "Qo‘shish",
         keepTyping: "Bekor qilish",
@@ -349,7 +356,7 @@ struct AIReplyStrings: Sendable {
         instructionPlaceholder: "Qanday javob beraman?",
         noSourceMessage: "Avval xabarni nusxalang",
         messageTooLongFormat: "Xabar juda uzun. %d belgigacha matnni nusxalang.",
-        fullAccessRequired: "Nusxalangan xabardan foydalanish uchun iOS sozlamalarida klaviaturaga to‘liq ruxsat bering.",
+        fullAccessRequired: "Nusxalangan matnni o‘qish va javob olish uchun iOS sozlamalarida AI Reply klaviaturasiga to‘liq ruxsat bering.",
         notConfigured: "AI Reply ilovasini ochib, sozlashni yakunlang.",
         offline: "Internet aloqasi yo‘q.",
         timedOut: "Juda uzoq davom etdi. Qayta urinib ko‘ring.",
@@ -369,6 +376,85 @@ struct AIReplyStrings: Sendable {
             QuickIntent(id: "friendly", label: "Do‘stona", phrase: "Iliq, do‘stona javob ber."),
             QuickIntent(id: "thanks", label: "Minnatdorchilik", phrase: "Minnatdorchilik bildir."),
             QuickIntent(id: "reschedule", label: "Boshqa vaqt", phrase: "Boshqa vaqt taklif qil.")
-        ]
+        ],
+        appLanguage: .uzbek
+    )
+}
+
+/// The words of the keyboard's typing help, by APP language like every
+/// product string: the suggestion strip above the keys (smart correction) and
+/// the cleaner version of an instruction offered after a pause.
+///
+/// The strip itself shows words, not labels; these are what VoiceOver says
+/// about them, the quotation marks around the typed word, and the two states
+/// of the instruction suggestion.
+struct TypingStrings: Sendable {
+
+    /// The typed word in the strip, in the language's own quotation marks:
+    /// “…” in English, «…» in Russian, Kazakh and Uzbek - as on Android.
+    let typedFormat: String
+    /// VoiceOver for the quoted word in the strip: tapping keeps it as typed.
+    let keepTypedFormat: String
+    /// VoiceOver for the word the next space will put in place of the typed one.
+    let correctionFormat: String
+    /// VoiceOver for the suggested version of the instruction.
+    let polishSuggestionFormat: String
+    let polishSuggestionHint: String
+    /// The chip after a suggestion was used: puts the user's text back.
+    let undo: String
+    let undoAccessibility: String
+
+    func typed(_ word: String) -> String { String(format: typedFormat, word) }
+    func keepTyped(_ word: String) -> String { String(format: keepTypedFormat, word) }
+    func correction(_ word: String) -> String { String(format: correctionFormat, word) }
+    func polishSuggestion(_ text: String) -> String { String(format: polishSuggestionFormat, text) }
+
+    static func forLanguage(_ language: AppLanguage) -> TypingStrings {
+        switch language {
+        case .english: return .english
+        case .russian: return .russian
+        case .kazakh:  return .kazakh
+        case .uzbek:   return .uzbek
+        }
+    }
+
+    private static let english = TypingStrings(
+        typedFormat: "\u{201C}%@\u{201D}",
+        keepTypedFormat: "Keep as typed: %@",
+        correctionFormat: "Autocorrection: %@",
+        polishSuggestionFormat: "Suggested correction: %@",
+        polishSuggestionHint: "Replaces your request with this version.",
+        undo: "Undo",
+        undoAccessibility: "Undo the correction"
+    )
+
+    private static let russian = TypingStrings(
+        typedFormat: "«%@»",
+        keepTypedFormat: "Оставить как есть: %@",
+        correctionFormat: "Автоисправление: %@",
+        polishSuggestionFormat: "Предлагаемое исправление: %@",
+        polishSuggestionHint: "Заменит ваш запрос этим вариантом.",
+        undo: "Отменить",
+        undoAccessibility: "Отменить исправление"
+    )
+
+    private static let kazakh = TypingStrings(
+        typedFormat: "«%@»",
+        keepTypedFormat: "Жазылғандай қалдыру: %@",
+        correctionFormat: "Автотүзету: %@",
+        polishSuggestionFormat: "Ұсынылған түзету: %@",
+        polishSuggestionHint: "Сұранысыңызды осы нұсқамен ауыстырады.",
+        undo: "Қайтару",
+        undoAccessibility: "Түзетуді қайтару"
+    )
+
+    private static let uzbek = TypingStrings(
+        typedFormat: "«%@»",
+        keepTypedFormat: "Yozilganicha qoldirish: %@",
+        correctionFormat: "Avtotuzatish: %@",
+        polishSuggestionFormat: "Taklif etilgan tuzatish: %@",
+        polishSuggestionHint: "So‘rovingizni shu variant bilan almashtiradi.",
+        undo: "Bekor qilish",
+        undoAccessibility: "Tuzatishni bekor qilish"
     )
 }

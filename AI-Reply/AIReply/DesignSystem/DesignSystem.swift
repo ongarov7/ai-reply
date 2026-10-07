@@ -204,13 +204,16 @@ struct DSStepRow: View {
     let index: Int
     let text: LocalizedStringKey
 
+    /// Grows with the number inside it, so large text never spills out.
+    @ScaledMetric(relativeTo: .footnote) private var badgeSize: CGFloat = 22
+
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.s) {
             Text("\(index)")
                 .font(.footnote.weight(.semibold))
                 .monospacedDigit()
                 .foregroundStyle(Color.dsSurface)
-                .frame(width: 22, height: 22)
+                .frame(width: badgeSize, height: badgeSize)
                 .background(Circle().fill(Color.primary))
                 .accessibilityHidden(true)
             Text(text)

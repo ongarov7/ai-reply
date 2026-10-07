@@ -4,6 +4,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.encodeToString
 import kz.yerek.aireply.domain.model.BusinessContext
 import kz.yerek.aireply.domain.model.EmojiPolicy
+import kz.yerek.aireply.domain.model.GrammaticalGender
 import kz.yerek.aireply.domain.model.RelationshipKind
 import kz.yerek.aireply.domain.model.ReplyConfiguration
 import kz.yerek.aireply.domain.model.ReplyTemplate
@@ -71,6 +72,30 @@ class ConfigurationTest {
         val original = ReplyConfiguration.INITIAL.normalized()
         val restored = json.decodeFromString<ReplyConfiguration>(json.encodeToString(original))
         assertEquals(original, restored)
+    }
+
+    /** Жыныс сұралмаған профиль null болып қалады; белгісіз мән профильді өшірмейді. */
+    @Test
+    fun `the grammatical gender decodes tolerantly`() {
+        val older = json.decodeFromString<ReplyConfiguration>("""{"profile":{"role":"дизайнер"}}""")
+        assertNull("never asked", older.profile.grammaticalGender)
+        assertEquals("дизайнер", older.profile.role)
+
+        val chosen = json.decodeFromString<ReplyConfiguration>("""{"profile":{"grammaticalGender":"female"}}""")
+        assertEquals(GrammaticalGender.FEMALE, chosen.profile.grammaticalGender)
+
+        val newer = json.decodeFromString<ReplyConfiguration>(
+            """{"profile":{"role":"дизайнер","grammaticalGender":"other"}}"""
+        )
+        assertNull("a value from a newer build", newer.profile.grammaticalGender)
+        assertEquals("the rest of the profile survives", "дизайнер", newer.profile.role)
+
+        val skipped = ReplyConfiguration.INITIAL.copy(
+            profile = ReplyConfiguration.INITIAL.profile.copy(grammaticalGender = GrammaticalGender.UNSPECIFIED)
+        )
+        val encoded = json.encodeToString(skipped)
+        assertTrue(encoded.contains("\"grammaticalGender\":\"unspecified\""))
+        assertEquals(skipped, json.decodeFromString<ReplyConfiguration>(encoded))
     }
 
     @Test

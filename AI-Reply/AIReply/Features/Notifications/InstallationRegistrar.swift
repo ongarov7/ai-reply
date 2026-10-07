@@ -6,11 +6,14 @@ import Foundation
 struct InstallationPayload: Codable, Equatable, Sendable {
 
     struct Push: Codable, Equatable, Sendable {
+        /// Always "fcm": Firebase delivers to Android and, through APNs, to iOS.
         let provider: String
-        /// The APNs device token, lowercase hex.
+        /// The FCM registration token.
         let token: String
-        /// "sandbox" or "production": which APNs host this build's token belongs to.
-        let environment: String
+
+        static func fcm(_ token: String) -> Push {
+            Push(provider: "fcm", token: token)
+        }
     }
 
     let installation_id: String
@@ -87,9 +90,8 @@ extension InstallationSnapshot {
         var installationID: String?
         var permission: NotificationPermission
         var notificationsEnabled: Bool
-        /// Already checked to belong to `installationID`.
-        var deviceToken: String?
-        var environment: APNsEnvironment
+        /// The FCM token, already checked to belong to `installationID`.
+        var pushToken: String?
         var locale: String
         /// A session in the Keychain: what the server will see.
         var hasSession: Bool
@@ -101,7 +103,7 @@ extension InstallationSnapshot {
     /// against a server without installations, before iOS was first asked
     /// about the permission, or without an installation id.
     static func make(_ inputs: Inputs,
-                     metadata: ClientMetadata = .current,
+                     build: BuildInfo = .current,
                      deviceModel: String = DeviceModel.identifier,
                      timezone: String = TimeZone.current.identifier) -> InstallationSnapshot? {
         guard inputs.isBootstrapComplete,
@@ -109,22 +111,19 @@ extension InstallationSnapshot {
               inputs.serverOffersInstallations == true,
               inputs.hasReadPermission,
               let installationID = inputs.installationID else { return nil }
-        let context = ClientContext(installationID: installationID, metadata: metadata,
+        let context = ClientContext(installationID: installationID, build: build,
                                     deviceModel: deviceModel, locale: inputs.locale, timezone: timezone)
-        let push = inputs.deviceToken.map {
-            InstallationPayload.Push(provider: "apns", token: $0, environment: inputs.environment.rawValue)
-        }
         return InstallationSnapshot(
             payload: context.installationPayload(permission: inputs.permission,
                                                  notificationsEnabled: inputs.notificationsEnabled,
-                                                 push: push),
+                                                 push: inputs.pushToken.map(InstallationPayload.Push.fcm)),
             isSignedIn: inputs.hasSession,
             accountID: inputs.hasSession ? inputs.accountID : nil
         )
     }
 }
 
-/// Sends one registration. Throws `APIFailure`.
+/// Sends one registration. Throws `APIError`.
 protocol InstallationTransport: Sendable {
     func register(_ payload: InstallationPayload, accessToken: String?) async throws -> InstallationResponse
 }
@@ -168,7 +167,7 @@ actor InstallationRegistrar {
         case registered(InstallationResponse)
         /// The server already has exactly this, from less than 24 hours ago.
         case unchanged
-        case failed(APIFailure)
+        case failed(APIError)
     }
 
     static let refreshInterval: TimeInterval = 24 * 60 * 60
@@ -208,11 +207,10 @@ actor InstallationRegistrar {
             rejectedFingerprint = nil
             store.setLastSync(InstallationSyncRecord(fingerprint: fingerprint, syncedAt: now()))
             return .registered(response)
-        } catch let failure as APIFailure {
+        } catch {
+            let failure = error as? APIError ?? .server
             if !Self.isRetryable(failure) { rejectedFingerprint = fingerprint }
             return .failed(failure)
-        } catch {
-            return .failed(APIFailure(error: .server, requestID: "", status: 0))
         }
     }
 
@@ -220,24 +218,13 @@ actor InstallationRegistrar {
         guard snapshot.isSignedIn else {
             return try await transport.register(snapshot.payload, accessToken: nil)
         }
-        let token = try await withTokenFailures { try await self.tokens.accessToken() }
+        let token = try await tokens.accessToken()
         do {
             return try await transport.register(snapshot.payload, accessToken: token)
-        } catch let failure as APIFailure where failure.error == .unauthorized {
+        } catch APIError.unauthorized {
             // Once, never in a loop.
-            let fresh = try await withTokenFailures { try await self.tokens.refreshAccessToken() }
+            let fresh = try await tokens.refreshAccessToken()
             return try await transport.register(snapshot.payload, accessToken: fresh)
-        }
-    }
-
-    /// A failure to obtain a token, in the same shape as a failed request.
-    private func withTokenFailures(_ work: @Sendable () async throws -> String) async throws -> String {
-        do {
-            return try await work()
-        } catch let failure as APIFailure {
-            throw failure
-        } catch let error as APIError {
-            throw APIFailure(error: error, requestID: "", status: error == .unauthorized ? 401 : 0)
         }
     }
 
@@ -251,14 +238,23 @@ actor InstallationRegistrar {
         return SHA256.hash(data: material).map { String(format: "%02x", $0) }.joined()
     }
 
-    /// Whether a failed registration is worth retrying automatically. A 4xx
-    /// other than 401, 408 and 429 would fail the same way again, so it waits
-    /// for the next change instead.
-    static func isRetryable(_ failure: APIFailure) -> Bool {
-        switch failure.status {
-        case 0, 401, 408, 429: return true
-        case 500...: return true
-        default: return false
+    /// Whether a failed registration is worth retrying automatically: no
+    /// answer, a server or gateway failure, a rate limit, or a session that
+    /// is refreshed or gone by the next pass. A refused request (400, 404,
+    /// 409) would fail the same way again, so it waits for the next change.
+    static func isRetryable(_ failure: APIError) -> Bool {
+        switch failure {
+        case .offline, .timedOut, .cancelled, .server, .providerTimeout, .providerUnavailable,
+             .rateLimited, .unauthorized:
+            return true
+        default:
+            return false
         }
+    }
+
+    /// The server's own wait, when it named one.
+    static func retryAfter(_ failure: APIError) -> Int? {
+        if case .rateLimited(let seconds) = failure { return seconds }
+        return nil
     }
 }

@@ -13,9 +13,9 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"io"
-	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -28,19 +28,6 @@ import (
 func rsaPEM(t *testing.T) (*rsa.PrivateKey, string) {
 	t.Helper()
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatal(err)
-	}
-	der, err := x509.MarshalPKCS8PrivateKey(key)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return key, string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der}))
-}
-
-func ecPEM(t *testing.T) (*ecdsa.PrivateKey, string) {
-	t.Helper()
-	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,15 +67,15 @@ func testMessage() Message {
 	}
 }
 
-// ---------------------------------------------------------------- FCM
+// ---------------------------------------------------------------- fake Google
 
 type fakeGoogle struct {
 	t           *testing.T
 	pub         *rsa.PublicKey
 	tokenCalls  atomic.Int32
 	sendCalls   atomic.Int32
-	lastMessage map[string]any
 	mu          sync.Mutex
+	lastMessage map[string]any
 	respond     func(w http.ResponseWriter)
 	server      *httptest.Server
 }
@@ -146,6 +133,23 @@ func (g *fakeGoogle) handle(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (g *fakeGoogle) setRespond(respond func(w http.ResponseWriter)) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.respond = respond
+}
+
+func (g *fakeGoogle) message(t *testing.T) map[string]any {
+	t.Helper()
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	message, ok := g.lastMessage["message"].(map[string]any)
+	if !ok {
+		t.Fatalf("no message was sent: %v", g.lastMessage)
+	}
+	return message
+}
+
 func newTestFCM(t *testing.T, g *fakeGoogle, key string, now func() time.Time) *FCM {
 	t.Helper()
 	provider, err := NewFCM(FCMConfig{
@@ -158,16 +162,19 @@ func newTestFCM(t *testing.T, g *fakeGoogle, key string, now func() time.Time) *
 	return provider
 }
 
+// ---------------------------------------------------------------- tests
+
 func TestFCMSendsHTTPv1MessageWithServiceAccountToken(t *testing.T) {
 	key, pemKey := rsaPEM(t)
 	g := newFakeGoogle(t, &key.PublicKey)
-	provider := newTestFCM(t, g, pemKey, nil)
+	now := time.Date(2026, 10, 1, 10, 0, 0, 0, time.UTC)
+	provider := newTestFCM(t, g, pemKey, func() time.Time { return now })
 
 	res := provider.Send(context.Background(), Target{Token: "fcm-token-1"}, testMessage())
 	if res.Outcome != Accepted || !strings.HasPrefix(res.MessageID, "projects/ai-reply/messages/") {
 		t.Fatalf("result = %+v", res)
 	}
-	message := g.lastMessage["message"].(map[string]any)
+	message := g.message(t)
 	if message["token"] != "fcm-token-1" {
 		t.Fatalf("token = %v", message["token"])
 	}
@@ -186,6 +193,23 @@ func TestFCMSendsHTTPv1MessageWithServiceAccountToken(t *testing.T) {
 		t.Fatalf("android = %v", android)
 	}
 
+	// iOS goes through the same request: the apns block makes it an alert
+	// that collapses by notification id and expires with the TTL.
+	apns := message["apns"].(map[string]any)
+	headers := apns["headers"].(map[string]any)
+	for name, want := range map[string]string{
+		"apns-push-type": "alert", "apns-priority": "10", "apns-collapse-id": "n-1",
+		"apns-expiration": strconv.FormatInt(now.Add(24*time.Hour).Unix(), 10),
+	} {
+		if headers[name] != want {
+			t.Errorf("%s = %v, want %s", name, headers[name], want)
+		}
+	}
+	aps := apns["payload"].(map[string]any)["aps"].(map[string]any)
+	if aps["sound"] != "default" || aps["thread-id"] != "subscription" {
+		t.Fatalf("aps = %v", aps)
+	}
+
 	// The OAuth token is cached: a second send does not ask Google again.
 	_ = provider.Send(context.Background(), Target{Token: "fcm-token-2"}, testMessage())
 	if g.tokenCalls.Load() != 1 || g.sendCalls.Load() != 2 {
@@ -193,14 +217,39 @@ func TestFCMSendsHTTPv1MessageWithServiceAccountToken(t *testing.T) {
 	}
 }
 
+func TestFCMOrdinaryCategoriesUseNormalPriority(t *testing.T) {
+	key, pemKey := rsaPEM(t)
+	g := newFakeGoogle(t, &key.PublicKey)
+	provider := newTestFCM(t, g, pemKey, nil)
+	msg := testMessage()
+	msg.Important, msg.Category = false, "marketing"
+	msg.CollapseID = strings.Repeat("ә", 40) // 80 bytes
+	if res := provider.Send(context.Background(), Target{Token: "t"}, msg); res.Outcome != Accepted {
+		t.Fatalf("result = %+v", res)
+	}
+	message := g.message(t)
+	android := message["android"].(map[string]any)
+	if android["priority"] != "NORMAL" || android["notification"].(map[string]any)["channel_id"] != "general" {
+		t.Fatalf("android = %v", android)
+	}
+	headers := message["apns"].(map[string]any)["headers"].(map[string]any)
+	collapse, _ := headers["apns-collapse-id"].(string)
+	if headers["apns-priority"] != "5" || len(collapse) > 64 || collapse != strings.Repeat("ә", 32) {
+		t.Fatalf("apns headers = %v", headers)
+	}
+}
+
 func TestFCMRefreshesTheAccessTokenBeforeItExpires(t *testing.T) {
 	key, pemKey := rsaPEM(t)
 	g := newFakeGoogle(t, &key.PublicKey)
 	now := time.Date(2026, 10, 1, 10, 0, 0, 0, time.UTC)
-	provider := newTestFCM(t, g, pemKey, func() time.Time { return now })
+	var mu sync.Mutex
+	provider := newTestFCM(t, g, pemKey, func() time.Time { mu.Lock(); defer mu.Unlock(); return now })
 
 	_ = provider.Send(context.Background(), Target{Token: "t"}, testMessage())
+	mu.Lock()
 	now = now.Add(56 * time.Minute) // < 5 minutes left of 3599 s
+	mu.Unlock()
 	_ = provider.Send(context.Background(), Target{Token: "t"}, testMessage())
 	if g.tokenCalls.Load() != 2 {
 		t.Fatalf("token calls = %d, want a refresh", g.tokenCalls.Load())
@@ -221,6 +270,7 @@ func TestFCMClassification(t *testing.T) {
 		{"sender mismatch", 403, `{"error":{"code":403,"status":"PERMISSION_DENIED","details":[{"@type":"type.googleapis.com/google.firebase.fcm.v1.FcmError","errorCode":"SENDER_ID_MISMATCH"}]}}`, "", InvalidToken, "SENDER_ID_MISMATCH"},
 		{"bad token format", 400, `{"error":{"code":400,"status":"INVALID_ARGUMENT","details":[{"@type":"type.googleapis.com/google.firebase.fcm.v1.FcmError","errorCode":"INVALID_ARGUMENT"},{"@type":"type.googleapis.com/google.rpc.BadRequest","fieldViolations":[{"field":"message.token","description":"The registration token is not a valid FCM registration token"}]}]}}`, "", InvalidToken, "INVALID_ARGUMENT"},
 		{"bad payload", 400, `{"error":{"code":400,"status":"INVALID_ARGUMENT","details":[{"@type":"type.googleapis.com/google.firebase.fcm.v1.FcmError","errorCode":"INVALID_ARGUMENT"},{"@type":"type.googleapis.com/google.rpc.BadRequest","fieldViolations":[{"field":"message.android.ttl"}]}]}}`, "", Rejected, "INVALID_ARGUMENT"},
+		{"apns key missing", 401, `{"error":{"code":401,"status":"UNAUTHENTICATED","details":[{"@type":"type.googleapis.com/google.firebase.fcm.v1.FcmError","errorCode":"THIRD_PARTY_AUTH_ERROR"}]}}`, "", Rejected, "THIRD_PARTY_AUTH_ERROR"},
 		{"quota", 429, `{"error":{"code":429,"status":"RESOURCE_EXHAUSTED","details":[{"@type":"type.googleapis.com/google.firebase.fcm.v1.FcmError","errorCode":"QUOTA_EXCEEDED"}]}}`, "30", Retry, "QUOTA_EXCEEDED"},
 		{"unavailable", 503, `{"error":{"code":503,"status":"UNAVAILABLE"}}`, "", Retry, "UNAVAILABLE"},
 		{"internal", 500, `{"error":{"code":500,"status":"INTERNAL"}}`, "", Retry, "INTERNAL"},
@@ -243,14 +293,14 @@ func TestFCMRefetchesTheOAuthTokenAfter401(t *testing.T) {
 	g := newFakeGoogle(t, &key.PublicKey)
 	provider := newTestFCM(t, g, pemKey, nil)
 	var calls atomic.Int32
-	g.respond = func(w http.ResponseWriter) {
+	g.setRespond(func(w http.ResponseWriter) {
 		if calls.Add(1) == 1 {
 			w.WriteHeader(http.StatusUnauthorized)
 			_, _ = io.WriteString(w, `{"error":{"code":401,"status":"UNAUTHENTICATED"}}`)
 			return
 		}
 		_, _ = io.WriteString(w, `{"name":"projects/ai-reply/messages/2"}`)
-	}
+	})
 	if res := provider.Send(context.Background(), Target{Token: "t"}, testMessage()); res.Outcome != Retry {
 		t.Fatalf("401 must be retried: %+v", res)
 	}
@@ -268,7 +318,7 @@ func TestFCMTimeoutIsRetryable(t *testing.T) {
 	provider := newTestFCM(t, g, pemKey, nil)
 	release := make(chan struct{})
 	defer close(release)
-	g.respond = func(w http.ResponseWriter) { <-release }
+	g.setRespond(func(w http.ResponseWriter) { <-release })
 
 	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
 	defer cancel()
@@ -283,250 +333,37 @@ func TestNewFCMRejectsBadKeysWithoutEchoingThem(t *testing.T) {
 	if err == nil || strings.Contains(err.Error(), "c2VjcmV0") {
 		t.Fatalf("err = %v", err)
 	}
-	_, ecKey := ecPEM(t)
-	if _, err := NewFCM(FCMConfig{ProjectID: "p", ClientEmail: "a@b", PrivateKey: ecKey}); err == nil {
-		t.Fatal("an EC key is not a service-account key")
-	}
-}
-
-// ---------------------------------------------------------------- APNs
-
-type fakeApple struct {
-	t        *testing.T
-	pub      *ecdsa.PublicKey
-	server   *httptest.Server
-	mu       sync.Mutex
-	requests []*http.Request
-	bodies   []map[string]any
-	jwts     []string
-	respond  func(w http.ResponseWriter, r *http.Request)
-}
-
-func newFakeApple(t *testing.T, pub *ecdsa.PublicKey) *fakeApple {
-	a := &fakeApple{t: t, pub: pub}
-	a.server = httptest.NewUnstartedServer(http.HandlerFunc(a.handle))
-	a.server.EnableHTTP2 = true
-	a.server.StartTLS()
-	t.Cleanup(a.server.Close)
-	return a
-}
-
-func (a *fakeApple) handle(w http.ResponseWriter, r *http.Request) {
-	var body map[string]any
-	_ = json.NewDecoder(r.Body).Decode(&body)
-	jwt := strings.TrimPrefix(r.Header.Get("authorization"), "bearer ")
-	a.mu.Lock()
-	a.requests = append(a.requests, r)
-	a.bodies = append(a.bodies, body)
-	a.jwts = append(a.jwts, jwt)
-	respond := a.respond
-	a.mu.Unlock()
-
-	if r.ProtoMajor != 2 {
-		w.WriteHeader(http.StatusBadRequest)
-		_, _ = io.WriteString(w, `{"reason":"BadPath"}`)
-		return
-	}
-	header, claims, signing, sig := decodeJWT(a.t, jwt)
-	digest := sha256.Sum256([]byte(signing))
-	valid := len(sig) == 64 && ecdsa.Verify(a.pub, digest[:],
-		new(big.Int).SetBytes(sig[:32]), new(big.Int).SetBytes(sig[32:]))
-	if !valid || header["alg"] != "ES256" || header["kid"] != "ABC123DEFG" || claims["iss"] != "JXM8N66QWU" {
-		w.WriteHeader(http.StatusForbidden)
-		_, _ = io.WriteString(w, `{"reason":"InvalidProviderToken"}`)
-		return
-	}
-	if respond != nil {
-		respond(w, r)
-		return
-	}
-	w.Header().Set("apns-id", "5E2F1C3A-0000-4000-8000-000000000001")
-	w.WriteHeader(http.StatusOK)
-}
-
-func newTestAPNs(t *testing.T, a *fakeApple, key string, env string, now func() time.Time) *APNs {
-	t.Helper()
-	provider, err := NewAPNs(APNsConfig{
-		KeyID: "ABC123DEFG", TeamID: "JXM8N66QWU", BundleID: "kz.yerek.replykeyboard", PrivateKey: key,
-		DefaultEnvironment: env, ProductionURL: a.server.URL + "/prod", SandboxURL: a.server.URL + "/sandbox",
-		HTTPClient: a.server.Client(), Now: now,
-	})
-	if err != nil {
-		t.Fatalf("NewAPNs: %v", err)
-	}
-	return provider
-}
-
-func TestAPNsSendsOverHTTP2WithTokenAuth(t *testing.T) {
-	key, pemKey := ecPEM(t)
-	apple := newFakeApple(t, &key.PublicKey)
-	provider := newTestAPNs(t, apple, pemKey, "production", nil)
-
-	token := strings.Repeat("ab", 32)
-	res := provider.Send(context.Background(), Target{Token: token, Environment: "production"}, testMessage())
-	if res.Outcome != Accepted || res.MessageID == "" {
-		t.Fatalf("result = %+v", res)
-	}
-	req := apple.requests[0]
-	if req.URL.Path != "/prod/3/device/"+token {
-		t.Fatalf("path = %s", req.URL.Path)
-	}
-	for header, want := range map[string]string{
-		"apns-topic": "kz.yerek.replykeyboard", "apns-push-type": "alert",
-		"apns-priority": "10", "apns-collapse-id": "n-1",
-	} {
-		if got := req.Header.Get(header); got != want {
-			t.Errorf("%s = %q, want %q", header, got, want)
-		}
-	}
-	if req.Header.Get("apns-expiration") == "" {
-		t.Error("apns-expiration missing")
-	}
-	body := apple.bodies[0]
-	aps := body["aps"].(map[string]any)
-	alert := aps["alert"].(map[string]any)
-	if alert["title"] != "Тариф скоро закончится" || aps["sound"] != "default" || aps["thread-id"] != "subscription" {
-		t.Fatalf("aps = %v", aps)
-	}
-	if body["nid"] != "n-1" || body["link"] != "aireply://subscription" {
-		t.Fatalf("custom keys = %v", body)
-	}
-}
-
-func TestAPNsReusesTheProviderTokenAndRenewsIt(t *testing.T) {
-	key, pemKey := ecPEM(t)
-	apple := newFakeApple(t, &key.PublicKey)
-	now := time.Date(2026, 10, 1, 10, 0, 0, 0, time.UTC)
-	provider := newTestAPNs(t, apple, pemKey, "production", func() time.Time { return now })
-
-	target := Target{Token: strings.Repeat("cd", 32), Environment: "production"}
-	provider.Send(context.Background(), target, testMessage())
-	provider.Send(context.Background(), target, testMessage())
-	now = now.Add(41 * time.Minute)
-	provider.Send(context.Background(), target, testMessage())
-	if apple.jwts[0] != apple.jwts[1] {
-		t.Fatal("the provider token must be reused within its lifetime")
-	}
-	if apple.jwts[1] == apple.jwts[2] {
-		t.Fatal("the provider token must be renewed after 40 minutes")
-	}
-}
-
-func TestAPNsClassification(t *testing.T) {
-	now := time.Now()
-	cases := []struct {
-		status  int
-		reason  string
-		outcome Outcome
-	}{
-		{400, "BadDeviceToken", InvalidToken},
-		{400, "DeviceTokenNotForTopic", InvalidToken},
-		{410, "Unregistered", InvalidToken},
-		{410, "ExpiredToken", InvalidToken},
-		{429, "TooManyRequests", Retry},
-		{500, "InternalServerError", Retry},
-		{503, "ServiceUnavailable", Retry},
-		{403, "ExpiredProviderToken", Retry},
-		{400, "BadTopic", Rejected},
-		{400, "PayloadEmpty", Rejected},
-		{413, "PayloadTooLarge", Rejected},
-		{403, "InvalidProviderToken", Rejected},
-	}
-	for _, tc := range cases {
-		res := ClassifyAPNs(tc.status, []byte(`{"reason":"`+tc.reason+`"}`), "", now)
-		if res.Outcome != tc.outcome || res.Code != tc.reason {
-			t.Errorf("%d %s: got %v %q", tc.status, tc.reason, res.Outcome, res.Code)
-		}
-	}
-}
-
-func TestAPNsTriesTheOtherEnvironmentOnlyWhenItGuessed(t *testing.T) {
-	key, pemKey := ecPEM(t)
-	apple := newFakeApple(t, &key.PublicKey)
-	apple.respond = func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasPrefix(r.URL.Path, "/prod/") {
-			w.WriteHeader(http.StatusBadRequest)
-			_, _ = io.WriteString(w, `{"reason":"BadDeviceToken"}`)
-			return
-		}
-		w.Header().Set("apns-id", "sandbox-id")
-		w.WriteHeader(http.StatusOK)
-	}
-	provider := newTestAPNs(t, apple, pemKey, "production", nil)
-	token := strings.Repeat("ef", 32)
-
-	if res := provider.Send(context.Background(), Target{Token: token}, testMessage()); res.Outcome != Accepted || res.MessageID != "sandbox-id" {
-		t.Fatalf("guessed environment: %+v", res)
-	}
-	// The app said "production": its token is dead there, no second guess.
-	if res := provider.Send(context.Background(), Target{Token: token, Environment: "production"}, testMessage()); res.Outcome != InvalidToken {
-		t.Fatalf("explicit environment: %+v", res)
-	}
-}
-
-func TestAPNsExpiredProviderTokenIsRenewed(t *testing.T) {
-	key, pemKey := ecPEM(t)
-	apple := newFakeApple(t, &key.PublicKey)
-	now := time.Date(2026, 10, 1, 10, 0, 0, 0, time.UTC)
-	provider := newTestAPNs(t, apple, pemKey, "production", func() time.Time { return now })
-	var calls atomic.Int32
-	apple.respond = func(w http.ResponseWriter, r *http.Request) {
-		if calls.Add(1) == 2 {
-			w.WriteHeader(http.StatusForbidden)
-			_, _ = io.WriteString(w, `{"reason":"ExpiredProviderToken"}`)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-	}
-	target := Target{Token: strings.Repeat("aa", 32), Environment: "production"}
-	provider.Send(context.Background(), target, testMessage())
-	now = now.Add(2 * time.Minute)
-	if res := provider.Send(context.Background(), target, testMessage()); res.Outcome != Retry {
-		t.Fatalf("expired provider token: %+v", res)
-	}
-	provider.Send(context.Background(), target, testMessage())
-	if apple.jwts[1] == apple.jwts[2] {
-		t.Fatal("an expired provider token must be replaced")
-	}
-}
-
-func TestAPNsNetworkErrorsNeverLeakTheDeviceToken(t *testing.T) {
-	_, pemKey := ecPEM(t)
-	provider, err := NewAPNs(APNsConfig{
-		KeyID: "ABC123DEFG", TeamID: "JXM8N66QWU", BundleID: "kz.yerek.replykeyboard", PrivateKey: pemKey,
-		ProductionURL: "http://127.0.0.1:1", HTTPClient: &http.Client{Timeout: time.Second},
-	})
+	ec, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
-	token := strings.Repeat("99", 32)
-	res := provider.Send(context.Background(), Target{Token: token, Environment: "production"}, testMessage())
-	if res.Outcome != Retry || strings.Contains(res.Detail, token) {
-		t.Fatalf("result = %+v", res)
+	der, err := x509.MarshalPKCS8PrivateKey(ec)
+	if err != nil {
+		t.Fatal(err)
 	}
-}
-
-func TestNewAPNsValidatesIdentifiersAndKey(t *testing.T) {
-	_, pemKey := ecPEM(t)
-	_, rsaKey := rsaPEM(t)
-	for name, cfg := range map[string]APNsConfig{
-		"key id":  {KeyID: "short", TeamID: "JXM8N66QWU", BundleID: "b", PrivateKey: pemKey},
-		"team id": {KeyID: "ABC123DEFG", TeamID: "x", BundleID: "b", PrivateKey: pemKey},
-		"bundle":  {KeyID: "ABC123DEFG", TeamID: "JXM8N66QWU", PrivateKey: pemKey},
-		"rsa key": {KeyID: "ABC123DEFG", TeamID: "JXM8N66QWU", BundleID: "b", PrivateKey: rsaKey},
-	} {
-		if _, err := NewAPNs(cfg); err == nil {
-			t.Errorf("%s: accepted", name)
-		}
+	ecKey := string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der}))
+	if _, err := NewFCM(FCMConfig{ProjectID: "p", ClientEmail: "a@b", PrivateKey: ecKey}); err == nil {
+		t.Fatal("an EC key is not a service-account key")
+	}
+	if _, err := NewFCM(FCMConfig{ProjectID: "p", ClientEmail: "not-an-email", PrivateKey: ecKey}); err == nil {
+		t.Fatal("the client e-mail is checked")
 	}
 }
 
 func TestPayloadSizesStayUnderProviderLimits(t *testing.T) {
 	msg := testMessage()
 	msg.Body = strings.Repeat("ә", 400)
+	msg.Title = strings.Repeat("ә", 80)
 	fcm, apns := PayloadSizes(msg)
 	if fcm > MaxFCMPayloadBytes || apns > MaxAPNsPayloadBytes {
 		t.Fatalf("sizes fcm=%d apns=%d", fcm, apns)
+	}
+	if fcm <= apns {
+		t.Fatalf("the FCM request carries the APNs part and more: fcm=%d apns=%d", fcm, apns)
+	}
+	msg.Data["extra"] = strings.Repeat("x", 4000)
+	if fcm, apns := PayloadSizes(msg); fcm <= MaxFCMPayloadBytes || apns <= MaxAPNsPayloadBytes {
+		t.Fatalf("oversized data must show up: fcm=%d apns=%d", fcm, apns)
 	}
 }
 

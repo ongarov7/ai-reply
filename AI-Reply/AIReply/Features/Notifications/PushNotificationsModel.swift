@@ -33,7 +33,7 @@ enum NotificationPermission: String, Equatable, Sendable {
 protocol NotificationAuthorizing: Sendable {
     func currentPermission() async -> NotificationPermission
     /// Shows the system prompt when the permission is not determined yet.
-    func requestPermission() async -> Bool
+    func requestPermission() async
 }
 
 struct SystemNotificationAuthorizer: NotificationAuthorizing {
@@ -45,9 +45,13 @@ struct SystemNotificationAuthorizer: NotificationAuthorizing {
         }
     }
 
-    func requestPermission() async -> Bool {
+    func requestPermission() async {
         // Alerts and sounds. No badge: the app never sets one.
-        (try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])) ?? false
+        do {
+            _ = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])
+        } catch {
+            ReplyLog.event("push: permission request failed: \(error)")
+        }
     }
 }
 
@@ -97,12 +101,12 @@ protocol NotificationPreferencesService: Sendable {
 
 /// What the notification UI shows, and what the user can change.
 ///
-/// Хабарлама күйі: iOS рұқсаты, қосымшадағы ауыстырғыш, санаттар, диагностика.
+/// Хабарлама күйі: iOS рұқсаты, қосымшадағы ауыстырғыш, санаттар.
 ///
 /// Holds no networking and no push plumbing of its own. It tells
 /// `AppServices` through closures when something changed that the server
-/// should hear about, when permission was just granted (time to ask APNs for
-/// a token) and which events happened.
+/// should hear about and when permission was just granted (time to ask for
+/// a token).
 @MainActor
 @Observable
 final class PushNotificationsModel {
@@ -116,7 +120,6 @@ final class PushNotificationsModel {
     /// first one already carries the real permission.
     private(set) var hasReadPermission = false
     private(set) var isEnabledInApp: Bool
-    private(set) var sharesDiagnostics: Bool
     private(set) var preferences: NotificationPreferences?
     private(set) var preferencesState: PreferencesState = .idle
     /// A category whose change the server refused; the switch went back.
@@ -126,10 +129,9 @@ final class PushNotificationsModel {
     private(set) var isSignedIn = false
     /// `features.push_notifications` from the server; nil until it answered.
     private(set) var serverDeliversPush: Bool?
-    /// `features.telemetry` from the server; nil until it answered.
-    private(set) var serverAcceptsTelemetry: Bool?
-
-    let buildSupportsPush: Bool
+    /// The build asks for push (AIREPLY_PUSH_NOTIFICATIONS) and Firebase is
+    /// configured. Set by `AppServices` at launch.
+    private(set) var buildSupportsPush: Bool
     /// DEBUG `-AIReplyForcePushCard YES`: shows the card and the Settings
     /// sections whatever the state, so both can be reviewed on a Simulator.
     let forcesPushUI: Bool
@@ -144,15 +146,13 @@ final class PushNotificationsModel {
 
     /// The installation's state changed: the server should hear about it.
     @ObservationIgnored var onStateChange: (() -> Void)?
-    /// Permission now allows notifications: time to ask APNs for a token.
+    /// Permission now allows notifications: time to ask for a token.
     @ObservationIgnored var onPermissionAllowsDelivery: (() -> Void)?
-    @ObservationIgnored var onEvent: ((AppEvent) -> Void)?
-    @ObservationIgnored var onShareDiagnosticsChange: ((Bool) -> Void)?
 
     init(authorizer: NotificationAuthorizing = SystemNotificationAuthorizer(),
          preferencesService: NotificationPreferencesService,
          store: NotificationSettingsStore = NotificationSettingsStore(),
-         buildSupportsPush: Bool = PushBuildConfiguration.isEnabledInThisBuild,
+         buildSupportsPush: Bool = false,
          forcesPushUI: Bool = false) {
         self.authorizer = authorizer
         self.preferencesService = preferencesService
@@ -160,15 +160,14 @@ final class PushNotificationsModel {
         self.buildSupportsPush = buildSupportsPush
         self.forcesPushUI = forcesPushUI
         self.isEnabledInApp = store.isEnabledInApp
-        self.sharesDiagnostics = store.sharesDiagnostics
         self.isCardDismissed = store.isPermissionCardDismissed
     }
 
     // MARK: What is shown
 
-    /// Pushes can reach this build at all: the build is entitled and the
-    /// server has a provider. Until the server says so, nothing about
-    /// notifications is shown - an older server keeps the app as it was.
+    /// Pushes can reach this build at all: the build is set up for FCM and
+    /// the server can send through it. Until the server says so, nothing
+    /// about notifications is shown - an older server keeps the app as it was.
     var isPushAvailable: Bool {
         buildSupportsPush && serverDeliversPush == true
     }
@@ -187,12 +186,6 @@ final class PushNotificationsModel {
     /// The per-category switches: they belong to an account.
     var showsCategories: Bool {
         showsNotificationSettings && (isSignedIn || forcesPushUI)
-    }
-
-    /// Settings ▸ Diagnostics: only where the switch does something, a server
-    /// that accepts app events.
-    var showsDiagnosticsSettings: Bool {
-        forcesPushUI || serverAcceptsTelemetry == true
     }
 
     /// Categories to render: the server's, or everything on while it answers.
@@ -214,8 +207,8 @@ final class PushNotificationsModel {
         serverDeliversPush = value
     }
 
-    func setServerAcceptsTelemetry(_ value: Bool?) {
-        serverAcceptsTelemetry = value
+    func setBuildSupportsPush(_ value: Bool) {
+        buildSupportsPush = value
     }
 
     /// Categories that arrived with an installation registration.
@@ -243,21 +236,17 @@ final class PushNotificationsModel {
 
     // MARK: Actions
 
-    /// "Turn on notifications": the system prompt, then a token.
+    /// "Turn on notifications": the system prompt, then a token. What iOS
+    /// reports afterwards decides, not the prompt's answer: a user may have
+    /// changed it in Settings meanwhile.
     func requestPermission() async {
         guard !isRequestingPermission else { return }
         isRequestingPermission = true
         defer { isRequestingPermission = false }
         if forcesPushUI { isCardHiddenThisLaunch = true }
 
-        onEvent?(.pushPermissionRequested)
-        let granted = await authorizer.requestPermission()
+        await authorizer.requestPermission()
         let status = await authorizer.currentPermission()
-        if granted, status.allowsDelivery {
-            onEvent?(.pushPermissionGranted(status))
-        } else {
-            onEvent?(.pushPermissionDenied)
-        }
         let before = permission
         permission = status
         hasReadPermission = true
@@ -280,13 +269,6 @@ final class PushNotificationsModel {
         isEnabledInApp = enabled
         store.setEnabledInApp(enabled)
         onStateChange?()
-    }
-
-    func setSharesDiagnostics(_ enabled: Bool) {
-        guard enabled != sharesDiagnostics else { return }
-        sharesDiagnostics = enabled
-        store.setSharesDiagnostics(enabled)
-        onShareDiagnosticsChange?(enabled)
     }
 
     // MARK: Categories

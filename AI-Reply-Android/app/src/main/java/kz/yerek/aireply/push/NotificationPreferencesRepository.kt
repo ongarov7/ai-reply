@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kz.yerek.aireply.platform.ReplyLog
 
 /**
  * The signed-in user's notification categories, for the Settings switches.
@@ -58,6 +59,7 @@ class NotificationPreferencesRepository(private val api: NotificationPreferences
             _state.update { it.copy(loading = false) }
             throw cancelled
         } catch (failure: Exception) {
+            ReplyLog.warn(failure) { "notification preferences not loaded" }
             _state.update { it.copy(loading = false, failed = true) }
         }
     }
@@ -84,6 +86,7 @@ class NotificationPreferencesRepository(private val api: NotificationPreferences
                 _state.update { it.copy(pending = it.pending.withoutIf(category, enabled)) }
                 throw cancelled
             } catch (failure: Exception) {
+                ReplyLog.warn(failure) { "notification preference not saved" }
                 // Rolled back: the switch shows the server's value again.
                 _state.update { it.copy(pending = it.pending.withoutIf(category, enabled), failed = true) }
                 false

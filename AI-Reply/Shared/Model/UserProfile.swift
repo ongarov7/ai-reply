@@ -2,9 +2,9 @@ import Foundation
 
 /// The lightweight personal communication profile built during onboarding.
 ///
-/// It never leaves the device except as part of an AI request the user
-/// explicitly triggered, and only the two fields the model actually needs
-/// (`description`, `preferredTone`) are sent even then.
+/// It leaves the device only as part of an AI request the user explicitly
+/// triggered - the fields `AIReplyService.profile(from:)` picks, never the
+/// whole struct - and as the server's copy of what the user edited here.
 struct UserProfile: Codable, Hashable, Sendable {
 
     /// Maximum stored length. The brief asks for roughly 500-1000 characters;
@@ -37,12 +37,22 @@ struct UserProfile: Codable, Hashable, Sendable {
 
     var workingHours: WorkingHours
 
-    var hasCompletedOnboarding: Bool
+    /// The newest onboarding this device has been through: 0 for none, 1 for
+    /// the first guide, `OnboardingFlow.currentVersion` once the current one
+    /// is done. Per device on purpose - setting up a keyboard is.
+    var completedOnboardingVersion: Int
+
+    /// What builds that only knew a yes/no flag still read and write.
+    var hasCompletedOnboarding: Bool { completedOnboardingVersion >= 1 }
 
     /// The language replies should be written in. nil - the default - means
     /// "the language of the incoming message", which is what most people want
     /// most of the time.
     var replyLanguage: ReplyLanguagePreference?
+
+    /// «Рад» or «рада». nil until the user has been asked; see
+    /// `GrammaticalGender`.
+    var grammaticalGender: GrammaticalGender?
 
     static let empty = UserProfile(
         descriptionText: "",
@@ -50,8 +60,7 @@ struct UserProfile: Codable, Hashable, Sendable {
         business: .empty,
         preferredTone: .natural,
         activeRelationships: Set(RelationshipKind.builtIns),
-        workingHours: .default,
-        hasCompletedOnboarding: false
+        workingHours: .default
     )
 
     mutating func setRole(_ value: String) {
@@ -93,8 +102,10 @@ struct UserProfile: Codable, Hashable, Sendable {
         case preferredTone
         case activeRelationships
         case workingHours
+        case completedOnboardingVersion
         case hasCompletedOnboarding
         case replyLanguage
+        case grammaticalGender
     }
 
     init(
@@ -104,8 +115,9 @@ struct UserProfile: Codable, Hashable, Sendable {
         preferredTone: ReplyTone,
         activeRelationships: Set<RelationshipKind>,
         workingHours: WorkingHours,
-        hasCompletedOnboarding: Bool,
-        replyLanguage: ReplyLanguagePreference? = nil
+        completedOnboardingVersion: Int = 0,
+        replyLanguage: ReplyLanguagePreference? = nil,
+        grammaticalGender: GrammaticalGender? = nil
     ) {
         self.descriptionText = descriptionText
         self.role = role
@@ -113,8 +125,9 @@ struct UserProfile: Codable, Hashable, Sendable {
         self.preferredTone = preferredTone
         self.activeRelationships = activeRelationships
         self.workingHours = workingHours
-        self.hasCompletedOnboarding = hasCompletedOnboarding
+        self.completedOnboardingVersion = completedOnboardingVersion
         self.replyLanguage = replyLanguage
+        self.grammaticalGender = grammaticalGender
     }
 
     init(from decoder: Decoder) throws {
@@ -126,10 +139,31 @@ struct UserProfile: Codable, Hashable, Sendable {
         activeRelationships = try container.decodeIfPresent(Set<RelationshipKind>.self, forKey: .activeRelationships)
             ?? Set(RelationshipKind.builtIns)
         workingHours = try container.decodeIfPresent(WorkingHours.self, forKey: .workingHours) ?? .default
-        hasCompletedOnboarding = try container.decodeIfPresent(Bool.self, forKey: .hasCompletedOnboarding) ?? false
+        // A profile written before versions existed only says yes or no; a
+        // yes was the first onboarding.
+        let legacyCompleted = (try? container.decodeIfPresent(Bool.self, forKey: .hasCompletedOnboarding)) ?? false
+        completedOnboardingVersion = (try? container.decodeIfPresent(Int.self, forKey: .completedOnboardingVersion))
+            ?? (legacyCompleted ? 1 : 0)
         // A value this build does not know (a newer app wrote it) reads as
         // "follow the message" rather than failing the whole profile.
         replyLanguage = (try? container.decodeIfPresent(ReplyLanguagePreference.self, forKey: .replyLanguage)) ?? nil
+        // The same for a gender value from a newer build: "never asked".
+        grammaticalGender = (try? container.decodeIfPresent(GrammaticalGender.self, forKey: .grammaticalGender)) ?? nil
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(descriptionText, forKey: .descriptionText)
+        try container.encode(role, forKey: .role)
+        try container.encode(business, forKey: .business)
+        try container.encode(preferredTone, forKey: .preferredTone)
+        try container.encode(activeRelationships, forKey: .activeRelationships)
+        try container.encode(workingHours, forKey: .workingHours)
+        try container.encode(completedOnboardingVersion, forKey: .completedOnboardingVersion)
+        // Still written, so a build that only knows the flag reads it right.
+        try container.encode(hasCompletedOnboarding, forKey: .hasCompletedOnboarding)
+        try container.encodeIfPresent(replyLanguage, forKey: .replyLanguage)
+        try container.encodeIfPresent(grammaticalGender, forKey: .grammaticalGender)
     }
 }
 

@@ -4,8 +4,6 @@
     <string name="kb_regenerate">Qayta yaratish</string>
     <string name="kb_insert">Kiritish</string>
     <string name="kb_cancel">Bekor qilish</string>
-    <string name="kb_add_template">Shablon qoʻshish</string>
-    <string name="kb_add_template_hint">AI Reply ochilmoqda…</string>
     <string name="kb_replace_existing">Almashtirish</string>
     <string name="kb_append_existing">Qoʻshish</string>
     <string name="kb_keep_typing">Bekor qilish</string>
@@ -33,7 +31,7 @@
     <string name="kb_secure_field">Parol maydonlarida AI Reply ishlamaydi.</string>
 
     <string name="voice_kb_start">Koʻrsatmani aytib yozish</string>
-    <string name="voice_kb_stop">Toʻxtatish</string>
+    <string name="voice_kb_stop">Aytib yozishni toʻxtatish</string>
     <string name="voice_kb_listening">Tinglanmoqda…</string>
     <string name="voice_kb_processing">Aniqlanmoqda…</string>
     <string name="voice_kb_permission_needed">Mikrofonga ruxsat berish uchun bosing</string>
@@ -41,6 +39,11 @@
     <string name="voice_kb_no_speech">Hech narsa eshitilmadi. Qayta urinib koʻring.</string>
     <string name="voice_kb_failed">Nutqni aniqlab boʻlmadi. Qayta urinib koʻring.</string>
     <string name="voice_kb_unavailable">Bu qurilmada nutqni aniqlash mavjud emas.</string>
+    <string name="voice_kb_stopped">Aytib yozish toʻxtatildi</string>
+    <string name="voice_kb_busy">Mikrofon hozir band. Birozdan soʻng qayta urinib koʻring.</string>
+    <string name="voice_kb_language_unavailable_kk">Bu telefon qozoqcha nutqni tanimaydi. Google ovozli yozishni oʻrnating yoki tilni almashtiring.</string>
+    <string name="voice_kb_language_unavailable_ru">Bu telefon ruscha nutqni tanimaydi. Google ovozli yozishni oʻrnating yoki tilni almashtiring.</string>
+    <string name="voice_kb_language_unavailable_en">Bu telefon inglizcha nutqni tanimaydi. Google ovozli yozishni oʻrnating yoki tilni almashtiring.</string>
     <string name="voice_permission_title">Mikrofon</string>
 
     <string name="android_setup_title">Klaviaturani sozlash</string>
@@ -114,7 +117,62 @@
     <string name="settings_debug_mock_replies">Sinov AI javoblari</string>
     <string name="settings_debug_mock_replies_footer">Faqat sinov yigʻmasida. Klaviatura xizmat oʻrniga tayyor javob beradi — limit sarflanmaydi. Koʻrsatmadagi teglar: #offline, #quota, #slow.</string>
 
-    <!-- Push notifications and diagnostics (2026-10). -->
+    <!-- Keyboard: Create (write a new message from an instruction) -->
+    <string name="kb_compose_open">AI bilan yangi xabar yozish</string>
+    <string name="kb_compose_title">AI bilan yozish</string>
+    <string name="kb_compose_placeholder">Xabarni tasvirlang, masalan: «Direktorni 55 yoshi bilan tabrikla»</string>
+    <string name="kb_compose_write">Yozish</string>
+    <string name="kb_compose_new">Yangi</string>
+    <string name="kb_compose_new_description">Boshidan boshlash</string>
+    <string name="kb_compose_edit_request">Soʻrovni oʻzgartirish</string>
+    <string name="kb_compose_draft_title">Xabaringiz</string>
+    <string name="kb_compose_err_no_instruction">Avval nima yozishni tasvirlang.</string>
+    <string name="kb_compose_err_too_long">Soʻrov juda uzun. %1$d belgigacha yozing.</string>
+    <string name="kb_compose_intent_congratulate">Tabriklash</string>
+    <string name="kb_compose_intent_congratulate_phrase">Tabrik yoz.</string>
+    <string name="kb_compose_intent_short">Qisqa</string>
+    <string name="kb_compose_intent_short_phrase">Qisqa yoz.</string>
+    <string name="kb_compose_intent_formal">Rasmiy</string>
+    <string name="kb_compose_intent_formal_phrase">Rasmiy ohangda yoz.</string>
+    <string name="kb_compose_intent_friendly">Doʻstona</string>
+    <string name="kb_compose_intent_friendly_phrase">Iliq va doʻstona yoz.</string>
+    <string name="kb_compose_intent_emoji">Emoji bilan</string>
+    <string name="kb_compose_intent_emoji_phrase">Bir nechta mos emoji qoʻsh.</string>
+    <string name="kb_compose_intent_thanks">Minnatdorchilik</string>
+    <string name="kb_compose_intent_thanks_phrase">Minnatdorchilik xabarini yoz.</string>
+    <string name="kb_compose_intent_decline">Muloyim rad</string>
+    <string name="kb_compose_intent_decline_phrase">Muloyim rad javobini yoz.</string>
+
+    <!-- Create: answer the copied message with the request written here -->
+    <string name="kb_reply_to_copied">Nusxalanganga javob berish</string>
+    <string name="kb_reply_to_copied_description">Nusxalangan xabarga shu soʻrov boʻyicha javob berish</string>
+
+    <!-- Smart correction in the keyboard: the suggestion strip and the instruction polish chip -->
+    <string name="kb_suggestions">Takliflar</string>
+    <string name="kb_suggestion_typed">«%1$s»</string>
+    <string name="kb_suggestion_keep_description">Yozilganicha qoldirish: %1$s</string>
+    <string name="kb_suggestion_correction_description">«%1$s» deb tuzatish</string>
+    <string name="kb_polish_suggestion_description">Taklif etilgan tuzatish: %1$s</string>
+    <string name="kb_polish_undo">Bekor qilish</string>
+    <string name="kb_polish_undo_description">Tuzatishni bekor qilish</string>
+
+    <!-- Onboarding v2 on Android: keyboard status and setup, switching, clipboard; smart correction -->
+    <string name="android_status_keyboard">AI\u00A0Reply klaviaturasi</string>
+    <string name="android_status_enabled">Yoqilgan</string>
+    <string name="android_status_not_enabled">Yoqilmagan</string>
+    <string name="android_status_current">Joriy klaviatura</string>
+    <string name="android_status_other_keyboard">Boshqasi</string>
+    <string name="onboarding_keyboard_step_enable">Klaviaturalar roʻyxatida AI\u00A0Replyni yoqing</string>
+    <string name="onboarding_keyboard_step_confirm">Tizim ogohlantirishini tasdiqlang</string>
+    <string name="onboarding_keyboard_step_choose">Shu yerga qaytib, AI\u00A0Replyni tanlang</string>
+    <string name="onboarding_switch_note">Klaviaturani almashtirish uchun navigatsiya panelidagi klaviatura belgisini bosing yoki boʻsh joy yoxud til tugmasini bosib turing — bu telefonga bogʻliq.</string>
+    <string name="onboarding_clipboard_note">AI\u00A0Reply nusxalangan xabarni faqat shablonni yoki «Xabarni joylash» tugmasini bosganingizda oʻqiydi. Androidning baʼzi versiyalari shu paytda bufer oʻqilgani haqida qisqa xabar koʻrsatadi — bu odatiy hol.</string>
+    <string name="cd_tutorial_next">Keyingi qadamni koʻrsatish</string>
+    <string name="settings_smart_correction">Aqlli tuzatish</string>
+    <string name="settings_smart_correction_footer">Xatolar tuzatiladi va soʻzlar toʻgʻridan-toʻgʻri telefonda taklif qilinadi: boshqa ilovalarda yozganlaringiz hech qayerga yuborilmaydi. AI\u00A0Reply maydonida koʻrsatma yozayotganingizda, tozaroq variant taklif qilish uchun bu matn yuborilishi mumkin.</string>
+    <string name="settings_smart_correction_attribution">Lugʻatlar: Leipzig Corpora Collection (CC BY).</string>
+
+    <!-- Push notifications (2026-10). -->
     <string name="push_channel_general">Umumiy</string>
     <string name="push_channel_general_description">Xizmat yangiliklari va eslatmalar</string>
     <string name="push_channel_important">Muhim</string>
@@ -130,7 +188,7 @@
     <string name="push_settings_status_not_asked">Sozlanmagan</string>
     <string name="push_settings_allow">Bildirishnomalarga ruxsat berish</string>
     <string name="push_settings_open_system">Telefon sozlamalarini ochish</string>
-    <string name="push_settings_enabled">AI Reply bildirishnomalari</string>
+    <string name="push_settings_enabled">AI\u00A0Reply bildirishnomalari</string>
     <string name="push_settings_footer">Toʻlov tasdiqlari va tarif tugashidan oldingi eslatmalar.</string>
     <string name="push_settings_unavailable">Bu versiyada bildirishnomalar hozircha mavjud emas.</string>
     <string name="push_category_account">Hisob</string>
@@ -141,8 +199,6 @@
     <string name="push_categories_footer">Xavfsizlik bildirishnomalari doim yoqilgan.</string>
     <string name="push_categories_loading">Yuklanmoqda…</string>
     <string name="push_categories_failed">Yangilab boʻlmadi. Internetni tekshirib, qayta urinib koʻring.</string>
-    <string name="diagnostics_share">Diagnostikani yuborish</string>
-    <string name="diagnostics_share_footer">Muammolarni topish va tuzatishga yordam beradi: ilova ishga tushishi, bildirishnomaga bosish va ulanish xatolari. Xabarlaringiz, yozgan matningiz va almashuv buferi hech qachon yuborilmaydi.</string>
     <string name="settings_debug_simulate_push">Sinov push-bildirishnomasi</string>
     <string name="settings_debug_force_push_prompt">Bildirishnoma kartasini doim koʻrsatish</string>
     <string name="settings_debug_push_footer">Faqat sinov yigʻmasida. Namuna 3 soniyadan soʻng ochiq ilovadagi haqiqiy bildirishnoma yoʻli bilan keladi va bosilganda «Tarif»ni ochadi. Kalit bosh ekrandagi kartani va bu sozlamalarni Firebase boʻlmasa ham koʻrsatadi.</string>

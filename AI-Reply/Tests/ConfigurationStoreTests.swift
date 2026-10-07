@@ -115,8 +115,41 @@ final class ConfigurationStoreTests: XCTestCase {
         let profile = try JSONDecoder().decode(UserProfile.self, from: Data(json.utf8))
         XCTAssertEqual(profile.descriptionText, "Kept")
         XCTAssertTrue(profile.hasCompletedOnboarding)
+        XCTAssertEqual(profile.completedOnboardingVersion, 1, "the old yes was the first onboarding")
+        XCTAssertNil(profile.grammaticalGender, "never asked")
         XCTAssertEqual(profile.preferredTone, .natural)
         XCTAssertEqual(profile.workingHours.days.count, 7)
+
+        let fresh = try JSONDecoder().decode(UserProfile.self, from: Data(#"{"descriptionText":""}"#.utf8))
+        XCTAssertEqual(fresh.completedOnboardingVersion, 0)
+        XCTAssertFalse(fresh.hasCompletedOnboarding)
+    }
+
+    /// The version and the gender survive a round trip, and the old flag is
+    /// still written for any build that only knows it.
+    func testOnboardingVersionAndGenderRoundTrip() throws {
+        var profile = UserProfile.empty
+        profile.completedOnboardingVersion = 2
+        profile.grammaticalGender = .female
+        let data = try JSONEncoder().encode(profile)
+
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(json["hasCompletedOnboarding"] as? Bool, true)
+        XCTAssertEqual(json["completedOnboardingVersion"] as? Int, 2)
+        XCTAssertEqual(json["grammaticalGender"] as? String, "female")
+
+        let decoded = try JSONDecoder().decode(UserProfile.self, from: data)
+        XCTAssertEqual(decoded, profile)
+    }
+
+    /// A gender value from a newer build reads as "never asked" rather than
+    /// failing the whole profile.
+    func testUnknownGenderDoesNotWipeTheProfile() throws {
+        let json = #"{"descriptionText":"Kept","grammaticalGender":"other","completedOnboardingVersion":2}"#
+        let profile = try JSONDecoder().decode(UserProfile.self, from: Data(json.utf8))
+        XCTAssertEqual(profile.descriptionText, "Kept")
+        XCTAssertNil(profile.grammaticalGender)
+        XCTAssertEqual(profile.completedOnboardingVersion, 2)
     }
 
     /// A missing App Group container must degrade, not crash.

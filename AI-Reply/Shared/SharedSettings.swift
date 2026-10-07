@@ -39,6 +39,7 @@ struct SharedSettings {
         static let enabledKeyboardLanguages = "shared.enabledKeyboardLanguages"
         static let lastTemplateID = "shared.lastTemplateID"
         static let keyboardHaptics = "shared.keyboardHaptics"
+        static let smartCorrection = "shared.smartCorrection"
 
         /// Where the keyboard stored its layout before the App Group existed.
         /// Read once so an existing install does not silently reset to English.
@@ -95,6 +96,17 @@ struct SharedSettings {
     /// keyboard and the tests read.
     func keyboardHapticsActive(hasFullAccess: Bool) -> Bool {
         hasFullAccess && keyboardHapticsEnabled
+    }
+
+    /// Typo fixes and word suggestions while typing. On by default; worked
+    /// out on the phone itself, so nothing typed in another app leaves it.
+    /// The keyboard reads it when it appears, never per keystroke.
+    var smartCorrectionEnabled: Bool {
+        defaults.object(forKey: Key.smartCorrection) as? Bool ?? true
+    }
+
+    func setSmartCorrectionEnabled(_ enabled: Bool) {
+        defaults.set(enabled, forKey: Key.smartCorrection)
     }
 
     // MARK: Persona row
@@ -163,8 +175,6 @@ struct SharedSettings {
     var keyboardHasFullAccess: Bool {
         defaults.bool(forKey: Key.keyboardFullAccess)
     }
-
-    var isKeyboardConfigured: Bool { keyboardLastSeen != nil }
 
     /// Called by the extension once it is on screen. Writes only a timestamp
     /// and a permission flag - never anything the user typed or copied.

@@ -205,6 +205,7 @@ private fun statusMessage(state: VoiceState): String = when (state) {
             AppLanguage.systemDefault().nativeName
         )
         VoiceFailure.UNAVAILABLE -> stringResource(R.string.voice_status_unavailable)
+        VoiceFailure.BUSY -> stringResource(R.string.voice_kb_busy)
         VoiceFailure.GENERIC -> stringResource(R.string.voice_kb_failed)
     }
 }

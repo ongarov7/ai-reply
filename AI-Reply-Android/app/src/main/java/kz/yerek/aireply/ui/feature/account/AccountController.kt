@@ -31,6 +31,7 @@ import kz.yerek.aireply.data.account.SubscriptionDto
 import kz.yerek.aireply.data.account.UsageDto
 import kz.yerek.aireply.data.account.raise
 import kz.yerek.aireply.data.legal.LegalConsentStore
+import kz.yerek.aireply.data.profile.ProfileSync
 import java.util.TimeZone
 
 /**
@@ -53,8 +54,12 @@ class AccountController(
     private val google: GoogleSignInClient? = null,
     /** Work that must outlive the screen that started it, such as device registration. */
     private val backgroundScope: CoroutineScope? = null,
+    /** Takes over a choice made on another device when the account is read. */
+    private val profileSync: ProfileSync? = null,
+    /** Drops what was kept for the account that just signed out, such as unsent product events. */
+    private val onSignedOut: () -> Unit = {},
     private val clock: () -> Long = System::currentTimeMillis,
-    /** Told about sign-in, sign-out and the server's features (the push installation). */
+    /** Told about sign-in, sign-out, the legal consent and the server's features (the push installation). */
     private val observer: AccountObserver? = null
 ) {
 
@@ -192,6 +197,8 @@ class AccountController(
             usageCache.storePlanCode(account.subscription.plan.code)
             credentials.displayIdentifier = account.user.identifier
             applyLegalConsent(account.legalConsent)
+            profileSync?.adopt(account.profile)
+            profileSync?.adoptPreferredLanguage(account.user.preferredLanguage)
             _state.update {
                 it.copy(
                     phase = Phase.SignedIn,
@@ -333,12 +340,10 @@ class AccountController(
                 return SignInOutcome.Cancelled
             }
             GoogleSignInClient.Result.NotConfigured, GoogleSignInClient.Result.Unavailable -> {
-                observer?.onSignInFailedLocally(METHOD_GOOGLE, "google_unavailable")
                 _state.update { it.copy(busy = false, errorMessage = R.string.account_error_provider_unavailable) }
                 return SignInOutcome.Failed(clearCode = false)
             }
             GoogleSignInClient.Result.Failed -> {
-                observer?.onSignInFailedLocally(METHOD_GOOGLE, "google_credential_failed")
                 _state.update { it.copy(busy = false, errorMessage = R.string.account_error_provider_failed) }
                 return SignInOutcome.Failed(clearCode = false)
             }
@@ -361,6 +366,9 @@ class AccountController(
         usageCache.store(session.usage)
         usageCache.storePlanCode(session.subscription.plan.code)
         applyLegalConsent(session.legalConsent)
+        // Before onboarding asks: a returning user's choice comes back with the session.
+        profileSync?.adopt(session.profile)
+        profileSync?.adoptPreferredLanguage(session.user.preferredLanguage)
         _state.update {
             it.copy(
                 phase = Phase.SignedIn,
@@ -424,6 +432,8 @@ class AccountController(
 
     private fun signOutLocally(userInitiated: Boolean) {
         credentials.clear()
+        profileSync?.signedOut()
+        onSignedOut()
         _state.update {
             it.copy(
                 phase = Phase.SignedOut,
@@ -439,8 +449,8 @@ class AccountController(
 
     /**
      * Runs a state change and tells the observer if it is the moment the
-     * terms became accepted: the installation registration and diagnostics
-     * wait for exactly that.
+     * terms became accepted: the installation registration waits for exactly
+     * that.
      */
     private inline fun trackingConsent(change: () -> Unit) {
         val before = _state.value.hasAcceptedLegal
@@ -487,7 +497,9 @@ class AccountController(
                     preferredTone = tone,
                     locale = locale,
                     timezone = TimeZone.getDefault().id,
-                    onboardingCompleted = true
+                    onboardingCompleted = true,
+                    // The server refuses a field it does not know.
+                    preferredLanguage = locale.takeIf { AILimits.features.preferredLanguage }
                 )
             )
             _state.update { it.copy(busy = false) }
@@ -531,8 +543,6 @@ class AccountController(
     companion object {
         /** The server's usual wait between codes, for an answer that did not say. */
         const val DEFAULT_RESEND_SECONDS = 32
-
-        private const val METHOD_GOOGLE = "google"
 
         /**
          * Maps a failure onto a string resource. The server's English message is

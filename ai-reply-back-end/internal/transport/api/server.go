@@ -15,9 +15,8 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/notifications"
 	"github.com/aireply/ai-reply-back-end/internal/payments"
 	"github.com/aireply/ai-reply-back-end/internal/plans"
-	"github.com/aireply/ai-reply-back-end/internal/reqctx"
+	"github.com/aireply/ai-reply-back-end/internal/productevents"
 	"github.com/aireply/ai-reply-back-end/internal/subscriptions"
-	"github.com/aireply/ai-reply-back-end/internal/telemetry"
 	"github.com/aireply/ai-reply-back-end/internal/transport/httpx"
 	"github.com/aireply/ai-reply-back-end/internal/users"
 )
@@ -35,17 +34,13 @@ type Server struct {
 	ai            *ai.Service
 	limits        *limits.Service
 	payments      *payments.Service
+	events        *productevents.Service
 	installations *installations.Service
 	notifications *notifications.Service
-	telemetry     *telemetry.Service
 	limiter       *middleware.Limiter
 	ping          Pinger
 	log           *slog.Logger
 }
-
-// sharedAddressFactor — how many installations' worth of requests one IP address
-// may send to the installation and event endpoints (carrier NAT, office Wi-Fi).
-const sharedAddressFactor = 20
 
 // Deps — сервер тәуелділіктері.
 type Deps struct {
@@ -57,9 +52,9 @@ type Deps struct {
 	AI            *ai.Service
 	Limits        *limits.Service
 	Payments      *payments.Service
+	Events        *productevents.Service
 	Installations *installations.Service
 	Notifications *notifications.Service
-	Telemetry     *telemetry.Service
 	Limiter       *middleware.Limiter
 	Ping          Pinger
 	Log           *slog.Logger
@@ -69,8 +64,8 @@ type Deps struct {
 func New(d Deps) *Server {
 	return &Server{
 		cfg: d.Config, auth: d.Auth, users: d.Users, plans: d.Plans, subs: d.Subs,
-		ai: d.AI, limits: d.Limits, payments: d.Payments, installations: d.Installations,
-		notifications: d.Notifications, telemetry: d.Telemetry, limiter: d.Limiter, ping: d.Ping, log: d.Log,
+		ai: d.AI, limits: d.Limits, payments: d.Payments, events: d.Events,
+		installations: d.Installations, notifications: d.Notifications, limiter: d.Limiter, ping: d.Ping, log: d.Log,
 	}
 }
 
@@ -96,12 +91,17 @@ func (s *Server) Register(mux *http.ServeMux) {
 	otpRequest := middleware.RateLimit(s.limiter, "otp_request", limits.OTPRequestPerHour, time.Hour, ip)
 	otpVerify := middleware.RateLimit(s.limiter, "otp_verify", limits.OTPVerifyPerHour, time.Hour, ip)
 	generic := middleware.RateLimit(s.limiter, "generic", limits.GenericPerMinute, time.Minute, ip)
-	aiLimit := middleware.RateLimit(s.limiter, "ai", limits.AIPerMinute, time.Minute, func(r *http.Request) string {
+	perUser := func(r *http.Request) string {
 		if u, ok := UserFrom(r.Context()); ok {
 			return u.ID
 		}
 		return httpx.ClientIP(r, s.cfg.App.TrustProxy)
-	})
+	}
+	aiLimit := middleware.RateLimit(s.limiter, "ai", limits.AIPerMinute, time.Minute, perUser)
+	// Polish үзіліс сайын шақырылады: жеке шелек, генерация лимитін жемейді.
+	polishLimit := middleware.RateLimit(s.limiter, "polish", limits.PolishPerMinute, time.Minute, perUser)
+	// Өнім оқиғалары: өз шелегі, басқа сұраныстардың лимитін жемейді.
+	eventsLimit := middleware.RateLimit(s.limiter, "events", limits.EventsPerMinute, time.Minute, perUser)
 
 	// --- аутентификация: пошта OTP (Resend), Google, Apple
 	mux.Handle("POST /api/v1/auth/email/otp/request", otpRequest(http.HandlerFunc(s.handleEmailOTPRequest)))
@@ -136,38 +136,24 @@ func (s *Server) Register(mux *http.ServeMux) {
 	// --- құрылғылар (ескі build-тер) және орнатулар (push, метадерек)
 	mux.Handle("POST /api/v1/devices", s.requireUser(http.HandlerFunc(s.handleRegisterDevice)))
 	mux.Handle("DELETE /api/v1/devices/{id}", s.requireUser(http.HandlerFunc(s.handleDeleteDevice)))
-	// Installation and event budgets are counted per installation (X-Installation-ID)
-	// when the app names one: behind carrier NAT many phones share one address, and
-	// a per-IP budget alone would throttle unrelated people together. A looser
-	// per-IP budget on top still stops a client that invents a new id per request.
-	installationKey := func(r *http.Request) string {
-		if id := reqctx.From(r.Context()).InstallationID; id != "" {
-			return "installation:" + id
-		}
-		return "ip:" + ip(r)
-	}
-	perIP := func(bucket string, limit int) func(http.Handler) http.Handler {
-		return middleware.RateLimit(s.limiter, bucket+"_ip", limit*sharedAddressFactor, time.Minute, ip)
-	}
-	installationLimit := func(h http.Handler) http.Handler {
-		return perIP("installation", limits.GenericPerMinute)(
-			middleware.RateLimit(s.limiter, "installation", limits.GenericPerMinute, time.Minute, installationKey)(h))
-	}
-	mux.Handle("POST /api/v1/installations", installationLimit(s.optionalUser(http.HandlerFunc(s.handleRegisterInstallation))))
+	mux.Handle("POST /api/v1/installations",
+		s.installationLimit(s.optionalUser(http.HandlerFunc(s.handleRegisterInstallation))))
 	mux.Handle("POST /api/v1/installations/{installation_id}/detach",
-		installationLimit(s.optionalUser(http.HandlerFunc(s.handleDetachInstallation))))
+		s.installationLimit(s.optionalUser(http.HandlerFunc(s.handleDetachInstallation))))
 	mux.Handle("GET /api/v1/me/notification-preferences", s.requireUser(http.HandlerFunc(s.handleNotificationPreferences)))
 	mux.Handle("PUT /api/v1/me/notification-preferences", s.requireUser(http.HandlerFunc(s.handleUpdateNotificationPreferences)))
-
-	// --- қосымша оқиғалары (рұқсат етілген тізім, топтап, шектеумен)
-	eventsLimit := func(h http.Handler) http.Handler {
-		return perIP("events", s.cfg.Telemetry.EventsPerMinute)(
-			middleware.RateLimit(s.limiter, "events", s.cfg.Telemetry.EventsPerMinute, time.Minute, installationKey)(h))
-	}
-	mux.Handle("POST /api/v1/events", eventsLimit(s.optionalUser(http.HandlerFunc(s.handleEvents))))
+	mux.Handle("POST /api/v1/notifications/opened",
+		s.installationLimit(s.optionalUser(http.HandlerFunc(s.handleNotificationOpened))))
 
 	// --- AI
 	mux.Handle("POST /api/v1/ai/reply", s.requireUser(aiLimit(http.HandlerFunc(s.handleReply))))
+	// Нұсқау бойынша жаңа хабарлама («Create»). Сол квота, сол rate limit.
+	mux.Handle("POST /api/v1/ai/compose", s.requireUser(aiLimit(http.HandlerFunc(s.handleCompose))))
+	// Нұсқауды түзету ұсынысы. Квотасыз; өшірулі болса 404 NOT_FOUND.
+	mux.Handle("POST /api/v1/ai/polish", s.requireUser(polishLimit(http.HandlerFunc(s.handlePolish))))
+
+	// --- өнім оқиғалары (тек қолданбадан; пернетақта ештеңе жібермейді)
+	mux.Handle("POST /api/v1/analytics/events", s.requireUser(eventsLimit(http.HandlerFunc(s.handleProductEvents))))
 
 	// --- төлемдер (демо адаптер)
 	mux.Handle("POST /api/v1/payments/checkout", s.requireUser(http.HandlerFunc(s.handleCheckout)))

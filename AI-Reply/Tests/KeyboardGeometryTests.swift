@@ -121,4 +121,87 @@ final class KeyboardGeometryTests: XCTestCase {
         XCTAssertEqual(layout.key(at: CGPoint(x: -10, y: -10))?.action, .character("q"))
         XCTAssertEqual(layout.key(at: CGPoint(x: 500, y: -10))?.action, .character("p"))
     }
+
+    // MARK: Persona row
+
+    /// Roughly "Друг", "Клиент", "Бизнес", "Работа" at the row's 14pt font.
+    private let fourPersonas: [CGFloat] = [33, 47, 50, 50]
+
+    /// ✨ comes first, at the leading edge; the personas follow it, in order,
+    /// and fill the rest of the row. There is no other action on the row.
+    /// (Below 375pt four Russian names scroll; see the crowded-row test.)
+    func testPersonaRowStartsWithCreateAndPersonasFollowIt() {
+        for width in portraitWidths + [844] where width >= 375 {
+            let row = PersonaRowLayout(width: width, textWidths: fourPersonas)
+            let create = row.createFrame
+            XCTAssertEqual(create, CGRect(x: 8, y: 3, width: 38, height: 30), "w=\(width)")
+
+            XCTAssertEqual(row.pillFrames.count, 4)
+            let pills = row.pillFrames.map { $0.offsetBy(dx: row.personasFrame.minX, dy: 0) }
+            XCTAssertEqual(pills[0].minX - create.maxX, PersonaRowLayout.spacing, accuracy: 0.01, "one gap after ✨")
+            for (left, right) in zip(pills, pills.dropFirst()) {
+                XCTAssertEqual(right.minX - left.maxX, PersonaRowLayout.spacing, accuracy: 0.01)
+            }
+            for pill in pills {
+                XCTAssertEqual(pill.minY, create.minY)
+                XCTAssertEqual(pill.height, create.height)
+                // Nothing past the trailing inset: no slot is left for a "+".
+                XCTAssertLessThanOrEqual(pill.maxX, width - PersonaRowLayout.edgeInset + 0.01, "w=\(width)")
+            }
+            XCTAssertFalse(row.scrolls, "four personas fit at w=\(width)")
+            // Stretched to the trailing edge, unless each already got the
+            // largest stretch allowed.
+            let slack = width - PersonaRowLayout.edgeInset - pills[3].maxX
+            let stretched = pills[0].width - (fourPersonas[0] + PersonaRowLayout.paddings[0] * 2)
+            if stretched < PersonaRowLayout.maximumStretch {
+                XCTAssertLessThan(slack, CGFloat(pills.count), "w=\(width)")
+            }
+        }
+    }
+
+    /// The suggestion strip covers exactly the personas' viewport: everything
+    /// right of ✨ and nothing of ✨ itself, so ✨ stays visible and tappable
+    /// while a word is typed.
+    func testSuggestionAreaIsTheRowRightOfCreate() {
+        for width in portraitWidths {
+            let row = PersonaRowLayout(width: width, textWidths: fourPersonas)
+            XCTAssertFalse(row.personasFrame.intersects(row.createFrame), "w=\(width)")
+            XCTAssertEqual(row.personasFrame.minX, row.createFrame.maxX + PersonaRowLayout.spacing / 2)
+            XCTAssertEqual(row.personasFrame.maxX, width)
+            XCTAssertEqual(row.personasFrame.minY, 0)
+            XCTAssertEqual(row.personasFrame.height, PersonaRowLayout.height)
+        }
+    }
+
+    /// Neither ✨ nor the strip's area depends on the personas, so a new
+    /// template, a rename or a language switch never moves them.
+    func testCreateAndSuggestionAreaNeverMove() {
+        let reference = PersonaRowLayout(width: 393, textWidths: fourPersonas)
+        for texts in [[], [40], fourPersonas, Array(repeating: CGFloat(90), count: 8)] {
+            let row = PersonaRowLayout(width: 393, textWidths: texts)
+            XCTAssertEqual(row.createFrame, reference.createFrame)
+            XCTAssertEqual(row.personasFrame, reference.personasFrame)
+        }
+    }
+
+    /// Too many personas for the width: they keep the tightest padding and
+    /// scroll, never cut a name, and never slide under ✨.
+    func testCrowdedPersonaRowScrollsRightOfCreate() {
+        let texts = Array(repeating: CGFloat(80), count: 7)
+        let row = PersonaRowLayout(width: 375, textWidths: texts)
+        XCTAssertTrue(row.scrolls)
+        let tightest = PersonaRowLayout.paddings.last!
+        for pill in row.pillFrames {
+            XCTAssertEqual(pill.width, 80 + tightest * 2)
+            XCTAssertGreaterThanOrEqual(pill.minX, 0, "content starts inside the viewport, after ✨")
+        }
+        XCTAssertEqual(row.contentWidth, row.pillFrames.last!.maxX + PersonaRowLayout.edgeInset)
+    }
+
+    func testEmptyPersonaRowStillOffersCreate() {
+        let row = PersonaRowLayout(width: 390, textWidths: [])
+        XCTAssertTrue(row.pillFrames.isEmpty)
+        XCTAssertFalse(row.scrolls)
+        XCTAssertEqual(row.createFrame.minX, PersonaRowLayout.edgeInset)
+    }
 }

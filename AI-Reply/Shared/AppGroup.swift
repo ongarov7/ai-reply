@@ -8,7 +8,7 @@ import Foundation
 /// signing Xcode regenerates them on the next build.
 enum AppGroup {
 
-    static let identifier = "group.kz.yerek.replykeyboard"
+    static let identifier = "group.kz.ai-reply.shared"
 
     /// Defaults shared between the app and the keyboard.
     ///
@@ -26,4 +26,11 @@ enum AppGroup {
     static var isAvailable: Bool {
         FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: identifier) != nil
     }
+}
+
+/// Keychain access group shared by the containing app and its keyboard.
+/// This value must match the expanded `keychain-access-groups` entitlement.
+enum KeychainGroup {
+
+    static let identifier = "2PK6339Q47.kz.ai-reply.shared"
 }

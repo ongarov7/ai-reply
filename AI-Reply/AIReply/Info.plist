@@ -2,12 +2,22 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>CFBundleDevelopmentRegion</key>
-	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>AIReplyAppIdentifierPrefix</key>
+	<string>$(AppIdentifierPrefix)</string>
+	<key>AIReplyFirebaseAPIKey</key>
+	<string>$(FIREBASE_API_KEY)</string>
+	<key>AIReplyFirebaseAppID</key>
+	<string>$(FIREBASE_GOOGLE_APP_ID)</string>
+	<key>AIReplyFirebaseProjectID</key>
+	<string>$(FIREBASE_PROJECT_ID)</string>
+	<key>AIReplyFirebaseSenderID</key>
+	<string>$(FIREBASE_GCM_SENDER_ID)</string>
 	<key>AIReplyPushNotifications</key>
 	<string>$(AIREPLY_PUSH_NOTIFICATIONS)</string>
 	<key>AIReplySignInWithApple</key>
 	<string>$(AIREPLY_SIGN_IN_WITH_APPLE)</string>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
 	<string>AI Reply</string>
 	<key>CFBundleExecutable</key>
@@ -20,6 +30,8 @@
 	<string>$(PRODUCT_NAME)</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -33,12 +45,16 @@
 			</array>
 		</dict>
 	</array>
-	<key>CFBundleShortVersionString</key>
-	<string>1.0</string>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>4</string>
+	<key>FirebaseAppDelegateProxyEnabled</key>
+	<false/>
+	<key>FirebaseMessagingAutoInitEnabled</key>
+	<false/>
 	<key>GIDClientID</key>
 	<string>$(GOOGLE_IOS_CLIENT_ID)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>AI Reply uses the microphone only while you are dictating a reply, and only after you tap the voice button.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>

@@ -65,6 +65,20 @@ data class NotificationPreferencesDto(
 @Serializable
 private data class NotificationPreferencesUpdate(val preferences: Map<String, Boolean>)
 
+/** `POST /api/v1/notifications/opened`: a tap on one delivery to this installation. */
+@Serializable
+data class NotificationOpenedRequest(
+    @SerialName("installation_id") val installationId: String,
+    @SerialName("delivery_id") val deliveryId: String
+)
+
+@Serializable
+data class NotificationOpenedResponse(
+    val ok: Boolean = false,
+    /** False when the delivery is not one the server sent to this installation. */
+    val recorded: Boolean = false
+)
+
 /** Registers this installation. Throws [kz.yerek.aireply.data.account.ApiException]. */
 fun interface InstallationApi {
     /** [token] null registers anonymously, which detaches it from any account. */
@@ -77,15 +91,23 @@ interface NotificationPreferencesApi {
     suspend fun update(changes: Map<String, Boolean>): NotificationPreferencesDto
 }
 
-/** Both, over the app's [ApiClient]. */
+/** Records that a notification was opened. Throws [kz.yerek.aireply.data.account.ApiException]. */
+fun interface NotificationOpenedApi {
+    suspend fun opened(request: NotificationOpenedRequest): NotificationOpenedResponse
+}
+
+/** Everything the push code asks of the server. */
+interface PushApi : InstallationApi, NotificationPreferencesApi, NotificationOpenedApi
+
+/** [PushApi] over the app's [ApiClient]. */
 class HttpPushApi(
     private val client: () -> ApiClient,
     private val session: SessionAuth
-) : InstallationApi, NotificationPreferencesApi {
+) : PushApi {
 
     override suspend fun register(request: InstallationRequest, token: String?): InstallationResponse {
         val body = json.encodeToString(InstallationRequest.serializer(), request)
-        return decode(InstallationResponse.serializer(), client().request("POST", "api/v1/installations", body, token))
+        return decode(InstallationResponse.serializer(), client().request("POST", INSTALLATIONS, body, token))
     }
 
     override suspend fun load(): NotificationPreferencesDto = session.authenticated { token ->
@@ -102,8 +124,19 @@ class HttpPushApi(
         }
     }
 
+    /**
+     * Sent without a token: the server matches the delivery to the
+     * installation, and a tap must not wait for, or fail on, a token refresh.
+     */
+    override suspend fun opened(request: NotificationOpenedRequest): NotificationOpenedResponse {
+        val body = json.encodeToString(NotificationOpenedRequest.serializer(), request)
+        return decode(NotificationOpenedResponse.serializer(), client().request("POST", OPENED, body))
+    }
+
     companion object {
+        private const val INSTALLATIONS = "api/v1/installations"
         private const val PREFERENCES = "api/v1/me/notification-preferences"
+        private const val OPENED = "api/v1/notifications/opened"
 
         /** Every field goes out; a null `push` is left out, not sent as null. */
         val json = Json {

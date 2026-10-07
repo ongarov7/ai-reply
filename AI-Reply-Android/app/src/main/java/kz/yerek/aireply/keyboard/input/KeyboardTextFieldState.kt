@@ -61,6 +61,22 @@ class KeyboardTextFieldState(initial: String = "") {
         return true
     }
 
+    /**
+     * Replaces the [length] UTF-16 units before the caret with [value] and
+     * puts the caret after it: an autocorrection, a picked suggestion, an
+     * undone correction. Refused, like [insert], when the result would pass
+     * [limit] characters, or when there are not [length] units to replace.
+     */
+    fun replaceBeforeCursor(length: Int, value: String, limit: Int? = null): Boolean {
+        val at = cursor.coerceIn(0, text.length)
+        if (length < 0 || length > at) return false
+        val next = text.substring(0, at - length) + value + text.substring(at)
+        if (limit != null && next.codePointLength() > limit) return false
+        text = next
+        cursor = at - length + value.length
+        return true
+    }
+
     /** Deletes the character before the caret - a whole emoji or combined letter. */
     fun deleteBackward(): Boolean {
         val at = cursor.coerceIn(0, text.length)

@@ -12,23 +12,23 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
+import kz.yerek.aireply.data.account.ApiClient
 import kz.yerek.aireply.data.account.ApiError
 import kz.yerek.aireply.data.account.ApiException
 import kz.yerek.aireply.data.account.ServerConfigDto
 import kz.yerek.aireply.data.account.SessionAuth
-import kz.yerek.aireply.data.account.TransportFailure
 import kz.yerek.aireply.push.HttpPushApi
 import kz.yerek.aireply.push.InstallationApi
 import kz.yerek.aireply.push.InstallationRegistrar
 import kz.yerek.aireply.push.InstallationRegistrar.Outcome
 import kz.yerek.aireply.push.InstallationRequest
 import kz.yerek.aireply.push.InstallationResponse
+import kz.yerek.aireply.push.NotificationOpenedRequest
 import kz.yerek.aireply.push.PushStateStore
 import kz.yerek.aireply.push.PushTokenDto
 import kz.yerek.aireply.support.FakeCredentials
 import kz.yerek.aireply.support.FakeResponse
 import kz.yerek.aireply.support.FakeServer
-import kz.yerek.aireply.support.InMemoryPreferences
 import kz.yerek.aireply.support.sessionOn
 import kz.yerek.aireply.support.tokenPair
 import org.junit.Assert.assertEquals
@@ -165,6 +165,47 @@ class InstallationRegistrarTest {
     }
 
     @Test
+    fun `a sign-out after a sign-in whose answer was lost still registers anonymously`() = runBlocking {
+        val session = SimpleSession(signedIn = false, token = "t1")
+        val registrar = registrar(session)
+        val accept = api.answer
+        assertTrue(registrar.syncOnce() is Outcome.Synced)
+
+        // The server may have attached the installation; the answer never came.
+        session.signedIn = true
+        store.accountUserId = "user-a"
+        api.answer = { _, _ -> throw ApiException(ApiError.Offline) }
+        assertTrue(registrar.syncOnce() is Outcome.RetryLater)
+
+        session.signedIn = false
+        store.accountUserId = null
+        api.answer = accept
+        assertTrue("the anonymous state is sent again", registrar.syncOnce() is Outcome.Synced)
+        assertEquals(listOf(null, "t1", null), api.calls.map { it.second })
+    }
+
+    @Test
+    fun `a sign-in after a sign-out whose answer was lost attaches again`() = runBlocking {
+        val session = SimpleSession(signedIn = true, token = "t1")
+        store.accountUserId = "user-a"
+        val registrar = registrar(session)
+        val accept = api.answer
+        assertTrue(registrar.syncOnce() is Outcome.Synced)
+
+        // The anonymous registration may have detached it; the answer never came.
+        session.signedIn = false
+        store.accountUserId = null
+        api.answer = { _, _ -> throw ApiException(ApiError.Server, httpStatus = 503) }
+        assertTrue(registrar.syncOnce() is Outcome.RetryLater)
+
+        session.signedIn = true
+        store.accountUserId = "user-a"
+        api.answer = accept
+        assertTrue("the same account is attached again", registrar.syncOnce() is Outcome.Synced)
+        assertEquals(listOf("t1", null, "t1"), api.calls.map { it.second })
+    }
+
+    @Test
     fun `a 401 refreshes the token once and retries once`() = runBlocking {
         val server = FakeServer { request ->
             if (request.path == "/api/v1/auth/refresh") tokenPair("new", "r2")
@@ -187,9 +228,7 @@ class InstallationRegistrarTest {
 
     @Test
     fun `network trouble backs off, and the same payload waits for it`() = runBlocking {
-        api.answer = { _, _ ->
-            throw ApiException(ApiError.Offline, httpStatus = 0, transport = TransportFailure.OFFLINE)
-        }
+        api.answer = { _, _ -> throw ApiException(ApiError.Offline) }
         val registrar = registrar(SimpleSession(signedIn = false))
 
         assertEquals(Outcome.RetryLater(30_000), registrar.syncOnce())
@@ -266,7 +305,7 @@ class InstallationRegistrarTest {
         val scope = CoroutineScope(dispatcher + Job())
         var failures = 1
         api.answer = { request, _ ->
-            if (failures-- > 0) throw ApiException(ApiError.Offline, httpStatus = 0, transport = TransportFailure.OFFLINE)
+            if (failures-- > 0) throw ApiException(ApiError.Offline)
             InstallationResponse(installationId = request.installationId)
         }
         val registrar = InstallationRegistrar(
@@ -293,7 +332,7 @@ class InstallationRegistrarTest {
     }
 
     @Test
-    fun `an old server has no installations, push or telemetry`() {
+    fun `an old server has no installations, push or preferred language`() {
         val json = Json { ignoreUnknownKeys = true }
         val production = json.decodeFromString(
             ServerConfigDto.serializer(),
@@ -301,14 +340,14 @@ class InstallationRegistrarTest {
         ).features!!
         assertFalse(production.installations)
         assertFalse(production.pushNotifications)
-        assertFalse(production.telemetry)
+        assertFalse(production.preferredLanguage)
         assertTrue("sign-in flags still default to on", production.appleSignIn)
 
         val current = json.decodeFromString(
             ServerConfigDto.serializer(),
-            """{"features": {"installations": true, "push_notifications": true, "telemetry": true}}"""
+            """{"features": {"installations": true, "push_notifications": true, "preferred_language": true}}"""
         ).features!!
-        assertTrue(current.installations && current.pushNotifications && current.telemetry)
+        assertTrue(current.installations && current.pushNotifications && current.preferredLanguage)
     }
 
     @Test
@@ -378,6 +417,66 @@ class InstallationRegistrarTest {
         assertFalse(same == InstallationRegistrar.fingerprint(request, "user-b"))
         assertFalse(same == InstallationRegistrar.fingerprint(request, InstallationRegistrar.ANONYMOUS))
         assertFalse("the token is not kept in the clear", same.contains("fcm"))
+    }
+
+    // ------------------------------------------------------------------ wire
+
+    @Test
+    fun `a registration goes to the installations endpoint with the token it was given`() = runBlocking {
+        val server = FakeServer {
+            FakeResponse(200, """{"installation_id":"${request.installationId}","attached":true,"push_status":"active","push_available":true,"preferences":{"marketing":false}}""")
+        }
+        val api = HttpPushApi(
+            client = { ApiClient("https://example.test", openConnection = server::open) },
+            session = SimpleSession(signedIn = true)
+        )
+
+        val response = api.register(request.copy(push = PushTokenDto("fcm", "fcm-token-000000000000000003")), "t1")
+        api.register(request, null)
+
+        val (signedIn, anonymous) = server.requests.toList()
+        assertEquals("POST", signedIn.method)
+        assertEquals("/api/v1/installations", signedIn.path)
+        assertEquals("Bearer t1", signedIn.header("Authorization"))
+        assertNull("anonymous: no token at all", anonymous.header("Authorization"))
+        assertNull("no metadata headers", signedIn.header("X-Installation-ID"))
+        assertEquals("\"fcm\"", Json.parseToJsonElement(signedIn.body).jsonObject["push"]!!.jsonObject["provider"].toString())
+        assertTrue(response.attached)
+        assertEquals(mapOf("marketing" to false), response.preferences)
+    }
+
+    @Test
+    fun `a refused registration keeps its status for the backoff rule`() = runBlocking {
+        val server = FakeServer { FakeResponse(400, FakeServer.envelope("INVALID_REQUEST")) }
+        val api = HttpPushApi(
+            client = { ApiClient("https://example.test", openConnection = server::open) },
+            session = SimpleSession(signedIn = false)
+        )
+        val failure = runCatching { api.register(request, null) }.exceptionOrNull() as ApiException
+        assertEquals(400, failure.httpStatus)
+        assertTrue(InstallationRegistrar.isPermanent(failure))
+        assertFalse(InstallationRegistrar.isPermanent(ApiException(ApiError.Offline)))
+        assertFalse(InstallationRegistrar.isPermanent(ApiException(ApiError.Unauthorized, httpStatus = 401)))
+    }
+
+    @Test
+    fun `a tapped notification is recorded for this installation, without a token`() = runBlocking {
+        val server = FakeServer { FakeResponse(200, """{"ok":true,"recorded":true}""") }
+        val api = HttpPushApi(
+            client = { ApiClient("https://example.test", openConnection = server::open) },
+            session = SimpleSession(signedIn = true)
+        )
+
+        val response = api.opened(NotificationOpenedRequest(request.installationId, "5e55a0b1-0000-4000-8000-000000000001"))
+
+        assertTrue(response.recorded)
+        val sent = server.requests.single()
+        assertEquals("POST", sent.method)
+        assertEquals("/api/v1/notifications/opened", sent.path)
+        assertNull(sent.header("Authorization"))
+        val body = Json.parseToJsonElement(sent.body).jsonObject
+        assertEquals(setOf("installation_id", "delivery_id"), body.keys)
+        assertEquals("\"${request.installationId}\"", body["installation_id"].toString())
     }
 
     private fun sample() = InstallationRequest(

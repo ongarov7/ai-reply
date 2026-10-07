@@ -27,6 +27,9 @@ struct AccountReplyTransport: ReplyTransport {
         /// reply's language follows the incoming message unless the user set a
         /// preference (`replyLanguage`).
         var appLanguage: String
+        /// The keyboard layout ("kk" / "ru" / "en") active when Reply was
+        /// tapped, if the request came from the keyboard.
+        var inputLanguage: String? = nil
         var business: WorkingHours.Context?
         /// The user's own profile as edited in the app. Sent with every
         /// request because the server copy is only written at registration:
@@ -44,6 +47,9 @@ struct AccountReplyTransport: ReplyTransport {
         /// "kk" / "ru" / "en" / "uz", or nil to answer in the language of the
         /// incoming message. Only sent to a server that understands it.
         var replyLanguage: String?
+        /// «Рад» or «рада»; nil when the user was never asked. Only sent to a
+        /// server that understands it.
+        var grammaticalGender: GrammaticalGender? = nil
     }
 
     private let context: RequestContext
@@ -62,7 +68,7 @@ struct AccountReplyTransport: ReplyTransport {
 
     // MARK: Wire format
 
-    private struct Business: Encodable {
+    struct Business: Encodable {
         let offering: String?
         let summary: String?
         let rules: [String]?
@@ -78,7 +84,7 @@ struct AccountReplyTransport: ReplyTransport {
         }
     }
 
-    private struct Template: Encodable {
+    struct Template: Encodable {
         let name: String
         let relationship: String
         let tone: String
@@ -89,7 +95,7 @@ struct AccountReplyTransport: ReplyTransport {
         let business: Business?
     }
 
-    private struct WorkingHoursBlock: Encodable {
+    struct WorkingHoursBlock: Encodable {
         let enabled: Bool
         let is_within_working_hours: Bool
         let current_local_time: String
@@ -97,18 +103,22 @@ struct AccountReplyTransport: ReplyTransport {
         let weekly_schedule: String?
     }
 
-    private struct ProfileBlock: Encodable {
+    struct ProfileBlock: Encodable {
         let description: String?
         let role: String?
         let preferred_tone: String
         let business: Business?
         let reply_language: String?
+        let grammatical_gender: String?
     }
 
-    private struct Request: Encodable {
+    /// The request body. Built by `body(for:...)` so tests can pin exactly
+    /// which fields an older server is spared.
+    struct Body: Encodable {
         let source_text: String
         let instruction: String?
         let language: String
+        let input_language: String?
         let template_id: String
         let template: Template
         let profile: ProfileBlock?
@@ -118,19 +128,24 @@ struct AccountReplyTransport: ReplyTransport {
     }
 
     /// The profile block, or nil when there is nothing personal to send.
-    /// `reply_language` is included only when the server has said it knows
-    /// the field: an older server rejects unknown fields outright.
-    static func profileBlock(_ profile: Profile?, serverSupportsPreferences: Bool) -> ProfileBlockSnapshot? {
+    /// `reply_language` and `grammatical_gender` are included only when the
+    /// server has said it knows them: an older server rejects unknown fields
+    /// outright.
+    static func profileBlock(
+        _ profile: Profile?,
+        serverSupportsPreferences: Bool,
+        serverSupportsSenderProfile: Bool
+    ) -> ProfileBlockSnapshot? {
         guard let profile else { return nil }
         let description = profile.description.trimmingCharacters(in: .whitespacesAndNewlines)
         let role = profile.role.trimmingCharacters(in: .whitespacesAndNewlines)
-        let language = serverSupportsPreferences ? profile.replyLanguage : nil
         return ProfileBlockSnapshot(
             description: description.isEmpty ? nil : description,
             role: role.isEmpty ? nil : role,
             preferredTone: profile.preferredTone.rawValue,
             hasBusiness: !profile.business.isEmpty,
-            replyLanguage: language
+            replyLanguage: serverSupportsPreferences ? profile.replyLanguage : nil,
+            grammaticalGender: serverSupportsSenderProfile ? profile.grammaticalGender?.rawValue : nil
         )
     }
 
@@ -142,24 +157,26 @@ struct AccountReplyTransport: ReplyTransport {
         let preferredTone: String
         let hasBusiness: Bool
         let replyLanguage: String?
+        let grammaticalGender: String?
     }
 
-    // MARK: Call
-
-    func generate(prompt: ReplyPromptBuilder.Prompt) async throws -> GeneratedReply {
-        guard let baseURL = AIConfiguration.shared.backendBaseURL else {
-            throw AIReplyError.notConfigured
-        }
-        guard session.isSignedIn else { throw AIReplyError.authenticationFailed }
-
-        let client = APIClient(baseURL: baseURL)
-        let descriptor = DeviceDescriptor.current
+    static func body(
+        for context: RequestContext,
+        descriptor: DeviceDescriptor = .current,
+        serverSupportsPreferences: Bool = AILimits.serverSupportsReplyPreferences,
+        serverSupportsSenderProfile: Bool = AILimits.serverSupportsSenderProfile
+    ) -> Body {
         let instruction = context.instruction.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        let request = Request(
+        let profile = profileBlock(
+            context.profile,
+            serverSupportsPreferences: serverSupportsPreferences,
+            serverSupportsSenderProfile: serverSupportsSenderProfile
+        )
+        return Body(
             source_text: context.message,
             instruction: instruction.isEmpty ? nil : instruction,
             language: context.appLanguage,
+            input_language: serverSupportsSenderProfile ? context.inputLanguage : nil,
             template_id: context.templateID,
             template: Template(
                 name: context.templateName,
@@ -171,16 +188,16 @@ struct AccountReplyTransport: ReplyTransport {
                 working_hours_behaviour: context.templateWorkingHoursBehaviour.rawValue,
                 business: Business(context.templateBusiness)
             ),
-            profile: Self.profileBlock(context.profile, serverSupportsPreferences: AILimits.serverSupportsReplyPreferences)
-                .map { snapshot in
-                    ProfileBlock(
-                        description: snapshot.description,
-                        role: snapshot.role,
-                        preferred_tone: snapshot.preferredTone,
-                        business: snapshot.hasBusiness ? Business(context.profile?.business) : nil,
-                        reply_language: snapshot.replyLanguage
-                    )
-                },
+            profile: profile.map { snapshot in
+                ProfileBlock(
+                    description: snapshot.description,
+                    role: snapshot.role,
+                    preferred_tone: snapshot.preferredTone,
+                    business: snapshot.hasBusiness ? Business(context.profile?.business) : nil,
+                    reply_language: snapshot.replyLanguage,
+                    grammatical_gender: snapshot.grammaticalGender
+                )
+            },
             business_context: context.business.map {
                 WorkingHoursBlock(
                     enabled: $0.isEnabled,
@@ -193,10 +210,22 @@ struct AccountReplyTransport: ReplyTransport {
             platform: descriptor.platform,
             app_version: descriptor.app_version
         )
+    }
+
+    // MARK: Call
+
+    func generate(prompt: ReplyPromptBuilder.Prompt) async throws -> GeneratedReply {
+        guard let baseURL = AIConfiguration.shared.backendBaseURL else {
+            throw AIReplyError.notConfigured
+        }
+        guard session.isSignedIn else { throw AIReplyError.authenticationFailed }
+
+        let client = APIClient(baseURL: baseURL)
+        let body = Self.body(for: context)
 
         do {
             let response: AccountAPI.ReplyResponse = try await session.authenticated { token in
-                try await client.post("api/v1/ai/reply", body: request, token: token)
+                try await client.post("api/v1/ai/reply", body: body, token: token)
             }
             onUsage?(response.usage)
 

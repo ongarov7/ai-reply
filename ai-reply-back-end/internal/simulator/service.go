@@ -7,10 +7,10 @@
 //
 // Екі шекара әдейі қатты:
 //
-//	1. Барлық жазу тек AccountID аккаунтына тиеді. Басқа қолданушының
-//	   профилі де, жазылымы да симулятор арқылы өзгермейді.
-//	2. Тариф бағасы өндірістік конфигурация. Симулятордағы «баға өзгерту»
-//	   тек жадтағы демо қабатқа жазылады (PlanDraft), plans кестесіне емес.
+//  1. Барлық жазу тек AccountID аккаунтына тиеді. Басқа қолданушының
+//     профилі де, жазылымы да симулятор арқылы өзгермейді.
+//  2. Тариф бағасы өндірістік конфигурация. Симулятордағы «баға өзгерту»
+//     тек жадтағы демо қабатқа жазылады (PlanDraft), plans кестесіне емес.
 package simulator
 
 import (
@@ -275,6 +275,7 @@ func (s *Service) Generate(ctx context.Context, in GenerateInput) (GenerateResul
 			Summary:  profile.BusinessSummary,
 			Rules:    profile.BusinessRules,
 		},
+		GrammaticalGender: profile.GrammaticalGender,
 	}
 	trace := []string{"incoming_message"}
 	if strings.TrimSpace(in.Instruction) != "" {

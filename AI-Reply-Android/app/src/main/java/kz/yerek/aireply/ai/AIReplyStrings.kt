@@ -52,5 +52,7 @@ class AppStrings(private val context: Context) {
         AIReplyError.QuotaExhausted -> get(R.string.kb_err_quota_exhausted)
         AIReplyError.EmptyResponse -> get(R.string.kb_err_empty_response)
         AIReplyError.ServiceUnavailable -> get(R.string.kb_err_service_unavailable)
+        AIReplyError.NoInstruction -> get(R.string.kb_compose_err_no_instruction)
+        is AIReplyError.InstructionTooLong -> get(R.string.kb_compose_err_too_long, error.limit)
     }
 }

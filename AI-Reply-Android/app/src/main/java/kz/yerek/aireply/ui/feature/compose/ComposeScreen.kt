@@ -44,7 +44,10 @@ import kz.yerek.aireply.ai.AIConfiguration
 import kz.yerek.aireply.ai.AIReplyError
 import kz.yerek.aireply.ai.AIReplyException
 import kz.yerek.aireply.ai.AIReplyService
+import kz.yerek.aireply.core.lang.AppLanguage
 import kz.yerek.aireply.core.lang.TemplateNaming
+import kz.yerek.aireply.domain.model.ReplyConfiguration
+import kz.yerek.aireply.domain.model.ReplyTemplate
 import kz.yerek.aireply.ui.LocalServices
 import kz.yerek.aireply.ui.common.AppScreen
 import kz.yerek.aireply.ui.common.Footnote
@@ -56,6 +59,30 @@ import kz.yerek.aireply.ui.design.ReadableColumn
 import kz.yerek.aireply.ui.design.Spacing
 import kz.yerek.aireply.ui.feature.profile.SelectableRow
 import kz.yerek.aireply.ui.feature.voice.DictationSheet
+
+/**
+ * The request "Try a reply" sends: the same one the keyboard sends, minus a
+ * keyboard layout, because there is none here.
+ *
+ * The message goes exactly as pasted (the service only trims it), and nothing
+ * here names a reply language: the reply follows the language of the incoming
+ * message, so a Kazakh message gets a Kazakh reply whatever the phone's or the
+ * app's language. [uiLanguage] only names the template the way the user saw it.
+ */
+internal fun tryReplyRequest(
+    message: String,
+    template: ReplyTemplate,
+    configuration: ReplyConfiguration,
+    uiLanguage: AppLanguage,
+    instruction: String
+): AIReplyService.Request = AIReplyService.Request(
+    message = message,
+    template = template,
+    configuration = configuration,
+    uiLanguage = uiLanguage,
+    instruction = instruction,
+    inputLanguage = null
+)
 
 /**
  * The in-app reply flow: paste or dictate a message, say who it is from, add an
@@ -104,7 +131,7 @@ fun ComposeScreen(onBack: () -> Unit) {
         job = scope.launch {
             try {
                 val generated = services.replyService.generate(
-                    AIReplyService.Request(
+                    tryReplyRequest(
                         message = message,
                         template = template,
                         configuration = configuration,

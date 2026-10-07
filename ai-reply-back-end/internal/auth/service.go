@@ -299,7 +299,7 @@ func (s *Service) openSession(ctx context.Context, user domain.User, isNew bool,
 
 // issueSession — құрылғыны тіркеп, токендер жұбын береді.
 func (s *Service) issueSession(ctx context.Context, user domain.User, info DeviceInfo, family string) (Session, error) {
-	deviceRecord := domain.Device{
+	device, err := s.repo.UpsertDevice(ctx, domain.Device{
 		ID:         info.DeviceID,
 		UserID:     user.ID,
 		Platform:   info.Platform,
@@ -307,15 +307,7 @@ func (s *Service) issueSession(ctx context.Context, user domain.User, info Devic
 		OSVersion:  info.OSVersion,
 		Model:      info.Model,
 		Locale:     domain.NormalizeLocale(info.Locale),
-	}
-	device, err := s.repo.UpsertDevice(ctx, deviceRecord)
-	if errors.Is(err, domain.ErrConflict) {
-		// The device id belongs to another account (a shared phone, a restored
-		// backup): this session gets a device record of its own instead of
-		// taking that one over. The app adopts the id from the response.
-		deviceRecord.ID = ""
-		device, err = s.repo.UpsertDevice(ctx, deviceRecord)
-	}
+	})
 	if err != nil {
 		return Session{}, err
 	}
@@ -428,13 +420,7 @@ func (s *Service) Refresh(ctx context.Context, rawToken string, info DeviceInfo)
 	}, nil
 }
 
-// Logout — берілген refresh токенді жабады.
-func (s *Service) Logout(ctx context.Context, rawToken string) error {
-	_, err := s.LogoutSession(ctx, rawToken)
-	return err
-}
-
-// LogoutSession — Logout, және токен қай тіркелгіге тиесілі болғаны ("" — белгісіз).
+// LogoutSession — берілген refresh токенді жабады; токен қай тіркелгіге тиесілі болғанын қайтарады ("" — белгісіз).
 //
 // The account id lets the caller detach the app installation from that
 // account in the same request, so no push meant for it reaches the phone

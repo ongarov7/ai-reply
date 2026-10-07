@@ -13,12 +13,160 @@ import kz.yerek.aireply.platform.ReplyLog
  * to do something a few milliseconds after the field it was editing went away,
  * and a keyboard that crashes inside WhatsApp is the worst failure this project
  * can produce.
+ *
+ * COMPOSING TEXT. While smart correction is on, the word being typed is the
+ * field's composing text ([compose]): the app underlines it and the keyboard
+ * can still replace it. Every other edit ends the word first, exactly as typed
+ * ([finishComposing]), so no operation ever works on a half-composed field;
+ * with smart correction off nothing is ever composed and every call below is
+ * the plain `commitText` / `deleteSurroundingText` it always was.
  */
 class HostField(private val connectionProvider: () -> InputConnection?) {
 
     var editorInfo: EditorInfo? = null
+        private set
+
+    /** The word being typed, shown by the app as composing text; empty when there is none. */
+    var composingText: String = ""
+        private set
+
+    /** The text before [composingText] when the word started, for autocorrect's guard. */
+    var textBeforeComposing: String = ""
+        private set
+
+    private val selection = HostSelection()
+
+    /** Where the composing text starts in the host's text; -1 when unknown. */
+    private var composingStart = -1
 
     private val connection: InputConnection? get() = connectionProvider()
+
+    // ------------------------------------------------------------- lifecycle
+
+    /**
+     * A field starts, or the app restarted the same one. A word still being
+     * composed is ended first: after a restart the app keeps its composing
+     * region, and the next letter must not replace it.
+     *
+     * The keyboard shown again over the same field gets the same EditorInfo,
+     * whose initial selection is long out of date; the selection reports kept
+     * coming meanwhile, so what they said is kept.
+     */
+    fun startInput(info: EditorInfo?, restarting: Boolean) {
+        if (restarting && composingText.isNotEmpty()) connection?.finishComposingText()
+        clearComposing()
+        val shownAgain = !restarting && info != null && info === editorInfo
+        editorInfo = info
+        if (!shownAgain) selection.reset(info?.initialSelStart ?: -1, info?.initialSelEnd ?: -1)
+    }
+
+    /** The field went away; its connection may already be gone, so nothing is sent. */
+    fun endInput() {
+        clearComposing()
+        selection.forget()
+    }
+
+    /**
+     * The app reported its selection. Returns true when that was not an echo
+     * of the keyboard's own edits - a tap elsewhere, a paste, the app clearing
+     * the field. A word being typed then ends where it stands, the caret
+     * untouched.
+     */
+    fun selectionChanged(selectionStart: Int, selectionEnd: Int, composingStart: Int, composingEnd: Int): Boolean {
+        val external = selection.report(selectionStart, selectionEnd, composingStart, composingEnd)
+        if (external && composingText.isNotEmpty()) {
+            connection?.finishComposingText()
+            clearComposing()
+        }
+        return external
+    }
+
+    /** One undoable step for the app, and one selection report: several edits as a batch. */
+    fun <T> batch(edit: () -> T): T {
+        val connection = connection
+        connection?.beginBatchEdit()
+        try {
+            return edit()
+        } finally {
+            connection?.endBatchEdit()
+        }
+    }
+
+    // ------------------------------------------------------------- composing
+
+    /**
+     * The text before the caret when a new word may start there, or null: the
+     * caret's position must be known (it anchors the composing region), and
+     * neither side of the caret or selection may be part of a word - typing
+     * into the middle of one stays plain, as it always was.
+     */
+    fun contextForNewWord(isWordCharacter: (Char) -> Boolean): String? {
+        val connection = connection ?: return null
+        if (composingText.isNotEmpty() || !selection.isKnown) return null
+        val before = connection.getTextBeforeCursor(WORD_CONTEXT, 0)?.toString() ?: return null
+        if (before.lastOrNull()?.let(isWordCharacter) == true) return null
+        val after = connection.getTextAfterCursor(1, 0)?.toString().orEmpty()
+        if (after.firstOrNull()?.let(isWordCharacter) == true) return null
+        return before
+    }
+
+    /**
+     * Shows [text] as the word being typed. The first call starts the word at
+     * the caret (replacing a selection), with [before] as the text before it;
+     * an empty [text] removes the word.
+     */
+    fun compose(text: String, before: String = textBeforeComposing) {
+        val connection = connection ?: return
+        if (composingText.isEmpty()) {
+            if (text.isEmpty()) return
+            // A region some other edit left behind would be replaced: end it.
+            if (selection.appHasComposing) connection.finishComposingText()
+            composingStart = if (selection.isKnown) selection.start else -1
+            textBeforeComposing = before
+        }
+        if (text.isEmpty()) {
+            connection.commitText("", 1)
+            expectCaret(composingStart)
+            clearComposing()
+            return
+        }
+        connection.setComposingText(text, 1)
+        composingText = text
+        if (composingStart >= 0) {
+            selection.expect(composingStart + text.length, composingStart, composingStart + text.length)
+        } else {
+            selection.forget()
+        }
+    }
+
+    /** Replaces the word being typed with [text] - a correction and its separator - and ends it. */
+    fun commitComposing(text: String) {
+        if (composingText.isEmpty()) {
+            commitText(text)
+            return
+        }
+        connection?.commitText(text, 1)
+        expectCaret(if (composingStart >= 0) composingStart + text.length else -1)
+        clearComposing()
+    }
+
+    /** Ends the word being typed exactly as it is; the caret stays where it is. */
+    fun finishComposing() {
+        if (composingText.isEmpty()) return
+        connection?.finishComposingText()
+        expectCaret(if (selection.isCollapsed) selection.start else -1)
+        clearComposing()
+    }
+
+    private fun clearComposing() {
+        composingText = ""
+        textBeforeComposing = ""
+        composingStart = -1
+    }
+
+    private fun expectCaret(caret: Int) {
+        if (caret >= 0) selection.expect(caret) else selection.forget()
+    }
 
     /**
      * How much context is read at a time.
@@ -33,10 +181,15 @@ class HostField(private val connectionProvider: () -> InputConnection?) {
     // --------------------------------------------------------------- writing
 
     fun commitText(text: String) {
-        connection?.commitText(text, 1)
+        finishComposing()
+        val connection = connection ?: return
+        connection.commitText(text, 1)
+        // Replaces a selection, if there was one.
+        expectCaret(if (selection.isKnown) selection.start + text.length else -1)
     }
 
     fun deleteBackward() {
+        finishComposing()
         val connection = connection ?: return
         // Delete the selection if there is one; otherwise one character. Asking
         // for one "character" by code point rather than by UTF-16 unit is what
@@ -44,6 +197,7 @@ class HostField(private val connectionProvider: () -> InputConnection?) {
         val selected = connection.getSelectedText(0)
         if (!selected.isNullOrEmpty()) {
             connection.commitText("", 1)
+            expectCaret(if (selection.isKnown) selection.start else -1)
             return
         }
         val before = connection.getTextBeforeCursor(2, 0)?.toString().orEmpty()
@@ -52,7 +206,7 @@ class HostField(private val connectionProvider: () -> InputConnection?) {
             before.length >= 2 && Character.isSurrogatePair(before[before.length - 2], before[before.length - 1]) -> 2
             else -> 1
         }
-        connection.deleteSurroundingText(length, 0)
+        deleteBefore(length)
     }
 
     /**
@@ -60,24 +214,35 @@ class HostField(private val connectionProvider: () -> InputConnection?) {
      * key does. One cross-process read, one delete.
      */
     fun deleteWordBackward() {
+        finishComposing()
         val connection = connection ?: return
         val selected = connection.getSelectedText(0)
         if (!selected.isNullOrEmpty()) {
             connection.commitText("", 1)
+            expectCaret(if (selection.isKnown) selection.start else -1)
             return
         }
         val before = connection.getTextBeforeCursor(WORD_WINDOW, 0)?.toString().orEmpty()
         val length = kz.yerek.aireply.keyboard.layout.TextDeletion.wordLength(before)
-        if (length > 0) connection.deleteSurroundingText(length, 0)
+        if (length > 0) deleteBefore(length)
+    }
+
+    /** Deletes [length] UTF-16 units right before a collapsed caret. */
+    fun deleteBefore(length: Int) {
+        finishComposing()
+        val connection = connection ?: return
+        connection.deleteSurroundingText(length, 0)
+        expectCaret(if (selection.isCollapsed) (selection.start - length).coerceAtLeast(0) else -1)
     }
 
     /**
-     * Moves the caret by whole characters (space-bar trackpad) from
-     * [position], the caret as `onUpdateSelection` last reported it. Reads
-     * just enough text either side to step over emoji rather than into them.
+     * Moves the caret by whole characters (space-bar trackpad). Reads just
+     * enough text either side to step over emoji rather than into them.
      */
-    fun moveCursorBy(offset: Int, position: Int) {
+    fun moveCursorBy(offset: Int) {
+        finishComposing()
         val connection = connection ?: return
+        val position = selection.end
         if (offset == 0 || position < 0) return
         val window = kotlin.math.abs(offset) * 2 + 2
         val before = connection.getTextBeforeCursor(window, 0)?.toString().orEmpty()
@@ -101,28 +266,41 @@ class HostField(private val connectionProvider: () -> InputConnection?) {
         if (units == 0) return
         val target = (position + units).coerceAtLeast(0)
         connection.setSelection(target, target)
+        selection.expect(target)
     }
 
     /** Puts the caret after the last character, so Add appends at the end. */
     fun moveCaretToEnd() {
+        finishComposing()
         val connection = connection ?: return
         val after = connection.getTextAfterCursor(MAX_CLEAR, 0)?.length ?: 0
         if (after == 0) return
         val before = connection.getTextBeforeCursor(MAX_CLEAR, 0)?.length ?: 0
         connection.setSelection(before + after, before + after)
+        selection.forget()
     }
 
+    /** True when return means a new line rather than the field's action (Send, Search…). */
+    val returnIsNewline: Boolean
+        get() {
+            val action = editorInfo?.imeOptions?.and(EditorInfo.IME_MASK_ACTION) ?: EditorInfo.IME_ACTION_NONE
+            val isMultiline = editorInfo?.inputType?.and(InputType.TYPE_TEXT_FLAG_MULTI_LINE) != 0
+            return isMultiline || action == EditorInfo.IME_ACTION_NONE || action == EditorInfo.IME_ACTION_UNSPECIFIED
+        }
+
     fun sendReturn() {
+        finishComposing()
         val connection = connection ?: return
-        val action = editorInfo?.imeOptions?.and(EditorInfo.IME_MASK_ACTION) ?: EditorInfo.IME_ACTION_NONE
-        val isMultiline = editorInfo?.inputType?.and(InputType.TYPE_TEXT_FLAG_MULTI_LINE) != 0
         // A multi-line field wants a newline; a single-line field with a Send or
         // Search action wants that action. Getting this backwards either sends a
         // half-written message or leaves the user unable to send at all.
-        if (isMultiline || action == EditorInfo.IME_ACTION_NONE || action == EditorInfo.IME_ACTION_UNSPECIFIED) {
-            connection.commitText("\n", 1)
+        if (returnIsNewline) {
+            commitText("\n")
         } else {
+            val action = editorInfo?.imeOptions?.and(EditorInfo.IME_MASK_ACTION) ?: EditorInfo.IME_ACTION_NONE
             connection.performEditorAction(action)
+            // Sending usually clears the field: nothing about it is predictable.
+            selection.forget()
         }
     }
 
@@ -164,11 +342,13 @@ class HostField(private val connectionProvider: () -> InputConnection?) {
      * another app's field. Neither is needed here.
      */
     fun clear() {
+        finishComposing()
         val connection = connection ?: return
         val before = connection.getTextBeforeCursor(MAX_CLEAR, 0)?.length ?: 0
         val after = connection.getTextAfterCursor(MAX_CLEAR, 0)?.length ?: 0
         if (before == 0 && after == 0) return
         connection.deleteSurroundingText(before, after)
+        selection.forget()
         ReplyLog.event { "cleared host field, $before before / $after after" }
     }
 
@@ -223,5 +403,11 @@ class HostField(private val connectionProvider: () -> InputConnection?) {
 
         /** Enough to find the start of any real word. */
         const val WORD_WINDOW = 64
+
+        /**
+         * The text read when a word starts: enough for autocorrect's guard (the
+         * chunk before the word) and no more, since each read crosses processes.
+         */
+        const val WORD_CONTEXT = 48
     }
 }

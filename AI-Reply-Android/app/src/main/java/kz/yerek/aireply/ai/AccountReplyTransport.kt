@@ -6,12 +6,12 @@ import kotlinx.serialization.json.Json
 import kz.yerek.aireply.data.account.ApiClient
 import kz.yerek.aireply.data.account.ApiError
 import kz.yerek.aireply.data.account.ApiException
-import kz.yerek.aireply.data.account.HeaderScope
 import kz.yerek.aireply.data.account.AccountSession
 import kz.yerek.aireply.data.account.AccountUsageCache
 import kz.yerek.aireply.data.account.ReplyResponseDto
 import kz.yerek.aireply.domain.model.BusinessContext
 import kz.yerek.aireply.domain.model.EmojiPolicy
+import kz.yerek.aireply.domain.model.GrammaticalGender
 import kz.yerek.aireply.domain.model.ReplyLength
 import kz.yerek.aireply.domain.model.ReplyTone
 import kz.yerek.aireply.domain.model.WorkingHours
@@ -25,9 +25,10 @@ import kz.yerek.aireply.domain.model.WorkingHoursBehaviour
  * This is the transport a signed-in user gets. Compared with the legacy
  * install-token path it adds two things: the request is attributed to a real
  * account, and the response carries the quota back, so the keyboard can show
- * "3 left today" without a second round trip. The profile is not sent — the
- * server holds it — but the template and working-hours context still are,
- * because those are per-reply choices the user just made on screen.
+ * "3 left today" without a second round trip. The template and working-hours
+ * context are per-reply choices the user just made on screen. The profile
+ * travels too, so an edit made after registration reaches the very next
+ * reply — but only to a server that announced it accepts it ([AIFeatures]).
  */
 class AccountReplyTransport(
     private val baseUrl: String,
@@ -60,45 +61,23 @@ class AccountReplyTransport(
          */
         val appLanguage: String,
         val business: WorkingHours.Context?,
-        val appVersion: String
+        val appVersion: String,
+        /** "About me", trimmed. Empty when the user wrote nothing. */
+        val profileDescription: String = "",
+        val profileRole: String = "",
+        val profileTone: ReplyTone = ReplyTone.NATURAL,
+        val profileBusiness: BusinessContext = BusinessContext.EMPTY,
+        /** Null until the user was asked. Only the enum value is ever sent. */
+        val grammaticalGender: GrammaticalGender? = null,
+        /** The keyboard layout's code (`kk`, `ru`, `en`) when Reply was tapped. */
+        val inputLanguage: String? = null
     )
 
     override suspend fun generate(prompt: ReplyPromptBuilder.Prompt): GeneratedReply {
         if (!session.isSignedIn) AIReplyError.AuthenticationFailed.raise()
 
-        // Reply requests carry no installation or session id: typing in
-        // another app is never tied to this installation.
-        val client = ApiClient(baseUrl, timeoutMs, scope = HeaderScope.KEYBOARD)
-        val body = json.encodeToString(
-            ReplyRequest.serializer(),
-            ReplyRequest(
-                sourceText = context.message,
-                instruction = context.userInstruction.trim().ifEmpty { null },
-                language = context.appLanguage,
-                templateId = context.templateId,
-                template = Template(
-                    name = context.templateName,
-                    relationship = context.templateRelationship,
-                    tone = context.templateTone.raw,
-                    instructions = context.templateInstructions,
-                    replyLength = context.templateReplyLength.raw,
-                    emojiPolicy = context.templateEmojiPolicy.raw,
-                    workingHoursBehaviour = context.templateWorkingHoursBehaviour.raw,
-                    business = Business.of(context.templateBusiness)
-                ),
-                businessContext = context.business?.let {
-                    WorkingHoursBlock(
-                        enabled = it.isEnabled,
-                        isWithinWorkingHours = it.isWithinWorkingHours,
-                        currentLocalTime = it.currentLocalTime,
-                        nextWorkingPeriod = it.nextWorkingPeriod,
-                        weeklySchedule = it.weeklySchedule
-                    )
-                },
-                platform = "android",
-                appVersion = context.appVersion
-            )
-        )
+        val client = ApiClient(baseUrl, timeoutMs)
+        val body = encode(context, AILimits.features)
 
         val payload = try {
             session.authenticated { token ->
@@ -129,9 +108,24 @@ class AccountReplyTransport(
         val language: String,
         @SerialName("template_id") val templateId: String,
         val template: Template,
+        val profile: ProfileBlock? = null,
         @SerialName("business_context") val businessContext: WorkingHoursBlock? = null,
+        @SerialName("input_language") val inputLanguage: String? = null,
         val platform: String,
         @SerialName("app_version") val appVersion: String
+    )
+
+    /**
+     * Who is replying. Every field is optional: an empty one is left out, and
+     * the server falls back to the copy it saved at registration.
+     */
+    @Serializable
+    private data class ProfileBlock(
+        val description: String? = null,
+        val role: String? = null,
+        @SerialName("preferred_tone") val preferredTone: String? = null,
+        val business: Business? = null,
+        @SerialName("grammatical_gender") val grammaticalGender: String? = null
     )
 
     @Serializable
@@ -181,6 +175,70 @@ class AccountReplyTransport(
         }
 
         /**
+         * The wire format, exposed so tests can pin it without a server.
+         *
+         * Each optional field goes only to a server that announced it: the
+         * profile basics with [AIFeatures.replyPreferences], the gender and the
+         * layout language with [AIFeatures.senderProfile].
+         */
+        internal fun encode(context: RequestContext, features: AIFeatures): String =
+            json.encodeToString(
+                ReplyRequest.serializer(),
+                ReplyRequest(
+                    sourceText = context.message,
+                    instruction = context.userInstruction.trim().ifEmpty { null },
+                    language = context.appLanguage,
+                    templateId = context.templateId,
+                    template = Template(
+                        name = context.templateName,
+                        relationship = context.templateRelationship,
+                        tone = context.templateTone.raw,
+                        instructions = context.templateInstructions,
+                        replyLength = context.templateReplyLength.raw,
+                        emojiPolicy = context.templateEmojiPolicy.raw,
+                        workingHoursBehaviour = context.templateWorkingHoursBehaviour.raw,
+                        business = Business.of(context.templateBusiness)
+                    ),
+                    profile = profileBlock(context, features),
+                    businessContext = context.business?.let {
+                        WorkingHoursBlock(
+                            enabled = it.isEnabled,
+                            isWithinWorkingHours = it.isWithinWorkingHours,
+                            currentLocalTime = it.currentLocalTime,
+                            nextWorkingPeriod = it.nextWorkingPeriod,
+                            weeklySchedule = it.weeklySchedule
+                        )
+                    },
+                    inputLanguage = context.inputLanguage.takeIf { features.senderProfile },
+                    platform = "android",
+                    appVersion = context.appVersion
+                )
+            )
+
+        /**
+         * Null when there is nothing to say: no text, the default tone and no
+         * gender. A gender on its own still sends the block.
+         */
+        private fun profileBlock(context: RequestContext, features: AIFeatures): ProfileBlock? {
+            val basics = features.replyPreferences
+            val description = context.profileDescription.takeIf { basics && it.isNotEmpty() }
+            val role = context.profileRole.takeIf { basics && it.isNotEmpty() }
+            val business = if (basics) Business.of(context.profileBusiness) else null
+            val gender = context.grammaticalGender?.raw.takeIf { features.senderProfile }
+            val customTone = basics && context.profileTone != ReplyTone.NATURAL
+            if (description == null && role == null && business == null && gender == null && !customTone) {
+                return null
+            }
+            return ProfileBlock(
+                description = description,
+                role = role,
+                preferredTone = context.profileTone.raw.takeIf { basics },
+                business = business,
+                grammaticalGender = gender
+            )
+        }
+
+        /**
          * Backend failures become the closed set the UI already knows how to
          * show.
          *
@@ -207,6 +265,8 @@ class AccountReplyTransport(
             }
             is ApiError.InvalidRequest ->
                 AIReplyError.MessageTooLong(AILimits.current.sourceCharacters)
+            // The instruction, not the message: say so, with the server's limit.
+            is ApiError.InstructionTooLong -> AIReplyError.InstructionTooLong(error.limit)
             else -> AIReplyError.ServiceUnavailable
         }
     }

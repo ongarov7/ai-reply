@@ -84,10 +84,14 @@ func (s *Service) SetUserStatus(ctx context.Context, admin domain.AdminUser, ip,
 
 // AssignPlan — тарифті ауыстыру.
 func (s *Service) AssignPlan(ctx context.Context, admin domain.AdminUser, ip, userID, planID string, expires *time.Time) error {
-	if _, err := s.subs.Assign(ctx, userID, planID, "admin", expires); err != nil {
+	sub, err := s.subs.Assign(ctx, userID, planID, "admin", expires)
+	if err != nil {
 		return err
 	}
 	s.Audit(ctx, admin, ip, "subscription.assign", "user", userID, map[string]any{"plan_id": planID})
+	if s.events != nil {
+		s.events.PlanAssigned(ctx, sub)
+	}
 	return nil
 }
 

@@ -4,6 +4,7 @@ package domain
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -53,6 +54,23 @@ const (
 	PlatformLegacy  = "legacy"
 )
 
+// Жіберушінің грамматикалық жынысы (user_profiles.grammatical_gender).
+// Тек орыс тіліндегі септеу үшін: есімнен, поштадан не хат-хабардан ешқашан
+// болжанбайды, пайдаланушы өзі таңдайды.
+const (
+	GenderMale        = "male"
+	GenderFemale      = "female"
+	GenderUnspecified = "unspecified"
+)
+
+// IsGrammaticalGender — рұқсат етілген мән бе.
+func IsGrammaticalGender(v string) bool {
+	return v == GenderMale || v == GenderFemale || v == GenderUnspecified
+}
+
+// MaxOnboardingVersion — клиент жібере алатын онбординг нұсқасының шегі.
+const MaxOnboardingVersion = 1000
+
 // Қолдау көрсетілетін тілдер.
 var Locales = []string{"kk", "ru", "en", "uz"}
 
@@ -63,6 +81,34 @@ func NormalizeLocale(v string) string {
 	}
 	for _, l := range Locales {
 		if l == v {
+			return l
+		}
+	}
+	return "en"
+}
+
+// NormalizePreferredLanguage — клиент жіберген тіл коды → kk | ru | en | uz, белгісізі "".
+//
+// Unlike NormalizeLocale nothing falls back to English silently: "RU" and
+// "ru-KZ" become "ru", an unsupported code becomes "" and the caller decides
+// (PATCH /me rejects it).
+func NormalizePreferredLanguage(v string) string {
+	v = strings.ToLower(strings.TrimSpace(v))
+	if i := strings.IndexAny(v, "-_"); i >= 0 {
+		v = v[:i]
+	}
+	for _, l := range Locales {
+		if l == v {
+			return l
+		}
+	}
+	return ""
+}
+
+// ResolveLanguage — бірінші қолдау көрсетілетін тіл (preferred → орнату → тіркелгі), әйтпесе en.
+func ResolveLanguage(candidates ...string) string {
+	for _, c := range candidates {
+		if l := NormalizePreferredLanguage(c); l != "" {
 			return l
 		}
 	}
@@ -82,9 +128,12 @@ type User struct {
 	OSVersion    string
 	Kind         string
 	LegacyClient string
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-	LastActiveAt *time.Time
+	// PreferredLanguage — қолданушы өзі таңдаған тіл (kk | ru | en | uz), "" — таңдалмаған.
+	// Хабарламалар мен хаттардың тілі осыдан шығады; Locale әр кірген сайын жаңарады.
+	PreferredLanguage string
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+	LastActiveAt      *time.Time
 }
 
 // Identifier — көрсетуге жарамды негізгі идентификатор.
@@ -127,7 +176,12 @@ type Profile struct {
 	BusinessSummary     string
 	BusinessRules       []string
 	OnboardingCompleted bool
-	UpdatedAt           time.Time
+	// GrammaticalGender — male | female | unspecified. Жеке дерек: журналға,
+	// usage оқиғасына және әкімші JSON-ына түспейді.
+	GrammaticalGender string
+	// OnboardingVersion — аяқталған онбордингтің ең жоғары нұсқасы (тек өседі).
+	OnboardingVersion int
+	UpdatedAt         time.Time
 }
 
 // LegalConsent records the exact public document versions accepted by an account.
@@ -268,7 +322,12 @@ type UsageEvent struct {
 	AppVersion   string
 	Language     string
 	SourceChars  int
-	CreatedAt    time.Time
+	// Mode — reply | compose | polish. Reply мен compose бір квотаны жұмсайды,
+	// polish квотаға кірмейді.
+	Mode string
+	// PromptVersion — reply_v2, reply_v2+repair_v1, compose_v2, polish_v1 …
+	PromptVersion string
+	CreatedAt     time.Time
 }
 
 // AdminUser — әкімші тіркелгісі (мобильді қолданушыдан бөлек).
@@ -295,7 +354,6 @@ type AuditEntry struct {
 	EntityID   string
 	Metadata   map[string]any
 	IP         string
-	RequestID  string
 	CreatedAt  time.Time
 }
 
@@ -346,6 +404,11 @@ var (
 	// ErrInvalidRequest-ті орайды: ескі клиенттер бұрынғыдай INVALID_REQUEST
 	// алады, жаңалары details ішінен нақты шекті оқиды.
 	ErrSourceTooLong = fmt.Errorf("%w: source text too long", ErrInvalidRequest)
+
+	// ErrInstructionMissing / ErrInstructionTooLong — compose режимінің нұсқауы
+	// бос немесе әкімші бекіткен шектен ұзын. Екеуі де INVALID_REQUEST.
+	ErrInstructionMissing = fmt.Errorf("%w: instruction is empty", ErrInvalidRequest)
+	ErrInstructionTooLong = fmt.Errorf("%w: instruction too long", ErrInvalidRequest)
 )
 
 // RetryAfterError — қатемен бірге қайта сұрауға болатын уақыт.
@@ -392,7 +455,7 @@ func (e *OTPAttemptError) Details() map[string]any {
 
 // Push хабарламалары.
 var (
-	// ErrPushDisabled — PUSH_NOTIFICATIONS_ENABLED=false не бірде-бір провайдер бапталмаған.
+	// ErrPushDisabled — PUSH_NOTIFICATIONS_ENABLED=false не FCM бапталмаған.
 	ErrPushDisabled = errors.New("push notifications are not configured")
 )
 

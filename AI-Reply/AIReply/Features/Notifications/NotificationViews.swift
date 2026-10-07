@@ -207,22 +207,3 @@ struct NotificationSettingsSection: View {
         UIApplication.shared.open(url)
     }
 }
-
-/// Settings ▸ Diagnostics: the one switch for app events.
-struct DiagnosticsSettingsSection: View {
-
-    @Environment(PushNotificationsModel.self) private var notifications
-
-    var body: some View {
-        Section {
-            Toggle("settings.diagnostics.share", isOn: Binding(
-                get: { notifications.sharesDiagnostics },
-                set: { notifications.setSharesDiagnostics($0) }
-            ))
-        } header: {
-            Text("settings.diagnostics")
-        } footer: {
-            Text("settings.diagnostics.footer")
-        }
-    }
-}

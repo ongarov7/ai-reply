@@ -11,7 +11,8 @@ Mobile (iOS / Android / клавиатура)
    AI Reply Backend  ──►  Auth ──► Quota ──► AI Gateway ──► OpenAI
         │                                   (ключ только на сервере)
         ├── SQLite (только метаданные: тексты переписки не хранятся)
-        ├── /admin  — Vue SPA: дашборд, пользователи, тарифы, аудит
+        ├── outbox уведомлений ──► FCM (Android и iOS) · Resend (письма)
+        ├── /admin  — Vue SPA: дашборд, пользователи, тарифы, аудит, уведомления
         └── /       — лендинг (kk / ru / en / uz)
 ```
 
@@ -85,13 +86,12 @@ internal/
   plans/             каталог тарифов
   subscriptions/     подписки и расчёт текущего лимита (entitlement)
   ai/                промпт, клиент OpenAI Responses API, шлюз с учётом токенов
+  productevents/     события онбординга и настроек из приложений: закрытый список, только счётчики
   payments/          интерфейс эквайринга + demo-адаптер
   installations/     реестр установок приложений, зашифрованные push-токены
-  push/              FCM HTTP v1 и APNs (.p8) без SDK, классификация ошибок
-  notifications/     уведомления, кампании, outbox-диспетчер, повторы, бизнес-события
-  telemetry/         события приложений, журнал входов, ошибки API, сроки хранения
-  reqctx/ redact/    метаданные клиента и request id; маскирование секретов и PII
-  admin/             права ролей, диагностика пользователя, названия устройств
+  push/              FCM HTTP v1 без SDK (Android и iOS), классификация ошибок
+  notifications/     уведомления, кампании, outbox-диспетчер (push и письма), бизнес-события
+  email/             Resend: код входа и письма уведомлений
   localization/      kk/ru/en/uz для веба и админки
   middleware/        request-id, логи, паника, CORS, заголовки, rate limit
   simulator/       демо-аккаунт, демо-данные и демо-слой тарифов для /simulator
@@ -113,13 +113,16 @@ internal/
 - access (15 мин) + refresh с ротацией и детектом переиспользования;
 - профиль, устройства, тарифы, подписки, usage;
 - AI-ответ через сервер: квота → провайдер → учёт токенов и стоимости;
+- качество ответа: версионированные промпты (`reply_v2`, `compose_v2`), язык
+  ответа решает входящее сообщение (казахское — ответ на казахском, даже при русских
+  телефоне, раскладке и инструкции), род отправителя для русских форм, очистка
+  вывода, проверка и одна исправляющая попытка, подсказка `/ai/polish` без квоты,
+  набор оценки (`internal/ai/eval`) — [docs/AI_QUALITY.md](docs/AI_QUALITY.md);
 - лимиты живут в БД: 30 → 50 в день меняется в админке без релиза приложения;
+- события онбординга и настроек (`POST /api/v1/analytics/events`): закрытый список
+  имён и значений, счётчики по именам в дашборде админки;
 - админка: дашборд с графиками, пользователи, CRUD тарифов, аудит, настройки;
-- push-уведомления (Android — FCM, iOS — APNs): установки с аккаунтом и без, кампании
-  с серверным подсчётом аудитории и `Idempotency-Key`, outbox с повторами, автоматические
-  push об оплате и подписке, статистика без подмены «принято провайдером» на «прочитано»;
-- телеметрия: разрешённые события приложений, журнал входов, ошибки API с `request_id`,
-  журналы и диагностика в админке по правам — [../docs/notifications.md](../docs/notifications.md);
+- push-уведомления через FCM на Android и iOS — см. раздел ниже;
 - лендинг на 4 языках с анимированной демонстрацией работы клавиатуры;
 - вход по телефону из приложений убран; эндпоинты `/auth/request-otp` и
   `/auth/verify-otp` оставлены только для уже установленных сборок;
@@ -139,12 +142,37 @@ internal/
 | Текст сообщения в БД | НЕТ — в схеме нет такой колонки |
 | Текст виден администратору | НЕТ — в admin API нет таких полей |
 | Текст в логах | НЕТ — логируются только метаданные |
+| Текст подсказки `/ai/polish` (заметка и исправленный вариант) в БД или логах | НЕТ — только длина, токены и `mode = 'polish'` |
+| Род отправителя в логах, событиях или admin JSON | НЕТ — хранится только в профиле и идёт в промпт |
+| Свободный текст в продуктовых событиях | НЕТ — только имена, коды, числа 0…1000 и bool из закрытого списка сервера |
 | Push-токен в логах / админке | НЕТ — в БД зашифрован, наружу только отпечаток `fcm:1a2b3c4d` |
-| Ключи FCM / APNs в приложениях | НЕТ — только `.env` на сервере |
+| Ключ Firebase в приложениях | НЕТ — сервисный аккаунт только в `.env` сервера |
 
 Тест `TestMessageContentIsNeverPersisted` отправляет уникальную строку через
 `/api/v1/ai/reply` и ищет её в файле БД, WAL и логах — любой найденный след
-роняет сборку.
+роняет сборку. `TestComposeContentIsNeverPersisted` и `TestPolishTextIsNeverPersisted`
+делают то же для «Создать» и для подсказки polish, `TestProductEventsNeverStoreText`
+— для продуктовых событий.
+
+## Push-уведомления
+
+Одна очередь (`notification_deliveries`) для push и писем; отправляет диспетчер
+в фоне, повторяет временные ошибки, выключает мёртвые токены. FCM доставляет и на
+Android, и на iOS (через APNs-ключ, загруженный в Firebase). Без ключей сервер
+работает: события пишутся как `skipped`, `features.push_notifications = false`.
+
+- Приложения регистрируют установку (`POST /api/v1/installations`, FCM-токен,
+  язык, разрешение); выход с `X-Installation-ID` отвязывает телефон от аккаунта.
+- Автоматически: тариф подключён (оплата или админ — push и письмо), тариф скоро
+  закончится / закончился, ответы на сегодня почти закончились / закончились.
+  Каждое событие — не больше одного уведомления (уникальный ключ в БД).
+- Кампании из админки: тексты на kk/ru/en (uz по желанию), каждому — на его языке,
+  аудитория считается на сервере, `Idempotency-Key`, статистика по языкам.
+- Настройка: `PUSH_NOTIFICATIONS_ENABLED=true` и сервисный аккаунт Firebase
+  (`FIREBASE_SERVICE_ACCOUNT_FILE` или `FIREBASE_PROJECT_ID` / `_CLIENT_EMAIL` /
+  `_PRIVATE_KEY`); письма — уже настроенный Resend.
+
+Подробно: [../docs/notifications.md](../docs/notifications.md), API — [docs/API.md](docs/API.md#установки-и-push-уведомления).
 
 ## Команды
 
@@ -163,11 +191,12 @@ make secrets     # сгенерировать JWT/legacy секреты
 - Google / Apple: client ID в `.env` (`GOOGLE_CLIENT_ID_IOS`, `GOOGLE_CLIENT_ID_WEB`,
   `APPLE_CLIENT_ID`);
 - реальный эквайринг — один интерфейс `payments.Provider`;
-- push: ключи FCM и APNs в `.env` и `PUSH_NOTIFICATIONS_ENABLED=true` —
-  [../docs/notifications.md](../docs/notifications.md) (разделы 8–10);
+- push: проект Firebase с приложениями `kz.yerek.aireply` и `kz.ai-reply.reply.keyboard.keyboard`,
+  APNs-ключ в Firebase, сервисный аккаунт и `PUSH_NOTIFICATIONS_ENABLED=true` в `.env` —
+  [../docs/notifications.md](../docs/notifications.md);
 - rate limiter в памяти → Redis при нескольких инстансах;
 - `APP_ENV=production`, HTTPS, `ADMIN_SECURE_COOKIES=true`, `AUTH_DEMO_MODE=false`.
 
 Подробности: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md),
-[docs/API.md](docs/API.md), [docs/AUTH.md](docs/AUTH.md),
+[docs/API.md](docs/API.md), [docs/AUTH.md](docs/AUTH.md), [docs/AI_QUALITY.md](docs/AI_QUALITY.md),
 [docs/MOBILE_MIGRATION.md](docs/MOBILE_MIGRATION.md).

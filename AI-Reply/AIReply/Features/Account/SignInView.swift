@@ -80,14 +80,14 @@ struct SignInView: View {
             switch result {
             case .success(let authorization):
                 guard let credential = AppleSignIn.credential(from: authorization) else {
-                    account.reportProviderFailure(errorCode: "missing_identity_token")
+                    account.reportProviderFailure()
                     return
                 }
                 let nonce = appleNonce
                 Task { finish(await account.signInWithApple(credential, rawNonce: nonce)) }
             case .failure(let error):
                 if !AppleSignIn.isCancellation(error) {
-                    account.reportProviderFailure(errorCode: AppleSignIn.errorCode(for: error))
+                    account.reportProviderFailure()
                 }
             }
         }

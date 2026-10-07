@@ -40,6 +40,8 @@ final class AccountModel {
 
     private(set) var phase: Phase
     private(set) var user: AccountAPI.User?
+    /// The server's copy of the profile, as of the last answer that carried it.
+    private(set) var profile: AccountAPI.Profile?
     private(set) var subscription: AccountAPI.Subscription?
     private(set) var usage: AccountAPI.Usage = .unknown
     private(set) var plans: [AccountAPI.Plan] = []
@@ -55,10 +57,16 @@ final class AccountModel {
 
     @ObservationIgnored private let service: AccountService
 
-    /// Hears about a sign-out and about sign-in failures inside Apple's or
-    /// Google's own sheet, which the server never sees. The app turns these
-    /// into app events; this model knows nothing about telemetry.
-    @ObservationIgnored var onActivity: ((AccountActivity) -> Void)?
+    /// Runs the moment the server's profile arrives - sign-in, `/me`, adding
+    /// an e-mail - before the screens switch. The app takes a gender chosen
+    /// on another device here, so a returning user's onboarding never asks
+    /// the question again.
+    @ObservationIgnored var didReceiveProfile: (@MainActor (AccountAPI.Profile?) -> Void)?
+
+    /// This phone's installation, named on the logout request so the server
+    /// stops sending the account's notifications to it at once. Nil when
+    /// there is none to name.
+    @ObservationIgnored var installationIDForSignOut: (@MainActor () -> String?)?
 
     init(service: AccountService = AccountService()) {
         self.service = service
@@ -107,6 +115,7 @@ final class AccountModel {
             // The limits the administrator set, for the app's own composer
             // and - through the App Group - for the keyboard.
             AILimits.apply(config)
+            ProductEvents.storeServerSupport(config.features)
         }
         hasAcceptedLegal = LegalConsentStore.hasAccepted(legalConfig)
     }
@@ -143,6 +152,7 @@ final class AccountModel {
         do {
             let account = try await service.account()
             apply(user: account.user, subscription: account.subscription, usage: account.usage)
+            receive(account.profile)
             applyLegalConsent(account.legalConsent)
             phase = .signedIn
         } catch APIError.unauthorized {
@@ -272,11 +282,9 @@ final class AccountModel {
             return .cancelled
         } catch GoogleSignInProvider.Failure.notConfigured {
             errorKey = "account.error.providerUnavailable"
-            onActivity?(.providerSignInFailed(method: .google, errorCode: "not_configured"))
             return .failed(clearCode: false)
         } catch {
             errorKey = "account.error.providerFailed"
-            onActivity?(.providerSignInFailed(method: .google, errorCode: "sdk_error"))
             return .failed(clearCode: false)
         }
 
@@ -289,11 +297,9 @@ final class AccountModel {
         }
     }
 
-    /// Apple's own sheet failed before our server was involved. `errorCode`
-    /// is a short machine code (`AppleSignIn.errorCode(for:)`), never a message.
-    func reportProviderFailure(errorCode: String = "provider_error") {
+    /// Apple's own sheet failed before our server was involved.
+    func reportProviderFailure() {
         errorKey = "account.error.providerFailed"
-        onActivity?(.providerSignInFailed(method: .apple, errorCode: errorCode))
     }
 
     /// The session is stored and the screens switch now. Device registration
@@ -301,6 +307,9 @@ final class AccountModel {
     /// to the short profile step instead of flashing the home screen first.
     private func completeSignIn(_ session: AccountAPI.Session) -> SignInOutcome {
         apply(user: session.user, subscription: session.subscription, usage: session.usage)
+        // Before the phase flips: onboarding decides its steps from what the
+        // device knows at that moment.
+        receive(session.profile)
         applyLegalConsent(session.legalConsent)
         phase = .signedIn
         pendingEmail = ""
@@ -331,6 +340,7 @@ final class AccountModel {
     func verifyLinkEmailCode(email: String, code: String) async throws {
         let account = try await service.verifyLinkEmailCode(email: email, code: code)
         apply(user: account.user, subscription: account.subscription, usage: account.usage)
+        receive(account.profile)
     }
 
     // MARK: Legal and session
@@ -343,21 +353,22 @@ final class AccountModel {
 
     func signOut() async {
         isBusy = true
-        onActivity?(.signedOut)
-        // The logout request names this installation (X-Installation-ID), so
-        // the server stops sending this account's notifications to the phone
-        // at once; the app then registers it again without an account.
-        await service.signOut()
+        await service.signOut(installationID: installationIDForSignOut?())
         await signOutLocally()
         isBusy = false
     }
 
     private func signOutLocally() async {
+        // A gender or language change this account never received stays
+        // with it: it must not be sent to whoever signs in next on this phone.
+        ProfileSync.discardPendingChange()
+        PreferredLanguageSync.discardPendingChange()
         AccountCredentials.clear()
         AccountUsageCache.clear()
         AppleSignIn.forget()
         GoogleSignInProvider.signOut()
         user = nil
+        profile = nil
         subscription = nil
         usage = .unknown
         phase = .signedOut
@@ -380,6 +391,8 @@ final class AccountModel {
         update.locale = locale
         update.timezone = TimeZone.current.identifier
         update.onboarding_completed = true
+        // The language of the account's notifications, where the server has it.
+        if features?.preferredLanguage == true { update.preferred_language = locale }
 
         do {
             _ = try await service.updateProfile(update)
@@ -387,6 +400,43 @@ final class AccountModel {
             return true
         } catch {
             errorKey = Self.message(for: error)
+            return false
+        }
+    }
+
+    /// Sends the sender fields - the grammatical gender, the onboarding this
+    /// device finished - to a server that publishes `sender_profile`.
+    ///
+    /// Returns false when nothing reached the server: signed out, an older
+    /// server, or a failure. Nothing is shown for it; the caller keeps the
+    /// change pending and it is retried on the next foreground.
+    func updateSenderProfile(gender: GrammaticalGender? = nil, onboardingVersion: Int? = nil) async -> Bool {
+        guard AccountCredentials.isSignedIn, AILimits.serverSupportsSenderProfile else { return false }
+        var update = AccountService.ProfileUpdate()
+        update.grammatical_gender = gender?.rawValue
+        update.onboarding_version = onboardingVersion
+        do {
+            profile = try await service.updateProfile(update)
+            return true
+        } catch {
+            ReplyLog.event("profile sync failed: \(error)")
+            return false
+        }
+    }
+
+    /// Sends the language of the account's notifications to a server that
+    /// publishes `preferred_language`. False when nothing reached the server;
+    /// the caller keeps it pending (see `PreferredLanguageSync`).
+    func updatePreferredLanguage(_ code: String) async -> Bool {
+        guard AccountCredentials.isSignedIn, features?.preferredLanguage == true else { return false }
+        var update = AccountService.ProfileUpdate()
+        update.preferred_language = code
+        do {
+            profile = try await service.updateProfile(update)
+            user = user?.withPreferredLanguage(code)
+            return true
+        } catch {
+            ReplyLog.event("preferred language sync failed: \(error)")
             return false
         }
     }
@@ -419,6 +469,12 @@ final class AccountModel {
     }
 
     // MARK: Helpers
+
+    /// The server's copy of the profile arrived.
+    private func receive(_ profile: AccountAPI.Profile?) {
+        self.profile = profile
+        didReceiveProfile?(profile)
+    }
 
     private func apply(user: AccountAPI.User, subscription: AccountAPI.Subscription, usage: AccountAPI.Usage) {
         self.user = user

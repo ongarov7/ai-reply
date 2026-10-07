@@ -10,7 +10,11 @@
 	</array>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.kz.yerek.replykeyboard</string>
+		<string>group.kz.ai-reply.shared</string>
+	</array>
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)kz.ai-reply.shared</string>
 	</array>
 </dict>
 </plist>

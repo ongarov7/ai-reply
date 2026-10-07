@@ -50,6 +50,52 @@ final class KeyboardViewController: UIInputViewController {
     // MARK: Collaborators
 
     private lazy var replyCoordinator = ReplyFlowCoordinator(service: Self.makeService())
+    private lazy var composeCoordinator = ComposeFlowCoordinator(service: Self.makeComposeService())
+
+    /// Smart correction: the strip, the correction a separator applies, Undo.
+    private lazy var autocorrect: AutocorrectController = {
+        let controller = AutocorrectController(language: language)
+        controller.delegate = self
+        return controller
+    }()
+
+    /// The cleaner version of the instruction, offered after a pause.
+    private lazy var polisher: InstructionPolisher = {
+        let polisher = InstructionPolisher(service: Self.makePolishService())
+        polisher.onChange = { [weak self] chip in self?.actionBar.showPolish(chip) }
+        return polisher
+    }()
+
+    /// The smart-correction setting, read when the keyboard appears.
+    private var smartCorrectionEnabled = true
+    /// Whether the host field wants typing help (not an address, a code or
+    /// a password), from its text traits.
+    private var hostAllowsCorrection = true
+    /// Whether a word is being typed at the caret right now. The strip and a
+    /// separator's correction act only then - never on a word that was
+    /// already there when the keyboard appeared or the caret moved.
+    private var wordTyping = AutocorrectCaret()
+    /// A word character right after the host's caret: the caret is inside a
+    /// word, where smart correction stays out. Read together with
+    /// `hostContext`; the keyboard's own typing never changes what follows
+    /// the caret, so no keystroke has to read it.
+    private var hostCaretInsideWord = false
+
+    /// Which AI flow owns the composer panel. At most one: Create drops any
+    /// reply session when it opens, and the persona row - the only way into a
+    /// reply - is hidden while Create is open. Derived, never stored, so it
+    /// cannot disagree with the coordinators.
+    private enum AIFlow {
+        case none
+        case reply
+        case compose
+    }
+
+    private var activeFlow: AIFlow {
+        if composeCoordinator.isActive { return .compose }
+        if replyCoordinator.isComposing { return .reply }
+        return .none
+    }
 
     private var configurationLoadedAt: TimeInterval = 0
     private var lastSpaceTap: TimeInterval = 0
@@ -76,6 +122,8 @@ final class KeyboardViewController: UIInputViewController {
         view.clipsToBounds = false
         replyCoordinator.delegate = self
         replyCoordinator.uiLanguage = uiLanguage
+        composeCoordinator.delegate = self
+        composeCoordinator.uiLanguage = uiLanguage
         actionBar.delegate = self
         keysView.delegate = self
 
@@ -99,6 +147,12 @@ final class KeyboardViewController: UIInputViewController {
         refreshScreenHeight()
         reloadSettings()
         AILimits.reload()
+        smartCorrectionEnabled = SharedSettings.shared.smartCorrectionEnabled
+        // A word already in the field is not being typed: no strip over the
+        // personas until the user types one.
+        wordTyping.reset()
+        autocorrect.keyboardWillAppear(settingEnabled: smartCorrectionEnabled, language: language)
+        polisher.reset()
         refreshThemeIfNeeded()
         showsGlobe = needsInputModeSwitchKey
         plane = KeyboardFieldKind.startsOnNumbers(textDocumentProxy.keyboardType ?? .default) ? .numbers : .letters
@@ -109,6 +163,9 @@ final class KeyboardViewController: UIInputViewController {
 
         if let parked = ReplySessionParking.take() {
             replyCoordinator.restore(parked)
+        } else if let parked = ComposeSessionParking.take() {
+            composeCoordinator.restore(parked)
+            showComposePanel()
         }
     }
 
@@ -122,14 +179,23 @@ final class KeyboardViewController: UIInputViewController {
         keysView.hapticsEnabled = SharedSettings.shared.keyboardHapticsActive(hasFullAccess: hasFullAccess)
         reportActivityToContainingApp()
         if hasFullAccess { AILimitsRefresher.refreshIfStale() }
+        // Dictionaries load only now, in the background: the first frame
+        // never waits for them.
+        autocorrect.keyboardDidAppear(lexiconSource: self)
+        polisher.isEnabled = smartCorrectionEnabled && serverOffersPolish && canReachNetwork
+        refreshSuggestions()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        // An unfinished reply is kept in memory for a few minutes, so a trip
-        // to another chat to copy a message does not cost the instruction.
-        if replyCoordinator.session != nil {
+        polisher.stop()
+        autocorrect.keepCorrection()
+        // An unfinished reply or Create is kept in memory for a few minutes,
+        // so a trip to another chat does not cost the instruction. A running
+        // request is stopped: no spinner survives the keyboard going away.
+        if replyCoordinator.session != nil || composeCoordinator.isActive {
             replyCoordinator.park()
+            composeCoordinator.park()
             actionBar.endComposing()
             keysView.isInputDimmed = false
             updateGeometry(animated: false)
@@ -159,6 +225,10 @@ final class KeyboardViewController: UIInputViewController {
         let ownMutation = now - lastHostMutation < 0.45
         if !ownMutation {
             refreshHostContext()
+            // The text moved under the correction: Undo no longer applies,
+            // and no word is being typed at the new caret yet.
+            autocorrect.keepCorrection()
+            wordTyping.reset()
             if now - lastAppearanceProbe > 0.5 {
                 lastAppearanceProbe = now
                 refreshThemeIfNeeded()
@@ -166,6 +236,7 @@ final class KeyboardViewController: UIInputViewController {
         }
         refreshAutoShift()
         refreshReturnKey()
+        refreshSuggestions()
     }
 
     // MARK: Hierarchy
@@ -210,6 +281,7 @@ final class KeyboardViewController: UIInputViewController {
         if appLanguage != uiLanguage {
             uiLanguage = appLanguage
             replyCoordinator.uiLanguage = appLanguage
+            composeCoordinator.uiLanguage = appLanguage
             actionBar.configure(theme: theme, uiLanguage: appLanguage)
             applyChips(from: replyCoordinator.configuration)
         }
@@ -231,50 +303,48 @@ final class KeyboardViewController: UIInputViewController {
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.replyCoordinator.configuration = configuration
+                self.composeCoordinator.grammaticalGender = configuration.profile.grammaticalGender
                 self.applyChips(from: configuration)
             }
         }
     }
 
     /// Row chips from the full configuration, or - before it has loaded - from
-    /// the compact summary the app keeps in the App Group.
+    /// the compact summary the app keeps in the App Group. Only the personas
+    /// the user shows in the keyboard; hidden ones stay in the app.
     private func applyChips(from configuration: ReplyConfiguration?) {
         let selected = SharedSettings.shared.lastTemplateID
         if let configuration {
-            let visible = configuration.visibleTemplates
-            let hidden = configuration.templates
-                .filter { !$0.isVisible }
-                .sorted { $0.sortIndex < $1.sortIndex }
             actionBar.setChips(
-                visible.map { TemplateChip(id: $0.id, name: $0.displayName(appLanguage: uiLanguage)) },
-                more: hidden.map { TemplateChip(id: $0.id, name: $0.displayName(appLanguage: uiLanguage)) },
+                configuration.visibleTemplates.map { TemplateChip(id: $0.id, name: $0.displayName(appLanguage: uiLanguage)) },
                 selectedID: selected
             )
         } else if let summaries = SharedSettings.shared.templateSummaries {
             actionBar.setChips(
                 summaries.map { TemplateChip(id: $0.id, name: $0.name(for: uiLanguage)) },
-                more: [],
                 selectedID: selected
             )
         } else {
             let defaults = ReplyConfiguration.initial.visibleTemplates
             actionBar.setChips(
                 defaults.map { TemplateChip(id: $0.id, name: $0.displayName(appLanguage: uiLanguage)) },
-                more: [],
                 selectedID: selected
             )
         }
     }
 
-    /// Lets the containing app show a truthful keyboard status. Throttled and
-    /// off the main thread.
+    /// Lets the containing app show a truthful keyboard status: a throttled
+    /// App Group heartbeat (it only lands with Full Access), then a Darwin
+    /// notification, which gets through either way. Off the main thread, and
+    /// in that order, so the app reads the fresh heartbeat when it is woken.
     private func reportActivityToContainingApp() {
         let fullAccess = hasFullAccess
         let settings = SharedSettings.shared
         let isStale = settings.keyboardLastSeen.map { Date().timeIntervalSince($0) > 300 } ?? true
-        guard isStale || settings.keyboardHasFullAccess != fullAccess else { return }
+        let needsHeartbeat = isStale || settings.keyboardHasFullAccess != fullAccess
         DispatchQueue.global(qos: .utility).async {
-            settings.markKeyboardActive(hasFullAccess: fullAccess)
+            if needsHeartbeat { settings.markKeyboardActive(hasFullAccess: fullAccess) }
+            KeyboardPresence.post(hasFullAccess: fullAccess)
         }
     }
 
@@ -423,7 +493,11 @@ final class KeyboardViewController: UIInputViewController {
     /// becomes editable and the key lands in it.
     private func prepareComposerForTyping() {
         guard actionBar.isComposing, !actionBar.acceptsTextInput else { return }
-        _ = replyCoordinator.beginEditingForTyping()
+        switch activeFlow {
+        case .compose: _ = composeCoordinator.beginEditingForTyping()
+        case .reply: _ = replyCoordinator.beginEditingForTyping()
+        case .none: break
+        }
     }
 
     private func insert(_ text: String) {
@@ -489,7 +563,103 @@ final class KeyboardViewController: UIInputViewController {
 
     private func refreshHostContext() {
         hostContext = (textDocumentProxy.documentContextBeforeInput).map { String($0.suffix(200)) }
+        hostCaretInsideWord = AutocorrectCaret.continuesWord(textDocumentProxy.documentContextAfterInput)
         hostAutocapitalization = textDocumentProxy.autocapitalizationType ?? .sentences
+        hostAllowsCorrection = AutocorrectFieldPolicy.allowsCorrection(in: textDocumentProxy)
+    }
+
+    // MARK: Smart correction
+
+    /// Whether the keys are typing where smart correction may help: a host
+    /// field that is not an address, a code or a password, or the composer's
+    /// instruction - never the copied message or a reply being edited. And
+    /// only for a word being typed right now, with nothing of it after the
+    /// caret: correcting the half before the caret would split the word.
+    private var correctionAllowed: Bool {
+        switch target {
+        case .host:
+            return hostAllowsCorrection && wordTyping.allowsCorrection(caretInsideWord: hostCaretInsideWord)
+        case .composer:
+            return actionBar.correctsFocusedField
+                && wordTyping.allowsCorrection(caretInsideWord: AutocorrectCaret.continuesWord(actionBar.textAfterCursor))
+        case .nowhere:
+            return false
+        }
+    }
+
+    /// Asks for the strip of the word now before the caret. Cheap when that
+    /// word did not change; the dictionaries are searched off the main thread.
+    private func refreshSuggestions() {
+        autocorrect.textDidChange(before: textBeforeCursor, allowed: correctionAllowed)
+    }
+
+    /// At a separator: the word before the caret swapped for its correction,
+    /// when one is ready. Returns it, so a backspace can take it back.
+    private func correctWordBeforeSeparator() -> AutocorrectCorrection? {
+        guard let correction = autocorrect.correction(before: textBeforeCursor, allowed: correctionAllowed),
+              replaceBeforeCursor(correction.original, with: correction.replacement, endsWord: true) else { return nil }
+        return correction
+    }
+
+    /// Replaces `old`, which ends right at the caret, with `new` - through
+    /// the same paths as typing, so the host mirror stays in step. With
+    /// `endsWord`, `old` is a word that must end at the caret.
+    ///
+    /// In another app's field the live text is read once more first: the
+    /// mirror can be a moment behind (a quick tap elsewhere, a field that
+    /// turned Return into an action), and deleting against it would delete
+    /// the wrong text. One read, only when a correction, an Undo or a strip
+    /// pick is about to change the text - never on a plain keystroke.
+    @discardableResult
+    private func replaceBeforeCursor(_ old: String, with new: String, endsWord: Bool) -> Bool {
+        switch target {
+        case .host:
+            guard let live = confirmedHostText(endingWith: old, endsWord: endsWord) else { return false }
+            for _ in 0..<old.count { textDocumentProxy.deleteBackward() }
+            textDocumentProxy.insertText(new)
+            hostContext = String((String(live.dropLast(old.count)) + new).suffix(200))
+            lastHostMutation = Date.timeIntervalSinceReferenceDate
+            return true
+        case .composer:
+            return actionBar.replaceBeforeCursor(length: (old as NSString).length, with: new)
+        case .nowhere:
+            return false
+        }
+    }
+
+    /// The host's live text before the caret, when it still ends with
+    /// `expected` (and, for `endsWord`, no word character follows the
+    /// caret). Otherwise nil, and the keyboard catches up with what the user
+    /// did: the mirror is re-read, the pending Undo dropped, and no word is
+    /// being typed at this caret.
+    private func confirmedHostText(endingWith expected: String, endsWord: Bool) -> String? {
+        let before = textDocumentProxy.documentContextBeforeInput
+        let after = endsWord ? textDocumentProxy.documentContextAfterInput : nil
+        if AutocorrectCaret.liveText(before: before, after: after, endsWith: expected, requiresWordEnd: endsWord),
+           let before {
+            return before
+        }
+        refreshHostContext()
+        autocorrect.keepCorrection()
+        wordTyping.reset()
+        autocorrect.restart()
+        return nil
+    }
+
+    /// Typed after a word, these end it and apply its correction.
+    private static let wordSeparators: Set<String> = [".", ",", "!", "?", ";", ":"]
+
+    /// The flag the server published, or the Simulator's mock.
+    private var serverOffersPolish: Bool {
+        #if DEBUG
+        if DebugReplyMock.isEnabled { return true }
+        #endif
+        return AILimits.serverSupportsInstructionPolish
+    }
+
+    /// The instruction changed: the polish suggestion starts over.
+    private func instructionDidChange(_ text: String, limit: Int) {
+        polisher.instructionDidChange(text, inputLanguage: language, limit: limit)
     }
 
     // MARK: Shift and return
@@ -534,8 +704,10 @@ final class KeyboardViewController: UIInputViewController {
         KeyboardLanguageStore.saveAsync(next)
         plane = .letters
         shift.reset()
+        autocorrect.switchLanguage(to: next)
         layoutKeyboard(force: true)
         refreshAutoShift()
+        refreshSuggestions()
         flashLanguageName()
     }
 
@@ -554,6 +726,10 @@ final class KeyboardViewController: UIInputViewController {
     private var aiStrings: AIReplyStrings { AIReplyStrings.forLanguage(uiLanguage) }
 
     private func renderComposer() {
+        if let compose = composeCoordinator.session {
+            renderCompose(compose)
+            return
+        }
         guard let session = replyCoordinator.session, replyCoordinator.isComposing else { return }
         let flow = session.flow
         let message = flow.error.map { aiStrings.message(for: $0) }
@@ -567,22 +743,70 @@ final class KeyboardViewController: UIInputViewController {
             instructionLimit: ReplyInstruction.maximumCharacters
         ))
         keysView.isInputDimmed = flow.isGenerating
+        if flow.stage != .composing { polisher.stop() }
         refreshReturnKey()
         updateGeometry(animated: true)
+        restartSuggestions()
+    }
+
+    /// The field being typed into may have changed: the strip is asked for
+    /// again where the keys now type, once a word is typed there.
+    private func restartSuggestions() {
+        wordTyping.reset()
+        autocorrect.restart()
+        refreshSuggestions()
+    }
+
+    /// Create: no persona and no message, only the instruction and the
+    /// versions - the same panel in its compose mode.
+    private func renderCompose(_ session: ComposeSession) {
+        let flow = session.flow
+        let notice = session.notice(aiStrings)
+        actionBar.render(ReplyComposerView.Content(
+            personaName: "",
+            source: "",
+            instruction: session.instruction,
+            flow: flow,
+            errorMessage: notice?.text,
+            sourceLimit: AILimits.current.sourceCharacters,
+            instructionLimit: AILimits.current.instructionCharacters,
+            mode: .compose,
+            errorOffersRetry: notice?.offersRetry ?? true
+        ))
+        keysView.isInputDimmed = flow.isGenerating
+        if flow.stage != .composing { polisher.stop() }
+        refreshReturnKey()
+        updateGeometry(animated: true)
+        restartSuggestions()
+    }
+
+    private func showComposePanel() {
+        actionBar.beginComposing()
+        shift.reset()
+        layoutKeyboard(force: false)
+        renderComposer()
+        refreshAutoShift()
     }
 
     private func closeComposer() {
+        polisher.stop()
         replyCoordinator.clear()
+        composeCoordinator.clear()
         actionBar.endComposing()
         keysView.isInputDimmed = false
         layoutKeyboard(force: false)
         updateGeometry(animated: true)
         refreshHostContext()
         refreshAutoShift()
+        restartSuggestions()
     }
 
     private func insertReply() {
-        switch replyCoordinator.requestInsert(hostHasText: hostFieldHasText()) {
+        let hostHasText = hostFieldHasText()
+        let decision = activeFlow == .compose
+            ? composeCoordinator.requestInsert(hostHasText: hostHasText)
+            : replyCoordinator.requestInsert(hostHasText: hostHasText)
+        switch decision {
         case .insert(let text):
             finishInsert(text)
         case .askAboutExistingText, .nothing:
@@ -591,7 +815,10 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func resolveConflict(_ choice: ReplyComposerFlow.ConflictChoice) {
-        switch replyCoordinator.resolveConflict(choice) {
+        let resolution = activeFlow == .compose
+            ? composeCoordinator.resolveConflict(choice)
+            : replyCoordinator.resolveConflict(choice)
+        switch resolution {
         case .replace(let text):
             clearHostField()
             finishInsert(text)
@@ -656,6 +883,33 @@ final class KeyboardViewController: UIInputViewController {
         #endif
         return AIReplyService()
     }
+
+    private static func makeComposeService() -> ComposeService {
+        #if DEBUG
+        if DebugReplyMock.isEnabled {
+            return ComposeService(transportOverride: { _ in DebugComposeMock() })
+        }
+        #endif
+        return ComposeService()
+    }
+
+    private static func makePolishService() -> PolishService {
+        #if DEBUG
+        if DebugReplyMock.isEnabled {
+            return PolishService(transportOverride: DebugPolishMock())
+        }
+        #endif
+        return PolishService()
+    }
+
+    /// Without Full Access a keyboard has no network at all, so a request
+    /// would only fail as "offline". Said plainly instead, before any request.
+    private var canReachNetwork: Bool {
+        #if DEBUG
+        if DebugReplyMock.isEnabled { return true }
+        #endif
+        return hasFullAccess
+    }
 }
 
 // MARK: - Keys
@@ -664,8 +918,12 @@ extension KeyboardViewController: KeyboardKeysViewDelegate {
 
     func keysView(_ view: KeyboardKeysView, didType text: String) {
         prepareComposerForTyping()
+        autocorrect.keepCorrection()
         let isLetter = plane == .letters && text.count == 1 && (text.first?.isLetter ?? false)
+        let corrected = Self.wordSeparators.contains(text) ? correctWordBeforeSeparator() : nil
         insert(isLetter ? shift.apply(to: text) : text)
+        if target != .nowhere { wordTyping.typed(text) }
+        if let corrected { autocorrect.didApply(corrected, separator: text) }
         if plane == .letters {
             shift.characterTyped()
         } else if text == "'" {
@@ -675,6 +933,7 @@ extension KeyboardViewController: KeyboardKeysViewDelegate {
             layoutKeyboard(force: false)
         }
         refreshAutoShift()
+        refreshSuggestions()
     }
 
     func keysViewDidTapShift(_ view: KeyboardKeysView) {
@@ -685,31 +944,54 @@ extension KeyboardViewController: KeyboardKeysViewDelegate {
 
     func keysView(_ view: KeyboardKeysView, didDelete unit: KeyboardKeysView.DeleteUnit) {
         prepareComposerForTyping()
+        // Backspace right after a correction takes it back: the word returns
+        // as typed, without the separator, and is not corrected again. When
+        // the live text no longer ends with the correction - a single-line
+        // field that turned Return into an action, a caret moved a moment
+        // ago - it is an ordinary backspace.
+        if unit == .character, autocorrect.takeBackCorrection(before: textBeforeCursor, replace: { applied in
+            self.replaceBeforeCursor(applied.correction.replacement + applied.separator,
+                                     with: applied.restoredText, endsWord: false)
+        }) {
+            refreshAutoShift()
+            refreshSuggestions()
+            return
+        }
+        autocorrect.keepCorrection()
         switch unit {
         case .character: deleteCharacter()
         case .word: deleteWord()
         }
         refreshAutoShift()
+        refreshSuggestions()
     }
 
     func keysViewDidTapSpace(_ view: KeyboardKeysView) {
         prepareComposerForTyping()
+        autocorrect.keepCorrection()
         let now = Date.timeIntervalSinceReferenceDate
         if SpaceShortcut.shouldInsertPeriod(before: textBeforeCursor, secondsSinceLastSpace: now - lastSpaceTap) {
             deleteCharacter()
             insert(". ")
             lastSpaceTap = 0
         } else {
+            let corrected = correctWordBeforeSeparator()
             insert(" ")
+            if let corrected { autocorrect.didApply(corrected, separator: " ") }
             lastSpaceTap = now
         }
         refreshAutoShift()
+        refreshSuggestions()
     }
 
     func keysViewDidTapReturn(_ view: KeyboardKeysView) {
         prepareComposerForTyping()
+        autocorrect.keepCorrection()
+        let corrected = correctWordBeforeSeparator()
         insert("\n")
+        if let corrected { autocorrect.didApply(corrected, separator: "\n") }
         refreshAutoShift()
+        refreshSuggestions()
     }
 
     func keysView(_ view: KeyboardKeysView, didSelectPlane selected: KeyboardPlane) {
@@ -738,12 +1020,18 @@ extension KeyboardViewController: KeyboardKeysViewDelegate {
     }
 
     func keysView(_ view: KeyboardKeysView, moveCursorBy offset: Int) {
+        autocorrect.keepCorrection()
+        wordTyping.reset()
         switch target {
         case .host:
+            // The context is re-read once the host reports the move; the
+            // strip goes now - it was for the word at the old caret.
             textDocumentProxy.adjustTextPosition(byCharacterOffset: offset)
             lastHostMutation = 0
+            refreshSuggestions()
         case .composer:
             actionBar.moveCaret(by: offset)
+            refreshSuggestions()
         case .nowhere:
             break
         }
@@ -757,6 +1045,7 @@ extension KeyboardViewController: KeyboardActionBarDelegate {
     /// Picking a persona OPENS THE COMPOSER. It is not a network request.
     func actionBar(_ bar: KeyboardActionBar, didSelectTemplateID id: String) {
         guard let template = resolveTemplate(id: id) else { return }
+        composeCoordinator.clear()
         DispatchQueue.global(qos: .utility).async {
             SharedSettings.shared.setLastTemplateID(id)
         }
@@ -772,28 +1061,118 @@ extension KeyboardViewController: KeyboardActionBarDelegate {
         return configuration.template(id: id)
     }
 
-    func actionBarDidRequestNewTemplate(_ bar: KeyboardActionBar) {
-        bar.showToast(aiStrings.addTemplateHint)
+    /// Create: a fresh, empty composer for writing a new message. The
+    /// clipboard is not read, and a reply the user had put aside (persona
+    /// row over a suspended session) is dropped rather than carried over.
+    func actionBarDidRequestCompose(_ bar: KeyboardActionBar) {
+        replyCoordinator.clear()
+        composeCoordinator.open()
+        showComposePanel()
     }
 
     func actionBarDidChangeHeight(_ bar: KeyboardActionBar) {
         updateGeometry(animated: true)
     }
 
+    /// A word of the strip: it replaces the word being typed, then a space.
+    /// The quoted word keeps what was typed and teaches it to the keyboard.
+    ///
+    /// Only for the word the strip was offered for, still being typed at the
+    /// caret: a strip left over from before a caret move, or one a newer
+    /// answer is about to replace, must not replace another word.
+    func actionBar(_ bar: KeyboardActionBar, didPick suggestion: AutocorrectSuggestion) {
+        guard correctionAllowed,
+              let word = textBeforeCursor.flatMap(TypedWord.init(before:)),
+              autocorrect.offersSuggestions(for: word) else {
+            autocorrect.restart()
+            refreshSuggestions()
+            return
+        }
+        autocorrect.keepCorrection()
+        switch suggestion.kind {
+        case .typed:
+            if target == .host {
+                // Nothing is replaced, but a word is learned and a space
+                // typed: only for the word really at the caret.
+                guard let live = confirmedHostText(endingWith: word.text, endsWord: true) else {
+                    refreshAutoShift()
+                    refreshSuggestions()
+                    return
+                }
+                hostContext = String(live.suffix(200))
+            }
+            autocorrect.keep(word.text)
+        case .correction, .word:
+            guard replaceBeforeCursor(word.text, with: suggestion.text, endsWord: true) else {
+                refreshAutoShift()
+                refreshSuggestions()
+                return
+            }
+        }
+        UIDevice.current.playInputClick()
+        insert(" ")
+        // A space typed right after this is a space, not the full-stop shortcut.
+        lastSpaceTap = 0
+        refreshAutoShift()
+        refreshSuggestions()
+    }
+
+    func actionBarDidAcceptPolish(_ bar: KeyboardActionBar) {
+        guard let text = polisher.accept(replacing: bar.instructionText) else { return }
+        bar.replaceInstruction(with: text)
+        // A whole new text, not a word being typed: no strip for its last word.
+        wordTyping.reset()
+        refreshAutoShift()
+        refreshSuggestions()
+    }
+
+    func actionBarDidUndoPolish(_ bar: KeyboardActionBar) {
+        guard let text = polisher.undo() else { return }
+        bar.replaceInstruction(with: text)
+        wordTyping.reset()
+        refreshAutoShift()
+        refreshSuggestions()
+    }
+
+    /// A tap put the composer's caret somewhere else (or in another field):
+    /// the strip was for the word at the old caret, and Undo for a correction
+    /// there no longer applies.
+    func actionBarDidMoveComposerCaret(_ bar: KeyboardActionBar) {
+        autocorrect.keepCorrection()
+        wordTyping.reset()
+        autocorrect.restart()
+        refreshAutoShift()
+        refreshSuggestions()
+    }
+
     func actionBar(_ bar: KeyboardActionBar, didSend event: ComposerEvent) {
+        if activeFlow == .compose {
+            handleCompose(event)
+            return
+        }
         switch event {
         case .close:
             closeComposer()
         case .changePersona:
             // Keep everything; show the persona row so another can be picked.
+            polisher.stop()
             replyCoordinator.suspend()
             actionBar.endComposing()
             keysView.isInputDimmed = false
             applyChips(from: replyCoordinator.configuration)
             updateGeometry(animated: true)
+            restartSuggestions()
         case .paste:
             replyCoordinator.pasteSource(proxy: textDocumentProxy, hasFullAccess: hasFullAccess)
         case .generate, .regenerate:
+            // A selection can fill the message without Full Access, but the
+            // request still needs the network: say so, not "offline".
+            guard canReachNetwork else {
+                replyCoordinator.showError(.fullAccessRequired)
+                return
+            }
+            polisher.stop()
+            replyCoordinator.inputLanguage = language
             replyCoordinator.generate()
         case .stop:
             replyCoordinator.cancelGeneration()
@@ -818,11 +1197,89 @@ extension KeyboardViewController: KeyboardActionBarDelegate {
         case .edited(let field, let text):
             switch field {
             case .source: replyCoordinator.updateSource(text)
-            case .instruction: replyCoordinator.updateInstruction(text)
+            case .instruction:
+                replyCoordinator.updateInstruction(text)
+                instructionDidChange(text, limit: ReplyInstruction.maximumCharacters)
             case .draft: replyCoordinator.updateDraft(text)
             case .none: break
             }
+        case .reset, .replyToCopied:
+            break
         }
+    }
+
+    private func handleCompose(_ event: ComposerEvent) {
+        switch event {
+        case .close:
+            closeComposer()
+        case .reset:
+            polisher.stop()
+            composeCoordinator.reset()
+        case .generate, .regenerate:
+            guard canReachNetwork else {
+                composeCoordinator.showError(.fullAccessRequired)
+                return
+            }
+            polisher.stop()
+            composeCoordinator.inputLanguage = language
+            composeCoordinator.generate()
+        case .stop:
+            composeCoordinator.cancelGeneration()
+        case .back:
+            composeCoordinator.back()
+        case .toggleEditing:
+            if composeCoordinator.flow.stage == .editing {
+                composeCoordinator.endEditing()
+            } else {
+                composeCoordinator.beginEditing()
+            }
+        case .tapReply:
+            composeCoordinator.beginEditing()
+        case .insert:
+            insertReply()
+        case .previousVersion:
+            composeCoordinator.showPreviousVersion()
+        case .nextVersion:
+            composeCoordinator.showNextVersion()
+        case .resolveConflict(let choice):
+            resolveConflict(choice)
+        case .edited(let field, let text):
+            switch field {
+            case .instruction:
+                composeCoordinator.updateInstruction(text)
+                instructionDidChange(text, limit: AILimits.current.instructionCharacters)
+            case .draft: composeCoordinator.updateDraft(text)
+            case .source, .none: break
+            }
+        case .replyToCopied:
+            replyToCopiedFromCreate()
+        case .changePersona, .paste:
+            // Create has no persona and no copied message.
+            break
+        }
+    }
+
+    /// "Reply to copied" in Create: the copied message is read now - this
+    /// tap is the user's gesture, as a persona tap is - and the panel
+    /// becomes the reply composer with it, the persona used last and the
+    /// instruction typed here. Nothing is generated: Reply is still the
+    /// user's tap. Nothing copied, or no Full Access: Create stays and
+    /// says so.
+    private func replyToCopiedFromCreate() {
+        let lastUsed = SharedSettings.shared.lastTemplateID
+        // A persona the configuration has not loaded yet is looked up
+        // once, on this tap.
+        if let lastUsed { _ = resolveTemplate(id: lastUsed) }
+        let persona = replyCoordinator.configuration.personaForCopiedReply(lastUsedID: lastUsed)
+        let proxy = textDocumentProxy
+        let fullAccess = hasFullAccess
+        guard let reply = composeCoordinator.replyToCopied(
+            persona: persona,
+            instructionLimit: ReplyInstruction.maximumCharacters,
+            read: { replyCoordinator.readCopiedMessage(proxy: proxy, hasFullAccess: fullAccess) }
+        ) else { return }
+        polisher.stop()
+        replyCoordinator.open(handedOff: reply)
     }
 }
 
@@ -841,5 +1298,24 @@ extension KeyboardViewController: ReplyFlowCoordinatorDelegate {
     func coordinatorDidChange(_ coordinator: ReplyFlowCoordinator) {
         renderComposer()
         refreshAutoShift()
+    }
+}
+
+// MARK: - Create flow
+
+extension KeyboardViewController: ComposeFlowCoordinatorDelegate {
+
+    func composeCoordinatorDidChange(_ coordinator: ComposeFlowCoordinator) {
+        renderComposer()
+        refreshAutoShift()
+    }
+}
+
+// MARK: - Smart correction
+
+extension KeyboardViewController: AutocorrectControllerDelegate {
+
+    func autocorrect(_ controller: AutocorrectController, didUpdate suggestions: [AutocorrectSuggestion]) {
+        actionBar.showSuggestions(suggestions)
     }
 }

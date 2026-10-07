@@ -15,8 +15,6 @@ import Foundation
 ///   which needs no alert, so `simctl push` notifications are delivered.
 /// - `-AIReplyDebugAutoOpenPush YES` treats a notification arriving in the
 ///   foreground as tapped, so routing can be checked with `simctl push`.
-/// - `-AIReplyLanguage kk` shows the app in that language for this launch
-///   only, without saving the choice.
 enum DebugLaunchOptions {
 
     static var forcesPushUI: Bool { flag("-AIReplyForcePushCard") }
@@ -25,10 +23,6 @@ enum DebugLaunchOptions {
 
     static var openLink: String? {
         value(after: "-AIReplyOpenLink").map(expandLink)
-    }
-
-    static var language: AppLanguage? {
-        value(after: "-AIReplyLanguage").flatMap { AppLanguage(rawValue: $0.lowercased()) }
     }
 
     /// "subscription" → "aireply://subscription", "web" → the site.

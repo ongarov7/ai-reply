@@ -1,7 +1,10 @@
 package kz.yerek.aireply.data.account
 
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import kz.yerek.aireply.platform.ReplyLog
 
 /**
  * The stored session as [AccountSession] needs it. [AccountCredentials] is the
@@ -41,9 +44,13 @@ class AccountSession(
     private val credentials: SessionCredentials,
     private val baseUrlProvider: () -> String?,
     private val deviceDescriptor: () -> DeviceDescriptor,
+    /**
+     * This installation's id for the logout request, or null before the legal
+     * consent (nothing about the installation is known to the server then).
+     */
+    private val installationId: () -> String? = { null },
     /** How a request is sent; a test seam. */
-    private val clientFactory: (baseUrl: String, scope: HeaderScope) -> ApiClient =
-        { baseUrl, scope -> ApiClient(baseUrl, scope = scope) }
+    private val clientFactory: (baseUrl: String) -> ApiClient = { baseUrl -> ApiClient(baseUrl) }
 ) : SessionAuth {
 
     private val refreshMutex = Mutex()
@@ -57,10 +64,6 @@ class AccountSession(
         }
         return refreshAccessToken(rejected = null)
     }
-
-    /** The stored access token if it is still fresh; never refreshes. */
-    fun freshAccessTokenOrNull(): String? =
-        credentials.accessToken?.takeIf { credentials.isAccessTokenFresh }
 
     /**
      * A new access token.
@@ -78,9 +81,7 @@ class AccountSession(
 
         val baseUrl = baseUrlProvider() ?: ApiError.InvalidRequest.raise()
         val refreshToken = credentials.refreshToken ?: ApiError.Unauthorized.raise()
-        // The keyboard refreshes too, so this carries no installation or
-        // session id.
-        val client = clientFactory(baseUrl, HeaderScope.KEYBOARD)
+        val client = clientFactory(baseUrl)
 
         val payload = client.json.encodeToString(
             RefreshRequest.serializer(),
@@ -131,8 +132,8 @@ class AccountSession(
      * current (the rotated one, if it rotated), and nothing stores a new pair
      * after the sign-out.
      *
-     * The logout request carries `X-Installation-ID` (APP scope), which is how
-     * the server detaches this installation from the account at once.
+     * The logout request alone carries `X-Installation-ID`, which is how the
+     * server detaches this installation from the account at once.
      */
     suspend fun signOut() {
         val baseUrl = baseUrlProvider()
@@ -141,13 +142,16 @@ class AccountSession(
         }
 
         if (baseUrl == null || refreshToken == null) return
-        val client = clientFactory(baseUrl, HeaderScope.APP)
+        val client = clientFactory(baseUrl)
         runCatching {
+            // The first read of the id may touch a file.
+            val installation = withContext(Dispatchers.IO) { installationId() }
             client.request(
                 "POST", "api/v1/auth/logout",
-                client.json.encodeToString(LogoutRequest.serializer(), LogoutRequest(refreshToken))
+                client.json.encodeToString(LogoutRequest.serializer(), LogoutRequest(refreshToken)),
+                headers = installation?.let { mapOf(HEADER_INSTALLATION_ID to it) }.orEmpty()
             )
-        }
+        }.onFailure { ReplyLog.warn(it) { "logout not delivered; the session is cleared locally" } }
     }
 
     /**
@@ -162,5 +166,9 @@ class AccountSession(
             if (exception.error !is ApiError.Unauthorized) throw exception
             work(refreshAccessToken(rejected = token))
         }
+    }
+
+    companion object {
+        const val HEADER_INSTALLATION_ID = "X-Installation-ID"
     }
 }

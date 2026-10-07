@@ -3,6 +3,7 @@ package kz.yerek.aireply.push
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import kz.yerek.aireply.AIReplyApplication
+import kz.yerek.aireply.platform.ReplyLog
 
 /**
  * Firebase's entry points: a new registration token, and a message that
@@ -17,6 +18,7 @@ class AppMessagingService : FirebaseMessagingService() {
 
     override fun onNewToken(token: String) {
         runCatching { AIReplyApplication.services(this).push.onNewToken(token) }
+            .onFailure { ReplyLog.warn(it) { "new FCM token not handled" } }
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
@@ -27,6 +29,6 @@ class AppMessagingService : FirebaseMessagingService() {
                 title = notification?.title,
                 body = notification?.body
             )
-        }
+        }.onFailure { ReplyLog.warn(it) { "push message not shown" } }
     }
 }

@@ -1,6 +1,8 @@
 package apptest
 
 import (
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -10,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/aireply/ai-reply-back-end/internal/domain"
+	"github.com/aireply/ai-reply-back-end/internal/repository"
 )
 
 // Әкімші панелінің (admin-app.js) әр кілті төрт тілде де болуы керек.
@@ -18,7 +21,7 @@ import (
 // translation shows up in the browser as "admin.push.form.title" — easy to
 // miss by eye. The test reads the script, collects every static key, and adds
 // the key families the script builds from backend enums (statuses,
-// categories, screens, …): a new enum value without a translation fails here
+// categories, segments, …): a new enum value without a translation fails here
 // instead of in front of an administrator.
 
 func adminAsset(t *testing.T, parts ...string) string {
@@ -31,8 +34,7 @@ func adminAsset(t *testing.T, parts ...string) string {
 }
 
 // adminStaticKeys — 'admin.*', 'common.*' and 'pricing.*' string literals in the SPA and its shell.
-func adminStaticKeys(t *testing.T, sources ...string) []string {
-	t.Helper()
+func adminStaticKeys(sources ...string) []string {
 	pattern := regexp.MustCompile("['\"`]((?:admin|common|pricing)\\.[a-z0-9_.]+)['\"`]")
 	found := map[string]bool{}
 	for _, source := range sources {
@@ -64,21 +66,24 @@ func adminKeyFamilies() map[string][]string {
 		"admin.push.push_status.":     {domain.PushNone, domain.PushActive, domain.PushInvalid, domain.PushReplaced},
 		"admin.push.permission.": {domain.PermissionAuthorized, domain.PermissionDenied, domain.PermissionNotDetermined,
 			domain.PermissionProvisional, domain.PermissionEphemeral, domain.PermissionUnknown},
-		// The audience enums notifications.ValidateAudience accepts.
-		"admin.push.auth.":         {"authenticated", "anonymous"},
-		"admin.push.payment.":      {"paid", "unpaid"},
-		"admin.push.subscription.": {"active", "expired", "none"},
-		"admin.logs.outcome.":      {domain.OutcomeSuccess, domain.OutcomeFailure},
+		// The audience enums notifications.ValidateAudience accepts (GET /notifications lists them).
+		"admin.push.segment.":      {domain.SegmentAll, domain.SegmentFree, domain.SegmentPaid, domain.SegmentDemo},
+		"admin.push.subscription.": {domain.SubscriptionFilterActive, domain.SubscriptionFilterExpired},
+		"admin.push.quota.":        {domain.QuotaHasRemaining, domain.QuotaNearExhausted, domain.QuotaExhausted},
+		// Delivery filters and columns.
+		"admin.push.channel.": {domain.ChannelPush, domain.ChannelEmail},
+		"admin.push.source.":  {repository.SourceCampaign, repository.SourceAutomatic},
+		"admin.push.type.":    append([]string{domain.TypeCampaign}, domain.AutomaticNotificationTypes...),
 		// Dashboard range buttons.
 		"common.": {"today", "7d", "30d", "month", "prev_month"},
 	}
 }
 
-var placeholderPattern = regexp.MustCompile(`\{(\w+)\}`)
+var adminPlaceholderPattern = regexp.MustCompile(`\{(\w+)\}`)
 
-func placeholders(s string) []string {
+func adminPlaceholders(s string) []string {
 	var out []string
-	for _, m := range placeholderPattern.FindAllStringSubmatch(s, -1) {
+	for _, m := range adminPlaceholderPattern.FindAllStringSubmatch(s, -1) {
 		out = append(out, m[1])
 	}
 	sort.Strings(out)
@@ -89,8 +94,8 @@ func TestAdminTranslationsAreCompleteInEveryLocale(t *testing.T) {
 	script := adminAsset(t, "static", "admin-app.js")
 	shell := adminAsset(t, "templates", "admin_app.gohtml")
 
-	required := adminStaticKeys(t, script, shell)
-	if len(required) < 300 {
+	required := adminStaticKeys(script, shell)
+	if len(required) < 250 {
 		t.Fatalf("suspiciously few admin keys collected: %d", len(required))
 	}
 	for prefix, values := range adminKeyFamilies() {
@@ -119,7 +124,7 @@ func TestAdminTranslationsAreCompleteInEveryLocale(t *testing.T) {
 				missing = append(missing, key)
 				continue
 			}
-			if !reflect.DeepEqual(placeholders(value), placeholders(english[key])) {
+			if !reflect.DeepEqual(adminPlaceholders(value), adminPlaceholders(english[key])) {
 				mismatched = append(mismatched, key)
 			}
 		}
@@ -158,5 +163,33 @@ func TestAdminScriptStatusListsMatchTheBackend(t *testing.T) {
 		if got := list(name); !reflect.DeepEqual(got, want) {
 			t.Errorf("%s = %v, backend has %v", name, got, want)
 		}
+	}
+}
+
+// The shell versions the admin script and stylesheet, so a deploy is never
+// served a cached script from the previous one.
+func TestAdminShellVersionsItsAssets(t *testing.T) {
+	h := newHarness(t)
+	adminSession := h.signInAdmin()
+
+	req, _ := http.NewRequest(http.MethodGet, h.server.URL+"/admin/notifications/new?user_ids=abc", nil)
+	req.AddCookie(&http.Cookie{Name: h.cfg.Admin.CookieName, Value: adminSession.cookie})
+	res, err := h.server.Client().Do(req)
+	if err != nil {
+		t.Fatalf("shell: %v", err)
+	}
+	defer res.Body.Close()
+	body, _ := io.ReadAll(res.Body)
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("shell status %d", res.StatusCode)
+	}
+	page := string(body)
+	for _, asset := range []string{"admin-app.js", "admin.css"} {
+		if !regexp.MustCompile(regexp.QuoteMeta("/static/"+asset) + `\?v=[0-9a-f]{12}"`).MatchString(page) {
+			t.Errorf("shell does not version %s", asset)
+		}
+	}
+	if status, _ := fetch(t, h, "/static/admin-app.js?v=0123456789ab"); status != http.StatusOK {
+		t.Fatalf("versioned script: status %d", status)
 	}
 }

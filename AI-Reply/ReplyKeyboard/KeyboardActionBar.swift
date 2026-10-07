@@ -17,21 +17,35 @@ enum ComposerEvent {
     case nextVersion
     case resolveConflict(ReplyComposerFlow.ConflictChoice)
     case edited(ReplyComposerView.Field, String)
+    /// Create mode: start over with an empty instruction.
+    case reset
+    /// Create mode: the same instruction, as a reply to the copied message.
+    case replyToCopied
 }
 
 protocol KeyboardActionBarDelegate: AnyObject {
     func actionBar(_ bar: KeyboardActionBar, didSelectTemplateID id: String)
-    func actionBarDidRequestNewTemplate(_ bar: KeyboardActionBar)
+    /// "Create" on the persona row: write a new message with AI.
+    func actionBarDidRequestCompose(_ bar: KeyboardActionBar)
     func actionBar(_ bar: KeyboardActionBar, didSend event: ComposerEvent)
     func actionBarDidChangeHeight(_ bar: KeyboardActionBar)
+    /// A word of the suggestion strip - above the keys or under the instruction.
+    func actionBar(_ bar: KeyboardActionBar, didPick suggestion: AutocorrectSuggestion)
+    /// The suggested version of the instruction was tapped.
+    func actionBarDidAcceptPolish(_ bar: KeyboardActionBar)
+    func actionBarDidUndoPolish(_ bar: KeyboardActionBar)
+    /// The composer's caret moved without typing: a tap, another field.
+    func actionBarDidMoveComposerCaret(_ bar: KeyboardActionBar)
 }
 
 /// The area above the keys. Two shapes:
 ///
-/// * PERSONAS - a 36pt row: Дос | Клиент | Бизнес | Жұмыс | + , plus a
-///   transient status line that changes no geometry. This is the keyboard at
-///   rest; its height is what gets cached for the next launch.
-/// * COMPOSER - the AI reply composer (`ReplyComposerView`).
+/// * PERSONAS - a 36pt row: ✨ Create | Дос | Клиент | Бизнес | Жұмыс. This
+///   is the keyboard at rest; its height is what gets cached for the next
+///   launch. While a word is typed into the host app the suggestion strip
+///   takes the pills' place - only theirs: ✨ stays exactly where it is.
+/// * COMPOSER - the AI composer (`ReplyComposerView`), answering a copied
+///   message or, after Create, writing a new one.
 ///
 /// Neither ever takes height from the keys: the keyboard grows instead, up to
 /// the ceiling the controller hands down.
@@ -40,10 +54,12 @@ final class KeyboardActionBar: UIView {
     weak var delegate: KeyboardActionBarDelegate?
 
     private let templateBar = TemplateBarView()
-    private let toastLabel = UILabel()
+    private let suggestionStrip = SuggestionStripView()
     private let composer = ReplyComposerView()
 
-    private var toastWorkItem: DispatchWorkItem?
+    /// Whether the strip is over the persona pills right now.
+    private var showsSuggestions = false
+
     private let idleHeight: CGFloat = TemplateBarView.preferredHeight + 4
 
     private(set) var isComposing = false
@@ -65,13 +81,14 @@ final class KeyboardActionBar: UIView {
         templateBar.delegate = self
 
         addSubview(templateBar)
-        toastLabel.textAlignment = .center
-        toastLabel.numberOfLines = 2
-        toastLabel.font = .systemFont(ofSize: 12, weight: .medium)
-        toastLabel.adjustsFontSizeToFitWidth = true
-        toastLabel.minimumScaleFactor = 0.75
-        toastLabel.isHidden = true
-        addSubview(toastLabel)
+        suggestionStrip.alpha = 0
+        suggestionStrip.isUserInteractionEnabled = false
+        suggestionStrip.accessibilityElementsHidden = true
+        suggestionStrip.onPick = { [weak self] suggestion in
+            guard let self else { return }
+            self.delegate?.actionBar(self, didPick: suggestion)
+        }
+        addSubview(suggestionStrip)
         composer.isHidden = true
         addSubview(composer)
     }
@@ -84,7 +101,9 @@ final class KeyboardActionBar: UIView {
     override func layoutSubviews() {
         super.layoutSubviews()
         templateBar.frame = CGRect(x: 0, y: 2, width: bounds.width, height: TemplateBarView.preferredHeight)
-        toastLabel.frame = CGRect(x: 14, y: 1, width: max(0, bounds.width - 28), height: TemplateBarView.preferredHeight + 2)
+        templateBar.layoutIfNeeded()
+        // Exactly the pills' viewport, right of ✨: the strip never covers it.
+        suggestionStrip.frame = templateBar.personasFrame.offsetBy(dx: templateBar.frame.minX, dy: templateBar.frame.minY)
         composer.frame = bounds
     }
 
@@ -92,13 +111,13 @@ final class KeyboardActionBar: UIView {
 
     /// This whole area is product UI, so it follows the APP language.
     func configure(theme: KeyboardTheme, uiLanguage: AppLanguage) {
-        toastLabel.textColor = theme.secondaryText
         templateBar.configure(theme: theme, uiLanguage: uiLanguage)
+        suggestionStrip.configure(theme: theme, uiLanguage: uiLanguage)
         composer.configure(theme: theme, uiLanguage: uiLanguage)
     }
 
-    func setChips(_ chips: [TemplateChip], more: [TemplateChip], selectedID: String?) {
-        templateBar.setChips(chips, more: more, selectedID: selectedID)
+    func setChips(_ chips: [TemplateChip], selectedID: String?) {
+        templateBar.setChips(chips, selectedID: selectedID)
     }
 
     func layout(forWidth width: CGFloat) {
@@ -112,8 +131,8 @@ final class KeyboardActionBar: UIView {
     // MARK: Composer
 
     func beginComposing() {
-        cancelToast()
         guard !isComposing else { return }
+        setHostSuggestionsVisible(false, animated: false)
         isComposing = true
         composer.isHidden = false
         templateBar.isHidden = true
@@ -142,41 +161,50 @@ final class KeyboardActionBar: UIView {
     func deleteWordBackward() { composer.deleteWordBackward() }
     func moveCaret(by offset: Int) { composer.moveCaret(by: offset) }
     var textBeforeCursor: String? { composer.textBeforeCursor }
+    @discardableResult
+    func replaceBeforeCursor(length: Int, with text: String) -> Bool { composer.replaceBeforeCaret(length: length, with: text) }
+    func replaceInstruction(with text: String) { composer.replaceInstruction(with: text) }
+    var instructionText: String { composer.instructionText }
+    /// The composer field being typed into is one smart correction looks after.
+    var correctsFocusedField: Bool { isComposing && composer.focusedFieldAcceptsCorrection }
+    /// The character right after the composer's caret; nil at the end of the
+    /// text or when the composer is closed.
+    var textAfterCursor: String? { isComposing ? composer.textAfterCursor : nil }
+    var isEditingInstruction: Bool { isComposing && composer.isEditingInstruction }
 
-    // MARK: Transient status
+    // MARK: Suggestions
 
-    /// A short message on the persona row. It never changes the keyboard's
-    /// geometry. Failures with the composer open are shown inside it instead.
-    func showToast(_ message: String) {
-        guard !isComposing, !message.isEmpty else { return }
-        cancelToast()
-        toastLabel.text = message
-        toastLabel.alpha = 0
-        toastLabel.isHidden = false
-        UIView.animate(withDuration: 0.16) {
-            self.toastLabel.alpha = 1
-            self.templateBar.alpha = 0
+    /// The strip for the word being typed: over the persona pills at rest,
+    /// under the instruction in the composer. Empty hides it.
+    func showSuggestions(_ items: [AutocorrectSuggestion]) {
+        if isComposing {
+            composer.showSuggestions(items)
+            return
         }
-        let work = DispatchWorkItem { [weak self] in
-            guard let self else { return }
-            UIView.animate(withDuration: 0.2, animations: {
-                self.toastLabel.alpha = 0
-                self.templateBar.alpha = 1
-            }, completion: { _ in
-                self.toastLabel.isHidden = true
-            })
-        }
-        toastWorkItem = work
-        // Long enough to read a two-line sentence in Kazakh or Russian.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.2, execute: work)
+        suggestionStrip.show(items)
+        setHostSuggestionsVisible(!items.isEmpty, animated: true)
     }
 
-    private func cancelToast() {
-        toastWorkItem?.cancel()
-        toastWorkItem = nil
-        toastLabel.isHidden = true
-        toastLabel.alpha = 0
-        templateBar.alpha = 1
+    /// The suggested version of the instruction, in the composer.
+    func showPolish(_ chip: InstructionPolisher.Chip) {
+        composer.showPolish(chip)
+    }
+
+    /// Crossfades the strip and the persona pills; ✨ is not touched.
+    private func setHostSuggestionsVisible(_ visible: Bool, animated: Bool) {
+        guard visible != showsSuggestions else { return }
+        showsSuggestions = visible
+        suggestionStrip.isUserInteractionEnabled = visible
+        suggestionStrip.accessibilityElementsHidden = !visible
+        let apply = {
+            self.suggestionStrip.alpha = visible ? 1 : 0
+            self.templateBar.setPersonasHidden(visible)
+        }
+        if animated, window != nil {
+            UIView.animate(withDuration: 0.16, delay: 0, options: [.beginFromCurrentState, .allowUserInteraction], animations: apply)
+        } else {
+            apply()
+        }
     }
 }
 
@@ -188,8 +216,8 @@ extension KeyboardActionBar: TemplateBarViewDelegate {
         delegate?.actionBar(self, didSelectTemplateID: id)
     }
 
-    func templateBarDidRequestNewTemplate(_ bar: TemplateBarView) {
-        delegate?.actionBarDidRequestNewTemplate(self)
+    func templateBarDidTapCreate(_ bar: TemplateBarView) {
+        delegate?.actionBarDidRequestCompose(self)
     }
 }
 
@@ -202,6 +230,8 @@ extension KeyboardActionBar: ReplyComposerViewDelegate {
     }
 
     func composerDidTapClose(_ composer: ReplyComposerView) { send(.close) }
+    func composerDidTapNew(_ composer: ReplyComposerView) { send(.reset) }
+    func composerDidTapReplyToCopied(_ composer: ReplyComposerView) { send(.replyToCopied) }
     func composerDidTapPersona(_ composer: ReplyComposerView) { send(.changePersona) }
     func composerDidTapPaste(_ composer: ReplyComposerView) { send(.paste) }
     func composerDidTapGenerate(_ composer: ReplyComposerView) { send(.generate) }
@@ -225,5 +255,22 @@ extension KeyboardActionBar: ReplyComposerViewDelegate {
     func composerDidChangeHeight(_ composer: ReplyComposerView) {
         guard isComposing else { return }
         delegate?.actionBarDidChangeHeight(self)
+    }
+
+    func composer(_ composer: ReplyComposerView, didPick suggestion: AutocorrectSuggestion) {
+        delegate?.actionBar(self, didPick: suggestion)
+    }
+
+    func composerDidAcceptPolish(_ composer: ReplyComposerView) {
+        delegate?.actionBarDidAcceptPolish(self)
+    }
+
+    func composerDidUndoPolish(_ composer: ReplyComposerView) {
+        delegate?.actionBarDidUndoPolish(self)
+    }
+
+    func composerDidMoveCaret(_ composer: ReplyComposerView) {
+        guard isComposing else { return }
+        delegate?.actionBarDidMoveComposerCaret(self)
     }
 }

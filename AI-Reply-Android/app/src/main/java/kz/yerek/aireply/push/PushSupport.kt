@@ -4,6 +4,7 @@ import android.content.Context
 import com.google.firebase.FirebaseApp
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kz.yerek.aireply.platform.ReplyLog
 import kotlin.coroutines.resume
 
 /**
@@ -19,7 +20,9 @@ import kotlin.coroutines.resume
 object PushSupport {
 
     fun isAvailable(context: Context): Boolean =
-        runCatching { FirebaseApp.getApps(context).isNotEmpty() }.getOrDefault(false)
+        runCatching { FirebaseApp.getApps(context).isNotEmpty() }
+            .onFailure { ReplyLog.warn(it) { "Firebase not available in this build" } }
+            .getOrDefault(false)
 
     sealed interface TokenResult {
         data class Token(val value: String) : TokenResult
@@ -39,10 +42,12 @@ object PushSupport {
             val messaging = FirebaseMessaging.getInstance()
             if (!messaging.isAutoInitEnabled) messaging.isAutoInitEnabled = true
             messaging.token
-        }.getOrNull() ?: return TokenResult.Failed
+        }.onFailure { ReplyLog.warn(it) { "FCM token request not started" } }
+            .getOrNull() ?: return TokenResult.Failed
         return suspendCancellableCoroutine { continuation ->
             task.addOnCompleteListener { completed ->
                 val token = if (completed.isSuccessful) completed.result?.takeIf(String::isNotBlank) else null
+                if (token == null) ReplyLog.warn(completed.exception) { "FCM token unavailable" }
                 if (continuation.isActive) {
                     continuation.resume(if (token != null) TokenResult.Token(token) else TokenResult.Failed)
                 }

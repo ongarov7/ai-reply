@@ -7,9 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aireply/ai-reply-back-end/internal/domain"
 	"github.com/aireply/ai-reply-back-end/internal/logging"
-	"github.com/aireply/ai-reply-back-end/internal/reqctx"
+	"github.com/aireply/ai-reply-back-end/internal/traits"
 	"github.com/aireply/ai-reply-back-end/internal/transport/httpx"
 )
 
@@ -21,28 +20,22 @@ func Chain(h http.Handler, middlewares ...func(http.Handler) http.Handler) http.
 	return h
 }
 
-// RequestID — корреляция идентификаторы және клиент метадерегі.
-//
-// A valid client X-Request-ID is kept (so an app's error report names the
-// same request as the server log); anything else is replaced by a fresh id.
-// The sanitized client headers and an Observed holder for the access log go
-// into the context.
+// RequestID — әр сұранысқа корреляция идентификаторы.
 func RequestID(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		client := reqctx.Parse(r)
-		w.Header().Set(reqctx.HeaderRequestID, client.RequestID)
-		ctx := logging.WithRequestID(r.Context(), client.RequestID)
-		ctx = reqctx.With(ctx, client)
-		ctx = reqctx.WithObserved(ctx, &reqctx.Observed{})
-		next.ServeHTTP(w, r.WithContext(ctx))
+		id := r.Header.Get("X-Request-ID")
+		if id == "" {
+			id = traits.RandomToken(8)
+		}
+		w.Header().Set("X-Request-ID", id)
+		next.ServeHTTP(w, r.WithContext(logging.WithRequestID(r.Context(), id)))
 	})
 }
 
 type statusWriter struct {
 	http.ResponseWriter
-	status    int
-	bytes     int
-	errorCode string
+	status int
+	bytes  int
 }
 
 func (w *statusWriter) WriteHeader(code int) {
@@ -59,34 +52,8 @@ func (w *statusWriter) Write(b []byte) (int, error) {
 	return n, err
 }
 
-// RecordErrorCode — httpx.Error клиентке кеткен кодты осы арқылы хабарлайды.
-func (w *statusWriter) RecordErrorCode(code string) { w.errorCode = code }
-
-// Unwrap — http.ResponseController және httpx үшін.
-func (w *statusWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
-
 // Logging — тек метадерек жазады: дене де, тақырып мәндері де емес.
 func Logging(log *slog.Logger) func(http.Handler) http.Handler {
-	return AccessLog(log, AccessLogOptions{})
-}
-
-// AccessLogOptions — кіру журналының қосымша тұтынушылары.
-type AccessLogOptions struct {
-	// RecordAPIError — an /api/ request answered with an error worth keeping
-	// (5xx, and 4xx except the routine 401, 404 and 405).
-	RecordAPIError func(domain.APIError)
-	// TouchInstallation — an /api/ request from an app that named its
-	// installation; the callee throttles the write.
-	TouchInstallation func(reqctx.Client)
-}
-
-// AccessLog — құрылымдық кіру журналы: бір сұраныс — бір жол.
-//
-// Fields: method, route (the matched pattern, never a path full of ids),
-// status, bytes, duration_ms, request_id, user_id, platform, app_version,
-// app_build, installation (a short prefix) and the error code the client
-// received. No body, no header value, no query string.
-func AccessLog(log *slog.Logger, opts AccessLogOptions) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			started := time.Now()
@@ -95,89 +62,15 @@ func AccessLog(log *slog.Logger, opts AccessLogOptions) func(http.Handler) http.
 			if sw.status == 0 {
 				sw.status = http.StatusOK
 			}
-			duration := time.Since(started)
-			client := reqctx.From(r.Context())
-			userID := reqctx.ObservedFrom(r.Context()).User()
-			route := routeOf(r)
-
-			level := slog.LevelInfo
-			switch {
-			case sw.status >= 500:
-				level = slog.LevelError
-			case sw.status == http.StatusTooManyRequests:
-				level = slog.LevelWarn
-			}
-			attrs := []any{
-				"method", r.Method, "route", route, "status", sw.status, "bytes", sw.bytes,
-				"duration_ms", duration.Milliseconds(),
-			}
-			if userID != "" {
-				attrs = append(attrs, "user_id", userID)
-			}
-			if client.Platform != "" {
-				attrs = append(attrs, "platform", client.Platform, "app_version", client.AppVersion,
-					"app_build", client.AppBuild)
-			}
-			if client.InstallationID != "" {
-				attrs = append(attrs, "installation", shortID(client.InstallationID))
-			}
-			if client.TraceID != "" {
-				attrs = append(attrs, "trace_id", client.TraceID)
-			}
-			if sw.errorCode != "" {
-				attrs = append(attrs, "error_code", sw.errorCode)
-			}
-			logging.FromContext(r.Context(), log).Log(r.Context(), level, "http", attrs...)
-
-			if !appAPI(r.URL.Path) {
-				return
-			}
-			if opts.TouchInstallation != nil && client.InstallationID != "" {
-				opts.TouchInstallation(client)
-			}
-			if opts.RecordAPIError != nil && sw.status >= 400 && sw.status != http.StatusUnauthorized &&
-				sw.status != http.StatusNotFound && sw.status != http.StatusMethodNotAllowed {
-				opts.RecordAPIError(domain.APIError{
-					RequestID: client.RequestID, TraceID: client.TraceID, UserID: userID,
-					InstallationID: client.InstallationID, SessionID: client.SessionID,
-					Platform: client.Platform, AppVersion: client.AppVersion, AppBuild: client.AppBuild,
-					OSVersion: client.OSVersion, Method: r.Method, Route: route, StatusCode: sw.status,
-					ErrorCode: sw.errorCode, DurationMS: int(duration.Milliseconds()), OccurredAt: started.UTC(),
-				})
-			}
+			logging.FromContext(r.Context(), log).Info("http",
+				"method", r.Method,
+				"path", r.URL.Path,
+				"status", sw.status,
+				"bytes", sw.bytes,
+				"duration_ms", time.Since(started).Milliseconds(),
+			)
 		})
 	}
-}
-
-// appAPI — қосымшалар шақыратын API. Әкімші панелі мен симулятордың өз
-// қателері тек құрылымды журналда қалады: api_errors — қосымшалардың қателері.
-func appAPI(path string) bool {
-	return strings.HasPrefix(path, "/api/") && !strings.HasPrefix(path, "/api/v1/admin/") &&
-		!strings.HasPrefix(path, "/api/v1/simulator/")
-}
-
-// routeOf — сәйкескен маршрут үлгісі ("POST /api/v1/devices/{id}"), болмаса жол үлгісі.
-func routeOf(r *http.Request) string {
-	if r.Pattern != "" {
-		if i := strings.IndexByte(r.Pattern, ' '); i >= 0 {
-			return r.Pattern[i+1:]
-		}
-		return r.Pattern
-	}
-	// Unmatched paths (404/405) are not stored; keep the log line short and
-	// free of anything a scanner put in the URL.
-	path := r.URL.Path
-	if len(path) > 64 {
-		path = path[:64]
-	}
-	return path
-}
-
-func shortID(id string) string {
-	if len(id) > 8 {
-		return id[:8]
-	}
-	return id
 }
 
 // Recover — панинканы 500-ге айналдырады, стек журналда қалады, клиентке кетпейді.
@@ -251,8 +144,7 @@ func CORS(origins []string) func(http.Handler) http.Handler {
 			if origin != "" && allowed[origin] {
 				h := w.Header()
 				h.Set("Access-Control-Allow-Origin", origin)
-				h.Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Request-ID, Idempotency-Key, "+
-					"X-Platform, X-App-Version, X-App-Build, X-OS-Version, X-Installation-ID, X-Session-ID")
+				h.Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Request-ID")
 				h.Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
 				h.Set("Vary", "Origin")
 			}

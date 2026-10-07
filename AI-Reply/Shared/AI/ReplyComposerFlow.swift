@@ -257,3 +257,50 @@ struct ReplyComposerFlow: Equatable, Sendable {
         self = ReplyComposerFlow()
     }
 }
+
+// MARK: - Reply session
+//
+// The reply's model. Pure values, like the flow above: the keyboard reads
+// the copied message (`ContextTextProvider`) and drives the session
+// (`ReplyFlowCoordinator`); Create hands one over from here too.
+
+enum ReplyContextSource: Equatable, Sendable {
+    /// Text the host exposed through `UITextDocumentProxy.selectedText`, i.e. a
+    /// selection inside the ACTIVE EDITABLE INPUT.
+    case editableSelection
+    /// Text the user explicitly copied, read only in direct response to a user
+    /// gesture.
+    case clipboard
+    /// Text the user typed into the source field themselves.
+    case typed
+}
+
+/// The THREE texts a reply involves, deliberately kept apart.
+///
+/// `sourceMessage` is the incoming message. It is reference material: it is
+/// never seeded into `instruction` and never into the reply, because what the
+/// other person wrote must never silently become what this user sends.
+///
+/// `instruction` is what THIS user wants said - "ответь вежливо, что согласен".
+/// It is sent to the model as a separate, named block and is never inserted
+/// into the host application.
+///
+/// The reply versions live in `flow.drafts`. Only the one on screen can reach
+/// the host application's input field.
+struct ReplySession: Equatable {
+    var sourceMessage: String
+    var source: ReplyContextSource?
+    var template: ReplyTemplate
+    var instruction: String = ""
+    var flow = ReplyComposerFlow()
+
+    var usableSource: String? {
+        let trimmed = sourceMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+}
+
+struct ReplyContext: Equatable {
+    let text: String
+    let source: ReplyContextSource
+}

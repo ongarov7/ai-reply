@@ -1,21 +1,23 @@
 package web
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"html/template"
 	"net/http"
 	"strings"
 
-	"github.com/aireply/ai-reply-back-end/internal/admin"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
 	"github.com/aireply/ai-reply-back-end/internal/localization"
 )
 
 // appView — Vue қосымшасының қабығы.
 type appView struct {
-	T      func(string) string
-	Locale string
-	Boot   template.JS
+	T       func(string) string
+	Locale  string
+	Boot    template.JS
+	Version string
 }
 
 // handleAdminApp — SPA қабығын береді; аудармалар мен CSRF бірден кіріктіріледі.
@@ -32,8 +34,6 @@ func (s *Server) handleAdminApp(w http.ResponseWriter, r *http.Request) {
 		"csrf": sessionFrom(r.Context()).CSRFToken,
 		"admin": map[string]any{
 			"id": adminUser.ID, "email": adminUser.Email, "name": adminUser.Name, "role": adminUser.Role,
-			// Only hides what the role cannot use; every endpoint checks again.
-			"permissions": admin.Permissions(adminUser.Role),
 		},
 		"locale":       locale,
 		"locales":      domain.Locales,
@@ -49,8 +49,25 @@ func (s *Server) handleAdminApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.render(w, "admin_app", "admin_app", appView{
-		T: s.bundle.Translator(locale), Locale: locale, Boot: template.JS(raw),
+		T: s.bundle.Translator(locale), Locale: locale, Boot: template.JS(raw), Version: s.adminVersion,
 	})
+}
+
+// assetVersion — кіріктірілген файлдар мазмұнының қысқа хэші.
+//
+// Static files are cached for an hour; the hash in the script and stylesheet
+// URLs changes with every deploy that touches them, so a browser never runs
+// an old admin script against a newer API.
+func assetVersion(names ...string) (string, error) {
+	h := sha256.New()
+	for _, name := range names {
+		raw, err := assets.ReadFile(name)
+		if err != nil {
+			return "", err
+		}
+		h.Write(raw)
+	}
+	return hex.EncodeToString(h.Sum(nil))[:12], nil
 }
 
 // adminMessages — SPA-ға қажет кілттер ғана (лендинг мәтіндері жіберілмейді).

@@ -13,8 +13,6 @@
     <string name="kb_regenerate">Қайта жасау</string>
     <string name="kb_insert">Кірістіру</string>
     <string name="kb_cancel">Бас тарту</string>
-    <string name="kb_add_template">Үлгі қосу</string>
-    <string name="kb_add_template_hint">AI Reply ашылуда…</string>
     <string name="kb_replace_existing">Ауыстыру</string>
     <string name="kb_append_existing">Қосу</string>
     <string name="kb_keep_typing">Бас тарту</string>
@@ -42,7 +40,7 @@
     <string name="kb_secure_field">Құпия сөз өрістерінде AI Reply өшірулі.</string>
 
     <string name="voice_kb_start">Нұсқауды айтып беру</string>
-    <string name="voice_kb_stop">Тоқтату</string>
+    <string name="voice_kb_stop">Айтып жазуды тоқтату</string>
     <string name="voice_kb_listening">Тыңдап тұрмын…</string>
     <string name="voice_kb_processing">Танып жатырмын…</string>
     <string name="voice_kb_permission_needed">Микрофонға рұқсат беру үшін түртіңіз</string>
@@ -50,6 +48,11 @@
     <string name="voice_kb_no_speech">Ештеңе естілмеді. Қайталап көріңіз.</string>
     <string name="voice_kb_failed">Тану мүмкін болмады. Қайталап көріңіз.</string>
     <string name="voice_kb_unavailable">Бұл құрылғыда сөзді тану қолжетімсіз.</string>
+    <string name="voice_kb_stopped">Айтып жазу тоқтатылды</string>
+    <string name="voice_kb_busy">Микрофон қазір бос емес. Сәлден соң қайталап көріңіз.</string>
+    <string name="voice_kb_language_unavailable_kk">Бұл телефон қазақша сөйлеуді танымайды. Google дауыспен енгізуін орнатыңыз немесе тілді ауыстырыңыз.</string>
+    <string name="voice_kb_language_unavailable_ru">Бұл телефон орысша сөйлеуді танымайды. Google дауыспен енгізуін орнатыңыз немесе тілді ауыстырыңыз.</string>
+    <string name="voice_kb_language_unavailable_en">Бұл телефон ағылшынша сөйлеуді танымайды. Google дауыспен енгізуін орнатыңыз немесе тілді ауыстырыңыз.</string>
     <string name="voice_permission_title">Микрофон</string>
 
     <string name="android_setup_title">Пернетақтаны баптау</string>
@@ -124,7 +127,62 @@
     <string name="settings_debug_mock_replies">Сынақ AI жауаптары</string>
     <string name="settings_debug_mock_replies_footer">Тек жөндеу нұсқасында. Пернетақта қызметтің орнына дайын жауап береді — лимит жұмсалмайды. Нұсқаудағы тегтер: #offline, #quota, #slow.</string>
 
-    <!-- Push notifications and diagnostics (2026-10). -->
+    <!-- Keyboard: Create (write a new message from an instruction) -->
+    <string name="kb_compose_open">AI арқылы жаңа хабарлама жазу</string>
+    <string name="kb_compose_title">AI-мен жазу</string>
+    <string name="kb_compose_placeholder">Хабарламаны сипаттаңыз, мысалы: «Директорды 55 жасқа толуымен құттықта»</string>
+    <string name="kb_compose_write">Жазу</string>
+    <string name="kb_compose_new">Жаңа</string>
+    <string name="kb_compose_new_description">Басынан бастау</string>
+    <string name="kb_compose_edit_request">Сұранысты өзгерту</string>
+    <string name="kb_compose_draft_title">Сіздің хабарламаңыз</string>
+    <string name="kb_compose_err_no_instruction">Алдымен не жазу керегін сипаттаңыз.</string>
+    <string name="kb_compose_err_too_long">Сұраныс тым ұзын. %1$d таңбадан аспасын.</string>
+    <string name="kb_compose_intent_congratulate">Құттықтау</string>
+    <string name="kb_compose_intent_congratulate_phrase">Құттықтау жаз.</string>
+    <string name="kb_compose_intent_short">Қысқа</string>
+    <string name="kb_compose_intent_short_phrase">Қысқа жаз.</string>
+    <string name="kb_compose_intent_formal">Ресми</string>
+    <string name="kb_compose_intent_formal_phrase">Ресми үнмен жаз.</string>
+    <string name="kb_compose_intent_friendly">Жылы</string>
+    <string name="kb_compose_intent_friendly_phrase">Жылы, достық үнмен жаз.</string>
+    <string name="kb_compose_intent_emoji">Эмодзимен</string>
+    <string name="kb_compose_intent_emoji_phrase">Бірнеше орынды эмодзи қос.</string>
+    <string name="kb_compose_intent_thanks">Алғыс айту</string>
+    <string name="kb_compose_intent_thanks_phrase">Алғыс хат жаз.</string>
+    <string name="kb_compose_intent_decline">Сыпайы бас тарту</string>
+    <string name="kb_compose_intent_decline_phrase">Сыпайы түрде бас тарт.</string>
+
+    <!-- Create: answer the copied message with the request written here -->
+    <string name="kb_reply_to_copied">Көшірілгенге жауап беру</string>
+    <string name="kb_reply_to_copied_description">Көшірілген хабарламаға осы сұраныс бойынша жауап беру</string>
+
+    <!-- Smart correction in the keyboard: the suggestion strip and the instruction polish chip -->
+    <string name="kb_suggestions">Ұсыныстар</string>
+    <string name="kb_suggestion_typed">«%1$s»</string>
+    <string name="kb_suggestion_keep_description">Терілгендей қалдыру: %1$s</string>
+    <string name="kb_suggestion_correction_description">«%1$s» деп түзету</string>
+    <string name="kb_polish_suggestion_description">Ұсынылған түзету: %1$s</string>
+    <string name="kb_polish_undo">Болдырмау</string>
+    <string name="kb_polish_undo_description">Түзетуді болдырмау</string>
+
+    <!-- Onboarding v2 on Android: keyboard status and setup, switching, clipboard; smart correction -->
+    <string name="android_status_keyboard">AI\u00A0Reply пернетақтасы</string>
+    <string name="android_status_enabled">Қосулы</string>
+    <string name="android_status_not_enabled">Қосылмаған</string>
+    <string name="android_status_current">Ағымдағы пернетақта</string>
+    <string name="android_status_other_keyboard">Басқасы</string>
+    <string name="onboarding_keyboard_step_enable">Пернетақталар тізімінде AI\u00A0Reply-ды қосыңыз</string>
+    <string name="onboarding_keyboard_step_confirm">Жүйелік ескертуді растаңыз</string>
+    <string name="onboarding_keyboard_step_choose">Осында оралып, AI\u00A0Reply-ды таңдаңыз</string>
+    <string name="onboarding_switch_note">Пернетақтаны ауыстыру үшін навигация панеліндегі пернетақта белгішесін басыңыз немесе бос орын не тіл пернесін басып тұрыңыз — бұл телефонға байланысты.</string>
+    <string name="onboarding_clipboard_note">AI\u00A0Reply көшірілген хабарламаны тек үлгіні немесе «Хабарламаны қою» түймесін басқанда оқиды. Android-тың кейбір нұсқалары сол сәтте буфер оқылғаны туралы қысқа хабарлама көрсетеді — бұл қалыпты жағдай.</string>
+    <string name="cd_tutorial_next">Келесі қадамды көрсету</string>
+    <string name="settings_smart_correction">Ақылды түзету</string>
+    <string name="settings_smart_correction_footer">Қателер телефонның өзінде түзетіліп, сөздер сонда ұсынылады: басқа қолданбаларда терген ештеңеңіз ешқайда жіберілмейді. AI\u00A0Reply өрісіне нұсқау жазғанда, тазарақ нұсқасын ұсыну үшін сол мәтін жіберілуі мүмкін.</string>
+    <string name="settings_smart_correction_attribution">Сөздіктер: Leipzig Corpora Collection (CC BY).</string>
+
+    <!-- Push notifications (2026-10). -->
     <string name="push_channel_general">Жалпы</string>
     <string name="push_channel_general_description">Сервис жаңалықтары мен еске салғыштар</string>
     <string name="push_channel_important">Маңызды</string>
@@ -140,7 +198,7 @@
     <string name="push_settings_status_not_asked">Бапталмаған</string>
     <string name="push_settings_allow">Хабарламаларға рұқсат беру</string>
     <string name="push_settings_open_system">Телефон баптауларын ашу</string>
-    <string name="push_settings_enabled">AI Reply хабарламалары</string>
+    <string name="push_settings_enabled">AI\u00A0Reply хабарламалары</string>
     <string name="push_settings_footer">Төлемнің расталуы және тариф аяқталар алдындағы еске салғыштар.</string>
     <string name="push_settings_unavailable">Бұл нұсқада хабарламалар әзірге қолжетімсіз.</string>
     <string name="push_category_account">Тіркелгі</string>
@@ -151,8 +209,6 @@
     <string name="push_categories_footer">Қауіпсіздік хабарламалары әрқашан қосулы.</string>
     <string name="push_categories_loading">Жүктелуде…</string>
     <string name="push_categories_failed">Жаңарту мүмкін болмады. Байланысты тексеріп, қайталап көріңіз.</string>
-    <string name="diagnostics_share">Диагностиканы жіберу</string>
-    <string name="diagnostics_share_footer">Ақауларды тауып, түзетуге көмектеседі: қосымшаның іске қосылуы, хабарламаны басу және байланыс қателері. Хабарламаларыңыз, терген мәтініңіз және алмасу буфері ешқашан жіберілмейді.</string>
     <string name="settings_debug_simulate_push">Сынақ push-хабарламасы</string>
     <string name="settings_debug_force_push_prompt">Хабарлама карточкасын әрқашан көрсету</string>
     <string name="settings_debug_push_footer">Тек жөндеу нұсқасында. Үлгі 3 секундтан кейін ашық қосымшадағы нақты хабарламаның жолымен келеді және басқанда «Тарифті» ашады. Ауыстырғыш басты экрандағы карточканы және осы баптауларды Firebase болмаса да көрсетеді.</string>

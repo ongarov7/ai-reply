@@ -57,7 +57,7 @@ final class ProfileStore: @unchecked Sendable {
     static let didChangeNotification = Notification.Name("ReplyProfileStoreDidChange")
 
     private let fileURL: URL?
-    private let queue = DispatchQueue(label: "kz.yerek.replykeyboard.profilestore")
+    private let queue = DispatchQueue(label: "kz.ai-reply.profilestore")
     private let settings: SharedSettings
 
     /// Guarded by `queue`.

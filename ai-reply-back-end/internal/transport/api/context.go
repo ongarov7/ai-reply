@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/aireply/ai-reply-back-end/internal/domain"
-	"github.com/aireply/ai-reply-back-end/internal/reqctx"
 	"github.com/aireply/ai-reply-back-end/internal/transport/httpx"
 )
 
@@ -61,7 +60,6 @@ func (s *Server) requireUser(next http.Handler) http.Handler {
 			httpx.Fail(w, err)
 			return
 		}
-		reqctx.ObservedFrom(r.Context()).SetUser(user.ID)
 		ctx := WithUser(r.Context(), user)
 		ctx = context.WithValue(ctx, deviceKey, claims.DeviceID)
 		ctx = context.WithValue(ctx, platformKey, claims.Platform)
@@ -97,7 +95,6 @@ func (s *Server) requireLegacy(next http.Handler) http.Handler {
 		if err != nil {
 			// Жаңа access токенмен де жұмыс істей берсін (біртіндеп көшу).
 			if u, claims, err2 := s.auth.Authenticate(r.Context(), token); err2 == nil {
-				reqctx.ObservedFrom(r.Context()).SetUser(u.ID)
 				ctx := context.WithValue(WithUser(r.Context(), u), deviceKey, claims.DeviceID)
 				next.ServeHTTP(w, r.WithContext(ctx))
 				return
@@ -105,7 +102,6 @@ func (s *Server) requireLegacy(next http.Handler) http.Handler {
 			httpx.Fail(w, err)
 			return
 		}
-		reqctx.ObservedFrom(r.Context()).SetUser(user.ID)
 		next.ServeHTTP(w, r.WithContext(WithUser(r.Context(), user)))
 	})
 }

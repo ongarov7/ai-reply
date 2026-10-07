@@ -2,7 +2,7 @@ package kz.yerek.aireply
 
 import android.app.Application
 import kz.yerek.aireply.ai.AILimits
-import kz.yerek.aireply.telemetry.SessionTracker
+import kz.yerek.aireply.analytics.ProductEvents
 
 /**
  * Holds the object graph.
@@ -25,12 +25,9 @@ class AIReplyApplication : Application() {
         // map lookup rather than a disk read on whatever thread asked.
         services.settings.warmUp()
         AILimits.install(services.settings.sharedPreferences)
+        ProductEvents.install(services.deviceState.sharedPreferences)
+        ProductEvents.sink = services.productEvents
         instance = this
-        // App sessions for diagnostics: only the app's own screen counts, never
-        // the keyboard or the transparent microphone-permission activity.
-        registerActivityLifecycleCallbacks(
-            SessionTracker.Callbacks(services.sessionTracker) { activity -> activity is MainActivity }
-        )
     }
 
     companion object {

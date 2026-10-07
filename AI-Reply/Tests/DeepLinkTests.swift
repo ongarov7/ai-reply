@@ -2,8 +2,8 @@ import XCTest
 @testable import AIReply
 
 /// Links from push notifications: what the app agrees to open, how a push's
-/// userInfo becomes a destination and an event, and the router that waits for
-/// the sign-in and consent gates instead of going around them.
+/// userInfo becomes a destination, and the router that waits for the sign-in
+/// and consent gates instead of going around them.
 ///
 /// Хабарлама сілтемелері: тек рұқсат етілген экрандар мен ai-reply.kz беттері.
 final class DeepLinkTests: XCTestCase {
@@ -61,10 +61,13 @@ final class DeepLinkTests: XCTestCase {
 
     // MARK: userInfo
 
-    /// The shape the server's APNs payload actually has.
+    /// The shape an FCM notification arrives in: the message's data as flat
+    /// keys next to `aps`.
     private let pushUserInfo: [AnyHashable: Any] = [
         "aps": ["alert": ["title": "Тариф", "body": "Тариф 3 күннен кейін бітеді"],
                 "sound": "default", "thread-id": "subscription"],
+        "gcm.message_id": "1720000000000000",
+        "google.c.a.e": "1",
         "nid": "0b7c9a52-4f5e-4d0a-9c1e-1d2f3a4b5c6d",
         "did": "d_4f1c2a9b7d3e5f60",
         "type": "subscription_expiring",
@@ -82,16 +85,6 @@ final class DeepLinkTests: XCTestCase {
         XCTAssertEqual(payload.destination, .screen(.subscription))
     }
 
-    func testTapReportsNotificationOpenedWithTheIDs() {
-        let event = NotificationPayload(userInfo: pushUserInfo).openedEvent
-        XCTAssertEqual(event.name, "notification_opened")
-        XCTAssertEqual(event.properties, [
-            "notification_id": .string("0b7c9a52-4f5e-4d0a-9c1e-1d2f3a4b5c6d"),
-            "delivery_id": .string("d_4f1c2a9b7d3e5f60"),
-            "type": .string("subscription_expiring")
-        ])
-    }
-
     func testMissingOrMalformedKeysAreSimplyAbsent() {
         let payload = NotificationPayload(userInfo: [
             "aps": ["alert": "Hi"],
@@ -103,15 +96,6 @@ final class DeepLinkTests: XCTestCase {
         XCTAssertNil(payload.deliveryID)
         XCTAssertNil(payload.type)
         XCTAssertEqual(payload.destination, .none, "no link: the app just opens")
-        XCTAssertEqual(payload.openedEvent.properties, ["notification_id": .string("42")])
-    }
-
-    /// One bad value would make the server refuse the whole event; it is left
-    /// out instead.
-    func testIDsTheServerWouldRefuseAreLeftOut() {
-        let event = NotificationPayload(notificationID: "has spaces", deliveryID: "ok-1",
-                                        type: String(repeating: "x", count: 65)).openedEvent
-        XCTAssertEqual(event.properties, ["delivery_id": .string("ok-1")])
     }
 
     // MARK: Router

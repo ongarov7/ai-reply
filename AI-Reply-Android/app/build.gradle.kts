@@ -107,6 +107,12 @@ android {
         }
     }
 
+    // JVM tests drive the keyboard's controllers, which log through
+    // android.util.Log in debug builds; the stub answers instead of throwing.
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
+
     lint {
         warningsAsErrors = false
         abortOnError = true

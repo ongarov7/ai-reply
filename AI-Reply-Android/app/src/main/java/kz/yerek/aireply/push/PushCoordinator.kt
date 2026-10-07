@@ -1,8 +1,7 @@
 package kz.yerek.aireply.push
 
 import android.content.Context
-import android.os.Handler
-import android.os.Looper
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -12,12 +11,10 @@ import kotlinx.coroutines.launch
 import kz.yerek.aireply.BuildConfig
 import kz.yerek.aireply.R
 import kz.yerek.aireply.data.account.AccountObserver
-import kz.yerek.aireply.data.account.ApiException
 import kz.yerek.aireply.data.account.ServerFeaturesDto
 import kz.yerek.aireply.data.account.SessionAuth
-import kz.yerek.aireply.data.account.diagnosticCode
 import kz.yerek.aireply.data.settings.SettingsStore
-import kz.yerek.aireply.telemetry.EventReporter
+import kz.yerek.aireply.platform.ReplyLog
 import java.util.UUID
 
 /**
@@ -43,7 +40,6 @@ data class PushUiState(
     val promptDismissed: Boolean = false,
     /** The in-app switch. */
     val notificationsEnabled: Boolean = true,
-    val shareDiagnostics: Boolean = true,
     /** Debug builds: show the card and the controls regardless. */
     val debugForced: Boolean = false
 ) {
@@ -66,9 +62,8 @@ data class PushUiState(
 }
 
 /**
- * Push notifications, the installation registration and the diagnostics that
- * go with them, in one place the Activity, the screens and the Firebase
- * service talk to.
+ * Push notifications and the installation registration, in one place the
+ * Activity, the screens and the Firebase service talk to.
  *
  * Push хабарламалары: орнатуды тіркеу, рұқсат, арналар, басылған хабарлама.
  *
@@ -81,8 +76,7 @@ class PushCoordinator(
     private val store: PushStateStore,
     private val client: ClientContext,
     private val session: SessionAuth,
-    private val api: HttpPushApi,
-    private val events: EventReporter,
+    private val api: PushApi,
     /** `features` from `GET /api/v1/config`; null before the answer or on an old server. */
     private val features: () -> ServerFeaturesDto?,
     /** Whether `GET /api/v1/config` has answered in this process. */
@@ -108,13 +102,8 @@ class PushCoordinator(
         isEnabled = { consentGiven() && features()?.installations == true },
         scope = scope,
         clock = clock,
-        listener = object : InstallationRegistrar.Listener {
-            override fun onSynced(request: InstallationRequest, response: InstallationResponse) =
-                onRegistered(request, response)
-
-            override fun onFailed(request: InstallationRequest, failure: ApiException?) =
-                onRegistrationFailed(request, failure)
-        }
+        // A signed-in registration answers with the account's categories: the switches follow.
+        listener = { _, response -> response.preferences?.let(preferences::adopt) }
     )
 
     /** Firebase is configured in this build. Read once: it cannot change while the process lives. */
@@ -129,9 +118,9 @@ class PushCoordinator(
     @Volatile
     private var lastConfigAttempt = 0L
 
-    private val reportedTokenFailures = HashSet<String>()
-
-    private val mainHandler = Handler(Looper.getMainLooper())
+    /** The language the channels were last named in. */
+    @Volatile
+    private var channelsLanguage: String? = null
 
     // --------------------------------------------------------------- app
 
@@ -139,7 +128,7 @@ class PushCoordinator(
     fun onAppLaunched() {
         refreshUi()
         scope.launch {
-            NotificationChannels.ensure(appContext, localized())
+            ensureChannels()
             // Firebase is told about this install only once the terms are accepted.
             if (isSupportedInBuild && !tokenFetched && consentGiven()) fetchToken()
             registrar.requestSync()
@@ -158,6 +147,7 @@ class PushCoordinator(
         }
         refreshUi()
         scope.launch {
+            ensureChannels()
             if (bootstrapped()) ensureServerFeatures()
             registrar.requestSync()
         }
@@ -180,9 +170,19 @@ class PushCoordinator(
             permanentlyDenied = store.permissionPermanentlyDenied,
             promptDismissed = store.promptDismissed,
             notificationsEnabled = settings.notificationsEnabled,
-            shareDiagnostics = settings.shareDiagnostics,
             debugForced = BuildConfig.DEBUG && settings.debugForcePushPrompt
         )
+    }
+
+    /**
+     * Channel names follow the app language. Re-creating an existing channel
+     * only renames it, so this runs whenever the language may have changed.
+     */
+    private fun ensureChannels() {
+        val language = client.locale
+        if (channelsLanguage == language) return
+        NotificationChannels.ensure(appContext, localized())
+        channelsLanguage = language
     }
 
     // ------------------------------------------------------------- token
@@ -203,8 +203,8 @@ class PushCoordinator(
                 tokenFetched = true
                 if (store.fcmToken != result.value) store.fcmToken = result.value
             }
-            PushSupport.TokenResult.Failed -> reportTokenFailure("fcm", FCM_TOKEN_UNAVAILABLE, null)
-            PushSupport.TokenResult.Unsupported -> Unit
+            // Logged by PushSupport; the next launch, or onNewToken, tries again.
+            PushSupport.TokenResult.Failed, PushSupport.TokenResult.Unsupported -> Unit
         }
     }
 
@@ -214,7 +214,13 @@ class PushCoordinator(
         val now = clock()
         if (now - lastConfigAttempt < CONFIG_RETRY_MS) return
         lastConfigAttempt = now
-        runCatching { loadServerConfig() }
+        try {
+            loadServerConfig()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            ReplyLog.warn(failure) { "server config not loaded for push" }
+        }
     }
 
     // ---------------------------------------------------------- messages
@@ -231,21 +237,32 @@ class PushCoordinator(
     }
 
     /**
-     * A notification was tapped: [data] are its String extras. Records
-     * `notification_opened` and returns where to go, or null when the intent
+     * A notification was tapped: [data] are its String extras. Tells the
+     * server (best effort) and returns where to go, or null when the intent
      * was not a notification of ours.
      */
     fun onNotificationOpened(data: Map<String, String?>): AppLink? {
         val payload = PushPayload.from(data) ?: return null
-        // Posted: on a cold start this runs in onCreate, before the session
-        // the tap opens has begun (it starts in onStart).
-        payload.openedEventProperties()?.let { properties ->
-            mainHandler.post { events.notificationOpened(properties) }
+        if (consentGiven()) {
+            scope.launch {
+                // Read here, off the main thread: the first read of the id touches a file.
+                val request = payload.openedRequest(client.installationId) ?: return@launch
+                try {
+                    api.opened(request)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (failure: Exception) {
+                    ReplyLog.warn(failure) { "notification open not recorded" }
+                }
+            }
         }
         return payload.link
     }
 
-    /** DEBUG BUILDS ONLY: the foreground path, with a sample payload, after [delayMillis]. */
+    /**
+     * DEBUG BUILDS ONLY: the foreground path, with a sample payload, after
+     * [delayMillis]. It has no delivery id, so a tap records nothing.
+     */
     fun simulatePush(delayMillis: Long) {
         if (!BuildConfig.DEBUG) return
         scope.launch {
@@ -254,7 +271,6 @@ class PushCoordinator(
             onMessageReceived(
                 data = mapOf(
                     PushPayload.KEY_NOTIFICATION_ID to UUID.randomUUID().toString(),
-                    PushPayload.KEY_DELIVERY_ID to "debug-" + UUID.randomUUID().toString().take(8),
                     PushPayload.KEY_TYPE to "debug_sample",
                     PushPayload.KEY_CATEGORY to "subscription",
                     PushPayload.KEY_LINK to "aireply://subscription"
@@ -270,7 +286,6 @@ class PushCoordinator(
     /** The system dialog is about to be shown. */
     fun onPermissionRequested() {
         store.permissionRequested = true
-        events.pushPermissionRequested()
     }
 
     /**
@@ -283,9 +298,7 @@ class PushCoordinator(
     fun onPermissionResult(granted: Boolean, rationaleBefore: Boolean, rationaleAfter: Boolean, fromPrompt: Boolean) {
         if (granted) {
             store.permissionPermanentlyDenied = false
-            events.pushPermissionGranted()
         } else {
-            events.pushPermissionDenied()
             val permanent = NotificationPermission.isPermanentDenial(
                 granted = false,
                 rationaleBefore = rationaleBefore,
@@ -314,12 +327,6 @@ class PushCoordinator(
         registrar.requestSync()
     }
 
-    fun setShareDiagnostics(enabled: Boolean) {
-        settings.shareDiagnostics = enabled
-        if (!enabled) events.clear()
-        refreshUi()
-    }
-
     /** DEBUG BUILDS ONLY. */
     fun setDebugForcePrompt(enabled: Boolean) {
         if (!BuildConfig.DEBUG) return
@@ -330,19 +337,17 @@ class PushCoordinator(
 
     // ----------------------------------------------------------- account
 
-    /** The terms were just accepted: register, fetch the token, send what diagnostics hold. */
+    /** The terms were just accepted: fetch the token and register. */
     override fun onLegalAccepted() {
         refreshUi()
         scope.launch {
             if (isSupportedInBuild && !tokenFetched) fetchToken()
             registrar.requestSync()
         }
-        events.onConsentGiven()
     }
 
     override fun onServerFeatures(features: ServerFeaturesDto?) {
         refreshUi()
-        events.onServerFeaturesChanged()
         registrar.requestSync()
     }
 
@@ -366,12 +371,7 @@ class PushCoordinator(
     override fun onSignedOut(userInitiated: Boolean) {
         store.accountUserId = null
         preferences.clear()
-        if (userInitiated) events.logout()
         registrar.requestSync()
-    }
-
-    override fun onSignInFailedLocally(method: String, errorCode: String) {
-        events.loginFailed(method, errorCode)
     }
 
     // ------------------------------------------------------ registration
@@ -392,36 +392,8 @@ class PushCoordinator(
         push = store.fcmToken?.takeIf { isSupportedInBuild }?.let { PushTokenDto(PROVIDER, it) }
     )
 
-    private fun onRegistered(request: InstallationRequest, response: InstallationResponse) {
-        val token = request.push?.token
-        val previous = store.registeredToken
-        if (token == null) {
-            store.registeredToken = null
-        } else if (response.pushStatus == PUSH_ACTIVE && token != previous) {
-            if (previous == null) events.pushTokenRegistered() else events.pushTokenRefreshed()
-            store.registeredToken = token
-        }
-        response.preferences?.let(preferences::adopt)
-    }
-
-    private fun onRegistrationFailed(request: InstallationRequest, failure: ApiException?) {
-        val token = request.push?.token ?: return
-        if (token == store.registeredToken) return
-        reportTokenFailure(token, failure?.diagnosticCode() ?: "unknown", failure?.requestId)
-    }
-
-    /** Once per token (or per kind of failure) per process: retries must not repeat it. */
-    private fun reportTokenFailure(key: String, code: String, requestId: String?) {
-        synchronized(reportedTokenFailures) {
-            if (!reportedTokenFailures.add(key)) return
-        }
-        events.pushTokenRegistrationFailed(code, requestId)
-    }
-
     companion object {
         const val PROVIDER = "fcm"
-        private const val PUSH_ACTIVE = "active"
-        private const val FCM_TOKEN_UNAVAILABLE = "fcm_token_unavailable"
         private const val CONFIG_RETRY_MS = 5L * 60 * 1000
     }
 }

@@ -28,20 +28,20 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import kz.yerek.aireply.R
-import kz.yerek.aireply.keyboard.input.KeyboardStatus
 import kz.yerek.aireply.ui.LocalServices
 import kz.yerek.aireply.ui.common.AppScreen
 import kz.yerek.aireply.ui.common.Footnote
 import kz.yerek.aireply.ui.common.NavigationRow
 import kz.yerek.aireply.ui.common.RowDividerIndented
 import kz.yerek.aireply.ui.common.RowGroup
+import kz.yerek.aireply.ui.common.privacyStatement
 import kz.yerek.aireply.ui.common.rememberKeyboardStatus
 import kz.yerek.aireply.ui.design.AppCard
 import kz.yerek.aireply.ui.design.AppMark
 import kz.yerek.aireply.ui.design.AppSection
 import kz.yerek.aireply.ui.design.LocalExtraColors
 import kz.yerek.aireply.ui.design.ReadableColumn
-import kz.yerek.aireply.ui.design.SecondaryButton
+import kz.yerek.aireply.ui.feature.setup.KeyboardSetupAction
 import kz.yerek.aireply.ui.design.Spacing
 import kz.yerek.aireply.ui.design.StepRow
 import kz.yerek.aireply.ui.navigation.Routes
@@ -172,16 +172,10 @@ fun HomeScreen(onOpen: (String) -> Unit) {
                             StepRow(2, stringResource(R.string.android_step_select))
                         }
 
-                        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
-                            SecondaryButton(
-                                text = stringResource(R.string.android_open_keyboard_settings),
-                                onClick = { KeyboardStatus.openKeyboardSettings(context) }
-                            )
-                            SecondaryButton(
-                                text = stringResource(R.string.settings_setup_guide),
-                                onClick = { onOpen(Routes.KeyboardSetup) }
-                            )
-                        }
+                        // ONE action, for the step that is actually missing, and
+                        // none once the keyboard is on and chosen. The guide is
+                        // still in Settings ▸ Keyboard setup.
+                        KeyboardSetupAction(status, context)
                     }
                 }
             }
@@ -199,7 +193,7 @@ fun HomeScreen(onOpen: (String) -> Unit) {
             }
 
             AppSection(stringResource(R.string.home_privacy_title)) {
-                AppCard { Footnote(stringResource(R.string.settings_privacy_body)) }
+                AppCard { Footnote(privacyStatement()) }
             }
         }
     }

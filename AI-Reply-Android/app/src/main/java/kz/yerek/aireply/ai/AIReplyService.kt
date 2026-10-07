@@ -4,6 +4,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ensureActive
 import kz.yerek.aireply.BuildConfig
 import kz.yerek.aireply.core.lang.AppLanguage
+import kz.yerek.aireply.core.lang.KeyboardLanguage
 import kz.yerek.aireply.core.text.clampToCodePoints
 import kz.yerek.aireply.core.text.codePointLength
 import kz.yerek.aireply.domain.model.ReplyConfiguration
@@ -53,6 +54,12 @@ class AIReplyService(
         val uiLanguage: AppLanguage,
         /** What the user typed or dictated for this reply. May be blank. */
         val instruction: String = "",
+        /**
+         * The keyboard layout on screen when Reply was tapped. A hint for the
+         * server when the incoming message itself is too short to tell; null
+         * outside the keyboard.
+         */
+        val inputLanguage: KeyboardLanguage? = null,
         /**
          * Injectable so working-hours behaviour is testable without waiting for
          * 18:30.
@@ -124,6 +131,7 @@ class AIReplyService(
         businessContext: kz.yerek.aireply.domain.model.WorkingHours.Context?
     ): ReplyTransport {
         val template = request.template
+        val profile = request.configuration.profile
         return accountTransport(
             configuration.backendBaseUrl,
             AccountReplyTransport.RequestContext(
@@ -140,7 +148,13 @@ class AIReplyService(
                 templateBusiness = template.effectiveBusiness,
                 appLanguage = request.uiLanguage.code,
                 business = businessContext,
-                appVersion = BuildConfig.VERSION_NAME
+                appVersion = BuildConfig.VERSION_NAME,
+                profileDescription = profile.promptDescription,
+                profileRole = profile.role.trim(),
+                profileTone = profile.preferredTone,
+                profileBusiness = profile.business,
+                grammaticalGender = profile.grammaticalGender,
+                inputLanguage = request.inputLanguage?.code
             )
         )
     }

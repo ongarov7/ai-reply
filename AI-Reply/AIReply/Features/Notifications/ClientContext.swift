@@ -10,31 +10,25 @@ import Security
 /// "iPhone17,1", never the name the owner gave the phone.
 struct ClientContext: Equatable, Sendable {
     let installationID: String
-    let platform: String
     let appVersion: String
     let appBuild: String
-    let osName: String
     let osVersion: String
     let deviceModel: String
-    let manufacturer: String
     /// The app's interface language (en, ru, kk, uz), not the phone's.
     let locale: String
     /// IANA name, e.g. "Asia/Almaty".
     let timezone: String
 
     init(installationID: String,
-         metadata: ClientMetadata = .current,
+         build: BuildInfo = .current,
          deviceModel: String = DeviceModel.identifier,
          locale: String,
          timezone: String = TimeZone.current.identifier) {
         self.installationID = installationID
-        self.platform = metadata.platform
-        self.appVersion = metadata.appVersion
-        self.appBuild = metadata.appBuild
-        self.osName = "iOS"
-        self.osVersion = metadata.osVersion
+        self.appVersion = build.appVersion
+        self.appBuild = build.appBuild
+        self.osVersion = build.osVersion
         self.deviceModel = deviceModel
-        self.manufacturer = "Apple"
         self.locale = locale
         self.timezone = timezone
     }
@@ -44,19 +38,50 @@ struct ClientContext: Equatable, Sendable {
                              push: InstallationPayload.Push?) -> InstallationPayload {
         InstallationPayload(
             installation_id: installationID,
-            platform: platform,
+            platform: "ios",
             app_version: appVersion,
             app_build: appBuild,
-            os_name: osName,
+            os_name: "iOS",
             os_version: osVersion,
             device_model: deviceModel,
-            manufacturer: manufacturer,
+            manufacturer: "Apple",
             locale: locale,
             timezone: timezone,
             notification_permission: permission.rawValue,
             notifications_enabled: notificationsEnabled,
             push: push
         )
+    }
+}
+
+/// The build and system versions, read once.
+struct BuildInfo: Equatable, Sendable {
+    let appVersion: String
+    let appBuild: String
+    let osVersion: String
+
+    static let current = BuildInfo(bundle: .main, processInfo: .processInfo)
+
+    init(appVersion: String, appBuild: String, osVersion: String) {
+        self.appVersion = appVersion
+        self.appBuild = appBuild
+        self.osVersion = osVersion
+    }
+
+    init(bundle: Bundle, processInfo: ProcessInfo) {
+        self.init(
+            appVersion: bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "",
+            appBuild: bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "",
+            osVersion: Self.systemVersion(processInfo.operatingSystemVersion)
+        )
+    }
+
+    /// The same text `UIDevice.current.systemVersion` gives ("17.5",
+    /// "17.5.1"), without touching UIKit.
+    static func systemVersion(_ version: OperatingSystemVersion) -> String {
+        var text = "\(version.majorVersion).\(version.minorVersion)"
+        if version.patchVersion > 0 { text += ".\(version.patchVersion)" }
+        return text
     }
 }
 
@@ -99,8 +124,8 @@ enum InstallationIDLoad: Equatable {
 /// - A random UUID made once. Never the advertising id or the vendor id, and
 ///   never derived from them or from hardware.
 /// - Kept in the Keychain as `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`
-///   in the app's OWN access group (no access group is named, so iOS uses the
-///   app's application identifier): the keyboard extension cannot read it.
+///   in the app's own access group (see `KeychainInstallationIDStorage`): the
+///   keyboard extension cannot read it.
 /// - It survives deleting and reinstalling the app on the same iPhone, because
 ///   iOS currently keeps an app's Keychain items after the app is deleted; the
 ///   server then recognises the same install instead of counting a new one.
@@ -149,19 +174,29 @@ final class InstallationIdentity {
 }
 
 /// The Keychain item behind `InstallationIdentity`.
+///
+/// The app's entitlements list the shared keychain group the keyboard also
+/// has, and an item saved without an access group lands in the first group
+/// listed - the shared one. So the group is named: the app's own application
+/// identifier, which every app may use and no extension of it can read.
 struct KeychainInstallationIDStorage: InstallationIDStorage {
 
-    private let service = "kz.yerek.replykeyboard.installation"
+    private let service = "kz.ai-reply.installation"
     private let account = "installation.id"
+    private let accessGroup: String?
 
-    /// No `kSecAttrAccessGroup`: the item lives in the app's own group, not in
-    /// the App Group the keyboard shares.
+    init(accessGroup: String? = KeychainInstallationIDStorage.applicationIdentifier) {
+        self.accessGroup = accessGroup
+    }
+
     private var query: [String: Any] {
-        [
+        var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account
         ]
+        if let accessGroup { query[kSecAttrAccessGroup as String] = accessGroup }
+        return query
     }
 
     func load() -> InstallationIDLoad {
@@ -194,103 +229,18 @@ struct KeychainInstallationIDStorage: InstallationIDStorage {
         insert.merge(attributes) { current, _ in current }
         return SecItemAdd(insert as CFDictionary, nil) == errSecSuccess
     }
-}
 
-// MARK: - Session
-
-/// The app session: a new id at every cold start and after 30 minutes in the
-/// background. It ties an API error to the events around it on the server.
-@MainActor
-final class SessionTracker {
-
-    static let backgroundTimeout: TimeInterval = 30 * 60
-
-    enum Transition: Equatable {
-        /// The app came to the front. `newSession` is false after a short
-        /// trip to the background.
-        case opened(coldStart: Bool, newSession: Bool)
-        case backgrounded(foregroundSeconds: Int)
+    /// "<team id>.<bundle id>". Xcode fills `AIReplyAppIdentifierPrefix`
+    /// ("<team id>.") when it signs the app; an unsigned build has none and
+    /// keeps the item in the default group.
+    static var applicationIdentifier: String? {
+        applicationIdentifier(info: Bundle.main.infoDictionary ?? [:], bundleID: Bundle.main.bundleIdentifier)
     }
 
-    private(set) var sessionID: String
-    private var isInForeground = false
-    private var isColdStart = true
-    private var foregroundSince: Date?
-    private var backgroundSince: Date?
-    private let now: () -> Date
-    private let makeID: () -> String
-
-    init(now: @escaping () -> Date = Date.init,
-         makeID: @escaping () -> String = { UUID().uuidString.lowercased() }) {
-        self.now = now
-        self.makeID = makeID
-        self.sessionID = makeID()
-    }
-
-    /// scenePhase became `.active`. Nil when the app never left the front
-    /// (a system alert or Control Center only makes it inactive).
-    func didBecomeActive() -> Transition? {
-        guard !isInForeground else { return nil }
-        isInForeground = true
-        let date = now()
-        defer {
-            foregroundSince = date
-            backgroundSince = nil
-            isColdStart = false
-        }
-        if isColdStart {
-            return .opened(coldStart: true, newSession: true)
-        }
-        if let since = backgroundSince, date.timeIntervalSince(since) >= Self.backgroundTimeout {
-            sessionID = makeID()
-            return .opened(coldStart: false, newSession: true)
-        }
-        return .opened(coldStart: false, newSession: false)
-    }
-
-    /// scenePhase became `.background`.
-    func didEnterBackground() -> Transition? {
-        guard isInForeground else { return nil }
-        isInForeground = false
-        let date = now()
-        backgroundSince = date
-        let seconds = foregroundSince.map { Int(max(0, date.timeIntervalSince($0)).rounded()) } ?? 0
-        foregroundSince = nil
-        return .backgrounded(foregroundSeconds: seconds)
-    }
-}
-
-/// The identity the containing app adds to its requests, readable from any
-/// thread (`APIClient` runs off the main actor).
-final class ClientIdentityHolder: @unchecked Sendable {
-    private let lock = NSLock()
-    private var identity = APIClientHooks.Identity()
-
-    var current: APIClientHooks.Identity {
-        lock.lock()
-        defer { lock.unlock() }
-        return identity
-    }
-
-    func update(_ identity: APIClientHooks.Identity) {
-        lock.lock()
-        self.identity = identity
-        lock.unlock()
-    }
-
-    /// Which identity the app's requests may carry.
-    ///
-    /// Nothing before the legal consent: no request names the installation or
-    /// the session, and the installation id is not even read (or made) until
-    /// then. After it, the installation - logout detaches the phone by it, and
-    /// the server counts its limits per installation - and the session only
-    /// while "Share diagnostics" is on. The same rule as the Android app.
-    static func identity(consentGiven: Bool,
-                         sharesDiagnostics: Bool,
-                         installationID: () -> String?,
-                         sessionID: String) -> APIClientHooks.Identity {
-        guard consentGiven else { return APIClientHooks.Identity() }
-        return APIClientHooks.Identity(installationID: installationID(),
-                                       sessionID: sharesDiagnostics ? sessionID : nil)
+    static func applicationIdentifier(info: [String: Any], bundleID: String?) -> String? {
+        guard let prefix = info["AIReplyAppIdentifierPrefix"] as? String,
+              prefix.count > 1, prefix.hasSuffix("."), !prefix.contains("$("),
+              let bundleID, !bundleID.isEmpty else { return nil }
+        return prefix + bundleID
     }
 }

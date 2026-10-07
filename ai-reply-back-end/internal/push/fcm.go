@@ -13,6 +13,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -31,6 +32,9 @@ const (
 	AndroidChannelImportant = "important"
 )
 
+// maxCollapseIDBytes — APNs apns-collapse-id тақырыбының шегі.
+const maxCollapseIDBytes = 64
+
 // FCMConfig — Firebase қызметтік тіркелгісі.
 type FCMConfig struct {
 	ProjectID   string
@@ -43,7 +47,7 @@ type FCMConfig struct {
 	Now        func() time.Time
 }
 
-// FCM — Firebase Cloud Messaging HTTP v1 провайдері.
+// FCM — Firebase Cloud Messaging HTTP v1 провайдері (Android және iOS).
 type FCM struct {
 	cfg    FCMConfig
 	key    *rsa.PrivateKey
@@ -58,14 +62,14 @@ type FCM struct {
 // NewFCM — кілтті тексеріп, провайдер жасайды. Қате мәтінінде кілт мазмұны болмайды.
 func NewFCM(cfg FCMConfig) (*FCM, error) {
 	if strings.TrimSpace(cfg.ProjectID) == "" || strings.TrimSpace(cfg.ClientEmail) == "" {
-		return nil, errors.New("fcm: FIREBASE_PROJECT_ID and FIREBASE_CLIENT_EMAIL are required")
+		return nil, errors.New("fcm: the Firebase project id and client e-mail are required")
 	}
 	if !strings.Contains(cfg.ClientEmail, "@") {
-		return nil, errors.New("fcm: FIREBASE_CLIENT_EMAIL must be the service account e-mail")
+		return nil, errors.New("fcm: the client e-mail must be the service account e-mail")
 	}
 	key, err := parseRSAKey(cfg.PrivateKey)
 	if err != nil {
-		return nil, errors.New("fcm: FIREBASE_PRIVATE_KEY is not a valid service-account private key")
+		return nil, errors.New("fcm: the private key is not a valid service-account private key")
 	}
 	if cfg.TokenURL == "" {
 		cfg.TokenURL = GoogleTokenURL
@@ -105,6 +109,7 @@ type fcmMessage struct {
 	Notification *fcmNotification  `json:"notification,omitempty"`
 	Data         map[string]string `json:"data,omitempty"`
 	Android      *fcmAndroid       `json:"android,omitempty"`
+	APNs         *fcmAPNs          `json:"apns,omitempty"`
 }
 
 type fcmNotification struct {
@@ -124,17 +129,33 @@ type fcmAndroidNotification struct {
 	DefaultSound bool   `json:"default_sound,omitempty"`
 }
 
-// buildFCMMessage — HTTP v1 денесі. Тестте де, өлшем тексерісінде де қолданылады.
+type fcmAPNs struct {
+	Headers map[string]string `json:"headers,omitempty"`
+	Payload fcmAPNsPayload    `json:"payload"`
+}
+
+type fcmAPNsPayload struct {
+	APS fcmAPS `json:"aps"`
+}
+
+type fcmAPS struct {
+	Sound    string `json:"sound,omitempty"`
+	ThreadID string `json:"thread-id,omitempty"`
+}
+
+// buildFCMMessage — HTTP v1 денесі. Жіберуде де, өлшем тексерісінде де қолданылады.
 //
-// A notification + data message: while the app is in the background the FCM
-// SDK shows it on the channel named here and puts the data keys into the
-// launch intent; in the foreground the app's FirebaseMessagingService shows
-// it itself with the same channel and tag. The tag is the notification id, so
-// a repeated delivery replaces the first one instead of stacking.
-func buildFCMMessage(token string, msg Message) fcmRequest {
-	priority, channel := "NORMAL", AndroidChannelGeneral
+// A notification + data message. Android: while the app is in the background
+// the FCM SDK shows it on the channel named here; in the foreground the app's
+// FirebaseMessagingService shows it itself with the same channel and tag. The
+// tag is the notification id, so a repeated delivery replaces the first one.
+// iOS: Firebase turns the notification into aps.alert and copies the data
+// keys to the top level of the APNs payload; the apns headers make it an alert
+// push that collapses by notification id and expires with the TTL.
+func buildFCMMessage(token string, msg Message, now time.Time) fcmRequest {
+	priority, channel, apnsPriority := "NORMAL", AndroidChannelGeneral, "5"
 	if msg.Important {
-		priority, channel = "HIGH", AndroidChannelImportant
+		priority, channel, apnsPriority = "HIGH", AndroidChannelImportant, "10"
 	}
 	android := &fcmAndroid{
 		Priority: priority,
@@ -142,15 +163,36 @@ func buildFCMMessage(token string, msg Message) fcmRequest {
 			ChannelID: channel, Tag: msg.CollapseID, DefaultSound: true,
 		},
 	}
+	headers := map[string]string{"apns-push-type": "alert", "apns-priority": apnsPriority}
+	if id := collapseID(msg.CollapseID); id != "" {
+		headers["apns-collapse-id"] = id
+	}
 	if msg.TTL > 0 {
 		android.TTL = fmt.Sprintf("%ds", int64(msg.TTL/time.Second))
+		headers["apns-expiration"] = strconv.FormatInt(now.Add(msg.TTL).Unix(), 10)
 	}
 	return fcmRequest{Message: fcmMessage{
 		Token:        token,
 		Notification: &fcmNotification{Title: msg.Title, Body: msg.Body},
 		Data:         msg.Data,
 		Android:      android,
+		APNs: &fcmAPNs{
+			Headers: headers,
+			Payload: fcmAPNsPayload{APS: fcmAPS{Sound: "default", ThreadID: msg.Category}},
+		},
 	}}
+}
+
+// collapseID — APNs 64 байттан ұзын collapse id қабылдамайды (UTF-8 шекарасында қиылады).
+func collapseID(id string) string {
+	if len(id) <= maxCollapseIDBytes {
+		return id
+	}
+	cut := maxCollapseIDBytes
+	for cut > 0 && (id[cut]&0xC0) == 0x80 {
+		cut--
+	}
+	return id[:cut]
 }
 
 // Send — бір құрылғыға бір хабарлама.
@@ -159,7 +201,7 @@ func (f *FCM) Send(ctx context.Context, target Target, msg Message) Result {
 	if err != nil {
 		return Result{Outcome: Retry, Code: "OAUTH_TOKEN_UNAVAILABLE", Detail: safeDetail(err.Error())}
 	}
-	body, err := json.Marshal(buildFCMMessage(target.Token, msg))
+	body, err := json.Marshal(buildFCMMessage(target.Token, msg, f.now()))
 	if err != nil {
 		return Result{Outcome: Rejected, Code: "PAYLOAD_ENCODING", Detail: "payload could not be encoded"}
 	}
@@ -212,9 +254,11 @@ type fcmError struct {
 // https://firebase.google.com/docs/reference/fcm/rest/v1/ErrorCode
 //
 //	UNREGISTERED (404), SENDER_ID_MISMATCH (403), INVALID_ARGUMENT on
-//	message.token (400)            → InvalidToken
+//	message.token (400)            → InvalidToken (dead Android and iOS tokens alike)
 //	QUOTA_EXCEEDED (429), UNAVAILABLE (503), INTERNAL (500),
 //	UNAUTHENTICATED (401), network → Retry
+//	THIRD_PARTY_AUTH_ERROR         → Rejected: the APNs key in the Firebase
+//	                                 project is missing or wrong, retries cannot help
 //	INVALID_ARGUMENT on the payload, other 4xx → Rejected
 func ClassifyFCM(status int, body []byte, retryAfterHeader string, now time.Time) Result {
 	var parsed fcmError
@@ -242,8 +286,9 @@ func ClassifyFCM(status int, body []byte, retryAfterHeader string, now time.Time
 		result.Outcome = InvalidToken
 	case code == "INVALID_ARGUMENT" && tokenField:
 		result.Outcome = InvalidToken
-	case code == "QUOTA_EXCEEDED", code == "UNAVAILABLE", code == "INTERNAL",
-		code == "UNAUTHENTICATED", code == "THIRD_PARTY_AUTH_ERROR":
+	case code == "THIRD_PARTY_AUTH_ERROR":
+		result.Outcome = Rejected
+	case code == "QUOTA_EXCEEDED", code == "UNAVAILABLE", code == "INTERNAL", code == "UNAUTHENTICATED":
 		result.Outcome = Retry
 	case status == http.StatusTooManyRequests, status == http.StatusUnauthorized, status >= 500:
 		result.Outcome = Retry
@@ -288,7 +333,7 @@ func (f *FCM) token(ctx context.Context) (string, error) {
 			Error string `json:"error"`
 		}
 		_ = json.Unmarshal(raw, &e)
-		return "", fmt.Errorf("oauth token refused: HTTP %d %s", res.StatusCode, e.Error)
+		return "", fmt.Errorf("oauth token refused: HTTP %d %s", res.StatusCode, safeDetail(e.Error))
 	}
 	var tok struct {
 		AccessToken string `json:"access_token"`

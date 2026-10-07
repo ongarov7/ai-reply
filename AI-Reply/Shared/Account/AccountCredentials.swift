@@ -11,8 +11,8 @@ import Security
 /// non-secret device id and the access-token expiry.
 enum AccountCredentials {
 
-    private static let service = "kz.yerek.replykeyboard.account"
-    private static let accessGroup = AppGroup.identifier
+    private static let service = "kz.ai-reply.account"
+    private static let accessGroup = KeychainGroup.identifier
 
     private enum Account {
         static let access = "account.access.token"

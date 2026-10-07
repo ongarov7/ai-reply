@@ -31,6 +31,8 @@ type Server struct {
 	limiter   *middleware.Limiter
 	log       *slog.Logger
 	templates map[string]*template.Template
+	// adminVersion — әкімші скрипті мен стилінің хэші (?v=…): жаңа нұсқа кэштен алынбайды.
+	adminVersion string
 }
 
 // Deps — тәуелділіктер.
@@ -67,6 +69,11 @@ func New(d Deps) (*Server, error) {
 		}
 		s.templates[name] = tpl
 	}
+	version, err := assetVersion("static/admin-app.js", "static/admin.css")
+	if err != nil {
+		return nil, err
+	}
+	s.adminVersion = version
 	return s, nil
 }
 

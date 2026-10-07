@@ -70,9 +70,11 @@ class ContextTextProvider {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
             ?: return Result.Failure(AIReplyError.ClipboardUnavailable)
 
+        // Browsers and some messengers copy rich text as HTML only; its text
+        // is the message just the same.
         val description = clipboard.primaryClipDescription
-        if (description == null || !description.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN)) {
-            ReplyLog.event { "clipboard: no plain text" }
+        if (description == null || TEXT_TYPES.none(description::hasMimeType)) {
+            ReplyLog.event { "clipboard: no text" }
             return Result.Failure(AIReplyError.NoSourceMessage)
         }
 
@@ -107,4 +109,8 @@ class ContextTextProvider {
     }
 
     private fun normalised(value: String?): String? = value?.trim()?.takeIf { it.isNotEmpty() }
+
+    private companion object {
+        val TEXT_TYPES = listOf(ClipDescription.MIMETYPE_TEXT_PLAIN, ClipDescription.MIMETYPE_TEXT_HTML)
+    }
 }

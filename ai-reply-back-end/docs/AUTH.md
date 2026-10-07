@@ -100,7 +100,7 @@ Google Cloud Console → APIs & Services:
 1. **OAuth consent screen**: название AI Reply, домен `ai-reply.kz`, ссылки на
    политику и оферту; scopes `openid`, `email`, `profile`. Опубликовать (Production).
 2. **Credentials → Create OAuth client ID**:
-   - **iOS**: bundle ID `kz.yerek.replykeyboard` → client ID в
+   - **iOS**: bundle ID `kz.ai-reply.reply.keyboard.keyboard` → client ID в
      `GOOGLE_CLIENT_ID_IOS` (сервер) и в build setting `GOOGLE_IOS_CLIENT_ID`
      (Xcode, таргет AIReply). В `GOOGLE_IOS_REVERSED_CLIENT_ID` — тот же ID
      наоборот: `com.googleusercontent.apps.<id>`.
@@ -115,11 +115,11 @@ Google Cloud Console → APIs & Services:
 
 ## 6. Настройка Apple
 
-1. developer.apple.com → Identifiers → `kz.yerek.replykeyboard` → включить
+1. developer.apple.com → Identifiers → `kz.ai-reply.reply.keyboard.keyboard` → включить
    **Sign in with Apple** (в проекте уже есть entitlement
    `com.apple.developer.applesignin`; Xcode с автоматической подписью обновит
    профиль сам).
-2. `.env` сервера: `APPLE_CLIENT_ID=kz.yerek.replykeyboard`.
+2. `.env` сервера: `APPLE_CLIENT_ID=kz.ai-reply.reply.keyboard.keyboard`.
 3. Скрытые адреса Apple (`@privaterelay.appleid.com`): Certificates, IDs &
    Profiles → Services → **Sign in with Apple for Email Communication** →
    добавить домен `ai-reply.kz` (и `send.ai-reply.kz` — домен обратного адреса

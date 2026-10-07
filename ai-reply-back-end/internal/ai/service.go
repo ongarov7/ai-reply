@@ -19,7 +19,17 @@ type LimitsSource interface {
 	Current(ctx context.Context) limits.Limits
 }
 
-// Service — AI шлюзі: квота → провайдер → есеп.
+// QuotaEvents — квота шегіне жеткенде хабарлайтын қабат (notifications.Events).
+//
+// usage carries the counters after this request (or at the limit when the
+// reservation was refused); date and month are the quota period keys. It is
+// called on the reply path: the implementation must decide cheaply and log
+// its own errors.
+type QuotaEvents interface {
+	QuotaUsed(ctx context.Context, user domain.User, usage domain.Entitlement, date, month string)
+}
+
+// Service — AI шлюзі: квота → провайдер → сапа → есеп.
 type Service struct {
 	repo     *repository.Store
 	subs     *subscriptions.Service
@@ -27,15 +37,24 @@ type Service struct {
 	limits   LimitsSource
 	log      *slog.Logger
 	clock    traits.Clock
+	repair   bool
+	quota    QuotaEvents
 }
 
-// New — шлюз.
+// New — шлюз. Тексеруден өтпеген жауапты түзету әдепкіде қосулы.
 func New(repo *repository.Store, subs *subscriptions.Service, provider Provider, limits LimitsSource, log *slog.Logger) *Service {
-	return &Service{repo: repo, subs: subs, provider: provider, limits: limits, log: log, clock: traits.SystemClock{}}
+	return &Service{repo: repo, subs: subs, provider: provider, limits: limits, log: log,
+		clock: traits.SystemClock{}, repair: true}
 }
 
 // WithClock — тестке.
 func (s *Service) WithClock(c traits.Clock) *Service { s.clock = c; return s }
+
+// WithRepair — бір реттік түзету сұранысы (AI_REPAIR_ENABLED).
+func (s *Service) WithRepair(enabled bool) *Service { s.repair = enabled; return s }
+
+// WithQuotaEvents — квота хабарламалары (nil — жоқ).
+func (s *Service) WithQuotaEvents(q QuotaEvents) *Service { s.quota = q; return s }
 
 // Request — бір жауап сұранысы. Мәтін тек жадта, тек осы шақыру ішінде болады.
 type Request struct {
@@ -44,12 +63,14 @@ type Request struct {
 	SourceText  string
 	Instruction string
 	Language    string
-	TemplateID  string
-	Profile     Profile
-	Template    Template
-	Business    WorkingHours
-	Platform    string
-	AppVersion  string
+	// InputLanguage — тексерілген пернетақта коды не бос.
+	InputLanguage string
+	TemplateID    string
+	Profile       Profile
+	Template      Template
+	Business      WorkingHours
+	Platform      string
+	AppVersion    string
 }
 
 // Result — клиентке қайтатын нәтиже.
@@ -66,6 +87,28 @@ type Result struct {
 	LatencyMS        int
 	// SourceLimit — ErrSourceTooLong кезінде клиентке нақты шекті айту үшін.
 	SourceLimit int
+	// InstructionLimit — compose нұсқауы шектен асқанда (ErrInstructionTooLong).
+	InstructionLimit int
+}
+
+// Сұраныс режимдері. Usage оқиғасында сақталады; reply мен compose бір
+// квотаны жұмсайды, polish квотаға кірмейді.
+const (
+	ModeReply   = "reply"
+	ModeCompose = "compose"
+	ModePolish  = "polish"
+)
+
+// call — генерацияның метадерегі: кім, қай режим, қай құрылғыдан. Мәтін емес.
+type call struct {
+	Mode       string
+	User       domain.User
+	DeviceID   string
+	Language   string
+	Platform   string
+	AppVersion string
+	// Chars — пайдаланушы мәтінінің ұзындығы (хабарлама не нұсқау), тек сан.
+	Chars int
 }
 
 // Reply — негізгі сценарий.
@@ -91,15 +134,44 @@ func (s *Service) Reply(ctx context.Context, req Request) (Result, error) {
 	}
 	req.Instruction = traits.Clamp(req.Instruction, lim.InstructionChars)
 
-	entitlement, err := s.subs.Entitlement(ctx, req.User.ID)
+	prompt := BuildPrompt(PromptInput{
+		Message:       source,
+		Instruction:   req.Instruction,
+		TemplateID:    req.TemplateID,
+		AppLanguage:   req.Language,
+		InputLanguage: req.InputLanguage,
+		Profile:       req.Profile,
+		Template:      req.Template,
+		WorkingHours:  req.Business,
+	})
+	prompt.MaxOutputTokens = lim.MaxOutputTokens
+
+	return s.generate(ctx, call{
+		Mode:       ModeReply,
+		User:       req.User,
+		DeviceID:   req.DeviceID,
+		Language:   req.Language,
+		Platform:   req.Platform,
+		AppVersion: req.AppVersion,
+		Chars:      traits.RuneLen(source),
+	}, prompt, started)
+}
+
+// generate — reply мен compose-қа ортақ жол: квота брондау → провайдер, тазарту,
+// тексеру, қажет болса түзету (Complete) → токен есебі → оқиға → журнал.
+// Түзету болса да квота бір рет жұмсалады, ал екі шақырудың токені есептеледі.
+func (s *Service) generate(ctx context.Context, c call, prompt Prompt, started time.Time) (Result, error) {
+	entitlement, err := s.subs.Entitlement(ctx, c.User.ID)
 	if err != nil {
 		return Result{}, err
 	}
 	date, month := s.subs.Keys(started)
 
-	if err := s.repo.ReserveQuota(ctx, req.User.ID, date, month,
-		entitlement.DailyLimit, entitlement.MonthlyLimit); err != nil {
-		s.record(ctx, req, entitlement, "error", errorCode(err), Completion{}, 0, source)
+	usedDay, usedMonth, err := s.repo.ReserveQuota(ctx, c.User.ID, date, month,
+		entitlement.DailyLimit, entitlement.MonthlyLimit)
+	if err != nil {
+		s.record(ctx, c, entitlement, "error", errorCode(err), prompt.Version, Completion{}, 0)
+		s.quotaRefused(ctx, c.User, entitlement, date, month, err)
 		return Result{
 			DailyLimit: entitlement.DailyLimit,
 			UsedToday:  entitlement.UsedToday,
@@ -107,82 +179,106 @@ func (s *Service) Reply(ctx context.Context, req Request) (Result, error) {
 		}, err
 	}
 
-	prompt := BuildPrompt(PromptInput{
-		Message:      source,
-		Instruction:  req.Instruction,
-		TemplateID:   req.TemplateID,
-		AppLanguage:  req.Language,
-		Profile:      req.Profile,
-		Template:     req.Template,
-		WorkingHours: req.Business,
-	})
-	prompt.MaxOutputTokens = lim.MaxOutputTokens
-
-	completion, providerErr := s.provider.Generate(ctx, prompt)
+	outcome, providerErr := Complete(ctx, s.provider, prompt, s.repair)
 	latency := int(s.clock.Now().Sub(started).Milliseconds())
 
 	if providerErr != nil {
 		// Жауап алынбады — бронды қайтарамыз (қайталау кезінде екі рет есептелмейді).
-		if err := s.repo.RefundQuota(ctx, req.User.ID, date, month); err != nil {
-			s.log.Error("quota refund failed", "user_id", req.User.ID, "error", err.Error())
+		if err := s.repo.RefundQuota(ctx, c.User.ID, date, month); err != nil {
+			s.log.Error("quota refund failed", "user_id", c.User.ID, "error", err.Error())
 		}
-		s.record(ctx, req, entitlement, "error", errorCode(providerErr), Completion{ProviderMS: 0}, latency, source)
-		s.log.Warn("ai request failed", "user_id", req.User.ID, "code", errorCode(providerErr), "latency_ms", latency)
+		s.record(ctx, c, entitlement, "error", errorCode(providerErr), prompt.Version, Completion{}, latency)
+		s.logFailure(c, prompt.Version, errorCode(providerErr), latency)
 		return Result{}, providerErr
 	}
-
-	cost := s.estimateCostMicros(ctx, completion)
-	if err := s.repo.AddTokens(ctx, req.User.ID, date, month,
-		completion.InputTokens, completion.OutputTokens, cost); err != nil {
-		s.log.Error("token accounting failed", "user_id", req.User.ID, "error", err.Error())
+	if outcome.RepairAttempted {
+		s.log.Info("ai_reply_repaired", "user_id", c.User.ID, "mode", c.Mode,
+			"issues", issueCodes(outcome.Issues), "accepted", outcome.Repaired, "code", outcome.RepairError)
 	}
-	s.record(ctx, req, entitlement, "success", "", completion, latency, source)
 
-	usedToday := entitlement.UsedToday + 1
-	remaining := entitlement.DailyLimit - usedToday
-	if remaining < 0 {
-		remaining = 0
+	completion := Completion{Model: outcome.Model, InputTokens: outcome.InputTokens,
+		OutputTokens: outcome.OutputTokens, ProviderMS: outcome.ProviderMS}
+	if err := s.repo.AddTokens(ctx, c.User.ID, date, month, completion.InputTokens,
+		completion.OutputTokens, s.estimateCostMicros(ctx, completion)); err != nil {
+		s.log.Error("token accounting failed", "user_id", c.User.ID, "error", err.Error())
+	}
+	s.record(ctx, c, entitlement, "success", "", outcome.Version, completion, latency)
+	s.log.Info("ai_reply_generated", "user_id", c.User.ID, "mode", c.Mode, "prompt_version", outcome.Version,
+		"target_language", prompt.Quality.Target.Lang, "language_source", prompt.Quality.Target.Source,
+		"platform", c.Platform, "app_version", c.AppVersion, "latency_ms", latency,
+		"input_tokens", completion.InputTokens, "output_tokens", completion.OutputTokens,
+		"repaired", outcome.Repaired, "truncated", outcome.Truncated)
+
+	usage := entitlement
+	usage.UsedToday, usage.UsedMonth = usedDay, usedMonth
+	if s.quota != nil {
+		s.quota.QuotaUsed(ctx, c.User, usage, date, month)
 	}
 
 	return Result{
-		Text:             completion.Text,
-		DetectedLanguage: DetectLanguage(completion.Text),
-		Model:            completion.Model,
-		InputTokens:      completion.InputTokens,
-		OutputTokens:     completion.OutputTokens,
+		Text:             outcome.Text,
+		DetectedLanguage: DetectLanguage(outcome.Text),
+		Model:            outcome.Model,
+		InputTokens:      outcome.InputTokens,
+		OutputTokens:     outcome.OutputTokens,
 		DailyLimit:       entitlement.DailyLimit,
-		UsedToday:        usedToday,
-		Remaining:        remaining,
+		UsedToday:        usage.UsedToday,
+		Remaining:        usage.Remaining(),
 		ResetsAt:         entitlement.ResetsAt,
 		LatencyMS:        latency,
 	}, nil
 }
 
-// record — оқиға метадерегі. source_text те, жауап та жазылмайды: тек ұзындығы.
-func (s *Service) record(ctx context.Context, req Request, ent domain.Entitlement,
-	status, code string, completion Completion, latency int, source string) {
+// quotaRefused — брон лимитке тірелді: квота бітті деген хабарлама (сол күннің кілтімен,
+// сондықтан сәтті соңғы генерациядан кейінгі хабармен қайталанбайды).
+func (s *Service) quotaRefused(ctx context.Context, user domain.User, ent domain.Entitlement, date, month string, err error) {
+	if s.quota == nil {
+		return
+	}
+	switch {
+	case errors.Is(err, domain.ErrDailyLimit):
+		ent.UsedToday = max(ent.UsedToday, ent.DailyLimit)
+	case errors.Is(err, domain.ErrMonthlyLimit):
+		ent.UsedMonth = max(ent.UsedMonth, ent.MonthlyLimit)
+	default:
+		return
+	}
+	s.quota.QuotaUsed(ctx, user, ent, date, month)
+}
+
+// logFailure — сәтсіз генерация: тек режим, нұсқа, код және кідіріс.
+func (s *Service) logFailure(c call, version, code string, latency int) {
+	s.log.Warn("ai_reply_failed", "user_id", c.User.ID, "mode", c.Mode, "prompt_version", version,
+		"code", code, "latency_ms", latency)
+}
+
+// record — оқиға метадерегі. Пайдаланушы мәтіні де, жауап та жазылмайды: тек ұзындығы.
+func (s *Service) record(ctx context.Context, c call, ent domain.Entitlement,
+	status, code, version string, completion Completion, latency int) {
 	model := completion.Model
 	if model == "" {
 		model = s.provider.Model()
 	}
 	event := domain.UsageEvent{
-		UserID:       req.User.ID,
-		DeviceID:     req.DeviceID,
-		PlanID:       ent.Plan.ID,
-		Model:        model,
-		Status:       status,
-		ErrorCode:    code,
-		InputTokens:  completion.InputTokens,
-		OutputTokens: completion.OutputTokens,
-		TotalTokens:  completion.InputTokens + completion.OutputTokens,
-		CostMicros:   s.estimateCostMicros(ctx, completion),
-		LatencyMS:    latency,
-		ProviderMS:   completion.ProviderMS,
-		Platform:     req.Platform,
-		AppVersion:   req.AppVersion,
-		Language:     domain.NormalizeLocale(req.Language),
-		SourceChars:  traits.RuneLen(source),
-		CreatedAt:    s.clock.Now(),
+		UserID:        c.User.ID,
+		DeviceID:      c.DeviceID,
+		PlanID:        ent.Plan.ID,
+		Model:         model,
+		Status:        status,
+		ErrorCode:     code,
+		InputTokens:   completion.InputTokens,
+		OutputTokens:  completion.OutputTokens,
+		TotalTokens:   completion.InputTokens + completion.OutputTokens,
+		CostMicros:    s.estimateCostMicros(ctx, completion),
+		LatencyMS:     latency,
+		ProviderMS:    completion.ProviderMS,
+		Platform:      c.Platform,
+		AppVersion:    c.AppVersion,
+		Language:      domain.NormalizeLocale(c.Language),
+		SourceChars:   c.Chars,
+		Mode:          c.Mode,
+		PromptVersion: version,
+		CreatedAt:     s.clock.Now(),
 	}
 	if err := s.repo.InsertUsageEvent(ctx, event); err != nil {
 		s.log.Error("usage event insert failed", "error", err.Error())

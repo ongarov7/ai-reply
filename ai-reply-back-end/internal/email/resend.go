@@ -35,7 +35,7 @@ type ResendConfig struct {
 	Translate  Translator
 }
 
-// Resend — https://resend.com арқылы OTP хаттарын жібереді.
+// Resend — https://resend.com арқылы OTP және хабарлама хаттарын жібереді.
 type Resend struct {
 	apiKey    string
 	from      string
@@ -115,17 +115,34 @@ func (r *Resend) SendOTP(ctx context.Context, msg OTPMessage) error {
 	if err != nil {
 		return err
 	}
+	key := ""
+	if msg.Reference != "" {
+		key = "otp-" + msg.Reference
+	}
+	return r.deliver(ctx, msg.To, content, key, msg.Reference)
+}
+
+// Send — дайын хатты жібереді (хабарлама хаттары). Қайталау ережесі SendOTP-пен бірдей.
+func (r *Resend) Send(ctx context.Context, msg Outgoing) error {
+	if strings.TrimSpace(msg.To) == "" || strings.TrimSpace(msg.Content.Subject) == "" {
+		return errors.New("email: recipient and subject are required")
+	}
+	return r.deliver(ctx, msg.To, msg.Content, msg.IdempotencyKey, msg.Reference)
+}
+
+// deliver — бір хат: Resend сұранысы, 5xx не желі қатесінде сол кілтпен бір рет қайталау.
+func (r *Resend) deliver(ctx context.Context, to string, content Content, idempotencyKey, reference string) error {
 	payload := resendRequest{
 		From:    r.from,
-		To:      []string{msg.To},
+		To:      []string{to},
 		Subject: content.Subject,
 		HTML:    content.HTML,
 		Text:    content.Text,
 	}
-	if msg.Reference != "" {
-		// A unique header keeps Gmail from folding consecutive codes into one
-		// thread, where the newest code would hide under the oldest.
-		payload.Headers = map[string]string{"X-Entity-Ref-ID": msg.Reference}
+	if reference != "" {
+		// A unique header keeps Gmail from folding consecutive messages into
+		// one thread, where the newest would hide under the oldest.
+		payload.Headers = map[string]string{"X-Entity-Ref-ID": reference}
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
@@ -134,7 +151,7 @@ func (r *Resend) SendOTP(ctx context.Context, msg OTPMessage) error {
 
 	var last error
 	for attempt := 1; attempt <= resendAttempts; attempt++ {
-		retry, err := r.post(ctx, body, msg.Reference)
+		retry, err := r.post(ctx, body, idempotencyKey)
 		if err == nil {
 			return nil
 		}
@@ -152,7 +169,7 @@ func (r *Resend) SendOTP(ctx context.Context, msg OTPMessage) error {
 }
 
 // post — бір HTTP сұранысы. retry=true — қайталауға болатын қате.
-func (r *Resend) post(ctx context.Context, body []byte, reference string) (retry bool, err error) {
+func (r *Resend) post(ctx context.Context, body []byte, idempotencyKey string) (retry bool, err error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, r.endpoint, bytes.NewReader(body))
 	if err != nil {
 		return false, err
@@ -161,8 +178,8 @@ func (r *Resend) post(ctx context.Context, body []byte, reference string) (retry
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", "ai-reply-backend")
-	if reference != "" {
-		req.Header.Set("Idempotency-Key", "otp-"+reference)
+	if idempotencyKey != "" {
+		req.Header.Set("Idempotency-Key", idempotencyKey)
 	}
 
 	res, err := r.client.Do(req)

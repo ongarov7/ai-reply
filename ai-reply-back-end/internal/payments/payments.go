@@ -71,10 +71,10 @@ func (DemoProvider) HandleWebhook(context.Context, []byte) (string, string, erro
 // RefundPayment — демо қайтарым.
 func (DemoProvider) RefundPayment(context.Context, domain.Payment) error { return nil }
 
-// Events — сәтті төлемнен кейінгі оқиғалар (мысалы, push хабарламасы).
+// Events — сәтті төлемнен кейінгі оқиғалар (хабарлама қабаты іске асырады).
 //
-// Payments do not know how the person is told: the notification layer
-// implements this. It must not fail the payment, so it returns nothing.
+// Payments do not know how the person is told. The call must not fail the
+// payment, so it returns nothing: the implementation logs its own errors.
 type Events interface {
 	PaymentSucceeded(ctx context.Context, p domain.Payment, sub domain.Subscription)
 }
@@ -88,13 +88,13 @@ type Service struct {
 	events   Events
 }
 
-// WithEvents — оқиға тыңдаушысы.
-func (s *Service) WithEvents(e Events) *Service { s.events = e; return s }
-
 // New — қызмет.
 func New(repo *repository.Store, subs *subscriptions.Service, provider Provider, mode string) *Service {
 	return &Service{repo: repo, subs: subs, provider: provider, mode: mode}
 }
+
+// WithEvents — төлем оқиғаларын тыңдаушы (nil — жоқ).
+func (s *Service) WithEvents(e Events) *Service { s.events = e; return s }
 
 // Mode — demo немесе live.
 func (s *Service) Mode() string { return s.mode }
@@ -152,11 +152,14 @@ func (s *Service) Confirm(ctx context.Context, userID, paymentID string) (domain
 	}
 	var expires *time.Time
 	sub, err := s.subs.Assign(ctx, userID, payment.PlanID, "payment", expires)
-	if err == nil && s.events != nil {
-		payment.Status = "succeeded"
+	if err != nil {
+		return domain.Subscription{}, err
+	}
+	if s.events != nil {
+		payment.Status, payment.ProviderRef = "succeeded", ref
 		s.events.PaymentSucceeded(ctx, payment, sub)
 	}
-	return sub, err
+	return sub, nil
 }
 
 // History — төлемдер тарихы.

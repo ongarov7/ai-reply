@@ -34,18 +34,12 @@ The product gap was therefore much larger than "polish an existing app": almost
 everything in the target spec (auth, backend, templates, quota, onboarding,
 clipboard history, account) does not exist yet.
 
-### Signing landmine found before anything was touched
+### Signing configuration
 
-`project.yml` declared `DEVELOPMENT_TEAM: VMF4X4NF22`. The checked-in
-`project.pbxproj` uses **`JXM8N66QWU` at target level**, which overrides the
-project-level value. Target level wins, so the app ships signed with
-`JXM8N66QWU`.
-
-Running `xcodegen generate` would have silently re-signed both targets with a
-different team. `project.yml` has been corrected to match what actually ships,
-and the divergence is documented in a comment at the top of that file. **No
-signing configuration, certificate, bundle identifier or provisioning setting
-was changed.**
+`project.yml` and the checked-in `project.pbxproj` consistently use the App
+Store Connect team (`2PK6339Q47`) at project and target level. This keeps a
+future `xcodegen generate` from silently re-signing AI Reply with another
+account.
 
 ---
 
@@ -140,7 +134,7 @@ language.
 
 ## 3. Shared state: App Group
 
-`group.kz.yerek.replykeyboard`, declared in `Config/AIReply.entitlements` and
+`group.kz.ai-reply.shared`, declared in `Config/AIReply.entitlements` and
 `Config/ReplyKeyboard.entitlements` and in `project.yml` so both the checked-in
 project file and a future `xcodegen generate` agree.
 

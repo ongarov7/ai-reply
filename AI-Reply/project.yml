@@ -3,18 +3,13 @@ name: AIReply
 # ---------------------------------------------------------------------------
 # SIGNING NOTE - read before changing DEVELOPMENT_TEAM.
 #
-# The checked-in AIReply.xcodeproj/project.pbxproj signs both targets with
-# team JXM8N66QWU at TARGET level, which overrides the project-level team.
-# An earlier version of this file said VMF4X4NF22 at target level, so running
-# `xcodegen generate` would have silently re-signed the app with a different
-# team. The target-level values below now match what actually ships.
-#
-# The project-level team is left as it was found. If JXM8N66QWU is the only
-# correct team, set it in `settings.base` too and delete the per-target lines.
+# The project and every target use the App Store Connect team (2PK6339Q47).
+# Keep these values aligned so `xcodegen generate` cannot silently re-sign the
+# app with another account.
 # ---------------------------------------------------------------------------
 
 options:
-  bundleIdPrefix: com.example
+  bundleIdPrefix: kz.ai-reply
   deploymentTarget:
     iOS: "17.0"
   developmentLanguage: en
@@ -23,6 +18,9 @@ packages:
   GoogleSignIn:
     url: https://github.com/google/GoogleSignIn-iOS
     from: 9.2.0
+  Firebase:
+    url: https://github.com/firebase/firebase-ios-sdk
+    from: 12.0.0
 
 settings:
   base:
@@ -30,7 +28,7 @@ settings:
     IPHONEOS_DEPLOYMENT_TARGET: "17.0"
     TARGETED_DEVICE_FAMILY: "1"
     SUPPORTS_MACCATALYST: "NO"
-    DEVELOPMENT_TEAM: VMF4X4NF22
+    DEVELOPMENT_TEAM: 2PK6339Q47
     CODE_SIGN_STYLE: Automatic
 
 targets:
@@ -44,10 +42,25 @@ targets:
       path: AIReply/Info.plist
       properties:
         CFBundleDisplayName: AI Reply
-        AIReplyPushNotifications: $(AIREPLY_PUSH_NOTIFICATIONS)
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: "4"
         AIReplySignInWithApple: $(AIREPLY_SIGN_IN_WITH_APPLE)
+        AIReplyPushNotifications: $(AIREPLY_PUSH_NOTIFICATIONS)
+        # "<team id>.", for the installation id's app-only keychain group.
+        AIReplyAppIdentifierPrefix: $(AppIdentifierPrefix)
+        # Firebase Cloud Messaging: the options come from the build settings
+        # below unless a GoogleService-Info.plist is added to the app.
+        AIReplyFirebaseAppID: $(FIREBASE_GOOGLE_APP_ID)
+        AIReplyFirebaseSenderID: $(FIREBASE_GCM_SENDER_ID)
+        AIReplyFirebaseAPIKey: $(FIREBASE_API_KEY)
+        AIReplyFirebaseProjectID: $(FIREBASE_PROJECT_ID)
+        # The app forwards the APNs token and handles taps itself, and asks
+        # for an FCM token only after the legal consent.
+        FirebaseAppDelegateProxyEnabled: false
+        FirebaseMessagingAutoInitEnabled: false
         # Google Sign-In: both values come from the build settings below.
         GIDClientID: $(GOOGLE_IOS_CLIENT_ID)
+        ITSAppUsesNonExemptEncryption: false
         CFBundleURLTypes:
           - CFBundleTypeRole: Editor
             CFBundleURLName: google-sign-in
@@ -63,31 +76,36 @@ targets:
       path: Config/AIReply.entitlements
       properties:
         # Push notifications. "development" here; exporting for the App Store
-        # (or TestFlight) re-signs it as "production". Release only, like
-        # Sign in with Apple: Debug signs with the file below, which has
-        # neither, so a free Personal Team can still install Debug builds.
+        # (or TestFlight) re-signs it as "production".
         aps-environment: development
         com.apple.developer.applesignin:
           - Default
         com.apple.security.application-groups:
-          - group.kz.yerek.replykeyboard
+          - group.kz.ai-reply.shared
+        keychain-access-groups:
+          - $(AppIdentifierPrefix)kz.ai-reply.shared
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: kz.yerek.replykeyboard
+        PRODUCT_BUNDLE_IDENTIFIER: kz.ai-reply.reply.keyboard.keyboard
         PRODUCT_NAME: AIReply
-        DEVELOPMENT_TEAM: JXM8N66QWU
+        DEVELOPMENT_TEAM: 2PK6339Q47
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_IDENTITY: "iPhone Developer"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "1"
-        # Sign in with Apple needs a paid Apple Developer team. Debug builds leave
-        # it out so a free Personal Team can still install the app on a phone;
-        # set both lines to the Release values to test Apple sign-in in Debug.
+        # Sign in with Apple: Debug builds hide the button (configs below) but
+        # sign with the same entitlements as Release.
         AIREPLY_SIGN_IN_WITH_APPLE: "YES"
-        # Push notifications need the same paid team (aps-environment). The app
-        # asks APNs for a token only when this is YES; Debug leaves it out
-        # together with the entitlement (Config/AIReply-NoAppleSignIn.entitlements).
+        # Push notifications (aps-environment is in the entitlements of both
+        # configurations). The app asks for a token only when this is YES and
+        # Firebase is configured.
         AIREPLY_PUSH_NOTIFICATIONS: "YES"
+        # Firebase iOS app of this bundle id (not secrets; they ship in the
+        # app). Empty keeps push off unless GoogleService-Info.plist is added.
+        FIREBASE_GOOGLE_APP_ID: ""
+        FIREBASE_GCM_SENDER_ID: ""
+        FIREBASE_API_KEY: ""
+        FIREBASE_PROJECT_ID: ""
         # iOS OAuth client from Google Cloud Console (not a secret; it ships in
         # the app). Empty keeps "Continue with Google" hidden in Release builds.
         GOOGLE_IOS_CLIENT_ID: ""
@@ -97,13 +115,15 @@ targets:
       configs:
         Debug:
           AIREPLY_SIGN_IN_WITH_APPLE: "NO"
-          AIREPLY_PUSH_NOTIFICATIONS: "NO"
-          CODE_SIGN_ENTITLEMENTS: Config/AIReply-NoAppleSignIn.entitlements
     dependencies:
       - target: ReplyKeyboard
         embed: true
       - package: GoogleSignIn
         product: GoogleSignIn
+      - package: Firebase
+        product: FirebaseCore
+      - package: Firebase
+        product: FirebaseMessaging
 
   AIReplyTests:
     type: bundle.unit-test
@@ -113,8 +133,8 @@ targets:
     dependencies:
       - target: AIReply
     settings:
-      PRODUCT_BUNDLE_IDENTIFIER: kz.yerek.replykeyboard.tests
-      DEVELOPMENT_TEAM: JXM8N66QWU
+      PRODUCT_BUNDLE_IDENTIFIER: kz.ai-reply.reply.keyboard.keyboard.tests
+      DEVELOPMENT_TEAM: 2PK6339Q47
       GENERATE_INFOPLIST_FILE: true
       TEST_HOST: "$(BUILT_PRODUCTS_DIR)/AIReply.app/AIReply"
       BUNDLE_LOADER: "$(TEST_HOST)"
@@ -129,6 +149,8 @@ targets:
       path: ReplyKeyboard/Info.plist
       properties:
         CFBundleDisplayName: AI Reply
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: "4"
         NSExtension:
           NSExtensionAttributes:
             IsASCIICapable: true
@@ -141,11 +163,13 @@ targets:
       path: Config/ReplyKeyboard.entitlements
       properties:
         com.apple.security.application-groups:
-          - group.kz.yerek.replykeyboard
+          - group.kz.ai-reply.shared
+        keychain-access-groups:
+          - $(AppIdentifierPrefix)kz.ai-reply.shared
     settings:
-      PRODUCT_BUNDLE_IDENTIFIER: kz.yerek.replykeyboard.keyboard
+      PRODUCT_BUNDLE_IDENTIFIER: kz.ai-reply.reply.keyboard.keyboard.extension
       PRODUCT_NAME: ReplyKeyboardExtension
-      DEVELOPMENT_TEAM: JXM8N66QWU
+      DEVELOPMENT_TEAM: 2PK6339Q47
       CODE_SIGN_STYLE: Automatic
       TARGETED_DEVICE_FAMILY: "1"
       APPLICATION_EXTENSION_API_ONLY: true

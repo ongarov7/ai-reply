@@ -123,7 +123,7 @@ final class AIReplyServiceTests: XCTestCase {
         let prompt = ReplyPromptBuilder.build(
             .init(
                 message: "Сможешь сегодня приехать в 18:00?",
-                instruction: ReplyInstruction.prepare("Вежливо откажи."),
+                instruction: ReplyInstruction.prepare("Вежливо откажи.", appendsLanguageRule: true),
                 template: .builtIn(.friend, sortIndex: 0),
                 templateName: "Друг",
                 profileDescription: "",
@@ -171,9 +171,18 @@ final class AIReplyServiceTests: XCTestCase {
     /// instruction, so it only exists when the user actually asked for
     /// something.
     func testLanguageRuleTravelsWithTheInstruction() {
-        let prepared = ReplyInstruction.prepare("Ответь на казахском")
+        let prepared = ReplyInstruction.prepare("Ответь на казахском", appendsLanguageRule: true)
         XCTAssertTrue(prepared.hasPrefix("Ответь на казахском"))
         XCTAssertTrue(prepared.hasSuffix(ReplyInstruction.languageRule))
+    }
+
+    /// A server that publishes `sender_profile` honours a named language by
+    /// itself; the instruction goes as the user typed it.
+    func testNoLanguageRuleForAServerThatResolvesTheLanguage() {
+        XCTAssertEqual(ReplyInstruction.prepare("  Ответь на казахском \n", appendsLanguageRule: false),
+                       "Ответь на казахском")
+        let long = String(repeating: "я", count: 900)
+        XCTAssertEqual(ReplyInstruction.prepare(long, appendsLanguageRule: false).unicodeScalars.count, 280)
     }
 
     /// The backend clamps `instruction` at its published limit (400 by
@@ -181,12 +190,13 @@ final class AIReplyServiceTests: XCTestCase {
     /// language rule - appended after it - would be the part that got cut.
     func testClampedInstructionStillLeavesRoomForTheLanguageRule() {
         let long = String(repeating: "я", count: 900)
-        let prepared = ReplyInstruction.prepare(long)
+        let prepared = ReplyInstruction.prepare(long, appendsLanguageRule: true)
 
         XCTAssertTrue(prepared.hasSuffix(ReplyInstruction.languageRule))
         XCTAssertLessThanOrEqual(prepared.unicodeScalars.count, 400)
-        XCTAssertEqual(ReplyInstruction.clamp(long).unicodeScalars.count, ReplyInstruction.maximumCharacters)
-        XCTAssertLessThanOrEqual(ReplyInstruction.maximumCharacters, 280)
+        let limit = ReplyInstruction.maximumCharacters(serverLimit: AILimits.current.instructionCharacters)
+        XCTAssertEqual(ReplyInstruction.clamp(long, limit: limit).unicodeScalars.count, limit)
+        XCTAssertLessThanOrEqual(limit, 280)
         XCTAssertEqual(ReplyInstruction.clamp("short").unicodeScalars.count, 5)
     }
 
@@ -197,7 +207,7 @@ final class AIReplyServiceTests: XCTestCase {
         let prompt = ReplyPromptBuilder.build(
             .init(
                 message: "Hi",
-                instruction: ReplyInstruction.prepare(attack),
+                instruction: ReplyInstruction.prepare(attack, appendsLanguageRule: true),
                 template: .builtIn(.work, sortIndex: 0),
                 templateName: "Work",
                 profileDescription: "",

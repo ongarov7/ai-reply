@@ -33,4 +33,8 @@ enum AIReplyError: Error, Equatable, Sendable {
     case emptyResponse
     /// Anything else: a 5xx, a malformed payload, an unreachable host.
     case serviceUnavailable
+    /// Compose mode: Generate was tapped with nothing described yet.
+    case noInstruction
+    /// Compose mode: the description is longer than the server's limit.
+    case instructionTooLong(limit: Int)
 }

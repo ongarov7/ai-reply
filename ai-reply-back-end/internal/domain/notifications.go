@@ -38,29 +38,42 @@ func CategoryImportant(category string) bool {
 	return category == CategoryAccount || category == CategorySubscription || category == CategorySecurity
 }
 
-// Push жеткізушілері.
+// Хабарлама түрлері. campaign — әкімші науқаны, қалғандары — сервердің автоматты оқиғалары.
 const (
-	ProviderFCM  = "fcm"
-	ProviderAPNs = "apns"
+	TypeCampaign              = "campaign"
+	TypeSubscriptionActivated = "subscription_activated"
+	TypeSubscriptionExpiring  = "subscription_expiring"
+	TypeSubscriptionExpired   = "subscription_expired"
+	TypeQuotaLow              = "quota_low"
+	TypeQuotaExhausted        = "quota_exhausted"
 )
+
+// AutomaticNotificationTypes — сервер өзі жіберетін түрлер (әкімші сүзгісі үшін).
+var AutomaticNotificationTypes = []string{
+	TypeSubscriptionActivated, TypeSubscriptionExpiring, TypeSubscriptionExpired, TypeQuotaLow, TypeQuotaExhausted,
+}
+
+// Жеткізу арналары.
+const (
+	ChannelPush  = "push"
+	ChannelEmail = "email"
+)
+
+// Push жеткізушісі: Android те, iOS та FCM арқылы (iOS-қа FCM өзі APNs-пен жеткізеді).
+const ProviderFCM = "fcm"
+
+// ProviderEmail — пошта жеткізушісі (delivery.provider).
+const ProviderEmail = "resend"
 
 // ProviderFor — платформаға жеткізетін провайдер ("" — push жоқ).
 func ProviderFor(platform string) string {
 	switch platform {
-	case PlatformAndroid:
+	case PlatformAndroid, PlatformIOS:
 		return ProviderFCM
-	case PlatformIOS:
-		return ProviderAPNs
 	default:
 		return ""
 	}
 }
-
-// APNs орталары.
-const (
-	APNsSandbox    = "sandbox"
-	APNsProduction = "production"
-)
 
 // ОЖ хабарлама рұқсатын қалай хабарлайды.
 const (
@@ -109,7 +122,6 @@ type Installation struct {
 	Locale               string
 	Timezone             string
 	PushProvider         string
-	PushEnvironment      string
 	PushTokenHash        string
 	PushPermission       string
 	NotificationsEnabled bool
@@ -123,9 +135,6 @@ type Installation struct {
 	CreatedAt            time.Time
 	UpdatedAt            time.Time
 }
-
-// HasToken — жарамды push токені бар ма.
-func (i Installation) HasToken() bool { return i.PushTokenHash != "" && i.PushStatus == PushActive }
 
 // TokenFingerprint — журнал мен әкімші панеліне жарамды қысқа белгі (токеннің өзі емес).
 func (i Installation) TokenFingerprint() string {
@@ -155,7 +164,7 @@ func ShortID(id string) string {
 }
 
 // Жеткізу күйлері. Провайдердің қабылдауы оқылды дегенді білдірмейді: ашылғанын
-// тек қосымшаның notification_opened оқиғасы растайды (opened_at).
+// тек қосымшаның POST /api/v1/notifications/opened сұранысы растайды (opened_at).
 const (
 	DeliveryQueued       = "queued"
 	DeliverySending      = "sending"
@@ -195,11 +204,13 @@ var CampaignStatuses = []string{
 	CampaignPartiallyFailed, CampaignFailed, CampaignCancelled,
 }
 
-// Notification — бір логикалық хабарлама: бір науқан не бір қолданушыға бір оқиға.
+// Notification — бір логикалық хабарлама: науқанның бір тілі не бір қолданушыға бір оқиға.
 //
 // DedupeKey is unique in the database. A second attempt to create the same
 // logical notification (a retried request, a repeated event, a second
 // backend instance) finds the first row instead of creating another one.
+// Params are the e-mail template values; they stay on the server and are
+// never part of a push payload.
 type Notification struct {
 	ID             string
 	DedupeKey      string
@@ -208,18 +219,22 @@ type Notification struct {
 	UserID         string
 	Category       string
 	Type           string
+	Locale         string
 	Title          string
 	Body           string
 	Link           string
 	Data           map[string]string
+	Params         map[string]string
 	CreatedAt      time.Time
 }
 
-// Delivery — бір хабарламаның бір орнатуға жеткізілуі (outbox жолы).
+// Delivery — бір хабарламаның бір арнамен жеткізілуі (outbox жолы).
+// Email rows and the single "push was not sent" row have no installation.
 type Delivery struct {
 	ID                string
 	NotificationID    string
 	CampaignID        string
+	Channel           string
 	InstallationID    string
 	UserID            string
 	Platform          string
@@ -228,6 +243,7 @@ type Delivery struct {
 	AttemptCount      int
 	NextAttemptAt     time.Time
 	ProviderMessageID string
+	TokenFingerprint  string // push: the token the last attempt used, fcm:1a2b3c4d
 	ErrorCode         string
 	ErrorDetail       string
 	CreatedAt         time.Time
@@ -237,44 +253,72 @@ type Delivery struct {
 	OpenedAt          *time.Time
 }
 
-// Орнатудың тіркелгіге байланысы (аудитория және құрылғылар тізімінің сүзгісі).
+// Аудитория сегменттері.
 const (
-	AuthAuthenticated = "authenticated"
-	AuthAnonymous     = "anonymous"
+	SegmentAll  = "all"
+	SegmentFree = "free"
+	SegmentPaid = "paid"
+	SegmentDemo = "demo"
 )
+
+// Аудиторияның жазылым және квота сүзгілері.
+const (
+	SubscriptionFilterActive  = "active"
+	SubscriptionFilterExpired = "expired"
+
+	QuotaHasRemaining  = "has_remaining"
+	QuotaNearExhausted = "near_exhaustion"
+	QuotaExhausted     = "exhausted"
+)
+
+// QuotaLowThreshold — «квота аяқталуға жақын» шегі: max(1, ceil(limit × percent / 100)).
+// A limit of 7 at 10% gives 1, so even the free plan has a "last one left"
+// moment before it is exhausted. The audience filter uses the same rule in SQL.
+func QuotaLowThreshold(limit, percent int) int {
+	return max(1, (limit*percent+99)/100)
+}
 
 // AudienceFilter — науқан алушыларын таңдау. Барлық шарт ЖӘНЕ арқылы біріктіріледі.
 //
-// The backend turns it into SQL over installations, users and subscriptions;
-// the browser never decides who receives a campaign.
+// Only devices attached to an active account (kind "account") are ever
+// targeted. UserIDs and Emails together name specific people: an e-mail is
+// resolved to its account on the server, and the device must belong to one of
+// the named accounts. The backend turns the filter into SQL; the browser never
+// decides who receives a campaign.
 type AudienceFilter struct {
-	Platforms        []string `json:"platforms,omitempty"`
-	Auth             string   `json:"auth,omitempty"`         // authenticated | anonymous
-	Payment          string   `json:"payment,omitempty"`      // paid | unpaid
-	Subscription     string   `json:"subscription,omitempty"` // active | expired | none
-	Locales          []string `json:"locales,omitempty"`
-	AppVersionMin    string   `json:"app_version_min,omitempty"`
-	AppVersionMax    string   `json:"app_version_max,omitempty"`
-	OSVersionMin     string   `json:"os_version_min,omitempty"`
-	ActiveWithinDays int      `json:"active_within_days,omitempty"`
-	InactiveForDays  int      `json:"inactive_for_days,omitempty"`
-	RegisteredFrom   string   `json:"registered_from,omitempty"` // YYYY-MM-DD
-	RegisteredTo     string   `json:"registered_to,omitempty"`   // YYYY-MM-DD
-	UserIDs          []string `json:"user_ids,omitempty"`
+	Segment      string   `json:"segment,omitempty"`      // free | paid | demo ("" or "all" — everyone)
+	PlanIDs      []string `json:"plan_ids,omitempty"`     // the account's current plan
+	Subscription string   `json:"subscription,omitempty"` // active | expired (a paid plan now / had one, none now)
+	Platforms    []string `json:"platforms,omitempty"`
+	Languages    []string `json:"languages,omitempty"` // the language the notification would be sent in
+	Quota        string   `json:"quota,omitempty"`     // has_remaining | near_exhaustion | exhausted (today)
+	UserIDs      []string `json:"user_ids,omitempty"`
+	Emails       []string `json:"emails,omitempty"`
 }
 
-// NeedsAccount — сүзгі тек тіркелгісі бар орнатуларға қатысты ма.
-func (f AudienceFilter) NeedsAccount() bool {
-	return f.Auth == AuthAuthenticated || f.Payment != "" || f.Subscription != "" ||
-		f.RegisteredFrom != "" || f.RegisteredTo != "" || len(f.UserIDs) > 0
+// Specific — сүзгі нақты адамдарды атайды ма.
+func (f AudienceFilter) Specific() bool { return len(f.UserIDs) > 0 || len(f.Emails) > 0 }
+
+// LocalizedText — бір тілдегі тақырып пен мәтін.
+type LocalizedText struct {
+	Title string `json:"title"`
+	Body  string `json:"body"`
 }
+
+// Filled — тақырып та, мәтін де бар.
+func (t LocalizedText) Filled() bool { return t.Title != "" && t.Body != "" }
 
 // Campaign — әкімші жіберетін жаппай хабарлама.
+//
+// Content holds the text per language; Title and Body repeat the fallback
+// language's text (the table's original columns).
 type Campaign struct {
 	ID             string
 	Name           string
 	Title          string
 	Body           string
+	Content        map[string]LocalizedText
+	FallbackLocale string
 	Category       string
 	Link           string
 	Data           map[string]string
@@ -294,20 +338,48 @@ type Campaign struct {
 	FinalStats     *DeliveryStats
 }
 
+// TextFor — тілге жіберілетін мәтін: сол тіл толық болса — сол, әйтпесе қор тіл,
+// ол да бос болса — kk, ru, en, uz ретімен алғашқы толтырылғаны.
+func (c Campaign) TextFor(locale string) (LocalizedText, string) {
+	if t := c.Content[locale]; t.Filled() {
+		return t, locale
+	}
+	if t := c.Content[c.FallbackLocale]; t.Filled() {
+		return t, c.FallbackLocale
+	}
+	for _, l := range Locales {
+		if t := c.Content[l]; t.Filled() {
+			return t, l
+		}
+	}
+	return LocalizedText{Title: c.Title, Body: c.Body}, c.FallbackLocale
+}
+
 // DeliveryStats — науқан не сүзгі бойынша жеткізу есебі.
 type DeliveryStats struct {
-	Total        int `json:"total"`
-	Queued       int `json:"queued"`
-	Sending      int `json:"sending"`
-	Retrying     int `json:"retrying"`
-	Accepted     int `json:"provider_accepted"`
-	Failed       int `json:"provider_failed"`
-	InvalidToken int `json:"invalid_token"`
-	Skipped      int `json:"skipped"`
-	Cancelled    int `json:"cancelled"`
-	Opened       int `json:"opened"`
-	Android      int `json:"android"`
-	IOS          int `json:"ios"`
+	Total        int                      `json:"total"`
+	Queued       int                      `json:"queued"`
+	Sending      int                      `json:"sending"`
+	Retrying     int                      `json:"retrying"`
+	Accepted     int                      `json:"provider_accepted"`
+	Failed       int                      `json:"provider_failed"`
+	InvalidToken int                      `json:"invalid_token"`
+	Skipped      int                      `json:"skipped"`
+	Cancelled    int                      `json:"cancelled"`
+	Opened       int                      `json:"opened"`
+	Android      int                      `json:"android"`
+	IOS          int                      `json:"ios"`
+	ByLanguage   map[string]LanguageStats `json:"by_language"`
+}
+
+// LanguageStats — бір тілге жіберілген хабарламалардың есебі.
+type LanguageStats struct {
+	Total    int `json:"total"`
+	Pending  int `json:"pending"`
+	Accepted int `json:"provider_accepted"`
+	Failed   int `json:"failed"` // provider_failed + invalid_token
+	Skipped  int `json:"skipped"`
+	Opened   int `json:"opened"`
 }
 
 // Pending — әлі аяқталмаған жеткізулер саны.
@@ -336,6 +408,27 @@ func (s *DeliveryStats) Add(status string, n int) {
 	}
 }
 
+// AddLanguage — бір тілдің бір күйдегі жолдары.
+func (s *DeliveryStats) AddLanguage(locale, status string, n, opened int) {
+	if s.ByLanguage == nil {
+		s.ByLanguage = map[string]LanguageStats{}
+	}
+	l := s.ByLanguage[locale]
+	l.Total += n
+	l.Opened += opened
+	switch {
+	case DeliveryPending(status):
+		l.Pending += n
+	case status == DeliveryAccepted:
+		l.Accepted += n
+	case status == DeliveryFailed || status == DeliveryInvalidToken:
+		l.Failed += n
+	case status == DeliverySkipped:
+		l.Skipped += n
+	}
+	s.ByLanguage[locale] = l
+}
+
 // FinalCampaignStatus — барлық жеткізу аяқталғанда науқанның қорытынды күйі.
 func FinalCampaignStatus(s DeliveryStats) string {
 	failed := s.Failed + s.InvalidToken
@@ -353,7 +446,7 @@ func FinalCampaignStatus(s DeliveryStats) string {
 //
 // Up to three numeric components, each capped at 999; anything after the
 // first non-numeric character of a component is ignored ("1.3.2-beta" is
-// 1.3.2). An unparsable version is 0, which no minimum-version filter matches.
+// 1.3.2). An unparsable version is 0.
 func VersionNumber(v string) int64 {
 	v = strings.TrimSpace(v)
 	if v == "" {
@@ -391,7 +484,7 @@ func VersionNumber(v string) int64 {
 	return out
 }
 
-// Deep link экрандары: қосымша оларды өз навигациясына аударады.
+// LinkScreens — deep link экрандары: қосымша оларды өз навигациясына аударады.
 var LinkScreens = []string{
 	"home", "subscription", "settings", "notifications", "templates", "profile", "keyboard", "compose",
 }

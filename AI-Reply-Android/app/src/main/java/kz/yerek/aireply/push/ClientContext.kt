@@ -1,20 +1,17 @@
 package kz.yerek.aireply.push
 
-import kz.yerek.aireply.data.account.HeaderScope
-import kz.yerek.aireply.data.account.RequestMetadata
+import kz.yerek.aireply.platform.ReplyLog
 import java.io.File
 import java.util.TimeZone
 import java.util.UUID
 
 /**
- * What the app says about itself to the server: the installation, the build,
- * the OS and the interface language. Nothing that identifies the person, and
- * no hardware identifier (no IMEI, MAC, serial, ANDROID_ID or advertising id).
+ * What the app says about itself in the installation registration: the
+ * installation, the build, the OS, the phone model and the interface language.
+ * Nothing that identifies the person, and no hardware identifier (no IMEI, MAC,
+ * serial, ANDROID_ID or advertising id).
  *
- * Қосымша өзі туралы айтатыны: орнату, нұсқа, ОЖ және тіл. Жеке дерек жоқ.
- *
- * It is also the one [RequestMetadata] provider: every backend request gets
- * its metadata headers from here, through [kz.yerek.aireply.data.account.ApiClient].
+ * Қосымша өзі туралы айтатыны: орнату, нұсқа, ОЖ, модель және тіл. Жеке дерек жоқ.
  */
 class ClientContext(
     private val installationIds: InstallationIdStore,
@@ -25,18 +22,12 @@ class ClientContext(
     deviceModel: String,
     /** The app's interface language code: en, ru, kk or uz. */
     private val language: () -> String,
-    private val timeZone: () -> String = { TimeZone.getDefault().id },
-    /** The foreground session, or null before the app was first opened. */
-    private val sessionId: () -> String? = { null },
-    /** The legal consent: before it, no request names the installation or the session. */
-    private val consentGiven: () -> Boolean = { true },
-    /** "Share diagnostics": the session id is diagnostics, and goes only while it is on. */
-    private val shareDiagnostics: () -> Boolean = { true }
-) : RequestMetadata {
+    private val timeZone: () -> String = { TimeZone.getDefault().id }
+) {
 
-    val appVersion: String = headerSafe(appVersion)
-    val appBuild: String = headerSafe(appBuild)
-    val osVersion: String = headerSafe(osVersion)
+    val appVersion: String = versionSafe(appVersion)
+    val appBuild: String = versionSafe(appBuild)
+    val osVersion: String = versionSafe(osVersion)
     val manufacturer: String = manufacturer.trim().take(64)
     val deviceModel: String = deviceModel.trim().take(64)
 
@@ -48,25 +39,6 @@ class ClientContext(
 
     val locale: String get() = language()
     val timezone: String get() = timeZone()
-    val currentSessionId: String? get() = sessionId()
-
-    override fun headers(scope: HeaderScope): Map<String, String> {
-        val headers = LinkedHashMap<String, String>(8)
-        headers["X-Platform"] = PLATFORM
-        if (appVersion.isNotEmpty()) headers["X-App-Version"] = appVersion
-        if (appBuild.isNotEmpty()) headers["X-App-Build"] = appBuild
-        if (osVersion.isNotEmpty()) headers["X-OS-Version"] = osVersion
-        // The installation id stays on even with diagnostics off: the logout
-        // detaches by it and the server counts its per-installation limits by
-        // it. The session id is diagnostics only.
-        if (scope == HeaderScope.APP && consentGiven()) {
-            headers["X-Installation-ID"] = installationId
-            if (shareDiagnostics()) {
-                sessionId()?.takeIf(InstallationIdStore::isValid)?.let { headers["X-Session-ID"] = it }
-            }
-        }
-        return headers
-    }
 
     companion object {
         const val PLATFORM = "android"
@@ -74,11 +46,8 @@ class ClientContext(
 
         private val VERSION_CHARS = Regex("[^0-9A-Za-z.+_ ()-]")
 
-        /**
-         * What the server keeps of a version (`^[0-9A-Za-z.+_ ()-]{1,32}$`), and
-         * what an HTTP header can carry: anything else is dropped, never sent.
-         */
-        fun headerSafe(value: String): String = VERSION_CHARS.replace(value.trim(), "").take(32).trim()
+        /** What the server keeps of a version (`^[0-9A-Za-z.+_ ()-]{1,32}$`): anything else is dropped. */
+        fun versionSafe(value: String): String = VERSION_CHARS.replace(value.trim(), "").take(32).trim()
     }
 }
 
@@ -110,13 +79,13 @@ class InstallationIdStore(private val directory: () -> File) {
 
     private fun loadOrCreate(): String {
         val file = File(directory(), FILE_NAME)
-        val existing = runCatching { file.readText(Charsets.UTF_8).trim() }.getOrNull()
+        val existing = if (file.isFile) runCatching { file.readText(Charsets.UTF_8).trim() }.getOrNull() else null
         if (existing != null && isValid(existing)) return existing
 
         val fresh = UUID.randomUUID().toString()
         // Written through a temporary file and renamed, so a crash half-way
         // never leaves a truncated id that would be replaced next launch.
-        runCatching {
+        try {
             file.parentFile?.mkdirs()
             val temporary = File(file.parentFile, "$FILE_NAME.tmp")
             temporary.writeText(fresh, Charsets.UTF_8)
@@ -124,8 +93,10 @@ class InstallationIdStore(private val directory: () -> File) {
                 file.writeText(fresh, Charsets.UTF_8)
                 temporary.delete()
             }
+        } catch (failure: Exception) {
+            // Even if the disk refused, this process keeps one stable id.
+            ReplyLog.warn(failure) { "installation id kept in memory only" }
         }
-        // Even if the disk refused, this process keeps one stable id.
         return fresh
     }
 
@@ -134,7 +105,7 @@ class InstallationIdStore(private val directory: () -> File) {
 
         private val PATTERN = Regex("^[A-Za-z0-9-]{8,64}$")
 
-        /** The server's installation and session id format. */
+        /** The server's installation id format. */
         fun isValid(value: String): Boolean = PATTERN.matches(value)
     }
 }

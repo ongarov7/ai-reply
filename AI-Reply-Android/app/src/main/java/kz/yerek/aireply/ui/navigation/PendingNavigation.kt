@@ -7,7 +7,7 @@ import kz.yerek.aireply.push.AppScreen
 
 /**
  * A screen asked for from outside the navigation graph — a tapped
- * notification, the keyboard's "+" chip — kept until the app can show it.
+ * notification — kept until the app can show it.
  *
  * Сыртқы сілтеме күте тұрады: кіру, келісім не онбординг аяқталғанша.
  *

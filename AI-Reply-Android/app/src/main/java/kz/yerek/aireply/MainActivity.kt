@@ -21,23 +21,23 @@ import kotlinx.coroutines.launch
 import kz.yerek.aireply.core.lang.AppLanguage
 import kz.yerek.aireply.core.lang.LocalizedContext
 import kz.yerek.aireply.data.settings.AppearancePreference
+import kz.yerek.aireply.platform.ReplyLog
 import kz.yerek.aireply.push.AppLink
 import kz.yerek.aireply.push.PushPayload
 import kz.yerek.aireply.ui.LocalServices
 import kz.yerek.aireply.ui.design.AIReplyTheme
 import kz.yerek.aireply.ui.navigation.AppNavHost
-import kz.yerek.aireply.ui.navigation.Routes
 
 /**
  * The only Activity.
  *
- * WHAT OPENS IT. The launcher; the keyboard's "+" chip ([EXTRA_ROUTE]); and a
- * tapped notification, whether the system showed it (the app was in the
- * background: Firebase starts the launcher activity with the push data as
- * String extras) or the app did (in the foreground: the same extras). It is
- * singleTask, so a tap while it exists arrives in [onNewIntent] — handled
- * exactly like a cold start. The destination goes to PendingNavigation, which
- * holds it until every gate (consent, sign-in, onboarding) is behind.
+ * WHAT OPENS IT. The launcher, and a tapped notification, whether the system
+ * showed it (the app was in the background: Firebase starts the launcher
+ * activity with the push data as String extras) or the app did (in the
+ * foreground: the same extras). It is singleTask, so a tap while it exists
+ * arrives in [onNewIntent] and is handled exactly like a cold start. The
+ * destination goes to PendingNavigation, which holds it until every gate
+ * (consent, sign-in, onboarding) is behind.
  *
  * LANGUAGE. The interface language is applied in [attachBaseContext] by wrapping
  * the base Context, which is the mechanism that works identically on every API
@@ -74,6 +74,9 @@ class MainActivity : ComponentActivity() {
         // that opened it the first time; a new one arrives in onNewIntent.
         if (savedInstanceState == null) handleExternalIntent(intent)
 
+        val debugOnboarding = BuildConfig.DEBUG &&
+            intent?.getStringExtra(EXTRA_DEBUG_SCREEN) == DEBUG_SCREEN_ONBOARDING
+
         setContent {
             // Built once: a Flow made during composition would be rebuilt, and
             // re-subscribed, on every recomposition.
@@ -97,7 +100,7 @@ class MainActivity : ComponentActivity() {
 
             CompositionLocalProvider(LocalServices provides services) {
                 AIReplyTheme(appearance = appearance) {
-                    AppNavHost()
+                    AppNavHost(debugOnboarding = debugOnboarding)
                 }
             }
         }
@@ -113,28 +116,30 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         val services = AIReplyApplication.services(this)
         services.configuration.reload()
+        // A profile change that could not reach the server is retried on every return.
+        lifecycleScope.launch { services.profileSync.pushPending() }
         // The notification permission may have changed in system settings.
         services.push.onResume()
     }
 
+    override fun onStop() {
+        super.onStop()
+        // The only Activity: stopping it is the app going to the background.
+        AIReplyApplication.services(this).productEvents.flush()
+    }
+
     /**
-     * The keyboard's "+" chip or a tapped notification. Handled extras are
-     * removed, so a re-creation of this Activity cannot open them again.
+     * A tapped notification. Its extras are removed once handled, so a
+     * re-creation of this Activity cannot open them again.
      */
     private fun handleExternalIntent(intent: Intent?) {
         if (intent == null) return
         // Reopened from Recents: the extras are the ones already handled.
         if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return
-        val services = AIReplyApplication.services(this)
-
-        when (intent.getStringExtra(EXTRA_ROUTE)) {
-            ROUTE_TEMPLATES -> services.navigation.open(Routes.Templates)
-            ROUTE_SETTINGS -> services.navigation.open(Routes.Settings)
-        }
-        intent.removeExtra(EXTRA_ROUTE)
-
         val extras = intent.extras ?: return
         if (!extras.containsKey(PushPayload.KEY_NOTIFICATION_ID)) return
+
+        val services = AIReplyApplication.services(this)
         val data = PushPayload.KEYS.associateWith { key -> extras.getString(key) }
         PushPayload.KEYS.forEach { key -> intent.removeExtra(key) }
         when (val link = services.push.onNotificationOpened(data)) {
@@ -151,6 +156,7 @@ class MainActivity : ComponentActivity() {
             startActivity(view)
         } catch (none: ActivityNotFoundException) {
             // No browser: the app is open, which is the fallback anyway.
+            ReplyLog.warn(none) { "no browser for a notification link" }
         }
     }
 
@@ -169,8 +175,11 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
-        const val EXTRA_ROUTE = "kz.yerek.aireply.route"
-        const val ROUTE_TEMPLATES = "templates"
-        const val ROUTE_SETTINGS = "settings"
+        /**
+         * DEBUG builds only, for reviewing a screen on an emulator:
+         * `adb shell am start -n kz.yerek.aireply/.MainActivity --es kz.yerek.aireply.debugScreen onboarding`.
+         */
+        const val EXTRA_DEBUG_SCREEN = "kz.yerek.aireply.debugScreen"
+        const val DEBUG_SCREEN_ONBOARDING = "onboarding"
     }
 }

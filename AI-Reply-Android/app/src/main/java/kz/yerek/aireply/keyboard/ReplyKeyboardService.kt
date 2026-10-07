@@ -1,13 +1,16 @@
 package kz.yerek.aireply.keyboard
 
-import android.content.Intent
+import android.content.res.Configuration
 import android.inputmethodservice.InputMethodService
 import android.os.Build
 import android.os.SystemClock
 import android.text.InputType
 import android.view.View
+import android.view.accessibility.AccessibilityManager
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -19,30 +22,40 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.ExecutorCoroutineDispatcher
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kz.yerek.aireply.AIReplyApplication
-import kz.yerek.aireply.MainActivity
+import kz.yerek.aireply.BuildConfig
 import kz.yerek.aireply.R
 import kz.yerek.aireply.ServiceLocator
 import kz.yerek.aireply.ai.AILimits
 import kz.yerek.aireply.ai.AIReplyError
+import kz.yerek.aireply.ai.AccountPolishTransport
 import kz.yerek.aireply.ai.AppStrings
+import kz.yerek.aireply.ai.DebugPolishMock
+import kz.yerek.aireply.ai.PolishService
 import kz.yerek.aireply.core.lang.AppLanguage
 import kz.yerek.aireply.core.lang.KeyboardLanguage
 import kz.yerek.aireply.core.lang.KeyboardPlane
 import kz.yerek.aireply.core.lang.TemplateNaming
-import kz.yerek.aireply.data.account.HeaderScope
 import kz.yerek.aireply.data.settings.AppearancePreference
 import kz.yerek.aireply.domain.model.ReplyConfiguration
 import kz.yerek.aireply.domain.model.TemplateSummary
+import kz.yerek.aireply.keyboard.autocorrect.AssetDictionarySource
+import kz.yerek.aireply.keyboard.autocorrect.AutocorrectController
+import kz.yerek.aireply.keyboard.autocorrect.AutocorrectDictionaries
+import kz.yerek.aireply.keyboard.autocorrect.AutocorrectEngine
+import kz.yerek.aireply.keyboard.autocorrect.PrefsLearnedWordsStore
+import kz.yerek.aireply.keyboard.autocorrect.Suggestion
 import kz.yerek.aireply.keyboard.input.ContextTextProvider
 import kz.yerek.aireply.keyboard.input.HostField
 import kz.yerek.aireply.keyboard.input.KeyboardStatus
@@ -55,14 +68,21 @@ import kz.yerek.aireply.keyboard.layout.KeyboardLabels
 import kz.yerek.aireply.keyboard.layout.KeyboardLayout
 import kz.yerek.aireply.keyboard.layout.KeyboardSizing
 import kz.yerek.aireply.keyboard.layout.PageOptions
+import kz.yerek.aireply.keyboard.layout.PanelFit
 import kz.yerek.aireply.keyboard.layout.ReturnFace
 import kz.yerek.aireply.keyboard.layout.ShiftState
 import kz.yerek.aireply.keyboard.layout.SpaceShortcut
+import kz.yerek.aireply.keyboard.reply.ComposeSessionController
+import kz.yerek.aireply.keyboard.reply.InstructionPolish
+import kz.yerek.aireply.keyboard.reply.KeyboardPanels
 import kz.yerek.aireply.keyboard.reply.ReplyComposerFlow
 import kz.yerek.aireply.keyboard.reply.ReplySessionController
 import kz.yerek.aireply.keyboard.ui.ComposerActions
 import kz.yerek.aireply.keyboard.ui.ComposerModel
 import kz.yerek.aireply.keyboard.ui.ComposerPanel
+import kz.yerek.aireply.keyboard.ui.CreateActions
+import kz.yerek.aireply.keyboard.ui.CreateModel
+import kz.yerek.aireply.keyboard.ui.CreatePanel
 import kz.yerek.aireply.keyboard.ui.KeySurfaceController
 import kz.yerek.aireply.keyboard.ui.KeySurfaceListener
 import kz.yerek.aireply.keyboard.ui.KeySurfaceState
@@ -70,13 +90,18 @@ import kz.yerek.aireply.keyboard.ui.KeyboardRoot
 import kz.yerek.aireply.keyboard.ui.PanelFocus
 import kz.yerek.aireply.keyboard.ui.PersonaRow
 import kz.yerek.aireply.keyboard.ui.QuickIntent
+import kz.yerek.aireply.keyboard.ui.TypingAssist
+import kz.yerek.aireply.keyboard.ui.TypingAssistActions
+import kz.yerek.aireply.keyboard.ui.text
+import kz.yerek.aireply.keyboard.voice.DictationController
+import kz.yerek.aireply.keyboard.voice.MicAccess
+import kz.yerek.aireply.keyboard.voice.VoiceAnnouncement
+import kz.yerek.aireply.keyboard.voice.VoiceStatusText
 import kz.yerek.aireply.platform.ReplyLog
 import kz.yerek.aireply.ui.design.AIReplyTheme
 import kz.yerek.aireply.voice.AndroidSpeechRecognitionClient
 import kz.yerek.aireply.voice.MicPermission
-import kz.yerek.aireply.voice.SpeechRecognitionClient
-import kz.yerek.aireply.voice.VoiceState
-import kotlin.math.max
+import java.util.concurrent.Executors
 
 /**
  * The AI Reply keyboard.
@@ -88,9 +113,20 @@ import kotlin.math.max
  *    keystroke only redraws.
  *  * Native layouts (ҚАЗ / РУС / ENG), one keyboard height for all of them,
  *    and no dead zones between keys.
- *  * A request is only ever started by the user tapping Reply, Regenerate or
- *    Try again. Appearing, copying and typing start nothing.
- *  * The clipboard is read only on an explicit tap (a persona, or Paste).
+ *  * A reply or a message is only ever requested by the user tapping Reply,
+ *    Write, Regenerate or Try again. Appearing, copying and typing start
+ *    nothing - with one opt-out exception: after a pause in an instruction
+ *    the user is writing, a cleaner version of THAT instruction may be
+ *    suggested (smart correction on, server offers it). It spends no quota
+ *    and never touches the copied message or a reply.
+ *  * Smart correction is local: the dictionaries are on the phone, and the
+ *    words typed into other apps never leave it.
+ *  * The clipboard is read only on an explicit tap (a persona, Paste, or
+ *    Reply to copied in Create).
+ *  * Dictation fills a field and nothing else: the recogniser listens in the
+ *    language of the layout on screen, the words land at the caret, and Write
+ *    or Reply still has to be tapped. The microphone is released whenever the
+ *    keyboard goes away.
  *  * The user's words are never lost: an edited reply survives Regenerate,
  *    a failure keeps the instruction, and Insert puts exactly the text on
  *    screen into the field - after asking, if the field has text already.
@@ -104,15 +140,20 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
     private lateinit var hostField: HostField
     private lateinit var feedback: KeyFeedback
     private lateinit var replies: ReplySessionController
+    private lateinit var compose: ComposeSessionController
     private lateinit var surface: KeySurfaceController
+    private lateinit var autocorrect: AutocorrectController
+    private lateinit var polish: InstructionPolish
+    private lateinit var dictation: DictationController
+    private lateinit var panels: KeyboardPanels
+
+    /** One thread for suggestions, so typing never waits for them. */
+    private val suggestionWorker: ExecutorCoroutineDispatcher =
+        Executors.newSingleThreadExecutor { work -> Thread(work, "autocorrect").apply { isDaemon = true } }
+            .asCoroutineDispatcher()
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val contextProvider = ContextTextProvider()
-
-    private var speech: SpeechRecognitionClient? = null
-    private var voiceJob: Job? = null
-    private var permissionJob: Job? = null
-    private var noticeJob: Job? = null
 
     private var inputView: ComposeView? = null
 
@@ -131,17 +172,17 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
     private var selectedTemplateId by mutableStateOf<String?>(null)
     private var focus by mutableStateOf(PanelFocus.INSTRUCTION)
     private var sourceExpanded by mutableStateOf(false)
-    private var voiceState by mutableStateOf<VoiceState>(VoiceState.Idle)
     private var showsGlobeKey by mutableStateOf(false)
     private var isSecureField by mutableStateOf(false)
     private var returnFace by mutableStateOf(ReturnFace.NEWLINE)
     private var fieldKind by mutableStateOf(FieldKind.TEXT)
-    private var notice by mutableStateOf<String?>(null)
 
     private var hostCapitalization = Capitalization.SENTENCES
-    private var hostSelectionEnd = -1
+    private var smartCorrection = true
     private var configurationLoadedAt = 0L
     private var lastSpaceTap = 0L
+    private var orientation = Configuration.ORIENTATION_UNDEFINED
+    private var announcementStrings: Pair<AppLanguage, AppStrings>? = null
 
     // -------------------------------------------------------------- lifecycle
 
@@ -155,7 +196,36 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         feedback.hapticsEnabled = services.settings.keyboardHaptics
         replies = ReplySessionController(scope, services.replyService, services.draftNormalizer)
         replies.onAsyncChange = { refreshAutoShift() }
+        compose = ComposeSessionController(scope, services.composeService, services.draftNormalizer)
+        compose.onAsyncChange = { refreshAutoShift() }
+        dictation = DictationController(
+            scope = scope,
+            newClient = { AndroidSpeechRecognitionClient(this) },
+            mic = microphone,
+            clock = SystemClock::uptimeMillis
+        ).apply {
+            onInserted = ::dictationInserted
+            onAnnounce = ::announce
+        }
+        panels = KeyboardPanels(replies, compose, dictation, layout = { language })
+        orientation = resources.configuration.orientation
         surface = KeySurfaceController(this)
+        autocorrect = AutocorrectController(
+            engine = AutocorrectEngine(
+                AutocorrectDictionaries(AssetDictionarySource(assets)),
+                PrefsLearnedWordsStore(this)
+            ),
+            host = hostField,
+            scope = scope,
+            worker = suggestionWorker
+        )
+        polish = InstructionPolish(scope, polishService()).apply {
+            isAllowed = {
+                smartCorrection && AILimits.features.instructionPolish && isComposing &&
+                    activeFlow.stage == ReplyComposerFlow.Stage.Composing
+            }
+            inputLanguage = { language }
+        }
 
         enabledLanguages = services.settings.enabledKeyboardLanguages
         language = services.settings.keyboardLanguage
@@ -165,6 +235,9 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         selectedTemplateId = services.settings.lastTemplateId
 
         replies.uiLanguage = uiLanguage
+        compose.uiLanguage = uiLanguage
+        replies.inputLanguage = { language }
+        compose.inputLanguage = { language }
         replies.configuration = ReplyConfiguration.INITIAL
     }
 
@@ -191,12 +264,13 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
-        hostField.editorInfo = info
+        hostField.startInput(info, restarting)
         isSecureField = hostField.isSecureField
-        hostSelectionEnd = info?.initialSelEnd ?: -1
         readField(info)
 
         refreshSettings()
+        autocorrect.startInput(info, smartCorrection, language)
+        if (!restarting) polish.reset()
         refreshGlobeKey()
         loadConfigurationIfNeeded()
         refreshLimitsIfStale()
@@ -209,8 +283,9 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
             plane = if (numeric) KeyboardPlane.NUMBERS else KeyboardPlane.LETTERS
             shift.reset()
         }
-        replies.restoreIfRecent(SystemClock.uptimeMillis())
-        if (isSecureField && replies.session != null) replies.suspend()
+        // A recent panel returns; in a password field, none does. A recording
+        // the microphone dialog interrupted may start now.
+        panels.keyboardShown(SystemClock.uptimeMillis(), isSecureField)
         refreshAutoShift()
         viewHost.onShown()
     }
@@ -219,11 +294,26 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         super.onFinishInputView(finishingInput)
         viewHost.onHidden()
         surface.cancelAll()
-        // An unfinished reply is kept in memory for a few minutes, so a trip
-        // to another chat to copy a message does not cost the instruction.
-        replies.park(SystemClock.uptimeMillis())
-        // Release the microphone rather than holding it across every app.
-        releaseSpeech()
+        // The word being typed stays exactly as typed.
+        autocorrect.endWord()
+        polish.dismiss()
+        // An unfinished reply or Create is kept in memory for a few minutes,
+        // so a trip to another chat does not cost the instruction. A running
+        // request is stopped: no spinner survives the keyboard going away.
+        // The microphone is released rather than held across every app.
+        panels.keyboardHidden(SystemClock.uptimeMillis())
+    }
+
+    /**
+     * Turning the phone ends a recording the way Stop does: the words heard so
+     * far land in the field, and the microphone closes.
+     */
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        if (newConfig.orientation != orientation) {
+            orientation = newConfig.orientation
+            dictation.stop()
+        }
+        super.onConfigurationChanged(newConfig)
     }
 
     override fun onUpdateSelection(
@@ -231,10 +321,19 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         candidatesStart: Int, candidatesEnd: Int
     ) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
-        hostSelectionEnd = newSelEnd
-        // The caret moved in the host (a tap, a paste, the app cleared the
-        // field after sending): shift follows it, as Gboard's does.
+        // An echo of the keyboard's own edit, or the caret moved in the host
+        // (a tap, a paste, the app cleared the field after sending) - which
+        // ends the word being typed where it stands.
+        autocorrect.hostSelectionChanged(newSelStart, newSelEnd, candidatesStart, candidatesEnd)
+        // Shift follows the caret, as Gboard's does.
         if (target == Target.HOST) refreshAutoShift()
+    }
+
+    override fun onFinishInput() {
+        super.onFinishInput()
+        // The connection is going away: forget the field, send nothing.
+        hostField.endInput()
+        autocorrect.clear()
     }
 
     /**
@@ -250,12 +349,15 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
     }
 
     override fun onDestroy() {
-        releaseSpeech()
-        noticeJob?.cancel()
-        permissionJob?.cancel()
+        dictation.cancel()
+        dictation.release()
+        polish.dismiss()
+        autocorrect.clear()
         replies.clear()
+        compose.clear()
         viewHost.onDestroy()
         scope.cancel()
+        suggestionWorker.close()
         inputView = null
         super.onDestroy()
     }
@@ -285,7 +387,7 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         val sizing = KeyboardSizing(width, KeyboardSizing.isLandscape(width, screenHeight), density)
         // ONE height for every page of every enabled layout.
         val areaHeight = sizing.keyAreaHeight(KeyboardLayout.maximumRowCount(enabledLanguages), screenHeight)
-        val composing = replies.isComposing
+        val composing = isComposing
         val options = PageOptions(
             showsGlobeKey = showsGlobeKey,
             showsLanguageKey = enabledLanguages.size > 1,
@@ -298,7 +400,8 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
 
         val strings = remember(uiLanguage) { services.strings(uiLanguage) }
         val intents = remember(uiLanguage) { quickIntents(strings) }
-        val flow = replies.flow
+        val createIntents = remember(uiLanguage) { composeIntents(strings) }
+        val flow = activeFlow
         val keys = KeySurfaceState(
             layout = page,
             labels = KeyboardLabels(language),
@@ -325,7 +428,36 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
                 },
                 top = {
                     val session = replies.session
-                    if (session != null && composing) {
+                    val created = compose.session
+                    val voiceLines = PanelFit.voiceLines(sizing.isLandscape)
+                    if (created != null) {
+                        // The window's height less the keys: what Create may take,
+                        // so on a phone on its side the space bar stays on screen.
+                        // It changes with the window, never with a keystroke.
+                        BoxWithConstraints(Modifier.fillMaxWidth()) {
+                            val room = if (constraints.hasBoundedHeight) maxHeight.value - areaHeight else Float.POSITIVE_INFINITY
+                            CreatePanel(
+                                model = CreateModel(
+                                    session = created,
+                                    intents = createIntents,
+                                    instructionLines = PanelFit.createInstructionLines(
+                                        room,
+                                        preferred = if (screenHeight >= 700f) 4 else 3,
+                                        compact = PanelFit.compactCreate(sizing.isLandscape)
+                                    ),
+                                    maxFieldLines = if (screenHeight >= 700f) 7 else 4,
+                                    assist = typingAssist(created.instruction),
+                                    voice = dictation.state,
+                                    voiceNotice = dictation.notice,
+                                    voiceLines = voiceLines,
+                                    compact = PanelFit.compactCreate(sizing.isLandscape)
+                                ),
+                                actions = createActions,
+                                strings = strings,
+                                theme = theme
+                            )
+                        }
+                    } else if (session != null && composing) {
                         ComposerPanel(
                             model = ComposerModel(
                                 personaName = TemplateNaming.displayName(services.localized(uiLanguage), session.template),
@@ -333,9 +465,12 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
                                 focus = focus,
                                 sourceExpanded = sourceExpanded,
                                 sourceLimit = AILimits.current.sourceCharacters,
-                                voice = voiceState,
+                                voice = dictation.state,
                                 intents = intents,
-                                maxFieldLines = if (screenHeight >= 700f) 5 else 3
+                                maxFieldLines = if (screenHeight >= 700f) 5 else 3,
+                                assist = typingAssist(session.instruction),
+                                voiceNotice = dictation.notice,
+                                voiceLines = voiceLines
                             ),
                             actions = composerActions,
                             strings = strings,
@@ -347,11 +482,17 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
                             chips = chips,
                             languageCode = uiLanguage.code,
                             selectedId = selectedTemplateId,
-                            notice = notice ?: if (isSecureField) strings[R.string.kb_secure_field] else null,
+                            notice = if (isSecureField) strings[R.string.kb_secure_field] else null,
                             theme = theme,
                             strings = strings,
                             onSelect = ::startReply,
-                            onAdd = ::openTemplateEditor
+                            onCreate = ::startCompose,
+                            suggestions = if (autocorrect.place == AutocorrectController.Place.HOST) {
+                                autocorrect.suggestions
+                            } else {
+                                emptyList()
+                            },
+                            onPick = ::pickSuggestion
                         )
                     }
                 }
@@ -362,17 +503,21 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
     private val composerActions by lazy {
         ComposerActions(
             onPersona = {
-                replies.suspend()
+                leaveFields()
+                panels.putReplyAside()
                 refreshAutoShift()
             },
             onClose = ::closeComposer,
             onPaste = ::pasteSource,
             onToggleSource = {
+                autocorrect.clear()
                 sourceExpanded = !sourceExpanded
                 if (!sourceExpanded && focus == PanelFocus.SOURCE) focus = PanelFocus.INSTRUCTION
+                polish.focusMoved(activeField)
                 refreshAutoShift()
             },
             onClearSource = {
+                autocorrect.clear()
                 replies.session?.source?.clear()
                 replies.composerEdited()
                 sourceExpanded = false
@@ -381,7 +526,8 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
             },
             onFieldTap = ::tapField,
             onPrimary = {
-                if (replies.flow.isGenerating) replies.stop() else replies.generate()
+                leaveFields()
+                panels.primaryTapped()
                 refreshAutoShift()
             },
             onIntent = ::applyIntent,
@@ -391,10 +537,12 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
                 refreshAutoShift()
             },
             onRegenerate = {
+                leaveFields()
                 if (replies.flow.generationOrigin == ReplyComposerFlow.Origin.RESULT) replies.stop() else replies.generate()
                 refreshAutoShift()
             },
             onEdit = {
+                leaveFields()
                 replies.toggleEditing()
                 if (replies.flow.isEditingDraft) focus = PanelFocus.DRAFT
                 refreshAutoShift()
@@ -403,9 +551,98 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
             onPreviousVersion = replies::showPreviousVersion,
             onNextVersion = replies::showNextVersion,
             onConflict = ::resolveConflict,
-            onMic = ::toggleMicrophone
+            onMic = panels::microphoneTapped,
+            assist = assistActions
         )
     }
+
+    private val createActions by lazy {
+        CreateActions(
+            onClose = ::closeComposer,
+            onNew = {
+                leaveFields()
+                panels.startOver()
+                focus = PanelFocus.INSTRUCTION
+                refreshAutoShift()
+            },
+            onFieldTap = ::tapField,
+            onPrimary = {
+                leaveFields()
+                panels.primaryTapped()
+                refreshAutoShift()
+            },
+            onIntent = ::applyIntent,
+            onBack = {
+                compose.back()
+                focus = PanelFocus.INSTRUCTION
+                refreshAutoShift()
+            },
+            onRegenerate = {
+                leaveFields()
+                if (compose.flow.generationOrigin == ReplyComposerFlow.Origin.RESULT) compose.stop() else compose.generate()
+                refreshAutoShift()
+            },
+            onEdit = {
+                leaveFields()
+                compose.toggleEditing()
+                if (compose.flow.isEditingDraft) focus = PanelFocus.DRAFT
+                refreshAutoShift()
+            },
+            onInsert = ::insertReply,
+            onPreviousVersion = compose::showPreviousVersion,
+            onNextVersion = compose::showNextVersion,
+            onConflict = ::resolveConflict,
+            assist = assistActions,
+            onMic = panels::microphoneTapped,
+            onReplyToCopied = ::replyToCopied
+        )
+    }
+
+    private val assistActions by lazy {
+        TypingAssistActions(
+            onPick = ::pickSuggestion,
+            onAcceptPolish = {
+                autocorrect.clear()
+                polish.accept()?.let { field -> fieldEdited(field, byUser = false) }
+                refreshAutoShift()
+            },
+            onUndoPolish = {
+                autocorrect.clear()
+                polish.undo()?.let { field -> fieldEdited(field, byUser = false) }
+                refreshAutoShift()
+            }
+        )
+    }
+
+    /**
+     * What replaces the intents while [instruction]'s panel is composing: the
+     * word suggestions, or the polish chip / its Undo for that instruction -
+     * only while the instruction is the field being typed in, so editing the
+     * copied message shows that field's own suggestions.
+     */
+    private fun typingAssist(instruction: KeyboardTextFieldState): TypingAssist {
+        val typingIn = activeField?.takeIf { it === instruction }
+        return TypingAssist(
+            suggestions = if (autocorrect.place == AutocorrectController.Place.COMPOSER) autocorrect.suggestions else emptyList(),
+            polished = polish.offerFor(typingIn),
+            canUndoPolish = polish.canUndo(typingIn)
+        )
+    }
+
+    /** Leaving the fields for an action (a request, a stage change): no strip, no chip, nothing pending. */
+    private fun leaveFields() {
+        autocorrect.clear()
+        polish.dismiss()
+    }
+
+    /**
+     * An AI panel is open: the reply composer, or Create. At most one - Create
+     * drops any reply session when it opens, and a persona chip drops Create.
+     */
+    private val isComposing: Boolean get() = compose.isActive || replies.isComposing
+
+    /** The stages of whichever panel is open. */
+    private val activeFlow: ReplyComposerFlow get() = if (compose.isActive) compose.flow else replies.flow
 
     // -------------------------------------------------------------- key input
 
@@ -418,13 +655,20 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
 
     private val target: Target
         get() = when {
-            !replies.isComposing -> Target.HOST
+            !isComposing -> Target.HOST
             activeField != null -> Target.COMPOSER
             else -> Target.NOWHERE
         }
 
     private val activeField: KeyboardTextFieldState?
         get() {
+            compose.session?.let { created ->
+                return when (created.flow.stage) {
+                    ReplyComposerFlow.Stage.Composing -> created.instruction
+                    ReplyComposerFlow.Stage.Editing -> created.draft
+                    else -> null
+                }
+            }
             val session = replies.session ?: return null
             if (replies.isSuspended) return null
             return when (session.flow.stage) {
@@ -437,8 +681,9 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
 
     /** With a reply on screen, typing means "let me change it". */
     private fun prepareComposerForTyping() {
-        if (!replies.isComposing || activeField != null) return
-        if (replies.beginEditingForTyping()) focus = PanelFocus.DRAFT
+        if (!isComposing || activeField != null) return
+        val editing = if (compose.isActive) compose.beginEditingForTyping() else replies.beginEditingForTyping()
+        if (editing) focus = PanelFocus.DRAFT
     }
 
     override fun onKeyDown(key: KeyboardKey) {
@@ -475,10 +720,27 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
     override fun onDelete(word: Boolean) {
         prepareComposerForTyping()
         when (target) {
-            Target.HOST -> if (word) hostField.deleteWordBackward() else hostField.deleteBackward()
+            Target.HOST -> when {
+                word -> {
+                    autocorrect.endWord()
+                    hostField.deleteWordBackward()
+                }
+                // Undoes the correction just applied, or edits the word being typed.
+                autocorrect.deleteInHost() -> Unit
+                else -> hostField.deleteBackward()
+            }
             Target.COMPOSER -> activeField?.let { field ->
-                val changed = if (word) field.deleteWordBackward() else field.deleteBackward()
-                if (changed) composerFieldEdited(field)
+                val limit = limitFor(field)
+                val corrects = correctsField(field)
+                val changed = when {
+                    word -> field.deleteWordBackward()
+                    corrects && autocorrect.deleteInField(field, limit) -> true
+                    else -> field.deleteBackward()
+                }
+                if (changed) {
+                    if (corrects) autocorrect.fieldChanged(field, limit)
+                    fieldEdited(field)
+                }
             }
             Target.NOWHERE -> Unit
         }
@@ -487,8 +749,14 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
 
     override fun onMoveCursor(offset: Int) {
         when (target) {
-            Target.HOST -> hostField.moveCursorBy(offset, hostSelectionEnd)
-            Target.COMPOSER -> activeField?.moveCursorBy(offset)
+            Target.HOST -> {
+                autocorrect.endWord()
+                hostField.moveCursorBy(offset)
+            }
+            Target.COMPOSER -> activeField?.let { field ->
+                field.moveCursorBy(offset)
+                if (correctsField(field)) autocorrect.fieldChanged(field, limitFor(field)) else autocorrect.clear()
+            }
             Target.NOWHERE -> {
                 // Moving the caret in a reply on screen starts editing it.
                 prepareComposerForTyping()
@@ -516,11 +784,16 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         if (SpaceShortcut.shouldInsertPeriod(textBeforeCursor(), now - lastSpaceTap)) {
             // ". " - the system keyboards' behaviour.
             when (target) {
-                Target.HOST -> hostField.deleteBackward()
-                Target.COMPOSER -> activeField?.deleteBackward()
+                Target.HOST -> hostField.batch {
+                    hostField.deleteBackward()
+                    insert(". ")
+                }
+                Target.COMPOSER -> {
+                    activeField?.deleteBackward()
+                    insert(". ")
+                }
                 Target.NOWHERE -> Unit
             }
-            insert(". ")
             lastSpaceTap = 0
         } else {
             insert(" ")
@@ -537,7 +810,13 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
             // Inside the composer return is a newline in the field; it never
             // reaches the messenger's Send action while a reply is open.
             Target.COMPOSER -> insert("\n")
-            Target.HOST -> hostField.sendReturn()
+            // A new line ends the word like a space; Send takes the word as typed.
+            Target.HOST -> if (hostField.returnIsNewline) {
+                insert("\n")
+            } else {
+                autocorrect.endWord()
+                hostField.sendReturn()
+            }
             Target.NOWHERE -> Unit
         }
         refreshAutoShift()
@@ -545,32 +824,73 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
 
     private fun insert(text: String) {
         when (target) {
-            Target.HOST -> hostField.commitText(text)
+            Target.HOST -> autocorrect.typeInHost(text)
             Target.COMPOSER -> activeField?.let { field ->
-                val session = replies.session
-                val limit = if (session != null && field === session.instruction) {
-                    AILimits.current.instructionCharacters
+                val limit = limitFor(field)
+                val edited = if (correctsField(field)) {
+                    autocorrect.typeInField(field, text, limit)
                 } else {
-                    null
+                    field.insert(text, limit)
                 }
-                if (field.insert(text, limit)) composerFieldEdited(field)
+                if (edited) fieldEdited(field)
             }
             Target.NOWHERE -> Unit
         }
     }
 
-    private fun composerFieldEdited(field: KeyboardTextFieldState) {
+    /** The instruction has the server's character limit; the other fields have none. */
+    private fun limitFor(field: KeyboardTextFieldState): Int? {
+        val instruction = compose.session?.instruction ?: replies.session?.instruction
+        return if (field === instruction) AILimits.current.instructionCharacters else null
+    }
+
+    /**
+     * Smart correction in the keyboard's own fields: while composing (the
+     * intents' row is there for the strip), not in a reply being edited.
+     */
+    private fun correctsField(field: KeyboardTextFieldState): Boolean =
+        autocorrect.correctsFields && field !== compose.session?.draft && field !== replies.session?.draft &&
+            activeFlow.correctsTyping
+
+    /**
+     * A composer field changed. [byUser]: typed, dictated or an intent - which
+     * also asks for a polish of the instruction after a pause; a polish taken
+     * or undone is not.
+     */
+    private fun fieldEdited(field: KeyboardTextFieldState, byUser: Boolean = true) {
+        // A dictation message ("nothing was heard", the limit) is about the
+        // text as it was; the user has moved on.
+        if (byUser) dictation.userEdited()
+        compose.session?.let { created ->
+            if (field === created.draft) compose.draftEdited() else compose.instructionEdited()
+            if (byUser && field === created.instruction) polish.edited(field)
+            return
+        }
         val session = replies.session ?: return
         if (field === session.draft) replies.draftEdited() else replies.composerEdited()
+        if (byUser && field === session.instruction) polish.edited(field)
+    }
+
+    /** A tap on the strip: the word being typed becomes the suggestion. */
+    private fun pickSuggestion(suggestion: Suggestion) {
+        val field = if (autocorrect.place == AutocorrectController.Place.COMPOSER) activeField else null
+        if (autocorrect.pick(suggestion) && field != null) fieldEdited(field)
+        // The space after the picked word is the keyboard's: a space typed
+        // next is not the start of the double-space full stop (as on iOS).
+        lastSpaceTap = 0
+        refreshAutoShift()
     }
 
     private fun textBeforeCursor(): String? = when (target) {
         Target.HOST -> hostField.textBeforeCursor(AUTOSHIFT_WINDOW)
         Target.COMPOSER -> activeField?.textBeforeCursor()
         // A reply on screen: the next keystroke edits it at its caret.
-        Target.NOWHERE -> replies.session
+        Target.NOWHERE -> compose.session
             ?.takeIf { it.flow.stage == ReplyComposerFlow.Stage.Result }
             ?.draft?.textBeforeCursor()
+            ?: replies.session
+                ?.takeIf { it.flow.stage == ReplyComposerFlow.Stage.Result }
+                ?.draft?.textBeforeCursor()
     }
 
     private fun refreshAutoShift() {
@@ -587,7 +907,10 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
 
     private fun switchLanguage(next: KeyboardLanguage) {
         if (next == language && plane == KeyboardPlane.LETTERS) return
+        // A recording in the old layout's language ends here, keeping its words.
+        if (next != language) panels.layoutChanged()
         language = next
+        autocorrect.switchLanguage(next)
         plane = KeyboardPlane.LETTERS
         // Off the main thread: it only matters to the next launch.
         scope.launch(Dispatchers.IO) { services.settings.keyboardLanguage = next }
@@ -640,23 +963,37 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
     private fun startReply(templateId: String) {
         if (isSecureField) return
         val template = resolveTemplate(templateId) ?: return
+        // The word being typed in the chat stays exactly as typed.
+        autocorrect.endWord()
+        polish.dismiss()
         selectedTemplateId = templateId
         scope.launch(Dispatchers.IO) { services.settings.lastTemplateId = templateId }
 
-        if (replies.session != null && replies.isSuspended) {
-            replies.resume(template)
+        val resuming = replies.session != null && replies.isSuspended
+        // The message: a selection in the field, else what the user copied.
+        // Opening never generates - it only shows the composer.
+        panels.openReply(template) { contextProvider.acquire(this, currentInputConnection, isSecureField) }
+        if (resuming) {
             refreshAutoShift()
             return
         }
+        focus = PanelFocus.INSTRUCTION
+        sourceExpanded = false
+        plane = KeyboardPlane.LETTERS
+        shift.reset()
+        refreshAutoShift()
+    }
 
-        // The message: a selection in the field, else what the user copied.
-        // Opening never generates - it only shows the composer.
-        when (val result = contextProvider.acquire(this, currentInputConnection, isSecureField)) {
-            is ContextTextProvider.Result.Success ->
-                replies.open(template, result.context.text, result.context.source, null)
-            is ContextTextProvider.Result.Failure ->
-                replies.open(template, "", null, result.error)
-        }
+    /**
+     * "✨" on the persona row: a fresh Create panel. The clipboard is not read,
+     * and a reply the user had put aside (persona row over a suspended
+     * session) is dropped rather than carried over.
+     */
+    private fun startCompose() {
+        if (isSecureField) return
+        autocorrect.endWord()
+        polish.dismiss()
+        panels.openCreate()
         focus = PanelFocus.INSTRUCTION
         sourceExpanded = false
         plane = KeyboardPlane.LETTERS
@@ -683,6 +1020,29 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
     }
 
     private fun tapField(field: PanelFocus, offset: Int) {
+        // The caret jumps: the word the strip was about is behind it.
+        autocorrect.clear()
+        compose.session?.let { created ->
+            val stage = created.flow.stage
+            when (field) {
+                PanelFocus.INSTRUCTION -> {
+                    if (stage != ReplyComposerFlow.Stage.Composing) return
+                    focus = field
+                    created.instruction.moveCursor(offset)
+                }
+                PanelFocus.DRAFT -> {
+                    if (stage == ReplyComposerFlow.Stage.Result) compose.beginEditingForTyping()
+                    if (compose.flow.stage != ReplyComposerFlow.Stage.Editing) return
+                    focus = PanelFocus.DRAFT
+                    created.draft.moveCursor(offset)
+                }
+                PanelFocus.SOURCE -> return
+            }
+            // A polish offer belongs to the instruction: it goes when typing moves elsewhere.
+            polish.focusMoved(activeField)
+            refreshAutoShift()
+            return
+        }
         val session = replies.session ?: return
         val stage = session.flow.stage
         when (field) {
@@ -700,17 +1060,20 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
                 session.draft.moveCursor(offset)
             }
         }
+        // Typing in the copied message or the reply: the instruction's polish offer goes.
+        polish.focusMoved(activeField)
         refreshAutoShift()
     }
 
     /** Intents WRITE INTO THE INSTRUCTION: readable, editable, stackable. */
     private fun applyIntent(intent: QuickIntent) {
-        val session = replies.session ?: return
-        if (session.flow.stage != ReplyComposerFlow.Stage.Composing) return
-        val current = session.instruction.text.trim()
+        val field = compose.session?.takeIf { it.flow.stage == ReplyComposerFlow.Stage.Composing }?.instruction
+            ?: replies.session?.takeIf { it.flow.stage == ReplyComposerFlow.Stage.Composing }?.instruction
+            ?: return
+        val current = field.text.trim()
         val combined = if (current.isEmpty()) intent.phrase else "$current ${intent.phrase}"
         val limit = AILimits.current.instructionCharacters
-        session.instruction.set(
+        field.set(
             if (combined.codePointCount(0, combined.length) <= limit) {
                 combined
             } else {
@@ -718,15 +1081,39 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
             }
         )
         focus = PanelFocus.INSTRUCTION
-        replies.composerEdited()
+        autocorrect.clear()
+        fieldEdited(field)
         refreshAutoShift()
     }
 
     private fun closeComposer() {
-        replies.clear()
+        leaveFields()
+        panels.closeAll()
         focus = PanelFocus.INSTRUCTION
         sourceExpanded = false
-        cancelSpeech()
+        refreshAutoShift()
+    }
+
+    /**
+     * "Reply to copied" in Create: the copied message (read now, on this tap)
+     * gets a reply by the last persona used, with the request written here as
+     * its instruction. Nothing is generated until the user taps Reply.
+     */
+    private fun replyToCopied() {
+        val configuration = replies.configuration.takeIf { it.visibleTemplates.isNotEmpty() }
+            ?: services.configuration.current.also { replies.configuration = it }
+        val template = KeyboardPanels.personaForCopied(configuration, selectedTemplateId ?: services.settings.lastTemplateId)
+        leaveFields()
+        // The clipboard only - a selection in the chat's field is the user's own draft.
+        val outcome = panels.replyToCopied(template, isSecureField) { contextProvider.acquire(this, null, isSecureField) }
+        if (outcome == KeyboardPanels.CopiedReply.Opened && template != null) {
+            selectedTemplateId = template.id
+            scope.launch(Dispatchers.IO) { services.settings.lastTemplateId = template.id }
+            focus = PanelFocus.INSTRUCTION
+            sourceExpanded = false
+            plane = KeyboardPlane.LETTERS
+            shift.reset()
+        }
         refreshAutoShift()
     }
 
@@ -735,7 +1122,9 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
      * screen, edits included. Nothing is ever sent.
      */
     private fun insertReply() {
-        when (val decision = replies.requestInsert(hostField.appearsToHaveText())) {
+        val hostHasText = hostField.appearsToHaveText()
+        val decision = if (compose.isActive) compose.requestInsert(hostHasText) else replies.requestInsert(hostHasText)
+        when (decision) {
             is ReplyComposerFlow.InsertDecision.Insert -> {
                 hostField.commitText(decision.text)
                 finishInsert()
@@ -747,15 +1136,20 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
     }
 
     private fun resolveConflict(choice: ReplyComposerFlow.ConflictChoice) {
-        when (val resolution = replies.resolveConflict(choice)) {
+        val resolution = if (compose.isActive) compose.resolveConflict(choice) else replies.resolveConflict(choice)
+        when (resolution) {
             is ReplyComposerFlow.ConflictResolution.Replace -> {
-                hostField.clear()
-                hostField.commitText(resolution.text)
+                hostField.batch {
+                    hostField.clear()
+                    hostField.commitText(resolution.text)
+                }
                 finishInsert()
             }
             is ReplyComposerFlow.ConflictResolution.Append -> {
-                hostField.moveCaretToEnd()
-                hostField.commitText(hostField.separatorForAppend() + resolution.text)
+                hostField.batch {
+                    hostField.moveCaretToEnd()
+                    hostField.commitText(hostField.separatorForAppend() + resolution.text)
+                }
                 finishInsert()
             }
             // Back to the reply exactly as it was.
@@ -768,92 +1162,52 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         closeComposer()
     }
 
-    private fun showNotice(message: String) {
-        notice = message
-        noticeJob?.cancel()
-        noticeJob = scope.launch {
-            delay(NOTICE_MS)
-            notice = null
-        }
-    }
-
     // ------------------------------------------------------------------ voice
 
-    private fun toggleMicrophone() {
-        val client = speech ?: AndroidSpeechRecognitionClient(this).also {
-            speech = it
-            observeVoice(it)
-        }
-        when (voiceState) {
-            is VoiceState.Listening, is VoiceState.Starting -> client.stop()
-            is VoiceState.Processing -> Unit
-            is VoiceState.PermissionDenied -> KeyboardStatus.openAppSettings(this)
-            is VoiceState.PermissionRequired -> requestMicrophone()
-            else -> if (!MicPermission.isGranted(this)) {
-                requestMicrophone()
+    /** The microphone permission, asked for through the transparent activity. */
+    private val microphone = object : MicAccess {
+        override fun isGranted(): Boolean = MicPermission.isGranted(this@ReplyKeyboardService)
+
+        /** The collector starts BEFORE the dialog: the answer has no replay, and a fast one would be lost. */
+        override suspend fun request(): MicPermission.Outcome? = coroutineScope {
+            val answer = async(start = CoroutineStart.UNDISPATCHED) { MicPermission.results.first() }
+            if (MicPermission.request(this@ReplyKeyboardService)) {
+                answer.await()
             } else {
-                client.reset()
-                client.start(uiLanguage.languageTag)
+                answer.cancel()
+                null
             }
         }
+
+        override fun openSettings() = KeyboardStatus.openAppSettings(this@ReplyKeyboardService)
+    }
+
+    /** Dictated words landed in [field]: the strip and any polish offer were about the old text. */
+    private fun dictationInserted(field: KeyboardTextFieldState) {
+        autocorrect.clear()
+        polish.dismiss()
+        // Not "by the user" for the polish: dictation sends nothing anywhere.
+        fieldEdited(field, byUser = false)
+        if (field === replies.session?.instruction) focus = PanelFocus.INSTRUCTION
+        refreshAutoShift()
     }
 
     /**
-     * The collector starts BEFORE the dialog: the result flow has no replay,
-     * and a fast answer would otherwise be lost.
+     * Tells a screen reader what the microphone did. Only while one is on, and
+     * never the words being recognised.
      */
-    private fun requestMicrophone() {
-        permissionJob?.cancel()
-        permissionJob = scope.launch {
-            val outcome = async { MicPermission.results.first() }
-            MicPermission.request(this@ReplyKeyboardService)
-            when (outcome.await()) {
-                MicPermission.Outcome.GRANTED -> {
-                    speech?.reset()
-                    speech?.start(uiLanguage.languageTag)
-                }
-                MicPermission.Outcome.PERMANENTLY_DENIED -> voiceState = VoiceState.PermissionDenied
-                MicPermission.Outcome.DENIED -> voiceState = VoiceState.PermissionRequired
-            }
-        }
-    }
-
-    private fun observeVoice(client: SpeechRecognitionClient) {
-        voiceJob?.cancel()
-        voiceJob = scope.launch {
-            client.state.collect { state ->
-                voiceState = state
-                if (state is VoiceState.Done) {
-                    // Dictation lands in the INSTRUCTION, appended.
-                    appendDictation(state.text)
-                    client.reset()
-                }
-            }
-        }
-    }
-
-    private fun appendDictation(text: String) {
-        val addition = text.trim()
-        val session = replies.session ?: return
-        if (addition.isEmpty()) return
-        val field = session.instruction
-        val separator = if (field.text.isEmpty() || field.text.endsWith(" ")) "" else " "
-        field.set(field.text + separator + addition)
-        focus = PanelFocus.INSTRUCTION
-        replies.composerEdited()
-    }
-
-    private fun cancelSpeech() {
-        speech?.cancel()
-        voiceState = VoiceState.Idle
-    }
-
-    private fun releaseSpeech() {
-        voiceJob?.cancel()
-        voiceJob = null
-        speech?.release()
-        speech = null
-        voiceState = VoiceState.Idle
+    private fun announce(event: VoiceAnnouncement) {
+        val view = inputView ?: return
+        val manager = getSystemService(ACCESSIBILITY_SERVICE) as? AccessibilityManager ?: return
+        if (!manager.isEnabled) return
+        val strings = announcementStrings?.takeIf { it.first == uiLanguage }?.second
+            ?: services.strings(uiLanguage).also { announcementStrings = uiLanguage to it }
+        val text = when (event) {
+            VoiceAnnouncement.Listening -> strings[R.string.voice_kb_listening]
+            VoiceAnnouncement.Stopped -> strings[R.string.voice_kb_stopped]
+            is VoiceAnnouncement.Message -> VoiceStatusText.message(event.state, event.notice)?.let { strings.text(it) }
+        } ?: return
+        view.announceForAccessibility(text)
     }
 
     // ----------------------------------------------------------- configuration
@@ -887,8 +1241,7 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
     private fun refreshLimitsIfStale() {
         if (!AILimits.isStale() || !services.accountCredentials.isSignedIn) return
         scope.launch(Dispatchers.IO) {
-            runCatching { services.accountService.serverConfig(HeaderScope.KEYBOARD) }
-                .getOrNull()?.let { AILimits.apply(it) }
+            runCatching { services.accountService.serverConfig() }.getOrNull()?.let { AILimits.apply(it) }
         }
     }
 
@@ -909,10 +1262,12 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         if (language != uiLanguage) {
             uiLanguage = language
             replies.uiLanguage = language
+            compose.uiLanguage = language
             chips = cachedChips()
         }
         appearance = services.settings.appearance
         feedback.hapticsEnabled = services.settings.keyboardHaptics
+        smartCorrection = services.settings.smartCorrection
         enabledLanguages = services.settings.enabledKeyboardLanguages
         val stored = services.settings.keyboardLanguage
         if (stored != this.language) this.language = stored
@@ -930,6 +1285,17 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         QuickIntent("reschedule", strings[R.string.kb_intent_reschedule], strings[R.string.kb_intent_reschedule_phrase])
     )
 
+    /** Create's one-tap additions: occasions first, then tones. */
+    private fun composeIntents(strings: AppStrings): List<QuickIntent> = listOf(
+        QuickIntent("congratulate", strings[R.string.kb_compose_intent_congratulate], strings[R.string.kb_compose_intent_congratulate_phrase]),
+        QuickIntent("short", strings[R.string.kb_compose_intent_short], strings[R.string.kb_compose_intent_short_phrase]),
+        QuickIntent("formal", strings[R.string.kb_compose_intent_formal], strings[R.string.kb_compose_intent_formal_phrase]),
+        QuickIntent("friendly", strings[R.string.kb_compose_intent_friendly], strings[R.string.kb_compose_intent_friendly_phrase]),
+        QuickIntent("emoji", strings[R.string.kb_compose_intent_emoji], strings[R.string.kb_compose_intent_emoji_phrase]),
+        QuickIntent("thanks", strings[R.string.kb_compose_intent_thanks], strings[R.string.kb_compose_intent_thanks_phrase]),
+        QuickIntent("decline", strings[R.string.kb_compose_intent_decline], strings[R.string.kb_compose_intent_decline_phrase])
+    )
+
     // -------------------------------------------------------- system keyboards
 
     private fun refreshGlobeKey() {
@@ -944,6 +1310,7 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
     }
 
     private fun switchToNextKeyboard() {
+        autocorrect.endWord()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             switchToNextInputMethod(false)
         } else {
@@ -955,25 +1322,28 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
     }
 
     private fun showKeyboardPicker() {
+        autocorrect.endWord()
         val manager = getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager
         runCatching { manager?.showInputMethodPicker() }
     }
 
     /**
-     * "+" opens the template editor in the app. An Android keyboard can start
-     * an Activity, so it does; the notice says what is happening meanwhile.
+     * The instruction polish: the account's endpoint, or in DEBUG builds the
+     * canned stand-in under the developer switch that serves canned replies.
      */
-    private fun openTemplateEditor() {
-        val intent = Intent(this, MainActivity::class.java)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            .putExtra(MainActivity.EXTRA_ROUTE, MainActivity.ROUTE_TEMPLATES)
-        runCatching { startActivity(intent) }
-            .onSuccess { showNotice(services.strings(uiLanguage)[R.string.kb_add_template_hint]) }
-            .onFailure { ReplyLog.warn(it) { "could not open the template editor" } }
-    }
+    private fun polishService(): PolishService = PolishService(
+        configuration = services.aiConfiguration,
+        accountTransport = { baseUrl ->
+            AccountPolishTransport(baseUrl, services.accountSession, BuildConfig.VERSION_NAME)
+        },
+        transportOverride = if (BuildConfig.DEBUG) {
+            { if (services.settings.debugMockReplies) DebugPolishMock() else null }
+        } else {
+            null
+        }
+    )
 
     private companion object {
-        const val NOTICE_MS = 3_200L
         const val CONFIG_RELOAD_MS = 1_000L
         /** Enough text to decide capitalization; each read crosses processes. */
         const val AUTOSHIFT_WINDOW = 48

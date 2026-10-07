@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -19,7 +20,6 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/auth"
 	"github.com/aireply/ai-reply-back-end/internal/auth/idtoken"
 	"github.com/aireply/ai-reply-back-end/internal/database"
-	"github.com/aireply/ai-reply-back-end/internal/domain"
 	"github.com/aireply/ai-reply-back-end/internal/email"
 	"github.com/aireply/ai-reply-back-end/internal/installations"
 	"github.com/aireply/ai-reply-back-end/internal/limits"
@@ -29,12 +29,11 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/notifications"
 	"github.com/aireply/ai-reply-back-end/internal/payments"
 	"github.com/aireply/ai-reply-back-end/internal/plans"
+	"github.com/aireply/ai-reply-back-end/internal/productevents"
 	"github.com/aireply/ai-reply-back-end/internal/push"
 	"github.com/aireply/ai-reply-back-end/internal/repository"
-	"github.com/aireply/ai-reply-back-end/internal/reqctx"
 	"github.com/aireply/ai-reply-back-end/internal/simulator"
 	"github.com/aireply/ai-reply-back-end/internal/subscriptions"
-	"github.com/aireply/ai-reply-back-end/internal/telemetry"
 	"github.com/aireply/ai-reply-back-end/internal/transport/adminapi"
 	"github.com/aireply/ai-reply-back-end/internal/transport/api"
 	"github.com/aireply/ai-reply-back-end/internal/transport/simulatorapi"
@@ -58,7 +57,7 @@ func run(envFile string) error {
 	if err != nil {
 		return err
 	}
-	log := logging.New(cfg.Log.Level, cfg.Log.Format).With("service", "ai-reply-backend", "environment", cfg.App.Env)
+	log := logging.New(cfg.Log.Level, cfg.Log.Format)
 
 	db, err := database.Open(database.Options{
 		Path:         cfg.Database.Path,
@@ -72,6 +71,14 @@ func run(envFile string) error {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	// Background workers use the database: they are stopped through ctx and
+	// awaited before the deferred db.Close runs.
+	var workers sync.WaitGroup
+	defer func() {
+		stop()
+		workers.Wait()
+	}()
 
 	if cfg.Database.MigrateOnStart {
 		applied, err := database.Migrate(ctx, db, migrations.FS)
@@ -95,29 +102,38 @@ func run(envFile string) error {
 	userSvc := users.New(store)
 	sender := auth.NewSender(cfg.Auth.OTPChannel, log)
 	authSvc := auth.New(store, cfg.Auth, sender, subSvc, log)
-	if err := configureSignIn(authSvc, cfg, bundle); err != nil {
+	mailer, err := newMailer(cfg, bundle)
+	if err != nil {
 		return err
 	}
+	if err := configureSignIn(authSvc, cfg, mailer); err != nil {
+		return err
+	}
+	installSvc := installations.New(store, cfg.Auth.AccessSecret, log)
+	pushProvider, err := configurePush(cfg.Push, log)
+	if err != nil {
+		return err
+	}
+	notifySvc := notifications.New(notifications.Deps{
+		Repo: store, Installations: installSvc, Provider: pushProvider, Plans: planSvc,
+		Config: cfg.Push, Location: cfg.App.Location(), Translate: bundle.T, Log: log,
+	})
+	if mailer != nil {
+		notifySvc.WithEmail(mailer, email.NotificationTemplates{Translate: bundle.T, Brand: cfg.Email.FromName})
+	}
+	// Automatic notifications: plan activated (payment, admin), plan expiring
+	// or expired (the expiry sweep below), quota low or exhausted (AI gateway).
+	notifyEvents := notifications.NewEvents(notifySvc)
 	provider := ai.NewOpenAI(cfg.OpenAI)
 	limitSvc := limits.New(store, limits.Limits{
 		SourceChars:      cfg.Limits.SourceTextChars,
 		InstructionChars: cfg.Limits.InstructionChars,
 		MaxOutputTokens:  cfg.OpenAI.MaxOutputTokens,
 	})
-	aiSvc := ai.New(store, subSvc, provider, limitSvc, log)
-	installSvc := installations.New(store, cfg.Auth.AccessSecret, log)
-	telemetrySvc := telemetry.New(store, cfg.Telemetry, cfg.Auth.AccessSecret, log)
-	pushProviders, err := configurePush(cfg.Push, log)
-	if err != nil {
-		return err
-	}
-	notifySvc := notifications.New(notifications.Deps{
-		Repo: store, Installations: installSvc, Providers: pushProviders, Config: cfg.Push,
-		Location: cfg.App.Location(), Log: log,
-	})
-	businessEvents := notifications.NewBusinessEvents(notifySvc, bundle)
-	paymentSvc := payments.New(store, subSvc, payments.DemoProvider{}, cfg.Payments.Mode).WithEvents(businessEvents)
-	adminSvc := admin.New(store, subSvc, planSvc, cfg, log).WithSubjectHasher(telemetrySvc)
+	aiSvc := ai.New(store, subSvc, provider, limitSvc, log).WithRepair(cfg.AI.RepairEnabled).WithQuotaEvents(notifyEvents)
+	paymentSvc := payments.New(store, subSvc, payments.DemoProvider{}, cfg.Payments.Mode).WithEvents(notifyEvents)
+	eventSvc := productevents.New(store, log)
+	adminSvc := admin.New(store, subSvc, planSvc, cfg, log).WithEvents(notifyEvents)
 	simulatorSvc := simulator.New(simulator.Deps{
 		Repo: store, Users: userSvc, Subs: subSvc, Plans: planSvc, AI: aiSvc, Limits: limitSvc,
 		Config: cfg, Log: log,
@@ -132,8 +148,8 @@ func run(envFile string) error {
 	mux := http.NewServeMux()
 	api.New(api.Deps{
 		Config: cfg, Auth: authSvc, Users: userSvc, Plans: planSvc, Subs: subSvc,
-		AI: aiSvc, Limits: limitSvc, Payments: paymentSvc, Installations: installSvc,
-		Notifications: notifySvc, Telemetry: telemetrySvc, Limiter: limiter, Log: log,
+		AI: aiSvc, Limits: limitSvc, Payments: paymentSvc, Events: eventSvc,
+		Installations: installSvc, Notifications: notifySvc, Limiter: limiter, Log: log,
 		Ping: func(ctx context.Context) error { return db.Reader().PingContext(ctx) },
 	}).Register(mux)
 
@@ -157,12 +173,7 @@ func run(envFile string) error {
 	handler := middleware.Chain(mux,
 		middleware.RequestID,
 		middleware.Recover(log),
-		middleware.AccessLog(log, middleware.AccessLogOptions{
-			RecordAPIError: telemetrySvc.RecordAPIError,
-			TouchInstallation: func(c reqctx.Client) {
-				installSvc.Touch(c.InstallationID, c.AppVersion, c.AppBuild, c.OSVersion)
-			},
-		}),
+		middleware.Logging(log),
 		middleware.SecurityHeaders(cfg.App.IsProduction()),
 		middleware.CORS(cfg.App.CORSOrigins),
 	)
@@ -176,9 +187,17 @@ func run(envFile string) error {
 		IdleTimeout:       90 * time.Second,
 	}
 
-	telemetrySvc.Start(ctx)
-	go notifySvc.Run(ctx)
-	go expireSubscriptions(ctx, subSvc, businessEvents, log)
+	for _, worker := range []func(context.Context){
+		func(ctx context.Context) { expireSubscriptions(ctx, subSvc, notifyEvents, log) },
+		notifySvc.Run,
+		notifySvc.RunRetention,
+	} {
+		workers.Add(1)
+		go func(run func(context.Context)) {
+			defer workers.Done()
+			run(ctx)
+		}(worker)
+	}
 
 	errCh := make(chan error, 1)
 	go func() {
@@ -187,7 +206,8 @@ func run(envFile string) error {
 			"demo_mode", cfg.Auth.DemoMode, "payment_mode", cfg.Payments.Mode,
 			"legacy_api", cfg.Auth.LegacyEnabled, "model", cfg.OpenAI.Model,
 			"email_otp", authSvc.EmailDelivery(), "google_sign_in", authSvc.GoogleEnabled(),
-			"apple_sign_in", authSvc.AppleEnabled())
+			"apple_sign_in", authSvc.AppleEnabled(), "push", notifySvc.Ready(),
+			"notification_email", notifySvc.Status().Email)
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}
@@ -200,58 +220,25 @@ func run(envFile string) error {
 		log.Info("shutting down")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
-		err := server.Shutdown(shutdownCtx)
-		// Queued analytics and error records are written before the database closes.
-		telemetrySvc.Wait(5 * time.Second)
-		return err
+		return server.Shutdown(shutdownCtx)
 	}
 }
 
-// configurePush — FCM және APNs провайдерлері, тек ортадағы баптаумен.
-//
-// A provider with no variables set is simply off. With
-// PUSH_NOTIFICATIONS_ENABLED=true a key that cannot be parsed stops the
-// server (someone meant to configure it); with push disabled it is only a
-// warning, so a local .env with half-filled keys never blocks development.
-func configurePush(cfg config.Push, log *slog.Logger) (map[string]push.Provider, error) {
-	providers := map[string]push.Provider{}
-	if cfg.FCM.Configured() {
-		fcm, err := push.NewFCM(push.FCMConfig{
-			ProjectID: cfg.FCM.ProjectID, ClientEmail: cfg.FCM.ClientEmail, PrivateKey: cfg.FCM.PrivateKey,
-		})
-		switch {
-		case err != nil && cfg.Enabled:
-			return nil, fmt.Errorf("push: %w", err)
-		case err != nil:
-			log.Warn("FCM configuration ignored", "error", err.Error())
-		default:
-			providers[domain.PlatformAndroid] = fcm
-		}
+// newMailer — Resend жіберушісі (бапталмаса nil): кіру кодтары да, хабарлама хаттары да осы арқылы.
+func newMailer(cfg config.Config, bundle *localization.Bundle) (*email.Resend, error) {
+	if !cfg.Email.Enabled() {
+		return nil, nil
 	}
-	if cfg.APNs.Configured() {
-		apns, err := push.NewAPNs(push.APNsConfig{
-			KeyID: cfg.APNs.KeyID, TeamID: cfg.APNs.TeamID, BundleID: cfg.APNs.BundleID,
-			PrivateKey: cfg.APNs.PrivateKey, DefaultEnvironment: cfg.APNs.Environment,
-		})
-		switch {
-		case err != nil && cfg.Enabled:
-			return nil, fmt.Errorf("push: %w", err)
-		case err != nil:
-			log.Warn("APNs configuration ignored", "error", err.Error())
-		default:
-			providers[domain.PlatformIOS] = apns
-		}
+	mailer, err := email.NewResend(email.ResendConfig{
+		APIKey:    cfg.Email.ResendAPIKey,
+		FromEmail: cfg.Email.FromEmail,
+		FromName:  cfg.Email.FromName,
+		Translate: bundle.T,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("email: %w", err)
 	}
-	switch {
-	case !cfg.Enabled:
-		log.Info("push notifications are off (PUSH_NOTIFICATIONS_ENABLED=false); installations are still registered")
-	case len(providers) == 0:
-		log.Warn("PUSH_NOTIFICATIONS_ENABLED=true but neither FCM nor APNs is configured: nothing will be sent")
-	default:
-		log.Info("push notifications on", "fcm", providers[domain.PlatformAndroid] != nil,
-			"apns", providers[domain.PlatformIOS] != nil, "apns_default_environment", cfg.APNs.Environment)
-	}
-	return providers, nil
+	return mailer, nil
 }
 
 // configureSignIn — пошта жеткізушісі (Resend) мен Google/Apple тексерушілерін қосады.
@@ -259,17 +246,8 @@ func configurePush(cfg config.Push, log *slog.Logger) (map[string]push.Provider,
 // Everything comes from the environment. A provider without configuration is
 // simply off: its endpoint answers AUTH_PROVIDER_UNAVAILABLE and /api/v1/config
 // says so, which the apps use to hide the button.
-func configureSignIn(authSvc *auth.Service, cfg config.Config, bundle *localization.Bundle) error {
-	if cfg.Email.Enabled() {
-		mailer, err := email.NewResend(email.ResendConfig{
-			APIKey:    cfg.Email.ResendAPIKey,
-			FromEmail: cfg.Email.FromEmail,
-			FromName:  cfg.Email.FromName,
-			Translate: bundle.T,
-		})
-		if err != nil {
-			return fmt.Errorf("email: %w", err)
-		}
+func configureSignIn(authSvc *auth.Service, cfg config.Config, mailer *email.Resend) error {
+	if mailer != nil {
 		authSvc.WithEmailSender(mailer)
 	}
 
@@ -294,9 +272,35 @@ func configureSignIn(authSvc *auth.Service, cfg config.Config, bundle *localizat
 	return nil
 }
 
-// expireSubscriptions — мерзімі өткен жазылымдарды белгілейтін фон тапсырмасы.
-// Сол өтуде тариф бітетіні және біткені туралы push жіберіледі (бір оқиғаға бір рет).
-func expireSubscriptions(ctx context.Context, subs *subscriptions.Service, events *notifications.BusinessEvents, log *slog.Logger) {
+// configurePush — Firebase Cloud Messaging (Android және iOS). Бапталмаса nil: сервер push-сыз жұмыс істейді.
+//
+// With PUSH_NOTIFICATIONS_ENABLED=true a key that cannot be used stops the
+// start: the operator asked for push and would otherwise get silence. The
+// key itself never reaches a log line or an error.
+func configurePush(cfg config.Push, log *slog.Logger) (push.Provider, error) {
+	if !cfg.FCM.Configured() {
+		if cfg.Enabled {
+			log.Warn("push notifications are enabled but Firebase is not configured; nothing will be sent " +
+				"(set FIREBASE_SERVICE_ACCOUNT_FILE or FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL and FIREBASE_PRIVATE_KEY)")
+		}
+		return nil, nil
+	}
+	provider, err := push.NewFCM(push.FCMConfig{
+		ProjectID: cfg.FCM.ProjectID, ClientEmail: cfg.FCM.ClientEmail, PrivateKey: cfg.FCM.PrivateKey,
+	})
+	if err != nil {
+		if cfg.Enabled {
+			return nil, fmt.Errorf("push: %w", err)
+		}
+		log.Warn("firebase credentials cannot be used; push stays off", "error", err.Error())
+		return nil, nil
+	}
+	return provider, nil
+}
+
+// expireSubscriptions — мерзімі өткен жазылымдарды белгілейтін және мерзімі туралы
+// еске салатын фон тапсырмасы.
+func expireSubscriptions(ctx context.Context, subs *subscriptions.Service, events *notifications.Events, log *slog.Logger) {
 	ticker := time.NewTicker(15 * time.Minute)
 	defer ticker.Stop()
 	for {

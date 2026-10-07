@@ -16,7 +16,6 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/limits"
 	"github.com/aireply/ai-reply-back-end/internal/middleware"
 	"github.com/aireply/ai-reply-back-end/internal/notifications"
-	"github.com/aireply/ai-reply-back-end/internal/redact"
 	"github.com/aireply/ai-reply-back-end/internal/repository"
 	"github.com/aireply/ai-reply-back-end/internal/traits"
 	"github.com/aireply/ai-reply-back-end/internal/transport/httpx"
@@ -45,8 +44,9 @@ type Deps struct {
 	Admin         *admin.Service
 	Limits        *limits.Service
 	Notifications *notifications.Service
-	Limiter       *middleware.Limiter
-	Log           *slog.Logger
+	// Limiter — науқан жіберу мен алдын ала санаудың әкімші шелектері (nil — өз шектегіші).
+	Limiter *middleware.Limiter
+	Log     *slog.Logger
 }
 
 // New — сервер.
@@ -58,44 +58,26 @@ func New(d Deps) *Server {
 	return &Server{cfg: d.Config, admin: d.Admin, limits: d.Limits, notify: d.Notifications, limiter: limiter, log: d.Log}
 }
 
-// Register — маршруттар. Әр маршрут рұқсатты серверде тексереді.
+// Register — маршруттар.
 func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /api/v1/admin/session", s.guard(s.handleSession))
 	mux.Handle("POST /api/v1/admin/locale", s.guard(s.handleSetLocale))
-	mux.Handle("GET /api/v1/admin/dashboard", s.can(admin.PermDashboardRead, s.handleDashboard))
-	mux.Handle("GET /api/v1/admin/users", s.can(admin.PermUsersRead, s.handleUsers))
-	mux.Handle("GET /api/v1/admin/users/{id}", s.can(admin.PermUsersRead, s.handleUserDetail))
-	mux.Handle("POST /api/v1/admin/users/{id}/status", s.can(admin.PermUsersWrite, s.handleUserStatus))
-	mux.Handle("POST /api/v1/admin/users/{id}/plan", s.can(admin.PermUsersWrite, s.handleUserPlan))
-	mux.Handle("POST /api/v1/admin/users/{id}/reset-quota", s.can(admin.PermUsersWrite, s.handleResetQuota))
-	mux.Handle("POST /api/v1/admin/users/{id}/revoke-sessions", s.can(admin.PermUsersWrite, s.handleRevokeSessions))
-	mux.Handle("GET /api/v1/admin/plans", s.can(admin.PermDashboardRead, s.handlePlans))
-	mux.Handle("POST /api/v1/admin/plans", s.can(admin.PermPlansWrite, s.handlePlanCreate))
-	mux.Handle("PATCH /api/v1/admin/plans/{id}", s.can(admin.PermPlansWrite, s.handlePlanUpdate))
-	mux.Handle("POST /api/v1/admin/plans/{id}/archive", s.can(admin.PermPlansWrite, s.handlePlanArchive))
-	mux.Handle("GET /api/v1/admin/audit", s.can(admin.PermAuditRead, s.handleAudit))
-	mux.Handle("GET /api/v1/admin/settings", s.can(admin.PermSettingsRead, s.handleSettings))
-	mux.Handle("POST /api/v1/admin/settings/pricing", s.can(admin.PermSettingsWrite, s.handleSavePricing))
-	mux.Handle("POST /api/v1/admin/settings/limits", s.can(admin.PermSettingsWrite, s.handleSaveLimits))
+	mux.Handle("GET /api/v1/admin/dashboard", s.guard(s.handleDashboard))
+	mux.Handle("GET /api/v1/admin/users", s.guard(s.handleUsers))
+	mux.Handle("GET /api/v1/admin/users/{id}", s.guard(s.handleUserDetail))
+	mux.Handle("POST /api/v1/admin/users/{id}/status", s.guard(s.handleUserStatus))
+	mux.Handle("POST /api/v1/admin/users/{id}/plan", s.guard(s.handleUserPlan))
+	mux.Handle("POST /api/v1/admin/users/{id}/reset-quota", s.guard(s.handleResetQuota))
+	mux.Handle("POST /api/v1/admin/users/{id}/revoke-sessions", s.guard(s.handleRevokeSessions))
+	mux.Handle("GET /api/v1/admin/plans", s.guard(s.handlePlans))
+	mux.Handle("POST /api/v1/admin/plans", s.guard(s.handlePlanCreate))
+	mux.Handle("PATCH /api/v1/admin/plans/{id}", s.guard(s.handlePlanUpdate))
+	mux.Handle("POST /api/v1/admin/plans/{id}/archive", s.guard(s.handlePlanArchive))
+	mux.Handle("GET /api/v1/admin/audit", s.guard(s.handleAudit))
+	mux.Handle("GET /api/v1/admin/settings", s.guard(s.handleSettings))
+	mux.Handle("POST /api/v1/admin/settings/pricing", s.guard(s.handleSavePricing))
+	mux.Handle("POST /api/v1/admin/settings/limits", s.guard(s.handleSaveLimits))
 	s.registerNotifications(mux)
-	s.registerDiagnostics(mux)
-}
-
-// can — сессия + CSRF (guard) және рөлдің рұқсаты. Батырманы жасыру жеткіліксіз: тексеру осында.
-func (s *Server) can(permission string, next http.HandlerFunc) http.Handler {
-	return s.guard(func(w http.ResponseWriter, r *http.Request) {
-		if !admin.Can(adminFrom(r.Context()).Role, permission) {
-			forbid(w, permission)
-			return
-		}
-		next(w, r)
-	})
-}
-
-// forbid — 403 with the permission the role lacks (the panel names it).
-func forbid(w http.ResponseWriter, permission string) {
-	httpx.Error(w, http.StatusForbidden, "FORBIDDEN", "This role cannot do that.",
-		map[string]any{"permission": permission})
 }
 
 // guard — cookie сессиясы + күй өзгертетін сұраныстарда CSRF тақырыбы.
@@ -111,23 +93,17 @@ func (s *Server) guard(next http.HandlerFunc) http.Handler {
 			httpx.Error(w, http.StatusUnauthorized, httpx.CodeUnauthorized, "Sign in required.", nil)
 			return
 		}
-		if r.Method != http.MethodGet && r.Method != http.MethodHead && !csrfMatches(r, session) {
-			httpx.Error(w, http.StatusForbidden, "CSRF_MISMATCH", "CSRF token mismatch.", nil)
-			return
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			if subtle.ConstantTimeCompare([]byte(r.Header.Get("X-CSRF-Token")), []byte(session.CSRFToken)) != 1 {
+				httpx.Error(w, http.StatusForbidden, "CSRF_MISMATCH", "CSRF token mismatch.", nil)
+				return
+			}
 		}
 		ctx := context.WithValue(r.Context(), adminKey, adminUser)
 		ctx = context.WithValue(ctx, sessionKey, session)
 		next(w, r.WithContext(ctx))
 	})
 }
-
-func csrfMatches(r *http.Request, session repository.AdminSession) bool {
-	return session.CSRFToken != "" &&
-		subtle.ConstantTimeCompare([]byte(r.Header.Get("X-CSRF-Token")), []byte(session.CSRFToken)) == 1
-}
-
-// csrfOK — the panel's CSRF token came with this request (for reads with side effects).
-func (s *Server) csrfOK(r *http.Request) bool { return csrfMatches(r, sessionFrom(r.Context())) }
 
 func adminFrom(ctx context.Context) domain.AdminUser {
 	v, _ := ctx.Value(adminKey).(domain.AdminUser)
@@ -149,7 +125,6 @@ func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 		"admin": map[string]any{
 			"id": adminUser.ID, "email": adminUser.Email, "name": adminUser.Name,
 			"role": adminUser.Role, "locale": adminUser.Locale,
-			"permissions": admin.Permissions(adminUser.Role),
 		},
 		"csrf":         sessionFrom(r.Context()).CSRFToken,
 		"env":          s.cfg.App.Env,
@@ -214,6 +189,8 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 			"errors":        dashboard.Errors,
 			"app_versions":  dashboard.AppVersions,
 			"top_cost":      dashboard.TopCost,
+			// Onboarding and settings events by name (counts only).
+			"product_events": dashboard.ProductEvents,
 		},
 	})
 }
@@ -239,20 +216,6 @@ func (s *Server) handleUsers(w http.ResponseWriter, r *http.Request) {
 		SortBy:   query.Get("sort"),
 		SortDesc: query.Get("dir") != "asc",
 	}
-	// Roles that may not open a person's diagnostics search by exact e-mail,
-	// exact phone or user-id prefix only: a substring search would let them
-	// recover a masked address character by character.
-	if filter.Search != "" && !s.seesPersonalData(r) {
-		resolved, err := s.admin.ResolveUser(r.Context(), filter.Search)
-		if err != nil {
-			s.fail(w, err)
-			return
-		}
-		filter.Search, filter.UserIDs = "", resolved.IDs
-		if filter.UserIDs == nil {
-			filter.UserIDs = []string{}
-		}
-	}
 
 	rows, total, err := s.admin.Users(r.Context(), filter)
 	if err != nil {
@@ -264,7 +227,7 @@ func (s *Server) handleUsers(w http.ResponseWriter, r *http.Request) {
 	for _, row := range rows {
 		out = append(out, map[string]any{
 			"id":           row.User.ID,
-			"identifier":   s.identifierFor(r, row.User),
+			"identifier":   maskIdentifier(row.User),
 			"plan_code":    row.PlanCode,
 			"sub_status":   row.SubStatus,
 			"used_today":   row.UsedToday,
@@ -300,6 +263,9 @@ func (s *Server) handleUserDetail(w http.ResponseWriter, r *http.Request) {
 			"input_tokens": e.InputTokens, "output_tokens": e.OutputTokens,
 			"cost_usd": float64(e.CostMicros) / 1_000_000, "latency_ms": e.LatencyMS,
 			"platform": e.Platform, "language": e.Language,
+			// Only flags: the privacy guard keeps words like "reply" out of this payload.
+			"compose": e.Mode == "compose",
+			"polish":  e.Mode == "polish",
 		})
 	}
 	devices := make([]map[string]any, 0, len(detail.Devices))
@@ -339,12 +305,13 @@ func (s *Server) handleUserDetail(w http.ResponseWriter, r *http.Request) {
 
 	httpx.JSON(w, http.StatusOK, map[string]any{
 		"user": map[string]any{
-			"id": detail.User.ID, "identifier": s.identifierFor(r, detail.User),
+			"id": detail.User.ID, "identifier": maskIdentifier(detail.User),
 			"status": detail.User.Status, "locale": detail.User.Locale,
 			"platform": detail.User.Platform, "app_version": detail.User.AppVersion,
-			"os_version":  detail.User.OSVersion,
-			"created_at":  detail.User.CreatedAt.In(loc).Format("2006-01-02 15:04"),
-			"last_active": optionalTime(detail.User.LastActiveAt, loc),
+			"os_version":         detail.User.OSVersion,
+			"preferred_language": detail.User.PreferredLanguage,
+			"created_at":         detail.User.CreatedAt.In(loc).Format("2006-01-02 15:04"),
+			"last_active":        optionalTime(detail.User.LastActiveAt, loc),
 		},
 		"profile": map[string]any{
 			"role": detail.Profile.Role, "tone": detail.Profile.PreferredTone,
@@ -425,28 +392,6 @@ func (s *Server) handleRevokeSessions(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
-// seesPersonalData — the admin may open a person's diagnostics (full e-mail and phone, audited).
-func (s *Server) seesPersonalData(r *http.Request) bool {
-	return admin.Can(adminFrom(r.Context()).Role, admin.PermDiagnosticsRead)
-}
-
-// identifierFor — a masked e-mail or phone for lists. Roles without diagnostics
-// get a stricter mask (first letter / last four digits) so that exact-match
-// searches cannot fill in the hidden part.
-func (s *Server) identifierFor(r *http.Request, u domain.User) string {
-	if s.seesPersonalData(r) {
-		return maskIdentifier(u)
-	}
-	switch {
-	case u.Phone != "":
-		return redact.Phone(u.Phone)
-	case u.Email != "":
-		return redact.Email(u.Email)
-	default:
-		return maskIdentifier(u)
-	}
-}
-
 func maskIdentifier(u domain.User) string {
 	if u.Phone != "" {
 		return traits.MaskIdentifier(u.Phone)
@@ -455,9 +400,9 @@ func maskIdentifier(u domain.User) string {
 		return traits.MaskIdentifier(u.Email)
 	}
 	if u.LegacyClient != "" {
-		return "legacy:" + domain.ShortID(u.LegacyClient)
+		return "legacy:" + u.LegacyClient[:8]
 	}
-	return domain.ShortID(u.ID)
+	return u.ID[:8]
 }
 
 func optionalTime(t *time.Time, loc *time.Location) string {

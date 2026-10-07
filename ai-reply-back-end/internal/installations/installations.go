@@ -15,6 +15,9 @@
 //   - the raw token is sealed (AES-256-GCM) before it reaches the database and
 //     is opened only by the delivery worker. Logs and the admin panel see a
 //     fingerprint of its hash.
+//
+// Both platforms register an FCM registration token: iOS gets its token from
+// the Firebase SDK too, and Firebase forwards the push to APNs.
 package installations
 
 import (
@@ -30,8 +33,6 @@ import (
 	"log/slog"
 	"regexp"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/aireply/ai-reply-back-end/internal/domain"
 	"github.com/aireply/ai-reply-back-end/internal/push"
@@ -56,11 +57,10 @@ type Registration struct {
 	Push                 *PushToken
 }
 
-// PushToken — FCM registration token не APNs device token.
+// PushToken — FCM registration token.
 type PushToken struct {
-	Provider    string
-	Token       string
-	Environment string
+	Provider string
+	Token    string
 }
 
 // Service — орнатулар.
@@ -69,17 +69,11 @@ type Service struct {
 	sealer *Sealer
 	log    *slog.Logger
 	clock  traits.Clock
-
-	touchMu   sync.Mutex
-	touchedAt map[string]time.Time
 }
 
 // New — қызмет. secret — токенді шифрлау кілтінің көзі (JWT_ACCESS_SECRET).
 func New(repo *repository.Store, secret string, log *slog.Logger) *Service {
-	return &Service{
-		repo: repo, sealer: NewSealer(secret), log: log, clock: traits.SystemClock{},
-		touchedAt: map[string]time.Time{},
-	}
+	return &Service{repo: repo, sealer: NewSealer(secret), log: log, clock: traits.SystemClock{}}
 }
 
 // WithClock — тестке арналған.
@@ -91,7 +85,6 @@ func (s *Service) Sealer() *Sealer { return s.sealer }
 var (
 	installationIDPattern = regexp.MustCompile(`^[A-Za-z0-9-]{8,64}$`)
 	fcmTokenPattern       = regexp.MustCompile(`^[A-Za-z0-9_:.\-]+$`)
-	apnsTokenPattern      = regexp.MustCompile(`^[0-9a-fA-F]{64,200}$`)
 	shortTextPattern      = regexp.MustCompile(`^[\p{L}\p{N} ._,()+/-]*$`)
 )
 
@@ -118,8 +111,7 @@ func (s *Service) Register(ctx context.Context, reg Registration, userID string)
 	case change.PreviousUserID != "" && change.PreviousUserID != userID:
 		// Detached (sign-out) or handed to another account on the same phone:
 		// from now on the previous account's notifications skip this device.
-		log.Info("installation owner changed", "previous_user_id", change.PreviousUserID,
-			"user_id", userID)
+		log.Info("installation owner changed", "previous_user_id", change.PreviousUserID, "user_id", userID)
 	}
 	if change.TokenChanged {
 		log.Info("push token updated", "push", inst.TokenFingerprint())
@@ -177,29 +169,11 @@ func (s *Service) normalize(reg Registration) (repository.InstallationUpsert, er
 		if provider == "" {
 			provider = domain.ProviderFor(platform)
 		}
-		if provider != domain.ProviderFor(platform) {
+		if provider != domain.ProviderFCM {
 			return repository.InstallationUpsert{}, fieldError("push.provider")
 		}
-		env := ""
-		switch provider {
-		case domain.ProviderFCM:
-			if len(token) < 20 || len(token) > 4096 || !fcmTokenPattern.MatchString(token) {
-				return repository.InstallationUpsert{}, fieldError("push.token")
-			}
-		case domain.ProviderAPNs:
-			if !apnsTokenPattern.MatchString(token) {
-				return repository.InstallationUpsert{}, fieldError("push.token")
-			}
-			token = strings.ToLower(token)
-			switch strings.ToLower(strings.TrimSpace(reg.Push.Environment)) {
-			case "", "unknown":
-			case "sandbox", "development":
-				env = domain.APNsSandbox
-			case "production":
-				env = domain.APNsProduction
-			default:
-				return repository.InstallationUpsert{}, fieldError("push.environment")
-			}
+		if len(token) < 20 || len(token) > 4096 || !fcmTokenPattern.MatchString(token) {
+			return repository.InstallationUpsert{}, fieldError("push.token")
 		}
 		sealed, err := s.sealer.Seal(token)
 		if err != nil {
@@ -207,7 +181,6 @@ func (s *Service) normalize(reg Registration) (repository.InstallationUpsert, er
 		}
 		in.HasToken = true
 		in.Provider = provider
-		in.Environment = env
 		in.TokenSealed = sealed
 		in.TokenHash = push.TokenHash(token)
 	}
@@ -242,48 +215,6 @@ func (s *Service) DetachAny(ctx context.Context, installationID string) (bool, e
 	return detached, err
 }
 
-// Lookup — қосымшаның идентификаторы бойынша орнату.
-func (s *Service) Lookup(ctx context.Context, installationID string) (domain.Installation, error) {
-	return s.repo.InstallationByClientID(ctx, installationID)
-}
-
-// DetachUser — барлық сессиясы жабылған не бұғатталған қолданушының құрылғылары.
-func (s *Service) DetachUser(ctx context.Context, userID string) (int64, error) {
-	return s.repo.DetachUserInstallations(ctx, userID, s.clock.Now())
-}
-
-// TouchInterval — last_seen_at жаңартуларының ең аз аралығы.
-const TouchInterval = 15 * time.Minute
-
-// Touch — сұраныс тақырыптарынан last_seen_at. Сирек және фонда: API жауабын кешіктірмейді.
-func (s *Service) Touch(installationID, appVersion, appBuild, osVersion string) {
-	if installationID == "" {
-		return
-	}
-	now := s.clock.Now()
-	s.touchMu.Lock()
-	if last, ok := s.touchedAt[installationID]; ok && now.Sub(last) < TouchInterval {
-		s.touchMu.Unlock()
-		return
-	}
-	if len(s.touchedAt) > 50_000 {
-		s.touchedAt = map[string]time.Time{}
-	}
-	s.touchedAt[installationID] = now
-	s.touchMu.Unlock()
-
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if err := s.repo.TouchInstallation(ctx, repository.InstallationTouch{
-			InstallationID: installationID, AppVersion: appVersion, AppBuild: appBuild,
-			OSVersion: osVersion, Now: now, MinInterval: TouchInterval,
-		}); err != nil {
-			s.log.Warn("installation touch failed", "installation", domain.ShortID(installationID), "error", err.Error())
-		}
-	}()
-}
-
 func fieldError(field string) error { return domain.InvalidField(field, "") }
 
 func clean(v string, max int) string {
@@ -294,6 +225,7 @@ func clean(v string, max int) string {
 	return v
 }
 
+// normalizeLocale — тілдің 2–3 әріптік коды ("ru-KZ" → "ru"), басқасы бос.
 func normalizeLocale(v string) string {
 	v = strings.ToLower(strings.TrimSpace(v))
 	if i := strings.IndexAny(v, "-_"); i > 0 {

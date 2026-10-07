@@ -3,7 +3,6 @@ package kz.yerek.aireply.support
 import kz.yerek.aireply.data.account.AccountSession
 import kz.yerek.aireply.data.account.ApiClient
 import kz.yerek.aireply.data.account.DeviceDescriptor
-import kz.yerek.aireply.data.account.RequestMetadata
 import kz.yerek.aireply.data.account.SessionCredentials
 
 /** The stored session as a few fields. [fresh] is what the expiry claims. */
@@ -37,15 +36,18 @@ class FakeCredentials(
 }
 
 /** A real AccountSession whose requests go to [server]. */
-fun sessionOn(server: FakeServer, credentials: FakeCredentials): AccountSession = AccountSession(
+fun sessionOn(
+    server: FakeServer,
+    credentials: FakeCredentials,
+    installationId: () -> String? = { null }
+): AccountSession = AccountSession(
     credentials = credentials,
     baseUrlProvider = { "https://example.test" },
     deviceDescriptor = {
         DeviceDescriptor("device-1", "android", "1.0", "15", "en", "Asia/Almaty")
     },
-    clientFactory = { baseUrl, scope ->
-        ApiClient(baseUrl, scope = scope, metadata = RequestMetadata.NONE, openConnection = server::open)
-    }
+    installationId = installationId,
+    clientFactory = { baseUrl -> ApiClient(baseUrl, openConnection = server::open) }
 )
 
 /** `/api/v1/auth/refresh` answering with [access] / [refresh]. */

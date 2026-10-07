@@ -12,8 +12,8 @@ import android.content.SharedPreferences
  * (res/xml/backup_rules.xml, data_extraction_rules.xml): an FCM token or a
  * "last synced" mark restored onto another phone would be wrong there — the
  * token belongs to the old phone, and the mark would stop the new one from
- * registering. The user's own choices (the notifications switch, "Share
- * diagnostics") live in SettingsStore and do travel with a backup.
+ * registering. The user's own choice (the notifications switch) lives in
+ * SettingsStore and does travel with a backup.
  */
 class PushStateStore internal constructor(private val prefs: SharedPreferences) {
 
@@ -25,11 +25,6 @@ class PushStateStore internal constructor(private val prefs: SharedPreferences) 
     var fcmToken: String?
         get() = prefs.getString(KEY_TOKEN, null)
         set(value) = putString(KEY_TOKEN, value)
-
-    /** The token the server last confirmed as active for this installation. */
-    var registeredToken: String?
-        get() = prefs.getString(KEY_REGISTERED_TOKEN, null)
-        set(value) = putString(KEY_REGISTERED_TOKEN, value)
 
     /**
      * The signed-in account's user id, for "has the owner changed since the
@@ -75,25 +70,24 @@ class PushStateStore internal constructor(private val prefs: SharedPreferences) 
             .apply()
     }
 
-    /** One more failure of [fingerprint]; returns the failure count. */
+    /**
+     * One more failure of [fingerprint]; returns the failure count.
+     *
+     * The request may have reached the server before its answer was lost, so
+     * what the server holds is no longer known: the last accepted mark is
+     * dropped, and the next sync sends even a payload equal to it (a sign-out
+     * after a sign-in whose answer never came must still register anonymously).
+     */
     fun recordFailure(fingerprint: String, nextAttemptAt: Long): Int {
         val count = if (failedFingerprint == fingerprint) failureCount + 1 else 1
         prefs.edit()
             .putString(KEY_FAILED_FINGERPRINT, fingerprint)
             .putInt(KEY_FAILURES, count)
             .putLong(KEY_NEXT_ATTEMPT, nextAttemptAt)
-            .apply()
-        return count
-    }
-
-    /** Forgets the sync marks, so the next trigger registers for certain. */
-    fun invalidateSync() {
-        prefs.edit()
             .remove(KEY_SYNC_FINGERPRINT)
             .remove(KEY_SYNC_AT)
-            .remove(KEY_REJECTED_FINGERPRINT)
-            .remove(KEY_REJECTED_AT)
             .apply()
+        return count
     }
 
     // -------------------------------------------------------- permission
@@ -129,7 +123,6 @@ class PushStateStore internal constructor(private val prefs: SharedPreferences) 
         const val NAME = "aireply_push"
 
         private const val KEY_TOKEN = "push.fcmToken"
-        private const val KEY_REGISTERED_TOKEN = "push.registeredToken"
         private const val KEY_ACCOUNT = "push.accountUserId"
         private const val KEY_SYNC_FINGERPRINT = "installation.syncFingerprint"
         private const val KEY_SYNC_AT = "installation.syncAt"

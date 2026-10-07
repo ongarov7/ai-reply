@@ -64,7 +64,13 @@ data class ProfileUpdate(
     @SerialName("business_rules") val businessRules: List<String>? = null,
     val locale: String? = null,
     val timezone: String? = null,
-    @SerialName("onboarding_completed") val onboardingCompleted: Boolean? = null
+    @SerialName("onboarding_completed") val onboardingCompleted: Boolean? = null,
+    /** Sent only to a server that announced `sender_profile`. */
+    @SerialName("grammatical_gender") val grammaticalGender: String? = null,
+    /** Sent only to a server that announced `sender_profile`; the server keeps the highest. */
+    @SerialName("onboarding_version") val onboardingVersion: Int? = null,
+    /** Sent only to a server that announced `preferred_language`: kk, ru, en or uz. */
+    @SerialName("preferred_language") val preferredLanguage: String? = null
 )
 
 @Serializable
@@ -102,24 +108,23 @@ private data class LegalConsentRequest(
 class AccountService(
     private val session: AccountSession,
     private val baseUrlProvider: () -> String?,
-    private val deviceDescriptor: () -> DeviceDescriptor
+    private val deviceDescriptor: () -> DeviceDescriptor,
+    /** How a request is sent; a test seam. */
+    private val clientFactory: (baseUrl: String) -> ApiClient = { baseUrl -> ApiClient(baseUrl) }
 ) {
 
-    private fun client(scope: HeaderScope = HeaderScope.APP): ApiClient {
+    private fun client(): ApiClient {
         val baseUrl = baseUrlProvider() ?: ApiError.InvalidRequest.raise()
-        return ApiClient(baseUrl, scope = scope)
+        return clientFactory(baseUrl)
     }
 
     private val json: Json get() = jsonCodec
 
     // ------------------------------------------------------ public endpoints
 
-    /**
-     * Limits, sign-in methods, features and current legal versions. Called
-     * before sign-in. The keyboard passes [HeaderScope.KEYBOARD].
-     */
-    suspend fun serverConfig(scope: HeaderScope = HeaderScope.APP): ServerConfigDto {
-        val client = client(scope)
+    /** Limits, sign-in methods and current legal versions. Called before sign-in. */
+    suspend fun serverConfig(): ServerConfigDto {
+        val client = client()
         return decode(ServerConfigDto.serializer(), client.request("GET", "api/v1/config"))
     }
 
@@ -199,6 +204,16 @@ class AccountService(
         val body = json.encodeToString(ProfileUpdate.serializer(), update)
         decode(AccountProfile.serializer(), client().request("POST", "api/v1/me", body, token))
     }
+
+    /** Product events, at most 20 per call. The server refuses unknown names and values one by one. */
+    suspend fun recordProductEvents(request: ProductEventsRequest): ProductEventsResultDto =
+        session.authenticated { token ->
+            val body = json.encodeToString(ProductEventsRequest.serializer(), request)
+            decode(
+                ProductEventsResultDto.serializer(),
+                client().request("POST", "api/v1/analytics/events", body, token)
+            )
+        }
 
     /** Registers this device so a push token has somewhere to live later. */
     suspend fun registerDevice(pushToken: String? = null) {

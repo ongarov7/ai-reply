@@ -3,8 +3,8 @@ package kz.yerek.aireply
 import kz.yerek.aireply.push.AppLink
 import kz.yerek.aireply.push.AppLinks
 import kz.yerek.aireply.push.AppScreen
+import kz.yerek.aireply.push.NotificationOpenedRequest
 import kz.yerek.aireply.push.PushPayload
-import kz.yerek.aireply.telemetry.EventSchema
 import kz.yerek.aireply.ui.navigation.PendingNavigation
 import kz.yerek.aireply.ui.navigation.Routes
 import org.junit.Assert.assertEquals
@@ -89,11 +89,11 @@ class AppLinksTest {
     // --------------------------------------------------------------- payload
 
     @Test
-    fun `a push payload becomes a destination and an open event`() {
+    fun `a push payload becomes a destination and an opened record`() {
         val payload = PushPayload.from(
             mapOf(
                 "nid" to "0b7c9a52-4f5e-4d0a-9c1e-1d2f3a4b5c6d",
-                "did" to "5e55a0b1d2c3",
+                "did" to "5e55a0b1-0000-4000-8000-000000000001",
                 "type" to "subscription_expiring",
                 "category" to "subscription",
                 "link" to "aireply://subscription",
@@ -105,16 +105,13 @@ class AppLinksTest {
 
         assertEquals(AppLink.Screen(AppScreen.SUBSCRIPTION), payload.link)
         assertEquals(PushPayload.CHANNEL_IMPORTANT, payload.channelId)
-        val properties = payload.openedEventProperties()!!
         assertEquals(
-            mapOf(
-                "notification_id" to "0b7c9a52-4f5e-4d0a-9c1e-1d2f3a4b5c6d",
-                "delivery_id" to "5e55a0b1d2c3",
-                "type" to "subscription_expiring"
+            NotificationOpenedRequest(
+                installationId = INSTALLATION,
+                deliveryId = "5e55a0b1-0000-4000-8000-000000000001"
             ),
-            properties
+            payload.openedRequest(INSTALLATION)
         )
-        assertTrue(EventSchema.isValid(EventSchema.NOTIFICATION_OPENED, properties))
     }
 
     @Test
@@ -125,14 +122,15 @@ class AppLinksTest {
     }
 
     @Test
-    fun `no link just opens the app, and ids the server would refuse send no event`() {
-        val plain = PushPayload.from(mapOf("nid" to "n-1", "did" to "has space", "type" to "promo"))!!
+    fun `no link just opens the app, and no usable delivery id records nothing`() {
+        val plain = PushPayload.from(mapOf("nid" to "n-1", "type" to "campaign"))!!
         assertEquals(AppLink.None, plain.link)
-        assertEquals("the bad delivery id is left out", mapOf("notification_id" to "n-1", "type" to "promo"),
-            plain.openedEventProperties())
+        assertNull("no delivery id", plain.openedRequest(INSTALLATION))
 
-        val refused = PushPayload.from(mapOf("nid" to "x".repeat(65)))!!
-        assertNull(refused.openedEventProperties())
+        listOf("has space", "x".repeat(65), "a/b", "").forEach { did ->
+            val refused = PushPayload.from(mapOf("nid" to "n-1", "did" to did))!!
+            assertNull(did, refused.openedRequest(INSTALLATION))
+        }
     }
 
     @Test
@@ -179,5 +177,9 @@ class AppLinksTest {
         assertTrue(navigation.consume(Routes.Templates))
         assertNull(navigation.route.value)
         assertFalse("applied once only", navigation.consume(Routes.Templates))
+    }
+
+    private companion object {
+        const val INSTALLATION = "0b7c9a52-4f5e-4d0a-9c1e-1d2f3a4b5c6d"
     }
 }

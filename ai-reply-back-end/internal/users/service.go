@@ -29,6 +29,9 @@ func (s *Service) Profile(ctx context.Context, userID string) (domain.Profile, e
 }
 
 // ProfileUpdate — тіркеуді аяқтау/өңдеу сұранысы.
+//
+// The API converts its request type into this one directly, so the two keep
+// identical fields in identical order (transport/api updateMeRequest).
 type ProfileUpdate struct {
 	DisplayName      *string
 	Role             *string
@@ -40,10 +43,23 @@ type ProfileUpdate struct {
 	Locale           *string
 	Timezone         *string
 	Completed        *bool
+	// GrammaticalGender — male | female | unspecified; басқа мән — қате.
+	GrammaticalGender *string
+	// OnboardingVersion — 0…1000; сақталатыны ескі мән мен жаңасының үлкені.
+	OnboardingVersion *int
+	// PreferredLanguage — kk | ru | en | uz ("ru-KZ", "RU" де қабылданады); басқасы — қате.
+	PreferredLanguage *string
 }
 
 // UpdateProfile — тек берілген өрістер өзгереді.
 func (s *Service) UpdateProfile(ctx context.Context, userID string, in ProfileUpdate) (domain.Profile, error) {
+	preferred := ""
+	if in.PreferredLanguage != nil {
+		// Checked before anything is written: a rejected request changes nothing.
+		if preferred = domain.NormalizePreferredLanguage(*in.PreferredLanguage); preferred == "" {
+			return domain.Profile{}, domain.InvalidField("preferred_language", "use kk, ru, en or uz")
+		}
+	}
 	profile, err := s.repo.Profile(ctx, userID)
 	if err != nil {
 		return domain.Profile{}, err
@@ -87,6 +103,23 @@ func (s *Service) UpdateProfile(ctx context.Context, userID string, in ProfileUp
 	if in.Completed != nil {
 		profile.OnboardingCompleted = *in.Completed
 	}
+	if in.GrammaticalGender != nil {
+		gender := strings.ToLower(strings.TrimSpace(*in.GrammaticalGender))
+		if !domain.IsGrammaticalGender(gender) {
+			return domain.Profile{}, domain.ErrInvalidRequest
+		}
+		profile.GrammaticalGender = gender
+	}
+	if in.OnboardingVersion != nil {
+		version := *in.OnboardingVersion
+		if version < 0 || version > domain.MaxOnboardingVersion {
+			return domain.Profile{}, domain.ErrInvalidRequest
+		}
+		// Ескі құрылғы нұсқаны кері түсіре алмайды.
+		if version > profile.OnboardingVersion {
+			profile.OnboardingVersion = version
+		}
+	}
 	if err := s.repo.SaveProfile(ctx, profile); err != nil {
 		return domain.Profile{}, err
 	}
@@ -100,6 +133,11 @@ func (s *Service) UpdateProfile(ctx context.Context, userID string, in ProfileUp
 			timezone = traits.Clamp(*in.Timezone, 64)
 		}
 		if err := s.repo.UpdateUserMeta(ctx, userID, "", "", "", locale, timezone); err != nil {
+			return domain.Profile{}, err
+		}
+	}
+	if preferred != "" {
+		if err := s.repo.UpdatePreferredLanguage(ctx, userID, preferred); err != nil {
 			return domain.Profile{}, err
 		}
 	}

@@ -48,6 +48,37 @@ final class AILimitsTests: XCTestCase {
         XCTAssertEqual(ReplyInstruction.maximumCharacters(serverLimit: 60), 40)
     }
 
+    /// A server that resolves the language itself gets no rule, so the user's
+    /// share is the whole limit (still capped for a short prompt).
+    func testWithoutTheLanguageRuleTheWholeLimitIsTheUsers() {
+        XCTAssertEqual(ReplyInstruction.maximumCharacters(serverLimit: 400, reservesLanguageRule: false), 280)
+        XCTAssertEqual(ReplyInstruction.maximumCharacters(serverLimit: 150, reservesLanguageRule: false), 150)
+    }
+
+    // MARK: Feature flags
+
+    /// Request-shaping flags are false unless the server published them true:
+    /// an unknown field sent to an older server fails the whole request.
+    func testFeatureFlagsAreStoredAndDefaultToOff() throws {
+        let defaults = freshDefaults()
+        AILimits.storeFeatures(nil, defaults: defaults)
+        for key in ["ai.features.replyPreferences", "ai.features.senderProfile", "ai.features.instructionPolish"] {
+            XCTAssertFalse(defaults.bool(forKey: key), key)
+        }
+
+        let features = try JSONDecoder().decode(AccountAPI.Features.self, from: Data("""
+        {"reply_preferences": true, "sender_profile": true, "instruction_polish": false, "compose": true}
+        """.utf8))
+        AILimits.storeFeatures(features, defaults: defaults)
+        XCTAssertTrue(defaults.bool(forKey: "ai.features.replyPreferences"))
+        XCTAssertTrue(defaults.bool(forKey: "ai.features.senderProfile"))
+        XCTAssertFalse(defaults.bool(forKey: "ai.features.instructionPolish"))
+
+        // A later config without the flags turns them off again.
+        AILimits.storeFeatures(try JSONDecoder().decode(AccountAPI.Features.self, from: Data("{}".utf8)), defaults: defaults)
+        XCTAssertFalse(defaults.bool(forKey: "ai.features.senderProfile"))
+    }
+
     // MARK: Server errors
 
     func testTooLongCarriesTheServersLimit() {
@@ -78,15 +109,18 @@ final class AILimitsTests: XCTestCase {
             description: "  Florist in Almaty ", role: "", preferredTone: .friendly,
             business: .empty, replyLanguage: "kk"
         )
-        let old = AccountReplyTransport.profileBlock(profile, serverSupportsPreferences: false)
+        let old = AccountReplyTransport.profileBlock(profile, serverSupportsPreferences: false,
+                                                     serverSupportsSenderProfile: false)
         XCTAssertNil(old?.replyLanguage)
         XCTAssertEqual(old?.description, "Florist in Almaty")
         XCTAssertNil(old?.role)
         XCTAssertEqual(old?.preferredTone, "friendly")
 
-        let current = AccountReplyTransport.profileBlock(profile, serverSupportsPreferences: true)
+        let current = AccountReplyTransport.profileBlock(profile, serverSupportsPreferences: true,
+                                                         serverSupportsSenderProfile: false)
         XCTAssertEqual(current?.replyLanguage, "kk")
-        XCTAssertNil(AccountReplyTransport.profileBlock(nil, serverSupportsPreferences: true))
+        XCTAssertNil(AccountReplyTransport.profileBlock(nil, serverSupportsPreferences: true,
+                                                        serverSupportsSenderProfile: true))
     }
 
     func testAnEmptyProfileSendsNothing() {

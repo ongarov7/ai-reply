@@ -73,9 +73,10 @@ enum DeepLink {
 
 /// The part of a push the app reads when it is tapped.
 ///
-/// The server puts flat keys next to `aps`: `nid` (notification), `did`
-/// (this delivery), `type`, `category`, `link`, plus custom ones the app
-/// ignores. Anything missing or of the wrong type is simply absent.
+/// FCM delivers the message's data as flat keys next to `aps`: `nid`
+/// (notification), `did` (this delivery), `type`, `category`, `link`,
+/// plus custom ones the app ignores. Anything missing or of the wrong type is
+/// simply absent.
 struct NotificationPayload: Equatable, Sendable {
     let notificationID: String?
     let deliveryID: String?
@@ -109,9 +110,4 @@ struct NotificationPayload: Equatable, Sendable {
     }
 
     var destination: DeepLinkDestination { DeepLink.destination(for: link) }
-
-    /// What a tap on this notification reports.
-    var openedEvent: AppEvent {
-        .notificationOpened(notificationID: notificationID, deliveryID: deliveryID, type: type)
-    }
 }

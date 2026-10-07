@@ -14,7 +14,7 @@ import (
 )
 
 const userColumns = `id, phone, email, status, locale, timezone, platform, app_version, os_version,
-	kind, legacy_client, created_at, updated_at, last_active_at`
+	kind, legacy_client, created_at, updated_at, last_active_at, preferred_language`
 
 func scanUser(row interface{ Scan(...any) error }) (domain.User, error) {
 	var (
@@ -24,7 +24,7 @@ func scanUser(row interface{ Scan(...any) error }) (domain.User, error) {
 		lastActive           sql.NullInt64
 	)
 	err := row.Scan(&u.ID, &phone, &email, &u.Status, &u.Locale, &u.Timezone, &u.Platform,
-		&u.AppVersion, &u.OSVersion, &u.Kind, &legacy, &created, &updated, &lastActive)
+		&u.AppVersion, &u.OSVersion, &u.Kind, &legacy, &created, &updated, &lastActive, &u.PreferredLanguage)
 	if err != nil {
 		return domain.User{}, err
 	}
@@ -133,6 +133,13 @@ func (s *Store) UpdateUserMeta(ctx context.Context, id string, platform, appVers
 	return err
 }
 
+// UpdatePreferredLanguage — қолданушы өзі таңдаған тіл (тек әдейі жазылады, кірген сайын емес).
+func (s *Store) UpdatePreferredLanguage(ctx context.Context, id, language string) error {
+	res, err := s.db.Writer().ExecContext(ctx,
+		`UPDATE users SET preferred_language = ?, updated_at = ? WHERE id = ?`, language, ms(time.Now()), id)
+	return affected(res, err)
+}
+
 // TouchUser — соңғы белсенділік.
 func (s *Store) TouchUser(ctx context.Context, id string) error {
 	_, err := s.db.Writer().ExecContext(ctx,
@@ -152,12 +159,16 @@ func (s *Store) Profile(ctx context.Context, userID string) (domain.Profile, err
 	)
 	err := s.db.Reader().QueryRowContext(ctx, `
 		SELECT user_id, display_name, role, description, preferred_tone, business_offering,
-		       business_summary, business_rules, onboarding_completed, updated_at
+		       business_summary, business_rules, onboarding_completed, grammatical_gender,
+		       onboarding_version, updated_at
 		FROM user_profiles WHERE user_id = ?`, userID).
 		Scan(&p.UserID, &p.DisplayName, &p.Role, &p.Description, &p.PreferredTone,
-			&p.BusinessOffering, &p.BusinessSummary, &rules, &done, &updated)
+			&p.BusinessOffering, &p.BusinessSummary, &rules, &done, &p.GrammaticalGender,
+			&p.OnboardingVersion, &updated)
 	if errors.Is(err, sql.ErrNoRows) {
-		return domain.Profile{UserID: userID, PreferredTone: "natural"}, nil
+		// Кесте әдепкі мәндерімен бірдей.
+		return domain.Profile{UserID: userID, PreferredTone: "natural",
+			GrammaticalGender: domain.GenderUnspecified}, nil
 	}
 	if err != nil {
 		return domain.Profile{}, err
@@ -178,11 +189,17 @@ func (s *Store) SaveProfile(ctx context.Context, p domain.Profile) error {
 	if p.OnboardingCompleted {
 		done = 1
 	}
+	// Бағанда тек рұқсат етілген мән тұрады (бос профиль де 'unspecified').
+	gender := p.GrammaticalGender
+	if !domain.IsGrammaticalGender(gender) {
+		gender = domain.GenderUnspecified
+	}
 	_, err = s.db.Writer().ExecContext(ctx, `
 		INSERT INTO user_profiles (user_id, display_name, role, description, preferred_tone,
 		                           business_offering, business_summary, business_rules,
-		                           onboarding_completed, updated_at)
-		VALUES (?,?,?,?,?,?,?,?,?,?)
+		                           onboarding_completed, grammatical_gender, onboarding_version,
+		                           updated_at)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
 		ON CONFLICT (user_id) DO UPDATE SET
 			display_name = excluded.display_name,
 			role = excluded.role,
@@ -192,9 +209,11 @@ func (s *Store) SaveProfile(ctx context.Context, p domain.Profile) error {
 			business_summary = excluded.business_summary,
 			business_rules = excluded.business_rules,
 			onboarding_completed = excluded.onboarding_completed,
+			grammatical_gender = excluded.grammatical_gender,
+			onboarding_version = excluded.onboarding_version,
 			updated_at = excluded.updated_at`,
 		p.UserID, p.DisplayName, p.Role, p.Description, p.PreferredTone, p.BusinessOffering,
-		p.BusinessSummary, string(rules), done, ms(time.Now()))
+		p.BusinessSummary, string(rules), done, gender, p.OnboardingVersion, ms(time.Now()))
 	return err
 }
 
@@ -216,7 +235,6 @@ func (s *Store) SaveIdentity(ctx context.Context, userID, kind, value, country s
 // UserFilter — әкімші тізімі үшін сүзгі.
 type UserFilter struct {
 	Search   string
-	UserIDs  []string // nil: no restriction; empty: nothing matched (exact-identity search)
 	Status   string
 	Platform string
 	PlanID   string
@@ -241,16 +259,7 @@ type UserRow struct {
 func (s *Store) ListUsers(ctx context.Context, f UserFilter, today, month string) ([]UserRow, int, error) {
 	where := []string{"u.deleted_at IS NULL"}
 	args := []any{}
-	if f.UserIDs != nil {
-		if len(f.UserIDs) == 0 {
-			where = append(where, "1 = 0")
-		} else {
-			where = append(where, "u.id IN ("+placeholders(len(f.UserIDs))+")")
-			for _, id := range f.UserIDs {
-				args = append(args, id)
-			}
-		}
-	} else if f.Search != "" {
+	if f.Search != "" {
 		where = append(where, "(u.phone LIKE ? OR u.email LIKE ? OR u.id LIKE ?)")
 		like := "%" + strings.TrimSpace(f.Search) + "%"
 		args = append(args, like, like, like)
@@ -331,7 +340,7 @@ func (s *Store) ListUsers(ctx context.Context, f UserFilter, today, month string
 		)
 		if err := rows.Scan(&r.User.ID, &phone, &email, &r.User.Status, &r.User.Locale, &r.User.Timezone,
 			&r.User.Platform, &r.User.AppVersion, &r.User.OSVersion, &r.User.Kind, &legacy,
-			&created, &updated, &lastActive,
+			&created, &updated, &lastActive, &r.User.PreferredLanguage,
 			&r.PlanCode, &r.PlanName, &r.SubStatus, &r.DailyLimit, &r.UsedToday, &r.TokensMonth, &expires); err != nil {
 			return nil, 0, err
 		}

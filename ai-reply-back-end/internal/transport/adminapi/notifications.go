@@ -9,41 +9,49 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/admin"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
 	"github.com/aireply/ai-reply-back-end/internal/notifications"
-	"github.com/aireply/ai-reply-back-end/internal/redact"
 	"github.com/aireply/ai-reply-back-end/internal/repository"
 	"github.com/aireply/ai-reply-back-end/internal/traits"
 	"github.com/aireply/ai-reply-back-end/internal/transport/httpx"
 )
 
-// Push хабарламалары: науқандар, алушылар, жеткізулер, құрылғылар.
+// Хабарламалар: науқандар, алушылар, жеткізулер, push тізілімі.
+
+// campaignBodyBytes — науқан мен алдын ала санау денесінің шегі (төрт тіл және 500 пошта сыяды).
+const campaignBodyBytes = 256 * 1024
+
+// previewsPerMinute — бір әкімшінің минутына алдын ала санау саны.
+const previewsPerMinute = 30
 
 func (s *Server) registerNotifications(mux *http.ServeMux) {
-	read, send := admin.PermNotificationsRead, admin.PermNotificationsSend
-	mux.Handle("GET /api/v1/admin/notifications", s.can(read, s.handleNotifications))
-	mux.Handle("POST /api/v1/admin/notifications/audience/preview", s.can(read, s.handleAudiencePreview))
-	mux.Handle("GET /api/v1/admin/notifications/campaigns", s.can(read, s.handleCampaigns))
-	mux.Handle("POST /api/v1/admin/notifications/campaigns", s.can(send, s.handleCampaignCreate))
-	mux.Handle("GET /api/v1/admin/notifications/campaigns/{id}", s.can(read, s.handleCampaign))
-	mux.Handle("POST /api/v1/admin/notifications/campaigns/{id}/send", s.can(send, s.handleCampaignSend))
-	mux.Handle("POST /api/v1/admin/notifications/campaigns/{id}/cancel", s.can(send, s.handleCampaignCancel))
-	mux.Handle("GET /api/v1/admin/notifications/deliveries", s.can(read, s.handleDeliveries))
-	mux.Handle("GET /api/v1/admin/notifications/devices", s.can(read, s.handleDevices))
+	mux.Handle("GET /api/v1/admin/notifications", s.guard(s.handleNotifications))
+	mux.Handle("POST /api/v1/admin/notifications/audience/preview", s.guard(s.handleAudiencePreview))
+	mux.Handle("GET /api/v1/admin/notifications/campaigns", s.guard(s.handleCampaigns))
+	mux.Handle("POST /api/v1/admin/notifications/campaigns", s.guard(s.handleCampaignCreate))
+	mux.Handle("GET /api/v1/admin/notifications/campaigns/{id}", s.guard(s.handleCampaign))
+	mux.Handle("POST /api/v1/admin/notifications/campaigns/{id}/send", s.guard(s.handleCampaignSend))
+	mux.Handle("POST /api/v1/admin/notifications/campaigns/{id}/cancel", s.guard(s.handleCampaignCancel))
+	mux.Handle("GET /api/v1/admin/notifications/deliveries", s.guard(s.handleDeliveries))
+	mux.Handle("GET /api/v1/admin/notifications/devices", s.guard(s.handleDevices))
 }
 
 func (s *Server) handleNotifications(w http.ResponseWriter, r *http.Request) {
-	status := s.notify.Status()
 	httpx.JSON(w, http.StatusOK, map[string]any{
-		"status": status,
-		// Kept for an admin bundle still open from before this release.
-		"apns":       status.APNs,
-		"fcm":        status.FCM,
-		"categories": domain.NotificationCategories,
-		"screens":    domain.LinkScreens,
-		"locales":    domain.Locales,
-		"platforms":  []string{domain.PlatformAndroid, domain.PlatformIOS},
+		"status":           s.notify.Status(),
+		"categories":       domain.NotificationCategories,
+		"screens":          domain.LinkScreens,
+		"content_locales":  notifications.ContentLocales,
+		"required_locales": notifications.RequiredLocales,
+		"fallback_locale":  notifications.DefaultFallbackLocale,
+		"languages":        domain.Locales,
+		"segments":         []string{domain.SegmentAll, domain.SegmentFree, domain.SegmentPaid, domain.SegmentDemo},
+		"subscription":     []string{domain.SubscriptionFilterActive, domain.SubscriptionFilterExpired},
+		"quota":            []string{domain.QuotaHasRemaining, domain.QuotaNearExhausted, domain.QuotaExhausted},
+		"platforms":        []string{domain.PlatformAndroid, domain.PlatformIOS},
+		"channels":         []string{domain.ChannelPush, domain.ChannelEmail},
+		"types":            domain.AutomaticNotificationTypes,
 		"limits": map[string]int{
 			"title": notifications.MaxTitleRunes, "body": notifications.MaxBodyRunes,
-			"data_keys": notifications.MaxDataKeys, "user_ids": notifications.MaxUserIDs,
+			"data_keys": notifications.MaxDataKeys, "recipients": notifications.MaxRecipients,
 		},
 	})
 }
@@ -53,21 +61,15 @@ type previewRequest struct {
 	Category string                `json:"category"`
 }
 
-// previewsPerMinute — audience previews one admin may run per minute.
-const previewsPerMinute = 30
-
 func (s *Server) handleAudiencePreview(w http.ResponseWriter, r *http.Request) {
-	// Each preview is a counting query over installations, users and
-	// subscriptions: generous for a person, a wall for a script.
-	if ok, retry := s.limiter.Allow("admin_audience_preview:"+adminFrom(r.Context()).ID, previewsPerMinute, time.Minute); !ok {
-		seconds := int(retry.Seconds())
-		w.Header().Set("Retry-After", strconv.Itoa(seconds))
-		httpx.Error(w, http.StatusTooManyRequests, httpx.CodeRateLimited, "Too many previews. Try again shortly.",
-			map[string]any{"retry_after_seconds": seconds})
+	// Each preview is a counting query over installations, users, plans and
+	// usage: generous for a person, a wall for a script.
+	if !s.allow(w, "admin_audience_preview:"+adminFrom(r.Context()).ID, previewsPerMinute, time.Minute,
+		"Too many previews. Try again shortly.") {
 		return
 	}
 	var body previewRequest
-	if err := httpx.Decode(w, r, 32*1024, &body); err != nil {
+	if err := httpx.Decode(w, r, campaignBodyBytes, &body); err != nil {
 		httpx.Fail(w, err)
 		return
 	}
@@ -95,14 +97,15 @@ func (s *Server) handleCampaigns(w http.ResponseWriter, r *http.Request) {
 }
 
 type campaignRequest struct {
-	Name     string                `json:"name"`
-	Title    string                `json:"title"`
-	Body     string                `json:"body"`
-	Category string                `json:"category"`
-	Link     string                `json:"link"`
-	Data     map[string]string     `json:"data"`
-	Audience domain.AudienceFilter `json:"audience"`
-	Send     bool                  `json:"send"`
+	Name           string                `json:"name"`
+	Category       string                `json:"category"`
+	FallbackLocale string                `json:"fallback_locale"`
+	Title          map[string]string     `json:"title"`
+	Body           map[string]string     `json:"body"`
+	Link           string                `json:"link"`
+	Data           map[string]string     `json:"data"`
+	Audience       domain.AudienceFilter `json:"audience"`
+	Send           bool                  `json:"send"`
 }
 
 // handleCampaignCreate — науқан жасау (қаласа бірден жіберу).
@@ -112,25 +115,31 @@ type campaignRequest struct {
 // first request made instead of creating a second one.
 func (s *Server) handleCampaignCreate(w http.ResponseWriter, r *http.Request) {
 	var body campaignRequest
-	if err := httpx.Decode(w, r, 32*1024, &body); err != nil {
+	if err := httpx.Decode(w, r, campaignBodyBytes, &body); err != nil {
 		httpx.Fail(w, err)
 		return
 	}
 	adminUser := adminFrom(r.Context())
-	if body.Send && !s.allowSend(w, adminUser) {
-		return
+	key := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
+	if body.Send {
+		// A retry of a create that already queued its campaign queues nothing:
+		// it does not use the send budget and gets the first answer back.
+		existing, err := s.notify.CampaignByIdempotencyKey(r.Context(), key)
+		if (err != nil || existing.Status == domain.CampaignDraft) && !s.allowSend(w, adminUser) {
+			return
+		}
 	}
 	result, err := s.notify.CreateCampaign(r.Context(), adminUser.ID, notifications.CampaignInput{
-		Name: body.Name, Title: body.Title, Body: body.Body, Category: body.Category, Link: body.Link,
-		Data: body.Data, Audience: body.Audience,
-	}, strings.TrimSpace(r.Header.Get("Idempotency-Key")), body.Send)
+		Name: body.Name, Category: body.Category, FallbackLocale: body.FallbackLocale,
+		Title: body.Title, Body: body.Body, Link: body.Link, Data: body.Data, Audience: body.Audience,
+	}, key, body.Send)
 	// The audit follows what actually happened: a retried create is not a new
 	// campaign, and a retry that queues a saved draft is a send.
 	campaign, created := result.Campaign, result.Created
 	if created {
-		s.admin.Audit(r.Context(), adminUser, s.ip(r), "notification.campaign.create", "notification_campaign",
-			campaign.ID, map[string]any{"category": campaign.Category, "audience": campaign.Audience,
-				"link": campaign.Link, "send": body.Send})
+		s.admin.Audit(r.Context(), adminUser, s.ip(r), "campaign.create", "notification_campaign", campaign.ID,
+			map[string]any{"category": campaign.Category, "audience": auditAudience(campaign.Audience), "link": campaign.Link,
+				"fallback_locale": campaign.FallbackLocale, "send": body.Send})
 	}
 	if err != nil {
 		httpx.Fail(w, err)
@@ -203,8 +212,8 @@ func (s *Server) handleCampaignCancel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if cancelled {
-		s.admin.Audit(r.Context(), adminUser, s.ip(r), "notification.campaign.cancel", "notification_campaign",
-			campaign.ID, map[string]any{"previous_status": before.Campaign.Status})
+		s.admin.Audit(r.Context(), adminUser, s.ip(r), "campaign.cancel", "notification_campaign", campaign.ID,
+			map[string]any{"previous_status": before.Campaign.Status})
 	}
 	view, err := s.notify.Campaign(r.Context(), campaign.ID)
 	if err != nil {
@@ -216,19 +225,48 @@ func (s *Server) handleCampaignCancel(w http.ResponseWriter, r *http.Request) {
 
 // allowSend — бір әкімшіге сағатына жаппай жіберу шегі (қате не ұрланған сессиядан қорғаныс).
 func (s *Server) allowSend(w http.ResponseWriter, adminUser domain.AdminUser) bool {
-	ok, retry := s.limiter.Allow("admin_push_send:"+adminUser.ID, s.cfg.Push.CampaignsPerHour, time.Hour)
-	if !ok {
-		seconds := int(retry.Seconds())
-		w.Header().Set("Retry-After", strconv.Itoa(seconds))
-		httpx.Error(w, http.StatusTooManyRequests, httpx.CodeRateLimited,
-			"Too many campaigns sent. Try again later.", map[string]any{"retry_after_seconds": seconds})
-		return false
+	return s.allow(w, "admin_push_send:"+adminUser.ID, s.cfg.Push.CampaignsPerHour, time.Hour,
+		"Too many campaigns sent. Try again later.")
+}
+
+// allow — әкімшінің жеке шелегі; толса 429 және retry_after_seconds.
+func (s *Server) allow(w http.ResponseWriter, key string, limit int, window time.Duration, message string) bool {
+	ok, retry := s.limiter.Allow(key, limit, window)
+	if ok {
+		return true
 	}
-	return true
+	seconds := int((retry + time.Second - 1) / time.Second)
+	if seconds < 1 {
+		seconds = 1
+	}
+	w.Header().Set("Retry-After", strconv.Itoa(seconds))
+	httpx.Error(w, http.StatusTooManyRequests, httpx.CodeRateLimited, message,
+		map[string]any{"retry_after_seconds": seconds})
+	return false
+}
+
+// auditAudience — аудитке сүзгінің қысқа түрі: нақты адамдардың идентификаторы мен поштасы
+// емес, тек саны (толық сүзгі науқанның өзінде сақталады).
+func auditAudience(f domain.AudienceFilter) map[string]any {
+	out := map[string]any{}
+	for key, value := range map[string]string{"segment": f.Segment, "subscription": f.Subscription, "quota": f.Quota} {
+		if value != "" {
+			out[key] = value
+		}
+	}
+	for key, values := range map[string][]string{"plan_ids": f.PlanIDs, "platforms": f.Platforms, "languages": f.Languages} {
+		if len(values) > 0 {
+			out[key] = values
+		}
+	}
+	if people := len(f.UserIDs) + len(f.Emails); people > 0 {
+		out["people"] = people
+	}
+	return out
 }
 
 func (s *Server) auditSend(r *http.Request, adminUser domain.AdminUser, c domain.Campaign) {
-	s.admin.Audit(r.Context(), adminUser, s.ip(r), "notification.campaign.send", "notification_campaign", c.ID,
+	s.admin.Audit(r.Context(), adminUser, s.ip(r), "campaign.send", "notification_campaign", c.ID,
 		map[string]any{"category": c.Category, "status": c.Status})
 }
 
@@ -239,9 +277,19 @@ func (s *Server) campaignDTO(v notifications.CampaignView) map[string]any {
 	if data == nil {
 		data = map[string]string{}
 	}
+	titles, bodies := map[string]string{}, map[string]string{}
+	for _, l := range notifications.ContentLocales {
+		titles[l], bodies[l] = c.Content[l].Title, c.Content[l].Body
+	}
+	stats := v.Stats
+	byLanguage := map[string]domain.LanguageStats{}
+	for _, l := range domain.Locales {
+		byLanguage[l] = stats.ByLanguage[l]
+	}
+	stats.ByLanguage = byLanguage
 	return map[string]any{
-		"id": c.ID, "name": c.Name, "title": c.Title, "body": c.Body, "category": c.Category,
-		"link": c.Link, "data": data, "audience": c.Audience, "status": c.Status,
+		"id": c.ID, "name": c.Name, "title": titles, "body": bodies, "fallback_locale": c.FallbackLocale,
+		"category": c.Category, "link": c.Link, "data": data, "audience": c.Audience, "status": c.Status,
 		"created_by": c.CreatedBy, "created_by_email": c.CreatedByEmail,
 		"recipient_count": c.RecipientCount, "device_count": c.DeviceCount,
 		"created_at":   c.CreatedAt.In(loc).Format("2006-01-02 15:04"),
@@ -249,22 +297,17 @@ func (s *Server) campaignDTO(v notifications.CampaignView) map[string]any {
 		"started_at":   optionalTime(c.StartedAt, loc),
 		"completed_at": optionalTime(c.CompletedAt, loc),
 		"cancelled_at": optionalTime(c.CancelledAt, loc),
-		"stats":        v.Stats,
+		"stats":        stats,
 	}
 }
 
 func (s *Server) handleDeliveries(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
-	// One person's push history belongs to their diagnostics (audited, own permission).
-	personal := s.seesPersonalData(r)
-	if query.Get("user_id") != "" && !personal {
-		forbid(w, admin.PermDiagnosticsRead)
-		return
-	}
 	page, limit := pageParams(r, 50)
 	rows, total, err := s.notify.Deliveries(r.Context(), repository.DeliveryFilter{
 		CampaignID: traits.Clamp(query.Get("campaign_id"), 64), UserID: traits.Clamp(query.Get("user_id"), 64),
-		Status: query.Get("status"), Platform: query.Get("platform"),
+		Status: query.Get("status"), Platform: query.Get("platform"), Channel: query.Get("channel"),
+		Type: traits.Clamp(query.Get("type"), 64), Source: query.Get("source"), Locale: query.Get("locale"),
 		Page: traits.NewPage(limit, (page-1)*limit),
 	})
 	if err != nil {
@@ -273,11 +316,7 @@ func (s *Server) handleDeliveries(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]map[string]any, 0, len(rows))
 	for _, row := range rows {
-		dto := s.deliveryDTO(row)
-		if !personal {
-			dto["user_id"] = ""
-		}
-		out = append(out, dto)
+		out = append(out, s.deliveryDTO(row))
 	}
 	httpx.JSON(w, http.StatusOK, map[string]any{"deliveries": out, "total": total, "page": page, "limit": limit})
 }
@@ -288,11 +327,12 @@ func (s *Server) deliveryDTO(row repository.DeliveryRow) map[string]any {
 	return map[string]any{
 		"id": d.ID, "notification_id": d.NotificationID, "campaign_id": d.CampaignID,
 		"campaign_name": row.CampaignName, "title": row.Title, "type": row.Type, "category": row.Category,
-		"user_id": d.UserID, "installation_id": d.InstallationID, "platform": d.Platform,
-		"provider": d.Provider, "device": admin.DeviceName(d.Platform, "", row.DeviceModel),
-		"app_version": row.AppVersion, "push": domain.TokenFingerprint(d.Provider, row.TokenHash),
+		"channel": d.Channel, "locale": row.Locale, "user_id": d.UserID, "installation_id": d.InstallationID,
+		"platform": d.Platform, "provider": d.Provider,
+		"device":      admin.DeviceName(d.Platform, row.Manufacturer, row.DeviceModel),
+		"app_version": row.AppVersion, "push": d.TokenFingerprint,
 		"status": d.Status, "attempts": d.AttemptCount, "error_code": d.ErrorCode,
-		"error_detail": redact.Text(d.ErrorDetail, 160),
+		"error_detail": traits.Clamp(d.ErrorDetail, 160),
 		"created_at":   d.CreatedAt.In(loc).Format("2006-01-02 15:04:05"),
 		"sent_at":      optionalTime(d.SentAt, loc),
 		"failed_at":    optionalTime(d.FailedAt, loc),
@@ -313,13 +353,8 @@ func (s *Server) handleDevices(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, domain.InvalidField("push_status", "unknown"))
 		return
 	}
-	personal := s.seesPersonalData(r)
-	if query.Get("user_id") != "" && !personal {
-		forbid(w, admin.PermDiagnosticsRead)
-		return
-	}
 	auth := query.Get("auth")
-	if !traits.OneOf(auth, "", domain.AuthAuthenticated, domain.AuthAnonymous) {
+	if !traits.OneOf(auth, "", repository.InstallationsAttached, repository.InstallationsAnonymous) {
 		httpx.Fail(w, domain.InvalidField("auth", "authenticated or anonymous"))
 		return
 	}
@@ -337,10 +372,7 @@ func (s *Server) handleDevices(w http.ResponseWriter, r *http.Request) {
 		dto := s.installationDTO(row.Installation)
 		dto["user"], dto["attached"] = "", row.Installation.UserID != ""
 		if row.Installation.UserID != "" {
-			dto["user"] = s.identifierFor(r, domain.User{ID: row.Installation.UserID, Email: row.UserEmail, Phone: row.UserPhone})
-		}
-		if !personal {
-			dto["user_id"] = "" // the device list is not a per-person lookup for this role
+			dto["user"] = maskIdentifier(domain.User{ID: row.Installation.UserID, Email: row.UserEmail, Phone: row.UserPhone})
 		}
 		out = append(out, dto)
 	}
@@ -360,7 +392,7 @@ func (s *Server) installationDTO(i domain.Installation) map[string]any {
 		"locale": i.Locale, "timezone": i.Timezone,
 		"push": map[string]any{
 			"status": i.PushStatus, "reason": i.PushStatusReason, "permission": i.PushPermission,
-			"enabled": i.NotificationsEnabled, "provider": i.PushProvider, "environment": i.PushEnvironment,
+			"enabled": i.NotificationsEnabled, "provider": i.PushProvider,
 			"token": i.TokenFingerprint(), "token_updated_at": optionalTime(i.TokenUpdatedAt, loc),
 		},
 		"attached_at": optionalTime(i.AttachedAt, loc),

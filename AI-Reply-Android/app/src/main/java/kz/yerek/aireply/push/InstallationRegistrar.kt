@@ -8,6 +8,7 @@ import kotlinx.coroutines.launch
 import kz.yerek.aireply.data.account.ApiError
 import kz.yerek.aireply.data.account.ApiException
 import kz.yerek.aireply.data.account.SessionAuth
+import kz.yerek.aireply.platform.ReplyLog
 import java.security.MessageDigest
 
 /**
@@ -29,8 +30,9 @@ import java.security.MessageDigest
  *
  * FAILURES. Network trouble, 5xx, 401 and 429 retry with exponential backoff
  * (and never sooner than a Retry-After); any other 4xx means this exact payload
- * is wrong, so it is not sent again until something in it changes. Nothing
- * here blocks the UI, and nothing here can crash the app.
+ * is wrong, so it is not sent again until something in it changes. A retried
+ * failure may still have reached the server, so it also forgets the last
+ * accepted state. Nothing here blocks the UI, and nothing here can crash the app.
  */
 class InstallationRegistrar(
     private val api: InstallationApi,
@@ -45,12 +47,11 @@ class InstallationRegistrar(
     private val isEnabled: () -> Boolean,
     private val scope: CoroutineScope,
     private val clock: () -> Long = System::currentTimeMillis,
-    private val listener: Listener = object : Listener {}
+    private val listener: Listener = Listener { _, _ -> }
 ) {
 
-    interface Listener {
-        fun onSynced(request: InstallationRequest, response: InstallationResponse) {}
-        fun onFailed(request: InstallationRequest, failure: ApiException?) {}
+    fun interface Listener {
+        fun onSynced(request: InstallationRequest, response: InstallationResponse)
     }
 
     sealed interface Outcome {
@@ -104,6 +105,7 @@ class InstallationRegistrar(
             val signedIn = session.isSignedIn
             val outcome = runCatching { syncOnce() }.getOrElse { failure ->
                 if (failure is CancellationException) throw failure
+                ReplyLog.warn(failure) { "installation sync failed" }
                 Outcome.RetryLater(backoffMillis(1))
             }
             if (outcome is Outcome.RetryLater) scheduleRetry(outcome.afterMillis)
@@ -162,7 +164,7 @@ class InstallationRegistrar(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (failure: ApiException) {
-            listener.onFailed(request, failure)
+            ReplyLog.warn(failure) { "installation not registered (HTTP ${failure.httpStatus ?: "none"})" }
             if (isPermanent(failure)) {
                 store.recordRejected(fingerprint, now)
                 Outcome.Rejected
@@ -170,7 +172,7 @@ class InstallationRegistrar(
                 retryLater(fingerprint, now, failure)
             }
         } catch (other: Exception) {
-            listener.onFailed(request, null)
+            ReplyLog.warn(other) { "installation not registered" }
             retryLater(fingerprint, now, null)
         }
     }
