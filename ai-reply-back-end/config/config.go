@@ -183,11 +183,15 @@ type Admin struct {
 
 type Payments struct {
 	Mode string // off | demo | live
-	// DemoCheckout — the demo provider may "sell" plans (PAYMENT_MODE=demo on a
-	// development server only). Without it no plan can be bought until a live
-	// provider exists.
+	// DemoCheckout — the demo provider may "sell" plans (PAYMENT_MODE=demo, and
+	// only when APP_ENV is development or test). Without it no plan can be
+	// bought until a live provider exists.
 	DemoCheckout bool
 }
+
+// Envs — APP_ENV мәндері. Қате жазылған орта іске қосылмайды: әйтпесе ол
+// production тексерулерін де, демо шектеулерін де үнсіз айналып өтер еді.
+var Envs = []string{"development", "test", "staging", "production"}
 
 // PaymentModes — PAYMENT_MODE мәндері. off — төлем мүлде жоқ (әдепкі: қолданбаларда
 // StoreKit / Play Billing әлі жоқ), demo — әзірлеу, live — нақты провайдер.
@@ -195,8 +199,10 @@ var PaymentModes = []string{"off", "demo", "live"}
 
 // Legal — заң беттеріндегі оператор (LEGAL_OPERATOR_NAME, LEGAL_OPERATOR_DETAILS).
 //
-// Both are optional and rendered as given. Empty means the pages name only the
-// app and the contact address: nothing is ever made up in their place.
+// Both are rendered as given and nothing is ever made up in their place.
+// Empty means the pages name only the app and the contact address; in
+// production the server then starts with a warning (see Warnings), because
+// the store policies expect the operator to be named.
 type Legal struct {
 	OperatorName    string
 	OperatorDetails string // мекенжай, тіркеу нөмірі
@@ -298,7 +304,7 @@ func Load(envFile string) (Config, error) {
 	}
 
 	publicBaseURL := strings.TrimRight(str("PUBLIC_BASE_URL", "https://ai-reply.kz"), "/")
-	appEnv := str("APP_ENV", "development")
+	appEnv := strings.ToLower(str("APP_ENV", "development"))
 	cfg := Config{
 		App: App{
 			Env:           appEnv,
@@ -430,6 +436,9 @@ func OpenAIFromEnv() OpenAI {
 func (c Config) Validate() []string {
 	var problems []string
 
+	if !contains(Envs, c.App.Env) {
+		problems = append(problems, "APP_ENV must be development, test, staging or production")
+	}
 	if c.App.Port < 1 || c.App.Port > 65535 {
 		problems = append(problems, "APP_PORT must be set to a port number between 1 and 65535")
 	}
@@ -457,15 +466,24 @@ func (c Config) Validate() []string {
 	if c.Auth.DemoMode && !c.App.AllowsDemo() {
 		problems = append(problems, "AUTH_DEMO_MODE=true is allowed only when APP_ENV is development or test")
 	}
+	// Демо сатып алу (тегін «төлем») — тек әзірлеу мен тестте: staging те нақты адамдар.
+	if c.Payments.DemoCheckout && !c.App.AllowsDemo() {
+		problems = append(problems, "PAYMENT_DEMO_CHECKOUT=true is allowed only when APP_ENV is development or test")
+	}
 	if c.App.IsProduction() {
 		if c.Payments.Mode == "demo" {
 			problems = append(problems, "PAYMENT_MODE=demo is not allowed when APP_ENV=production")
 		}
-		if c.Payments.DemoCheckout {
-			problems = append(problems, "PAYMENT_DEMO_CHECKOUT must be false when APP_ENV=production")
-		}
 		if strings.HasPrefix(c.App.PublicBaseURL, "http://") {
 			problems = append(problems, "PUBLIC_BASE_URL must be https in production")
+		}
+		// Ескі /v1 API-де келісім экраны жоқ: оның клиенттері келісім бере алмайды.
+		if c.Auth.LegacyEnabled {
+			problems = append(problems, "LEGACY_API_ENABLED=true is not allowed when APP_ENV=production (legacy clients cannot give consent)")
+		}
+		// Құпиялық саясаты, оферта және қолдау беті нақты байланысқа сілтейді.
+		if c.App.Contact == "" {
+			problems = append(problems, "CONTACT_EMAIL must be set when APP_ENV=production (the privacy policy, the offer and the support page need a real contact)")
 		}
 	}
 	if c.Auth.DemoMode && !isDigits(c.Auth.DemoOTP, 4) {
@@ -518,6 +536,69 @@ func (c Config) Validate() []string {
 	}
 	problems = append(problems, c.Push.validate()...)
 	return problems
+}
+
+// Warnings — іске қосылуды тоқтатпайтын, бірақ оператор білуі тиіс баптау олқылықтары.
+//
+// Logged once at startup. They do not stop the server because the gap is a
+// legal or store-review matter the operator decides on, not a broken setup.
+func (c Config) Warnings() []string {
+	var warnings []string
+	if c.App.IsProduction() && strings.TrimSpace(c.Legal.OperatorName) == "" {
+		warnings = append(warnings, "LEGAL_OPERATOR_NAME is empty: the privacy policy and the public offer name no operator "+
+			"(\"the operator of the service\" only); set it before submitting the apps to the stores")
+	}
+	if len(c.OAuth.AppleClientIDs) > 0 && !c.OAuth.AppleRevocation() {
+		warning := "Sign in with Apple is on but APPLE_TEAM_ID, APPLE_KEY_ID and APPLE_PRIVATE_KEY are not set: " +
+			"Apple tokens of deleted accounts are not revoked, and the deletion page and privacy policy say only " +
+			"that people can remove AI Reply in their Apple ID settings"
+		if c.App.IsProduction() {
+			warning += " (App Store guideline 5.1.1(v) expects the token to be revoked)"
+		}
+		warnings = append(warnings, warning)
+	}
+	for _, id := range c.OAuth.AppleClientIDs {
+		if !looksLikeBundleID(id) {
+			warnings = append(warnings, fmt.Sprintf("APPLE_CLIENT_ID %q does not look like the iOS app's bundle id "+
+				"(for example kz.ai-reply.reply.keyboard.keyboard): Apple puts the bundle id in the token's aud, "+
+				"so Sign in with Apple from the app will be refused", id))
+		}
+	}
+	return warnings
+}
+
+// looksLikeBundleID — iOS bundle id пішіні: нүктемен бөлінген кемінде екі бөлік, тек A–Z, a–z, 0–9 және «-».
+//
+// Catches the usual mix-ups: a Google client id (….apps.googleusercontent.com),
+// a URL, or an App ID copied with its Team ID prefix (ABCDE12345.kz.…), whose
+// prefix never appears in aud.
+func looksLikeBundleID(id string) bool {
+	if strings.HasSuffix(id, ".apps.googleusercontent.com") {
+		return false
+	}
+	parts := strings.Split(id, ".")
+	if len(parts) < 2 {
+		return false
+	}
+	for _, part := range parts {
+		if part == "" {
+			return false
+		}
+		for _, r := range part {
+			if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '-') {
+				return false
+			}
+		}
+	}
+	return !(len(parts) > 2 && isTeamID(parts[0]))
+}
+
+// isTeamID — Apple Team ID: 10 бас әріп не цифр, кемінде бір цифрмен.
+func isTeamID(v string) bool {
+	if len(v) != 10 || strings.ToUpper(v) != v {
+		return false
+	}
+	return strings.ContainsAny(v, "0123456789")
 }
 
 // placeholders — .env.example-дегі толтырғыштар (REPLACE…, CHANGE_ME) қалып қойған құпиялар.

@@ -66,20 +66,61 @@ func (s *Store) ReplaceSubscription(ctx context.Context, userID string, next dom
 		next.StartedAt = now
 	}
 	next.CreatedAt, next.UpdatedAt = now, now
+	err := s.db.Tx(ctx, func(tx *sql.Tx) error { return replaceSubscription(ctx, tx, userID, next, now) })
+	return next, err
+}
+
+// replaceSubscription — транзакция ішінде: белсенді жазылымдарды жауып, next-ті қосады.
+func replaceSubscription(ctx context.Context, tx *sql.Tx, userID string, next domain.Subscription, now time.Time) error {
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE subscriptions SET status = 'cancelled', cancelled_at = ?, updated_at = ?
+		WHERE user_id = ? AND status IN ('active','trial','payment_pending')`,
+		ms(now), ms(now), userID); err != nil {
+		return err
+	}
+	_, err := tx.ExecContext(ctx, `
+		INSERT INTO subscriptions (`+subColumns+`) VALUES (?,?,?,?,?,?,?,?,?,?)`,
+		next.ID, userID, next.PlanID, next.Status, next.Source, ms(next.StartedAt),
+		msPtr(next.ExpiresAt), nil, ms(now), ms(now))
+	return err
+}
+
+// CompletePayment — төлемді «сәтті» деп белгілеп, тарифті бір транзакцияда ауыстырады.
+//
+// The payment status and the subscription change together or not at all, so
+// "succeeded" always means the plan was given. applied=false: the payment was
+// already succeeded (a parallel or earlier confirm finished it) and nothing
+// was written.
+func (s *Store) CompletePayment(ctx context.Context, paymentID, ref string, next domain.Subscription) (bool, domain.Subscription, error) {
+	if next.ID == "" {
+		next.ID = traits.NewID()
+	}
+	now := time.Now().UTC()
+	if next.StartedAt.IsZero() {
+		next.StartedAt = now
+	}
+	next.CreatedAt, next.UpdatedAt = now, now
+	applied := false
 	err := s.db.Tx(ctx, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, `
-			UPDATE subscriptions SET status = 'cancelled', cancelled_at = ?, updated_at = ?
-			WHERE user_id = ? AND status IN ('active','trial','payment_pending')`,
-			ms(now), ms(now), userID); err != nil {
+		res, err := tx.ExecContext(ctx, `
+			UPDATE payments SET status = 'succeeded', provider_ref = ?, updated_at = ?
+			WHERE id = ? AND status <> 'succeeded'`, ref, ms(now), paymentID)
+		if err != nil {
 			return err
 		}
-		_, err := tx.ExecContext(ctx, `
-			INSERT INTO subscriptions (`+subColumns+`) VALUES (?,?,?,?,?,?,?,?,?,?)`,
-			next.ID, userID, next.PlanID, next.Status, next.Source, ms(next.StartedAt),
-			msPtr(next.ExpiresAt), nil, ms(now), ms(now))
-		return err
+		if n, err := res.RowsAffected(); err != nil || n == 0 {
+			return err
+		}
+		if err := replaceSubscription(ctx, tx, next.UserID, next, now); err != nil {
+			return err
+		}
+		applied = true
+		return nil
 	})
-	return next, err
+	if err != nil || !applied {
+		return false, domain.Subscription{}, err
+	}
+	return true, next, nil
 }
 
 // UpdateSubscription — күй/мерзім өзгерісі.

@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -21,6 +22,12 @@ type loginResult struct {
 
 // adminLogin — кіру формасын ашып (CSRF cookie), поштамен және құпиясөзбен жібереді.
 func (h *harness) adminLogin(area, email, password string) loginResult {
+	h.t.Helper()
+	return h.adminLoginFrom(area, email, password, "")
+}
+
+// adminLoginFrom — сол кіру, X-Forwarded-For арқылы берілген IP-ден (TRUST_PROXY=true болса).
+func (h *harness) adminLoginFrom(area, email, password, ip string) loginResult {
 	h.t.Helper()
 	client := h.server.Client()
 	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
@@ -40,6 +47,9 @@ func (h *harness) adminLogin(area, email, password string) loginResult {
 	values := url.Values{"email": {email}, "password": {password}, "csrf": {csrf}}
 	req, _ := http.NewRequest(http.MethodPost, h.server.URL+"/"+area+"/login", strings.NewReader(values.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if ip != "" {
+		req.Header.Set("X-Forwarded-For", ip)
+	}
 	req.AddCookie(&http.Cookie{Name: csrfName, Value: csrf})
 	res, err := client.Do(req)
 	if err != nil {
@@ -55,7 +65,7 @@ func (h *harness) adminLogin(area, email, password string) loginResult {
 	return out
 }
 
-// Бір әкімші поштасына 15 минутта 5 әрекет, IP шегінен бөлек; басқа пошта өз шелегінде.
+// Бір пошта мен бір IP жұбына 15 минутта 5 әрекет; басқа пошта өз шелегінде.
 func TestAdminLoginIsLimitedPerEmail(t *testing.T) {
 	h := newHarness(t, withEnv("RATE_ADMIN_LOGIN_PER_HOUR", "100"))
 	for i := 0; i < 5; i++ {
@@ -63,8 +73,8 @@ func TestAdminLoginIsLimitedPerEmail(t *testing.T) {
 			t.Fatalf("attempt %d: %+v", i+1, res)
 		}
 	}
-	// The sixth attempt is refused before the password is checked, even the right one,
-	// and the simulator's sign-in shares the bucket.
+	// The sixth attempt from the same source is refused before the password is
+	// checked, even the right one, and the simulator's sign-in shares the bucket.
 	for _, area := range []string{"admin", "simulator"} {
 		if res := h.adminLogin(area, strings.ToUpper(adminEmail), adminPassword); res.status != http.StatusTooManyRequests || res.session != nil {
 			t.Fatalf("%s: sixth attempt = %+v", area, res)
@@ -72,6 +82,37 @@ func TestAdminLoginIsLimitedPerEmail(t *testing.T) {
 	}
 	if res := h.adminLogin("admin", "someone-else@aireply.test", "x"); res.status != http.StatusSeeOther {
 		t.Fatalf("another address has its own bucket: %+v", res)
+	}
+}
+
+// Әкімшіні әдейі қателесіп бұғаттау мүмкін емес: пошта шелегі толса да, қателеспеген
+// IP-ден дұрыс құпиясөз өтеді; қателескен IP-лер бұғатталады.
+func TestAdminLoginCannotBeLockedOutByOthers(t *testing.T) {
+	h := newHarness(t, withEnv("RATE_ADMIN_LOGIN_PER_HOUR", "1000"), withEnv("TRUST_PROXY", "true"))
+	// 20 failures for the address from four sources fill the account-wide bucket.
+	for source := 1; source <= 4; source++ {
+		for i := 0; i < 5; i++ {
+			ip := "203.0.113." + strconv.Itoa(source)
+			if res := h.adminLoginFrom("admin", adminEmail, "wrong-password", ip); res.status != http.StatusSeeOther {
+				t.Fatalf("%s attempt %d: %+v", ip, i+1, res)
+			}
+		}
+	}
+	// A new source still has its password checked once; after failing it is refused too.
+	if res := h.adminLoginFrom("admin", adminEmail, "wrong-again", "198.51.100.7"); res.status != http.StatusSeeOther {
+		t.Fatalf("a clean source is checked: %+v", res)
+	}
+	for _, area := range []string{"admin", "simulator"} {
+		if res := h.adminLoginFrom(area, adminEmail, adminPassword, "198.51.100.7"); res.status != http.StatusTooManyRequests || res.session != nil {
+			t.Fatalf("%s: a failing source while the address is under attack: %+v", area, res)
+		}
+	}
+	// The administrator, from a source that has not been failing, signs in.
+	for _, area := range []string{"admin", "simulator"} {
+		res := h.adminLoginFrom(area, adminEmail, adminPassword, "192.0.2.10")
+		if res.status != http.StatusSeeOther || res.session == nil || res.location != "/"+area {
+			t.Fatalf("%s: the administrator is locked out: %+v", area, res)
+		}
 	}
 }
 

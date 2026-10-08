@@ -17,6 +17,7 @@ func setValidEnv(t *testing.T) {
 		"JWT_REFRESH_SECRET":  "test-refresh-secret-that-is-long-enough-0",
 		"AUTH_SIGNING_SECRET": "test-legacy-secret-that-is-long-enough-00",
 		"AUTH_DEMO_MODE":      "true", "AUTH_DEMO_OTP": "1111", "ADMIN_EMAIL": "",
+		"CONTACT_EMAIL": "support@ai-reply.kz",
 	}
 	for key, value := range env {
 		t.Setenv(key, value)
@@ -96,7 +97,7 @@ func TestSignInSettingsFromEnvironment(t *testing.T) {
 	setValidEnv(t)
 	t.Setenv("GOOGLE_CLIENT_ID_IOS", "123-ios.apps.googleusercontent.com")
 	t.Setenv("GOOGLE_CLIENT_ID_WEB", "123-web.apps.googleusercontent.com")
-	t.Setenv("APPLE_CLIENT_ID", "kz.yerek.replykeyboard")
+	t.Setenv("APPLE_CLIENT_ID", "kz.ai-reply.reply.keyboard.keyboard")
 	cfg, err := Load("")
 	if err != nil {
 		t.Fatal(err)
@@ -105,7 +106,7 @@ func TestSignInSettingsFromEnvironment(t *testing.T) {
 		cfg.OAuth.GoogleClientIDs[1] != "123-web.apps.googleusercontent.com" {
 		t.Fatalf("google = %v", cfg.OAuth.GoogleClientIDs)
 	}
-	if len(cfg.OAuth.AppleClientIDs) != 1 || cfg.OAuth.AppleClientIDs[0] != "kz.yerek.replykeyboard" {
+	if len(cfg.OAuth.AppleClientIDs) != 1 || cfg.OAuth.AppleClientIDs[0] != "kz.ai-reply.reply.keyboard.keyboard" {
 		t.Fatalf("apple = %v", cfg.OAuth.AppleClientIDs)
 	}
 	if cfg.Auth.OTPResendCooldown.Seconds() != 32 || cfg.Auth.OTPRequestsPerDay != 10 || cfg.Auth.OTPTTL.Minutes() != 5 {
@@ -642,6 +643,162 @@ func TestStoreURLs(t *testing.T) {
 		t.Setenv(key, value)
 		if _, err := Load(""); err == nil || !strings.Contains(err.Error(), key) {
 			t.Errorf("%s=%s accepted (err %v)", key, value, err)
+		}
+	}
+}
+
+// setProductionEnv — production тексерулерінен өтетін ең аз баптау.
+func setProductionEnv(t *testing.T) {
+	t.Helper()
+	setValidEnv(t)
+	t.Setenv("APP_ENV", "production")
+	t.Setenv("AUTH_DEMO_MODE", "false")
+	t.Setenv("PAYMENT_MODE", "off")
+	t.Setenv("PUBLIC_BASE_URL", "https://ai-reply.kz")
+	t.Setenv("RESEND_API_KEY", "re_test_key")
+	t.Setenv("RESEND_FROM_EMAIL", "noreply@ai-reply.kz")
+	unset(t, "LEGACY_API_ENABLED", "PAYMENT_DEMO_CHECKOUT", "LEGAL_OPERATOR_NAME", "APPLE_CLIENT_ID",
+		"APPLE_TEAM_ID", "APPLE_KEY_ID", "APPLE_PRIVATE_KEY")
+}
+
+// Ескі /v1 API-де келісім жоқ: production оны қосып іске қосылмайды; басқа ортада болады.
+func TestProductionRefusesLegacyAPI(t *testing.T) {
+	setProductionEnv(t)
+	if _, err := Load(""); err != nil {
+		t.Fatalf("production baseline: %v", err)
+	}
+	t.Setenv("LEGACY_API_ENABLED", "true")
+	if _, err := Load(""); err == nil || !strings.Contains(err.Error(), "LEGACY_API_ENABLED=true is not allowed when APP_ENV=production") {
+		t.Fatalf("production with the legacy API: %v", err)
+	}
+	setValidEnv(t)
+	t.Setenv("LEGACY_API_ENABLED", "true")
+	if cfg, err := Load(""); err != nil || !cfg.Auth.LegacyEnabled {
+		t.Fatalf("development keeps the switch: %v", err)
+	}
+}
+
+// Production-да байланыс поштасы міндетті: құпиялық саясаты мен қолдау беті соған сілтейді.
+func TestProductionRequiresContactEmail(t *testing.T) {
+	setProductionEnv(t)
+	unset(t, "CONTACT_EMAIL")
+	if _, err := Load(""); err == nil || !strings.Contains(err.Error(), "CONTACT_EMAIL must be set when APP_ENV=production") {
+		t.Fatalf("production without a contact: %v", err)
+	}
+	t.Setenv("CONTACT_EMAIL", "support@ai-reply.kz")
+	if cfg, err := Load(""); err != nil || cfg.App.ContactEmail() != "support@ai-reply.kz" {
+		t.Fatalf("production with a contact: %v", err)
+	}
+	setValidEnv(t)
+	unset(t, "CONTACT_EMAIL")
+	if _, err := Load(""); err != nil {
+		t.Fatalf("development may leave it empty: %v", err)
+	}
+}
+
+// Демо сатып алу тек development пен test-те; staging пен production-да іске қосылмайды.
+func TestDemoCheckoutOnlyForDevelopmentAndTest(t *testing.T) {
+	for env, ok := range map[string]bool{"development": true, "test": true, "staging": false, "production": false} {
+		setValidEnv(t)
+		t.Setenv("APP_ENV", env)
+		t.Setenv("AUTH_DEMO_MODE", "false")
+		t.Setenv("PAYMENT_MODE", "demo")
+		t.Setenv("PAYMENT_DEMO_CHECKOUT", "true")
+		t.Setenv("PUBLIC_BASE_URL", "https://ai-reply.kz")
+		t.Setenv("RESEND_API_KEY", "re_test_key")
+		t.Setenv("RESEND_FROM_EMAIL", "noreply@ai-reply.kz")
+		_, err := Load("")
+		if ok && err != nil {
+			t.Errorf("%s: %v", env, err)
+		}
+		if !ok && (err == nil || !strings.Contains(err.Error(), "PAYMENT_DEMO_CHECKOUT=true is allowed only when APP_ENV is development or test")) {
+			t.Errorf("%s accepted demo checkout (err %v)", env, err)
+		}
+	}
+	// Staging may still run the demo provider without checkout.
+	setValidEnv(t)
+	t.Setenv("APP_ENV", "staging")
+	t.Setenv("AUTH_DEMO_MODE", "false")
+	t.Setenv("PAYMENT_MODE", "demo")
+	unset(t, "PAYMENT_DEMO_CHECKOUT")
+	if _, err := Load(""); err != nil {
+		t.Fatalf("staging with PAYMENT_MODE=demo and no checkout: %v", err)
+	}
+}
+
+// Белгісіз орта іске қосылмайды: қате жазылған APP_ENV production тексерулерін айналып өтпейді.
+func TestAppEnvMustBeKnown(t *testing.T) {
+	for _, env := range []string{"prod", "Production1", "live"} {
+		setValidEnv(t)
+		t.Setenv("APP_ENV", env)
+		t.Setenv("AUTH_DEMO_MODE", "false")
+		if _, err := Load(""); err == nil || !strings.Contains(err.Error(), "APP_ENV must be development, test, staging or production") {
+			t.Errorf("APP_ENV=%q accepted (err %v)", env, err)
+		}
+	}
+	setProductionEnv(t)
+	t.Setenv("APP_ENV", " Production ")
+	if cfg, err := Load(""); err != nil || !cfg.App.IsProduction() {
+		t.Fatalf("APP_ENV is trimmed and lowercased: %q %v", cfg.App.Env, err)
+	}
+}
+
+// Ескертулер іске қосылуды тоқтатпайды: оператор аты production-да, Apple токенін кері қайтару кілті.
+func TestStartupWarnings(t *testing.T) {
+	setProductionEnv(t)
+	cfg, err := Load("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if w := strings.Join(cfg.Warnings(), "\n"); !strings.Contains(w, "LEGAL_OPERATOR_NAME is empty") || strings.Contains(w, "APPLE") {
+		t.Fatalf("production without an operator: %q", w)
+	}
+
+	t.Setenv("LEGAL_OPERATOR_NAME", "Operator Name")
+	t.Setenv("APPLE_CLIENT_ID", "kz.ai-reply.app")
+	if cfg, err = Load(""); err != nil {
+		t.Fatalf("apple sign-in without the revocation key still starts: %v", err)
+	}
+	if w := strings.Join(cfg.Warnings(), "\n"); strings.Contains(w, "LEGAL_OPERATOR_NAME") ||
+		!strings.Contains(w, "APPLE_TEAM_ID, APPLE_KEY_ID and APPLE_PRIVATE_KEY are not set") || !strings.Contains(w, "5.1.1(v)") {
+		t.Fatalf("apple without revocation: %q", w)
+	}
+
+	t.Setenv("APPLE_TEAM_ID", "TEAM123")
+	t.Setenv("APPLE_KEY_ID", "KEY123")
+	t.Setenv("APPLE_PRIVATE_KEY", `-----BEGIN PRIVATE KEY-----\nc2VjcmV0\n-----END PRIVATE KEY-----`)
+	if cfg, err = Load(""); err != nil || len(cfg.Warnings()) != 0 {
+		t.Fatalf("complete production setup: %v %v", cfg.Warnings(), err)
+	}
+
+	// Outside production an empty operator is not worth a warning.
+	setValidEnv(t)
+	unset(t, "LEGAL_OPERATOR_NAME", "APPLE_CLIENT_ID", "APPLE_TEAM_ID", "APPLE_KEY_ID", "APPLE_PRIVATE_KEY")
+	if cfg, err = Load(""); err != nil || len(cfg.Warnings()) != 0 {
+		t.Fatalf("development: %v %v", cfg.Warnings(), err)
+	}
+}
+
+// APPLE_CLIENT_ID bundle id-ге ұқсамаса, іске қосылғанда ескерту шығады (Apple кіруі aud бойынша құлайды).
+func TestAppleClientIDMustLookLikeABundleID(t *testing.T) {
+	for id, ok := range map[string]bool{
+		"kz.ai-reply.reply.keyboard.keyboard":            true,
+		"kz.yerek.replykeyboard":                         true, // a bundle id, only not this app's: the per-token warning names it
+		"123-ios.apps.googleusercontent.com":             false,
+		"https://appleid.apple.com":                      false,
+		"ABCDE12345.kz.ai-reply.reply.keyboard.keyboard": false,
+		"aireply":         false,
+		"kz.ai reply.app": false,
+	} {
+		setValidEnv(t)
+		t.Setenv("APPLE_CLIENT_ID", id)
+		cfg, err := Load("")
+		if err != nil {
+			t.Fatalf("%q: %v", id, err)
+		}
+		warned := strings.Contains(strings.Join(cfg.Warnings(), "\n"), "does not look like the iOS app's bundle id")
+		if warned == ok {
+			t.Errorf("APPLE_CLIENT_ID=%q: warned=%v", id, warned)
 		}
 	}
 }

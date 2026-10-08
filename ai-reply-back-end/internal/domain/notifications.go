@@ -329,10 +329,46 @@ type AudienceFilter struct {
 	Quota        string   `json:"quota,omitempty"`     // has_remaining | near_exhaustion | exhausted (today)
 	UserIDs      []string `json:"user_ids,omitempty"`
 	Emails       []string `json:"emails,omitempty"`
+	// RedactedPeople — сүзгіден алынған жойылған тіркелгілер саны (тек тіркелгі жойылғанда қойылады).
+	//
+	// When an account is deleted its id and e-mails are taken out of every
+	// stored filter. The count keeps the filter specific, so a campaign that
+	// named only deleted people reaches nobody instead of widening to everyone.
+	RedactedPeople int `json:"redacted_people,omitempty"`
 }
 
-// Specific — сүзгі нақты адамдарды атайды ма.
-func (f AudienceFilter) Specific() bool { return len(f.UserIDs) > 0 || len(f.Emails) > 0 }
+// Specific — сүзгі нақты адамдарды атайды ма (жойылғандарын қоса).
+func (f AudienceFilter) Specific() bool {
+	return len(f.UserIDs) > 0 || len(f.Emails) > 0 || f.RedactedPeople > 0
+}
+
+// People — сүзгі атаған адамдар саны (жойылғандарын қоса).
+func (f AudienceFilter) People() int { return len(f.UserIDs) + len(f.Emails) + f.RedactedPeople }
+
+// RedactAccount — жойылған тіркелгінің идентификаторы мен поштасын сүзгіден алады.
+//
+// Returns false when the filter does not name the account. Every removed
+// entry is counted in RedactedPeople, so Specific() stays true.
+func (f *AudienceFilter) RedactAccount(userID string, emails map[string]bool) bool {
+	var keepIDs, keepEmails []string
+	for _, id := range f.UserIDs {
+		if id != userID {
+			keepIDs = append(keepIDs, id)
+		}
+	}
+	for _, e := range f.Emails {
+		if !emails[e] {
+			keepEmails = append(keepEmails, e)
+		}
+	}
+	removed := len(f.UserIDs) - len(keepIDs) + len(f.Emails) - len(keepEmails)
+	if removed == 0 {
+		return false
+	}
+	f.UserIDs, f.Emails = keepIDs, keepEmails
+	f.RedactedPeople += removed
+	return true
+}
 
 // LocalizedText — бір тілдегі тақырып пен мәтін.
 type LocalizedText struct {

@@ -277,6 +277,8 @@ func hostAllowed(host string, allowed []string) bool {
 // normalized form (a retried campaign compares equal).
 func ValidateAudience(f domain.AudienceFilter) (domain.AudienceFilter, error) {
 	var err error
+	// Only account deletion sets it; an administrator never does.
+	f.RedactedPeople = 0
 	f.Segment = strings.ToLower(strings.TrimSpace(f.Segment))
 	if f.Segment == domain.SegmentAll {
 		f.Segment = ""

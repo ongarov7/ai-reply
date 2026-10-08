@@ -586,6 +586,7 @@ paths:
                   changed: { type: boolean }
         "400": { description: "INVALID_REQUEST (details.field = text, details.max_characters)" }
         "401": { description: UNAUTHORIZED }
+        "403": { description: "CONSENT_REQUIRED — нет согласия на текущие версии условий и политики (клиенты молча игнорируют ошибки polish)" }
         "404": { description: NOT_FOUND — polish выключен (AI_POLISH_ENABLED=false) }
         "429": { description: RATE_LIMITED — отдельный лимит RATE_POLISH_PER_MINUTE }
         "502": { description: AI_PROVIDER_UNAVAILABLE }

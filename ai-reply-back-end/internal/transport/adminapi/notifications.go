@@ -259,7 +259,7 @@ func auditAudience(f domain.AudienceFilter) map[string]any {
 			out[key] = values
 		}
 	}
-	if people := len(f.UserIDs) + len(f.Emails); people > 0 {
+	if people := f.People(); people > 0 {
 		out["people"] = people
 	}
 	return out

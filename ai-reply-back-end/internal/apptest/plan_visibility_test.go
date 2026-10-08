@@ -356,6 +356,54 @@ func TestHidingAPlanKeepsSubscribersAndPayments(t *testing.T) {
 	}
 }
 
+// Тариф жазылмай қалса, төлем «сәтті» болмайды: қайталанған растау тарифті береді.
+func TestARetriedConfirmGrantsThePlanAfterAFailedAssign(t *testing.T) {
+	h := newHarness(t)
+	s := h.signIn("retry-confirm@example.com")
+	h.openStore("standard")
+	checkout := h.checkout(s, "standard")
+	paymentID := checkout.str("payment_id")
+	if checkout.status != http.StatusOK || paymentID == "" {
+		t.Fatalf("checkout: %d %s", checkout.status, checkout.raw)
+	}
+	exec := func(query string) {
+		t.Helper()
+		if _, err := h.db.Writer().Exec(query); err != nil {
+			t.Fatalf("%s: %v", query, err)
+		}
+	}
+	// The plan cannot be written: the first confirm fails half-way.
+	exec(`CREATE TRIGGER fail_paid_plan BEFORE INSERT ON subscriptions WHEN NEW.source = 'payment'
+		BEGIN SELECT RAISE(ABORT, 'disk full'); END`)
+	confirm := func() response {
+		return h.do(http.MethodPost, "/api/v1/payments/"+paymentID+"/confirm", map[string]any{}, h.auth(s.access))
+	}
+	if res := confirm(); res.status != http.StatusInternalServerError {
+		t.Fatalf("confirm with a failing write: %d %s", res.status, res.raw)
+	}
+	if status := h.text(`SELECT status FROM payments WHERE id = ?`, paymentID); status == "succeeded" {
+		t.Fatal("the payment is succeeded without its plan")
+	}
+	if plan := h.do(http.MethodGet, "/api/v1/me/subscription", nil, h.auth(s.access)).str("plan", "code"); plan != "free" {
+		t.Fatalf("plan after the failed confirm = %q", plan)
+	}
+
+	exec(`DROP TRIGGER fail_paid_plan`)
+	if res := confirm(); res.status != http.StatusOK || res.str("subscription", "plan", "code") != "standard" {
+		t.Fatalf("retried confirm: %d %s", res.status, res.raw)
+	}
+	if status := h.text(`SELECT status FROM payments WHERE id = ?`, paymentID); status != "succeeded" {
+		t.Fatalf("payment status = %q", status)
+	}
+	// A third confirm changes nothing and opens no second subscription.
+	if res := confirm(); res.status != http.StatusOK || res.str("subscription", "plan", "code") != "standard" {
+		t.Fatalf("repeat confirm: %d %s", res.status, res.raw)
+	}
+	if n := h.scalar(`SELECT COUNT(*) FROM subscriptions WHERE user_id = ? AND source = 'payment'`, s.userID); n != 1 {
+		t.Fatalf("paid subscriptions = %d", n)
+	}
+}
+
 // Әдепкі тегін тарифті өшіруге не мұрағаттауға болмайды: тіркелу соған сүйенеді.
 func TestTheDefaultPlanStaysEnabled(t *testing.T) {
 	h := newHarness(t)

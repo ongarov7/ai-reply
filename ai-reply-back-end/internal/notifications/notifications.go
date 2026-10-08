@@ -18,6 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"os"
 	"regexp"
 	"sort"
@@ -678,10 +679,23 @@ func (s *Service) view(ctx context.Context, c domain.Campaign) (CampaignView, er
 	if err != nil {
 		return CampaignView{}, err
 	}
-	// Deliveries of old campaigns are removed by retention; the counters
-	// saved when the campaign finished remain.
-	if stats.Total == 0 && c.FinalStats != nil {
+	// Аяқталған науқанның есебі — сақталған қорытынды; тірі деректен тек ашылулар.
+	//
+	// Delivery rows can leave before the campaign does: notification retention,
+	// an account deletion (ON DELETE CASCADE) or the anonymous-installation
+	// sweep. The counters saved when the campaign finished therefore stay the
+	// report; only opens that arrive later are taken from the live rows, and
+	// they never drop below the snapshot either. Running campaigns have no
+	// snapshot and stay fully live.
+	if c.FinalStats != nil {
+		live := stats
 		stats = *c.FinalStats
+		stats.ByLanguage = maps.Clone(c.FinalStats.ByLanguage)
+		stats.Opened = max(stats.Opened, live.Opened)
+		for lang, ls := range stats.ByLanguage {
+			ls.Opened = max(ls.Opened, live.ByLanguage[lang].Opened)
+			stats.ByLanguage[lang] = ls
+		}
 	}
 	return CampaignView{Campaign: c, Stats: stats}, nil
 }

@@ -6,14 +6,18 @@ import (
 	"strings"
 
 	"github.com/aireply/ai-reply-back-end/config"
+	"github.com/aireply/ai-reply-back-end/internal/notifications"
 )
 
 // LEGAL TEXTS. The public offer and the privacy policy are rendered from
 // here in four languages. Everything that depends on the deployment comes from
 // the configuration: the operator (LEGAL_OPERATOR_NAME / _DETAILS, shown only
 // when set — no entity is ever made up), the contact address (CONTACT_EMAIL;
-// without it the support page is named instead) and the retention windows the
-// server actually applies (RETENTION_*). Bump legal.PrivacyVersion /
+// without it the support page is named instead, production requires it), the
+// retention windows the server actually applies (RETENTION_*) and whether
+// deleting an account revokes Sign in with Apple (APPLE_TEAM_ID / _KEY_ID /
+// _PRIVATE_KEY; without the key the texts promise only what the person can do
+// in their Apple ID settings). Bump legal.PrivacyVersion /
 // legal.TermsVersion when the meaning of a text changes: the apps then ask
 // every account to accept again before AI replies work.
 
@@ -25,21 +29,36 @@ type legalInfo struct {
 	SupportURL      string
 	DeletionURL     string
 	Retention       config.Retention
-	// NotificationDays — RETENTION_NOTIFICATIONS_DAYS (аяқталған хабарламалар).
+	// NotificationDays — RETENTION_NOTIFICATIONS_DAYS (аяқталған жеткізулер).
 	NotificationDays int
+	// NotificationRowDays — хабарламалардың өзі: кемінде notifications.MinNotificationRetentionDays
+	// (бір оқиғаға бір хабарлама кепілі); 0 — өшірілмейді.
+	NotificationRowDays int
+	// AppleRevocation — тіркелгі жойылғанда Sign in with Apple токені кері қайтарыла ма.
+	AppleRevocation bool
 }
 
 func (s *Server) legalInfo() legalInfo {
 	base := s.cfg.App.PublicBaseURL
 	return legalInfo{
-		OperatorName:     s.cfg.Legal.OperatorName,
-		OperatorDetails:  s.cfg.Legal.OperatorDetails,
-		ContactEmail:     s.cfg.App.ContactEmail(),
-		SupportURL:       base + "/support",
-		DeletionURL:      base + "/account/delete",
-		Retention:        s.cfg.Retention,
-		NotificationDays: s.cfg.Push.RetentionDays,
+		OperatorName:        s.cfg.Legal.OperatorName,
+		OperatorDetails:     s.cfg.Legal.OperatorDetails,
+		ContactEmail:        s.cfg.App.ContactEmail(),
+		SupportURL:          base + "/support",
+		DeletionURL:         base + "/account/delete",
+		Retention:           s.cfg.Retention,
+		NotificationDays:    s.cfg.Push.RetentionDays,
+		NotificationRowDays: notificationRowDays(s.cfg.Push.RetentionDays),
+		AppleRevocation:     s.cfg.OAuth.AppleRevocation(),
 	}
+}
+
+// notificationRowDays — хабарлама жолдары қанша күн сақталады (жеткізулерден ұзағырақ болуы мүмкін).
+func notificationRowDays(days int) int {
+	if days <= 0 {
+		return 0
+	}
+	return max(days, notifications.MinNotificationRetentionDays)
 }
 
 // legalWords — тілге тәуелді шағын бөліктер (оператор, байланыс, мерзім).
@@ -250,12 +269,26 @@ func privacyBody(locale string, info legalInfo) string {
 		w := words[l]
 		who, reach := w.who(info, true), w.reach(info)
 		p := w.period
+		// Жеткізулер мен хабарламалардың мерзімі бірдей болса — бір жол, әйтпесе екеуі бөлек.
+		notices := func(both, deliveries, rows string) string {
+			if info.NotificationRowDays == info.NotificationDays {
+				return both + " — " + p(info.NotificationDays)
+			}
+			return deliveries + " — " + p(info.NotificationDays) + "; " + rows + " — " + p(info.NotificationRowDays)
+		}
+		// Apple: кері қайтару кілті бар болса ғана «ажыратамыз» дейміз.
+		apple := func(revoked, manual string) string {
+			if info.AppleRevocation {
+				return revoked
+			}
+			return manual
+		}
 		switch l {
 		case "kk":
 			sections[l] = [][2]string{
 				{"Біз кімбіз", "Бұл саясат iPhone мен Android-қа арналған AI Reply қосымшасында, оның пернетақтасында және осы сайтта дербес деректер қалай өңделетінін түсіндіреді. " + who},
 				{"Қандай деректер жинаймыз", strings.Join([]string{
-					"Аккаунт: пошта мекенжайы; Apple не Google арқылы кірсеңіз — олар беретін аккаунт идентификаторы мен олар бөлісетін пошта (Apple-де бұл жасырын жіберу мекенжайы болуы мүмкін); атыңыз, егер оны өзіңіз енгізсеңіз не Apple берсе.",
+					"Аккаунт: пошта мекенжайы; Apple не Google арқылы кірсеңіз — олар беретін аккаунт идентификаторы мен олар бөлісетін пошта (Apple-де бұл жасырын жіберу мекенжайы болуы мүмкін); атыңыз, егер оны өзіңіз енгізсеңіз не Apple немесе Google берсе.",
 					"Профиль: қосымшада толтыратыныңыз — рөл, өзіңіз туралы қысқаша сипаттама, қалаған тон, бизнестің не ұсынатыны, сипаттамасы мен ережелері, орысша жауаптардағы грамматикалық тек, жауап тілі, таңдалған қосымша тілі, локаль және уақыт белдеуі.",
 					"Құрылғы және орнату: қосымша жасайтын кездейсоқ құрылғы және орнату идентификаторлары, платформа, жүйе нұсқасы, қосымша нұсқасы, құрылғы моделі мен өндірушісі, push-токен (шифрланып сақталады) және хабарламаларға рұқсат бар-жоғы.",
 					"Қолданыс: күндік және айлық жауап санағыштары және әр сұраныс бойынша тек метадерек — уақыты, ұзақтығы, токен саны, болжамды құны, қате коды, тілі, мәтін ұзындығы, режимі (жауап, жазу не түзету) және тариф.",
@@ -265,24 +298,27 @@ func privacyBody(locale string, info legalInfo) string {
 					"Төлемдер: сатып алу жазбалары — ақылы тарифтер сатылса ғана; сатып алу App Store не Google Play арқылы өтеді.",
 				}, "\n")},
 				{"AI жауаптары қалай жазылады", strings.Join([]string{
-					"«Жауап беру» немесе «Жазу» батырмасын басқанда көшірілген хабарлама, нұсқауыңыз, профиль деректері және таңдалған үлгі біздің сервер арқылы OpenAI-ға (АҚШ) жіберіледі, мәтінді соның моделі жазады. Ақылды түзету қосулы болса, AI Reply-дың өз өрісінде терген нұсқауыңыз түзету ұсыну үшін теру кезінде де жіберіледі.",
+					"«Жауап беру» батырмасын басқанда көшірілген хабарлама не ағымдағы өрісте өзіңіз белгілеген мәтін (пернетақта оны тек осы сәтте оқиды), нұсқауыңыз, профиль деректері және таңдалған үлгі біздің сервер арқылы OpenAI-ға (АҚШ) жіберіледі, мәтінді соның моделі жазады. «Жазу» батырмасын басқанда тек нұсқауыңыз бен грамматикалық тегіңіз жіберіледі; көшірілген хабарлама «Көшірілгенге жауап беру» таңдасаңыз ғана, жауап ретінде жіберіледі. Ақылды түзету қосулы болса, AI Reply-дың өз өрісінде терген нұсқауыңыз түзету ұсыну үшін теру кезінде де жіберіледі.",
 					"Біздің сервер бұл мәтіндерді сұранысты өңдеу кезінде ғана жадта ұстайды, оларды дерекқорға да, журналға да жазбайды. OpenAI-ға олар сақтау өшірілген API арқылы (store=false) жіберіледі; OpenAI оларды өзінің API ережелері бойынша өңдейді: мысалы, теріс пайдалануды анықтау үшін шектеулі уақыт сақтай алады және әдепкіде API деректерін модельдерді үйретуге пайдаланбайды.",
 					"Бұл тек келісім экранында келісім бергеннен кейін болады. Келісімді кез келген уақытта Параметрлер → Құпиялылық бөлімінде кері қайтаруға болады.",
 					"Android-та нұсқауды дауыспен айтуға болады. Сөз мүмкін болса телефонның өзінде, болмаса телефонның сөйлеуді тану қызметімен (әдетте Google) танылады; AI Reply тек танылған мәтінді алады, дауыс жазбасын емес.",
+					"iPhone қосымшасында жауап берілетін хабарламаны, профильді не үлгіні дауыспен айтуға болады. Сөз мүмкін болса iPhone-ның өзінде Apple сөйлеуді тану жүйесімен, болмаса Apple сөйлеуді тану қызметінде танылады; AI Reply тек танылған мәтінді алады, дауыс жазбасын емес.",
 				}, "\n")},
-				{"Нені жинамаймыз", "Біз контактілерді, геолокацияны және жарнама идентификаторларын жинамаймыз және сізді басқа қосымшаларда бақыламаймыз. Пернетақта басқа қосымшаларда тергеніңізді жібермейді: жоғарыда айтылғандай, тек AI Reply-дың өз нұсқау өрісінің мәтіні жіберіледі. Алмасу буфері оны қолданатын әрекетті басқанда ғана оқылады, мысалы үлгіні не қою батырмасын. Құпиясөздер мен қорғалған өрістер ешқашан өңделмейді."},
-				{"Біздің атымыздан деректерді кім өңдейді", "OpenAI — жауаптарды, хабарламаларды және түзетулерді жазады. Google — Google арқылы кіру, Firebase Cloud Messaging (екі платформадағы хабарламалар) және Android-та, егер қолданылса, телефонның сөйлеуді тану қызметі. Apple — Apple арқылы кіру және iPhone-ға хабарлама жеткізу (Firebase арқылы Apple Push Notification service). Resend — кіру кодтары мен аккаунт хаттарын жібереді. Серверіміздің хостинг провайдері — дерекқорды сақтайды. Әрқайсысы тек өз міндетіне қажеттіні алады."},
+				{"Нені жинамаймыз", "Біз контактілерді, геолокацияны және жарнама идентификаторларын жинамаймыз және сізді басқа қосымшаларда бақыламаймыз. Басқа қосымшаларда тергеніңізден ештеңе жіберілмейді, тек «Жауап беру» басқанда көшірілген не өзіңіз белгілеген хабарлама және AI Reply-дың өз өрісінде терген нұсқауыңыз жіберіледі. Алмасу буфері мен белгіленген мәтін оларды қолданатын әрекетті басқанда ғана оқылады, мысалы «Жауап беру», «Көшірілгенге жауап беру», үлгі не қою батырмасы. Құпиясөздер мен қорғалған өрістер ешқашан өңделмейді."},
+				{"Біздің атымыздан деректерді кім өңдейді", "OpenAI — жауаптарды, хабарламаларды және түзетулерді жазады. Google — Google арқылы кіру, Firebase Cloud Messaging (екі платформадағы хабарламалар) және Android-та, егер қолданылса, телефонның сөйлеуді тану қызметі. Apple — Apple арқылы кіру, iPhone-ға хабарлама жеткізу (Firebase арқылы Apple Push Notification service) және iPhone қосымшасында дауыспен айтсаңыз, Apple сөйлеуді тану жүйесі. Resend — кіру кодтары мен аккаунт хаттарын жібереді. Серверіміздің хостинг провайдері — дерекқорды сақтайды. Әрқайсысы тек өз міндетіне қажеттіні алады."},
 				{"Деректерді басқа елдерге беру", "OpenAI, Google, Apple және Resend деректерді АҚШ-та және басқа елдерде өңдейді. Сондықтан оларға берілген деректер сіздің еліңізден тыс шығуы мүмкін; олар деректерді өздерінің деректерді қорғау және қауіпсіздік міндеттемелеріне сәйкес өңдейді."},
-				{"Деректер қанша сақталады", "Аккаунт деректері — пошта мен кіру тәсілдері, профиль мен баптаулар, келісім жазбалары, құрылғылар, санағыштар, шағымдар және хабарлама баптаулары — аккаунт жойылғанға дейін сақталады. Қалғаны автоматты түрде жойылады: " + strings.Join([]string{
+				{"Деректер қанша сақталады", "Аккаунт деректері — пошта мен кіру тәсілдері, профиль мен баптаулар, келісім жазбалары, құрылғылар, санағыштар, шағымдар, хабарлама баптаулары, сондай-ақ сізге жеке жіберілген хабарламаның алушылар тізіміндегі поштаңыз не аккаунт нөміріңіз — аккаунт жойылғанға дейін сақталады. Басқа деректер автоматты түрде жойылады: " + strings.Join([]string{
 					"сұраныс метадеректері — " + p(r.AIUsageEventsDays),
 					"қосымша оқиғалары — " + p(r.ProductEventsDays),
 					"кіру және жою кодтары (берілген сәттен) — " + p(r.OTPDays),
 					"аяқталған сессиялар (мерзімі біткеннен не шыққаннан бастап) — " + p(r.RefreshTokenDays),
 					"аккаунтқа байланбаған қосымша орнатуы (соңғы рет көрінгеннен бастап) — " + p(r.AnonInstallationsDays),
-					"аяқталған хабарламалар мен жеткізулер — " + p(info.NotificationDays),
-				}, "; ") + ". Көшірілген хабарламалар, нұсқаулар және жасалған жауаптар мүлде сақталмайды, тек өзіңіз жіберген шағымдағы жауап мәтіні қалады."},
+					notices("аяқталған хабарламалар мен жеткізулер", "аяқталған хабарлама жеткізулері", "хабарламалардың өзі"),
+				}, "; ") + ". Әкімшінің аккаунтқа қатысты әрекеттерінің журналы (мысалы, бұғаттау не тарифті ауыстыру) аккаунттың кездейсоқ нөмірін поштаңызсыз сақтайды және автоматты түрде жойылмайды, аккаунт жойылғаннан кейін де. Көшірілген хабарламалар, нұсқаулар және жасалған жауаптар мүлде сақталмайды, тек өзіңіз жіберген шағымдағы жауап мәтіні қалады."},
 				{"Қолжетімділік және қауіпсіздік", "Әкімші панеліне тек уәкілетті әкімшілер кіре алады. Онда поштасының бір бөлігі жасырылған аккаунттар, тарифтер, санағыштар, сұраныс метадеректері және жіберілген шағымдар көрінеді; сұраныс мәтіндерінің экраны жоқ, өйткені олар сақталмайды. Байланыстар шифрланады, push-токендер шифрланып, кіру кодтары тек хэш түрінде сақталады."},
-				{"Сіздің таңдауыңыз бен құқықтарыңыз", "Қосымшада профиліңізді көріп, өзгерте аласыз, хабарлама санаттарын қосып-өшіре аласыз (жарнама хабарламалары өзіңіз қоспайынша өшірулі) және Параметрлер → Құпиялылық бөлімінде AI өңдеуге келісімді кері қайтара аласыз: қайта келісім бергенше AI жауаптары жұмыс істемейді, аккаунт сақталады. Аккаунтты Параметрлер → Тіркелгі → Аккаунтты жою бөлімінде немесе " + info.DeletionURL + " бетінде жоюға болады — ол бірден жойылады. Деректеріңіздің көшірмесін алу, оларды түзету немесе сұрақ қою үшін " + reach + "."},
+				{"Сіздің таңдауыңыз бен құқықтарыңыз", "Қосымшада профиліңізді көріп, өзгерте аласыз, хабарлама санаттарын қосып-өшіре аласыз (жарнама хабарламалары өзіңіз қоспайынша өшірулі) және Параметрлер → Құпиялылық бөлімінде AI өңдеуге келісімді кері қайтара аласыз: қайта келісім бергенше AI жауаптары жұмыс істемейді, аккаунт сақталады. Аккаунтты Параметрлер → Тіркелгі → Тіркелгіні жою бөлімінде немесе " + info.DeletionURL + " бетінде жоюға болады — ол бірден жойылады. " + apple(
+					"Apple арқылы кірген болсаңыз, iPhone қосымшасында аккаунтты жойғанда Apple-ден Apple арқылы кіруді ажыратуды да сұраймыз; AI Reply-ды Apple ID баптауларындағы «Apple арқылы кіру» бөлімінен өзіңіз де кез келген уақытта алып тастай аласыз.",
+					"Apple арқылы кірген болсаңыз, AI Reply-ды Apple ID баптауларындағы «Apple арқылы кіру» бөлімінен алып тастай аласыз.") + " Деректеріңіздің көшірмесін алу, оларды түзету немесе сұрақ қою үшін " + reach + "."},
 				{"Балалар", "AI Reply 13 жасқа толмаған балаларға арналмаған."},
 				{"Саясаттың өзгеруі", "Саясаттың жаңа редакциясы осы бетте күнімен жарияланады. Өзгеріс мәтіндерді өңдеуге қатысты болса, AI жауаптары қайта жұмыс істеуі үшін қосымша жаңа нұсқаны қабылдауды сұрайды."},
 			}
@@ -290,7 +326,7 @@ func privacyBody(locale string, info legalInfo) string {
 			sections[l] = [][2]string{
 				{"Кто мы", "Эта политика объясняет, как обрабатываются персональные данные в приложении AI Reply для iPhone и Android, его клавиатуре и на этом сайте. " + who},
 				{"Какие данные мы собираем", strings.Join([]string{
-					"Аккаунт: адрес почты; при входе через Apple или Google — идентификатор аккаунта, который они передают, и почта, которой они делятся (у Apple это может быть скрытый адрес для пересылки); имя, если вы его укажете или его передаст Apple.",
+					"Аккаунт: адрес почты; при входе через Apple или Google — идентификатор аккаунта, который они передают, и почта, которой они делятся (у Apple это может быть скрытый адрес для пересылки); имя, если вы его укажете или его передаст Apple или Google.",
 					"Профиль: то, что вы заполняете в приложении, — роль, краткое описание, предпочитаемый тон, что предлагает ваш бизнес, его описание и правила, грамматический род для ответов на русском, язык ответов, выбранный язык приложения, локаль и часовой пояс.",
 					"Устройство и установка: случайные идентификаторы устройства и установки, которые создаёт приложение, платформа, версия системы, версия приложения, модель и производитель устройства, push-токен (хранится в зашифрованном виде) и разрешены ли уведомления.",
 					"Использование: дневной и месячный счётчики ответов и по каждому запросу только метаданные — время, длительность, число токенов, расчётная стоимость, код ошибки, язык, длина текста, режим (ответ, написание или коррекция) и тариф.",
@@ -300,24 +336,27 @@ func privacyBody(locale string, info legalInfo) string {
 					"Платежи: записи о покупках — только если платные тарифы когда-либо будут продаваться; покупка будет проходить через App Store или Google Play.",
 				}, "\n")},
 				{"Как пишутся AI-ответы", strings.Join([]string{
-					"Когда вы нажимаете «Ответить» или «Написать», скопированное сообщение, ваша инструкция, данные профиля и выбранный шаблон передаются через наш сервер в OpenAI (США), модель которой пишет текст. Если включена умная коррекция, инструкция, которую вы набираете в собственном поле AI Reply, отправляется и во время набора, чтобы предложить исправление.",
+					"Когда вы нажимаете «Ответить», скопированное сообщение или текст, который вы выделили в текущем поле (клавиатура читает его только в этот момент), ваша инструкция, данные профиля и выбранный шаблон передаются через наш сервер в OpenAI (США), модель которой пишет текст. Когда вы нажимаете «Написать», отправляются только ваша инструкция и грамматический род; скопированное сообщение отправляется, только если вы выберете «Ответить на скопированное», — тогда это обычный ответ. Если включена умная коррекция, инструкция, которую вы набираете в собственном поле AI Reply, отправляется и во время набора, чтобы предложить исправление.",
 					"Наш сервер держит эти тексты только в памяти на время обработки запроса и не записывает их ни в базу, ни в логи. В OpenAI они передаются через API с отключённым хранением (store=false); OpenAI обрабатывает их по своим правилам для API: например, может хранить ограниченное время для выявления злоупотреблений и по умолчанию не использует данные API для обучения моделей.",
 					"Это происходит только после того, как вы дали согласие на экране согласия. Отозвать его можно в любой момент в разделе Настройки → Конфиденциальность.",
 					"На Android инструкцию можно надиктовать. Речь распознаётся на самом телефоне, если это возможно, иначе — системной службой распознавания речи (обычно Google); AI Reply получает только распознанный текст, но не запись голоса.",
+					"В приложении для iPhone можно надиктовать сообщение, на которое нужно ответить, профиль или шаблон. Речь распознаёт система распознавания речи Apple на самом iPhone, если это возможно, иначе — сервис распознавания речи Apple; AI Reply получает только распознанный текст, но не запись голоса.",
 				}, "\n")},
-				{"Что мы не собираем", "Мы не собираем контакты, геолокацию и рекламные идентификаторы и не отслеживаем вас в других приложениях. Клавиатура не отправляет то, что вы набираете в других приложениях: отправляется только текст собственного поля инструкции AI Reply, как описано выше. Буфер обмена читается только когда вы нажимаете действие, которое его использует, например шаблон или кнопку вставки. Пароли и защищённые поля никогда не обрабатываются."},
-				{"Кто обрабатывает данные по нашему поручению", "OpenAI — пишет ответы, сообщения и исправления. Google — вход через Google, Firebase Cloud Messaging (уведомления на обеих платформах) и на Android — служба распознавания речи телефона, если она используется. Apple — вход через Apple и доставка уведомлений на iPhone (Apple Push Notification service через Firebase). Resend — отправляет коды входа и письма об аккаунте. Хостинг-провайдер нашего сервера — хранит базу данных. Каждый из них получает только то, что нужно для его задачи."},
+				{"Что мы не собираем", "Мы не собираем контакты, геолокацию и рекламные идентификаторы и не отслеживаем вас в других приложениях. Из того, что вы набираете в других приложениях, ничего не отправляется, кроме скопированного или выделенного вами сообщения, когда вы нажимаете «Ответить», и инструкции в собственном поле AI Reply. Буфер обмена и выделенный текст читаются только когда вы нажимаете действие, которое их использует, например «Ответить», «Ответить на скопированное», шаблон или кнопку вставки. Пароли и защищённые поля никогда не обрабатываются."},
+				{"Кто обрабатывает данные по нашему поручению", "OpenAI — пишет ответы, сообщения и исправления. Google — вход через Google, Firebase Cloud Messaging (уведомления на обеих платформах) и на Android — служба распознавания речи телефона, если она используется. Apple — вход через Apple, доставка уведомлений на iPhone (Apple Push Notification service через Firebase) и, если вы диктуете в приложении для iPhone, распознавание речи Apple. Resend — отправляет коды входа и письма об аккаунте. Хостинг-провайдер нашего сервера — хранит базу данных. Каждый из них получает только то, что нужно для его задачи."},
 				{"Передача данных в другие страны", "OpenAI, Google, Apple и Resend обрабатывают данные в США и других странах. Поэтому переданные им данные могут покидать вашу страну; они обрабатывают их в соответствии со своими обязательствами по защите данных и безопасности."},
-				{"Сколько хранятся данные", "Данные аккаунта — почта и способы входа, профиль и настройки, записи о согласии, устройства, счётчики, жалобы и настройки уведомлений — хранятся до удаления аккаунта. Остальное удаляется автоматически: " + strings.Join([]string{
+				{"Сколько хранятся данные", "Данные аккаунта — почта и способы входа, профиль и настройки, записи о согласии, устройства, счётчики, жалобы, настройки уведомлений, а также ваша почта или номер аккаунта в списке получателей уведомления, отправленного лично вам, — хранятся до удаления аккаунта. Остальные данные удаляются автоматически: " + strings.Join([]string{
 					"метаданные запросов — " + p(r.AIUsageEventsDays),
 					"события приложения — " + p(r.ProductEventsDays),
 					"коды входа и удаления (с момента выдачи) — " + p(r.OTPDays),
 					"завершённые сессии (с окончания срока или выхода) — " + p(r.RefreshTokenDays),
 					"установка приложения без привязки к аккаунту (с последнего появления) — " + p(r.AnonInstallationsDays),
-					"завершённые уведомления и доставки — " + p(info.NotificationDays),
-				}, "; ") + ". Скопированные сообщения, инструкции и сгенерированные ответы не хранятся вовсе, кроме текста ответа в жалобе, которую вы решили отправить."},
+					notices("завершённые уведомления и доставки", "завершённые доставки уведомлений", "сами уведомления"),
+				}, "; ") + ". Журнал действий администраторов с аккаунтом (например, блокировка или смена тарифа) хранит случайный номер аккаунта без вашей почты и не удаляется автоматически, в том числе после удаления аккаунта. Скопированные сообщения, инструкции и сгенерированные ответы не хранятся вовсе, кроме текста ответа в жалобе, которую вы решили отправить."},
 				{"Доступ и безопасность", "В админ-панель могут войти только уполномоченные администраторы. Там видны аккаунты со скрытой частью почты, тарифы, счётчики, метаданные запросов и присланные жалобы; экрана с текстами запросов нет, потому что они не хранятся. Соединения шифруются, push-токены хранятся в зашифрованном виде, коды входа — только в виде хэшей."},
-				{"Ваш выбор и права", "В приложении можно посмотреть и изменить профиль, включить или выключить категории уведомлений (рекламные выключены, пока вы их не включите) и отозвать согласие на AI-обработку в разделе Настройки → Конфиденциальность: AI-ответы перестанут работать, пока вы снова не дадите согласие, а аккаунт сохранится. Удалить аккаунт можно в разделе Настройки → Аккаунт → Удалить аккаунт или на странице " + info.DeletionURL + " — он удаляется сразу. Чтобы получить копию своих данных, исправить их или задать вопрос, " + reach + "."},
+				{"Ваш выбор и права", "В приложении можно посмотреть и изменить профиль, включить или выключить категории уведомлений (рекламные выключены, пока вы их не включите) и отозвать согласие на AI-обработку в разделе Настройки → Конфиденциальность: AI-ответы перестанут работать, пока вы снова не дадите согласие, а аккаунт сохранится. Удалить аккаунт можно в разделе Настройки → Аккаунт → Удалить аккаунт или на странице " + info.DeletionURL + " — он удаляется сразу. " + apple(
+					"Если вы входили через Apple, при удалении аккаунта в приложении для iPhone мы также просим Apple отключить вход с Apple; удалить AI Reply самостоятельно можно в любой момент в настройках Apple ID в разделе «Вход с Apple».",
+					"Если вы входили через Apple, AI Reply можно удалить в настройках Apple ID в разделе «Вход с Apple».") + " Чтобы получить копию своих данных, исправить их или задать вопрос, " + reach + "."},
 				{"Дети", "AI Reply не предназначен для детей младше 13 лет."},
 				{"Изменения политики", "Новая редакция политики публикуется на этой странице с датой. Если изменение касается обработки текстов, приложение попросит принять новую версию, прежде чем AI-ответы снова заработают."},
 			}
@@ -325,7 +364,7 @@ func privacyBody(locale string, info legalInfo) string {
 			sections[l] = [][2]string{
 				{"Who we are", "This policy explains how personal data is processed in the AI Reply app for iPhone and Android, its keyboard and on this website. " + who},
 				{"What we collect", strings.Join([]string{
-					"Account: your e-mail address; if you sign in with Apple or Google, the account identifier they give us and the e-mail they share (with Apple this can be a private relay address); your name, if you enter it or Apple shares it.",
+					"Account: your e-mail address; if you sign in with Apple or Google, the account identifier they give us and the e-mail they share (with Apple this can be a private relay address); your name, if you enter it or Apple or Google shares it.",
 					"Profile: what you fill in in the app — role, a short description of yourself, preferred tone, what your business offers, its summary and rules, the grammatical gender for replies in Russian, reply language, the app language you choose, locale and time zone.",
 					"Device and installation: random device and installation identifiers created by the app, platform, operating-system version, app version, device model and manufacturer, the push token (stored encrypted) and whether notifications are allowed.",
 					"Usage: daily and monthly reply counters and, for each request, metadata only — time, duration, token counts, estimated cost, error code, language, text length, mode (reply, write or correction) and plan.",
@@ -335,24 +374,27 @@ func privacyBody(locale string, info legalInfo) string {
 					"Payments: purchase records — only if paid plans are ever sold; they would be bought through the App Store or Google Play.",
 				}, "\n")},
 				{"How AI replies are written", strings.Join([]string{
-					"When you tap Reply or Write, the message you copied, your instruction, your profile details and the template you chose go through our server to OpenAI (USA), whose model writes the text. With Smart correction on, the instruction you type in AI Reply's own field is also sent while you type it, to suggest a correction.",
+					"When you tap Reply, the message you copied or the text you selected in the current field (the keyboard reads it only at that moment), your instruction, your profile details and the template you chose go through our server to OpenAI (USA), whose model writes the text. When you tap Write, only your instruction and your grammatical gender are sent; the copied message goes only if you choose Reply to copied, and then as a reply. With Smart correction on, the instruction you type in AI Reply's own field is also sent while you type it, to suggest a correction.",
 					"Our server keeps these texts only in memory while it handles the request and does not write them to the database or the logs. They are sent to OpenAI through its API with storage turned off (store=false); OpenAI processes them under its own API policies: for example, it may keep them for a limited time to detect abuse, and by default it does not use API data to train its models.",
 					"This happens only after you accept it on the consent screen. You can withdraw that consent at any time in Settings → Privacy.",
 					"On Android you can dictate the instruction. Speech is recognised on the phone when possible, otherwise by the phone's speech recognition service (usually Google); AI Reply receives only the recognised text, never the audio.",
+					"In the iPhone app you can dictate a message to reply to, your profile or a template. Speech is recognised by Apple speech recognition on the iPhone when possible, otherwise by Apple's speech recognition service; AI Reply receives only the recognised text, never the audio.",
 				}, "\n")},
-				{"What we do not collect", "We do not collect contacts, location or advertising identifiers, and we do not track you across other apps. The keyboard does not send what you type in other apps: only the text of AI Reply's own instruction field is sent, as described above. The clipboard is read only when you tap an action that uses it, such as a template or the paste button. Passwords and secure fields are never processed."},
-				{"Who processes data for us", "OpenAI — writes replies, messages and corrections. Google — Sign in with Google, Firebase Cloud Messaging (notifications on both platforms) and, on Android, the phone's speech recognition service if it is used. Apple — Sign in with Apple and delivery of notifications to iPhone (Apple Push Notification service, through Firebase). Resend — sends sign-in codes and account e-mails. The hosting provider of our server — stores the database. Each of them receives only what its task needs."},
+				{"What we do not collect", "We do not collect contacts, location or advertising identifiers, and we do not track you across other apps. Nothing else you type in other apps is sent: only the message you copied or selected yourself, when you tap Reply, and the instruction you type in AI Reply's own field. The clipboard and the selected text are read only when you tap an action that uses them, such as Reply, Reply to copied, a template or the paste button. Passwords and secure fields are never processed."},
+				{"Who processes data for us", "OpenAI — writes replies, messages and corrections. Google — Sign in with Google, Firebase Cloud Messaging (notifications on both platforms) and, on Android, the phone's speech recognition service if it is used. Apple — Sign in with Apple, delivery of notifications to iPhone (Apple Push Notification service, through Firebase) and, if you dictate in the iPhone app, Apple speech recognition. Resend — sends sign-in codes and account e-mails. The hosting provider of our server — stores the database. Each of them receives only what its task needs."},
 				{"Transfers to other countries", "OpenAI, Google, Apple and Resend process data in the USA and other countries. Data sent to them may therefore leave your country; they process it under their own data protection and security commitments."},
-				{"How long we keep data", "Account data — e-mail and sign-in methods, profile and settings, consent records, devices, counters, reports and notification settings — is kept until you delete the account. Everything else is removed automatically: " + strings.Join([]string{
+				{"How long we keep data", "Account data — e-mail and sign-in methods, profile and settings, consent records, devices, counters, reports, notification settings and your e-mail or account number in the recipient list of a notification sent to you personally — is kept until you delete the account. Other data is removed automatically: " + strings.Join([]string{
 					"request metadata — " + p(r.AIUsageEventsDays),
 					"app events — " + p(r.ProductEventsDays),
 					"sign-in and deletion codes (from when they are issued) — " + p(r.OTPDays),
 					"ended sessions (from expiry or sign-out) — " + p(r.RefreshTokenDays),
 					"an app installation not linked to an account (from when it was last seen) — " + p(r.AnonInstallationsDays),
-					"finished notifications and deliveries — " + p(info.NotificationDays),
-				}, "; ") + ". Copied messages, instructions and generated replies are not kept at all, except the reply text in a report you choose to send."},
+					notices("finished notifications and deliveries", "finished notification deliveries", "the notifications themselves"),
+				}, "; ") + ". A log of administrator actions on an account (for example a block or a plan change) keeps the random account number, without your e-mail, and is not removed automatically, including after the account is deleted. Copied messages, instructions and generated replies are not kept at all, except the reply text in a report you choose to send."},
 				{"Access and security", "Only authorised administrators can sign in to the admin panel. It shows accounts with a partly hidden e-mail, plans, counters, request metadata and the reports people send; it has no screen for the texts of requests, because they are not stored. Connections are encrypted, push tokens are stored encrypted and sign-in codes only as hashes."},
-				{"Your choices and rights", "In the app you can see and change your profile, turn notification categories on or off (marketing is off until you turn it on) and withdraw consent to AI processing in Settings → Privacy: AI replies then stop until you accept again, and the account stays. You can delete your account in Settings → Account → Delete account or on the page " + info.DeletionURL + "; it is deleted right away. To get a copy of your data, correct it or ask a question, " + reach + "."},
+				{"Your choices and rights", "In the app you can see and change your profile, turn notification categories on or off (marketing is off until you turn it on) and withdraw consent to AI processing in Settings → Privacy: AI replies then stop until you accept again, and the account stays. You can delete your account in Settings → Account → Delete account or on the page " + info.DeletionURL + "; it is deleted right away. " + apple(
+					"If you signed in with Apple, deleting the account in the iPhone app also asks Apple to disconnect Sign in with Apple; you can always remove AI Reply yourself in your Apple ID settings under Sign in with Apple.",
+					"If you signed in with Apple, you can remove AI Reply in your Apple ID settings under Sign in with Apple.") + " To get a copy of your data, correct it or ask a question, " + reach + "."},
 				{"Children", "AI Reply is not intended for children under 13."},
 				{"Changes to this policy", "A new version of this policy is published on this page with its date. When a change affects how texts are processed, the app asks you to accept the new version before AI replies work again."},
 			}
@@ -360,7 +402,7 @@ func privacyBody(locale string, info legalInfo) string {
 			sections[l] = [][2]string{
 				{"Biz kimmiz", "Ushbu siyosat iPhone va Android uchun AI Reply ilovasida, uning klaviaturasida va ushbu saytda shaxsiy maʼlumotlar qanday qayta ishlanishini tushuntiradi. " + who},
 				{"Qanday maʼlumotlarni yigʻamiz", strings.Join([]string{
-					"Hisob: pochta manzili; Apple yoki Google orqali kirsangiz — ular beradigan hisob identifikatori va ular ulashadigan pochta (Apple’da bu yashirin uzatish manzili boʻlishi mumkin); ismingiz, agar uni oʻzingiz kiritsangiz yoki Apple bersa.",
+					"Hisob: pochta manzili; Apple yoki Google orqali kirsangiz — ular beradigan hisob identifikatori va ular ulashadigan pochta (Apple’da bu yashirin uzatish manzili boʻlishi mumkin); ismingiz, agar uni oʻzingiz kiritsangiz yoki Apple yoki Google bersa.",
 					"Profil: ilovada toʻldiradiganingiz — rol, oʻzingiz haqingizda qisqa tavsif, afzal koʻrgan ohang, biznesingiz nimani taklif qilishi, uning tavsifi va qoidalari, rus tilidagi javoblar uchun grammatik jins, javob tili, tanlangan ilova tili, lokal va vaqt mintaqasi.",
 					"Qurilma va oʻrnatish: ilova yaratadigan tasodifiy qurilma va oʻrnatish identifikatorlari, platforma, tizim versiyasi, ilova versiyasi, qurilma modeli va ishlab chiqaruvchisi, push-token (shifrlangan holda saqlanadi) va bildirishnomalarga ruxsat bor-yoʻqligi.",
 					"Foydalanish: kunlik va oylik javob hisoblagichlari va har bir soʻrov boʻyicha faqat metamaʼlumot — vaqt, davomiylik, token soni, taxminiy narx, xato kodi, til, matn uzunligi, rejim (javob, yozish yoki tuzatish) va tarif.",
@@ -370,24 +412,27 @@ func privacyBody(locale string, info legalInfo) string {
 					"Toʻlovlar: xaridlar yozuvlari — faqat pullik tariflar sotilsa; xarid App Store yoki Google Play orqali amalga oshiriladi.",
 				}, "\n")},
 				{"AI javoblari qanday yoziladi", strings.Join([]string{
-					"«Javob berish» yoki «Yozish» tugmasini bosganingizda nusxalangan xabar, koʻrsatmangiz, profil maʼlumotlaringiz va tanlangan shablon serverimiz orqali OpenAI’ga (AQSH) yuboriladi va matnni uning modeli yozadi. Aqlli tuzatish yoqilgan boʻlsa, AI Reply’ning oʻz maydonida yozayotgan koʻrsatmangiz tuzatish taklif qilish uchun yozish paytida ham yuboriladi.",
+					"«Javob berish» tugmasini bosganingizda nusxalangan xabar yoki joriy maydonda oʻzingiz belgilagan matn (klaviatura uni faqat shu paytda oʻqiydi), koʻrsatmangiz, profil maʼlumotlaringiz va tanlangan shablon serverimiz orqali OpenAI’ga (AQSH) yuboriladi va matnni uning modeli yozadi. «Yozish» tugmasini bosganingizda faqat koʻrsatmangiz va grammatik jinsingiz yuboriladi; nusxalangan xabar faqat «Nusxalanganga javob berish»ni tanlasangiz, javob sifatida yuboriladi. Aqlli tuzatish yoqilgan boʻlsa, AI Reply’ning oʻz maydonida yozayotgan koʻrsatmangiz tuzatish taklif qilish uchun yozish paytida ham yuboriladi.",
 					"Serverimiz bu matnlarni faqat soʻrovni qayta ishlash vaqtida xotirada saqlaydi va ularni na bazaga, na jurnalga yozadi. OpenAI’ga ular saqlash oʻchirilgan API orqali (store=false) yuboriladi; OpenAI ularni oʻzining API qoidalari boʻyicha qayta ishlaydi: masalan, suiisteʼmolni aniqlash uchun cheklangan muddat saqlashi mumkin va sukut boʻyicha API maʼlumotlarini modellarni oʻqitishda ishlatmaydi.",
 					"Bu faqat rozilik ekranida rozilik berganingizdan keyin sodir boʻladi. Rozilikni istalgan vaqtda Sozlamalar → Maxfiylik boʻlimida qaytarib olish mumkin.",
 					"Android’da koʻrsatmani ovoz bilan aytish mumkin. Nutq imkon boʻlsa telefonning oʻzida, aks holda telefonning nutqni tanish xizmati (odatda Google) tomonidan aniqlanadi; AI Reply faqat aniqlangan matnni oladi, ovoz yozuvini emas.",
+					"iPhone ilovasida javob beriladigan xabarni, profilni yoki shablonni ovoz bilan aytish mumkin. Nutq imkon boʻlsa iPhone’ning oʻzida Apple nutqni tanish tizimi, aks holda Apple nutqni tanish xizmati tomonidan aniqlanadi; AI Reply faqat aniqlangan matnni oladi, ovoz yozuvini emas.",
 				}, "\n")},
-				{"Nimalarni yigʻmaymiz", "Biz kontaktlar, geolokatsiya va reklama identifikatorlarini yigʻmaymiz hamda sizni boshqa ilovalarda kuzatmaymiz. Klaviatura boshqa ilovalarda yozganingizni yubormaydi: yuqorida aytilganidek, faqat AI Reply’ning oʻz koʻrsatma maydonidagi matn yuboriladi. Almashish buferi faqat undan foydalanadigan amalni bosganingizda oʻqiladi, masalan shablon yoki qoʻyish tugmasi. Parollar va himoyalangan maydonlar hech qachon qayta ishlanmaydi."},
-				{"Maʼlumotlarni biz uchun kim qayta ishlaydi", "OpenAI — javoblar, xabarlar va tuzatishlarni yozadi. Google — Google orqali kirish, Firebase Cloud Messaging (ikkala platformadagi bildirishnomalar) va Android’da, agar ishlatilsa, telefonning nutqni tanish xizmati. Apple — Apple orqali kirish va iPhone’ga bildirishnomalarni yetkazish (Firebase orqali Apple Push Notification service). Resend — kirish kodlari va hisob xatlarini yuboradi. Serverimizning xosting provayderi — maʼlumotlar bazasini saqlaydi. Ularning har biri faqat oʻz vazifasi uchun keraklisini oladi."},
+				{"Nimalarni yigʻmaymiz", "Biz kontaktlar, geolokatsiya va reklama identifikatorlarini yigʻmaymiz hamda sizni boshqa ilovalarda kuzatmaymiz. Boshqa ilovalarda yozganlaringizdan hech narsa yuborilmaydi, faqat «Javob berish»ni bosganingizda nusxalangan yoki oʻzingiz belgilagan xabar va AI Reply’ning oʻz maydonidagi koʻrsatmangiz yuboriladi. Almashish buferi va belgilangan matn faqat ulardan foydalanadigan amalni bosganingizda oʻqiladi, masalan «Javob berish», «Nusxalanganga javob berish», shablon yoki qoʻyish tugmasi. Parollar va himoyalangan maydonlar hech qachon qayta ishlanmaydi."},
+				{"Maʼlumotlarni biz uchun kim qayta ishlaydi", "OpenAI — javoblar, xabarlar va tuzatishlarni yozadi. Google — Google orqali kirish, Firebase Cloud Messaging (ikkala platformadagi bildirishnomalar) va Android’da, agar ishlatilsa, telefonning nutqni tanish xizmati. Apple — Apple orqali kirish, iPhone’ga bildirishnomalarni yetkazish (Firebase orqali Apple Push Notification service) va iPhone ilovasida ovoz bilan aytsangiz, Apple nutqni tanish tizimi. Resend — kirish kodlari va hisob xatlarini yuboradi. Serverimizning xosting provayderi — maʼlumotlar bazasini saqlaydi. Ularning har biri faqat oʻz vazifasi uchun keraklisini oladi."},
 				{"Maʼlumotlarni boshqa davlatlarga uzatish", "OpenAI, Google, Apple va Resend maʼlumotlarni AQSH va boshqa davlatlarda qayta ishlaydi. Shu sababli ularga uzatilgan maʼlumotlar mamlakatingizdan tashqariga chiqishi mumkin; ular maʼlumotlarni oʻzlarining maʼlumotlarni himoya qilish va xavfsizlik majburiyatlariga muvofiq qayta ishlaydi."},
-				{"Maʼlumotlar qancha saqlanadi", "Hisob maʼlumotlari — pochta va kirish usullari, profil va sozlamalar, rozilik yozuvlari, qurilmalar, hisoblagichlar, shikoyatlar va bildirishnoma sozlamalari — hisob oʻchirilgunga qadar saqlanadi. Qolganlari avtomatik oʻchiriladi: " + strings.Join([]string{
+				{"Maʼlumotlar qancha saqlanadi", "Hisob maʼlumotlari — pochta va kirish usullari, profil va sozlamalar, rozilik yozuvlari, qurilmalar, hisoblagichlar, shikoyatlar, bildirishnoma sozlamalari, shuningdek shaxsan sizga yuborilgan bildirishnomaning qabul qiluvchilar roʻyxatidagi pochtangiz yoki hisob raqamingiz — hisob oʻchirilgunga qadar saqlanadi. Boshqa maʼlumotlar avtomatik oʻchiriladi: " + strings.Join([]string{
 					"soʻrov metamaʼlumotlari — " + p(r.AIUsageEventsDays),
 					"ilova hodisalari — " + p(r.ProductEventsDays),
 					"kirish va oʻchirish kodlari (berilgan paytdan) — " + p(r.OTPDays),
 					"tugagan seanslar (muddati tugagan yoki chiqilgan paytdan) — " + p(r.RefreshTokenDays),
 					"hisobga bogʻlanmagan ilova oʻrnatilishi (oxirgi marta koʻringan paytdan) — " + p(r.AnonInstallationsDays),
-					"tugagan bildirishnomalar va yetkazishlar — " + p(info.NotificationDays),
-				}, "; ") + ". Nusxalangan xabarlar, koʻrsatmalar va yaratilgan javoblar umuman saqlanmaydi, faqat oʻzingiz yuborgan shikoyatdagi javob matni bundan mustasno."},
+					notices("tugagan bildirishnomalar va yetkazishlar", "tugagan bildirishnoma yetkazishlari", "bildirishnomalarning oʻzi"),
+				}, "; ") + ". Administratorlarning hisob bilan bogʻliq harakatlari jurnali (masalan, bloklash yoki tarifni oʻzgartirish) hisobning tasodifiy raqamini pochtangizsiz saqlaydi va avtomatik oʻchirilmaydi, hisob oʻchirilgandan keyin ham. Nusxalangan xabarlar, koʻrsatmalar va yaratilgan javoblar umuman saqlanmaydi, faqat oʻzingiz yuborgan shikoyatdagi javob matni bundan mustasno."},
 				{"Kirish va xavfsizlik", "Admin panelga faqat vakolatli administratorlar kira oladi. Unda pochtasining bir qismi yashirilgan hisoblar, tariflar, hisoblagichlar, soʻrov metamaʼlumotlari va yuborilgan shikoyatlar koʻrinadi; soʻrov matnlari ekrani yoʻq, chunki ular saqlanmaydi. Ulanishlar shifrlanadi, push-tokenlar shifrlangan holda, kirish kodlari esa faqat xesh koʻrinishida saqlanadi."},
-				{"Tanlovingiz va huquqlaringiz", "Ilovada profilingizni koʻrish va oʻzgartirish, bildirishnoma toifalarini yoqish yoki oʻchirish (reklama bildirishnomalari oʻzingiz yoqmaguningizcha oʻchiq) va Sozlamalar → Maxfiylik boʻlimida AI ishlov berishga rozilikni qaytarib olish mumkin: yana rozilik bermaguningizcha AI javoblar ishlamaydi, hisob saqlanadi. Hisobni Sozlamalar → Hisob → Hisobni oʻchirish boʻlimida yoki " + info.DeletionURL + " sahifasida oʻchirish mumkin — u darhol oʻchiriladi. Maʼlumotlaringiz nusxasini olish, ularni tuzatish yoki savol berish uchun " + reach + "."},
+				{"Tanlovingiz va huquqlaringiz", "Ilovada profilingizni koʻrish va oʻzgartirish, bildirishnoma toifalarini yoqish yoki oʻchirish (reklama bildirishnomalari oʻzingiz yoqmaguningizcha oʻchiq) va Sozlamalar → Maxfiylik boʻlimida AI ishlov berishga rozilikni qaytarib olish mumkin: yana rozilik bermaguningizcha AI javoblar ishlamaydi, hisob saqlanadi. Hisobni Sozlamalar → Hisob → Hisobni oʻchirish boʻlimida yoki " + info.DeletionURL + " sahifasida oʻchirish mumkin — u darhol oʻchiriladi. " + apple(
+					"Apple orqali kirgan boʻlsangiz, iPhone ilovasida hisobni oʻchirganingizda Apple’dan Apple orqali kirishni uzishni ham soʻraymiz; AI Reply’ni Apple ID sozlamalaridagi «Apple orqali kirish» boʻlimidan istalgan vaqtda oʻzingiz ham olib tashlashingiz mumkin.",
+					"Apple orqali kirgan boʻlsangiz, AI Reply’ni Apple ID sozlamalaridagi «Apple orqali kirish» boʻlimidan olib tashlashingiz mumkin.") + " Maʼlumotlaringiz nusxasini olish, ularni tuzatish yoki savol berish uchun " + reach + "."},
 				{"Bolalar", "AI Reply 13 yoshga toʻlmagan bolalar uchun moʻljallanmagan."},
 				{"Siyosatdagi oʻzgarishlar", "Siyosatning yangi tahriri ushbu sahifada sanasi bilan eʼlon qilinadi. Agar oʻzgarish matnlarni qayta ishlashga taalluqli boʻlsa, AI javoblar yana ishlashi uchun ilova yangi versiyani qabul qilishni soʻraydi."},
 			}

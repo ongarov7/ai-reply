@@ -3,7 +3,9 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
+	"maps"
 	"strings"
 	"time"
 
@@ -19,6 +21,9 @@ import (
 //     installations are detached with the stored push token cleared, so the
 //     phone is no longer addressable as this person (the app registers again
 //     anonymously after sign-out);
+//   - campaign audience filters that name the account (by id, by its e-mail or
+//     by an address a provider gave) lose those entries; they are counted in
+//     redacted_people, so the filter stays specific and never widens to everyone;
 //   - DELETE FROM users removes everything else through ON DELETE CASCADE
 //     (foreign_keys=on): profile, identities, devices, refresh tokens,
 //     subscriptions, usage counters and events, payments, legal consents,
@@ -88,7 +93,80 @@ func (s *Store) DeleteUserAccount(ctx context.Context, userID string, now time.T
 			return err
 		}
 
+		// A campaign may name the person by any address the account holds,
+		// a provider's (Apple relay, Google) included.
+		emails := maps.Clone(values[domain.IdentityEmail])
+		if err := providerEmails(ctx, tx, userID, emails); err != nil {
+			return err
+		}
+		if err := redactCampaignAudiences(ctx, tx, userID, emails, now); err != nil {
+			return err
+		}
+
 		res, err := tx.ExecContext(ctx, `DELETE FROM users WHERE id = ?`, userID)
 		return affected(res, err)
 	})
+}
+
+// providerEmails — тіркелгінің Google/Apple берген поштасы (кіші әріппен) жиынға қосылады.
+func providerEmails(ctx context.Context, tx *sql.Tx, userID string, into map[string]bool) error {
+	rows, err := tx.QueryContext(ctx, `
+		SELECT provider_email FROM auth_identities WHERE user_id = ? AND provider_email <> ''`, userID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var address string
+		if err := rows.Scan(&address); err != nil {
+			return err
+		}
+		into[strings.ToLower(strings.TrimSpace(address))] = true
+	}
+	return rows.Err()
+}
+
+// redactCampaignAudiences — науқан сүзгілерінен жойылатын тіркелгінің id-і мен поштасын алады.
+//
+// The table is small and the JSON shape is domain.AudienceFilter, so rows that
+// may name people are decoded and rewritten in Go; LIKE only narrows the scan.
+func redactCampaignAudiences(ctx context.Context, tx *sql.Tx, userID string, emails map[string]bool, now time.Time) error {
+	rows, err := tx.QueryContext(ctx, `
+		SELECT id, audience_filter FROM notification_campaigns
+		WHERE audience_filter LIKE '%"user_ids"%' OR audience_filter LIKE '%"emails"%'`)
+	if err != nil {
+		return err
+	}
+	changed := map[string]string{}
+	for rows.Next() {
+		var id, raw string
+		if err := rows.Scan(&id, &raw); err != nil {
+			rows.Close()
+			return err
+		}
+		var f domain.AudienceFilter
+		if json.Unmarshal([]byte(raw), &f) != nil || !f.RedactAccount(userID, emails) {
+			continue
+		}
+		encoded, err := json.Marshal(f)
+		if err != nil {
+			rows.Close()
+			return err
+		}
+		changed[id] = string(encoded)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	for id, filter := range changed {
+		if _, err := tx.ExecContext(ctx, `UPDATE notification_campaigns SET audience_filter = ?, updated_at = ? WHERE id = ?`,
+			filter, ms(now), id); err != nil {
+			return err
+		}
+	}
+	return nil
 }

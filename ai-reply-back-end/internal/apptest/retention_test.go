@@ -2,9 +2,12 @@ package apptest
 
 import (
 	"context"
+	"fmt"
+	"net/http"
 	"testing"
 	"time"
 
+	"github.com/aireply/ai-reply-back-end/internal/domain"
 	"github.com/aireply/ai-reply-back-end/internal/retention"
 )
 
@@ -93,5 +96,53 @@ func TestRetentionRemovesOnlyExpiredRows(t *testing.T) {
 	}
 	if off["ai_usage_events"] == 0 {
 		t.Fatalf("the other windows still apply: %v", off)
+	}
+}
+
+// Аккаунтсыз ескі орнатуды тазалау аяқталған науқанның есебін өзгертпейді.
+func TestRetentionKeepsTheTotalsOfFinishedCampaigns(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	for i := 0; i < 2; i++ {
+		s := h.signIn(fmt.Sprintf("campaign-totals-%d@example.com", i))
+		h.optInMarketing(s.access)
+		h.mustRegister(installation(installID(130+i), "android", fcmToken(130+i)), s.access)
+	}
+	headers := h.signInAdmin().headers(h.cfg.Admin.CookieName)
+	id := h.do(http.MethodPost, "/api/v1/admin/notifications/campaigns", campaignBody(map[string]any{"send": true}),
+		withKey(headers, "retention-totals-000001")).str("id")
+	h.tick()
+	before, err := h.notify.Campaign(ctx, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if before.Campaign.Status != domain.CampaignCompleted || before.Campaign.FinalStats == nil ||
+		before.Stats.Total != 2 || before.Stats.Accepted != 2 {
+		t.Fatalf("campaign before retention: %s %+v", before.Campaign.Status, before.Stats)
+	}
+
+	// One recipient signed out long ago (or deleted the account): the phone is
+	// anonymous and its last sighting is past the anonymous-installation window.
+	if _, err := h.db.Writer().ExecContext(ctx, `UPDATE app_installations SET user_id = NULL, last_seen_at = ?
+		WHERE installation_id = ?`, h.clock.Now().AddDate(0, 0, -200).UnixMilli(), installID(130)); err != nil {
+		t.Fatal(err)
+	}
+	removed := retention.New(h.store, h.cfg.Retention, discardLog()).WithClock(h.clock).Sweep(ctx)
+	if removed["app_installations"] != 1 || h.scalar(`SELECT COUNT(*) FROM notification_deliveries WHERE campaign_id = ?`, id) != 1 {
+		t.Fatalf("the sweep did not take the installation and its delivery: %v", removed)
+	}
+
+	after, err := h.notify.Campaign(ctx, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	final := before.Campaign.FinalStats
+	if after.Stats.Total != final.Total || after.Stats.Accepted != final.Accepted || after.Stats.Android != final.Android ||
+		after.Stats.ByLanguage["kk"].Total != final.ByLanguage["kk"].Total {
+		t.Fatalf("totals changed: %+v, final %+v", after.Stats, *final)
+	}
+	list := h.do(http.MethodGet, "/api/v1/admin/notifications/campaigns/"+id, nil, headers)
+	if list.num("stats", "total") != 2 || list.num("stats", "provider_accepted") != 2 {
+		t.Fatalf("admin view: %s", list.raw)
 	}
 }

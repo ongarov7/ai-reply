@@ -31,8 +31,13 @@ const (
 	// dedupeHorizon — an automatic notification row is the once-per-period
 	// guard of its event, and the longest period is a calendar month
 	// (quota_*:month keys): the row outlives a shorter retention.
-	dedupeHorizon = 40 * 24 * time.Hour
+	dedupeHorizon = MinNotificationRetentionDays * 24 * time.Hour
 )
+
+// MinNotificationRetentionDays — хабарлама жолы кемінде осынша күн сақталады
+// (RETENTION_NOTIFICATIONS_DAYS одан қысқа болса да). The privacy policy
+// prints it next to the shorter delivery window.
+const MinNotificationRetentionDays = 40
 
 // retrySchedule — сәтсіз әрекеттен кейінгі күту: 2-ші әрекет ~5 с, 3-ші ~30 с,
 // 4-ші ~2 мин, 5-ші ~10 мин (±20% кездейсоқ ауытқумен).

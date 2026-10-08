@@ -17,7 +17,7 @@ import (
 
 const (
 	testGoogleAudience = "123-web.apps.googleusercontent.com"
-	testAppleAudience  = "kz.yerek.replykeyboard"
+	testAppleAudience  = "kz.ai-reply.reply.keyboard.keyboard" // the iOS app's bundle id
 )
 
 // identityProviders — тесттегі Google мен Apple: өз кілттерімен қол қояды,

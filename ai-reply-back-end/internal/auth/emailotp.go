@@ -19,6 +19,8 @@ const (
 	channelEmail  = "email"
 	channelStub   = "stub"   // демо: AUTH_DEMO_OTP, хат жоқ
 	channelReview = "review" // App Review / Play review: REVIEW_LOGIN_CODE, хат жоқ
+	// channelNone — тіркелгісі жоқ поштаға жою коды: хат жоқ, кодты ешкім алмайды.
+	channelNone = "none"
 )
 
 // EmailChallenge — кодты сұрау нәтижесі.
@@ -35,7 +37,7 @@ type EmailChallenge struct {
 
 // RequestEmailOTP — поштаға кіру коды. Тіркелу мен кіру — бір ағын.
 func (s *Service) RequestEmailOTP(ctx context.Context, rawEmail, locale string) (EmailChallenge, error) {
-	return s.requestEmailOTP(ctx, rawEmail, locale, domain.OTPPurposeLogin)
+	return s.requestEmailOTP(ctx, rawEmail, locale, domain.OTPPurposeLogin, false)
 }
 
 // VerifyEmailOTP — кодты тексереді, тіркелгіні табады не ашады және сессия береді.
@@ -60,7 +62,7 @@ func (s *Service) RequestLinkEmailOTP(ctx context.Context, user domain.User, raw
 	if user.Email != "" {
 		return EmailChallenge{}, domain.ErrConflict
 	}
-	return s.requestEmailOTP(ctx, rawEmail, locale, domain.OTPPurposeLinkEmail)
+	return s.requestEmailOTP(ctx, rawEmail, locale, domain.OTPPurposeLinkEmail, false)
 }
 
 // VerifyLinkEmailOTP — кодты тексеріп, поштаны осы тіркелгіге бекітеді.
@@ -79,7 +81,15 @@ func (s *Service) VerifyLinkEmailOTP(ctx context.Context, user domain.User, rawE
 	return s.repo.UserByID(ctx, user.ID)
 }
 
-func (s *Service) requestEmailOTP(ctx context.Context, rawEmail, locale, purpose string) (EmailChallenge, error) {
+// requestEmailOTP — кодты шығарады. silent: хатсыз және ешкім білмейтін код.
+//
+// The silent mode serves account deletion for an address without an account:
+// it runs the same cooldown, quotas, failure lock-out and attempt limit and
+// stores a random four-digit code like any other, only never sent, so neither
+// the confirm answers nor the sign-in cooldown tell whether the address has an
+// account. A lucky guess reaches an account that does not exist and gets the
+// same {"deleted": true} a real deletion gets.
+func (s *Service) requestEmailOTP(ctx context.Context, rawEmail, locale, purpose string, silent bool) (EmailChallenge, error) {
 	address, err := NormalizeEmail(rawEmail)
 	if err != nil {
 		return EmailChallenge{}, err
@@ -105,7 +115,7 @@ func (s *Service) requestEmailOTP(ctx context.Context, rawEmail, locale, purpose
 		return EmailChallenge{}, err
 	}
 
-	code, channel, err := s.emailCode(address)
+	code, channel, err := s.emailCode(address, silent)
 	if err != nil {
 		return EmailChallenge{}, err
 	}
@@ -217,13 +227,21 @@ func (s *Service) checkEmailFailures(ctx context.Context, address string, now ti
 	return nil
 }
 
-// emailCode — жаңа код және оның жеткізілу тәсілі.
+// emailCode — жаңа код және оның жеткізілу тәсілі (silent — жоғарыдағы requestEmailOTP-ты қараңыз).
 //
 // The review address gets the configured review code without a mail, so App
 // Review and Play review can sign in from the submission notes; every cap
 // and attempt limit still applies to it. Without a mail provider only demo
 // mode issues codes: the fixed demo code.
-func (s *Service) emailCode(address string) (code, channel string, err error) {
+func (s *Service) emailCode(address string, silent bool) (code, channel string, err error) {
+	if silent {
+		// Fails exactly when a real code would: no provider and no demo mode.
+		if s.mail == nil && !s.cfg.DemoMode && !(s.cfg.ReviewLogin() && address == s.cfg.ReviewEmail) {
+			return "", "", domain.ErrEmailDelivery
+		}
+		code, err := NewOTPCode(s.random)
+		return code, channelNone, err
+	}
 	if s.cfg.ReviewLogin() && address == s.cfg.ReviewEmail {
 		return s.cfg.ReviewCode, channelReview, nil
 	}

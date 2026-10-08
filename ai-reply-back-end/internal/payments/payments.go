@@ -95,7 +95,7 @@ type Service struct {
 	provider Provider
 	mode     string
 	events   Events
-	// demoCheckout — the demo provider may sell on this (non-production) server.
+	// demoCheckout — the demo provider may sell on this (development or test) server.
 	demoCheckout bool
 	// production — APP_ENV=production: an unverified payment is never announced.
 	production bool
@@ -109,10 +109,10 @@ func New(repo *repository.Store, subs *subscriptions.Service, provider Provider,
 // WithEvents — төлем оқиғаларын тыңдаушы (nil — жоқ).
 func (s *Service) WithEvents(e Events) *Service { s.events = e; return s }
 
-// WithDemoCheckout — демо провайдерге сатуға рұқсат (тек әзірлеу серверінде).
+// WithDemoCheckout — демо провайдерге сатуға рұқсат (тек әзірлеу мен тест серверінде).
 //
-// Config refuses PAYMENT_DEMO_CHECKOUT=true when APP_ENV=production, so a
-// production server can only sell through a live provider.
+// Config refuses PAYMENT_DEMO_CHECKOUT=true unless APP_ENV is development or
+// test, so staging and production can only sell through a live provider.
 func (s *Service) WithDemoCheckout(enabled bool) *Service { s.demoCheckout = enabled; return s }
 
 // WithProduction — production серверінде тек нақты провайдердің төлемі хабарланады.
@@ -122,8 +122,9 @@ func (s *Service) WithProduction(production bool) *Service { s.production = prod
 //
 // Only for money that is real or deliberately simulated: a live provider
 // that verifies every payment, or demo checkout switched on for a
-// non-production server. Config already refuses demo checkout in
-// production; this keeps the rule even if the wiring is ever wrong.
+// development or test server. Config already refuses demo checkout on
+// staging and production; this keeps the production rule even if the
+// wiring is ever wrong.
 func (s *Service) announces() bool {
 	return s.provider.Live() || (s.demoCheckout && !s.production)
 }
@@ -248,20 +249,31 @@ func (s *Service) Confirm(ctx context.Context, userID, paymentID string) (domain
 		return domain.Subscription{}, domain.ErrPaymentRequired
 	}
 	ref := fmt.Sprintf("%s-%s", s.provider.Name(), traits.RandomToken(6))
-	if err := s.repo.UpdatePaymentStatus(ctx, payment.ID, "succeeded", ref); err != nil {
-		return domain.Subscription{}, err
-	}
-	var expires *time.Time
-	sub, err := s.subs.Assign(ctx, userID, payment.PlanID, "payment", expires)
+	// Төлем күйі мен тариф бірге жазылады; клиент кетіп қалса да жазу аяқталады.
+	//
+	// "succeeded" and the new plan are one transaction, so a failure leaves
+	// the payment unfinished and a retried confirm assigns the plan; it can
+	// never be paid but stuck on the old plan. The writes run detached from
+	// the request: a client that disconnects must not cancel them half-way.
+	writeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), completeTimeout)
+	defer cancel()
+	sub, applied, err := s.subs.AssignForPayment(writeCtx, userID, payment.ID, payment.PlanID, ref)
 	if err != nil {
 		return domain.Subscription{}, err
 	}
+	if !applied {
+		// A parallel confirm finished it first: same answer, no second notice.
+		return s.subs.Current(ctx, userID)
+	}
 	if s.events != nil && s.announces() {
 		payment.Status, payment.ProviderRef = "succeeded", ref
-		s.events.PaymentSucceeded(ctx, payment, sub)
+		s.events.PaymentSucceeded(writeCtx, payment, sub)
 	}
 	return sub, nil
 }
+
+// completeTimeout — төлемді аяқтау жазуларына берілетін уақыт (сұраныстан тәуелсіз).
+const completeTimeout = 10 * time.Second
 
 // History — төлемдер тарихы.
 func (s *Service) History(ctx context.Context, userID string) ([]domain.Payment, error) {

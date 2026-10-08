@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -125,28 +126,58 @@ func (s *Server) view(r *http.Request, w http.ResponseWriter, active, titleKey s
 
 // ---------------------------------------------------------------- login
 
-// Бір әкімші поштасына кіру әрекеттері: IP шегіне қосымша (admin_login).
+// Бір әкімші поштасына кіру шектері: IP шегіне қосымша (admin_login).
+//
+// Two buckets, so guessing is capped at the account without letting anyone
+// lock the real administrator out by failing on purpose:
+//   - per (address, IP): 5 attempts in 15 minutes, counted before the password
+//     is checked; caps what any one source can try;
+//   - per address: 20 failures an hour from all IPs, counted only after a
+//     wrong password. While it is full, only IPs that have themselves failed
+//     for this address in that hour are refused; a source that has not been
+//     failing still has its password checked, so the administrator signs in
+//     from their own network while someone else keeps guessing.
 const (
-	adminLoginPerEmail    = 5
-	adminLoginEmailWindow = 15 * time.Minute
+	adminLoginPerSource       = 5
+	adminLoginSourceWindow    = 15 * time.Minute
+	adminLoginFailuresPerUser = 20
+	adminLoginFailureWindow   = time.Hour
 )
 
-// allowLoginFor — бір поштаға 15 минутта 5 әрекет, қай IP-ден болса да; толса 429 жазады.
-//
-// The per-IP bucket alone lets anyone with many addresses keep guessing one
-// admin's password; this caps the guesses at the account. Admin panel and
-// simulator sign-in share it, as they share the account.
-func (s *Server) allowLoginFor(w http.ResponseWriter, email string) bool {
-	key := "admin_login_email:" + traits.Clamp(strings.ToLower(strings.TrimSpace(email)), 254)
-	ok, retry := s.limiter.Allow(key, adminLoginPerEmail, adminLoginEmailWindow)
-	if ok {
-		return true
+// loginKeys — шелек кілттері: поштаның өзі және пошта+IP жұбы.
+func (s *Server) loginKeys(r *http.Request, email string) (address, source string) {
+	address = traits.Clamp(strings.ToLower(strings.TrimSpace(email)), 254)
+	return address, address + "|" + clientIP(r, s.cfg.App.TrustProxy)
+}
+
+// allowLoginFor — кіруге рұқсат па; болмаса 429 жазады. Әкімші панелі мен симулятор ортақ.
+func (s *Server) allowLoginFor(w http.ResponseWriter, r *http.Request, email string) bool {
+	address, source := s.loginKeys(r, email)
+	if failures, _ := s.limiter.Hits("admin_login_failures:"+address, adminLoginFailureWindow); failures >= adminLoginFailuresPerUser {
+		if mine, retry := s.limiter.Hits("admin_login_source_failures:"+source, adminLoginFailureWindow); mine > 0 {
+			tooManyLogins(w, retry)
+			return false
+		}
 	}
+	if ok, retry := s.limiter.Allow("admin_login_source:"+source, adminLoginPerSource, adminLoginSourceWindow); !ok {
+		tooManyLogins(w, retry)
+		return false
+	}
+	return true
+}
+
+// loginFailed — қате құпиясөз не белгісіз пошта: поштаның және осы көздің сәтсіздігі.
+func (s *Server) loginFailed(r *http.Request, email string) {
+	address, source := s.loginKeys(r, email)
+	s.limiter.Allow("admin_login_failures:"+address, adminLoginFailuresPerUser, adminLoginFailureWindow)
+	s.limiter.Allow("admin_login_source_failures:"+source, adminLoginPerSource, adminLoginFailureWindow)
+}
+
+func tooManyLogins(w http.ResponseWriter, retry time.Duration) {
 	seconds := max(int(retry.Seconds()), 1)
 	w.Header().Set("Retry-After", strconv.Itoa(seconds))
 	httpx.Error(w, http.StatusTooManyRequests, httpx.CodeRateLimited, "Too many requests. Try again shortly.",
 		map[string]any{"retry_after_seconds": seconds})
-	return false
 }
 
 // sessionCSRF — форма (csrf) не тақырып (X-CSRF-Token) сессияның токенімен сәйкес пе.
@@ -213,13 +244,16 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "csrf token mismatch", http.StatusForbidden)
 		return
 	}
-	if !s.allowLoginFor(w, r.FormValue("email")) {
+	if !s.allowLoginFor(w, r, r.FormValue("email")) {
 		return
 	}
 
 	session, err := s.admin.Login(r.Context(), r.FormValue("email"), r.FormValue("password"),
 		clientIP(r, s.cfg.App.TrustProxy), r.UserAgent())
 	if err != nil {
+		if errors.Is(err, domain.ErrUnauthorized) {
+			s.loginFailed(r, r.FormValue("email"))
+		}
 		s.log.Warn("admin login failed", "ip", clientIP(r, s.cfg.App.TrustProxy))
 		http.Redirect(w, r, "/admin/login?error=1", http.StatusSeeOther)
 		return

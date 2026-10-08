@@ -73,7 +73,11 @@ HTML и текстовой частью на языке пользователя
   при недоступности провайдера используются последние известные ключи;
 - `iss`, `aud` (список client ID), `exp`, `iat`, `nbf` с допуском 60 с, `sub`;
 - `nonce`: Google — точное совпадение; Apple — `SHA256(nonce)` в hex;
-  сравнение за постоянное время.
+  сравнение за постоянное время;
+- отказ — одно предупреждение `identity token rejected` с причиной (`audience_mismatch`,
+  `issuer_mismatch`, `bad_signature`, `unknown_key_id`, `expired`, `not_yet_valid`,
+  `nonce_mismatch` + `nonce_form`, `missing_nonce`, `missing_email`, `malformed`) и
+  публичными значениями (`token_aud`, `configured_aud`, `kid`…), без токена и почты.
 
 Связывание аккаунтов (консервативно):
 
@@ -130,7 +134,12 @@ Google Cloud Console → APIs & Services:
    **Sign in with Apple** (в проекте уже есть entitlement
    `com.apple.developer.applesignin`; Xcode с автоматической подписью обновит
    профиль сам).
-2. `.env` сервера: `APPLE_CLIENT_ID=kz.ai-reply.reply.keyboard.keyboard`.
+2. `.env` сервера: `APPLE_CLIENT_ID=kz.ai-reply.reply.keyboard.keyboard` — ровно bundle id
+   приложения (его Apple кладёт в `aud`). Старый `kz.yerek.replykeyboard` или App ID с
+   префиксом Team ID дают `401 INVALID_ID_TOKEN` на каждый вход; в журнале это видно как
+   `identity token rejected` с `reason=audience_mismatch`, `token_aud` и `configured_aud`.
+   При старте строка `sign-in client ids` показывает настроенные значения, а значение не в
+   форме bundle id даёт `configuration warning`.
 3. Скрытые адреса Apple (`@privaterelay.appleid.com`): Certificates, IDs &
    Profiles → Services → **Sign in with Apple for Email Communication** →
    добавить домен `ai-reply.kz` (и `send.ai-reply.kz` — домен обратного адреса
@@ -144,7 +153,9 @@ Google Cloud Console → APIs & Services:
    или base64. iOS перед `DELETE /api/v1/me` получает свежий authorization code и
    присылает его в `apple_authorization_code`; сервер меняет его на refresh token и
    отзывает (`/auth/token` → `/auth/revoke`). Без ключа аккаунт всё равно удаляется,
-   `apple_token_revoked: false`, в логе предупреждение.
+   `apple_token_revoked: false`; сервер при старте пишет предупреждение, а страница
+   удаления и политика конфиденциальности тогда не обещают отключение Apple — только
+   «можно убрать AI Reply в настройках Apple ID».
 
 ## 7. Проверка после деплоя
 

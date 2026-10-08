@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -151,14 +152,14 @@ func TestVerifyToleratesSmallClockSkew(t *testing.T) {
 
 func TestAppleClaimShapes(t *testing.T) {
 	key := newKey(t)
-	v, err := New(Config{Issuers: AppleIssuers, Audiences: []string{"kz.yerek.replykeyboard"},
+	v, err := New(Config{Issuers: AppleIssuers, Audiences: []string{"kz.ai-reply.reply.keyboard.keyboard"},
 		Keys: StaticKeys{"a1": &key.PublicKey}, Now: func() time.Time { return testNow }})
 	if err != nil {
 		t.Fatal(err)
 	}
 	raw := "raw-nonce-value"
 	token := sign(t, key, map[string]any{"alg": "RS256", "kid": "a1"}, map[string]any{
-		"iss": "https://appleid.apple.com", "aud": []string{"kz.yerek.replykeyboard"},
+		"iss": "https://appleid.apple.com", "aud": []string{"kz.ai-reply.reply.keyboard.keyboard"},
 		"sub": "001234.abcdef.0987", "exp": float64(testNow.Add(10 * time.Minute).Unix()),
 		"iat": testNow.Unix(), "nonce": AppleNonce(raw), "email": "x7k2@privaterelay.appleid.com",
 		"email_verified": "true", "is_private_email": "true",
@@ -319,5 +320,117 @@ func TestCacheTTL(t *testing.T) {
 		if got := cacheTTL(header); got != want {
 			t.Errorf("cacheTTL(%q) = %v, want %v", header, got, want)
 		}
+	}
+}
+
+// Әр қабылданбаған токен құлаған тексерудің санатын және оның ашық мәндерін атайды.
+func TestRejectionsNameTheFailedCheck(t *testing.T) {
+	key := newKey(t)
+	other := newKey(t)
+	v := verifier(t, StaticKeys{"k1": &key.PublicKey})
+	header := map[string]any{"alg": "RS256", "kid": "k1"}
+	with := func(mutate func(map[string]any)) map[string]any {
+		c := googleClaims()
+		mutate(c)
+		return c
+	}
+
+	cases := map[string]struct {
+		token  string
+		reason Reason
+		check  func(t *testing.T, r *RejectError)
+	}{
+		"garbage":  {token: "not-a-token", reason: ReasonMalformed},
+		"alg none": {token: b64(map[string]any{"alg": "none", "kid": "k1"}) + "." + b64(googleClaims()) + ".", reason: ReasonAlgorithm},
+		"no kid":   {token: sign(t, key, map[string]any{"alg": "RS256"}, googleClaims()), reason: ReasonKeyID},
+		"other kid": {token: sign(t, key, map[string]any{"alg": "RS256", "kid": "k9"}, googleClaims()), reason: ReasonKeyID,
+			check: func(t *testing.T, r *RejectError) {
+				if r.KeyID != "k9" {
+					t.Fatalf("kid = %q", r.KeyID)
+				}
+			}},
+		"other key": {token: sign(t, other, header, googleClaims()), reason: ReasonSignature},
+		"issuer": {token: sign(t, key, header, with(func(c map[string]any) { c["iss"] = "https://evil.example" })), reason: ReasonIssuer,
+			check: func(t *testing.T, r *RejectError) {
+				if r.Issuer != "https://evil.example" || strings.Join(r.Expected, ",") != strings.Join(GoogleIssuers, ",") {
+					t.Fatalf("issuer details = %q / %v", r.Issuer, r.Expected)
+				}
+			}},
+		"audience": {token: sign(t, key, header, with(func(c map[string]any) { c["aud"] = []string{"kz.yerek.replykeyboard"} })),
+			reason: ReasonAudience,
+			check: func(t *testing.T, r *RejectError) {
+				if strings.Join(r.Audience, ",") != "kz.yerek.replykeyboard" || strings.Join(r.Expected, ",") != "ios-client,web-client" ||
+					r.AuthorizedParty != "android-client" {
+					t.Fatalf("audience details = %v / %v / %q", r.Audience, r.Expected, r.AuthorizedParty)
+				}
+			}},
+		"missing subject": {token: sign(t, key, header, with(func(c map[string]any) { delete(c, "sub") })), reason: ReasonMalformed},
+		"expired": {token: sign(t, key, header, with(func(c map[string]any) { c["exp"] = testNow.Add(-time.Hour).Unix() })),
+			reason: ReasonExpired,
+			check: func(t *testing.T, r *RejectError) {
+				if r.Off != time.Hour {
+					t.Fatalf("expired for %v", r.Off)
+				}
+			}},
+		"future iat": {token: sign(t, key, header, with(func(c map[string]any) { c["iat"] = testNow.Add(10 * time.Minute).Unix() })),
+			reason: ReasonNotYetValid},
+		"nonce": {token: sign(t, key, header, with(func(c map[string]any) { c["nonce"] = AppleNonce("n-123") })), reason: ReasonNonce,
+			check: func(t *testing.T, r *RejectError) {
+				if !r.NonceIs(AppleNonce("n-123")) || r.NonceIs("n-123") || r.NonceIs("") {
+					t.Fatal("NonceIs does not compare with the token's nonce")
+				}
+			}},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, err := v.Verify(context.Background(), c.token, "n-123")
+			var r *RejectError
+			if !errors.As(err, &r) || !errors.Is(err, ErrInvalidToken) {
+				t.Fatalf("err = %v, want a *RejectError wrapping ErrInvalidToken", err)
+			}
+			if r.Reason != c.reason {
+				t.Fatalf("reason = %q, want %q (%v)", r.Reason, c.reason, err)
+			}
+			if c.check != nil {
+				c.check(t, r)
+			}
+			// The log fields never carry the token, its subject or its nonce.
+			logged := strings.ToLower(strings.Join(strings.Fields(strings.Trim(fmt.Sprint(r.Attrs()), "[]")), " "))
+			for _, secret := range []string{"1234567890", "someone@gmail.com", strings.ToLower(AppleNonce("n-123")), "n-123"} {
+				if strings.Contains(logged, secret) {
+					t.Fatalf("attrs %v contain %q", r.Attrs(), secret)
+				}
+			}
+			if r.Reason != ReasonNonce && r.NonceIs("") {
+				t.Fatal("NonceIs answers outside a nonce mismatch")
+			}
+		})
+	}
+}
+
+// Audience mismatch журналы токеннің aud-ын да, бапталған id-лерді де көрсетеді.
+func TestAudienceMismatchAttrs(t *testing.T) {
+	key := newKey(t)
+	v, err := New(Config{Issuers: AppleIssuers, Audiences: []string{"kz.ai-reply.reply.keyboard.keyboard"},
+		Keys: StaticKeys{"a1": &key.PublicKey}, Now: func() time.Time { return testNow }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	token := sign(t, key, map[string]any{"alg": "RS256", "kid": "a1"}, map[string]any{
+		"iss": "https://appleid.apple.com", "aud": "kz.yerek.replykeyboard", "sub": "001234.abcdef.0987",
+		"exp": testNow.Add(10 * time.Minute).Unix(), "iat": testNow.Unix(), "nonce": AppleNonce("raw"),
+	})
+	_, err = v.Verify(context.Background(), token, AppleNonce("raw"))
+	var r *RejectError
+	if !errors.As(err, &r) {
+		t.Fatalf("err = %v", err)
+	}
+	attrs := map[string]any{}
+	for i := 0; i+1 < len(r.Attrs()); i += 2 {
+		attrs[r.Attrs()[i].(string)] = r.Attrs()[i+1]
+	}
+	if attrs["reason"] != "audience_mismatch" || fmt.Sprint(attrs["token_aud"]) != "[kz.yerek.replykeyboard]" ||
+		fmt.Sprint(attrs["configured_aud"]) != "[kz.ai-reply.reply.keyboard.keyboard]" {
+		t.Fatalf("attrs = %v", attrs)
 	}
 }

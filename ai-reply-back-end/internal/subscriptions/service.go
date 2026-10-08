@@ -76,6 +76,26 @@ func (s *Service) Assign(ctx context.Context, userID, planID, source string, exp
 	})
 }
 
+// AssignForPayment — төлемді аяқтап, оның тарифін береді (бір транзакция, Assign сияқты кезең).
+//
+// applied=false: the payment had already been completed and nothing changed.
+func (s *Service) AssignForPayment(ctx context.Context, userID, paymentID, planID, ref string) (domain.Subscription, bool, error) {
+	plan, err := s.repo.Plan(ctx, planID)
+	if err != nil {
+		return domain.Subscription{}, false, err
+	}
+	now := s.clock.Now()
+	applied, sub, err := s.repo.CompletePayment(ctx, paymentID, ref, domain.Subscription{
+		UserID:    userID,
+		PlanID:    plan.ID,
+		Status:    domain.SubActive,
+		Source:    "payment",
+		StartedAt: now,
+		ExpiresAt: periodEnd(plan, now, nil),
+	})
+	return sub, applied, err
+}
+
 // Renew — ағымдағы жарамды жазылым дәл осы тариф болса, тек мерзімін ауыстырады.
 //
 // true means it did: the person keeps the one subscription they have (and

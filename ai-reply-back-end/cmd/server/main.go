@@ -47,12 +47,35 @@ import (
 
 func main() {
 	envFile := flag.String("env", ".env", "path to the env file")
+	check := flag.Bool("check", false, "validate the configuration, print its warnings and exit (opens nothing)")
 	flag.Parse()
 
+	if *check {
+		os.Exit(checkConfig(*envFile))
+	}
 	if err := run(*envFile); err != nil {
 		fmt.Fprintf(os.Stderr, "\nstartup failed:\n%v\n\nSee .env.example for the required configuration.\n", err)
 		os.Exit(1)
 	}
+}
+
+// checkConfig — тек баптауды тексереді: дерекқор да, порт та ашылмайды (жаңартудан бұрын).
+//
+// Every problem that would stop the start is listed at once, then every
+// warning, so an existing .env can be checked against a new build before the
+// running container is replaced.
+func checkConfig(envFile string) int {
+	cfg, err := config.Load(envFile)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "configuration check failed:\n%v\n", err)
+		return 1
+	}
+	for _, warning := range cfg.Warnings() {
+		fmt.Fprintf(os.Stderr, "warning: %s\n", warning)
+	}
+	fmt.Printf("configuration OK (APP_ENV=%s)\nsign-in client ids: google=%v apple=%v\n",
+		cfg.App.Env, cfg.OAuth.GoogleClientIDs, cfg.OAuth.AppleClientIDs)
+	return 0
 }
 
 func run(envFile string) error {
@@ -61,6 +84,10 @@ func run(envFile string) error {
 		return err
 	}
 	log := logging.New(cfg.Log.Level, cfg.Log.Format)
+	// Іске қосылуды тоқтатпайтын олқылықтар: оператор аты, Apple токенін кері қайтару, APPLE_CLIENT_ID пішіні.
+	for _, warning := range cfg.Warnings() {
+		log.Warn("configuration warning: " + warning)
+	}
 
 	db, err := database.Open(database.Options{
 		Path:         cfg.Database.Path,
@@ -103,7 +130,7 @@ func run(envFile string) error {
 	planSvc := plans.New(store)
 	subSvc := subscriptions.New(store, planSvc, cfg.App.Location())
 	userSvc := users.New(store).WithLogger(log)
-	if err := configureAppleRevocation(userSvc, cfg.OAuth, log); err != nil {
+	if err := configureAppleRevocation(userSvc, cfg.OAuth); err != nil {
 		return err
 	}
 	sender := auth.NewSender(cfg.Auth.OTPChannel, log)
@@ -118,6 +145,9 @@ func run(envFile string) error {
 	if err := configureSignIn(authSvc, cfg, mailer); err != nil {
 		return err
 	}
+	// Client id-лер — ашық мәндер: токеннің aud-ы сәйкес келмесе, журналда екеуі де көрінеді.
+	log.Info("sign-in client ids", "google", cfg.OAuth.GoogleClientIDs, "apple", cfg.OAuth.AppleClientIDs,
+		"apple_token_revocation", cfg.OAuth.AppleRevocation())
 	installSvc := installations.New(store, cfg.Auth.AccessSecret, log)
 	pushProvider, err := configurePush(cfg.Push, log)
 	if err != nil {
@@ -295,16 +325,15 @@ func configureSignIn(authSvc *auth.Service, cfg config.Config, mailer *email.Res
 
 // configureAppleRevocation — тіркелгі жойылғанда Sign in with Apple токенін кері қайтару.
 //
-// Optional: without APPLE_TEAM_ID, APPLE_KEY_ID and APPLE_PRIVATE_KEY accounts
-// are still deleted, only the Apple token stays until the person removes the
-// app from their Apple ID settings. A key that is set but cannot be used
-// stops the start; the key itself never reaches a log line or an error.
-func configureAppleRevocation(userSvc *users.Service, cfg config.OAuth, log *slog.Logger) error {
+// Needed whenever Sign in with Apple is on (App Store guideline 5.1.1(v));
+// without APPLE_TEAM_ID, APPLE_KEY_ID and APPLE_PRIVATE_KEY the server still
+// starts with a warning (config.Warnings), accounts are still deleted, and
+// the Apple token stays until the person removes the app from their Apple ID
+// settings, which is all the deletion page then promises. A key that is set
+// but cannot be used stops the start; the key itself never reaches a log line
+// or an error.
+func configureAppleRevocation(userSvc *users.Service, cfg config.OAuth) error {
 	if !cfg.AppleRevocation() {
-		if len(cfg.AppleClientIDs) > 0 {
-			log.Warn("sign in with apple is on but APPLE_TEAM_ID, APPLE_KEY_ID and APPLE_PRIVATE_KEY are not set: " +
-				"deleted accounts keep their Apple token")
-		}
 		return nil
 	}
 	revoker, err := appleid.New(appleid.Config{

@@ -161,7 +161,9 @@ type accountDeleteView struct {
 	CodeSent string
 	// KeptBody — «не сақталады»: аккаунтсыз орнату қашан жойылатыны RETENTION_ANON_INSTALLATIONS_DAYS-тан.
 	KeptBody string
-	Boot     template.JS
+	// AppBody — қолданбада жою: Apple-ді «ажыратамыз» тек кері қайтару кілті бапталса.
+	AppBody string
+	Boot    template.JS
 }
 
 // handleAccountDelete — тіркелгіні жою беті (Google Play «Delete account URL»): қолданбадағы
@@ -189,10 +191,17 @@ func (s *Server) handleAccountDelete(w http.ResponseWriter, r *http.Request) {
 	if days := s.cfg.Retention.AnonInstallationsDays; days > 0 {
 		kept = strings.ReplaceAll(s.bundle.T(locale, "delete.kept_body"), "{after}", wordsFor(locale).period(days))
 	}
+	// Without APPLE_TEAM_ID / _KEY_ID / _PRIVATE_KEY nothing revokes the Apple
+	// token, so the page only says what the person can do in their Apple ID.
+	appBody := s.bundle.T(locale, "delete.app_body_apple_manual")
+	if s.cfg.OAuth.AppleRevocation() {
+		appBody = s.bundle.T(locale, "delete.app_body")
+	}
 	s.render(w, "account_delete", "public_layout", accountDeleteView{
 		baseView: s.base(locale),
 		CodeSent: strings.ReplaceAll(s.bundle.T(locale, "delete.code_sent"), "{minutes}", strconv.Itoa(minutes)),
 		KeptBody: kept,
+		AppBody:  appBody,
 		Boot:     template.JS(boot),
 	})
 }

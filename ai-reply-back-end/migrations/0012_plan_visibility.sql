@@ -12,8 +12,16 @@
 -- when the server also has a verified billing integration (see payments), so
 -- showing a plan or flipping this switch alone never starts taking payments.
 --
--- Only additive changes. Rollback: older binaries ignore the column and the
--- setting, so deploying the previous build is enough.
+-- Only additive changes. Rollback: do NOT roll production back to a build
+-- before this migration (pre-a1c7e38). Those builds accept only
+-- PAYMENT_MODE=demo|live, and production refuses demo, so they need
+-- PAYMENT_MODE=live; in them "live" is still wired to the demo provider, which
+-- approves every checkout, and checkout ignores is_visible, is_active and
+-- archived_at: every paid plan becomes free to anyone who calls the API. If such
+-- a rollback is unavoidable: set PAYMENT_MODE=live, deny POST /api/v1/payments/*
+-- at Caddy for the whole window, and after rolling forward review payments with
+-- provider='demo' AND status='succeeded' and the subscriptions created from them
+-- (source='payment').
 ALTER TABLE plans ADD COLUMN is_visible INTEGER NOT NULL DEFAULT 1;
 UPDATE plans SET is_visible = 0 WHERE is_free = 0;
 

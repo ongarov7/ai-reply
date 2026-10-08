@@ -107,3 +107,21 @@ func TestLegacyMessageTooLong(t *testing.T) {
 		t.Fatalf("legacy 413 payload changed: %s", res.raw)
 	}
 }
+
+// Ескі маршрут тек install-token қабылдайды: жаңа access токенмен келісім тексерісін айналып өтуге болмайды.
+func TestLegacyEndpointRefusesModernAccessTokens(t *testing.T) {
+	h := newHarness(t)
+	for name, s := range map[string]session{
+		"never consented": h.signInWithoutConsent("legacy-no-consent@example.com"),
+		"consented":       h.signIn("legacy-consented@example.com"),
+	} {
+		res := h.do(http.MethodPost, "/v1/reply/generate",
+			map[string]any{"message": "Сәлеметсіз бе!", "keyboard_language": "kk"}, h.auth(s.access))
+		if res.status != http.StatusUnauthorized {
+			t.Fatalf("%s: access token on the legacy route: %d %s", name, res.status, res.raw)
+		}
+	}
+	if h.provider.calls != 0 {
+		t.Fatalf("provider called %d times through the legacy route", h.provider.calls)
+	}
+}

@@ -78,6 +78,22 @@ func (l *Limiter) Allow(key string, limit int, window time.Duration) (bool, time
 	return true, 0
 }
 
+// Hits — кілттің терезедегі соққылары (ештеңе жазбайды) және ең ескісі шыққанша қалған уақыт.
+func (l *Limiter) Hits(key string, window time.Duration) (int, time.Duration) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	b := l.buckets[key]
+	if b == nil {
+		return 0, 0
+	}
+	now := l.now()
+	b.hits = filter(b.hits, now, window)
+	if len(b.hits) == 0 {
+		return 0, 0
+	}
+	return len(b.hits), max(window-now.Sub(b.hits[0]), time.Second)
+}
+
 // collect — әр кілтті өз терезесімен тазалайды; бос кілттер жойылады.
 func (l *Limiter) collect(now time.Time) {
 	for k, b := range l.buckets {

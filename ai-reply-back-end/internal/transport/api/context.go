@@ -100,7 +100,13 @@ func (s *Server) requireConsent(next http.Handler) http.Handler {
 	})
 }
 
-// requireLegacy — ескі install-token миддлварі.
+// requireLegacy — ескі install-token миддлварі (тек install-token).
+//
+// Only legacy install tokens are accepted. A normal /api/v1 access token is
+// refused here: the legacy route has no consent check, and a current-app user
+// without consent (or who withdrew it) must never reach the provider through
+// it. No shipped client needs that path: Node-era builds hold install tokens
+// only, and the current apps never call /v1/*.
 func (s *Server) requireLegacy(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token := bearer(r)
@@ -110,12 +116,6 @@ func (s *Server) requireLegacy(next http.Handler) http.Handler {
 		}
 		user, err := s.auth.AuthenticateLegacy(r.Context(), token)
 		if err != nil {
-			// Жаңа access токенмен де жұмыс істей берсін (біртіндеп көшу).
-			if u, claims, err2 := s.auth.Authenticate(r.Context(), token); err2 == nil {
-				ctx := context.WithValue(WithUser(r.Context(), u), deviceKey, claims.DeviceID)
-				next.ServeHTTP(w, r.WithContext(ctx))
-				return
-			}
 			httpx.Fail(w, err)
 			return
 		}

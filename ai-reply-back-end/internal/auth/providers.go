@@ -39,11 +39,12 @@ func (s *Service) SignInWithGoogle(ctx context.Context, token, nonce string, inf
 		return Session{}, domain.ErrAuthProviderUnavailable
 	}
 	if strings.TrimSpace(nonce) == "" {
+		s.tokenRejected(domain.IdentityGoogle, "missing_nonce")
 		return Session{}, domain.ErrInvalidIDToken
 	}
 	claims, err := s.google.Verify(ctx, strings.TrimSpace(token), nonce)
 	if err != nil {
-		return Session{}, s.providerError(domain.IdentityGoogle, err)
+		return Session{}, s.providerError(domain.IdentityGoogle, err, nonce)
 	}
 	address, _ := NormalizeEmail(claims.Email)
 	verified := claims.EmailVerified && address != ""
@@ -68,11 +69,12 @@ func (s *Service) SignInWithApple(ctx context.Context, token, rawNonce, fullName
 		return Session{}, domain.ErrAuthProviderUnavailable
 	}
 	if strings.TrimSpace(rawNonce) == "" {
+		s.tokenRejected(domain.IdentityApple, "missing_nonce")
 		return Session{}, domain.ErrInvalidIDToken
 	}
 	claims, err := s.apple.Verify(ctx, strings.TrimSpace(token), idtoken.AppleNonce(rawNonce))
 	if err != nil {
-		return Session{}, s.providerError(domain.IdentityApple, err)
+		return Session{}, s.providerError(domain.IdentityApple, err, rawNonce)
 	}
 	address, _ := NormalizeEmail(claims.Email)
 	verified := claims.EmailVerified && address != ""
@@ -86,14 +88,62 @@ func (s *Service) SignInWithApple(ctx context.Context, token, rawNonce, fullName
 	}, info)
 }
 
-func (s *Service) providerError(kind string, err error) error {
+// providerError — тексерілмеген токен: бір ескерту (себеп санатымен) және клиентке қате.
+//
+// Every rejected token gives exactly one warning, "identity token rejected",
+// with the failed check (bad signature or key id, issuer, audience — with the
+// aud the token carried and the client ids this server accepts, nonce,
+// expiry, …). Those are public identifiers; the token, its subject and the
+// e-mail never reach the log. The HTTP answer stays INVALID_ID_TOKEN.
+func (s *Service) providerError(kind string, err error, sentNonce string) error {
 	if errors.Is(err, idtoken.ErrUnavailable) {
 		s.log.Warn("identity provider keys unavailable", "provider", kind, "error", err.Error())
 		return domain.ErrAuthProviderUnavailable
 	}
-	// The reason names the failed check ("audience mismatch"), never the token.
-	s.log.Info("identity token rejected", "provider", kind, "reason", err.Error())
+	var rejected *idtoken.RejectError
+	if !errors.As(err, &rejected) {
+		s.tokenRejected(kind, "invalid", "check", err.Error())
+		return domain.ErrInvalidIDToken
+	}
+	attrs := rejected.Attrs()
+	if rejected.Reason == idtoken.ReasonNonce {
+		attrs = append(attrs, "nonce_form", nonceForm(kind, sentNonce, rejected))
+	}
+	s.tokenRejected(kind, "", attrs...)
 	return domain.ErrInvalidIDToken
+}
+
+// tokenRejected — «identity token rejected» ескертуі. reason бос болса, ол attrs ішінде.
+func (s *Service) tokenRejected(kind, reason string, attrs ...any) {
+	fields := []any{"provider", kind}
+	if reason != "" {
+		fields = append(fields, "reason", reason)
+	}
+	s.log.Warn("identity token rejected", append(fields, attrs...)...)
+}
+
+// nonceForm — nonce келісімі қалай бұзылды (мәннің өзі журналға шықпайды).
+//
+// Google must carry the app's nonce as is; Apple must carry the lowercase hex
+// SHA-256 of the raw nonce the app sends here. "absent": the token has no
+// nonce; "sent_value": the token carries exactly what the app sent here (for
+// Apple: the app put the raw value in the Apple request, or sent us the hash
+// instead of the raw value); "hashed": a Google token carries the hash;
+// "uppercase_hash": the Apple hash in upper case; "different": another value,
+// e.g. the nonce of an earlier attempt.
+func nonceForm(kind, sent string, rejected *idtoken.RejectError) string {
+	switch {
+	case rejected.NonceIs(""):
+		return "absent"
+	case rejected.NonceIs(sent):
+		return "sent_value"
+	case kind == domain.IdentityGoogle && rejected.NonceIs(idtoken.AppleNonce(sent)):
+		return "hashed"
+	case kind == domain.IdentityApple && rejected.NonceIs(strings.ToUpper(idtoken.AppleNonce(sent))):
+		return "uppercase_hash"
+	default:
+		return "different"
+	}
 }
 
 func (s *Service) signInWithProvider(ctx context.Context, p providerSignIn, info DeviceInfo) (Session, error) {
@@ -158,7 +208,8 @@ func (s *Service) linkOrCreateProviderUser(ctx context.Context, p providerSignIn
 	// requires one (users CHECK). Providers send a verified address whenever the
 	// e-mail scope is granted, which both apps request.
 	if !p.emailVerified {
-		s.log.Info("identity token rejected", "provider", p.kind, "reason", "no verified e-mail")
+		// email_in_token: the token had an address the provider did not mark verified.
+		s.tokenRejected(p.kind, "missing_email", "email_in_token", p.email != "")
 		return domain.User{}, false, domain.ErrInvalidIDToken
 	}
 	identities := []domain.Identity{identity}

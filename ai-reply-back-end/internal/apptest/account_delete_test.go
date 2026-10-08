@@ -230,15 +230,18 @@ func TestWebAccountDeletion(t *testing.T) {
 	mailer := withMailer(h, 4821, 1357)
 	sent := mailer.count()
 
-	// Unknown address: same answer, nothing sent, no code stored.
+	// Unknown address: same answer, nothing sent; a silent code nobody receives stands in for it.
 	unknown := h.requestDeletion("nobody@example.com")
 	if unknown.status != http.StatusOK || unknown.body["ok"] != true {
 		t.Fatalf("unknown address: %d %s", unknown.status, unknown.raw)
 	}
-	if mailer.count() != sent || h.scalar(`SELECT COUNT(*) FROM otp_codes WHERE identity_value = 'nobody@example.com'`) != 0 {
-		t.Fatal("a code was issued for an address without an account")
+	if mailer.count() != sent {
+		t.Fatal("a code was e-mailed to an address without an account")
 	}
-	mustStatus(t, h.confirmDeletion("nobody@example.com", "1234"), http.StatusBadRequest, "INVALID_OTP")
+	if h.scalar(`SELECT COUNT(*) FROM otp_codes WHERE identity_value = 'nobody@example.com'
+		AND purpose = 'delete' AND channel = 'none'`) != 1 {
+		t.Fatal("no silent code for the address without an account")
+	}
 	mustStatus(t, h.do(http.MethodPost, "/api/v1/account/delete/request", map[string]any{"email": "not-an-email"}, nil),
 		http.StatusBadRequest, "INVALID_EMAIL")
 
@@ -252,11 +255,15 @@ func TestWebAccountDeletion(t *testing.T) {
 		t.Fatalf("deletion e-mail = %+v (count %d)", msg, mailer.count())
 	}
 
-	// A wrong code changes nothing; a sign-in verification cannot use the deletion code.
+	// A wrong code changes nothing, and answers exactly as for the unknown address;
+	// a sign-in verification cannot use the deletion code.
 	wrong := h.confirmDeletion("web.delete@example.com", "0000")
 	mustStatus(t, wrong, http.StatusBadRequest, "INVALID_OTP")
 	if wrong.num("error", "details", "attempts_remaining") != 4 {
 		t.Fatalf("attempts = %s", wrong.raw)
+	}
+	if other := h.confirmDeletion("nobody@example.com", "0000"); other.status != wrong.status || string(other.raw) != string(wrong.raw) {
+		t.Fatalf("unknown address answers differently: %s / %s", other.raw, wrong.raw)
 	}
 	mustStatus(t, h.verifyEmailCode("web.delete@example.com", msg.Code), http.StatusBadRequest, "INVALID_OTP")
 	if h.scalar(`SELECT COUNT(*) FROM users WHERE id = ?`, signedIn.userID) != 1 {
@@ -279,6 +286,46 @@ func TestWebAccountDeletion(t *testing.T) {
 	mustStatus(t, h.confirmDeletion("web.delete@example.com", msg.Code), http.StatusBadRequest, "INVALID_OTP")
 	if strings.Contains(h.logs.String(), "web.delete@example.com") {
 		t.Fatal("logs contain the address")
+	}
+}
+
+// Тіркелгісі жоқ пошта мен бар пошта бір-бірінен ажыратылмайды: растау жауаптары,
+// әрекет саны, бұғат және кіру кодының үзілісі бірдей.
+func TestWebAccountDeletionLooksTheSameWithoutAnAccount(t *testing.T) {
+	h := newHarness(t)
+	h.signInWithoutConsent("real.person@example.com")
+	h.clock.Advance(time.Minute) // past the sign-in code's resend cooldown
+	// The second code is the silent one the address without an account gets.
+	mailer := withMailer(h, 4821, 6390)
+	sent := mailer.count()
+
+	if a, b := h.requestDeletion("real.person@example.com"), h.requestDeletion("no.account@example.com"); string(a.raw) != string(b.raw) {
+		t.Fatalf("request answers differ: %s / %s", a.raw, b.raw)
+	}
+	if mailer.count() != sent+1 || mailer.last(t).To != "real.person@example.com" {
+		t.Fatalf("only the real account gets a mail (sent %d)", mailer.count()-sent)
+	}
+
+	// The sign-in code request right after: the same cooldown for both.
+	real, none := h.requestEmailCode("real.person@example.com"), h.requestEmailCode("no.account@example.com")
+	mustStatus(t, real, http.StatusTooManyRequests, "OTP_RESEND_COOLDOWN")
+	if string(real.raw) != string(none.raw) || real.status != none.status {
+		t.Fatalf("cooldown differs: %s / %s", real.raw, none.raw)
+	}
+
+	// Every wrong guess, the last one and the one after it: the same answers.
+	wrongCode := "0000"
+	if mailer.last(t).Code == wrongCode {
+		wrongCode = "0001"
+	}
+	for i := 0; i < h.cfg.Auth.OTPMaxAttempts+1; i++ {
+		a, b := h.confirmDeletion("real.person@example.com", wrongCode), h.confirmDeletion("no.account@example.com", wrongCode)
+		if a.status == http.StatusOK || a.status != b.status || string(a.raw) != string(b.raw) {
+			t.Fatalf("guess %d: %d %s / %d %s", i+1, a.status, a.raw, b.status, b.raw)
+		}
+	}
+	if h.scalar(`SELECT COUNT(*) FROM users WHERE email = 'real.person@example.com'`) != 1 {
+		t.Fatal("wrong guesses deleted the account")
 	}
 }
 
@@ -354,5 +401,56 @@ func TestAccountPagesRender(t *testing.T) {
 	}
 	if config := bare.do(http.MethodGet, "/api/v1/config", nil, nil); config.str("legal", "contact_email") != "" {
 		t.Fatalf("contact_email = %q", config.str("legal", "contact_email"))
+	}
+}
+
+// Жойылған тіркелгінің поштасы мен id-і науқан сүзгілерінде қалмайды, ал сүзгі бәріне кеңеймейді.
+func TestAccountDeletionRemovesThePersonFromCampaignAudiences(t *testing.T) {
+	h := newHarness(t)
+	gone := h.signIn("target.person@example.com")
+	stays := h.signIn("bystander@example.com")
+	for i, s := range []session{gone, stays} {
+		h.optInMarketing(s.access)
+		h.mustRegister(installation(installID(81+i), "android", fcmToken(81+i)), s.access)
+	}
+	headers := h.signInAdmin().headers(h.cfg.Admin.CookieName)
+	create := func(key string, audience map[string]any) string {
+		t.Helper()
+		res := h.do(http.MethodPost, "/api/v1/admin/notifications/campaigns", campaignBody(map[string]any{"audience": audience}),
+			withKey(headers, key))
+		if res.status != http.StatusCreated {
+			t.Fatalf("campaign: %d %s", res.status, res.raw)
+		}
+		return res.str("id")
+	}
+	onlyGone := create("deleted-target-000001", map[string]any{"emails": []string{"Target.Person@example.com"}})
+	both := create("deleted-target-000002", map[string]any{"emails": []string{"target.person@example.com"},
+		"user_ids": []string{gone.userID, stays.userID}})
+
+	if res := h.do(http.MethodDelete, "/api/v1/me", nil, h.auth(gone.access)); res.status != http.StatusOK {
+		t.Fatalf("delete: %d %s", res.status, res.raw)
+	}
+	if n := h.scalar(`SELECT COUNT(*) FROM notification_campaigns WHERE audience_filter LIKE '%target.person%'
+		OR audience_filter LIKE '%' || ? || '%'`, gone.userID); n != 0 {
+		t.Fatalf("%d campaign filter(s) still name the deleted account", n)
+	}
+	detail := h.do(http.MethodGet, "/api/v1/admin/notifications/campaigns/"+onlyGone, nil, headers)
+	if detail.num("audience", "redacted_people") != 1 || strings.Contains(string(detail.raw), "target.person") {
+		t.Fatalf("redacted filter: %s", detail.raw)
+	}
+	if h.text(`SELECT audience_filter FROM notification_campaigns WHERE id = ?`, both) !=
+		`{"user_ids":["`+stays.userID+`"],"redacted_people":2}` {
+		t.Fatalf("mixed filter = %s", h.text(`SELECT audience_filter FROM notification_campaigns WHERE id = ?`, both))
+	}
+
+	// The draft that named only the deleted person reaches nobody; the other still reaches the bystander.
+	for _, id := range []string{onlyGone, both} {
+		if res := h.do(http.MethodPost, "/api/v1/admin/notifications/campaigns/"+id+"/send", map[string]any{}, headers); res.status != http.StatusOK {
+			t.Fatalf("send %s: %d %s", id, res.status, res.raw)
+		}
+	}
+	h.tick()
+	if got := sentTokens(h.push); len(got) != 1 || got[fcmToken(82)] != 1 {
+		t.Fatalf("sent = %v, want only the bystander once", got)
 	}
 }
