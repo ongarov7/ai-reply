@@ -1,5 +1,7 @@
 # AI Reply: готовность к релизу в App Store и Google Play
 
+> **Актуальное состояние — в разделе «Development Handoff» в конце документа (9 октября 2026).** Статусы в разделах 1 и 12 обновлены.
+
 Исторический отчёт Claude от 8 октября 2026: на момент составления ветка `notification` была только локальной, без push и deploy. Актуальное дополнение Codex — в конце документа.
 
 > Разделы 1–12 ниже — сохранённый исторический отчёт Claude. Утверждения о `release-audit`, stash и файле review не подтвердились в этом checkout. Актуальные результаты Codex и изменения Firebase находятся в разделе **Claude Code Handoff — Recovery and Continuation** в конце документа.
@@ -18,17 +20,14 @@
 - безопасные значения конфигурации и ужесточение авторизации;
 - подготовка конфигурации Firebase.
 
-**Не закончено:** исправления по 21 находке ревью бэкенда, из них две P1. Это обход согласия через старый API и неточности в политике про выделенный текст. Незаконченная работа лежит в stash ветки `release-audit`, список находок — в `docs/review-backend-confirmed.txt` внутри этого stash.
+**Закончено 9 октября:** все 21 находка ревью бэкенда, включая две P1. Подробности — в разделе «Development Handoff».
 
 **Статус релиза:**
-- iOS App Store: **BLOCKED**;
-- Google Play: **BLOCKED**.
+- iOS App Store: **READY AFTER MANUAL CONFIGURATION**;
+- Google Play: **READY AFTER MANUAL CONFIGURATION**.
 
-**Что осталось до READY AFTER MANUAL CONFIGURATION:**
-1. Закончить исправления по ревью бэкенда.
-2. Развернуть бэкенд с production `.env` (раздел 11.1).
-3. Задать оператора и контакт.
-4. Подписать сборки и проверить на устройствах.
+Блокеров в коде не осталось. Обязательные ручные шаги: production `.env` и деплой бэкенда, оператор и контакт, `APPLE_CLIENT_ID`, подпись сборок, поля App Privacy и Data safety, проверка на реальных устройствах (раздел 11 и «Development Handoff»). Push не обязателен для ревью, но до его включения нужен APNs-ключ.
+
 ## 2. Синхронизация Git
 
 **Исходное состояние (8 октября 2026, до любых изменений):**
@@ -149,6 +148,8 @@
 3. **Сервер.** Новые реализации `payments.Provider` (`appstore`, `googleplay`) с `Live() == true`. `subs.Assign(source = "app_store" | "google_play")` только после проверки. Идемпотентность по ID транзакции и маппинг продуктов на тарифы. Таблицы `payments` и `subscriptions` уже есть.
 4. **Альтернативный биллинг.** Для Казахстана ни у Apple (External Purchase / Link Entitlement), ни у Google (User Choice Billing, External Offers) программ нет: Казахстан не входит в списки стран. Поэтому в приложениях только IAP и Play Billing, никаких ссылок на оплату картой или через Kaspi.
 5. **Порядок включения:** реализовать провайдер → проверить в sandbox → в админке сделать тарифы видимыми → включить «Покупки» → выпустить версию приложений с UI покупки. Видимость без оплаты разрешена, но показывать платный тариф без возможности купить его в приложении рискованно для ревью. Админка об этом предупреждает.
+## 6. Приватность и безопасность
+
 ### 6.1 Фактические потоки данных (по коду)
 
 | Данные | Откуда | Куда | Где хранится | Срок |
@@ -514,17 +515,20 @@ Apple private relay: письма на `@privaterelay.appleid.com` дойдут 
   - решение по ZDR в OpenAI.
 ## 12. Решение о релизе
 
-- **iOS App Store: BLOCKED.** Причины:
-  - на проде демо-режим входа и оплаты (нужно сменить `.env`);
-  - не закончены исправления ревью бэкенда (P1: старый API без согласия, неточности политики);
-  - не заданы оператор и контакт;
-  - нет проверки на устройстве.
+- **iOS App Store: READY AFTER MANUAL CONFIGURATION.** Перед отправкой обязательно:
+  - production `.env` и деплой бэкенда (раздел 11.1 и «Upgrading an existing production .env» в `ai-reply-back-end/README.md`), в том числе `APPLE_CLIENT_ID=kz.ai-reply.reply.keyboard.keyboard`;
+  - `CONTACT_EMAIL` и оператор;
+  - архив сборки **1.0 (6)**;
+  - App Privacy;
+  - вход для ревьюера;
+  - проверка на iPhone: клавиатура, согласие, удаление, вход через Apple.
+- **Google Play: READY AFTER MANUAL CONFIGURATION.** Те же серверные шаги плюс:
+  - подписанный AAB с `google-services.json` и `aireply.googleWebClientId`;
+  - Data safety, URL удаления, контентный рейтинг;
+  - при необходимости закрытый тест (12 человек, 14 дней);
+  - проверка на устройствах Android.
 
-  После этого статус станет READY AFTER MANUAL CONFIGURATION.
-- **Google Play: BLOCKED.** Те же причины плюс подписанный AAB, Data safety, URL удаления, при необходимости закрытый тест (12 человек, 14 дней).
-
-Одобрение стора не гарантируется.
-
+Если любая ручная проверка выявит дефект, статус возвращается к BLOCKED. Одобрение стора не гарантируется.
 
 ## Claude Code Handoff — Recovery and Continuation
 
@@ -594,24 +598,75 @@ Apple private relay: письма на `@privaterelay.appleid.com` дойдут 
 
 APK / AAB / IPA не создавались; backend deploy, store upload, публикация, force push и изменения `main` не выполнялись. Передача клиентских конфигов выполняется обычным `git push origin notification` после локальной проверки. На втором ноутбуке сохранить работу Claude и изучить Firebase-коммит перед cherry-pick / fast-forward (см. checklist).
 
-## Development Handoff — продолжение после Codex (8 октября 2026, вечер)
+## Development Handoff — 9 октября 2026 (Claude, после Codex)
 
-> Промежуточная запись. Она обновляется в конце сессии, актуальна последняя версия раздела.
+**Git.**
+- Ветка `notification`. Последний коммит кода — `b111181`, последний коммит документации — этот раздел (см. `git log`).
+- Отправлено в `origin/notification` обычным push, без force.
+- Рабочее дерево чистое, кроме игнорируемых артефактов сборки.
+- `main` (`397f6da`) не трогали и в `notification` не вливали: в нём только номер сборки 5 и debug APK.
+- `stash@{0}` (заготовка бэкенда) полностью применена и закоммичена. Её можно удалить (`git stash drop stash@{0}`), но я её не удалял.
 
-**Сопоставление с работой Codex.** Коммит Codex `3807b3a` добавил:
-- настоящие клиентские конфиги Firebase (публичные идентификаторы проекта `ai-reply-4bf8f`; приватных ключей нет, валидатор `tools/validate_firebase_config.py` проходит);
+**Что сделал Codex** (`3807b3a`), не переделывалось:
+- настоящие клиентские конфиги Firebase (проект `ai-reply-4bf8f`);
+- `tools/validate_firebase_config.py`;
 - `docs/FIREBASE_RELEASE_CHECKLIST.md`;
-- уточнения в документации.
+- FCM v1 и service account с ролью `firebasecloudmessaging.admin`. JSON лежит только на ноутбуке Codex, вне Git.
 
-Код клиентов и сервера Codex не менял. Серверный JSON сервисного аккаунта есть только на ноутбуке Codex (`ai-reply-back-end/secrets/`, вне Git). На этом Mac его нет, в истории Git его тоже нет (проверено).
+**Что сделано в этой сессии:**
 
-`main` (`397f6da`: номер сборки 5 + debug APK в `outputs/`) в `notification` не вливался по указанию владельца. Номер сборки 5 в `notification` уже был.
+| Коммит | Что |
+|---|---|
+| `4d1da47` | Исправлены устаревший `APPLE_CLIENT_ID` (`kz.yerek.replykeyboard`) в `docs/auth-redesign-report.md` и App Group в `HANDOFF.md`. Добавлен список 21 находки `docs/review-backend-confirmed.txt` |
+| `8bdd2a0` | iOS: сборка **6** (номер 5 занят в App Store Connect). Сообщения «сервер не принял вход» и «сбой на телефоне» теперь разные. Тест проверяет, что Firebase-конфиг попадает в бандл. Клиентский поток входа через Apple проверен и корректен: nonce, поля запроса, entitlement, флаг Release |
+| `a6f095c` | Android: то же разделение сообщений об ошибке входа |
+| `b111181` | Бэкенд, закрыты все 21 находка (список ниже) |
 
-**Незаконченная работа Claude найдена и продолжена.** Заготовка исправлений 21 находки ревью бэкенда лежала в stash ветки `release-audit` на этом Mac. Она применена к `notification`, работа идёт. Список находок: `docs/review-backend-confirmed.txt`.
+Содержание `b111181`:
+- старый `/v1` принимает только install-токены, а `LEGACY_API_ENABLED=true` запрещён в production;
+- веб-удаление аккаунта не раскрывает, существует ли адрес;
+- админа нельзя заблокировать чужими неудачными входами;
+- после удаления идентификаторы человека убираются из фильтров кампаний;
+- очистка данных не уменьшает статистику завершённых кампаний;
+- повторный `confirm` после сбоя выдаёт тариф (одна транзакция);
+- в production обязателен `CONTACT_EMAIL`, а отсутствие оператора, ключей отзыва Apple или bundle id в `APPLE_CLIENT_ID` выводит предупреждения;
+- политика и тексты лендинга точно описывают отправку (скопированное или выделенное по нажатию, «Написать» отправляет только инструкцию, диктовка iOS и Android, имя от Google);
+- Apple-формулировки зависят от наличия ключей отзыва;
+- **лог `identity token rejected` с причиной** (`audience_mismatch` и др., с публичными `token_aud` и `configured_aud`, без токена и e-mail);
+- флаг **`-check`** для проверки `.env`;
+- в README раздел о переходе существующего production `.env`, порядок деплоя и отката.
 
-**Вход через Apple в TestFlight.** Наиболее вероятная причина — `APPLE_CLIENT_ID` на сервере. `docs/auth-redesign-report.md` советовал старый `kz.yerek.replykeyboard`, а токен Apple приходит с `aud = kz.ai-reply.reply.keyboard.keyboard`. Документ исправлен. Владельцу нужно проверить `.env`: `APPLE_CLIENT_ID=kz.ai-reply.reply.keyboard.keyboard`. Добавляется безопасный лог причины отказа.
+**Вход через Apple в TestFlight.** В коде клиента ошибок нет. Наиболее вероятная причина — `APPLE_CLIENT_ID` на сервере не содержит `kz.ai-reply.reply.keyboard.keyboard`. После деплоя причина будет видна в логе `identity token rejected reason=…`. Кроме того, проверить:
+- Sign in with Apple у App ID;
+- что provisioning profile пересоздан после включения возможности;
+- что у тестировщика включена двухфакторная аутентификация.
 
-**Тесты в этой сессии:**
+**Тесты, запущенные в этой сессии (фактические результаты):**
 - `python3 tools/validate_firebase_config.py`: OK;
-- Android `testDebugUnitTest --rerun lintRelease compileReleaseKotlin processReleaseGoogleServices` с настоящим `google-services.json`: BUILD SUCCESSFUL, 511 тестов, 0 ошибок;
-- iOS и бэкенд: прогоняются после текущих исправлений, результаты будут ниже.
+- бэкенд: `gofmt -l .` пусто, `go vet ./...` чисто, `go test ./... -count=1`: все 17 пакетов ok (запускал сам). `go test ./... -count=1 -race`: все пакеты ok (запускал агент);
+- iOS: `xcodebuild test` на симуляторе AE83D443: **463 теста, 0 ошибок**. Release `build` без подписи (`.app`, не IPA): BUILD SUCCEEDED, CFBundleVersion 6, Firebase-plist в бандле. Запуск в симуляторе: Firebase инициализируется, до согласия токен не запрашивается, без падений;
+- Android: `testDebugUnitTest --rerun lintRelease compileReleaseKotlin` с настоящим `google-services.json`: **512 тестов, 0 ошибок**, lint 0 ошибок, `processReleaseGoogleServices` OK;
+- APK, AAB, IPA не собирались.
+
+**Не проверено (нужны устройства, ключи или консоли):**
+- живая доставка push (APNs-ключа ещё нет);
+- вход через Apple в TestFlight после исправления `APPLE_CLIENT_ID`;
+- реальный отзыв токена Apple (ключ .p8);
+- удаление аккаунта и согласие на реальных телефонах;
+- подписанные сборки.
+
+**Следующие шаги, по порядку:**
+1. Сервер: `go run ./cmd/server -env <prod .env> -check` (или `docker compose run --rm --no-deps backend -check`). Исправить всё, что найдено, по разделу «Upgrading an existing production .env» в `ai-reply-back-end/README.md`:
+   - `APP_ENV=production`, `AUTH_DEMO_MODE=false`, `PAYMENT_MODE=off`, `LEGACY_API_ENABLED=false`, `TRUST_PROXY=true`;
+   - `CONTACT_EMAIL` на ai-reply.kz, `LEGAL_OPERATOR_*`;
+   - `APPLE_CLIENT_ID=kz.ai-reply.reply.keyboard.keyboard`;
+   - по желанию `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY`.
+2. Бэкап SQLite, деплой бэкенда (миграции 0011–0014), проверка `/healthz`, `/api/v1/config`, `/privacy`, `/account/delete`, `/support`.
+3. Push (по желанию для v1):
+   - Apple Developer: Push Notifications у App ID, APNs-ключ → Firebase;
+   - перенести service account JSON на сервер защищённо;
+   - mount, `FIREBASE_SERVICE_ACCOUNT_FILE`, `PUSH_NOTIFICATIONS_ENABLED=true`.
+4. В Google Cloud ограничить клиентские API-ключи Firebase из репозитория (Android по пакету и SHA-1, iOS по bundle id, только нужные Firebase API).
+5. iOS: архив 1.0 (6) → TestFlight → проверка входа через Apple, клавиатуры, согласия, удаления. Затем App Privacy и заметки для ревьюера (`REVIEW_LOGIN_*`).
+6. Android: подписанный AAB (`-Paireply.versionCode`), Data safety, URL удаления, закрытый тест при необходимости.
+7. Юридическая проверка текстов (раздел 11.4).
