@@ -279,6 +279,7 @@
     <string name="account_error_email_delivery">Хатты жіберу мүмкін болмады. Бір минуттан кейін қайталаңыз.</string>
     <string name="account_error_email_in_use">Бұл пошта басқа тіркелгіге тиесілі. Оған жіберілетін кодпен кіріңіз немесе басқа мекенжай қолданыңыз.</string>
     <string name="account_error_provider_failed">Кіру сәтсіз аяқталды. Қайталаңыз немесе басқа тәсілді таңдаңыз.</string>
+    <string name="account_error_provider_rejected">Біздің сервер бұл кіруді қабылдамады. Қайталаңыз немесе басқа тәсілді таңдаңыз.</string>
     <string name="account_error_provider_unavailable">Бұл кіру тәсілі қазір қолжетімсіз. Басқа тәсілді таңдаңыз.</string>
     <string name="settings_account_add_email">Кіру үшін пошта қосу</string>
     <string name="settings_account_add_email_body">Телефон нөмірімен кіру енді қолжетімсіз. Осы тіркелгіге, оның тарифі мен тарихына кіруді сақтау үшін пошта мекенжайын қосыңыз.</string>

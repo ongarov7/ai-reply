@@ -279,6 +279,7 @@
     <string name="account_error_email_delivery">Не удалось отправить письмо. Попробуйте через минуту.</string>
     <string name="account_error_email_in_use">Эта почта уже привязана к другому аккаунту. Войдите по коду из письма или укажите другой адрес.</string>
     <string name="account_error_provider_failed">Не удалось войти. Попробуйте ещё раз или выберите другой способ.</string>
+    <string name="account_error_provider_rejected">Наш сервер не принял этот вход. Попробуйте ещё раз или выберите другой способ.</string>
     <string name="account_error_provider_unavailable">Этот способ входа сейчас недоступен. Выберите другой.</string>
     <string name="settings_account_add_email">Добавить почту для входа</string>
     <string name="settings_account_add_email_body">Вход по номеру телефона больше недоступен. Добавьте почту, чтобы сохранить доступ к аккаунту, тарифу и истории.</string>

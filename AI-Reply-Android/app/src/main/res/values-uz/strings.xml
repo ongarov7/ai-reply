@@ -199,6 +199,7 @@
     <string name="account_error_email_delivery">Xatni yuborib boʻlmadi. Bir daqiqadan keyin qayta urinib koʻring.</string>
     <string name="account_error_email_in_use">Bu e-pochta boshqa hisobga biriktirilgan. Unga yuboriladigan kod bilan kiring yoki boshqa manzildan foydalaning.</string>
     <string name="account_error_provider_failed">Kirish amalga oshmadi. Qayta urinib koʻring yoki boshqa usulni tanlang.</string>
+    <string name="account_error_provider_rejected">Serverimiz bu kirishni qabul qilmadi. Qayta urinib koʻring yoki boshqa usulni tanlang.</string>
     <string name="account_error_provider_unavailable">Bu kirish usuli hozir mavjud emas. Boshqa usulni tanlang.</string>
     <string name="settings_account_add_email">Kirish uchun e-pochta qoʻshish</string>
     <string name="settings_account_add_email_body">Telefon raqami orqali kirish endi mavjud emas. Hisob, tarif va tarixga kirishni saqlab qolish uchun e-pochta qoʻshing.</string>

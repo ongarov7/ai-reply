@@ -745,7 +745,7 @@ class AccountController(
                 is ApiError.InvalidEmail -> R.string.account_error_invalid_email
                 is ApiError.EmailDeliveryFailed -> R.string.account_error_email_delivery
                 is ApiError.EmailInUse -> R.string.account_error_email_in_use
-                is ApiError.InvalidIdToken -> R.string.account_error_provider_failed
+                is ApiError.InvalidIdToken -> R.string.account_error_provider_rejected
                 is ApiError.AuthProviderUnavailable -> R.string.account_error_provider_unavailable
                 is ApiError.Unauthorized -> R.string.account_error_session_expired
                 is ApiError.AccountDisabled -> R.string.account_error_disabled

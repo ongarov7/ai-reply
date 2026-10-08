@@ -279,6 +279,7 @@
     <string name="account_error_email_delivery">We couldn\'t send the e-mail. Try again in a minute.</string>
     <string name="account_error_email_in_use">This e-mail already belongs to another account. Sign in with a code sent to it, or use a different address.</string>
     <string name="account_error_provider_failed">Sign-in didn\'t go through. Try again or choose another method.</string>
+    <string name="account_error_provider_rejected">Our server didn\'t accept this sign-in. Try again or choose another method.</string>
     <string name="account_error_provider_unavailable">This sign-in option is unavailable right now. Choose another method.</string>
     <string name="settings_account_add_email">Add e-mail for sign-in</string>
     <string name="settings_account_add_email_body">Sign-in by phone number is no longer available. Add an e-mail address to keep access to this account, its plan and history.</string>
