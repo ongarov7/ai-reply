@@ -23,7 +23,6 @@
       <a href="/#privacy">{{call .T "nav.privacy"}}</a>
       <a href="/#pricing">{{call .T "nav.pricing"}}</a>
       <a href="/#faq">{{call .T "nav.faq"}}</a>
-      <a href="/simulator" rel="nofollow">{{call .T "nav.demo"}}</a>
     </nav>
     <div class="header-right">
       <div class="lang lang-links">
@@ -46,8 +45,9 @@
     <nav>
       <a href="/offer?lang={{.Locale}}">{{call .T "footer.terms"}}</a>
       <a href="/privacy?lang={{.Locale}}">{{call .T "footer.privacy"}}</a>
-      <a href="/simulator" rel="nofollow">{{call .T "nav.demo"}}</a>
-      <a href="mailto:{{.ContactEmail}}">{{call .T "footer.contact"}}</a>
+      <a href="/support?lang={{.Locale}}">{{call .T "footer.support"}}</a>
+      <a href="/account/delete?lang={{.Locale}}">{{call .T "footer.delete_account"}}</a>
+      {{if .ContactEmail}}<a href="mailto:{{.ContactEmail}}">{{call .T "footer.contact"}}</a>{{end}}
     </nav>
   </div>
 </footer>

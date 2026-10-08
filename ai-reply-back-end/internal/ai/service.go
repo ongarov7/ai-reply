@@ -39,6 +39,8 @@ type Service struct {
 	clock    traits.Clock
 	repair   bool
 	quota    QuotaEvents
+	// polishPerDay — бір қолданушының сервер күніндегі polish шегі (0 — шексіз).
+	polishPerDay int
 }
 
 // New — шлюз. Тексеруден өтпеген жауапты түзету әдепкіде қосулы.
@@ -55,6 +57,9 @@ func (s *Service) WithRepair(enabled bool) *Service { s.repair = enabled; return
 
 // WithQuotaEvents — квота хабарламалары (nil — жоқ).
 func (s *Service) WithQuotaEvents(q QuotaEvents) *Service { s.quota = q; return s }
+
+// WithPolishDailyLimit — polish шегі бір қолданушыға күніне (LIMIT_POLISH_PER_DAY).
+func (s *Service) WithPolishDailyLimit(n int) *Service { s.polishPerDay = n; return s }
 
 // Request — бір жауап сұранысы. Мәтін тек жадта, тек осы шақыру ішінде болады.
 type Request struct {
@@ -83,8 +88,11 @@ type Result struct {
 	DailyLimit       int
 	UsedToday        int
 	Remaining        int
-	ResetsAt         time.Time
-	LatencyMS        int
+	// MonthlyLimit — 0 болса айлық шек жоқ; UsedMonth — осы айда жұмсалғаны.
+	MonthlyLimit int
+	UsedMonth    int
+	ResetsAt     time.Time
+	LatencyMS    int
 	// SourceLimit — ErrSourceTooLong кезінде клиентке нақты шекті айту үшін.
 	SourceLimit int
 	// InstructionLimit — compose нұсқауы шектен асқанда (ErrInstructionTooLong).
@@ -98,6 +106,20 @@ const (
 	ModeCompose = "compose"
 	ModePolish  = "polish"
 )
+
+// bookkeepingTimeout — провайдерден кейінгі есепке (квотаны қайтару, токендер, оқиға) берілетін уақыт.
+const bookkeepingTimeout = 5 * time.Second
+
+// bookkeeping — провайдер жауап бергеннен кейінгі жазбаларға арналған контекст.
+//
+// The request context is cancelled when the client goes away — exactly what
+// happens when a keyboard is closed while the provider is still writing. The
+// refund, the token counters and the usage event must still be written, so
+// they run on a context that keeps the request's values but not its
+// cancellation, bounded by a short timeout of its own.
+func bookkeeping(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.WithoutCancel(ctx), bookkeepingTimeout)
+}
 
 // call — генерацияның метадерегі: кім, қай режим, қай құрылғыдан. Мәтін емес.
 type call struct {
@@ -173,14 +195,21 @@ func (s *Service) generate(ctx context.Context, c call, prompt Prompt, started t
 		s.record(ctx, c, entitlement, "error", errorCode(err), prompt.Version, Completion{}, 0)
 		s.quotaRefused(ctx, c.User, entitlement, date, month, err)
 		return Result{
-			DailyLimit: entitlement.DailyLimit,
-			UsedToday:  entitlement.UsedToday,
-			ResetsAt:   entitlement.ResetsAt,
+			DailyLimit:   entitlement.DailyLimit,
+			UsedToday:    entitlement.UsedToday,
+			MonthlyLimit: entitlement.MonthlyLimit,
+			UsedMonth:    entitlement.UsedMonth,
+			ResetsAt:     entitlement.ResetsAt,
 		}, err
 	}
 
 	outcome, providerErr := Complete(ctx, s.provider, prompt, s.repair)
 	latency := int(s.clock.Now().Sub(started).Milliseconds())
+
+	// From here on the request may already be cancelled: what is written
+	// below must be written anyway.
+	ctx, cancel := bookkeeping(ctx)
+	defer cancel()
 
 	if providerErr != nil {
 		// Жауап алынбады — бронды қайтарамыз (қайталау кезінде екі рет есептелмейді).
@@ -224,6 +253,8 @@ func (s *Service) generate(ctx context.Context, c call, prompt Prompt, started t
 		DailyLimit:       entitlement.DailyLimit,
 		UsedToday:        usage.UsedToday,
 		Remaining:        usage.Remaining(),
+		MonthlyLimit:     entitlement.MonthlyLimit,
+		UsedMonth:        usage.UsedMonth,
 		ResetsAt:         entitlement.ResetsAt,
 		LatencyMS:        latency,
 	}, nil

@@ -35,6 +35,8 @@ const (
 const (
 	OTPPurposeLogin     = "login"
 	OTPPurposeLinkEmail = "link_email"
+	// OTPPurposeDelete — тіркелгіні веб-беттен жою (/account/delete).
+	OTPPurposeDelete = "delete"
 )
 
 // OTP жабылу себептері (otp_codes.consumed_reason).
@@ -185,6 +187,7 @@ type Profile struct {
 }
 
 // LegalConsent records the exact public document versions accepted by an account.
+// A withdrawn consent stays as a record (withdrawn_at) and no longer counts.
 type LegalConsent struct {
 	ID             string
 	UserID         string
@@ -298,15 +301,60 @@ type Entitlement struct {
 }
 
 // Remaining — бүгін қалған генерация саны.
+//
+// A monthly cap (MonthlyLimit > 0) can end the day early: what is left today
+// is never more than what is left this month.
 func (e Entitlement) Remaining() int {
 	if e.DailyLimit <= 0 {
 		return 0
 	}
-	if e.UsedToday >= e.DailyLimit {
-		return 0
+	left := e.DailyLimit - e.UsedToday
+	if e.MonthlyLimit > 0 {
+		left = min(left, e.MonthlyLimit-e.UsedMonth)
 	}
-	return e.DailyLimit - e.UsedToday
+	return max(left, 0)
 }
+
+// AIReport — AI жасаған мәтінге шағым (POST /api/v1/ai/reports).
+//
+// Text is the generated reply or message, stored only when the person chose
+// to include it. The copied message and the instruction are never part of a
+// report.
+type AIReport struct {
+	ID         string
+	UserID     string
+	Mode       string // reply | compose
+	Reason     string
+	Comment    string
+	Text       string
+	Platform   string
+	AppVersion string
+	Status     string // open | resolved
+	CreatedAt  time.Time
+	ResolvedAt *time.Time
+	ResolvedBy string
+}
+
+// Шағым күйлері.
+const (
+	ReportOpen     = "open"
+	ReportResolved = "resolved"
+)
+
+// ReportStatuses — әкімші сүзгісінің мәндері.
+var ReportStatuses = []string{ReportOpen, ReportResolved}
+
+// ReportReasons — шағым себептері (қолданбалар осы кодтарды жібереді).
+var ReportReasons = []string{"offensive", "harmful", "false_info", "wrong_language", "other"}
+
+// ReportModes — шағым қай режимнің мәтініне.
+var ReportModes = []string{"reply", "compose"}
+
+// Шағым өрістерінің шегі (таңбамен).
+const (
+	ReportCommentMax = 500
+	ReportTextMax    = 2000
+)
 
 // UsageEvent — тек метадерек. source_text те, жауап та жоқ.
 type UsageEvent struct {
@@ -394,6 +442,9 @@ var (
 	ErrEmptyCompletion  = errors.New("empty completion")
 	ErrPaymentRequired  = errors.New("payment required")
 	ErrDemoDisabled     = errors.New("demo authentication disabled")
+	// ErrConsentRequired — ағымдағы шарттар мен құпиялық саясатына келісім жоқ
+	// (не кері қайтарылған): AI сұраныстары тоқтайды.
+	ErrConsentRequired = errors.New("legal consent required")
 
 	// Кіру: пошта, OTP, Google және Apple.
 	ErrInvalidEmail            = errors.New("invalid email")

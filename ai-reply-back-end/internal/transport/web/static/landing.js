@@ -1,6 +1,6 @@
 /*
- * Лендингтің интерактив бөлігі. Фреймворксіз: мазмұн серверде рендерленген,
- * бұл скрипт оны тек жандандырады.
+ * Лендингтің және көпшілік беттердің интерактив бөлігі. Фреймворксіз: мазмұн
+ * серверде рендерленген, бұл скрипт оны тек жандандырады.
  *
  * WHY NO FRAMEWORK HERE. The page is server-rendered for search engines and for
  * the first paint, and everything below is three small enhancements. Shipping a
@@ -196,6 +196,91 @@
         header.classList.remove("is-open");
         toggle.setAttribute("aria-expanded", "false");
       });
+    });
+  }
+
+  /* ------------------------------------------------- account deletion (/account/delete) */
+  // Екі қадам: пошта → код. Сервер тіркелгі бар-жоғын айтпайды, сондықтан бірінші
+  // қадамнан кейін әрқашан код өрісі ашылады.
+  var deletion = document.getElementById("delete-account");
+  if (deletion) {
+    startDeletion(deletion, (data && data.errors) || {});
+  }
+
+  function startDeletion(root, errors) {
+    var emailForm = root.querySelector('[data-step="email"]');
+    var codeForm = root.querySelector('[data-step="code"]');
+    var done = root.querySelector('[data-step="done"]');
+    var errorBox = root.querySelector(".form-error");
+    var email = "";
+
+    function showError(code) {
+      errorBox.textContent = errors[code] || errors["default"] || "";
+      errorBox.hidden = !errorBox.textContent;
+    }
+
+    function post(path, body) {
+      return fetch(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify(body)
+      }).then(function (response) {
+        return response.json().catch(function () { return {}; }).then(function (payload) {
+          if (response.ok) return payload;
+          var code = payload && payload.error ? payload.error.code : "default";
+          throw new Error(code || "default");
+        });
+      });
+    }
+
+    function busy(form, on) {
+      form.querySelectorAll("button, input").forEach(function (node) { node.disabled = on; });
+    }
+
+    emailForm.addEventListener("submit", function (event) {
+      event.preventDefault();
+      errorBox.hidden = true;
+      email = emailForm.elements.email.value.trim();
+      if (!email) { showError("INVALID_EMAIL"); return; }
+      busy(emailForm, true);
+      post("/api/v1/account/delete/request", { email: email, locale: root.getAttribute("data-locale") || "en" })
+        .then(function () {
+          emailForm.hidden = true;
+          codeForm.hidden = false;
+        })
+        .catch(function (error) { showError(error.message); return true; })
+        .then(function (failed) {
+          busy(emailForm, false);
+          // Disabled fields lose focus: put it back where the person continues.
+          (failed ? emailForm.elements.email : codeForm.elements.code).focus();
+        });
+    });
+
+    codeForm.addEventListener("submit", function (event) {
+      event.preventDefault();
+      errorBox.hidden = true;
+      var code = codeForm.elements.code.value.trim();
+      if (!code) { showError("INVALID_OTP"); return; }
+      busy(codeForm, true);
+      post("/api/v1/account/delete/confirm", { email: email, code: code })
+        .then(function () {
+          codeForm.hidden = true;
+          done.hidden = false;
+        })
+        .catch(function (error) { showError(error.message); return true; })
+        .then(function (failed) {
+          busy(codeForm, false);
+          if (failed) codeForm.elements.code.select();
+        });
+    });
+
+    codeForm.querySelector('[data-action="restart"]').addEventListener("click", function () {
+      errorBox.hidden = true;
+      codeForm.reset();
+      codeForm.hidden = true;
+      emailForm.hidden = false;
+      emailForm.elements.email.focus();
     });
   }
 

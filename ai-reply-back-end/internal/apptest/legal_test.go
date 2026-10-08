@@ -71,3 +71,30 @@ func TestLegalConsentRejectsUnknownVersions(t *testing.T) {
 		t.Fatalf("unknown version accepted: %d %s", res.status, res.raw)
 	}
 }
+
+// /api/v1/config: қолдау, жою беті, AI провайдері және жаңа мүмкіндіктер.
+func TestConfigAnnouncesLegalLinksAndFeatures(t *testing.T) {
+	h := newHarness(t, withEnv("CONTACT_EMAIL", "support@ai-reply.kz"))
+	config := h.do(http.MethodGet, "/api/v1/config", nil, nil)
+	for path, want := range map[[2]string]string{
+		{"legal", "contact_email"}:        "support@ai-reply.kz",
+		{"legal", "support_url"}:          "http://localhost:8084/support",
+		{"legal", "account_deletion_url"}: "http://localhost:8084/account/delete",
+		{"legal", "ai_provider"}:          "OpenAI",
+		{"legal", "terms_version"}:        "2026-10-08",
+		{"legal", "privacy_version"}:      "2026-10-08",
+		{"payment_mode", ""}:              "demo",
+	} {
+		keys := []string{path[0]}
+		if path[1] != "" {
+			keys = append(keys, path[1])
+		}
+		if got := config.str(keys...); got != want {
+			t.Errorf("%v = %q, want %q", keys, got, want)
+		}
+	}
+	features, _ := config.body["features"].(map[string]any)
+	if features["ai_reports"] != true || features["account_deletion"] != true {
+		t.Fatalf("features = %v", features)
+	}
+}

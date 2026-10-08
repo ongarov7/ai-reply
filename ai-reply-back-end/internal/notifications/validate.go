@@ -157,6 +157,9 @@ func (s *Service) validateCampaign(in CampaignInput) (map[string]domain.Localize
 	if err != nil {
 		return nil, "", Content{}, err
 	}
+	if !domain.IsCampaignCategory(envelope.Category) {
+		return nil, "", Content{}, domain.InvalidField("category", "not allowed for campaigns")
+	}
 	content := map[string]domain.LocalizedText{}
 	for _, l := range ContentLocales {
 		title, body := strings.TrimSpace(in.Title[l]), strings.TrimSpace(in.Body[l])

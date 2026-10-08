@@ -18,6 +18,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/admin"
 	"github.com/aireply/ai-reply-back-end/internal/ai"
 	"github.com/aireply/ai-reply-back-end/internal/auth"
+	"github.com/aireply/ai-reply-back-end/internal/auth/appleid"
 	"github.com/aireply/ai-reply-back-end/internal/auth/idtoken"
 	"github.com/aireply/ai-reply-back-end/internal/database"
 	"github.com/aireply/ai-reply-back-end/internal/email"
@@ -31,7 +32,9 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/plans"
 	"github.com/aireply/ai-reply-back-end/internal/productevents"
 	"github.com/aireply/ai-reply-back-end/internal/push"
+	"github.com/aireply/ai-reply-back-end/internal/reports"
 	"github.com/aireply/ai-reply-back-end/internal/repository"
+	"github.com/aireply/ai-reply-back-end/internal/retention"
 	"github.com/aireply/ai-reply-back-end/internal/simulator"
 	"github.com/aireply/ai-reply-back-end/internal/subscriptions"
 	"github.com/aireply/ai-reply-back-end/internal/transport/adminapi"
@@ -99,9 +102,15 @@ func run(envFile string) error {
 	store := repository.New(db)
 	planSvc := plans.New(store)
 	subSvc := subscriptions.New(store, planSvc, cfg.App.Location())
-	userSvc := users.New(store)
+	userSvc := users.New(store).WithLogger(log)
+	if err := configureAppleRevocation(userSvc, cfg.OAuth, log); err != nil {
+		return err
+	}
 	sender := auth.NewSender(cfg.Auth.OTPChannel, log)
 	authSvc := auth.New(store, cfg.Auth, sender, subSvc, log)
+	// Account-deletion codes are issued in the background; let them finish
+	// before the database closes.
+	defer authSvc.Wait()
 	mailer, err := newMailer(cfg, bundle)
 	if err != nil {
 		return err
@@ -123,19 +132,22 @@ func run(envFile string) error {
 	}
 	// Automatic notifications: plan activated (payment, admin), plan expiring
 	// or expired (the expiry sweep below), quota low or exhausted (AI gateway).
-	notifyEvents := notifications.NewEvents(notifySvc)
+	notifyEvents := notifications.NewEvents(notifySvc).
+		WithDemoPayments(cfg.Payments.DemoCheckout && !cfg.App.IsProduction())
 	provider := ai.NewOpenAI(cfg.OpenAI)
 	limitSvc := limits.New(store, limits.Limits{
 		SourceChars:      cfg.Limits.SourceTextChars,
 		InstructionChars: cfg.Limits.InstructionChars,
 		MaxOutputTokens:  cfg.OpenAI.MaxOutputTokens,
 	})
-	aiSvc := ai.New(store, subSvc, provider, limitSvc, log).WithRepair(cfg.AI.RepairEnabled).WithQuotaEvents(notifyEvents)
+	aiSvc := ai.New(store, subSvc, provider, limitSvc, log).WithRepair(cfg.AI.RepairEnabled).WithQuotaEvents(notifyEvents).
+		WithPolishDailyLimit(cfg.Limits.PolishPerDay)
 	// No live provider exists yet (StoreKit / Play Billing come later), so
 	// nothing can be bought unless a development server opts into demo checkout.
 	paymentSvc := payments.New(store, subSvc, payments.DemoProvider{}, cfg.Payments.Mode).
-		WithEvents(notifyEvents).WithDemoCheckout(cfg.Payments.DemoCheckout)
+		WithEvents(notifyEvents).WithDemoCheckout(cfg.Payments.DemoCheckout).WithProduction(cfg.App.IsProduction())
 	eventSvc := productevents.New(store, log)
+	reportSvc := reports.New(store, log)
 	adminSvc := admin.New(store, subSvc, planSvc, cfg, log).WithEvents(notifyEvents)
 	simulatorSvc := simulator.New(simulator.Deps{
 		Repo: store, Users: userSvc, Subs: subSvc, Plans: planSvc, AI: aiSvc, Limits: limitSvc,
@@ -152,13 +164,13 @@ func run(envFile string) error {
 	api.New(api.Deps{
 		Config: cfg, Auth: authSvc, Users: userSvc, Plans: planSvc, Subs: subSvc,
 		AI: aiSvc, Limits: limitSvc, Payments: paymentSvc, Events: eventSvc,
-		Installations: installSvc, Notifications: notifySvc, Limiter: limiter, Log: log,
+		Installations: installSvc, Notifications: notifySvc, Reports: reportSvc, Limiter: limiter, Log: log,
 		Ping: func(ctx context.Context) error { return db.Reader().PingContext(ctx) },
 	}).Register(mux)
 
 	adminapi.New(adminapi.Deps{
 		Config: cfg, Admin: adminSvc, Limits: limitSvc, Notifications: notifySvc, Payments: paymentSvc,
-		Limiter: limiter, Log: log,
+		Reports: reportSvc, Limiter: limiter, Log: log,
 	}).Register(mux)
 
 	simulatorapi.New(simulatorapi.Deps{
@@ -166,7 +178,7 @@ func run(envFile string) error {
 	}).Register(mux)
 
 	webServer, err := web.New(web.Deps{
-		Config: cfg, Admin: adminSvc, Plans: planSvc, Notifications: notifySvc,
+		Config: cfg, Admin: adminSvc, Plans: planSvc, Payments: paymentSvc, Notifications: notifySvc,
 		Bundle: bundle, Limiter: limiter, Log: log,
 	})
 	if err != nil {
@@ -178,7 +190,7 @@ func run(envFile string) error {
 		middleware.RequestID,
 		middleware.Recover(log),
 		middleware.Logging(log),
-		middleware.SecurityHeaders(cfg.App.IsProduction()),
+		middleware.SecurityHeaders(cfg.App.HSTS()),
 		middleware.CORS(cfg.App.CORSOrigins),
 	)
 
@@ -195,6 +207,8 @@ func run(envFile string) error {
 		func(ctx context.Context) { expireSubscriptions(ctx, subSvc, notifyEvents, log) },
 		notifySvc.Run,
 		notifySvc.RunRetention,
+		// Spent codes, dead sessions, abandoned installations, old metadata (RETENTION_*).
+		retention.New(store, cfg.Retention, log).Run,
 	} {
 		workers.Add(1)
 		go func(run func(context.Context)) {
@@ -239,6 +253,8 @@ func newMailer(cfg config.Config, bundle *localization.Bundle) (*email.Resend, e
 		FromEmail: cfg.Email.FromEmail,
 		FromName:  cfg.Email.FromName,
 		Translate: bundle.T,
+		// Replies to a code or a plan notice reach a person, not noreply@.
+		ReplyTo: cfg.App.ContactEmail(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("email: %w", err)
@@ -277,6 +293,30 @@ func configureSignIn(authSvc *auth.Service, cfg config.Config, mailer *email.Res
 	return nil
 }
 
+// configureAppleRevocation — тіркелгі жойылғанда Sign in with Apple токенін кері қайтару.
+//
+// Optional: without APPLE_TEAM_ID, APPLE_KEY_ID and APPLE_PRIVATE_KEY accounts
+// are still deleted, only the Apple token stays until the person removes the
+// app from their Apple ID settings. A key that is set but cannot be used
+// stops the start; the key itself never reaches a log line or an error.
+func configureAppleRevocation(userSvc *users.Service, cfg config.OAuth, log *slog.Logger) error {
+	if !cfg.AppleRevocation() {
+		if len(cfg.AppleClientIDs) > 0 {
+			log.Warn("sign in with apple is on but APPLE_TEAM_ID, APPLE_KEY_ID and APPLE_PRIVATE_KEY are not set: " +
+				"deleted accounts keep their Apple token")
+		}
+		return nil
+	}
+	revoker, err := appleid.New(appleid.Config{
+		TeamID: cfg.AppleTeamID, KeyID: cfg.AppleKeyID, PrivateKey: cfg.ApplePrivateKey, ClientIDs: cfg.AppleClientIDs,
+	})
+	if err != nil {
+		return fmt.Errorf("apple token revocation: %w", err)
+	}
+	userSvc.WithAppleRevoker(revoker)
+	return nil
+}
+
 // configurePush — Firebase Cloud Messaging (Android және iOS). Бапталмаса nil: сервер push-сыз жұмыс істейді.
 //
 // With PUSH_NOTIFICATIONS_ENABLED=true a key that cannot be used stops the
@@ -303,8 +343,8 @@ func configurePush(cfg config.Push, log *slog.Logger) (push.Provider, error) {
 	return provider, nil
 }
 
-// expireSubscriptions — мерзімі өткен жазылымдарды белгілейтін және мерзімі туралы
-// еске салатын фон тапсырмасы.
+// expireSubscriptions — мерзімі өткен жазылымдарды белгілейтін, мерзімі туралы
+// еске салатын және жазылмай қалған «тариф қосылды» хабарын жіберетін фон тапсырмасы.
 func expireSubscriptions(ctx context.Context, subs *subscriptions.Service, events *notifications.Events, log *slog.Logger) {
 	ticker := time.NewTicker(15 * time.Minute)
 	defer ticker.Stop()
@@ -315,6 +355,7 @@ func expireSubscriptions(ctx context.Context, subs *subscriptions.Service, event
 			log.Info("subscriptions expired", "count", count)
 		}
 		events.SweepSubscriptions(ctx)
+		events.ReconcileActivations(ctx)
 		select {
 		case <-ctx.Done():
 			return

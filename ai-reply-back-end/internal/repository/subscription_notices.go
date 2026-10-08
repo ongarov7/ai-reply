@@ -4,6 +4,8 @@ import (
 	"context"
 	"strconv"
 	"time"
+
+	"github.com/aireply/ai-reply-back-end/internal/domain"
 )
 
 // UserNotificationKey — бір қолданушының бір оқиғасының dedupe кілті (notifications.dedupe_key).
@@ -71,6 +73,62 @@ func (s *Store) SubscriptionsExpiringBetween(ctx context.Context, from, to time.
 		  AND NOT `+noticeSent+`
 		ORDER BY s.expires_at LIMIT ?`, ms(from), ms(to), kind, maxSubscriptionNotices)
 }
+
+// ActivationNotice — «тариф қосылды» хабарламасы жоқ жазылым және оның кілтінің соңы:
+// "payment:<payment id>" (төлем) не "sub:<subscription id>" (әкімші).
+type ActivationNotice struct {
+	Subscription domain.Subscription
+	Ref          string
+}
+
+// SubscriptionsMissingActivation — since-тен бері төлеммен не әкімші берген, әлі жарамды
+// ақылы жазылымдар, олардың kind хабарламасы жоқ болса.
+//
+// A payment subscription is matched to the succeeded payment that created
+// it (same person and plan, confirmed just before), because its notice is
+// keyed by the payment. Demo payments count only when demoPayments is true,
+// exactly as they are announced at confirmation.
+func (s *Store) SubscriptionsMissingActivation(ctx context.Context, since, now time.Time, kind string, demoPayments bool) ([]ActivationNotice, error) {
+	rows, err := s.db.Reader().QueryContext(ctx, `
+		WITH candidates AS (
+			SELECT s.id, s.user_id, s.plan_id, s.status, s.source, s.started_at, s.expires_at, s.cancelled_at,
+			       s.created_at, s.updated_at,
+			       CASE s.source WHEN 'admin' THEN 'sub:' || s.id ELSE (
+			           SELECT 'payment:' || pay.id FROM payments pay
+			           WHERE pay.user_id = s.user_id AND pay.plan_id = s.plan_id AND pay.status = 'succeeded'
+			             AND pay.updated_at <= s.created_at AND (pay.provider <> 'demo' OR ?)
+			           ORDER BY pay.updated_at DESC LIMIT 1) END AS ref
+			FROM subscriptions s JOIN plans p ON p.id = s.plan_id JOIN users u ON u.id = s.user_id
+			WHERE s.source IN ('payment','admin') AND s.created_at >= ? AND s.status IN ('active','trial')
+			  AND (s.expires_at IS NULL OR s.expires_at > ?) AND p.is_free = 0
+			  AND u.status = 'active' AND u.kind = 'account' AND u.deleted_at IS NULL)
+		SELECT `+subColumns+`, ref FROM candidates c
+		WHERE ref IS NOT NULL
+		  AND NOT EXISTS (SELECT 1 FROM notifications n WHERE n.dedupe_key = 'user:' || c.user_id || ':' || ? || ':' || c.ref)
+		ORDER BY created_at LIMIT ?`, demoPayments, ms(since), ms(now), kind, maxSubscriptionNotices)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []ActivationNotice
+	for rows.Next() {
+		var n ActivationNotice
+		sub, err := scanSubscription(scanner(func(dest ...any) error {
+			return rows.Scan(append(dest, &n.Ref)...)
+		}))
+		if err != nil {
+			return nil, err
+		}
+		n.Subscription = sub
+		out = append(out, n)
+	}
+	return out, rows.Err()
+}
+
+// scanner — Scan функциясын scanSubscription қабылдайтын түрге айналдырады.
+type scanner func(dest ...any) error
+
+func (f scanner) Scan(dest ...any) error { return f(dest...) }
 
 // SubscriptionsExpiredBetween — мерзімі (from, to] аралығында біткен, орнына басқа ақылы тариф
 // алынбаған және kind түріндегі хабарламасы әлі жасалмаған жазылымдар.

@@ -153,6 +153,15 @@ func (s *Store) InsertUsageEvent(ctx context.Context, e domain.UsageEvent) error
 	return err
 }
 
+// UsageEventsSince — қолданушының осы режимдегі since-тен бергі сұраныстары (idx_ai_events_user).
+func (s *Store) UsageEventsSince(ctx context.Context, userID, mode string, since time.Time) (int, error) {
+	var n int
+	err := s.db.Reader().QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM ai_usage_events WHERE user_id = ? AND created_at >= ? AND mode = ?`,
+		userID, ms(since), mode).Scan(&n)
+	return n, err
+}
+
 // ---------------------------------------------------------------- analytics
 
 // Stats — басқару тақтасының жиынтық сандары.

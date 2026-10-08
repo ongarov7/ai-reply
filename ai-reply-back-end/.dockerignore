@@ -9,3 +9,7 @@ tmp/
 .git
 .DS_Store
 coverage.out
+# Firebase service account and other mounted secrets never go into the image.
+secrets/
+*firebase-adminsdk*.json
+*service-account*.json

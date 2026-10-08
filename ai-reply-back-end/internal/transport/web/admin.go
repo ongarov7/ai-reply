@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/aireply/ai-reply-back-end/internal/admin"
@@ -14,6 +15,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/localization"
 	"github.com/aireply/ai-reply-back-end/internal/repository"
 	"github.com/aireply/ai-reply-back-end/internal/traits"
+	"github.com/aireply/ai-reply-back-end/internal/transport/httpx"
 )
 
 type adminCtxKey string
@@ -123,6 +125,59 @@ func (s *Server) view(r *http.Request, w http.ResponseWriter, active, titleKey s
 
 // ---------------------------------------------------------------- login
 
+// Бір әкімші поштасына кіру әрекеттері: IP шегіне қосымша (admin_login).
+const (
+	adminLoginPerEmail    = 5
+	adminLoginEmailWindow = 15 * time.Minute
+)
+
+// allowLoginFor — бір поштаға 15 минутта 5 әрекет, қай IP-ден болса да; толса 429 жазады.
+//
+// The per-IP bucket alone lets anyone with many addresses keep guessing one
+// admin's password; this caps the guesses at the account. Admin panel and
+// simulator sign-in share it, as they share the account.
+func (s *Server) allowLoginFor(w http.ResponseWriter, email string) bool {
+	key := "admin_login_email:" + traits.Clamp(strings.ToLower(strings.TrimSpace(email)), 254)
+	ok, retry := s.limiter.Allow(key, adminLoginPerEmail, adminLoginEmailWindow)
+	if ok {
+		return true
+	}
+	seconds := max(int(retry.Seconds()), 1)
+	w.Header().Set("Retry-After", strconv.Itoa(seconds))
+	httpx.Error(w, http.StatusTooManyRequests, httpx.CodeRateLimited, "Too many requests. Try again shortly.",
+		map[string]any{"retry_after_seconds": seconds})
+	return false
+}
+
+// sessionCSRF — форма (csrf) не тақырып (X-CSRF-Token) сессияның токенімен сәйкес пе.
+func sessionCSRF(r *http.Request, session repository.AdminSession) bool {
+	token := r.FormValue("csrf")
+	if token == "" {
+		token = r.Header.Get("X-CSRF-Token")
+	}
+	return token != "" && subtle.ConstantTimeCompare([]byte(token), []byte(session.CSRFToken)) == 1
+}
+
+// endSession — шығу: сессия болса, CSRF тексеріп жабады. false — 403 жазылды.
+//
+// Without the check any page could sign an admin out with a hidden form.
+func (s *Server) endSession(w http.ResponseWriter, r *http.Request) bool {
+	cookie, err := r.Cookie(s.cfg.Admin.CookieName)
+	if err != nil {
+		return true
+	}
+	_, session, err := s.admin.Authenticate(r.Context(), cookie.Value)
+	if err != nil {
+		return true // nothing open: clearing the cookie is all there is to do
+	}
+	if !sessionCSRF(r, session) {
+		http.Error(w, "csrf token mismatch", http.StatusForbidden)
+		return false
+	}
+	_ = s.admin.Logout(r.Context(), session.ID)
+	return true
+}
+
 type loginView struct {
 	T       func(string) string
 	Locale  string
@@ -158,6 +213,9 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "csrf token mismatch", http.StatusForbidden)
 		return
 	}
+	if !s.allowLoginFor(w, r.FormValue("email")) {
+		return
+	}
 
 	session, err := s.admin.Login(r.Context(), r.FormValue("email"), r.FormValue("password"),
 		clientIP(r, s.cfg.App.TrustProxy), r.UserAgent())
@@ -176,10 +234,8 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
-	if cookie, err := r.Cookie(s.cfg.Admin.CookieName); err == nil {
-		if _, session, err := s.admin.Authenticate(r.Context(), cookie.Value); err == nil {
-			_ = s.admin.Logout(r.Context(), session.ID)
-		}
+	if !s.endSession(w, r) {
+		return
 	}
 	s.clearCookie(w)
 	http.Redirect(w, r, "/admin/login", http.StatusSeeOther)

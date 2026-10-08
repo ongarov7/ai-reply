@@ -1,0 +1,30 @@
+{{define "title"}}{{call .T "support.title"}} — AI Reply{{end}}
+{{define "content"}}
+<div class="wrap">
+  <article class="legal">
+    <h1>{{call .T "support.title"}}</h1>
+    <p>{{call .T "support.intro"}}</p>
+
+    {{if .ContactEmail}}
+    <h2>{{call .T "support.contact_title"}}</h2>
+    <p>{{call .T "support.contact_body"}} <a href="mailto:{{.ContactEmail}}">{{.ContactEmail}}</a></p>
+    {{end}}
+
+    <h2>{{call .T "support.help_title"}}</h2>
+    <ul>
+      <li>{{call .T "support.help_keyboard"}}</li>
+      <li>{{call .T "support.help_limit"}}</li>
+      <li>{{call .T "support.help_report"}}</li>
+      <li>{{call .T "support.help_consent"}}</li>
+    </ul>
+
+    <h2>{{call .T "support.documents_title"}}</h2>
+    <ul>
+      <li><a href="/privacy?lang={{.Locale}}">{{call .T "footer.privacy"}}</a></li>
+      <li><a href="/offer?lang={{.Locale}}">{{call .T "footer.terms"}}</a></li>
+      <li><a href="/account/delete?lang={{.Locale}}">{{call .T "footer.delete_account"}}</a></li>
+    </ul>
+    <p style="margin-top:36px"><a class="btn btn-ghost" href="/?lang={{.Locale}}">{{call .T "legal.back"}}</a></p>
+  </article>
+</div>
+{{end}}

@@ -161,7 +161,7 @@ func TestAnonymousInstallationBecomesTheAccountsDevice(t *testing.T) {
 		t.Fatalf("user_id = %q, want %q", got, s.userID)
 	}
 	prefs, _ := res.body["preferences"].(map[string]any)
-	if prefs["security"] != true || prefs["marketing"] != true {
+	if prefs["security"] != true || prefs["system"] != true || prefs["marketing"] != false {
 		t.Fatalf("an attached installation gets the account's preferences: %s", res.raw)
 	}
 }
@@ -568,9 +568,11 @@ func TestAFailedReadIsRetriedNotSkipped(t *testing.T) {
 func TestAutomaticNotificationsGoBeforeACampaignBacklog(t *testing.T) {
 	h := newHarness(t, withEnv("PUSH_BATCH_SIZE", "1"))
 	buyer := h.signIn("buyer@example.com")
+	h.optInMarketing(buyer.access)
 	h.mustRegister(installation(installID(89), "android", fcmToken(89)), buyer.access)
 	for i := 0; i < 3; i++ {
 		s := h.signIn(fmt.Sprintf("audience-%d@example.com", i))
+		h.optInMarketing(s.access)
 		h.mustRegister(installation(installID(890+i), "ios", fcmToken(890+i)), s.access)
 	}
 	admin := h.signInAdmin()
@@ -610,6 +612,7 @@ func TestConcurrentWorkersNeverSendTheSameDeliveryTwice(t *testing.T) {
 	const devices = 60
 	for i := 0; i < devices; i++ {
 		s := h.signIn(fmt.Sprintf("crowd-%03d@example.com", i))
+		h.optInMarketing(s.access)
 		platform := domain.PlatformAndroid
 		if i%2 == 1 {
 			platform = domain.PlatformIOS
@@ -883,5 +886,65 @@ func TestDisablingAnAccountOrRevokingSessionsDetachesItsDevices(t *testing.T) {
 	}
 	if detached != 2 {
 		t.Fatalf("audit devices_detached = %d", detached)
+	}
+}
+
+// Жарнама — тек келісіммен: таңдау сақталмаған аккаунтқа маркетинг науқаны да,
+// маркетинг хабарламасы да келмейді; басқа санаттар әдепкіде қосулы.
+func TestMarketingIsOptIn(t *testing.T) {
+	h := newHarness(t)
+	silent := h.signIn("no-choice@example.com")
+	h.mustRegister(installation(installID(17), "android", fcmToken(17)), silent.access)
+	willing := h.signIn("said-yes@example.com")
+	h.mustRegister(installation(installID(18), "android", fcmToken(18)), willing.access)
+	h.optInMarketing(willing.access)
+
+	get := h.do(http.MethodGet, "/api/v1/me/notification-preferences", nil, h.auth(silent.access))
+	prefs := get.body["preferences"].(map[string]any)
+	if prefs["marketing"] != false || prefs["system"] != true || prefs["account"] != true || prefs["subscription"] != true {
+		t.Fatalf("defaults = %v", prefs)
+	}
+	if h.scalar(`SELECT COUNT(*) FROM notification_preferences WHERE user_id = ?`, silent.userID) != 0 {
+		t.Fatal("reading the defaults stored a choice")
+	}
+
+	admin := h.signInAdmin()
+	headers := admin.headers(h.cfg.Admin.CookieName)
+	preview := h.do(http.MethodPost, "/api/v1/admin/notifications/audience/preview",
+		map[string]any{"audience": map[string]any{}, "category": "marketing"}, headers)
+	if preview.num("preview", "users") != 1 || preview.num("preview", "matched_devices") != 2 {
+		t.Fatalf("marketing preview: %s", preview.raw)
+	}
+	system := h.do(http.MethodPost, "/api/v1/admin/notifications/audience/preview",
+		map[string]any{"audience": map[string]any{}, "category": "system"}, headers)
+	if system.num("preview", "users") != 2 {
+		t.Fatalf("system preview: %s", system.raw)
+	}
+
+	created := h.do(http.MethodPost, "/api/v1/admin/notifications/campaigns", campaignBody(map[string]any{"send": true}),
+		withKey(headers, "marketing-opt-in-0001"))
+	if created.status != http.StatusCreated {
+		t.Fatalf("campaign: %d %s", created.status, created.raw)
+	}
+	h.tick()
+	if got := sentTokens(h.push); len(got) != 1 || got[fcmToken(18)] != 1 {
+		t.Fatalf("marketing campaign reached %v, want only the device of the account that opted in", got)
+	}
+
+	direct, err := h.notify.NotifyUser(context.Background(), notifications.UserNotification{UserID: silent.userID,
+		IdempotencyKey: "m:opt-in", Type: "promo", Category: domain.CategoryMarketing,
+		Text: func(string) (string, string) { return "Акция", "Жеңілдік" }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if direct.Devices != 0 || direct.Skipped != notifications.SkipDisabledByUser {
+		t.Fatalf("marketing without a choice: %+v", direct)
+	}
+
+	// Switching it off again is respected as before.
+	if res := h.do(http.MethodPut, "/api/v1/me/notification-preferences",
+		map[string]any{"preferences": map[string]any{"marketing": false}}, h.auth(willing.access)); res.str("preferences", "marketing") != "" ||
+		res.body["preferences"].(map[string]any)["marketing"] != false {
+		t.Fatalf("opt-out: %s", res.raw)
 	}
 }

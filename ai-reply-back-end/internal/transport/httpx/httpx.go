@@ -50,6 +50,9 @@ const (
 	// Тарифтер мен сатып алу.
 	CodePlanUnavailable   = "PLAN_UNAVAILABLE"
 	CodePurchasesDisabled = "PURCHASES_DISABLED"
+
+	// Ағымдағы шарттарға келісім жоқ: қолданба келісім экранына қайтады.
+	CodeConsentRequired = "CONSENT_REQUIRED"
 )
 
 // ErrorBody — қате конверті.
@@ -125,6 +128,8 @@ func Translate(err error) (int, string, string) {
 		return http.StatusUnauthorized, CodeUnauthorized, "Authentication is required."
 	case errors.Is(err, domain.ErrAccountDisabled):
 		return http.StatusForbidden, CodeAccountDisabled, "This account is disabled."
+	case errors.Is(err, domain.ErrConsentRequired):
+		return http.StatusForbidden, CodeConsentRequired, "Accept the current terms and privacy policy to use AI replies."
 	case errors.Is(err, domain.ErrDailyLimit):
 		return http.StatusTooManyRequests, CodeDailyLimit, "Daily generation limit reached."
 	case errors.Is(err, domain.ErrMonthlyLimit):
@@ -178,16 +183,19 @@ func Decode(w http.ResponseWriter, r *http.Request, maxBytes int64, target any) 
 }
 
 // ClientIP — прокси артында да жұмыс істейтін IP анықтау.
+//
+// With TRUST_PROXY the address is the right-most X-Forwarded-For entry: the
+// one our reverse proxy appended from the connection it accepted. Everything
+// to its left came from the client and can be anything, so a forged first
+// entry cannot pick a fresh rate-limit bucket per request. X-Real-IP is not
+// read: a proxy that does not overwrite it passes the client's value along.
 func ClientIP(r *http.Request, trustProxy bool) string {
 	if trustProxy {
-		if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
-			parts := strings.Split(forwarded, ",")
-			if ip := strings.TrimSpace(parts[0]); ip != "" {
-				return ip
+		if values := r.Header.Values("X-Forwarded-For"); len(values) > 0 {
+			parts := strings.Split(values[len(values)-1], ",")
+			if ip := net.ParseIP(strings.TrimSpace(parts[len(parts)-1])); ip != nil {
+				return ip.String()
 			}
-		}
-		if real := r.Header.Get("X-Real-IP"); real != "" {
-			return strings.TrimSpace(real)
 		}
 	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)

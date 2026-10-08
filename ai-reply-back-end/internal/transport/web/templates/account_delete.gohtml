@@ -1,0 +1,45 @@
+{{define "title"}}{{call .T "delete.title"}} — AI Reply{{end}}
+{{define "content"}}
+<div class="wrap">
+  <article class="legal">
+    <h1>{{call .T "delete.title"}}</h1>
+    <p>{{call .T "delete.intro"}}</p>
+
+    <h2>{{call .T "delete.app_title"}}</h2>
+    <p>{{call .T "delete.app_body"}}</p>
+
+    <h2>{{call .T "delete.data_title"}}</h2>
+    <p>{{call .T "delete.data_body"}}</p>
+
+    <h2>{{call .T "delete.kept_title"}}</h2>
+    <p>{{.KeptBody}}</p>
+
+    <h2>{{call .T "delete.web_title"}}</h2>
+    <p>{{call .T "delete.web_body"}}</p>
+    <p><small>{{call .T "delete.web_apple_note"}}</small></p>
+
+    <div class="account-form" id="delete-account" data-locale="{{.Locale}}">
+      <form data-step="email" novalidate>
+        <label for="delete-email">{{call .T "delete.email_label"}}</label>
+        <input id="delete-email" name="email" type="email" autocomplete="email" inputmode="email" required maxlength="254">
+        <button class="btn btn-primary" type="submit">{{call .T "delete.send_code"}}</button>
+      </form>
+      <form data-step="code" hidden novalidate>
+        <p class="form-status" role="status">{{.CodeSent}}</p>
+        <label for="delete-code">{{call .T "delete.code_label"}}</label>
+        <input id="delete-code" name="code" type="text" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]*" maxlength="4" required>
+        <p class="form-hint">{{call .T "delete.confirm_note"}}</p>
+        <div class="form-actions">
+          <button class="btn btn-primary" type="submit">{{call .T "delete.confirm"}}</button>
+          <button class="btn btn-ghost" type="button" data-action="restart">{{call .T "delete.change_email"}}</button>
+        </div>
+      </form>
+      <p class="form-done" data-step="done" role="status" hidden>{{call .T "delete.done"}}</p>
+      <p class="form-error" role="alert" hidden></p>
+    </div>
+
+    {{if .ContactEmail}}<p>{{call .T "delete.contact"}} <a href="mailto:{{.ContactEmail}}">{{.ContactEmail}}</a></p>{{end}}
+    <p style="margin-top:36px"><a class="btn btn-ghost" href="/support?lang={{.Locale}}">{{call .T "support.title"}}</a></p>
+  </article>
+</div>
+{{end}}

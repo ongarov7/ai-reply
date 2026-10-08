@@ -190,15 +190,7 @@ func (s *Store) RotateRefreshToken(ctx context.Context, oldID string, next Refre
 	return next, err
 }
 
-// RevokeRefreshToken — шығу.
-func (s *Store) RevokeRefreshToken(ctx context.Context, id, reason string) error {
-	res, err := s.db.Writer().ExecContext(ctx,
-		`UPDATE refresh_tokens SET revoked_at = ?, revoked_reason = ? WHERE id = ? AND revoked_at IS NULL`,
-		ms(time.Now()), reason, id)
-	return affected(res, err)
-}
-
-// RevokeFamily — қайта пайдалану анықталғанда бүкіл тізбекті жабады.
+// RevokeFamily — бүкіл тізбекті жабады: қайта пайдалану анықталғанда және шығуда.
 func (s *Store) RevokeFamily(ctx context.Context, familyID, reason string) error {
 	_, err := s.db.Writer().ExecContext(ctx,
 		`UPDATE refresh_tokens SET revoked_at = ?, revoked_reason = ? WHERE family_id = ? AND revoked_at IS NULL`,

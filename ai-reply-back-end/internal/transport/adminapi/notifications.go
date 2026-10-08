@@ -37,7 +37,7 @@ func (s *Server) registerNotifications(mux *http.ServeMux) {
 func (s *Server) handleNotifications(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, map[string]any{
 		"status":           s.notify.Status(),
-		"categories":       domain.NotificationCategories,
+		"categories":       domain.CampaignCategories,
 		"screens":          domain.LinkScreens,
 		"content_locales":  notifications.ContentLocales,
 		"required_locales": notifications.RequiredLocales,

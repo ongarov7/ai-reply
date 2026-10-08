@@ -1,0 +1,12 @@
+-- 0014_consent_withdrawal: келісімді кері қайтару (DELETE /api/v1/me/consents).
+--
+-- withdrawn_at is set when the person withdraws consent to AI processing in
+-- the app. The row stays as the record of what was accepted and when; a
+-- withdrawn row no longer counts, so AI requests answer CONSENT_REQUIRED until
+-- the app posts consent again, which clears the column and restarts
+-- accepted_at. Rows go away with the account (ON DELETE CASCADE).
+--
+-- Only additive. Rollback: older binaries ignore the column — but they would
+-- treat a withdrawn consent as given again, so withdraw by hand first
+-- (DELETE FROM legal_consents WHERE withdrawn_at IS NOT NULL).
+ALTER TABLE legal_consents ADD COLUMN withdrawn_at INTEGER;

@@ -97,6 +97,7 @@ func TestNewUserStartsOnTheFreePlan(t *testing.T) {
 	if usage.num("daily_limit") != 7 || usage.num("remaining_today") != 7 {
 		t.Fatalf("usage = %s", usage.raw)
 	}
+	h.consent(access)
 	if res := h.generate(access, "Сәлем, бағасы қанша?"); res.status != http.StatusOK {
 		t.Fatalf("first reply: %d %s", res.status, res.raw)
 	}

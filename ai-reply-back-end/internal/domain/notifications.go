@@ -20,6 +20,23 @@ var NotificationCategories = []string{
 	CategoryAccount, CategorySubscription, CategorySecurity, CategorySystem, CategoryMarketing,
 }
 
+// CampaignCategories — әкімші науқанына рұқсат етілген санаттар.
+//
+// Security and account notices reach people who switched everything else off
+// and are delivered as important: only the server's own events may use them,
+// never a campaign written in the admin panel.
+var CampaignCategories = []string{CategorySubscription, CategorySystem, CategoryMarketing}
+
+// IsCampaignCategory — науқанға рұқсат етілген санат па.
+func IsCampaignCategory(v string) bool {
+	for _, c := range CampaignCategories {
+		if c == v {
+			return true
+		}
+	}
+	return false
+}
+
 // IsNotificationCategory — белгілі санат па.
 func IsNotificationCategory(v string) bool {
 	for _, c := range NotificationCategories {
@@ -32,6 +49,24 @@ func IsNotificationCategory(v string) bool {
 
 // CategoryOptional — қолданушы бұл санатты өшіре ала ма (қауіпсіздік хабарлары әрқашан келеді).
 func CategoryOptional(category string) bool { return category != CategorySecurity }
+
+// CategoryOptIn — қолданушы өзі қоспайынша өшірулі санат (жарнама).
+//
+// Marketing needs an explicit yes: an account without a stored choice gets
+// none. The other optional categories stay on until switched off.
+func CategoryOptIn(category string) bool { return category == CategoryMarketing }
+
+// CategoryEnabled — сақталған таңдау (stored: санат → қосулы ма) бойынша санат қосулы ма.
+func CategoryEnabled(category string, stored map[string]bool) bool {
+	if !CategoryOptional(category) {
+		return true
+	}
+	enabled, set := stored[category]
+	if !set {
+		return !CategoryOptIn(category)
+	}
+	return enabled
+}
 
 // CategoryImportant — жоғары басымдықпен және «маңызды» арнамен жеткізілетін санаттар.
 func CategoryImportant(category string) bool {

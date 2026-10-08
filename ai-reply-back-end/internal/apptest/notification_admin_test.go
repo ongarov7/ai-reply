@@ -31,6 +31,15 @@ func campaignBody(extra map[string]any) map[string]any {
 	return body
 }
 
+// optInMarketing — жарнама хабарламаларына келісім (қолданушы өзі қоспаса, науқан келмейді).
+func (h *harness) optInMarketing(access string) {
+	h.t.Helper()
+	if res := h.do(http.MethodPut, "/api/v1/me/notification-preferences",
+		map[string]any{"preferences": map[string]any{"marketing": true}}, h.auth(access)); res.status != http.StatusOK {
+		h.t.Fatalf("marketing opt-in: %d %s", res.status, res.raw)
+	}
+}
+
 func (h *harness) setPreferredLanguage(access, language string) {
 	h.t.Helper()
 	if res := h.do(http.MethodPatch, "/api/v1/me", map[string]any{"preferred_language": language}, h.auth(access)); res.status != http.StatusOK {
@@ -57,6 +66,7 @@ func (h *harness) planID(code string) string {
 func TestCampaignCreationIsIdempotent(t *testing.T) {
 	h := newHarness(t)
 	s := h.signIn("campaign-target@example.com")
+	h.optInMarketing(s.access)
 	h.mustRegister(installation(installID(21), "android", fcmToken(21)), s.access)
 	admin := h.signInAdmin()
 	headers := admin.headers(h.cfg.Admin.CookieName)
@@ -189,6 +199,7 @@ func TestCampaignCancel(t *testing.T) {
 func TestACancelledCampaignIsNotRetriedOrResent(t *testing.T) {
 	h := newHarness(t)
 	s := h.signIn("cancel-in-flight@example.com")
+	h.optInMarketing(s.access)
 	h.mustRegister(installation(installID(41), "android", fcmToken(41)), s.access)
 	admin := h.signInAdmin()
 	headers := admin.headers(h.cfg.Admin.CookieName)
@@ -240,6 +251,7 @@ func TestACancelledCampaignKeepsItsTotals(t *testing.T) {
 	h := newHarness(t, withEnv("PUSH_BATCH_SIZE", "1"))
 	for i := 0; i < 2; i++ {
 		s := h.signIn(fmt.Sprintf("cancel-totals-%d@example.com", i))
+		h.optInMarketing(s.access)
 		h.mustRegister(installation(installID(42+i), "android", fcmToken(42+i)), s.access)
 	}
 	admin := h.signInAdmin()
@@ -444,6 +456,7 @@ func TestCampaignIsSentInEachRecipientsLanguage(t *testing.T) {
 	}
 	for _, p := range people {
 		s := h.signIn(p.identifier)
+		h.optInMarketing(s.access)
 		if p.preferred != "" {
 			h.setPreferredLanguage(s.access, p.preferred)
 		}
@@ -511,6 +524,8 @@ func TestAudiencePreviewCountsByLanguageAndReportsUnknownEmails(t *testing.T) {
 	h := newHarness(t)
 	kk := h.signIn("preview-kk@example.com")
 	ru := h.signIn("preview-ru@example.com")
+	h.optInMarketing(kk.access)
+	h.optInMarketing(ru.access)
 	h.setPreferredLanguage(ru.access, "ru")
 	h.mustRegister(installation(installID(201), "android", fcmToken(201)), kk.access)
 	h.mustRegister(installation(installID(202), "ios", fcmToken(202)), kk.access)
@@ -582,6 +597,7 @@ func TestAudienceFilters(t *testing.T) {
 	headers := admin.headers(h.cfg.Admin.CookieName)
 	seed := 300
 	devices := func(access, platform, locale string, n int) {
+		h.optInMarketing(access) // the previews below are for marketing
 		for i := 0; i < n; i++ {
 			seed++
 			body := installation(installID(seed), platform, fcmToken(seed))

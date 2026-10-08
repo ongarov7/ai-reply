@@ -82,6 +82,10 @@ func (s *Service) WithClock(c traits.Clock) *Service { s.clock = c; return s }
 // Sealer — жұмысшыға токенді ашу үшін.
 func (s *Service) Sealer() *Sealer { return s.sealer }
 
+// maxPushTokenLength — FCM registration token бұдан әлдеқайда қысқа (~150–200 таңба);
+// шек дерекқорға шексіз мәтін жазылмауы үшін.
+const maxPushTokenLength = 1024
+
 var (
 	installationIDPattern = regexp.MustCompile(`^[A-Za-z0-9-]{8,64}$`)
 	fcmTokenPattern       = regexp.MustCompile(`^[A-Za-z0-9_:.\-]+$`)
@@ -172,7 +176,7 @@ func (s *Service) normalize(reg Registration) (repository.InstallationUpsert, er
 		if provider != domain.ProviderFCM {
 			return repository.InstallationUpsert{}, fieldError("push.provider")
 		}
-		if len(token) < 20 || len(token) > 4096 || !fcmTokenPattern.MatchString(token) {
+		if len(token) < 20 || len(token) > maxPushTokenLength || !fcmTokenPattern.MatchString(token) {
 			return repository.InstallationUpsert{}, fieldError("push.token")
 		}
 		sealed, err := s.sealer.Seal(token)

@@ -182,7 +182,8 @@ func quotaClause(q AudienceQuery) (string, []any) {
 //
 // A live token, the in-app switch on, OS permission that shows alerts, a
 // configured provider, seen recently enough, and — unless the category is
-// security — the account has not switched this category off.
+// security — the account has not switched this category off. Marketing is
+// opt-in: only accounts that switched it on are reached.
 func reachableClause(q AudienceQuery) (string, []any) {
 	where := []string{
 		"i.push_status = 'active'",
@@ -203,7 +204,12 @@ func reachableClause(q AudienceQuery) (string, []any) {
 		where = append(where, "i.last_seen_at >= ?")
 		args = append(args, ms(q.Now.Add(-q.StaleAfter)))
 	}
-	if domain.CategoryOptional(q.Category) {
+	switch {
+	case domain.CategoryOptIn(q.Category):
+		where = append(where, `EXISTS (SELECT 1 FROM notification_preferences np
+			WHERE np.user_id = i.user_id AND np.category = ? AND np.enabled = 1)`)
+		args = append(args, q.Category)
+	case domain.CategoryOptional(q.Category):
 		where = append(where, `NOT EXISTS (SELECT 1 FROM notification_preferences np
 			WHERE np.user_id = i.user_id AND np.category = ? AND np.enabled = 0)`)
 		args = append(args, q.Category)

@@ -20,7 +20,8 @@ Mobile (iOS / Android / клавиатура)
 
 ```bash
 cp .env.example .env
-# заполнить OPENAI_API_KEY и три секрета: make secrets
+# заполнить OPENAI_API_KEY, ADMIN_PASSWORD и три секрета (make secrets):
+# с заглушками REPLACE… / CHANGE_ME сервер не стартует
 make run           # http://localhost:8080 (порт = APP_PORT из .env)
 ```
 
@@ -61,13 +62,27 @@ curl localhost:8080/healthz
 curl localhost:8080/api/v1/plans
 open http://localhost:8080/          # лендинг
 open http://localhost:8080/admin     # админка
-open http://localhost:8080/simulator # интерактивный симулятор продукта
+open http://localhost:8080/simulator # симулятор продукта (только при SIMULATOR_ENABLED)
 ```
 
 Демо-вход в приложении (только разработка): «Продолжить с e-mail», любой адрес
 и код **1111** — если `AUTH_DEMO_MODE=true` и Resend не настроен. С настроенным
-Resend код всегда случайный и приходит письмом. В production демо-режим не
-запускается, а без `RESEND_API_KEY` / `RESEND_FROM_EMAIL` сервер откажется стартовать.
+Resend код всегда случайный и приходит письмом. По умолчанию `AUTH_DEMO_MODE=false`;
+`true` сервер принимает только при `APP_ENV=development` или `test` (staging и
+production не стартуют), а без `RESEND_API_KEY` / `RESEND_FROM_EMAIL` production
+откажется стартовать. Вход по телефону без демо-режима отвечает
+`AUTH_PROVIDER_UNAVAILABLE`: SMS-провайдера нет, и сервер не делает вид, что код ушёл.
+
+Безопасные значения по умолчанию для релиза: `LEGACY_API_ENABLED=false` (старый
+`/v1/*` API для install-token сборок), `PAYMENT_MODE=off` (`off | demo | live`;
+production — только `off` или `live`), `PAYMENT_DEMO_CHECKOUT=true` допустим только
+вместе с `PAYMENT_MODE=demo` вне production. Для разработки их включают явно в `.env`.
+
+Публичные страницы для магазинов: `/privacy`, `/offer`, `/support` (контакт —
+`CONTACT_EMAIL`, реальный ящик; без него адрес нигде не показывается) и
+`/account/delete` (`/delete-account` → редирект): удаление аккаунта в приложении
+или по коду на почту. Оператор в юридических текстах — `LEGAL_OPERATOR_NAME` и
+`LEGAL_OPERATOR_DETAILS` (без них тексты называют только AI Reply и контакт).
 
 ## Структура
 
@@ -82,11 +97,14 @@ internal/
   database/          SQLite: WAL, один писатель, пул читателей, миграции
   repository/        SQL-слой (в т.ч. атомарный учёт квоты)
   auth/              OTP, JWT (15 мин), refresh с ротацией, PBKDF2 для админов
-  users/             профиль и устройства
+    appleid/         отзыв токена Sign in with Apple при удалении аккаунта (ES256 client_secret)
+  users/             профиль, согласие, удаление аккаунта
   plans/             каталог тарифов
   subscriptions/     подписки и расчёт текущего лимита (entitlement)
   ai/                промпт, клиент OpenAI Responses API, шлюз с учётом токенов
   productevents/     события онбординга и настроек из приложений: закрытый список, только счётчики
+  reports/           жалобы на AI-ответы (приложения → админка «Жалобы»)
+  retention/         удаление просроченных кодов, сессий, установок и метаданных (RETENTION_*)
   payments/          интерфейс эквайринга + demo-адаптер
   installations/     реестр установок приложений, зашифрованные push-токены
   push/              FCM HTTP v1 без SDK (Android и iOS), классификация ошибок
@@ -129,7 +147,8 @@ internal/
 - `/simulator` — интерактивный симулятор продукта для показа клиентам:
   iOS и Android, AI-клавиатура, голосовой ввод, архитектура, админ-демо;
   генерация идёт через настоящий бэкенд, вход — теми же логином и паролем,
-  что и админка (`docs/SIMULATOR.md`);
+  что и админка (`docs/SIMULATOR.md`). Включён только при `SIMULATOR_ENABLED=true`
+  (по умолчанию — в development/test); ссылок на него на публичных страницах нет;
 - полная совместимость со старым контрактом (`/v1/auth/register`, `/v1/reply/generate`),
   поэтому уже собранные iOS/Android-версии продолжают работать.
 
@@ -189,13 +208,43 @@ make secrets     # сгенерировать JWT/legacy секреты
 - Resend: подтвердить домен `ai-reply.kz` и прописать `RESEND_*` в `.env` сервера
   (без них `APP_ENV=production` не стартует) — [docs/AUTH.md](docs/AUTH.md);
 - Google / Apple: client ID в `.env` (`GOOGLE_CLIENT_ID_IOS`, `GOOGLE_CLIENT_ID_WEB`,
-  `APPLE_CLIENT_ID`);
+  `APPLE_CLIENT_ID`); для отзыва токена Sign in with Apple при удалении аккаунта —
+  ключ «Sign in with Apple» из Apple Developer: `APPLE_TEAM_ID`, `APPLE_KEY_ID`,
+  `APPLE_PRIVATE_KEY` (PEM `.p8`, одной строкой с `\n` или base64);
+- `CONTACT_EMAIL` — реальный ящик поддержки; при необходимости `LEGAL_OPERATOR_NAME`
+  и `LEGAL_OPERATOR_DETAILS` (наименование и реквизиты оператора);
 - реальный эквайринг — один интерфейс `payments.Provider`;
 - push: проект Firebase с приложениями `kz.yerek.aireply` и `kz.ai-reply.reply.keyboard.keyboard`,
   APNs-ключ в Firebase, сервисный аккаунт и `PUSH_NOTIFICATIONS_ENABLED=true` в `.env` —
   [../docs/notifications.md](../docs/notifications.md);
-- rate limiter в памяти → Redis при нескольких инстансах;
-- `APP_ENV=production`, HTTPS, `ADMIN_SECURE_COOKIES=true`, `AUTH_DEMO_MODE=false`.
+- rate limiter в памяти → Redis при нескольких инстансах.
+
+### Чек-лист деплоя
+
+- `APP_ENV=production`, `AUTH_DEMO_MODE=false`, `PAYMENT_MODE=off`, `LEGACY_API_ENABLED=false`,
+  `SIMULATOR_ENABLED=false` (по умолчанию вне development/test);
+- `PUBLIC_BASE_URL=https://ai-reply.kz`: cookie админки тогда `Secure` и идёт HSTS
+  (`ADMIN_SECURE_COOKIES` можно задать явно — явное значение главнее);
+- `TRUST_PROXY=true` за Caddy: IP клиента — последний адрес в `X-Forwarded-For`
+  (тот, что добавил прокси), `X-Real-IP` не читается;
+- секреты из `make secrets`, `ADMIN_PASSWORD` не короче 16 символов; значения-заглушки
+  (`REPLACE…`, `CHANGE_ME`) сервер не принимает. Смена `ADMIN_PASSWORD` и рестарт —
+  это ротация: новый хэш, все сессии админа закрываются, запись в аудите;
+- `CONTACT_EMAIL` — реальный ящик на `ai-reply.kz` (и Reply-To всех писем);
+- `REVIEW_LOGIN_EMAIL` + `REVIEW_LOGIN_CODE` — только на время проверки App Review /
+  Google Play: новый код на каждую подачу, после одобрения обе переменные очистить
+  ([docs/AUTH.md](docs/AUTH.md#вход-для-проверки-app-review--google-play));
+- `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY` — отзыв Sign in with Apple при удалении аккаунта;
+- `APP_STORE_URL` / `PLAY_STORE_URL` — когда приложения опубликованы (лендинг покажет ссылки);
+- бэкап тома `aireply-data` по расписанию и вне сервера: `sqlite3 aireply.db ".backup aireply-$(date +%F).db"`
+  или копия тома при остановленном контейнере (файлы `-wal`/`-shm` вместе с базой).
+
+Хранение данных: фоновая задача удаляет просроченное пачками — коды входа
+(`RETENTION_OTP_DAYS=30`), завершённые сессии (`RETENTION_REFRESH_TOKENS_DAYS=30`
+после истечения или отзыва), установки без аккаунта (`RETENTION_ANON_INSTALLATIONS_DAYS=180`
+с последнего появления), события приложения и метаданные запросов
+(`RETENTION_PRODUCT_EVENTS_DAYS` / `RETENTION_AI_USAGE_EVENTS_DAYS`, по 400). `0` — не удалять.
+Эти же числа выводит политика конфиденциальности.
 
 Подробности: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md),
 [docs/API.md](docs/API.md), [docs/AUTH.md](docs/AUTH.md), [docs/AI_QUALITY.md](docs/AI_QUALITY.md),

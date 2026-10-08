@@ -21,11 +21,12 @@
 
 | Айнымалы | Не үшін |
 |---|---|
+| `SIMULATOR_ENABLED` | симулятор беттері мен API-і тіркеле ме; әдепкі — тек `development`/`test`. Өшірулі болса `/simulator` және `/api/v1/simulator/*` — 404. Көпшілік беттерде сілтеме жоқ, мекенжай тек URL арқылы |
 | `ADMIN_EMAIL` | симуляторға да, `/admin`-ге де кіру |
 | `ADMIN_PASSWORD` | сол құпиясөз (PBKDF2-мен хэштеліп сақталады) |
 | `ADMIN_SESSION_TTL` | сессия мерзімі (әдепкі 8 сағат) |
-| `ADMIN_SECURE_COOKIES` | production-да `true` |
-| `RATE_ADMIN_LOGIN_PER_HOUR` | кіру әрекеттерінің шегі (симулятормен ортақ) |
+| `ADMIN_SECURE_COOKIES` | бос болса — `PUBLIC_BASE_URL` https кезінде `true` |
+| `RATE_ADMIN_LOGIN_PER_HOUR` | кіру әрекеттерінің шегі IP бойынша (симулятормен ортақ); бір поштаға 15 минутта 5 әрекет |
 
 Жаңа әкімші қосу қажет болса — `ADMIN_EMAIL`/`ADMIN_PASSWORD` арқылы bootstrap,
 одан әрі әкімші панелі. Симулятор үшін жеке тіркелгі жасаудың қажеті жоқ.

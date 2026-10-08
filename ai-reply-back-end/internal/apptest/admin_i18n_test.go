@@ -74,6 +74,10 @@ func adminKeyFamilies() map[string][]string {
 		"admin.push.channel.": {domain.ChannelPush, domain.ChannelEmail},
 		"admin.push.source.":  {repository.SourceCampaign, repository.SourceAutomatic},
 		"admin.push.type.":    append([]string{domain.TypeCampaign}, domain.AutomaticNotificationTypes...),
+		// Reports on AI replies.
+		"admin.reports.reason.": domain.ReportReasons,
+		"admin.reports.status.": domain.ReportStatuses,
+		"admin.reports.mode.":   domain.ReportModes,
 		// Dashboard range buttons.
 		"common.": {"today", "7d", "30d", "month", "prev_month"},
 	}

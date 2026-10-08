@@ -335,7 +335,7 @@ func TestSubscriptionRemindersAreSentOncePerPeriod(t *testing.T) {
 	h.tick()
 	msgs := h.pushesOf(domain.TypeSubscriptionExpiring)
 	if len(msgs) != 1 || msgs[0].Title != "Жазылым мерзімі аяқталуға жақын" ||
-		msgs[0].Body != "«"+h.planName("standard", "kk")+"» тарифі 12.03.2026 дейін жарамды. Жауап лимитін сақтау үшін тарифті ұзартыңыз." ||
+		msgs[0].Body != "«"+h.planName("standard", "kk")+"» тарифі 12.03.2026 дейін жарамды. Одан кейін тегін тариф лимиттері қолданылады." ||
 		msgs[0].Data["link"] != "aireply://subscription" {
 		t.Fatalf("reminder = %+v", msgs)
 	}
@@ -445,14 +445,20 @@ func TestQuotaNoticesOncePerDay(t *testing.T) {
 			}
 
 			h.tick()
+			// Nothing to buy on the free plan: its notices open the app's home screen.
+			link := "aireply://subscription"
+			if tc.code == "free" {
+				link = "aireply://home"
+			}
 			low := h.pushesOf(domain.TypeQuotaLow)
 			wantBody := "Бүгін тағы " + strconv.Itoa(tc.threshold) + " жауап жасай аласыз (күндік лимит — " + strconv.Itoa(tc.limit) + "). Лимит түн ортасында жаңарады."
 			if len(low) != 1 || low[0].Title != "Жауаптар таусылуға жақын" || low[0].Body != wantBody ||
-				low[0].Data["link"] != "aireply://subscription" || low[0].Data["category"] != domain.CategorySubscription {
+				low[0].Data["link"] != link || low[0].Data["category"] != domain.CategorySubscription {
 				t.Fatalf("quota_low push = %+v", low)
 			}
 			out := h.pushesOf(domain.TypeQuotaExhausted)
-			if len(out) != 1 || out[0].Title != "Жауап лимиті таусылды" || !strings.Contains(out[0].Body, "Бүгінгі "+strconv.Itoa(tc.limit)+" жауаптың") {
+			if len(out) != 1 || out[0].Title != "Жауап лимиті таусылды" || !strings.Contains(out[0].Body, "Бүгінгі "+strconv.Itoa(tc.limit)+" жауаптың") ||
+				out[0].Data["link"] != link {
 				t.Fatalf("quota_exhausted push = %+v", out)
 			}
 

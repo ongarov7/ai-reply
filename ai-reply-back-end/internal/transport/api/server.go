@@ -16,6 +16,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/payments"
 	"github.com/aireply/ai-reply-back-end/internal/plans"
 	"github.com/aireply/ai-reply-back-end/internal/productevents"
+	"github.com/aireply/ai-reply-back-end/internal/reports"
 	"github.com/aireply/ai-reply-back-end/internal/subscriptions"
 	"github.com/aireply/ai-reply-back-end/internal/transport/httpx"
 	"github.com/aireply/ai-reply-back-end/internal/users"
@@ -37,6 +38,7 @@ type Server struct {
 	events        *productevents.Service
 	installations *installations.Service
 	notifications *notifications.Service
+	reports       *reports.Service
 	limiter       *middleware.Limiter
 	ping          Pinger
 	log           *slog.Logger
@@ -55,9 +57,11 @@ type Deps struct {
 	Events        *productevents.Service
 	Installations *installations.Service
 	Notifications *notifications.Service
-	Limiter       *middleware.Limiter
-	Ping          Pinger
-	Log           *slog.Logger
+	// Reports — AI жауабына шағымдар (POST /api/v1/ai/reports).
+	Reports *reports.Service
+	Limiter *middleware.Limiter
+	Ping    Pinger
+	Log     *slog.Logger
 }
 
 // New — API сервері.
@@ -65,15 +69,17 @@ func New(d Deps) *Server {
 	return &Server{
 		cfg: d.Config, auth: d.Auth, users: d.Users, plans: d.Plans, subs: d.Subs,
 		ai: d.AI, limits: d.Limits, payments: d.Payments, events: d.Events,
-		installations: d.Installations, notifications: d.Notifications, limiter: d.Limiter, ping: d.Ping, log: d.Log,
+		installations: d.Installations, notifications: d.Notifications, reports: d.Reports,
+		limiter: d.Limiter, ping: d.Ping, log: d.Log,
 	}
 }
 
 // Register — маршруттарды негізгі mux-қа қосады.
 func (s *Server) Register(mux *http.ServeMux) {
-	// Денсаулық тексерулері — балансерге арналған, аутентификациясыз.
+	// Денсаулық тексерулері — балансерге арналған, аутентификациясыз. Орта аты
+	// (production, staging) айтылмайды: ол сырттағы ешкімге керек емес.
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
-		httpx.JSON(w, http.StatusOK, map[string]any{"ok": true, "env": s.cfg.App.Env})
+		httpx.JSON(w, http.StatusOK, map[string]any{"ok": true})
 	})
 	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
 		if s.ping != nil {
@@ -102,6 +108,8 @@ func (s *Server) Register(mux *http.ServeMux) {
 	polishLimit := middleware.RateLimit(s.limiter, "polish", limits.PolishPerMinute, time.Minute, perUser)
 	// Өнім оқиғалары: өз шелегі, басқа сұраныстардың лимитін жемейді.
 	eventsLimit := middleware.RateLimit(s.limiter, "events", limits.EventsPerMinute, time.Minute, perUser)
+	// Шағымдар: сағатына бір қолданушыға шектеулі (өз шелегі).
+	reportsLimit := middleware.RateLimit(s.limiter, "ai_reports", limits.ReportsPerHour, time.Hour, perUser)
 
 	// --- аутентификация: пошта OTP (Resend), Google, Apple
 	mux.Handle("POST /api/v1/auth/email/otp/request", otpRequest(http.HandlerFunc(s.handleEmailOTPRequest)))
@@ -125,6 +133,14 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /api/v1/me/subscription", s.requireUser(http.HandlerFunc(s.handleSubscription)))
 	mux.Handle("GET /api/v1/me/devices", s.requireUser(http.HandlerFunc(s.handleListDevices)))
 	mux.Handle("POST /api/v1/me/consents", s.requireUser(http.HandlerFunc(s.handleSaveLegalConsent)))
+	// Келісімді кері қайтару: AI тоқтайды, тіркелгі қалады.
+	mux.Handle("DELETE /api/v1/me/consents", s.requireUser(http.HandlerFunc(s.handleWithdrawLegalConsent)))
+	// Тіркелгіні жою. POST — DELETE-ке дене жібере алмайтын клиенттер үшін, мағынасы бірдей.
+	mux.Handle("DELETE /api/v1/me", s.requireUser(generic(http.HandlerFunc(s.handleDeleteAccount))))
+	mux.Handle("POST /api/v1/me/delete", s.requireUser(generic(http.HandlerFunc(s.handleDeleteAccount))))
+	// Қолданбасыз жою (/account/delete беті): поштаға код → код → жою.
+	mux.Handle("POST /api/v1/account/delete/request", otpRequest(http.HandlerFunc(s.handleAccountDeletionRequest)))
+	mux.Handle("POST /api/v1/account/delete/confirm", otpVerify(http.HandlerFunc(s.handleAccountDeletionConfirm)))
 	// Поштасы жоқ тіркелгіге (телефонмен ашылған) пошта қосу — кейін сол поштамен кіру үшін.
 	mux.Handle("POST /api/v1/me/email/otp/request", s.requireUser(otpRequest(http.HandlerFunc(s.handleLinkEmailRequest))))
 	mux.Handle("POST /api/v1/me/email/otp/verify", s.requireUser(otpVerify(http.HandlerFunc(s.handleLinkEmailVerify))))
@@ -145,12 +161,14 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /api/v1/notifications/opened",
 		s.installationLimit(s.optionalUser(http.HandlerFunc(s.handleNotificationOpened))))
 
-	// --- AI
-	mux.Handle("POST /api/v1/ai/reply", s.requireUser(aiLimit(http.HandlerFunc(s.handleReply))))
+	// --- AI: мәтін OpenAI-ға тек ағымдағы шарттарға келісім болса кетеді.
+	mux.Handle("POST /api/v1/ai/reply", s.requireUser(s.requireConsent(aiLimit(http.HandlerFunc(s.handleReply)))))
 	// Нұсқау бойынша жаңа хабарлама («Create»). Сол квота, сол rate limit.
-	mux.Handle("POST /api/v1/ai/compose", s.requireUser(aiLimit(http.HandlerFunc(s.handleCompose))))
+	mux.Handle("POST /api/v1/ai/compose", s.requireUser(s.requireConsent(aiLimit(http.HandlerFunc(s.handleCompose)))))
 	// Нұсқауды түзету ұсынысы. Квотасыз; өшірулі болса 404 NOT_FOUND.
-	mux.Handle("POST /api/v1/ai/polish", s.requireUser(polishLimit(http.HandlerFunc(s.handlePolish))))
+	mux.Handle("POST /api/v1/ai/polish", s.requireUser(s.requireConsent(polishLimit(http.HandlerFunc(s.handlePolish)))))
+	// AI жауабына шағым. Келісімсіз де қабылданады: шағым OpenAI-ға кетпейді.
+	mux.Handle("POST /api/v1/ai/reports", s.requireUser(reportsLimit(http.HandlerFunc(s.handleAIReport))))
 
 	// --- өнім оқиғалары (тек қолданбадан; пернетақта ештеңе жібермейді)
 	mux.Handle("POST /api/v1/analytics/events", s.requireUser(eventsLimit(http.HandlerFunc(s.handleProductEvents))))

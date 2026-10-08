@@ -15,6 +15,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/localization"
 	"github.com/aireply/ai-reply-back-end/internal/middleware"
 	"github.com/aireply/ai-reply-back-end/internal/notifications"
+	"github.com/aireply/ai-reply-back-end/internal/payments"
 	"github.com/aireply/ai-reply-back-end/internal/plans"
 )
 
@@ -26,6 +27,7 @@ type Server struct {
 	cfg       config.Config
 	admin     *admin.Service
 	plans     *plans.Service
+	payments  *payments.Service
 	notify    *notifications.Service
 	bundle    *localization.Bundle
 	limiter   *middleware.Limiter
@@ -37,9 +39,11 @@ type Server struct {
 
 // Deps — тәуелділіктер.
 type Deps struct {
-	Config        config.Config
-	Admin         *admin.Service
-	Plans         *plans.Service
+	Config config.Config
+	Admin  *admin.Service
+	Plans  *plans.Service
+	// Payments — лендинг тариф сатылатын-сатылмайтынын осыдан біледі (nil — ештеңе сатылмайды).
+	Payments      *payments.Service
 	Notifications *notifications.Service
 	Bundle        *localization.Bundle
 	Limiter       *middleware.Limiter
@@ -49,15 +53,18 @@ type Deps struct {
 // New — шаблондарды жинап, серверді құрады.
 func New(d Deps) (*Server, error) {
 	s := &Server{
-		cfg: d.Config, admin: d.Admin, plans: d.Plans, notify: d.Notifications,
+		cfg: d.Config, admin: d.Admin, plans: d.Plans, payments: d.Payments, notify: d.Notifications,
 		bundle: d.Bundle, limiter: d.Limiter, log: d.Log,
 		templates: map[string]*template.Template{},
 	}
 	pages := map[string][]string{
-		"landing":     {"templates/public_layout.gohtml", "templates/landing.gohtml"},
-		"legal":       {"templates/public_layout.gohtml", "templates/legal.gohtml"},
-		"admin_login": {"templates/admin_login.gohtml"},
-		"admin_app":   {"templates/admin_app.gohtml"},
+		"landing": {"templates/public_layout.gohtml", "templates/landing.gohtml"},
+		"legal":   {"templates/public_layout.gohtml", "templates/legal.gohtml"},
+		// Қолдау және тіркелгіні жою — дүкендер сұрайтын көпшілік беттер.
+		"support":        {"templates/public_layout.gohtml", "templates/support.gohtml"},
+		"account_delete": {"templates/public_layout.gohtml", "templates/account_delete.gohtml"},
+		"admin_login":    {"templates/admin_login.gohtml"},
+		"admin_app":      {"templates/admin_app.gohtml"},
 		// Интерактивті өнім симуляторы — бөлек қабық, әкімші панелін қозғамайды.
 		"simulator_login": {"templates/simulator_login.gohtml"},
 		"simulator_app":   {"templates/simulator_app.gohtml"},
@@ -95,6 +102,9 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /offer", s.handleTerms)
 	mux.HandleFunc("GET /terms", s.handleTerms)
 	mux.HandleFunc("GET /privacy", s.handlePrivacy)
+	mux.HandleFunc("GET /support", s.handleSupport)
+	mux.HandleFunc("GET /account/delete", s.handleAccountDelete)
+	mux.HandleFunc("GET /delete-account", s.handleDeleteAccountRedirect)
 
 	ipKey := func(r *http.Request) string { return clientIP(r, s.cfg.App.TrustProxy) }
 	loginLimit := middleware.RateLimit(s.limiter, "admin_login", s.cfg.Limits.AdminLoginPerHour, time.Hour, ipKey)
@@ -108,6 +118,10 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /admin/{path...}", s.guard(s.handleAdminApp))
 
 	// Интерактивті өнім симуляторы. Кіру — әкімші тіркелгісімен, сол шектеумен.
+	// SIMULATOR_ENABLED=false (production әдепкісі) болса, маршруттар мүлде жоқ: 404.
+	if !s.cfg.App.SimulatorEnabled {
+		return
+	}
 	mux.HandleFunc("GET /simulator/login", s.handleSimulatorLoginForm)
 	mux.Handle("POST /simulator/login", loginLimit(http.HandlerFunc(s.handleSimulatorLogin)))
 	mux.HandleFunc("POST /simulator/logout", s.handleSimulatorLogout)

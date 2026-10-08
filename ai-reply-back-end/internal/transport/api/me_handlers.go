@@ -102,6 +102,18 @@ func (s *Server) handleSaveLegalConsent(w http.ResponseWriter, r *http.Request) 
 	httpx.JSON(w, http.StatusOK, toLegalConsentDTO(consent))
 }
 
+// handleWithdrawLegalConsent — AI өңдеуге келісімді кері қайтару (Баптаулар ▸ Құпиялық).
+// Идемпотентті: келісім болмаса да {"ok": true}.
+func (s *Server) handleWithdrawLegalConsent(w http.ResponseWriter, r *http.Request) {
+	user, _ := UserFrom(r.Context())
+	if err := s.users.WithdrawLegalConsent(r.Context(), user.ID); err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	s.log.Info("legal consent withdrawn", "user_id", user.ID)
+	httpx.JSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
 // updateMeRequest — users.ProfileUpdate-ке тікелей айналады: өрістері мен
 // олардың реті бірдей болуы керек.
 type updateMeRequest struct {
@@ -228,6 +240,10 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 			// Plans can be bought right now (admin switch + verified billing).
 			// /api/v1/plans lists only visible plans and marks each purchasable.
 			"purchases": s.payments.PurchasesEnabled(r.Context()),
+			// POST /api/v1/ai/reports — reporting a generated text.
+			"ai_reports": true,
+			// DELETE /api/v1/me and POST /api/v1/me/delete.
+			"account_deletion": true,
 		},
 		"demo_mode":    s.cfg.Auth.DemoMode,
 		"payment_mode": s.payments.Mode(),
@@ -237,6 +253,12 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 			"privacy_version": legal.PrivacyVersion,
 			"terms_url":       s.cfg.App.PublicBaseURL + "/offer",
 			"privacy_url":     s.cfg.App.PublicBaseURL + "/privacy",
+			// "" when CONTACT_EMAIL is not set: the apps then show only the support page.
+			"contact_email":        s.cfg.App.ContactEmail(),
+			"support_url":          s.cfg.App.PublicBaseURL + "/support",
+			"account_deletion_url": s.cfg.App.PublicBaseURL + "/account/delete",
+			// Who writes the replies; the consent screen names it.
+			"ai_provider": legal.AIProvider,
 		},
 	})
 }

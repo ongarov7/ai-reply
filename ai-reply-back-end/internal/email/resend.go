@@ -33,12 +33,16 @@ type ResendConfig struct {
 	// HTTPClient — бос болса, 10 секунд таймауты бар клиент.
 	HTTPClient *http.Client
 	Translate  Translator
+	// ReplyTo — жауап хаты баратын жәшік (CONTACT_EMAIL); бос болса өріс жіберілмейді
+	// және жауап noreply мекенжайына кетеді.
+	ReplyTo string
 }
 
 // Resend — https://resend.com арқылы OTP және хабарлама хаттарын жібереді.
 type Resend struct {
 	apiKey    string
 	from      string
+	replyTo   string
 	brand     string
 	endpoint  string
 	client    *http.Client
@@ -57,6 +61,12 @@ func NewResend(cfg ResendConfig) (*Resend, error) {
 	if cfg.Translate == nil {
 		return nil, errors.New("email: translator is required")
 	}
+	replyTo := strings.TrimSpace(cfg.ReplyTo)
+	if replyTo != "" {
+		if addr, err := mail.ParseAddress(replyTo); err != nil || addr.Name != "" {
+			return nil, errors.New("email: the reply-to address must be a plain address")
+		}
+	}
 	brand := strings.TrimSpace(cfg.FromName)
 	if brand == "" {
 		brand = "AI Reply"
@@ -72,6 +82,7 @@ func NewResend(cfg ResendConfig) (*Resend, error) {
 	return &Resend{
 		apiKey:    strings.TrimSpace(cfg.APIKey),
 		from:      (&mail.Address{Name: brand, Address: from.Address}).String(),
+		replyTo:   replyTo,
 		brand:     brand,
 		endpoint:  base + "/emails",
 		client:    client,
@@ -101,6 +112,7 @@ type resendRequest struct {
 	Subject string            `json:"subject"`
 	HTML    string            `json:"html"`
 	Text    string            `json:"text"`
+	ReplyTo string            `json:"reply_to,omitempty"`
 	Headers map[string]string `json:"headers,omitempty"`
 }
 
@@ -111,7 +123,7 @@ type resendRequest struct {
 // (bad key, unverified domain, quota) are not retried: repeating them cannot
 // succeed and only burns the rate limit.
 func (r *Resend) SendOTP(ctx context.Context, msg OTPMessage) error {
-	content, err := RenderOTP(r.translate, r.brand, msg.Locale, msg.Code, msg.TTL)
+	content, err := RenderOTPFor(r.translate, r.brand, msg.Locale, msg.Code, msg.TTL, msg.Purpose)
 	if err != nil {
 		return err
 	}
@@ -138,6 +150,7 @@ func (r *Resend) deliver(ctx context.Context, to string, content Content, idempo
 		Subject: content.Subject,
 		HTML:    content.HTML,
 		Text:    content.Text,
+		ReplyTo: r.replyTo,
 	}
 	if reference != "" {
 		// A unique header keeps Gmail from folding consecutive messages into

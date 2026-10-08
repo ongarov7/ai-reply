@@ -83,6 +83,23 @@ func (s *Server) optionalUser(next http.Handler) http.Handler {
 	})
 }
 
+// requireConsent — AI сұраныстары тек ағымдағы шарттарға келісім болса өтеді.
+//
+// Runs after requireUser. Without a consent row for the current terms and
+// privacy versions (none yet, an older version, or withdrawn) the request is
+// refused with 403 CONSENT_REQUIRED before any text reaches the provider; the
+// app returns to its consent screen and posts /api/v1/me/consents.
+func (s *Server) requireConsent(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, _ := UserFrom(r.Context())
+		if err := s.users.RequireConsent(r.Context(), user.ID); err != nil {
+			httpx.Fail(w, err)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // requireLegacy — ескі install-token миддлварі.
 func (s *Server) requireLegacy(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

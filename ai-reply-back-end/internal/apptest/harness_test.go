@@ -24,6 +24,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/domain"
 	"github.com/aireply/ai-reply-back-end/internal/email"
 	"github.com/aireply/ai-reply-back-end/internal/installations"
+	"github.com/aireply/ai-reply-back-end/internal/legal"
 	"github.com/aireply/ai-reply-back-end/internal/limits"
 	"github.com/aireply/ai-reply-back-end/internal/localization"
 	"github.com/aireply/ai-reply-back-end/internal/middleware"
@@ -32,6 +33,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/plans"
 	"github.com/aireply/ai-reply-back-end/internal/productevents"
 	"github.com/aireply/ai-reply-back-end/internal/push"
+	"github.com/aireply/ai-reply-back-end/internal/reports"
 	"github.com/aireply/ai-reply-back-end/internal/repository"
 	"github.com/aireply/ai-reply-back-end/internal/simulator"
 	"github.com/aireply/ai-reply-back-end/internal/subscriptions"
@@ -56,13 +58,32 @@ type fakeProvider struct {
 	lastUser      string
 	lastDeveloper string
 	lastMaxTokens int
+	// hold — келесі шақыру клиент кеткенше күтеді; арна шақыру басталғанда жабылады.
+	hold chan struct{}
 }
 
 func (f *fakeProvider) Name() string  { return "fake" }
 func (f *fakeProvider) Model() string { return "test-model" }
 
-func (f *fakeProvider) Generate(_ context.Context, prompt ai.Prompt) (ai.Completion, error) {
+// holdNext — келесі шақыру сұраныс тоқтағанша (клиент байланысты үзгенше) жауап бермейді.
+func (f *fakeProvider) holdNext() <-chan struct{} {
 	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.hold = make(chan struct{})
+	return f.hold
+}
+
+func (f *fakeProvider) Generate(ctx context.Context, prompt ai.Prompt) (ai.Completion, error) {
+	f.mu.Lock()
+	if hold := f.hold; hold != nil {
+		f.hold = nil
+		f.calls++
+		f.mu.Unlock()
+		close(hold)
+		<-ctx.Done()
+		// What the OpenAI client reports when the request is cancelled under it.
+		return ai.Completion{}, domain.ErrProviderDown
+	}
 	defer f.mu.Unlock()
 	f.calls++
 	f.prompts = append(f.prompts, prompt)
@@ -190,6 +211,7 @@ type harness struct {
 	admin         *admin.Service
 	limits        *limits.Service
 	authSvc       *auth.Service
+	users         *users.Service
 	installations *installations.Service
 	notify        *notifications.Service
 	events        *notifications.Events
@@ -228,7 +250,9 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 		"AUTH_SIGNING_SECRET": "test-legacy-secret-that-is-long-enough-00",
 		"ACCESS_TOKEN_TTL":    "15m", "REFRESH_TOKEN_TTL": "720h",
 		"OPENAI_API_KEY": "sk-test-key", "OPENAI_MODEL": "test-model",
-		"AUTH_DEMO_MODE": "true", "AUTH_DEMO_OTP": "1111",
+		// Every switch whose default is "off" for a real server is set here on
+		// purpose: demo sign-in, demo checkout and the old install-token API.
+		"AUTH_DEMO_MODE": "true", "AUTH_DEMO_OTP": "1111", "LEGACY_API_ENABLED": "true",
 		"PAYMENT_MODE": "demo", "PAYMENT_DEMO_CHECKOUT": "true",
 		"ADMIN_EMAIL": adminEmail, "ADMIN_PASSWORD": adminPassword,
 		"LOG_LEVEL": "info", "LOG_FORMAT": "json", "RATE_AI_PER_MINUTE": "1000",
@@ -273,7 +297,7 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 	store := repository.New(db)
 	planSvc := plans.New(store)
 	subSvc := subscriptions.New(store, planSvc, cfg.App.Location()).WithClock(clock)
-	userSvc := users.New(store)
+	userSvc := users.New(store).WithLogger(log).WithClock(clock)
 	authSvc := auth.New(store, cfg.Auth, auth.StubSender{Log: log}, subSvc, log).WithClock(clock)
 	provider := &fakeProvider{reply: "Сәлеметсіз бе! Бағаны нақтылап, бірер минуттан соң жазамын."}
 	limitSvc := limits.New(store, limits.Limits{
@@ -292,12 +316,14 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 		Repo: store, Installations: installSvc, Provider: fcm, Plans: planSvc, Config: cfg.Push,
 		Location: cfg.App.Location(), Translate: bundle.T, Log: log, Clock: pushClock,
 	}).WithEmail(mail, fakeEmailRenderer{})
-	events := notifications.NewEvents(notifySvc)
+	events := notifications.NewEvents(notifySvc).
+		WithDemoPayments(cfg.Payments.DemoCheckout && !cfg.App.IsProduction())
 	aiSvc := ai.New(store, subSvc, provider, limitSvc, log).WithClock(clock).WithRepair(cfg.AI.RepairEnabled).
-		WithQuotaEvents(events)
+		WithQuotaEvents(events).WithPolishDailyLimit(cfg.Limits.PolishPerDay)
 	paymentSvc := payments.New(store, subSvc, payments.DemoProvider{}, cfg.Payments.Mode).WithEvents(events).
-		WithDemoCheckout(cfg.Payments.DemoCheckout)
+		WithDemoCheckout(cfg.Payments.DemoCheckout).WithProduction(cfg.App.IsProduction())
 	eventSvc := productevents.New(store, log).WithClock(clock)
+	reportSvc := reports.New(store, log).WithClock(clock)
 	adminSvc := admin.New(store, subSvc, planSvc, cfg, log).WithEvents(events)
 	simulatorSvc := simulator.New(simulator.Deps{
 		Repo: store, Users: userSvc, Subs: subSvc, Plans: planSvc, AI: aiSvc, Limits: limitSvc,
@@ -312,13 +338,13 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 	mux := http.NewServeMux()
 	api.New(api.Deps{Config: cfg, Auth: authSvc, Users: userSvc, Plans: planSvc, Subs: subSvc,
 		AI: aiSvc, Limits: limitSvc, Payments: paymentSvc, Events: eventSvc, Installations: installSvc,
-		Notifications: notifySvc, Limiter: limiter, Log: log,
+		Notifications: notifySvc, Reports: reportSvc, Limiter: limiter, Log: log,
 		Ping: func(ctx context.Context) error { return db.Reader().PingContext(ctx) }}).Register(mux)
 	adminapi.New(adminapi.Deps{Config: cfg, Admin: adminSvc, Limits: limitSvc, Notifications: notifySvc,
-		Payments: paymentSvc, Limiter: limiter, Log: log}).Register(mux)
+		Payments: paymentSvc, Reports: reportSvc, Limiter: limiter, Log: log}).Register(mux)
 	simulatorapi.New(simulatorapi.Deps{Config: cfg, Admin: adminSvc, Simulator: simulatorSvc,
 		Limiter: limiter, Log: log}).Register(mux)
-	webServer, err := web.New(web.Deps{Config: cfg, Admin: adminSvc, Plans: planSvc,
+	webServer, err := web.New(web.Deps{Config: cfg, Admin: adminSvc, Plans: planSvc, Payments: paymentSvc,
 		Notifications: notifySvc, Bundle: bundle, Limiter: limiter, Log: log})
 	if err != nil {
 		t.Fatalf("web: %v", err)
@@ -326,12 +352,12 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 	webServer.Register(mux)
 
 	handler := middleware.Chain(mux, middleware.RequestID, middleware.Recover(log), middleware.Logging(log),
-		middleware.SecurityHeaders(cfg.App.IsProduction()))
+		middleware.SecurityHeaders(cfg.App.HSTS()))
 	server := httptest.NewServer(handler)
 
 	h := &harness{t: t, cfg: cfg, server: server, store: store, db: db,
 		provider: provider, clock: clock, logs: logs, dbPath: dbPath, admin: adminSvc, limits: limitSvc,
-		authSvc: authSvc, installations: installSvc, notify: notifySvc, events: events, push: fcm, mail: mail,
+		authSvc: authSvc, users: userSvc, installations: installSvc, notify: notifySvc, events: events, push: fcm, mail: mail,
 		pushClock: pushClock}
 	t.Cleanup(func() {
 		server.Close()
@@ -446,11 +472,27 @@ func (h *harness) signIn(identifier string) session {
 		h.t.Fatalf("verify-otp: status %d body %s", verify.status, verify.raw)
 	}
 	isNew, _ := verify.body["is_new_user"].(bool)
-	return session{
+	s := session{
 		access:  verify.str("access_token"),
 		refresh: verify.str("refresh_token"),
 		userID:  verify.str("user", "id"),
 		isNew:   isNew,
+	}
+	// The apps accept the current terms right after sign-in; without it every
+	// AI request answers CONSENT_REQUIRED.
+	h.consent(s.access)
+	return s
+}
+
+// consent — ағымдағы шарттар мен құпиялық саясатына келісім (қолданбадағыдай).
+func (h *harness) consent(access string) {
+	h.t.Helper()
+	res := h.do(http.MethodPost, "/api/v1/me/consents", map[string]any{
+		"terms_version": legal.TermsVersion, "privacy_version": legal.PrivacyVersion,
+		"locale": "kk", "platform": "ios", "app_version": "1.0.0",
+	}, h.auth(access))
+	if res.status != http.StatusOK {
+		h.t.Fatalf("consent: status %d body %s", res.status, res.raw)
 	}
 }
 

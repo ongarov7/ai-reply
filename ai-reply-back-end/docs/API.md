@@ -15,8 +15,17 @@
 `INVALID_REQUEST`, `INVALID_OTP`, `OTP_EXPIRED`, `UNAUTHORIZED`, `TOKEN_EXPIRED`,
 `ACCOUNT_DISABLED`, `DAILY_LIMIT_REACHED`, `MONTHLY_LIMIT_REACHED`,
 `SUBSCRIPTION_EXPIRED`, `RATE_LIMITED`, `AI_PROVIDER_UNAVAILABLE`, `AI_TIMEOUT`,
-`AI_EMPTY_RESPONSE`, `PAYMENT_REQUIRED`, `NOT_FOUND`, `CONFLICT`, `INTERNAL_ERROR`,
+`AI_EMPTY_RESPONSE`, `PAYMENT_REQUIRED`, `PLAN_UNAVAILABLE`, `PURCHASES_DISABLED`,
+`CONSENT_REQUIRED`, `NOT_FOUND`, `CONFLICT`, `INTERNAL_ERROR`,
 `PUSH_DISABLED` (409, только админ-панель: отправка push выключена или FCM не настроен).
+
+Коды, на которые приложения реагируют своим текстом:
+
+| Код | HTTP | Когда | Что делает приложение |
+|---|---|---|---|
+| `DAILY_LIMIT_REACHED` | 429 | дневной лимит ответов исчерпан | «Ответы на сегодня закончились…» |
+| `MONTHLY_LIMIT_REACHED` | 429 | месячный лимит тарифа исчерпан (`monthly_message_limit > 0`) | своё сообщение «…на этот месяц» |
+| `CONSENT_REQUIRED` | 403 | нет согласия на **текущие** версии условий и политики (не давали, старая версия или отозвано) | возвращается на экран согласия; клавиатура просит открыть приложение |
 
 Ошибка конкретного поля — `400 INVALID_REQUEST` с `details { field, reason }`
 (например, `preferred_language`, `push.token`, `title.kk`, `audience.segment`).
@@ -40,7 +49,10 @@
 
 Способы входа: iOS — Apple, Google, почта; Android — Google, почта. Вход по
 номеру телефона (WhatsApp/SMS) из приложений удалён; старые эндпоинты оставлены
-только для уже установленных сборок (см. ниже). Каждый успешный вход отвечает
+только для уже установленных сборок (см. ниже). SMS-провайдера нет: без
+`AUTH_DEMO_MODE=true` запрос кода на телефон отвечает `503 AUTH_PROVIDER_UNAVAILABLE`
+(сервер не делает вид, что код отправлен). Демо-режим разрешён только при
+`APP_ENV=development` или `test`. Каждый успешный вход отвечает
 одной и той же сессией: `access_token`, `refresh_token`, `expires_in`,
 `device_id`, `is_new_user`, `user` (с `auth_providers`), `profile`,
 `subscription`, `usage`, `legal_consent`.
@@ -51,7 +63,9 @@
   "os_version": "18.2", "locale": "kk", "timezone": "Asia/Almaty" }
 ```
 `device_id` можно не присылать — сервер вернёт сгенерированный, его нужно
-сохранить и присылать дальше.
+сохранить и присылать дальше. Если присланный `device_id` принадлежит другому
+аккаунту, его запись не меняется: сервер заводит устройство под новым id и
+возвращает его в `device_id`.
 
 ### POST /api/v1/auth/email/otp/request
 ```json
@@ -65,7 +79,12 @@
   HMAC-SHA256; живёт 5 минут (`OTP_TTL`), 5 попыток (`OTP_MAX_ATTEMPTS`).
 - Новый код аннулирует предыдущий. Повторный запрос раньше `OTP_RESEND_COOLDOWN`
   (32 с) → `OTP_RESEND_COOLDOWN` с `retry_after_seconds`.
-- Лимиты: `RATE_OTP_REQUEST_PER_HOUR` на IP и на адрес, `RATE_OTP_REQUEST_PER_DAY` на адрес.
+- Лимиты на адрес (в БД): `RATE_OTP_REQUEST_PER_ADDRESS_PER_HOUR` (5) и `RATE_OTP_REQUEST_PER_DAY`
+  (10) кодов; недоставленные (`EMAIL_DELIVERY_FAILED`) не считаются. Мягкий лимит на IP —
+  `RATE_OTP_REQUEST_PER_HOUR` (30). Адрес, на котором за 24 ч набралось `OTP_MAX_FAILED_PER_DAY`
+  (10) неверных кодов, получает `429 RATE_LIMITED` с `retry_after_seconds` и на запрос, и на проверку.
+- `REVIEW_LOGIN_EMAIL` (для App Review / Google Play) получает `REVIEW_LOGIN_CODE` без письма;
+  ответ и все лимиты — как у любого адреса ([AUTH.md](AUTH.md#вход-для-проверки-app-review--google-play)).
 - Ответ одинаков для известного и нового адреса — перечислить аккаунты нельзя.
 - Письмо уходит через Resend (HTML + plain text, язык из `locale`). Если Resend
   отказал, код сразу гасится и приходит `EMAIL_DELIVERY_FAILED`; ждать 32 с не нужно.
@@ -77,7 +96,8 @@
 → сессия. Аккаунт создаётся при первом входе. Проверка атомарна: код, введённый
 одновременно с двух устройств, срабатывает ровно один раз (второе получает
 `OTP_ALREADY_USED`). Ошибки: `INVALID_OTP` (+ `attempts_remaining`), `OTP_EXPIRED`,
-`OTP_ALREADY_USED`, `OTP_ATTEMPTS_EXCEEDED`, `RATE_LIMITED`.
+`OTP_ALREADY_USED`, `OTP_ATTEMPTS_EXCEEDED`, `RATE_LIMITED` (IP: `RATE_OTP_VERIFY_PER_HOUR`, 60;
+адрес: `OTP_MAX_FAILED_PER_DAY` неверных кодов за 24 ч).
 
 ### POST /api/v1/auth/google
 ```json
@@ -123,6 +143,9 @@ HMAC, лимиты). Новые сборки их не вызывают.
 
 ### POST /api/v1/auth/logout
 `{ "refresh_token": "…" }` → `{ "ok": true }` (идемпотентно).
+Закрывается вся цепочка сессии (`revoked_reason = logout`): выход со старым, уже
+ротированным refresh-токеном закрывает и его новейший токен. Другие устройства аккаунта
+не затрагиваются.
 С заголовком `X-Installation-ID: <id установки>` установка сразу отвязывается от
 аккаунта — даже если refresh-токен уже истёк: push этого аккаунта на телефон больше
 не приходят. Это единственный запрос, где клиент шлёт этот заголовок.
@@ -138,10 +161,87 @@ HMAC, лимиты). Новые сборки их не вызывают.
 | GET | `/api/v1/me/devices` | список устройств |
 | POST | `/api/v1/devices` | регистрация устройства (для старых сборок; push — через `/installations`) |
 | DELETE | `/api/v1/devices/{id}` | отозвать устройство |
-| GET | `/api/v1/plans` | активные тарифы (публично) |
-| GET | `/api/v1/config` | лимиты, языки, режимы, `features.email_otp` / `google_sign_in` / `apple_sign_in` / `compose` / `reply_preferences` / `sender_profile` / `instruction_polish` / `product_events` / `installations` / `push_notifications` / `preferred_language` (публично) |
+| GET | `/api/v1/plans` | видимые тарифы (публично); у каждого `purchasable` |
+| GET | `/api/v1/config` | лимиты, языки, режимы, `features.*`, `legal.*` (публично, см. ниже) |
+| POST | `/api/v1/me/consents` | согласие на текущие версии условий и политики |
+| DELETE | `/api/v1/me/consents` | отзыв согласия на AI-обработку → `{ "ok": true }` |
+| DELETE | `/api/v1/me` | удаление аккаунта (`POST /api/v1/me/delete` — то же самое) |
 | POST | `/api/v1/me/email/otp/request` | код на почту, которую нужно добавить к аккаунту (для старых аккаунтов «только телефон») |
 | POST | `/api/v1/me/email/otp/verify` | `{ "email", "code" }` → почта привязана, ответ как у `GET /me`; `CONFLICT`, если почта у аккаунта уже есть; `EMAIL_ALREADY_IN_USE`, если адрес занят |
+
+### GET /api/v1/config
+
+```json
+{ "features": { "email_otp": true, "google_sign_in": true, "apple_sign_in": true, "compose": true,
+                "reply_preferences": true, "sender_profile": true, "instruction_polish": true,
+                "product_events": true, "installations": true, "push_notifications": true,
+                "preferred_language": true, "purchases": false, "ai_reports": true, "account_deletion": true },
+  "payment_mode": "off",
+  "legal": { "terms_version": "2026-10-08", "privacy_version": "2026-10-08",
+             "terms_url": "https://ai-reply.kz/offer", "privacy_url": "https://ai-reply.kz/privacy",
+             "contact_email": "", "support_url": "https://ai-reply.kz/support",
+             "account_deletion_url": "https://ai-reply.kz/account/delete", "ai_provider": "OpenAI" },
+  "…": "…" }
+```
+
+- `features.purchases` — купить тариф можно прямо сейчас (переключатель в админке +
+  проверенная интеграция оплаты). Релизные сборки кнопку покупки не показывают вовсе
+  (StoreKit / Play Billing пока нет); debug-сборки — только у тарифа с `purchasable: true`.
+- `features.ai_reports` — показывать кнопку «Пожаловаться» (`POST /api/v1/ai/reports`).
+- `features.account_deletion` — показывать «Удалить аккаунт».
+- `payment_mode` — строка `off | demo | live` (по умолчанию `off`).
+- `legal.contact_email` — `CONTACT_EMAIL`, пустая строка, если не задан (тогда приложение
+  ведёт на `support_url`). `legal.ai_provider` — кому уходят тексты (экран согласия).
+
+### Согласие на условия и AI-обработку
+
+Версии условий и политики — `2026-10-08`. `POST /api/v1/ai/reply`, `/ai/compose` и
+`/ai/polish` отвечают `403 CONSENT_REQUIRED`, если у аккаунта нет действующей записи
+`legal_consents` ровно для текущих `terms_version` **и** `privacy_version` (не давал,
+принимал прошлую версию или отозвал). Проверка — до квоты и провайдера: ничего не
+резервируется и в OpenAI не уходит.
+
+- `POST /api/v1/me/consents` — `{ "terms_version", "privacy_version", "locale", "platform", "app_version" }`
+  (только текущие версии, иначе `400`). Повтор не меняет `accepted_at`; после отзыва
+  запись восстанавливается с новым `accepted_at`.
+- `DELETE /api/v1/me/consents` → `{ "ok": true }` (идемпотентно). Запись остаётся с
+  `withdrawn_at` (миграция `0014`), `GET /me` возвращает `legal_consent: null`,
+  AI-запросы — `CONSENT_REQUIRED`, пока приложение снова не отправит `POST`. Аккаунт не трогается.
+- Жалобы (`/ai/reports`) согласия не требуют — в OpenAI они не уходят.
+
+### Удаление аккаунта
+
+`DELETE /api/v1/me` или `POST /api/v1/me/delete` (для клиентов, которые не умеют
+отправлять тело с DELETE). Токен обязателен. Тело необязательно:
+
+```json
+{ "apple_authorization_code": "<свежий authorization code от Sign in with Apple>" }
+```
+→ `{ "deleted": true, "apple_token_revoked": true }`
+
+- Всё удаляется сразу, одной транзакцией: коды входа (`otp_codes` по почте и телефону
+  аккаунта), затем строка `users` и каскадом профиль, способы входа, устройства,
+  refresh-токены, подписки, счётчики, `ai_usage_events`, платежи, согласия, события
+  приложения, настройки и уведомления, жалобы. Установки приложения отвязываются
+  (`user_id = NULL`), их push-токен стирается, недоставленные push отменяются.
+- Сразу после этого любой access- и refresh-токен аккаунта отвечает `401`.
+- Отзыв Apple: если в теле есть код, у аккаунта есть вход через Apple и на сервере
+  заданы `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY` (+ `APPLE_CLIENT_ID`),
+  сервер подписывает ES256 `client_secret`, меняет код на refresh token
+  (`https://appleid.apple.com/auth/token`) и отзывает его (`/auth/revoke`). Ошибка Apple
+  не мешает удалению: `apple_token_revoked: false` и предупреждение в логе (без кода и токенов).
+- Неизвестное поле в теле — `400`. В логе одна строка `account deleted` с id аккаунта,
+  без почты.
+
+Без приложения (страница `/account/delete`, `/delete-account` → редирект):
+
+- `POST /api/v1/account/delete/request` `{ "email", "locale" }` → всегда `200 { "ok": true }`
+  (перечислить аккаунты нельзя). Код уходит, только если аккаунт с этой почтой есть:
+  та же машина e-mail OTP с отдельным `purpose = "delete"`, те же лимиты и пауза
+  `OTP_RESEND_COOLDOWN`; письмо говорит, что это код удаления. Некорректный адрес — `400 INVALID_EMAIL`.
+- `POST /api/v1/account/delete/confirm` `{ "email", "code" }` → `200 { "deleted": true }`;
+  ошибки как у входа: `INVALID_OTP` (+ `attempts_remaining`), `OTP_EXPIRED`, `OTP_ALREADY_USED`,
+  `OTP_ATTEMPTS_EXCEEDED`. Код входа здесь не подходит, код удаления не подходит для входа.
 
 ### Профиль: род отправителя и версия онбординга
 
@@ -206,13 +306,13 @@ FCM-токене, смене языка, разрешения или внутр�
 ```json
 { "installation_id": "0b7c9a52-…", "attached": true, "push_status": "active", "push_available": true,
   "notifications_enabled": true,
-  "preferences": { "account": true, "subscription": true, "security": true, "system": true, "marketing": true } }
+  "preferences": { "account": true, "subscription": true, "security": true, "system": true, "marketing": false } }
 ```
 
 - `installation_id` — `[A-Za-z0-9-]{8,64}`, генерирует приложение один раз (UUID).
 - `notification_permission`: `authorized | denied | not_determined | provisional | ephemeral | unknown`.
 - `push` необязателен (нет токена — не присылать). `provider` — только `fcm` (или не указывать) на
-  **обеих** платформах; токен — 20–4096 символов `[A-Za-z0-9_:.-]`. Неизвестные поля (в том числе
+  **обеих** платформах; токен — 20–1024 символа `[A-Za-z0-9_:.-]`. Неизвестные поля (в том числе
   прежний `push.environment`) → `400`.
 - Аккаунт берётся **только** из access-токена: с токеном установка привязывается к аккаунту, без
   токена становится анонимной (и отвязывается от прежнего владельца телефона), недействительный
@@ -244,6 +344,11 @@ FCM-токене, смене языка, разрешения или внутр�
 Пустой объект, неизвестная категория или `security: false` → `400` с `details.field`.
 Выключенная категория выключает push и письма этой категории. Исключение — письмо
 `subscription_activated`: оно подтверждает покупку или выдачу тарифа и уходит всегда.
+
+`marketing` — только с явного согласия: пока человек сам не включил категорию
+(`PUT … { "marketing": true }`), `GET` возвращает `marketing: false`, маркетинговые
+кампании и уведомления этого аккаунта не достигают (в предпросмотре аудитории он не
+считается). Остальные категории без сохранённого выбора включены.
 
 ### POST /api/v1/notifications/opened
 
@@ -285,7 +390,12 @@ FCM-токене, смене языка, разрешения или внутр�
 | `subscription_expiring:<subscription_id>:<expires_ms>` · `subscription_expired:<…>` | одно на срок (продлили — новый срок, новое напоминание) |
 | `quota_low:day:<YYYY-MM-DD>` · `quota_exhausted:day:<YYYY-MM-DD>` | одно в день; `…:month:<YYYY-MM>` — в месяц |
 
-Категория у всех — `subscription`, ссылка — `aireply://subscription`. Бесплатный тариф,
+Категория у всех — `subscription`, ссылка — `aireply://subscription`; квотные уведомления
+на бесплатном тарифе ведут на `aireply://home` (покупать нечего). «Тариф подключён» за
+демо-оплату уходит только при `PAYMENT_DEMO_CHECKOUT` вне production. Раз в 15 минут
+сервер сверяет платные тарифы, выданные оплатой или админом за последние 24 ч: если
+уведомление с их ключом не записалось, оно создаётся (один раз). Повторная выдача
+админом того же действующего тарифа только переносит срок — без нового уведомления. Бесплатный тариф,
 системная выдача при регистрации, аккаунт симулятора и старые install-токены уведомлений не
 получают. Месячные — только при `monthly_message_limit > 0`; дата и месяц — в часовом поясе
 приложения (`DEFAULT_TIMEZONE`). Сбой уведомления никогда не ломает оплату, выдачу тарифа или
@@ -315,12 +425,20 @@ FCM-токене, смене языка, разрешения или внутр�
 ```json
 { "reply": "…", "detected_language": "ru",
   "usage": { "daily_limit": 7, "used_today": 1, "remaining_today": 6,
+             "monthly_limit": 0, "used_month": 1,
              "resets_at": "2026-03-11T19:00:00Z", "timezone": "Asia/Almaty" } }
 ```
 
-Порядок на сервере: аутентификация → валидация размера → тариф и квота
-(атомарный резерв) → промпт → провайдер → учёт токенов → ответ.
-При ошибке провайдера резерв возвращается, счётчик не растёт.
+Порядок на сервере: аутентификация → согласие (`CONSENT_REQUIRED`) → валидация
+размера → тариф и квота (атомарный резерв) → промпт → провайдер → учёт токенов → ответ.
+При ошибке провайдера резерв возвращается, счётчик не растёт — и тогда, когда клиент
+ушёл, не дождавшись ответа (клавиатуру закрыли): возврат квоты, токены и событие
+пишутся в отдельном контексте с коротким таймаутом.
+
+`usage.monthly_limit` (0 — без месячного лимита) и `used_month` — как в `GET /me/usage`.
+При месячном лимите `remaining_today` не больше того, что осталось на месяц. В
+`429 DAILY_LIMIT_REACHED` / `MONTHLY_LIMIT_REACHED` `details` — `daily_limit`, `used_today`,
+`resets_at` и, если у тарифа есть месячный лимит, `monthly_limit` и `used_month`.
 
 Профиль берётся с сервера; блок `profile` в запросе допускается для клиентов,
 которые держат его локально, и имеет приоритет.
@@ -374,6 +492,7 @@ markdown, приписка модели «Примечание: …» о сам�
 ```json
 { "text": "Уважаемый Сакен Бакпакбекович! …", "detected_language": "ru",
   "usage": { "daily_limit": 7, "used_today": 2, "remaining_today": 5,
+             "monthly_limit": 0, "used_month": 2,
              "resets_at": "2026-03-11T19:00:00Z", "timezone": "Asia/Almaty" } }
 ```
 
@@ -425,10 +544,33 @@ markdown, приписка модели «Примечание: …» о сам�
   Клиенты игнорируют любые ошибки polish молча.
 - Выключается `AI_POLISH_ENABLED=false`: тогда `features.instruction_polish = false`,
   а эндпоинт отвечает `404 NOT_FOUND`.
+- Дневной потолок на пользователя — `LIMIT_POLISH_PER_DAY` (100, сутки сервера): после него
+  ответ `200 { "text": <исходный>, "changed": false }` без обращения к провайдеру.
 - Ни текст, ни подсказка не сохраняются и не логируются: в `ai_usage_events`
   пишется `mode = 'polish'`, `prompt_version = 'polish_v1'`, длина и токены
   (токены и стоимость учитываются в `usage_daily` / `usage_monthly`, `used` не растёт).
   Графики «генераций» в админке polish не считают.
+
+### POST /api/v1/ai/reports
+
+Жалоба на сгенерированный текст (кнопка «Пожаловаться» в приложении и клавиатуре;
+только при `features.ai_reports = true`). Токен обязателен, согласие — нет.
+
+```json
+{ "mode": "reply", "reason": "offensive", "comment": "…", "text": "<сгенерированный текст>",
+  "platform": "ios", "app_version": "1.4.0" }
+```
+→ `201 { "id": "…" }`
+
+- `mode` — `reply` | `compose`; `reason` — `offensive` | `harmful` | `false_info` |
+  `wrong_language` | `other`; `comment` ≤ 500 символов, `text` ≤ 2000 (оба необязательны);
+  `platform` — `ios` | `android` (или пусто). Иное, длиннее или неизвестное поле —
+  `400 INVALID_REQUEST` с `details.field`; ничего не обрезается молча.
+- `text` присылается, только если человек оставил включённым «Отправить текст ответа
+  вместе с жалобой». Скопированное сообщение и инструкция в жалобу не попадают никогда.
+- Лимит — `RATE_AI_REPORTS_PER_HOUR` (20 в час на пользователя) → `429 RATE_LIMITED`.
+- Таблица `ai_reports` (миграция `0013`) удаляется вместе с аккаунтом. В лог пишется
+  только id, причина и есть ли текст — без комментария и текста.
 
 ### Версии промптов и логи
 
@@ -491,14 +633,19 @@ latency_ms, токены, repaired, truncated; у polish — changed), `ai_reply
 | POST | `/api/v1/payments/checkout` → `{ "plan_id": "…" }` |
 | POST | `/api/v1/payments/{id}/confirm` |
 
-В `PAYMENT_MODE=demo` подтверждение сразу переводит пользователя на тариф.
+`PAYMENT_MODE` — `off` (по умолчанию: ничего не продаётся), `demo` или `live`; в
+production только `off` или `live`. Демо-оплата (`PAYMENT_DEMO_CHECKOUT=true`) работает
+только при `PAYMENT_MODE=demo` вне production. В `PAYMENT_MODE=demo` подтверждение сразу
+переводит пользователя на тариф. Без интеграции checkout отвечает `403 PURCHASES_DISABLED`.
 Реальный эквайринг подключается одной реализацией `payments.Provider`.
 После подтверждения пользователь получает `subscription_activated` (push и письмо) —
 один раз на платёж, даже если подтверждение повторили.
 
 ## Совместимость со старыми сборками
 
-Пока `LEGACY_API_ENABLED=true` работают эндпоинты прежнего бэкенда — байт в байт:
+По умолчанию выключено (`LEGACY_API_ENABLED=false`). Пока `LEGACY_API_ENABLED=true`
+работают эндпоинты прежнего бэкенда — байт в байт (у этих сборок нет экрана согласия,
+поэтому `CONSENT_REQUIRED` к ним не применяется — в production не включать):
 
 - `POST /v1/auth/register` — `{ "install_id": "…" }` → `{ "token", "expires_at" }`
 - `POST /v1/reply/generate` — прежний формат, включая `keyboard_language`,
@@ -512,15 +659,33 @@ latency_ms, токены, repaired, truncated; у polish — changed), `ai_reply
 
 `/api/v1/admin/*` — cookie-сессия + заголовок `X-CSRF-Token` на любые изменения.
 `session`, `dashboard`, `users`, `users/{id}`, `users/{id}/status|plan|reset-quota|revoke-sessions`,
-`plans` (GET/POST/PATCH/archive), `audit`, `settings`, `settings/pricing`, `notifications`, `locale`.
+`plans` (GET/POST/PATCH/archive), `audit`, `settings`, `settings/pricing`, `notifications`, `locale`,
+`reports`.
 `users/{id}` отдаёт `user.preferred_language`. Отключение пользователя и «отозвать сессии»
 отвязывают его установки (`devices_detached` в аудите).
+
+Вход (`POST /admin/login`, `/simulator/login`): `RATE_ADMIN_LOGIN_PER_HOUR` на IP и 5 попыток
+за 15 минут на адрес (общие для админки и симулятора) → `429`. Неизвестный адрес проверяется
+против фиктивного хэша (время ответа то же). Каждая неудача — `admin.login_failed` в аудите
+с IP и причиной (`wrong_password`, `unknown_email`, `disabled`), без пароля и без
+неизвестного адреса. Выход (`POST /admin/logout`, `/simulator/logout`) требует `csrf` сессии
+(поле формы или `X-CSRF-Token`), иначе `403`. Новый `ADMIN_PASSWORD` при старте — ротация:
+хэш обновляется, сессии этого админа закрываются, `admin.password_rotated` в аудите.
+
+### Жалобы на AI-ответы (`/api/v1/admin/reports`)
+
+| Метод | Путь | Что делает |
+|---|---|---|
+| GET | `/reports?status=open\|resolved&page=` | жалобы, новые первыми (25 на страницу; без `status` — все): `id`, `user_id`, `identifier` (маска почты), `mode`, `reason`, `comment`, `text`, `platform`, `app_version`, `status`, `created_at`, `resolved_at`, `resolved_by` |
+| POST | `/reports/{id}/resolve` | отметить решённой (CSRF) → `{ "ok": true, "changed": true }`; повтор — `changed: false`; аудит `report.resolve` |
+
+Текст жалобы виден администратору — человек сам решил его отправить.
 
 ### Уведомления (`/api/v1/admin/notifications…`)
 
 | Метод | Путь | Что делает |
 |---|---|---|
-| GET | `/notifications` | состояние (`status: { enabled, worker, fcm, email, link_hosts }`) и справочники формы: категории, экраны, языки (`content_locales`, `required_locales`, `fallback_locale: "ru"`), сегменты, фильтры, платформы, каналы, типы, лимиты |
+| GET | `/notifications` | состояние (`status: { enabled, worker, fcm, email, link_hosts }`) и справочники формы: категории кампаний (`subscription`, `system`, `marketing`), экраны, языки (`content_locales`, `required_locales`, `fallback_locale: "ru"`), сегменты, фильтры, платформы, каналы, типы, лимиты |
 | POST | `/notifications/audience/preview` | `{ audience, category }` → `{ preview: { users, devices, android, ios, by_language, unresolved }, audience }`; только считает, 30 в минуту на админа |
 | GET | `/notifications/campaigns?status=&page=&limit=` | список с live-статистикой |
 | POST | `/notifications/campaigns` | создать (и при `send: true` — отправить); заголовок `Idempotency-Key` обязателен |
@@ -551,6 +716,8 @@ latency_ms, токены, repaired, truncated; у polish — changed), `ai_reply
   `languages` (язык уведомления), `quota` (`has_remaining` | `near_exhaustion` | `exhausted`,
   сегодняшний остаток по тому же порогу, что `quota_low`), `user_ids` + `emails` (≤ 500 вместе,
   конкретные люди). Неизвестное значение → `400` с `details.field` (`audience.segment`, …).
+- `category` — `subscription`, `system` или `marketing` (по умолчанию). `security` и `account`
+  только для событий самого сервера: в кампании и предпросмотре → `400`, `details.field = category`.
 - `data` — до 10 строк, ключ `^[a-z][a-z0-9_]{0,31}$`. Служебные ключи (`nid`, `did`, `type`,
   `category`, `link`, `from`, `message_type`, …) и всё, что начинается с `google` или `gcm`
   (FCM отклонил бы сообщение целиком) → `400`, `details.field = data.<ключ>`.
@@ -565,9 +732,14 @@ latency_ms, токены, repaired, truncated; у polish — changed), `ai_reply
   записана: после удаления доставок по сроку хранения статистика остаётся.
 - «Принято провайдером» (`provider_accepted`) — не «прочитано»: открытие видно только по `opened_at`.
 
-Ни один admin-эндпоинт не отдаёт текст сообщений — такой функции нет.
+Ни один admin-эндпоинт не отдаёт текст сообщений — такой функции нет (исключение — текст
+ответа в жалобе, который человек сам решил отправить, `GET /reports`).
 `dashboard` → `series.product_events`: `[{ "label": "onboarding_completed", "value": 12 }, …]`.
 
 ## Служебное
 
-`GET /healthz` — живость, `GET /readyz` — готовность (пинг БД).
+`GET /healthz` — живость (`{ "ok": true }`, без имени окружения), `GET /readyz` — готовность (пинг БД).
+`X-Request-ID` клиента принимается, только если это `[A-Za-z0-9-]{1,64}`; иначе сервер ставит свой.
+С `TRUST_PROXY=true` IP клиента — последний адрес `X-Forwarded-For` (его добавил прокси),
+`X-Real-IP` не используется. Симулятор (`/simulator`, `/api/v1/simulator/*`) регистрируется
+только при `SIMULATOR_ENABLED=true` (по умолчанию — в development/test), иначе `404`.

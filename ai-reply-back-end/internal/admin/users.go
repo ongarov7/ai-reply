@@ -83,7 +83,18 @@ func (s *Service) SetUserStatus(ctx context.Context, admin domain.AdminUser, ip,
 }
 
 // AssignPlan — тарифті ауыстыру.
+//
+// Giving someone the plan they already have only moves its end date: no new
+// subscription, so no second "plan active" push and e-mail.
 func (s *Service) AssignPlan(ctx context.Context, admin domain.AdminUser, ip, userID, planID string, expires *time.Time) error {
+	renewed, err := s.subs.Renew(ctx, userID, planID, expires)
+	if err != nil {
+		return err
+	}
+	if renewed {
+		s.Audit(ctx, admin, ip, "subscription.assign", "user", userID, map[string]any{"plan_id": planID, "renewed": true})
+		return nil
+	}
 	sub, err := s.subs.Assign(ctx, userID, planID, "admin", expires)
 	if err != nil {
 		return err

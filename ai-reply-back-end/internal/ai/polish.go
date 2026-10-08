@@ -4,6 +4,7 @@ import (
 	"context"
 	"regexp"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/aireply/ai-reply-back-end/internal/domain"
@@ -71,6 +72,9 @@ func (s *Service) Polish(ctx context.Context, req PolishRequest) (PolishResult, 
 	if traits.RuneLen(text) > lim.InstructionChars {
 		return PolishResult{TextLimit: lim.InstructionChars}, domain.ErrInstructionTooLong
 	}
+	if s.polishCapReached(ctx, req.User.ID, started) {
+		return PolishResult{Text: text}, nil
+	}
 	entitlement, err := s.subs.Entitlement(ctx, req.User.ID)
 	if err != nil {
 		return PolishResult{}, err
@@ -88,6 +92,10 @@ func (s *Service) Polish(ctx context.Context, req PolishRequest) (PolishResult, 
 	prompt := BuildPolishPrompt(text)
 	completion, err := s.provider.Generate(ctx, prompt)
 	latency := int(s.clock.Now().Sub(started).Milliseconds())
+	// The keyboard drops a polish request as soon as the person types on:
+	// the tokens and the event are recorded even then.
+	ctx, cancel := bookkeeping(ctx)
+	defer cancel()
 	if err != nil {
 		s.record(ctx, c, entitlement, "error", errorCode(err), prompt.Version, Completion{}, latency)
 		s.logFailure(c, prompt.Version, errorCode(err), latency)
@@ -109,6 +117,31 @@ func (s *Service) Polish(ctx context.Context, req PolishRequest) (PolishResult, 
 		return PolishResult{Text: text}, nil
 	}
 	return PolishResult{Text: polished, Changed: true}, nil
+}
+
+// polishCapReached — бүгінгі (сервер күні) polish шегі толды ма.
+//
+// Polish runs while the person types, so a client stuck in a loop could call
+// it all day at the provider's expense. Past the cap the answer is "no
+// suggestion", exactly like a note the guard rejects: the keyboard keeps
+// working and shows nothing. The count is the day's polish events, one
+// indexed query; if it fails, the request goes through.
+func (s *Service) polishCapReached(ctx context.Context, userID string, now time.Time) bool {
+	if s.polishPerDay <= 0 {
+		return false
+	}
+	local := now.In(s.subs.Location())
+	dayStart := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, local.Location())
+	count, err := s.repo.UsageEventsSince(ctx, userID, ModePolish, dayStart)
+	if err != nil {
+		s.log.Error("polish cap check failed", "user_id", userID, "error", err.Error())
+		return false
+	}
+	if count >= s.polishPerDay {
+		s.log.Debug("polish daily cap reached", "user_id", userID)
+		return true
+	}
+	return false
 }
 
 // acceptPolish — модель жазбаны тек емле мен тыныс белгісі деңгейінде

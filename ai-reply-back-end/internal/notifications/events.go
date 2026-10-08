@@ -13,6 +13,9 @@ import (
 // LinkSubscription — тариф пен квота хабарламалары ашатын экран.
 const LinkSubscription = "aireply://subscription"
 
+// LinkHome — тегін тарифтегі квота хабарламасы ашатын экран (сатып алатын ештеңе жоқ).
+const LinkHome = "aireply://home"
+
 const (
 	// eventTimeout — тариф оқиғасының хабарламасын жазу уақыты (сұранысқа тәуелсіз).
 	eventTimeout = 5 * time.Second
@@ -26,6 +29,8 @@ const (
 	maxRecentKeys = 50_000
 	// dateLayout — хабарлама мәтініндегі күн (қолданба белдеуінде).
 	dateLayout = "02.01.2006"
+	// activationWindow — «тариф қосылды» хабары жазылмай қалса, қанша уақыт ішінде қайта тексеріледі.
+	activationWindow = 24 * time.Hour
 )
 
 // Events — бизнес-оқиғалардан автоматты хабарламалар: тариф қосылды, мерзімі
@@ -41,17 +46,25 @@ const (
 type Events struct {
 	svc    *Service
 	recent recentKeys
+	// demoPayments — демо төлемдер де хабарланады (production емес серверде демо checkout).
+	demoPayments bool
 }
 
 // NewEvents — svc арқылы жіберетін оқиғалар.
 func NewEvents(svc *Service) *Events { return &Events{svc: svc} }
+
+// WithDemoPayments — демо төлемнің тарифі туралы да хабарлау (payments.Service-тегі ережемен бірдей).
+func (e *Events) WithDemoPayments(enabled bool) *Events { e.demoPayments = enabled; return e }
+
+// activationKey — «тариф қосылды» кілті: ref — "payment:<id>" не "sub:<id>".
+func activationKey(ref string) string { return domain.TypeSubscriptionActivated + ":" + ref }
 
 // PaymentSucceeded — төлем расталып, ақылы тариф қосылды (payments.Events).
 func (e *Events) PaymentSucceeded(ctx context.Context, p domain.Payment, sub domain.Subscription) {
 	if sub.Source != "payment" {
 		return
 	}
-	e.activated(ctx, sub, domain.TypeSubscriptionActivated+":payment:"+p.ID)
+	e.activated(ctx, sub, activationKey("payment:"+p.ID))
 }
 
 // PlanAssigned — әкімші ақылы тарифті қосты (admin.Events).
@@ -59,7 +72,30 @@ func (e *Events) PlanAssigned(ctx context.Context, sub domain.Subscription) {
 	if sub.Source != "admin" {
 		return
 	}
-	e.activated(ctx, sub, domain.TypeSubscriptionActivated+":sub:"+sub.ID)
+	e.activated(ctx, sub, activationKey("sub:"+sub.ID))
+}
+
+// ReconcileActivations — «тариф қосылды» жазылмай қалған соңғы тәуліктің ақылы тарифтері.
+//
+// Runs with the subscription sweep. The notice is normally written the
+// moment a payment is confirmed or an admin gives a plan; if that write was
+// lost (database busy, process stopped), the subscription is found here by
+// the same key and told once. Free and ended plans, the simulator and demo
+// payments that were not announced stay silent, as they did at the event.
+func (e *Events) ReconcileActivations(ctx context.Context) {
+	now := e.svc.clock.Now()
+	missing, err := e.svc.repo.SubscriptionsMissingActivation(ctx, now.Add(-activationWindow), now,
+		domain.TypeSubscriptionActivated, e.demoPayments)
+	if err != nil {
+		e.svc.log.Error("activation reconciliation failed", "error", err.Error())
+		return
+	}
+	for _, m := range missing {
+		if ctx.Err() != nil {
+			return
+		}
+		e.activated(ctx, m.Subscription, activationKey(m.Ref))
+	}
 }
 
 // activated — «тариф қосылды»: push және хат (хат санат өшірулі болса да кетеді: ол
@@ -159,6 +195,10 @@ func (e *Events) QuotaUsed(ctx context.Context, user domain.User, usage domain.E
 	n, ok := e.quotaNotice(user.ID, usage, date, month)
 	if !ok {
 		return
+	}
+	if usage.Plan.IsFree {
+		// Nothing to buy on the free plan: the notice opens the app, not plans.
+		n.Link = LinkHome
 	}
 	key := repository.UserNotificationKey(user.ID, n.IdempotencyKey)
 	if e.recent.has(date, key) {

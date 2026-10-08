@@ -44,6 +44,7 @@
     if (parts[1] === "users") return parts[2] ? { name: "user", id: parts[2] } : { name: "users" };
     if (parts[1] === "plans") return { name: "plans" };
     if (parts[1] === "audit") return { name: "audit" };
+    if (parts[1] === "reports") return { name: "reports" };
     if (parts[1] === "settings") return { name: "settings" };
     if (parts[1] === "notifications") {
       if (parts[2] === "new") return { name: "notifications", tab: "create" };
@@ -985,6 +986,89 @@
       </div>`
   };
 
+  /* ------------------------------------------------------------ reports */
+  // AI жауаптарына шағымдар. Мәтін — тек адам өзі жіберуді таңдаған жасалған жауап;
+  // көшірілген хабарлама мен нұсқау шағымға ешқашан кірмейді.
+  var Reports = {
+    data: function () { return { loading: true, rows: [], total: 0, page: 1, limit: 25, status: "open", busy: "" }; },
+    mounted: function () { this.load(); },
+    methods: {
+      t: t, tf: tf, nf: nf,
+      async load() {
+        this.loading = true;
+        try {
+          var params = new URLSearchParams({ page: this.page });
+          if (this.status) params.set("status", this.status);
+          var data = await api("/reports?" + params.toString());
+          this.rows = data.reports; this.total = data.total; this.limit = data.limit;
+        } catch (e) { toast("danger", t("common.error")); }
+        this.loading = false;
+      },
+      filter() { this.page = 1; this.load(); },
+      move(delta) { this.page = Math.max(1, this.page + delta); this.load(); },
+      async resolve(row) {
+        this.busy = row.id;
+        try {
+          await api("/reports/" + encodeURIComponent(row.id) + "/resolve", { method: "POST", body: {} });
+          toast("ok", t("admin.reports.resolved_toast"));
+          await this.load();
+        } catch (e) { toast("danger", t("common.error")); }
+        this.busy = "";
+      }
+    },
+    template: `
+      <div class="card">
+        <div class="card-head"><h2>{{ t('admin.reports.title') }}</h2>
+          <div class="right"><span class="badge badge-muted">{{ t('common.total') }}: {{ nf(total) }}</span></div></div>
+        <div class="card-body filters-row">
+          <select v-model="status" @change="filter" :aria-label="t('admin.reports.col_status')">
+            <option value="open">{{ t('admin.reports.status.open') }}</option>
+            <option value="resolved">{{ t('admin.reports.status.resolved') }}</option>
+            <option value="">{{ t('common.all') }}</option>
+          </select>
+          <span class="muted">{{ t('admin.reports.hint') }}</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>{{ t('admin.reports.col_when') }}</th><th>{{ t('admin.reports.col_user') }}</th>
+              <th>{{ t('admin.reports.col_reason') }}</th><th>{{ t('admin.reports.col_text') }}</th>
+              <th>{{ t('admin.reports.col_app') }}</th><th>{{ t('admin.reports.col_status') }}</th></tr></thead>
+            <tbody>
+              <tr v-if="loading" v-for="n in 4" :key="'s' + n"><td colspan="6"><div class="skeleton-row"></div></td></tr>
+              <tr v-else v-for="row in rows" :key="row.id">
+                <td class="mono">{{ row.created_at }}</td>
+                <td><a :href="'/admin/users/' + row.user_id" @click.prevent="$root.go('/admin/users/' + row.user_id)">
+                  <b>{{ row.identifier }}</b></a><div class="mono">{{ row.user_id.slice(0, 8) }}</div></td>
+                <td><span class="badge badge-warn">{{ t('admin.reports.reason.' + row.reason) }}</span>
+                  <div class="muted">{{ t('admin.reports.mode.' + row.mode) }}</div></td>
+                <td style="min-width:240px; max-width:420px">
+                  <div v-if="row.text" style="white-space:pre-line; word-break:break-word">{{ row.text }}</div>
+                  <div v-else class="muted">{{ t('admin.reports.no_text') }}</div>
+                  <div v-if="row.comment" class="muted" style="margin-top:6px; word-break:break-word">
+                    {{ t('admin.reports.comment') }}: {{ row.comment }}</div>
+                </td>
+                <td>{{ row.platform || '—' }} <span class="mono" v-if="row.app_version">{{ row.app_version }}</span></td>
+                <td>
+                  <span :class="'badge ' + (row.status === 'open' ? 'badge-danger' : 'badge-ok')">
+                    {{ t('admin.reports.status.' + row.status) }}</span>
+                  <div v-if="row.status === 'resolved'" class="muted">
+                    {{ tf('admin.reports.resolved_by', { admin: row.resolved_by || '—', at: row.resolved_at }) }}</div>
+                  <button v-else class="btn btn-sm" :disabled="busy === row.id" @click="resolve(row)"
+                          style="margin-top:6px">{{ t('admin.reports.resolve') }}</button>
+                </td>
+              </tr>
+              <tr v-if="!loading && !rows.length"><td colspan="6" class="empty">{{ t('common.empty') }}</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination">
+          <button class="btn btn-sm" :disabled="page === 1" @click="move(-1)">{{ t('common.prev') }}</button>
+          <span>{{ t('common.page') }} {{ page }}</span>
+          <button class="btn btn-sm" :disabled="page * limit >= total" @click="move(1)">{{ t('common.next') }}</button>
+        </div>
+      </div>`
+  };
+
   var LIMIT_FIELDS = [
     { key: "max_source_characters", label: "admin.settings.source_chars" },
     { key: "max_instruction_length", label: "admin.settings.instruction_chars" },
@@ -1153,7 +1237,7 @@
   // listed here: the audience form always loads them from GET /plans.
   var DEFAULT_PUSH_META = {
     status: { enabled: false, worker: false, fcm: false, email: false, link_hosts: [] },
-    categories: ["account", "subscription", "security", "system", "marketing"],
+    categories: ["subscription", "system", "marketing"],
     screens: ["home", "subscription", "settings", "notifications", "templates", "profile", "keyboard", "compose"],
     content_locales: ["kk", "ru", "en", "uz"], required_locales: ["kk", "ru", "en"], fallback_locale: "ru",
     languages: ["kk", "ru", "en", "uz"], segments: ["all", "free", "paid", "demo"],
@@ -1745,7 +1829,7 @@
                   <select v-model="form.category" :aria-invalid="!!errorFor('category')">
                     <option v-for="c in m.categories" :key="c" :value="c">{{ t('admin.push.category.' + c) }}</option>
                   </select>
-                  <small class="hint">{{ form.category === 'security' ? t('admin.push.form.security_hint') : t('admin.push.form.category_hint') }}</small>
+                  <small class="hint">{{ t('admin.push.form.category_hint') }}</small>
                   <small v-if="errorFor('category')" class="field-error" role="alert">{{ errorFor('category') }}</small></label>
                 <label class="field"><span>{{ t('admin.push.form.fallback') }}</span>
                   <select v-model="form.fallback" :aria-invalid="!!errorFor('fallback_locale')">
@@ -2473,13 +2557,13 @@
   /* --------------------------------------------------------------- shell */
   var App = {
     components: { Dashboard: Dashboard, Users: Users, UserDetail: UserDetail, Plans: Plans,
-                  Audit: Audit, Settings: Settings, Notifications: Notifications },
+                  Audit: Audit, Reports: Reports, Settings: Settings, Notifications: Notifications },
     data: function () { return { state: state }; },
     computed: {
       title: function () {
         return {
           dashboard: t("admin.nav.dashboard"), users: t("admin.users.title"), user: t("admin.user.detail"),
-          plans: t("admin.plans.title"), audit: t("admin.audit.title"),
+          plans: t("admin.plans.title"), audit: t("admin.audit.title"), reports: t("admin.reports.title"),
           settings: t("admin.settings.title"), notifications: t("admin.notifications.title")
         }[state.route.name];
       }
@@ -2516,6 +2600,10 @@
              :aria-current="isActive('notifications') ? 'page' : null" @click.prevent="go('/admin/notifications')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9a6 6 0 1 1 12 0c0 5 2 6 2 6H4s2-1 2-6M10 20a2 2 0 0 0 4 0"/></svg>
             {{ t('admin.nav.notifications') }}</a>
+          <a class="item" href="/admin/reports" :class="{ 'is-active': isActive('reports') }"
+             :aria-current="isActive('reports') ? 'page' : null" @click.prevent="go('/admin/reports')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg>
+            {{ t('admin.nav.reports') }}</a>
           <a class="item" href="/admin/audit" :class="{ 'is-active': isActive('audit') }"
              :aria-current="isActive('audit') ? 'page' : null" @click.prevent="go('/admin/audit')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg>
@@ -2552,6 +2640,7 @@
             <user-detail v-else-if="state.route.name === 'user'" :id="state.route.id" :key="state.route.id"/>
             <plans v-else-if="state.route.name === 'plans'"/>
             <audit v-else-if="state.route.name === 'audit'"/>
+            <reports v-else-if="state.route.name === 'reports'"/>
             <settings v-else-if="state.route.name === 'settings'"/>
             <notifications v-else-if="state.route.name === 'notifications'" :route="state.route" :seq="state.routeSeq"/>
           </main>

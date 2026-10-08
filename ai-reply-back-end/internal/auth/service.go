@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/aireply/ai-reply-back-end/config"
@@ -37,6 +38,8 @@ type Service struct {
 	// google, apple — токен тексерушілері; nil болса, провайдер өшірулі.
 	google IDTokenVerifier
 	apple  IDTokenVerifier
+	// background — фонда шығарылып жатқан жою кодтары (Wait).
+	background sync.WaitGroup
 }
 
 // New — қызметті құрады.
@@ -130,6 +133,11 @@ func (s *Service) RequestOTP(ctx context.Context, rawIdentifier, locale string) 
 		}
 		return Challenge{Kind: identity.Kind, Masked: challenge.MaskedEmail, Channel: channel,
 			ExpiresIn: challenge.ExpiresIn, DemoMode: challenge.DemoMode}, nil
+	}
+	// The apps no longer offer phone sign-in and no SMS provider is wired in:
+	// outside demo mode the stub would answer "sent" for a code nobody gets.
+	if !s.cfg.DemoMode && s.send.Channel() == "stub" {
+		return Challenge{}, domain.ErrAuthProviderUnavailable
 	}
 
 	// Бір идентификаторға сағатына шектеу (brute-force және шығын қорғанысы).
@@ -420,11 +428,14 @@ func (s *Service) Refresh(ctx context.Context, rawToken string, info DeviceInfo)
 	}, nil
 }
 
-// LogoutSession — берілген refresh токенді жабады; токен қай тіркелгіге тиесілі болғанын қайтарады ("" — белгісіз).
+// LogoutSession — берілген refresh токеннің бүкіл тізбегін жабады; токен қай тіркелгіге
+// тиесілі болғанын қайтарады ("" — белгісіз).
 //
-// The account id lets the caller detach the app installation from that
-// account in the same request, so no push meant for it reaches the phone
-// after sign-out.
+// The whole family is revoked: an app that signs out with a token that was
+// already rotated (its newer one lost on the way back) still ends that
+// session. The account id lets the caller detach the app installation from
+// that account in the same request, so no push meant for it reaches the
+// phone after sign-out.
 func (s *Service) LogoutSession(ctx context.Context, rawToken string) (string, error) {
 	if strings.TrimSpace(rawToken) == "" {
 		return "", nil
@@ -436,7 +447,10 @@ func (s *Service) LogoutSession(ctx context.Context, rawToken string) (string, e
 	if err != nil {
 		return "", err
 	}
-	return stored.UserID, s.repo.RevokeRefreshToken(ctx, stored.ID, "logout")
+	if err := s.repo.RevokeFamily(ctx, stored.FamilyID, "logout"); err != nil && !errors.Is(err, domain.ErrNotFound) {
+		return stored.UserID, err
+	}
+	return stored.UserID, nil
 }
 
 // Authenticate — access токенді тексеріп, қолданушыны қайтарады.

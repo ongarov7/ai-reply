@@ -14,6 +14,13 @@ import (
 // emailSendTimeout — хатты жіберуге берілетін ең ұзақ уақыт (қайталаумен бірге).
 const emailSendTimeout = 12 * time.Second
 
+// Кодтың жеткізілу тәсілі (otp_codes.channel).
+const (
+	channelEmail  = "email"
+	channelStub   = "stub"   // демо: AUTH_DEMO_OTP, хат жоқ
+	channelReview = "review" // App Review / Play review: REVIEW_LOGIN_CODE, хат жоқ
+)
+
 // EmailChallenge — кодты сұрау нәтижесі.
 //
 // It is the same for an address we know and one we have never seen, so the
@@ -93,15 +100,16 @@ func (s *Service) requestEmailOTP(ctx context.Context, rawEmail, locale, purpose
 	if err := s.checkEmailQuota(ctx, address, now); err != nil {
 		return EmailChallenge{}, err
 	}
+	// An address locked by wrong guesses gets no new code until the window passes.
+	if err := s.checkEmailFailures(ctx, address, now); err != nil {
+		return EmailChallenge{}, err
+	}
 
-	code, deliver, err := s.emailCode()
+	code, channel, err := s.emailCode(address)
 	if err != nil {
 		return EmailChallenge{}, err
 	}
-	channel := "email"
-	if !deliver {
-		channel = "stub"
-	}
+	deliver := channel == channelEmail
 	record, err := s.repo.IssueOTP(ctx, repository.OTPRecord{
 		Kind:        domain.IdentityEmail,
 		Value:       address,
@@ -122,7 +130,7 @@ func (s *Service) requestEmailOTP(ctx context.Context, rawEmail, locale, purpose
 	if deliver {
 		sendCtx, cancel := context.WithTimeout(ctx, emailSendTimeout)
 		err := s.mail.SendOTP(sendCtx, email.OTPMessage{
-			To: address, Code: code, Locale: locale, TTL: s.cfg.OTPTTL, Reference: record.ID,
+			To: address, Code: code, Locale: locale, TTL: s.cfg.OTPTTL, Reference: record.ID, Purpose: purpose,
 		})
 		cancel()
 		if err != nil {
@@ -134,13 +142,18 @@ func (s *Service) requestEmailOTP(ctx context.Context, rawEmail, locale, purpose
 		}
 	}
 
-	s.log.Info("email otp issued", "purpose", purpose, "channel", channel)
+	if channel == channelReview {
+		// The address stays out of the log, as for every other code.
+		s.log.Info("review login code issued", "purpose", purpose)
+	} else {
+		s.log.Info("email otp issued", "purpose", purpose, "channel", channel)
+	}
 	return EmailChallenge{
 		MaskedEmail: maskEmail(address),
 		ExpiresIn:   int(s.cfg.OTPTTL / time.Second),
 		ResendAfter: int((cooldown + time.Second - 1) / time.Second),
 		CodeLength:  otpDigits,
-		DemoMode:    !deliver,
+		DemoMode:    channel == channelStub,
 	}, nil
 }
 
@@ -172,16 +185,56 @@ func (s *Service) checkEmailQuota(ctx context.Context, address string, now time.
 	return nil
 }
 
-// emailCode — жаңа код. Хат провайдері жоқ болса — тек демо режимде, тұрақты демо код.
-func (s *Service) emailCode() (code string, deliver bool, err error) {
+// checkEmailFailures — бір поштаға тәулігіне қате код енгізу шегі (OTP_MAX_FAILED_PER_DAY).
+//
+// The attempt limit stops guessing one code; this stops guessing across many:
+// four digits and a fresh code every half a minute would otherwise add up.
+// Counted from the codes table, like the issue caps, so it holds across IPs
+// and restarts. The wait lasts until enough of the oldest failures leave the
+// 24-hour window.
+func (s *Service) checkEmailFailures(ctx context.Context, address string, now time.Time) error {
+	limit := s.cfg.OTPMaxFailedPerDay
+	if limit <= 0 {
+		return nil
+	}
+	failures, err := s.repo.OTPFailuresSince(ctx, domain.IdentityEmail, address, now.Add(-24*time.Hour))
+	if err != nil {
+		return err
+	}
+	total := 0
+	for _, f := range failures {
+		total += f.Failed
+	}
+	for _, f := range failures {
+		if total < limit {
+			break
+		}
+		total -= f.Failed
+		if total < limit {
+			return domain.RetryAfter(domain.ErrRateLimited, f.CreatedAt.Add(24*time.Hour).Sub(now))
+		}
+	}
+	return nil
+}
+
+// emailCode — жаңа код және оның жеткізілу тәсілі.
+//
+// The review address gets the configured review code without a mail, so App
+// Review and Play review can sign in from the submission notes; every cap
+// and attempt limit still applies to it. Without a mail provider only demo
+// mode issues codes: the fixed demo code.
+func (s *Service) emailCode(address string) (code, channel string, err error) {
+	if s.cfg.ReviewLogin() && address == s.cfg.ReviewEmail {
+		return s.cfg.ReviewCode, channelReview, nil
+	}
 	if s.mail != nil {
 		code, err := NewOTPCode(s.random)
-		return code, true, err
+		return code, channelEmail, err
 	}
 	if s.cfg.DemoMode {
-		return s.cfg.DemoOTP, false, nil
+		return s.cfg.DemoOTP, channelStub, nil
 	}
-	return "", false, domain.ErrEmailDelivery
+	return "", "", domain.ErrEmailDelivery
 }
 
 // consumeEmailOTP — кодты тексеріп жабады; сәтті болса нормаланған поштаны қайтарады.
@@ -216,6 +269,9 @@ func (s *Service) consumeEmailOTP(ctx context.Context, rawEmail, code, purpose s
 	if !now.Before(record.ExpiresAt) {
 		_ = s.repo.CloseOTP(ctx, record.ID, domain.OTPReasonExpired, now)
 		return "", domain.ErrOTPExpired
+	}
+	if err := s.checkEmailFailures(ctx, address, now); err != nil {
+		return "", err
 	}
 
 	attempts, err := s.repo.RegisterOTPAttempt(ctx, record.ID, now)

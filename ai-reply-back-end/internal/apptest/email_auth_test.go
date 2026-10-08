@@ -269,9 +269,9 @@ func TestEmailOTPConcurrentVerificationSucceedsOnce(t *testing.T) {
 	}
 }
 
-// Бір поштаға сағаттық шек IP-ге қарамай сақталады.
+// Бір поштаға сағаттық шек IP-ге қарамай сақталады (IP шегінен бөлек баптау).
 func TestEmailOTPPerAddressHourlyLimit(t *testing.T) {
-	h := newHarness(t, withEnv("RATE_OTP_REQUEST_PER_HOUR", "3"), withEnv("TRUST_PROXY", "true"))
+	h := newHarness(t, withEnv("RATE_OTP_REQUEST_PER_ADDRESS_PER_HOUR", "3"), withEnv("TRUST_PROXY", "true"))
 	withMailer(h)
 	address := "limited@example.com"
 	for i := 1; i <= 3; i++ {

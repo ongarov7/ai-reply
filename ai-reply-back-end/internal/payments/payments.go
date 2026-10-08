@@ -97,6 +97,8 @@ type Service struct {
 	events   Events
 	// demoCheckout — the demo provider may sell on this (non-production) server.
 	demoCheckout bool
+	// production — APP_ENV=production: an unverified payment is never announced.
+	production bool
 }
 
 // New — қызмет.
@@ -113,7 +115,20 @@ func (s *Service) WithEvents(e Events) *Service { s.events = e; return s }
 // production server can only sell through a live provider.
 func (s *Service) WithDemoCheckout(enabled bool) *Service { s.demoCheckout = enabled; return s }
 
-// Mode — demo немесе live.
+// WithProduction — production серверінде тек нақты провайдердің төлемі хабарланады.
+func (s *Service) WithProduction(production bool) *Service { s.production = production; return s }
+
+// announces — «тариф қосылды» (push және хат) осы сервердің төлемдеріне жіберіле ме.
+//
+// Only for money that is real or deliberately simulated: a live provider
+// that verifies every payment, or demo checkout switched on for a
+// non-production server. Config already refuses demo checkout in
+// production; this keeps the rule even if the wiring is ever wrong.
+func (s *Service) announces() bool {
+	return s.provider.Live() || (s.demoCheckout && !s.production)
+}
+
+// Mode — off, demo немесе live.
 func (s *Service) Mode() string { return s.mode }
 
 // Provider — қосылған провайдер аты.
@@ -124,11 +139,19 @@ func (s *Service) Live() bool { return s.provider.Live() }
 
 // CheckoutAvailable — серверде сатуға жарайтын төлем интеграциясы бар ма.
 //
-// A live, verified provider, or the demo provider on a development server
-// that opted in. Without one, nothing can be bought, whatever the admin
-// switch or plan visibility say.
+// A live, verified provider (PAYMENT_MODE=live), or the demo provider on a
+// development server that opted in (PAYMENT_MODE=demo with
+// PAYMENT_DEMO_CHECKOUT=true). PAYMENT_MODE=off sells nothing. Without one,
+// nothing can be bought, whatever the admin switch or plan visibility say.
 func (s *Service) CheckoutAvailable() bool {
-	return s.provider.Live() || s.demoCheckout
+	switch s.mode {
+	case "live":
+		return s.provider.Live()
+	case "demo":
+		return s.provider.Live() || s.demoCheckout
+	default:
+		return false
+	}
 }
 
 // PurchasesEnabled — сатып алу қазір ашық па: интеграция бар және әкімші қосқан.
@@ -233,7 +256,7 @@ func (s *Service) Confirm(ctx context.Context, userID, paymentID string) (domain
 	if err != nil {
 		return domain.Subscription{}, err
 	}
-	if s.events != nil {
+	if s.events != nil && s.announces() {
 		payment.Status, payment.ProviderRef = "succeeded", ref
 		s.events.PaymentSucceeded(ctx, payment, sub)
 	}

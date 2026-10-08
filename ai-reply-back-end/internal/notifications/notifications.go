@@ -336,8 +336,7 @@ func (s *Service) NotifyUser(ctx context.Context, n UserNotification) (NotifyRes
 		if err != nil {
 			return NotifyResult{}, err
 		}
-		enabled, set := prefs[content.Category]
-		silenced = set && !enabled
+		silenced = !domain.CategoryEnabled(content.Category, prefs)
 	}
 	channels := repository.UserChannels{Email: n.Email}
 	switch {
@@ -440,8 +439,8 @@ func (s *Service) Preferences(ctx context.Context, userID string) (map[string]bo
 	}
 	out := map[string]bool{}
 	for _, c := range domain.NotificationCategories {
-		enabled, ok := stored[c]
-		out[c] = !ok || enabled || !domain.CategoryOptional(c)
+		// No stored row: on, except marketing, which needs an explicit yes.
+		out[c] = domain.CategoryEnabled(c, stored)
 	}
 	return out, nil
 }
@@ -718,6 +717,9 @@ func (s *Service) Preview(ctx context.Context, filter domain.AudienceFilter, cat
 	}
 	if !domain.IsNotificationCategory(category) {
 		return repository.AudiencePreview{}, audience, domain.InvalidField("category", "unknown")
+	}
+	if !domain.IsCampaignCategory(category) {
+		return repository.AudiencePreview{}, audience, domain.InvalidField("category", "not allowed for campaigns")
 	}
 	q, unresolved, err := s.audienceQuery(ctx, audience, category)
 	if err != nil {

@@ -16,14 +16,32 @@ import (
 // and is not.
 type Limiter struct {
 	mu      sync.Mutex
-	hits    map[string][]time.Time
+	buckets map[string]*bucket
 	lastGC  time.Time
 	maxKeys int
+	now     func() time.Time
 }
+
+// bucket — бір кілттің соққылары және оның өз терезесі.
+//
+// The window is stored with the hits: cleanup runs from whichever request
+// comes along, and must not trim an hourly bucket with a per-minute window.
+type bucket struct {
+	window time.Duration
+	hits   []time.Time
+}
+
+const (
+	// gcInterval — ескі кілттерді тазалаудың әдеттегі аралығы.
+	gcInterval = 10 * time.Minute
+	// gcMinInterval — кілт саны шектен асса да, тазалау бұдан жиі жүрмейді
+	// (әйтпесе әр сұраныс бүкіл кестені аралайды).
+	gcMinInterval = 10 * time.Second
+)
 
 // NewLimiter — лимитер.
 func NewLimiter() *Limiter {
-	return &Limiter{hits: make(map[string][]time.Time), lastGC: time.Now(), maxKeys: 50000}
+	return &Limiter{buckets: make(map[string]*bucket), lastGC: time.Now(), maxKeys: 50000, now: time.Now}
 }
 
 // Allow — берілген кілт үшін терезеде орын бар ма.
@@ -31,33 +49,43 @@ func (l *Limiter) Allow(key string, limit int, window time.Duration) (bool, time
 	if limit <= 0 {
 		return true, 0
 	}
-	now := time.Now()
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	now := l.now()
 
-	if now.Sub(l.lastGC) > 10*time.Minute || len(l.hits) > l.maxKeys {
-		for k, v := range l.hits {
-			live := filter(v, now, window)
-			if len(live) == 0 {
-				delete(l.hits, k)
-			} else {
-				l.hits[k] = live
-			}
-		}
-		l.lastGC = now
+	if since := now.Sub(l.lastGC); since > gcInterval || (len(l.buckets) > l.maxKeys && since > gcMinInterval) {
+		l.collect(now)
 	}
 
-	live := filter(l.hits[key], now, window)
-	if len(live) >= limit {
-		retry := window - now.Sub(live[0])
-		l.hits[key] = live
+	b := l.buckets[key]
+	if b == nil {
+		b = &bucket{window: window}
+		l.buckets[key] = b
+	}
+	// A key always belongs to one rule; the widest window seen is kept.
+	if window > b.window {
+		b.window = window
+	}
+	b.hits = filter(b.hits, now, window)
+	if len(b.hits) >= limit {
+		retry := window - now.Sub(b.hits[0])
 		if retry < time.Second {
 			retry = time.Second
 		}
 		return false, retry
 	}
-	l.hits[key] = append(live, now)
+	b.hits = append(b.hits, now)
 	return true, 0
+}
+
+// collect — әр кілтті өз терезесімен тазалайды; бос кілттер жойылады.
+func (l *Limiter) collect(now time.Time) {
+	for k, b := range l.buckets {
+		if b.hits = filter(b.hits, now, b.window); len(b.hits) == 0 {
+			delete(l.buckets, k)
+		}
+	}
+	l.lastGC = now
 }
 
 func filter(values []time.Time, now time.Time, window time.Duration) []time.Time {

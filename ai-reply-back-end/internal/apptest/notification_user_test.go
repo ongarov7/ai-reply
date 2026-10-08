@@ -301,6 +301,7 @@ func TestRetentionKeepsPendingDeliveriesAndCampaignTotals(t *testing.T) {
 	finished := h.signIn("retention-finished@example.com")
 	oldDone := h.notifyUser(finished.userID, "retention:done") // no device: one skipped row
 	pending := h.signIn("retention-pending@example.com")
+	h.optInMarketing(pending.access)
 	h.mustRegister(installation(installID(501), "android", fcmToken(501)), pending.access)
 	oldQueued := h.notifyUser(pending.userID, "retention:queued") // not sent yet
 	fresh := h.notifyUser(finished.userID, "retention:fresh")
@@ -373,6 +374,7 @@ func TestShortRetentionKeepsTheOncePerPeriodGuard(t *testing.T) {
 func TestDeliveriesListFilters(t *testing.T) {
 	h := newHarness(t)
 	s := h.signIn("delivery-list@example.com")
+	h.optInMarketing(s.access)
 	h.mustRegister(installation(installID(601), "android", fcmToken(601)), s.access)
 	n := accountNotice(s.userID, "list:1")
 	n.Email = true

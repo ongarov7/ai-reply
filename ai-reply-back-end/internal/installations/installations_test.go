@@ -62,6 +62,11 @@ func TestRegistrationValidation(t *testing.T) {
 		Platform: "android", Push: &PushToken{Provider: "FCM", Token: fcm}}); err != nil {
 		t.Fatalf("fcm token refused: %v", err)
 	}
+	// The cap is 1024 characters: the longest accepted token still registers.
+	if _, err := svc.normalize(Registration{InstallationID: testInstallationID,
+		Platform: "android", Push: &PushToken{Token: strings.Repeat("a", 1024)}}); err != nil {
+		t.Fatalf("a 1024-character token refused: %v", err)
+	}
 	for name, reg := range map[string]Registration{
 		"no id":        {Platform: "ios"},
 		"short id":     {InstallationID: "abc", Platform: "ios"},
@@ -75,7 +80,7 @@ func TestRegistrationValidation(t *testing.T) {
 		"fcm too short": {InstallationID: testInstallationID, Platform: "android",
 			Push: &PushToken{Token: "short"}},
 		"fcm too long": {InstallationID: testInstallationID, Platform: "android",
-			Push: &PushToken{Token: strings.Repeat("a", 4097)}},
+			Push: &PushToken{Token: strings.Repeat("a", 1025)}},
 	} {
 		_, err := svc.normalize(reg)
 		var field *domain.FieldError

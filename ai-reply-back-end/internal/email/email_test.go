@@ -21,6 +21,10 @@ var texts = map[string]map[string]string{
 		keyExpires:    "This code expires in {minutes} minutes.",
 		keyNeverShare: "Do not share this code with anyone.",
 		keyIgnore:     "If you did not request this code, you can ignore this email.",
+
+		keyDeleteSubject: "AI Reply account deletion code",
+		keyDeleteIntro:   "Your code to delete the AI Reply account is:",
+		keyDeleteIgnore:  "If you did not ask to delete your account, ignore this email: the account stays.",
 	},
 	"ru": {
 		keySubject:    "Код подтверждения AI Reply",
@@ -60,6 +64,31 @@ func TestRenderOTPIsLocalizedAndComplete(t *testing.T) {
 	fallback, _ := RenderOTP(translate, "", "xx", "0007", 5*time.Minute)
 	if fallback.Subject != "AI Reply verification code" || !strings.Contains(fallback.Text, "\n0007\n") {
 		t.Fatalf("fallback = %+v", fallback)
+	}
+}
+
+// Жою коды хатта кіру коды деп аталмайды.
+func TestRenderOTPForDeletionSaysWhatTheCodeIsFor(t *testing.T) {
+	content, err := RenderOTPFor(translate, "AI Reply", "en", "4821", 5*time.Minute, "delete")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if content.Subject != "AI Reply account deletion code" {
+		t.Fatalf("subject = %q", content.Subject)
+	}
+	for _, part := range []string{"Your code to delete the AI Reply account is:", "4821", "the account stays",
+		"Do not share this code with anyone."} {
+		if !strings.Contains(content.Text, part) || !strings.Contains(content.HTML, part) {
+			t.Fatalf("%q missing from text or html", part)
+		}
+	}
+	if strings.Contains(content.Text, "verification code") {
+		t.Fatal("a deletion code is described as a sign-in code")
+	}
+	// Any other purpose keeps the sign-in wording.
+	login, _ := RenderOTPFor(translate, "AI Reply", "en", "4821", 5*time.Minute, "login")
+	if login.Subject != "AI Reply verification code" {
+		t.Fatalf("login subject = %q", login.Subject)
 	}
 }
 
@@ -163,6 +192,33 @@ func TestResendSendsTheDocumentedRequest(t *testing.T) {
 	if body.Headers["X-Entity-Ref-ID"] != "otp-row-1" {
 		t.Fatalf("headers = %v", body.Headers)
 	}
+	if body.ReplyTo != "" {
+		t.Fatalf("reply_to without CONTACT_EMAIL = %q", body.ReplyTo)
+	}
+}
+
+// CONTACT_EMAIL берілсе, хатқа жауап сол жәшікке барады (Resend reply_to).
+func TestResendSetsReplyToTheContactAddress(t *testing.T) {
+	stub := newResendStub(t)
+	sender, err := NewResend(ResendConfig{
+		APIKey: "re_test_key", FromEmail: "noreply@ai-reply.kz", FromName: "AI Reply",
+		BaseURL: stub.URL, Translate: translate, ReplyTo: "support@ai-reply.kz",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := sender.SendOTP(context.Background(), otp()); err != nil {
+		t.Fatalf("send: %v", err)
+	}
+	if err := sender.Send(context.Background(), Outgoing{To: "user@example.com",
+		Content: Content{Subject: "Pro", Text: "Pro", HTML: "<p>Pro</p>"}}); err != nil {
+		t.Fatalf("send notification: %v", err)
+	}
+	for i := 0; i < 2; i++ {
+		if req := <-stub.requests; req.body.ReplyTo != "support@ai-reply.kz" || req.body.From != `"AI Reply" <noreply@ai-reply.kz>` {
+			t.Fatalf("request %d: reply_to %q, from %q", i+1, req.body.ReplyTo, req.body.From)
+		}
+	}
 }
 
 func TestResendRetriesServerErrorsOnceWithTheSameKey(t *testing.T) {
@@ -223,6 +279,8 @@ func TestNewResendValidatesConfiguration(t *testing.T) {
 		"display name":   {APIKey: "re_x", FromEmail: "AI Reply <noreply@ai-reply.kz>", Translate: translate},
 		"not an address": {APIKey: "re_x", FromEmail: "noreply", Translate: translate},
 		"no translator":  {APIKey: "re_x", FromEmail: "noreply@ai-reply.kz"},
+		"named reply-to": {APIKey: "re_x", FromEmail: "noreply@ai-reply.kz", Translate: translate,
+			ReplyTo: "Support <support@ai-reply.kz>"},
 	} {
 		if _, err := NewResend(cfg); err == nil {
 			t.Errorf("%s: accepted", name)
