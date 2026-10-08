@@ -162,6 +162,8 @@ no_verified_email`. `Idempotency-Key` в Resend — `notification-<delivery_id>`
 
 ## 7. Настройка Firebase
 
+Пошаговая инструкция с точными путями файлов: `docs/FIREBASE_SETUP.md`. Ниже кратко.
+
 Один проект Firebase на оба приложения.
 
 1. **Проект.** Firebase Console → создать проект. Project settings ▸ Cloud Messaging:
@@ -169,7 +171,8 @@ no_verified_email`. `Idempotency-Key` в Resend — `notification-<delivery_id>`
 2. **Android.** Add app ▸ Android, package `kz.yerek.aireply` → скачать
    `google-services.json` в `AI-Reply-Android/app/` (файл в `.gitignore`, в CI — из секрета).
 3. **iOS.** Add app ▸ Apple, bundle id `kz.ai-reply.reply.keyboard.keyboard` →
-   `GoogleService-Info.plist` в таргет `AIReply` или значения в build settings
+   `GoogleService-Info.plist` в `AI-Reply/Config/Firebase/` (шаг сборки «Firebase config»
+   копирует его в приложение; в Xcode добавлять не нужно) или значения в build settings
    `FIREBASE_*` (см. `AI-Reply/README.md`).
 4. **APNs-ключ.** Apple Developer ▸ Identifiers ▸ App ID `kz.ai-reply.reply.keyboard.keyboard`
    → включить *Push Notifications*. Keys ▸ «+» ▸ *Apple Push Notifications service (APNs)* →
@@ -178,7 +181,8 @@ no_verified_email`. `Idempotency-Key` в Resend — `notification-<delivery_id>`
    ▸ Upload: файл `.p8`, Key ID, Team ID. Один ключ работает и для sandbox, и для production.
 5. **Сервер.** Project settings ▸ Service accounts ▸ *Generate new private key* → JSON.
    В `.env` сервера — либо путь `FIREBASE_SERVICE_ACCOUNT_FILE`, либо три значения из файла.
-   В Docker файл должен быть смонтирован в контейнер — проще задать три переменные.
+   В Docker файл монтируется только для чтения (строка-образец в `docker-compose.yml`)
+   или задаются три переменные.
    JSON не коммитить и не класть в приложения.
 6. `PUSH_NOTIFICATIONS_ENABLED=true`, перезапуск. Админка ▸ Уведомления: FCM «настроен».
 
@@ -240,7 +244,7 @@ no_verified_email`. `Idempotency-Key` в Resend — `notification-<delivery_id>`
 | `invalid_token SENDER_ID_MISMATCH` | конфигурация приложения из другого проекта Firebase |
 | `invalid_token UNREGISTERED` | приложение удалено или токен устарел — приложение пришлёт новый при запуске |
 | `token_unreadable` | сменили `JWT_ACCESS_SECRET` (им шифруются токены) — приложения перерегистрируются сами |
-| в предпросмотре 0 получателей | разрешение `denied`, выключен переключатель или категория, установка старше 270 дней, push выключен |
+| в предпросмотре 0 получателей | разрешение `denied`, выключен переключатель или категория, установка старше 270 дней, push выключен; для категории «Новости» (marketing) — только аккаунты, которые сами её включили (opt-in, по умолчанию выключена) |
 | письмо `skipped no_verified_email` | у аккаунта нет подтверждённой почты (вход по телефону); Apple private relay требует домен отправителя, зарегистрированный в Apple |
 
 Push-токены хранятся зашифрованными, в журналах и админке — только отпечаток

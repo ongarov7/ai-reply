@@ -64,7 +64,7 @@ Push-уведомления AI Reply идут через Firebase Cloud Messagin
 
 ## 5. Проверка после настройки
 
-1. Сервер: в логе при старте `push` готов. `GET https://ai-reply.kz/api/v1/config` отдаёт `features.push_notifications: true` и `features.installations: true`.
+1. Сервер: в строке лога `server listening` поле `"push": true` (если `PUSH_NOTIFICATIONS_ENABLED=true`, а Firebase не настроен, будет предупреждение `push notifications are enabled but Firebase is not configured`). `GET https://ai-reply.kz/api/v1/config` отдаёт `features.push_notifications: true` и `features.installations: true`.
 2. Android: сборка без `WARNING: Firebase setup pending`. На устройстве: согласие → вход → карточка «Уведомления» → разрешить.
 3. iOS (реальный iPhone, симулятор APNs-токен не получит): в логе сборки нет `note: Firebase is not configured yet`. Согласие → вход → разрешить уведомления.
 4. Админка → Уведомления → тестовая кампания на свой аккаунт (категория «Новости»: она теперь по умолчанию выключена, сначала включите её в настройках приложения).
