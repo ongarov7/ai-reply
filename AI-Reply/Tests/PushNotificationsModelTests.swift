@@ -236,10 +236,22 @@ final class PushNotificationsModelTests: XCTestCase {
         model.setServerDeliversPush(true)
         await model.loadPreferences()
 
-        await model.setCategory("marketing", enabled: false)
-        XCTAssertEqual(preferences.saves, [["marketing": false]])
-        XCTAssertFalse(model.displayedPreferences.isOn("marketing"))
+        await model.setCategory("marketing", enabled: true)
+        XCTAssertEqual(preferences.saves, [["marketing": true]])
+        XCTAssertTrue(model.displayedPreferences.isOn("marketing"))
         XCTAssertNil(model.failedCategory)
+    }
+
+    /// News and offers wait for the user's own yes; the rest is on.
+    func testMarketingIsOffUntilSwitchedOn() {
+        let defaults = NotificationPreferences.defaults
+        XCTAssertFalse(defaults.isOn("marketing"))
+        for category in NotificationPreferences.categories where category != "marketing" {
+            XCTAssertTrue(defaults.isOn(category), category)
+        }
+        let unnamed = NotificationPreferences(values: [:], optional: NotificationPreferences.categories)
+        XCTAssertFalse(unnamed.isOn("marketing"), "a server that does not name it")
+        XCTAssertTrue(unnamed.isOn("subscription"))
     }
 
     @MainActor

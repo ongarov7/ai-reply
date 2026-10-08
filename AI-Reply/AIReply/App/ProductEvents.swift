@@ -243,6 +243,13 @@ final class ProductEventReporter: ProductEventSink {
         return task
     }
 
+    /// Drops what waits: the account it belonged to was deleted.
+    func discardWaiting() {
+        timer?.cancel()
+        timer = nil
+        queue.removeAll()
+    }
+
     /// The app is going to the background: send what waits now, and ask iOS
     /// for the few seconds that takes.
     func flushBeforeSuspension() {

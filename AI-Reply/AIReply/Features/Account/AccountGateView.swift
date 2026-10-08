@@ -38,9 +38,18 @@ struct AccountGateView<Content: View>: View {
             }
         }
         .animation(.default, value: account.phase)
+        // Said once, over whichever screen comes next: "your account has
+        // been deleted" lands on the consent or sign-in screen.
+        .alert(Text(LocalizedStringKey(account.noticeKey ?? "")), isPresented: noticeBinding) {
+            Button("common.done", role: .cancel) { account.dismissNotice() }
+        }
         .task {
             await account.bootstrap()
         }
+    }
+
+    private var noticeBinding: Binding<Bool> {
+        Binding(get: { account.noticeKey != nil }, set: { if !$0 { account.dismissNotice() } })
     }
 }
 
@@ -50,6 +59,8 @@ private struct LegalConsentView: View {
     @Environment(\.openURL) private var openURL
 
     @State private var isAccepted = false
+    /// The second, separate consent: the texts go to the AI provider.
+    @State private var isAIAccepted = false
     @State private var isSubmitting = false
 
     var body: some View {
@@ -74,18 +85,14 @@ private struct LegalConsentView: View {
                         .fill(Color.dsSurface)
                 )
 
-                Button { isAccepted.toggle() } label: {
-                    HStack(alignment: .top, spacing: DS.Spacing.s) {
-                        Image(systemName: isAccepted ? "checkmark.square.fill" : "square")
-                            .font(.title3)
-                            .foregroundStyle(isAccepted ? Color.accentColor : Color.secondary)
-                        Text("legal.consent.checkbox")
-                            .font(.subheadline)
-                            .foregroundStyle(.primary)
-                            .multilineTextAlignment(.leading)
-                    }
-                }
-                .buttonStyle(.plain)
+                // What happens to the texts, said before anyone agrees to it.
+                Text("legal.consent.ai")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                checkbox("legal.consent.checkbox", isOn: $isAccepted)
+                checkbox("legal.consent.aiCheckbox", isOn: $isAIAccepted)
 
                 Button {
                     isSubmitting = true
@@ -98,13 +105,29 @@ private struct LegalConsentView: View {
                     else { Text("legal.consent.continue") }
                 }
                 .buttonStyle(.dsPrimary)
-                .disabled(!isAccepted || isSubmitting)
+                .disabled(!isAccepted || !isAIAccepted || isSubmitting)
 
                 Text("legal.consent.footer")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
         }
+    }
+
+    private func checkbox(_ title: LocalizedStringKey, isOn: Binding<Bool>) -> some View {
+        Button { isOn.wrappedValue.toggle() } label: {
+            HStack(alignment: .top, spacing: DS.Spacing.s) {
+                Image(systemName: isOn.wrappedValue ? "checkmark.square.fill" : "square")
+                    .font(.title3)
+                    .foregroundStyle(isOn.wrappedValue ? Color.accentColor : Color.secondary)
+                Text(title)
+                    .font(.subheadline)
+                    .foregroundStyle(.primary)
+                    .multilineTextAlignment(.leading)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isOn.wrappedValue ? .isSelected : [])
     }
 
     private func legalLink(_ title: LocalizedStringKey, urlString: String) -> some View {

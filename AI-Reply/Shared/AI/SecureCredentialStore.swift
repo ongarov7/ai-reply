@@ -42,8 +42,14 @@ struct StoredLegalConsent: Codable, Equatable, Sendable {
 }
 
 /// Non-secret acceptance state shared by the host app and its keyboard.
+///
+/// Келісім күйі App Group-та: пернетақта AI сұранысынан бұрын тексереді.
 enum LegalConsentStore {
     private static let key = "account.legalConsent.v1"
+    /// The versions the server publishes now, from the last config read by
+    /// the app or the keyboard.
+    private static let currentTermsKey = "account.legalVersions.terms"
+    private static let currentPrivacyKey = "account.legalVersions.privacy"
 
     static func load(defaults: UserDefaults = AppGroup.defaults) -> StoredLegalConsent? {
         guard let data = defaults.data(forKey: key) else { return nil }
@@ -84,6 +90,49 @@ enum LegalConsentStore {
             appVersion: consent.appVersion ?? "",
             isPendingSync: false
         ), defaults: defaults)
+    }
+
+    // MARK: Current versions
+
+    static func storeCurrentVersions(_ config: AccountAPI.LegalConfig,
+                                     defaults: UserDefaults = AppGroup.defaults) {
+        defaults.set(config.termsVersion, forKey: currentTermsKey)
+        defaults.set(config.privacyVersion, forKey: currentPrivacyKey)
+    }
+
+    /// The published versions; this build's own until a config was read.
+    static func currentVersions(defaults: UserDefaults = AppGroup.defaults) -> (terms: String, privacy: String) {
+        let terms = defaults.string(forKey: currentTermsKey) ?? ""
+        let privacy = defaults.string(forKey: currentPrivacyKey) ?? ""
+        guard !terms.isEmpty, !privacy.isEmpty else {
+            return (AccountAPI.LegalConfig.production.termsVersion, AccountAPI.LegalConfig.production.privacyVersion)
+        }
+        return (terms, privacy)
+    }
+
+    /// Whether the documents in force now were accepted on this device.
+    /// Checked before every AI request, in the app and in the keyboard: the
+    /// server refuses anyway, this only spares the request.
+    static func hasAcceptedCurrentVersions(defaults: UserDefaults = AppGroup.defaults) -> Bool {
+        guard let record = load(defaults: defaults) else { return false }
+        let current = currentVersions(defaults: defaults)
+        return record.termsVersion == current.terms && record.privacyVersion == current.privacy
+    }
+
+    // MARK: Removal
+
+    /// Withdrawal and account deletion.
+    static func clear(defaults: UserDefaults = AppGroup.defaults) {
+        defaults.removeObject(forKey: key)
+    }
+
+    /// The server answered CONSENT_REQUIRED. A record it had confirmed is out
+    /// of date there (withdrawn on another device, or older documents) and is
+    /// dropped; one still waiting to be sent is kept, the app sends it on its
+    /// next start.
+    static func forgetAfterServerRefusal(defaults: UserDefaults = AppGroup.defaults) {
+        guard let record = load(defaults: defaults), !record.isPendingSync else { return }
+        clear(defaults: defaults)
     }
 
     static func markSynced(defaults: UserDefaults = AppGroup.defaults) {

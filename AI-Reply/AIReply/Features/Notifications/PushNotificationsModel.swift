@@ -83,12 +83,16 @@ struct NotificationPreferences: Decodable, Equatable, Sendable {
 
     func isOptional(_ category: String) -> Bool { optional.contains(category) }
 
-    /// Unknown means on: that is the server's default for every category.
-    func isOn(_ category: String) -> Bool { values[category] ?? true }
+    /// News and offers need the user's own yes; everything else is on until
+    /// switched off.
+    static func isOnByDefault(_ category: String) -> Bool { category != "marketing" }
+
+    /// A category the server did not mention has its default.
+    func isOn(_ category: String) -> Bool { values[category] ?? Self.isOnByDefault(category) }
 
     /// What a new account starts with, shown until the server has answered.
     static let defaults = NotificationPreferences(
-        values: Dictionary(uniqueKeysWithValues: categories.map { ($0, true) }),
+        values: Dictionary(uniqueKeysWithValues: categories.map { ($0, isOnByDefault($0)) }),
         optional: categories.filter { $0 != "security" }
     )
 }

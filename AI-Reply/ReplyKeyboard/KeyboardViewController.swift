@@ -68,6 +68,9 @@ final class KeyboardViewController: UIInputViewController {
 
     /// The smart-correction setting, read when the keyboard appears.
     private var smartCorrectionEnabled = true
+    /// Whether the server takes reports about a generated text, read when
+    /// the keyboard appears.
+    private var serverTakesReports = false
     /// Whether the host field wants typing help (not an address, a code or
     /// a password), from its text traits.
     private var hostAllowsCorrection = true
@@ -107,6 +110,10 @@ final class KeyboardViewController: UIInputViewController {
     private var hostContext: String?
     private var hostAutocapitalization: UITextAutocapitalizationType = .sentences
     private var lastHostMutation: TimeInterval = 0
+    /// The host field the keys type into. Return or Next can move the caret
+    /// to another field inside the window where the keyboard trusts its own
+    /// mirror; a new field is read at once regardless.
+    private var hostField = HostFieldTracker()
     private var lastAppearanceProbe: TimeInterval = 0
 
     // MARK: Lifecycle
@@ -148,6 +155,7 @@ final class KeyboardViewController: UIInputViewController {
         reloadSettings()
         AILimits.reload()
         smartCorrectionEnabled = SharedSettings.shared.smartCorrectionEnabled
+        serverTakesReports = AILimits.serverSupportsAIReports
         // A word already in the field is not being typed: no strip over the
         // personas until the user types one.
         wordTyping.reset()
@@ -156,6 +164,7 @@ final class KeyboardViewController: UIInputViewController {
         refreshThemeIfNeeded()
         showsGlobe = needsInputModeSwitchKey
         plane = KeyboardFieldKind.startsOnNumbers(textDocumentProxy.keyboardType ?? .default) ? .numbers : .letters
+        hostField.reset(to: currentHostField)
         refreshHostContext()
         layoutKeyboard(force: true)
         refreshAutoShift()
@@ -221,8 +230,12 @@ final class KeyboardViewController: UIInputViewController {
         let now = Date.timeIntervalSinceReferenceDate
         // Our own keystrokes already updated `hostContext`. Anything else -
         // the user moved the caret, the host cleared the field after sending
-        // - is re-read once.
-        let ownMutation = now - lastHostMutation < 0.45
+        // - is re-read once. So is another field: Return or Next moves the
+        // caret there right after the keyboard's own keystroke.
+        let fieldChanged = hostField.update(currentHostField)
+        let ownMutation = HostFieldTracker.trustsMirror(sinceOwnMutation: now - lastHostMutation,
+                                                        fieldChanged: fieldChanged)
+        if fieldChanged { hostFieldDidChange() }
         if !ownMutation {
             refreshHostContext()
             // The text moved under the correction: Undo no longer applies,
@@ -492,7 +505,8 @@ final class KeyboardViewController: UIInputViewController {
     /// With a reply on screen, typing means "let me change it": the reply
     /// becomes editable and the key lands in it.
     private func prepareComposerForTyping() {
-        guard actionBar.isComposing, !actionBar.acceptsTextInput else { return }
+        // The report panel is not the reply: its keys type nothing.
+        guard actionBar.isComposing, !actionBar.acceptsTextInput, !actionBar.isReporting else { return }
         switch activeFlow {
         case .compose: _ = composeCoordinator.beginEditingForTyping()
         case .reply: _ = replyCoordinator.beginEditingForTyping()
@@ -566,6 +580,27 @@ final class KeyboardViewController: UIInputViewController {
         hostCaretInsideWord = AutocorrectCaret.continuesWord(textDocumentProxy.documentContextAfterInput)
         hostAutocapitalization = textDocumentProxy.autocapitalizationType ?? .sentences
         hostAllowsCorrection = AutocorrectFieldPolicy.allowsCorrection(in: textDocumentProxy)
+    }
+
+    private var currentHostField: HostFieldIdentity {
+        HostFieldIdentity(documentIdentifier: textDocumentProxy.documentIdentifier,
+                          keyboardType: textDocumentProxy.keyboardType)
+    }
+
+    /// The caret is in another host field now. Its text and traits are
+    /// re-read by `textDidChange` like any change from elsewhere; here the
+    /// strip and the double-space shortcut forget the old field, and -
+    /// unless the composer owns the keys - the page starts where the new
+    /// field wants it (digits for a code). The page is rebuilt only if it
+    /// really changed.
+    private func hostFieldDidChange() {
+        autocorrect.restart()
+        lastSpaceTap = 0
+        guard !actionBar.isComposing else { return }
+        let startsOnNumbers = KeyboardFieldKind.startsOnNumbers(textDocumentProxy.keyboardType ?? .default)
+        plane = startsOnNumbers ? .numbers : .letters
+        if startsOnNumbers { shift.reset() }
+        layoutKeyboard(force: false)
     }
 
     // MARK: Smart correction
@@ -740,9 +775,10 @@ final class KeyboardViewController: UIInputViewController {
             flow: flow,
             errorMessage: (message?.isEmpty ?? true) ? nil : message,
             sourceLimit: AILimits.current.sourceCharacters,
-            instructionLimit: ReplyInstruction.maximumCharacters
+            instructionLimit: ReplyInstruction.maximumCharacters,
+            offersReport: offersReport
         ))
-        keysView.isInputDimmed = flow.isGenerating
+        keysView.isInputDimmed = flow.isGenerating || actionBar.isReporting
         if flow.stage != .composing { polisher.stop() }
         refreshReturnKey()
         updateGeometry(animated: true)
@@ -771,9 +807,10 @@ final class KeyboardViewController: UIInputViewController {
             sourceLimit: AILimits.current.sourceCharacters,
             instructionLimit: AILimits.current.instructionCharacters,
             mode: .compose,
-            errorOffersRetry: notice?.offersRetry ?? true
+            errorOffersRetry: notice?.offersRetry ?? true,
+            offersReport: offersReport
         ))
-        keysView.isInputDimmed = flow.isGenerating
+        keysView.isInputDimmed = flow.isGenerating || actionBar.isReporting
         if flow.stage != .composing { polisher.stop() }
         refreshReturnKey()
         updateGeometry(animated: true)
@@ -909,6 +946,44 @@ final class KeyboardViewController: UIInputViewController {
         if DebugReplyMock.isEnabled { return true }
         #endif
         return hasFullAccess
+    }
+
+    // MARK: Reports
+
+    /// Report under a result: a server that takes reports, and a network
+    /// to send one over.
+    private var offersReport: Bool {
+        #if DEBUG
+        if DebugReplyMock.isEnabled { return true }
+        #endif
+        return serverTakesReports && canReachNetwork
+    }
+
+    /// Sends a report about the text on screen; the panel says how it went.
+    private func sendReport(_ reason: AIReport.Reason, text: String?, mode: AIReport.Mode) {
+        #if DEBUG
+        if DebugReplyMock.isEnabled {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+                self?.actionBar.reportDidFinish(sent: true)
+            }
+            return
+        }
+        #endif
+        let report = AIReport(mode: mode, reason: reason, text: text)
+        Task { [weak self] in
+            let sent = (try? await AccountService().reportAIOutput(report)) != nil
+            self?.actionBar.reportDidFinish(sent: sent)
+        }
+    }
+
+    /// The report panel opened or closed: the keys are dimmed and type
+    /// nothing while it is open.
+    private func reportingDidChange() {
+        let generating = activeFlow == .compose ? composeCoordinator.flow.isGenerating : replyCoordinator.flow.isGenerating
+        keysView.isInputDimmed = generating || actionBar.isReporting
+        refreshReturnKey()
+        refreshAutoShift()
+        restartSuggestions()
     }
 }
 
@@ -1203,6 +1278,10 @@ extension KeyboardViewController: KeyboardActionBarDelegate {
             case .draft: replyCoordinator.updateDraft(text)
             case .none: break
             }
+        case .report(let reason, let text):
+            sendReport(reason, text: text, mode: .reply)
+        case .reportingChanged:
+            reportingDidChange()
         case .reset, .replyToCopied:
             break
         }
@@ -1253,6 +1332,10 @@ extension KeyboardViewController: KeyboardActionBarDelegate {
             }
         case .replyToCopied:
             replyToCopiedFromCreate()
+        case .report(let reason, let text):
+            sendReport(reason, text: text, mode: .compose)
+        case .reportingChanged:
+            reportingDidChange()
         case .changePersona, .paste:
             // Create has no persona and no copied message.
             break

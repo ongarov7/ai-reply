@@ -36,6 +36,11 @@ protocol ReplyComposerViewDelegate: AnyObject {
     /// The caret moved without typing - a tap in a field, another field
     /// focused, a quick intent: the word suggestions belong to the old place.
     func composerDidMoveCaret(_ composer: ReplyComposerView)
+    /// Send a report about the reply on screen; `text` is nil when the user
+    /// switched "send the text" off. Answer with `reportDidFinish(sent:)`.
+    func composer(_ composer: ReplyComposerView, didReport reason: AIReport.Reason, text: String?)
+    /// The report panel opened or closed: the keys type nothing while it is open.
+    func composerDidChangeReporting(_ composer: ReplyComposerView)
 }
 
 /// The AI reply composer.
@@ -99,6 +104,9 @@ final class ReplyComposerView: UIView {
         /// shown. Not when the error is about the copied message: Retry
         /// would write a new message, which is not what was just tried.
         var errorOffersRetry = true
+        /// The result offers Report: the server takes reports and the
+        /// keyboard can reach it.
+        var offersReport = false
     }
 
     // MARK: State
@@ -161,6 +169,31 @@ final class ReplyComposerView: UIView {
     /// changed in their shared place.
     private var slotTapGuard = PolishSlotTapGuard()
 
+    /// The report panel, while it is open over a result.
+    private struct ReportPanel: Equatable {
+        enum Phase: Equatable {
+            case choosing
+            case sending
+            case sent
+            case failed
+        }
+
+        var reason: AIReport.Reason?
+        var includesText = true
+        var phase: Phase = .choosing
+        /// The composer's height when the panel opened. The panel keeps it,
+        /// like the "field is not empty" question, and only grows when its
+        /// own rows need more.
+        var height: CGFloat
+    }
+
+    private var reportPanel: ReportPanel?
+    private var offersReport = false
+    private var reportCloseTimer: DispatchWorkItem?
+
+    /// Whether the report panel is open: the keys type nothing meanwhile.
+    var isReporting: Bool { reportPanel != nil }
+
     // MARK: Views
 
     private let panel = UIView()
@@ -215,13 +248,31 @@ final class ReplyComposerView: UIView {
 
     private var iconButtons: [CircleIconButton] {
         [closeButton, collapseButton, pasteButton, clearButton, backButton, regenerateButton,
-         editButton, previousButton, nextButton]
+         editButton, previousButton, nextButton, reportButton]
     }
 
     // Conflict row
     private let replaceButton = UIButton(type: .system)
     private let appendButton = UIButton(type: .system)
     private let conflictCancelButton = UIButton(type: .system)
+
+    // Report: a small flag at the end of the header's flexible part, and the
+    // panel it opens in the reply's place - reasons, "send the text", Send.
+    // An inline panel, because a keyboard cannot present a sheet.
+    private let reportButton = CircleIconButton(symbol: "flag", pointSize: 11, filled: false)
+    private let reasonButtons: [(reason: AIReport.Reason, button: UIButton)] =
+        AIReport.Reason.allCases.map { ($0, UIButton(type: .system)) }
+    private let includeTextSwitch = UISwitch()
+    private let includeTextLabel = UILabel()
+    private let reportStatusLabel = UILabel()
+    private let reportCancelButton = UIButton(type: .system)
+    private let reportSendButton = UIButton(type: .system)
+    private let reasonFont = UIFont.systemFont(ofSize: 12.5, weight: .medium)
+
+    private var reportViews: [UIView] {
+        reasonButtons.map(\.button) + [includeTextSwitch, includeTextLabel, reportStatusLabel,
+                                        reportCancelButton, reportSendButton]
+    }
 
     // MARK: Metrics
 
@@ -233,6 +284,9 @@ final class ReplyComposerView: UIView {
     private var previewHeight: CGFloat { headerHeight - 4 }
     private let rowHeight: CGFloat = 32
     private let iconSize: CGFloat = 32
+    private let reasonHeight: CGFloat = 28
+    /// A switch at its natural size, and its label beside it.
+    private let includeTextHeight: CGFloat = 31
 
     // MARK: Init
 
@@ -337,12 +391,34 @@ final class ReplyComposerView: UIView {
             button.addTarget(self, action: action, for: .touchUpInside)
         }
 
+        reportButton.addTarget(self, action: #selector(reportTapped), for: .touchUpInside)
+        for (_, button) in reasonButtons {
+            configurePill(button, symbol: nil, trailingImage: false)
+            button.addTarget(self, action: #selector(reasonTapped(_:)), for: .touchUpInside)
+        }
+        includeTextSwitch.addTarget(self, action: #selector(includeTextChanged), for: .valueChanged)
+        includeTextLabel.font = .systemFont(ofSize: 13, weight: .regular)
+        includeTextLabel.numberOfLines = 2
+        includeTextLabel.adjustsFontSizeToFitWidth = true
+        includeTextLabel.minimumScaleFactor = 0.8
+        includeTextLabel.isUserInteractionEnabled = true
+        includeTextLabel.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(includeTextLabelTapped)))
+        reportStatusLabel.font = .systemFont(ofSize: 12, weight: .medium)
+        reportStatusLabel.numberOfLines = 2
+        reportStatusLabel.adjustsFontSizeToFitWidth = true
+        reportStatusLabel.minimumScaleFactor = 0.8
+        configurePill(reportCancelButton, symbol: nil, trailingImage: false)
+        reportCancelButton.addTarget(self, action: #selector(reportCancelTapped), for: .touchUpInside)
+        configurePill(reportSendButton, symbol: nil, trailingImage: false)
+        reportSendButton.addTarget(self, action: #selector(reportSendTapped), for: .touchUpInside)
+
         [personaChip, previewButton, counterLabel, closeButton, titleIcon, titleLabel, newButton,
          copiedButton, sourceCard, instructionView, draftView,
          errorLabel, conflictLabel, quickActions, suggestionStrip, polishChip, primaryButton, backButton,
          regenerateButton, editButton,
          previousButton, versionLabel, nextButton, insertButton, replaceButton, appendButton,
-         conflictCancelButton].forEach(panel.addSubview)
+         conflictCancelButton, reportButton].forEach(panel.addSubview)
+        reportViews.forEach(panel.addSubview)
     }
 
     /// The quoted-message look: the reply header's message preview, and
@@ -426,6 +502,12 @@ final class ReplyComposerView: UIView {
         errorOffersRetry = content.errorOffersRetry
         sourceLimit = content.sourceLimit
         instructionLimit = content.instructionLimit
+        offersReport = content.offersReport
+        // The report is about the reply on screen; once that is gone - a
+        // new version, editing, Back - so is the panel.
+        if reportPanel != nil, flow.stage != .result || !offersReport || previous.drafts != flow.drafts {
+            closeReport()
+        }
 
         applyText(content.personaName, to: personaChip, size: 13, weight: .semibold)
         personaChip.accessibilityLabel = content.personaName
@@ -469,6 +551,9 @@ final class ReplyComposerView: UIView {
         errorOffersRetry = true
         isSourceExpanded = false
         conflictHeight = 0
+        reportCloseTimer?.cancel()
+        reportCloseTimer = nil
+        reportPanel = nil
         suggestions = []
         polish = .none
         polishChip.show(.none)
@@ -531,6 +616,12 @@ final class ReplyComposerView: UIView {
         }
         conflictCancelButton.configuration?.background.backgroundColor = theme.fieldBackground
         conflictCancelButton.configuration?.baseForegroundColor = theme.primaryText
+        reportButton.glyphColor = theme.secondaryText
+        includeTextSwitch.onTintColor = theme.accent
+        includeTextLabel.textColor = theme.primaryText
+        reportCancelButton.configuration?.background.backgroundColor = theme.fieldBackground
+        reportCancelButton.configuration?.baseForegroundColor = theme.primaryText
+        reportSendButton.configuration?.baseForegroundColor = .white
         refreshBorders()
     }
 
@@ -714,7 +805,68 @@ final class ReplyComposerView: UIView {
         applyText(strings.appendToExisting, to: appendButton, size: 14, weight: .semibold)
         applyText(strings.keepTyping, to: conflictCancelButton, size: 14, weight: .semibold)
 
+        refreshReport()
         setNeedsLayout()
+    }
+
+    /// The flag on a result, and the panel in the reply's place while it is
+    /// open: the header names it, everything about the reply steps aside.
+    private func refreshReport() {
+        let words = strings.report
+        let reporting = reportPanel != nil
+        reportButton.isHidden = reporting || !offersReport || flow.stage != .result || isConflict
+        reportButton.accessibilityLabel = words.report
+        titleIcon.image = UIImage(systemName: reporting ? "flag" : "sparkles",
+                                  withConfiguration: UIImage.SymbolConfiguration(pointSize: 13, weight: .semibold))
+        for view in reportViews { view.isHidden = !reporting }
+        guard let panel = reportPanel else { return }
+
+        for view in [personaChip, previewButton, counterLabel, newButton, closeButton, copiedButton, sourceCard,
+                     instructionView, draftView, errorLabel, backButton, regenerateButton, editButton,
+                     previousButton, versionLabel, nextButton, insertButton] as [UIView] {
+            view.isHidden = true
+        }
+        titleIcon.isHidden = false
+        titleLabel.isHidden = false
+        titleLabel.text = words.title
+
+        let editable = panel.phase == .choosing || panel.phase == .failed
+        for (reason, button) in reasonButtons {
+            let selected = panel.reason == reason
+            applyText(words.reason(reason), to: button, size: reasonFont.pointSize, weight: .medium)
+            button.configuration?.background.backgroundColor = selected ? theme.accent : theme.fieldBackground
+            button.configuration?.baseForegroundColor = selected ? .white : theme.primaryText
+            button.isSelected = selected
+            button.accessibilityTraits = selected ? [.button, .selected] : .button
+            button.isEnabled = editable
+        }
+        includeTextSwitch.isOn = panel.includesText
+        includeTextSwitch.isEnabled = editable
+        includeTextSwitch.accessibilityLabel = words.includeText
+        includeTextLabel.text = words.includeText
+        includeTextLabel.alpha = editable ? 1 : 0.5
+
+        switch panel.phase {
+        case .sent:
+            reportStatusLabel.text = words.thanks
+            reportStatusLabel.textColor = theme.primaryText
+        case .failed:
+            reportStatusLabel.text = words.failed
+            reportStatusLabel.textColor = theme.destructive
+        case .choosing, .sending:
+            reportStatusLabel.text = nil
+        }
+
+        applyText(panel.phase == .sent ? strings.doneEditing : strings.cancel,
+                  to: reportCancelButton, size: 14, weight: .semibold)
+        applyText(words.send, to: reportSendButton, size: 14, weight: .semibold)
+        reportSendButton.isHidden = panel.phase == .sent
+        let canSend = panel.reason != nil && editable
+        reportSendButton.isEnabled = canSend
+        reportSendButton.configuration?.showsActivityIndicator = panel.phase == .sending
+        reportSendButton.configuration?.background.backgroundColor = canSend || panel.phase == .sending
+            ? theme.accent
+            : theme.accent.withAlphaComponent(0.35)
     }
 
     private func refreshBorders() {
@@ -767,6 +919,16 @@ final class ReplyComposerView: UIView {
             // height: the keys stay exactly where they were.
             let minimum = chrome + 36
             plan.total = max(minimum, conflictHeight).rounded(.up)
+            plan.field = plan.total - chrome
+            return plan
+        }
+
+        if let report = reportPanel {
+            // The reasons and the switch where the reply was; Cancel and
+            // Send where its buttons were.
+            let rows = reasonFrames(width: width).map(\.maxY).max() ?? reasonHeight
+            let minimum = chrome + rows + gap + includeTextHeight
+            plan.total = max(minimum, report.height).rounded(.up)
             plan.field = plan.total - chrome
             return plan
         }
@@ -851,7 +1013,15 @@ final class ReplyComposerView: UIView {
         let newWidth = min(max(64, ceil(newButton.intrinsicContentSize.width)), width * 0.4)
         place(newButton, CGRect(x: closeButton.frame.minX - 6 - newWidth, y: y + 1, width: newWidth, height: headerHeight - 2))
         place(titleIcon, CGRect(x: left + 2, y: y, width: 20, height: headerHeight))
-        let titleRight = newButton.isHidden ? closeButton.frame.minX - 6 : newButton.frame.minX - 6
+        // The flag takes its place from the title or the message preview,
+        // at their end: no other control moves for it.
+        let showsReportButton = !reportButton.isHidden
+        var titleRight = newButton.isHidden ? closeButton.frame.minX - 6 : newButton.frame.minX - 6
+        if showsReportButton, isCompose {
+            place(reportButton, CGRect(x: titleRight - 24, y: y + 3, width: 24, height: 24))
+            titleRight = reportButton.frame.minX - 4
+        }
+        if reportPanel != nil { titleRight = left + width }
         place(titleLabel, CGRect(x: titleIcon.frame.maxX + 5, y: y, width: max(0, titleRight - titleIcon.frame.maxX - 5), height: headerHeight))
         var previewRight = closeButton.frame.minX - 6
         if !counterLabel.isHidden {
@@ -859,9 +1029,18 @@ final class ReplyComposerView: UIView {
             place(counterLabel, CGRect(x: previewRight - counterWidth, y: y, width: counterWidth, height: headerHeight))
             previewRight = counterLabel.frame.minX - 6
         }
+        if showsReportButton, !isCompose {
+            place(reportButton, CGRect(x: previewRight - 24, y: y + 3, width: 24, height: 24))
+            previewRight = reportButton.frame.minX - 4
+        }
         let previewLeft = personaChip.frame.maxX + 6
         place(previewButton, CGRect(x: previewLeft, y: y + 2, width: max(0, previewRight - previewLeft), height: previewHeight))
         y += headerHeight + gap
+
+        if reportPanel != nil {
+            layoutReport(left: left, width: width, top: y, area: plan.field)
+            return
+        }
 
         if isConflict {
             // The question sits where the reply was, the answers where the
@@ -938,6 +1117,53 @@ final class ReplyComposerView: UIView {
         for view in [sourceView, instructionView, draftView] where view.showsCaret {
             view.scrollCaretIntoView()
         }
+    }
+
+    /// The reasons, wrapped onto as many rows as their words need; frames
+    /// from the top-left of the reasons' area.
+    private func reasonFrames(width: CGFloat) -> [CGRect] {
+        var frames: [CGRect] = []
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        for (reason, _) in reasonButtons {
+            let title = strings.report.reason(reason) as NSString
+            let pill = min(width, ceil(title.size(withAttributes: [.font: reasonFont]).width) + 24)
+            if x > 0, x + pill > width {
+                x = 0
+                y += reasonHeight + gap
+            }
+            frames.append(CGRect(x: x, y: y, width: pill, height: reasonHeight))
+            x += pill + gap
+        }
+        return frames
+    }
+
+    private func layoutReport(left: CGFloat, width: CGFloat, top: CGFloat, area: CGFloat) {
+        let frames = reasonFrames(width: width)
+        for ((_, button), frame) in zip(reasonButtons, frames) {
+            place(button, frame.offsetBy(dx: left, dy: top))
+        }
+        let rowsBottom = top + (frames.map(\.maxY).max() ?? reasonHeight)
+
+        let toggleY = rowsBottom + gap
+        let switchSize = includeTextSwitch.intrinsicContentSize
+        place(includeTextSwitch, CGRect(x: left, y: toggleY + (includeTextHeight - switchSize.height) / 2,
+                                        width: switchSize.width, height: switchSize.height))
+        let labelX = left + switchSize.width + 8
+        place(includeTextLabel, CGRect(x: labelX, y: toggleY, width: max(0, left + width - labelX), height: includeTextHeight))
+
+        // Cancel and Send on the reply's button row; what happened beside them.
+        let rowY = top + area + gap
+        var right = left + width
+        if !reportSendButton.isHidden {
+            let sendWidth = min(max(96, ceil(reportSendButton.intrinsicContentSize.width)), width * 0.4)
+            place(reportSendButton, CGRect(x: right - sendWidth, y: rowY, width: sendWidth, height: rowHeight))
+            right = reportSendButton.frame.minX - 6
+        }
+        let cancelWidth = min(max(80, ceil(reportCancelButton.intrinsicContentSize.width)), width * 0.35)
+        place(reportCancelButton, CGRect(x: right - cancelWidth, y: rowY, width: cancelWidth, height: rowHeight))
+        place(reportStatusLabel, CGRect(x: left + 2, y: rowY - 2, width: max(0, reportCancelButton.frame.minX - left - 8),
+                                        height: rowHeight + 4))
     }
 
     /// Sets a frame. The keyboard animates height changes, and inside that
@@ -1157,6 +1383,74 @@ final class ReplyComposerView: UIView {
     @objc private func replaceTapped() { delegate?.composer(self, didResolveConflictWith: .replace) }
     @objc private func appendTapped() { delegate?.composer(self, didResolveConflictWith: .append) }
     @objc private func conflictCancelTapped() { delegate?.composer(self, didResolveConflictWith: .cancel) }
+
+    // MARK: Report
+
+    @objc private func reportTapped() {
+        guard offersReport, flow.stage == .result, reportPanel == nil else { return }
+        reportPanel = ReportPanel(height: preferredHeight)
+        refresh()
+        remeasure()
+        delegate?.composerDidChangeReporting(self)
+    }
+
+    @objc private func reasonTapped(_ sender: UIButton) {
+        guard var panel = reportPanel, panel.phase == .choosing || panel.phase == .failed,
+              let reason = reasonButtons.first(where: { $0.button === sender })?.reason else { return }
+        panel.reason = reason
+        panel.phase = .choosing
+        reportPanel = panel
+        refresh()
+    }
+
+    @objc private func includeTextChanged() {
+        reportPanel?.includesText = includeTextSwitch.isOn
+    }
+
+    @objc private func includeTextLabelTapped() {
+        guard includeTextSwitch.isEnabled, !includeTextSwitch.isHidden else { return }
+        includeTextSwitch.setOn(!includeTextSwitch.isOn, animated: true)
+        includeTextChanged()
+    }
+
+    @objc private func reportSendTapped() {
+        guard var panel = reportPanel, let reason = panel.reason,
+              panel.phase == .choosing || panel.phase == .failed else { return }
+        panel.phase = .sending
+        reportPanel = panel
+        refresh()
+        // What the model wrote, not the user's edits of it.
+        let generated = flow.drafts.current?.generated.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let text = panel.includesText && !generated.isEmpty ? generated : nil
+        delegate?.composer(self, didReport: reason, text: text)
+    }
+
+    @objc private func reportCancelTapped() {
+        closeReport()
+    }
+
+    /// How sending went. Sent: thanks, and the reply comes back by itself a
+    /// moment later. Not sent: the panel stays, for another try.
+    func reportDidFinish(sent: Bool) {
+        guard var panel = reportPanel, panel.phase == .sending else { return }
+        panel.phase = sent ? .sent : .failed
+        reportPanel = panel
+        refresh()
+        guard sent else { return }
+        let close = DispatchWorkItem { [weak self] in self?.closeReport() }
+        reportCloseTimer = close
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6, execute: close)
+    }
+
+    private func closeReport() {
+        reportCloseTimer?.cancel()
+        reportCloseTimer = nil
+        guard reportPanel != nil else { return }
+        reportPanel = nil
+        refresh()
+        remeasure()
+        delegate?.composerDidChangeReporting(self)
+    }
 
     @objc private func polishTapped() {
         guard slotTapGuard.acceptsTap(at: ProcessInfo.processInfo.systemUptime) else { return }

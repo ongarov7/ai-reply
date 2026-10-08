@@ -52,6 +52,7 @@ extension AILimits {
         static let replyPreferences = "ai.features.replyPreferences"
         static let senderProfile = "ai.features.senderProfile"
         static let instructionPolish = "ai.features.instructionPolish"
+        static let aiReports = "ai.features.aiReports"
     }
 
     private static let lock = NSLock()
@@ -134,15 +135,23 @@ extension AILimits {
         AppGroup.defaults.bool(forKey: Key.instructionPolish)
     }
 
+    /// Whether `POST /api/v1/ai/reports` takes reports about a generated
+    /// text: the Report control is shown only then.
+    static var serverSupportsAIReports: Bool {
+        AppGroup.defaults.bool(forKey: Key.aiReports)
+    }
+
     /// Stores the request-shaping flags. Anything the server did not publish
     /// is false: a field is only ever sent to a server that asked for it.
     static func storeFeatures(_ features: AccountAPI.Features?, defaults: UserDefaults = AppGroup.defaults) {
         defaults.set(features?.replyPreferences ?? false, forKey: Key.replyPreferences)
         defaults.set(features?.senderProfile ?? false, forKey: Key.senderProfile)
         defaults.set(features?.instructionPolish ?? false, forKey: Key.instructionPolish)
+        defaults.set(features?.aiReports ?? false, forKey: Key.aiReports)
     }
 
-    /// Everything `/api/v1/config` publishes that the reply flow uses.
+    /// Everything `/api/v1/config` publishes that the reply flow uses,
+    /// including the legal versions the keyboard checks consent against.
     static func apply(_ config: AccountAPI.ServerConfig, defaults: UserDefaults = AppGroup.defaults) {
         store(
             sourceCharacters: config.maxSourceCharacters,
@@ -150,6 +159,7 @@ extension AILimits {
             defaults: defaults
         )
         storeFeatures(config.features, defaults: defaults)
+        LegalConsentStore.storeCurrentVersions(config.legal ?? .production, defaults: defaults)
     }
 }
 

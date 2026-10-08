@@ -21,6 +21,11 @@ enum ComposerEvent {
     case reset
     /// Create mode: the same instruction, as a reply to the copied message.
     case replyToCopied
+    /// Send a report about the text on screen; the text itself only when the
+    /// user left "send the text" on.
+    case report(AIReport.Reason, text: String?)
+    /// The report panel opened or closed.
+    case reportingChanged
 }
 
 protocol KeyboardActionBarDelegate: AnyObject {
@@ -171,6 +176,10 @@ final class KeyboardActionBar: UIView {
     /// text or when the composer is closed.
     var textAfterCursor: String? { isComposing ? composer.textAfterCursor : nil }
     var isEditingInstruction: Bool { isComposing && composer.isEditingInstruction }
+    /// The report panel is open over a result: the keys type nothing.
+    var isReporting: Bool { isComposing && composer.isReporting }
+    /// How the report went: thanks, or the panel stays for another try.
+    func reportDidFinish(sent: Bool) { composer.reportDidFinish(sent: sent) }
 
     // MARK: Suggestions
 
@@ -272,5 +281,14 @@ extension KeyboardActionBar: ReplyComposerViewDelegate {
     func composerDidMoveCaret(_ composer: ReplyComposerView) {
         guard isComposing else { return }
         delegate?.actionBarDidMoveComposerCaret(self)
+    }
+
+    func composer(_ composer: ReplyComposerView, didReport reason: AIReport.Reason, text: String?) {
+        send(.report(reason, text: text))
+    }
+
+    func composerDidChangeReporting(_ composer: ReplyComposerView) {
+        guard isComposing else { return }
+        send(.reportingChanged)
     }
 }

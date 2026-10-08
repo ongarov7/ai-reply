@@ -66,6 +66,7 @@ struct AccountComposeTransport: ComposeTransport {
             guard !text.isEmpty else { throw AIReplyError.emptyResponse }
             return GeneratedReply(text: text, detectedLanguage: response.detectedLanguage)
         } catch let error as APIError {
+            AccountReplyTransport.noteRefusal(error)
             throw Self.map(error)
         }
     }

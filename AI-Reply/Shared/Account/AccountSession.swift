@@ -4,16 +4,23 @@ import Foundation
 ///
 /// Access токен 15 минут жарамды; ескіргенде бір рет қана жаңартылады.
 ///
-/// Why an actor: the app and the keyboard can both ask for a token at the same
-/// moment, and two parallel refreshes would rotate the refresh token twice -
+/// Why an actor: two parallel refreshes would rotate the refresh token twice -
 /// the server treats the second use of a rotated token as theft and kills the
-/// whole session. Serialising through one actor, with a single in-flight
-/// refresh task, is what makes that impossible.
+/// whole session. Within one process the actor, with a single in-flight
+/// refresh task, makes that impossible. The app and the keyboard are two
+/// processes, though, each with its own actor: a file lock in the App Group
+/// serialises them, and the second one to get it uses the pair the first one
+/// just stored instead of spending the old refresh token again.
 actor AccountSession {
 
     static let shared = AccountSession()
 
     private var refreshTask: Task<String, Error>?
+    private let refreshLock: CrossProcessLock
+
+    init(refreshLock: CrossProcessLock = .accountRefresh) {
+        self.refreshLock = refreshLock
+    }
 
     /// Whether a session exists at all. Cheap: reads the keychain, no network.
     nonisolated var isSignedIn: Bool { AccountCredentials.isSignedIn }
@@ -45,6 +52,34 @@ actor AccountSession {
     private func clearRefreshTask() { refreshTask = nil }
 
     private func performRefresh() async throws -> String {
+        // The token this process wanted to replace. Read before waiting: if
+        // the keychain holds another one once the lock is ours, the other
+        // process has already rotated it.
+        let stale = AccountCredentials.refreshToken
+        let lock = await refreshLock.acquire()
+        defer { lock.release() }
+        if let fresh = rotatedElsewhere(since: stale) {
+            return fresh
+        }
+        return try await refreshOverNetwork()
+    }
+
+    /// The access token another process stored while this one waited for the
+    /// lock, when it is safe to use instead of a refresh: the refresh token
+    /// changed since this process last read it, and the new access token is
+    /// still fresh. Nil means "refresh over the network".
+    nonisolated static func tokenRotatedElsewhere(
+        staleRefreshToken: String?,
+        storedRefreshToken: String?,
+        storedAccessToken: String?,
+        isAccessTokenFresh: Bool
+    ) -> String? {
+        guard let storedRefreshToken, storedRefreshToken != staleRefreshToken,
+              isAccessTokenFresh, let storedAccessToken, !storedAccessToken.isEmpty else { return nil }
+        return storedAccessToken
+    }
+
+    private func refreshOverNetwork() async throws -> String {
         guard let baseURL else { throw APIError.invalidRequest }
         guard let refreshToken = AccountCredentials.refreshToken else {
             throw APIError.unauthorized
@@ -67,21 +102,54 @@ actor AccountSession {
         }
 
         let client = APIClient(baseURL: baseURL)
+        let response: Response
         do {
-            let response: Response = try await client.post(
+            response = try await client.post(
                 "api/v1/auth/refresh",
                 body: Request(refresh_token: refreshToken, device: .current)
             )
-            AccountCredentials.store(accessToken: response.accessToken,
-                                     refreshToken: response.refreshToken,
-                                     expiresIn: response.expiresIn)
-            return response.accessToken
         } catch APIError.unauthorized {
             // The refresh token is gone, rotated or revoked. Nothing local can
-            // fix that, so the session is cleared and the UI asks for sign-in.
-            AccountCredentials.clear()
+            // fix that, so the session is cleared and the UI asks for sign-in -
+            // unless another session was stored meanwhile, which is not this
+            // refresh's to clear.
+            if Self.isSameSession(sentRefreshToken: refreshToken, storedRefreshToken: AccountCredentials.refreshToken) {
+                AccountCredentials.clear()
+            } else if let fresh = rotatedElsewhere(since: refreshToken) {
+                return fresh
+            }
             throw APIError.unauthorized
         }
+
+        // The session ended or was replaced while the request was out (a
+        // sign-out, another account signing in, the other process rotating
+        // it after the lock timed out). Storing this pair would sign a
+        // signed-out app back in, so it is dropped; nothing is cleared,
+        // whatever is stored now is not this session's.
+        guard Self.isSameSession(sentRefreshToken: refreshToken, storedRefreshToken: AccountCredentials.refreshToken) else {
+            if let fresh = rotatedElsewhere(since: refreshToken) { return fresh }
+            throw APIError.unauthorized
+        }
+        AccountCredentials.store(accessToken: response.accessToken,
+                                 refreshToken: response.refreshToken,
+                                 expiresIn: response.expiresIn)
+        return response.accessToken
+    }
+
+    /// Whether the refresh token sent is still the stored one: only then may
+    /// the answer to it be stored, or the session cleared over it.
+    nonisolated static func isSameSession(sentRefreshToken: String, storedRefreshToken: String?) -> Bool {
+        storedRefreshToken == sentRefreshToken
+    }
+
+    /// `tokenRotatedElsewhere` against what the keychain holds now.
+    private func rotatedElsewhere(since refreshToken: String?) -> String? {
+        Self.tokenRotatedElsewhere(
+            staleRefreshToken: refreshToken,
+            storedRefreshToken: AccountCredentials.refreshToken,
+            storedAccessToken: AccountCredentials.accessToken,
+            isAccessTokenFresh: AccountCredentials.isAccessTokenFresh
+        )
     }
 
     /// Stores a freshly issued session.
@@ -125,6 +193,94 @@ actor AccountSession {
             let fresh = try await refreshAccessToken()
             return try await work(fresh)
         }
+    }
+}
+
+/// An advisory lock on a file in the App Group container, shared by the app
+/// and the keyboard extension.
+///
+/// Ортақ файл құлпы: қосымша мен пернетақта токенді кезекпен жаңартады.
+///
+/// `flock` belongs to the open file, so the system releases it when the
+/// holder exits - a keyboard killed mid-refresh never leaves it held.
+/// Waiting polls with a short sleep instead of blocking a thread, and gives
+/// up after `timeout`: a holder that long overdue is stuck, and running
+/// without the lock is better than never refreshing.
+///
+/// iOS terminates a process that is suspended while it holds a lock on a
+/// file in a shared container, so the holder asks for time to finish
+/// (`performExpiringActivity`, which works in the app and the extension)
+/// and gives the lock back early if that time runs out.
+struct CrossProcessLock: Sendable {
+
+    /// Nil when the App Group container is not reachable: the work then runs
+    /// unlocked, serialised in-process by the caller's actor only.
+    let fileURL: URL?
+    var timeout: Duration = .seconds(30)
+    var pollInterval: Duration = .milliseconds(50)
+
+    static let accountRefresh = CrossProcessLock(
+        fileURL: FileManager.default
+            .containerURL(forSecurityApplicationGroupIdentifier: AppGroup.identifier)?
+            .appendingPathComponent("account-refresh.lock")
+    )
+
+    /// The lock, once held; `release()` gives it back. Released at most
+    /// once, whether by the holder or because the process is being suspended.
+    final class Held: @unchecked Sendable {
+        private let mutex = NSLock()
+        /// -1 when running unlocked or once released.
+        private var descriptor: Int32
+        private let activityDone = DispatchSemaphore(value: 0)
+
+        fileprivate init(descriptor: Int32) {
+            self.descriptor = descriptor
+            guard descriptor >= 0 else { return }
+            ProcessInfo.processInfo.performExpiringActivity(withReason: "account-refresh") { [weak self] expired in
+                guard let self else { return }
+                if expired {
+                    // About to be suspended: not with the lock held.
+                    self.release()
+                } else {
+                    self.activityDone.wait()
+                }
+            }
+        }
+
+        var isLocked: Bool {
+            mutex.lock()
+            defer { mutex.unlock() }
+            return descriptor >= 0
+        }
+
+        func release() {
+            mutex.lock()
+            let held = descriptor
+            descriptor = -1
+            mutex.unlock()
+            guard held >= 0 else { return }
+            flock(held, LOCK_UN)
+            close(held)
+            activityDone.signal()
+        }
+    }
+
+    /// Waits for the lock: held, or unlocked when there is no container or
+    /// the wait timed out.
+    func acquire() async -> Held {
+        guard let path = fileURL?.path else { return Held(descriptor: -1) }
+        let descriptor = open(path, O_RDWR | O_CREAT | O_CLOEXEC, 0o600)
+        guard descriptor >= 0 else { return Held(descriptor: -1) }
+        let deadline = ContinuousClock.now.advanced(by: timeout)
+        while flock(descriptor, LOCK_EX | LOCK_NB) != 0 {
+            guard errno == EWOULDBLOCK || errno == EINTR, ContinuousClock.now < deadline,
+                  !Task.isCancelled else {
+                close(descriptor)
+                return Held(descriptor: -1)
+            }
+            try? await Task.sleep(for: pollInterval)
+        }
+        return Held(descriptor: descriptor)
     }
 }
 

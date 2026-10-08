@@ -43,7 +43,7 @@ targets:
       properties:
         CFBundleDisplayName: AI Reply
         CFBundleShortVersionString: "1.0"
-        CFBundleVersion: "4"
+        CFBundleVersion: "5"
         AIReplySignInWithApple: $(AIREPLY_SIGN_IN_WITH_APPLE)
         AIReplyPushNotifications: $(AIREPLY_PUSH_NOTIFICATIONS)
         # "<team id>.", for the installation id's app-only keychain group.
@@ -66,8 +66,8 @@ targets:
             CFBundleURLName: google-sign-in
             CFBundleURLSchemes:
               - $(GOOGLE_IOS_REVERSED_CLIENT_ID)
-        NSMicrophoneUsageDescription: AI Reply uses the microphone only while you are dictating a reply, and only after you tap the voice button.
-        NSSpeechRecognitionUsageDescription: AI Reply uses Apple speech recognition to turn your dictated reply into text.
+        NSMicrophoneUsageDescription: "AI Reply uses the microphone only while you dictate in the app: a message to reply to, your profile or a template. Recording starts when you tap the microphone button."
+        NSSpeechRecognitionUsageDescription: "AI Reply turns your dictation into text with Apple speech recognition. When on-device recognition is unavailable for your language, Apple's speech service processes the audio, and AI Reply receives only the text."
         UILaunchScreen: {}
         UIRequiresFullScreen: true
         UISupportedInterfaceOrientations:
@@ -150,7 +150,7 @@ targets:
       properties:
         CFBundleDisplayName: AI Reply
         CFBundleShortVersionString: "1.0"
-        CFBundleVersion: "4"
+        CFBundleVersion: "5"
         NSExtension:
           NSExtensionAttributes:
             IsASCIICapable: true

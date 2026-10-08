@@ -86,6 +86,16 @@ final class ReplyConfigurationModel {
         persist()
     }
 
+    /// The account was deleted: the profile it synced - name, role,
+    /// description, business, gender - goes with it. The personas stay, and
+    /// so does this device's onboarding.
+    func forgetAccountProfile() {
+        var profile = UserProfile.empty
+        profile.completedOnboardingVersion = configuration.profile.completedOnboardingVersion
+        configuration.profile = profile
+        persist()
+    }
+
     private func persist() {
         configuration = configuration.normalized()
         store.save(configuration)

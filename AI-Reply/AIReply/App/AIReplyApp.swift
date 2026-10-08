@@ -33,6 +33,10 @@ struct AIReplyApp: App {
             ProfileSync(configuration: configuration, account: account).adoptServerChoice(profile?.gender)
         }
         account.installationIDForSignOut = { AppServices.shared.installationIDForSignOut }
+        account.didDeleteAccount = { [weak configuration] in
+            configuration?.forgetAccountProfile()
+            ProductEventReporter.shared.discardWaiting()
+        }
         AppServices.shared.appLanguage = { settings.effectiveLanguage.rawValue }
         // A quota or plan notification opens on current numbers.
         AppServices.shared.onNotificationOpened = { [weak account] in
@@ -93,6 +97,8 @@ struct AIReplyApp: App {
                 switch phase {
                 case .active:
                     keyboardStatus.refresh()
+                    // The keyboard may have dropped a consent the server no longer has.
+                    account.revalidateLegalConsent()
                     Task { await profileSync.reconcile() }
                     Task { await languageSync.reconcile() }
                 case .background:

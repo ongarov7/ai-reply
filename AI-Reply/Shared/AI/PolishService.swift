@@ -25,10 +25,13 @@ struct PolishService: Sendable {
 
     private let configuration: AIConfiguration
     private let transportOverride: (any PolishTransport)?
+    private let hasConsent: @Sendable () -> Bool
 
-    init(configuration: AIConfiguration = .shared, transportOverride: (any PolishTransport)? = nil) {
+    init(configuration: AIConfiguration = .shared, transportOverride: (any PolishTransport)? = nil,
+         hasConsent: @escaping @Sendable () -> Bool = { LegalConsentStore.hasAcceptedCurrentVersions() }) {
         self.configuration = configuration
         self.transportOverride = transportOverride
+        self.hasConsent = hasConsent
     }
 
     /// The suggested text, or nil when there is nothing to suggest.
@@ -40,7 +43,14 @@ struct PolishService: Sendable {
         if let transportOverride {
             transport = transportOverride
         } else {
-            guard configuration.isReady, AccountSession.shared.isSignedIn else { throw AIReplyError.authenticationFailed }
+            switch AIReplyService.preflight(isSignedIn: configuration.isReady && AccountSession.shared.isSignedIn,
+                                            hasConsent: hasConsent()) {
+            case .none: break
+            // Nothing is sent and nothing is said: a missing suggestion is
+            // not worth a message, and Reply explains the consent.
+            case .consentRequired?: return nil
+            case let refusal?: throw refusal
+            }
             transport = AccountPolishTransport()
         }
 

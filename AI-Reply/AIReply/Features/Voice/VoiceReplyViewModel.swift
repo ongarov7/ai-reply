@@ -25,9 +25,11 @@ enum VoiceStatus: Equatable {
     case languageUnavailable(AppLanguage)
     case recognitionFailed(reason: String, mayNeedNetwork: Bool)
 
-    func message(locale: Locale) -> String {
-        func localized(_ key: String.LocalizationValue) -> String {
-            String(localized: key, locale: locale)
+    /// In the language chosen in the app: `String(localized:locale:)` would
+    /// read the phone's language instead (see `AppSettings.localized`).
+    func message(language: AppLanguage) -> String {
+        func localized(_ key: String) -> String {
+            AppSettings.localized(key, language: language)
         }
 
         switch self {
@@ -48,9 +50,7 @@ enum VoiceStatus: Equatable {
         case .languageUnavailable(let language):
             return String(format: localized("voice.status.languageUnavailable"), language.nativeName)
         case .recognitionFailed(let reason, let mayNeedNetwork):
-            let key: String.LocalizationValue = mayNeedNetwork
-                ? "voice.status.failedNetwork"
-                : "voice.status.failed"
+            let key = mayNeedNetwork ? "voice.status.failedNetwork" : "voice.status.failed"
             return String(format: localized(key), reason)
         }
     }
@@ -86,23 +86,21 @@ final class VoiceReplyViewModel {
 
     // MARK: Presentation
 
-    var statusMessage: String { status.message(locale: locale) }
+    var statusMessage: String { status.message(language: language) }
 
     var elapsedLabel: String { Self.format(elapsed) }
 
     var recordingLabel: String {
         String(
-            format: String(localized: "voice.recording", locale: locale),
+            format: AppSettings.localized("voice.recording", language: language),
             elapsedLabel,
             Self.format(Self.maximumDuration)
         )
     }
 
     var recognitionModeLabel: String {
-        let key: String.LocalizationValue = isUsingOnDeviceRecognition
-            ? "voice.mode.onDevice"
-            : "voice.mode.server"
-        return String(format: String(localized: key, locale: locale), language.nativeName)
+        let key = isUsingOnDeviceRecognition ? "voice.mode.onDevice" : "voice.mode.server"
+        return String(format: AppSettings.localized(key, language: language), language.nativeName)
     }
 
     var canCopyOrClear: Bool {

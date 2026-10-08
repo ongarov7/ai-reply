@@ -267,4 +267,90 @@ final class LocalizationTests: XCTestCase {
             XCTAssertNotEqual(try value(key, "uz"), en, "\(key) is English in Uzbek")
         }
     }
+
+    // MARK: Dictation
+
+    /// Dictation speaks the language chosen in the app, whatever the phone's:
+    /// the status, the recording counter and the recognition mode.
+    @MainActor
+    func testDictationLabelsFollowTheChosenLanguage() {
+        XCTAssertEqual(VoiceStatus.recognitionFailed(reason: "x", mayNeedNetwork: false).message(language: .russian),
+                       "Ошибка распознавания: x")
+        XCTAssertEqual(VoiceStatus.recognitionFailed(reason: "x", mayNeedNetwork: false).message(language: .english),
+                       "Recognition failed: x")
+        XCTAssertTrue(VoiceStatus.languageUnavailable(.kazakh).message(language: .kazakh).hasPrefix("Бұл құрылғыда"))
+
+        let model = VoiceReplyViewModel()
+        model.updateLanguage(.kazakh)
+        XCTAssertTrue(model.recordingLabel.hasPrefix("Жазу "), model.recordingLabel)
+        XCTAssertTrue(model.recognitionModeLabel.contains("Apple қызметі"), model.recognitionModeLabel)
+        XCTAssertEqual(model.statusMessage, AppSettings.localized("voice.tapToSpeak", language: .kazakh))
+        model.updateLanguage(.uzbek)
+        XCTAssertTrue(model.recordingLabel.hasPrefix("Yozib olinmoqda "), model.recordingLabel)
+    }
+
+    /// The microphone and speech prompts iOS shows are in every app language.
+    func testPermissionPromptsAreLocalized() throws {
+        var texts: [String: String] = [:]
+        for language in ["en", "ru", "kk", "uz"] {
+            let path = try XCTUnwrap(
+                Bundle.main.path(forResource: "InfoPlist", ofType: "strings", inDirectory: "\(language).lproj"),
+                "\(language).lproj/InfoPlist.strings is missing from the app bundle"
+            )
+            let table = try XCTUnwrap(NSDictionary(contentsOfFile: path) as? [String: String])
+            let microphone = try XCTUnwrap(table["NSMicrophoneUsageDescription"], language)
+            let speech = try XCTUnwrap(table["NSSpeechRecognitionUsageDescription"], language)
+            XCTAssertTrue(speech.contains("Apple"), language)
+            texts[language] = microphone
+        }
+        XCTAssertEqual(Set(texts.values).count, 4, "a prompt is untranslated")
+    }
+
+    // MARK: Release copy
+
+    /// The new keyboard messages and the report words exist in every
+    /// language, and none of them is English left in another language.
+    func testKeyboardReleaseStringsAreTranslated() {
+        let english = AIReplyStrings.forLanguage(.english)
+        XCTAssertEqual(english.message(for: .quotaExhausted), "You have used today's replies. They come back tomorrow.")
+        XCTAssertEqual(english.message(for: .monthlyQuotaExhausted),
+                       "You have used this month's replies. They come back next month.")
+        XCTAssertEqual(english.message(for: .consentRequired),
+                       "Open AI Reply and accept the updated terms to keep using AI replies.")
+        XCTAssertEqual(AIReplyStrings.forLanguage(.uzbek).quotaExhausted, "Bugungi javoblar tugadi. Ular ertaga yangilanadi.")
+
+        for language in AppLanguage.allCases where language != .english {
+            let strings = AIReplyStrings.forLanguage(language)
+            for error in [AIReplyError.quotaExhausted, .monthlyQuotaExhausted, .consentRequired] {
+                XCTAssertFalse(strings.message(for: error).isEmpty)
+                XCTAssertNotEqual(strings.message(for: error), english.message(for: error), "\(error) in \(language)")
+            }
+            XCTAssertNotEqual(strings.message(for: .quotaExhausted), strings.message(for: .monthlyQuotaExhausted))
+            let report = strings.report
+            for reason in AIReport.Reason.allCases {
+                XCTAssertNotEqual(report.reason(reason), english.report.reason(reason), "\(reason) in \(language)")
+            }
+            XCTAssertNotEqual(report.title, english.report.title)
+            XCTAssertNotEqual(report.includeText, english.report.includeText)
+            XCTAssertNotEqual(report.thanks, english.report.thanks)
+        }
+        XCTAssertEqual(AIReplyStrings.forLanguage(.russian).report.report, "Пожаловаться")
+        XCTAssertEqual(AIReplyStrings.forLanguage(.kazakh).report.send, "Жіберу")
+    }
+
+    /// Who writes the replies is named wherever the app explains what is sent.
+    func testTheAIProviderIsNamed() {
+        let settings = AppSettings(store: SharedSettings(defaults: UserDefaults(suiteName: "LocalizationTests.\(UUID())")!))
+        for language in AppLanguage.allCases {
+            settings.setLanguage(language)
+            for key in ["legal.consent.ai", "legal.consent.aiCheckbox", "settings.privacy.body",
+                        "home.privacy.body", "onboarding.fullAccess.warning"] {
+                XCTAssertTrue(settings.localized(key).contains("OpenAI"), "\(key) in \(language.rawValue)")
+            }
+            for key in ["onboarding.fullAccess.onlyOnTap", "setup.privacy.explicit", "home.howItWorks.fullAccess"] {
+                XCTAssertTrue(settings.localized(key).contains(AIReplyStrings.forLanguage(language).compose.replyToCopied),
+                              "\(key) leaves out Reply to copied in \(language.rawValue)")
+            }
+        }
+    }
 }

@@ -18,6 +18,9 @@ struct SettingsView: View {
     @Environment(\.openURL) private var openURL
 
     @State private var isShowingTutorial = false
+    @State private var isConfirmingWithdrawal = false
+    /// Why the withdrawal did not reach the server, shown in an alert.
+    @State private var withdrawalFailureKey: String?
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -123,6 +126,25 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
                 Button("legal.terms") { openLegal(account.legalConfig.termsURL) }
                 Button("legal.privacy") { openLegal(account.legalConfig.privacyURL) }
+                // The AI consent can be taken back as easily as it was given;
+                // the consent screen then returns until it is given again.
+                Button("settings.privacy.withdraw", role: .destructive) {
+                    isConfirmingWithdrawal = true
+                }
+                .disabled(account.isBusy)
+                .confirmationDialog("settings.privacy.withdraw", isPresented: $isConfirmingWithdrawal,
+                                    titleVisibility: .visible) {
+                    Button("settings.privacy.withdraw", role: .destructive) {
+                        Task { withdrawalFailureKey = await account.withdrawLegalConsent() }
+                    }
+                    Button("common.cancel", role: .cancel) {}
+                } message: {
+                    Text("settings.privacy.withdraw.body")
+                }
+                .alert(Text(LocalizedStringKey(withdrawalFailureKey ?? "account.error.generic")),
+                       isPresented: withdrawalFailureBinding) {
+                    Button("common.done", role: .cancel) {}
+                }
             } header: {
                 Text("settings.privacy.title")
             }
@@ -138,6 +160,14 @@ struct SettingsView: View {
                 Text("settings.tutorial.footer")
             }
 
+            Section {
+                Button {
+                    openLegal(account.legalConfig.resolvedSupportURL)
+                } label: {
+                    Label("settings.support", systemImage: "questionmark.circle")
+                }
+            }
+
             if !AppGroup.isAvailable || !model.isPersistent {
                 Section {
                     Label("settings.storage.unavailable", systemImage: "exclamationmark.triangle")
@@ -146,6 +176,10 @@ struct SettingsView: View {
                 }
             }
         }
+    }
+
+    private var withdrawalFailureBinding: Binding<Bool> {
+        Binding(get: { withdrawalFailureKey != nil }, set: { if !$0 { withdrawalFailureKey = nil } })
     }
 
     private var appearanceBinding: Binding<AppearancePreference> {

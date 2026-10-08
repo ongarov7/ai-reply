@@ -1,5 +1,3 @@
-import AVFoundation
-import Speech
 import SwiftUI
 
 /// The keyboard setup guide.
@@ -14,11 +12,13 @@ import SwiftUI
 /// not extension identifiers. So this screen does not guess: it reports what
 /// the keyboard itself said when it last ran (`KeyboardStatusMonitor`),
 /// including "we cannot tell yet" as a real state.
+///
+/// The keyboard has no microphone, so there is no microphone or speech
+/// permission to set up here: dictation in the app asks for both the first
+/// time its microphone button is tapped.
 struct KeyboardSetupView: View {
 
     @Environment(KeyboardStatusMonitor.self) private var keyboard
-    @State private var microphoneStatus = AVCaptureDevice.authorizationStatus(for: .audio)
-    @State private var speechStatus = SFSpeechRecognizer.authorizationStatus()
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -63,22 +63,10 @@ struct KeyboardSetupView: View {
                     title: "setup.checklist.fullAccess",
                     state: fullAccessState
                 )
-                ChecklistRow(
-                    title: "setup.checklist.microphone",
-                    state: permissionState(microphoneStatus)
-                )
-                ChecklistRow(
-                    title: "setup.checklist.speech",
-                    state: permissionState(speechStatus)
-                )
                 if !keyboard.status.isEnabled {
                     Text("setup.checklist.unknown.footer")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
-                }
-                if microphoneStatus != .authorized || speechStatus != .authorized {
-                    Button("setup.voice.enable") { Task { await requestVoicePermissions() } }
-                        .buttonStyle(.dsSecondary)
                 }
             }
             .dsCard()
@@ -92,43 +80,6 @@ struct KeyboardSetupView: View {
         case .on:      return .done
         case .off:     return .missing
         case .unknown: return .unknown
-        }
-    }
-
-    private func permissionState(_ status: AVAuthorizationStatus) -> ChecklistRow.State {
-        switch status {
-        case .authorized: return .done
-        case .notDetermined: return .unknown
-        case .denied, .restricted: return .missing
-        @unknown default: return .unknown
-        }
-    }
-
-    private func permissionState(_ status: SFSpeechRecognizerAuthorizationStatus) -> ChecklistRow.State {
-        switch status {
-        case .authorized: return .done
-        case .notDetermined: return .unknown
-        case .denied, .restricted: return .missing
-        @unknown default: return .unknown
-        }
-    }
-
-    @MainActor
-    private func requestVoicePermissions() async {
-        if microphoneStatus == .notDetermined {
-            _ = await AVCaptureDevice.requestAccess(for: .audio)
-        }
-        if speechStatus == .notDetermined {
-            _ = await withCheckedContinuation { continuation in
-                SFSpeechRecognizer.requestAuthorization { status in
-                    continuation.resume(returning: status)
-                }
-            }
-        }
-        microphoneStatus = AVCaptureDevice.authorizationStatus(for: .audio)
-        speechStatus = SFSpeechRecognizer.authorizationStatus()
-        if microphoneStatus == .denied || speechStatus == .denied {
-            OpenKeyboardSettingsButton.openSystemSettings()
         }
     }
 

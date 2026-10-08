@@ -236,3 +236,284 @@ final class AccountAPITests: XCTestCase {
         XCTAssertNotNil(AppLanguage(rawValue: DeviceDescriptor.current.locale))
     }
 }
+
+/// What the release added to the account layer: plans that cannot be bought,
+/// consent and quota errors, account deletion, reports, and the session's
+/// guards between the app and the keyboard.
+///
+/// Шығарылымға қосылғандар: сатып алу, келісім, тіркелгіні жою, шағым, токен.
+final class AccountReleaseTests: XCTestCase {
+
+    private func response(_ status: Int) -> HTTPURLResponse {
+        HTTPURLResponse(url: URL(string: "https://example.test")!, statusCode: status, httpVersion: nil, headerFields: nil)!
+    }
+
+    private func envelope(_ code: String) -> Data {
+        Data("{\"error\": {\"code\": \"\(code)\", \"message\": \"x\"}}".utf8)
+    }
+
+    private func freshDefaults() -> UserDefaults {
+        let suite = "AccountReleaseTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        addTeardownBlock { defaults.removePersistentDomain(forName: suite) }
+        return defaults
+    }
+
+    private func plan(_ extra: String) throws -> AccountAPI.Plan {
+        try JSONDecoder().decode(AccountAPI.Plan.self, from: Data("""
+        {"id": "p2", "code": "pro", "name": {"en": "Pro"}, "description": {"en": ""}, "price": 349000,
+         "price_text": "3 490 KZT", "currency": "KZT", "daily_message_limit": 50,
+         "monthly_message_limit": 0, "period_days": 30, "is_free": false\(extra)}
+        """.utf8))
+    }
+
+    // MARK: Plans
+
+    func testPlanIsPurchasableOnlyWhenTheServerSaysSo() throws {
+        XCTAssertTrue(try plan(#", "purchasable": true"#).purchasable)
+        XCTAssertFalse(try plan(#", "purchasable": false"#).purchasable)
+        XCTAssertFalse(try plan("").purchasable, "an older server does not send it, and nothing is sold then")
+    }
+
+    /// A price and Choose only next to a plan that can be bought, and only in
+    /// a build that can buy at all (DEBUG here; Release has no StoreKit flow).
+    @MainActor
+    func testChooseNeedsABuildThatCanBuyAndAPurchasablePlan() throws {
+        let model = AccountModel()
+        XCTAssertTrue(AccountModel.purchasesAvailableInThisBuild, "tests run the DEBUG build")
+        XCTAssertTrue(model.canPurchase(try plan(#", "purchasable": true"#)))
+        XCTAssertFalse(model.canPurchase(try plan("")))
+        let free = try JSONDecoder().decode(AccountAPI.Plan.self, from: Data("""
+        {"id": "p1", "code": "free", "name": {"en": "Free"}, "description": {"en": ""}, "price": 0,
+         "price_text": "0", "currency": "KZT", "daily_message_limit": 7, "monthly_message_limit": 0,
+         "period_days": 0, "is_free": true, "purchasable": true}
+        """.utf8))
+        XCTAssertFalse(model.canPurchase(free))
+    }
+
+    // MARK: Config
+
+    func testConfigCarriesSupportAndTheNewFeatures() throws {
+        let legal = try JSONDecoder().decode(AccountAPI.LegalConfig.self, from: Data("""
+        {"terms_version": "2026-10-08", "privacy_version": "2026-10-08", "terms_url": "https://x/offer",
+         "privacy_url": "https://x/privacy", "contact_email": "", "support_url": "https://x/support",
+         "account_deletion_url": "https://x/account/delete", "ai_provider": "OpenAI"}
+        """.utf8))
+        XCTAssertEqual(legal.resolvedSupportURL, "https://x/support")
+        XCTAssertEqual(legal.aiProvider, "OpenAI")
+
+        let older = try JSONDecoder().decode(AccountAPI.LegalConfig.self, from: Data("""
+        {"terms_version": "a", "privacy_version": "b", "terms_url": "u", "privacy_url": "v"}
+        """.utf8))
+        XCTAssertNil(older.supportURL)
+        XCTAssertEqual(older.resolvedSupportURL, "https://ai-reply.kz/support")
+        XCTAssertEqual(AccountAPI.LegalConfig.production.termsVersion, "2026-10-08")
+
+        let features = try JSONDecoder().decode(AccountAPI.Features.self, from: Data("""
+        {"ai_reports": true, "account_deletion": true, "purchases": false}
+        """.utf8))
+        XCTAssertEqual(features.aiReports, true)
+        XCTAssertEqual(features.accountDeletion, true)
+        XCTAssertEqual(features.purchases, false)
+    }
+
+    /// The keyboard shows Report only for a server that takes reports.
+    func testTheReportFlagReachesTheKeyboard() throws {
+        let defaults = freshDefaults()
+        AILimits.storeFeatures(try JSONDecoder().decode(AccountAPI.Features.self,
+                                                        from: Data(#"{"ai_reports": true}"#.utf8)), defaults: defaults)
+        XCTAssertTrue(defaults.bool(forKey: "ai.features.aiReports"))
+        AILimits.storeFeatures(nil, defaults: defaults)
+        XCTAssertFalse(defaults.bool(forKey: "ai.features.aiReports"))
+    }
+
+    // MARK: Errors
+
+    func testMonthlyQuotaAndConsentHaveTheirOwnErrors() {
+        XCTAssertEqual(APIClient.mapServerError(status: 429, data: envelope("MONTHLY_LIMIT_REACHED"), headers: response(429)),
+                       .monthlyLimitReached)
+        XCTAssertEqual(APIClient.mapServerError(status: 403, data: envelope("CONSENT_REQUIRED"), headers: response(403)),
+                       .consentRequired)
+        XCTAssertEqual(AccountReplyTransport.map(.monthlyLimitReached), .monthlyQuotaExhausted)
+        XCTAssertEqual(AccountReplyTransport.map(.consentRequired), .consentRequired)
+        XCTAssertEqual(AccountComposeTransport.map(.consentRequired), .consentRequired)
+        for language in AppLanguage.allCases {
+            let strings = AIReplyStrings.forLanguage(language)
+            XCTAssertEqual(strings.message(for: .monthlyQuotaExhausted), strings.monthlyQuotaExhausted)
+            XCTAssertEqual(strings.message(for: .consentRequired), strings.consentRequired)
+        }
+    }
+
+    // MARK: Consent
+
+    /// The keyboard checks the consent against the versions the server
+    /// published last, before anything is sent.
+    func testConsentIsCheckedAgainstThePublishedVersions() {
+        let defaults = freshDefaults()
+        XCTAssertFalse(LegalConsentStore.hasAcceptedCurrentVersions(defaults: defaults), "nothing accepted")
+
+        let current = AccountAPI.LegalConfig(termsVersion: "2026-10-08", privacyVersion: "2026-10-08",
+                                             termsURL: "", privacyURL: "")
+        LegalConsentStore.accept(current, locale: "kk", defaults: defaults)
+        XCTAssertTrue(LegalConsentStore.hasAcceptedCurrentVersions(defaults: defaults),
+                      "before any config, this build's own versions count")
+
+        LegalConsentStore.storeCurrentVersions(
+            AccountAPI.LegalConfig(termsVersion: "2026-12-01", privacyVersion: "2026-10-08", termsURL: "", privacyURL: ""),
+            defaults: defaults)
+        XCTAssertFalse(LegalConsentStore.hasAcceptedCurrentVersions(defaults: defaults), "the terms changed")
+
+        LegalConsentStore.storeCurrentVersions(current, defaults: defaults)
+        XCTAssertTrue(LegalConsentStore.hasAcceptedCurrentVersions(defaults: defaults))
+    }
+
+    /// CONSENT_REQUIRED drops a consent the server had confirmed, but not one
+    /// still waiting to be sent.
+    func testAServerRefusalForgetsOnlyAConfirmedConsent() {
+        let defaults = freshDefaults()
+        LegalConsentStore.accept(.production, locale: "ru", defaults: defaults)
+        LegalConsentStore.forgetAfterServerRefusal(defaults: defaults)
+        XCTAssertNotNil(LegalConsentStore.load(defaults: defaults), "pending: the app sends it next")
+
+        LegalConsentStore.markSynced(defaults: defaults)
+        LegalConsentStore.forgetAfterServerRefusal(defaults: defaults)
+        XCTAssertNil(LegalConsentStore.load(defaults: defaults))
+    }
+
+    func testRequestsStopBeforeTheNetworkWithoutASessionOrConsent() {
+        XCTAssertEqual(AIReplyService.preflight(isSignedIn: false, hasConsent: false), .authenticationFailed)
+        XCTAssertEqual(AIReplyService.preflight(isSignedIn: true, hasConsent: false), .consentRequired)
+        XCTAssertNil(AIReplyService.preflight(isSignedIn: true, hasConsent: true))
+    }
+
+    // MARK: Account deletion
+
+    func testDeletionIsADeleteCarryingTheAppleCodeOnlyWhenThere() throws {
+        let client = APIClient(baseURL: URL(string: "https://example.test")!)
+        let apple = try client.makeRequest(path: AccountService.deletionPath, method: "DELETE",
+                                           body: AccountService.DeletionRequest(appleAuthorizationCode: " c0de \n"),
+                                           token: "access")
+        XCTAssertEqual(apple.httpMethod, "DELETE")
+        XCTAssertEqual(apple.url?.absoluteString, "https://example.test/api/v1/me")
+        XCTAssertEqual(apple.value(forHTTPHeaderField: "Authorization"), "Bearer access")
+        XCTAssertEqual(apple.value(forHTTPHeaderField: "Content-Type"), "application/json")
+        let body = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(apple.httpBody)) as? [String: String])
+        XCTAssertEqual(body, ["apple_authorization_code": "c0de"])
+
+        let plain = try client.makeRequest(path: AccountService.deletionPath, method: "DELETE",
+                                           body: AccountService.DeletionRequest(appleAuthorizationCode: ""),
+                                           token: "access")
+        XCTAssertEqual(String(data: try XCTUnwrap(plain.httpBody), encoding: .utf8), "{}")
+    }
+
+    func testDeletionResultDecodes() throws {
+        let result = try JSONDecoder().decode(AccountService.DeletionResult.self,
+                                              from: Data(#"{"deleted": true, "apple_token_revoked": false}"#.utf8))
+        XCTAssertEqual(result, AccountService.DeletionResult(deleted: true, appleTokenRevoked: false))
+        XCTAssertFalse(try JSONDecoder().decode(AccountService.DeletionResult.self, from: Data("{}".utf8)).deleted)
+    }
+
+    /// Everything this phone kept for the account goes; the keyboard's own
+    /// settings stay.
+    @MainActor
+    func testDeletionWipesWhatThisDeviceKeptForTheAccount() throws {
+        let group = freshDefaults()
+        let app = freshDefaults()
+        LegalConsentStore.accept(.production, locale: "kk", defaults: group)
+        AccountUsageCache.store(try JSONDecoder().decode(AccountAPI.Usage.self, from: Data("""
+        {"daily_limit": 7, "used_today": 2, "remaining_today": 5, "monthly_limit": 0, "used_month": 2,
+         "resets_at": "", "timezone": "Asia/Almaty"}
+        """.utf8)), defaults: group)
+        AccountUsageCache.storePlanCode("pro", defaults: group)
+        let words = DefaultsLearnedWordsStore(defaults: group)
+        for language in [KeyboardLanguage.english, .russian, .kazakh] {
+            words.saveLearnedWords(["сәлем", "hello"], for: language)
+        }
+        PendingProfileChange(defaults: app).markChanged()
+        PendingProfileChange(defaults: app, field: .preferredLanguage).markChanged()
+        group.set(false, forKey: "shared.smartCorrection")
+
+        LocalAccountData.wipe(appGroup: group, app: app)
+
+        XCTAssertNil(LegalConsentStore.load(defaults: group))
+        XCTAssertEqual(AccountUsageCache.snapshot(defaults: group).dailyLimit, 0)
+        for language in KeyboardLanguage.allCases {
+            XCTAssertTrue(words.learnedWords(for: language).isEmpty, language.rawValue)
+        }
+        XCTAssertNotEqual(words.resetStamp, 0, "a running keyboard learns that the words went")
+        XCTAssertFalse(PendingProfileChange(defaults: app).isPending)
+        XCTAssertFalse(PendingProfileChange(defaults: app, field: .preferredLanguage).isPending)
+        XCTAssertNotNil(group.object(forKey: "shared.smartCorrection"), "device settings stay")
+    }
+
+    // MARK: Reports
+
+    func testAReportCarriesOnlyWhatTheUserChose() throws {
+        let long = String(repeating: "ә", count: 2100)
+        let report = AIReport(mode: .compose, reason: .wrongLanguage, comment: "  ", text: long)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(report)) as? [String: Any])
+        XCTAssertEqual(json["mode"] as? String, "compose")
+        XCTAssertEqual(json["reason"] as? String, "wrong_language")
+        XCTAssertEqual(json["platform"] as? String, "ios")
+        XCTAssertNotNil(json["app_version"])
+        XCTAssertNil(json["comment"], "an empty comment is not sent")
+        XCTAssertEqual((json["text"] as? String)?.unicodeScalars.count, AIReport.maximumTextCharacters)
+
+        let withoutText = AIReport(mode: .reply, reason: .falseInfo, text: nil)
+        let bare = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(withoutText)) as? [String: Any])
+        XCTAssertNil(bare["text"], "the switch was off")
+        XCTAssertEqual(bare["reason"] as? String, "false_info")
+        XCTAssertEqual(AIReport.Reason.allCases.map(\.rawValue),
+                       ["offensive", "harmful", "false_info", "wrong_language", "other"])
+    }
+
+    // MARK: Session between the app and the keyboard
+
+    /// A refresh answer is stored, and a refusal clears the session, only
+    /// while the refresh token sent is still the stored one.
+    func testARefreshOnlyTouchesItsOwnSession() {
+        XCTAssertTrue(AccountSession.isSameSession(sentRefreshToken: "r1", storedRefreshToken: "r1"))
+        XCTAssertFalse(AccountSession.isSameSession(sentRefreshToken: "r1", storedRefreshToken: nil), "signed out meanwhile")
+        XCTAssertFalse(AccountSession.isSameSession(sentRefreshToken: "r1", storedRefreshToken: "r2"),
+                       "rotated by the other process, or another account")
+    }
+
+    /// After waiting for the lock: the pair the other process stored is used
+    /// instead of spending the old refresh token again.
+    func testAPairRotatedElsewhereIsReused() {
+        XCTAssertEqual(AccountSession.tokenRotatedElsewhere(staleRefreshToken: "r1", storedRefreshToken: "r2",
+                                                            storedAccessToken: "a2", isAccessTokenFresh: true), "a2")
+        XCTAssertNil(AccountSession.tokenRotatedElsewhere(staleRefreshToken: "r1", storedRefreshToken: "r1",
+                                                          storedAccessToken: "a1", isAccessTokenFresh: true),
+                     "nothing rotated: refresh")
+        XCTAssertNil(AccountSession.tokenRotatedElsewhere(staleRefreshToken: "r1", storedRefreshToken: "r2",
+                                                          storedAccessToken: "a2", isAccessTokenFresh: false))
+        XCTAssertNil(AccountSession.tokenRotatedElsewhere(staleRefreshToken: "r1", storedRefreshToken: nil,
+                                                          storedAccessToken: nil, isAccessTokenFresh: false))
+    }
+
+    /// Two holders of the same lock file exclude each other, like the app
+    /// and the keyboard do.
+    func testTheRefreshLockExcludesASecondHolder() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("lock-\(UUID().uuidString)")
+        addTeardownBlock { try? FileManager.default.removeItem(at: url) }
+        var other = CrossProcessLock(fileURL: url)
+        other.timeout = .milliseconds(150)
+        other.pollInterval = .milliseconds(20)
+
+        let first = await CrossProcessLock(fileURL: url).acquire()
+        XCTAssertTrue(first.isLocked)
+        let blocked = await other.acquire()
+        XCTAssertFalse(blocked.isLocked, "gave up after the timeout")
+
+        first.release()
+        first.release()
+        XCTAssertFalse(first.isLocked)
+        let second = await other.acquire()
+        XCTAssertTrue(second.isLocked)
+        second.release()
+
+        let noContainer = await CrossProcessLock(fileURL: nil).acquire()
+        XCTAssertFalse(noContainer.isLocked, "no App Group: unlocked, the actor still serialises")
+    }
+}

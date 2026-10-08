@@ -52,6 +52,7 @@ struct AccountPolishTransport: PolishTransport {
             }
             return PolishService.Result(text: response.text, changed: response.changed)
         } catch let error as APIError {
+            AccountReplyTransport.noteRefusal(error)
             throw AccountComposeTransport.map(error)
         }
     }

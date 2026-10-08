@@ -35,6 +35,11 @@ enum APIError: Error, Equatable, Sendable {
     case authProviderUnavailable
     /// Daily quota is spent. `resetsAt` is ISO-8601 from the server.
     case dailyLimitReached(limit: Int, usedToday: Int, resetsAt: String?)
+    /// The plan's replies for this month are spent: tomorrow does not help.
+    case monthlyLimitReached
+    /// The account has not accepted the current terms and privacy policy,
+    /// so the AI endpoints refuse until the app records a new consent.
+    case consentRequired
     case subscriptionExpired
     case paymentRequired
     case providerUnavailable
@@ -115,11 +120,23 @@ struct APIClient: Sendable {
         try await send(path: path, method: "PUT", body: body, token: token)
     }
 
+    @discardableResult
+    func delete<Response: Decodable>(_ path: String, token: String? = nil) async throws -> Response {
+        try await send(path: path, method: "DELETE", body: Optional<Empty>.none, token: token)
+    }
+
+    /// DELETE with a JSON body: account deletion carries the Apple code.
+    @discardableResult
+    func delete<Body: Encodable, Response: Decodable>(
+        _ path: String, body: Body, token: String? = nil
+    ) async throws -> Response {
+        try await send(path: path, method: "DELETE", body: body, token: token)
+    }
+
     // MARK: Transport
 
-    private func send<Body: Encodable, Response: Decodable>(
-        path: String, method: String, body: Body?, token: String?
-    ) async throws -> Response {
+    /// The request `send` puts on the wire; separate so its shape is testable.
+    func makeRequest<Body: Encodable>(path: String, method: String, body: Body?, token: String?) throws -> URLRequest {
         var request = URLRequest(url: baseURL.appendingPathComponent(path))
         request.httpMethod = method
         for (name, value) in headers {
@@ -133,6 +150,13 @@ struct APIClient: Sendable {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.httpBody = try JSONEncoder().encode(body)
         }
+        return request
+    }
+
+    private func send<Body: Encodable, Response: Decodable>(
+        path: String, method: String, body: Body?, token: String?
+    ) async throws -> Response {
+        let request = try makeRequest(path: path, method: method, body: body, token: token)
 
         let data: Data
         let response: URLResponse
@@ -210,10 +234,12 @@ struct APIClient: Sendable {
         case "EMAIL_ALREADY_IN_USE":            return .emailInUse
         case "INVALID_ID_TOKEN":                return .invalidIDToken
         case "AUTH_PROVIDER_UNAVAILABLE":       return .authProviderUnavailable
-        case "DAILY_LIMIT_REACHED", "MONTHLY_LIMIT_REACHED":
+        case "DAILY_LIMIT_REACHED":
             return .dailyLimitReached(limit: details?.dailyLimit ?? 0,
                                       usedToday: details?.usedToday ?? 0,
                                       resetsAt: details?.resetsAt)
+        case "MONTHLY_LIMIT_REACHED":           return .monthlyLimitReached
+        case "CONSENT_REQUIRED":                return .consentRequired
         case "SUBSCRIPTION_EXPIRED":            return .subscriptionExpired
         case "PAYMENT_REQUIRED":                return .paymentRequired
         case "AI_PROVIDER_UNAVAILABLE":         return .providerUnavailable

@@ -76,7 +76,12 @@ final class AppSettings {
     /// in English. So the lookup goes to the chosen language's own `.lproj`.
     /// Every string built in code goes through here.
     func localized(_ key: String) -> String {
-        Self.bundle(for: effectiveLanguage).localizedString(forKey: key, value: nil, table: nil)
+        Self.localized(key, language: effectiveLanguage)
+    }
+
+    /// The same lookup for code that holds a language rather than the settings.
+    static func localized(_ key: String, language: AppLanguage) -> String {
+        bundle(for: language).localizedString(forKey: key, value: nil, table: nil)
     }
 
     /// The app's table for one language; the main bundle if it is missing.

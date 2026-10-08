@@ -1,6 +1,7 @@
 import AuthenticationServices
 import CryptoKit
 import Foundation
+import UIKit
 
 /// A fresh random value for one sign-in attempt.
 ///
@@ -42,6 +43,9 @@ enum AppleSignIn {
         let userID: String
         /// Only present on the very first authorization; empty afterwards.
         let fullName: String
+        /// Apple's one-time code for this authorization. Deleting the account
+        /// sends a fresh one, so the server can revoke the Apple token.
+        var authorizationCode: String? = nil
     }
 
     /// Whether this build carries the Sign in with Apple entitlement.
@@ -70,7 +74,14 @@ enum AppleSignIn {
               let data = apple.identityToken,
               let token = String(data: data, encoding: .utf8),
               !token.isEmpty else { return nil }
-        return Credential(identityToken: token, userID: apple.user, fullName: fullName(apple.fullName))
+        return Credential(identityToken: token, userID: apple.user, fullName: fullName(apple.fullName),
+                          authorizationCode: authorizationCode(from: apple))
+    }
+
+    static func authorizationCode(from credential: ASAuthorizationAppleIDCredential) -> String? {
+        guard let data = credential.authorizationCode,
+              let code = String(data: data, encoding: .utf8), !code.isEmpty else { return nil }
+        return code
     }
 
     static func fullName(_ components: PersonNameComponents?) -> String {
@@ -82,6 +93,24 @@ enum AppleSignIn {
     /// The user closed the Apple sheet: not an error worth a message.
     static func isCancellation(_ error: Error) -> Bool {
         (error as? ASAuthorizationError)?.code == .canceled
+    }
+
+    // MARK: Account deletion
+
+    /// Why the Apple step before an account deletion did not produce a code.
+    enum ConfirmationFailure: Error, Equatable {
+        case cancelled
+        case failed
+    }
+
+    /// Asks Apple once more - no name, no e-mail - for a fresh authorization
+    /// code, which the server spends revoking the app's Apple token as it
+    /// deletes the account (App Review requires the revocation).
+    @MainActor
+    static func confirmForDeletion() async throws -> String {
+        let request = ASAuthorizationAppleIDProvider().createRequest()
+        request.requestedScopes = []
+        return try await AuthorizationCodeRequest().perform(request)
     }
 
     // MARK: Revocation
@@ -103,5 +132,56 @@ enum AppleSignIn {
         guard let userID = defaults.string(forKey: userIDKey) else { return false }
         let state = try? await ASAuthorizationAppleIDProvider().credentialState(forUserID: userID)
         return state == .revoked
+    }
+}
+
+/// One Apple authorization run from code rather than from Apple's button:
+/// the account deletion's confirmation.
+@MainActor
+private final class AuthorizationCodeRequest: NSObject,
+                                              ASAuthorizationControllerDelegate,
+                                              ASAuthorizationControllerPresentationContextProviding {
+
+    private var continuation: CheckedContinuation<String, Error>?
+    /// Kept for the length of the request: the controller holds its delegate weakly.
+    private var controller: ASAuthorizationController?
+
+    func perform(_ request: ASAuthorizationAppleIDRequest) async throws -> String {
+        try await withCheckedThrowingContinuation { continuation in
+            self.continuation = continuation
+            let controller = ASAuthorizationController(authorizationRequests: [request])
+            controller.delegate = self
+            controller.presentationContextProvider = self
+            self.controller = controller
+            controller.performRequests()
+        }
+    }
+
+    func authorizationController(controller: ASAuthorizationController,
+                                 didCompleteWithAuthorization authorization: ASAuthorization) {
+        guard let apple = authorization.credential as? ASAuthorizationAppleIDCredential,
+              let code = AppleSignIn.authorizationCode(from: apple) else {
+            finish(.failure(AppleSignIn.ConfirmationFailure.failed))
+            return
+        }
+        finish(.success(code))
+    }
+
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
+        finish(.failure(AppleSignIn.isCancellation(error)
+            ? AppleSignIn.ConfirmationFailure.cancelled
+            : AppleSignIn.ConfirmationFailure.failed))
+    }
+
+    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        let scene = scenes.first { $0.activationState == .foregroundActive } ?? scenes.first
+        return scene?.windows.first(where: \.isKeyWindow) ?? scene?.windows.first ?? ASPresentationAnchor()
+    }
+
+    private func finish(_ result: Result<String, Error>) {
+        continuation?.resume(with: result)
+        continuation = nil
+        controller = nil
     }
 }

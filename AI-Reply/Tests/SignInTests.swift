@@ -95,6 +95,18 @@ final class SignInTests: XCTestCase {
                                                           "CFBundleURLTypes": [registered]]))
     }
 
+    /// App Review guideline 4.8: a Release build offers Google only beside
+    /// Sign in with Apple. DEBUG builds keep it for review without Apple.
+    @MainActor
+    func testReleaseOffersGoogleOnlyBesideApple() {
+        XCTAssertTrue(AccountModel.offersGoogle(configured: true, serverAllows: true, offersApple: true, isRelease: true))
+        XCTAssertFalse(AccountModel.offersGoogle(configured: true, serverAllows: true, offersApple: false, isRelease: true),
+                       "no Apple, no Google in a Release build")
+        XCTAssertTrue(AccountModel.offersGoogle(configured: true, serverAllows: true, offersApple: false, isRelease: false))
+        XCTAssertFalse(AccountModel.offersGoogle(configured: false, serverAllows: true, offersApple: true, isRelease: true))
+        XCTAssertFalse(AccountModel.offersGoogle(configured: true, serverAllows: false, offersApple: true, isRelease: false))
+    }
+
     // MARK: Server answers
 
     private func response(_ status: Int) -> HTTPURLResponse {

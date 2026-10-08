@@ -50,6 +50,14 @@ struct LearnedWords: Equatable, Sendable {
 protocol LearnedWordsStore: Sendable {
     func learnedWords(for language: KeyboardLanguage) -> [String]
     func saveLearnedWords(_ words: [String], for language: KeyboardLanguage)
+    /// Changes when every learned word was removed (the account was deleted
+    /// in the app), so a running keyboard drops what it still holds instead
+    /// of writing it back.
+    var resetStamp: Double { get }
+}
+
+extension LearnedWordsStore {
+    var resetStamp: Double { 0 }
 }
 
 /// Learned words as a string array per language under
@@ -73,6 +81,18 @@ struct DefaultsLearnedWordsStore: LearnedWordsStore, @unchecked Sendable {
 
     func saveLearnedWords(_ words: [String], for language: KeyboardLanguage) {
         defaults.set(words, forKey: Self.key(for: language))
+    }
+
+    static let resetStampKey = "autocorrect.learned.resetAt"
+
+    var resetStamp: Double { defaults.double(forKey: Self.resetStampKey) }
+
+    /// Forgets the learned words of every layout.
+    func removeAll(now: Date = Date()) {
+        for language in KeyboardLanguage.allCases {
+            defaults.removeObject(forKey: Self.key(for: language))
+        }
+        defaults.set(now.timeIntervalSince1970, forKey: Self.resetStampKey)
     }
 }
 

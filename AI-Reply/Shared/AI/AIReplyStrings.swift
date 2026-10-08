@@ -106,6 +106,10 @@ struct AIReplyStrings: Sendable {
     let signInRequired: String
     /// Backend mode only: the plan's daily generations are spent.
     let quotaExhausted: String
+    /// The plan's generations for this month are spent.
+    let monthlyQuotaExhausted: String
+    /// The current terms are not accepted (or the consent was withdrawn).
+    let consentRequired: String
 
     // Host-field conflict
     let hostFieldNotEmpty: String
@@ -121,6 +125,9 @@ struct AIReplyStrings: Sendable {
 
     /// The suggestion strip and the instruction suggestion.
     var typing: TypingStrings { TypingStrings.forLanguage(appLanguage) }
+
+    /// Reporting a generated text.
+    var report: ReportStrings { ReportStrings.forLanguage(appLanguage) }
 
     static func forLanguage(_ language: AppLanguage) -> AIReplyStrings {
         switch language {
@@ -145,6 +152,8 @@ struct AIReplyStrings: Sendable {
         case .authenticationFailed:       return signInRequired
         case .rateLimited:                return rateLimited
         case .quotaExhausted:             return quotaExhausted
+        case .monthlyQuotaExhausted:      return monthlyQuotaExhausted
+        case .consentRequired:            return consentRequired
         case .emptyResponse:              return emptyResponse
         case .serviceUnavailable:         return serviceUnavailable
         case .noInstruction:              return compose.noInstruction
@@ -203,7 +212,9 @@ struct AIReplyStrings: Sendable {
         emptyResponse: "No reply came back. Try again.",
         serviceUnavailable: "The service is unavailable right now. Try again.",
         signInRequired: "Open the AI Reply app and sign in to keep replying.",
-        quotaExhausted: "You have used today's replies. They come back tomorrow, or change your plan in the app.",
+        quotaExhausted: "You have used today's replies. They come back tomorrow.",
+        monthlyQuotaExhausted: "You have used this month's replies. They come back next month.",
+        consentRequired: "Open AI Reply and accept the updated terms to keep using AI replies.",
         hostFieldNotEmpty: "There is already text in this field.",
         quickIntents: [
             QuickIntent(id: "agree", label: "Agree", phrase: "Reply that I agree."),
@@ -257,7 +268,9 @@ struct AIReplyStrings: Sendable {
         emptyResponse: "Ответ не получен. Попробуйте ещё раз.",
         serviceUnavailable: "Сервис сейчас недоступен. Попробуйте позже.",
         signInRequired: "Откройте приложение AI Reply и войдите, чтобы продолжить.",
-        quotaExhausted: "Ответы на сегодня закончились. Они обновятся завтра — или смените тариф в приложении.",
+        quotaExhausted: "Ответы на сегодня закончились. Они обновятся завтра.",
+        monthlyQuotaExhausted: "Ответы на этот месяц закончились. Они обновятся в следующем месяце.",
+        consentRequired: "Откройте AI Reply и примите обновлённые условия, чтобы продолжить пользоваться AI-ответами.",
         hostFieldNotEmpty: "В этом поле уже есть текст.",
         quickIntents: [
             QuickIntent(id: "agree", label: "Согласиться", phrase: "Ответь согласием."),
@@ -311,7 +324,9 @@ struct AIReplyStrings: Sendable {
         emptyResponse: "Жауап келмеді. Қайталап көріңіз.",
         serviceUnavailable: "Қызмет қазір қолжетімсіз. Кейінірек көріңіз.",
         signInRequired: "Жалғастыру үшін AI Reply қолданбасын ашып, кіріңіз.",
-        quotaExhausted: "Бүгінгі жауаптар бітті. Ертең жаңарады немесе қолданбадан тарифті ауыстырыңыз.",
+        quotaExhausted: "Бүгінгі жауаптар бітті. Ертең жаңарады.",
+        monthlyQuotaExhausted: "Осы айдағы жауаптар бітті. Келесі айда жаңарады.",
+        consentRequired: "AI жауаптарын қолдануды жалғастыру үшін AI Reply қосымшасын ашып, жаңартылған шарттарды қабылдаңыз.",
         hostFieldNotEmpty: "Бұл өрісте мәтін бар.",
         quickIntents: [
             QuickIntent(id: "agree", label: "Келісу", phrase: "Келісетінімді жаз."),
@@ -365,7 +380,9 @@ struct AIReplyStrings: Sendable {
         emptyResponse: "Javob kelmadi. Qayta urinib ko‘ring.",
         serviceUnavailable: "Xizmat hozir mavjud emas. Keyinroq urinib ko‘ring.",
         signInRequired: "Davom etish uchun AI Reply ilovasini ochib, tizimga kiring.",
-        quotaExhausted: "Bugungi javoblar tugadi. Ular ertaga yangilanadi yoki ilovada tarifni o‘zgartiring.",
+        quotaExhausted: "Bugungi javoblar tugadi. Ular ertaga yangilanadi.",
+        monthlyQuotaExhausted: "Bu oygi javoblar tugadi. Keyingi oyda yangilanadi.",
+        consentRequired: "AI javoblardan foydalanishni davom ettirish uchun AI Reply ilovasini oching va yangilangan shartlarni qabul qiling.",
         hostFieldNotEmpty: "Bu maydonda matn bor.",
         quickIntents: [
             QuickIntent(id: "agree", label: "Rozilik", phrase: "Rozi ekanimni yoz."),
@@ -456,5 +473,100 @@ struct TypingStrings: Sendable {
         polishSuggestionHint: "So‘rovingizni shu variant bilan almashtiradi.",
         undo: "Bekor qilish",
         undoAccessibility: "Tuzatishni bekor qilish"
+    )
+}
+
+/// The words of reporting a generated text, by APP language like every
+/// product string: the Report control under a reply or a written message,
+/// the reasons the server takes, and what is said afterwards. The app's own
+/// report sheet uses the same table, so both say the same thing.
+struct ReportStrings: Sendable {
+
+    let report: String
+    let title: String
+    let offensive: String
+    let harmful: String
+    let falseInfo: String
+    let wrongLanguage: String
+    let other: String
+    /// The switch that sends the reply's text along (on by default).
+    let includeText: String
+    let send: String
+    let thanks: String
+    let failed: String
+
+    func reason(_ reason: AIReport.Reason) -> String {
+        switch reason {
+        case .offensive:     return offensive
+        case .harmful:       return harmful
+        case .falseInfo:     return falseInfo
+        case .wrongLanguage: return wrongLanguage
+        case .other:         return other
+        }
+    }
+
+    static func forLanguage(_ language: AppLanguage) -> ReportStrings {
+        switch language {
+        case .english: return .english
+        case .russian: return .russian
+        case .kazakh:  return .kazakh
+        case .uzbek:   return .uzbek
+        }
+    }
+
+    private static let english = ReportStrings(
+        report: "Report",
+        title: "Report this reply",
+        offensive: "Offensive or hateful",
+        harmful: "Harmful or dangerous",
+        falseInfo: "False information",
+        wrongLanguage: "Wrong language",
+        other: "Something else",
+        includeText: "Send the reply text with the report",
+        send: "Send report",
+        thanks: "Thanks. We'll review this reply.",
+        failed: "Couldn't send the report. Try again."
+    )
+
+    private static let russian = ReportStrings(
+        report: "Пожаловаться",
+        title: "Пожаловаться на ответ",
+        offensive: "Оскорбительный",
+        harmful: "Вредный или опасный",
+        falseInfo: "Ложная информация",
+        wrongLanguage: "Не тот язык",
+        other: "Другое",
+        includeText: "Отправить текст ответа вместе с жалобой",
+        send: "Отправить",
+        thanks: "Спасибо, мы проверим этот ответ.",
+        failed: "Не удалось отправить жалобу. Попробуйте ещё раз."
+    )
+
+    private static let kazakh = ReportStrings(
+        report: "Шағымдану",
+        title: "Жауапқа шағым",
+        offensive: "Қорлайтын",
+        harmful: "Зиянды не қауіпті",
+        falseInfo: "Жалған ақпарат",
+        wrongLanguage: "Тілі дұрыс емес",
+        other: "Басқа",
+        includeText: "Жауап мәтінін шағыммен бірге жіберу",
+        send: "Жіберу",
+        thanks: "Рақмет, бұл жауапты тексереміз.",
+        failed: "Шағымды жіберу мүмкін болмады. Қайталап көріңіз."
+    )
+
+    private static let uzbek = ReportStrings(
+        report: "Shikoyat qilish",
+        title: "Javob ustidan shikoyat",
+        offensive: "Haqoratli",
+        harmful: "Zararli yoki xavfli",
+        falseInfo: "Notoʻgʻri maʼlumot",
+        wrongLanguage: "Til notoʻgʻri",
+        other: "Boshqa",
+        includeText: "Javob matnini shikoyat bilan birga yuborish",
+        send: "Yuborish",
+        thanks: "Rahmat, bu javobni tekshiramiz.",
+        failed: "Shikoyatni yuborib boʻlmadi. Qayta urinib koʻring."
     )
 }

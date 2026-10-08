@@ -1,0 +1,66 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "NSMicrophoneUsageDescription" : {
+      "comment" : "Microphone permission: in-app dictation only.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply uses the microphone only while you dictate in the app: a message to reply to, your profile or a template. Recording starts when you tap the microphone button."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply микрофонды тек қосымшада айтып жазған кезде қолданады: жауап берілетін хабарлама, профиль немесе үлгі. Жазу микрофон түймесін басқанда басталады."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply использует микрофон, только пока вы диктуете в приложении: сообщение для ответа, профиль или шаблон. Запись начинается, когда вы нажимаете кнопку микрофона."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply mikrofondan faqat ilovada aytib yozayotganingizda foydalanadi: javob beriladigan xabar, profil yoki shablon. Yozuv mikrofon tugmasini bosganingizda boshlanadi."
+          }
+        }
+      }
+    },
+    "NSSpeechRecognitionUsageDescription" : {
+      "comment" : "Speech recognition permission: in-app dictation only.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply turns your dictation into text with Apple speech recognition. When on-device recognition is unavailable for your language, Apple's speech service processes the audio, and AI Reply receives only the text."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply айтқаныңызды Apple сөйлеуді тану қызметімен мәтінге айналдырады. Тіліңіз үшін құрылғыда тану қолжетімсіз болса, дыбысты Apple қызметі өңдейді, ал AI Reply тек мәтінді алады."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply превращает диктовку в текст с помощью распознавания речи Apple. Если распознавание на устройстве для вашего языка недоступно, звук обрабатывает сервис Apple, а AI Reply получает только текст."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply aytganlaringizni Apple nutqni aniqlash yordamida matnga aylantiradi. Tilingiz uchun qurilmada aniqlash mavjud boʻlmasa, ovozni Apple xizmati qayta ishlaydi, AI Reply esa faqat matnni oladi."
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.1"
+}
