@@ -40,4 +40,12 @@ class MemoryLearnedWordsStore : LearnedWordsStore {
         values[language] = value
         writes++
     }
+
+    override var generation = 0
+        private set
+
+    override fun clear() {
+        values.clear()
+        generation++
+    }
 }

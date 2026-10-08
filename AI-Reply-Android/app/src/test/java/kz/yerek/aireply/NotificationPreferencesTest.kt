@@ -87,6 +87,26 @@ class NotificationPreferencesTest {
     }
 
     @Test
+    fun `offers stay off until the user switches them on`() = runBlocking {
+        val before = NotificationPreferencesRepository(FakePreferencesApi()).state.value
+        assertFalse("nothing loaded yet: marketing is opt-in", before.isOn("marketing"))
+        listOf("account", "subscription", "security", "system").forEach { category ->
+            assertTrue("$category keeps its default", before.isOn(category))
+        }
+
+        // A server whose answer does not mention marketing.
+        val api = FakePreferencesApi().apply { server = server - "marketing" }
+        val repository = NotificationPreferencesRepository(api)
+        repository.load()
+        assertFalse(repository.state.value.isOn("marketing"))
+        assertTrue(repository.state.value.isOn("account"))
+
+        assertTrue(repository.set("marketing", true))
+        assertTrue("the user's choice wins", repository.state.value.isOn("marketing"))
+        assertEquals(listOf(mapOf("marketing" to true)), api.updates)
+    }
+
+    @Test
     fun `signing out forgets the previous account's switches`() = runBlocking {
         val repository = NotificationPreferencesRepository(FakePreferencesApi())
         repository.load()

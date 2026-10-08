@@ -43,8 +43,8 @@ import kz.yerek.aireply.ui.design.Spacing
  *
  * What the phone allows (with the way to change it), the app's own switch,
  * and the categories of a signed-in account (security always on). Where push
- * cannot work — a build without Firebase, a server without it — it says so
- * instead of showing switches that do nothing.
+ * cannot work — a build without Firebase, a server without it — the section
+ * is not shown at all rather than showing switches that do nothing.
  */
 @Composable
 fun NotificationSettingsSection(modifier: Modifier = Modifier) {
@@ -65,68 +65,66 @@ fun NotificationSettingsSection(modifier: Modifier = Modifier) {
         if (showsCategories && !categories.isLoaded && !categories.loading) push.preferences.load()
     }
 
-    AppSection(stringResource(R.string.push_settings_title), modifier = modifier) {
-        if (ui.isAvailable) {
-            RowGroup {
-                StatusRow(
-                    label = stringResource(R.string.push_settings_system),
-                    value = stringResource(statusText(ui))
-                )
-                if (!ui.canPost) {
-                    RowDividerIndented()
-                    if (ui.canAskSystem) {
-                        NavigationRow(
-                            Icons.Outlined.Notifications,
-                            stringResource(R.string.push_settings_allow)
-                        ) { requestPermission() }
-                    } else {
-                        NavigationRow(
-                            Icons.Outlined.Settings,
-                            stringResource(R.string.push_settings_open_system)
-                        ) { NotificationPermission.openSystemSettings(context) }
-                    }
-                }
-                RowDividerIndented()
-                SwitchRow(
-                    label = stringResource(R.string.push_settings_enabled),
-                    checked = ui.notificationsEnabled,
-                    enabled = true
-                ) { checked -> push.setNotificationsEnabled(checked) }
-            }
-            Footnote(stringResource(R.string.push_settings_footer))
+    if (!ui.isAvailable) return
 
-            if (showsCategories) {
-                when {
-                    categories.isLoaded -> {
-                        RowGroup {
-                            CATEGORIES.forEachIndexed { index, (category, label) ->
-                                if (index > 0) RowDividerIndented()
-                                val locked = categories.isLocked(category)
-                                SwitchRow(
-                                    label = stringResource(label),
-                                    checked = locked || categories.isOn(category),
-                                    enabled = !locked
-                                ) { checked -> scope.launch { push.preferences.set(category, checked) } }
-                            }
+    AppSection(stringResource(R.string.push_settings_title), modifier = modifier) {
+        RowGroup {
+            StatusRow(
+                label = stringResource(R.string.push_settings_system),
+                value = stringResource(statusText(ui))
+            )
+            if (!ui.canPost) {
+                RowDividerIndented()
+                if (ui.canAskSystem) {
+                    NavigationRow(
+                        Icons.Outlined.Notifications,
+                        stringResource(R.string.push_settings_allow)
+                    ) { requestPermission() }
+                } else {
+                    NavigationRow(
+                        Icons.Outlined.Settings,
+                        stringResource(R.string.push_settings_open_system)
+                    ) { NotificationPermission.openSystemSettings(context) }
+                }
+            }
+            RowDividerIndented()
+            SwitchRow(
+                label = stringResource(R.string.push_settings_enabled),
+                checked = ui.notificationsEnabled,
+                enabled = true
+            ) { checked -> push.setNotificationsEnabled(checked) }
+        }
+        Footnote(stringResource(R.string.push_settings_footer))
+
+        if (showsCategories) {
+            when {
+                categories.isLoaded -> {
+                    RowGroup {
+                        CATEGORIES.forEachIndexed { index, (category, label) ->
+                            if (index > 0) RowDividerIndented()
+                            val locked = categories.isLocked(category)
+                            SwitchRow(
+                                label = stringResource(label),
+                                checked = locked || categories.isOn(category),
+                                enabled = !locked
+                            ) { checked -> scope.launch { push.preferences.set(category, checked) } }
                         }
-                        Footnote(
-                            stringResource(
-                                if (categories.failed) R.string.push_categories_failed
-                                else R.string.push_categories_footer
-                            )
-                        )
                     }
-                    categories.loading -> Footnote(stringResource(R.string.push_categories_loading))
-                    else -> AppCard {
-                        Footnote(stringResource(R.string.push_categories_failed))
-                        TextButton(onClick = { scope.launch { push.preferences.load() } }) {
-                            Text(stringResource(R.string.kb_retry))
-                        }
+                    Footnote(
+                        stringResource(
+                            if (categories.failed) R.string.push_categories_failed
+                            else R.string.push_categories_footer
+                        )
+                    )
+                }
+                categories.loading -> Footnote(stringResource(R.string.push_categories_loading))
+                else -> AppCard {
+                    Footnote(stringResource(R.string.push_categories_failed))
+                    TextButton(onClick = { scope.launch { push.preferences.load() } }) {
+                        Text(stringResource(R.string.kb_retry))
                     }
                 }
             }
-        } else {
-            AppCard { Footnote(stringResource(R.string.push_settings_unavailable)) }
         }
     }
 }

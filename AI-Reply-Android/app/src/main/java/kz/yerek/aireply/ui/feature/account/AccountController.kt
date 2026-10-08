@@ -3,15 +3,17 @@ package kz.yerek.aireply.ui.feature.account
 import android.app.Activity
 import kz.yerek.aireply.ai.AILimits
 import androidx.annotation.StringRes
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kz.yerek.aireply.BuildConfig
 import kz.yerek.aireply.R
-import kz.yerek.aireply.data.account.AccountCredentials
 import kz.yerek.aireply.data.account.AccountObserver
 import kz.yerek.aireply.data.account.AccountService
 import kz.yerek.aireply.data.account.AccountSessionDto
@@ -27,11 +29,13 @@ import kz.yerek.aireply.data.account.OtpCode
 import kz.yerek.aireply.data.account.PlanDto
 import kz.yerek.aireply.data.account.ProfileUpdate
 import kz.yerek.aireply.data.account.ServerFeaturesDto
+import kz.yerek.aireply.data.account.SessionCredentials
 import kz.yerek.aireply.data.account.SubscriptionDto
 import kz.yerek.aireply.data.account.UsageDto
 import kz.yerek.aireply.data.account.raise
 import kz.yerek.aireply.data.legal.LegalConsentStore
 import kz.yerek.aireply.data.profile.ProfileSync
+import kz.yerek.aireply.keyboard.autocorrect.LearnedWordsStore
 import java.util.TimeZone
 
 /**
@@ -48,7 +52,7 @@ import java.util.TimeZone
  */
 class AccountController(
     private val service: AccountService,
-    private val credentials: AccountCredentials,
+    private val credentials: SessionCredentials,
     private val usageCache: AccountUsageCache,
     private val legalConsentStore: LegalConsentStore,
     private val google: GoogleSignInClient? = null,
@@ -60,7 +64,9 @@ class AccountController(
     private val onSignedOut: () -> Unit = {},
     private val clock: () -> Long = System::currentTimeMillis,
     /** Told about sign-in, sign-out, the legal consent and the server's features (the push installation). */
-    private val observer: AccountObserver? = null
+    private val observer: AccountObserver? = null,
+    /** The words the keyboard learned; they go with a deleted account. */
+    private val learnedWords: LearnedWordsStore? = null
 ) {
 
     /**
@@ -106,7 +112,9 @@ class AccountController(
         val bootstrapComplete: Boolean = false,
         val busy: Boolean = false,
         /** A string resource, never a server sentence. */
-        @StringRes val errorMessage: Int? = null
+        @StringRes val errorMessage: Int? = null,
+        /** A confirmation for the next screen, such as the account having been deleted. */
+        @StringRes val notice: Int? = null
     ) {
         val isSignedIn: Boolean get() = phase is Phase.SignedIn
         val remainingToday: Int get() = usage.remainingToday
@@ -115,7 +123,10 @@ class AccountController(
     private val _state = MutableStateFlow(
         State(
             phase = if (credentials.isSignedIn) Phase.SignedIn else Phase.SignedOut,
-            hasAcceptedLegal = legalConsentStore.hasAccepted(LegalConfigDto.PRODUCTION)
+            // The versions the server published last, so a bump made while
+            // the app was away asks again before anything reaches the server.
+            legalConfig = legalConsentStore.latestConfig(),
+            hasAcceptedLegal = legalConsentStore.hasAcceptedLatest()
         )
     )
     val state: StateFlow<State> = _state.asStateFlow()
@@ -145,6 +156,8 @@ class AccountController(
             // The administrator's character limits, for the keyboard too.
             AILimits.apply(config)
             val legal = config.legal ?: LegalConfigDto.PRODUCTION
+            // The keyboard checks the consent against these versions too.
+            legalConsentStore.rememberConfig(legal)
             trackingConsent {
                 _state.update {
                     it.copy(
@@ -414,8 +427,94 @@ class AccountController(
 
     suspend fun acceptLegal(locale: String) {
         legalConsentStore.accept(_state.value.legalConfig, locale, BuildConfig.VERSION_NAME)
-        trackingConsent { _state.update { it.copy(hasAcceptedLegal = true) } }
+        trackingConsent { _state.update { it.copy(hasAcceptedLegal = true, notice = null) } }
         syncPendingLegalConsent()
+    }
+
+    /**
+     * Settings ▸ Withdraw AI consent. The server is told first, so AI requests
+     * stop there too; then the consent screen comes back. Offline nothing
+     * changes and the reason is returned instead: a string resource, as
+     * [messageFor] gives it (not annotated: a suspend function returns an
+     * Object to lint).
+     */
+    suspend fun withdrawLegalConsent(): Int? {
+        _state.update { it.copy(busy = true) }
+        if (credentials.isSignedIn) {
+            try {
+                service.withdrawLegalConsent()
+            } catch (cancellation: CancellationException) {
+                _state.update { it.copy(busy = false) }
+                throw cancellation
+            } catch (exception: Throwable) {
+                _state.update { it.copy(busy = false) }
+                return messageFor(exception)
+            }
+        }
+        legalConsentStore.clear()
+        _state.update { it.copy(busy = false, hasAcceptedLegal = false) }
+        return null
+    }
+
+    /**
+     * An AI request was refused for a missing consent - by the server
+     * (CONSENT_REQUIRED: new versions, or withdrawn on another device) or on
+     * this phone (the keyboard saw new versions first). The consent screen
+     * shows again, for the newest versions known, and accepting there records
+     * it on the server. May run on the keyboard's thread.
+     */
+    fun consentRequired() {
+        legalConsentStore.clear()
+        legalRecheckPending = true
+        _state.update { it.copy(legalConfig = legalConsentStore.latestConfig(), hasAcceptedLegal = false) }
+    }
+
+    /**
+     * The consent screen appeared after [consentRequired]: the server may have
+     * published versions this phone has not seen yet, and accepting older ones
+     * would only be refused again. One `GET /config`, then never until the next
+     * refusal.
+     */
+    suspend fun recheckLegalVersions() {
+        if (!legalRecheckPending) return
+        legalRecheckPending = false
+        loadServerConfig()
+    }
+
+    @Volatile
+    private var legalRecheckPending = false
+
+    /**
+     * Settings ▸ Delete account. The server deletes the account, its profile,
+     * consents, usage and devices; then this phone forgets everything it kept
+     * for it - the session, the consent, the learned words, the quota and the
+     * profile the server had a copy of - and shows the consent screen with
+     * [R.string.account_deleted]. The keyboard keeps typing.
+     *
+     * Not cancelled when the screen goes away mid-request: an account deleted
+     * on the server must not stay half signed in here.
+     */
+    suspend fun deleteAccount(): Boolean {
+        if (!credentials.isSignedIn) return false
+        _state.update { it.copy(busy = true, errorMessage = null) }
+        return withContext(NonCancellable) {
+            try {
+                service.deleteAccount()
+            } catch (exception: Throwable) {
+                _state.update { it.copy(busy = false) }
+                return@withContext false
+            }
+            // The consent first: the sign-out below must not register this
+            // installation again as if the terms were still accepted.
+            legalConsentStore.clear()
+            _state.update { it.copy(hasAcceptedLegal = false, notice = R.string.account_deleted) }
+            learnedWords?.clear()
+            usageCache.clear()
+            profileSync?.accountDeleted()
+            signOutLocally(userInitiated = true)
+            backgroundScope?.launch { runCatching { google?.signOut() } }
+            true
+        }
     }
 
     /**
@@ -519,7 +618,7 @@ class AccountController(
      * changes.
      */
     suspend fun choosePlan(plan: PlanDto): Boolean {
-        if (plan.isFree) return false
+        if (plan.isFree || !plan.purchasable) return false
         _state.update { it.copy(busy = true, errorMessage = null) }
         return try {
             val checkout = service.startCheckout(plan.id)
@@ -568,6 +667,8 @@ class AccountController(
                 is ApiError.Unauthorized -> R.string.account_error_session_expired
                 is ApiError.AccountDisabled -> R.string.account_error_disabled
                 is ApiError.DailyLimitReached -> R.string.account_error_limit_reached
+                is ApiError.MonthlyLimitReached -> R.string.kb_err_quota_monthly
+                is ApiError.ConsentRequired -> R.string.kb_err_consent_required
                 is ApiError.PaymentRequired, is ApiError.SubscriptionExpired ->
                     R.string.account_error_payment_required
                 else -> R.string.account_error_generic

@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kz.yerek.aireply.R
 import kz.yerek.aireply.ai.AIReplyError
+import kz.yerek.aireply.ai.AIReportDraft
 import kz.yerek.aireply.ai.AppStrings
 import kz.yerek.aireply.keyboard.KeyboardTheme
 import kz.yerek.aireply.keyboard.reply.ComposeSession
@@ -67,7 +68,11 @@ class CreateModel(
      * A short, wide window (a phone on its side): the line under the request
      * moves up into the header, where there is width to spare.
      */
-    val compact: Boolean = false
+    val compact: Boolean = false,
+    /** The server takes reports and a message the model wrote is on screen: the flag shows. */
+    val canReport: Boolean = false,
+    /** The report being written about that message; it takes the message's place. */
+    val report: AIReportDraft? = null
 )
 
 class CreateActions(
@@ -90,7 +95,8 @@ class CreateActions(
     /** The microphone: dictate the request. */
     val onMic: () -> Unit = {},
     /** Answer the copied message with this request instead. */
-    val onReplyToCopied: () -> Unit = {}
+    val onReplyToCopied: () -> Unit = {},
+    val report: ReportActions = ReportActions.NONE
 )
 
 /**
@@ -134,6 +140,11 @@ fun CreatePanel(
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         CreateHeader(model, actions, strings, theme)
+
+        model.report?.let { report ->
+            ReportPanel(report, strings, theme, actions.report)
+            return@Column
+        }
 
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             val fieldHeight = draftFieldHeight(flow, maxWidth, model.maxFieldLines, minLines = 3)
@@ -246,6 +257,10 @@ private fun CreateHeader(model: CreateModel, actions: CreateActions, strings: Ap
             Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                 CreateLineContent(model, actions, strings, theme)
             }
+            Spacer(Modifier.width(6.dp))
+        }
+        if (model.canReport) {
+            ReportFlag(open = model.report != null, strings = strings, theme = theme, onClick = actions.report.onToggle)
             Spacer(Modifier.width(6.dp))
         }
         if (model.session.hasContent && !flow.isConflict) {

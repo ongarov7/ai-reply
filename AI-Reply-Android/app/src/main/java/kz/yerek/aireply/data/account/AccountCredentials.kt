@@ -101,6 +101,11 @@ class AccountUsageCache(private val settings: SettingsStore) {
         settings.cachedPlanCode = code
     }
 
+    /** Forgets the quota of an account that is gone. */
+    fun clear() {
+        settings.clearUsageCache()
+    }
+
     fun current(): Snapshot = Snapshot(
         dailyLimit = settings.cachedDailyLimit,
         usedToday = settings.cachedUsedToday,

@@ -16,9 +16,12 @@ import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.PersonOutline
+import androidx.compose.material.icons.outlined.PrivacyTip
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -33,14 +36,16 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kz.yerek.aireply.BuildConfig
 import kz.yerek.aireply.R
 import kz.yerek.aireply.analytics.ProductEvent
@@ -55,6 +60,7 @@ import kz.yerek.aireply.ui.common.Footnote
 import kz.yerek.aireply.ui.common.NavigationRow
 import kz.yerek.aireply.ui.common.RowDividerIndented
 import kz.yerek.aireply.ui.common.RowGroup
+import kz.yerek.aireply.ui.common.openWebPage
 import kz.yerek.aireply.ui.common.privacyStatement
 import kz.yerek.aireply.ui.common.rememberKeyboardStatus
 import kz.yerek.aireply.ui.design.AppCard
@@ -72,7 +78,8 @@ import kz.yerek.aireply.ui.navigation.Routes
 @Composable
 fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit, focusSection: String? = null) {
     val services = LocalServices.current
-    val uriHandler = LocalUriHandler.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val accountState by services.account.state.collectAsStateWithLifecycle()
     val pushState by services.push.ui.collectAsStateWithLifecycle()
     val notificationsSection = remember { BringIntoViewRequester() }
@@ -92,6 +99,9 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit, focusSection: S
     var smartCorrection by remember { mutableStateOf(services.settings.smartCorrection) }
     val keyboardStatus by rememberKeyboardStatus()
     var mockReplies by remember { mutableStateOf(services.settings.debugMockReplies) }
+    var confirmingWithdrawal by remember { mutableStateOf(false) }
+    var withdrawalError by remember { mutableStateOf<Int?>(null) }
+    val pageLanguage = services.settings.effectiveAppLanguage.code
 
     AppScreen(title = stringResource(R.string.settings_title), onBack = onBack) {
         ReadableColumn {
@@ -238,20 +248,30 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit, focusSection: S
                     NavigationRow(
                         Icons.Outlined.Description,
                         stringResource(R.string.legal_terms)
-                    ) {
-                        uriHandler.openUri(
-                            "${accountState.legalConfig.termsUrl}?lang=${services.settings.effectiveAppLanguage.code}"
-                        )
-                    }
+                    ) { context.openWebPage(accountState.legalConfig.termsUrl, pageLanguage) }
                     RowDividerIndented()
                     NavigationRow(
                         Icons.Outlined.Lock,
                         stringResource(R.string.legal_privacy)
-                    ) {
-                        uriHandler.openUri(
-                            "${accountState.legalConfig.privacyUrl}?lang=${services.settings.effectiveAppLanguage.code}"
-                        )
+                    ) { context.openWebPage(accountState.legalConfig.privacyUrl, pageLanguage) }
+                    if (accountState.hasAcceptedLegal) {
+                        RowDividerIndented()
+                        NavigationRow(
+                            Icons.Outlined.PrivacyTip,
+                            stringResource(R.string.settings_withdraw_consent),
+                            enabled = !accountState.busy
+                        ) {
+                            withdrawalError = null
+                            confirmingWithdrawal = true
+                        }
                     }
+                }
+                withdrawalError?.let { message ->
+                    Text(
+                        stringResource(message),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
                 }
             }
 
@@ -265,6 +285,15 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit, focusSection: S
                     }
                 }
                 Footnote(stringResource(R.string.settings_tutorial_footer))
+                RowGroup {
+                    NavigationRow(
+                        Icons.AutoMirrored.Outlined.HelpOutline,
+                        stringResource(R.string.settings_support)
+                    ) {
+                        val url = accountState.legalConfig.supportUrl.ifBlank { DEFAULT_SUPPORT_URL }
+                        context.openWebPage(url, pageLanguage)
+                    }
+                }
             }
 
             // Debug builds only: release builds do not have this section.
@@ -296,7 +325,29 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit, focusSection: S
                     Footnote(stringResource(R.string.settings_debug_push_footer))
                 }
             }
+
+            Footnote(stringResource(R.string.settings_version, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE))
         }
+    }
+
+    if (confirmingWithdrawal) {
+        AlertDialog(
+            onDismissRequest = { confirmingWithdrawal = false },
+            title = { Text(stringResource(R.string.settings_withdraw_consent)) },
+            text = { Text(stringResource(R.string.settings_withdraw_consent_body)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmingWithdrawal = false
+                    // On success the consent screen takes over; a failure stays here.
+                    scope.launch { withdrawalError = services.account.withdrawLegalConsent() }
+                }) { Text(stringResource(R.string.settings_withdraw_consent_action)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmingWithdrawal = false }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            }
+        )
     }
 }
 
@@ -324,6 +375,9 @@ private fun LanguageRow(label: String, selected: Boolean, onClick: () -> Unit) {
 }
 
 private const val FOCUS_DELAY_MS = 300L
+
+/** Where Help and support goes when the server's config has no page for it. */
+private const val DEFAULT_SUPPORT_URL = "https://ai-reply.kz/support"
 
 /** Debug builds: time to leave the app, to see the notification arrive in the background too. */
 private const val DEBUG_PUSH_DELAY_MS = 3_000L

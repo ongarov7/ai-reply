@@ -155,6 +155,14 @@ data class ReplyComposerFlow(
 
     val draftText: String get() = drafts.currentText
 
+    /**
+     * What the model wrote for the version on screen, while it is shown as a
+     * result: the text a Report is about. Null while it is being edited,
+     * regenerated or inserted, and for a reply the user typed themselves.
+     */
+    val reportableText: String?
+        get() = drafts.current?.generated?.takeIf { stage == Stage.Result && it.isNotBlank() }
+
     // ---------------------------------------------------------- generation
 
     /**

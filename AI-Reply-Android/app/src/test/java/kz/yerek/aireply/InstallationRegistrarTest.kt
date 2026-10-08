@@ -23,6 +23,7 @@ import kz.yerek.aireply.push.InstallationRegistrar
 import kz.yerek.aireply.push.InstallationRegistrar.Outcome
 import kz.yerek.aireply.push.InstallationRequest
 import kz.yerek.aireply.push.InstallationResponse
+import kz.yerek.aireply.push.InvalidTokenRenewal
 import kz.yerek.aireply.push.NotificationOpenedRequest
 import kz.yerek.aireply.push.PushStateStore
 import kz.yerek.aireply.push.PushTokenDto
@@ -477,6 +478,45 @@ class InstallationRegistrarTest {
         val body = Json.parseToJsonElement(sent.body).jsonObject
         assertEquals(setOf("installation_id", "delivery_id"), body.keys)
         assertEquals("\"${request.installationId}\"", body["installation_id"].toString())
+    }
+
+    // --------------------------------------------------- invalid FCM token
+
+    @Test
+    fun `a token the server reports invalid is renewed once per process`() {
+        val renewal = InvalidTokenRenewal()
+        val withToken = sample().copy(push = PushTokenDto("fcm", "old-token"))
+        val invalid = InstallationResponse(installationId = withToken.installationId, pushStatus = "invalid")
+
+        assertFalse("active", renewal.shouldRenew(withToken, invalid.copy(pushStatus = "active")))
+        assertFalse("replaced by another install", renewal.shouldRenew(withToken, invalid.copy(pushStatus = "replaced")))
+        assertFalse("no token was sent", renewal.shouldRenew(sample(), invalid))
+        assertTrue(renewal.shouldRenew(withToken, invalid))
+        assertFalse(
+            "a new token refused as well does not loop",
+            renewal.shouldRenew(withToken.copy(push = PushTokenDto("fcm", "new-token")), invalid)
+        )
+    }
+
+    @Test
+    fun `the registrar hands the answer for the token it sent to its listener`() = runBlocking {
+        request = sample().copy(push = PushTokenDto("fcm", "old-token"))
+        api.answer = { sent, _ -> InstallationResponse(installationId = sent.installationId, pushStatus = "invalid") }
+        val renewal = InvalidTokenRenewal()
+        val renewed = mutableListOf<String?>()
+        val registrar = InstallationRegistrar(
+            api = api,
+            session = SimpleSession(signedIn = true),
+            store = store,
+            snapshot = { request },
+            isEnabled = { true },
+            scope = idle,
+            clock = { now },
+            listener = { sent, response -> if (renewal.shouldRenew(sent, response)) renewed += sent.push?.token }
+        )
+
+        assertTrue(registrar.syncOnce() is Outcome.Synced)
+        assertEquals(listOf<String?>("old-token"), renewed)
     }
 
     private fun sample() = InstallationRequest(

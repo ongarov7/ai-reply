@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kz.yerek.aireply.ai.AIReplyError
@@ -176,7 +177,11 @@ class ReplySessionController(
             instruction = current.instruction.text,
             inputLanguage = inputLanguage()
         )
-        job = scope.launch {
+        // Started only once it is the job: on Main.immediate a request that
+        // fails before its first suspension (no account, no consent) has
+        // already finished inside launch, and assigning it afterwards would
+        // leave a dead job that refuses every Try again.
+        val running = scope.launch(start = CoroutineStart.LAZY) {
             try {
                 val reply = service.generate(request)
                 if (mine != ticket || session !== current) return@launch
@@ -203,6 +208,8 @@ class ReplySessionController(
                 if (mine == ticket) job = null
             }
         }
+        job = running
+        running.start()
     }
 
     /** Stop. Everything typed stays; a late answer is ignored. */

@@ -414,6 +414,26 @@ class ImeComposingTest {
     }
 
     @Test
+    fun `a name or an address is suggested for but never replaced`() {
+        val text = InputType.TYPE_CLASS_TEXT
+        listOf(
+            text or InputType.TYPE_TEXT_VARIATION_PERSON_NAME or InputType.TYPE_TEXT_FLAG_CAP_WORDS,
+            text or InputType.TYPE_TEXT_VARIATION_POSTAL_ADDRESS
+        ).forEach { type ->
+            start(inputType = type)
+            assertTrue(controller.correctsHost)
+            type("сегодян")
+            assertTrue("the strip still offers it", controller.suggestions.any { it.text == "сегодня" })
+            type(" ")
+            assertEquals("input type $type", "сегодян ", connection.toString())
+        }
+        // The same word in a message is corrected, as always.
+        start()
+        type("сегодян ")
+        assertEquals("сегодня ", connection.toString())
+    }
+
+    @Test
     fun `fields that are not prose are left alone`() {
         val text = InputType.TYPE_CLASS_TEXT
         listOf(

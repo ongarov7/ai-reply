@@ -68,6 +68,9 @@ class AutocorrectController(
     var correctsFields: Boolean = false
         private set
 
+    /** A separator may replace the word typed in the host's field; off in names and addresses. */
+    private var autoReplacesHost = true
+
     private var language = KeyboardLanguage.KAZAKH
     private var learns = true
 
@@ -109,6 +112,7 @@ class AutocorrectController(
      */
     fun startInput(info: EditorInfo?, smartCorrection: Boolean, language: KeyboardLanguage) {
         correctsHost = AutocorrectGate.allows(info, smartCorrection)
+        autoReplacesHost = AutocorrectGate.autoReplaces(info)
         correctsFields = smartCorrection
         learns = AutocorrectGate.learns(info)
         clear()
@@ -283,7 +287,7 @@ class AutocorrectController(
     /** The separator [separator] ends [word]: corrected when the engine is sure, as typed otherwise. */
     private fun endWord(surface: TypingSurface, word: String, separator: String): Boolean {
         val before = surface.textBeforeWord
-        val correction = correctionFor(word, before)
+        val correction = if (surface === hostSurface && !autoReplacesHost) null else correctionFor(word, before)
         if (correction != null && correction != word && surface.endWord(correction, separator)) {
             undo = Undo(AppliedCorrection(word, correction, separator, language), before, surface)
             return true

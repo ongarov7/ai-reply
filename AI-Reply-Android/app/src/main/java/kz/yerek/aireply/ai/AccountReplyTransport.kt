@@ -243,7 +243,7 @@ class AccountReplyTransport(
          * show.
          *
          * A spent quota and a burst of requests are different problems with
-         * different fixes - change plan or wait until tomorrow, versus wait a
+         * different fixes - wait until tomorrow (or next month), versus wait a
          * few seconds - so they stay different errors. They used to share one,
          * and a user who tapped Regenerate twice was told their day's replies
          * were gone.
@@ -253,6 +253,8 @@ class AccountReplyTransport(
             is ApiError.TimedOut, is ApiError.ProviderTimeout -> AIReplyError.TimedOut
             is ApiError.Cancelled -> AIReplyError.Cancelled
             is ApiError.Unauthorized, is ApiError.AccountDisabled -> AIReplyError.AuthenticationFailed
+            is ApiError.ConsentRequired -> AIReplyError.ConsentRequired
+            is ApiError.MonthlyLimitReached -> AIReplyError.MonthlyQuotaExhausted
             is ApiError.DailyLimitReached, is ApiError.SubscriptionExpired,
             is ApiError.PaymentRequired -> AIReplyError.QuotaExhausted
             is ApiError.RateLimited -> AIReplyError.RateLimited

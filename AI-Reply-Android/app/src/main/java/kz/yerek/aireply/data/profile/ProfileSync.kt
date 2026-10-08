@@ -9,7 +9,9 @@ import kz.yerek.aireply.data.account.AccountProfile
 import kz.yerek.aireply.data.account.AccountService
 import kz.yerek.aireply.data.account.ProfileUpdate
 import kz.yerek.aireply.data.settings.DeviceStateStore
+import kz.yerek.aireply.domain.model.BusinessContext
 import kz.yerek.aireply.domain.model.GrammaticalGender
+import kz.yerek.aireply.domain.model.ReplyTone
 
 /**
  * Keeps the grammatical gender the same on every device of one account, gives
@@ -72,6 +74,25 @@ class ProfileSync(
 
     /** The account signed out: its unsent change must not reach the next one ([DeviceStateStore.accountSignedOut]). */
     fun signedOut() {
+        device.accountSignedOut()
+    }
+
+    /**
+     * The account was deleted: what this phone kept of the profile the server
+     * had a copy of goes too - about me, role, business, tone, gender. The
+     * personas, their order and the working hours are this phone's settings
+     * and stay.
+     */
+    fun accountDeleted() {
+        configuration.updateProfile {
+            it.copy(
+                descriptionText = "",
+                role = "",
+                business = BusinessContext.EMPTY,
+                preferredTone = ReplyTone.NATURAL,
+                grammaticalGender = null
+            )
+        }
         device.accountSignedOut()
     }
 

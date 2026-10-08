@@ -50,6 +50,8 @@ class AppStrings(private val context: Context) {
         AIReplyError.AuthenticationFailed -> get(R.string.kb_err_sign_in_required)
         AIReplyError.RateLimited -> get(R.string.kb_err_rate_limited)
         AIReplyError.QuotaExhausted -> get(R.string.kb_err_quota_exhausted)
+        AIReplyError.MonthlyQuotaExhausted -> get(R.string.kb_err_quota_monthly)
+        AIReplyError.ConsentRequired -> get(R.string.kb_err_consent_required)
         AIReplyError.EmptyResponse -> get(R.string.kb_err_empty_response)
         AIReplyError.ServiceUnavailable -> get(R.string.kb_err_service_unavailable)
         AIReplyError.NoInstruction -> get(R.string.kb_compose_err_no_instruction)

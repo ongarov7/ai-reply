@@ -43,7 +43,7 @@
     <string name="home_keyboard_opensettings">iOS параметрлерін ашу</string>
     <string name="home_keyboard_ready">AI Reply пернетақтасы қосулы</string>
     <string name="home_keyboard_title">Пернетақта</string>
-    <string name="home_privacy_body">Мәтін тек жауап сұраған кезде өңделеді. Ол AI Reply арқылы AI провайдеріне жіберіледі, бірақ дерекқорда сақталмайды және журналға жазылмайды.</string>
+    <string name="home_privacy_body">Мәтін тек жауап сұраған кезде өңделеді. Ол AI Reply арқылы OpenAI-ға жіберіледі, бірақ дерекқорда сақталмайды және журналға жазылмайды.</string>
     <string name="home_privacy_title">Құпиялылық</string>
     <string name="home_profile_edit">Профиль</string>
     <string name="home_profile_hours">Жұмыс уақыты</string>
@@ -140,7 +140,7 @@
     <string name="settings_appgroup_unavailable">Қолданба мен пернетақта әзірге параметрлермен алмаса алмайды. App Group қолданылуы үшін қолданбаны қайта жинаңыз.</string>
     <string name="settings_language">Тіл</string>
     <string name="settings_language_footer">Осы қолданбаның тілін өзгертеді. Пернетақтадағы жазулар пернетақтада таңдалған орналасуға сәйкес келеді.</string>
-    <string name="settings_privacy_body">«%1$s» түймесі көшірілген хабарлама мен нұсқауыңызды, «%2$s» түймесі тек нұсқауды жібереді. Ақылды түзету қосулы болса, AI\u00A0Reply өрісіне жазған нұсқауыңыз түзету ұсыну үшін де жіберілуі мүмкін. Мәтін AI\u00A0Reply сервері арқылы AI провайдеріне беріледі, дерекқорда сақталмайды және журналға жазылмайды.</string>
+    <string name="settings_privacy_body">«%1$s» түймесі көшірілген хабарлама мен нұсқауыңызды, «%2$s» түймесі тек нұсқауды жібереді. Ақылды түзету қосулы болса, AI\u00A0Reply өрісіне жазған нұсқауыңыз түзету ұсыну үшін де жіберілуі мүмкін. Мәтін AI\u00A0Reply сервері арқылы OpenAI-ға беріледі, дерекқорда сақталмайды және журналға жазылмайды.</string>
     <string name="settings_privacy_title">Құпиялылық</string>
     <string name="settings_setup">Баптау</string>
     <string name="settings_setup_footer">Пернетақта күйі, қадамдық баптау және AI\u00A0Reply көшірілген мәтінді қалай оқитыны.</string>
@@ -323,7 +323,7 @@
     <string name="home_usage_title">Бүгінгі жауаптар</string>
     <string name="home_usage_left">%1$d-тен қалды</string>
     <string name="kb_err_sign_in_required">Жалғастыру үшін AI Reply қолданбасын ашып, кіріңіз.</string>
-    <string name="kb_err_quota_exhausted">Бүгінгі жауаптар бітті. Ертең жаңарады немесе қолданбадан тарифті ауыстырыңыз.</string>
+    <string name="kb_err_quota_exhausted">Бүгінгі жауаптар бітті. Ертең жаңарады.</string>
 
     <!-- Onboarding v2, the sender's grammatical gender, the tutorial row -->
     <string name="onboarding_skip_tutorial">Нұсқаулықты өткізу</string>
@@ -359,6 +359,6 @@
     <string name="profile_gender_footer">Тек орыс тілінің грамматикасы үшін керек: «рад/рада», «сделал/сделала». Біз мұны атыңыздан не аккаунтыңыздан ешқашан болжамаймыз.</string>
     <string name="settings_tutorial">AI\u00A0Reply-ды қалай қолдануға болады</string>
     <string name="settings_tutorial_footer">Қысқа нұсқаулық: хабарламаны көшіру, пернетақтадан жауап беру, жаттығу. Ешқандай параметр өзгермейді.</string>
-    <string name="onboarding_keyboard_privacy">Android пернетақта «сіз терген мәтіннің барлығын жинауы мүмкін» деп ескертеді. Бұл — кез келген пернетақтаға көрсетілетін стандартты ескерту. AI\u00A0Reply мәтінді «%1$s» не «%2$s» түймесін басқанда жібереді. Ақылды түзету қосулы болса, AI\u00A0Reply өрісіне жазған нұсқауыңыз түзету ұсыну үшін де жіберілуі мүмкін. Терген басқа мәтініңіз ешқайда жіберілмейді.</string>
+    <string name="onboarding_keyboard_privacy">Android пернетақта «сіз терген мәтіннің барлығын жинауы мүмкін» деп ескертеді. Бұл — кез келген пернетақтаға көрсетілетін стандартты ескерту. AI\u00A0Reply мәтінді «%1$s» не «%2$s» түймесін басқанда өз сервері арқылы OpenAI-ға жібереді. Ақылды түзету қосулы болса, AI\u00A0Reply өрісіне жазған нұсқауыңыз түзету ұсыну үшін де жіберілуі мүмкін. Терген басқа мәтініңіз ешқайда жіберілмейді.</string>
 
 </resources>

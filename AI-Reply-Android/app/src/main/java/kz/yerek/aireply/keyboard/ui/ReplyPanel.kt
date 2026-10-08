@@ -71,6 +71,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kz.yerek.aireply.R
 import kz.yerek.aireply.ai.AIReplyService
+import kz.yerek.aireply.ai.AIReportDraft
 import kz.yerek.aireply.ai.AppStrings
 import kz.yerek.aireply.domain.model.TemplateSummary
 import kz.yerek.aireply.keyboard.KeyboardTheme
@@ -105,7 +106,11 @@ class ComposerModel(
     /** The last dictation reached the instruction's limit. */
     val voiceNotice: DictationNotice? = null,
     /** Lines of the dictation status: fewer on a phone on its side. */
-    val voiceLines: Int = 2
+    val voiceLines: Int = 2,
+    /** The server takes reports and a reply the model wrote is on screen: the flag shows. */
+    val canReport: Boolean = false,
+    /** The report being written about that reply; it takes the reply's place. */
+    val report: AIReportDraft? = null
 )
 
 class ComposerActions(
@@ -130,7 +135,8 @@ class ComposerActions(
     val onNextVersion: () -> Unit,
     val onConflict: (ReplyComposerFlow.ConflictChoice) -> Unit,
     val onMic: () -> Unit,
-    val assist: TypingAssistActions
+    val assist: TypingAssistActions,
+    val report: ReportActions = ReportActions.NONE
 )
 
 // ----------------------------------------------------------------- persona row
@@ -338,6 +344,11 @@ fun ComposerPanel(
             SourceCard(model, actions, strings, theme)
         }
 
+        model.report?.let { report ->
+            ReportPanel(report, strings, theme, actions.report)
+            return@Column
+        }
+
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             val fieldHeight = draftFieldHeight(flow, maxWidth, model.maxFieldLines)
             when {
@@ -536,6 +547,11 @@ private fun Header(model: ComposerModel, actions: ComposerActions, strings: AppS
             }
         } else {
             Spacer(Modifier.weight(1f))
+        }
+
+        if (model.canReport) {
+            Spacer(Modifier.width(4.dp))
+            ReportFlag(open = model.report != null, strings = strings, theme = theme, onClick = actions.report.onToggle)
         }
 
         if (hasSource) {

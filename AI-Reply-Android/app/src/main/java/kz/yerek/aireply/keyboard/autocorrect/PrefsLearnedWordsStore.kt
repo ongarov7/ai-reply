@@ -3,6 +3,7 @@ package kz.yerek.aireply.keyboard.autocorrect
 import android.content.Context
 import android.content.SharedPreferences
 import kz.yerek.aireply.core.lang.KeyboardLanguage
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * The words the user taught the keyboard, one preferences key per layout
@@ -26,7 +27,18 @@ class PrefsLearnedWordsStore internal constructor(private val prefs: SharedPrefe
         prefs.edit().putString(LearnedWordsStore.key(language), value).apply()
     }
 
+    override fun clear() {
+        // The copy in memory is out of date first, so it cannot be written back after the removal.
+        clears.incrementAndGet()
+        prefs.edit().apply { KeyboardLanguage.entries.forEach { remove(LearnedWordsStore.key(it)) } }.apply()
+    }
+
+    /** Shared by every instance: the app clears the file the keyboard's engine has in memory. */
+    override val generation: Int get() = clears.get()
+
     private companion object {
         const val NAME = "aireply_autocorrect"
+
+        val clears = AtomicInteger()
     }
 }

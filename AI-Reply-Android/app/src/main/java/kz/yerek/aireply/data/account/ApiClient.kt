@@ -61,6 +61,15 @@ sealed interface ApiError {
         val resetsAt: String?
     ) : ApiError
 
+    /** This month's quota is spent; it comes back with the next month, not tomorrow. */
+    data class MonthlyLimitReached(val resetsAt: String?) : ApiError
+
+    /**
+     * The account has not accepted the current terms and privacy policy (or
+     * withdrew its consent): AI requests wait until the app records it again.
+     */
+    data object ConsentRequired : ApiError
+
     data object SubscriptionExpired : ApiError
     data object PaymentRequired : ApiError
     data object ProviderUnavailable : ApiError
@@ -217,11 +226,13 @@ class ApiClient(
                 "INVALID_ID_TOKEN" -> return ApiError.InvalidIdToken
                 "AUTH_PROVIDER_UNAVAILABLE" -> return ApiError.AuthProviderUnavailable
                 "RATE_LIMITED" -> return ApiError.RateLimited(retryAfter)
-                "DAILY_LIMIT_REACHED", "MONTHLY_LIMIT_REACHED" -> return ApiError.DailyLimitReached(
+                "DAILY_LIMIT_REACHED" -> return ApiError.DailyLimitReached(
                     limit = details?.dailyLimit ?: 0,
                     usedToday = details?.usedToday ?: 0,
                     resetsAt = details?.resetsAt
                 )
+                "MONTHLY_LIMIT_REACHED" -> return ApiError.MonthlyLimitReached(details?.resetsAt)
+                "CONSENT_REQUIRED" -> return ApiError.ConsentRequired
                 "SUBSCRIPTION_EXPIRED" -> return ApiError.SubscriptionExpired
                 "PAYMENT_REQUIRED" -> return ApiError.PaymentRequired
                 "AI_PROVIDER_UNAVAILABLE" -> return ApiError.ProviderUnavailable

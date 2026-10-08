@@ -86,6 +86,17 @@ as long as the Compose BOM and the Compose compiler plugin move with Kotlin.
 ./gradlew assembleRelease         # needs a signing config; none is checked in
 ```
 
+Each Play upload needs a higher `versionCode`. The defaults (1 / "1.0") stay
+in `app/build.gradle.kts`; an upload overrides them instead of editing it:
+
+```bash
+./gradlew bundleRelease -Paireply.versionCode=7 -Paireply.versionName=1.0.6
+```
+
+A release build without `app/google-services.json` (no push) or without a
+Google web client id (no "Continue with Google") still builds, but prints a
+warning, since a store upload without them is almost always a mistake.
+
 If `local.properties` is missing:
 
 ```bash

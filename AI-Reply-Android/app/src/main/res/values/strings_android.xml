@@ -208,16 +208,16 @@
     <string name="onboarding_clipboard_note">AI\u00A0Reply reads the message you copied only when you tap a template or Paste message. Some Android versions then briefly show a notice that the clipboard was read — that\'s normal.</string>
     <string name="cd_tutorial_next">Show the next step</string>
     <string name="settings_smart_correction">Smart correction</string>
-    <string name="settings_smart_correction_footer">Typos are fixed and words suggested on your phone: nothing you type in other apps is sent anywhere. While you write an instruction in AI\u00A0Reply\'s own field, that text may be sent to suggest a cleaner version.</string>
+    <string name="settings_smart_correction_footer">Typos are fixed and words suggested on your phone: nothing you type in other apps is sent anywhere. While you write an instruction in AI\u00A0Reply\'s own field, that text may be sent through the AI\u00A0Reply server to OpenAI to suggest a cleaner version.</string>
     <string name="settings_smart_correction_attribution">Word lists: Leipzig Corpora Collection (CC BY).</string>
 
     <!-- Push notifications (2026-10). -->
     <string name="push_channel_general">General</string>
     <string name="push_channel_general_description">Service news and reminders</string>
     <string name="push_channel_important">Important</string>
-    <string name="push_channel_important_description">Account, payments and security</string>
+    <string name="push_channel_important_description">Account, limits and security</string>
     <string name="push_prompt_title">Turn on notifications</string>
-    <string name="push_prompt_body">Know when a payment goes through, and before your plan runs out.</string>
+    <string name="push_prompt_body">Get alerts about your account and reply limits, and news about the service.</string>
     <string name="push_prompt_enable">Turn on</string>
     <string name="push_prompt_later">Not now</string>
     <string name="push_settings_title">Notifications</string>
@@ -228,10 +228,9 @@
     <string name="push_settings_allow">Allow notifications</string>
     <string name="push_settings_open_system">Open phone settings</string>
     <string name="push_settings_enabled">Notifications from AI\u00A0Reply</string>
-    <string name="push_settings_footer">Payment confirmations and reminders before your plan ends.</string>
-    <string name="push_settings_unavailable">Notifications are not available in this version yet.</string>
+    <string name="push_settings_footer">Alerts about your account and reply limits, and service news.</string>
     <string name="push_category_account">Account</string>
-    <string name="push_category_subscription">Plan and payments</string>
+    <string name="push_category_subscription">Reply limits</string>
     <string name="push_category_security">Security</string>
     <string name="push_category_system">Service updates</string>
     <string name="push_category_marketing">Offers</string>
@@ -243,5 +242,33 @@
     <string name="settings_debug_push_footer">Debug builds only. The sample arrives in 3 seconds through the same path as a real one in the foreground, and opens Plan when tapped. The switch shows the Home card and these settings even without Firebase.</string>
     <string name="debug_push_title">Payment received</string>
     <string name="debug_push_body">Sample notification: tap to open your plan.</string>
+
+    <!-- Release readiness (2026-10): AI consent, account deletion, reports, support. -->
+    <string name="legal_consent_ai_disclosure">When you tap %1$s or %2$s, AI Reply sends the message you copied, your instruction and your profile details through our server to OpenAI to write the text. With Smart correction on, your instruction is also sent while you type it. Our server does not save these texts.</string>
+    <string name="legal_consent_ai_checkbox">I agree that these texts are sent to OpenAI to write replies.</string>
+    <string name="kb_err_quota_monthly">You have used this month\'s replies. They come back next month.</string>
+    <string name="kb_err_consent_required">Open AI Reply and accept the updated terms to keep using AI replies.</string>
+    <string name="settings_account_delete">Delete account</string>
+    <string name="settings_account_delete_title">Delete your account?</string>
+    <string name="settings_account_delete_body">Your account, profile, consents, usage history and devices are deleted from our server right away. This cannot be undone. The keyboard keeps working for typing.</string>
+    <string name="account_deleted">Your account has been deleted.</string>
+    <string name="account_delete_failed">Couldn\'t delete the account. Check the connection and try again.</string>
+    <string name="report_action">Report</string>
+    <string name="report_title">Report this reply</string>
+    <string name="report_reason_offensive">Offensive or hateful</string>
+    <string name="report_reason_harmful">Harmful or dangerous</string>
+    <string name="report_reason_false_info">False information</string>
+    <string name="report_reason_wrong_language">Wrong language</string>
+    <string name="report_reason_other">Something else</string>
+    <string name="report_include_text">Send the reply text with the report</string>
+    <string name="report_send">Send report</string>
+    <string name="report_thanks">Thanks. We\'ll review this reply.</string>
+    <string name="report_failed">Couldn\'t send the report. Try again.</string>
+    <string name="settings_support">Help and support</string>
+    <string name="settings_withdraw_consent">Withdraw AI consent</string>
+    <string name="settings_withdraw_consent_body">AI replies stop working until you accept again. Your account stays.</string>
+    <string name="settings_withdraw_consent_action">Withdraw</string>
+    <string name="settings_version">Version %1$s (%2$d)</string>
+    <string name="common_link_failed">No app on this phone can open the link.</string>
 
 </resources>

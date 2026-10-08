@@ -22,6 +22,10 @@
     describes this device only. The installation id itself lives in
     noBackupFilesDir, which is never backed up, so a restored or reinstalled
     app registers as a new installation.
+
+    aireply_account.xml holds the session's non-secret values (the server's
+    device id, the account e-mail shown in Settings, the cached quota). The
+    tokens they go with never leave the phone, so neither do they.
 -->
 <data-extraction-rules>
     <cloud-backup>
@@ -29,11 +33,13 @@
         <exclude domain="sharedpref" path="aireply_device.xml" />
         <exclude domain="sharedpref" path="aireply_autocorrect.xml" />
         <exclude domain="sharedpref" path="aireply_push.xml" />
+        <exclude domain="sharedpref" path="aireply_account.xml" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="sharedpref" path="aireply_secure.xml" />
         <exclude domain="sharedpref" path="aireply_device.xml" />
         <exclude domain="sharedpref" path="aireply_autocorrect.xml" />
         <exclude domain="sharedpref" path="aireply_push.xml" />
+        <exclude domain="sharedpref" path="aireply_account.xml" />
     </device-transfer>
 </data-extraction-rules>

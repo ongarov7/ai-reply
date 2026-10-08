@@ -16,6 +16,7 @@ import kz.yerek.aireply.data.account.SessionAuth
 import kz.yerek.aireply.data.settings.SettingsStore
 import kz.yerek.aireply.platform.ReplyLog
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * What the screens show about notifications. Pure data; [showsPrompt] and
@@ -94,6 +95,8 @@ class PushCoordinator(
 
     val preferences = NotificationPreferencesRepository(api)
 
+    private val tokenRenewal = InvalidTokenRenewal()
+
     val registrar = InstallationRegistrar(
         api = api,
         session = session,
@@ -102,8 +105,11 @@ class PushCoordinator(
         isEnabled = { consentGiven() && features()?.installations == true },
         scope = scope,
         clock = clock,
-        // A signed-in registration answers with the account's categories: the switches follow.
-        listener = { _, response -> response.preferences?.let(preferences::adopt) }
+        listener = { request, response ->
+            // A signed-in registration answers with the account's categories: the switches follow.
+            response.preferences?.let(preferences::adopt)
+            if (tokenRenewal.shouldRenew(request, response)) renewToken(request.push?.token)
+        }
     )
 
     /** Firebase is configured in this build. Read once: it cannot change while the process lives. */
@@ -205,6 +211,27 @@ class PushCoordinator(
             }
             // Logged by PushSupport; the next launch, or onNewToken, tries again.
             PushSupport.TokenResult.Failed, PushSupport.TokenResult.Unsupported -> Unit
+        }
+    }
+
+    /**
+     * The server found the token it was sent unregistered at FCM: it is
+     * deleted and a new one asked for, and the next sync sends that one. The
+     * invalid one is never sent again, even if no new one comes now
+     * ([onNewToken] brings it later).
+     */
+    private fun renewToken(invalid: String?) {
+        if (!isSupportedInBuild) return
+        scope.launch {
+            if (invalid != null && store.fcmToken == invalid) store.fcmToken = null
+            when (val result = PushSupport.renewToken(appContext)) {
+                is PushSupport.TokenResult.Token -> {
+                    tokenFetched = true
+                    store.fcmToken = result.value
+                }
+                PushSupport.TokenResult.Failed, PushSupport.TokenResult.Unsupported -> Unit
+            }
+            registrar.requestSync()
         }
     }
 
@@ -395,5 +422,24 @@ class PushCoordinator(
     companion object {
         const val PROVIDER = "fcm"
         private const val CONFIG_RETRY_MS = 5L * 60 * 1000
+    }
+}
+
+/**
+ * Whether an installation answer calls for a new FCM token: the token that
+ * was sent is reported `invalid`. At most once per process, so a phone whose
+ * new token is refused as well does not loop.
+ *
+ * Сервер токенді жарамсыз деді: процесс сайын бір рет қана жаңасы алынады.
+ */
+class InvalidTokenRenewal {
+    private val used = AtomicBoolean(false)
+
+    fun shouldRenew(sent: InstallationRequest, response: InstallationResponse): Boolean =
+        sent.push != null && response.pushStatus == STATUS_INVALID && used.compareAndSet(false, true)
+
+    companion object {
+        /** `push_status` for a token FCM no longer delivers to. */
+        const val STATUS_INVALID = "invalid"
     }
 }

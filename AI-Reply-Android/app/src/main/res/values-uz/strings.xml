@@ -99,7 +99,7 @@
     <string name="settings_appearance_system">Tizim</string>
     <string name="settings_language">Til</string>
     <string name="settings_language_footer">Ilova tilini oʻzgartiradi. Klaviatura tugmalari tanlangan klaviatura tartibiga mos keladi.</string>
-    <string name="settings_privacy_body">«%1$s» tugmasi nusxalangan xabar va koʻrsatmangizni, «%2$s» tugmasi esa faqat koʻrsatmani yuboradi. Aqlli tuzatish yoqilgan boʻlsa, AI\u00A0Reply maydoniga yozgan koʻrsatmangiz tuzatish taklif qilish uchun ham yuborilishi mumkin. Matn AI\u00A0Reply serveri orqali AI provayderiga uzatiladi, bazada saqlanmaydi va jurnallarga yozilmaydi.</string>
+    <string name="settings_privacy_body">«%1$s» tugmasi nusxalangan xabar va koʻrsatmangizni, «%2$s» tugmasi esa faqat koʻrsatmani yuboradi. Aqlli tuzatish yoqilgan boʻlsa, AI\u00A0Reply maydoniga yozgan koʻrsatmangiz tuzatish taklif qilish uchun ham yuborilishi mumkin. Matn AI\u00A0Reply serveri orqali OpenAI’ga uzatiladi, bazada saqlanmaydi va jurnallarga yozilmaydi.</string>
     <string name="settings_privacy_title">Maxfiylik</string>
     <string name="settings_setup">Sozlash</string>
     <string name="settings_setup_footer">Klaviatura, mikrofon va nusxalangan matn uchun bosqichma-bosqich yoʻriqnoma.</string>
@@ -245,7 +245,7 @@
     <string name="settings_account_signed_out">Hisobga kirilmagan</string>
     <string name="settings_account_footer">Klaviatura ham shu hisobdan foydalanadi. Chiqsangiz, qayta kirguningizcha javoblar ishlamaydi.</string>
     <string name="kb_err_sign_in_required">Javob berishni davom ettirish uchun AI Reply ilovasini ochib, hisobga kiring.</string>
-    <string name="kb_err_quota_exhausted">Bugungi javoblaringiz tugadi. Ular ertaga yangilanadi yoki ilovada tarifni oʻzgartiring.</string>
+    <string name="kb_err_quota_exhausted">Bugungi javoblaringiz tugadi. Ular ertaga yangilanadi.</string>
 
     <!-- Onboarding v2, the sender's grammatical gender, the tutorial row -->
     <string name="onboarding_skip_tutorial">Qoʻllanmani oʻtkazib yuborish</string>
@@ -281,6 +281,6 @@
     <string name="profile_gender_footer">Faqat rus tili grammatikasi uchun kerak: «рад/рада», «сделал/сделала». Biz buni hech qachon ismingiz yoki akkauntingizdan taxmin qilmaymiz.</string>
     <string name="settings_tutorial">AI\u00A0Replydan qanday foydalanish</string>
     <string name="settings_tutorial_footer">Qisqa qoʻllanma: xabarni nusxalash, klaviaturadan javob berish, mashq. Hech qanday sozlama oʻzgarmaydi.</string>
-    <string name="onboarding_keyboard_privacy">Android klaviatura «siz yozgan barcha matnni yigʻishi mumkin» deb ogohlantiradi. Bu har qanday klaviatura uchun odatiy ogohlantirish. AI\u00A0Reply matnni «%1$s» yoki «%2$s»ni bosganingizda yuboradi. Aqlli tuzatish yoqilgan boʻlsa, AI\u00A0Reply maydoniga yozgan koʻrsatmangiz tuzatish taklif qilish uchun ham yuborilishi mumkin. Yozgan boshqa matningiz hech qayerga yuborilmaydi.</string>
+    <string name="onboarding_keyboard_privacy">Android klaviatura «siz yozgan barcha matnni yigʻishi mumkin» deb ogohlantiradi. Bu har qanday klaviatura uchun odatiy ogohlantirish. AI\u00A0Reply matnni «%1$s» yoki «%2$s»ni bosganingizda oʻz serveri orqali OpenAI’ga yuboradi. Aqlli tuzatish yoqilgan boʻlsa, AI\u00A0Reply maydoniga yozgan koʻrsatmangiz tuzatish taklif qilish uchun ham yuborilishi mumkin. Yozgan boshqa matningiz hech qayerga yuborilmaydi.</string>
 
 </resources>

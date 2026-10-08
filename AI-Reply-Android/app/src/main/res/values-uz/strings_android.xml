@@ -169,16 +169,16 @@
     <string name="onboarding_clipboard_note">AI\u00A0Reply nusxalangan xabarni faqat shablonni yoki «Xabarni joylash» tugmasini bosganingizda oʻqiydi. Androidning baʼzi versiyalari shu paytda bufer oʻqilgani haqida qisqa xabar koʻrsatadi — bu odatiy hol.</string>
     <string name="cd_tutorial_next">Keyingi qadamni koʻrsatish</string>
     <string name="settings_smart_correction">Aqlli tuzatish</string>
-    <string name="settings_smart_correction_footer">Xatolar tuzatiladi va soʻzlar toʻgʻridan-toʻgʻri telefonda taklif qilinadi: boshqa ilovalarda yozganlaringiz hech qayerga yuborilmaydi. AI\u00A0Reply maydonida koʻrsatma yozayotganingizda, tozaroq variant taklif qilish uchun bu matn yuborilishi mumkin.</string>
+    <string name="settings_smart_correction_footer">Xatolar tuzatiladi va soʻzlar toʻgʻridan-toʻgʻri telefonda taklif qilinadi: boshqa ilovalarda yozganlaringiz hech qayerga yuborilmaydi. AI\u00A0Reply maydonida koʻrsatma yozayotganingizda, tozaroq variant taklif qilish uchun bu matn AI\u00A0Reply serveri orqali OpenAI’ga yuborilishi mumkin.</string>
     <string name="settings_smart_correction_attribution">Lugʻatlar: Leipzig Corpora Collection (CC BY).</string>
 
     <!-- Push notifications (2026-10). -->
     <string name="push_channel_general">Umumiy</string>
     <string name="push_channel_general_description">Xizmat yangiliklari va eslatmalar</string>
     <string name="push_channel_important">Muhim</string>
-    <string name="push_channel_important_description">Hisob, toʻlov va xavfsizlik</string>
+    <string name="push_channel_important_description">Hisob, limitlar va xavfsizlik</string>
     <string name="push_prompt_title">Bildirishnomalarni yoqing</string>
-    <string name="push_prompt_body">Toʻlov oʻtganini va tarif tugashini oldindan bilib turing.</string>
+    <string name="push_prompt_body">Hisob va javob limitlari haqidagi bildirishnomalar hamda xizmat yangiliklari.</string>
     <string name="push_prompt_enable">Yoqish</string>
     <string name="push_prompt_later">Hozir emas</string>
     <string name="push_settings_title">Bildirishnomalar</string>
@@ -189,10 +189,9 @@
     <string name="push_settings_allow">Bildirishnomalarga ruxsat berish</string>
     <string name="push_settings_open_system">Telefon sozlamalarini ochish</string>
     <string name="push_settings_enabled">AI\u00A0Reply bildirishnomalari</string>
-    <string name="push_settings_footer">Toʻlov tasdiqlari va tarif tugashidan oldingi eslatmalar.</string>
-    <string name="push_settings_unavailable">Bu versiyada bildirishnomalar hozircha mavjud emas.</string>
+    <string name="push_settings_footer">Hisob va javob limitlari haqidagi bildirishnomalar, xizmat yangiliklari.</string>
     <string name="push_category_account">Hisob</string>
-    <string name="push_category_subscription">Tarif va toʻlov</string>
+    <string name="push_category_subscription">Javob limitlari</string>
     <string name="push_category_security">Xavfsizlik</string>
     <string name="push_category_system">Xizmat yangiliklari</string>
     <string name="push_category_marketing">Takliflar</string>
@@ -204,5 +203,33 @@
     <string name="settings_debug_push_footer">Faqat sinov yigʻmasida. Namuna 3 soniyadan soʻng ochiq ilovadagi haqiqiy bildirishnoma yoʻli bilan keladi va bosilganda «Tarif»ni ochadi. Kalit bosh ekrandagi kartani va bu sozlamalarni Firebase boʻlmasa ham koʻrsatadi.</string>
     <string name="debug_push_title">Toʻlov oʻtdi</string>
     <string name="debug_push_body">Sinov bildirishnomasi: tarifni ochish uchun bosing.</string>
+
+    <!-- Release readiness (2026-10): AI consent, account deletion, reports, support. -->
+    <string name="legal_consent_ai_disclosure">«%1$s» yoki «%2$s» tugmasini bosganingizda AI Reply matn yozish uchun nusxalangan xabarni, koʻrsatmangizni va profil maʼlumotlaringizni serverimiz orqali OpenAI’ga yuboradi. Aqlli tuzatish yoqilgan boʻlsa, koʻrsatma yozish paytida ham yuboriladi. Serverimiz bu matnlarni saqlamaydi.</string>
+    <string name="legal_consent_ai_checkbox">Javob yozish uchun bu matnlar OpenAI’ga yuborilishiga roziman.</string>
+    <string name="kb_err_quota_monthly">Bu oygi javoblar tugadi. Keyingi oyda yangilanadi.</string>
+    <string name="kb_err_consent_required">AI javoblardan foydalanishni davom ettirish uchun AI Reply ilovasini oching va yangilangan shartlarni qabul qiling.</string>
+    <string name="settings_account_delete">Hisobni oʻchirish</string>
+    <string name="settings_account_delete_title">Hisob oʻchirilsinmi?</string>
+    <string name="settings_account_delete_body">Hisob, profil, roziliklar, foydalanish tarixi va qurilmalar serverimizdan darhol oʻchiriladi. Buni bekor qilib boʻlmaydi. Klaviatura matn yozish uchun ishlashda davom etadi.</string>
+    <string name="account_deleted">Hisob oʻchirildi.</string>
+    <string name="account_delete_failed">Hisobni oʻchirib boʻlmadi. Ulanishni tekshirib, qayta urinib koʻring.</string>
+    <string name="report_action">Shikoyat qilish</string>
+    <string name="report_title">Javob ustidan shikoyat</string>
+    <string name="report_reason_offensive">Haqoratli</string>
+    <string name="report_reason_harmful">Zararli yoki xavfli</string>
+    <string name="report_reason_false_info">Notoʻgʻri maʼlumot</string>
+    <string name="report_reason_wrong_language">Til notoʻgʻri</string>
+    <string name="report_reason_other">Boshqa</string>
+    <string name="report_include_text">Javob matnini shikoyat bilan birga yuborish</string>
+    <string name="report_send">Yuborish</string>
+    <string name="report_thanks">Rahmat, bu javobni tekshiramiz.</string>
+    <string name="report_failed">Shikoyatni yuborib boʻlmadi. Qayta urinib koʻring.</string>
+    <string name="settings_support">Yordam va qoʻllab-quvvatlash</string>
+    <string name="settings_withdraw_consent">AI ishlov berishga rozilikni qaytarib olish</string>
+    <string name="settings_withdraw_consent_body">Yana rozilik bermaguningizcha AI javoblar ishlamaydi. Hisob saqlanadi.</string>
+    <string name="settings_withdraw_consent_action">Qaytarib olish</string>
+    <string name="settings_version">Versiya %1$s (%2$d)</string>
+    <string name="common_link_failed">Telefonda bu havolani ochadigan ilova yoʻq.</string>
 
 </resources>

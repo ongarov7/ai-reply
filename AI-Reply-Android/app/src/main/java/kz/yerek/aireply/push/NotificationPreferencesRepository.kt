@@ -32,11 +32,20 @@ class NotificationPreferencesRepository(private val api: NotificationPreferences
     ) {
         val isLoaded: Boolean get() = server != null
 
-        /** On unless the server or a pending tap says off. */
-        fun isOn(category: String): Boolean = pending[category] ?: server?.get(category) ?: true
+        /**
+         * What the server or a pending tap says; for a category neither has
+         * spoken about, on - except offers, which wait for the user to opt in.
+         */
+        fun isOn(category: String): Boolean =
+            pending[category] ?: server?.get(category) ?: (category !in OFF_BY_DEFAULT)
 
         /** Security, and anything the server does not list as optional, cannot be switched off. */
         fun isLocked(category: String): Boolean = category !in optional
+    }
+
+    companion object {
+        /** Marketing is opt-in: never on before the user switched it on. */
+        val OFF_BY_DEFAULT = setOf("marketing")
     }
 
     private val _state = MutableStateFlow(State())

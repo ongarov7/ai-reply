@@ -188,8 +188,21 @@ natively, iOS through the Firebase Messaging SDK (APNs underneath).
 | Registration | `POST /api/v1/installations`, FCM token | `InstallationRegistrar`: body + account fingerprint, 24 h re-sync, backoff, 401 refresh-and-retry | IMPLEMENTED_AND_VERIFIED | `InstallationRegistrarTest`, `AccountSessionRefreshTest` |
 | Nothing before consent | Token and registration after the terms | `firebase_messaging_auto_init_enabled=false`; token and registration after the terms | IMPLEMENTED_NOT_DEVICE_VERIFIED | |
 | Sign-out | `X-Installation-ID` on the logout, then anonymous registration | Same | IMPLEMENTED_AND_VERIFIED | `AccountSessionRefreshTest` |
-| Builds without Firebase config | Firebase config supplied per environment | `google-services.json` git-ignored; plugin applied only when present, `FirebaseApp.getApps` gate at runtime | IMPLEMENTED_NOT_DEVICE_VERIFIED | Push then shows as unavailable |
+| Builds without Firebase config | Firebase config supplied per environment | `google-services.json` git-ignored; plugin applied only when present, `FirebaseApp.getApps` gate at runtime | IMPLEMENTED_NOT_DEVICE_VERIFIED | Settings then has no Notifications section at all |
 | Channels, foreground display | System presentation | `general` / `important`, named in the app language; tag = notification id | IMPLEMENTED_NOT_DEVICE_VERIFIED | Debug "simulate push" runs the foreground path |
 | Taps and links | `aireply://<screen>`, `https://ai-reply.kz` | `AppLinks` + `PendingNavigation` (waits for consent, sign-in, onboarding); `notifications/opened` when the push has a delivery id | IMPLEMENTED_AND_VERIFIED | `AppLinksTest` |
 | Permission UX | Home card after sign-in, Settings ▸ Notifications | Home card after sign-in (Android 13+), Settings ▸ Notifications with categories | IMPLEMENTED_NOT_DEVICE_VERIFIED | Never at first launch |
 | Notification language | `preferred_language` on `/me` | `PreferredLanguageSync`: on a Settings change, or once when the account has none; only with `features.preferred_language` | IMPLEMENTED_AND_VERIFIED | `PreferredLanguageTest` |
+| Invalid FCM token | — | `push_status: "invalid"` for the token sent: once per process `deleteToken` + a new token, sent on the next sync | IMPLEMENTED_NOT_DEVICE_VERIFIED | `InstallationRegistrarTest` (the decision) |
+| Offers (marketing) | — | Off until the user switches it on; the other categories keep their defaults | IMPLEMENTED_AND_VERIFIED | `NotificationPreferencesTest` |
+
+## 12. Store release (2026-10)
+
+| Feature | iOS | Android | Status | Notes |
+|---|---|---|---|---|
+| AI consent | Disclosure naming OpenAI + its own checkbox | Same, on `LegalConsentScreen`; both boxes needed. The keyboard and the app refuse AI requests until the current versions are accepted; `CONSENT_REQUIRED` brings the screen back | IMPLEMENTED_AND_VERIFIED | `LegalConsentTest`, `AccountDeletionTest` |
+| Withdraw consent | Settings | Settings ▸ Privacy ▸ Withdraw AI consent: `DELETE /api/v1/me/consents`, then the consent screen | IMPLEMENTED_AND_VERIFIED | `AccountDeletionTest` |
+| Delete account | Settings, Apple ID confirmation for Apple accounts | Settings ▸ Account ▸ Delete account: `POST /api/v1/me/delete`, then the session, consent, learned words, quota cache and synced profile go | IMPLEMENTED_AND_VERIFIED | No Apple sign-in on Android |
+| Report AI output | Report on a result | App: dialog under Try a reply. Keyboard: a flag in the panel header opens an inline panel in place of the result - no window over the chat | IMPLEMENTED_NOT_DEVICE_VERIFIED | Only with `features.ai_reports`; `AIReportsTest` |
+| Purchases | No StoreKit yet | No Play Billing yet: release builds show no price and no Choose; debug builds only for plans marked `purchasable` | IMPLEMENTED_AND_VERIFIED | `SubscriptionDisplayTest` |
+| Help and version | Settings | Settings: Help and support (`legal.support_url`), version and build at the bottom | IMPLEMENTED_NOT_DEVICE_VERIFIED | |

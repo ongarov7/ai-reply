@@ -54,4 +54,23 @@ object PushSupport {
             }
         }
     }
+
+    /**
+     * Deletes the current token and asks for a new one: for a token the
+     * server reported invalid. Without a successful deletion the same token
+     * would come back, so that is a failure too.
+     */
+    suspend fun renewToken(context: Context): TokenResult {
+        if (!isAvailable(context)) return TokenResult.Unsupported
+        val deletion = runCatching { FirebaseMessaging.getInstance().deleteToken() }
+            .onFailure { ReplyLog.warn(it) { "FCM token deletion not started" } }
+            .getOrNull() ?: return TokenResult.Failed
+        val deleted = suspendCancellableCoroutine { continuation ->
+            deletion.addOnCompleteListener { completed ->
+                if (!completed.isSuccessful) ReplyLog.warn(completed.exception) { "FCM token not deleted" }
+                if (continuation.isActive) continuation.resume(completed.isSuccessful)
+            }
+        }
+        return if (deleted) fetchToken(context) else TokenResult.Failed
+    }
 }

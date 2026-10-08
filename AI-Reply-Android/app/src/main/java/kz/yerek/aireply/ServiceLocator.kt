@@ -8,6 +8,7 @@ import kotlinx.coroutines.Dispatchers
 import kz.yerek.aireply.ai.AIConfiguration
 import kz.yerek.aireply.ai.AILimits
 import kz.yerek.aireply.ai.AIReplyService
+import kz.yerek.aireply.ai.AIReportSender
 import kz.yerek.aireply.ai.AccountComposeTransport
 import kz.yerek.aireply.ai.AccountReplyTransport
 import kz.yerek.aireply.ai.AppStrings
@@ -39,6 +40,7 @@ import kz.yerek.aireply.data.profile.ProfileSync
 import kz.yerek.aireply.data.secure.SecureCredentialStore
 import kz.yerek.aireply.data.settings.DeviceStateStore
 import kz.yerek.aireply.data.settings.SettingsStore
+import kz.yerek.aireply.keyboard.autocorrect.PrefsLearnedWordsStore
 import kz.yerek.aireply.push.ClientContext
 import kz.yerek.aireply.push.HttpPushApi
 import kz.yerek.aireply.push.InstallationIdStore
@@ -90,7 +92,18 @@ class ServiceLocator(context: Context) {
         ConfigurationRepository(appContext, profileStore, settings, scope)
     }
 
-    val aiConfiguration: AIConfiguration by lazy { AIConfiguration { accountCredentials.isSignedIn } }
+    /**
+     * Ready with an account and the current legal versions accepted on this
+     * phone. A CONSENT_REQUIRED answer resets the app's consent state, so the
+     * next time the app is opened it asks again.
+     */
+    val aiConfiguration: AIConfiguration by lazy {
+        AIConfiguration(
+            hasLegalConsent = { legalConsentStore.hasAcceptedLatest() },
+            onConsentRequired = { account.consentRequired() },
+            isAccountSignedIn = { accountCredentials.isSignedIn }
+        )
+    }
 
     // ------------------------------------------------------------- account
 
@@ -137,7 +150,8 @@ class ServiceLocator(context: Context) {
             backgroundScope = scope,
             profileSync = profileSync,
             onSignedOut = { productEvents.discard() },
-            observer = accountObserver
+            observer = accountObserver,
+            learnedWords = PrefsLearnedWordsStore(appContext)
         )
     }
 
@@ -252,6 +266,11 @@ class ServiceLocator(context: Context) {
     )
 
     val draftNormalizer: ReplyDraftNormalizer by lazy { ReplyDraftNormalizer() }
+
+    /** Reports about AI output, from the keyboard's panel and the app's dialog alike. */
+    val aiReportSender: AIReportSender by lazy {
+        AIReportSender { request -> accountService.reportAIOutput(request) }
+    }
 
     val replyService: AIReplyService by lazy {
         AIReplyService(

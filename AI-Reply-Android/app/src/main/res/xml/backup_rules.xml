@@ -6,4 +6,6 @@
     <exclude domain="sharedpref" path="aireply_autocorrect.xml" />
     <!-- Push token and installation sync state belong to this device only. -->
     <exclude domain="sharedpref" path="aireply_push.xml" />
+    <!-- The session's non-secret values: device id, account e-mail, quota cache. -->
+    <exclude domain="sharedpref" path="aireply_account.xml" />
 </full-backup-content>

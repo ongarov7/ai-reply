@@ -268,6 +268,33 @@ class AccountService(
             )
         }
 
+    /**
+     * Withdraws the consent to the current terms and AI processing. AI
+     * requests are refused with CONSENT_REQUIRED until [recordLegalConsent]
+     * runs again; the account itself stays.
+     */
+    suspend fun withdrawLegalConsent() {
+        session.authenticated { token ->
+            client().request("DELETE", "api/v1/me/consents", token = token)
+        }
+    }
+
+    /**
+     * Deletes the account and everything the server keeps for it; every
+     * token of it stops working. The POST alias rather than `DELETE /me`:
+     * HttpURLConnection does not send a body with DELETE on every Android
+     * version, and the alias takes the same (here empty) body.
+     */
+    suspend fun deleteAccount(): AccountDeletionDto = session.authenticated { token ->
+        decode(AccountDeletionDto.serializer(), client().request("POST", "api/v1/me/delete", "{}", token))
+    }
+
+    /** A report about text the AI wrote; answers with the report's id. */
+    suspend fun reportAIOutput(report: AIReportRequest): String = session.authenticated { token ->
+        val body = json.encodeToString(AIReportRequest.serializer(), report)
+        decode(AIReportResultDto.serializer(), client().request("POST", "api/v1/ai/reports", body, token)).id
+    }
+
     // --------------------------------------- subscription (demo payment flow)
 
     suspend fun startCheckout(planId: String): CheckoutDto = session.authenticated { token ->

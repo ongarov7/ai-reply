@@ -52,7 +52,7 @@ class ComposeService(
         val prepared = request.copy(instruction = instruction)
 
         val override = transportOverride?.invoke(prepared)
-        if (override == null && !configuration.isReady) AIReplyError.AuthenticationFailed.raise()
+        if (override == null) configuration.checkReady()
         val transport = override ?: accountTransport(configuration.backendBaseUrl)
 
         return try {
@@ -62,6 +62,7 @@ class ComposeService(
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (exception: AIReplyException) {
+            configuration.requestFailed(exception.error)
             throw exception
         } catch (throwable: Throwable) {
             throw AIReplyException(ReplyNetworking.mapError(throwable))
