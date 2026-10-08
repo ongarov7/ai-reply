@@ -338,6 +338,67 @@ final class LocalizationTests: XCTestCase {
         XCTAssertEqual(AIReplyStrings.forLanguage(.kazakh).report.send, "Жіберу")
     }
 
+    /// Create writes a message, not a reply: its report panel says so, and
+    /// Reply keeps the reply's words.
+    func testTheReportNamesAMessageInCreateMode() {
+        let english = ReportStrings.forLanguage(.english)
+        XCTAssertEqual(english.forMode(.reply).title, "Report this reply")
+        XCTAssertEqual(english.forMode(.compose).title, "Report this message")
+        XCTAssertEqual(english.forMode(.compose).includeText, "Send the message text with the report")
+        XCTAssertEqual(english.forMode(.compose).thanks, "Thanks. We'll review this message.")
+        XCTAssertEqual(ReportStrings.forLanguage(.russian).forMode(.compose).title, "Пожаловаться на сообщение")
+        XCTAssertEqual(ReportStrings.forLanguage(.kazakh).forMode(.compose).title, "Хабарламаға шағым")
+        XCTAssertEqual(ReportStrings.forLanguage(.uzbek).forMode(.compose).thanks, "Rahmat, bu xabarni tekshiramiz.")
+
+        for language in AppLanguage.allCases {
+            let words = ReportStrings.forLanguage(language)
+            let reply = words.forMode(.reply)
+            let compose = words.forMode(.compose)
+            XCTAssertEqual(reply.title, words.title, language.rawValue)
+            XCTAssertEqual(reply.includeText, words.includeText, language.rawValue)
+            XCTAssertEqual(reply.thanks, words.thanks, language.rawValue)
+            XCTAssertNotEqual(compose.title, reply.title, language.rawValue)
+            XCTAssertNotEqual(compose.includeText, reply.includeText, language.rawValue)
+            XCTAssertNotEqual(compose.thanks, reply.thanks, language.rawValue)
+            // Everything else is the same in both modes.
+            XCTAssertEqual(compose.send, reply.send)
+            XCTAssertEqual(compose.failed, reply.failed)
+            if language != .english {
+                XCTAssertNotEqual(compose.title, english.forMode(.compose).title, language.rawValue)
+                XCTAssertNotEqual(compose.includeText, english.forMode(.compose).includeText, language.rawValue)
+                XCTAssertNotEqual(compose.thanks, english.forMode(.compose).thanks, language.rawValue)
+            }
+        }
+    }
+
+    /// What the privacy texts promise matches the consent: the selected
+    /// text goes too, and a text sent with a report is kept.
+    func testThePrivacyTextsMatchTheConsent() {
+        let settings = AppSettings(store: SharedSettings(defaults: UserDefaults(suiteName: "LocalizationTests.\(UUID())")!))
+        settings.setLanguage(.english)
+        XCTAssertTrue(settings.localized("legal.consent.ai").contains("the message you copied or selected"))
+        XCTAssertTrue(settings.localized("legal.consent.ai").contains("your profile is kept in your account until you delete it"))
+        for key in ["settings.privacy.body", "onboarding.fullAccess.warning"] {
+            XCTAssertTrue(settings.localized(key).contains("unless you select it yourself and tap Reply"), key)
+            XCTAssertFalse(settings.localized(key).contains("never sent"), key)
+        }
+        for key in ["settings.privacy.body", "home.privacy.body"] {
+            XCTAssertTrue(settings.localized(key).contains("only a generated text you send with a report is kept"), key)
+        }
+        XCTAssertEqual(settings.localized("settings.privacy.withdraw.body"),
+                       "AI replies stop working and the app asks for your consent again. Your account stays.")
+
+        // Kazakh calls the account «тіркелгі» everywhere in Settings.
+        settings.setLanguage(.kazakh)
+        for key in ["settings.account", "settings.account.delete", "settings.account.delete.confirm",
+                    "settings.account.delete.body", "account.delete.done", "account.delete.failed",
+                    "account.delete.appleRequired", "settings.privacy.withdraw.body", "legal.consent.ai"] {
+            let text = settings.localized(key).lowercased()
+            XCTAssertTrue(text.contains("тіркелгі"), key)
+            XCTAssertFalse(text.contains("аккаунт"), key)
+        }
+    }
+
     /// Who writes the replies is named wherever the app explains what is sent.
     func testTheAIProviderIsNamed() {
         let settings = AppSettings(store: SharedSettings(defaults: UserDefaults(suiteName: "LocalizationTests.\(UUID())")!))

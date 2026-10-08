@@ -332,7 +332,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Аккаунтты жоюды Apple ID арқылы растаңыз."
+            "value" : "Тіркелгіні жоюды Apple ID арқылы растаңыз."
           }
         },
         "ru" : {
@@ -361,7 +361,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Аккаунт жойылды."
+            "value" : "Тіркелгі жойылды."
           }
         },
         "ru" : {
@@ -390,7 +390,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Аккаунтты жою мүмкін болмады. Байланысты тексеріп, қайталап көріңіз."
+            "value" : "Тіркелгіні жою мүмкін болмады. Байланысты тексеріп, қайталап көріңіз."
           }
         },
         "ru" : {
@@ -2124,25 +2124,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Text is sent only when you tap Reply or Write and, with Smart correction on, while you type an instruction in AI Reply's own field. It goes through the AI Reply server to OpenAI and is not stored in the database or written to logs."
+            "value" : "Text is sent only when you tap Reply or Write and, with Smart correction on, while you type an instruction in AI Reply's own field. It goes through the AI Reply server to OpenAI and is not stored in the database or written to logs; only a generated text you send with a report is kept."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Мәтін тек «Жауап беру» не «Жазу» түймесін басқанда, ал ақылды түзету қосулы болса, AI Reply-дың өз өрісіне нұсқау жазып жатқанда да жіберіледі. Ол AI Reply сервері арқылы OpenAI-ға жетеді, дерекқорда сақталмайды және журналға жазылмайды."
+            "value" : "Мәтін тек «Жауап беру» не «Жазу» түймесін басқанда, ал ақылды түзету қосулы болса, AI Reply-дың өз өрісіне нұсқау жазып жатқанда да жіберіледі. Ол AI Reply сервері арқылы OpenAI-ға жетеді, дерекқорда сақталмайды және журналға жазылмайды; тек шағыммен бірге жіберген дайын мәтініңіз сақталады."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Текст отправляется, только когда вы нажимаете «Ответить» или «Написать», а при включённой умной коррекции — ещё и пока вы пишете просьбу в поле самого AI Reply. Он передаётся в OpenAI через сервер AI Reply, не сохраняется в базе и не записывается в логи."
+            "value" : "Текст отправляется, только когда вы нажимаете «Ответить» или «Написать», а при включённой умной коррекции — ещё и пока вы пишете просьбу в поле самого AI Reply. Он передаётся в OpenAI через сервер AI Reply, не сохраняется в базе и не записывается в логи; сохраняется только готовый текст, который вы отправили вместе с жалобой."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Matn faqat «Javob berish» yoki «Yozish»ni bosganingizda, Aqlli tuzatish yoqilgan boʻlsa esa AI Replyning oʻz maydonida koʻrsatma yozayotganingizda ham yuboriladi. U AI Reply serveri orqali OpenAI’ga boradi, bazada saqlanmaydi va jurnallarga yozilmaydi."
+            "value" : "Matn faqat «Javob berish» yoki «Yozish»ni bosganingizda, Aqlli tuzatish yoqilgan boʻlsa esa AI Replyning oʻz maydonida koʻrsatma yozayotganingizda ham yuboriladi. U AI Reply serveri orqali OpenAI’ga boradi, bazada saqlanmaydi va jurnallarga yozilmaydi; faqat shikoyat bilan birga yuborgan tayyor matningiz saqlanadi."
           }
         }
       }
@@ -3026,25 +3026,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "When you tap Reply or Write, AI Reply sends the message you copied, your instruction and your profile details through our server to OpenAI to write the text. With Smart correction on, your instruction is also sent while you type it. Our server does not save these texts."
+            "value" : "When you tap Reply or Write, AI Reply sends the message you copied or selected, your instruction and your profile details through our server to OpenAI to write the text. With Smart correction on, your instruction is also sent while you type it. Our server does not save the messages, instructions or generated texts; your profile is kept in your account until you delete it."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "«Жауап беру» немесе «Жазу» батырмасын басқанда AI Reply мәтін жазу үшін көшірілген хабарламаны, нұсқауыңызды және профиль деректерін біздің сервер арқылы OpenAI-ға жібереді. Ақылды түзету қосулы болса, нұсқау теру кезінде де жіберіледі. Біздің сервер бұл мәтіндерді сақтамайды."
+            "value" : "«Жауап беру» немесе «Жазу» батырмасын басқанда AI Reply мәтін жазу үшін көшірілген не белгіленген хабарламаны, нұсқауыңызды және профиль деректерін біздің сервер арқылы OpenAI-ға жібереді. Ақылды түзету қосулы болса, нұсқау теру кезінде де жіберіледі. Біздің сервер хабарламаларды, нұсқауларды және дайын мәтіндерді сақтамайды; профиль тіркелгіңізді жойғанша сонда сақталады."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Когда вы нажимаете «Ответить» или «Написать», AI Reply отправляет скопированное сообщение, вашу инструкцию и данные профиля через наш сервер в OpenAI, чтобы написать текст. Если включена умная коррекция, инструкция отправляется и во время набора. Наш сервер эти тексты не сохраняет."
+            "value" : "Когда вы нажимаете «Ответить» или «Написать», AI Reply отправляет скопированное или выделенное сообщение, вашу инструкцию и данные профиля через наш сервер в OpenAI, чтобы написать текст. Если включена умная коррекция, инструкция отправляется и во время набора. Наш сервер не сохраняет сообщения, инструкции и готовые тексты; профиль хранится в вашем аккаунте, пока вы его не удалите."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "«Javob berish» yoki «Yozish» tugmasini bosganingizda AI Reply matn yozish uchun nusxalangan xabarni, koʻrsatmangizni va profil maʼlumotlaringizni serverimiz orqali OpenAI’ga yuboradi. Aqlli tuzatish yoqilgan boʻlsa, koʻrsatma yozish paytida ham yuboriladi. Serverimiz bu matnlarni saqlamaydi."
+            "value" : "«Javob berish» yoki «Yozish» tugmasini bosganingizda AI Reply matn yozish uchun nusxalangan yoki belgilangan xabarni, koʻrsatmangizni va profil maʼlumotlaringizni serverimiz orqali OpenAI’ga yuboradi. Aqlli tuzatish yoqilgan boʻlsa, koʻrsatma yozish paytida ham yuboriladi. Serverimiz xabarlar, koʻrsatmalar va tayyor matnlarni saqlamaydi; profil hisobingizni oʻchirmaguningizcha unda saqlanadi."
           }
         }
       }
@@ -3780,25 +3780,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iOS will warn that the keyboard can send anything you type. That's the standard text for every keyboard. AI Reply sends text through its server to OpenAI only when you tap Reply or Write and, with Smart correction on, the instruction you type in its own field. What you type in other apps is never sent. Choose Allow."
+            "value" : "iOS will warn that the keyboard can send anything you type. That's the standard text for every keyboard. AI Reply sends text through its server to OpenAI only when you tap Reply or Write and, with Smart correction on, the instruction you type in its own field. Nothing you type in other apps is sent unless you select it yourself and tap Reply. Choose Allow."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iOS пернетақта терген мәтініңіздің бәрін жібере алады деп ескертеді. Бұл — кез келген пернетақтаға шығатын стандартты мәтін. AI Reply мәтінді өз сервері арқылы OpenAI-ға тек «Жауап беру» не «Жазу» түймесін басқанда жібереді, ал ақылды түзету қосулы болса, AI Reply өрісіне жазған нұсқауыңызды да жібереді. Басқа қолданбаларда терген мәтініңіз ешқайда жіберілмейді. «Рұқсат ету» түймесін басыңыз."
+            "value" : "iOS пернетақта терген мәтініңіздің бәрін жібере алады деп ескертеді. Бұл — кез келген пернетақтаға шығатын стандартты мәтін. AI Reply мәтінді өз сервері арқылы OpenAI-ға тек «Жауап беру» не «Жазу» түймесін басқанда жібереді, ал ақылды түзету қосулы болса, AI Reply өрісіне жазған нұсқауыңызды да жібереді. Басқа қолданбаларда терген мәтініңізді өзіңіз белгілеп, «Жауап беру» түймесін баспасаңыз, ол жіберілмейді. «Рұқсат ету» түймесін басыңыз."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iOS предупредит, что клавиатура может передавать всё, что вы печатаете. Это стандартный текст для любой клавиатуры. AI Reply отправляет текст через свой сервер в OpenAI, только когда вы нажимаете «Ответить» или «Написать», а при включённой умной коррекции — ещё и просьбу, которую вы пишете в поле AI Reply. То, что вы печатаете в других приложениях, никуда не отправляется. Нажмите «Разрешить»."
+            "value" : "iOS предупредит, что клавиатура может передавать всё, что вы печатаете. Это стандартный текст для любой клавиатуры. AI Reply отправляет текст через свой сервер в OpenAI, только когда вы нажимаете «Ответить» или «Написать», а при включённой умной коррекции — ещё и просьбу, которую вы пишете в поле AI Reply. То, что вы печатаете в других приложениях, не отправляется, если вы сами не выделили это и не нажали «Ответить». Нажмите «Разрешить»."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iOS klaviatura siz yozgan hamma narsani yuborishi mumkinligi haqida ogohlantiradi. Bu har qanday klaviatura uchun standart matn. AI Reply matnni oʻz serveri orqali OpenAI’ga faqat «Javob berish» yoki «Yozish»ni bosganingizda yuboradi, Aqlli tuzatish yoqilgan boʻlsa esa AI Reply maydonida yozgan koʻrsatmangizni ham. Boshqa ilovalarda yozganlaringiz hech qayerga yuborilmaydi. «Ruxsat berish»ni tanlang."
+            "value" : "iOS klaviatura siz yozgan hamma narsani yuborishi mumkinligi haqida ogohlantiradi. Bu har qanday klaviatura uchun standart matn. AI Reply matnni oʻz serveri orqali OpenAI’ga faqat «Javob berish» yoki «Yozish»ni bosganingizda yuboradi, Aqlli tuzatish yoqilgan boʻlsa esa AI Reply maydonida yozgan koʻrsatmangizni ham. Boshqa ilovalarda yozganlaringizni oʻzingiz belgilab, «Javob berish»ni bosmaguningizcha ular yuborilmaydi. «Ruxsat berish»ni tanlang."
           }
         }
       }
@@ -6483,7 +6483,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Аккаунтты жою"
+            "value" : "Тіркелгіні жою"
           }
         },
         "ru" : {
@@ -6512,7 +6512,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Аккаунт, профиль, келісімдер, қолданыс тарихы мен құрылғылар біздің серверден бірден жойылады. Мұны қайтару мүмкін емес. Пернетақта мәтін теру үшін жұмыс істей береді."
+            "value" : "Тіркелгі, профиль, келісімдер, қолданыс тарихы мен құрылғылар біздің серверден бірден жойылады. Мұны қайтару мүмкін емес. Пернетақта мәтін теру үшін жұмыс істей береді."
           }
         },
         "ru" : {
@@ -6541,7 +6541,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Аккаунтты жоясыз ба?"
+            "value" : "Тіркелгіні жоясыз ба?"
           }
         },
         "ru" : {
@@ -7666,25 +7666,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "When you tap Reply, the copied message and any instruction you wrote go through the AI Reply server to OpenAI; when you tap Write, only your instruction does. With Smart correction on, an instruction you type in AI Reply's own field may be sent before you tap, to suggest a correction. Neither these texts nor the replies are stored in the database or written to logs, and what you type in other apps is never sent."
+            "value" : "When you tap Reply, the message you copied or selected and any instruction you wrote go through the AI Reply server to OpenAI; when you tap Write, only your instruction does. With Smart correction on, an instruction you type in AI Reply's own field may be sent before you tap, to suggest a correction. Neither these texts nor the replies are stored in the database or written to logs; only a generated text you send with a report is kept. Nothing you type in other apps is sent unless you select it yourself and tap Reply."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "«Жауап беру» түймесін басқанда көшірілген хабарлама мен нұсқауыңыз (бар болса) AI Reply сервері арқылы OpenAI-ға жіберіледі, ал «Жазу» түймесін басқанда — тек нұсқау. Ақылды түзету қосулы болса, AI Reply-дың өз өрісіне жазып жатқан нұсқауыңыз түзету ұсыну үшін түймені баспай тұрып та жіберілуі мүмкін. Бұл мәтіндер де, жауаптар да дерекқорда сақталмайды және журналға жазылмайды, ал басқа қолданбаларда терген мәтініңіз ешқайда жіберілмейді."
+            "value" : "«Жауап беру» түймесін басқанда көшірілген не белгіленген хабарлама мен нұсқауыңыз (бар болса) AI Reply сервері арқылы OpenAI-ға жіберіледі, ал «Жазу» түймесін басқанда — тек нұсқау. Ақылды түзету қосулы болса, AI Reply-дың өз өрісіне жазып жатқан нұсқауыңыз түзету ұсыну үшін түймені баспай тұрып та жіберілуі мүмкін. Бұл мәтіндер де, жауаптар да дерекқорда сақталмайды және журналға жазылмайды; тек шағыммен бірге жіберген дайын мәтініңіз сақталады. Басқа қолданбаларда терген мәтініңізді өзіңіз белгілеп, «Жауап беру» түймесін баспасаңыз, ол жіберілмейді."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Когда вы нажимаете «Ответить», скопированное сообщение и ваша просьба, если она есть, передаются в OpenAI через сервер AI Reply, а когда «Написать» — только просьба. При включённой умной коррекции просьба, которую вы пишете в поле самого AI Reply, может отправиться и до нажатия кнопки — чтобы предложить исправление. Ни эти тексты, ни ответы не сохраняются в базе и не записываются в логи, а то, что вы печатаете в других приложениях, никуда не отправляется."
+            "value" : "Когда вы нажимаете «Ответить», скопированное или выделенное сообщение и ваша просьба, если она есть, передаются в OpenAI через сервер AI Reply, а когда «Написать» — только просьба. При включённой умной коррекции просьба, которую вы пишете в поле самого AI Reply, может отправиться и до нажатия кнопки — чтобы предложить исправление. Ни эти тексты, ни ответы не сохраняются в базе и не записываются в логи; сохраняется только готовый текст, который вы отправили вместе с жалобой. То, что вы печатаете в других приложениях, не отправляется, если вы сами не выделили это и не нажали «Ответить»."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "«Javob berish»ni bosganingizda nusxalangan xabar va koʻrsatmangiz (agar boʻlsa) AI Reply serveri orqali OpenAI’ga yuboriladi, «Yozish»ni bosganingizda esa faqat koʻrsatma. Aqlli tuzatish yoqilgan boʻlsa, AI Replyning oʻz maydonida yozayotgan koʻrsatmangiz tuzatish taklif qilish uchun tugmani bosishingizdan oldin ham yuborilishi mumkin. Bu matnlar ham, javoblar ham bazada saqlanmaydi va jurnallarga yozilmaydi, boshqa ilovalarda yozganlaringiz esa hech qayerga yuborilmaydi."
+            "value" : "«Javob berish»ni bosganingizda nusxalangan yoki belgilangan xabar va koʻrsatmangiz (agar boʻlsa) AI Reply serveri orqali OpenAI’ga yuboriladi, «Yozish»ni bosganingizda esa faqat koʻrsatma. Aqlli tuzatish yoqilgan boʻlsa, AI Replyning oʻz maydonida yozayotgan koʻrsatmangiz tuzatish taklif qilish uchun tugmani bosishingizdan oldin ham yuborilishi mumkin. Bu matnlar ham, javoblar ham bazada saqlanmaydi va jurnallarga yozilmaydi; faqat shikoyat bilan birga yuborgan tayyor matningiz saqlanadi. Boshqa ilovalarda yozganlaringizni oʻzingiz belgilab, «Javob berish»ni bosmaguningizcha ular yuborilmaydi."
           }
         }
       }
@@ -7753,25 +7753,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI replies stop working until you accept again. Your account stays."
+            "value" : "AI replies stop working and the app asks for your consent again. Your account stays."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Қайта келісім бергенше AI жауаптары жұмыс істемейді. Аккаунт сақталады."
+            "value" : "AI жауаптары тоқтайды, қосымша келісімді қайта сұрайды. Тіркелгі сақталады."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI-ответы перестанут работать, пока вы снова не дадите согласие. Аккаунт сохранится."
+            "value" : "AI-ответы перестанут работать, и приложение снова попросит согласие. Аккаунт сохранится."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Yana rozilik bermaguningizcha AI javoblar ishlamaydi. Hisob saqlanadi."
+            "value" : "AI javoblar ishlamay qoladi va ilova yana rozilik soʻraydi. Hisob saqlanadi."
           }
         }
       }

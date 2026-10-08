@@ -66,6 +66,8 @@ final class AccountModel {
     /// Whether `legalConfig` came from the server in this launch, rather than
     /// from this build's own defaults.
     @ObservationIgnored private var hasServerLegalConfig = false
+    /// A foreground reload of the legal versions is already out.
+    @ObservationIgnored private var isReloadingLegalConfig = false
 
     @ObservationIgnored private let service: AccountService
 
@@ -208,8 +210,15 @@ final class AccountModel {
             receive(account.profile)
             applyLegalConsent(account.legalConsent, recordBefore: consentBefore)
             phase = .signedIn
+            // The account is there: no earlier deletion went through.
+            hasUnansweredDeletion = false
         } catch APIError.unauthorized {
-            await signOutLocally()
+            // A deletion whose answer was lost (the app closed since) did delete it.
+            if hasUnansweredDeletion {
+                await forgetDeletedAccount()
+            } else {
+                await signOutLocally()
+            }
         } catch APIError.accountDisabled {
             errorKey = "account.error.disabled"
             await signOutLocally()
@@ -366,6 +375,7 @@ final class AccountModel {
         applyLegalConsent(session.legalConsent, recordBefore: LegalConsentStore.load())
         phase = .signedIn
         pendingEmail = ""
+        hasUnansweredDeletion = false
         Task {
             // Best effort: a failed device registration must not block sign-in.
             try? await service.registerDevice()
@@ -399,6 +409,10 @@ final class AccountModel {
     // MARK: Legal and session
 
     func acceptLegal(locale: String) async {
+        // The versions the server and the keyboard enforce now, not the ones
+        // read at launch: the screen may have come up from that older check.
+        // Offline, the current ones stay.
+        await loadServerConfig()
         LegalConsentStore.accept(legalConfig, locale: locale)
         hasAcceptedLegal = true
         await syncPendingLegalConsent()
@@ -406,10 +420,17 @@ final class AccountModel {
 
     /// Re-reads the consent the App Group holds: the keyboard drops it when
     /// the server answers CONSENT_REQUIRED. Called on every return to the
-    /// foreground.
+    /// foreground. The documents may have changed while the app was away,
+    /// so their current versions are loaded too, as the keyboard has them.
     func revalidateLegalConsent() {
         guard isBootstrapComplete else { return }
         hasAcceptedLegal = LegalConsentStore.hasAccepted(legalConfig)
+        guard !isReloadingLegalConfig else { return }
+        isReloadingLegalConfig = true
+        Task {
+            await serverRequiresConsent()
+            isReloadingLegalConfig = false
+        }
     }
 
     /// An AI request in the app came back CONSENT_REQUIRED, or was refused
@@ -447,10 +468,11 @@ final class AccountModel {
         isBusy = false
     }
 
-    /// Settings ▸ Delete account, after the user confirmed it. An account
-    /// that signs in with Apple is confirmed with Apple once more, so the
-    /// server can revoke Apple's token. Once the server has deleted the
-    /// account, this device forgets it too and returns to sign-in.
+    /// Settings ▸ Delete account (or the consent screen), after the user
+    /// confirmed it. An account that signs in with Apple is confirmed with
+    /// Apple once more, so the server can revoke Apple's token. Once the
+    /// server has deleted the account, this device forgets it too and
+    /// returns to sign-in.
     func deleteAccount() async -> DeletionOutcome {
         isBusy = true
         defer { isBusy = false }
@@ -460,7 +482,11 @@ final class AccountModel {
             do {
                 appleCode = try await AppleSignIn.confirmForDeletion()
             } catch {
-                return .failed(messageKey: "account.delete.appleRequired")
+                guard Self.deletionContinues(afterAppleFailure: error) else {
+                    return .failed(messageKey: "account.delete.appleRequired")
+                }
+                // The server deletes without a code and only skips the revocation.
+                ReplyLog.event("apple confirmation for deletion failed: \(error)")
             }
         }
 
@@ -468,15 +494,74 @@ final class AccountModel {
             _ = try await service.deleteAccount(appleAuthorizationCode: appleCode)
         } catch {
             ReplyLog.event("account deletion failed: \(error)")
-            return .failed(messageKey: "account.delete.failed")
+            switch Self.deletionFailure(error, afterUnansweredAttempt: hasUnansweredDeletion) {
+            case .alreadyDeleted:
+                // The earlier attempt deleted it; only its answer was lost.
+                break
+            case .unanswered:
+                hasUnansweredDeletion = true
+                return .failed(messageKey: "account.delete.failed")
+            case .sessionEnded:
+                errorKey = "account.error.sessionExpired"
+                await signOutLocally()
+                return .failed(messageKey: "account.error.sessionExpired")
+            case .refused:
+                return .failed(messageKey: "account.delete.failed")
+            }
         }
 
+        await forgetDeletedAccount()
+        return .deleted
+    }
+
+    /// How a failed `DELETE /me` is read.
+    enum DeletionFailure: Equatable {
+        /// 401 after an attempt that got no answer: that attempt deleted the
+        /// account, and every token of it stopped working.
+        case alreadyDeleted
+        /// The request may have reached the server, but no answer came back.
+        case unanswered
+        /// 401 with no such attempt before: the session ended, the account
+        /// may well still be there.
+        case sessionEnded
+        /// The server answered, and nothing was deleted.
+        case refused
+    }
+
+    nonisolated static func deletionFailure(_ error: Error, afterUnansweredAttempt: Bool) -> DeletionFailure {
+        switch error as? APIError {
+        case .unauthorized:
+            return afterUnansweredAttempt ? .alreadyDeleted : .sessionEnded
+        // `offline` too: a connection lost after the request left is reported so.
+        case .offline, .timedOut, .cancelled, .server, .providerTimeout:
+            return .unanswered
+        default:
+            return .refused
+        }
+    }
+
+    /// The Apple step before a deletion gave no code. The user cancelling it
+    /// stops the deletion; Apple failing on this device does not.
+    nonisolated static func deletionContinues(afterAppleFailure error: Error) -> Bool {
+        (error as? AppleSignIn.ConfirmationFailure) != .cancelled
+    }
+
+    /// A deletion went out and no answer came back, so the account may be
+    /// gone already. Kept across launches; dropped with the session.
+    private var hasUnansweredDeletion: Bool {
+        get { UserDefaults.standard.bool(forKey: Self.unansweredDeletionKey) }
+        set { UserDefaults.standard.set(newValue, forKey: Self.unansweredDeletionKey) }
+    }
+
+    private static let unansweredDeletionKey = "account.deletionUnanswered"
+
+    /// The server no longer has the account: this device forgets it too.
+    private func forgetDeletedAccount() async {
         LocalAccountData.wipe()
         didDeleteAccount?()
         await signOutLocally()
         hasAcceptedLegal = LegalConsentStore.hasAccepted(legalConfig)
         noticeKey = "account.delete.done"
-        return .deleted
     }
 
     func dismissNotice() {
@@ -488,6 +573,7 @@ final class AccountModel {
         // with it: it must not be sent to whoever signs in next on this phone.
         ProfileSync.discardPendingChange()
         PreferredLanguageSync.discardPendingChange()
+        hasUnansweredDeletion = false
         AccountCredentials.clear()
         AccountUsageCache.clear()
         AppleSignIn.forget()

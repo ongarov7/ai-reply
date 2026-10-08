@@ -446,6 +446,32 @@ final class AccountReleaseTests: XCTestCase {
         XCTAssertNotNil(group.object(forKey: "shared.smartCorrection"), "device settings stay")
     }
 
+    /// Only the user closing Apple's sheet stops a deletion. Apple failing
+    /// (no Apple ID on the phone, error 1000, no code) does not: the server
+    /// deletes without a code and skips the revocation.
+    func testOnlyCancellingTheAppleStepStopsTheDeletion() {
+        XCTAssertFalse(AccountModel.deletionContinues(afterAppleFailure: AppleSignIn.ConfirmationFailure.cancelled))
+        XCTAssertTrue(AccountModel.deletionContinues(afterAppleFailure: AppleSignIn.ConfirmationFailure.failed))
+        XCTAssertTrue(AccountModel.deletionContinues(afterAppleFailure: APIError.server))
+    }
+
+    /// The first attempt's answer was lost; the retry's 401 means that
+    /// attempt deleted the account, and the device is wiped. A 401 with no
+    /// such attempt before is only an ended session.
+    func testA401AfterALostAnswerMeansTheAccountIsGone() {
+        for lost in [APIError.timedOut, .offline, .server, .providerTimeout, .cancelled] {
+            XCTAssertEqual(AccountModel.deletionFailure(lost, afterUnansweredAttempt: false), .unanswered, "\(lost)")
+        }
+        XCTAssertEqual(AccountModel.deletionFailure(APIError.unauthorized, afterUnansweredAttempt: true), .alreadyDeleted)
+        XCTAssertEqual(AccountModel.deletionFailure(APIError.unauthorized, afterUnansweredAttempt: false), .sessionEnded)
+        // The 401 the server sends once the user is gone.
+        let gone = APIClient.mapServerError(status: 401, data: envelope("UNAUTHORIZED"), headers: response(401))
+        XCTAssertEqual(AccountModel.deletionFailure(gone, afterUnansweredAttempt: true), .alreadyDeleted)
+        for answered in [APIError.rateLimited(retryAfter: 5), .invalidRequest, .notFound, .malformedResponse] {
+            XCTAssertEqual(AccountModel.deletionFailure(answered, afterUnansweredAttempt: true), .refused, "\(answered)")
+        }
+    }
+
     // MARK: Reports
 
     func testAReportCarriesOnlyWhatTheUserChose() throws {

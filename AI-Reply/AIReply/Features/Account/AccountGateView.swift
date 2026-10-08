@@ -110,6 +110,17 @@ private struct LegalConsentView: View {
                 Text("legal.consent.footer")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+
+                // Signed in, nobody is held here: signing out and deleting
+                // the account need no consent first (withdrawn, a new version
+                // of the documents, or the server asking again).
+                if account.isSignedIn {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Divider()
+                        AccountExitActions()
+                    }
+                    .buttonStyle(ExitActionButtonStyle())
+                }
             }
         }
     }
@@ -150,5 +161,26 @@ private struct LegalConsentView: View {
             .frame(minHeight: DS.Layout.minimumTouchTarget)
         }
         .buttonStyle(.plain)
+    }
+}
+
+/// The quiet ways out under the consent: text only, a full touch target.
+private struct ExitActionButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        StyleBody(configuration: configuration)
+    }
+
+    private struct StyleBody: View {
+        let configuration: ButtonStyleConfiguration
+        @Environment(\.isEnabled) private var isEnabled
+
+        var body: some View {
+            configuration.label
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(configuration.role == .destructive ? Color.red : Color.accentColor)
+                .frame(minHeight: DS.Layout.minimumTouchTarget)
+                .contentShape(Rectangle())
+                .opacity(isEnabled ? (configuration.isPressed ? 0.6 : 1) : 0.4)
+        }
     }
 }

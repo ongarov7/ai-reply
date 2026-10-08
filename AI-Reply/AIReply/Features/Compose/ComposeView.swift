@@ -201,7 +201,7 @@ struct AIReportSheet: View {
     @State private var didSend = false
     @State private var didFail = false
 
-    private var strings: ReportStrings { ReportStrings.forLanguage(settings.effectiveLanguage) }
+    private var strings: ReportStrings { ReportStrings.forLanguage(settings.effectiveLanguage).forMode(mode) }
 
     var body: some View {
         NavigationStack {

@@ -483,17 +483,33 @@ struct TypingStrings: Sendable {
 struct ReportStrings: Sendable {
 
     let report: String
-    let title: String
+    private(set) var title: String
     let offensive: String
     let harmful: String
     let falseInfo: String
     let wrongLanguage: String
     let other: String
     /// The switch that sends the reply's text along (on by default).
-    let includeText: String
+    private(set) var includeText: String
     let send: String
-    let thanks: String
+    private(set) var thanks: String
     let failed: String
+    /// Create mode writes a message, not a reply: the title, the switch and
+    /// the thanks name the message there.
+    let messageTitle: String
+    let messageIncludeText: String
+    let messageThanks: String
+
+    /// The table for a report's mode: Create names the message, Reply keeps
+    /// the reply's words.
+    func forMode(_ mode: AIReport.Mode) -> ReportStrings {
+        guard mode == .compose else { return self }
+        var words = self
+        words.title = messageTitle
+        words.includeText = messageIncludeText
+        words.thanks = messageThanks
+        return words
+    }
 
     func reason(_ reason: AIReport.Reason) -> String {
         switch reason {
@@ -525,7 +541,10 @@ struct ReportStrings: Sendable {
         includeText: "Send the reply text with the report",
         send: "Send report",
         thanks: "Thanks. We'll review this reply.",
-        failed: "Couldn't send the report. Try again."
+        failed: "Couldn't send the report. Try again.",
+        messageTitle: "Report this message",
+        messageIncludeText: "Send the message text with the report",
+        messageThanks: "Thanks. We'll review this message."
     )
 
     private static let russian = ReportStrings(
@@ -539,7 +558,10 @@ struct ReportStrings: Sendable {
         includeText: "Отправить текст ответа вместе с жалобой",
         send: "Отправить",
         thanks: "Спасибо, мы проверим этот ответ.",
-        failed: "Не удалось отправить жалобу. Попробуйте ещё раз."
+        failed: "Не удалось отправить жалобу. Попробуйте ещё раз.",
+        messageTitle: "Пожаловаться на сообщение",
+        messageIncludeText: "Отправить текст сообщения вместе с жалобой",
+        messageThanks: "Спасибо, мы проверим это сообщение."
     )
 
     private static let kazakh = ReportStrings(
@@ -553,7 +575,10 @@ struct ReportStrings: Sendable {
         includeText: "Жауап мәтінін шағыммен бірге жіберу",
         send: "Жіберу",
         thanks: "Рақмет, бұл жауапты тексереміз.",
-        failed: "Шағымды жіберу мүмкін болмады. Қайталап көріңіз."
+        failed: "Шағымды жіберу мүмкін болмады. Қайталап көріңіз.",
+        messageTitle: "Хабарламаға шағым",
+        messageIncludeText: "Хабарлама мәтінін шағыммен бірге жіберу",
+        messageThanks: "Рақмет, бұл хабарламаны тексереміз."
     )
 
     private static let uzbek = ReportStrings(
@@ -567,6 +592,9 @@ struct ReportStrings: Sendable {
         includeText: "Javob matnini shikoyat bilan birga yuborish",
         send: "Yuborish",
         thanks: "Rahmat, bu javobni tekshiramiz.",
-        failed: "Shikoyatni yuborib boʻlmadi. Qayta urinib koʻring."
+        failed: "Shikoyatni yuborib boʻlmadi. Qayta urinib koʻring.",
+        messageTitle: "Xabar ustidan shikoyat",
+        messageIncludeText: "Xabar matnini shikoyat bilan birga yuborish",
+        messageThanks: "Rahmat, bu xabarni tekshiramiz."
     )
 }

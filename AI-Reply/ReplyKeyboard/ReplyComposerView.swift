@@ -662,6 +662,8 @@ final class ReplyComposerView: UIView {
         counterLabel.isHidden = !hasSource
 
         closeButton.accessibilityLabel = strings.cancel
+        // The report panel hides it while open; every way it closes ends here.
+        closeButton.isHidden = false
         personaChip.isEnabled = !flow.isGenerating
 
         // Full message
@@ -812,7 +814,7 @@ final class ReplyComposerView: UIView {
     /// The flag on a result, and the panel in the reply's place while it is
     /// open: the header names it, everything about the reply steps aside.
     private func refreshReport() {
-        let words = strings.report
+        let words = strings.report.forMode(isCompose ? .compose : .reply)
         let reporting = reportPanel != nil
         reportButton.isHidden = reporting || !offersReport || flow.stage != .result || isConflict
         reportButton.accessibilityLabel = words.report
