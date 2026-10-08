@@ -1,3 +1,4 @@
+import AuthenticationServices
 import XCTest
 @testable import AIReply
 
@@ -149,11 +150,33 @@ final class SignInTests: XCTestCase {
             .resendCooldown(retryAfter: 10), .invalidEmail, .emailDeliveryFailed, .emailInUse,
             .invalidIDToken, .authProviderUnavailable
         ]
-        let keys = errors.map(AccountModel.message(for:))
+        // Apple's or Google's sheet failing on the phone reads apart from them all.
+        let keys = errors.map(AccountModel.message(for:)) + [AccountModel.providerFailureKey]
         XCTAssertEqual(Set(keys).count, keys.count, "each failure needs its own wording: \(keys)")
         for key in keys {
             XCTAssertNotNil(table[key], "\(key) is not in the string catalog")
         }
+    }
+
+    /// A sign-in report has to say which side failed: Apple's sheet on the
+    /// phone, or our server refusing the token Apple handed over.
+    @MainActor
+    func testAFailureOnThePhoneReadsApartFromATokenTheServerRefused() {
+        let model = AccountModel()
+        model.reportProviderFailure()
+        XCTAssertEqual(model.errorKey, "account.error.providerFailed")
+        XCTAssertEqual(AccountModel.message(for: APIError.invalidIDToken), "account.error.providerRejected")
+        XCTAssertEqual(AccountModel.message(for: APIError.authProviderUnavailable), "account.error.providerUnavailable")
+    }
+
+    /// Only the user closing Apple's sheet is silent; any other Apple error
+    /// is shown as a failure on the phone.
+    func testOnlyClosingTheAppleSheetIsSilent() {
+        XCTAssertTrue(AppleSignIn.isCancellation(ASAuthorizationError(.canceled)))
+        for code: ASAuthorizationError.Code in [.unknown, .failed, .invalidResponse, .notHandled, .notInteractive] {
+            XCTAssertFalse(AppleSignIn.isCancellation(ASAuthorizationError(code)), "\(code.rawValue)")
+        }
+        XCTAssertFalse(AppleSignIn.isCancellation(APIError.invalidIDToken))
     }
 
     @MainActor

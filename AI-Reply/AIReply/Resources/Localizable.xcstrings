@@ -842,6 +842,35 @@
         }
       }
     },
+    "account.error.providerRejected" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Our server didn't accept this sign-in. Try again or choose another method."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Біздің сервер бұл кіруді қабылдамады. Қайталаңыз немесе басқа тәсілді таңдаңыз."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Наш сервер не принял этот вход. Попробуйте ещё раз или выберите другой способ."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Serverimiz bu kirishni qabul qilmadi. Qayta urinib koʻring yoki boshqa usulni tanlang."
+          }
+        }
+      }
+    },
     "account.error.providerUnavailable" : {
       "extractionState" : "manual",
       "localizations" : {

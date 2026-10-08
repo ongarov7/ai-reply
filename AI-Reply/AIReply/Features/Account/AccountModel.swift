@@ -346,7 +346,7 @@ final class AccountModel {
             errorKey = "account.error.providerUnavailable"
             return .failed(clearCode: false)
         } catch {
-            errorKey = "account.error.providerFailed"
+            errorKey = Self.providerFailureKey
             return .failed(clearCode: false)
         }
 
@@ -360,9 +360,16 @@ final class AccountModel {
     }
 
     /// Apple's own sheet failed before our server was involved.
+    ///
+    /// Құрылғыдағы Apple терезесі сәтсіз аяқталды; сервер әлі қатыспады.
     func reportProviderFailure() {
-        errorKey = "account.error.providerFailed"
+        errorKey = Self.providerFailureKey
     }
+
+    /// The sign-in failed on the phone (Apple's or Google's sheet), never
+    /// reaching our server. A token the server refused reads differently
+    /// (`message(for: .invalidIDToken)`), so a report says which side failed.
+    nonisolated static let providerFailureKey = "account.error.providerFailed"
 
     /// The session is stored and the screens switch now. Device registration
     /// and the consent sync follow on their own, so a new account goes straight
@@ -756,7 +763,9 @@ final class AccountModel {
         case .invalidEmail:             return "account.error.invalidEmail"
         case .emailDeliveryFailed:      return "account.error.emailDelivery"
         case .emailInUse:               return "account.error.emailInUse"
-        case .invalidIDToken:           return "account.error.providerFailed"
+        // Our server refused Apple's or Google's token: said apart from the
+        // provider's own sheet failing on the phone (`providerFailed`).
+        case .invalidIDToken:           return "account.error.providerRejected"
         case .authProviderUnavailable:  return "account.error.providerUnavailable"
         case .unauthorized:             return "account.error.sessionExpired"
         case .accountDisabled:          return "account.error.disabled"

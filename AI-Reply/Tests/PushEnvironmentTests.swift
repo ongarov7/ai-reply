@@ -90,6 +90,27 @@ final class PushEnvironmentTests: XCTestCase {
         XCTAssertEqual(options.projectID, "ai-reply-push")
     }
 
+    /// The shared client config in Config/Firebase reaches the app through
+    /// the "Firebase config" build phase and passes the checks that guard
+    /// `FirebaseApp.configure`. No value of it is printed.
+    func testTheCommittedFirebaseConfigIsCopiedIntoTheAppAndAccepted() throws {
+        let source = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Config/Firebase/GoogleService-Info.plist")
+        guard FileManager.default.fileExists(atPath: source.path) else {
+            throw XCTSkip("this checkout has no Config/Firebase/GoogleService-Info.plist")
+        }
+        let path = try XCTUnwrap(Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist"),
+                                 "the Firebase config phase did not copy the file into the app")
+        XCTAssertTrue(FileManager.default.contentsEqual(atPath: path, andPath: source.path), "a stale copy")
+        let file = try XCTUnwrap(NSDictionary(contentsOfFile: path) as? [String: Any])
+        XCTAssertEqual(file["BUNDLE_ID"] as? String, Bundle.main.bundleIdentifier)
+        let options = FirebasePush.validated(googleAppID: file["GOOGLE_APP_ID"] as? String,
+                                             gcmSenderID: file["GCM_SENDER_ID"] as? String,
+                                             apiKey: file["API_KEY"] as? String,
+                                             projectID: file["PROJECT_ID"] as? String)
+        XCTAssertTrue(options != nil, "push would stay off with these options")
+    }
+
     // MARK: Installation id
 
     private final class MemoryIDStorage: InstallationIDStorage {
