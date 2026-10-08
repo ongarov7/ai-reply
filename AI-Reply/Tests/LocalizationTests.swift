@@ -316,7 +316,7 @@ final class LocalizationTests: XCTestCase {
         XCTAssertEqual(english.message(for: .monthlyQuotaExhausted),
                        "You have used this month's replies. They come back next month.")
         XCTAssertEqual(english.message(for: .consentRequired),
-                       "Open AI Reply and accept the updated terms to keep using AI replies.")
+                       "Open AI Reply and accept the terms to use AI replies.")
         XCTAssertEqual(AIReplyStrings.forLanguage(.uzbek).quotaExhausted, "Bugungi javoblar tugadi. Ular ertaga yangilanadi.")
 
         for language in AppLanguage.allCases where language != .english {

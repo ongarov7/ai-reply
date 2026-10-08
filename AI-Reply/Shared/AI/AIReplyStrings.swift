@@ -214,7 +214,7 @@ struct AIReplyStrings: Sendable {
         signInRequired: "Open the AI Reply app and sign in to keep replying.",
         quotaExhausted: "You have used today's replies. They come back tomorrow.",
         monthlyQuotaExhausted: "You have used this month's replies. They come back next month.",
-        consentRequired: "Open AI Reply and accept the updated terms to keep using AI replies.",
+        consentRequired: "Open AI Reply and accept the terms to use AI replies.",
         hostFieldNotEmpty: "There is already text in this field.",
         quickIntents: [
             QuickIntent(id: "agree", label: "Agree", phrase: "Reply that I agree."),
@@ -270,7 +270,7 @@ struct AIReplyStrings: Sendable {
         signInRequired: "Откройте приложение AI Reply и войдите, чтобы продолжить.",
         quotaExhausted: "Ответы на сегодня закончились. Они обновятся завтра.",
         monthlyQuotaExhausted: "Ответы на этот месяц закончились. Они обновятся в следующем месяце.",
-        consentRequired: "Откройте AI Reply и примите обновлённые условия, чтобы продолжить пользоваться AI-ответами.",
+        consentRequired: "Откройте AI Reply и примите условия, чтобы пользоваться AI-ответами.",
         hostFieldNotEmpty: "В этом поле уже есть текст.",
         quickIntents: [
             QuickIntent(id: "agree", label: "Согласиться", phrase: "Ответь согласием."),
@@ -326,7 +326,7 @@ struct AIReplyStrings: Sendable {
         signInRequired: "Жалғастыру үшін AI Reply қолданбасын ашып, кіріңіз.",
         quotaExhausted: "Бүгінгі жауаптар бітті. Ертең жаңарады.",
         monthlyQuotaExhausted: "Осы айдағы жауаптар бітті. Келесі айда жаңарады.",
-        consentRequired: "AI жауаптарын қолдануды жалғастыру үшін AI Reply қосымшасын ашып, жаңартылған шарттарды қабылдаңыз.",
+        consentRequired: "AI жауаптары үшін AI Reply қосымшасын ашып, шарттарды қабылдаңыз.",
         hostFieldNotEmpty: "Бұл өрісте мәтін бар.",
         quickIntents: [
             QuickIntent(id: "agree", label: "Келісу", phrase: "Келісетінімді жаз."),
@@ -382,7 +382,7 @@ struct AIReplyStrings: Sendable {
         signInRequired: "Davom etish uchun AI Reply ilovasini ochib, tizimga kiring.",
         quotaExhausted: "Bugungi javoblar tugadi. Ular ertaga yangilanadi.",
         monthlyQuotaExhausted: "Bu oygi javoblar tugadi. Keyingi oyda yangilanadi.",
-        consentRequired: "AI javoblardan foydalanishni davom ettirish uchun AI Reply ilovasini oching va yangilangan shartlarni qabul qiling.",
+        consentRequired: "AI javoblar uchun AI Reply ilovasini ochib, shartlarni qabul qiling.",
         hostFieldNotEmpty: "Bu maydonda matn bor.",
         quickIntents: [
             QuickIntent(id: "agree", label: "Rozilik", phrase: "Rozi ekanimni yoz."),
