@@ -12,6 +12,10 @@
 *.jks
 *.keystore
 AI-Reply-Android/app/google-services.json
+AI-Reply/Config/Firebase/GoogleService-Info.plist
+# Backend Firebase service account (FIREBASE_CREDENTIALS_FILE points outside the repo)
+ai-reply-back-end/secrets/
+*firebase-adminsdk*.json
 
 # Logs and local build/test output
 *.log

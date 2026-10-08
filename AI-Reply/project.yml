@@ -88,6 +88,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: kz.ai-reply.reply.keyboard.keyboard
         PRODUCT_NAME: AIReply
+        ENABLE_USER_SCRIPT_SANDBOXING: "NO"
         DEVELOPMENT_TEAM: 2PK6339Q47
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_IDENTITY: "iPhone Developer"
@@ -115,6 +116,30 @@ targets:
       configs:
         Debug:
           AIREPLY_SIGN_IN_WITH_APPLE: "NO"
+    # Firebase: Config/Firebase/GoogleService-Info.plist is copied into the app
+    # when it exists (git-ignored; see docs/FIREBASE_SETUP.md). The script reads
+    # a file that may be absent, so it cannot run in the script sandbox.
+    postBuildScripts:
+      - name: Firebase config
+        basedOnDependencyAnalysis: false
+        script: |
+          SRC="${PROJECT_DIR}/Config/Firebase/GoogleService-Info.plist"
+          DST="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/GoogleService-Info.plist"
+          if [ ! -f "$SRC" ]; then
+            rm -f "$DST"
+            echo "note: Firebase is not configured yet (no Config/Firebase/GoogleService-Info.plist); push stays off in this build."
+            exit 0
+          fi
+          if ! /usr/bin/plutil -lint -s "$SRC"; then
+            echo "error: Config/Firebase/GoogleService-Info.plist is not a valid property list."
+            exit 1
+          fi
+          BUNDLE_ID=$(/usr/libexec/PlistBuddy -c "Print :BUNDLE_ID" "$SRC" 2>/dev/null || true)
+          if [ -n "$BUNDLE_ID" ] && [ "$BUNDLE_ID" != "$PRODUCT_BUNDLE_IDENTIFIER" ]; then
+            echo "error: GoogleService-Info.plist belongs to $BUNDLE_ID, but this app is $PRODUCT_BUNDLE_IDENTIFIER."
+            exit 1
+          fi
+          /bin/cp "$SRC" "$DST"
     dependencies:
       - target: ReplyKeyboard
         embed: true
