@@ -15,6 +15,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.HelpOutline
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -40,6 +41,8 @@ fun NavigationRow(
     /** An action that cannot be undone (Delete account): icon and label in the error colour. */
     destructive: Boolean = false,
     enabled: Boolean = true,
+    /** The row's action is on its way: a small spinner where the chevron is, so nothing moves. */
+    busy: Boolean = false,
     onClick: () -> Unit
 ) {
     val accent = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
@@ -73,12 +76,16 @@ fun NavigationRow(
                 color = LocalExtraColors.current.textSecondary
             )
         }
-        Icon(
-            Icons.AutoMirrored.Filled.KeyboardArrowRight,
-            contentDescription = null,
-            tint = LocalExtraColors.current.textTertiary,
-            modifier = Modifier.size(20.dp)
-        )
+        if (busy) {
+            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = accent)
+        } else {
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = LocalExtraColors.current.textTertiary,
+                modifier = Modifier.size(20.dp)
+            )
+        }
     }
 }
 

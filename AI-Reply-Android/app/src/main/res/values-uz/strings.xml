@@ -99,7 +99,7 @@
     <string name="settings_appearance_system">Tizim</string>
     <string name="settings_language">Til</string>
     <string name="settings_language_footer">Ilova tilini oʻzgartiradi. Klaviatura tugmalari tanlangan klaviatura tartibiga mos keladi.</string>
-    <string name="settings_privacy_body">«%1$s» tugmasi nusxalangan xabar va koʻrsatmangizni, «%2$s» tugmasi esa faqat koʻrsatmani yuboradi. Aqlli tuzatish yoqilgan boʻlsa, AI\u00A0Reply maydoniga yozgan koʻrsatmangiz tuzatish taklif qilish uchun ham yuborilishi mumkin. Matn AI\u00A0Reply serveri orqali OpenAI’ga uzatiladi, bazada saqlanmaydi va jurnallarga yozilmaydi.</string>
+    <string name="settings_privacy_body">«%1$s» tugmasi nusxalangan yoki belgilangan xabar va koʻrsatmangizni, «%2$s» tugmasi esa faqat koʻrsatmani yuboradi. Aqlli tuzatish yoqilgan boʻlsa, AI\u00A0Reply maydoniga yozgan koʻrsatmangiz tuzatish taklif qilish uchun ham yuborilishi mumkin. Matn AI\u00A0Reply serveri orqali OpenAI’ga uzatiladi, bazada saqlanmaydi va jurnallarga yozilmaydi, faqat oʻzingiz yuborgan shikoyatdagi matn bundan mustasno.</string>
     <string name="settings_privacy_title">Maxfiylik</string>
     <string name="settings_setup">Sozlash</string>
     <string name="settings_setup_footer">Klaviatura, mikrofon va nusxalangan matn uchun bosqichma-bosqich yoʻriqnoma.</string>

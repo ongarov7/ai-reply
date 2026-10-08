@@ -114,7 +114,16 @@ class AccountController(
         /** A string resource, never a server sentence. */
         @StringRes val errorMessage: Int? = null,
         /** A confirmation for the next screen, such as the account having been deleted. */
-        @StringRes val notice: Int? = null
+        @StringRes val notice: Int? = null,
+        /** Delete account is on its way; the row shows it, and the other account rows wait. */
+        val deletingAccount: Boolean = false,
+        /**
+         * The last Delete account failed. Kept here rather than on the screen,
+         * so it is still shown when Settings comes back.
+         */
+        val accountDeletionFailed: Boolean = false,
+        /** Withdraw AI consent is on its way. */
+        val withdrawingConsent: Boolean = false
     ) {
         val isSignedIn: Boolean get() = phase is Phase.SignedIn
         val remainingToday: Int get() = usage.remainingToday
@@ -175,10 +184,8 @@ class AccountController(
     suspend fun bootstrap() {
         if (_state.value.bootstrapComplete) return
         loadServerConfig()
-        if (credentials.isSignedIn) {
-            refresh()
-            syncPendingLegalConsent()
-        }
+        // The refresh also sends an acceptance still waiting for the server.
+        if (credentials.isSignedIn) refresh()
         trackingConsent {
             _state.update {
                 it.copy(
@@ -198,6 +205,11 @@ class AccountController(
     /** Profile, plan and quota in one call. Safe on every appearance. */
     suspend fun refresh() {
         if (!credentials.isSignedIn) {
+            // The account itself went: a deletion whose answer was lost did go through.
+            if (deletionMayHaveSucceeded) {
+                forgetDeletedAccount()
+                return
+            }
             // The session ended elsewhere (a refresh token the server revoked).
             val wasSignedIn = _state.value.isSignedIn
             _state.update { it.copy(phase = Phase.SignedOut) }
@@ -222,9 +234,13 @@ class AccountController(
                 )
             }
             observer?.onAccountLoaded(account.user.id)
+            // Home and Settings refresh on every appearance, so an acceptance
+            // the server never got (offline, a timeout) goes again before
+            // the keyboard can be refused for it.
+            syncPendingLegalConsent()
         } catch (exception: ApiException) {
             when (exception.error) {
-                is ApiError.Unauthorized -> signOutLocally(userInitiated = false)
+                is ApiError.Unauthorized -> sessionEnded()
                 is ApiError.AccountDisabled -> {
                     signOutLocally(userInitiated = false)
                     _state.update { it.copy(errorMessage = R.string.account_error_disabled) }
@@ -376,6 +392,7 @@ class AccountController(
      * the moment the phase changes.
      */
     private fun completeSignIn(session: AccountSessionDto): SignInOutcome {
+        deletionMayHaveSucceeded = false
         usageCache.store(session.usage)
         usageCache.storePlanCode(session.subscription.plan.code)
         applyLegalConsent(session.legalConsent)
@@ -425,10 +442,15 @@ class AccountController(
         }
     }
 
+    /**
+     * Continue on the consent screen. The upload runs on the background
+     * scope, like the one after sign-in: the consent screen leaves the
+     * composition - and cancels its own scope - the moment the flag flips.
+     */
     suspend fun acceptLegal(locale: String) {
         legalConsentStore.accept(_state.value.legalConfig, locale, BuildConfig.VERSION_NAME)
         trackingConsent { _state.update { it.copy(hasAcceptedLegal = true, notice = null) } }
-        syncPendingLegalConsent()
+        backgroundScope?.launch { syncPendingLegalConsent() } ?: syncPendingLegalConsent()
     }
 
     /**
@@ -439,20 +461,20 @@ class AccountController(
      * Object to lint).
      */
     suspend fun withdrawLegalConsent(): Int? {
-        _state.update { it.copy(busy = true) }
+        _state.update { it.copy(busy = true, withdrawingConsent = true) }
         if (credentials.isSignedIn) {
             try {
                 service.withdrawLegalConsent()
             } catch (cancellation: CancellationException) {
-                _state.update { it.copy(busy = false) }
+                _state.update { it.copy(busy = false, withdrawingConsent = false) }
                 throw cancellation
             } catch (exception: Throwable) {
-                _state.update { it.copy(busy = false) }
+                _state.update { it.copy(busy = false, withdrawingConsent = false) }
                 return messageFor(exception)
             }
         }
         legalConsentStore.clear()
-        _state.update { it.copy(busy = false, hasAcceptedLegal = false) }
+        _state.update { it.copy(busy = false, withdrawingConsent = false, hasAcceptedLegal = false) }
         return null
     }
 
@@ -493,28 +515,86 @@ class AccountController(
      *
      * Not cancelled when the screen goes away mid-request: an account deleted
      * on the server must not stay half signed in here.
+     *
+     * Жауабы жоғалған жою: қайта басқанда 401 келсе, тіркелгі жойылған.
+     * A deletion that got no clear answer (a timeout, a dropped connection, a
+     * 5xx) may have gone through. If the next try - or the next refresh - is
+     * then refused with 401, the account is gone, and the phone forgets it
+     * as if the first answer had arrived. Without such an attempt a 401 only
+     * means the session ended: the user signs in again, nothing is wiped.
+     * The mark lives in memory, so it does not survive the process.
      */
     suspend fun deleteAccount(): Boolean {
         if (!credentials.isSignedIn) return false
-        _state.update { it.copy(busy = true, errorMessage = null) }
+        _state.update {
+            it.copy(busy = true, errorMessage = null, deletingAccount = true, accountDeletionFailed = false)
+        }
         return withContext(NonCancellable) {
             try {
                 service.deleteAccount()
             } catch (exception: Throwable) {
-                _state.update { it.copy(busy = false) }
+                val error = (exception as? ApiException)?.error
+                when {
+                    error is ApiError.Unauthorized && deletionMayHaveSucceeded -> {
+                        forgetDeletedAccount()
+                        return@withContext true
+                    }
+                    error is ApiError.Unauthorized -> {
+                        signOutLocally(userInitiated = false)
+                        _state.update { it.copy(errorMessage = R.string.account_error_session_expired) }
+                    }
+                    else -> {
+                        if (mayHaveReachedServer(error)) deletionMayHaveSucceeded = true
+                        _state.update {
+                            it.copy(busy = false, deletingAccount = false, accountDeletionFailed = true)
+                        }
+                    }
+                }
                 return@withContext false
             }
-            // The consent first: the sign-out below must not register this
-            // installation again as if the terms were still accepted.
-            legalConsentStore.clear()
-            _state.update { it.copy(hasAcceptedLegal = false, notice = R.string.account_deleted) }
-            learnedWords?.clear()
-            usageCache.clear()
-            profileSync?.accountDeleted()
-            signOutLocally(userInitiated = true)
-            backgroundScope?.launch { runCatching { google?.signOut() } }
+            forgetDeletedAccount()
             true
         }
+    }
+
+    /** Delete account was tapped again: the last failure is old news. */
+    fun clearDeletionFailure() {
+        _state.update { it.copy(accountDeletionFailed = false) }
+    }
+
+    /**
+     * Set by a deletion that got no clear answer; cleared by any sign-in or
+     * sign-out. See [deleteAccount].
+     */
+    @Volatile
+    private var deletionMayHaveSucceeded = false
+
+    /**
+     * The server deleted the account: the session, the consent, the learned
+     * words, the quota and the profile the server had a copy of go too.
+     */
+    private fun forgetDeletedAccount() {
+        // The consent first: the sign-out below must not register this
+        // installation again as if the terms were still accepted.
+        legalConsentStore.clear()
+        _state.update {
+            it.copy(
+                hasAcceptedLegal = false,
+                notice = R.string.account_deleted,
+                deletingAccount = false,
+                accountDeletionFailed = false
+            )
+        }
+        learnedWords?.clear()
+        usageCache.clear()
+        profileSync?.accountDeleted()
+        signOutLocally(userInitiated = true)
+        backgroundScope?.launch { runCatching { google?.signOut() } }
+    }
+
+    /** The server refused the session: the account is gone too if a deletion may have reached it. */
+    private fun sessionEnded() {
+        if (deletionMayHaveSucceeded) forgetDeletedAccount() else signOutLocally(userInitiated = false)
     }
 
     /**
@@ -530,6 +610,7 @@ class AccountController(
     }
 
     private fun signOutLocally(userInitiated: Boolean) {
+        deletionMayHaveSucceeded = false
         credentials.clear()
         profileSync?.signedOut()
         onSignedOut()
@@ -540,7 +621,9 @@ class AccountController(
                 subscription = null,
                 usage = UsageDto.UNKNOWN,
                 plans = emptyList(),
-                busy = false
+                busy = false,
+                deletingAccount = false,
+                accountDeletionFailed = false
             )
         }
         observer?.onSignedOut(userInitiated)
@@ -682,6 +765,16 @@ class AccountController(
         fun codeIsSpent(throwable: Throwable): Boolean = when ((throwable as? ApiException)?.error) {
             is ApiError.InvalidOtp, is ApiError.OtpExpired,
             is ApiError.OtpAlreadyUsed, is ApiError.OtpAttemptsExceeded -> true
+            else -> false
+        }
+
+        /**
+         * A failure with no clear answer from the server: the request may have
+         * arrived and done its work. Offline it never left the phone.
+         */
+        fun mayHaveReachedServer(error: ApiError?): Boolean = when (error) {
+            is ApiError.TimedOut, is ApiError.Server,
+            is ApiError.ProviderTimeout, is ApiError.MalformedResponse -> true
             else -> false
         }
     }

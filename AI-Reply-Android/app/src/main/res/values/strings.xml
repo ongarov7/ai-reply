@@ -140,7 +140,7 @@
     <string name="settings_appgroup_unavailable">The app and the keyboard cannot share settings yet. Rebuild the app so the App Group entitlement is applied.</string>
     <string name="settings_language">Language</string>
     <string name="settings_language_footer">Changes the language of this app. The keyboard\'s own labels follow the layout you select on the keyboard itself.</string>
-    <string name="settings_privacy_body">Tapping %1$s sends the copied message and your instruction; %2$s sends only your instruction. With Smart correction on, an instruction you type in AI\u00A0Reply\'s own field may also be sent to suggest a correction. Text goes through the AI\u00A0Reply server to OpenAI and is not stored in the database or written to logs.</string>
+    <string name="settings_privacy_body">Tapping %1$s sends the message you copied or selected and your instruction; %2$s sends only your instruction. With Smart correction on, an instruction you type in AI\u00A0Reply\'s own field may also be sent to suggest a correction. Text goes through the AI\u00A0Reply server to OpenAI and is not stored in the database or written to logs, except the text of a report you choose to send.</string>
     <string name="settings_privacy_title">Privacy</string>
     <string name="settings_setup">Setup</string>
     <string name="settings_setup_footer">Keyboard status, step-by-step setup and how AI\u00A0Reply reads what you copy.</string>

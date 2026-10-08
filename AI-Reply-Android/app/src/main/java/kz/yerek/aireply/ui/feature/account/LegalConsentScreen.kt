@@ -4,10 +4,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -40,6 +42,11 @@ import kz.yerek.aireply.ui.design.Spacing
  * anything else. Two separate boxes: the documents, and the texts going to
  * OpenAI; Continue needs both. It shows again when the versions change, when
  * the consent is withdrawn in Settings, and after the account is deleted.
+ *
+ * Келісімсіз де шығуға және тіркелгіні жоюға болады.
+ * A signed-in user who does not consent is not trapped here: Sign out and
+ * Delete account sit under Continue, with Settings' own confirmations, so
+ * neither needs the texts-to-OpenAI box ticked first.
  */
 @Composable
 fun LegalConsentScreen() {
@@ -49,6 +56,8 @@ fun LegalConsentScreen() {
     val scope = rememberCoroutineScope()
     var accepted by remember { mutableStateOf(false) }
     var acceptedAi by remember { mutableStateOf(false) }
+    var confirmingSignOut by remember { mutableStateOf(false) }
+    var confirmingDeletion by remember { mutableStateOf(false) }
 
     fun open(rawUrl: String) = context.openWebPage(rawUrl, services.settings.effectiveAppLanguage.code)
 
@@ -100,6 +109,77 @@ fun LegalConsentScreen() {
         )
 
         Footnote(stringResource(R.string.legal_consent_footer))
+
+        if (state.isSignedIn) {
+            AccountExits(
+                state = state,
+                onSignOut = { confirmingSignOut = true },
+                onDelete = {
+                    services.account.clearDeletionFailure()
+                    confirmingDeletion = true
+                }
+            )
+        }
+    }
+
+    if (confirmingSignOut) {
+        SignOutDialog(
+            onConfirm = {
+                confirmingSignOut = false
+                scope.launch { services.account.signOut() }
+            },
+            onDismiss = { confirmingSignOut = false }
+        )
+    }
+
+    if (confirmingDeletion) {
+        DeleteAccountDialog(
+            onConfirm = {
+                confirmingDeletion = false
+                // On success this screen stays and says the account is gone.
+                scope.launch { services.account.deleteAccount() }
+            },
+            onDismiss = { confirmingDeletion = false }
+        )
+    }
+}
+
+/** Sign out and Delete account, quieter than Continue. */
+@Composable
+private fun AccountExits(state: AccountController.State, onSignOut: () -> Unit, onDelete: () -> Unit) {
+    // Unknown features (no answer yet) offer it, as in Settings.
+    val offersDeletion = state.features?.accountDeletion ?: true
+    Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        TextButton(onClick = onSignOut, enabled = !state.busy) {
+            Text(stringResource(R.string.settings_account_sign_out))
+        }
+        if (offersDeletion) {
+            TextButton(onClick = onDelete, enabled = !state.busy) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s)
+                ) {
+                    if (state.deletingAccount) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                    Text(
+                        stringResource(R.string.settings_account_delete),
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        }
+        if (state.accountDeletionFailed) {
+            Text(
+                stringResource(R.string.account_delete_failed),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error
+            )
+        }
     }
 }
 

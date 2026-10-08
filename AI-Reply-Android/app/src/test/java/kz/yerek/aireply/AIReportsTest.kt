@@ -65,6 +65,17 @@ class AIReportsTest {
     }
 
     @Test
+    fun `a written message is reported as a message, a reply as a reply`() {
+        assertEquals(R.string.report_title, AIReportMode.REPLY.title)
+        assertEquals(R.string.report_include_text, AIReportMode.REPLY.includeText)
+        assertEquals(R.string.report_thanks, AIReportMode.REPLY.thanks)
+
+        assertEquals(R.string.report_title_compose, AIReportMode.COMPOSE.title)
+        assertEquals(R.string.report_include_text_compose, AIReportMode.COMPOSE.includeText)
+        assertEquals(R.string.report_thanks_compose, AIReportMode.COMPOSE.thanks)
+    }
+
+    @Test
     fun `every reason travels as the server's code`() {
         assertEquals(
             listOf("offensive", "harmful", "false_info", "wrong_language", "other"),

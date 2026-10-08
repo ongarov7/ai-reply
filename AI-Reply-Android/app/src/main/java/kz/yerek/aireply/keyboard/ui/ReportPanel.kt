@@ -94,7 +94,7 @@ internal fun ReportPanel(
 
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(
-            text = strings[R.string.report_title],
+            text = strings[draft.mode.title],
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
             color = theme.primaryText,
@@ -152,7 +152,7 @@ internal fun ReportPanel(
             )
             Spacer(Modifier.width(6.dp))
             Text(
-                text = strings[R.string.report_include_text],
+                text = strings[draft.mode.includeText],
                 fontSize = 12.5.sp,
                 color = theme.primaryText,
                 maxLines = 2,
@@ -161,7 +161,7 @@ internal fun ReportPanel(
         }
 
         val status = when (draft.status) {
-            AIReportDraft.Status.SENT -> strings[R.string.report_thanks]
+            AIReportDraft.Status.SENT -> strings[draft.mode.thanks]
             AIReportDraft.Status.FAILED -> strings[R.string.report_failed]
             else -> null
         }

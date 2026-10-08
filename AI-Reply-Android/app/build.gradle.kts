@@ -159,8 +159,9 @@ val releaseSetupCheck = tasks.register("checkReleaseSetup") {
     doLast {
         if (missingFirebase) {
             logger.warn(
-                "WARNING: app/google-services.json is missing. This release build has no push " +
-                    "notifications (FCM). Add the Firebase config before uploading to Google Play."
+                "WARNING: Firebase setup pending: app/google-services.json is not there yet, so this " +
+                    "release build has no push notifications (FCM). Add it before uploading to Google Play " +
+                    "(docs/FIREBASE_SETUP.md)."
             )
         }
         if (missingGoogleClientId) {

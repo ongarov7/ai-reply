@@ -259,7 +259,8 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit, focusSection: S
                         NavigationRow(
                             Icons.Outlined.PrivacyTip,
                             stringResource(R.string.settings_withdraw_consent),
-                            enabled = !accountState.busy
+                            enabled = !accountState.busy,
+                            busy = accountState.withdrawingConsent
                         ) {
                             withdrawalError = null
                             confirmingWithdrawal = true

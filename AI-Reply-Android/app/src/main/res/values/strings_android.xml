@@ -208,7 +208,7 @@
     <string name="onboarding_clipboard_note">AI\u00A0Reply reads the message you copied only when you tap a template or Paste message. Some Android versions then briefly show a notice that the clipboard was read — that\'s normal.</string>
     <string name="cd_tutorial_next">Show the next step</string>
     <string name="settings_smart_correction">Smart correction</string>
-    <string name="settings_smart_correction_footer">Typos are fixed and words suggested on your phone: nothing you type in other apps is sent anywhere. While you write an instruction in AI\u00A0Reply\'s own field, that text may be sent through the AI\u00A0Reply server to OpenAI to suggest a cleaner version.</string>
+    <string name="settings_smart_correction_footer">Typos are fixed and words suggested on your phone: nothing you type in other apps is sent for this. While you write an instruction in AI\u00A0Reply\'s own field, that text may be sent through the AI\u00A0Reply server to OpenAI to suggest a cleaner version.</string>
     <string name="settings_smart_correction_attribution">Word lists: Leipzig Corpora Collection (CC BY).</string>
 
     <!-- Push notifications (2026-10). -->
@@ -244,10 +244,10 @@
     <string name="debug_push_body">Sample notification: tap to open your plan.</string>
 
     <!-- Release readiness (2026-10): AI consent, account deletion, reports, support. -->
-    <string name="legal_consent_ai_disclosure">When you tap %1$s or %2$s, AI Reply sends the message you copied, your instruction and your profile details through our server to OpenAI to write the text. With Smart correction on, your instruction is also sent while you type it. Our server does not save these texts.</string>
+    <string name="legal_consent_ai_disclosure">When you tap %1$s or %2$s, AI Reply sends the message you copied or selected, your instruction and your profile details through our server to OpenAI to write the text. With Smart correction on, your instruction is also sent while you type it. Our server does not save the messages, instructions or generated texts; your profile is kept in your account until you delete it.</string>
     <string name="legal_consent_ai_checkbox">I agree that these texts are sent to OpenAI to write replies.</string>
     <string name="kb_err_quota_monthly">You have used this month\'s replies. They come back next month.</string>
-    <string name="kb_err_consent_required">Open AI Reply and accept the updated terms to keep using AI replies.</string>
+    <string name="kb_err_consent_required">Open AI Reply and accept the terms to use AI replies.</string>
     <string name="settings_account_delete">Delete account</string>
     <string name="settings_account_delete_title">Delete your account?</string>
     <string name="settings_account_delete_body">Your account, profile, consents, usage history and devices are deleted from our server right away. This cannot be undone. The keyboard keeps working for typing.</string>
@@ -264,9 +264,12 @@
     <string name="report_send">Send report</string>
     <string name="report_thanks">Thanks. We\'ll review this reply.</string>
     <string name="report_failed">Couldn\'t send the report. Try again.</string>
+    <string name="report_title_compose">Report this message</string>
+    <string name="report_include_text_compose">Send the message text with the report</string>
+    <string name="report_thanks_compose">Thanks. We\'ll review this message.</string>
     <string name="settings_support">Help and support</string>
     <string name="settings_withdraw_consent">Withdraw AI consent</string>
-    <string name="settings_withdraw_consent_body">AI replies stop working until you accept again. Your account stays.</string>
+    <string name="settings_withdraw_consent_body">AI replies stop working and the app asks for your consent again. Your account stays.</string>
     <string name="settings_withdraw_consent_action">Withdraw</string>
     <string name="settings_version">Version %1$s (%2$d)</string>
     <string name="common_link_failed">No app on this phone can open the link.</string>

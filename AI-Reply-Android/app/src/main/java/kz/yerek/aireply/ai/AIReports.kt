@@ -12,10 +12,21 @@ import kz.yerek.aireply.R
 import kz.yerek.aireply.core.text.clampToCodePoints
 import kz.yerek.aireply.data.account.AIReportRequest
 
-/** Which AI flow wrote the text a report is about. */
-enum class AIReportMode(val raw: String) {
-    REPLY("reply"),
-    COMPOSE("compose")
+/** Which AI flow wrote the text a report is about, and what the report calls that text. */
+enum class AIReportMode(
+    val raw: String,
+    @StringRes val title: Int,
+    @StringRes val includeText: Int,
+    @StringRes val thanks: Int
+) {
+    REPLY("reply", R.string.report_title, R.string.report_include_text, R.string.report_thanks),
+    /** Write with AI: the text is a message of the user's own, not a reply. */
+    COMPOSE(
+        "compose",
+        R.string.report_title_compose,
+        R.string.report_include_text_compose,
+        R.string.report_thanks_compose
+    )
 }
 
 /** Why the user reports it: the server's codes, in display order. */

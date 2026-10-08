@@ -179,7 +179,7 @@
     <string name="onboarding_clipboard_note">AI\u00A0Reply читает скопированное сообщение, только когда вы нажимаете шаблон или кнопку «Вставить сообщение». Некоторые версии Android в этот момент ненадолго показывают уведомление о чтении буфера обмена — это нормально.</string>
     <string name="cd_tutorial_next">Показать следующий шаг</string>
     <string name="settings_smart_correction">Умная коррекция</string>
-    <string name="settings_smart_correction_footer">Опечатки исправляются, а слова подсказываются прямо на телефоне: ничего из того, что вы печатаете в других приложениях, никуда не отправляется. Когда вы пишете инструкцию в поле AI\u00A0Reply, этот текст может отправляться через сервер AI\u00A0Reply в OpenAI, чтобы предложить более аккуратный вариант.</string>
+    <string name="settings_smart_correction_footer">Опечатки исправляются, а слова подсказываются прямо на телефоне: для этого ничего из того, что вы печатаете в других приложениях, не отправляется. Когда вы пишете инструкцию в поле AI\u00A0Reply, этот текст может отправляться через сервер AI\u00A0Reply в OpenAI, чтобы предложить более аккуратный вариант.</string>
     <string name="settings_smart_correction_attribution">Словари: Leipzig Corpora Collection (CC BY).</string>
 
     <!-- Push notifications (2026-10). -->
@@ -215,10 +215,10 @@
     <string name="debug_push_body">Тестовое уведомление: нажмите, чтобы открыть тариф.</string>
 
     <!-- Release readiness (2026-10): AI consent, account deletion, reports, support. -->
-    <string name="legal_consent_ai_disclosure">Когда вы нажимаете «%1$s» или «%2$s», AI Reply отправляет скопированное сообщение, вашу инструкцию и данные профиля через наш сервер в OpenAI, чтобы написать текст. Если включена умная коррекция, инструкция отправляется и во время набора. Наш сервер эти тексты не сохраняет.</string>
+    <string name="legal_consent_ai_disclosure">Когда вы нажимаете «%1$s» или «%2$s», AI Reply отправляет скопированное или выделенное сообщение, вашу инструкцию и данные профиля через наш сервер в OpenAI, чтобы написать текст. Если включена умная коррекция, инструкция отправляется и во время набора. Наш сервер не сохраняет сообщения, инструкции и готовые тексты; профиль хранится в вашем аккаунте, пока вы его не удалите.</string>
     <string name="legal_consent_ai_checkbox">Я соглашаюсь на отправку этих текстов в OpenAI для написания ответов.</string>
     <string name="kb_err_quota_monthly">Ответы на этот месяц закончились. Они обновятся в следующем месяце.</string>
-    <string name="kb_err_consent_required">Откройте AI Reply и примите обновлённые условия, чтобы продолжить пользоваться AI-ответами.</string>
+    <string name="kb_err_consent_required">Откройте AI Reply и примите условия, чтобы пользоваться AI-ответами.</string>
     <string name="settings_account_delete">Удалить аккаунт</string>
     <string name="settings_account_delete_title">Удалить аккаунт?</string>
     <string name="settings_account_delete_body">Аккаунт, профиль, согласия, история использования и устройства сразу удаляются с нашего сервера. Это нельзя отменить. Клавиатура продолжит работать для набора текста.</string>
@@ -235,9 +235,12 @@
     <string name="report_send">Отправить</string>
     <string name="report_thanks">Спасибо, мы проверим этот ответ.</string>
     <string name="report_failed">Не удалось отправить жалобу. Попробуйте ещё раз.</string>
+    <string name="report_title_compose">Пожаловаться на сообщение</string>
+    <string name="report_include_text_compose">Отправить текст сообщения вместе с жалобой</string>
+    <string name="report_thanks_compose">Спасибо, мы проверим это сообщение.</string>
     <string name="settings_support">Помощь и поддержка</string>
     <string name="settings_withdraw_consent">Отозвать согласие на AI-обработку</string>
-    <string name="settings_withdraw_consent_body">AI-ответы перестанут работать, пока вы снова не дадите согласие. Аккаунт сохранится.</string>
+    <string name="settings_withdraw_consent_body">AI-ответы перестанут работать, и приложение снова попросит согласие. Аккаунт сохранится.</string>
     <string name="settings_withdraw_consent_action">Отозвать</string>
     <string name="settings_version">Версия %1$s (%2$d)</string>
     <string name="common_link_failed">На телефоне нет приложения, которое может открыть ссылку.</string>
