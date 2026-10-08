@@ -40,7 +40,7 @@ targets:
       properties:
         CFBundleDisplayName: AI Reply
         CFBundleShortVersionString: "1.0"
-        CFBundleVersion: "4"
+        CFBundleVersion: "5"
         AIReplySignInWithApple: $(AIREPLY_SIGN_IN_WITH_APPLE)
         # Google Sign-In: both values come from the build settings below.
         GIDClientID: $(GOOGLE_IOS_CLIENT_ID)
@@ -119,7 +119,7 @@ targets:
       properties:
         CFBundleDisplayName: AI Reply
         CFBundleShortVersionString: "1.0"
-        CFBundleVersion: "4"
+        CFBundleVersion: "5"
         NSExtension:
           NSExtensionAttributes:
             IsASCIICapable: true
