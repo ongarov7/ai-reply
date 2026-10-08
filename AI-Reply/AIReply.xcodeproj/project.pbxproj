@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A1B2C3D4E5F6071829304A02 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071829304A01 /* PrivacyInfo.xcprivacy */; };
+		A1B2C3D4E5F6071829304A04 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071829304A03 /* PrivacyInfo.xcprivacy */; };
 		01B9F4CDCCDDFD2D4BD97650 /* KeyboardTyping.swift in Sources */ = {isa = PBXBuildFile; fileRef = C09C0AE3852C149085890DC1 /* KeyboardTyping.swift */; };
 		04C222BF74DEA28FF5B91C8E /* KeyProximity+Layout.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED4D38573AC93304F5EC9EAC /* KeyProximity+Layout.swift */; };
 		0728C3B010583C95E4BC7E8C /* UserProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01E2326063481AC80000952A /* UserProfile.swift */; };
@@ -274,6 +276,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		A1B2C3D4E5F6071829304A01 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		A1B2C3D4E5F6071829304A03 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		007CAE30B84E19B48967E9DA /* TemplateListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateListView.swift; sourceTree = "<group>"; };
 		00985BE1BD5750228F264479 /* PushNotificationsModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushNotificationsModelTests.swift; sourceTree = "<group>"; };
 		01E2326063481AC80000952A /* UserProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfile.swift; sourceTree = "<group>"; };
@@ -673,6 +677,7 @@
 		6A1E57A3437AD9D4EB1984BB /* ReplyKeyboard */ = {
 			isa = PBXGroup;
 			children = (
+				A1B2C3D4E5F6071829304A03 /* PrivacyInfo.xcprivacy */,
 				DC8891EEF9A743BBEBC33855 /* ComposerTextView.swift */,
 				B3EB80F941E05498FE3A9CFE /* DebugReplyMock.swift */,
 				F48C07F111CE28BC5FFB81B8 /* Info.plist */,
@@ -834,6 +839,7 @@
 			isa = PBXGroup;
 			children = (
 				9B614C117924E8EC6A4EF32D /* Info.plist */,
+				A1B2C3D4E5F6071829304A01 /* PrivacyInfo.xcprivacy */,
 				9B17D77227F58293EA87C67D /* App */,
 				439CB702C697D8899359DCCD /* DesignSystem */,
 				B9159257397F0F7D0483FAF4 /* Features */,
@@ -969,6 +975,7 @@
 			files = (
 				84FB3DEC26F06F5650AC3549 /* Assets.xcassets in Resources */,
 				39325F9CAB90B0BDF6FBAE0A /* Localizable.xcstrings in Resources */,
+				A1B2C3D4E5F6071829304A02 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -982,6 +989,7 @@
 				99018F02A49D1ECF4DE6540E /* kk.words in Resources */,
 				6449E00B6C3E007FCB93A6F6 /* ru.known in Resources */,
 				92943962AE5C53CAC6DC4977 /* ru.words in Resources */,
+				A1B2C3D4E5F6071829304A04 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
