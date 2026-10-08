@@ -131,7 +131,10 @@ func run(envFile string) error {
 		MaxOutputTokens:  cfg.OpenAI.MaxOutputTokens,
 	})
 	aiSvc := ai.New(store, subSvc, provider, limitSvc, log).WithRepair(cfg.AI.RepairEnabled).WithQuotaEvents(notifyEvents)
-	paymentSvc := payments.New(store, subSvc, payments.DemoProvider{}, cfg.Payments.Mode).WithEvents(notifyEvents)
+	// No live provider exists yet (StoreKit / Play Billing come later), so
+	// nothing can be bought unless a development server opts into demo checkout.
+	paymentSvc := payments.New(store, subSvc, payments.DemoProvider{}, cfg.Payments.Mode).
+		WithEvents(notifyEvents).WithDemoCheckout(cfg.Payments.DemoCheckout)
 	eventSvc := productevents.New(store, log)
 	adminSvc := admin.New(store, subSvc, planSvc, cfg, log).WithEvents(notifyEvents)
 	simulatorSvc := simulator.New(simulator.Deps{
@@ -154,7 +157,8 @@ func run(envFile string) error {
 	}).Register(mux)
 
 	adminapi.New(adminapi.Deps{
-		Config: cfg, Admin: adminSvc, Limits: limitSvc, Notifications: notifySvc, Limiter: limiter, Log: log,
+		Config: cfg, Admin: adminSvc, Limits: limitSvc, Notifications: notifySvc, Payments: paymentSvc,
+		Limiter: limiter, Log: log,
 	}).Register(mux)
 
 	simulatorapi.New(simulatorapi.Deps{
@@ -204,6 +208,7 @@ func run(envFile string) error {
 		log.Info("server listening",
 			"addr", server.Addr, "env", cfg.App.Env, "timezone", cfg.App.Timezone,
 			"demo_mode", cfg.Auth.DemoMode, "payment_mode", cfg.Payments.Mode,
+			"demo_checkout", cfg.Payments.DemoCheckout,
 			"legacy_api", cfg.Auth.LegacyEnabled, "model", cfg.OpenAI.Model,
 			"email_otp", authSvc.EmailDelivery(), "google_sign_in", authSvc.GoogleEnabled(),
 			"apple_sign_in", authSvc.AppleEnabled(), "push", notifySvc.Ready(),

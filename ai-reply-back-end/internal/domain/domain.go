@@ -226,11 +226,16 @@ type Plan struct {
 	PeriodDays   int
 	IsFree       bool
 	IsActive     bool
-	SortOrder    int
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-	ArchivedAt   *time.Time
+	// IsVisible — customers see the plan (apps, landing, /api/v1/plans).
+	IsVisible  bool
+	SortOrder  int
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+	ArchivedAt *time.Time
 }
+
+// Listed — тариф клиентке көрсетіледі: қосулы, көрінеді, мұрағатта емес.
+func (p Plan) Listed() bool { return p.IsActive && p.IsVisible && p.ArchivedAt == nil }
 
 // Localized таңдалған тілдегі атауды қайтарады (болмаса — ағылшынша).
 func (p Plan) LocalizedName(locale string) string { return pick(p.Name, locale) }
@@ -399,6 +404,12 @@ var (
 	ErrEmailInUse              = errors.New("email belongs to another account")
 	ErrInvalidIDToken          = errors.New("invalid identity token")
 	ErrAuthProviderUnavailable = errors.New("auth provider unavailable")
+
+	// Тарифтер мен сатып алу.
+	// ErrPlanUnavailable — the plan is hidden, disabled, archived or free.
+	// ErrPurchasesDisabled — buying is switched off or no verified billing exists.
+	ErrPlanUnavailable   = errors.New("plan is not available for purchase")
+	ErrPurchasesDisabled = errors.New("purchases are disabled")
 
 	// ErrSourceTooLong — көшірілген хабарлама әкімші бекіткен шектен ұзын.
 	// ErrInvalidRequest-ті орайды: ескі клиенттер бұрынғыдай INVALID_REQUEST

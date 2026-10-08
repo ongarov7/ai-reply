@@ -16,6 +16,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/limits"
 	"github.com/aireply/ai-reply-back-end/internal/middleware"
 	"github.com/aireply/ai-reply-back-end/internal/notifications"
+	"github.com/aireply/ai-reply-back-end/internal/payments"
 	"github.com/aireply/ai-reply-back-end/internal/repository"
 	"github.com/aireply/ai-reply-back-end/internal/traits"
 	"github.com/aireply/ai-reply-back-end/internal/transport/httpx"
@@ -30,12 +31,13 @@ const (
 
 // Server — әкімші API.
 type Server struct {
-	cfg     config.Config
-	admin   *admin.Service
-	limits  *limits.Service
-	notify  *notifications.Service
-	limiter *middleware.Limiter
-	log     *slog.Logger
+	cfg      config.Config
+	admin    *admin.Service
+	limits   *limits.Service
+	notify   *notifications.Service
+	payments *payments.Service
+	limiter  *middleware.Limiter
+	log      *slog.Logger
 }
 
 // Deps — тәуелділіктер.
@@ -44,6 +46,8 @@ type Deps struct {
 	Admin         *admin.Service
 	Limits        *limits.Service
 	Notifications *notifications.Service
+	// Payments — сатып алу ауыстырғышы мен төлем интеграциясының күйі.
+	Payments *payments.Service
 	// Limiter — науқан жіберу мен алдын ала санаудың әкімші шелектері (nil — өз шектегіші).
 	Limiter *middleware.Limiter
 	Log     *slog.Logger
@@ -55,7 +59,8 @@ func New(d Deps) *Server {
 	if limiter == nil {
 		limiter = middleware.NewLimiter()
 	}
-	return &Server{cfg: d.Config, admin: d.Admin, limits: d.Limits, notify: d.Notifications, limiter: limiter, log: d.Log}
+	return &Server{cfg: d.Config, admin: d.Admin, limits: d.Limits, notify: d.Notifications, payments: d.Payments,
+		limiter: limiter, log: d.Log}
 }
 
 // Register — маршруттар.
@@ -77,6 +82,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /api/v1/admin/settings", s.guard(s.handleSettings))
 	mux.Handle("POST /api/v1/admin/settings/pricing", s.guard(s.handleSavePricing))
 	mux.Handle("POST /api/v1/admin/settings/limits", s.guard(s.handleSaveLimits))
+	mux.Handle("POST /api/v1/admin/settings/purchases", s.guard(s.handleSavePurchases))
 	s.registerNotifications(mux)
 }
 

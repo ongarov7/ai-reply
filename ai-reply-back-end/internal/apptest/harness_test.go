@@ -229,7 +229,8 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 		"ACCESS_TOKEN_TTL":    "15m", "REFRESH_TOKEN_TTL": "720h",
 		"OPENAI_API_KEY": "sk-test-key", "OPENAI_MODEL": "test-model",
 		"AUTH_DEMO_MODE": "true", "AUTH_DEMO_OTP": "1111",
-		"PAYMENT_MODE": "demo", "ADMIN_EMAIL": adminEmail, "ADMIN_PASSWORD": adminPassword,
+		"PAYMENT_MODE": "demo", "PAYMENT_DEMO_CHECKOUT": "true",
+		"ADMIN_EMAIL": adminEmail, "ADMIN_PASSWORD": adminPassword,
 		"LOG_LEVEL": "info", "LOG_FORMAT": "json", "RATE_AI_PER_MINUTE": "1000",
 		"RATE_OTP_REQUEST_PER_HOUR": "100", "RATE_OTP_VERIFY_PER_HOUR": "200",
 		"RATE_GENERIC_PER_MINUTE": "1000", "OTP_MAX_ATTEMPTS": "5", "PUSH_NOTIFICATIONS_ENABLED": "true",
@@ -294,7 +295,8 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 	events := notifications.NewEvents(notifySvc)
 	aiSvc := ai.New(store, subSvc, provider, limitSvc, log).WithClock(clock).WithRepair(cfg.AI.RepairEnabled).
 		WithQuotaEvents(events)
-	paymentSvc := payments.New(store, subSvc, payments.DemoProvider{}, cfg.Payments.Mode).WithEvents(events)
+	paymentSvc := payments.New(store, subSvc, payments.DemoProvider{}, cfg.Payments.Mode).WithEvents(events).
+		WithDemoCheckout(cfg.Payments.DemoCheckout)
 	eventSvc := productevents.New(store, log).WithClock(clock)
 	adminSvc := admin.New(store, subSvc, planSvc, cfg, log).WithEvents(events)
 	simulatorSvc := simulator.New(simulator.Deps{
@@ -313,7 +315,7 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 		Notifications: notifySvc, Limiter: limiter, Log: log,
 		Ping: func(ctx context.Context) error { return db.Reader().PingContext(ctx) }}).Register(mux)
 	adminapi.New(adminapi.Deps{Config: cfg, Admin: adminSvc, Limits: limitSvc, Notifications: notifySvc,
-		Limiter: limiter, Log: log}).Register(mux)
+		Payments: paymentSvc, Limiter: limiter, Log: log}).Register(mux)
 	simulatorapi.New(simulatorapi.Deps{Config: cfg, Admin: adminSvc, Simulator: simulatorSvc,
 		Limiter: limiter, Log: log}).Register(mux)
 	webServer, err := web.New(web.Deps{Config: cfg, Admin: adminSvc, Plans: planSvc,

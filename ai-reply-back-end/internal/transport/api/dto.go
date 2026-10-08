@@ -108,6 +108,9 @@ type planDTO struct {
 	PeriodDays   int               `json:"period_days"`
 	IsFree       bool              `json:"is_free"`
 	SortOrder    int               `json:"sort_order"`
+	// Purchasable — the plan can be bought right now. False for the current
+	// plan inside a subscription and whenever buying is switched off.
+	Purchasable bool `json:"purchasable"`
 }
 
 func toPlanDTO(p domain.Plan) planDTO {

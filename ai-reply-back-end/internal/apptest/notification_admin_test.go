@@ -606,6 +606,7 @@ func TestAudienceFilters(t *testing.T) {
 	// demo: standard bought through the demo payment provider.
 	demo := h.signIn("filter-demo@example.com")
 	devices(demo.access, "android", "kk", 8)
+	h.openStore("standard")
 	checkout := h.do(http.MethodPost, "/api/v1/payments/checkout", map[string]any{"plan_id": h.planID("standard")}, h.auth(demo.access))
 	if checkout.status != http.StatusOK {
 		t.Fatalf("checkout: %d %s", checkout.status, checkout.raw)

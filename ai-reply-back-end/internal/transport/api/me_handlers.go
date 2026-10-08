@@ -160,18 +160,24 @@ func (s *Server) handleSubscription(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, s.subscriptionDTO(entitlement))
 }
 
-// handlePlans — қолжетімді тарифтер.
+// handlePlans — клиентке көрінетін тарифтер.
+//
+// Only plans the admin left enabled and visible. A hidden plan is not listed
+// at all; people already on it still get it from /me/subscription.
 func (s *Server) handlePlans(w http.ResponseWriter, r *http.Request) {
-	list, err := s.plans.Active(r.Context())
+	list, err := s.plans.Listed(r.Context())
 	if err != nil {
 		httpx.Fail(w, err)
 		return
 	}
+	purchases := s.payments.PurchasesEnabled(r.Context())
 	out := make([]planDTO, 0, len(list))
 	for _, p := range list {
-		out = append(out, toPlanDTO(p))
+		dto := toPlanDTO(p)
+		dto.Purchasable = purchases && !p.IsFree
+		out = append(out, dto)
 	}
-	httpx.JSON(w, http.StatusOK, map[string]any{"plans": out})
+	httpx.JSON(w, http.StatusOK, map[string]any{"plans": out, "purchases_enabled": purchases})
 }
 
 type countryDTO struct {
@@ -219,6 +225,9 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 			"push_notifications": s.notifications != nil && s.notifications.Ready(),
 			// preferred_language on PATCH|POST /me and in user.
 			"preferred_language": true,
+			// Plans can be bought right now (admin switch + verified billing).
+			// /api/v1/plans lists only visible plans and marks each purchasable.
+			"purchases": s.payments.PurchasesEnabled(r.Context()),
 		},
 		"demo_mode":    s.cfg.Auth.DemoMode,
 		"payment_mode": s.payments.Mode(),

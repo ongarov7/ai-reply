@@ -143,6 +143,7 @@ func (s *Service) CreatePlan(ctx context.Context, admin domain.AdminUser, ip str
 	}
 	s.Audit(ctx, admin, ip, "plan.create", "plan", created.ID, map[string]any{
 		"code": created.Code, "daily_limit": created.DailyLimit, "price": created.Price,
+		"is_active": created.IsActive, "is_visible": created.IsVisible,
 	})
 	return created, nil
 }
@@ -154,8 +155,14 @@ func (s *Service) UpdatePlan(ctx context.Context, admin domain.AdminUser, ip str
 	}
 	s.Audit(ctx, admin, ip, "plan.update", "plan", plan.ID, map[string]any{
 		"code": plan.Code, "daily_limit": plan.DailyLimit, "price": plan.Price, "is_active": plan.IsActive,
+		"is_visible": plan.IsVisible,
 	})
 	return nil
+}
+
+// IsDefaultPlan — жаңа қолданушыларға берілетін тариф пе.
+func (s *Service) IsDefaultPlan(ctx context.Context, id string) (bool, error) {
+	return s.plans.IsDefault(ctx, id)
 }
 
 // ArchivePlan — тарифті мұрағаттау.

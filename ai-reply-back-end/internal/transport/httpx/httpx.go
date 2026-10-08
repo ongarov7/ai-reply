@@ -46,6 +46,10 @@ const (
 
 	// Push хабарламалары.
 	CodePushDisabled = "PUSH_DISABLED"
+
+	// Тарифтер мен сатып алу.
+	CodePlanUnavailable   = "PLAN_UNAVAILABLE"
+	CodePurchasesDisabled = "PURCHASES_DISABLED"
 )
 
 // ErrorBody — қате конверті.
@@ -129,6 +133,10 @@ func Translate(err error) (int, string, string) {
 		return http.StatusPaymentRequired, CodeSubExpired, "The subscription has expired."
 	case errors.Is(err, domain.ErrPaymentRequired):
 		return http.StatusPaymentRequired, CodePaymentRequired, "Payment is required."
+	case errors.Is(err, domain.ErrPlanUnavailable):
+		return http.StatusConflict, CodePlanUnavailable, "This plan is not available."
+	case errors.Is(err, domain.ErrPurchasesDisabled):
+		return http.StatusForbidden, CodePurchasesDisabled, "Purchases are not available right now."
 	case errors.Is(err, domain.ErrRateLimited):
 		return http.StatusTooManyRequests, CodeRateLimited, "Too many requests. Try again shortly."
 	case errors.Is(err, domain.ErrProviderTimeout):

@@ -26,11 +26,14 @@ type Intent struct {
 
 // Provider — эквайринг келісімшарты.
 //
-// One interface, one demo implementation. A real acquirer is a second
-// implementation of exactly these four methods — business code never learns
-// which one is wired in.
+// One interface, one demo implementation. A real acquirer (App Store, Google
+// Play Billing) is a second implementation of these methods — business code
+// never learns which one is wired in.
 type Provider interface {
 	Name() string
+	// Live — the provider takes real payments and verifies every one of them
+	// with the store or acquirer. Only a live provider can sell in production.
+	Live() bool
 	CreatePayment(ctx context.Context, p domain.Payment) (Intent, error)
 	VerifyPayment(ctx context.Context, p domain.Payment) (string, error)
 	HandleWebhook(ctx context.Context, payload []byte) (string, string, error) // paymentID, status
@@ -45,6 +48,9 @@ type DemoProvider struct{}
 
 // Name — провайдер аты.
 func (DemoProvider) Name() string { return "demo" }
+
+// Live — демо ешқашан нақты төлем емес.
+func (DemoProvider) Live() bool { return false }
 
 // CreatePayment — бірден «төленді» деп белгілеуге дайын ниет жасайды.
 func (DemoProvider) CreatePayment(_ context.Context, p domain.Payment) (Intent, error) {
@@ -79,6 +85,9 @@ type Events interface {
 	PaymentSucceeded(ctx context.Context, p domain.Payment, sub domain.Subscription)
 }
 
+// SettingPurchasesEnabled — әкімшінің «сатып алу қосулы» ауыстырғышы (system_settings).
+const SettingPurchasesEnabled = "purchases_enabled"
+
 // Service — төлем сценарийлері.
 type Service struct {
 	repo     *repository.Store
@@ -86,6 +95,8 @@ type Service struct {
 	provider Provider
 	mode     string
 	events   Events
+	// demoCheckout — the demo provider may sell on this (non-production) server.
+	demoCheckout bool
 }
 
 // New — қызмет.
@@ -96,17 +107,73 @@ func New(repo *repository.Store, subs *subscriptions.Service, provider Provider,
 // WithEvents — төлем оқиғаларын тыңдаушы (nil — жоқ).
 func (s *Service) WithEvents(e Events) *Service { s.events = e; return s }
 
+// WithDemoCheckout — демо провайдерге сатуға рұқсат (тек әзірлеу серверінде).
+//
+// Config refuses PAYMENT_DEMO_CHECKOUT=true when APP_ENV=production, so a
+// production server can only sell through a live provider.
+func (s *Service) WithDemoCheckout(enabled bool) *Service { s.demoCheckout = enabled; return s }
+
 // Mode — demo немесе live.
 func (s *Service) Mode() string { return s.mode }
 
+// Provider — қосылған провайдер аты.
+func (s *Service) Provider() string { return s.provider.Name() }
+
+// Live — провайдер нақты, тексерілетін төлем қабылдайды.
+func (s *Service) Live() bool { return s.provider.Live() }
+
+// CheckoutAvailable — серверде сатуға жарайтын төлем интеграциясы бар ма.
+//
+// A live, verified provider, or the demo provider on a development server
+// that opted in. Without one, nothing can be bought, whatever the admin
+// switch or plan visibility say.
+func (s *Service) CheckoutAvailable() bool {
+	return s.provider.Live() || s.demoCheckout
+}
+
+// PurchasesEnabled — сатып алу қазір ашық па: интеграция бар және әкімші қосқан.
+func (s *Service) PurchasesEnabled(ctx context.Context) bool {
+	if !s.CheckoutAvailable() {
+		return false
+	}
+	value, err := s.repo.Setting(ctx, SettingPurchasesEnabled)
+	return err == nil && value == "true"
+}
+
+// SetPurchasesEnabled — әкімшінің ауыстырғышы. Интеграциясыз қосуға болмайды.
+func (s *Service) SetPurchasesEnabled(ctx context.Context, enabled bool) error {
+	if enabled && !s.CheckoutAvailable() {
+		return domain.ErrPurchasesDisabled
+	}
+	value := "false"
+	if enabled {
+		value = "true"
+	}
+	return s.repo.SetSetting(ctx, SettingPurchasesEnabled, value)
+}
+
+// Purchasable — бұл тарифті дәл қазір сатып алуға бола ма.
+func (s *Service) Purchasable(ctx context.Context, plan domain.Plan) bool {
+	return !plan.IsFree && plan.Listed() && s.PurchasesEnabled(ctx)
+}
+
 // Start — таңдалған тарифке төлем бастау.
+//
+// The server decides, not the app: a hidden, disabled, archived or free plan
+// is refused even when an old build or a direct request still offers it.
 func (s *Service) Start(ctx context.Context, userID, planID string) (Intent, error) {
 	plan, err := s.repo.Plan(ctx, planID)
+	if errors.Is(err, domain.ErrNotFound) {
+		return Intent{}, domain.ErrPlanUnavailable
+	}
 	if err != nil {
 		return Intent{}, err
 	}
-	if plan.IsFree {
-		return Intent{}, domain.ErrInvalidRequest
+	if plan.IsFree || !plan.Listed() {
+		return Intent{}, domain.ErrPlanUnavailable
+	}
+	if !s.PurchasesEnabled(ctx) {
+		return Intent{}, domain.ErrPurchasesDisabled
 	}
 	payment, err := s.repo.CreatePayment(ctx, domain.Payment{
 		UserID:   userID,
@@ -137,6 +204,17 @@ func (s *Service) Confirm(ctx context.Context, userID, paymentID string) (domain
 	}
 	if payment.UserID != userID {
 		return domain.Subscription{}, domain.ErrNotFound
+	}
+	if payment.Status == "succeeded" {
+		// Idempotent: a repeated confirm returns the plan the payment already
+		// gave, without restarting its period or sending a second notice.
+		return s.subs.Current(ctx, userID)
+	}
+	// Demo money is not real: once buying is switched off, an unfinished demo
+	// payment can no longer turn into a plan. A live provider's payment that
+	// the store confirms is honoured, because the person has paid.
+	if !s.provider.Live() && !s.PurchasesEnabled(ctx) {
+		return domain.Subscription{}, domain.ErrPurchasesDisabled
 	}
 	status, err := s.provider.VerifyPayment(ctx, payment)
 	if err != nil {

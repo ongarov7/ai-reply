@@ -147,6 +147,9 @@ type Admin struct {
 
 type Payments struct {
 	Mode string // demo | live
+	// DemoCheckout — the demo provider may "sell" plans (development and
+	// tests only). Without it no plan can be bought until a live provider exists.
+	DemoCheckout bool
 }
 
 type Limits struct {
@@ -281,7 +284,10 @@ func Load(envFile string) (Config, error) {
 			CookieName:        str("ADMIN_COOKIE_NAME", "aireply_admin"),
 			SecureCookies:     boolean("ADMIN_SECURE_COOKIES", str("APP_ENV", "development") == "production"),
 		},
-		Payments: Payments{Mode: str("PAYMENT_MODE", "demo")},
+		Payments: Payments{
+			Mode:         str("PAYMENT_MODE", "demo"),
+			DemoCheckout: boolean("PAYMENT_DEMO_CHECKOUT", false),
+		},
 		Limits: Limits{
 			SourceTextChars:   num("LIMIT_SOURCE_TEXT_CHARS", 400),
 			InstructionChars:  num("LIMIT_INSTRUCTION_CHARS", 400),
@@ -352,6 +358,9 @@ func (c Config) Validate() []string {
 		}
 		if c.Payments.Mode == "demo" {
 			problems = append(problems, "PAYMENT_MODE=demo is not allowed when APP_ENV=production")
+		}
+		if c.Payments.DemoCheckout {
+			problems = append(problems, "PAYMENT_DEMO_CHECKOUT must be false when APP_ENV=production")
 		}
 		if strings.HasPrefix(c.App.PublicBaseURL, "http://") {
 			problems = append(problems, "PUBLIC_BASE_URL must be https in production")

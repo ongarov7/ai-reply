@@ -60,6 +60,7 @@ func (h *harness) subscribe(userID, code string, expires time.Time) domain.Subsc
 // buy — демо төлем: checkout, содан кейін confirm (times рет). Төлем идентификаторын қайтарады.
 func (h *harness) buy(s session, code string, times int) string {
 	h.t.Helper()
+	h.openStore(code)
 	checkout := h.do(http.MethodPost, "/api/v1/payments/checkout", map[string]any{"plan_id": h.planID(code)}, h.auth(s.access))
 	paymentID := checkout.str("payment_id")
 	if checkout.status != http.StatusOK || paymentID == "" {

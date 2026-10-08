@@ -60,7 +60,7 @@ func (s *Server) demoScenes(locale string) []demoScene {
 // handleLanding — басты бет.
 func (s *Server) handleLanding(w http.ResponseWriter, r *http.Request) {
 	locale := s.locale(w, r)
-	list, err := s.plans.Active(r.Context())
+	list, err := s.plans.Listed(r.Context())
 	if err != nil {
 		s.log.Error("landing plans failed", "error", err.Error())
 	}

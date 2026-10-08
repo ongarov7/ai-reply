@@ -808,14 +808,17 @@
 
   var Plans = {
     data: function () {
-      return { loading: true, plans: [], editing: null, tab: "kk", saving: false };
+      return { loading: true, plans: [], purchases: null, editing: null, tab: "kk", saving: false };
     },
     mounted: function () { this.load(); },
     methods: {
       t: t, nf: nf,
       async load() {
         this.loading = true;
-        try { this.plans = (await api("/plans")).plans; }
+        try {
+          var data = await api("/plans");
+          this.plans = data.plans; this.purchases = data.purchases || null;
+        }
         catch (e) { toast("danger", t("common.error")); }
         this.loading = false;
       },
@@ -823,7 +826,7 @@
         return { id: "", code: "", name: { kk: "", ru: "", en: "", uz: "" },
                  description: { kk: "", ru: "", en: "", uz: "" }, price: 0, currency: "KZT",
                  daily_message_limit: 30, monthly_message_limit: 0, period_days: 30,
-                 is_free: false, is_active: true, sort_order: 50 };
+                 is_free: false, is_active: true, is_visible: false, sort_order: 50 };
       },
       create() { this.editing = this.blank(); this.tab = "kk"; },
       edit(plan) { this.editing = JSON.parse(JSON.stringify(plan)); this.tab = "kk"; },
@@ -836,14 +839,17 @@
           else await api("/plans", { method: "POST", body: body });
           toast("ok", t("common.saved"));
           this.close(); this.load();
-        } catch (e) { toast("danger", e.message === "CONFLICT" ? t("common.error") : t("common.error")); }
+        } catch (e) { toast("danger", this.planError(e)); }
         this.saving = false;
       },
       async archive(plan) {
         if (!window.confirm(t("admin.plans.archive_confirm"))) return;
         try { await api("/plans/" + plan.id + "/archive", { method: "POST", body: {} });
               toast("ok", t("common.saved")); this.load(); }
-        catch (e) { toast("danger", t("common.error")); }
+        catch (e) { toast("danger", this.planError(e)); }
+      },
+      planError(e) {
+        return e.details && e.details.reason === "default_plan" ? t("admin.plans.default_locked") : t("common.error");
       }
     },
     template: `
@@ -858,7 +864,7 @@
               <thead><tr><th>{{ t('admin.plans.code') }}</th><th>{{ t('admin.plans.name') }}</th>
                 <th>{{ t('admin.plans.daily') }}</th><th>{{ t('admin.plans.monthly') }}</th>
                 <th>{{ t('admin.plans.price') }}</th><th>{{ t('admin.plans.subscribers') }}</th>
-                <th>{{ t('admin.users.col_status') }}</th><th></th></tr></thead>
+                <th>{{ t('admin.users.col_status') }}</th><th>{{ t('admin.plans.col_visible') }}</th><th></th></tr></thead>
               <tbody>
                 <tr v-for="p in plans" :key="p.id">
                   <td><b>{{ p.code }}</b> <span v-if="p.is_free" class="badge badge-muted">free</span></td>
@@ -869,14 +875,21 @@
                   <td>{{ p.subscribers }}</td>
                   <td><span :class="'badge ' + (p.is_active ? 'badge-ok' : 'badge-muted')">
                     {{ p.is_active ? t('common.active') : t('common.disabled') }}</span></td>
+                  <td><span :class="'badge ' + (p.listed ? 'badge-ok' : 'badge-muted')">
+                    {{ p.listed ? t('admin.plans.shown') : t('admin.plans.hidden') }}</span>
+                    <span v-if="p.purchasable" class="badge badge-brand">{{ t('admin.plans.for_sale') }}</span></td>
                   <td style="text-align:right; white-space:nowrap">
                     <button class="btn btn-sm" @click="edit(p)">{{ t('common.edit') }}</button>
                     <button class="btn btn-sm btn-danger" @click="archive(p)">{{ t('common.archive') }}</button>
                   </td>
                 </tr>
-                <tr v-if="!plans.length && !loading"><td colspan="8" class="empty">{{ t('common.empty') }}</td></tr>
+                <tr v-if="!plans.length && !loading"><td colspan="9" class="empty">{{ t('common.empty') }}</td></tr>
               </tbody>
             </table>
+          </div>
+          <div class="card-body">
+            <p class="muted" style="margin:0">{{ t('admin.plans.flags_hint') }}</p>
+            <p class="muted" style="margin:8px 0 0" v-if="purchases && !purchases.enabled">{{ t('admin.plans.purchases_off') }}</p>
           </div>
         </div>
 
@@ -913,8 +926,11 @@
                 <label class="field"><span>{{ t('admin.plans.period') }}</span>
                   <input type="number" v-model.number="editing.period_days" min="0"></label>
               </div>
-              <label class="checkline"><input type="checkbox" v-model="editing.is_free"> {{ t('admin.plans.is_free') }}</label>
-              <label class="checkline"><input type="checkbox" v-model="editing.is_active"> {{ t('admin.plans.is_active') }}</label>
+              <label class="checkline"><input type="checkbox" v-model="editing.is_free" :disabled="editing.is_default"> {{ t('admin.plans.is_free') }}</label>
+              <label class="checkline"><input type="checkbox" v-model="editing.is_active" :disabled="editing.is_default"> {{ t('admin.plans.is_active') }}</label>
+              <label class="checkline"><input type="checkbox" v-model="editing.is_visible"> {{ t('admin.plans.visible') }}</label>
+              <p class="muted" v-if="editing.is_default">{{ t('admin.plans.default_locked') }}</p>
+              <p class="muted" v-if="!editing.is_free && editing.is_visible">⚠ {{ t('admin.plans.paid_visible_warning') }}</p>
             </div>
             <div class="modal-foot">
               <button class="btn" @click="close">{{ t('common.cancel') }}</button>
@@ -1011,6 +1027,15 @@
           toast("ok", t("common.saved")); this.load();
         } catch (e) { toast("danger", t("common.error")); }
       },
+      async setPurchases(enabled) {
+        try {
+          this.data.purchases = await api("/settings/purchases", { method: "POST", body: { enabled: enabled } });
+          toast("ok", t("common.saved"));
+        } catch (e) {
+          toast("danger", e.details && e.details.reason === "checkout_unavailable"
+            ? t("admin.settings.purchases_unavailable") : t("common.error"));
+        }
+      },
       async saveLimits() {
         var self = this;
         if (LIMIT_FIELDS.some(function (f) { return self.outOfRange(f.key); })) {
@@ -1047,6 +1072,25 @@
                 {{ data.legacy_api ? 'on' : 'off' }}</span></dd>
               <dt>Access / Refresh TTL</dt><dd class="mono">{{ data.access_ttl }} · {{ data.refresh_ttl }}</dd>
             </dl>
+          </div>
+        </div>
+        <div class="card" v-if="data.purchases">
+          <div class="card-head"><h2>{{ t('admin.settings.purchases') }}</h2></div>
+          <div class="card-body">
+            <p class="muted" style="margin-top:0">{{ t('admin.settings.purchases_hint') }}</p>
+            <dl class="kv">
+              <dt>{{ t('admin.settings.purchases_provider') }}</dt>
+              <dd><span class="badge badge-muted">{{ data.purchases.provider }}</span>
+                <span :class="'badge ' + (data.purchases.checkout_available ? 'badge-ok' : 'badge-warn')">
+                  {{ data.purchases.checkout_available ? t('admin.settings.purchases_ready') : t('admin.settings.purchases_not_ready') }}</span></dd>
+              <dt>{{ t('admin.settings.purchases_state') }}</dt>
+              <dd><span :class="'badge ' + (data.purchases.enabled ? 'badge-ok' : 'badge-muted')">
+                {{ data.purchases.enabled ? 'on' : 'off' }}</span></dd>
+            </dl>
+            <button v-if="!data.purchases.enabled" class="btn btn-primary" :disabled="!data.purchases.checkout_available"
+              @click="setPurchases(true)">{{ t('admin.settings.purchases_on') }}</button>
+            <button v-else class="btn btn-danger" @click="setPurchases(false)">{{ t('admin.settings.purchases_off_btn') }}</button>
+            <p class="muted" v-if="!data.purchases.checkout_available">{{ t('admin.settings.purchases_unavailable') }}</p>
           </div>
         </div>
         <div class="card" v-if="data.ai_limits">

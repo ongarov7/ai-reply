@@ -9,6 +9,7 @@ import (
 
 	"github.com/aireply/ai-reply-back-end/internal/domain"
 	"github.com/aireply/ai-reply-back-end/internal/limits"
+	"github.com/aireply/ai-reply-back-end/internal/plans"
 	"github.com/aireply/ai-reply-back-end/internal/repository"
 	"github.com/aireply/ai-reply-back-end/internal/traits"
 	"github.com/aireply/ai-reply-back-end/internal/transport/httpx"
@@ -25,15 +26,31 @@ type planPayload struct {
 	PeriodDays   int               `json:"period_days"`
 	IsFree       bool              `json:"is_free"`
 	IsActive     bool              `json:"is_active"`
-	SortOrder    int               `json:"sort_order"`
+	// IsVisible — nil keeps the stored value (an admin tab opened before this
+	// field existed); on create, nil means visible only for a free plan.
+	IsVisible *bool `json:"is_visible"`
+	SortOrder int   `json:"sort_order"`
+
+	// Read-only fields of the list row. The Plans page sends the row it was
+	// given straight back, so they are accepted here and ignored.
+	ID          string `json:"id"`
+	PriceText   string `json:"price_text"`
+	Subscribers int    `json:"subscribers"`
+	Archived    bool   `json:"archived"`
+	Listed      bool   `json:"listed"`
+	Purchasable bool   `json:"purchasable"`
+	IsDefault   bool   `json:"is_default"`
 }
 
-func (p planPayload) toDomain(id string) domain.Plan {
+func (p planPayload) toDomain(id string, visible bool) domain.Plan {
+	if p.IsVisible != nil {
+		visible = *p.IsVisible
+	}
 	plan := domain.Plan{
 		ID: id, Code: p.Code, Name: map[string]string{}, Description: map[string]string{},
 		Price: p.Price, Currency: p.Currency, DailyLimit: p.DailyLimit,
 		MonthlyLimit: p.MonthlyLimit, PeriodDays: p.PeriodDays,
-		IsFree: p.IsFree, IsActive: p.IsActive, SortOrder: p.SortOrder,
+		IsFree: p.IsFree, IsActive: p.IsActive, IsVisible: visible, SortOrder: p.SortOrder,
 	}
 	for _, locale := range domain.Locales {
 		plan.Name[locale] = traits.Clamp(p.Name[locale], 60)
@@ -51,16 +68,33 @@ func (s *Server) handlePlans(w http.ResponseWriter, r *http.Request) {
 	out := make([]map[string]any, 0, len(list))
 	for _, p := range list {
 		count, _ := s.admin.PlanUsage(r.Context(), p.ID)
+		isDefault, _ := s.admin.IsDefaultPlan(r.Context(), p.ID)
 		out = append(out, map[string]any{
 			"id": p.ID, "code": p.Code, "name": p.Name, "description": p.Description,
 			"price": p.Price, "price_text": traits.FormatMoney(p.Price, p.Currency),
 			"currency": p.Currency, "daily_message_limit": p.DailyLimit,
 			"monthly_message_limit": p.MonthlyLimit, "period_days": p.PeriodDays,
-			"is_free": p.IsFree, "is_active": p.IsActive, "sort_order": p.SortOrder,
+			"is_free": p.IsFree, "is_active": p.IsActive, "is_visible": p.IsVisible, "sort_order": p.SortOrder,
 			"subscribers": count, "archived": p.ArchivedAt != nil,
+			// listed — customers see it; purchasable — it can be bought right now.
+			"listed": p.Listed(), "purchasable": s.purchasable(r, p), "is_default": isDefault,
 		})
 	}
-	httpx.JSON(w, http.StatusOK, map[string]any{"plans": out})
+	httpx.JSON(w, http.StatusOK, map[string]any{"plans": out, "purchases": s.purchasesPayload(r)})
+}
+
+func (s *Server) purchasable(r *http.Request, p domain.Plan) bool {
+	return s.payments != nil && s.payments.Purchasable(r.Context(), p)
+}
+
+// planFail — әдепкі тарифті өшіру әрекетін анық себеппен қайтарады.
+func (s *Server) planFail(w http.ResponseWriter, err error) {
+	if errors.Is(err, plans.ErrDefaultPlan) {
+		httpx.Error(w, http.StatusBadRequest, httpx.CodeInvalidRequest, "The default free plan must stay enabled.",
+			map[string]any{"field": "is_active", "reason": "default_plan"})
+		return
+	}
+	httpx.Fail(w, err)
 }
 
 func (s *Server) handlePlanCreate(w http.ResponseWriter, r *http.Request) {
@@ -69,9 +103,9 @@ func (s *Server) handlePlanCreate(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, err)
 		return
 	}
-	plan, err := s.admin.CreatePlan(r.Context(), adminFrom(r.Context()), s.ip(r), body.toDomain(""))
+	plan, err := s.admin.CreatePlan(r.Context(), adminFrom(r.Context()), s.ip(r), body.toDomain("", body.IsFree))
 	if err != nil {
-		httpx.Fail(w, err)
+		s.planFail(w, err)
 		return
 	}
 	httpx.JSON(w, http.StatusCreated, map[string]any{"id": plan.ID})
@@ -83,9 +117,14 @@ func (s *Server) handlePlanUpdate(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, err)
 		return
 	}
-	if err := s.admin.UpdatePlan(r.Context(), adminFrom(r.Context()), s.ip(r),
-		body.toDomain(r.PathValue("id"))); err != nil {
+	current, err := s.admin.Plan(r.Context(), r.PathValue("id"))
+	if err != nil {
 		httpx.Fail(w, err)
+		return
+	}
+	if err := s.admin.UpdatePlan(r.Context(), adminFrom(r.Context()), s.ip(r),
+		body.toDomain(current.ID, current.IsVisible)); err != nil {
+		s.planFail(w, err)
 		return
 	}
 	httpx.JSON(w, http.StatusOK, map[string]bool{"ok": true})
@@ -93,7 +132,7 @@ func (s *Server) handlePlanUpdate(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handlePlanArchive(w http.ResponseWriter, r *http.Request) {
 	if err := s.admin.ArchivePlan(r.Context(), adminFrom(r.Context()), s.ip(r), r.PathValue("id")); err != nil {
-		httpx.Fail(w, err)
+		s.planFail(w, err)
 		return
 	}
 	httpx.JSON(w, http.StatusOK, map[string]bool{"ok": true})
@@ -157,7 +196,53 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		"source_limit": aiLimits.Current.SourceChars,
 		"ai_limits":    aiLimits,
 		"pricing":      rows,
+		"purchases":    s.purchasesPayload(r),
 	})
+}
+
+// purchasesPayload — сатып алу күйі: интеграция бар ма және әкімші қосқан ба.
+//
+// checkout_available is false until a live provider (StoreKit, Play Billing)
+// is wired in; while it is false the switch cannot be turned on.
+func (s *Server) purchasesPayload(r *http.Request) map[string]any {
+	if s.payments == nil {
+		return map[string]any{"enabled": false, "checkout_available": false, "provider": "", "live": false}
+	}
+	return map[string]any{
+		"enabled":            s.payments.PurchasesEnabled(r.Context()),
+		"checkout_available": s.payments.CheckoutAvailable(),
+		"provider":           s.payments.Provider(),
+		"live":               s.payments.Live(),
+	}
+}
+
+// handleSavePurchases — «Сатып алу» ауыстырғышы (аудитпен).
+func (s *Server) handleSavePurchases(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Enabled bool `json:"enabled"`
+	}
+	if err := httpx.Decode(w, r, 256, &body); err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	if s.payments == nil {
+		httpx.Fail(w, domain.ErrPurchasesDisabled)
+		return
+	}
+	before := s.payments.PurchasesEnabled(r.Context())
+	if err := s.payments.SetPurchasesEnabled(r.Context(), body.Enabled); err != nil {
+		if errors.Is(err, domain.ErrPurchasesDisabled) {
+			httpx.Error(w, http.StatusConflict, httpx.CodePurchasesDisabled,
+				"No verified billing integration is configured on this server.",
+				map[string]any{"reason": "checkout_unavailable"})
+			return
+		}
+		s.fail(w, err)
+		return
+	}
+	s.admin.Audit(r.Context(), adminFrom(r.Context()), s.ip(r), "settings.purchases.update", "system_settings",
+		"purchases_enabled", map[string]any{"before": before, "after": body.Enabled})
+	httpx.JSON(w, http.StatusOK, s.purchasesPayload(r))
 }
 
 // aiLimitsDTO — ағымдағы мәндер, әдепкілер, қайсысы әкімшіден және рұқсат ауқымы.
