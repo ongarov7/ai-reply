@@ -166,20 +166,22 @@ no_verified_email`. `Idempotency-Key` в Resend — `notification-<delivery_id>`
 
 Один проект Firebase на оба приложения.
 
-1. **Проект.** Firebase Console → создать проект. Project settings ▸ Cloud Messaging:
+1. **Проект.** Использовать существующий `ai-reply-4bf8f`. Project settings ▸ Cloud Messaging:
    включён **Firebase Cloud Messaging API (V1)** (legacy-ключ не нужен).
-2. **Android.** Add app ▸ Android, package `kz.yerek.aireply` → скачать
-   `google-services.json` в `AI-Reply-Android/app/` (файл в `.gitignore`, в CI — из секрета).
-3. **iOS.** Add app ▸ Apple, bundle id `kz.ai-reply.reply.keyboard.keyboard` →
-   `GoogleService-Info.plist` в `AI-Reply/Config/Firebase/` (шаг сборки «Firebase config»
+2. **Android.** Приложение `kz.yerek.aireply` уже зарегистрировано; настоящий
+   `google-services.json` находится в `AI-Reply-Android/app/` и включён в Git.
+3. **iOS.** Приложение `kz.ai-reply.reply.keyboard.keyboard` уже зарегистрировано;
+   настоящий `GoogleService-Info.plist` включён в Git в `AI-Reply/Config/Firebase/` (шаг сборки «Firebase config»
    копирует его в приложение; в Xcode добавлять не нужно) или значения в build settings
    `FIREBASE_*` (см. `AI-Reply/README.md`).
 4. **APNs-ключ.** Apple Developer ▸ Identifiers ▸ App ID `kz.ai-reply.reply.keyboard.keyboard`
    → включить *Push Notifications*. Keys ▸ «+» ▸ *Apple Push Notifications service (APNs)* →
    скачать `AuthKey_<KEY_ID>.p8` (скачивается один раз, хранить как секрет). Firebase ▸
    Project settings ▸ Cloud Messaging ▸ *Apple app configuration* ▸ *APNs Authentication Key*
-   ▸ Upload: файл `.p8`, Key ID, Team ID. Один ключ работает и для sandbox, и для production.
-5. **Сервер.** Project settings ▸ Service accounts ▸ *Generate new private key* → JSON.
+   ▸ Upload: файл `.p8`, Key ID, Team ID. Для новых ключей выбрать нужное окружение Sandbox / Production и минимальную область
+   Topic Specific для bundle ID приложения; загрузить каждый в соответствующий слот Firebase.
+5. **Сервер.** Отдельный аккаунт `ai-reply-fcm-sender` с ролью
+   `roles/firebasecloudmessaging.admin` уже создан; его JSON хранить отдельно от Git.
    В `.env` сервера — либо путь `FIREBASE_SERVICE_ACCOUNT_FILE`, либо три значения из файла.
    В Docker файл монтируется только для чтения (строка-образец в `docker-compose.yml`)
    или задаются три переменные.

@@ -11,11 +11,11 @@
 *.p12
 *.jks
 *.keystore
-AI-Reply-Android/app/google-services.json
-AI-Reply/Config/Firebase/GoogleService-Info.plist
-# Backend Firebase service account (FIREBASE_CREDENTIALS_FILE points outside the repo)
+# Firebase client configuration is shared with the project. Server keys stay private.
+# Backend Firebase service account (FIREBASE_SERVICE_ACCOUNT_FILE points outside the repo)
 ai-reply-back-end/secrets/
 *firebase-adminsdk*.json
+*service-account*.json
 
 # Logs and local build/test output
 *.log

@@ -135,10 +135,12 @@ default). The system's own keypress-vibration setting still applies on top.
 Pushes arrive through Firebase Cloud Messaging (iOS uses FCM too, through the
 Firebase Messaging SDK, so the server has one provider).
 
-1. In the Firebase console, add an **Android app** with the package name
-   `kz.yerek.aireply` to the project the server's service account belongs to.
-2. Download its `google-services.json` and put it in `app/`. The file is
-   environment-specific and git-ignored: never commit it.
+1. The **Android app** `kz.yerek.aireply` is registered in Firebase project
+   `ai-reply-4bf8f`, shared with iOS and the backend service account.
+2. The genuine public client config `app/google-services.json` is version
+   controlled at the owner's request. Server credentials must stay outside Git.
+   Validate both clients with `python3 ../tools/validate_firebase_config.py`;
+   see `../docs/FIREBASE_SETUP.md` for the handoff and remaining setup.
 3. Build as usual. The Google Services plugin is applied only when the file is
    there; without it the app still builds and runs, and push is unavailable
    (Settings ▸ Notifications says so).

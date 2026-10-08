@@ -117,7 +117,7 @@ targets:
         Debug:
           AIREPLY_SIGN_IN_WITH_APPLE: "NO"
     # Firebase: Config/Firebase/GoogleService-Info.plist is copied into the app
-    # when it exists (git-ignored; see docs/FIREBASE_SETUP.md). The script reads
+    # when it exists (shared client config; see docs/FIREBASE_SETUP.md). The script reads
     # a file that may be absent, so it cannot run in the script sandbox.
     postBuildScripts:
       - name: Firebase config

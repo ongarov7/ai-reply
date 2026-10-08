@@ -637,14 +637,16 @@ in `FirebasePush.swift`.
 
 Setup:
 
-1. Firebase console: add an iOS app for `kz.ai-reply.reply.keyboard.keyboard`.
-   Under *Project settings ▸ Cloud Messaging* upload the APNs auth key (.p8)
-   with its Key ID and the team ID.
+1. Firebase project `ai-reply-4bf8f` already has the iOS app
+   `kz.ai-reply.reply.keyboard.keyboard` and a version-controlled client plist.
+   Under *Project settings ▸ Cloud Messaging* upload APNs auth keys (.p8)
+   for the required environments with their Key IDs and team ID `2PK6339Q47`.
 2. Apple portal: enable *Push Notifications* for that App ID.
    `Config/AIReply.entitlements` has `aps-environment` (`development`; an App
    Store / TestFlight export re-signs it as `production`).
 3. Give the app the Firebase options, either way:
-   * add `GoogleService-Info.plist` to the `AIReply` target, or
+   * use the shared `Config/Firebase/GoogleService-Info.plist`; the existing
+     Firebase config build phase copies it into the main app only, or
    * set the build settings `FIREBASE_GOOGLE_APP_ID`, `FIREBASE_GCM_SENDER_ID`,
      `FIREBASE_API_KEY` and `FIREBASE_PROJECT_ID` on the `AIReply` target (not
      secrets; they ship in the app).

@@ -1,6 +1,8 @@
 # AI Reply: готовность к релизу в App Store и Google Play
 
-Дата: 8 октября 2026. Ветка `notification`, только локально, ничего не отправлено и не задеплоено.
+Исторический отчёт Claude от 8 октября 2026: на момент составления ветка `notification` была только локальной, без push и deploy. Актуальное дополнение Codex — в конце документа.
+
+> Разделы 1–12 ниже — сохранённый исторический отчёт Claude. Утверждения о `release-audit`, stash и файле review не подтвердились в этом checkout. Актуальные результаты Codex и изменения Firebase находятся в разделе **Claude Code Handoff — Recovery and Continuation** в конце документа.
 
 ## 1. Краткое резюме
 
@@ -522,3 +524,72 @@ Apple private relay: письма на `@privaterelay.appleid.com` дойдут 
 - **Google Play: BLOCKED.** Те же причины плюс подписанный AAB, Data safety, URL удаления, при необходимости закрытый тест (12 человек, 14 дней).
 
 Одобрение стора не гарантируется.
+
+
+## Claude Code Handoff — Recovery and Continuation
+
+Дата проверки: **8 октября 2026**. По уточнению владельца текущий этап ограничен настройкой Firebase и передачей конфигураций через `origin/notification`: дополнительные пять часов Claude находятся на другом ноутбуке и ещё не отправлены. Backend fixes и deploy нельзя объявлять завершёнными по этому checkout.
+
+### Проверенное предыдущее состояние
+
+- Начальная рабочая копия чистая: `notification` / `origin/notification` на `58aad815ce042f4be8a6507d8f7f587037e31ec5`. Этот коммит добавляет только `ios-shot.png` поверх аудита `6ad8167`. `main` и `origin/main`: `397f6da`, не изменялись.
+- Проверены status, branches, recent log/reflog, зарегистрированные worktrees, оба stash, недостижимые Git-объекты и доступные локальные Claude task notes. Зарегистрирована только эта рабочая копия. `release-audit` worktree / branch не найдены; `docs/review-backend-confirmed.txt` отсутствует. Ссылку старого отчёта нельзя использовать как доказательство наличия патча.
+- `stash@{0}` (`e1c9b25`): только iOS build number 5 в plist / project.yml, сохранён до переключения с main. `stash@{1}` (`050480b`): старые конфигурационные изменения 17 файлов. Оба сохранены без apply/drop; это не подтверждённая незаконченная пачка из 21 находки.
+- Дополнительные незакоммиченные изменения Claude в начале этой сессии не обнаружены. Точное место остановки пятичасовой сессии можно определить только после получения её коммитов, diff и review notes со второго ноутбука. Недоступные изменения не восстановлены и не заменены предположениями.
+
+### Что уже было завершено и сохранено
+
+| Коммиты | Реализованное направление |
+|---|---|
+| `fb39678` | Синхронизация main, существующая iOS/Android push-интеграция |
+| `a1c7e38`, `79b20b8`, `b03450f` | Управление видимостью тарифов / покупками, Android target 36 / AGP, iOS privacy manifests |
+| `ea80a49`, `e28bf9d` | Consent, account deletion и AI reports в клиентах |
+| `d4b839c`, `14beb47` | Пути Firebase и мануал, marketing opt-in notes |
+| `67c8f8d`, `62a9b9b`, `13a20f1` | iOS/Android review fixes, нейтральный текст согласия клавиатуры |
+| `e56b511` | Backend deletion, consent, reports, legal texts и hardening |
+| `6ad8167`, `58aad81` | Исторический store audit и screenshot |
+
+Эти реализации не переписывались. Firebase SDK уже был подключён в обоих клиентах; backend уже отправляет через FCM HTTP v1 с сервисным OAuth-токеном. Добавлять второй провайдер / повторять SDK setup не требуется.
+
+### Незавершённые патчи и остающиеся findings
+
+1. **P1, legacy `/v1/reply/generate`: подтверждено в текущем коде.** При включении `LEGACY_API_ENABLED` route не требует актуального AI consent. Default `false` снижает доступность legacy, но не закрывает обход при его включении. Перед релизом нужно обеспечить consent guard для всех путей генерации и regression cases с разными типами токенов / состояниями согласия.
+2. **P1, Privacy Policy: подтверждено в текущем коде.** Четыре языковые версии описывают copied text / instruction, но не раскрывают selected text. Обе клавиатуры действительно могут брать выделенный текст из текущего editable field перед clipboard. Нужно согласованное исправление текста, версии policy и клиентских defaults после объединения работы Claude.
+3. **Остальные 19 из заявленных 21:** полный report недоступен. Их severity, patch status и закрытие не установлены. Нельзя выдавать реконструированный список за подтверждённый. Получить report на втором ноутбуке и проверять P2/P3 по коду и тестам.
+4. Начатый **Codex** локальный вариант исправлений legacy consent / policy, включая regression tests, отложен после уточнения владельца и сохранён только в `/private/tmp/aireply-backend-continuation-2026-10-08.patch` (40518 байт). Это **не восстановленный патч Claude и не проверенное готовое исправление**. Из рабочего дерева он снят без изменения старых коммитов / stash, в Firebase-коммит не входит. Перед будущим apply обязательно проверить diff на актуальной объединённой ветке и повторить тесты. Файл в `/private/tmp` не является долговременной резервной копией.
+
+### Работа Codex на текущем этапе
+
+- Использован разрешённый существующий Firebase-проект `ai-reply-4bf8f` / `307300959376`, Spark; новый проект, billing, Firebase Auth, Analytics и базы не подключались.
+- Зарегистрированы реальные идентификаторы Android `kz.yerek.aireply` и iOS `kz.ai-reply.reply.keyboard.keyboard`. Нельзя переименовывать опубликованное приложение в выдуманный `com.*`. App Store ID `6818570150` сверён в App Store Connect.
+- Скачаны настоящие клиентские `AI-Reply-Android/app/google-services.json` и `AI-Reply/Config/Firebase/GoogleService-Info.plist`. По явному запросу владельца они включаются в Git для второго ноутбука; прежние client ignore rules сняты. Серверные credentials и `.p8` остаются исключены.
+- FCM HTTP v1 включён, legacy messaging выключен. Выделенному `ai-reply-fcm-sender` с отдельным разрешением назначена только `roles/firebasecloudmessaging.admin`, создан JSON. Он хранится локально в игнорируемом `ai-reply-back-end/secrets/firebase-service-account.json`, права файла `600`, каталога `700`; не отправлен серверу или в Git.
+- Добавлен `tools/validate_firebase_config.py`: проверяет project/sender/app IDs, Gradle и Xcode wiring, Messaging / отключённый Analytics; отклоняет приватные credentials в client files, не печатает API keys. Мануал и ссылки приведены в соответствие с фактической настройкой; добавлен `docs/FIREBASE_RELEASE_CHECKLIST.md`.
+- Apple Developer проверен в разрешённом аккаунте: Team `2PK6339Q47`, основной App ID совпадает; **Sign in with Apple включён**, **Push Notifications выключен**, список Keys пуст. Firebase APNs development / production слоты пусты. На включение push и создание / загрузку scoped APNs keys оставлены отдельные запросы; до ответа изменения не выполняются.
+- Ошибка Apple-входа на iPhone TestFlight не исправлена: нужен точный текст ошибки или безопасная причина server log. Backend должен проверять Apple audience `kz.ai-reply.reply.keyboard.keyboard`; наличие APNs-ключа не является условием Apple sign-in. Ключ Sign in with Apple нужен отдельно для реального отзыва токенов при удалении.
+
+### Регрессионные проверки Codex
+
+| Проверка | Фактический результат текущей сессии |
+|---|---|
+| Backend `GOCACHE=/private/tmp/aireply-go-cache go test ./... -count=1 -race` | **17 пакетов OK**, exit 0. После sandbox-запрета loopback повторено с разрешённым доступом. Это baseline / текущий неизменённый backend, не доказательство исправления P1 |
+| Android `testDebugUnitTest --rerun compileReleaseKotlin lintRelease` (JBR Android Studio) | **BUILD SUCCESSFUL**, 511 tests / 51 suites, 0 failures/errors/skipped, lint 0 errors. Обе Google Services задачи обработки настоящего JSON прошли. Первый промежуточный запуск имел один policy-version assertion failure во время отложенных правок; итоговый запуск сделан после возвращения исходного кода |
+| iOS Xcode 26.4.1, iPhone 17e iOS 26.4.1 simulator, `xcodebuild test`, `CODE_SIGNING_ALLOWED=NO` | **TEST SUCCEEDED**, exit 0; xcresult: **460 passed, 0 failed/skipped**. Main app и клавиатура скомпилированы; настоящий Firebase plist проверен в app bundle |
+| Firebase config validator, `plutil -lint`, `git diff --check` | Успешно; отрицательные smoke checks отклоняют чужой project / package и приватный credential |
+| Существующий iOS Firebase build phase | Настоящий plist успешно скопирован в временный resource directory; байты совпадают с исходником |
+| Реальные устройства, live push, production Apple login / revocation, production data | Не проверялись живыми действиями; production конфигурации / данные не менялись |
+
+Первый iOS запуск остановлен на медленной загрузке полной истории Firebase SDK. Повторный запуск использовал локальный shallow-кэш официального tag `12.19.2`: commit `8c29ca981990a32e626c8617544fa65d22b1834f` совпадает с `Package.resolved`. Команда дополнена `-clonedSourcePackagesDirPath /private/tmp/aireply-firebase-ios-tests/SourcePackages -skipPackageUpdates -onlyUsePackageVersionsFromResolvedFile`. Версии зависимостей и проект не менялись. Результат: `/private/tmp/aireply-firebase-ios-results.xcresult`.
+
+Логи находятся локально в `/private/tmp/aireply-backend-baseline.log`, `/private/tmp/aireply-android-final.log`, `/private/tmp/aireply-ios-final.log`. Они не включаются в Git. Android предупреждает об отсутствующем Google Web client ID на этой машине — Firebase push config не заменяет Google OAuth setup. В iOS остаются существующие compiler warnings про `NSLock` в async-коде для будущего Swift 6 mode; в этом этапе код не переписывался.
+
+### Остающиеся release blockers и продолжение
+
+- Получить и сопоставить работу Claude с другого ноутбука; закрыть оба P1 и восстановить полный review list, затем обработать P2/P3. Ничего не считать завершённым только по старому summary.
+- С разрешением владельца включить Apple Push Notifications, создать scoped Sandbox / Production APNs keys и загрузить в Firebase. Перенести серверный JSON защищённо, смонтировать read-only и выполнить отдельно согласованный deployment; production `/api/v1/config` пока не объявляет push features.
+- После настройки APNs/backend на тестовых физических iPhone/Android проверить permission denied/allowed, token refresh, foreground/background/tap, несколько устройств, logout и deletion. После объединения новых изменений Claude повторить соответствующие regression suites. Не отправлять кампанию реальным пользователям.
+- Диагностировать Apple-вход в TestFlight и реальный Apple revocation при deletion. Проверить production auth, скрытые Standard/Pro, Free limit и клиентские store disclosures после интеграции backend.
+- В App Store Connect проверено: TestFlight build number **5 уже занят**. Для будущей загрузки выбрать номер больше 5 после объединения работы Claude; сейчас номер сборки не менялся.
+- Завершить production config, operator/contact, privacy disclosures и остальные ручные пункты раздела 11. Текущие изменения **не означают READY** для App Store / Google Play.
+
+APK / AAB / IPA не создавались; backend deploy, store upload, публикация, force push и изменения `main` не выполнялись. Передача клиентских конфигов выполняется обычным `git push origin notification` после локальной проверки. На втором ноутбуке сохранить работу Claude и изучить Firebase-коммит перед cherry-pick / fast-forward (см. checklist).

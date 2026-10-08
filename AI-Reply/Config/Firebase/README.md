@@ -4,4 +4,6 @@ Put the Firebase iOS config of the app `kz.ai-reply.reply.keyboard.keyboard` her
 
     AI-Reply/Config/Firebase/GoogleService-Info.plist
 
-The file is git-ignored. The "Firebase config" build phase copies it into the app when it is present and checks that its BUNDLE_ID matches the app; without it the app builds and push stays off. See `docs/FIREBASE_SETUP.md`.
+The genuine client config for project `ai-reply-4bf8f` is version-controlled so it travels with the repository. The "Firebase config" build phase copies it into the main app and checks its BUNDLE_ID. Firebase is not included in the keyboard extension.
+
+From the repository root, run `python3 tools/validate_firebase_config.py`. See `docs/FIREBASE_SETUP.md` for APNs and backend requirements. Service account keys and Apple `.p8` files must stay outside Git.

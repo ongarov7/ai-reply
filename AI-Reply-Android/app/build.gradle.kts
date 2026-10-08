@@ -11,7 +11,7 @@ plugins {
  * Push notifications (Firebase Cloud Messaging).
  *
  * app/google-services.json holds the Firebase project's client configuration.
- * It is environment-specific and git-ignored, so it is never committed. With
+ * It contains public client identifiers and is version-controlled. With
  * the file present the Google Services plugin turns it into resources and
  * FirebaseApp initialises at startup; without it the plugin is not applied,
  * the build still succeeds, and push is simply unavailable at runtime
