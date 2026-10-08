@@ -593,3 +593,25 @@ Apple private relay: письма на `@privaterelay.appleid.com` дойдут 
 - Завершить production config, operator/contact, privacy disclosures и остальные ручные пункты раздела 11. Текущие изменения **не означают READY** для App Store / Google Play.
 
 APK / AAB / IPA не создавались; backend deploy, store upload, публикация, force push и изменения `main` не выполнялись. Передача клиентских конфигов выполняется обычным `git push origin notification` после локальной проверки. На втором ноутбуке сохранить работу Claude и изучить Firebase-коммит перед cherry-pick / fast-forward (см. checklist).
+
+## Development Handoff — продолжение после Codex (8 октября 2026, вечер)
+
+> Промежуточная запись. Она обновляется в конце сессии, актуальна последняя версия раздела.
+
+**Сопоставление с работой Codex.** Коммит Codex `3807b3a` добавил:
+- настоящие клиентские конфиги Firebase (публичные идентификаторы проекта `ai-reply-4bf8f`; приватных ключей нет, валидатор `tools/validate_firebase_config.py` проходит);
+- `docs/FIREBASE_RELEASE_CHECKLIST.md`;
+- уточнения в документации.
+
+Код клиентов и сервера Codex не менял. Серверный JSON сервисного аккаунта есть только на ноутбуке Codex (`ai-reply-back-end/secrets/`, вне Git). На этом Mac его нет, в истории Git его тоже нет (проверено).
+
+`main` (`397f6da`: номер сборки 5 + debug APK в `outputs/`) в `notification` не вливался по указанию владельца. Номер сборки 5 в `notification` уже был.
+
+**Незаконченная работа Claude найдена и продолжена.** Заготовка исправлений 21 находки ревью бэкенда лежала в stash ветки `release-audit` на этом Mac. Она применена к `notification`, работа идёт. Список находок: `docs/review-backend-confirmed.txt`.
+
+**Вход через Apple в TestFlight.** Наиболее вероятная причина — `APPLE_CLIENT_ID` на сервере. `docs/auth-redesign-report.md` советовал старый `kz.yerek.replykeyboard`, а токен Apple приходит с `aud = kz.ai-reply.reply.keyboard.keyboard`. Документ исправлен. Владельцу нужно проверить `.env`: `APPLE_CLIENT_ID=kz.ai-reply.reply.keyboard.keyboard`. Добавляется безопасный лог причины отказа.
+
+**Тесты в этой сессии:**
+- `python3 tools/validate_firebase_config.py`: OK;
+- Android `testDebugUnitTest --rerun lintRelease compileReleaseKotlin processReleaseGoogleServices` с настоящим `google-services.json`: BUILD SUCCESSFUL, 511 тестов, 0 ошибок;
+- iOS и бэкенд: прогоняются после текущих исправлений, результаты будут ниже.

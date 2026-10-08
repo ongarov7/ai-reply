@@ -117,7 +117,7 @@ Push заново собран поверх `main` (старая ветка `ori
     Generate → Edit → Regenerate → Insert не проверен.
 
 Правила репозитория: коммиты без AI-подписей (никаких `Co-Authored-By` и т.п.). Не трогать bundle id, подпись,
-App Group (`group.kz.yerek.replykeyboard`) и конфиг расширения без понимания последствий.
+App Group (`group.kz.ai-reply.shared`) и конфиг расширения без понимания последствий.
 Не читать и не выводить `ai-reply-back-end/.env`.
 
 ---

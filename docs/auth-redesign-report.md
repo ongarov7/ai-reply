@@ -108,7 +108,7 @@ RS256 по JWKS (кэш по `Cache-Control` 5 мин – 24 ч, перечит�
 | `RESEND_FROM_NAME` | `AI Reply` |
 | `GOOGLE_CLIENT_ID_IOS` | iOS OAuth client ID |
 | `GOOGLE_CLIENT_ID_WEB` | Web OAuth client ID (его же использует Android) |
-| `APPLE_CLIENT_ID` | `kz.yerek.replykeyboard` |
+| `APPLE_CLIENT_ID` | `kz.ai-reply.reply.keyboard.keyboard` (bundle id приложения; старый `kz.yerek.replykeyboard` больше не подходит — Apple-вход будет отклонён) |
 | `OTP_TTL` / `OTP_MAX_ATTEMPTS` | `5m` / `5` |
 | `OTP_RESEND_COOLDOWN` | `32s` |
 | `RATE_OTP_REQUEST_PER_HOUR` / `RATE_OTP_REQUEST_PER_DAY` | `5` / `10` |
