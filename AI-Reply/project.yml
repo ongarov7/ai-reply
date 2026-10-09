@@ -107,12 +107,12 @@ targets:
         FIREBASE_GCM_SENDER_ID: ""
         FIREBASE_API_KEY: ""
         FIREBASE_PROJECT_ID: ""
-        # iOS OAuth client from Google Cloud Console (not a secret; it ships in
-        # the app). Empty keeps "Continue with Google" hidden in Release builds.
-        GOOGLE_IOS_CLIENT_ID: ""
+        # Public iOS OAuth client from ai-reply-4bf8f. The downloaded client
+        # plist is saved in Config/GoogleSignIn/GoogleOAuth-Info.plist.
+        GOOGLE_IOS_CLIENT_ID: "307300959376-cmqofin5ebbdjupepp5ff5u1ehhi84eo.apps.googleusercontent.com"
         # com.googleusercontent.apps.<id> - the client id reversed. Must match
         # GOOGLE_IOS_CLIENT_ID or the button stays hidden.
-        GOOGLE_IOS_REVERSED_CLIENT_ID: $(PRODUCT_BUNDLE_IDENTIFIER).google-signin
+        GOOGLE_IOS_REVERSED_CLIENT_ID: "com.googleusercontent.apps.307300959376-cmqofin5ebbdjupepp5ff5u1ehhi84eo"
       configs:
         Debug:
           AIREPLY_SIGN_IN_WITH_APPLE: "NO"

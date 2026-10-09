@@ -13,3 +13,4 @@ coverage.out
 secrets/
 *firebase-adminsdk*.json
 *service-account*.json
+ai-reply-4bf8f-31db4f3ee80d.json
