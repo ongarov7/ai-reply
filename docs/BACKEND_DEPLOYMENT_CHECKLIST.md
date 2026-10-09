@@ -76,6 +76,28 @@ APPLE_PRIVATE_KEY=<PEM_WITH_ESCAPED_NEWLINES_OR_BASE64>
 
 `APPLE_PRIVATE_KEY` is the key's contents in the supported format, not a filesystem path. An APNs-only key cannot replace a Sign in with Apple key. Without revocation credentials, local account deletion still runs but Apple authorization is not revoked; startup warns and the legal text reflects that limitation.
 
+The owner subsequently registered **Sign in with Apple key `F7Y9SJDM6R`** in team `2PK6339Q47` and downloaded `AuthKey_F7Y9SJDM6R.p8`. Developer UI confirms that service; this is separate from APNs key `J2YCR8N32P`. The attached key passed OpenSSL validation and is kept locally with mode 600 at `ai-reply-back-end/secrets/apple/AuthKey_F7Y9SJDM6R.p8`, ignored by Git and Docker. Server environment activation and a test-account deletion are still pending.
+
+Transfer the `.p8` securely from the Mac:
+
+```sh
+scp /Users/yerek/Downloads/AuthKey_F7Y9SJDM6R.p8 root@154.59.111.195:/srv/ai-reply/secrets/
+```
+
+Then run on the server host, using Python 3 and OpenSSL:
+
+```sh
+cd /home/ai-reply/ai-reply-back-end
+git pull --ff-only origin main
+chmod 600 /srv/ai-reply/secrets/AuthKey_F7Y9SJDM6R.p8
+python3 scripts/configure-apple-revocation-env.py \
+  --key-file /srv/ai-reply/secrets/AuthKey_F7Y9SJDM6R.p8 \
+  --team-id 2PK6339Q47 --key-id F7Y9SJDM6R
+docker compose run --rm --no-deps backend -check
+```
+
+The helper updates only the three Apple credential assignments in the existing `.env`, removes their duplicates, encodes the PEM as one-line base64, writes atomically with mode 600, preserves other settings and prints no secret values. It does not contact Apple or deploy anything. After `-check` succeeds, the owner can recreate the backend with `docker compose up -d --force-recreate backend`. The `.p8` needs no additional Docker mount because the backend receives its contents through `APPLE_PRIVATE_KEY`. Verify startup reports `apple_token_revocation=true`, then test deletion using a fresh Apple authorization code from a test account.
+
 Alternatively, FCM accepts the three variables `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`. Choose either these variables or the mounted JSON. The file option is recommended for the existing Docker deployment; do not set both sources. Client `GoogleService-Info.plist` / `google-services.json` cannot authenticate the server sender.
 
 Resend is already present in the pasted server environment. Confirm the new rotated key and verified sender domain; it is absent only from the laptop's `.env`. Other new template variables for retention, batch sizes, rate limits and AI features have defaults and do not need new credentials. `REVIEW_LOGIN_EMAIL` and `REVIEW_LOGIN_CODE` are optional review access; use only when preparing store review and clear them afterwards.
