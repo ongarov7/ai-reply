@@ -670,3 +670,37 @@ APK / AAB / IPA не создавались; backend deploy, store upload, пу�
 5. iOS: архив 1.0 (6) → TestFlight → проверка входа через Apple, клавиатуры, согласия, удаления. Затем App Privacy и заметки для ревьюера (`REVIEW_LOGIN_*`).
 6. Android: подписанный AAB (`-Paireply.versionCode`), Data safety, URL удаления, закрытый тест при необходимости.
 7. Юридическая проверка текстов (раздел 11.4).
+
+## TestFlight Preparation — 9 October 2026 (Codex)
+
+### Claude Code Handoff — Recovery and Continuation (continued)
+
+The active branch is `notification`. Before this continuation, the latest code was `b111181` and the handoff was `da5d314`. The recovered review report now exists at `docs/review-backend-confirmed.txt`; Claude's implementation of the 21 confirmed findings is committed, including the legacy-token restriction/production legacy disablement and corrected AI privacy disclosures. The earlier temporary Codex patch was not reapplied. Existing stashes and all client/backend implementations were preserved.
+
+The owner ran `git pull origin main`, leaving a merge in progress. All three conflicts were build-number conflicts in the two iOS Info.plists and `project.yml`: main had build 5 while notification had build 6. Resolution kept each conflicted file byte-for-byte identical to notification HEAD, including Firebase settings. The merge also preserved main's already-committed debug APK. Merge commit `e5f0504` was pushed only to `origin/notification` to fulfil the owner's PR conflict request. GitHub confirmed PR #1 is open, `mergeable=true`, `mergeable_state=clean`; no PR merge into main was performed.
+
+Current local changes:
+
+- Public Google iOS OAuth configuration created by the owner in `ai-reply-4bf8f`, saved as `AI-Reply/Config/GoogleSignIn/GoogleOAuth-Info.plist`. Client ID and reversed URL scheme are set in both `project.yml` and the checked-in Xcode project. This OAuth plist does not replace Firebase's messaging plist.
+- The downloaded private service-account JSON's exact filename is excluded from Git and the backend Docker build context. The original files remain in place. Local `.env` permissions changed to 600; its values were not changed or displayed.
+- The owner registered and downloaded APNs key `J2YCR8N32P`. Before registration, its scope was verified as Production / Topic Specific / `kz.ai-reply.reply.keyboard.keyboard`, with only APNs enabled. The original download and protected copy `AI-Reply/Config/Secrets/APNs/AuthKey_J2YCR8N32P.p8` have permissions 600; the secrets directory is excluded from Git. The key parses successfully. After the owner completed the upload, Firebase Cloud Messaging UI confirmed the production auth key `J2YCR8N32P` / Team `2PK6339Q47` for this iOS app. No Sandbox key is installed; physical-device delivery remains untested.
+- Safe `.env.example` comments and `docs/BACKEND_DEPLOYMENT_CHECKLIST.md` distinguish the pasted server environment from the different laptop environment and document missing credentials and the read-only FCM mount. No production server action was performed.
+
+Regression verification performed in this continuation:
+
+- Firebase client configuration validator: passed; correct project, sender, iOS bundle and Android package.
+- `go test ./... -count=1`: all 17 test packages passed. Log: `/private/tmp/aireply-testflight-2026-10-09/backend-tests.log`.
+- `xcodebuild test` on iPhone 17 Pro / iOS 26.4.1: **463 tests passed, zero failures**. Result: `/private/tmp/aireply-testflight-2026-10-09/iOS-tests.xcresult`. Compiled app contains the real Google OAuth client ID, reversed URL scheme and matching Firebase plist.
+- Local `.env -check` correctly rejects `AUTH_DEMO_MODE=true` with `APP_ENV=staging`; the live server was not checked. The same incompatible pair exists in the owner's pasted environment and must be corrected before deployment of the new backend.
+- Android source and release pipeline were not changed in this continuation. Claude's previous 512-test/lint result is historical; physical-device regressions remain to be checked after server configuration.
+
+Signing and upload status at this checkpoint:
+
+- Team `2PK6339Q47`, main bundle `kz.ai-reply.reply.keyboard.keyboard`, extension `.extension`, App Store Connect app `6818570150` verified. Version remains 1.0 (6); ASC currently has builds 1–5, so 6 is available.
+- Existing client Apple Development certificate matches this team. Old development and App Store profiles lack `aps-environment`; Apple App ID initially had Push Notifications off and Sign in with Apple on. Firebase initially has no APNs authentication keys or certificates. Push capability/key setup and refreshed signing profiles are required before the signed archive.
+- A signed Release archive 1.0 (6) has now been created from the working notification checkout. Both app and `ReplyKeyboardExtension.appex` pass strict signature verification with team `2PK6339Q47` and App Group `group.kz.ai-reply.shared`. The refreshed app profile and signed entitlements both contain `aps-environment=development`; Sign in with Apple is present. The archive includes 21 privacy manifests.
+- `xcodebuild -exportArchive` completed successfully. The locally exported IPA also passes strict signature verification for app and extension with App Store distribution profiles and no device/debug allowance. **Production `aps-environment` is present in both the app signature and profile**. Google client ID/URL scheme, Apple sign-in, push flags and bundled Firebase configuration verified. Validation logs and artifacts are under `/private/tmp/aireply-testflight-2026-10-09`; TestFlight upload has not occurred.
+
+The owner subsequently merged PR #1 into main (`f1d256c`, confirmed by GitHub). New Google/config documentation changes still need their own push and merge. The owner explicitly requires the final TestFlight build to come from the completed main branch; the first notification archive is a signing check only and will not be uploaded as the final build.
+
+Remaining release blockers: final-main TestFlight receipt; verify Google OAuth tester access/App Check enforcement; configure the actual backend Google/Apple audiences and FCM sender; remove staging/demo settings before deployment; supply actual legal operator details and Apple revocation credentials; test sign-in, deletion and notification delivery on physical devices. Production APNs is installed and distribution signing already passed the preliminary archive/export checks. The owner handles server deployment. No public App Store submission or Google Play release is authorized by this TestFlight task.

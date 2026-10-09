@@ -8,6 +8,8 @@
 !.env.example
 *.pem
 *.p8
+# Local Apple keys and their private backups; never bundled or committed.
+AI-Reply/Config/Secrets/
 *.p12
 *.jks
 *.keystore
@@ -16,6 +18,8 @@
 ai-reply-back-end/secrets/
 *firebase-adminsdk*.json
 *service-account*.json
+# Downloaded FCM sender key (the original local filename is kept).
+ai-reply-back-end/ai-reply-4bf8f-31db4f3ee80d.json
 
 # Logs and local build/test output
 *.log

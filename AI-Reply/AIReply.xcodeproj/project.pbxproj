@@ -1297,8 +1297,8 @@
 				FIREBASE_GCM_SENDER_ID = "";
 				FIREBASE_GOOGLE_APP_ID = "";
 				FIREBASE_PROJECT_ID = "";
-				GOOGLE_IOS_CLIENT_ID = "";
-				GOOGLE_IOS_REVERSED_CLIENT_ID = "$(PRODUCT_BUNDLE_IDENTIFIER).google-signin";
+				GOOGLE_IOS_CLIENT_ID = "307300959376-cmqofin5ebbdjupepp5ff5u1ehhi84eo.apps.googleusercontent.com";
+				GOOGLE_IOS_REVERSED_CLIENT_ID = "com.googleusercontent.apps.307300959376-cmqofin5ebbdjupepp5ff5u1ehhi84eo";
 				INFOPLIST_FILE = AIReply/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1513,8 +1513,8 @@
 				FIREBASE_GCM_SENDER_ID = "";
 				FIREBASE_GOOGLE_APP_ID = "";
 				FIREBASE_PROJECT_ID = "";
-				GOOGLE_IOS_CLIENT_ID = "";
-				GOOGLE_IOS_REVERSED_CLIENT_ID = "$(PRODUCT_BUNDLE_IDENTIFIER).google-signin";
+				GOOGLE_IOS_CLIENT_ID = "307300959376-cmqofin5ebbdjupepp5ff5u1ehhi84eo.apps.googleusercontent.com";
+				GOOGLE_IOS_REVERSED_CLIENT_ID = "com.googleusercontent.apps.307300959376-cmqofin5ebbdjupepp5ff5u1ehhi84eo";
 				INFOPLIST_FILE = AIReply/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

@@ -1,6 +1,6 @@
-# Firebase release checklist — 2026-10-08
+# Firebase release checklist — updated 2026-10-09
 
-Статус: **локальные клиентские конфигурации готовы; production push и релиз BLOCKED**.
+Статус: **клиентские конфигурации, production APNs и проверочная iOS distribution-сборка готовы; server config и финальный TestFlight upload ещё не подтверждены**.
 Рабочая ветка: `notification`. Основной мануал: [FIREBASE_SETUP.md](FIREBASE_SETUP.md).
 
 | Проверка | Статус / следующий шаг |
@@ -14,17 +14,20 @@
 | Backend JSON | Создан с разрешения владельца, локально `ai-reply-back-end/secrets/firebase-service-account.json`, права `600`; Git и Docker исключают secrets |
 | Server deployment | Не выполнялся; JSON ещё не переносился на сервер; нужны mount + `FIREBASE_SERVICE_ACCOUNT_FILE` + `PUSH_NOTIFICATIONS_ENABLED=true` |
 | Apple Team / App ID | Проверены в Developer portal: `2PK6339Q47` / основной bundle ID совпадают |
-| Apple Push Notifications capability | Выключена в Apple Developer; отдельный запрос разрешения ожидает ответа |
-| APNs Sandbox / Production | Keys в Apple Developer отсутствуют, оба Firebase-слота пусты; запрос создания и загрузки ожидает ответа |
-| Sign in with Apple | Capability включена; ошибка входа на iPhone TestFlight ещё не диагностирована |
+| Apple Push Notifications capability | Включена с разрешения владельца 9 октября; новый development profile содержит `aps-environment=development`, подписанный archive создан |
+| APNs Production | Владелец зарегистрировал и скачал ключ `J2YCR8N32P`: только APNs, Production / Topic Specific / основной bundle. Защищённая копия `AI-Reply/Config/Secrets/APNs/AuthKey_J2YCR8N32P.p8`, права 600, вне Git. Firebase UI подтвердил production-ключ и Team `2PK6339Q47`; реальная доставка ещё не проверена |
+| APNs Sandbox | Отдельный Sandbox-ключ ещё не настроен. Production-ключ используется для TestFlight, не для Debug push |
+| Sign in with Apple | Capability включена и присутствует в подписанном archive; в присланном server env неверный `APPLE_CLIENT_ID`, требуется `kz.ai-reply.reply.keyboard.keyboard`, затем тест на iPhone |
+| Google iOS sign-in | Создан настоящий iOS OAuth client, публичный plist сохранён в `Config/GoogleSignIn`; Client ID и reversed scheme встроены в приложение; backend audience должен быть настроен владельцем. OAuth External / Testing: доступ тестеров и App Check enforcement ещё требуют проверки |
 | Notification permissions | Существующие flows сохранены; реальная проверка Android 13+ и iPhone не выполнена |
-| Backend regressions | `go test ./... -count=1 -race`: 17 пакетов OK |
-| Android regressions | 511 tests, 0 failures/errors; release Kotlin OK; lint 0 errors; Google Services processing OK |
-| iOS regressions | `xcodebuild test`: TEST SUCCEEDED, 460 passed, 0 failed/skipped; Xcode 26.4.1, iPhone 17e simulator iOS 26.4.1; настоящий plist присутствует в app bundle |
+| Backend regressions | 9 октября Codex: `go test ./... -count=1`, 17 тестируемых пакетов OK; предыдущий race-результат Claude сохранён в аудите |
+| Android regressions | Claude: 512 tests, 0 failures; release Kotlin / lint / Google Services OK. Исторический результат; Android-код в текущем продолжении не менялся |
+| iOS regressions | 9 октября Codex: `xcodebuild test`, 463 passed, 0 failed; iPhone 17 Pro iOS 26.4.1. Firebase plist, OAuth ID и URL scheme подтверждены в собранном app |
 | Live push / logout / account deletion | Нужны отдельные тестовые устройства после настройки APNs/backend; живые кампании не отправлялись |
-| Backend P1 review | Legacy consent bypass и неточный privacy text остаются блокерами; см. recovery-раздел аудита |
-| Следующий iOS build number | В App Store Connect номер 5 уже занят; перед будущей загрузкой выбрать >5, сейчас версия не менялась |
-| App Store / Google Play | Поля приватности, production config, оператор/контакт и проверка устройств остаются; APK/AAB/IPA, upload и публикация не выполнялись |
+| Backend P1 review | Исправления Claude уже в `b111181`; повторные backend-тесты прошли. Требуется отдельный deployment владельцем с production env; на live server изменения не применялись Codex |
+| Следующий iOS build number | 1.0 (6), одинаковый у приложения и расширения; в ASC подтверждены 1–5. Перед финальным upload повторно проверить доступность 6 |
+| Distribution signing | Release archive и локальный App Store export успешны; обе подписи и App Groups проверены, в IPA `aps-environment=production`. Этот archive из notification — проверочный; финальный build будет из main |
+| App Store / Google Play | Поля приватности, production config, оператор/контакт и физические устройства ещё требуют проверки. Цель текущего этапа — TestFlight из финального main; public store review / release не выполнялись |
 
 ## Передача на второй ноутбук
 
@@ -34,4 +37,4 @@
 4. Запустить `python3 tools/validate_firebase_config.py` из корня. Это локальная проверка идентификаторов и подключения, не тест доставки.
 5. Серверный JSON и APNs `.p8` переносить отдельно защищённым каналом. Их нет в Git. Не создавать новые ключи ради переноса уже существующих.
 
-Для следующего инженера: сначала сопоставить отсутствующие Claude-коммиты и полный список 21 находки с текущим кодом; закрыть P1, затем P2/P3 по реальной тяжести. Не считать исторические результаты тестов проверкой новых изменений.
+Для следующего инженера: восстановленные Claude-коммиты и список 21 находки уже находятся в репозитории. Актуальный прогресс — в конце `STORE_RELEASE_AUDIT.md`; server env diff и порядок deployment — в `BACKEND_DEPLOYMENT_CHECKLIST.md`. Не применять старую временную recovery patch поверх готового `b111181`. Не считать исторические тесты проверкой новых изменений.
