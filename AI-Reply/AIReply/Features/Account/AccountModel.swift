@@ -29,6 +29,12 @@ final class AccountModel {
         var resendAvailableAt: Date
     }
 
+    /// How an account deletion ended. `messageKey` is localized by the view.
+    enum DeletionOutcome: Equatable {
+        case deleted
+        case failed(messageKey: String)
+    }
+
     /// How a sign-in attempt ended, for the screen that started it.
     enum SignInOutcome: Equatable {
         case signedIn(isNewUser: Bool)
@@ -54,6 +60,14 @@ final class AccountModel {
     private(set) var pendingEmail = ""
     /// A key the view localizes. Never a raw server string.
     private(set) var errorKey: String?
+    /// Something to tell the user once, whichever screen is up - the account
+    /// was deleted, say. A localization key.
+    private(set) var noticeKey: String?
+    /// Whether `legalConfig` came from the server in this launch, rather than
+    /// from this build's own defaults.
+    @ObservationIgnored private var hasServerLegalConfig = false
+    /// A foreground reload of the legal versions is already out.
+    @ObservationIgnored private var isReloadingLegalConfig = false
 
     @ObservationIgnored private let service: AccountService
 
@@ -62,6 +76,15 @@ final class AccountModel {
     /// on another device here, so a returning user's onboarding never asks
     /// the question again.
     @ObservationIgnored var didReceiveProfile: (@MainActor (AccountAPI.Profile?) -> Void)?
+
+    /// This phone's installation, named on the logout request so the server
+    /// stops sending the account's notifications to it at once. Nil when
+    /// there is none to name.
+    @ObservationIgnored var installationIDForSignOut: (@MainActor () -> String?)?
+
+    /// The account was deleted: the app drops what it keeps for it beyond
+    /// the session (the synced profile, the events waiting to be sent).
+    @ObservationIgnored var didDeleteAccount: (@MainActor () -> Void)?
 
     init(service: AccountService = AccountService()) {
         self.service = service
@@ -94,11 +117,44 @@ final class AccountModel {
     var offersGoogle: Bool {
         #if DEBUG
         let configured = true
+        let isRelease = false
         #else
         let configured = GoogleSignInProvider.isConfigured
+        let isRelease = true
         #endif
-        return configured && (features?.googleSignIn ?? true)
+        return Self.offersGoogle(configured: configured, serverAllows: features?.googleSignIn ?? true,
+                                 offersApple: offersApple, isRelease: isRelease)
     }
+
+    /// App Review guideline 4.8: an app that signs in with Google must offer
+    /// Sign in with Apple beside it, so a Release build without Apple hides
+    /// Google too. DEBUG builds, which leave Apple out for Personal Team
+    /// signing, keep Google for review.
+    static func offersGoogle(configured: Bool, serverAllows: Bool, offersApple: Bool, isRelease: Bool) -> Bool {
+        guard configured, serverAllows else { return false }
+        return offersApple || !isRelease
+    }
+
+    /// Whether this build can take a payment at all. Release builds cannot:
+    /// there is no StoreKit purchase flow yet, and a plan sold outside it
+    /// would not pass App Review. DEBUG builds may, against a development
+    /// server with the demo checkout.
+    static var purchasesAvailableInThisBuild: Bool {
+        #if DEBUG
+        return true
+        #else
+        return false
+        #endif
+    }
+
+    /// A Choose button (and a price) for this plan: the build can buy, and
+    /// the server says the plan can be bought right now.
+    func canPurchase(_ plan: AccountAPI.Plan) -> Bool {
+        Self.purchasesAvailableInThisBuild && plan.purchasable && !plan.isFree
+    }
+
+    /// The account signs in with Apple, so deleting it revokes Apple's token.
+    var signsInWithApple: Bool { user?.authProviders?.contains("apple") == true }
 
     // MARK: Loading
 
@@ -106,6 +162,7 @@ final class AccountModel {
     func loadServerConfig() async {
         if let config = try? await service.serverConfig() {
             legalConfig = config.legal ?? .production
+            hasServerLegalConfig = config.legal != nil
             features = config.features
             // The limits the administrator set, for the app's own composer
             // and - through the App Group - for the keyboard.
@@ -144,14 +201,24 @@ final class AccountModel {
             phase = .signedOut
             return
         }
+        // An acceptance confirmed while this request was out is newer than
+        // its answer, which must not undo it.
+        let consentBefore = LegalConsentStore.load()
         do {
             let account = try await service.account()
             apply(user: account.user, subscription: account.subscription, usage: account.usage)
             receive(account.profile)
-            applyLegalConsent(account.legalConsent)
+            applyLegalConsent(account.legalConsent, recordBefore: consentBefore)
             phase = .signedIn
+            // The account is there: no earlier deletion went through.
+            hasUnansweredDeletion = false
         } catch APIError.unauthorized {
-            await signOutLocally()
+            // A deletion whose answer was lost (the app closed since) did delete it.
+            if hasUnansweredDeletion {
+                await forgetDeletedAccount()
+            } else {
+                await signOutLocally()
+            }
         } catch APIError.accountDisabled {
             errorKey = "account.error.disabled"
             await signOutLocally()
@@ -279,7 +346,7 @@ final class AccountModel {
             errorKey = "account.error.providerUnavailable"
             return .failed(clearCode: false)
         } catch {
-            errorKey = "account.error.providerFailed"
+            errorKey = Self.providerFailureKey
             return .failed(clearCode: false)
         }
 
@@ -293,9 +360,16 @@ final class AccountModel {
     }
 
     /// Apple's own sheet failed before our server was involved.
+    ///
+    /// Құрылғыдағы Apple терезесі сәтсіз аяқталды; сервер әлі қатыспады.
     func reportProviderFailure() {
-        errorKey = "account.error.providerFailed"
+        errorKey = Self.providerFailureKey
     }
+
+    /// The sign-in failed on the phone (Apple's or Google's sheet), never
+    /// reaching our server. A token the server refused reads differently
+    /// (`message(for: .invalidIDToken)`), so a report says which side failed.
+    nonisolated static let providerFailureKey = "account.error.providerFailed"
 
     /// The session is stored and the screens switch now. Device registration
     /// and the consent sync follow on their own, so a new account goes straight
@@ -305,9 +379,10 @@ final class AccountModel {
         // Before the phase flips: onboarding decides its steps from what the
         // device knows at that moment.
         receive(session.profile)
-        applyLegalConsent(session.legalConsent)
+        applyLegalConsent(session.legalConsent, recordBefore: LegalConsentStore.load())
         phase = .signedIn
         pendingEmail = ""
+        hasUnansweredDeletion = false
         Task {
             // Best effort: a failed device registration must not block sign-in.
             try? await service.registerDevice()
@@ -341,22 +416,171 @@ final class AccountModel {
     // MARK: Legal and session
 
     func acceptLegal(locale: String) async {
+        // The versions the server and the keyboard enforce now, not the ones
+        // read at launch: the screen may have come up from that older check.
+        // Offline, the current ones stay.
+        await loadServerConfig()
         LegalConsentStore.accept(legalConfig, locale: locale)
         hasAcceptedLegal = true
         await syncPendingLegalConsent()
     }
 
+    /// Re-reads the consent the App Group holds: the keyboard drops it when
+    /// the server answers CONSENT_REQUIRED. Called on every return to the
+    /// foreground. The documents may have changed while the app was away,
+    /// so their current versions are loaded too, as the keyboard has them.
+    func revalidateLegalConsent() {
+        guard isBootstrapComplete else { return }
+        hasAcceptedLegal = LegalConsentStore.hasAccepted(legalConfig)
+        guard !isReloadingLegalConfig else { return }
+        isReloadingLegalConfig = true
+        Task {
+            await serverRequiresConsent()
+            isReloadingLegalConfig = false
+        }
+    }
+
+    /// An AI request in the app came back CONSENT_REQUIRED, or was refused
+    /// before it was sent (the transport has already dropped an out-of-date
+    /// record): the consent screen comes back, unless an acceptance is only
+    /// waiting to be sent.
+    func serverRequiresConsent() async {
+        // The documents may have changed since launch: their current
+        // versions first, for the screen and for the keyboard.
+        await loadServerConfig()
+        await syncPendingLegalConsent()
+    }
+
+    /// Settings ▸ Privacy ▸ Withdraw AI consent. The server hears it first:
+    /// the AI endpoints refuse from then on, and the consent screen returns
+    /// until the user accepts again. The account stays signed in. Returns a
+    /// message key when the withdrawal did not reach the server.
+    func withdrawLegalConsent() async -> String? {
+        isBusy = true
+        defer { isBusy = false }
+        do {
+            try await service.withdrawLegalConsent()
+        } catch {
+            return Self.message(for: error)
+        }
+        LegalConsentStore.clear()
+        hasAcceptedLegal = false
+        return nil
+    }
+
     func signOut() async {
         isBusy = true
-        await service.signOut()
+        await service.signOut(installationID: installationIDForSignOut?())
         await signOutLocally()
         isBusy = false
     }
 
+    /// Settings ▸ Delete account (or the consent screen), after the user
+    /// confirmed it. An account that signs in with Apple is confirmed with
+    /// Apple once more, so the server can revoke Apple's token. Once the
+    /// server has deleted the account, this device forgets it too and
+    /// returns to sign-in.
+    func deleteAccount() async -> DeletionOutcome {
+        isBusy = true
+        defer { isBusy = false }
+
+        var appleCode: String?
+        if signsInWithApple && AppleSignIn.isEnabledInThisBuild {
+            do {
+                appleCode = try await AppleSignIn.confirmForDeletion()
+            } catch {
+                guard Self.deletionContinues(afterAppleFailure: error) else {
+                    return .failed(messageKey: "account.delete.appleRequired")
+                }
+                // The server deletes without a code and only skips the revocation.
+                ReplyLog.event("apple confirmation for deletion failed: \(error)")
+            }
+        }
+
+        do {
+            _ = try await service.deleteAccount(appleAuthorizationCode: appleCode)
+        } catch {
+            ReplyLog.event("account deletion failed: \(error)")
+            switch Self.deletionFailure(error, afterUnansweredAttempt: hasUnansweredDeletion) {
+            case .alreadyDeleted:
+                // The earlier attempt deleted it; only its answer was lost.
+                break
+            case .unanswered:
+                hasUnansweredDeletion = true
+                return .failed(messageKey: "account.delete.failed")
+            case .sessionEnded:
+                errorKey = "account.error.sessionExpired"
+                await signOutLocally()
+                return .failed(messageKey: "account.error.sessionExpired")
+            case .refused:
+                return .failed(messageKey: "account.delete.failed")
+            }
+        }
+
+        await forgetDeletedAccount()
+        return .deleted
+    }
+
+    /// How a failed `DELETE /me` is read.
+    enum DeletionFailure: Equatable {
+        /// 401 after an attempt that got no answer: that attempt deleted the
+        /// account, and every token of it stopped working.
+        case alreadyDeleted
+        /// The request may have reached the server, but no answer came back.
+        case unanswered
+        /// 401 with no such attempt before: the session ended, the account
+        /// may well still be there.
+        case sessionEnded
+        /// The server answered, and nothing was deleted.
+        case refused
+    }
+
+    nonisolated static func deletionFailure(_ error: Error, afterUnansweredAttempt: Bool) -> DeletionFailure {
+        switch error as? APIError {
+        case .unauthorized:
+            return afterUnansweredAttempt ? .alreadyDeleted : .sessionEnded
+        // `offline` too: a connection lost after the request left is reported so.
+        case .offline, .timedOut, .cancelled, .server, .providerTimeout:
+            return .unanswered
+        default:
+            return .refused
+        }
+    }
+
+    /// The Apple step before a deletion gave no code. The user cancelling it
+    /// stops the deletion; Apple failing on this device does not.
+    nonisolated static func deletionContinues(afterAppleFailure error: Error) -> Bool {
+        (error as? AppleSignIn.ConfirmationFailure) != .cancelled
+    }
+
+    /// A deletion went out and no answer came back, so the account may be
+    /// gone already. Kept across launches; dropped with the session.
+    private var hasUnansweredDeletion: Bool {
+        get { UserDefaults.standard.bool(forKey: Self.unansweredDeletionKey) }
+        set { UserDefaults.standard.set(newValue, forKey: Self.unansweredDeletionKey) }
+    }
+
+    private static let unansweredDeletionKey = "account.deletionUnanswered"
+
+    /// The server no longer has the account: this device forgets it too.
+    private func forgetDeletedAccount() async {
+        LocalAccountData.wipe()
+        didDeleteAccount?()
+        await signOutLocally()
+        hasAcceptedLegal = LegalConsentStore.hasAccepted(legalConfig)
+        noticeKey = "account.delete.done"
+    }
+
+    func dismissNotice() {
+        noticeKey = nil
+    }
+
     private func signOutLocally() async {
-        // A gender change this account never received stays with it: it must
-        // not be sent to whoever signs in next on this phone.
+        // A gender or language change this account never received stays
+        // with it: it must not be sent to whoever signs in next on this phone.
         ProfileSync.discardPendingChange()
+        PreferredLanguageSync.discardPendingChange()
+        hasUnansweredDeletion = false
         AccountCredentials.clear()
         AccountUsageCache.clear()
         AppleSignIn.forget()
@@ -385,6 +609,8 @@ final class AccountModel {
         update.locale = locale
         update.timezone = TimeZone.current.identifier
         update.onboarding_completed = true
+        // The language of the account's notifications, where the server has it.
+        if features?.preferredLanguage == true { update.preferred_language = locale }
 
         do {
             _ = try await service.updateProfile(update)
@@ -412,6 +638,23 @@ final class AccountModel {
             return true
         } catch {
             ReplyLog.event("profile sync failed: \(error)")
+            return false
+        }
+    }
+
+    /// Sends the language of the account's notifications to a server that
+    /// publishes `preferred_language`. False when nothing reached the server;
+    /// the caller keeps it pending (see `PreferredLanguageSync`).
+    func updatePreferredLanguage(_ code: String) async -> Bool {
+        guard AccountCredentials.isSignedIn, features?.preferredLanguage == true else { return false }
+        var update = AccountService.ProfileUpdate()
+        update.preferred_language = code
+        do {
+            profile = try await service.updateProfile(update)
+            user = user?.withPreferredLanguage(code)
+            return true
+        } catch {
+            ReplyLog.event("preferred language sync failed: \(error)")
             return false
         }
     }
@@ -460,10 +703,22 @@ final class AccountModel {
         AccountCredentials.setDisplayIdentifier(user.identifier)
     }
 
-    private func applyLegalConsent(_ consent: AccountAPI.LegalConsent?) {
+    /// The server's record decides. Without a consent there for the
+    /// documents in force, one this device had confirmed is out of date -
+    /// withdrawn on another device, or another account's - and the consent
+    /// screen returns. An acceptance still waiting to be sent stays, and so
+    /// does one that changed since `recordBefore` was read (the request was
+    /// already out when it was confirmed).
+    private func applyLegalConsent(_ consent: AccountAPI.LegalConsent?, recordBefore: StoredLegalConsent?) {
         guard let consent,
               consent.termsVersion == legalConfig.termsVersion,
-              consent.privacyVersion == legalConfig.privacyVersion else { return }
+              consent.privacyVersion == legalConfig.privacyVersion else {
+            guard hasServerLegalConfig, let recordBefore, !recordBefore.isPendingSync,
+                  LegalConsentStore.load() == recordBefore else { return }
+            LegalConsentStore.clear()
+            hasAcceptedLegal = LegalConsentStore.hasAccepted(legalConfig)
+            return
+        }
         LegalConsentStore.restore(consent)
         hasAcceptedLegal = true
     }
@@ -508,7 +763,9 @@ final class AccountModel {
         case .invalidEmail:             return "account.error.invalidEmail"
         case .emailDeliveryFailed:      return "account.error.emailDelivery"
         case .emailInUse:               return "account.error.emailInUse"
-        case .invalidIDToken:           return "account.error.providerFailed"
+        // Our server refused Apple's or Google's token: said apart from the
+        // provider's own sheet failing on the phone (`providerFailed`).
+        case .invalidIDToken:           return "account.error.providerRejected"
         case .authProviderUnavailable:  return "account.error.providerUnavailable"
         case .unauthorized:             return "account.error.sessionExpired"
         case .accountDisabled:          return "account.error.disabled"
@@ -516,5 +773,28 @@ final class AccountModel {
         case .paymentRequired, .subscriptionExpired: return "account.error.paymentRequired"
         default:                        return "account.error.generic"
         }
+    }
+}
+
+/// What this device keeps for an account besides the session, removed when
+/// the account is deleted.
+///
+/// Тіркелгі жойылғанда құрылғыдағы оның деректері де өшеді.
+///
+/// The keyboard's settings (layouts, haptics, smart correction) and the app's
+/// language belong to the device and stay. The keychain session, the Apple
+/// and Google sign-in state and the in-memory data are dropped by
+/// `AccountModel` itself.
+@MainActor
+enum LocalAccountData {
+
+    static func wipe(appGroup: UserDefaults = AppGroup.defaults, app: UserDefaults = .standard) {
+        LegalConsentStore.clear(defaults: appGroup)
+        AccountUsageCache.clear(defaults: appGroup)
+        // Words the keyboard learned from what this user typed.
+        DefaultsLearnedWordsStore(defaults: appGroup).removeAll()
+        // Changes this account never received must not reach the next one.
+        ProfileSync.discardPendingChange(defaults: app)
+        PreferredLanguageSync.discardPendingChange(defaults: app)
     }
 }

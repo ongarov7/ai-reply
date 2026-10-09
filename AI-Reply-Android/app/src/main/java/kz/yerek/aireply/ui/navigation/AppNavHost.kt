@@ -13,9 +13,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import kz.yerek.aireply.BuildConfig
 import kz.yerek.aireply.ui.LocalServices
 import kz.yerek.aireply.ui.feature.account.AccountController
@@ -38,6 +41,13 @@ import kz.yerek.aireply.ui.feature.templates.TemplateEditorScreen
 import kz.yerek.aireply.ui.feature.templates.TemplateListScreen
 
 /**
+ * The gates, then the graph.
+ *
+ * A screen asked for from outside — a tapped notification — waits in
+ * [PendingNavigation] while any gate (legal consent, sign-in, the
+ * registration step, onboarding) is showing, and is opened on top of Home
+ * once they are all behind. It never skips one.
+ *
  * @param debugOnboarding DEBUG builds only: open the first run straight away,
  *   before sign-in, so it can be reviewed on an emulator without an account.
  */
@@ -143,11 +153,42 @@ fun AppNavHost(debugOnboarding: Boolean = false) {
             TemplateEditorScreen(templateId = id, onBack = navController::popBackStack)
         }
 
-        composable(Routes.Settings) {
+        composable(
+            route = Routes.SettingsPattern,
+            arguments = listOf(
+                navArgument(Routes.SettingsSectionArg) {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { entry ->
             SettingsScreen(
                 onBack = navController::popBackStack,
-                onOpen = { route -> navController.navigate(route) }
+                onOpen = { route -> navController.navigate(route) },
+                focusSection = entry.arguments?.getString(Routes.SettingsSectionArg)
             )
         }
+    }
+
+    // Reached only with every gate behind: a pending link opens now. During
+    // onboarding the start is not Home yet, and the link keeps waiting.
+    val pending by services.navigation.route.collectAsStateWithLifecycle()
+    LaunchedEffect(pending, start) {
+        val route = pending ?: return@LaunchedEffect
+        if (!PendingNavigation.canApply(start)) return@LaunchedEffect
+        if (services.navigation.consume(route)) navController.openFromOutside(route)
+    }
+}
+
+/** Opens [route] on top of Home: the back button then leads to Home, never out of the app. */
+private fun NavHostController.openFromOutside(route: String) {
+    if (route == Routes.Home) {
+        popBackStack(Routes.Home, inclusive = false)
+        return
+    }
+    navigate(route) {
+        popUpTo(Routes.Home) { inclusive = false }
+        launchSingleTop = true
     }
 }

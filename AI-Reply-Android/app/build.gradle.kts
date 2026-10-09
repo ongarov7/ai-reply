@@ -8,6 +8,20 @@ plugins {
 }
 
 /**
+ * Push notifications (Firebase Cloud Messaging).
+ *
+ * app/google-services.json holds the Firebase project's client configuration.
+ * It contains public client identifiers and is version-controlled. With
+ * the file present the Google Services plugin turns it into resources and
+ * FirebaseApp initialises at startup; without it the plugin is not applied,
+ * the build still succeeds, and push is simply unavailable at runtime
+ * (PushSupport checks FirebaseApp.getApps before touching FirebaseMessaging).
+ */
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
+/**
  * "Continue with Google": the OAuth client of type *Web application* from
  * Google Cloud Console. Not a secret (it ships in every APK), but it differs
  * per environment, so it is not checked in. First match wins:
@@ -31,16 +45,33 @@ val googleWebClientId: String = run {
     }
 }
 
+/**
+ * versionCode 1 / versionName "1.0" unless overridden for a store upload, so
+ * every Play upload gets a higher number without editing this file:
+ *   ./gradlew bundleRelease -Paireply.versionCode=7 -Paireply.versionName=1.0.6
+ * A value that is not a positive whole number (Play's ceiling is 2100000000),
+ * or an empty name, stops the build rather than uploading a wrong one.
+ */
+val appVersionCode: Int = (findProperty("aireply.versionCode") as String?)?.trim()?.let { raw ->
+    requireNotNull(raw.toIntOrNull()?.takeIf { it in 1..2_100_000_000 }) {
+        "aireply.versionCode must be a whole number from 1 to 2100000000, got \"$raw\""
+    }
+} ?: 1
+
+val appVersionName: String = (findProperty("aireply.versionName") as String?)?.trim()?.also { name ->
+    require(name.isNotEmpty()) { "aireply.versionName must not be empty" }
+} ?: "1.0"
+
 android {
     namespace = "kz.yerek.aireply"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "kz.yerek.aireply"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        targetSdk = 36
+        versionCode = appVersionCode
+        versionName = appVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -116,6 +147,34 @@ android {
     }
 }
 
+/**
+ * A release built without push or without Google sign-in still builds - both
+ * are optional by design - but a store upload without them is almost always
+ * a mistake, so every release build says so loudly. A warning, not a failure:
+ * CI and local release checks keep working without the private files.
+ */
+val releaseSetupCheck = tasks.register("checkReleaseSetup") {
+    val missingFirebase = !file("google-services.json").exists()
+    val missingGoogleClientId = googleWebClientId.isEmpty()
+    doLast {
+        if (missingFirebase) {
+            logger.warn(
+                "WARNING: Firebase setup pending: app/google-services.json is not there yet, so this " +
+                    "release build has no push notifications (FCM). Add it before uploading to Google Play " +
+                    "(docs/FIREBASE_SETUP.md)."
+            )
+        }
+        if (missingGoogleClientId) {
+            logger.warn(
+                "WARNING: aireply.googleWebClientId is empty. This release build hides " +
+                    "\"Continue with Google\". Set it in local.properties, ~/.gradle/gradle.properties " +
+                    "or GOOGLE_WEB_CLIENT_ID before uploading to Google Play."
+            )
+        }
+    }
+}
+tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(releaseSetupCheck) }
+
 // LocalizationParityTest reads the string resources straight from src/main/res,
 // which Gradle cannot see. Declared as an input, a change to a translation alone
 // re-runs the unit tests instead of reporting an up-to-date or cached pass.
@@ -148,6 +207,9 @@ dependencies {
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.googleid)
+
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 

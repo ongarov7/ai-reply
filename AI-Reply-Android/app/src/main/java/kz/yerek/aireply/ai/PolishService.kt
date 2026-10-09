@@ -32,7 +32,7 @@ class PolishService(
         val inputLanguage: KeyboardLanguage? = null
     )
 
-    /** Whether a suggestion is possible without asking anyone: an account, or a DEBUG mock. */
+    /** Whether a suggestion is possible without asking anyone: an account with the consent, or a DEBUG mock. */
     val isAvailable: Boolean get() = configuration.isReady || transportOverride?.invoke() != null
 
     /**
@@ -47,7 +47,7 @@ class PolishService(
         if (!qualifies(text, limit)) return null
 
         val override = transportOverride?.invoke()
-        if (override == null && !configuration.isReady) AIReplyError.AuthenticationFailed.raise()
+        if (override == null) configuration.checkReady()
         val transport = override ?: accountTransport(configuration.backendBaseUrl)
 
         val polished = try {
@@ -57,6 +57,7 @@ class PolishService(
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (exception: AIReplyException) {
+            configuration.requestFailed(exception.error)
             throw exception
         } catch (throwable: Throwable) {
             throw AIReplyException(ReplyNetworking.mapError(throwable))

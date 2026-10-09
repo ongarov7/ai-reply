@@ -46,11 +46,23 @@ extension AccountAPI {
         /// Ways this account signs in: "apple", "email", "google", "phone".
         /// Absent on servers from before Google and Apple sign-in.
         let authProviders: [String]?
+        /// The language of the account's notifications: kk, ru, en, uz, or
+        /// "" while none was chosen. Absent on servers without
+        /// `preferred_language`.
+        let preferredLanguage: String?
 
         enum CodingKeys: String, CodingKey {
             case id, phone, email, status, locale
             case onboardingCompleted = "onboarding_completed"
             case authProviders = "auth_providers"
+            case preferredLanguage = "preferred_language"
+        }
+
+        /// The same account after the server confirmed a new language.
+        func withPreferredLanguage(_ code: String) -> User {
+            User(id: id, phone: phone, email: email, status: status, locale: locale,
+                 onboardingCompleted: onboardingCompleted, authProviders: authProviders,
+                 preferredLanguage: code)
         }
 
         /// What the user recognises themselves by.
@@ -109,9 +121,13 @@ extension AccountAPI {
         let monthlyLimit: Int
         let periodDays: Int
         let isFree: Bool
+        /// The server would take a checkout for this plan right now (a
+        /// verified billing integration and the administrator's switch).
+        /// Absent on older servers, which counts as no.
+        var purchasable = false
 
         enum CodingKeys: String, CodingKey {
-            case id, code, name, description, price, currency
+            case id, code, name, description, price, currency, purchasable
             case priceText = "price_text"
             case dailyLimit = "daily_message_limit"
             case monthlyLimit = "monthly_message_limit"
@@ -238,20 +254,38 @@ extension AccountAPI {
         let privacyVersion: String
         let termsURL: String
         let privacyURL: String
+        /// Where users write to; may be empty. Absent on older servers.
+        var contactEmail: String? = nil
+        var supportURL: String? = nil
+        var accountDeletionURL: String? = nil
+        /// Who writes the replies, named on the consent screen.
+        var aiProvider: String? = nil
 
         enum CodingKeys: String, CodingKey {
             case termsVersion = "terms_version"
             case privacyVersion = "privacy_version"
             case termsURL = "terms_url"
             case privacyURL = "privacy_url"
+            case contactEmail = "contact_email"
+            case supportURL = "support_url"
+            case accountDeletionURL = "account_deletion_url"
+            case aiProvider = "ai_provider"
         }
 
         static let production = LegalConfig(
-            termsVersion: "2026-09-19",
-            privacyVersion: "2026-09-19",
+            termsVersion: "2026-10-08",
+            privacyVersion: "2026-10-08",
             termsURL: "https://ai-reply.kz/offer",
             privacyURL: "https://ai-reply.kz/privacy"
         )
+
+        /// Help and support, from the server or the site's own page.
+        static let fallbackSupportURL = "https://ai-reply.kz/support"
+
+        var resolvedSupportURL: String {
+            let published = (supportURL ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            return published.isEmpty ? Self.fallbackSupportURL : published
+        }
     }
 
     /// Non-secret server configuration the client is allowed to know.
@@ -293,6 +327,20 @@ extension AccountAPI {
         let emailOTP: Bool?
         let googleSignIn: Bool?
         let appleSignIn: Bool?
+        /// `POST /api/v1/installations` exists. A missing key is "no": the app
+        /// then never registers the installation.
+        let installations: Bool?
+        /// The server can deliver push notifications (FCM is set up).
+        let pushNotifications: Bool?
+        /// `PATCH /api/v1/me` takes `preferred_language`.
+        let preferredLanguage: Bool?
+        /// `POST /api/v1/ai/reports` takes reports about generated text.
+        var aiReports: Bool? = nil
+        /// `DELETE /api/v1/me` deletes the account.
+        var accountDeletion: Bool? = nil
+        /// The administrator switched purchases on. Informational: the app
+        /// reads `purchasable` on each plan.
+        var purchases: Bool? = nil
 
         enum CodingKeys: String, CodingKey {
             case replyPreferences = "reply_preferences"
@@ -303,6 +351,12 @@ extension AccountAPI {
             case emailOTP = "email_otp"
             case googleSignIn = "google_sign_in"
             case appleSignIn = "apple_sign_in"
+            case installations
+            case pushNotifications = "push_notifications"
+            case preferredLanguage = "preferred_language"
+            case aiReports = "ai_reports"
+            case accountDeletion = "account_deletion"
+            case purchases
         }
     }
 
@@ -328,5 +382,26 @@ extension AccountAPI {
             case text, usage
             case detectedLanguage = "detected_language"
         }
+    }
+}
+
+extension AccountAPI.Plan {
+
+    /// Written out so `purchasable` can be missing: an older server does not
+    /// send it, and such a plan cannot be bought.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        code = try container.decode(String.self, forKey: .code)
+        name = try container.decode([String: String].self, forKey: .name)
+        description = try container.decode([String: String].self, forKey: .description)
+        price = try container.decode(Int.self, forKey: .price)
+        priceText = try container.decode(String.self, forKey: .priceText)
+        currency = try container.decode(String.self, forKey: .currency)
+        dailyLimit = try container.decode(Int.self, forKey: .dailyLimit)
+        monthlyLimit = try container.decode(Int.self, forKey: .monthlyLimit)
+        periodDays = try container.decode(Int.self, forKey: .periodDays)
+        isFree = try container.decode(Bool.self, forKey: .isFree)
+        purchasable = try container.decodeIfPresent(Bool.self, forKey: .purchasable) ?? false
     }
 }

@@ -85,7 +85,9 @@ data class AILimits(
                     replyPreferences = announced?.replyPreferences ?: false,
                     senderProfile = announced?.senderProfile ?: false,
                     instructionPolish = announced?.instructionPolish ?: false,
-                    productEvents = announced?.productEvents ?: false
+                    productEvents = announced?.productEvents ?: false,
+                    preferredLanguage = announced?.preferredLanguage ?: false,
+                    aiReports = announced?.aiReports ?: false
                 )
             )
         }
@@ -112,6 +114,8 @@ data class AILimits(
                 ?.putBoolean(KEY_SENDER_PROFILE, features.senderProfile)
                 ?.putBoolean(KEY_INSTRUCTION_POLISH, features.instructionPolish)
                 ?.putBoolean(KEY_PRODUCT_EVENTS, features.productEvents)
+                ?.putBoolean(KEY_PREFERRED_LANGUAGE, features.preferredLanguage)
+                ?.putBoolean(KEY_AI_REPORTS, features.aiReports)
                 ?.apply()
         }
 
@@ -121,7 +125,9 @@ data class AILimits(
                 replyPreferences = preferences.getBoolean(KEY_REPLY_PREFERENCES, false),
                 senderProfile = preferences.getBoolean(KEY_SENDER_PROFILE, false),
                 instructionPolish = preferences.getBoolean(KEY_INSTRUCTION_POLISH, false),
-                productEvents = preferences.getBoolean(KEY_PRODUCT_EVENTS, false)
+                productEvents = preferences.getBoolean(KEY_PRODUCT_EVENTS, false),
+                preferredLanguage = preferences.getBoolean(KEY_PREFERRED_LANGUAGE, false),
+                aiReports = preferences.getBoolean(KEY_AI_REPORTS, false)
             )
         }
 
@@ -139,5 +145,7 @@ data class AILimits(
         private const val KEY_SENDER_PROFILE = "ai.features.senderProfile"
         private const val KEY_INSTRUCTION_POLISH = "ai.features.instructionPolish"
         private const val KEY_PRODUCT_EVENTS = "ai.features.productEvents"
+        private const val KEY_PREFERRED_LANGUAGE = "ai.features.preferredLanguage"
+        private const val KEY_AI_REPORTS = "ai.features.aiReports"
     }
 }

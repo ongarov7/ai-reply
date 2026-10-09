@@ -599,13 +599,13 @@ The account screen offers **Continue with Apple**, **Continue with Google** and
 Phone-number sign-in was removed. The server verifies every token and code;
 the app only forwards them. Setup, in full: `ai-reply-back-end/docs/AUTH.md`.
 
-* **Apple** — needs a paid Apple Developer team. Release builds sign with
-  `Config/AIReply.entitlements` (includes `com.apple.developer.applesignin`);
-  Debug builds use `Config/AIReply-NoAppleSignIn.entitlements` and hide the
-  button, so a free Personal Team can still run the app on an iPhone. To test
-  Apple sign-in in Debug, set `AIREPLY_SIGN_IN_WITH_APPLE = YES` and
-  `CODE_SIGN_ENTITLEMENTS = Config/AIReply.entitlements` for Debug. Enable
-  *Sign in with Apple* for the App ID `kz.ai-reply.reply.keyboard.keyboard` in the portal.
+* **Apple** — needs a paid Apple Developer team. Debug and Release both sign
+  with `Config/AIReply.entitlements` (Sign in with Apple and push); Debug hides
+  the button (`AIREPLY_SIGN_IN_WITH_APPLE = NO`), set it to `YES` to test Apple
+  sign-in there. A free Personal Team can sign Debug with
+  `Config/AIReply-NoAppleSignIn.entitlements` instead, with
+  `AIREPLY_PUSH_NOTIFICATIONS = NO`. Enable *Sign in with Apple* for the App ID
+  `kz.ai-reply.reply.keyboard.keyboard` in the portal.
 * **Google** — Swift Package `GoogleSignIn-iOS` (9.x, resolved in
   `Package.resolved`). Set two build settings on the `AIReply` target:
   `GOOGLE_IOS_CLIENT_ID` (`<id>.apps.googleusercontent.com`) and
@@ -626,6 +626,74 @@ Install:
 2. Settings ▸ General ▸ Keyboard ▸ Keyboards ▸ Add New Keyboard ▸ Reply Keyboard.
 3. For the Copy → Reply test only: open Reply Keyboard in that list and turn on
    **Allow Full Access**. Typing tests do not need it.
+
+### Push notifications
+
+Firebase Cloud Messaging (Swift Package `firebase-ios-sdk` 12.x, products
+`FirebaseCore` and `FirebaseMessaging`, linked to the app only — never the
+keyboard). APNs carries the notifications; the server sends to the FCM
+registration token. App side: `AIReply/Features/Notifications/`, the SDK only
+in `FirebasePush.swift`.
+
+Setup:
+
+1. Firebase project `ai-reply-4bf8f` already has the iOS app
+   `kz.ai-reply.reply.keyboard.keyboard` and a version-controlled client plist.
+   Under *Project settings ▸ Cloud Messaging* upload APNs auth keys (.p8)
+   for the required environments with their Key IDs and team ID `2PK6339Q47`.
+2. Apple portal: enable *Push Notifications* for that App ID.
+   `Config/AIReply.entitlements` has `aps-environment` (`development`; an App
+   Store / TestFlight export re-signs it as `production`).
+3. Give the app the Firebase options, either way:
+   * use the shared `Config/Firebase/GoogleService-Info.plist`; the existing
+     Firebase config build phase copies it into the main app only, or
+   * set the build settings `FIREBASE_GOOGLE_APP_ID`, `FIREBASE_GCM_SENDER_ID`,
+     `FIREBASE_API_KEY` and `FIREBASE_PROJECT_ID` on the `AIReply` target (not
+     secrets; they ship in the app).
+
+   While they are empty or malformed, the app does not configure Firebase and
+   shows nothing about notifications. `AIREPLY_PUSH_NOTIFICATIONS = NO` turns
+   push off for a build signed without `aps-environment`.
+
+Behaviour:
+
+* **Only after the legal consent.** `FirebaseMessagingAutoInitEnabled = NO`:
+  before the consent no FCM token exists and nothing is registered.
+  `FirebaseAppDelegateProxyEnabled = NO`: `AppServices` hands the APNs token to
+  FCM itself and handles taps through its own notification delegate.
+* **Only with a server that offers it.** `GET /api/v1/config` →
+  `features.installations`, `push_notifications`, `preferred_language`. A
+  missing key is "no": no registration, no card, no Notifications section.
+* **Installation** (`POST /api/v1/installations`, provider `fcm`) after launch,
+  sign-in (with the access token), sign-out (anonymous), a new FCM token, a
+  permission or in-app switch change and a language change — only when
+  something differs from the last accepted registration, else once a day. A 401
+  refreshes the session once; failures back off. The logout request carries
+  `X-Installation-ID` (no other request does).
+* **Installation id.** A random UUID in the Keychain
+  (`AfterFirstUnlockThisDeviceOnly`) in the app's own access group
+  (`<team>.kz.ai-reply.reply.keyboard.keyboard`), so the keyboard cannot read
+  it. The FCM token is kept with the installation it was handed to.
+* **Permission.** Never asked at launch. Home shows a soft card to a signed-in
+  user while it is undetermined; Settings ▸ Notifications has the iOS status,
+  the in-app switch and the account's categories (security always on).
+* **Taps.** `aireply://<screen>` opens that screen (unknown → Home);
+  `https://ai-reply.kz/...` opens in an in-app browser; anything else just opens
+  the app. A destination waits behind consent, sign-in and onboarding (15
+  minutes at most). A tap with a delivery id is reported to
+  `POST /api/v1/notifications/opened`.
+* **Language.** The account's `preferred_language` (the language of its
+  notifications) follows a language picked in Settings, and is set from the
+  app's language when the account has none; it never overwrites a choice made
+  on another device.
+
+DEBUG only: `-AIReplyForcePushCard YES` shows the card and the Settings
+section whatever the state; `-AIReplyOpenLink subscription` (or a full link, or
+`web`) opens a link at launch like a tapped notification;
+`-AIReplyDebugProvisionalPush YES` gets provisional permission without an
+alert so `xcrun simctl push` is delivered, and `-AIReplyDebugAutoOpenPush YES`
+treats it as tapped; `-AIReplyDebugScreen notifications` opens Settings at the
+notifications section.
 
 ---
 

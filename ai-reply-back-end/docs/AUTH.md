@@ -39,7 +39,8 @@ Apple. Приложения ничего не решают о подлиннос
 | Повторная отправка | не раньше 32 с (`OTP_RESEND_COOLDOWN`), проверяет сервер |
 | Новый код | гасит предыдущий (`superseded`) |
 | Одноразовость | погашение — условный `UPDATE`: из двух параллельных проверок проходит одна |
-| Лимиты | IP и адрес: `RATE_OTP_REQUEST_PER_HOUR`; адрес: `RATE_OTP_REQUEST_PER_DAY`; проверка: `RATE_OTP_VERIFY_PER_HOUR` |
+| Лимиты на адрес (в БД, главная защита) | коды: `RATE_OTP_REQUEST_PER_ADDRESS_PER_HOUR` (5) и `RATE_OTP_REQUEST_PER_DAY` (10); неверные коды за 24 ч по всем кодам адреса: `OTP_MAX_FAILED_PER_DAY` (10) → `429 RATE_LIMITED` с `Retry-After`. Недоставленные коды (`delivery_failed`) не считаются |
+| Лимиты на IP (память, мягкие из-за NAT) | запрос: `RATE_OTP_REQUEST_PER_HOUR` (30), проверка: `RATE_OTP_VERIFY_PER_HOUR` (60) |
 | Перечисление аккаунтов | ответ одинаков для нового и известного адреса |
 | Логи | ни код, ни токены, ни ключ Resend не пишутся |
 
@@ -53,6 +54,16 @@ HTML и текстовой частью на языке пользователя
 отказал, код сразу гасится, клиент получает `EMAIL_DELIVERY_FAILED` и может
 запросить новый без ожидания.
 
+### Вход для проверки App Review / Google Play
+
+`REVIEW_LOGIN_EMAIL` (ровно один адрес) и `REVIEW_LOGIN_CODE` (ровно 4 цифры)
+задаются вместе; по умолчанию пусты. Для этого адреса запрос кода не отправляет
+письмо, а выдаёт заданный код — ответ API такой же, как обычно. Ожидание 32 с,
+лимиты на адрес и попытки действуют, в логе — `review login code issued` без адреса.
+Аккаунт обычный, на бесплатном тарифе. Адрес и код указываются в заметках для
+проверяющего; код меняется на каждую подачу, после одобрения обе переменные
+очищаются (и сервер перезапускается).
+
 ## 3. Google и Apple
 
 Проверка (`internal/auth/idtoken`, только стандартная библиотека):
@@ -62,7 +73,11 @@ HTML и текстовой частью на языке пользователя
   при недоступности провайдера используются последние известные ключи;
 - `iss`, `aud` (список client ID), `exp`, `iat`, `nbf` с допуском 60 с, `sub`;
 - `nonce`: Google — точное совпадение; Apple — `SHA256(nonce)` в hex;
-  сравнение за постоянное время.
+  сравнение за постоянное время;
+- отказ — одно предупреждение `identity token rejected` с причиной (`audience_mismatch`,
+  `issuer_mismatch`, `bad_signature`, `unknown_key_id`, `expired`, `not_yet_valid`,
+  `nonce_mismatch` + `nonce_form`, `missing_nonce`, `missing_email`, `malformed`) и
+  публичными значениями (`token_aud`, `configured_aud`, `kid`…), без токена и почты.
 
 Связывание аккаунтов (консервативно):
 
@@ -119,13 +134,28 @@ Google Cloud Console → APIs & Services:
    **Sign in with Apple** (в проекте уже есть entitlement
    `com.apple.developer.applesignin`; Xcode с автоматической подписью обновит
    профиль сам).
-2. `.env` сервера: `APPLE_CLIENT_ID=kz.ai-reply.reply.keyboard.keyboard`.
+2. `.env` сервера: `APPLE_CLIENT_ID=kz.ai-reply.reply.keyboard.keyboard` — ровно bundle id
+   приложения (его Apple кладёт в `aud`). Старый `kz.yerek.replykeyboard` или App ID с
+   префиксом Team ID дают `401 INVALID_ID_TOKEN` на каждый вход; в журнале это видно как
+   `identity token rejected` с `reason=audience_mismatch`, `token_aud` и `configured_aud`.
+   При старте строка `sign-in client ids` показывает настроенные значения, а значение не в
+   форме bundle id даёт `configuration warning`.
 3. Скрытые адреса Apple (`@privaterelay.appleid.com`): Certificates, IDs &
    Profiles → Services → **Sign in with Apple for Email Communication** →
    добавить домен `ai-reply.kz` (и `send.ai-reply.kz` — домен обратного адреса
    Resend) и адрес `noreply@ai-reply.kz`; SPF и DKIM из шага 4 должны проходить.
    Без этого письма с кодом на такие адреса Apple не доставит (вход через Apple
    при этом работает).
+4. Отзыв токена при удалении аккаунта (требование App Store Review): Keys → «+» →
+   **Sign in with Apple** (Primary App ID — `kz.ai-reply.reply.keyboard.keyboard`) →
+   скачать `.p8`. В `.env` сервера: `APPLE_TEAM_ID` (Membership), `APPLE_KEY_ID` (ID
+   ключа) и `APPLE_PRIVATE_KEY` — содержимое `.p8` одной строкой с `\n` (в кавычках)
+   или base64. iOS перед `DELETE /api/v1/me` получает свежий authorization code и
+   присылает его в `apple_authorization_code`; сервер меняет его на refresh token и
+   отзывает (`/auth/token` → `/auth/revoke`). Без ключа аккаунт всё равно удаляется,
+   `apple_token_revoked: false`; сервер при старте пишет предупреждение, а страница
+   удаления и политика конфиденциальности тогда не обещают отключение Apple — только
+   «можно убрать AI Reply в настройках Apple ID».
 
 ## 7. Проверка после деплоя
 

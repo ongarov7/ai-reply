@@ -100,6 +100,12 @@ class SignInTest {
     }
 
     @Test
+    fun `a token the server refused reads apart from a failure on the phone`() {
+        assertEquals(R.string.account_error_provider_rejected,
+            AccountController.messageFor(ApiException(ApiError.InvalidIdToken)))
+    }
+
+    @Test
     fun `only a spent code empties the field`() {
         listOf(ApiError.InvalidOtp(1), ApiError.OtpExpired, ApiError.OtpAlreadyUsed, ApiError.OtpAttemptsExceeded)
             .forEach { assertTrue("$it", AccountController.codeIsSpent(ApiException(it))) }

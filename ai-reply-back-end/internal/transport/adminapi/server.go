@@ -14,7 +14,10 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/admin"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
 	"github.com/aireply/ai-reply-back-end/internal/limits"
+	"github.com/aireply/ai-reply-back-end/internal/middleware"
 	"github.com/aireply/ai-reply-back-end/internal/notifications"
+	"github.com/aireply/ai-reply-back-end/internal/payments"
+	"github.com/aireply/ai-reply-back-end/internal/reports"
 	"github.com/aireply/ai-reply-back-end/internal/repository"
 	"github.com/aireply/ai-reply-back-end/internal/traits"
 	"github.com/aireply/ai-reply-back-end/internal/transport/httpx"
@@ -29,11 +32,14 @@ const (
 
 // Server — әкімші API.
 type Server struct {
-	cfg    config.Config
-	admin  *admin.Service
-	limits *limits.Service
-	notify *notifications.Service
-	log    *slog.Logger
+	cfg      config.Config
+	admin    *admin.Service
+	limits   *limits.Service
+	notify   *notifications.Service
+	payments *payments.Service
+	reports  *reports.Service
+	limiter  *middleware.Limiter
+	log      *slog.Logger
 }
 
 // Deps — тәуелділіктер.
@@ -42,12 +48,23 @@ type Deps struct {
 	Admin         *admin.Service
 	Limits        *limits.Service
 	Notifications *notifications.Service
-	Log           *slog.Logger
+	// Payments — сатып алу ауыстырғышы мен төлем интеграциясының күйі.
+	Payments *payments.Service
+	// Reports — AI жауаптарына шағымдар (Шағымдар беті).
+	Reports *reports.Service
+	// Limiter — науқан жіберу мен алдын ала санаудың әкімші шелектері (nil — өз шектегіші).
+	Limiter *middleware.Limiter
+	Log     *slog.Logger
 }
 
 // New — сервер.
 func New(d Deps) *Server {
-	return &Server{cfg: d.Config, admin: d.Admin, limits: d.Limits, notify: d.Notifications, log: d.Log}
+	limiter := d.Limiter
+	if limiter == nil {
+		limiter = middleware.NewLimiter()
+	}
+	return &Server{cfg: d.Config, admin: d.Admin, limits: d.Limits, notify: d.Notifications, payments: d.Payments,
+		reports: d.Reports, limiter: limiter, log: d.Log}
 }
 
 // Register — маршруттар.
@@ -69,7 +86,10 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /api/v1/admin/settings", s.guard(s.handleSettings))
 	mux.Handle("POST /api/v1/admin/settings/pricing", s.guard(s.handleSavePricing))
 	mux.Handle("POST /api/v1/admin/settings/limits", s.guard(s.handleSaveLimits))
-	mux.Handle("GET /api/v1/admin/notifications", s.guard(s.handleNotifications))
+	mux.Handle("POST /api/v1/admin/settings/purchases", s.guard(s.handleSavePurchases))
+	mux.Handle("GET /api/v1/admin/reports", s.guard(s.handleReports))
+	mux.Handle("POST /api/v1/admin/reports/{id}/resolve", s.guard(s.handleResolveReport))
+	s.registerNotifications(mux)
 }
 
 // guard — cookie сессиясы + күй өзгертетін сұраныстарда CSRF тақырыбы.
@@ -300,9 +320,10 @@ func (s *Server) handleUserDetail(w http.ResponseWriter, r *http.Request) {
 			"id": detail.User.ID, "identifier": maskIdentifier(detail.User),
 			"status": detail.User.Status, "locale": detail.User.Locale,
 			"platform": detail.User.Platform, "app_version": detail.User.AppVersion,
-			"os_version":  detail.User.OSVersion,
-			"created_at":  detail.User.CreatedAt.In(loc).Format("2006-01-02 15:04"),
-			"last_active": optionalTime(detail.User.LastActiveAt, loc),
+			"os_version":         detail.User.OSVersion,
+			"preferred_language": detail.User.PreferredLanguage,
+			"created_at":         detail.User.CreatedAt.In(loc).Format("2006-01-02 15:04"),
+			"last_active":        optionalTime(detail.User.LastActiveAt, loc),
 		},
 		"profile": map[string]any{
 			"role": detail.Profile.Role, "tone": detail.Profile.PreferredTone,

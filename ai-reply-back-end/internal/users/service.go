@@ -3,6 +3,8 @@ package users
 
 import (
 	"context"
+	"errors"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -13,10 +15,31 @@ import (
 )
 
 // Service — қолданушы деректері.
-type Service struct{ repo *repository.Store }
+type Service struct {
+	repo  *repository.Store
+	apple AppleRevoker
+	log   *slog.Logger
+	clock traits.Clock
+}
+
+// AppleRevoker — Sign in with Apple токенін кері қайтарады (appleid.Revoker).
+type AppleRevoker interface {
+	Revoke(ctx context.Context, authorizationCode string) error
+}
 
 // New — қызмет.
-func New(repo *repository.Store) *Service { return &Service{repo: repo} }
+func New(repo *repository.Store) *Service {
+	return &Service{repo: repo, log: slog.New(slog.DiscardHandler), clock: traits.SystemClock{}}
+}
+
+// WithAppleRevoker — тіркелгі жойылғанда Apple токенін кері қайтару (nil — кілт бапталмаған).
+func (s *Service) WithAppleRevoker(r AppleRevoker) *Service { s.apple = r; return s }
+
+// WithLogger — журнал (тек метадерек).
+func (s *Service) WithLogger(log *slog.Logger) *Service { s.log = log; return s }
+
+// WithClock — тестке.
+func (s *Service) WithClock(c traits.Clock) *Service { s.clock = c; return s }
 
 // SignInMethods — қолданушының кіру тәсілдері.
 func (s *Service) SignInMethods(ctx context.Context, userID string) ([]string, error) {
@@ -47,10 +70,19 @@ type ProfileUpdate struct {
 	GrammaticalGender *string
 	// OnboardingVersion — 0…1000; сақталатыны ескі мән мен жаңасының үлкені.
 	OnboardingVersion *int
+	// PreferredLanguage — kk | ru | en | uz ("ru-KZ", "RU" де қабылданады); басқасы — қате.
+	PreferredLanguage *string
 }
 
 // UpdateProfile — тек берілген өрістер өзгереді.
 func (s *Service) UpdateProfile(ctx context.Context, userID string, in ProfileUpdate) (domain.Profile, error) {
+	preferred := ""
+	if in.PreferredLanguage != nil {
+		// Checked before anything is written: a rejected request changes nothing.
+		if preferred = domain.NormalizePreferredLanguage(*in.PreferredLanguage); preferred == "" {
+			return domain.Profile{}, domain.InvalidField("preferred_language", "use kk, ru, en or uz")
+		}
+	}
 	profile, err := s.repo.Profile(ctx, userID)
 	if err != nil {
 		return domain.Profile{}, err
@@ -127,6 +159,11 @@ func (s *Service) UpdateProfile(ctx context.Context, userID string, in ProfileUp
 			return domain.Profile{}, err
 		}
 	}
+	if preferred != "" {
+		if err := s.repo.UpdatePreferredLanguage(ctx, userID, preferred); err != nil {
+			return domain.Profile{}, err
+		}
+	}
 	return profile, nil
 }
 
@@ -188,4 +225,77 @@ func (s *Service) SaveLegalConsent(ctx context.Context, userID string, in LegalC
 // CurrentLegalConsent returns acceptance for the public versions served now.
 func (s *Service) CurrentLegalConsent(ctx context.Context, userID string) (domain.LegalConsent, error) {
 	return s.repo.LegalConsent(ctx, userID, legal.TermsVersion, legal.PrivacyVersion)
+}
+
+// RequireConsent — ErrConsentRequired, if the account has not accepted the
+// documents served now (or withdrew that acceptance). AI requests check it.
+func (s *Service) RequireConsent(ctx context.Context, userID string) error {
+	_, err := s.CurrentLegalConsent(ctx, userID)
+	if errors.Is(err, domain.ErrNotFound) {
+		return domain.ErrConsentRequired
+	}
+	return err
+}
+
+// WithdrawLegalConsent — келісімді кері қайтару: жазба қалады, бірақ AI сұраныстары
+// қайта келісім берілгенше тоқтайды. Тіркелгі сақталады.
+func (s *Service) WithdrawLegalConsent(ctx context.Context, userID string) error {
+	_, err := s.repo.WithdrawLegalConsents(ctx, userID, s.clock.Now())
+	return err
+}
+
+// appleRevokeTimeout — Apple-ге екі сұраныс; жою оны күтіп қалмауы керек.
+const appleRevokeTimeout = 15 * time.Second
+
+// Тіркелгіні жою сұранысының көзі (журнал үшін).
+const (
+	DeletedInApp = "app"
+	DeletedOnWeb = "web"
+)
+
+// DeleteResult — жою нәтижесі.
+type DeleteResult struct {
+	// AppleTokenRevoked — Sign in with Apple токені Apple-де кері қайтарылды.
+	AppleTokenRevoked bool
+}
+
+// DeleteAccount — тіркелгіні және оның серверлік деректерін бірден, қайтарусыз жояды.
+//
+// With appleCode (a fresh authorization code the iOS app gets right before
+// it asks) and an Apple identity on the account, the Apple tokens are revoked
+// first, as App Store Review requires. A revocation failure is logged and
+// reported, never a reason to keep the account. Afterwards every access and
+// refresh token of the account answers 401. One metadata-only log line
+// records the deletion: the account id, never the address.
+func (s *Service) DeleteAccount(ctx context.Context, userID, appleCode, source string) (DeleteResult, error) {
+	var result DeleteResult
+	if appleCode = strings.TrimSpace(appleCode); appleCode != "" {
+		methods, err := s.repo.SignInMethods(ctx, userID)
+		if err != nil {
+			return DeleteResult{}, err
+		}
+		switch {
+		case !traits.OneOf(domain.IdentityApple, methods...):
+			// A code from an account that never used Apple here: nothing to revoke.
+		case s.apple == nil:
+			s.log.Warn("apple token not revoked: APPLE_TEAM_ID, APPLE_KEY_ID and APPLE_PRIVATE_KEY are not set",
+				"user_id", userID)
+		default:
+			revokeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), appleRevokeTimeout)
+			err := s.apple.Revoke(revokeCtx, appleCode)
+			cancel()
+			if err != nil {
+				s.log.Warn("apple token revocation failed", "user_id", userID, "error", err.Error())
+			} else {
+				result.AppleTokenRevoked = true
+			}
+		}
+	}
+	// The person asked for it: a dropped connection does not stop it halfway.
+	if err := s.repo.DeleteUserAccount(context.WithoutCancel(ctx), userID, s.clock.Now()); err != nil {
+		return result, err
+	}
+	s.log.Info("account deleted", "user_id", userID, "source", source,
+		"apple_token_revoked", result.AppleTokenRevoked)
+	return result, nil
 }

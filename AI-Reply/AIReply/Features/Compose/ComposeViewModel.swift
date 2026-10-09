@@ -17,6 +17,9 @@ final class ComposeViewModel {
     private(set) var reply: String = ""
     private(set) var isGenerating = false
     private(set) var errorMessage: String?
+    /// The failure behind `errorMessage`: CONSENT_REQUIRED sends the app back
+    /// to its consent screen.
+    private(set) var failure: AIReplyError?
     private(set) var didCopy = false
 
     @ObservationIgnored private let service = AIReplyService()
@@ -65,6 +68,7 @@ final class ComposeViewModel {
         // racing it, so rapid taps cannot produce two answers or two bills.
         task?.cancel()
         errorMessage = nil
+        failure = nil
         reply = ""
         isGenerating = true
 
@@ -88,6 +92,7 @@ final class ComposeViewModel {
                 self.isGenerating = false
                 let mapped = (error as? AIReplyError) ?? .serviceUnavailable
                 guard mapped != .cancelled else { return }
+                self.failure = mapped
                 self.errorMessage = strings.message(for: mapped)
             }
         }

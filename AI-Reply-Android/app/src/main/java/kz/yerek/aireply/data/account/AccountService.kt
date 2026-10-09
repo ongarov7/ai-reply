@@ -68,7 +68,9 @@ data class ProfileUpdate(
     /** Sent only to a server that announced `sender_profile`. */
     @SerialName("grammatical_gender") val grammaticalGender: String? = null,
     /** Sent only to a server that announced `sender_profile`; the server keeps the highest. */
-    @SerialName("onboarding_version") val onboardingVersion: Int? = null
+    @SerialName("onboarding_version") val onboardingVersion: Int? = null,
+    /** Sent only to a server that announced `preferred_language`: kk, ru, en or uz. */
+    @SerialName("preferred_language") val preferredLanguage: String? = null
 )
 
 @Serializable
@@ -106,12 +108,14 @@ private data class LegalConsentRequest(
 class AccountService(
     private val session: AccountSession,
     private val baseUrlProvider: () -> String?,
-    private val deviceDescriptor: () -> DeviceDescriptor
+    private val deviceDescriptor: () -> DeviceDescriptor,
+    /** How a request is sent; a test seam. */
+    private val clientFactory: (baseUrl: String) -> ApiClient = { baseUrl -> ApiClient(baseUrl) }
 ) {
 
     private fun client(): ApiClient {
         val baseUrl = baseUrlProvider() ?: ApiError.InvalidRequest.raise()
-        return ApiClient(baseUrl)
+        return clientFactory(baseUrl)
     }
 
     private val json: Json get() = jsonCodec
@@ -263,6 +267,33 @@ class AccountService(
                 client().request("POST", "api/v1/me/consents", body, token)
             )
         }
+
+    /**
+     * Withdraws the consent to the current terms and AI processing. AI
+     * requests are refused with CONSENT_REQUIRED until [recordLegalConsent]
+     * runs again; the account itself stays.
+     */
+    suspend fun withdrawLegalConsent() {
+        session.authenticated { token ->
+            client().request("DELETE", "api/v1/me/consents", token = token)
+        }
+    }
+
+    /**
+     * Deletes the account and everything the server keeps for it; every
+     * token of it stops working. The POST alias rather than `DELETE /me`:
+     * HttpURLConnection does not send a body with DELETE on every Android
+     * version, and the alias takes the same (here empty) body.
+     */
+    suspend fun deleteAccount(): AccountDeletionDto = session.authenticated { token ->
+        decode(AccountDeletionDto.serializer(), client().request("POST", "api/v1/me/delete", "{}", token))
+    }
+
+    /** A report about text the AI wrote; answers with the report's id. */
+    suspend fun reportAIOutput(report: AIReportRequest): String = session.authenticated { token ->
+        val body = json.encodeToString(AIReportRequest.serializer(), report)
+        decode(AIReportResultDto.serializer(), client().request("POST", "api/v1/ai/reports", body, token)).id
+    }
 
     // --------------------------------------- subscription (demo payment flow)
 

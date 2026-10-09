@@ -3,24 +3,27 @@ package kz.yerek.aireply
 import android.content.SharedPreferences
 
 /**
- * SharedPreferences without Android: a map, applied immediately. Listeners are
- * not called, so `changes()` flows are not exercised with it.
+ * SharedPreferences without Android: a map, applied immediately, and safe to
+ * use from several threads like the real one. Listeners are not called, so
+ * `changes()` flows are not exercised with it.
  */
 internal class InMemoryPreferences : SharedPreferences {
     private val values = HashMap<String, Any?>()
 
-    override fun getAll(): MutableMap<String, *> = HashMap(values)
-    override fun getString(key: String?, defValue: String?): String? = values[key] as String? ?: defValue
+    private fun <T> read(block: (Map<String, Any?>) -> T): T = synchronized(values) { block(values) }
+
+    override fun getAll(): MutableMap<String, *> = read { HashMap(it) }
+    override fun getString(key: String?, defValue: String?): String? = read { it[key] as String? ?: defValue }
 
     @Suppress("UNCHECKED_CAST")
     override fun getStringSet(key: String?, defValues: MutableSet<String>?): MutableSet<String>? =
-        (values[key] as Set<String>?)?.toMutableSet() ?: defValues
+        read { (it[key] as Set<String>?)?.toMutableSet() ?: defValues }
 
-    override fun getInt(key: String?, defValue: Int): Int = values[key] as Int? ?: defValue
-    override fun getLong(key: String?, defValue: Long): Long = values[key] as Long? ?: defValue
-    override fun getFloat(key: String?, defValue: Float): Float = values[key] as Float? ?: defValue
-    override fun getBoolean(key: String?, defValue: Boolean): Boolean = values[key] as Boolean? ?: defValue
-    override fun contains(key: String?): Boolean = values.containsKey(key)
+    override fun getInt(key: String?, defValue: Int): Int = read { it[key] as Int? ?: defValue }
+    override fun getLong(key: String?, defValue: Long): Long = read { it[key] as Long? ?: defValue }
+    override fun getFloat(key: String?, defValue: Float): Float = read { it[key] as Float? ?: defValue }
+    override fun getBoolean(key: String?, defValue: Boolean): Boolean = read { it[key] as Boolean? ?: defValue }
+    override fun contains(key: String?): Boolean = read { it.containsKey(key) }
     override fun edit(): SharedPreferences.Editor = Editor()
     override fun registerOnSharedPreferenceChangeListener(
         listener: SharedPreferences.OnSharedPreferenceChangeListener?
@@ -62,9 +65,11 @@ internal class InMemoryPreferences : SharedPreferences {
         }
 
         override fun apply() {
-            if (clearAll) values.clear()
-            removed.forEach(values::remove)
-            values.putAll(pending)
+            synchronized(values) {
+                if (clearAll) values.clear()
+                removed.forEach(values::remove)
+                values.putAll(pending)
+            }
         }
     }
 }

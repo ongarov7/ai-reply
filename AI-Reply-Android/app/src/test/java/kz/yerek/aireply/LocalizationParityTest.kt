@@ -116,6 +116,48 @@ class LocalizationParityTest {
         }
     }
 
+    /** Write with AI produces a message of the user's own: its report never calls it a reply. */
+    @Test
+    fun `the compose report speaks of a message`() {
+        val keys = listOf("report_title_compose", "report_include_text_compose", "report_thanks_compose")
+        val reply = mapOf("en" to "reply", "ru" to "ответ", "kk" to "жауап", "uz" to "javob")
+        val message = mapOf("en" to "message", "ru" to "сообщени", "kk" to "хабарлама", "uz" to "xabar")
+        mapOf("en" to english, "ru" to russian, "kk" to kazakh, "uz" to uzbek).forEach { (language, table) ->
+            keys.forEach { key ->
+                val text = table.getValue(key).lowercase()
+                assertTrue("$key ($language): $text", text.contains(message.getValue(language)))
+                assertTrue("$key ($language): $text", !text.contains(reply.getValue(language)))
+            }
+        }
+    }
+
+    /**
+     * The consent names everything that leaves: the selection too, not only
+     * what was copied.
+     */
+    @Test
+    fun `the AI disclosure covers selected text`() {
+        val selected = mapOf("en" to "selected", "ru" to "выделенное", "kk" to "белгіленген", "uz" to "belgilangan")
+        mapOf("en" to english, "ru" to russian, "kk" to kazakh, "uz" to uzbek).forEach { (language, table) ->
+            listOf("legal_consent_ai_disclosure", "settings_privacy_body").forEach { key ->
+                val text = table.getValue(key)
+                assertTrue("$key ($language): $text", text.contains(selected.getValue(language)))
+            }
+        }
+    }
+
+    /** Kazakh Settings says «тіркелгі» for the account; the deletion strings sit in the same section. */
+    @Test
+    fun `kazakh uses one word for the account`() {
+        listOf(
+            "settings_account_delete", "settings_account_delete_title", "settings_account_delete_body",
+            "account_deleted", "account_delete_failed", "settings_withdraw_consent_body"
+        ).forEach { key ->
+            val text = kazakh.getValue(key)
+            assertTrue("$key: $text", text.contains("ркелгі") && !text.contains("ккаунт"))
+        }
+    }
+
     @Test
     fun `no translation is left as the untranslated english text`() {
         // Sanity check on the mechanical conversion: a handful of identical

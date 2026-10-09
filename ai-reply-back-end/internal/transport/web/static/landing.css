@@ -218,16 +218,34 @@ details.qa p { color: var(--muted); margin: 12px 0 0; font-size: 16px; }
 }
 .store small { display: block; font-size: 11px; opacity: .7; line-height: 1.2; }
 .store b { font-size: 15px; font-weight: 600; }
+a.store:hover { background: rgba(255, 255, 255, .14); }
 
 .site-footer { padding: 46px 0; border-top: 1px solid var(--line-2); color: var(--muted); font-size: 14.5px; }
 .site-footer .wrap { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
-.site-footer nav { margin-left: auto; display: flex; gap: 20px; }
+.site-footer nav { margin-left: auto; display: flex; gap: 20px; flex-wrap: wrap; }
 .site-footer a:hover { color: var(--ink); }
 
 .legal { max-width: 760px; margin: 0 auto; padding: 64px 0; overflow-wrap: anywhere; }
 .legal h1 { font-size: 34px; }
 .legal h2 { font-size: 21px; margin-top: 34px; }
 .legal p, .legal li { color: var(--muted); font-size: 16px; }
+.legal a:not(.btn) { color: var(--brand-ink); text-decoration: underline; text-underline-offset: 2px; }
+
+/* тіркелгіні жою формасы (/account/delete) */
+.account-form { margin-top: 18px; padding: 22px; background: var(--bg-soft); border: 1px solid var(--line); border-radius: var(--radius); }
+.account-form form { display: grid; gap: 10px; }
+.account-form [hidden] { display: none; }
+.account-form label { font-weight: 600; font-size: 15px; }
+.account-form input {
+  min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px;
+  background: #fff; color: var(--ink); font: inherit; font-size: 16px;
+}
+.account-form input:focus { outline: 2px solid rgba(59, 91, 253, .35); border-color: var(--brand); }
+.account-form .btn { justify-self: start; }
+.account-form .form-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.account-form .form-status, .account-form .form-hint { margin: 0; font-size: 15px; }
+.account-form .form-done { margin: 0; color: var(--ok); font-weight: 600; }
+.account-form .form-error { margin: 10px 0 0; color: var(--warn); font-size: 15px; }
 
 @media (max-width: 960px) {
   .hero .wrap { grid-template-columns: 1fr; }

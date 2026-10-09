@@ -1,0 +1,250 @@
+[backend][P3] SEC-1 Legacy /v1/reply/generate accepts modern access tokens and never checks consent, and production does not refuse LEGACY_API_ENABLED
+  file: ai-reply-back-end/internal/transport/api/context.go:114
+  scenario: An operator sets LEGACY_API_ENABLED=true so that builds already in the stores keep working. A current-app user withdraws consent (DELETE /api/v1/me/consents) or never accepts the current terms or privacy version. That user sends POST /v1/reply/generate with their normal /api/v1 access token. requireLegacy falls back to s.auth.Authenticate (context.go:114) and calls handleLegacyGenerate, which goes straight to s.ai.Reply. The text reaches OpenAI without consent. Install-token users created by /v1/auth/register can never consent at all. config.Validate refuses demo auth outside dev/test (config.go:457) but has no rule for LEGACY_API_ENABLED in production. Only API.md says not to enable it there.
+  fix: 1. Delete the modern access-token fallback in requireLegacy (context.go:112-117) and simply call httpx.Fail(w, err) when AuthenticateLegacy fails. No shipped client needs that fallback: Node-era builds only hold install tokens, and the current apps never call /v1/*. If you keep the fallback, call s.users.RequireConsent(r.Context(), u.ID) inside it and refuse with legacyError(w, http.StatusForbidden, "consent_required", nil). That keeps the response in the legacy {"error":{"code":...}} format the old clients parse, instead of using httpx.Fail.
+2. Add a check in config.Validate, inside the existing `if c.App.IsProduction() {` block: `if c.Auth.LegacyEnabled { problems = append(problems, "LEGACY_API_ENABLED=true is not allowed when APP_ENV=production (legacy clients cannot give consent)") }`. The existing config tests that set LEGACY_API_ENABLED=true use strings.Contains on a specific message, and none of them set APP_ENV=production as far as I can see, so they should not break. Also add a test like TestProductionRefusesLegacyAPI.
+
+[backend][P3] SEC-2 Web account deletion reveals whether an e-mail has an account, despite the documented guarantee
+  file: ai-reply-back-end/internal/auth/account_delete.go:43
+  scenario: An attacker sends POST /api/v1/account/delete/request {email: X}, which always answers {ok:true}. A second later they send POST /api/v1/account/delete/confirm {email: X, code: "0000"}. If X has an account, a delete-purpose code was issued and the answer is 400 INVALID_OTP with details.attempts_remaining=4. If X has no account, no code exists and the answer is a bare 400 INVALID_OTP with no details. Further wrong guesses give OTP_ATTEMPTS_EXCEEDED or RATE_LIMITED only for real accounts. There is a second oracle: right after the delete request, POST /api/v1/auth/email/otp/request for X returns 429 OTP_COOLDOWN only when a deletion code was issued, i.e. only when the account exists. Either way, account existence can be enumerated at the per-IP otp limits. This contradicts the comments at acco
+  fix: Use the finding's main fix, built so both paths go through the same checks.
+
+1. In emailotp.go, add a silent mode to `requestEmailOTP`, for example a `silent bool` parameter or a small wrapper. In silent mode, always generate the code with `NewOTPCode(s.random)`, never the demo or review code. Use a channel such as `"none"`; otp_codes.channel has no CHECK constraint. Skip `s.mail.SendOTP`.
+2. Keep the same LatestOTP cooldown, `checkEmailQuota`, `checkEmailFailures` and `IssueOTP` steps, with Purpose = `OTPPurposeDelete` and the same MaxAttempts and TTL.
+3. In account_delete.go:37-42, on `domain.ErrNotFound`, call that silent path instead of returning.
+
+Result: cooldown, quotas, attempts_remaining, OTP_ATTEMPTS_EXCEEDED and the daily failure lock-out behave the same whether or not the address has an account. If someone did guess the random code, `ConfirmAccountDeletion` would return ErrNotFound, and the handler already turns that into {deleted:true} without doing anything.
+
+Also update TestWebAccountDeletion. Line 238 currently requires zero otp_codes rows for nobody@example.com. It should instead check that no mail was sent, and that a wrong guess returns the same body as for a real account. Fix the docstrings at account_delete.go:16-20 and :51-54 to match.
+
+Don't use the "collapse confirm errors" option on its own: the cooldown oracle on /auth/email/otp/request stays open.
+
+[backend][P3] SEC-3 Per-email admin login bucket lets anyone lock the administrator out of the admin panel indefinitely
+  file: ai-reply-back-end/internal/transport/web/admin.go:141
+  scenario: An attacker who knows or guesses ADMIN_EMAIL (often the same as the public CONTACT_EMAIL shown on the support and legal pages) GETs /admin/login for a CSRF cookie, then POSTs 5 wrong passwords for that address every 15 minutes, spread over 2 IPs to stay under the 10/hour per-IP admin_login limit. allowLoginFor counts every attempt for the address, from any IP and before the password is checked. The real admin then gets 429 even with the correct password, on /admin/login and /simulator/login alike, for as long as the attacker keeps going. With a single admin (RBAC was dropped), nobody can reach the panel, for example to switch purchases off or deal with reports.
+  fix: Keep an account-wide cap, but have it count only failures, and keep it from locking out a sender who has not been failing.
+
+Minimal version, in admin.go allowLoginFor/handleLogin:
+- Keep a cap per (email, clientIP), e.g. 5 per 15 minutes, checked before Login. This caps guesses from any one source.
+- Add an account-wide failure bucket, e.g. 20 per hour. Charge it only after `s.admin.Login` returns ErrUnauthorized, not on every attempt.
+- When that bucket is full, refuse only IPs that have themselves failed against this email in the window (the per-(email, IP) bucket is non-empty). A clean IP still gets its password checked, so the real admin connecting from their own network can sign in.
+
+Stronger version (the OWASP "device cookie" pattern): on a successful admin login, set a long-lived signed cookie bound to the admin ID. Requests that carry a valid cookie skip the account-wide bucket and are limited only per IP; requests without it hit the account-wide bucket as now.
+
+Apply the same change to handleSimulatorLogin (simulator.go:58). Update TestAdminLoginIsLimitedPerEmail so that a correct password from an untouched IP, or with a device cookie, succeeds while the hammering IP still gets 429.
+
+[backend][P2] DEL-1 Account deletion leaves the person's e-mail (and account id) in notification_campaigns.audience_filter forever, shown in the admin API
+  file: ai-reply-back-end/internal/repository/account.go:91
+  scenario: An admin sends a campaign to specific people, for example audience.emails=["aigerim@example.com"] (validate.go:315-326 lowercases the address and keeps it). The full filter is stored in notification_campaigns.audience_filter (repository/notifications.go:194-199; the comment in adminapi/notifications.go:248-249 says the full filter is kept in the campaign itself). Aigerim then deletes her account in the app or at /account/delete. DeleteUserAccount only deletes otp_codes, cancels deliveries, detaches installations and runs DELETE FROM users. Nothing touches notification_campaigns, and no retention job ever deletes campaign rows. Her plaintext address and old user id stay in the DB with no time limit, and GET /api/v1/admin/notifications/campaigns/{id} returns them to every admin (campaignDTO 
+  fix: Scrub the person from campaign filters inside DeleteUserAccount, in the same transaction, without ever making a filter non-specific.
+
+1. Do it in Go rather than with a json_set query: the table is small and edited by hand, and the JSON shape is already defined in domain.AudienceFilter.
+   - `SELECT id, audience_filter FROM notification_campaigns WHERE audience_filter LIKE '%"emails"%' OR audience_filter LIKE '%"user_ids"%'`
+   - For each row, unmarshal into domain.AudienceFilter.
+   - Drop every e-mail in the account's collected e-mail set (`values[domain.IdentityEmail]`, which is already lowercased).
+   - If something was dropped and userID is not already in UserIDs, append userID and re-sort.
+   - Re-marshal and run `UPDATE notification_campaigns SET audience_filter = ?, updated_at = ? WHERE id = ?`.
+
+2. Why keep the deleted user's id:
+   - It is the random account number the deletion copy already allows to remain.
+   - It resolves to no devices once the user row is gone.
+   - It keeps Specific() true, so audience.go keeps narrowing the audience (or adds "0 = 1"), and a stored campaign can never widen into a broadcast.
+   - Leave existing user_ids entries alone for the same reason.
+
+   If even the id must go, replace it with a count instead: add a `RemovedPeople int json:"removed_people,omitempty"` field, make Specific() also return true when RemovedPeople > 0, and increment 
+
+[backend][P3] DEL-2 New anonymous-installation retention cascades campaign deliveries and silently lowers the stats of completed campaigns
+  file: ai-reply-back-end/internal/repository/retention.go:28
+  scenario: Campaigns reach installations last seen up to 270 days ago (notifications.StaleAfter = 270 days, notifications.go:40). Anonymous installations are deleted after 180 days unseen (RETENTION_ANON_INSTALLATIONS_DAYS default). Example: campaign C completes on day 0 with final_stats total = 1000. One recipient's phone was last seen 200 days earlier. On day 10 that person deletes the account on the web, or an admin disables them or revokes their sessions. DeleteUserAccount or DetachUserInstallations sets user_id = NULL and leaves last_seen_at unchanged, so the next 6-hourly sweep deletes the installation right away. ON DELETE CASCADE then removes its notification_deliveries row for C, long before the 180-day notification retention would. notifications.view (notifications.go:681-685) only uses the
+  fix: Fix it in the report code, not in retention. In internal/notifications/notifications.go view() (around line 683), use the saved snapshot for delivery counts whenever it exists, and take live data only for opens, never letting them drop below the snapshot:
+
+```go
+if c.FinalStats != nil {
+    live := stats
+    stats = *c.FinalStats
+    stats.ByLanguage = maps.Clone(c.FinalStats.ByLanguage)
+    stats.Opened = max(stats.Opened, live.Opened)
+    for lang, ls := range stats.ByLanguage {
+        ls.Opened = max(ls.Opened, live.ByLanguage[lang].Opened)
+        stats.ByLanguage[lang] = ls
+    }
+}
+```
+
+FinalStats is set only on completed or cancelled campaigns that have nothing pending, so running campaigns still show fully live numbers. The counts recorded at completion can no longer drop, opens that arrive after completion still show, and nothing is kept longer than the privacy text states. Add a test: complete a campaign, detach one recipient installation whose last_seen_at is older than the cutoff, run retention.Sweep, and check that Campaign(id).Stats.Total equals FinalStats.Total.
+
+If raw delivery rows must also survive installation deletion, change notification_deliveries.installation_id to ON DELETE SET NULL. That needs a SQLite table-rebuild migration, and the delete must first cancel any queued or retrying deliveries of that installation so none are stranded. It is more invasiv
+
+[backend][P3] payments-confirm-idempotency-strands-paid-plan A retried Confirm never grants the plan if Assign failed after the payment was marked succeeded
+  file: ai-reply-back-end/internal/payments/payments.go:231
+  scenario: Confirm marks the payment succeeded at line 251 and only then calls subs.Assign at line 255. Both calls use the request context. Suppose the client drops the connection between them, the process stops, or SQLite is busy. Assign then fails and the payment row stays 'succeeded' with no paid subscription. When the app retries POST /payments/{id}/confirm, the new idempotency shortcut at line 231 sees status == 'succeeded' and returns s.subs.Current(), which is the old free system subscription, with 200 OK. The person has paid but never gets the plan, and every later retry gives the same answer. ReconcileActivations does not catch this, because it only looks at subscriptions that already exist. Before this change a retry re-verified and re-assigned, so the problem fixed itself on retry. Today o
+  fix: Add one repository method, e.g. Store.CompletePayment(ctx, paymentID, ref string, next domain.Subscription) (applied bool, sub domain.Subscription, err error). Inside a single s.db.Tx it should:
+1. Run `UPDATE payments SET status='succeeded', provider_ref=?, updated_at=? WHERE id=? AND status<>'succeeded'`.
+2. If RowsAffected == 0, return applied=false. Another confirm already finished, so the caller returns Current.
+3. Otherwise cancel the active subscriptions and insert `next`, exactly as ReplaceSubscription does now, then commit.
+
+In Confirm, build `next` the way subscriptions.Assign does (plan lookup plus periodEnd), call CompletePayment, and send PaymentSucceeded only when applied=true. Run these writes, after VerifyPayment, on a detached context with a short timeout, so a client disconnect cannot cancel them halfway.
+
+The payment status and the plan then change together or not at all, and two concurrent confirms can no longer both assign and announce. The status == "succeeded" shortcut becomes safe because 'succeeded' always implies the subscription was written.
+
+Cheaper stopgap if you want a smaller change now: call Assign first, then mark the payment succeeded. A failure between the two then leaves the payment unfinished and a retry re-assigns. The worst case is a restarted period or a duplicate notice instead of a paid user stuck on free.
+
+[backend][P2] legacy-ai-endpoint-bypasses-consent-in-production Production still starts with LEGACY_API_ENABLED=true, so /v1/reply/generate sends text to OpenAI without any consent
+  file: ai-reply-back-end/config/config.go:460
+  scenario: The new consent gate is only on /api/v1/ai/reply, /compose and /polish. The legacy route at server.go:183, s.requireLegacy(aiLimit(handleLegacyGenerate)), has no requireConsent. Legacy install-token users are kind 'legacy_install' and have no way to post /me/consents. Config.Validate refuses demo auth and demo payments in production but does not refuse LEGACY_API_ENABLED=true. The previous .env.example shipped LEGACY_API_ENABLED=true, and the previous default was also true. So a production .env carried over from the old template still starts after this deploy, and any install token gets AI replies with the copied message sent to OpenAI and no consent row. That breaks the requirement that AI endpoints need consent for the current legal versions. docs/API.md:646-648 even says 'в production н
+  fix: The proposed fix is correct and low-risk. Do it as the main change:
+
+- In config/config.go, inside the `if c.App.IsProduction()` block (around line 460), add `if c.Auth.LegacyEnabled { problems = append(problems, "LEGACY_API_ENABLED=true is not allowed when APP_ENV=production (the legacy API has no consent screen)") }`.
+- Add a config_test case: APP_ENV=production, AUTH_DEMO_MODE=false, PAYMENT_MODE=off, Resend set, LEGACY_API_ENABLED=true. Load must return that error.
+- Consider using `!c.App.AllowsDemo()` instead of IsProduction, as AUTH_DEMO_MODE does, since the comment at line 455 says staging serves real people too. No current client needs /v1/*.
+
+Also close the second bypass, for environments where legacy stays on. In requireLegacy's fallback branch (context.go, the `if u, claims, err2 := s.auth.Authenticate(...)` path), run the consent check before `next`. For example: `if err := s.users.RequireConsent(ctx, u.ID); err != nil { httpx.Fail(w, err); return }`. Or answer with `legacyError(w, http.StatusForbidden, "consent_required", nil)` to keep the old wire format. Without this, a /api/v1 access-token user with no consent, or withdrawn consent, can still reach OpenAI through /v1/reply/generate.
+
+[backend][P2] LEGAL-1 Production serves a privacy policy and public offer with no named operator, and its only contact can lead to a support page with no contact
+  file: ai-reply-back-end/internal/transport/web/legal_texts.go:326
+  scenario: Deploy with APP_ENV=production and the shipped .env.example, where LEGAL_OPERATOR_NAME= and LEGAL_OPERATOR_DETAILS= are empty (.env.example:23-24). /privacy then says only "In this policy 'AI Reply', 'we' and 'us' mean the operator of the service" and never names the controller. /offer has no offeror at all, because offerer() returns "". If CONTACT_EMAIL is also unset, which production allows, Who-we-are and Your-rights send people to "the support page https://ai-reply.kz/support", but support.gohtml shows its contact block only {{if .ContactEmail}}. That page then has no address, so requests to get a copy of data or correct it have nowhere to go. The download.body text "Write to us" has no target either. Google Play's User Data policy requires the developer's identity and a privacy contac
+  fix: In Config.Validate, inside the existing `if c.App.IsProduction()` block (config/config.go:460), add:
+
+- `if c.App.Contact == "" { problems = append(problems, "CONTACT_EMAIL must be set when APP_ENV=production: the privacy policy, offer and support page need a real contact") }`
+
+This closes the support-page dead end without touching templates.
+
+Make LEGAL_OPERATOR_NAME required in production the same way, since the offer and the Play policy need an identifiable operator. If the owner wants to keep it optional, the code cannot fix this; then at least log a startup warning and change README.md:84-85 and 214-215 from "при необходимости" to required before store submission.
+
+Update the README deploy checklist to match, and add one config_test case each. The legal_texts.go fallbacks need no change. Optionally, point download.body's "Write to us" at the contact address.
+
+[backend][P1] LEGAL-2 Privacy policy says the keyboard never sends text typed in other apps and leaves out selected host-field text; it also says Write sends the copied message
+  file: ai-reply-back-end/internal/transport/web/legal_texts.go:343
+  scenario: A user selects text in the messenger's own input field (text they typed in that app) and taps Reply. Both keyboards take the host selection before the clipboard and send it to /api/v1/ai/reply, then on to OpenAI. The policy says, in all four languages, "The keyboard does not send what you type in other apps: only the text of AI Reply's own instruction field is sent", and lists only "the message you copied". It also says that on Write "the message you copied, your instruction, your profile details and the template" are sent, but compose sends only the instruction and the grammatical gender. The landing page has the same problems: privacy.note says "the keyboard only sees the text you copied" and how.step2.body (en) says "Nothing else is accessed". The in-app Settings → Privacy text describe
+  fix: This is a text-only change in legal_texts.go (kk/ru/en/uz).
+
+1. **"How AI replies are written" (en line 338 and equivalents):** split by button.
+   - Reply: the message you copied or selected in the current text field, your instruction, your profile details and the chosen template.
+   - Write: only your instruction and your grammatical gender.
+2. **"What we do not collect" (en line 343 and equivalents):** replace "The keyboard does not send what you type in other apps: only the text of AI Reply's own instruction field is sent" with the in-app wording: "Nothing you type in other apps is sent unless you select it yourself and tap Reply."
+3. **locales/*.json `privacy.note`:** change "only sees the text you copied" to "only sees the text you copied or selected". Also fix the en `how.step2.body` ("Nothing else is accessed") the same way.
+4. **Version:** keep `legal.PrivacyVersion = "2026-10-08"` if this version has not been deployed. Bump it only if a production build already recorded acceptance of 2026-10-08.
+
+[backend][P3] LEGAL-3 how.step2.body: ru/kk/uz say no extra permission is needed (false), and en says something different
+  file: ai-reply-back-end/internal/localization/locales/ru.json:471
+  scenario: A Russian, Kazakh or Uzbek visitor reads "никаких дополнительных доступов не требуется" / "қосымша ешқандай рұқсат сұралмайды" / "qoʻshimcha ruxsat soʻralmaydi". On iPhone the keyboard does not work without Full Access, and the site's own support page says so (support.help_keyboard). On Android, dictation asks for the microphone permission. The English string makes a different claim ("Nothing else is accessed"), so the four languages disagree with each other and with the support page.
+  fix: Change only how.step2.body in the four files under internal/localization/locales/. Give it one platform-accurate meaning in all four languages, and don't say Full Access is needed only for the server. The README says it is also needed to read what was copied, so keep the reason general:
+- en: "The keyboard reads only the text you copied or selected. On iPhone it needs Full Access — the app shows how to turn it on."
+- ru: "Клавиатура видит только скопированный или выделенный текст. На iPhone для этого нужен полный доступ — приложение покажет, как его включить."
+- kk: "Пернетақта тек көшірілген не белгіленген мәтінді көреді. iPhone-да толық қолжетімділік керек — қосымша оны қалай қосуды көрсетеді."
+- uz: "Klaviatura faqat nusxalangan yoki belgilangan matnni koʻradi. iPhone’da toʻliq ruxsat kerak — ilova uni qanday yoqishni koʻrsatadi."
+
+Don't add a microphone note here: Android dictation is already described in step 3.
+
+[backend][P2] LEGAL-4 Deletion page says Sign in with Apple is disconnected, but production does not require the revocation key and the shipped config skips revocation
+  file: ai-reply-back-end/internal/localization/locales/en.json:1024
+  scenario: With .env.example, APPLE_CLIENT_ID is set (line 92) and APPLE_TEAM_ID/APPLE_KEY_ID are empty (lines 98-99). Sign in with Apple works, but configureAppleRevocation never installs a revoker. When an Apple user deletes the account, DeleteAccount only logs a warning and returns apple_token_revoked=false. The deletion page tells them in all four languages that "Sign in with Apple is disconnected too", which is false, and App Store guideline 5.1.1(v) requires the revocation.
+  fix: 1. In config.Validate, inside the `if c.App.IsProduction()` block (config/config.go:~460), add `if len(c.OAuth.AppleClientIDs) > 0 && !c.OAuth.AppleRevocation() { problems = append(problems, "APPLE_TEAM_ID, APPLE_KEY_ID and APPLE_PRIVATE_KEY must be set when APPLE_CLIENT_ID is set and APP_ENV=production (Sign in with Apple tokens must be revoked on account deletion)") }`. This works like the Resend rule: production does not start with Apple sign-in on and no way to revoke. A key that is set but can't be parsed already stops startup in configureAppleRevocation. Update the comments in .env.example and main.go:298 that call the key optional. Add a config test for production with APPLE_CLIENT_ID set and the key missing.
+2. Revocation can still be skipped even with the key: the iOS fallback at AccountModel.swift:485-489 continues without an Apple code, and service.go:288-290 deletes after a failed revoke. So change delete.app_body in all four locales so it does not promise the outcome. For example: "...the iPhone asks you to confirm with your Apple ID so we can also disconnect Sign in with Apple. You can always remove AI Reply yourself in Settings → [your name] → Sign in with Apple." With that wording the text stays true in every case.
+
+[backend][P2] LEGAL-5 Deletion page says no e-mail or identifying data remains, but targeted campaigns keep the person's e-mail and account id
+  file: ai-reply-back-end/internal/repository/account.go:91
+  scenario: An admin sends a campaign targeted at someone by e-mail (audience.emails) or by user id. Later that person deletes the account. DeleteUserAccount never touches notification_campaigns, and the e-mail stays in audience_filter for good. The admin campaign API returns it unmasked ("audience": c.Audience), and no retention job removes it. The deletion page promises that the e-mail is deleted, "Nothing that identifies you" remains, and only the audit log keeps a random account number "without your e-mail".
+  fix: Inside the `DeleteUserAccount` transaction, before `DELETE FROM users`, find the campaigns whose filter names this person and replace those entries with redacted placeholders that cannot match anyone. Do not remove the entries.
+
+- Match on the user id and on every e-mail already collected in `values[IdentityEmail]` (users.email and the person's e-mail identities).
+- In Go: select `id, audience_filter` from `notification_campaigns` where `audience_filter` contains `"user_ids"` or `"emails"`. Decode each into `domain.AudienceFilter`.
+- Replace each matching `UserIDs` entry with `"deleted"`, and each matching `Emails` entry with `"deleted@invalid"` (dedupe if needed). Write the JSON back with `updated_at = now`.
+- This keeps `Specific()` true and the people count unchanged. `ResolveAccountEmails` reports the placeholder as unresolved, and the audience falls back to `0 = 1`, so a pending campaign can never widen to all users.
+- A cleaner variant: add a `RedactedPeople int` field (json `redacted_people`) to `AudienceFilter`, count it in `Specific()` and in the people count, and drop the matching entries.
+
+Add a test: create a draft campaign targeted only at user A's e-mail, delete A, then check that the stored filter no longer contains the e-mail and that sending the draft reaches zero devices.
+
+[backend][P3] LEGAL-6 Retention section says everything else is removed automatically, but some rows are never purged or are kept longer than stated
+  file: ai-reply-back-end/internal/transport/web/legal_texts.go:346
+  scenario: The policy splits data into account data kept until deletion and "Everything else is removed automatically" on the listed schedule. That misses several cases. admin_audit_logs keep account ids forever, including after deletion (the deletion page admits this but the policy does not). Campaign audience filters are never purged (see LEGAL-5). With RETENTION_NOTIFICATIONS_DAYS below 40, e.g. 7, the policy says "finished notifications and deliveries — after 7 days", but per-user notification rows are kept at least 40 days because of the dedupe floor.
+  fix: 1. **Audit-log disclosure.** In legal_texts.go, add one sentence to the retention section in all four languages (around lines 276/311/346/381). English: "A log of administrator actions on an account (for example a block or a plan change) keeps the random account number, without your e-mail, and is not removed automatically, including after the account is deleted." Also drop or soften the word "Everything" in "Everything else is removed automatically" so the sentence is no longer absolute. This matches the existing delete.kept_body wording.
+
+2. **Notification period.** Fix it at the source instead of only rewording the text. In config.go, clamp the push retention: if 0 < RetentionDays < 40, set it to 40. Move the 40 into a shared exported constant, such as notifications.MinPersonalRetentionDays, so the dispatcher's dedupeHorizon and the config clamp use the same value. Then the printed p(info.NotificationDays) is accurate for both deliveries and notifications. A text-only alternative works too: print the deliveries period and the notifications period separately, with the notifications period as max(N, 40) when N > 0.
+
+3. **Audience filters.** Handle under LEGAL-5. When a campaign completes or is cancelled, strip user_ids and emails from audience_filter after the notification retention window. Or disclose that campaign targeting lists are kept.
+
+4. **Version bump.** Bump legal.Pr
+
+[backend][P3] LEGAL-7 Policy says the name comes only from the user or Apple, but the Google account name is stored too
+  file: ai-reply-back-end/internal/transport/web/legal_texts.go:328
+  scenario: A user signs in with Google. The server copies claims.Name from the Google ID token into user_profiles.display_name. The policy says in all four languages that the name is collected only "if you enter it or Apple shares it", so it understates what Google sign-in collects.
+  fix: Keep the proposed fix: add Google to the name clause in all four languages, i.e. legal_texts.go:258 (kk), 293 (ru), 328 (en) and 363 (uz). In English: "your name, if you enter it or Apple or Google shares it." If a privacy version has already been published, also bump legal.PrivacyVersion, as legal_texts.go:16 requires.
+
+The other option is to change the code instead of the policy: stop storing the Google name by dropping `displayName: cleanDisplayName(claims.Name)` at providers.go:56. This is only better if the product does not need a prefilled name. It keeps data collection minimal and leaves the current wording accurate.
+
+[backend][P3] LEGAL-8 Kazakh deletion steps name a button that does not exist in the apps
+  file: ai-reply-back-end/internal/localization/locales/kk.json:1024
+  scenario: A Kazakh-language user follows "Параметрлер → Тіркелгі → Аккаунтты жою" from the deletion page or the privacy policy. Both apps label the button "Тіркелгіні жою", so the step names a control the user cannot find. The deletion path is what the Play Store's Delete-account URL points to.
+  fix: Apply the proposed fix and change only the in-app path step:
+- kk.json:1024: "... Параметрлер → Тіркелгі → Тіркелгіні жою тармағын таңдаңыз да ..."
+- legal_texts.go:285: "Аккаунтты Параметрлер → Тіркелгі → Тіркелгіні жою бөлімінде немесе ..."
+
+Leave the web page's own labels alone (footer.delete_account, delete.title, delete.confirm, faq.a6), because they name the web control, which really is called "Аккаунтты жою". Do not bump legal.PrivacyVersion (internal/legal/legal.go:7) for this wording fix, because the meaning is unchanged and a bump would force every account to accept again.
+
+[backend][P1] OPS-1 Production still accepts LEGACY_API_ENABLED=true, and the legacy /v1/reply/generate path skips the consent check
+  file: ai-reply-back-end/config/config.go:448
+  scenario: The production .env written from the previous .env.example contains LEGACY_API_ENABLED=true; the old code also defaulted to true. After this deploy an explicit true is still honoured. I loaded an old-style production .env (with a 16+ character ADMIN_PASSWORD) through config.Load and it returned OK with env=production legacy=true. Anyone can then POST /v1/auth/register with any 16–128 character install_id and get a token without an e-mail or a consent record. With that token, POST /v1/reply/generate sends the message to OpenAI with no CONSENT_REQUIRED check. This breaks the rule that AI endpoints need consent to the current legal versions. Each new install_id is also a new free account with a fresh daily quota, limited only by the per-IP otp_request bucket.
+  fix: Fail closed at startup, the same way demo auth is handled. In Config.Validate (config/config.go, next to the AUTH_DEMO_MODE check at ~455), add:
+
+```go
+if c.Auth.LegacyEnabled && !c.App.AllowsDemo() {
+	problems = append(problems, "LEGACY_API_ENABLED=true is allowed only when APP_ENV is development or test (the /v1 API has no consent check)")
+}
+```
+
+This uses `!AllowsDemo()` instead of only `IsProduction()`, because staging also serves real people. Add a config test that sets APP_ENV=production and LEGACY_API_ENABLED=true and expects an error. Existing tests are unaffected: setValidEnv uses APP_ENV=development, and the legacy=true test at config_test.go:514 does not change APP_ENV.
+
+Defence in depth: in requireLegacy (internal/transport/api/context.go:113-118), remove the fallback to normal access tokens, or run s.users.RequireConsent on it. That way a consented-or-withdrawn /api/v1 user can never reach the unchecked legacy path, even outside production. No README change is needed (README.md:224 already lists it). Operators should be told in the release note that an old .env with LEGACY_API_ENABLED=true will now stop the server from starting.
+
+[backend][P2] OPS-2 Rollback note 'deploying the previous build is enough' is wrong: the old build refuses PAYMENT_MODE=off, and with PAYMENT_MODE=live it gives away paid plans
+  file: ai-reply-back-end/migrations/0012_plan_visibility.sql:15
+  scenario: The operator follows the new deploy checklist (PAYMENT_MODE=off), then rolls back to fb39678 during an incident, as the 0012 comment advises. Validating the new production .env with the old config code returns 'PAYMENT_MODE must be demo or live', so the container restart-loops (restart: unless-stopped) and the whole API is down. If the operator then sets PAYMENT_MODE=live to get it started, the old binary ignores is_visible: /api/v1/plans lists every paid plan again. The old payments.Service has DemoProvider wired, and its VerifyPayment always returns "succeeded". Any user, including TestFlight build 4 with its choosePlan → checkout → confirm flow, can give themselves a paid plan for free, and 'plan activated' notices go out.
+  fix: The proposed fix is sound. Here is a tighter version of the text and steps.
+
+1. **Replace the rollback lines in 0012_plan_visibility.sql:15-16:**
+
+"Rollback: do NOT roll production back to a build before this migration (pre-a1c7e38). Those builds accept only PAYMENT_MODE=demo|live, and production refuses demo, so they need PAYMENT_MODE=live. In those builds 'live' is still wired to DemoProvider, which approves every checkout, and Start ignores is_visible, is_active and archived_at. Every paid plan becomes free to anyone who calls the API. If such a rollback is unavoidable: set PAYMENT_MODE=live, deny POST /api/v1/payments/* at Caddy for the whole window, and after rolling forward review payments with provider='demo' AND status='succeeded' and the subscriptions created from them (source='payment')."
+
+2. **Add the same point as a one-line 'Rollback' item in README.md**, next to the 'Чек-лист деплоя' section.
+
+3. **Optional, one-off:** run `SELECT count(*) FROM payments WHERE provider='demo' AND status='succeeded'` against the current production DB before deploying. This only matters if a pre-a1c7e38 build ever ran there with APP_ENV=production.
+
+No code change is needed. The new build already gates checkout correctly.
+
+[backend][P3] OPS-3 Upgrading an existing production .env: start-blocking checks and env vars whose meaning changed are not listed as upgrade steps
+  file: ai-reply-back-end/config/config.go:380
+  scenario: (a) The production .env from the previous release has ADMIN_EMAIL set and a 10–15 character ADMIN_PASSWORD, which the old minimum of 10 allowed. The new binary refuses to start ('ADMIN_PASSWORD must be at least 16 characters when APP_ENV=production'). Under docker compose that is a restart loop and an outage; I reproduced the refusal with an old-style .env. (b) The old .env.example set RATE_OTP_REQUEST_PER_HOUR=5 and RATE_OTP_VERIFY_PER_HOUR=10. Those explicit values now mean per-IP only, so the wider NAT limits (30/60) never apply to existing deployments. The same IP buckets are now also used by /api/v1/account/delete/request and /confirm (server.go:142-143). Behind carrier CGNAT, about 5 code requests per hour per public IP block sign-in for everyone on that IP. The per-address limit mov
+  fix: Add one line to ai-reply-back-end/README.md under "Чек-лист деплоя", with no code change: "Existing .env from the previous release: delete RATE_OTP_REQUEST_PER_HOUR=5 and RATE_OTP_VERIFY_PER_HOUR=10, or set them to 30/60. They are now per-IP only (they also cover /account/delete), and the per-address limit is RATE_OTP_REQUEST_PER_ADDRESS_PER_HOUR=5." Optionally also add: "Before `docker compose up -d --build`, start the new binary once against the server .env, for example `go run ./cmd/server -env /path/.env`. config.Load validates before opening the database and lists every problem, so the running container is not replaced by one that refuses to start." Skip the startup warning the finding suggests: per-IP below per-address is a legitimate setup.
+
+[backend][P3] OPS-4 After the legal version bump, existing builds (TestFlight build 4, older Android) read CONSENT_REQUIRED as an expired session
+  file: ai-reply-back-end/internal/transport/api/context.go:92
+  scenario: Every existing account only has consent for 2026-09-19, so after deploy every keyboard AI tap gets 403 CONSENT_REQUIRED. Build 4 and older Android do not know this code and fall back to the status: 403 means unauthorized. They refresh, which rotates the refresh token, retry, get 403 again, and the keyboard says 'Your session could not be verified. Sign in again in the AI Reply app.' The host app shows the consent gate only on a cold launch or after sign-out, because bootstrap runs once per process. A warm app shows normal signed-in content while the keyboard keeps failing. It recovers (relaunch or sign out and back in shows the consent gate, and POST /me/consents with the new versions is accepted), so nothing crashes and nobody is locked out for good. But every tap until then costs a refre
+  fix: Keep the server as it is and handle this in the docs and the deploy order:
+1. In API.md:28, note that builds before ea80a49 (iOS) and e28bf9d (Android) show "sign in again" in the keyboard after the 2026-10-08 bump. Put the same note in the deploy notes.
+2. Deploy the backend only after consent-aware builds are on TestFlight and internal tracks.
+3. Tell testers to force-quit and reopen the app, not to sign out. In a warm build-4 process, signing out and back in does not bring the consent gate back.
+
+Optional, not recommended now: send CONSENT_REQUIRED with a non-401/403 status such as 428. The old iOS fallback would then map it to .invalidRequest and stop rotating the refresh token on every tap, and the new clients already map by code. But this changes the documented 403 contract and its tests, so it is not worth it for TestFlight-only clients.
+
+[backend][P3] OPS-5 Demo checkout is allowed on staging, although .env.example and the code's own rule say demo is only for development and test
+  file: ai-reply-back-end/config/config.go:464
+  scenario: A staging server, which config.go:455-456 calls a real server with real people, runs with PAYMENT_MODE=demo and PAYMENT_DEMO_CHECKOUT=true. Validation passes, CheckoutAvailable() is true, and any staging user can switch on and 'buy' paid plans for free. The demo payment also sends 'plan activated' push and e-mail, because main.go turns on WithDemoPayments(DemoCheckout && !IsProduction()).
+  fix: First decide which rule is intended, then make everything match it.
+
+(a) If staging should be able to test checkout, which is what README.md:77-79 and docs/API.md:637 say, change only the comments. In .env.example:125-126, replace "тек әзірлеу/тест" with "тек production емес ортада". Do the same in the comments at config.go:186-188, payments.go:98, payments.go:112 and payments.go:142-144.
+
+(b) If demo checkout should be development or test only, fix it once in config: at config.go:464, use `if c.Payments.DemoCheckout && !c.App.AllowsDemo() { problems = append(problems, "PAYMENT_DEMO_CHECKOUT=true is allowed only when APP_ENV is development or test") }`, outside the IsProduction block. Keep the PAYMENT_MODE=demo check inside the production block. main.go:136/148 and announces() can stay on `!IsProduction()` as a second line of defence, because config already refuses staging. Changing WithProduction to mean AllowsDemo would change what "production" means elsewhere. Add "staging" to the table test next to TestDemoModeOnlyForDevelopmentAndTest, and update README and API.md to match.
+
+Either way, also make the environment check fail closed. In Validate, add `if !contains([]string{"development","test","staging","production"}, c.App.Env) { problems = append(problems, "APP_ENV must be development, test, staging or production") }`, and lowercase or trim APP_ENV at config.go:301. A typo 
+
+[backend][P3] OPS-6 Docs disagree with the code: README promises old-contract compatibility and says admins never see text; openapi omits CONSENT_REQUIRED on /ai/polish
+  file: ai-reply-back-end/README.md:152
+  scenario: An operator reads 'полная совместимость со старым контрактом … уже собранные iOS/Android-версии продолжают работать' and expects /v1/* to work, but it returns 404 by default now. The README privacy table (line 162) says 'Текст виден администратору — НЕТ — в admin API нет таких полей', yet /api/v1/admin/reports returns the reported reply text and the comment. Client developers working from openapi.yaml do not handle 403 on /ai/polish.
+  fix: The proposed fix is correct. Two small refinements:
+
+(a) README.md:152-153: replace the bullet with "старый контракт `/v1/auth/register`, `/v1/reply/generate` — только при `LEGACY_API_ENABLED=true` (по умолчанию выключен; согласие на нём не проверяется, в production не включать)". This matches API.md:646-648.
+
+(b) README.md:162: the exception should cover the comment as well as the generated text. For example: "НЕТ — кроме жалоб (`/api/v1/admin/reports`): причина, комментарий пользователя и сгенерированный ответ, если пользователь оставил «Отправить текст ответа вместе с жалобой»; скопированное сообщение и инструкция туда не попадают".
+
+(c) docs/openapi.yaml, under /api/v1/ai/polish responses: add `"403": { description: CONSENT_REQUIRED }`. Optionally add a note to the polish description that clients ignore polish errors (API.md:544).

@@ -42,10 +42,20 @@ sealed interface AIReplyError {
     data object RateLimited : AIReplyError
 
     /**
-     * The plan's replies for today (or this period) are spent. Waiting a
-     * moment does NOT fix it, which is why it is not [RateLimited].
+     * The plan's replies for today are spent. Waiting a moment does NOT fix
+     * it, which is why it is not [RateLimited].
      */
     data object QuotaExhausted : AIReplyError
+
+    /** This month's replies are spent: they come back next month, not tomorrow. */
+    data object MonthlyQuotaExhausted : AIReplyError
+
+    /**
+     * The current terms, privacy policy and AI processing are not accepted on
+     * this phone, or the server says the account's consent is missing. The
+     * app has to be opened to accept them again.
+     */
+    data object ConsentRequired : AIReplyError
 
     /** The service answered, but not with a usable reply. */
     data object EmptyResponse : AIReplyError

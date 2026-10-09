@@ -35,10 +35,19 @@ import kz.yerek.aireply.domain.model.TemplateSummary
  * Nothing secret belongs here — no tokens, no credentials, no message text.
  * The credential lives in [kz.yerek.aireply.data.secure.SecureCredentialStore].
  */
-class SettingsStore internal constructor(private val prefs: SharedPreferences) {
+class SettingsStore internal constructor(
+    private val prefs: SharedPreferences,
+    /**
+     * The account.* values, in a file of their own that backups leave out
+     * (`res/xml/backup_rules.xml`, `res/xml/data_extraction_rules.xml`): they
+     * describe this install's session, not a choice worth restoring.
+     */
+    private val accountPrefs: SharedPreferences = prefs
+) {
 
     constructor(context: Context) : this(
-        context.applicationContext.getSharedPreferences(NAME, Context.MODE_PRIVATE)
+        context.applicationContext.getSharedPreferences(NAME, Context.MODE_PRIVATE),
+        context.applicationContext.getSharedPreferences(ACCOUNT_NAME, Context.MODE_PRIVATE)
     )
 
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
@@ -127,7 +136,7 @@ class SettingsStore internal constructor(private val prefs: SharedPreferences) {
         val legacyDeviceId = prefs.getString(KEY_INSTALL_ID, null)
         val editor = prefs.edit()
         if (accountDeviceId.isNullOrEmpty() && !legacyDeviceId.isNullOrEmpty()) {
-            editor.putString(KEY_ACCOUNT_DEVICE, legacyDeviceId)
+            accountDeviceId = legacyDeviceId
         }
         editor
             .remove(KEY_AI_MODE)
@@ -146,14 +155,14 @@ class SettingsStore internal constructor(private val prefs: SharedPreferences) {
      * network call returns.
      */
     var accessTokenExpiry: Long
-        get() = prefs.getLong(KEY_ACCESS_EXPIRY, 0L)
-        set(value) = prefs.edit().putLong(KEY_ACCESS_EXPIRY, value).apply()
+        get() = account().getLong(KEY_ACCESS_EXPIRY, 0L)
+        set(value) = account().edit().putLong(KEY_ACCESS_EXPIRY, value).apply()
 
     /** Masked by the server before it ever reached us. */
     var accountIdentifier: String?
-        get() = prefs.getString(KEY_ACCOUNT_IDENTIFIER, null)
+        get() = account().getString(KEY_ACCOUNT_IDENTIFIER, null)
         set(value) {
-            prefs.edit().apply {
+            account().edit().apply {
                 if (value.isNullOrEmpty()) remove(KEY_ACCOUNT_IDENTIFIER)
                 else putString(KEY_ACCOUNT_IDENTIFIER, value)
             }.apply()
@@ -161,9 +170,9 @@ class SettingsStore internal constructor(private val prefs: SharedPreferences) {
 
     /** Server-issued device id, so a re-install does not orphan a device row. */
     var accountDeviceId: String?
-        get() = prefs.getString(KEY_ACCOUNT_DEVICE, null)
+        get() = account().getString(KEY_ACCOUNT_DEVICE, null)
         set(value) {
-            prefs.edit().apply {
+            account().edit().apply {
                 if (value.isNullOrEmpty()) remove(KEY_ACCOUNT_DEVICE)
                 else putString(KEY_ACCOUNT_DEVICE, value)
             }.apply()
@@ -177,27 +186,27 @@ class SettingsStore internal constructor(private val prefs: SharedPreferences) {
      * instant it opens instead of blanking a label until a call returns.
      */
     var cachedDailyLimit: Int
-        get() = prefs.getInt(KEY_USAGE_LIMIT, 0)
-        set(value) = prefs.edit().putInt(KEY_USAGE_LIMIT, value).apply()
+        get() = account().getInt(KEY_USAGE_LIMIT, 0)
+        set(value) = account().edit().putInt(KEY_USAGE_LIMIT, value).apply()
 
     var cachedUsedToday: Int
-        get() = prefs.getInt(KEY_USAGE_USED, 0)
-        set(value) = prefs.edit().putInt(KEY_USAGE_USED, value).apply()
+        get() = account().getInt(KEY_USAGE_USED, 0)
+        set(value) = account().edit().putInt(KEY_USAGE_USED, value).apply()
 
     var cachedRemainingToday: Int
-        get() = prefs.getInt(KEY_USAGE_REMAINING, 0)
-        set(value) = prefs.edit().putInt(KEY_USAGE_REMAINING, value).apply()
+        get() = account().getInt(KEY_USAGE_REMAINING, 0)
+        set(value) = account().edit().putInt(KEY_USAGE_REMAINING, value).apply()
 
     var cachedPlanCode: String?
-        get() = prefs.getString(KEY_USAGE_PLAN, null)
+        get() = account().getString(KEY_USAGE_PLAN, null)
         set(value) {
-            prefs.edit().apply {
+            account().edit().apply {
                 if (value.isNullOrEmpty()) remove(KEY_USAGE_PLAN) else putString(KEY_USAGE_PLAN, value)
             }.apply()
         }
 
     fun clearAccountState() {
-        prefs.edit()
+        account().edit()
             .remove(KEY_ACCESS_EXPIRY)
             .remove(KEY_ACCOUNT_IDENTIFIER)
             .remove(KEY_USAGE_LIMIT)
@@ -205,6 +214,48 @@ class SettingsStore internal constructor(private val prefs: SharedPreferences) {
             .remove(KEY_USAGE_REMAINING)
             .remove(KEY_USAGE_PLAN)
             .apply()
+    }
+
+    /** The last known quota only; the session values stay. */
+    fun clearUsageCache() {
+        account().edit()
+            .remove(KEY_USAGE_LIMIT)
+            .remove(KEY_USAGE_USED)
+            .remove(KEY_USAGE_REMAINING)
+            .remove(KEY_USAGE_PLAN)
+            .apply()
+    }
+
+    @Volatile
+    private var accountKeysMoved = accountPrefs === prefs
+
+    /**
+     * The account file, after moving what older builds kept in the backed-up
+     * settings file. Once per process and only for keys that are there: a
+     * value already in the account file wins, and the old copy is removed only
+     * after the new one is on disk.
+     */
+    private fun account(): SharedPreferences {
+        if (accountKeysMoved) return accountPrefs
+        synchronized(this) {
+            if (!accountKeysMoved) {
+                val legacy = prefs.all.filterKeys { it in ACCOUNT_KEYS }
+                if (legacy.isNotEmpty()) {
+                    val moved = accountPrefs.edit()
+                    legacy.forEach { (key, value) ->
+                        if (accountPrefs.contains(key)) return@forEach
+                        when (value) {
+                            is String -> moved.putString(key, value)
+                            is Int -> moved.putInt(key, value)
+                            is Long -> moved.putLong(key, value)
+                        }
+                    }
+                    if (moved.commit()) prefs.edit().apply { legacy.keys.forEach(::remove) }.apply()
+                }
+                accountKeysMoved = true
+            }
+        }
+        return accountPrefs
     }
 
     // ------------------------------------------------------------ keyboard
@@ -261,6 +312,27 @@ class SettingsStore internal constructor(private val prefs: SharedPreferences) {
         get() = prefs.getBoolean(KEY_DEBUG_MOCK, false)
         set(value) = prefs.edit().putBoolean(KEY_DEBUG_MOCK, value).apply()
 
+    /**
+     * DEBUG BUILDS ONLY: show the Home notification card and the Settings push
+     * controls even where push is unavailable, so both can be reviewed on an
+     * emulator without Firebase or a new server. Ignored in release builds.
+     */
+    var debugForcePushPrompt: Boolean
+        get() = prefs.getBoolean(KEY_DEBUG_FORCE_PUSH, false)
+        set(value) = prefs.edit().putBoolean(KEY_DEBUG_FORCE_PUSH, value).apply()
+
+    // ---------------------------------------------------------- notifications
+
+    /**
+     * The in-app notifications switch (Settings ▸ Notifications), on until the
+     * user turns it off. The server stops sending to this installation when it
+     * is off; the system permission is a separate matter. The user's own
+     * choice, so it travels with a backup.
+     */
+    var notificationsEnabled: Boolean
+        get() = prefs.getBoolean(KEY_NOTIFICATIONS_ENABLED, true)
+        set(value) = prefs.edit().putBoolean(KEY_NOTIFICATIONS_ENABLED, value).apply()
+
     /** The backing file, for [kz.yerek.aireply.ai.AILimits]. */
     val sharedPreferences: SharedPreferences get() = prefs
 
@@ -273,6 +345,7 @@ class SettingsStore internal constructor(private val prefs: SharedPreferences) {
 
     private companion object {
         const val NAME = "aireply_settings"
+        const val ACCOUNT_NAME = "aireply_account"
 
         const val KEY_KEYBOARD_LANGUAGE = "shared.keyboardLanguage"
         const val KEY_APP_LANGUAGE = "shared.appLanguage"
@@ -284,6 +357,8 @@ class SettingsStore internal constructor(private val prefs: SharedPreferences) {
         const val KEY_KEYBOARD_HAPTICS = "shared.keyboardHaptics"
         const val KEY_SMART_CORRECTION = "shared.smartCorrection"
         const val KEY_DEBUG_MOCK = "debug.mockReplies"
+        const val KEY_DEBUG_FORCE_PUSH = "debug.forcePushPrompt"
+        const val KEY_NOTIFICATIONS_ENABLED = "notifications.enabled"
 
         const val KEY_AI_MODE = "ai.transportMode"
         const val KEY_AI_MODEL = "ai.model"
@@ -298,5 +373,10 @@ class SettingsStore internal constructor(private val prefs: SharedPreferences) {
         const val KEY_USAGE_USED = "account.usage.usedToday"
         const val KEY_USAGE_REMAINING = "account.usage.remainingToday"
         const val KEY_USAGE_PLAN = "account.usage.planCode"
+
+        val ACCOUNT_KEYS = setOf(
+            KEY_ACCESS_EXPIRY, KEY_ACCOUNT_IDENTIFIER, KEY_ACCOUNT_DEVICE,
+            KEY_USAGE_LIMIT, KEY_USAGE_USED, KEY_USAGE_REMAINING, KEY_USAGE_PLAN
+        )
     }
 }

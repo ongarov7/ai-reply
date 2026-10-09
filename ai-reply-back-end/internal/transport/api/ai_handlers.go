@@ -114,11 +114,7 @@ func (s *Server) handleReply(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		status, code, message := httpx.Translate(err)
 		details := map[string]any{}
-		if code == httpx.CodeDailyLimit || code == httpx.CodeMonthlyLimit {
-			details["daily_limit"] = result.DailyLimit
-			details["used_today"] = result.UsedToday
-			details["resets_at"] = result.ResetsAt.Format(time.RFC3339)
-		}
+		limitDetails(details, code, result)
 		// Still INVALID_REQUEST for old clients; new ones read the real limit
 		// here instead of assuming the number they were built with.
 		if errors.Is(err, domain.ErrSourceTooLong) {
@@ -135,13 +131,7 @@ func (s *Server) handleReply(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, replyResponse{
 		Reply:            result.Text,
 		DetectedLanguage: result.DetectedLanguage,
-		Usage: usageDTO{
-			DailyLimit:     result.DailyLimit,
-			UsedToday:      result.UsedToday,
-			RemainingToday: result.Remaining,
-			ResetsAt:       result.ResetsAt.Format(time.RFC3339),
-			Timezone:       s.cfg.App.Timezone,
-		},
+		Usage:            s.resultUsage(result),
 	})
 }
 
@@ -207,11 +197,7 @@ func (s *Server) handleCompose(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		status, code, message := httpx.Translate(err)
 		details := map[string]any{}
-		if code == httpx.CodeDailyLimit || code == httpx.CodeMonthlyLimit {
-			details["daily_limit"] = result.DailyLimit
-			details["used_today"] = result.UsedToday
-			details["resets_at"] = result.ResetsAt.Format(time.RFC3339)
-		}
+		limitDetails(details, code, result)
 		switch {
 		case errors.Is(err, domain.ErrInstructionMissing):
 			details["field"] = "instruction"
@@ -229,14 +215,36 @@ func (s *Server) handleCompose(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, composeResponse{
 		Text:             result.Text,
 		DetectedLanguage: result.DetectedLanguage,
-		Usage: usageDTO{
-			DailyLimit:     result.DailyLimit,
-			UsedToday:      result.UsedToday,
-			RemainingToday: result.Remaining,
-			ResetsAt:       result.ResetsAt.Format(time.RFC3339),
-			Timezone:       s.cfg.App.Timezone,
-		},
+		Usage:            s.resultUsage(result),
 	})
+}
+
+// resultUsage — генерациядан кейінгі санағыштар (GET /me/usage-пен бірдей өрістер).
+func (s *Server) resultUsage(result ai.Result) usageDTO {
+	return usageDTO{
+		DailyLimit:     result.DailyLimit,
+		UsedToday:      result.UsedToday,
+		RemainingToday: result.Remaining,
+		MonthlyLimit:   result.MonthlyLimit,
+		UsedMonth:      result.UsedMonth,
+		ResetsAt:       result.ResetsAt.Format(time.RFC3339),
+		Timezone:       s.cfg.App.Timezone,
+	}
+}
+
+// limitDetails — DAILY_LIMIT_REACHED / MONTHLY_LIMIT_REACHED қатесіндегі санағыштар.
+// monthly_limit пен used_month тек айлық шек бар тарифте (0 емес) қосылады.
+func limitDetails(details map[string]any, code string, result ai.Result) {
+	if code != httpx.CodeDailyLimit && code != httpx.CodeMonthlyLimit {
+		return
+	}
+	details["daily_limit"] = result.DailyLimit
+	details["used_today"] = result.UsedToday
+	details["resets_at"] = result.ResetsAt.Format(time.RFC3339)
+	if result.MonthlyLimit > 0 {
+		details["monthly_limit"] = result.MonthlyLimit
+		details["used_month"] = result.UsedMonth
+	}
 }
 
 // polishRequest — нұсқау өрісіндегі мәтін (features.instruction_polish).

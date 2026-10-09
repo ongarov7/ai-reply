@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/aireply/ai-reply-back-end/internal/domain"
@@ -16,26 +17,28 @@ import (
 // remaining generation therefore cannot both succeed: the second UPDATE
 // matches no row and comes back as a limit error. A provider failure refunds
 // the reservation, so a user is only ever charged for a generation they got.
-func (s *Store) ReserveQuota(ctx context.Context, userID, date, month string, dailyLimit, monthlyLimit int) error {
+// The returned counters are the values right after this reservation, read in
+// the same transaction: two parallel requests never see the same count.
+func (s *Store) ReserveQuota(ctx context.Context, userID, date, month string, dailyLimit, monthlyLimit int) (day, mon int, err error) {
 	if dailyLimit <= 0 {
-		return domain.ErrDailyLimit
+		return 0, 0, domain.ErrDailyLimit
 	}
 	now := ms(time.Now())
-	return s.db.Tx(ctx, func(tx *sql.Tx) error {
+	err = s.db.Tx(ctx, func(tx *sql.Tx) error {
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO usage_daily (user_id, usage_date, used, updated_at)
 			VALUES (?, ?, 0, ?) ON CONFLICT (user_id, usage_date) DO NOTHING`,
 			userID, date, now); err != nil {
 			return err
 		}
-		res, err := tx.ExecContext(ctx, `
+		err := tx.QueryRowContext(ctx, `
 			UPDATE usage_daily SET used = used + 1, updated_at = ?
-			WHERE user_id = ? AND usage_date = ? AND used < ?`, now, userID, date, dailyLimit)
+			WHERE user_id = ? AND usage_date = ? AND used < ? RETURNING used`, now, userID, date, dailyLimit).Scan(&day)
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.ErrDailyLimit
+		}
 		if err != nil {
 			return err
-		}
-		if n, _ := res.RowsAffected(); n == 0 {
-			return domain.ErrDailyLimit
 		}
 
 		if _, err := tx.ExecContext(ctx, `
@@ -45,22 +48,22 @@ func (s *Store) ReserveQuota(ctx context.Context, userID, date, month string, da
 			return err
 		}
 		if monthlyLimit > 0 {
-			res, err = tx.ExecContext(ctx, `
+			err = tx.QueryRowContext(ctx, `
 				UPDATE usage_monthly SET used = used + 1, updated_at = ?
-				WHERE user_id = ? AND usage_month = ? AND used < ?`, now, userID, month, monthlyLimit)
-			if err != nil {
-				return err
-			}
-			if n, _ := res.RowsAffected(); n == 0 {
+				WHERE user_id = ? AND usage_month = ? AND used < ? RETURNING used`, now, userID, month, monthlyLimit).Scan(&mon)
+			if errors.Is(err, sql.ErrNoRows) {
 				return domain.ErrMonthlyLimit // транзакция кері қайтарылады, күндік те есептелмейді
 			}
-			return nil
+			return err
 		}
-		_, err = tx.ExecContext(ctx, `
-			UPDATE usage_monthly SET used = used + 1, updated_at = ? WHERE user_id = ? AND usage_month = ?`,
-			now, userID, month)
-		return err
+		return tx.QueryRowContext(ctx, `
+			UPDATE usage_monthly SET used = used + 1, updated_at = ? WHERE user_id = ? AND usage_month = ? RETURNING used`,
+			now, userID, month).Scan(&mon)
 	})
+	if err != nil {
+		return 0, 0, err
+	}
+	return day, mon, nil
 }
 
 // RefundQuota — провайдер қатесінде бронды қайтарады (қолданушы алмаған жауап үшін төлемейді).
@@ -148,6 +151,15 @@ func (s *Store) InsertUsageEvent(ctx context.Context, e domain.UsageEvent) error
 		e.InputTokens, e.OutputTokens, e.TotalTokens, e.CostMicros, e.LatencyMS, e.ProviderMS,
 		e.Platform, e.AppVersion, e.Language, e.SourceChars, e.Mode, e.PromptVersion, ms(e.CreatedAt))
 	return err
+}
+
+// UsageEventsSince — қолданушының осы режимдегі since-тен бергі сұраныстары (idx_ai_events_user).
+func (s *Store) UsageEventsSince(ctx context.Context, userID, mode string, since time.Time) (int, error) {
+	var n int
+	err := s.db.Reader().QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM ai_usage_events WHERE user_id = ? AND created_at >= ? AND mode = ?`,
+		userID, ms(since), mode).Scan(&n)
+	return n, err
 }
 
 // ---------------------------------------------------------------- analytics

@@ -136,25 +136,44 @@ struct ProfileSync {
     }
 }
 
-/// The marker for a gender change the server has not confirmed yet:
-/// `profile.pendingSync`, plus a revision that every new choice raises.
-/// Device-local, in the app's own defaults.
+/// The marker for a profile change the server has not confirmed yet: a
+/// pending flag, plus a revision that every new choice raises. One pair of
+/// keys per field. Device-local, in the app's own defaults.
 struct PendingProfileChange {
 
+    enum Field {
+        /// `profile.pendingSync`, the grammatical gender.
+        case gender
+        /// The account's preferred language (`PreferredLanguageSync`).
+        case preferredLanguage
+    }
+
     var defaults: UserDefaults = .standard
+    var field: Field = .gender
 
-    private static let pendingKey = "profile.pendingSync"
-    private static let revisionKey = "profile.pendingRevision"
+    private var pendingKey: String {
+        switch field {
+        case .gender:            return "profile.pendingSync"
+        case .preferredLanguage: return "profile.language.pendingSync"
+        }
+    }
 
-    var isPending: Bool { defaults.bool(forKey: Self.pendingKey) }
-    var revision: Int { defaults.integer(forKey: Self.revisionKey) }
+    private var revisionKey: String {
+        switch field {
+        case .gender:            return "profile.pendingRevision"
+        case .preferredLanguage: return "profile.language.pendingRevision"
+        }
+    }
+
+    var isPending: Bool { defaults.bool(forKey: pendingKey) }
+    var revision: Int { defaults.integer(forKey: revisionKey) }
 
     /// A new choice was made: pending, under a new revision.
     @discardableResult
     func markChanged() -> Int {
         let next = revision &+ 1
-        defaults.set(next, forKey: Self.revisionKey)
-        defaults.set(true, forKey: Self.pendingKey)
+        defaults.set(next, forKey: revisionKey)
+        defaults.set(true, forKey: pendingKey)
         return next
     }
 
@@ -162,10 +181,10 @@ struct PendingProfileChange {
     /// choice's confirmation clears the marker.
     func confirm(revision sent: Int) {
         guard sent == revision else { return }
-        defaults.removeObject(forKey: Self.pendingKey)
+        defaults.removeObject(forKey: pendingKey)
     }
 
     func discard() {
-        defaults.removeObject(forKey: Self.pendingKey)
+        defaults.removeObject(forKey: pendingKey)
     }
 }

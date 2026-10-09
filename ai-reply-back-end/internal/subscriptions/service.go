@@ -66,18 +66,69 @@ func (s *Service) Assign(ctx context.Context, userID, planID, source string, exp
 		return domain.Subscription{}, err
 	}
 	now := s.clock.Now()
-	if expires == nil && !plan.IsFree && plan.PeriodDays > 0 {
-		end := now.AddDate(0, 0, plan.PeriodDays)
-		expires = &end
-	}
 	return s.repo.ReplaceSubscription(ctx, userID, domain.Subscription{
 		UserID:    userID,
 		PlanID:    plan.ID,
 		Status:    domain.SubActive,
 		Source:    source,
 		StartedAt: now,
-		ExpiresAt: expires,
+		ExpiresAt: periodEnd(plan, now, expires),
 	})
+}
+
+// AssignForPayment — төлемді аяқтап, оның тарифін береді (бір транзакция, Assign сияқты кезең).
+//
+// applied=false: the payment had already been completed and nothing changed.
+func (s *Service) AssignForPayment(ctx context.Context, userID, paymentID, planID, ref string) (domain.Subscription, bool, error) {
+	plan, err := s.repo.Plan(ctx, planID)
+	if err != nil {
+		return domain.Subscription{}, false, err
+	}
+	now := s.clock.Now()
+	applied, sub, err := s.repo.CompletePayment(ctx, paymentID, ref, domain.Subscription{
+		UserID:    userID,
+		PlanID:    plan.ID,
+		Status:    domain.SubActive,
+		Source:    "payment",
+		StartedAt: now,
+		ExpiresAt: periodEnd(plan, now, nil),
+	})
+	return sub, applied, err
+}
+
+// Renew — ағымдағы жарамды жазылым дәл осы тариф болса, тек мерзімін ауыстырады.
+//
+// true means it did: the person keeps the one subscription they have (and
+// gets no second "plan active" notice). false means the current plan is a
+// different one, or no longer usable, and the caller should Assign instead.
+// The end date follows the same rule as Assign: without one, a paid plan
+// with a period runs one period from now.
+func (s *Service) Renew(ctx context.Context, userID, planID string, expires *time.Time) (bool, error) {
+	current, err := s.repo.CurrentSubscription(ctx, userID)
+	if errors.Is(err, domain.ErrNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	now := s.clock.Now()
+	if current.PlanID != planID || !current.IsUsable(now) {
+		return false, nil
+	}
+	plan, err := s.repo.Plan(ctx, planID)
+	if err != nil {
+		return false, err
+	}
+	return true, s.SetExpiry(ctx, current.ID, userID, periodEnd(plan, now, expires))
+}
+
+// periodEnd — берілген мерзім, болмаса ақылы кезеңді тарифке бүгіннен бастап бір кезең.
+func periodEnd(plan domain.Plan, now time.Time, expires *time.Time) *time.Time {
+	if expires == nil && !plan.IsFree && plan.PeriodDays > 0 {
+		end := now.AddDate(0, 0, plan.PeriodDays)
+		return &end
+	}
+	return expires
 }
 
 // SetExpiry — мерзімді өзгерту.

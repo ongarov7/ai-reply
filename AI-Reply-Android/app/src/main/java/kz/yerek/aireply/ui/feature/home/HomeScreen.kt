@@ -52,7 +52,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
  * The root screen.
  *
  * Section order matches iOS: mark and subtitle, a reply test, account usage,
- * profile links, keyboard status, workflow and privacy.
+ * the notifications card (only when it applies), profile links, keyboard
+ * status, workflow and privacy.
  */
 @Composable
 fun HomeScreen(onOpen: (String) -> Unit) {
@@ -115,6 +116,8 @@ fun HomeScreen(onOpen: (String) -> Unit) {
             }
 
             UsageCard(onOpen = onOpen)
+
+            NotificationPromptCard()
 
             AppSection(stringResource(R.string.home_profile_title)) {
                 RowGroup {

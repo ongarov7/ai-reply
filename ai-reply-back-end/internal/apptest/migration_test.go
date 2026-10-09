@@ -166,3 +166,86 @@ func TestSenderProfileMigrationKeepsExistingProfiles(t *testing.T) {
 		t.Fatalf("second run applied %v (%v)", again, err)
 	}
 }
+
+// 0011 бар дерекқорға қолданылады: тіркелгілер, профильдер, жазылымдар өзгермейді,
+// preferred_language бос (таңдалмаған), науқан кестесінің бұрынғы жолдары оқылады.
+func TestPushMigrationKeepsExistingAccounts(t *testing.T) {
+	ctx := context.Background()
+	db, err := database.Open(database.Options{Path: filepath.Join(t.TempDir(), "old.db"), MaxReadConns: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+
+	before := fstest.MapFS{}
+	entries, err := fs.ReadDir(migrations.FS, ".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".sql") && e.Name() < "0011" {
+			body, _ := fs.ReadFile(migrations.FS, e.Name())
+			before[e.Name()] = &fstest.MapFile{Data: body}
+		}
+	}
+	if _, err := database.Migrate(ctx, db, before); err != nil {
+		t.Fatalf("old migrations: %v", err)
+	}
+
+	seed := []string{
+		`INSERT INTO users (id, email, status, locale, created_at, updated_at, email_verified_at)
+		 VALUES ('u-kk', 'kk@example.com', 'active', 'kk', 1000, 1000, 1000)`,
+		`INSERT INTO user_profiles (user_id, role, onboarding_completed, grammatical_gender, onboarding_version, updated_at)
+		 VALUES ('u-kk', 'сатушы', 1, 'female', 1, 1000)`,
+		`INSERT INTO users (id, phone, status, locale, created_at, updated_at) VALUES ('u-ru', '+77011112233', 'active', 'ru', 2000, 2000)`,
+		`INSERT INTO subscriptions (id, user_id, plan_id, status, source, started_at, expires_at, created_at, updated_at)
+		 SELECT 's-1', 'u-ru', id, 'active', 'payment', 2000, 9999999999999, 2000, 2000 FROM plans WHERE code = 'pro'`,
+		`INSERT INTO notification_campaigns (id, title, body, created_at, updated_at) VALUES ('c-old', 'T', 'B', 3000, 3000)`,
+	}
+	for _, stmt := range seed {
+		if _, err := db.Writer().ExecContext(ctx, stmt); err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+	}
+
+	applied, err := database.Migrate(ctx, db, migrations.FS)
+	if err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	if len(applied) == 0 || applied[0] != "0011_push_notifications.sql" {
+		t.Fatalf("applied = %v", applied)
+	}
+
+	store := repository.New(db)
+	kk, err := store.UserByID(ctx, "u-kk")
+	if err != nil || kk.Email != "kk@example.com" || kk.Locale != "kk" || kk.PreferredLanguage != "" {
+		t.Fatalf("user = %+v (%v)", kk, err)
+	}
+	profile, err := store.Profile(ctx, "u-kk")
+	if err != nil || profile.Role != "сатушы" || profile.GrammaticalGender != domain.GenderFemale || profile.OnboardingVersion != 1 {
+		t.Fatalf("profile = %+v (%v)", profile, err)
+	}
+	ru, err := store.UserByID(ctx, "u-ru")
+	if err != nil || ru.Phone != "+77011112233" || ru.PreferredLanguage != "" {
+		t.Fatalf("user = %+v (%v)", ru, err)
+	}
+	sub, err := store.CurrentSubscription(ctx, "u-ru")
+	if err != nil || sub.ID != "s-1" || sub.Status != domain.SubActive || sub.Source != "payment" {
+		t.Fatalf("subscription = %+v (%v)", sub, err)
+	}
+	campaign, err := store.Campaign(ctx, "c-old")
+	if err != nil || campaign.Title != "T" || campaign.Category != domain.CategoryMarketing || len(campaign.Content) != 0 {
+		t.Fatalf("old campaign row = %+v (%v)", campaign, err)
+	}
+	if err := store.UpdatePreferredLanguage(ctx, "u-ru", "ru"); err != nil {
+		t.Fatal(err)
+	}
+	var empty int
+	if err := db.Reader().QueryRow(`SELECT COUNT(*) FROM app_installations`).Scan(&empty); err != nil || empty != 0 {
+		t.Fatalf("installations = %d (%v)", empty, err)
+	}
+
+	if again, err := database.Migrate(ctx, db, migrations.FS); err != nil || len(again) != 0 {
+		t.Fatalf("second run applied %v (%v)", again, err)
+	}
+}

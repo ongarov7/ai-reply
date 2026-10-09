@@ -11,6 +11,12 @@ import (
 )
 
 // UpsertDevice — құрылғыны тіркейді немесе жаңартады.
+//
+// The id comes from the client, so it may name a row that belongs to another
+// account (a phone handed over, or a forged id). That row is never touched:
+// the device is stored under a fresh server id instead, which the caller
+// gets back and puts into the session. A push token another row already
+// holds is not copied onto the new row.
 func (s *Store) UpsertDevice(ctx context.Context, d domain.Device) (domain.Device, error) {
 	now := time.Now().UTC()
 	if d.ID == "" {
@@ -24,23 +30,46 @@ func (s *Store) UpsertDevice(ctx context.Context, d domain.Device) (domain.Devic
 	if d.PushOn {
 		push = 1
 	}
-	_, err := s.db.Writer().ExecContext(ctx, `
-		INSERT INTO devices (id, user_id, platform, app_version, os_version, model, locale,
-		                     push_token, push_enabled, created_at, last_seen_at)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?)
-		ON CONFLICT (id) DO UPDATE SET
-			platform = excluded.platform,
-			app_version = excluded.app_version,
-			os_version = excluded.os_version,
-			model = excluded.model,
-			locale = excluded.locale,
-			push_token = COALESCE(excluded.push_token, devices.push_token),
-			push_enabled = excluded.push_enabled,
-			last_seen_at = excluded.last_seen_at,
-			revoked_at = NULL`,
-		d.ID, d.UserID, d.Platform, d.AppVersion, d.OSVersion, d.Model, d.Locale,
-		nullText(d.PushToken), push, ms(d.CreatedAt), ms(d.LastSeenAt))
-	return d, err
+	err := s.db.Tx(ctx, func(tx *sql.Tx) error {
+		res, err := tx.ExecContext(ctx, `
+			INSERT INTO devices (id, user_id, platform, app_version, os_version, model, locale,
+			                     push_token, push_enabled, created_at, last_seen_at)
+			VALUES (?,?,?,?,?,?,?,?,?,?,?)
+			ON CONFLICT (id) DO UPDATE SET
+				platform = excluded.platform,
+				app_version = excluded.app_version,
+				os_version = excluded.os_version,
+				model = excluded.model,
+				locale = excluded.locale,
+				push_token = COALESCE(excluded.push_token, devices.push_token),
+				push_enabled = excluded.push_enabled,
+				last_seen_at = excluded.last_seen_at,
+				revoked_at = NULL
+			WHERE devices.user_id = excluded.user_id`,
+			d.ID, d.UserID, d.Platform, d.AppVersion, d.OSVersion, d.Model, d.Locale,
+			nullText(d.PushToken), push, ms(d.CreatedAt), ms(d.LastSeenAt))
+		if err != nil {
+			return err
+		}
+		if n, err := res.RowsAffected(); err != nil || n > 0 {
+			return err
+		}
+		// The id is another account's device.
+		d.ID, d.CreatedAt = traits.NewID(), now
+		_, err = tx.ExecContext(ctx, `
+			INSERT INTO devices (id, user_id, platform, app_version, os_version, model, locale,
+			                     push_token, push_enabled, created_at, last_seen_at)
+			VALUES (?,?,?,?,?,?,?,
+			        CASE WHEN EXISTS (SELECT 1 FROM devices WHERE push_token = ?) THEN NULL ELSE ? END,
+			        ?,?,?)`,
+			d.ID, d.UserID, d.Platform, d.AppVersion, d.OSVersion, d.Model, d.Locale,
+			nullText(d.PushToken), nullText(d.PushToken), push, ms(d.CreatedAt), ms(d.LastSeenAt))
+		return err
+	})
+	if err != nil {
+		return domain.Device{}, err
+	}
+	return d, nil
 }
 
 // Device — бір құрылғы.

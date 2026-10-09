@@ -3,11 +3,17 @@ import SwiftUI
 @main
 struct AIReplyApp: App {
 
-    @State private var settings = AppSettings()
+    /// UIKit's push callbacks (launch, APNs token) have no SwiftUI
+    /// equivalent; the delegate hands them to `AppServices`.
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
+    @State private var settings: AppSettings
     @State private var configuration: ReplyConfigurationModel
     @State private var account: AccountModel
     @State private var keyboardStatus = KeyboardStatusMonitor()
     @Environment(\.scenePhase) private var scenePhase
+
+    private let services = AppServices.shared
 
     init() {
         #if DEBUG
@@ -16,6 +22,7 @@ struct AIReplyApp: App {
         // Sends only for a signed-in user of a server that asks for events.
         ProductEvents.sink = ProductEventReporter.shared
 
+        let settings = AppSettings()
         let configuration = ReplyConfigurationModel()
         let account = AccountModel()
         // A gender chosen on another device is taken the moment the profile
@@ -25,6 +32,17 @@ struct AIReplyApp: App {
             guard let configuration, let account else { return }
             ProfileSync(configuration: configuration, account: account).adoptServerChoice(profile?.gender)
         }
+        account.installationIDForSignOut = { AppServices.shared.installationIDForSignOut }
+        account.didDeleteAccount = { [weak configuration] in
+            configuration?.forgetAccountProfile()
+            ProductEventReporter.shared.discardWaiting()
+        }
+        AppServices.shared.appLanguage = { settings.effectiveLanguage.rawValue }
+        // A quota or plan notification opens on current numbers.
+        AppServices.shared.onNotificationOpened = { [weak account] in
+            Task { await account?.refresh() }
+        }
+        _settings = State(initialValue: settings)
         _configuration = State(initialValue: configuration)
         _account = State(initialValue: account)
     }
@@ -54,16 +72,35 @@ struct AIReplyApp: App {
             .environment(configuration)
             .environment(account)
             .environment(keyboardStatus)
+            .environment(services.router)
+            .environment(services.notifications)
             // A gender picked on another device arrives with /me; one picked
             // here and not yet confirmed is retried on every return.
             .onChange(of: account.profile) {
                 Task { await profileSync.reconcile() }
             }
+            // An account without a notification language gets this app's.
+            .onChange(of: account.user) {
+                Task { await languageSync.reconcile() }
+            }
+            // Sign-in, sign-out and the server's features decide whether and
+            // how this install is registered for notifications.
+            .onChange(of: accountState, initial: true) { _, state in
+                services.accountDidChange(state)
+            }
+            // The installation carries the app's language.
+            .onChange(of: settings.effectiveLanguage) {
+                services.requestInstallationSync()
+            }
             .onChange(of: scenePhase) { _, phase in
+                services.scenePhaseDidChange(phase)
                 switch phase {
                 case .active:
                     keyboardStatus.refresh()
+                    // The keyboard may have dropped a consent the server no longer has.
+                    account.revalidateLegalConsent()
                     Task { await profileSync.reconcile() }
+                    Task { await languageSync.reconcile() }
                 case .background:
                     ProductEventReporter.shared.flushBeforeSuspension()
                 default:
@@ -89,12 +126,26 @@ struct AIReplyApp: App {
                 server: account.profile?.gender
             )))
         } else {
-            NavigationStack { HomeView() }
+            RootNavigationView()
         }
     }
 
     private var profileSync: ProfileSync {
         ProfileSync(configuration: configuration, account: account)
+    }
+
+    private var languageSync: PreferredLanguageSync {
+        PreferredLanguageSync(account: account, settings: settings)
+    }
+
+    private var accountState: AppServices.AccountState {
+        AppServices.AccountState(
+            isBootstrapComplete: account.isBootstrapComplete,
+            hasAcceptedLegal: account.hasAcceptedLegal,
+            isSignedIn: account.isSignedIn,
+            userID: account.user?.id,
+            features: account.features
+        )
     }
 }
 
@@ -102,6 +153,8 @@ struct AIReplyApp: App {
 /// Which screen `-AIReplyDebugScreen <name>` should open.
 enum DebugScreen: String {
     case keyboard, setup, home, settings, profile, templates
+    /// Settings, scrolled to its notifications section.
+    case notifications
     /// The first-run onboarding, whatever was completed: from its first step,
     /// or from the one `-AIReplyDebugStep` names.
     case onboarding
@@ -131,8 +184,10 @@ private struct DebugScreenHost: View {
         switch screen {
         case .keyboard:  DebugKeyboardHost()
         case .setup:     NavigationStack { KeyboardSetupView() }
-        case .home:      NavigationStack { HomeView() }
+        // The router's own stack, so `-AIReplyOpenLink` can be tried here.
+        case .home:      RootNavigationView()
         case .settings:  NavigationStack { SettingsView() }
+        case .notifications: NavigationStack { SettingsView(focus: .notifications) }
         case .profile:   NavigationStack { ProfileEditorView() }
         case .templates: NavigationStack { TemplateEditorView(templateID: "client") }
         case .onboarding:

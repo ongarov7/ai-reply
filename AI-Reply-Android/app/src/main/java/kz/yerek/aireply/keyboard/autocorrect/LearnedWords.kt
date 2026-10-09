@@ -59,6 +59,15 @@ interface LearnedWordsStore {
 
     fun write(language: KeyboardLanguage, value: String)
 
+    /** Every layout's words go: the account they were typed under was deleted. */
+    fun clear()
+
+    /**
+     * Changes whenever [clear] runs, so a copy held in memory (the keyboard's
+     * engine, in the same process as the app) knows it is out of date.
+     */
+    val generation: Int get() = 0
+
     companion object {
         /** `autocorrect.learned.<lang>`. */
         fun key(language: KeyboardLanguage): String = "autocorrect.learned.${language.code}"

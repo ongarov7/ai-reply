@@ -16,6 +16,8 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.outlined.Flag
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -39,11 +41,14 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kz.yerek.aireply.BuildConfig
 import kz.yerek.aireply.R
 import kz.yerek.aireply.ai.AIConfiguration
 import kz.yerek.aireply.ai.AIReplyError
 import kz.yerek.aireply.ai.AIReplyException
 import kz.yerek.aireply.ai.AIReplyService
+import kz.yerek.aireply.ai.AIReportController
+import kz.yerek.aireply.ai.AIReportMode
 import kz.yerek.aireply.core.lang.AppLanguage
 import kz.yerek.aireply.core.lang.TemplateNaming
 import kz.yerek.aireply.domain.model.ReplyConfiguration
@@ -101,6 +106,10 @@ fun ComposeScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val configuration by services.configuration.configuration.collectAsStateWithLifecycle()
+    val accountState by services.account.state.collectAsStateWithLifecycle()
+    val reports = remember { AIReportController(scope, services.aiReportSender, BuildConfig.VERSION_NAME) }
+    // Only on a server that takes reports.
+    val canReport = accountState.features?.aiReports == true
 
     var message by remember { mutableStateOf("") }
     var instruction by remember { mutableStateOf("") }
@@ -127,6 +136,8 @@ fun ComposeScreen(onBack: () -> Unit) {
         error = null
         reply = ""
         generating = true
+        // A report is about the reply it was opened on.
+        reports.close()
 
         job = scope.launch {
             try {
@@ -326,6 +337,26 @@ fun ComposeScreen(onBack: () -> Unit) {
                                 )
                             }
                         }
+                        // Quiet and on its own line: Copy and Regenerate keep their places.
+                        if (canReport) {
+                            TextButton(
+                                onClick = { reports.open(AIReportMode.REPLY, reply) },
+                                enabled = !generating,
+                                colors = ButtonDefaults.textButtonColors(
+                                    contentColor = LocalExtraColors.current.textSecondary
+                                )
+                            ) {
+                                Icon(
+                                    Icons.Outlined.Flag,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Text(
+                                    stringResource(R.string.report_action),
+                                    modifier = Modifier.padding(start = Spacing.xxs)
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -337,6 +368,10 @@ fun ComposeScreen(onBack: () -> Unit) {
             delay(2_000)
             copied = false
         }
+    }
+
+    reports.draft?.let { draft ->
+        ReportDialog(draft = draft, onSend = reports::send, onDismiss = reports::close)
     }
 
     if (dictatingMessage) {

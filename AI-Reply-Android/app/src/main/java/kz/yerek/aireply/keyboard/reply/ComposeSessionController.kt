@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kz.yerek.aireply.ai.AIReplyError
@@ -110,7 +111,8 @@ class ComposeSessionController(
             isRegeneration = regenerating,
             inputLanguage = inputLanguage()
         )
-        job = scope.launch {
+        // Started only once it is the job (see ReplySessionController.generate).
+        val running = scope.launch(start = CoroutineStart.LAZY) {
             try {
                 val message = service.compose(request)
                 if (mine != ticket || session !== current) return@launch
@@ -136,6 +138,8 @@ class ComposeSessionController(
                 if (mine == ticket) job = null
             }
         }
+        job = running
+        running.start()
     }
 
     /** Stop. The instruction and versions stay; a late answer is ignored. */

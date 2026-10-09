@@ -19,6 +19,16 @@ type LimitsSource interface {
 	Current(ctx context.Context) limits.Limits
 }
 
+// QuotaEvents — квота шегіне жеткенде хабарлайтын қабат (notifications.Events).
+//
+// usage carries the counters after this request (or at the limit when the
+// reservation was refused); date and month are the quota period keys. It is
+// called on the reply path: the implementation must decide cheaply and log
+// its own errors.
+type QuotaEvents interface {
+	QuotaUsed(ctx context.Context, user domain.User, usage domain.Entitlement, date, month string)
+}
+
 // Service — AI шлюзі: квота → провайдер → сапа → есеп.
 type Service struct {
 	repo     *repository.Store
@@ -28,6 +38,9 @@ type Service struct {
 	log      *slog.Logger
 	clock    traits.Clock
 	repair   bool
+	quota    QuotaEvents
+	// polishPerDay — бір қолданушының сервер күніндегі polish шегі (0 — шексіз).
+	polishPerDay int
 }
 
 // New — шлюз. Тексеруден өтпеген жауапты түзету әдепкіде қосулы.
@@ -41,6 +54,12 @@ func (s *Service) WithClock(c traits.Clock) *Service { s.clock = c; return s }
 
 // WithRepair — бір реттік түзету сұранысы (AI_REPAIR_ENABLED).
 func (s *Service) WithRepair(enabled bool) *Service { s.repair = enabled; return s }
+
+// WithQuotaEvents — квота хабарламалары (nil — жоқ).
+func (s *Service) WithQuotaEvents(q QuotaEvents) *Service { s.quota = q; return s }
+
+// WithPolishDailyLimit — polish шегі бір қолданушыға күніне (LIMIT_POLISH_PER_DAY).
+func (s *Service) WithPolishDailyLimit(n int) *Service { s.polishPerDay = n; return s }
 
 // Request — бір жауап сұранысы. Мәтін тек жадта, тек осы шақыру ішінде болады.
 type Request struct {
@@ -69,8 +88,11 @@ type Result struct {
 	DailyLimit       int
 	UsedToday        int
 	Remaining        int
-	ResetsAt         time.Time
-	LatencyMS        int
+	// MonthlyLimit — 0 болса айлық шек жоқ; UsedMonth — осы айда жұмсалғаны.
+	MonthlyLimit int
+	UsedMonth    int
+	ResetsAt     time.Time
+	LatencyMS    int
 	// SourceLimit — ErrSourceTooLong кезінде клиентке нақты шекті айту үшін.
 	SourceLimit int
 	// InstructionLimit — compose нұсқауы шектен асқанда (ErrInstructionTooLong).
@@ -84,6 +106,20 @@ const (
 	ModeCompose = "compose"
 	ModePolish  = "polish"
 )
+
+// bookkeepingTimeout — провайдерден кейінгі есепке (квотаны қайтару, токендер, оқиға) берілетін уақыт.
+const bookkeepingTimeout = 5 * time.Second
+
+// bookkeeping — провайдер жауап бергеннен кейінгі жазбаларға арналған контекст.
+//
+// The request context is cancelled when the client goes away — exactly what
+// happens when a keyboard is closed while the provider is still writing. The
+// refund, the token counters and the usage event must still be written, so
+// they run on a context that keeps the request's values but not its
+// cancellation, bounded by a short timeout of its own.
+func bookkeeping(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.WithoutCancel(ctx), bookkeepingTimeout)
+}
 
 // call — генерацияның метадерегі: кім, қай режим, қай құрылғыдан. Мәтін емес.
 type call struct {
@@ -153,18 +189,27 @@ func (s *Service) generate(ctx context.Context, c call, prompt Prompt, started t
 	}
 	date, month := s.subs.Keys(started)
 
-	if err := s.repo.ReserveQuota(ctx, c.User.ID, date, month,
-		entitlement.DailyLimit, entitlement.MonthlyLimit); err != nil {
+	usedDay, usedMonth, err := s.repo.ReserveQuota(ctx, c.User.ID, date, month,
+		entitlement.DailyLimit, entitlement.MonthlyLimit)
+	if err != nil {
 		s.record(ctx, c, entitlement, "error", errorCode(err), prompt.Version, Completion{}, 0)
+		s.quotaRefused(ctx, c.User, entitlement, date, month, err)
 		return Result{
-			DailyLimit: entitlement.DailyLimit,
-			UsedToday:  entitlement.UsedToday,
-			ResetsAt:   entitlement.ResetsAt,
+			DailyLimit:   entitlement.DailyLimit,
+			UsedToday:    entitlement.UsedToday,
+			MonthlyLimit: entitlement.MonthlyLimit,
+			UsedMonth:    entitlement.UsedMonth,
+			ResetsAt:     entitlement.ResetsAt,
 		}, err
 	}
 
 	outcome, providerErr := Complete(ctx, s.provider, prompt, s.repair)
 	latency := int(s.clock.Now().Sub(started).Milliseconds())
+
+	// From here on the request may already be cancelled: what is written
+	// below must be written anyway.
+	ctx, cancel := bookkeeping(ctx)
+	defer cancel()
 
 	if providerErr != nil {
 		// Жауап алынбады — бронды қайтарамыз (қайталау кезінде екі рет есептелмейді).
@@ -193,10 +238,10 @@ func (s *Service) generate(ctx context.Context, c call, prompt Prompt, started t
 		"input_tokens", completion.InputTokens, "output_tokens", completion.OutputTokens,
 		"repaired", outcome.Repaired, "truncated", outcome.Truncated)
 
-	usedToday := entitlement.UsedToday + 1
-	remaining := entitlement.DailyLimit - usedToday
-	if remaining < 0 {
-		remaining = 0
+	usage := entitlement
+	usage.UsedToday, usage.UsedMonth = usedDay, usedMonth
+	if s.quota != nil {
+		s.quota.QuotaUsed(ctx, c.User, usage, date, month)
 	}
 
 	return Result{
@@ -206,11 +251,30 @@ func (s *Service) generate(ctx context.Context, c call, prompt Prompt, started t
 		InputTokens:      outcome.InputTokens,
 		OutputTokens:     outcome.OutputTokens,
 		DailyLimit:       entitlement.DailyLimit,
-		UsedToday:        usedToday,
-		Remaining:        remaining,
+		UsedToday:        usage.UsedToday,
+		Remaining:        usage.Remaining(),
+		MonthlyLimit:     entitlement.MonthlyLimit,
+		UsedMonth:        usage.UsedMonth,
 		ResetsAt:         entitlement.ResetsAt,
 		LatencyMS:        latency,
 	}, nil
+}
+
+// quotaRefused — брон лимитке тірелді: квота бітті деген хабарлама (сол күннің кілтімен,
+// сондықтан сәтті соңғы генерациядан кейінгі хабармен қайталанбайды).
+func (s *Service) quotaRefused(ctx context.Context, user domain.User, ent domain.Entitlement, date, month string, err error) {
+	if s.quota == nil {
+		return
+	}
+	switch {
+	case errors.Is(err, domain.ErrDailyLimit):
+		ent.UsedToday = max(ent.UsedToday, ent.DailyLimit)
+	case errors.Is(err, domain.ErrMonthlyLimit):
+		ent.UsedMonth = max(ent.UsedMonth, ent.MonthlyLimit)
+	default:
+		return
+	}
+	s.quota.QuotaUsed(ctx, user, ent, date, month)
 }
 
 // logFailure — сәтсіз генерация: тек режим, нұсқа, код және кідіріс.

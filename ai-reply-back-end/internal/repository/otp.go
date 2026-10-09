@@ -49,11 +49,14 @@ func (s *Store) OTPByID(ctx context.Context, id string) (OTPRecord, error) {
 }
 
 // OTPIssuedSince — берілген сәттен бері шығарылған кодтардың уақыты, өсу ретімен.
+//
+// A code whose delivery failed never reached anyone: it does not count
+// toward the per-address caps, so a mail outage cannot lock an address out.
 func (s *Store) OTPIssuedSince(ctx context.Context, kind, value string, since time.Time) ([]time.Time, error) {
 	rows, err := s.db.Reader().QueryContext(ctx, `
 		SELECT created_at FROM otp_codes
-		WHERE identity_kind = ? AND identity_value = ? AND created_at >= ?
-		ORDER BY created_at`, kind, value, ms(since))
+		WHERE identity_kind = ? AND identity_value = ? AND created_at >= ? AND consumed_reason <> ?
+		ORDER BY created_at`, kind, value, ms(since), domain.OTPReasonDeliveryFailed)
 	if err != nil {
 		return nil, err
 	}
@@ -65,6 +68,43 @@ func (s *Store) OTPIssuedSince(ctx context.Context, kind, value string, since ti
 			return nil, err
 		}
 		out = append(out, timeFrom(created))
+	}
+	return out, rows.Err()
+}
+
+// OTPFailure — бір кодтың қате енгізулері.
+type OTPFailure struct {
+	CreatedAt time.Time
+	Failed    int
+}
+
+// OTPFailuresSince — берілген сәттен бері шығарылған кодтардың қате енгізулері, өсу ретімен.
+//
+// Every guess is counted in attempts; on a verified code the last attempt
+// was the right one. Codes without a wrong guess are left out.
+func (s *Store) OTPFailuresSince(ctx context.Context, kind, value string, since time.Time) ([]OTPFailure, error) {
+	rows, err := s.db.Reader().QueryContext(ctx, `
+		SELECT created_at, CASE WHEN consumed_reason = ? THEN attempts - 1 ELSE attempts END AS failed
+		FROM otp_codes
+		WHERE identity_kind = ? AND identity_value = ? AND created_at >= ? AND attempts > 0
+		ORDER BY created_at`, domain.OTPReasonVerified, kind, value, ms(since))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []OTPFailure
+	for rows.Next() {
+		var (
+			f       OTPFailure
+			created int64
+		)
+		if err := rows.Scan(&created, &f.Failed); err != nil {
+			return nil, err
+		}
+		if f.Failed > 0 {
+			f.CreatedAt = timeFrom(created)
+			out = append(out, f)
+		}
 	}
 	return out, rows.Err()
 }

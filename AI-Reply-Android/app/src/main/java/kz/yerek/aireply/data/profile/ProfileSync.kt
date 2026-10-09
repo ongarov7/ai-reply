@@ -9,11 +9,14 @@ import kz.yerek.aireply.data.account.AccountProfile
 import kz.yerek.aireply.data.account.AccountService
 import kz.yerek.aireply.data.account.ProfileUpdate
 import kz.yerek.aireply.data.settings.DeviceStateStore
+import kz.yerek.aireply.domain.model.BusinessContext
 import kz.yerek.aireply.domain.model.GrammaticalGender
+import kz.yerek.aireply.domain.model.ReplyTone
 
 /**
- * Keeps the grammatical gender the same on every device of one account, and
- * gives the server its informational copy of the onboarding version.
+ * Keeps the grammatical gender the same on every device of one account, gives
+ * the server its informational copy of the onboarding version, and tells it
+ * the language for the account's notifications ([PreferredLanguageSync]).
  *
  * Жыныс алдымен құрылғыда сақталады, серверге мүмкін болғанда жіберіледі.
  *
@@ -30,7 +33,8 @@ class ProfileSync(
     private val isSignedIn: () -> Boolean,
     private val features: () -> AIFeatures,
     /** Outlives the screen that made the change. */
-    private val scope: CoroutineScope
+    private val scope: CoroutineScope,
+    private val preferredLanguage: PreferredLanguageSync? = null
 ) {
 
     /** One request at a time, so an older choice can never land after a newer one. */
@@ -43,8 +47,18 @@ class ProfileSync(
         scope.launch { pushPending() }
     }
 
+    /** The user picked another app language in Settings. */
+    fun appLanguageChanged() {
+        preferredLanguage?.languageChanged()
+    }
+
     /** Sends a change that has not reached the server yet. A no-op when nothing is waiting. */
     suspend fun pushPending() {
+        pushGender()
+        preferredLanguage?.pushPending()
+    }
+
+    private suspend fun pushGender() {
         if (!device.profilePendingSync || !canSend()) return
         sending.withLock {
             val gender = configuration.profile.grammaticalGender
@@ -63,11 +77,35 @@ class ProfileSync(
         device.accountSignedOut()
     }
 
+    /**
+     * The account was deleted: what this phone kept of the profile the server
+     * had a copy of goes too - about me, role, business, tone, gender. The
+     * personas, their order and the working hours are this phone's settings
+     * and stay.
+     */
+    fun accountDeleted() {
+        configuration.updateProfile {
+            it.copy(
+                descriptionText = "",
+                role = "",
+                business = BusinessContext.EMPTY,
+                preferredTone = ReplyTone.NATURAL,
+                grammaticalGender = null
+            )
+        }
+        device.accountSignedOut()
+    }
+
     /** After `/me`: a choice made on another device of the same account is taken over. */
     fun adopt(server: AccountProfile) {
         val local = configuration.profile.grammaticalGender
         val adopted = adoptedGender(local, server.grammaticalGender, device.profilePendingSync) ?: return
         configuration.updateProfile { it.copy(grammaticalGender = adopted) }
+    }
+
+    /** After sign-in or `/me`: [server] is the account's `preferred_language`. */
+    fun adoptPreferredLanguage(server: String?) {
+        preferredLanguage?.adopt(server)
     }
 
     /** Onboarding [version] finished on this device. Informational for the server. */

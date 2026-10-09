@@ -105,8 +105,8 @@ class AIReplyService(
         )
 
         val override = transportOverride?.invoke(request, prompt)
-        // Only the real service needs an account; an override does not.
-        if (override == null && !configuration.isReady) AIReplyError.AuthenticationFailed.raise()
+        // Only the real service needs an account and the consent; an override does not.
+        if (override == null) configuration.checkReady()
         val transport = override
             ?: makeTransport(request, message, templateName, instruction, businessContext)
 
@@ -117,6 +117,7 @@ class AIReplyService(
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (exception: AIReplyException) {
+            configuration.requestFailed(exception.error)
             throw exception
         } catch (throwable: Throwable) {
             throw AIReplyException(ReplyNetworking.mapError(throwable))

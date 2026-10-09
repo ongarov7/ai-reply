@@ -51,8 +51,11 @@ func New(d Deps) *Server {
 	return &Server{cfg: d.Config, admin: d.Admin, sim: d.Simulator, limiter: d.Limiter, log: d.Log}
 }
 
-// Register — маршруттар.
+// Register — маршруттар. SIMULATOR_ENABLED=false болса, ештеңе тіркелмейді (404).
 func (s *Server) Register(mux *http.ServeMux) {
+	if !s.cfg.App.SimulatorEnabled {
+		return
+	}
 	generate := middleware.RateLimit(s.limiter, "simulator_ai", s.cfg.Limits.AIPerMinute, time.Minute,
 		func(r *http.Request) string {
 			if a := adminFrom(r.Context()); a.ID != "" {

@@ -4,6 +4,7 @@ package domain
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -34,6 +35,8 @@ const (
 const (
 	OTPPurposeLogin     = "login"
 	OTPPurposeLinkEmail = "link_email"
+	// OTPPurposeDelete — тіркелгіні веб-беттен жою (/account/delete).
+	OTPPurposeDelete = "delete"
 )
 
 // OTP жабылу себептері (otp_codes.consumed_reason).
@@ -86,6 +89,34 @@ func NormalizeLocale(v string) string {
 	return "en"
 }
 
+// NormalizePreferredLanguage — клиент жіберген тіл коды → kk | ru | en | uz, белгісізі "".
+//
+// Unlike NormalizeLocale nothing falls back to English silently: "RU" and
+// "ru-KZ" become "ru", an unsupported code becomes "" and the caller decides
+// (PATCH /me rejects it).
+func NormalizePreferredLanguage(v string) string {
+	v = strings.ToLower(strings.TrimSpace(v))
+	if i := strings.IndexAny(v, "-_"); i >= 0 {
+		v = v[:i]
+	}
+	for _, l := range Locales {
+		if l == v {
+			return l
+		}
+	}
+	return ""
+}
+
+// ResolveLanguage — бірінші қолдау көрсетілетін тіл (preferred → орнату → тіркелгі), әйтпесе en.
+func ResolveLanguage(candidates ...string) string {
+	for _, c := range candidates {
+		if l := NormalizePreferredLanguage(c); l != "" {
+			return l
+		}
+	}
+	return "en"
+}
+
 // User — есептік жазба. Мұнда хабарлама мазмұны ешқашан болмайды.
 type User struct {
 	ID           string
@@ -99,9 +130,12 @@ type User struct {
 	OSVersion    string
 	Kind         string
 	LegacyClient string
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-	LastActiveAt *time.Time
+	// PreferredLanguage — қолданушы өзі таңдаған тіл (kk | ru | en | uz), "" — таңдалмаған.
+	// Хабарламалар мен хаттардың тілі осыдан шығады; Locale әр кірген сайын жаңарады.
+	PreferredLanguage string
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+	LastActiveAt      *time.Time
 }
 
 // Identifier — көрсетуге жарамды негізгі идентификатор.
@@ -153,6 +187,7 @@ type Profile struct {
 }
 
 // LegalConsent records the exact public document versions accepted by an account.
+// A withdrawn consent stays as a record (withdrawn_at) and no longer counts.
 type LegalConsent struct {
 	ID             string
 	UserID         string
@@ -194,11 +229,16 @@ type Plan struct {
 	PeriodDays   int
 	IsFree       bool
 	IsActive     bool
-	SortOrder    int
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-	ArchivedAt   *time.Time
+	// IsVisible — customers see the plan (apps, landing, /api/v1/plans).
+	IsVisible  bool
+	SortOrder  int
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+	ArchivedAt *time.Time
 }
+
+// Listed — тариф клиентке көрсетіледі: қосулы, көрінеді, мұрағатта емес.
+func (p Plan) Listed() bool { return p.IsActive && p.IsVisible && p.ArchivedAt == nil }
 
 // Localized таңдалған тілдегі атауды қайтарады (болмаса — ағылшынша).
 func (p Plan) LocalizedName(locale string) string { return pick(p.Name, locale) }
@@ -261,15 +301,60 @@ type Entitlement struct {
 }
 
 // Remaining — бүгін қалған генерация саны.
+//
+// A monthly cap (MonthlyLimit > 0) can end the day early: what is left today
+// is never more than what is left this month.
 func (e Entitlement) Remaining() int {
 	if e.DailyLimit <= 0 {
 		return 0
 	}
-	if e.UsedToday >= e.DailyLimit {
-		return 0
+	left := e.DailyLimit - e.UsedToday
+	if e.MonthlyLimit > 0 {
+		left = min(left, e.MonthlyLimit-e.UsedMonth)
 	}
-	return e.DailyLimit - e.UsedToday
+	return max(left, 0)
 }
+
+// AIReport — AI жасаған мәтінге шағым (POST /api/v1/ai/reports).
+//
+// Text is the generated reply or message, stored only when the person chose
+// to include it. The copied message and the instruction are never part of a
+// report.
+type AIReport struct {
+	ID         string
+	UserID     string
+	Mode       string // reply | compose
+	Reason     string
+	Comment    string
+	Text       string
+	Platform   string
+	AppVersion string
+	Status     string // open | resolved
+	CreatedAt  time.Time
+	ResolvedAt *time.Time
+	ResolvedBy string
+}
+
+// Шағым күйлері.
+const (
+	ReportOpen     = "open"
+	ReportResolved = "resolved"
+)
+
+// ReportStatuses — әкімші сүзгісінің мәндері.
+var ReportStatuses = []string{ReportOpen, ReportResolved}
+
+// ReportReasons — шағым себептері (қолданбалар осы кодтарды жібереді).
+var ReportReasons = []string{"offensive", "harmful", "false_info", "wrong_language", "other"}
+
+// ReportModes — шағым қай режимнің мәтініне.
+var ReportModes = []string{"reply", "compose"}
+
+// Шағым өрістерінің шегі (таңбамен).
+const (
+	ReportCommentMax = 500
+	ReportTextMax    = 2000
+)
 
 // UsageEvent — тек метадерек. source_text те, жауап та жоқ.
 type UsageEvent struct {
@@ -357,6 +442,9 @@ var (
 	ErrEmptyCompletion  = errors.New("empty completion")
 	ErrPaymentRequired  = errors.New("payment required")
 	ErrDemoDisabled     = errors.New("demo authentication disabled")
+	// ErrConsentRequired — ағымдағы шарттар мен құпиялық саясатына келісім жоқ
+	// (не кері қайтарылған): AI сұраныстары тоқтайды.
+	ErrConsentRequired = errors.New("legal consent required")
 
 	// Кіру: пошта, OTP, Google және Apple.
 	ErrInvalidEmail            = errors.New("invalid email")
@@ -367,6 +455,12 @@ var (
 	ErrEmailInUse              = errors.New("email belongs to another account")
 	ErrInvalidIDToken          = errors.New("invalid identity token")
 	ErrAuthProviderUnavailable = errors.New("auth provider unavailable")
+
+	// Тарифтер мен сатып алу.
+	// ErrPlanUnavailable — the plan is hidden, disabled, archived or free.
+	// ErrPurchasesDisabled — buying is switched off or no verified billing exists.
+	ErrPlanUnavailable   = errors.New("plan is not available for purchase")
+	ErrPurchasesDisabled = errors.New("purchases are disabled")
 
 	// ErrSourceTooLong — көшірілген хабарлама әкімші бекіткен шектен ұзын.
 	// ErrInvalidRequest-ті орайды: ескі клиенттер бұрынғыдай INVALID_REQUEST
@@ -420,3 +514,56 @@ func (e *OTPAttemptError) Unwrap() error { return ErrInvalidOTP }
 func (e *OTPAttemptError) Details() map[string]any {
 	return map[string]any{"attempts_remaining": e.Remaining}
 }
+
+// Push хабарламалары.
+var (
+	// ErrPushDisabled — PUSH_NOTIFICATIONS_ENABLED=false не FCM бапталмаған.
+	ErrPushDisabled = errors.New("push notifications are not configured")
+)
+
+// FieldError — сұраныстың қай өрісі жарамсыз (400 INVALID_REQUEST + details.field).
+type FieldError struct {
+	Field  string
+	Reason string
+}
+
+func (e *FieldError) Error() string {
+	if e.Reason != "" {
+		return "invalid " + e.Field + ": " + e.Reason
+	}
+	return "invalid " + e.Field
+}
+
+// Unwrap — ErrInvalidRequest: ескі клиенттер бұрынғыдай INVALID_REQUEST алады.
+func (e *FieldError) Unwrap() error { return ErrInvalidRequest }
+
+// Details — клиентке қай өріс екені (мәннің өзі емес).
+func (e *FieldError) Details() map[string]any {
+	d := map[string]any{"field": e.Field}
+	if e.Reason != "" {
+		d["reason"] = e.Reason
+	}
+	return d
+}
+
+// InvalidField — FieldError жасайды.
+func InvalidField(field, reason string) error { return &FieldError{Field: field, Reason: reason} }
+
+// ConflictError — сұраныс бұрынғы күйге қайшы (409 CONFLICT + details.field).
+type ConflictError struct {
+	Field  string
+	Reason string
+}
+
+func (e *ConflictError) Error() string { return "conflict on " + e.Field + ": " + e.Reason }
+
+// Unwrap — ErrConflict.
+func (e *ConflictError) Unwrap() error { return ErrConflict }
+
+// Details — қай өріс екені.
+func (e *ConflictError) Details() map[string]any {
+	return map[string]any{"field": e.Field, "reason": e.Reason}
+}
+
+// ConflictField — ConflictError жасайды.
+func ConflictField(field, reason string) error { return &ConflictError{Field: field, Reason: reason} }

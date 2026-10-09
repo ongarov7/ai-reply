@@ -4,6 +4,7 @@ import android.text.InputType
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import kz.yerek.aireply.platform.ReplyLog
+import java.text.BreakIterator
 
 /**
  * Everything the keyboard does to the host application's text field, in one
@@ -191,22 +192,19 @@ class HostField(private val connectionProvider: () -> InputConnection?) {
     fun deleteBackward() {
         finishComposing()
         val connection = connection ?: return
-        // Delete the selection if there is one; otherwise one character. Asking
-        // for one "character" by code point rather than by UTF-16 unit is what
-        // makes an emoji delete whole instead of leaving half a surrogate pair.
+        // Delete the selection if there is one; otherwise one character as the
+        // user sees it - a whole emoji (a flag, a family, a skin tone) or a
+        // letter with its combining marks, never half of one, exactly as the
+        // keyboard's own fields do (KeyboardTextFieldState).
         val selected = connection.getSelectedText(0)
         if (!selected.isNullOrEmpty()) {
             connection.commitText("", 1)
             expectCaret(if (selection.isKnown) selection.start else -1)
             return
         }
-        val before = connection.getTextBeforeCursor(2, 0)?.toString().orEmpty()
-        val length = when {
-            before.isEmpty() -> return
-            before.length >= 2 && Character.isSurrogatePair(before[before.length - 2], before[before.length - 1]) -> 2
-            else -> 1
-        }
-        deleteBefore(length)
+        val before = connection.getTextBeforeCursor(CLUSTER_WINDOW, 0)?.toString().orEmpty()
+        if (before.isEmpty()) return
+        deleteBefore(before.length - previousCluster(before, before.length))
     }
 
     /**
@@ -236,32 +234,26 @@ class HostField(private val connectionProvider: () -> InputConnection?) {
     }
 
     /**
-     * Moves the caret by whole characters (space-bar trackpad). Reads just
-     * enough text either side to step over emoji rather than into them.
+     * Moves the caret by whole characters (space-bar trackpad), stepping over
+     * an emoji or a combined letter rather than into it. Reads just enough
+     * text either side for that.
      */
     fun moveCursorBy(offset: Int) {
         finishComposing()
         val connection = connection ?: return
         val position = selection.end
         if (offset == 0 || position < 0) return
-        val window = kotlin.math.abs(offset) * 2 + 2
-        val before = connection.getTextBeforeCursor(window, 0)?.toString().orEmpty()
-        val after = connection.getTextAfterCursor(window, 0)?.toString().orEmpty()
-        var units = 0
-        if (offset < 0) {
+        val window = (kotlin.math.abs(offset) * CLUSTER_WINDOW).coerceAtMost(MAX_MOVE_WINDOW)
+        val units = if (offset < 0) {
+            val before = connection.getTextBeforeCursor(window, 0)?.toString().orEmpty()
             var index = before.length
-            repeat(-offset) {
-                if (index <= 0) return@repeat
-                index = if (index >= 2 && Character.isSurrogatePair(before[index - 2], before[index - 1])) index - 2 else index - 1
-            }
-            units = index - before.length
+            repeat(-offset) { if (index > 0) index = previousCluster(before, index) }
+            index - before.length
         } else {
+            val after = connection.getTextAfterCursor(window, 0)?.toString().orEmpty()
             var index = 0
-            repeat(offset) {
-                if (index >= after.length) return@repeat
-                index = if (index + 1 < after.length && Character.isSurrogatePair(after[index], after[index + 1])) index + 2 else index + 1
-            }
-            units = index
+            repeat(offset) { if (index < after.length) index = nextCluster(after, index) }
+            index
         }
         if (units == 0) return
         val target = (position + units).coerceAtLeast(0)
@@ -269,21 +261,32 @@ class HostField(private val connectionProvider: () -> InputConnection?) {
         selection.expect(target)
     }
 
-    /** Puts the caret after the last character, so Add appends at the end. */
+    /**
+     * Puts the caret after the last character, so Add appends at the end. A
+     * selection counts as text: it is kept, not typed over.
+     */
     fun moveCaretToEnd() {
         finishComposing()
         val connection = connection ?: return
         val after = connection.getTextAfterCursor(MAX_CLEAR, 0)?.length ?: 0
-        if (after == 0) return
+        val selected = connection.getSelectedText(0)?.length ?: 0
+        if (after == 0 && selected == 0) return
         val before = connection.getTextBeforeCursor(MAX_CLEAR, 0)?.length ?: 0
-        connection.setSelection(before + after, before + after)
+        val end = before + selected + after
+        connection.setSelection(end, end)
         selection.forget()
     }
 
-    /** True when return means a new line rather than the field's action (Send, Search…). */
+    /**
+     * True when return means a new line rather than the field's action (Send,
+     * Search…). A field that asks for no enter action gets a new line, which
+     * is also the face the return key shows there.
+     */
     val returnIsNewline: Boolean
         get() {
-            val action = editorInfo?.imeOptions?.and(EditorInfo.IME_MASK_ACTION) ?: EditorInfo.IME_ACTION_NONE
+            val options = editorInfo?.imeOptions ?: EditorInfo.IME_ACTION_NONE
+            if (options and EditorInfo.IME_FLAG_NO_ENTER_ACTION != 0) return true
+            val action = options and EditorInfo.IME_MASK_ACTION
             val isMultiline = editorInfo?.inputType?.and(InputType.TYPE_TEXT_FLAG_MULTI_LINE) != 0
             return isMultiline || action == EditorInfo.IME_ACTION_NONE || action == EditorInfo.IME_ACTION_UNSPECIFIED
         }
@@ -395,6 +398,29 @@ class HostField(private val connectionProvider: () -> InputConnection?) {
         }
 
     private companion object {
+        /**
+         * Text read to find one user-perceived character: room for the longest
+         * emoji sequences (a family with skin tones is about 25 UTF-16 units).
+         */
+        const val CLUSTER_WINDOW = 32
+
+        /** Upper bound on the text read for one trackpad move. */
+        const val MAX_MOVE_WINDOW = 1_024
+
+        /** Where the character ending at [offset] in [text] starts. */
+        fun previousCluster(text: String, offset: Int): Int {
+            if (offset <= 0) return 0
+            val iterator = BreakIterator.getCharacterInstance().also { it.setText(text) }
+            return iterator.preceding(offset).takeIf { it != BreakIterator.DONE } ?: 0
+        }
+
+        /** Where the character starting at [offset] in [text] ends. */
+        fun nextCluster(text: String, offset: Int): Int {
+            if (offset >= text.length) return text.length
+            val iterator = BreakIterator.getCharacterInstance().also { it.setText(text) }
+            return iterator.following(offset).takeIf { it != BreakIterator.DONE } ?: text.length
+        }
+
         /**
          * Upper bound on a single clear. Well past any realistic chat draft, and
          * bounded so a misbehaving host cannot make this allocate without limit.

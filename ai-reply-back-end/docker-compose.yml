@@ -20,6 +20,12 @@ services:
       - "127.0.0.1:${APP_PORT:?APP_PORT must be set in .env}:${APP_PORT:?APP_PORT must be set in .env}"
     volumes:
       - aireply-data:/app/data
+      # Firebase Admin service account (push), read-only, kept outside the repo.
+      # Uncomment once the file exists on the host and set
+      # FIREBASE_SERVICE_ACCOUNT_FILE=/run/secrets/firebase-service-account.json
+      # in .env (docs/FIREBASE_SETUP.md). A missing host file would be created
+      # as an empty directory, so do not enable this line before the file is there.
+      # - /srv/ai-reply/secrets/firebase-service-account.json:/run/secrets/firebase-service-account.json:ro
     restart: unless-stopped
 
 volumes:

@@ -2,17 +2,54 @@ import SwiftUI
 
 struct SettingsView: View {
 
+    /// A part of Settings a notification link can open directly.
+    enum Focus: Hashable {
+        case notifications
+    }
+
+    /// Scrolled into view when the screen appears.
+    var focus: Focus?
+
     @Environment(AppSettings.self) private var settings
     @Environment(ReplyConfigurationModel.self) private var model
     @Environment(AccountModel.self) private var account
     @Environment(KeyboardStatusMonitor.self) private var keyboard
+    @Environment(PushNotificationsModel.self) private var notifications
     @Environment(\.openURL) private var openURL
 
     @State private var isShowingTutorial = false
+    @State private var isConfirmingWithdrawal = false
+    /// Why the withdrawal did not reach the server, shown in an alert.
+    @State private var withdrawalFailureKey: String?
 
     var body: some View {
+        ScrollViewReader { proxy in
+            form
+                .task {
+                    guard let focus else { return }
+                    // After the push animation, so the row exists to scroll to.
+                    // Centred rather than at the top, where the section's header
+                    // would sit under the navigation bar.
+                    try? await Task.sleep(for: .milliseconds(350))
+                    withAnimation { proxy.scrollTo(focus, anchor: .center) }
+                }
+        }
+        .navigationTitle("settings.title")
+        .navigationBarTitleDisplayMode(.inline)
+        // The app re-reads it on every return to the foreground as well.
+        .onAppear { keyboard.refresh() }
+        .fullScreenCover(isPresented: $isShowingTutorial) {
+            OnboardingView(flow: OnboardingFlow(mode: .tutorial, asksGender: false))
+        }
+    }
+
+    private var form: some View {
         Form {
             AccountSettingsSection()
+
+            if notifications.showsNotificationSettings {
+                NotificationSettingsSection()
+            }
 
             Section {
                 NavigationLink { ProfileEditorView() } label: {
@@ -89,6 +126,25 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
                 Button("legal.terms") { openLegal(account.legalConfig.termsURL) }
                 Button("legal.privacy") { openLegal(account.legalConfig.privacyURL) }
+                // The AI consent can be taken back as easily as it was given;
+                // the consent screen then returns until it is given again.
+                Button("settings.privacy.withdraw", role: .destructive) {
+                    isConfirmingWithdrawal = true
+                }
+                .disabled(account.isBusy)
+                .confirmationDialog("settings.privacy.withdraw", isPresented: $isConfirmingWithdrawal,
+                                    titleVisibility: .visible) {
+                    Button("settings.privacy.withdraw", role: .destructive) {
+                        Task { withdrawalFailureKey = await account.withdrawLegalConsent() }
+                    }
+                    Button("common.cancel", role: .cancel) {}
+                } message: {
+                    Text("settings.privacy.withdraw.body")
+                }
+                .alert(Text(LocalizedStringKey(withdrawalFailureKey ?? "account.error.generic")),
+                       isPresented: withdrawalFailureBinding) {
+                    Button("common.done", role: .cancel) {}
+                }
             } header: {
                 Text("settings.privacy.title")
             }
@@ -104,6 +160,14 @@ struct SettingsView: View {
                 Text("settings.tutorial.footer")
             }
 
+            Section {
+                Button {
+                    openLegal(account.legalConfig.resolvedSupportURL)
+                } label: {
+                    Label("settings.support", systemImage: "questionmark.circle")
+                }
+            }
+
             if !AppGroup.isAvailable || !model.isPersistent {
                 Section {
                     Label("settings.storage.unavailable", systemImage: "exclamationmark.triangle")
@@ -112,13 +176,10 @@ struct SettingsView: View {
                 }
             }
         }
-        .navigationTitle("settings.title")
-        .navigationBarTitleDisplayMode(.inline)
-        // The app re-reads it on every return to the foreground as well.
-        .onAppear { keyboard.refresh() }
-        .fullScreenCover(isPresented: $isShowingTutorial) {
-            OnboardingView(flow: OnboardingFlow(mode: .tutorial, asksGender: false))
-        }
+    }
+
+    private var withdrawalFailureBinding: Binding<Bool> {
+        Binding(get: { withdrawalFailureKey != nil }, set: { if !$0 { withdrawalFailureKey = nil } })
     }
 
     private var appearanceBinding: Binding<AppearancePreference> {
@@ -147,7 +208,11 @@ struct SettingsView: View {
     }
 
     private var languageBinding: Binding<AppLanguage?> {
-        Binding(get: { settings.language }, set: { settings.setLanguage($0) })
+        Binding(get: { settings.language }, set: { language in
+            settings.setLanguage(language)
+            // Also the language of the account's notifications.
+            PreferredLanguageSync(account: account, settings: settings).languageChosen()
+        })
     }
 
     private func openLegal(_ rawURL: String) {

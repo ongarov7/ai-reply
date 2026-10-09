@@ -4,11 +4,16 @@ package plans
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/aireply/ai-reply-back-end/internal/domain"
 	"github.com/aireply/ai-reply-back-end/internal/repository"
 )
+
+// ErrDefaultPlan — әдепкі тегін тарифті өшіруге не мұрағаттауға болмайды:
+// every new account is put on it, so registration would stop working.
+var ErrDefaultPlan = fmt.Errorf("%w: the default plan must stay enabled and free", domain.ErrInvalidRequest)
 
 // Service — тарифтермен жұмыс.
 type Service struct{ repo *repository.Store }
@@ -16,9 +21,17 @@ type Service struct{ repo *repository.Store }
 // New — қызмет.
 func New(repo *repository.Store) *Service { return &Service{repo: repo} }
 
-// Active — мобильді қолданбаға арналған тізім.
+// Active — қосулы тарифтер (көрінбейтіндері де бар).
 func (s *Service) Active(ctx context.Context) ([]domain.Plan, error) {
 	return s.repo.Plans(ctx, true)
+}
+
+// Listed — клиентке көрінетін тарифтер: мобильді қолданба мен лендинг.
+//
+// Read straight from the database on every call, so a change in the admin
+// panel reaches the apps on their next request without a release.
+func (s *Service) Listed(ctx context.Context) ([]domain.Plan, error) {
+	return s.repo.ListedPlans(ctx)
 }
 
 // All — әкімшіге арналған толық тізім.
@@ -70,12 +83,38 @@ func (s *Service) Update(ctx context.Context, p domain.Plan) error {
 	if err := validate(&p); err != nil {
 		return err
 	}
+	if isDefault, err := s.isDefault(ctx, p.ID); err != nil {
+		return err
+	} else if isDefault && (!p.IsActive || !p.IsFree) {
+		return ErrDefaultPlan
+	}
 	return s.repo.UpdatePlan(ctx, p)
 }
 
 // Archive — мұрағаттау (жою емес: тарих сақталады).
 func (s *Service) Archive(ctx context.Context, id string) error {
+	if isDefault, err := s.isDefault(ctx, id); err != nil {
+		return err
+	} else if isDefault {
+		return ErrDefaultPlan
+	}
 	return s.repo.ArchivePlan(ctx, id)
+}
+
+// IsDefault — бұл тариф жаңа қолданушыларға беріле ме.
+func (s *Service) IsDefault(ctx context.Context, id string) (bool, error) {
+	return s.isDefault(ctx, id)
+}
+
+func (s *Service) isDefault(ctx context.Context, id string) (bool, error) {
+	plan, err := s.Default(ctx)
+	if errors.Is(err, domain.ErrNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return plan.ID == id, nil
 }
 
 // UsageCount — тарифтегі белсенді жазылым саны.

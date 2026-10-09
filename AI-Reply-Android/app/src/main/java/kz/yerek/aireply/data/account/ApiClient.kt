@@ -61,6 +61,15 @@ sealed interface ApiError {
         val resetsAt: String?
     ) : ApiError
 
+    /** This month's quota is spent; it comes back with the next month, not tomorrow. */
+    data class MonthlyLimitReached(val resetsAt: String?) : ApiError
+
+    /**
+     * The account has not accepted the current terms and privacy policy (or
+     * withdrew its consent): AI requests wait until the app records it again.
+     */
+    data object ConsentRequired : ApiError
+
     data object SubscriptionExpired : ApiError
     data object PaymentRequired : ApiError
     data object ProviderUnavailable : ApiError
@@ -81,8 +90,16 @@ sealed interface ApiError {
     data object MalformedResponse : ApiError
 }
 
-/** Thrown across suspend boundaries; the payload is what the UI actually reads. */
-class ApiException(val error: ApiError) : Exception(error::class.simpleName)
+/**
+ * Thrown across suspend boundaries; the payload is what the UI actually reads.
+ *
+ * [httpStatus] is the status of the answer, or null when the request got no
+ * HTTP answer at all (offline, a timeout) or never left the app.
+ */
+class ApiException(
+    val error: ApiError,
+    val httpStatus: Int? = null
+) : Exception(error::class.simpleName)
 
 fun ApiError.raise(): Nothing = throw ApiException(this)
 
@@ -100,7 +117,9 @@ fun ApiError.raise(): Nothing = throw ApiException(this)
  */
 class ApiClient(
     private val baseUrl: String,
-    private val timeoutMs: Int = DEFAULT_TIMEOUT_MS
+    private val timeoutMs: Int = DEFAULT_TIMEOUT_MS,
+    /** The connection factory; a test seam, never replaced in the app. */
+    private val openConnection: (URL) -> HttpURLConnection = { it.openConnection() as HttpURLConnection }
 ) {
 
     val json: Json = Json {
@@ -115,23 +134,34 @@ class ApiClient(
      * The response body of a FAILED request is read for the error envelope only
      * and never logged: it can quote the request back, and a request can carry
      * a private message.
+     *
+     * [headers] are extra headers for this one request only (the logout names
+     * the installation it signs out); no request carries metadata otherwise.
      */
     suspend fun request(
         method: String,
         path: String,
         body: String? = null,
-        token: String? = null
+        token: String? = null,
+        headers: Map<String, String> = emptyMap()
     ): String = withContext(Dispatchers.IO) {
         val url = baseUrl.trimEnd('/') + "/" + path.trimStart('/')
-        val connection = (URL(url).openConnection() as HttpURLConnection).apply {
-            requestMethod = method
-            connectTimeout = timeoutMs
-            readTimeout = timeoutMs
-            useCaches = false
-            setRequestProperty("Accept", "application/json")
-            if (body != null) setRequestProperty("Content-Type", "application/json; charset=utf-8")
-            if (token != null) setRequestProperty("Authorization", "Bearer $token")
-            doOutput = body != null
+        val connection = try {
+            openConnection(URL(url)).apply {
+                requestMethod = method
+                connectTimeout = timeoutMs
+                readTimeout = timeoutMs
+                useCaches = false
+                setRequestProperty("Accept", "application/json")
+                if (body != null) setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                if (token != null) setRequestProperty("Authorization", "Bearer $token")
+                headers.forEach { (name, value) -> setRequestProperty(name, value) }
+                doOutput = body != null
+            }
+        } catch (throwable: Exception) {
+            // A malformed URL or a header value the platform refuses: the
+            // request never left, which is a transport failure, not a crash.
+            throw ApiException(mapTransportError(throwable))
         }
 
         // Cancellation is real, not cooperative-only: the socket read is
@@ -151,7 +181,8 @@ class ApiClient(
 
             if (status !in 200..299) {
                 throw ApiException(
-                    mapServerError(status, text, connection.getHeaderField("Retry-After"))
+                    error = mapServerError(status, text, connection.getHeaderField("Retry-After")),
+                    httpStatus = status
                 )
             }
             text
@@ -195,11 +226,13 @@ class ApiClient(
                 "INVALID_ID_TOKEN" -> return ApiError.InvalidIdToken
                 "AUTH_PROVIDER_UNAVAILABLE" -> return ApiError.AuthProviderUnavailable
                 "RATE_LIMITED" -> return ApiError.RateLimited(retryAfter)
-                "DAILY_LIMIT_REACHED", "MONTHLY_LIMIT_REACHED" -> return ApiError.DailyLimitReached(
+                "DAILY_LIMIT_REACHED" -> return ApiError.DailyLimitReached(
                     limit = details?.dailyLimit ?: 0,
                     usedToday = details?.usedToday ?: 0,
                     resetsAt = details?.resetsAt
                 )
+                "MONTHLY_LIMIT_REACHED" -> return ApiError.MonthlyLimitReached(details?.resetsAt)
+                "CONSENT_REQUIRED" -> return ApiError.ConsentRequired
                 "SUBSCRIPTION_EXPIRED" -> return ApiError.SubscriptionExpired
                 "PAYMENT_REQUIRED" -> return ApiError.PaymentRequired
                 "AI_PROVIDER_UNAVAILABLE" -> return ApiError.ProviderUnavailable

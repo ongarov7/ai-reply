@@ -11,9 +11,11 @@ struct ComposeView: View {
 
     @Environment(ReplyConfigurationModel.self) private var model
     @Environment(AppSettings.self) private var settings
+    @Environment(AccountModel.self) private var account
 
     @State private var viewModel = ComposeViewModel()
     @State private var isDictating = false
+    @State private var isReporting = false
     @FocusState private var isFocused: Bool
 
     var body: some View {
@@ -34,6 +36,15 @@ struct ComposeView: View {
         .sheet(isPresented: $isDictating) {
             DictationSheet(language: settings.effectiveLanguage) { transcript in
                 viewModel.appendDictated(transcript)
+            }
+        }
+        .sheet(isPresented: $isReporting) {
+            AIReportSheet(mode: .reply, text: viewModel.reply)
+        }
+        // The terms were not accepted on the server: back to the consent screen.
+        .onChange(of: viewModel.failure) { _, failure in
+            if failure == .consentRequired {
+                Task { await account.serverRequiresConsent() }
             }
         }
     }
@@ -147,10 +158,118 @@ struct ComposeView: View {
                 }
                 .disabled(viewModel.isGenerating)
             }
+            // Each button its own tap target inside the row.
+            .buttonStyle(.borderless)
+
+            if account.features?.aiReports == true {
+                Button {
+                    isReporting = true
+                } label: {
+                    Label(reportStrings.report, systemImage: "flag").font(.subheadline)
+                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.secondary)
+                .disabled(viewModel.isGenerating)
+            }
         }
     }
 
+    private var reportStrings: ReportStrings { ReportStrings.forLanguage(settings.effectiveLanguage) }
+
     private var counterText: String {
         String(format: settings.localized("compose.counter"), viewModel.characterCount, viewModel.characterLimit)
+    }
+}
+
+/// Reporting a generated reply: a reason, whether its text goes along, Send.
+///
+/// Жауапқа шағым: себеп, мәтінді қосу, жіберу.
+///
+/// The words are the keyboard's (`ReportStrings`), so both say the same.
+/// Only the reason and, when the switch stays on, the reply itself are sent.
+struct AIReportSheet: View {
+
+    let mode: AIReport.Mode
+    let text: String
+
+    @Environment(AppSettings.self) private var settings
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var reason: AIReport.Reason?
+    @State private var includesText = true
+    @State private var isSending = false
+    @State private var didSend = false
+    @State private var didFail = false
+
+    private var strings: ReportStrings { ReportStrings.forLanguage(settings.effectiveLanguage).forMode(mode) }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                if didSend {
+                    Section {
+                        Label(strings.thanks, systemImage: "checkmark.circle")
+                    }
+                } else {
+                    Section {
+                        Picker(selection: $reason) {
+                            ForEach(AIReport.Reason.allCases, id: \.self) { reason in
+                                Text(strings.reason(reason)).tag(AIReport.Reason?.some(reason))
+                            }
+                        } label: {
+                            Text(strings.title)
+                        }
+                        .pickerStyle(.inline)
+                        .labelsHidden()
+                    }
+                    Section {
+                        Toggle(strings.includeText, isOn: $includesText)
+                    }
+                    Section {
+                        Button {
+                            Task { await send() }
+                        } label: {
+                            HStack {
+                                Text(strings.send)
+                                if isSending {
+                                    Spacer()
+                                    ProgressView()
+                                }
+                            }
+                        }
+                        .disabled(reason == nil || isSending)
+                    } footer: {
+                        if didFail {
+                            Text(strings.failed).foregroundStyle(Color.red)
+                        }
+                    }
+                }
+            }
+            .navigationTitle(strings.title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: didSend ? .confirmationAction : .cancellationAction) {
+                    Button(didSend ? LocalizedStringKey("common.done") : LocalizedStringKey("common.cancel")) {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private func send() async {
+        guard let reason else { return }
+        isSending = true
+        didFail = false
+        defer { isSending = false }
+        do {
+            try await AccountService().reportAIOutput(
+                AIReport(mode: mode, reason: reason, text: includesText ? text : nil)
+            )
+            didSend = true
+        } catch {
+            didFail = true
+        }
     }
 }

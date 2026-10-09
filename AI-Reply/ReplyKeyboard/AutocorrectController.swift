@@ -50,6 +50,8 @@ final class AutocorrectController {
 
     private lazy var checker = UITextChecker()
     private var lexiconRequested = false
+    /// The store's reset stamp when the learned words were last read.
+    private var learnedResetStamp: Double?
 
     init(language: KeyboardLanguage, store: LearnedWordsStore = DefaultsLearnedWordsStore()) {
         self.language = language
@@ -264,8 +266,16 @@ final class AutocorrectController {
         let store = self.store
         DispatchQueue.global(qos: .utility).async { [weak self] in
             let stored = LearnedWords(language: language, store: store)
+            let stamp = store.resetStamp
             DispatchQueue.main.async {
                 guard let self, self.language == language, self.session.learned.language == language else { return }
+                defer { self.learnedResetStamp = stamp }
+                // The words were removed in the app meanwhile: what this
+                // process still holds goes too.
+                if let seen = self.learnedResetStamp, seen != stamp {
+                    self.session.learned = stored
+                    return
+                }
                 // Words taught before the store answered stay taught.
                 var merged = stored
                 self.session.learned.words.forEach { merged.learn($0) }
@@ -277,7 +287,11 @@ final class AutocorrectController {
     private func saveLearnedWords() {
         let learned = session.learned
         let store = self.store
+        let seen = learnedResetStamp
         DispatchQueue.global(qos: .utility).async {
+            // Removed in the app since this process read them: what it still
+            // holds is not written back.
+            if let seen, store.resetStamp != seen { return }
             learned.save(to: store)
         }
     }

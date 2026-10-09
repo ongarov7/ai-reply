@@ -68,13 +68,18 @@ class DeviceStateStore internal constructor(private val prefs: SharedPreferences
         get() = prefs.getBoolean(KEY_PENDING_SYNC, false)
         set(value) = prefs.edit().putBoolean(KEY_PENDING_SYNC, value).apply()
 
+    /** The app language changed (or the account has none yet) and the server has not been told. */
+    var languagePendingSync: Boolean
+        get() = prefs.getBoolean(KEY_LANGUAGE_PENDING_SYNC, false)
+        set(value) = prefs.edit().putBoolean(KEY_LANGUAGE_PENDING_SYNC, value).apply()
+
     /**
      * The account signed out: a profile change it never received is dropped,
      * so it is never sent to the next account that signs in on this phone,
      * and that account's own choice is taken over again.
      */
     fun accountSignedOut() {
-        prefs.edit().remove(KEY_PENDING_SYNC).apply()
+        prefs.edit().remove(KEY_PENDING_SYNC).remove(KEY_LANGUAGE_PENDING_SYNC).apply()
     }
 
     /** The backing file, for once-per-install flags such as [kz.yerek.aireply.analytics.ProductEvents]. */
@@ -87,5 +92,6 @@ class DeviceStateStore internal constructor(private val prefs: SharedPreferences
         const val KEY_RESUME_STEP = "onboarding.resumeStep"
         const val KEY_ASKS_GENDER = "onboarding.asksGender"
         const val KEY_PENDING_SYNC = "profile.pendingSync"
+        const val KEY_LANGUAGE_PENDING_SYNC = "profile.languagePendingSync"
     }
 }

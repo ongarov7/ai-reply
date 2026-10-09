@@ -26,9 +26,15 @@ enum AIReplyError: Error, Equatable, Sendable {
     case authenticationFailed
     /// Too many requests in a short time. Waiting a moment fixes it.
     case rateLimited
-    /// The plan's replies for today (or this period) are spent. Waiting a
-    /// moment does NOT fix it, which is why it is not `rateLimited`.
+    /// The plan's replies for today are spent. Waiting a moment does NOT fix
+    /// it, which is why it is not `rateLimited`.
     case quotaExhausted
+    /// The plan's replies for this month are spent: they come back next
+    /// month, not tomorrow.
+    case monthlyQuotaExhausted
+    /// The current terms were not accepted (or the consent was withdrawn):
+    /// the app has to be opened to accept them. Said before any request.
+    case consentRequired
     /// The service answered, but not with a usable reply.
     case emptyResponse
     /// Anything else: a 5xx, a malformed payload, an unreachable host.

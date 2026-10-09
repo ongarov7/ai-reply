@@ -45,6 +45,12 @@ data class AccountUser(
     val email: String? = null,
     val status: String = "active",
     val locale: String = "en",
+    /**
+     * The language the server writes this account's notifications and e-mails
+     * in: kk, ru, en or uz, or empty when it was never set. Absent on servers
+     * without `features.preferred_language`.
+     */
+    @SerialName("preferred_language") val preferredLanguage: String? = null,
     @SerialName("onboarding_completed") val onboardingCompleted: Boolean = false,
     /** How this account can sign in: `email`, `google`, `apple`, `phone`. Absent on older servers. */
     @SerialName("auth_providers") val authProviders: List<String>? = null
@@ -96,7 +102,13 @@ data class PlanDto(
     @SerialName("monthly_message_limit") val monthlyLimit: Int = 0,
     @SerialName("period_days") val periodDays: Int = 0,
     @SerialName("is_free") val isFree: Boolean = false,
-    @SerialName("sort_order") val sortOrder: Int = 0
+    @SerialName("sort_order") val sortOrder: Int = 0,
+    /**
+     * The server would sell this plan right now: enabled, visible, a verified
+     * billing integration and the administrator's switch. Absent (older
+     * servers) means no.
+     */
+    val purchasable: Boolean = false
 ) {
     /** Localized name with an English fallback, mirroring the server. */
     fun localizedName(language: String): String =
@@ -173,14 +185,24 @@ data class LegalConfigDto(
     @SerialName("terms_version") val termsVersion: String,
     @SerialName("privacy_version") val privacyVersion: String,
     @SerialName("terms_url") val termsUrl: String,
-    @SerialName("privacy_url") val privacyUrl: String
+    @SerialName("privacy_url") val privacyUrl: String,
+    /** May be empty: the support page is the way to reach a person. */
+    @SerialName("contact_email") val contactEmail: String = "",
+    @SerialName("support_url") val supportUrl: String = "",
+    /** The web page for deleting an account without the app. */
+    @SerialName("account_deletion_url") val accountDeletionUrl: String = "",
+    /** Who writes the replies, named on the consent screen. */
+    @SerialName("ai_provider") val aiProvider: String = ""
 ) {
     companion object {
         val PRODUCTION = LegalConfigDto(
-            termsVersion = "2026-09-19",
-            privacyVersion = "2026-09-19",
+            termsVersion = "2026-10-08",
+            privacyVersion = "2026-10-08",
             termsUrl = "https://ai-reply.kz/offer",
-            privacyUrl = "https://ai-reply.kz/privacy"
+            privacyUrl = "https://ai-reply.kz/privacy",
+            supportUrl = "https://ai-reply.kz/support",
+            accountDeletionUrl = "https://ai-reply.kz/account/delete",
+            aiProvider = "OpenAI"
         )
     }
 }
@@ -190,9 +212,9 @@ data class LegalConfigDto(
  *
  * Two kinds of flag with opposite defaults. A missing SIGN-IN flag means an
  * older server: assume yes, the button is harmless. A missing REQUEST-SHAPING
- * flag means no: the server decodes bodies strictly, so a field it does not
- * know turns a reply into a 400 that the keyboard would show as "message too
- * long".
+ * or ENDPOINT flag means no: the server decodes bodies strictly, so a field it
+ * does not know turns a reply into a 400 that the keyboard would show as
+ * "message too long", and an endpoint it does not have is never called.
  */
 @Serializable
 data class ServerFeaturesDto(
@@ -206,7 +228,17 @@ data class ServerFeaturesDto(
     /** `POST /api/v1/ai/polish` exists and is switched on. */
     @SerialName("instruction_polish") val instructionPolish: Boolean = false,
     /** `POST /api/v1/analytics/events` exists and is switched on. */
-    @SerialName("product_events") val productEvents: Boolean = false
+    @SerialName("product_events") val productEvents: Boolean = false,
+    /** `POST /api/v1/installations` and the notification preferences exist. */
+    val installations: Boolean = false,
+    /** The server can actually deliver pushes (FCM is configured). */
+    @SerialName("push_notifications") val pushNotifications: Boolean = false,
+    /** `preferred_language` on `/me` (read and update). */
+    @SerialName("preferred_language") val preferredLanguage: Boolean = false,
+    /** `POST /api/v1/ai/reports`: a user can report a reply or a message the AI wrote. */
+    @SerialName("ai_reports") val aiReports: Boolean = false,
+    /** `DELETE /api/v1/me` and its POST alias `/api/v1/me/delete`. */
+    @SerialName("account_deletion") val accountDeletion: Boolean = false
 )
 
 /** Non-secret server configuration the client is allowed to know. */
@@ -265,6 +297,35 @@ data class ProductEventsResultDto(
     val accepted: Int = 0,
     val rejected: Int = 0
 )
+
+/** `POST /api/v1/me/delete`: the account and everything the server kept for it are gone. */
+@Serializable
+data class AccountDeletionDto(
+    val deleted: Boolean = false,
+    /** Apple sign-in only; always false for an Android client, which sends no Apple code. */
+    @SerialName("apple_token_revoked") val appleTokenRevoked: Boolean = false
+)
+
+/**
+ * `POST /api/v1/ai/reports`: a user's report about text the AI wrote.
+ *
+ * [text] is the generated text and travels only when the user chose to
+ * include it; nothing else about the conversation is sent.
+ */
+@Serializable
+data class AIReportRequest(
+    /** `reply` or `compose`. */
+    val mode: String,
+    /** `offensive`, `harmful`, `false_info`, `wrong_language` or `other`. */
+    val reason: String,
+    val comment: String? = null,
+    val text: String? = null,
+    val platform: String,
+    @SerialName("app_version") val appVersion: String
+)
+
+@Serializable
+data class AIReportResultDto(val id: String = "")
 
 /** Demo checkout. A real acquirer changes this shape, not the callers. */
 @Serializable

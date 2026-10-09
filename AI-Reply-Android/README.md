@@ -86,6 +86,17 @@ as long as the Compose BOM and the Compose compiler plugin move with Kotlin.
 ./gradlew assembleRelease         # needs a signing config; none is checked in
 ```
 
+Each Play upload needs a higher `versionCode`. The defaults (1 / "1.0") stay
+in `app/build.gradle.kts`; an upload overrides them instead of editing it:
+
+```bash
+./gradlew bundleRelease -Paireply.versionCode=7 -Paireply.versionName=1.0.6
+```
+
+A release build without `app/google-services.json` (no push) or without a
+Google web client id (no "Continue with Google") still builds, but prints a
+warning, since a store upload without them is almost always a mistake.
+
 If `local.properties` is missing:
 
 ```bash
@@ -118,6 +129,66 @@ client id, release builds hide the Google button.
 
 Keyboard vibration: Settings ▸ Keyboard ▸ *Vibration on key press* (on by
 default). The system's own keypress-vibration setting still applies on top.
+
+### Push notifications (Firebase)
+
+Pushes arrive through Firebase Cloud Messaging (iOS uses FCM too, through the
+Firebase Messaging SDK, so the server has one provider).
+
+1. The **Android app** `kz.yerek.aireply` is registered in Firebase project
+   `ai-reply-4bf8f`, shared with iOS and the backend service account.
+2. The genuine public client config `app/google-services.json` is version
+   controlled at the owner's request. Server credentials must stay outside Git.
+   Validate both clients with `python3 ../tools/validate_firebase_config.py`;
+   see `../docs/FIREBASE_SETUP.md` for the handoff and remaining setup.
+3. Build as usual. The Google Services plugin is applied only when the file is
+   there; without it the app still builds and runs, and push is unavailable
+   (Settings ▸ Notifications says so).
+
+The server side (service account, `PUSH_NOTIFICATIONS_ENABLED`) lives in the
+backend's configuration; the app only uses what `GET /api/v1/config`
+announces (`features.installations`, `push_notifications`,
+`preferred_language`) and calls nothing a server did not announce.
+
+What the app does:
+
+* **Nothing before the terms are accepted.** Firebase auto-init is off in the
+  manifest; the token is fetched, and the installation registered, only after
+  the legal consent.
+* **Installation.** A random UUID in `noBackupFilesDir` (no hardware id, never
+  backed up, so a reinstall or a restore is a new installation) is registered
+  with `POST /api/v1/installations`: with the access token when signed in (the
+  server attaches it to that account), without one when signed out. It is
+  sent on start and return to the app, after sign-in, on a new FCM token, on a
+  language change, and when the permission or the in-app switch changes — but
+  only when the body or the account differs from the last accepted one, else
+  once a day. Failures back off (30 s doubling, at most an hour); a 4xx other
+  than 401/408/429 is not retried until the body changes.
+* **Sign-out.** The logout request — and no other request — carries
+  `X-Installation-ID`, so the server detaches the installation at once; the
+  app then registers it again anonymously.
+* **Permission.** Never asked at first launch. After sign-in, on Android 13+,
+  Home shows a card (*Turn on* → the system dialog, *Not now* → gone for
+  good). Settings ▸ Notifications shows the phone's state, the way to system
+  settings when blocked, the in-app switch and, signed in, the categories
+  (security always on).
+* **Display and taps.** Channels `general` and `important` (account,
+  subscription, security), named in the app language. In the background the
+  system shows the push; in the foreground the app shows it the same way (tag
+  = notification id). A tap reports `POST /api/v1/notifications/opened` (best
+  effort, when the push has a delivery id), then opens the `aireply://<screen>`
+  it names — after the consent, sign-in and onboarding gates, never around
+  them — or an `https://ai-reply.kz` page in the browser; anything else only
+  opens the app.
+* **Language.** The account's `preferred_language` (the language of its
+  notifications and e-mails) is sent when the user picks a language in
+  Settings (System sends the language the app shows), or once when the
+  account has none yet. A language set on another device is left alone.
+
+Debug builds, Settings ▸ Developer: *Simulate a push notification* runs the
+foreground path with a sample payload (it opens Plan), and *Always show the
+notification card* shows the Home card and the Settings controls without
+Firebase or a server that delivers.
 
 ---
 
@@ -207,6 +278,8 @@ app/src/main/java/kz/yerek/aireply/
 │                              and the reply panel, in Compose
 │
 ├── voice/                     SpeechRecognitionClient + the Android one
+├── push/                      installation id and registration, FCM service,
+│                              channels, notification links, permission
 ├── platform/                  logging that never carries message text
 └── ui/                        design system, navigation, and the app screens
 ```
@@ -276,10 +349,16 @@ These are properties of the code, not intentions:
   only in memory — for ten minutes, so you can copy one more message and come
   back, and then dropped.
 * `ReplyLog` records lengths and outcomes, never text, and only in debug builds.
-* Requests carry the message, your profile and the selected template. They carry
-  no device identifier, no contacts, no chat history, no location, no
+* AI requests carry the message, your profile and the selected template. They
+  carry no device identifier, no contacts, no chat history, no location, no
   advertising ID, no device model and no OS version. The per-install identifier
   is a random UUID generated locally and discarded on uninstall.
+* The push installation registration (only after the terms are accepted) sends
+  a random installation id, the app version and build, the OS version, the
+  device model and manufacturer, the interface language, the time zone, the
+  notification permission, the in-app switch and the FCM token. The account is
+  never in it: the server takes it from the access token. Only the logout
+  request names the installation in a header.
 * Working hours send a wall-clock time and two booleans. No timezone, no city,
   no coordinates.
 * There is no accessibility service in this project, and no code that reads

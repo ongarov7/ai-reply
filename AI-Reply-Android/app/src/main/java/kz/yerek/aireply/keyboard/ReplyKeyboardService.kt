@@ -39,6 +39,8 @@ import kz.yerek.aireply.R
 import kz.yerek.aireply.ServiceLocator
 import kz.yerek.aireply.ai.AILimits
 import kz.yerek.aireply.ai.AIReplyError
+import kz.yerek.aireply.ai.AIReportController
+import kz.yerek.aireply.ai.AIReportMode
 import kz.yerek.aireply.ai.AccountPolishTransport
 import kz.yerek.aireply.ai.AppStrings
 import kz.yerek.aireply.ai.DebugPolishMock
@@ -47,6 +49,7 @@ import kz.yerek.aireply.core.lang.AppLanguage
 import kz.yerek.aireply.core.lang.KeyboardLanguage
 import kz.yerek.aireply.core.lang.KeyboardPlane
 import kz.yerek.aireply.core.lang.TemplateNaming
+import kz.yerek.aireply.data.account.LegalConfigDto
 import kz.yerek.aireply.data.settings.AppearancePreference
 import kz.yerek.aireply.domain.model.ReplyConfiguration
 import kz.yerek.aireply.domain.model.TemplateSummary
@@ -90,6 +93,7 @@ import kz.yerek.aireply.keyboard.ui.KeyboardRoot
 import kz.yerek.aireply.keyboard.ui.PanelFocus
 import kz.yerek.aireply.keyboard.ui.PersonaRow
 import kz.yerek.aireply.keyboard.ui.QuickIntent
+import kz.yerek.aireply.keyboard.ui.ReportActions
 import kz.yerek.aireply.keyboard.ui.TypingAssist
 import kz.yerek.aireply.keyboard.ui.TypingAssistActions
 import kz.yerek.aireply.keyboard.ui.text
@@ -146,6 +150,7 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
     private lateinit var polish: InstructionPolish
     private lateinit var dictation: DictationController
     private lateinit var panels: KeyboardPanels
+    private lateinit var reports: AIReportController
 
     /** One thread for suggestions, so typing never waits for them. */
     private val suggestionWorker: ExecutorCoroutineDispatcher =
@@ -176,6 +181,8 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
     private var isSecureField by mutableStateOf(false)
     private var returnFace by mutableStateOf(ReturnFace.NEWLINE)
     private var fieldKind by mutableStateOf(FieldKind.TEXT)
+    /** `features.ai_reports`, as the app or the last refresh stored it. */
+    private var reportsEnabled by mutableStateOf(false)
 
     private var hostCapitalization = Capitalization.SENTENCES
     private var smartCorrection = true
@@ -208,6 +215,7 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
             onAnnounce = ::announce
         }
         panels = KeyboardPanels(replies, compose, dictation, layout = { language })
+        reports = AIReportController(scope, services.aiReportSender, BuildConfig.VERSION_NAME)
         orientation = resources.configuration.orientation
         surface = KeySurfaceController(this)
         autocorrect = AutocorrectController(
@@ -302,6 +310,8 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         // request is stopped: no spinner survives the keyboard going away.
         // The microphone is released rather than held across every app.
         panels.keyboardHidden(SystemClock.uptimeMillis())
+        // A report half written is dropped; one already sent still arrives.
+        reports.close()
     }
 
     /**
@@ -414,7 +424,8 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
             returnEnabled = !composing || target == Target.COMPOSER ||
                 flow.stage == ReplyComposerFlow.Stage.Result,
             spaceCaption = language.nativeName,
-            dimmed = composing && flow.isGenerating,
+            // Nothing to type into while a report is open either.
+            dimmed = composing && (flow.isGenerating || reports.isOpen),
             languages = enabledLanguages
         )
 
@@ -450,7 +461,12 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
                                     voice = dictation.state,
                                     voiceNotice = dictation.notice,
                                     voiceLines = voiceLines,
-                                    compact = PanelFit.compactCreate(sizing.isLandscape)
+                                    compact = PanelFit.compactCreate(sizing.isLandscape),
+                                    canReport = reportsEnabled && created.flow.reportableText != null,
+                                    report = reports.draft?.takeIf {
+                                        it.mode == AIReportMode.COMPOSE && reportsEnabled &&
+                                            created.flow.reportableText != null
+                                    }
                                 ),
                                 actions = createActions,
                                 strings = strings,
@@ -470,7 +486,12 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
                                 maxFieldLines = if (screenHeight >= 700f) 5 else 3,
                                 assist = typingAssist(session.instruction),
                                 voiceNotice = dictation.notice,
-                                voiceLines = voiceLines
+                                voiceLines = voiceLines,
+                                canReport = reportsEnabled && session.flow.reportableText != null,
+                                report = reports.draft?.takeIf {
+                                    it.mode == AIReportMode.REPLY && reportsEnabled &&
+                                        session.flow.reportableText != null
+                                }
                             ),
                             actions = composerActions,
                             strings = strings,
@@ -504,6 +525,7 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         ComposerActions(
             onPersona = {
                 leaveFields()
+                reports.close()
                 panels.putReplyAside()
                 refreshAutoShift()
             },
@@ -552,7 +574,8 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
             onNextVersion = replies::showNextVersion,
             onConflict = ::resolveConflict,
             onMic = panels::microphoneTapped,
-            assist = assistActions
+            assist = assistActions,
+            report = reportActions
         )
     }
 
@@ -561,6 +584,7 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
             onClose = ::closeComposer,
             onNew = {
                 leaveFields()
+                reports.close()
                 panels.startOver()
                 focus = PanelFocus.INSTRUCTION
                 refreshAutoShift()
@@ -594,7 +618,30 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
             onConflict = ::resolveConflict,
             assist = assistActions,
             onMic = panels::microphoneTapped,
-            onReplyToCopied = ::replyToCopied
+            onReplyToCopied = ::replyToCopied,
+            report = reportActions
+        )
+    }
+
+    /**
+     * Report under a result, in either panel: about what the model wrote for
+     * the version on screen, never the user's edits or the copied message.
+     */
+    private val reportActions by lazy {
+        ReportActions(
+            onToggle = {
+                if (reports.isOpen) {
+                    reports.close()
+                } else {
+                    val mode = if (compose.isActive) AIReportMode.COMPOSE else AIReportMode.REPLY
+                    activeFlow.reportableText?.let { text ->
+                        leaveFields()
+                        reports.open(mode, text)
+                    }
+                }
+            },
+            onSend = { reports.send() },
+            onCancel = { reports.close() }
         )
     }
 
@@ -681,7 +728,8 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
 
     /** With a reply on screen, typing means "let me change it". */
     private fun prepareComposerForTyping() {
-        if (!isComposing || activeField != null) return
+        // An open report keeps the reply as it is: the keys wait.
+        if (!isComposing || activeField != null || reports.isOpen) return
         val editing = if (compose.isActive) compose.beginEditingForTyping() else replies.beginEditingForTyping()
         if (editing) focus = PanelFocus.DRAFT
     }
@@ -1088,6 +1136,7 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
 
     private fun closeComposer() {
         leaveFields()
+        reports.close()
         panels.closeAll()
         focus = PanelFocus.INSTRUCTION
         sourceExpanded = false
@@ -1237,11 +1286,17 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         }
     }
 
-    /** The server's character limits, at most every few hours. */
+    /** The server's character limits and features, and its legal versions, at most every few hours. */
     private fun refreshLimitsIfStale() {
         if (!AILimits.isStale() || !services.accountCredentials.isSignedIn) return
-        scope.launch(Dispatchers.IO) {
-            runCatching { services.accountService.serverConfig() }.getOrNull()?.let { AILimits.apply(it) }
+        scope.launch {
+            val config = withContext(Dispatchers.IO) {
+                runCatching { services.accountService.serverConfig() }.getOrNull()
+            } ?: return@launch
+            AILimits.apply(config)
+            // New versions stop Reply and Write here until the app has them accepted.
+            services.legalConsentStore.rememberConfig(config.legal ?: LegalConfigDto.PRODUCTION)
+            reportsEnabled = AILimits.features.aiReports
         }
     }
 
@@ -1266,6 +1321,7 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
             chips = cachedChips()
         }
         appearance = services.settings.appearance
+        reportsEnabled = AILimits.features.aiReports
         feedback.hapticsEnabled = services.settings.keyboardHaptics
         smartCorrection = services.settings.smartCorrection
         enabledLanguages = services.settings.enabledKeyboardLanguages

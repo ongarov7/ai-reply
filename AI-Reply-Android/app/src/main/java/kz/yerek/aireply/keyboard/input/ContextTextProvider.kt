@@ -3,7 +3,6 @@ package kz.yerek.aireply.keyboard.input
 import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
-import android.os.Build
 import android.view.inputmethod.InputConnection
 import kz.yerek.aireply.ai.AIReplyError
 import kz.yerek.aireply.platform.ReplyLog
@@ -81,13 +80,12 @@ class ContextTextProvider {
         // Password managers and banking apps flag what they copy. Honouring the
         // flag is the Android equivalent of the iOS promise that secure fields
         // are never processed — and it is the difference between a keyboard that
-        // may read the clipboard and one that reads whatever is in it.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val sensitive = description.extras?.getBoolean(ClipDescription.EXTRA_IS_SENSITIVE) == true
-            if (sensitive) {
-                ReplyLog.event { "clipboard: refused, marked sensitive" }
-                return Result.Failure(AIReplyError.NoSourceMessage)
-            }
+        // may read the clipboard and one that reads whatever is in it. The
+        // constant is API 33, but Android's copy-and-paste guidance has apps
+        // set the same key on older versions too, so it is read on all of them.
+        if (isMarkedSensitive { key -> description.extras?.getBoolean(key, false) }) {
+            ReplyLog.event { "clipboard: refused, marked sensitive" }
+            return Result.Failure(AIReplyError.NoSourceMessage)
         }
 
         val copied = normalised(
@@ -110,7 +108,18 @@ class ContextTextProvider {
 
     private fun normalised(value: String?): String? = value?.trim()?.takeIf { it.isNotEmpty() }
 
-    private companion object {
+    internal companion object {
         val TEXT_TYPES = listOf(ClipDescription.MIMETYPE_TEXT_PLAIN, ClipDescription.MIMETYPE_TEXT_HTML)
+
+        /** `ClipDescription.EXTRA_IS_SENSITIVE`, spelled out so it is usable below API 33. */
+        const val EXTRA_IS_SENSITIVE = "android.content.extra.IS_SENSITIVE"
+
+        /**
+         * True when the copying app flagged the clip as sensitive, on every
+         * API level. [flag] reads one boolean from the clip's extras; extras
+         * that cannot be read count as no flag.
+         */
+        fun isMarkedSensitive(flag: (String) -> Boolean?): Boolean =
+            runCatching { flag(EXTRA_IS_SENSITIVE) }.getOrNull() == true
     }
 }

@@ -5,6 +5,7 @@ struct HomeView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(ReplyConfigurationModel.self) private var model
     @Environment(AccountModel.self) private var account
+    @Environment(PushNotificationsModel.self) private var notifications
 
     /// Re-read on appearance and on every return to the foreground -
     /// typically from iOS Settings, or from another app where the keyboard
@@ -17,6 +18,10 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: DS.Spacing.xl) {
                 header
                 if account.isSignedIn { usageCard }
+                if notifications.showsPermissionCard {
+                    PushPermissionCard()
+                        .transition(.opacity)
+                }
                 tryItCard
                 setupCard
                 keyboardCard
@@ -31,9 +36,12 @@ struct HomeView: View {
         .background(Color.dsBackground)
         .navigationTitle("home.title")
         .navigationBarTitleDisplayMode(.inline)
+        // Every screen Home opens is a route, so a notification can open the
+        // same screens the same way (see AppRouter).
+        .navigationDestination(for: AppRoute.self) { route in route.destination }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                NavigationLink { SettingsView() } label: {
+                NavigationLink(value: AppRoute.settings) {
                     Image(systemName: "gearshape")
                 }
                 .accessibilityLabel("common.settings")
@@ -65,7 +73,7 @@ struct HomeView: View {
     /// What is left today, and a way to the plans. Shown only for accounts,
     /// because only the server knows the number.
     private var usageCard: some View {
-        NavigationLink { SubscriptionView() } label: {
+        NavigationLink(value: AppRoute.subscription) {
             HStack(alignment: .center, spacing: DS.Spacing.m) {
                 VStack(alignment: .leading, spacing: DS.Spacing.xxs) {
                     Text("home.usage.title").font(.subheadline.weight(.semibold))
@@ -92,7 +100,7 @@ struct HomeView: View {
     }
 
     private var tryItCard: some View {
-        NavigationLink { ComposeView() } label: {
+        NavigationLink(value: AppRoute.compose) {
             HStack {
                 Label("home.tryIt", systemImage: "sparkles")
                     .font(.body.weight(.medium))
@@ -108,11 +116,11 @@ struct HomeView: View {
     private var setupCard: some View {
         DSSection(title: "home.profile.title") {
             VStack(spacing: 0) {
-                link("home.profile.edit", "person.text.rectangle") { ProfileEditorView() }
+                link("home.profile.edit", "person.text.rectangle", to: .profile)
                 Divider().padding(.leading, 44)
-                link("home.profile.templates", "text.bubble") { TemplateListView() }
+                link("home.profile.templates", "text.bubble", to: .templates)
                 Divider().padding(.leading, 44)
-                link("home.profile.hours", "clock") { WorkingHoursView() }
+                link("home.profile.hours", "clock", to: .workingHours)
             }
             .padding(.vertical, DS.Spacing.xxs)
             .background(
@@ -121,12 +129,8 @@ struct HomeView: View {
         }
     }
 
-    private func link<Destination: View>(
-        _ titleKey: LocalizedStringKey,
-        _ symbol: String,
-        @ViewBuilder destination: @escaping () -> Destination
-    ) -> some View {
-        NavigationLink(destination: destination) {
+    private func link(_ titleKey: LocalizedStringKey, _ symbol: String, to route: AppRoute) -> some View {
+        NavigationLink(value: route) {
             HStack(spacing: DS.Spacing.s) {
                 Image(systemName: symbol)
                     .frame(width: 24)

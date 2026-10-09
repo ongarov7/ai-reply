@@ -1,6 +1,9 @@
 package apptest
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"sync"
@@ -209,5 +212,87 @@ func TestProviderTimeoutIsReported(t *testing.T) {
 	}
 	if used := h.entitlement(session.userID).UsedToday; used != 0 {
 		t.Fatalf("used_today = %d after timeout, want 0", used)
+	}
+}
+
+// Клиент провайдер жауабын күтпей кетсе (пернетақта жабылды), бронь бәрібір қайтарылады.
+func TestCancelledRequestRefundsQuota(t *testing.T) {
+	h := newHarness(t)
+	session := h.signIn("+7 702 444 55 66")
+	started := h.provider.holdNext()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	raw, _ := json.Marshal(map[string]any{"source_text": "Клиент кетіп қалды", "language": "kk"})
+	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, h.server.URL+"/api/v1/ai/reply", bytes.NewReader(raw))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+session.access)
+	done := make(chan error, 1)
+	go func() {
+		res, err := h.server.Client().Do(req)
+		if err == nil {
+			res.Body.Close()
+		}
+		done <- err
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the request never reached the provider")
+	}
+	if used := h.entitlement(session.userID).UsedToday; used != 1 {
+		t.Fatalf("used_today = %d while the provider works, want the reservation (1)", used)
+	}
+	cancel()
+	if err := <-done; err == nil {
+		t.Fatal("the client request was not cancelled")
+	}
+
+	// The server finishes on its own after the client is gone: wait for its event.
+	deadline := time.Now().Add(5 * time.Second)
+	for h.scalar(`SELECT COUNT(*) FROM ai_usage_events WHERE user_id = ? AND status = 'error'`, session.userID) == 0 {
+		if time.Now().After(deadline) {
+			t.Fatal("the cancelled request left no usage event")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if used := h.entitlement(session.userID).UsedToday; used != 0 {
+		t.Fatalf("used_today = %d after the client went away, want 0", used)
+	}
+}
+
+// Айлық шегі бар тариф: /ai/reply мен /ai/compose usage блогы айлық санағышты да береді,
+// ал remaining_today айдың қалғанынан аспайды.
+func TestUsageReportsTheMonthlyCap(t *testing.T) {
+	h := newHarness(t)
+	session := h.signIn("+7 702 555 66 77")
+	if _, err := h.db.Writer().Exec(`UPDATE plans SET monthly_message_limit = 3 WHERE code = 'standard'`); err != nil {
+		t.Fatal(err)
+	}
+	h.assignPlan(h.signInAdmin(), session.userID, "standard", "")
+
+	first := h.generate(session.access, "Сәлеметсіз бе, бағасы қанша?")
+	if first.status != http.StatusOK {
+		t.Fatalf("reply: %d %s", first.status, first.raw)
+	}
+	if first.num("usage", "monthly_limit") != 3 || first.num("usage", "used_month") != 1 ||
+		first.num("usage", "daily_limit") != 30 || first.num("usage", "remaining_today") != 2 {
+		t.Fatalf("usage = %s", first.raw)
+	}
+	second := h.compose(session.access, map[string]any{"instruction": "Әріптесімді құттықта", "language": "kk"})
+	if second.status != http.StatusOK || second.num("usage", "used_month") != 2 || second.num("usage", "remaining_today") != 1 {
+		t.Fatalf("compose usage = %d %s", second.status, second.raw)
+	}
+	mustStatus(t, h.generate(session.access, "Тағы бір сұрақ"), http.StatusOK, "")
+
+	blocked := h.generate(session.access, "Айлық шек бітті")
+	mustStatus(t, blocked, http.StatusTooManyRequests, "MONTHLY_LIMIT_REACHED")
+	if blocked.num("error", "details", "monthly_limit") != 3 || blocked.num("error", "details", "used_month") != 3 {
+		t.Fatalf("details = %s", blocked.raw)
+	}
+	usage := h.do(http.MethodGet, "/api/v1/me/usage", nil, h.auth(session.access))
+	if usage.num("remaining_today") != 0 || usage.num("used_today") != 3 {
+		t.Fatalf("/me/usage after the monthly cap = %s", usage.raw)
 	}
 }

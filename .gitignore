@@ -11,6 +11,11 @@
 *.p12
 *.jks
 *.keystore
+# Firebase client configuration is shared with the project. Server keys stay private.
+# Backend Firebase service account (FIREBASE_SERVICE_ACCOUNT_FILE points outside the repo)
+ai-reply-back-end/secrets/
+*firebase-adminsdk*.json
+*service-account*.json
 
 # Logs and local build/test output
 *.log

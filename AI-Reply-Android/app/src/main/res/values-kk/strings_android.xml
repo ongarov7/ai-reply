@@ -179,7 +179,70 @@
     <string name="onboarding_clipboard_note">AI\u00A0Reply көшірілген хабарламаны тек үлгіні немесе «Хабарламаны қою» түймесін басқанда оқиды. Android-тың кейбір нұсқалары сол сәтте буфер оқылғаны туралы қысқа хабарлама көрсетеді — бұл қалыпты жағдай.</string>
     <string name="cd_tutorial_next">Келесі қадамды көрсету</string>
     <string name="settings_smart_correction">Ақылды түзету</string>
-    <string name="settings_smart_correction_footer">Қателер телефонның өзінде түзетіліп, сөздер сонда ұсынылады: басқа қолданбаларда терген ештеңеңіз ешқайда жіберілмейді. AI\u00A0Reply өрісіне нұсқау жазғанда, тазарақ нұсқасын ұсыну үшін сол мәтін жіберілуі мүмкін.</string>
+    <string name="settings_smart_correction_footer">Қателер телефонның өзінде түзетіліп, сөздер сонда ұсынылады: бұл үшін басқа қолданбаларда терген ештеңеңіз жіберілмейді. AI\u00A0Reply өрісіне нұсқау жазғанда, тазарақ нұсқасын ұсыну үшін сол мәтін AI\u00A0Reply сервері арқылы OpenAI-ға жіберілуі мүмкін.</string>
     <string name="settings_smart_correction_attribution">Сөздіктер: Leipzig Corpora Collection (CC BY).</string>
+
+    <!-- Push notifications (2026-10). -->
+    <string name="push_channel_general">Жалпы</string>
+    <string name="push_channel_general_description">Сервис жаңалықтары мен еске салғыштар</string>
+    <string name="push_channel_important">Маңызды</string>
+    <string name="push_channel_important_description">Тіркелгі, лимиттер және қауіпсіздік</string>
+    <string name="push_prompt_title">Хабарламаларды қосыңыз</string>
+    <string name="push_prompt_body">Тіркелгі мен жауап лимиттері туралы хабарламалар және сервис жаңалықтары.</string>
+    <string name="push_prompt_enable">Қосу</string>
+    <string name="push_prompt_later">Қазір емес</string>
+    <string name="push_settings_title">Хабарламалар</string>
+    <string name="push_settings_system">Осы телефонда</string>
+    <string name="push_settings_status_allowed">Рұқсат етілген</string>
+    <string name="push_settings_status_blocked">Өшірулі</string>
+    <string name="push_settings_status_not_asked">Бапталмаған</string>
+    <string name="push_settings_allow">Хабарламаларға рұқсат беру</string>
+    <string name="push_settings_open_system">Телефон баптауларын ашу</string>
+    <string name="push_settings_enabled">AI\u00A0Reply хабарламалары</string>
+    <string name="push_settings_footer">Тіркелгі мен жауап лимиттері туралы хабарламалар, сервис жаңалықтары.</string>
+    <string name="push_category_account">Тіркелгі</string>
+    <string name="push_category_subscription">Жауап лимиттері</string>
+    <string name="push_category_security">Қауіпсіздік</string>
+    <string name="push_category_system">Сервис жаңалықтары</string>
+    <string name="push_category_marketing">Ұсыныстар</string>
+    <string name="push_categories_footer">Қауіпсіздік хабарламалары әрқашан қосулы.</string>
+    <string name="push_categories_loading">Жүктелуде…</string>
+    <string name="push_categories_failed">Жаңарту мүмкін болмады. Байланысты тексеріп, қайталап көріңіз.</string>
+    <string name="settings_debug_simulate_push">Сынақ push-хабарламасы</string>
+    <string name="settings_debug_force_push_prompt">Хабарлама карточкасын әрқашан көрсету</string>
+    <string name="settings_debug_push_footer">Тек жөндеу нұсқасында. Үлгі 3 секундтан кейін ашық қосымшадағы нақты хабарламаның жолымен келеді және басқанда «Тарифті» ашады. Ауыстырғыш басты экрандағы карточканы және осы баптауларды Firebase болмаса да көрсетеді.</string>
+    <string name="debug_push_title">Төлем өтті</string>
+    <string name="debug_push_body">Сынақ хабарлама: тарифті ашу үшін басыңыз.</string>
+
+    <!-- Release readiness (2026-10): AI consent, account deletion, reports, support. -->
+    <string name="legal_consent_ai_disclosure">«%1$s» немесе «%2$s» батырмасын басқанда AI Reply мәтін жазу үшін көшірілген не белгіленген хабарламаны, нұсқауыңызды және профиль деректерін біздің сервер арқылы OpenAI-ға жібереді. Ақылды түзету қосулы болса, нұсқау теру кезінде де жіберіледі. Біздің сервер хабарламаларды, нұсқауларды және дайын мәтіндерді сақтамайды; профиль тіркелгіңізді жойғанша сонда сақталады.</string>
+    <string name="legal_consent_ai_checkbox">Жауап жазу үшін бұл мәтіндердің OpenAI-ға жіберілуіне келісемін.</string>
+    <string name="kb_err_quota_monthly">Осы айдағы жауаптар бітті. Келесі айда жаңарады.</string>
+    <string name="kb_err_consent_required">AI жауаптары үшін AI Reply қолданбасын ашып, шарттарды қабылдаңыз.</string>
+    <string name="settings_account_delete">Тіркелгіні жою</string>
+    <string name="settings_account_delete_title">Тіркелгіні жоясыз ба?</string>
+    <string name="settings_account_delete_body">Тіркелгі, профиль, келісімдер, қолданыс тарихы мен құрылғылар біздің серверден бірден жойылады. Мұны қайтару мүмкін емес. Пернетақта мәтін теру үшін жұмыс істей береді.</string>
+    <string name="account_deleted">Тіркелгі жойылды.</string>
+    <string name="account_delete_failed">Тіркелгіні жою мүмкін болмады. Байланысты тексеріп, қайталап көріңіз.</string>
+    <string name="report_action">Шағымдану</string>
+    <string name="report_title">Жауапқа шағым</string>
+    <string name="report_reason_offensive">Қорлайтын</string>
+    <string name="report_reason_harmful">Зиянды не қауіпті</string>
+    <string name="report_reason_false_info">Жалған ақпарат</string>
+    <string name="report_reason_wrong_language">Тілі дұрыс емес</string>
+    <string name="report_reason_other">Басқа</string>
+    <string name="report_include_text">Жауап мәтінін шағыммен бірге жіберу</string>
+    <string name="report_send">Жіберу</string>
+    <string name="report_thanks">Рақмет, бұл жауапты тексереміз.</string>
+    <string name="report_failed">Шағымды жіберу мүмкін болмады. Қайталап көріңіз.</string>
+    <string name="report_title_compose">Хабарламаға шағым</string>
+    <string name="report_include_text_compose">Хабарлама мәтінін шағыммен бірге жіберу</string>
+    <string name="report_thanks_compose">Рақмет, бұл хабарламаны тексереміз.</string>
+    <string name="settings_support">Көмек және қолдау</string>
+    <string name="settings_withdraw_consent">AI өңдеуге келісімді кері қайтару</string>
+    <string name="settings_withdraw_consent_body">AI жауаптары тоқтайды, қосымша келісімді қайта сұрайды. Тіркелгі сақталады.</string>
+    <string name="settings_withdraw_consent_action">Кері қайтару</string>
+    <string name="settings_version">Нұсқа %1$s (%2$d)</string>
+    <string name="common_link_failed">Телефонда бұл сілтемені ашатын қолданба жоқ.</string>
 
 </resources>

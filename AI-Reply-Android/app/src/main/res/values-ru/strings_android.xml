@@ -179,7 +179,70 @@
     <string name="onboarding_clipboard_note">AI\u00A0Reply читает скопированное сообщение, только когда вы нажимаете шаблон или кнопку «Вставить сообщение». Некоторые версии Android в этот момент ненадолго показывают уведомление о чтении буфера обмена — это нормально.</string>
     <string name="cd_tutorial_next">Показать следующий шаг</string>
     <string name="settings_smart_correction">Умная коррекция</string>
-    <string name="settings_smart_correction_footer">Опечатки исправляются, а слова подсказываются прямо на телефоне: ничего из того, что вы печатаете в других приложениях, никуда не отправляется. Когда вы пишете инструкцию в поле AI\u00A0Reply, этот текст может отправляться, чтобы предложить более аккуратный вариант.</string>
+    <string name="settings_smart_correction_footer">Опечатки исправляются, а слова подсказываются прямо на телефоне: для этого ничего из того, что вы печатаете в других приложениях, не отправляется. Когда вы пишете инструкцию в поле AI\u00A0Reply, этот текст может отправляться через сервер AI\u00A0Reply в OpenAI, чтобы предложить более аккуратный вариант.</string>
     <string name="settings_smart_correction_attribution">Словари: Leipzig Corpora Collection (CC BY).</string>
+
+    <!-- Push notifications (2026-10). -->
+    <string name="push_channel_general">Общие</string>
+    <string name="push_channel_general_description">Новости сервиса и напоминания</string>
+    <string name="push_channel_important">Важные</string>
+    <string name="push_channel_important_description">Аккаунт, лимиты и безопасность</string>
+    <string name="push_prompt_title">Включите уведомления</string>
+    <string name="push_prompt_body">Уведомления об аккаунте и лимитах ответов, а также новости сервиса.</string>
+    <string name="push_prompt_enable">Включить</string>
+    <string name="push_prompt_later">Не сейчас</string>
+    <string name="push_settings_title">Уведомления</string>
+    <string name="push_settings_system">На этом телефоне</string>
+    <string name="push_settings_status_allowed">Разрешены</string>
+    <string name="push_settings_status_blocked">Выключены</string>
+    <string name="push_settings_status_not_asked">Не настроены</string>
+    <string name="push_settings_allow">Разрешить уведомления</string>
+    <string name="push_settings_open_system">Открыть настройки телефона</string>
+    <string name="push_settings_enabled">Уведомления AI\u00A0Reply</string>
+    <string name="push_settings_footer">Уведомления об аккаунте и лимитах ответов, новости сервиса.</string>
+    <string name="push_category_account">Аккаунт</string>
+    <string name="push_category_subscription">Лимиты ответов</string>
+    <string name="push_category_security">Безопасность</string>
+    <string name="push_category_system">Новости сервиса</string>
+    <string name="push_category_marketing">Предложения</string>
+    <string name="push_categories_footer">Уведомления о безопасности включены всегда.</string>
+    <string name="push_categories_loading">Загрузка…</string>
+    <string name="push_categories_failed">Не удалось обновить. Проверьте подключение и попробуйте снова.</string>
+    <string name="settings_debug_simulate_push">Тестовое push-уведомление</string>
+    <string name="settings_debug_force_push_prompt">Всегда показывать карточку уведомлений</string>
+    <string name="settings_debug_push_footer">Только в отладочной сборке. Пример придёт через 3 секунды тем же путём, что и настоящее уведомление в открытом приложении, и по нажатию откроет «Тариф». Переключатель показывает карточку на главном экране и эти настройки даже без Firebase.</string>
+    <string name="debug_push_title">Оплата прошла</string>
+    <string name="debug_push_body">Тестовое уведомление: нажмите, чтобы открыть тариф.</string>
+
+    <!-- Release readiness (2026-10): AI consent, account deletion, reports, support. -->
+    <string name="legal_consent_ai_disclosure">Когда вы нажимаете «%1$s» или «%2$s», AI Reply отправляет скопированное или выделенное сообщение, вашу инструкцию и данные профиля через наш сервер в OpenAI, чтобы написать текст. Если включена умная коррекция, инструкция отправляется и во время набора. Наш сервер не сохраняет сообщения, инструкции и готовые тексты; профиль хранится в вашем аккаунте, пока вы его не удалите.</string>
+    <string name="legal_consent_ai_checkbox">Я соглашаюсь на отправку этих текстов в OpenAI для написания ответов.</string>
+    <string name="kb_err_quota_monthly">Ответы на этот месяц закончились. Они обновятся в следующем месяце.</string>
+    <string name="kb_err_consent_required">Откройте AI Reply и примите условия, чтобы пользоваться AI-ответами.</string>
+    <string name="settings_account_delete">Удалить аккаунт</string>
+    <string name="settings_account_delete_title">Удалить аккаунт?</string>
+    <string name="settings_account_delete_body">Аккаунт, профиль, согласия, история использования и устройства сразу удаляются с нашего сервера. Это нельзя отменить. Клавиатура продолжит работать для набора текста.</string>
+    <string name="account_deleted">Аккаунт удалён.</string>
+    <string name="account_delete_failed">Не удалось удалить аккаунт. Проверьте подключение и попробуйте ещё раз.</string>
+    <string name="report_action">Пожаловаться</string>
+    <string name="report_title">Пожаловаться на ответ</string>
+    <string name="report_reason_offensive">Оскорбительный</string>
+    <string name="report_reason_harmful">Вредный или опасный</string>
+    <string name="report_reason_false_info">Ложная информация</string>
+    <string name="report_reason_wrong_language">Не тот язык</string>
+    <string name="report_reason_other">Другое</string>
+    <string name="report_include_text">Отправить текст ответа вместе с жалобой</string>
+    <string name="report_send">Отправить</string>
+    <string name="report_thanks">Спасибо, мы проверим этот ответ.</string>
+    <string name="report_failed">Не удалось отправить жалобу. Попробуйте ещё раз.</string>
+    <string name="report_title_compose">Пожаловаться на сообщение</string>
+    <string name="report_include_text_compose">Отправить текст сообщения вместе с жалобой</string>
+    <string name="report_thanks_compose">Спасибо, мы проверим это сообщение.</string>
+    <string name="settings_support">Помощь и поддержка</string>
+    <string name="settings_withdraw_consent">Отозвать согласие на AI-обработку</string>
+    <string name="settings_withdraw_consent_body">AI-ответы перестанут работать, и приложение снова попросит согласие. Аккаунт сохранится.</string>
+    <string name="settings_withdraw_consent_action">Отозвать</string>
+    <string name="settings_version">Версия %1$s (%2$d)</string>
+    <string name="common_link_failed">На телефоне нет приложения, которое может открыть ссылку.</string>
 
 </resources>

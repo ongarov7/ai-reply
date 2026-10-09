@@ -1,5 +1,6 @@
 package kz.yerek.aireply.ui.feature.settings
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -7,14 +8,20 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.PersonOutline
+import androidx.compose.material.icons.outlined.PrivacyTip
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -25,16 +32,20 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kz.yerek.aireply.BuildConfig
 import kz.yerek.aireply.R
 import kz.yerek.aireply.analytics.ProductEvent
@@ -49,6 +60,7 @@ import kz.yerek.aireply.ui.common.Footnote
 import kz.yerek.aireply.ui.common.NavigationRow
 import kz.yerek.aireply.ui.common.RowDividerIndented
 import kz.yerek.aireply.ui.common.RowGroup
+import kz.yerek.aireply.ui.common.openWebPage
 import kz.yerek.aireply.ui.common.privacyStatement
 import kz.yerek.aireply.ui.common.rememberKeyboardStatus
 import kz.yerek.aireply.ui.design.AppCard
@@ -58,12 +70,27 @@ import kz.yerek.aireply.ui.design.Spacing
 import kz.yerek.aireply.ui.feature.setup.KeyboardStatusRows
 import kz.yerek.aireply.ui.navigation.Routes
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * @param focusSection a section to scroll to when opened from outside:
+ *   [Routes.SectionNotifications] for a notification's `aireply://notifications`.
+ */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
+fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit, focusSection: String? = null) {
     val services = LocalServices.current
-    val uriHandler = LocalUriHandler.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val accountState by services.account.state.collectAsStateWithLifecycle()
+    val pushState by services.push.ui.collectAsStateWithLifecycle()
+    val notificationsSection = remember { BringIntoViewRequester() }
+
+    LaunchedEffect(focusSection) {
+        if (focusSection == Routes.SectionNotifications) {
+            // After the first layout pass, so there is somewhere to scroll to.
+            delay(FOCUS_DELAY_MS)
+            notificationsSection.bringIntoView()
+        }
+    }
 
     var appearance by remember { mutableStateOf(services.settings.appearance) }
     var language by remember { mutableStateOf(services.settings.appLanguage) }
@@ -72,6 +99,9 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
     var smartCorrection by remember { mutableStateOf(services.settings.smartCorrection) }
     val keyboardStatus by rememberKeyboardStatus()
     var mockReplies by remember { mutableStateOf(services.settings.debugMockReplies) }
+    var confirmingWithdrawal by remember { mutableStateOf(false) }
+    var withdrawalError by remember { mutableStateOf<Int?>(null) }
+    val pageLanguage = services.settings.effectiveAppLanguage.code
 
     AppScreen(title = stringResource(R.string.settings_title), onBack = onBack) {
         ReadableColumn {
@@ -152,6 +182,10 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
 
             AccountSection(onOpenSubscription = { onOpen(Routes.Subscription) })
 
+            NotificationSettingsSection(
+                modifier = Modifier.bringIntoViewRequester(notificationsSection)
+            )
+
             AppSection(stringResource(R.string.settings_appearance)) {
                 SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                     AppearancePreference.entries.forEachIndexed { index, option ->
@@ -186,16 +220,22 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
                         label = stringResource(R.string.common_system),
                         selected = language == null
                     ) {
-                        language = null
-                        services.settings.appLanguage = null
+                        if (language != null) {
+                            language = null
+                            services.settings.appLanguage = null
+                            services.profileSync.appLanguageChanged()
+                        }
                     }
                     AppLanguage.entries.forEach { option ->
                         RowDividerIndented()
                         // Always shown in its own language: a Kazakh speaker
                         // looking for Kazakh should see "Қазақша".
                         LanguageRow(label = option.nativeName, selected = language == option) {
-                            language = option
-                            services.settings.appLanguage = option
+                            if (language != option) {
+                                language = option
+                                services.settings.appLanguage = option
+                                services.profileSync.appLanguageChanged()
+                            }
                         }
                     }
                 }
@@ -208,20 +248,31 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
                     NavigationRow(
                         Icons.Outlined.Description,
                         stringResource(R.string.legal_terms)
-                    ) {
-                        uriHandler.openUri(
-                            "${accountState.legalConfig.termsUrl}?lang=${services.settings.effectiveAppLanguage.code}"
-                        )
-                    }
+                    ) { context.openWebPage(accountState.legalConfig.termsUrl, pageLanguage) }
                     RowDividerIndented()
                     NavigationRow(
                         Icons.Outlined.Lock,
                         stringResource(R.string.legal_privacy)
-                    ) {
-                        uriHandler.openUri(
-                            "${accountState.legalConfig.privacyUrl}?lang=${services.settings.effectiveAppLanguage.code}"
-                        )
+                    ) { context.openWebPage(accountState.legalConfig.privacyUrl, pageLanguage) }
+                    if (accountState.hasAcceptedLegal) {
+                        RowDividerIndented()
+                        NavigationRow(
+                            Icons.Outlined.PrivacyTip,
+                            stringResource(R.string.settings_withdraw_consent),
+                            enabled = !accountState.busy,
+                            busy = accountState.withdrawingConsent
+                        ) {
+                            withdrawalError = null
+                            confirmingWithdrawal = true
+                        }
                     }
+                }
+                withdrawalError?.let { message ->
+                    Text(
+                        stringResource(message),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
                 }
             }
 
@@ -235,6 +286,15 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
                     }
                 }
                 Footnote(stringResource(R.string.settings_tutorial_footer))
+                RowGroup {
+                    NavigationRow(
+                        Icons.AutoMirrored.Outlined.HelpOutline,
+                        stringResource(R.string.settings_support)
+                    ) {
+                        val url = accountState.legalConfig.supportUrl.ifBlank { DEFAULT_SUPPORT_URL }
+                        context.openWebPage(url, pageLanguage)
+                    }
+                }
             }
 
             // Debug builds only: release builds do not have this section.
@@ -251,9 +311,44 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
                         }
                     }
                     Footnote(stringResource(R.string.settings_debug_mock_replies_footer))
+                    RowGroup {
+                        NavigationRow(
+                            Icons.Outlined.NotificationsActive,
+                            stringResource(R.string.settings_debug_simulate_push)
+                        ) { services.push.simulatePush(DEBUG_PUSH_DELAY_MS) }
+                        RowDividerIndented()
+                        SwitchRow(
+                            label = stringResource(R.string.settings_debug_force_push_prompt),
+                            checked = pushState.debugForced,
+                            enabled = true
+                        ) { checked -> services.push.setDebugForcePrompt(checked) }
+                    }
+                    Footnote(stringResource(R.string.settings_debug_push_footer))
                 }
             }
+
+            Footnote(stringResource(R.string.settings_version, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE))
         }
+    }
+
+    if (confirmingWithdrawal) {
+        AlertDialog(
+            onDismissRequest = { confirmingWithdrawal = false },
+            title = { Text(stringResource(R.string.settings_withdraw_consent)) },
+            text = { Text(stringResource(R.string.settings_withdraw_consent_body)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmingWithdrawal = false
+                    // On success the consent screen takes over; a failure stays here.
+                    scope.launch { withdrawalError = services.account.withdrawLegalConsent() }
+                }) { Text(stringResource(R.string.settings_withdraw_consent_action)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmingWithdrawal = false }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            }
+        )
     }
 }
 
@@ -280,8 +375,16 @@ private fun LanguageRow(label: String, selected: Boolean, onClick: () -> Unit) {
     }
 }
 
+private const val FOCUS_DELAY_MS = 300L
+
+/** Where Help and support goes when the server's config has no page for it. */
+private const val DEFAULT_SUPPORT_URL = "https://ai-reply.kz/support"
+
+/** Debug builds: time to leave the app, to see the notification arrive in the background too. */
+private const val DEBUG_PUSH_DELAY_MS = 3_000L
+
 @Composable
-private fun SwitchRow(label: String, checked: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit) {
+internal fun SwitchRow(label: String, checked: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()

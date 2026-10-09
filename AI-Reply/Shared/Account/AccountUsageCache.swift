@@ -32,8 +32,7 @@ enum AccountUsageCache {
         var isExhausted: Bool { dailyLimit > 0 && remainingToday <= 0 }
     }
 
-    static func store(_ usage: AccountAPI.Usage) {
-        let defaults = AppGroup.defaults
+    static func store(_ usage: AccountAPI.Usage, defaults: UserDefaults = AppGroup.defaults) {
         defaults.set(usage.dailyLimit, forKey: Key.dailyLimit)
         defaults.set(usage.usedToday, forKey: Key.usedToday)
         defaults.set(usage.remainingToday, forKey: Key.remaining)
@@ -41,12 +40,13 @@ enum AccountUsageCache {
         defaults.set(Date().timeIntervalSince1970, forKey: Key.updatedAt)
     }
 
-    static func storePlanCode(_ code: String) {
-        AppGroup.defaults.set(code, forKey: Key.planName)
+    static func storePlanCode(_ code: String, defaults: UserDefaults = AppGroup.defaults) {
+        defaults.set(code, forKey: Key.planName)
     }
 
-    static var current: Snapshot {
-        let defaults = AppGroup.defaults
+    static var current: Snapshot { snapshot() }
+
+    static func snapshot(defaults: UserDefaults = AppGroup.defaults) -> Snapshot {
         let updated = defaults.double(forKey: Key.updatedAt)
         return Snapshot(
             dailyLimit: defaults.integer(forKey: Key.dailyLimit),
@@ -58,8 +58,7 @@ enum AccountUsageCache {
         )
     }
 
-    static func clear() {
-        let defaults = AppGroup.defaults
+    static func clear(defaults: UserDefaults = AppGroup.defaults) {
         for key in [Key.dailyLimit, Key.usedToday, Key.remaining, Key.resetsAt, Key.planName, Key.updatedAt] {
             defaults.removeObject(forKey: key)
         }

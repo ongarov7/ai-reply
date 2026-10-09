@@ -4,7 +4,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -36,6 +43,10 @@ import kz.yerek.aireply.ui.design.Spacing
  * Deliberately three fields. Templates, working hours and business rules all
  * have their own screens and are better filled in later by someone who has seen
  * a reply first.
+ *
+ * Shown outside the navigation scaffold, so it keeps clear of the system bars
+ * and the keyboard itself, and scrolls: with the keyboard up on a small phone
+ * the three fields and Finish do not fit.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -50,7 +61,13 @@ fun RegistrationStepScreen(onFinished: () -> Unit) {
     var description by remember { mutableStateOf(configuration.profile.descriptionText) }
     var tone by remember { mutableStateOf(configuration.profile.preferredTone) }
 
-    ReadableColumn {
+    ReadableColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .imePadding()
+            .verticalScroll(rememberScrollState())
+    ) {
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
             Text(
                 stringResource(R.string.registration_title),

@@ -21,6 +21,8 @@ type userDTO struct {
 	Onboarding bool   `json:"onboarding_completed"`
 	// AuthProviders — кіру тәсілдері: apple | email | google | phone.
 	AuthProviders []string `json:"auth_providers"`
+	// PreferredLanguage — kk | ru | en | uz, "" — қолданушы әлі таңдамаған.
+	PreferredLanguage string `json:"preferred_language"`
 }
 
 func toUserDTO(u domain.User, p domain.Profile) userDTO {
@@ -34,7 +36,8 @@ func toUserDTO(u domain.User, p domain.Profile) userDTO {
 		CreatedAt:  u.CreatedAt.Format(time.RFC3339),
 		Onboarding: p.OnboardingCompleted,
 
-		AuthProviders: []string{},
+		AuthProviders:     []string{},
+		PreferredLanguage: u.PreferredLanguage,
 	}
 }
 
@@ -105,6 +108,9 @@ type planDTO struct {
 	PeriodDays   int               `json:"period_days"`
 	IsFree       bool              `json:"is_free"`
 	SortOrder    int               `json:"sort_order"`
+	// Purchasable — the plan can be bought right now. False for the current
+	// plan inside a subscription and whenever buying is switched off.
+	Purchasable bool `json:"purchasable"`
 }
 
 func toPlanDTO(p domain.Plan) planDTO {

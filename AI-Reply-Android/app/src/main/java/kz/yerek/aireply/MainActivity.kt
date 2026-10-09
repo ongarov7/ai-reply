@@ -1,7 +1,9 @@
 package kz.yerek.aireply
 
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -19,12 +21,23 @@ import kotlinx.coroutines.launch
 import kz.yerek.aireply.core.lang.AppLanguage
 import kz.yerek.aireply.core.lang.LocalizedContext
 import kz.yerek.aireply.data.settings.AppearancePreference
+import kz.yerek.aireply.platform.ReplyLog
+import kz.yerek.aireply.push.AppLink
+import kz.yerek.aireply.push.PushPayload
 import kz.yerek.aireply.ui.LocalServices
 import kz.yerek.aireply.ui.design.AIReplyTheme
 import kz.yerek.aireply.ui.navigation.AppNavHost
 
 /**
  * The only Activity.
+ *
+ * WHAT OPENS IT. The launcher, and a tapped notification, whether the system
+ * showed it (the app was in the background: Firebase starts the launcher
+ * activity with the push data as String extras) or the app did (in the
+ * foreground: the same extras). It is singleTask, so a tap while it exists
+ * arrives in [onNewIntent] and is handled exactly like a cold start. The
+ * destination goes to PendingNavigation, which holds it until every gate
+ * (consent, sign-in, onboarding) is behind.
  *
  * LANGUAGE. The interface language is applied in [attachBaseContext] by wrapping
  * the base Context, which is the mechanism that works identically on every API
@@ -53,6 +66,13 @@ class MainActivity : ComponentActivity() {
         services.configuration.reload()
 
         observeLanguageChanges()
+
+        // Channels in the current language, the push token, the installation.
+        services.push.onAppLaunched()
+
+        // A re-created Activity (restored state) must not replay the intent
+        // that opened it the first time; a new one arrives in onNewIntent.
+        if (savedInstanceState == null) handleExternalIntent(intent)
 
         val debugOnboarding = BuildConfig.DEBUG &&
             intent?.getStringExtra(EXTRA_DEBUG_SCREEN) == DEBUG_SCREEN_ONBOARDING
@@ -89,6 +109,7 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        handleExternalIntent(intent)
     }
 
     override fun onResume() {
@@ -97,12 +118,46 @@ class MainActivity : ComponentActivity() {
         services.configuration.reload()
         // A profile change that could not reach the server is retried on every return.
         lifecycleScope.launch { services.profileSync.pushPending() }
+        // The notification permission may have changed in system settings.
+        services.push.onResume()
     }
 
     override fun onStop() {
         super.onStop()
         // The only Activity: stopping it is the app going to the background.
         AIReplyApplication.services(this).productEvents.flush()
+    }
+
+    /**
+     * A tapped notification. Its extras are removed once handled, so a
+     * re-creation of this Activity cannot open them again.
+     */
+    private fun handleExternalIntent(intent: Intent?) {
+        if (intent == null) return
+        // Reopened from Recents: the extras are the ones already handled.
+        if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return
+        val extras = intent.extras ?: return
+        if (!extras.containsKey(PushPayload.KEY_NOTIFICATION_ID)) return
+
+        val services = AIReplyApplication.services(this)
+        val data = PushPayload.KEYS.associateWith { key -> extras.getString(key) }
+        PushPayload.KEYS.forEach { key -> intent.removeExtra(key) }
+        when (val link = services.push.onNotificationOpened(data)) {
+            is AppLink.Screen -> services.navigation.open(link.screen)
+            is AppLink.Web -> openInBrowser(link.url)
+            AppLink.None, null -> Unit
+        }
+    }
+
+    /** A validated https page on ai-reply.kz; see AppLinks. */
+    private fun openInBrowser(url: String) {
+        val view = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE)
+        try {
+            startActivity(view)
+        } catch (none: ActivityNotFoundException) {
+            // No browser: the app is open, which is the fallback anyway.
+            ReplyLog.warn(none) { "no browser for a notification link" }
+        }
     }
 
     /**

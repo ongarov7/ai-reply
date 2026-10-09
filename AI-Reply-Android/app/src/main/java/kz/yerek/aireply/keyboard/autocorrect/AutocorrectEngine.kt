@@ -29,6 +29,10 @@ class AutocorrectEngine(
     private val rejected: MutableSet<RejectedCorrection> = ConcurrentHashMap.newKeySet()
     private val learning = Any()
 
+    /** The store's [LearnedWordsStore.generation] the words in [learned] were read at. */
+    @Volatile
+    private var learnedGeneration = learnedStore.generation
+
     fun isReady(language: KeyboardLanguage): Boolean =
         dictionaries.isLoaded(language) && learned.containsKey(language)
 
@@ -124,6 +128,7 @@ class AutocorrectEngine(
         val key = lookupKey(word.trim())
         if (key.none(Char::isLetter)) return
         synchronized(learning) {
+            forgetIfCleared()
             val current = learned[language] ?: LearnedWords.decode(learnedStore.read(language))
             val updated = current.adding(key)
             learned[language] = updated
@@ -267,7 +272,18 @@ class AutocorrectEngine(
         return filters.any { plain in it }
     }
 
-    private fun learnedWords(language: KeyboardLanguage): LearnedWords = learned[language] ?: LearnedWords.EMPTY
+    private fun learnedWords(language: KeyboardLanguage): LearnedWords {
+        forgetIfCleared()
+        return learned[language] ?: LearnedWords.EMPTY
+    }
+
+    /** The store was cleared meanwhile: the words in memory go too, and are never written back. */
+    private fun forgetIfCleared() {
+        val current = learnedStore.generation
+        if (current == learnedGeneration) return
+        learnedGeneration = current
+        learned.replaceAll { _, _ -> LearnedWords.EMPTY }
+    }
 
     companion object {
         /** Slots on the suggestion strip. */

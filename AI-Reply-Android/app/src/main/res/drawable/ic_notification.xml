@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Status-bar icon for notifications: the app mark (reply arrow and spark, the
+    geometry of ic_launcher_foreground) as a single white shape. The system
+    tints it; colour here would be ignored, and shading would turn into a blob.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <group
+        android:scaleX="0.3667"
+        android:scaleY="0.3667"
+        android:translateX="-9.27"
+        android:translateY="-6.15">
+
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M28,52 L48,34 L48,44 C66,45.5 78,56.5 80.5,77 C72,62.5 62,57.5 48,57.5 L48,68 Z" />
+
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M78,22 L80.6,29.4 L88,32 L80.6,34.6 L78,42 L75.4,34.6 L68,32 L75.4,29.4 Z" />
+    </group>
+
+</vector>

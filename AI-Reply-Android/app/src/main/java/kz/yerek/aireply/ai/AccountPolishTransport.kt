@@ -84,6 +84,7 @@ class AccountPolishTransport(
             is ApiError.TimedOut, is ApiError.ProviderTimeout -> AIReplyError.TimedOut
             is ApiError.Cancelled -> AIReplyError.Cancelled
             is ApiError.Unauthorized, is ApiError.AccountDisabled -> AIReplyError.AuthenticationFailed
+            is ApiError.ConsentRequired -> AIReplyError.ConsentRequired
             is ApiError.RateLimited -> AIReplyError.RateLimited
             else -> AIReplyError.ServiceUnavailable
         }

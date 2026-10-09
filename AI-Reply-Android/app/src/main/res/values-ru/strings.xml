@@ -43,7 +43,7 @@
     <string name="home_keyboard_opensettings">Открыть настройки iOS</string>
     <string name="home_keyboard_ready">Клавиатура AI Reply подключена</string>
     <string name="home_keyboard_title">Клавиатура</string>
-    <string name="home_privacy_body">Текст обрабатывается только когда вы просите ответ. Он передаётся через AI Reply AI-провайдеру, но не сохраняется в базе и не записывается в логи.</string>
+    <string name="home_privacy_body">Текст обрабатывается только когда вы просите ответ. Он передаётся через AI Reply в OpenAI, но не сохраняется в базе и не записывается в логи.</string>
     <string name="home_privacy_title">Конфиденциальность</string>
     <string name="home_profile_edit">Профиль</string>
     <string name="home_profile_hours">Рабочее время</string>
@@ -140,7 +140,7 @@
     <string name="settings_appgroup_unavailable">Приложение и клавиатура пока не могут обмениваться настройками. Пересоберите приложение, чтобы применился App Group.</string>
     <string name="settings_language">Язык</string>
     <string name="settings_language_footer">Меняет язык этого приложения. Надписи на самой клавиатуре следуют выбранной на ней раскладке.</string>
-    <string name="settings_privacy_body">Кнопка «%1$s» отправляет скопированное сообщение и вашу инструкцию, кнопка «%2$s» — только инструкцию. Когда включена умная коррекция, инструкция, которую вы пишете в поле AI\u00A0Reply, тоже может отправляться — чтобы предложить исправление. Текст передаётся через сервер AI\u00A0Reply AI-провайдеру, не хранится в базе и не попадает в логи.</string>
+    <string name="settings_privacy_body">Кнопка «%1$s» отправляет скопированное или выделенное сообщение и вашу инструкцию, кнопка «%2$s» — только инструкцию. Когда включена умная коррекция, инструкция, которую вы пишете в поле AI\u00A0Reply, тоже может отправляться — чтобы предложить исправление. Текст передаётся через сервер AI\u00A0Reply в OpenAI, не хранится в базе и не попадает в логи, кроме текста в жалобе, которую вы решили отправить.</string>
     <string name="settings_privacy_title">Конфиденциальность</string>
     <string name="settings_setup">Настройка</string>
     <string name="settings_setup_footer">Статус клавиатуры, пошаговая настройка и то, как AI\u00A0Reply читает скопированный текст.</string>
@@ -279,6 +279,7 @@
     <string name="account_error_email_delivery">Не удалось отправить письмо. Попробуйте через минуту.</string>
     <string name="account_error_email_in_use">Эта почта уже привязана к другому аккаунту. Войдите по коду из письма или укажите другой адрес.</string>
     <string name="account_error_provider_failed">Не удалось войти. Попробуйте ещё раз или выберите другой способ.</string>
+    <string name="account_error_provider_rejected">Наш сервер не принял этот вход. Попробуйте ещё раз или выберите другой способ.</string>
     <string name="account_error_provider_unavailable">Этот способ входа сейчас недоступен. Выберите другой.</string>
     <string name="settings_account_add_email">Добавить почту для входа</string>
     <string name="settings_account_add_email_body">Вход по номеру телефона больше недоступен. Добавьте почту, чтобы сохранить доступ к аккаунту, тарифу и истории.</string>
@@ -323,7 +324,7 @@
     <string name="home_usage_title">Ответы сегодня</string>
     <string name="home_usage_left">осталось из %1$d</string>
     <string name="kb_err_sign_in_required">Откройте приложение AI Reply и войдите, чтобы продолжить.</string>
-    <string name="kb_err_quota_exhausted">Ответы на сегодня закончились. Они обновятся завтра — или смените тариф в приложении.</string>
+    <string name="kb_err_quota_exhausted">Ответы на сегодня закончились. Они обновятся завтра.</string>
 
     <!-- Onboarding v2, the sender's grammatical gender, the tutorial row -->
     <string name="onboarding_skip_tutorial">Пропустить обучение</string>
@@ -359,6 +360,6 @@
     <string name="profile_gender_footer">Нужен только для русской грамматики: «рад/рада», «сделал/сделала». Мы никогда не угадываем его по имени или аккаунту.</string>
     <string name="settings_tutorial">Как пользоваться AI\u00A0Reply</string>
     <string name="settings_tutorial_footer">Короткое обучение: как скопировать сообщение, ответить с клавиатуры и потренироваться. Настройки при этом не сбрасываются.</string>
-    <string name="onboarding_keyboard_privacy">Android предупреждает, что клавиатура «может собирать весь вводимый текст». Такое стандартное предупреждение показывается для любой клавиатуры. AI\u00A0Reply отправляет текст, когда вы нажимаете «%1$s» или «%2$s», а при включённой умной коррекции — ещё и инструкцию из поля AI\u00A0Reply, чтобы предложить исправление. Больше ничего из того, что вы печатаете, не отправляется.</string>
+    <string name="onboarding_keyboard_privacy">Android предупреждает, что клавиатура «может собирать весь вводимый текст». Такое стандартное предупреждение показывается для любой клавиатуры. AI\u00A0Reply отправляет текст через свой сервер в OpenAI, когда вы нажимаете «%1$s» или «%2$s», а при включённой умной коррекции — ещё и инструкцию из поля AI\u00A0Reply, чтобы предложить исправление. Больше ничего из того, что вы печатаете, не отправляется.</string>
 
 </resources>

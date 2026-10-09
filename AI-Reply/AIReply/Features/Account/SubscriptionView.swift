@@ -7,18 +7,24 @@ import SwiftUI
 /// The numbers on this screen come from the server on every appearance. The app
 /// keeps a cached copy only so the keyboard can render instantly; it is never
 /// the source of truth, and a stale cache can only ever be pessimistic.
+///
+/// Nothing is sold here in a Release build (see
+/// `AccountModel.purchasesAvailableInThisBuild`): the other plans are listed
+/// with their limits, without a price or a button.
 struct SubscriptionView: View {
 
     @Environment(AppSettings.self) private var settings
     @Environment(AccountModel.self) private var account
 
     @State private var isChanging = false
+    /// Why the last Choose failed; shown under the plans.
+    @State private var purchaseErrorKey: String?
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: DS.Spacing.xl) {
                 usageCard
-                if !account.plans.isEmpty { plansSection }
+                if showsPlans { plansSection }
             }
             .padding(.horizontal, DS.Spacing.l)
             .padding(.vertical, DS.Spacing.l)
@@ -69,11 +75,20 @@ struct SubscriptionView: View {
         .dsCard()
     }
 
+    /// The server lists only the plans it shows; the section is worth a
+    /// place only when one of them is not the current plan.
+    private var showsPlans: Bool {
+        account.plans.contains { $0.id != account.subscription?.plan.id }
+    }
+
     private var plansSection: some View {
         DSSection(title: "subscription.available") {
-            VStack(spacing: DS.Spacing.s) {
+            VStack(alignment: .leading, spacing: DS.Spacing.s) {
                 ForEach(account.plans) { plan in
                     planRow(plan)
+                }
+                if let purchaseErrorKey {
+                    AuthErrorLabel(key: purchaseErrorKey)
                 }
             }
         }
@@ -82,15 +97,19 @@ struct SubscriptionView: View {
     private func planRow(_ plan: AccountAPI.Plan) -> some View {
         let language = settings.effectiveLanguage.rawValue
         let isCurrent = account.subscription?.plan.id == plan.id
+        // A price only next to a button that can take it.
+        let isPurchasable = account.canPurchase(plan)
 
         return VStack(alignment: .leading, spacing: DS.Spacing.xs) {
             HStack(alignment: .firstTextBaseline) {
                 Text(verbatim: plan.localizedName(language))
                     .font(.body.weight(.semibold))
                 Spacer()
-                Text(verbatim: plan.isFree ? "" : plan.priceText)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(.secondary)
+                if isPurchasable {
+                    Text(verbatim: plan.priceText)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Text(verbatim: plan.localizedDescription(language))
@@ -117,11 +136,14 @@ struct SubscriptionView: View {
                             Capsule().fill(Color.accentColor.opacity(0.15))
                         )
                         .foregroundStyle(Color.accentColor)
-                } else if !plan.isFree {
+                } else if isPurchasable {
                     Button("subscription.choose") {
                         Task {
                             isChanging = true
-                            _ = await account.choosePlan(plan)
+                            purchaseErrorKey = nil
+                            if !(await account.choosePlan(plan)) {
+                                purchaseErrorKey = account.errorKey ?? "account.error.generic"
+                            }
                             isChanging = false
                         }
                     }

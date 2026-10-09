@@ -36,6 +36,23 @@ object AutocorrectGate {
         return inputType and InputType.TYPE_MASK_VARIATION !in EXCLUDED_VARIATIONS
     }
 
+    /**
+     * Names and postal addresses are full of words no dictionary knows, and a
+     * surname "corrected" into a common word is worse than a typo: the strip
+     * still suggests there, but a separator never replaces the word.
+     */
+    private val NO_AUTO_REPLACEMENT = setOf(
+        InputType.TYPE_TEXT_VARIATION_PERSON_NAME,
+        InputType.TYPE_TEXT_VARIATION_POSTAL_ADDRESS
+    )
+
+    /** True when a separator may replace the word typed in [inputType]'s field with a correction. */
+    fun autoReplaces(inputType: Int): Boolean =
+        inputType and InputType.TYPE_MASK_CLASS != InputType.TYPE_CLASS_TEXT ||
+            inputType and InputType.TYPE_MASK_VARIATION !in NO_AUTO_REPLACEMENT
+
+    fun autoReplaces(info: EditorInfo?): Boolean = info == null || autoReplaces(info.inputType)
+
     /** False when the app asks the keyboard not to learn from this field (an incognito tab, say). */
     fun learns(imeOptions: Int): Boolean = imeOptions and EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING == 0
 

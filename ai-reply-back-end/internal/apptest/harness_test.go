@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -21,6 +22,9 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/auth"
 	"github.com/aireply/ai-reply-back-end/internal/database"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
+	"github.com/aireply/ai-reply-back-end/internal/email"
+	"github.com/aireply/ai-reply-back-end/internal/installations"
+	"github.com/aireply/ai-reply-back-end/internal/legal"
 	"github.com/aireply/ai-reply-back-end/internal/limits"
 	"github.com/aireply/ai-reply-back-end/internal/localization"
 	"github.com/aireply/ai-reply-back-end/internal/middleware"
@@ -28,6 +32,8 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/payments"
 	"github.com/aireply/ai-reply-back-end/internal/plans"
 	"github.com/aireply/ai-reply-back-end/internal/productevents"
+	"github.com/aireply/ai-reply-back-end/internal/push"
+	"github.com/aireply/ai-reply-back-end/internal/reports"
 	"github.com/aireply/ai-reply-back-end/internal/repository"
 	"github.com/aireply/ai-reply-back-end/internal/simulator"
 	"github.com/aireply/ai-reply-back-end/internal/subscriptions"
@@ -52,13 +58,32 @@ type fakeProvider struct {
 	lastUser      string
 	lastDeveloper string
 	lastMaxTokens int
+	// hold — келесі шақыру клиент кеткенше күтеді; арна шақыру басталғанда жабылады.
+	hold chan struct{}
 }
 
 func (f *fakeProvider) Name() string  { return "fake" }
 func (f *fakeProvider) Model() string { return "test-model" }
 
-func (f *fakeProvider) Generate(_ context.Context, prompt ai.Prompt) (ai.Completion, error) {
+// holdNext — келесі шақыру сұраныс тоқтағанша (клиент байланысты үзгенше) жауап бермейді.
+func (f *fakeProvider) holdNext() <-chan struct{} {
 	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.hold = make(chan struct{})
+	return f.hold
+}
+
+func (f *fakeProvider) Generate(ctx context.Context, prompt ai.Prompt) (ai.Completion, error) {
+	f.mu.Lock()
+	if hold := f.hold; hold != nil {
+		f.hold = nil
+		f.calls++
+		f.mu.Unlock()
+		close(hold)
+		<-ctx.Done()
+		// What the OpenAI client reports when the request is cancelled under it.
+		return ai.Completion{}, domain.ErrProviderDown
+	}
 	defer f.mu.Unlock()
 	f.calls++
 	f.prompts = append(f.prompts, prompt)
@@ -77,20 +102,125 @@ func (f *fakeProvider) Generate(_ context.Context, prompt ai.Prompt) (ai.Complet
 	}, nil
 }
 
+// fakePush — FCM орнына (Android және iOS): не жіберілгенін жазады, жауапты тест таңдайды.
+type fakePush struct {
+	mu      sync.Mutex
+	sent    []fakeSent
+	results []push.Result
+	onSend  func()
+}
+
+type fakeSent struct {
+	token string
+	msg   push.Message
+}
+
+func (f *fakePush) Name() string { return "fcm" }
+
+func (f *fakePush) Send(_ context.Context, target push.Target, msg push.Message) push.Result {
+	f.mu.Lock()
+	hook := f.onSend
+	f.mu.Unlock()
+	if hook != nil {
+		hook()
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.sent = append(f.sent, fakeSent{token: target.Token, msg: msg})
+	if len(f.results) > 0 {
+		res := f.results[0]
+		f.results = f.results[1:]
+		return res
+	}
+	return push.Result{Outcome: push.Accepted, MessageID: "projects/test/messages/" + strconv.Itoa(len(f.sent))}
+}
+
+// respond — келесі жіберулердің нәтижелері (реті бойынша), кейін — Accepted.
+func (f *fakePush) respond(results ...push.Result) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.results = append(f.results, results...)
+}
+
+// whenSending — әр жіберу сәтінде орындалады (провайдер жауап бергенге дейін), nil — алып тастайды.
+func (f *fakePush) whenSending(hook func()) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.onSend = hook
+}
+
+func (f *fakePush) messages() []fakeSent {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]fakeSent(nil), f.sent...)
+}
+
+// fakeNotificationMailer — хабарлама хаттарын жадта ұстайды (Resend орнына).
+type fakeNotificationMailer struct {
+	mu   sync.Mutex
+	sent []email.Outgoing
+	fail []error
+}
+
+func (f *fakeNotificationMailer) Send(_ context.Context, msg email.Outgoing) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if len(f.fail) > 0 {
+		err := f.fail[0]
+		f.fail = f.fail[1:]
+		return err
+	}
+	f.sent = append(f.sent, msg)
+	return nil
+}
+
+// failNext — келесі жіберулердің қателері (реті бойынша).
+func (f *fakeNotificationMailer) failNext(errs ...error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.fail = append(f.fail, errs...)
+}
+
+func (f *fakeNotificationMailer) messages() []email.Outgoing {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]email.Outgoing(nil), f.sent...)
+}
+
+// fakeEmailRenderer — хат мазмұны: түр, тіл және params (нақты үлгілер аудармаларда).
+type fakeEmailRenderer struct{}
+
+func (fakeEmailRenderer) Render(kind, locale string, params map[string]string) (email.Content, error) {
+	if kind == "no_template" {
+		return email.Content{}, email.ErrTemplateMissing
+	}
+	return email.Content{Subject: kind + " " + locale, Text: params["plan"], HTML: "<p>" + params["plan"] + "</p>"}, nil
+}
+
 // harness — жинақталған қолданба.
 type harness struct {
-	t        *testing.T
-	cfg      config.Config
-	server   *httptest.Server
-	store    *repository.Store
-	db       *database.DB
-	provider *fakeProvider
-	clock    *traits.FixedClock
-	logs     *bytes.Buffer
-	dbPath   string
-	admin    *admin.Service
-	limits   *limits.Service
-	authSvc  *auth.Service
+	t             *testing.T
+	cfg           config.Config
+	server        *httptest.Server
+	store         *repository.Store
+	db            *database.DB
+	provider      *fakeProvider
+	clock         *traits.FixedClock
+	logs          *bytes.Buffer
+	dbPath        string
+	admin         *admin.Service
+	limits        *limits.Service
+	authSvc       *auth.Service
+	users         *users.Service
+	installations *installations.Service
+	notify        *notifications.Service
+	events        *notifications.Events
+	// push — the FCM fake both platforms send through; mail — notification e-mails.
+	push *fakePush
+	mail *fakeNotificationMailer
+	// pushClock — installations and notifications only: backoff tests move it
+	// without expiring the access tokens that run on clock.
+	pushClock *traits.FixedClock
 }
 
 // harnessOption — жекелеген тесттің баптауы (мысалы, лимитті азайту).
@@ -120,11 +250,14 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 		"AUTH_SIGNING_SECRET": "test-legacy-secret-that-is-long-enough-00",
 		"ACCESS_TOKEN_TTL":    "15m", "REFRESH_TOKEN_TTL": "720h",
 		"OPENAI_API_KEY": "sk-test-key", "OPENAI_MODEL": "test-model",
-		"AUTH_DEMO_MODE": "true", "AUTH_DEMO_OTP": "1111",
-		"PAYMENT_MODE": "demo", "ADMIN_EMAIL": adminEmail, "ADMIN_PASSWORD": adminPassword,
+		// Every switch whose default is "off" for a real server is set here on
+		// purpose: demo sign-in, demo checkout and the old install-token API.
+		"AUTH_DEMO_MODE": "true", "AUTH_DEMO_OTP": "1111", "LEGACY_API_ENABLED": "true",
+		"PAYMENT_MODE": "demo", "PAYMENT_DEMO_CHECKOUT": "true",
+		"ADMIN_EMAIL": adminEmail, "ADMIN_PASSWORD": adminPassword,
 		"LOG_LEVEL": "info", "LOG_FORMAT": "json", "RATE_AI_PER_MINUTE": "1000",
 		"RATE_OTP_REQUEST_PER_HOUR": "100", "RATE_OTP_VERIFY_PER_HOUR": "200",
-		"RATE_GENERIC_PER_MINUTE": "1000", "OTP_MAX_ATTEMPTS": "5",
+		"RATE_GENERIC_PER_MINUTE": "1000", "OTP_MAX_ATTEMPTS": "5", "PUSH_NOTIFICATIONS_ENABLED": "true",
 		// The fake provider answers the same text to every prompt, so the
 		// language check would "repair" most of them. Repair tests switch it on.
 		"AI_REPAIR_ENABLED": "false",
@@ -164,7 +297,7 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 	store := repository.New(db)
 	planSvc := plans.New(store)
 	subSvc := subscriptions.New(store, planSvc, cfg.App.Location()).WithClock(clock)
-	userSvc := users.New(store)
+	userSvc := users.New(store).WithLogger(log).WithClock(clock)
 	authSvc := auth.New(store, cfg.Auth, auth.StubSender{Log: log}, subSvc, log).WithClock(clock)
 	provider := &fakeProvider{reply: "Сәлеметсіз бе! Бағаны нақтылап, бірер минуттан соң жазамын."}
 	limitSvc := limits.New(store, limits.Limits{
@@ -172,11 +305,26 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 		InstructionChars: cfg.Limits.InstructionChars,
 		MaxOutputTokens:  cfg.OpenAI.MaxOutputTokens,
 	}).WithTTL(0)
-	aiSvc := ai.New(store, subSvc, provider, limitSvc, log).WithClock(clock).WithRepair(cfg.AI.RepairEnabled)
-	paymentSvc := payments.New(store, subSvc, payments.DemoProvider{}, cfg.Payments.Mode)
+	pushClock := &traits.FixedClock{T: clock.T}
+	installSvc := installations.New(store, cfg.Auth.AccessSecret, log).WithClock(pushClock)
+	fcm, mail := &fakePush{}, &fakeNotificationMailer{}
+	bundle, err := localization.Load()
+	if err != nil {
+		t.Fatalf("localization: %v", err)
+	}
+	notifySvc := notifications.New(notifications.Deps{
+		Repo: store, Installations: installSvc, Provider: fcm, Plans: planSvc, Config: cfg.Push,
+		Location: cfg.App.Location(), Translate: bundle.T, Log: log, Clock: pushClock,
+	}).WithEmail(mail, fakeEmailRenderer{})
+	events := notifications.NewEvents(notifySvc).
+		WithDemoPayments(cfg.Payments.DemoCheckout && !cfg.App.IsProduction())
+	aiSvc := ai.New(store, subSvc, provider, limitSvc, log).WithClock(clock).WithRepair(cfg.AI.RepairEnabled).
+		WithQuotaEvents(events).WithPolishDailyLimit(cfg.Limits.PolishPerDay)
+	paymentSvc := payments.New(store, subSvc, payments.DemoProvider{}, cfg.Payments.Mode).WithEvents(events).
+		WithDemoCheckout(cfg.Payments.DemoCheckout).WithProduction(cfg.App.IsProduction())
 	eventSvc := productevents.New(store, log).WithClock(clock)
-	notifySvc := notifications.New(store)
-	adminSvc := admin.New(store, subSvc, planSvc, cfg, log)
+	reportSvc := reports.New(store, log).WithClock(clock)
+	adminSvc := admin.New(store, subSvc, planSvc, cfg, log).WithEvents(events)
 	simulatorSvc := simulator.New(simulator.Deps{
 		Repo: store, Users: userSvc, Subs: subSvc, Plans: planSvc, AI: aiSvc, Limits: limitSvc,
 		Config: cfg, Log: log,
@@ -185,21 +333,18 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 		t.Fatalf("admin bootstrap: %v", err)
 	}
 
-	bundle, err := localization.Load()
-	if err != nil {
-		t.Fatalf("localization: %v", err)
-	}
 	limiter := middleware.NewLimiter()
 
 	mux := http.NewServeMux()
 	api.New(api.Deps{Config: cfg, Auth: authSvc, Users: userSvc, Plans: planSvc, Subs: subSvc,
-		AI: aiSvc, Limits: limitSvc, Payments: paymentSvc, Events: eventSvc, Limiter: limiter, Log: log,
+		AI: aiSvc, Limits: limitSvc, Payments: paymentSvc, Events: eventSvc, Installations: installSvc,
+		Notifications: notifySvc, Reports: reportSvc, Limiter: limiter, Log: log,
 		Ping: func(ctx context.Context) error { return db.Reader().PingContext(ctx) }}).Register(mux)
 	adminapi.New(adminapi.Deps{Config: cfg, Admin: adminSvc, Limits: limitSvc, Notifications: notifySvc,
-		Log: log}).Register(mux)
+		Payments: paymentSvc, Reports: reportSvc, Limiter: limiter, Log: log}).Register(mux)
 	simulatorapi.New(simulatorapi.Deps{Config: cfg, Admin: adminSvc, Simulator: simulatorSvc,
 		Limiter: limiter, Log: log}).Register(mux)
-	webServer, err := web.New(web.Deps{Config: cfg, Admin: adminSvc, Plans: planSvc,
+	webServer, err := web.New(web.Deps{Config: cfg, Admin: adminSvc, Plans: planSvc, Payments: paymentSvc,
 		Notifications: notifySvc, Bundle: bundle, Limiter: limiter, Log: log})
 	if err != nil {
 		t.Fatalf("web: %v", err)
@@ -207,12 +352,13 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 	webServer.Register(mux)
 
 	handler := middleware.Chain(mux, middleware.RequestID, middleware.Recover(log), middleware.Logging(log),
-		middleware.SecurityHeaders(cfg.App.IsProduction()))
+		middleware.SecurityHeaders(cfg.App.HSTS()))
 	server := httptest.NewServer(handler)
 
 	h := &harness{t: t, cfg: cfg, server: server, store: store, db: db,
 		provider: provider, clock: clock, logs: logs, dbPath: dbPath, admin: adminSvc, limits: limitSvc,
-		authSvc: authSvc}
+		authSvc: authSvc, users: userSvc, installations: installSvc, notify: notifySvc, events: events, push: fcm, mail: mail,
+		pushClock: pushClock}
 	t.Cleanup(func() {
 		server.Close()
 		_ = db.Close()
@@ -326,11 +472,27 @@ func (h *harness) signIn(identifier string) session {
 		h.t.Fatalf("verify-otp: status %d body %s", verify.status, verify.raw)
 	}
 	isNew, _ := verify.body["is_new_user"].(bool)
-	return session{
+	s := session{
 		access:  verify.str("access_token"),
 		refresh: verify.str("refresh_token"),
 		userID:  verify.str("user", "id"),
 		isNew:   isNew,
+	}
+	// The apps accept the current terms right after sign-in; without it every
+	// AI request answers CONSENT_REQUIRED.
+	h.consent(s.access)
+	return s
+}
+
+// consent — ағымдағы шарттар мен құпиялық саясатына келісім (қолданбадағыдай).
+func (h *harness) consent(access string) {
+	h.t.Helper()
+	res := h.do(http.MethodPost, "/api/v1/me/consents", map[string]any{
+		"terms_version": legal.TermsVersion, "privacy_version": legal.PrivacyVersion,
+		"locale": "kk", "platform": "ios", "app_version": "1.0.0",
+	}, h.auth(access))
+	if res.status != http.StatusOK {
+		h.t.Fatalf("consent: status %d body %s", res.status, res.raw)
 	}
 }
 

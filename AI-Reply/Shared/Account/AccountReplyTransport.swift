@@ -240,15 +240,22 @@ struct AccountReplyTransport: ReplyTransport {
             if case .sourceTooLong(let limit) = error {
                 AILimits.storeSourceLimit(limit)
             }
+            Self.noteRefusal(error)
             throw Self.map(error)
         }
+    }
+
+    /// A consent the server no longer has is forgotten here too, so the
+    /// keyboard stops asking and the app shows its consent screen again.
+    static func noteRefusal(_ error: APIError) {
+        if error == .consentRequired { LegalConsentStore.forgetAfterServerRefusal() }
     }
 
     /// Backend failures become the closed set the UI already knows how to show.
     ///
     /// A spent quota and a burst of requests are different problems with
-    /// different fixes - change plan or wait until tomorrow, versus wait a few
-    /// seconds - so they stay different errors. They used to share one, and a
+    /// different fixes - wait until tomorrow (or next month), versus wait a
+    /// few seconds - so they stay different errors. They used to share one, and a
     /// user who tapped Regenerate twice was told their day's replies were gone.
     static func map(_ error: APIError) -> AIReplyError {
         switch error {
@@ -258,6 +265,8 @@ struct AccountReplyTransport: ReplyTransport {
         case .unauthorized, .accountDisabled: return .authenticationFailed
         case .dailyLimitReached, .subscriptionExpired, .paymentRequired:
             return .quotaExhausted
+        case .monthlyLimitReached:     return .monthlyQuotaExhausted
+        case .consentRequired:         return .consentRequired
         case .rateLimited:             return .rateLimited
         case .emptyResponse:           return .emptyResponse
         case .sourceTooLong(let limit): return .messageTooLong(limit: limit)

@@ -22,7 +22,7 @@ import (
 )
 
 var (
-	// ErrInvalidToken — қолтаңба, мерзім, aud/iss не nonce сәйкес емес.
+	// ErrInvalidToken — қолтаңба, мерзім, aud/iss не nonce сәйкес емес (себебі — *RejectError).
 	ErrInvalidToken = errors.New("idtoken: invalid token")
 	// ErrUnavailable — провайдердің ашық кілттерін алу мүмкін болмады.
 	ErrUnavailable = errors.New("idtoken: signing keys unavailable")
@@ -123,15 +123,17 @@ func AppleNonce(raw string) string {
 // Verify — қолтаңбаны, iss, aud, мерзімді және (берілсе) nonce-ты тексереді.
 //
 // expectedNonce is compared in constant time; an empty value skips the check.
-// Errors wrap ErrInvalidToken or ErrUnavailable and name the failed check, so
-// the reason can be logged without ever logging the token itself.
+// A rejected token is a *RejectError (it wraps ErrInvalidToken) that names
+// the failed check and the public values behind it, so the reason can be
+// logged without ever logging the token itself. Missing provider keys wrap
+// ErrUnavailable instead.
 func (v *Verifier) Verify(ctx context.Context, token, expectedNonce string) (Claims, error) {
 	if token == "" || len(token) > maxTokenBytes {
-		return Claims{}, invalid("malformed token")
+		return Claims{}, reject(ReasonMalformed, "malformed token")
 	}
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
-		return Claims{}, invalid("malformed token")
+		return Claims{}, reject(ReasonMalformed, "malformed token")
 	}
 
 	var header struct {
@@ -139,17 +141,17 @@ func (v *Verifier) Verify(ctx context.Context, token, expectedNonce string) (Cla
 		Kid string `json:"kid"`
 	}
 	if err := decodeSegment(parts[0], &header); err != nil {
-		return Claims{}, invalid("malformed header")
+		return Claims{}, reject(ReasonMalformed, "malformed header")
 	}
 	if header.Alg != "RS256" {
-		return Claims{}, invalid("unexpected algorithm")
+		return Claims{}, reject(ReasonAlgorithm, "unexpected algorithm")
 	}
 	if header.Kid == "" {
-		return Claims{}, invalid("missing key id")
+		return Claims{}, reject(ReasonKeyID, "missing key id")
 	}
 	signature, err := base64.RawURLEncoding.DecodeString(parts[2])
 	if err != nil || len(signature) == 0 {
-		return Claims{}, invalid("malformed signature")
+		return Claims{}, reject(ReasonMalformed, "malformed signature")
 	}
 
 	key, err := v.keys.PublicKey(ctx, header.Kid)
@@ -157,16 +159,20 @@ func (v *Verifier) Verify(ctx context.Context, token, expectedNonce string) (Cla
 		if errors.Is(err, ErrUnavailable) {
 			return Claims{}, err
 		}
-		return Claims{}, invalid("unknown signing key")
+		r := reject(ReasonKeyID, "unknown signing key")
+		r.KeyID = header.Kid
+		return Claims{}, r
 	}
 	digest := sha256.Sum256([]byte(parts[0] + "." + parts[1]))
 	if err := rsa.VerifyPKCS1v15(key, crypto.SHA256, digest[:], signature); err != nil {
-		return Claims{}, invalid("bad signature")
+		r := reject(ReasonSignature, "bad signature")
+		r.KeyID = header.Kid
+		return Claims{}, r
 	}
 
 	var raw rawClaims
 	if err := decodeSegment(parts[1], &raw); err != nil {
-		return Claims{}, invalid("malformed claims")
+		return Claims{}, reject(ReasonMalformed, "malformed claims")
 	}
 	return v.validate(raw, expectedNonce)
 }
@@ -174,30 +180,42 @@ func (v *Verifier) Verify(ctx context.Context, token, expectedNonce string) (Cla
 func (v *Verifier) validate(raw rawClaims, expectedNonce string) (Claims, error) {
 	now := v.now()
 	if !contains(v.issuers, raw.Issuer) {
-		return Claims{}, invalid("issuer mismatch")
+		r := reject(ReasonIssuer, "issuer mismatch")
+		r.Issuer, r.Expected = raw.Issuer, v.issuers
+		return Claims{}, r
 	}
 	if !intersects(v.audiences, raw.Audience) {
-		return Claims{}, invalid("audience mismatch")
+		r := reject(ReasonAudience, "audience mismatch")
+		r.Audience, r.AuthorizedParty, r.Expected = []string(raw.Audience), raw.AuthorizedParty, v.audiences
+		return Claims{}, r
 	}
 	if raw.Subject == "" || len(raw.Subject) > 255 {
-		return Claims{}, invalid("missing subject")
+		return Claims{}, reject(ReasonMalformed, "missing subject")
 	}
 	if raw.ExpiresAt == 0 {
-		return Claims{}, invalid("missing expiry")
+		return Claims{}, reject(ReasonMalformed, "missing expiry")
 	}
 	expires := time.Unix(int64(raw.ExpiresAt), 0)
 	if now.After(expires.Add(v.leeway)) {
-		return Claims{}, invalid("token expired")
+		r := reject(ReasonExpired, "token expired")
+		r.Off = now.Sub(expires)
+		return Claims{}, r
 	}
 	if raw.IssuedAt != 0 && time.Unix(int64(raw.IssuedAt), 0).After(now.Add(v.leeway)) {
-		return Claims{}, invalid("issued in the future")
+		r := reject(ReasonNotYetValid, "issued in the future")
+		r.Off = time.Unix(int64(raw.IssuedAt), 0).Sub(now)
+		return Claims{}, r
 	}
 	if raw.NotBefore != 0 && time.Unix(int64(raw.NotBefore), 0).After(now.Add(v.leeway)) {
-		return Claims{}, invalid("not yet valid")
+		r := reject(ReasonNotYetValid, "not yet valid")
+		r.Off = time.Unix(int64(raw.NotBefore), 0).Sub(now)
+		return Claims{}, r
 	}
 	if expectedNonce != "" &&
 		subtle.ConstantTimeCompare([]byte(raw.Nonce), []byte(expectedNonce)) != 1 {
-		return Claims{}, invalid("nonce mismatch")
+		r := reject(ReasonNonce, "nonce mismatch")
+		r.tokenNonce = raw.Nonce
+		return Claims{}, r
 	}
 
 	claims := Claims{

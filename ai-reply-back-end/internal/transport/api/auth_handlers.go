@@ -134,7 +134,12 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, err)
 		return
 	}
-	if err := s.auth.Logout(r.Context(), body.RefreshToken); err != nil {
+	userID, err := s.auth.LogoutSession(r.Context(), body.RefreshToken)
+	// The app names its installation in X-Installation-ID: from this moment
+	// the account's notifications no longer go to this phone, even when the
+	// sessions could not be closed.
+	s.detachOnLogout(r, userID)
+	if err != nil {
 		httpx.Fail(w, err)
 		return
 	}

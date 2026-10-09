@@ -14,7 +14,7 @@ import (
 )
 
 const userColumns = `id, phone, email, status, locale, timezone, platform, app_version, os_version,
-	kind, legacy_client, created_at, updated_at, last_active_at`
+	kind, legacy_client, created_at, updated_at, last_active_at, preferred_language`
 
 func scanUser(row interface{ Scan(...any) error }) (domain.User, error) {
 	var (
@@ -24,7 +24,7 @@ func scanUser(row interface{ Scan(...any) error }) (domain.User, error) {
 		lastActive           sql.NullInt64
 	)
 	err := row.Scan(&u.ID, &phone, &email, &u.Status, &u.Locale, &u.Timezone, &u.Platform,
-		&u.AppVersion, &u.OSVersion, &u.Kind, &legacy, &created, &updated, &lastActive)
+		&u.AppVersion, &u.OSVersion, &u.Kind, &legacy, &created, &updated, &lastActive, &u.PreferredLanguage)
 	if err != nil {
 		return domain.User{}, err
 	}
@@ -131,6 +131,13 @@ func (s *Store) UpdateUserMeta(ctx context.Context, id string, platform, appVers
 		platform, platform, appVersion, appVersion, osVersion, osVersion,
 		locale, locale, tz, tz, ms(time.Now()), ms(time.Now()), id)
 	return err
+}
+
+// UpdatePreferredLanguage — қолданушы өзі таңдаған тіл (тек әдейі жазылады, кірген сайын емес).
+func (s *Store) UpdatePreferredLanguage(ctx context.Context, id, language string) error {
+	res, err := s.db.Writer().ExecContext(ctx,
+		`UPDATE users SET preferred_language = ?, updated_at = ? WHERE id = ?`, language, ms(time.Now()), id)
+	return affected(res, err)
 }
 
 // TouchUser — соңғы белсенділік.
@@ -333,7 +340,7 @@ func (s *Store) ListUsers(ctx context.Context, f UserFilter, today, month string
 		)
 		if err := rows.Scan(&r.User.ID, &phone, &email, &r.User.Status, &r.User.Locale, &r.User.Timezone,
 			&r.User.Platform, &r.User.AppVersion, &r.User.OSVersion, &r.User.Kind, &legacy,
-			&created, &updated, &lastActive,
+			&created, &updated, &lastActive, &r.User.PreferredLanguage,
 			&r.PlanCode, &r.PlanName, &r.SubStatus, &r.DailyLimit, &r.UsedToday, &r.TokensMonth, &expires); err != nil {
 			return nil, 0, err
 		}

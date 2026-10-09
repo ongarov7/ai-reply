@@ -67,7 +67,46 @@ func (s *Server) requireUser(next http.Handler) http.Handler {
 	})
 }
 
-// requireLegacy — ескі install-token миддлварі.
+// optionalUser — токен болса тексереді, болмаса сұраныс анонимді өтеді.
+//
+// A token that is present but no longer valid is refused with 401 rather
+// than treated as anonymous: for installation registration "anonymous"
+// means "signed out" and detaches the device, which an expired access token
+// must never do. The app refreshes and repeats the call.
+func (s *Server) optionalUser(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.TrimSpace(r.Header.Get("Authorization")) == "" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		s.requireUser(next).ServeHTTP(w, r)
+	})
+}
+
+// requireConsent — AI сұраныстары тек ағымдағы шарттарға келісім болса өтеді.
+//
+// Runs after requireUser. Without a consent row for the current terms and
+// privacy versions (none yet, an older version, or withdrawn) the request is
+// refused with 403 CONSENT_REQUIRED before any text reaches the provider; the
+// app returns to its consent screen and posts /api/v1/me/consents.
+func (s *Server) requireConsent(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, _ := UserFrom(r.Context())
+		if err := s.users.RequireConsent(r.Context(), user.ID); err != nil {
+			httpx.Fail(w, err)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// requireLegacy — ескі install-token миддлварі (тек install-token).
+//
+// Only legacy install tokens are accepted. A normal /api/v1 access token is
+// refused here: the legacy route has no consent check, and a current-app user
+// without consent (or who withdrew it) must never reach the provider through
+// it. No shipped client needs that path: Node-era builds hold install tokens
+// only, and the current apps never call /v1/*.
 func (s *Server) requireLegacy(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token := bearer(r)
@@ -77,12 +116,6 @@ func (s *Server) requireLegacy(next http.Handler) http.Handler {
 		}
 		user, err := s.auth.AuthenticateLegacy(r.Context(), token)
 		if err != nil {
-			// Жаңа access токенмен де жұмыс істей берсін (біртіндеп көшу).
-			if u, claims, err2 := s.auth.Authenticate(r.Context(), token); err2 == nil {
-				ctx := context.WithValue(WithUser(r.Context(), u), deviceKey, claims.DeviceID)
-				next.ServeHTTP(w, r.WithContext(ctx))
-				return
-			}
 			httpx.Fail(w, err)
 			return
 		}

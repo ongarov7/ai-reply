@@ -66,21 +66,43 @@ func (s *Service) SetUserStatus(ctx context.Context, admin domain.AdminUser, ip,
 	if err := s.repo.UpdateUserStatus(ctx, userID, status); err != nil {
 		return err
 	}
+	meta := map[string]any{"status": status}
 	if status == domain.UserDisabled {
 		if _, err := s.repo.RevokeUserSessions(ctx, userID, "account_disabled"); err != nil {
 			return err
 		}
+		// A disabled account keeps no device: its notifications stop at once.
+		detached, err := s.repo.DetachUserInstallations(ctx, userID, s.clock.Now())
+		if err != nil {
+			return err
+		}
+		meta["devices_detached"] = detached
 	}
-	s.Audit(ctx, admin, ip, "user.status", "user", userID, map[string]any{"status": status})
+	s.Audit(ctx, admin, ip, "user.status", "user", userID, meta)
 	return nil
 }
 
 // AssignPlan — тарифті ауыстыру.
+//
+// Giving someone the plan they already have only moves its end date: no new
+// subscription, so no second "plan active" push and e-mail.
 func (s *Service) AssignPlan(ctx context.Context, admin domain.AdminUser, ip, userID, planID string, expires *time.Time) error {
-	if _, err := s.subs.Assign(ctx, userID, planID, "admin", expires); err != nil {
+	renewed, err := s.subs.Renew(ctx, userID, planID, expires)
+	if err != nil {
+		return err
+	}
+	if renewed {
+		s.Audit(ctx, admin, ip, "subscription.assign", "user", userID, map[string]any{"plan_id": planID, "renewed": true})
+		return nil
+	}
+	sub, err := s.subs.Assign(ctx, userID, planID, "admin", expires)
+	if err != nil {
 		return err
 	}
 	s.Audit(ctx, admin, ip, "subscription.assign", "user", userID, map[string]any{"plan_id": planID})
+	if s.events != nil {
+		s.events.PlanAssigned(ctx, sub)
+	}
 	return nil
 }
 
@@ -113,7 +135,14 @@ func (s *Service) RevokeSessions(ctx context.Context, admin domain.AdminUser, ip
 	if err != nil {
 		return err
 	}
-	s.Audit(ctx, admin, ip, "sessions.revoke", "user", userID, map[string]any{"revoked": count})
+	// "Sign out everywhere" includes push: the phones stop receiving this
+	// account's notifications until the person signs in again.
+	detached, err := s.repo.DetachUserInstallations(ctx, userID, s.clock.Now())
+	if err != nil {
+		return err
+	}
+	s.Audit(ctx, admin, ip, "sessions.revoke", "user", userID,
+		map[string]any{"revoked": count, "devices_detached": detached})
 	return nil
 }
 
@@ -125,6 +154,7 @@ func (s *Service) CreatePlan(ctx context.Context, admin domain.AdminUser, ip str
 	}
 	s.Audit(ctx, admin, ip, "plan.create", "plan", created.ID, map[string]any{
 		"code": created.Code, "daily_limit": created.DailyLimit, "price": created.Price,
+		"is_active": created.IsActive, "is_visible": created.IsVisible,
 	})
 	return created, nil
 }
@@ -136,8 +166,14 @@ func (s *Service) UpdatePlan(ctx context.Context, admin domain.AdminUser, ip str
 	}
 	s.Audit(ctx, admin, ip, "plan.update", "plan", plan.ID, map[string]any{
 		"code": plan.Code, "daily_limit": plan.DailyLimit, "price": plan.Price, "is_active": plan.IsActive,
+		"is_visible": plan.IsVisible,
 	})
 	return nil
+}
+
+// IsDefaultPlan — жаңа қолданушыларға берілетін тариф пе.
+func (s *Service) IsDefaultPlan(ctx context.Context, id string) (bool, error) {
+	return s.plans.IsDefault(ctx, id)
 }
 
 // ArchivePlan — тарифті мұрағаттау.

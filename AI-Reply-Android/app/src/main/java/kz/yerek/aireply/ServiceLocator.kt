@@ -1,12 +1,14 @@
 package kz.yerek.aireply
 
 import android.content.Context
+import android.os.Build
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Dispatchers
 import kz.yerek.aireply.ai.AIConfiguration
 import kz.yerek.aireply.ai.AILimits
 import kz.yerek.aireply.ai.AIReplyService
+import kz.yerek.aireply.ai.AIReportSender
 import kz.yerek.aireply.ai.AccountComposeTransport
 import kz.yerek.aireply.ai.AccountReplyTransport
 import kz.yerek.aireply.ai.AppStrings
@@ -22,19 +24,30 @@ import kz.yerek.aireply.core.lang.KeyboardLanguage
 import kz.yerek.aireply.core.lang.LocalizedContext
 import kz.yerek.aireply.core.lang.TemplateNaming
 import kz.yerek.aireply.data.account.AccountCredentials
+import kz.yerek.aireply.data.account.AccountObserver
 import kz.yerek.aireply.data.account.AccountService
 import kz.yerek.aireply.data.account.AccountSession
 import kz.yerek.aireply.data.account.AccountUsageCache
+import kz.yerek.aireply.data.account.ApiClient
 import kz.yerek.aireply.data.account.DeviceDescriptor
 import kz.yerek.aireply.data.account.GoogleSignInClient
+import kz.yerek.aireply.data.account.ServerFeaturesDto
 import kz.yerek.aireply.data.legal.LegalConsentStore
 import kz.yerek.aireply.data.profile.ConfigurationRepository
+import kz.yerek.aireply.data.profile.PreferredLanguageSync
 import kz.yerek.aireply.data.profile.ProfileStore
 import kz.yerek.aireply.data.profile.ProfileSync
 import kz.yerek.aireply.data.secure.SecureCredentialStore
 import kz.yerek.aireply.data.settings.DeviceStateStore
 import kz.yerek.aireply.data.settings.SettingsStore
+import kz.yerek.aireply.keyboard.autocorrect.PrefsLearnedWordsStore
+import kz.yerek.aireply.push.ClientContext
+import kz.yerek.aireply.push.HttpPushApi
+import kz.yerek.aireply.push.InstallationIdStore
+import kz.yerek.aireply.push.PushCoordinator
+import kz.yerek.aireply.push.PushStateStore
 import kz.yerek.aireply.ui.feature.account.AccountController
+import kz.yerek.aireply.ui.navigation.PendingNavigation
 import java.util.TimeZone
 
 /**
@@ -79,7 +92,18 @@ class ServiceLocator(context: Context) {
         ConfigurationRepository(appContext, profileStore, settings, scope)
     }
 
-    val aiConfiguration: AIConfiguration by lazy { AIConfiguration { accountCredentials.isSignedIn } }
+    /**
+     * Ready with an account and the current legal versions accepted on this
+     * phone. A CONSENT_REQUIRED answer resets the app's consent state, so the
+     * next time the app is opened it asks again.
+     */
+    val aiConfiguration: AIConfiguration by lazy {
+        AIConfiguration(
+            hasLegalConsent = { legalConsentStore.hasAcceptedLatest() },
+            onConsentRequired = { account.consentRequired() },
+            isAccountSignedIn = { accountCredentials.isSignedIn }
+        )
+    }
 
     // ------------------------------------------------------------- account
 
@@ -99,7 +123,11 @@ class ServiceLocator(context: Context) {
         AccountSession(
             credentials = accountCredentials,
             baseUrlProvider = { aiConfiguration.backendBaseUrl },
-            deviceDescriptor = ::deviceDescriptor
+            deviceDescriptor = ::deviceDescriptor,
+            // Named on the logout only, and only once the terms were accepted.
+            installationId = {
+                if (account.state.value.hasAcceptedLegal) clientContext.installationId else null
+            }
         )
     }
 
@@ -121,8 +149,19 @@ class ServiceLocator(context: Context) {
             google = googleSignIn,
             backgroundScope = scope,
             profileSync = profileSync,
-            onSignedOut = { productEvents.discard() }
+            onSignedOut = { productEvents.discard() },
+            observer = accountObserver,
+            learnedWords = PrefsLearnedWordsStore(appContext)
         )
+    }
+
+    /** Hands account transitions to [push] without constructing it before it is needed. */
+    private val accountObserver = object : AccountObserver {
+        override fun onServerFeatures(features: ServerFeaturesDto?) = push.onServerFeatures(features)
+        override fun onLegalAccepted() = push.onLegalAccepted()
+        override fun onSignedIn(userId: String) = push.onSignedIn(userId)
+        override fun onAccountLoaded(userId: String) = push.onAccountLoaded(userId)
+        override fun onSignedOut(userInitiated: Boolean) = push.onSignedOut(userInitiated)
     }
 
     /**
@@ -141,7 +180,10 @@ class ServiceLocator(context: Context) {
         )
     }
 
-    /** The grammatical gender across devices, and the server's copy of the onboarding version. */
+    /**
+     * The grammatical gender across devices, the server's copy of the
+     * onboarding version, and the language of the account's notifications.
+     */
     val profileSync: ProfileSync by lazy {
         ProfileSync(
             service = accountService,
@@ -149,7 +191,15 @@ class ServiceLocator(context: Context) {
             device = deviceState,
             isSignedIn = { accountCredentials.isSignedIn },
             features = { AILimits.features },
-            scope = scope
+            scope = scope,
+            preferredLanguage = PreferredLanguageSync(
+                update = { change -> accountService.updateProfile(change) },
+                device = deviceState,
+                isSignedIn = { accountCredentials.isSignedIn },
+                features = { AILimits.features },
+                language = { settings.effectiveAppLanguage.code },
+                scope = scope
+            )
         )
     }
 
@@ -160,6 +210,50 @@ class ServiceLocator(context: Context) {
             deviceDescriptor = ::deviceDescriptor
         )
     }
+
+    // ---------------------------------------------- push and the installation
+
+    /**
+     * Installation id, versions, OS, model, language and time zone: the body
+     * of the installation registration. No hardware identifier.
+     */
+    val clientContext: ClientContext by lazy {
+        ClientContext(
+            installationIds = InstallationIdStore { appContext.noBackupFilesDir },
+            appVersion = BuildConfig.VERSION_NAME,
+            appBuild = BuildConfig.VERSION_CODE.toString(),
+            osVersion = Build.VERSION.RELEASE.orEmpty(),
+            manufacturer = Build.MANUFACTURER.orEmpty(),
+            deviceModel = Build.MODEL.orEmpty(),
+            language = { settings.effectiveAppLanguage.code }
+        )
+    }
+
+    val pushState: PushStateStore by lazy { PushStateStore(appContext) }
+
+    /** Push notifications and the installation registration. The keyboard never uses it. */
+    val push: PushCoordinator by lazy {
+        PushCoordinator(
+            appContext = appContext,
+            settings = settings,
+            store = pushState,
+            client = clientContext,
+            session = accountSession,
+            api = HttpPushApi(client = { ApiClient(aiConfiguration.backendBaseUrl) }, session = accountSession),
+            features = { account.state.value.features },
+            featuresLoaded = { account.state.value.featuresLoaded },
+            bootstrapped = { account.state.value.bootstrapComplete },
+            consentGiven = { account.state.value.hasAcceptedLegal },
+            loadServerConfig = { account.loadServerConfig() },
+            // A fresh Context each time: these are read off the main thread
+            // (Firebase's service), where the shared cache below is not safe.
+            localized = { LocalizedContext.wrap(appContext, settings.effectiveAppLanguage) },
+            scope = scope
+        )
+    }
+
+    /** A screen asked for from outside the navigation graph: a tapped notification. */
+    val navigation: PendingNavigation by lazy { PendingNavigation() }
 
     /** Platform, version, locale and time zone — nothing that identifies a person. */
     fun deviceDescriptor(): DeviceDescriptor = DeviceDescriptor(
@@ -172,6 +266,11 @@ class ServiceLocator(context: Context) {
     )
 
     val draftNormalizer: ReplyDraftNormalizer by lazy { ReplyDraftNormalizer() }
+
+    /** Reports about AI output, from the keyboard's panel and the app's dialog alike. */
+    val aiReportSender: AIReportSender by lazy {
+        AIReportSender { request -> accountService.reportAIOutput(request) }
+    }
 
     val replyService: AIReplyService by lazy {
         AIReplyService(

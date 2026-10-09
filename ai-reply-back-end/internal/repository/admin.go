@@ -141,6 +141,16 @@ func (s *Store) AdminSessionByHash(ctx context.Context, hash string) (AdminSessi
 	return sess, nil
 }
 
+// RevokeAdminSessions — әкімшінің барлық ашық сессиясын жабады (құпиясөз ауысқанда).
+func (s *Store) RevokeAdminSessions(ctx context.Context, adminID string) (int64, error) {
+	res, err := s.db.Writer().ExecContext(ctx,
+		`UPDATE admin_sessions SET revoked_at = ? WHERE admin_id = ? AND revoked_at IS NULL`, ms(time.Now()), adminID)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
 // RevokeAdminSession — шығу.
 func (s *Store) RevokeAdminSession(ctx context.Context, id string) error {
 	_, err := s.db.Writer().ExecContext(ctx,

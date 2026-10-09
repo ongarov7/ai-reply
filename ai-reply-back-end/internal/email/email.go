@@ -30,6 +30,9 @@ type OTPMessage struct {
 	// Reference — провайдерге жіберілетін қайталанбайтын идентификатор
 	// (OTP жазбасының ID-і): қайталап жіберу бір хатқа айналады.
 	Reference string
+	// Purpose — кодтың мақсаты (domain.OTPPurpose*): "delete" хаты тіркелгіні
+	// жою коды екенін айтады, қалғаны — кіру коды.
+	Purpose string
 }
 
 // Sender — хат жіберу абстракциясы.
@@ -57,6 +60,11 @@ const (
 	keyExpires    = "email.otp.expires"
 	keyNeverShare = "email.otp.never_share"
 	keyIgnore     = "email.otp.ignore"
+
+	// Тіркелгіні жою коды: тақырып, кіріспе және «сұрамасаңыз» жолы өзгеше.
+	keyDeleteSubject = "email.otp_delete.subject"
+	keyDeleteIntro   = "email.otp_delete.intro"
+	keyDeleteIgnore  = "email.otp_delete.ignore"
 )
 
 var otpHTML = template.Must(template.New("otp").Parse(`<!doctype html>
@@ -84,6 +92,11 @@ var otpHTML = template.Must(template.New("otp").Parse(`<!doctype html>
 // The plain-text part is always present: some clients and most spam filters
 // look at it, and it is what screen readers fall back to.
 func RenderOTP(t Translator, brand, locale, code string, ttl time.Duration) (Content, error) {
+	return RenderOTPFor(t, brand, locale, code, ttl, "")
+}
+
+// RenderOTPFor — RenderOTP, мақсатымен: "delete" — тіркелгіні жою коды.
+func RenderOTPFor(t Translator, brand, locale, code string, ttl time.Duration, purpose string) (Content, error) {
 	if t == nil {
 		return Content{}, errors.New("email: translator is required")
 	}
@@ -106,6 +119,9 @@ func RenderOTP(t Translator, brand, locale, code string, ttl time.Duration) (Con
 		Expires:    strings.ReplaceAll(t(lang, keyExpires), "{minutes}", strconv.Itoa(minutes)),
 		NeverShare: t(lang, keyNeverShare),
 		Ignore:     t(lang, keyIgnore),
+	}
+	if purpose == domain.OTPPurposeDelete {
+		view.Subject, view.Intro, view.Ignore = t(lang, keyDeleteSubject), t(lang, keyDeleteIntro), t(lang, keyDeleteIgnore)
 	}
 
 	var html bytes.Buffer

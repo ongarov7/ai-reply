@@ -5,7 +5,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
-import androidx.compose.material.icons.filled.CreditCard
+import androidx.compose.material.icons.outlined.DataUsage
+import androidx.compose.material.icons.outlined.DeleteForever
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
@@ -35,10 +36,11 @@ import kz.yerek.aireply.ui.design.AppSection
 /**
  * The account block inside Settings.
  *
- * Баптаулардағы тіркелгі бөлімі: тариф, квота, шығу.
+ * Баптаулардағы тіркелгі бөлімі: тариф, квота, шығу, жою.
  *
  * Shows what the user needs to recognise their account and nothing more: the
- * e-mail it signs in with, the plan, what is left today, and the way out. An
+ * e-mail it signs in with, the plan, what is left today, the way out, and the
+ * way to delete it (store policy: deletion must be possible in the app). An
  * account opened with a phone number is offered to add an e-mail, because
  * phone sign-in no longer exists.
  */
@@ -50,7 +52,11 @@ fun AccountSection(onOpenSubscription: () -> Unit) {
     val scope = rememberCoroutineScope()
     var confirming by remember { mutableStateOf(false) }
     var addingEmail by remember { mutableStateOf(false) }
+    var confirmingDeletion by remember { mutableStateOf(false) }
     val needsEmail = state.isSignedIn && state.user?.needsEmail == true
+    // Unknown features (no answer yet) offer it; an older server that did
+    // not announce it has no such endpoint.
+    val offersDeletion = state.features?.accountDeletion ?: true
 
     LaunchedEffect(Unit) { account.refresh() }
 
@@ -82,16 +88,39 @@ fun AccountSection(onOpenSubscription: () -> Unit) {
                     ) { addingEmail = true }
                     RowDividerIndented()
                 }
+                // The account is on its way out while Delete runs: nothing else to do with it.
                 NavigationRow(
-                    Icons.Filled.CreditCard,
+                    Icons.Outlined.DataUsage,
                     stringResource(R.string.settings_account_plan),
-                    value = planSummary(state, services.settings.effectiveAppLanguage.code)
+                    value = planSummary(state, services.settings.effectiveAppLanguage.code),
+                    enabled = !state.deletingAccount
                 ) { onOpenSubscription() }
                 RowDividerIndented()
                 NavigationRow(
                     Icons.AutoMirrored.Filled.Logout,
-                    stringResource(R.string.settings_account_sign_out)
+                    stringResource(R.string.settings_account_sign_out),
+                    enabled = !state.deletingAccount
                 ) { confirming = true }
+                if (offersDeletion) {
+                    RowDividerIndented()
+                    NavigationRow(
+                        Icons.Outlined.DeleteForever,
+                        stringResource(R.string.settings_account_delete),
+                        destructive = true,
+                        enabled = !state.busy,
+                        busy = state.deletingAccount
+                    ) {
+                        account.clearDeletionFailure()
+                        confirmingDeletion = true
+                    }
+                }
+            }
+            if (state.accountDeletionFailed) {
+                Text(
+                    stringResource(R.string.account_delete_failed),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
             }
         } else {
             AppCard {
@@ -114,22 +143,66 @@ fun AccountSection(onOpenSubscription: () -> Unit) {
     }
 
     if (confirming) {
-        AlertDialog(
-            onDismissRequest = { confirming = false },
-            title = { Text(stringResource(R.string.settings_account_sign_out_confirm)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirming = false
-                    scope.launch { account.signOut() }
-                }) { Text(stringResource(R.string.settings_account_sign_out)) }
+        SignOutDialog(
+            onConfirm = {
+                confirming = false
+                scope.launch { account.signOut() }
             },
-            dismissButton = {
-                TextButton(onClick = { confirming = false }) {
-                    Text(stringResource(R.string.common_cancel))
-                }
-            }
+            onDismiss = { confirming = false }
         )
     }
+
+    if (confirmingDeletion) {
+        DeleteAccountDialog(
+            onConfirm = {
+                confirmingDeletion = false
+                // On success the consent screen replaces Settings and says
+                // the account is gone; a failure stays in the state and shows here.
+                scope.launch { account.deleteAccount() }
+            },
+            onDismiss = { confirmingDeletion = false }
+        )
+    }
+}
+
+/**
+ * "Sign out of this account?" - in Settings and on the consent screen.
+ * [onConfirm] runs on the caller's scope: this dialog leaves the
+ * composition as soon as it is answered.
+ */
+@Composable
+internal fun SignOutDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.settings_account_sign_out_confirm)) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) { Text(stringResource(R.string.settings_account_sign_out)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
+        }
+    )
+}
+
+/** The Delete account confirmation - in Settings and on the consent screen. */
+@Composable
+internal fun DeleteAccountDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.settings_account_delete_title)) },
+        text = { Text(stringResource(R.string.settings_account_delete_body)) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(
+                    stringResource(R.string.settings_account_delete),
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
+        }
+    )
 }
 
 private fun planSummary(state: AccountController.State, language: String): String {

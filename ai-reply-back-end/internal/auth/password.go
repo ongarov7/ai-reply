@@ -23,6 +23,20 @@ const (
 // ErrPasswordMismatch — құпиясөз сәйкес емес.
 var ErrPasswordMismatch = errors.New("auth: password mismatch")
 
+// dummyHash — ешбір құпиясөзге сәйкес келмейтін, бірақ нақты хэшпен бірдей
+// бағалы хэш (сол итерация саны, сол ұзындықтар).
+var dummyHash = fmt.Sprintf("pbkdf2-sha256$%d$%s$%s", pbkdf2Iterations,
+	base64.RawStdEncoding.EncodeToString(make([]byte, pbkdf2SaltLength)),
+	base64.RawStdEncoding.EncodeToString(make([]byte, pbkdf2KeyLength)))
+
+// VerifyDummyPassword — белгісіз тіркелгіге де дәл сондай уақыт жұмсайды.
+//
+// Answering an unknown e-mail at once and a known one after a full PBKDF2 run
+// would tell an attacker which addresses are accounts. It always fails.
+func VerifyDummyPassword(password string) {
+	_ = VerifyPassword(dummyHash, password)
+}
+
 // HashPassword — жаңа хэш: pbkdf2-sha256$iter$salt$key.
 func HashPassword(password string) (string, error) {
 	salt := make([]byte, pbkdf2SaltLength)

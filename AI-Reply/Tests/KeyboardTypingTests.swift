@@ -110,4 +110,40 @@ final class KeyboardTypingTests: XCTestCase {
         XCTAssertEqual(TextDeletion.wordLength(before: "ok 👍"), 1)
         XCTAssertEqual(TextDeletion.wordLength(before: ""), 0)
     }
+
+    // MARK: Host field
+
+    /// Return or Next moves the caret to another field right after the
+    /// keyboard's own keystroke: that field is read at once, while an echo of
+    /// a keystroke in the same field still is not.
+    func testAnotherFieldIsNoticedInsideTheOwnKeystrokeWindow() {
+        let message = HostFieldIdentity(documentIdentifier: UUID(), keyboardType: .default)
+        var tracker = HostFieldTracker()
+        tracker.reset(to: message)
+
+        XCTAssertFalse(tracker.update(message), "the same field")
+        XCTAssertTrue(HostFieldTracker.trustsMirror(sinceOwnMutation: 0.1, fieldChanged: false))
+        XCTAssertFalse(HostFieldTracker.trustsMirror(sinceOwnMutation: 0.5, fieldChanged: false))
+
+        let email = HostFieldIdentity(documentIdentifier: UUID(), keyboardType: .emailAddress)
+        XCTAssertTrue(tracker.update(email), "Next moved to the e-mail field")
+        XCTAssertFalse(HostFieldTracker.trustsMirror(sinceOwnMutation: 0.1, fieldChanged: true))
+        XCTAssertFalse(tracker.update(email), "and stays there")
+    }
+
+    /// A host that keeps one document but swaps the keyboard type (a form
+    /// reusing its field) is a new field too.
+    func testAKeyboardTypeChangeAloneIsANewField() {
+        let document = UUID()
+        var tracker = HostFieldTracker()
+        tracker.reset(to: HostFieldIdentity(documentIdentifier: document, keyboardType: .default))
+        XCTAssertTrue(tracker.update(HostFieldIdentity(documentIdentifier: document, keyboardType: .numberPad)))
+    }
+
+    /// The first field seen is where the keyboard appeared, not a move.
+    func testTheFirstFieldIsNotAChange() {
+        var tracker = HostFieldTracker()
+        XCTAssertFalse(tracker.update(HostFieldIdentity(documentIdentifier: UUID(), keyboardType: nil)))
+        XCTAssertNotNil(tracker.current)
+    }
 }

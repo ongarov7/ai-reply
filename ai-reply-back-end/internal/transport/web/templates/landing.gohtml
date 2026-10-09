@@ -11,7 +11,7 @@
         <a class="btn btn-primary" href="#pricing">{{call .T "hero.cta_primary"}}</a>
         <a class="btn btn-ghost" href="#how">{{call .T "hero.cta_secondary"}}</a>
       </div>
-      <p class="hero-note">{{call .T "hero.note"}}</p>
+      {{if .HeroNote}}<p class="hero-note">{{.HeroNote}}</p>{{end}}
     </div>
 
     <div class="hero-demo">
@@ -45,8 +45,8 @@
     <div class="stats-strip">
       <div class="stat"><b data-count="8" data-suffix="s">8s</b><span>{{call .T "stats.seconds"}}</span></div>
       <div class="stat"><b data-count="4">4</b><span>{{call .T "stats.languages"}}</span></div>
-      <div class="stat"><b data-count="12">12</b><span>{{call .T "stats.countries"}}</span></div>
-      <div class="stat"><b data-count="7">7</b><span>{{call .T "stats.free"}}</span></div>
+      <div class="stat"><b data-count="2">2</b><span>{{call .T "stats.platforms"}}</span></div>
+      {{if .FreeLimit}}<div class="stat"><b data-count="{{.FreeLimit}}">{{.FreeLimit}}</b><span>{{call .T "stats.free"}}</span></div>{{end}}
       <div class="stat"><b data-count="0">0</b><span>{{call .T "stats.stored"}}</span></div>
     </div>
   </div>
@@ -128,7 +128,7 @@
   <div class="wrap">
     <div class="section-head">
       <h2>{{call .T "pricing.title"}}</h2>
-      <p class="section-sub">{{call .T "pricing.subtitle"}}</p>
+      <p class="section-sub">{{.PricingSubtitle}}</p>
     </div>
     <div class="plans">
       {{range .Plans}}
@@ -138,7 +138,7 @@
         {{if not .IsFree}}<div class="plan-period">{{call $.T "pricing.per_month"}}</div>{{end}}
         <p class="plan-desc">{{.Description}}</p>
         <div class="plan-limit"><b>{{.DailyLimit}}</b><span>{{call $.T "pricing.per_day"}}</span></div>
-        <a class="btn {{if .Featured}}btn-primary{{else}}btn-ghost{{end}}" href="#download">{{call $.T "pricing.cta"}}</a>
+        <a class="btn {{if .Featured}}btn-primary{{else}}btn-ghost{{end}}" href="#download">{{$.PricingCTA}}</a>
       </div>
       {{end}}
     </div>
@@ -163,11 +163,18 @@
 <section class="reveal" id="download">
   <div class="wrap">
     <div class="cta-box">
+      {{if or .AppStoreURL .PlayStoreURL}}
+      <h2>{{call .T "download.title_available"}}</h2>
+      <p>{{call .T "download.body_available"}}</p>
+      {{else}}
       <h2>{{call .T "download.title"}}</h2>
       <p>{{call .T "download.body"}}</p>
+      {{end}}
       <div class="store-badges">
-        <span class="store"><small>{{call .T "download.soon"}}</small><b>App Store</b></span>
-        <span class="store"><small>{{call .T "download.soon"}}</small><b>Google Play</b></span>
+        {{if .AppStoreURL}}<a class="store" href="{{.AppStoreURL}}" rel="noopener"><small>{{call .T "download.available"}}</small><b>App Store</b></a>
+        {{else}}<span class="store"><small>{{call .T "download.soon"}}</small><b>App Store</b></span>{{end}}
+        {{if .PlayStoreURL}}<a class="store" href="{{.PlayStoreURL}}" rel="noopener"><small>{{call .T "download.available"}}</small><b>Google Play</b></a>
+        {{else}}<span class="store"><small>{{call .T "download.soon"}}</small><b>Google Play</b></span>{{end}}
       </div>
     </div>
   </div>

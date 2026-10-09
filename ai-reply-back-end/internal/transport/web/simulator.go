@@ -3,6 +3,7 @@ package web
 import (
 	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"html/template"
 	"net/http"
 	"strings"
@@ -55,9 +56,15 @@ func (s *Server) handleSimulatorLogin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "csrf token mismatch", http.StatusForbidden)
 		return
 	}
+	if !s.allowLoginFor(w, r, r.FormValue("email")) {
+		return
+	}
 	session, err := s.admin.Login(r.Context(), r.FormValue("email"), r.FormValue("password"),
 		clientIP(r, s.cfg.App.TrustProxy), r.UserAgent())
 	if err != nil {
+		if errors.Is(err, domain.ErrUnauthorized) {
+			s.loginFailed(r, r.FormValue("email"))
+		}
 		s.log.Warn("simulator login failed", "ip", clientIP(r, s.cfg.App.TrustProxy))
 		http.Redirect(w, r, "/simulator/login?error=1", http.StatusSeeOther)
 		return
@@ -72,10 +79,8 @@ func (s *Server) handleSimulatorLogin(w http.ResponseWriter, r *http.Request) {
 
 // handleSimulatorLogout — шығу.
 func (s *Server) handleSimulatorLogout(w http.ResponseWriter, r *http.Request) {
-	if cookie, err := r.Cookie(s.cfg.Admin.CookieName); err == nil {
-		if _, session, err := s.admin.Authenticate(r.Context(), cookie.Value); err == nil {
-			_ = s.admin.Logout(r.Context(), session.ID)
-		}
+	if !s.endSession(w, r) {
+		return
 	}
 	s.clearCookie(w)
 	http.Redirect(w, r, "/simulator/login", http.StatusSeeOther)

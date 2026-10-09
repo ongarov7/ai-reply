@@ -179,3 +179,44 @@ enum TextDeletion {
         return max(count, 1)
     }
 }
+
+/// Which host field the keys type into, as far as a keyboard can tell: the
+/// proxy's document identifier and the field's keyboard type.
+struct HostFieldIdentity: Equatable {
+    var documentIdentifier: UUID?
+    var keyboardType: UIKeyboardType?
+}
+
+/// Notices the caret moving to another host field.
+///
+/// Return or Next in a form moves the caret to the next field right after the
+/// keyboard's own keystroke - inside the window in which the keyboard trusts
+/// its own copy of the text and skips re-reading the host. Without this the
+/// old field's capitalisation, correction and keyboard type would stay.
+struct HostFieldTracker {
+
+    /// How long after its own keystroke the keyboard trusts its copy of the
+    /// host text.
+    static let ownMutationWindow: TimeInterval = 0.45
+
+    private(set) var current: HostFieldIdentity?
+
+    /// The keyboard appeared on a field: that one is current, not "new".
+    mutating func reset(to field: HostFieldIdentity) {
+        current = field
+    }
+
+    /// Records the field the host reports now. True when it is another one
+    /// than before - never for the first field seen.
+    mutating func update(_ field: HostFieldIdentity) -> Bool {
+        defer { current = field }
+        guard let current else { return false }
+        return current != field
+    }
+
+    /// Whether a text change is the keyboard's own keystroke echoing back,
+    /// so the host need not be re-read. Never for another field.
+    static func trustsMirror(sinceOwnMutation elapsed: TimeInterval, fieldChanged: Bool) -> Bool {
+        !fieldChanged && elapsed < ownMutationWindow
+    }
+}

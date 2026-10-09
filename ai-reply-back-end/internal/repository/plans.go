@@ -13,36 +13,45 @@ import (
 const planColumns = `id, code, name_kk, name_ru, name_en, name_uz,
 	description_kk, description_ru, description_en, description_uz,
 	price, currency, daily_message_limit, monthly_message_limit, period_days,
-	is_free, is_active, sort_order, created_at, updated_at, archived_at`
+	is_free, is_active, sort_order, created_at, updated_at, archived_at, is_visible`
 
 func scanPlan(row interface{ Scan(...any) error }) (domain.Plan, error) {
 	var (
 		p                  domain.Plan
 		nkk, nru, nen, nuz string
 		dkk, dru, den, duz string
-		free, active       int
+		free, active, seen int
 		created, updated   int64
 		archived           sql.NullInt64
 	)
 	if err := row.Scan(&p.ID, &p.Code, &nkk, &nru, &nen, &nuz, &dkk, &dru, &den, &duz,
 		&p.Price, &p.Currency, &p.DailyLimit, &p.MonthlyLimit, &p.PeriodDays,
-		&free, &active, &p.SortOrder, &created, &updated, &archived); err != nil {
+		&free, &active, &p.SortOrder, &created, &updated, &archived, &seen); err != nil {
 		return domain.Plan{}, err
 	}
 	p.Name = map[string]string{"kk": nkk, "ru": nru, "en": nen, "uz": nuz}
 	p.Description = map[string]string{"kk": dkk, "ru": dru, "en": den, "uz": duz}
-	p.IsFree, p.IsActive = free == 1, active == 1
+	p.IsFree, p.IsActive, p.IsVisible = free == 1, active == 1, seen == 1
 	p.CreatedAt, p.UpdatedAt, p.ArchivedAt = timeFrom(created), timeFrom(updated), timePtr(archived)
 	return p, nil
 }
 
-// Plans — тізім. activeOnly=true болса, мобильді клиентке арналған тізім.
+// Plans — тізім. activeOnly=true болса, тек қосулы әрі мұрағатта емес тарифтер.
 func (s *Store) Plans(ctx context.Context, activeOnly bool) ([]domain.Plan, error) {
-	query := `SELECT ` + planColumns + ` FROM plans`
+	where := ``
 	if activeOnly {
-		query += ` WHERE is_active = 1 AND archived_at IS NULL`
+		where = ` WHERE is_active = 1 AND archived_at IS NULL`
 	}
-	query += ` ORDER BY sort_order ASC, price ASC`
+	return s.queryPlans(ctx, where)
+}
+
+// ListedPlans — клиентке көрінетін тарифтер (қолданба, лендинг, /api/v1/plans).
+func (s *Store) ListedPlans(ctx context.Context) ([]domain.Plan, error) {
+	return s.queryPlans(ctx, ` WHERE is_active = 1 AND is_visible = 1 AND archived_at IS NULL`)
+}
+
+func (s *Store) queryPlans(ctx context.Context, where string) ([]domain.Plan, error) {
+	query := `SELECT ` + planColumns + ` FROM plans` + where + ` ORDER BY sort_order ASC, price ASC`
 	rows, err := s.db.Reader().QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
@@ -86,11 +95,11 @@ func (s *Store) CreatePlan(ctx context.Context, p domain.Plan) (domain.Plan, err
 	p.CreatedAt, p.UpdatedAt = now, now
 	_, err := s.db.Writer().ExecContext(ctx, `
 		INSERT INTO plans (`+planColumns+`)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		p.ID, p.Code, p.Name["kk"], p.Name["ru"], p.Name["en"], p.Name["uz"],
 		p.Description["kk"], p.Description["ru"], p.Description["en"], p.Description["uz"],
 		p.Price, p.Currency, p.DailyLimit, p.MonthlyLimit, p.PeriodDays,
-		boolInt(p.IsFree), boolInt(p.IsActive), p.SortOrder, ms(now), ms(now), nil)
+		boolInt(p.IsFree), boolInt(p.IsActive), p.SortOrder, ms(now), ms(now), nil, boolInt(p.IsVisible))
 	if isUnique(err) {
 		return domain.Plan{}, domain.ErrConflict
 	}
@@ -103,12 +112,12 @@ func (s *Store) UpdatePlan(ctx context.Context, p domain.Plan) error {
 		UPDATE plans SET code = ?, name_kk = ?, name_ru = ?, name_en = ?, name_uz = ?,
 			description_kk = ?, description_ru = ?, description_en = ?, description_uz = ?,
 			price = ?, currency = ?, daily_message_limit = ?, monthly_message_limit = ?,
-			period_days = ?, is_free = ?, is_active = ?, sort_order = ?, updated_at = ?
+			period_days = ?, is_free = ?, is_active = ?, is_visible = ?, sort_order = ?, updated_at = ?
 		WHERE id = ?`,
 		p.Code, p.Name["kk"], p.Name["ru"], p.Name["en"], p.Name["uz"],
 		p.Description["kk"], p.Description["ru"], p.Description["en"], p.Description["uz"],
 		p.Price, p.Currency, p.DailyLimit, p.MonthlyLimit, p.PeriodDays,
-		boolInt(p.IsFree), boolInt(p.IsActive), p.SortOrder, ms(time.Now()), p.ID)
+		boolInt(p.IsFree), boolInt(p.IsActive), boolInt(p.IsVisible), p.SortOrder, ms(time.Now()), p.ID)
 	if isUnique(err) {
 		return domain.ErrConflict
 	}

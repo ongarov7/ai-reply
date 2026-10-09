@@ -101,8 +101,8 @@ struct AccountService: Sendable {
         return result
     }
 
-    func signOut() async {
-        await session.signOut()
+    func signOut(installationID: String? = nil) async {
+        await session.signOut(installationID: installationID)
     }
 
     // MARK: Authenticated endpoints
@@ -142,6 +142,9 @@ struct AccountService: Sendable {
         /// rejects the whole update over an unknown field.
         var grammatical_gender: String?
         var onboarding_version: Int?
+        /// The language of the account's notifications. Only for a server that
+        /// publishes `preferred_language`.
+        var preferred_language: String?
     }
 
     @discardableResult
@@ -223,6 +226,78 @@ struct AccountService: Sendable {
         }
     }
 
+    /// Withdraws the AI consent: until the app records a new one, the AI
+    /// endpoints answer CONSENT_REQUIRED. The account itself stays.
+    func withdrawLegalConsent() async throws {
+        struct Response: Decodable, Sendable { let ok: Bool? }
+        let _: Response = try await session.authenticated { token in
+            try await client().delete("api/v1/me/consents", token: token)
+        }
+    }
+
+    // MARK: Account deletion
+
+    /// The body of `DELETE /api/v1/me`. Apple's one-time code lets the server
+    /// revoke the Sign in with Apple token along with the account; nil for an
+    /// account without Apple, and then the body is `{}`.
+    struct DeletionRequest: Encodable, Equatable, Sendable {
+        let apple_authorization_code: String?
+
+        init(appleAuthorizationCode: String?) {
+            let code = appleAuthorizationCode?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            apple_authorization_code = code.isEmpty ? nil : code
+        }
+    }
+
+    struct DeletionResult: Decodable, Sendable, Equatable {
+        let deleted: Bool
+        let appleTokenRevoked: Bool
+
+        enum CodingKeys: String, CodingKey {
+            case deleted
+            case appleTokenRevoked = "apple_token_revoked"
+        }
+
+        init(deleted: Bool, appleTokenRevoked: Bool) {
+            self.deleted = deleted
+            self.appleTokenRevoked = appleTokenRevoked
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            deleted = try container.decodeIfPresent(Bool.self, forKey: .deleted) ?? false
+            appleTokenRevoked = try container.decodeIfPresent(Bool.self, forKey: .appleTokenRevoked) ?? false
+        }
+    }
+
+    /// `DELETE /api/v1/me`; the server also takes `POST /api/v1/me/delete`
+    /// for clients that cannot send a body with DELETE.
+    static let deletionPath = "api/v1/me"
+
+    /// Deletes the account and everything the server keeps for it. Every
+    /// token of the account stops working; the caller wipes this device.
+    func deleteAccount(appleAuthorizationCode: String?) async throws -> DeletionResult {
+        let request = DeletionRequest(appleAuthorizationCode: appleAuthorizationCode)
+        let result: DeletionResult = try await session.authenticated { token in
+            try await client().delete(Self.deletionPath, body: request, token: token)
+        }
+        // A 200 that does not say so is not a deletion.
+        guard result.deleted else { throw APIError.malformedResponse }
+        return result
+    }
+
+    // MARK: Reports
+
+    /// Sends a report about a generated text. Returns the report's id.
+    @discardableResult
+    func reportAIOutput(_ report: AIReport) async throws -> String {
+        struct Receipt: Decodable, Sendable { let id: String? }
+        let receipt: Receipt = try await session.authenticated { token in
+            try await client().post("api/v1/ai/reports", body: report, token: token)
+        }
+        return receipt.id ?? ""
+    }
+
     // MARK: Subscription changes (demo payment adapter)
 
     struct CheckoutResult: Decodable, Sendable {
@@ -265,4 +340,61 @@ struct AccountService: Sendable {
 extension APIClient {
     /// A body for endpoints that take none but still expect JSON.
     struct EmptyBody: Encodable, Sendable {}
+}
+
+/// A report about a generated reply or message (`POST /api/v1/ai/reports`).
+///
+/// Жауапқа шағым: себеп, қаласа — мәтіннің өзі.
+///
+/// The text goes only when the user left "send the text" on; nothing else
+/// of the conversation is sent - no copied message, no instruction.
+struct AIReport: Encodable, Equatable, Sendable {
+
+    enum Mode: String, Encodable, Sendable {
+        case reply
+        case compose
+    }
+
+    /// The reasons the server takes, in the order they are offered.
+    enum Reason: String, Encodable, CaseIterable, Sendable {
+        case offensive
+        case harmful
+        case falseInfo = "false_info"
+        case wrongLanguage = "wrong_language"
+        case other
+    }
+
+    /// The server's limits, in characters.
+    static let maximumCommentCharacters = 500
+    static let maximumTextCharacters = 2000
+
+    let mode: Mode
+    let reason: Reason
+    let comment: String?
+    let text: String?
+    let platform: String
+    let appVersion: String
+
+    enum CodingKeys: String, CodingKey {
+        case mode, reason, comment, text, platform
+        case appVersion = "app_version"
+    }
+
+    init(mode: Mode, reason: Reason, comment: String? = nil, text: String?,
+         descriptor: DeviceDescriptor = .current) {
+        self.mode = mode
+        self.reason = reason
+        self.comment = Self.clamped(comment, to: Self.maximumCommentCharacters)
+        self.text = Self.clamped(text, to: Self.maximumTextCharacters)
+        self.platform = descriptor.platform
+        self.appVersion = descriptor.app_version
+    }
+
+    /// Trimmed and cut to the server's limit; nil when nothing is left.
+    private static func clamped(_ value: String?, to limit: Int) -> String? {
+        let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !trimmed.isEmpty else { return nil }
+        guard trimmed.unicodeScalars.count > limit else { return trimmed }
+        return String(String.UnicodeScalarView(trimmed.unicodeScalars.prefix(limit)))
+    }
 }

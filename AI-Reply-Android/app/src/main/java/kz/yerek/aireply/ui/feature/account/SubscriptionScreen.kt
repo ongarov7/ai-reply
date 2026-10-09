@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
+import kz.yerek.aireply.BuildConfig
 import kz.yerek.aireply.R
 import kz.yerek.aireply.data.account.PlanDto
 import kz.yerek.aireply.ui.LocalServices
@@ -29,6 +30,12 @@ import kz.yerek.aireply.ui.design.AppCard
 import kz.yerek.aireply.ui.design.AppSection
 import kz.yerek.aireply.ui.design.ReadableColumn
 import kz.yerek.aireply.ui.design.Spacing
+import java.time.LocalDate
+import java.time.OffsetDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
+import java.util.Locale
 
 /**
  * Current plan, what is left today, and the plans that can replace it.
@@ -38,6 +45,11 @@ import kz.yerek.aireply.ui.design.Spacing
  * The numbers come from the server on every appearance. The cached copy exists
  * only so the keyboard can render instantly; it is never the source of truth,
  * and a stale cache can only ever be pessimistic.
+ *
+ * Nothing here can be bought yet: there is no Google Play Billing in this
+ * build, so a release build lists the plans without prices or a Choose
+ * button. A debug build against a development server with demo checkout shows
+ * them for a plan the server marks purchasable.
  */
 @Composable
 fun SubscriptionScreen(onBack: () -> Unit) {
@@ -45,7 +57,8 @@ fun SubscriptionScreen(onBack: () -> Unit) {
     val account = services.account
     val state by account.state.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
-    val language = services.settings.effectiveAppLanguage.code
+    val appLanguage = services.settings.effectiveAppLanguage
+    val language = appLanguage.code
 
     LaunchedEffect(Unit) {
         account.loadPlans()
@@ -107,12 +120,13 @@ fun SubscriptionScreen(onBack: () -> Unit) {
                         state.usage.dailyLimit
                     )
                 )
-                state.subscription?.expiresAt?.takeIf { it.isNotEmpty() }?.let { expiry ->
-                    Footnote(stringResource(R.string.subscription_renews, expiry.take(10)))
+                state.subscription?.expiresAt?.let { formatExpiry(it, appLanguage.locale) }?.let { expiry ->
+                    Footnote(stringResource(R.string.subscription_renews, expiry))
                 }
             }
 
-            if (state.plans.isNotEmpty()) {
+            // Only worth a section when there is something besides the current plan.
+            if (state.plans.any { it.id != state.subscription?.plan?.id }) {
                 AppSection(stringResource(R.string.subscription_available)) {
                     state.plans.forEach { plan -> PlanRow(plan, language, state.busy) { chosen ->
                         scope.launch { account.choosePlan(chosen) }
@@ -141,6 +155,7 @@ private fun PlanRow(
     val services = LocalServices.current
     val state by services.account.state.collectAsStateWithLifecycle()
     val isCurrent = state.subscription?.plan?.id == plan.id
+    val offersPurchase = canOfferPurchase(plan)
 
     AppCard(modifier = Modifier.padding(bottom = Spacing.s)) {
         Row(
@@ -148,7 +163,8 @@ private fun PlanRow(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(plan.localizedName(language), style = MaterialTheme.typography.titleSmall)
-            if (!plan.isFree) {
+            // A price only next to a plan that can actually be bought here.
+            if (offersPurchase) {
                 Text(
                     plan.priceText,
                     style = MaterialTheme.typography.bodyMedium,
@@ -179,11 +195,32 @@ private fun PlanRow(
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary
                 )
-            } else if (!plan.isFree) {
+            } else if (offersPurchase) {
                 TextButton(enabled = !busy, onClick = { onChoose(plan) }) {
                     Text(stringResource(R.string.subscription_choose))
                 }
             }
         }
     }
+}
+
+/**
+ * Price and Choose: never in a release build, which has no Play Billing (a
+ * digital plan sold in the app must go through it), and in a debug build only
+ * for a paid plan the server says it would sell (demo checkout).
+ */
+internal fun canOfferPurchase(plan: PlanDto, debugBuild: Boolean = BuildConfig.DEBUG): Boolean =
+    debugBuild && plan.purchasable && !plan.isFree
+
+/**
+ * The plan's end date in the app's language ("8 Nov 2026", «8 нояб. 2026 г.»),
+ * on this phone's calendar. Null when the server sent nothing readable.
+ */
+internal fun formatExpiry(raw: String, locale: Locale, zone: ZoneId = ZoneId.systemDefault()): String? {
+    val value = raw.trim()
+    if (value.isEmpty()) return null
+    val date = runCatching { OffsetDateTime.parse(value).atZoneSameInstant(zone).toLocalDate() }.getOrNull()
+        ?: runCatching { LocalDate.parse(value.take(10)) }.getOrNull()
+        ?: return null
+    return DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale).format(date)
 }

@@ -5,7 +5,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -16,6 +15,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.HelpOutline
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import kz.yerek.aireply.ui.design.LocalExtraColors
@@ -37,12 +38,18 @@ fun NavigationRow(
     modifier: Modifier = Modifier,
     /** Optional trailing detail, shown quietly before the chevron. */
     value: String? = null,
+    /** An action that cannot be undone (Delete account): icon and label in the error colour. */
+    destructive: Boolean = false,
+    enabled: Boolean = true,
+    /** The row's action is on its way: a small spinner where the chevron is, so nothing moves. */
+    busy: Boolean = false,
     onClick: () -> Unit
 ) {
+    val accent = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
             .defaultMinSize(minHeight = 48.dp)
             .padding(horizontal = Spacing.m, vertical = Spacing.s),
         verticalAlignment = Alignment.CenterVertically,
@@ -51,11 +58,17 @@ fun NavigationRow(
         Icon(
             icon,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
+            tint = accent,
             modifier = Modifier.size(24.dp)
         )
-        Text(title, style = MaterialTheme.typography.bodyLarge)
-        Spacer(Modifier.weight(1f))
+        // Takes the room left by the value and the chevron, so a long label
+        // wraps instead of pushing them off the row.
+        Text(
+            title,
+            style = MaterialTheme.typography.bodyLarge,
+            color = if (destructive) accent else Color.Unspecified,
+            modifier = Modifier.weight(1f)
+        )
         if (!value.isNullOrEmpty()) {
             Text(
                 value,
@@ -63,12 +76,16 @@ fun NavigationRow(
                 color = LocalExtraColors.current.textSecondary
             )
         }
-        Icon(
-            Icons.AutoMirrored.Filled.KeyboardArrowRight,
-            contentDescription = null,
-            tint = LocalExtraColors.current.textTertiary,
-            modifier = Modifier.size(20.dp)
-        )
+        if (busy) {
+            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = accent)
+        } else {
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = LocalExtraColors.current.textTertiary,
+                modifier = Modifier.size(20.dp)
+            )
+        }
     }
 }
 

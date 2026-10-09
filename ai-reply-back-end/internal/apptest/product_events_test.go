@@ -250,8 +250,9 @@ func TestProductEventsMigration(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Later migrations may follow it; 0010 must be the first one applied.
 	applied, err := database.Migrate(ctx, db, migrations.FS)
-	if err != nil || len(applied) != 1 || applied[0] != "0010_product_events.sql" {
+	if err != nil || len(applied) == 0 || applied[0] != "0010_product_events.sql" {
 		t.Fatalf("applied = %v (%v)", applied, err)
 	}
 	store := repository.New(db)

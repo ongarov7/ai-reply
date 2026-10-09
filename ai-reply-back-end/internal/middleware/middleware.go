@@ -4,6 +4,7 @@ package middleware
 import (
 	"log/slog"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -20,11 +21,18 @@ func Chain(h http.Handler, middlewares ...func(http.Handler) http.Handler) http.
 	return h
 }
 
+// requestIDPattern — клиент жіберген X-Request-ID қабылданатын пішім.
+var requestIDPattern = regexp.MustCompile(`^[A-Za-z0-9-]{1,64}$`)
+
 // RequestID — әр сұранысқа корреляция идентификаторы.
+//
+// A client may pass its own id to correlate logs, but only a short
+// [A-Za-z0-9-] value: anything else would reach every log line of the
+// request and the response header verbatim, so it is replaced.
 func RequestID(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := r.Header.Get("X-Request-ID")
-		if id == "" {
+		if !requestIDPattern.MatchString(id) {
 			id = traits.RandomToken(8)
 		}
 		w.Header().Set("X-Request-ID", id)
@@ -89,8 +97,9 @@ func Recover(log *slog.Logger) func(http.Handler) http.Handler {
 	}
 }
 
-// SecurityHeaders — базалық қорғаныс тақырыптары.
-func SecurityHeaders(production bool) func(http.Handler) http.Handler {
+// SecurityHeaders — базалық қорғаныс тақырыптары. hsts — Strict-Transport-Security
+// жіберіледі ме (production не https PUBLIC_BASE_URL: config.App.HSTS).
+func SecurityHeaders(hsts bool) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			h := w.Header()
@@ -124,7 +133,7 @@ func SecurityHeaders(production bool) func(http.Handler) http.Handler {
 			h.Set("Content-Security-Policy",
 				"default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; "+
 					script+"; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'")
-			if production {
+			if hsts {
 				h.Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 			}
 			next.ServeHTTP(w, r)

@@ -36,13 +36,28 @@ struct AIReplyService: Sendable {
 
     private let configuration: AIConfiguration
     private let transportOverride: (@Sendable (Request, ReplyPromptBuilder.Prompt) -> ReplyTransport)?
+    private let hasConsent: @Sendable () -> Bool
 
     init(
         configuration: AIConfiguration = .shared,
-        transportOverride: (@Sendable (Request, ReplyPromptBuilder.Prompt) -> ReplyTransport)? = nil
+        transportOverride: (@Sendable (Request, ReplyPromptBuilder.Prompt) -> ReplyTransport)? = nil,
+        hasConsent: @escaping @Sendable () -> Bool = { LegalConsentStore.hasAcceptedCurrentVersions() }
     ) {
         self.configuration = configuration
         self.transportOverride = transportOverride
+        self.hasConsent = hasConsent
+    }
+
+    // MARK: Before sending
+
+    /// What stops an AI request before anything leaves the device: no
+    /// session, or the documents in force not accepted here. Reply, Create
+    /// and the instruction polish all ask this, in this order; the server
+    /// refuses the same requests anyway.
+    static func preflight(isSignedIn: Bool, hasConsent: Bool) -> AIReplyError? {
+        if !isSignedIn { return .authenticationFailed }
+        if !hasConsent { return .consentRequired }
+        return nil
     }
 
     // MARK: Validation
@@ -84,7 +99,10 @@ struct AIReplyService: Sendable {
         }
 
         // An injected transport (tests, the DEBUG mock) needs no account.
-        guard transportOverride != nil || configuration.isReady else { throw AIReplyError.authenticationFailed }
+        if transportOverride == nil,
+           let refusal = Self.preflight(isSignedIn: configuration.isReady, hasConsent: hasConsent()) {
+            throw refusal
+        }
 
         let profile = request.configuration.profile
         let templateName = request.template.displayName(appLanguage: request.uiLanguage)

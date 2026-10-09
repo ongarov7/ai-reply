@@ -30,13 +30,16 @@ struct ComposeService: Sendable {
 
     private let configuration: AIConfiguration
     private let transportOverride: (@Sendable (Request) -> ComposeTransport)?
+    private let hasConsent: @Sendable () -> Bool
 
     init(
         configuration: AIConfiguration = .shared,
-        transportOverride: (@Sendable (Request) -> ComposeTransport)? = nil
+        transportOverride: (@Sendable (Request) -> ComposeTransport)? = nil,
+        hasConsent: @escaping @Sendable () -> Bool = { LegalConsentStore.hasAcceptedCurrentVersions() }
     ) {
         self.configuration = configuration
         self.transportOverride = transportOverride
+        self.hasConsent = hasConsent
     }
 
     // MARK: Validation
@@ -67,8 +70,11 @@ struct ComposeService: Sendable {
         if let override = transportOverride?(prepared) {
             transport = override
         } else {
-            guard configuration.isReady, AccountSession.shared.isSignedIn else {
-                throw AIReplyError.authenticationFailed
+            if let refusal = AIReplyService.preflight(
+                isSignedIn: configuration.isReady && AccountSession.shared.isSignedIn,
+                hasConsent: hasConsent()
+            ) {
+                throw refusal
             }
             transport = AccountComposeTransport(onUsage: { usage in AccountUsageCache.store(usage) })
         }

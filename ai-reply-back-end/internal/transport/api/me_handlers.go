@@ -102,6 +102,18 @@ func (s *Server) handleSaveLegalConsent(w http.ResponseWriter, r *http.Request) 
 	httpx.JSON(w, http.StatusOK, toLegalConsentDTO(consent))
 }
 
+// handleWithdrawLegalConsent — AI өңдеуге келісімді кері қайтару (Баптаулар ▸ Құпиялық).
+// Идемпотентті: келісім болмаса да {"ok": true}.
+func (s *Server) handleWithdrawLegalConsent(w http.ResponseWriter, r *http.Request) {
+	user, _ := UserFrom(r.Context())
+	if err := s.users.WithdrawLegalConsent(r.Context(), user.ID); err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	s.log.Info("legal consent withdrawn", "user_id", user.ID)
+	httpx.JSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
 // updateMeRequest — users.ProfileUpdate-ке тікелей айналады: өрістері мен
 // олардың реті бірдей болуы керек.
 type updateMeRequest struct {
@@ -118,6 +130,8 @@ type updateMeRequest struct {
 	// Жаңа клиенттер тек features.sender_profile=true болса жібереді.
 	GrammaticalGender *string `json:"grammatical_gender"`
 	OnboardingVersion *int    `json:"onboarding_version"`
+	// Тек features.preferred_language=true болса жіберіледі.
+	PreferredLanguage *string `json:"preferred_language"`
 }
 
 // handleUpdateMe — тіркеуді аяқтау немесе профильді өңдеу.
@@ -158,18 +172,24 @@ func (s *Server) handleSubscription(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, s.subscriptionDTO(entitlement))
 }
 
-// handlePlans — қолжетімді тарифтер.
+// handlePlans — клиентке көрінетін тарифтер.
+//
+// Only plans the admin left enabled and visible. A hidden plan is not listed
+// at all; people already on it still get it from /me/subscription.
 func (s *Server) handlePlans(w http.ResponseWriter, r *http.Request) {
-	list, err := s.plans.Active(r.Context())
+	list, err := s.plans.Listed(r.Context())
 	if err != nil {
 		httpx.Fail(w, err)
 		return
 	}
+	purchases := s.payments.PurchasesEnabled(r.Context())
 	out := make([]planDTO, 0, len(list))
 	for _, p := range list {
-		out = append(out, toPlanDTO(p))
+		dto := toPlanDTO(p)
+		dto.Purchasable = purchases && !p.IsFree
+		out = append(out, dto)
 	}
-	httpx.JSON(w, http.StatusOK, map[string]any{"plans": out})
+	httpx.JSON(w, http.StatusOK, map[string]any{"plans": out, "purchases_enabled": purchases})
 }
 
 type countryDTO struct {
@@ -211,6 +231,19 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 			"email_otp":      s.auth.EmailDelivery() != "off",
 			"google_sign_in": s.auth.GoogleEnabled(),
 			"apple_sign_in":  s.auth.AppleEnabled(),
+			// POST /api/v1/installations and the notification preferences;
+			// push says whether this server can actually deliver (FCM set up).
+			"installations":      s.installations != nil,
+			"push_notifications": s.notifications != nil && s.notifications.Ready(),
+			// preferred_language on PATCH|POST /me and in user.
+			"preferred_language": true,
+			// Plans can be bought right now (admin switch + verified billing).
+			// /api/v1/plans lists only visible plans and marks each purchasable.
+			"purchases": s.payments.PurchasesEnabled(r.Context()),
+			// POST /api/v1/ai/reports — reporting a generated text.
+			"ai_reports": true,
+			// DELETE /api/v1/me and POST /api/v1/me/delete.
+			"account_deletion": true,
 		},
 		"demo_mode":    s.cfg.Auth.DemoMode,
 		"payment_mode": s.payments.Mode(),
@@ -220,6 +253,12 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 			"privacy_version": legal.PrivacyVersion,
 			"terms_url":       s.cfg.App.PublicBaseURL + "/offer",
 			"privacy_url":     s.cfg.App.PublicBaseURL + "/privacy",
+			// "" when CONTACT_EMAIL is not set: the apps then show only the support page.
+			"contact_email":        s.cfg.App.ContactEmail(),
+			"support_url":          s.cfg.App.PublicBaseURL + "/support",
+			"account_deletion_url": s.cfg.App.PublicBaseURL + "/account/delete",
+			// Who writes the replies; the consent screen names it.
+			"ai_provider": legal.AIProvider,
 		},
 	})
 }

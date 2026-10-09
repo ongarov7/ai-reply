@@ -4,9 +4,11 @@ import (
 	"context"
 	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/aireply/ai-reply-back-end/internal/admin"
@@ -14,6 +16,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/localization"
 	"github.com/aireply/ai-reply-back-end/internal/repository"
 	"github.com/aireply/ai-reply-back-end/internal/traits"
+	"github.com/aireply/ai-reply-back-end/internal/transport/httpx"
 )
 
 type adminCtxKey string
@@ -123,6 +126,89 @@ func (s *Server) view(r *http.Request, w http.ResponseWriter, active, titleKey s
 
 // ---------------------------------------------------------------- login
 
+// Бір әкімші поштасына кіру шектері: IP шегіне қосымша (admin_login).
+//
+// Two buckets, so guessing is capped at the account without letting anyone
+// lock the real administrator out by failing on purpose:
+//   - per (address, IP): 5 attempts in 15 minutes, counted before the password
+//     is checked; caps what any one source can try;
+//   - per address: 20 failures an hour from all IPs, counted only after a
+//     wrong password. While it is full, only IPs that have themselves failed
+//     for this address in that hour are refused; a source that has not been
+//     failing still has its password checked, so the administrator signs in
+//     from their own network while someone else keeps guessing.
+const (
+	adminLoginPerSource       = 5
+	adminLoginSourceWindow    = 15 * time.Minute
+	adminLoginFailuresPerUser = 20
+	adminLoginFailureWindow   = time.Hour
+)
+
+// loginKeys — шелек кілттері: поштаның өзі және пошта+IP жұбы.
+func (s *Server) loginKeys(r *http.Request, email string) (address, source string) {
+	address = traits.Clamp(strings.ToLower(strings.TrimSpace(email)), 254)
+	return address, address + "|" + clientIP(r, s.cfg.App.TrustProxy)
+}
+
+// allowLoginFor — кіруге рұқсат па; болмаса 429 жазады. Әкімші панелі мен симулятор ортақ.
+func (s *Server) allowLoginFor(w http.ResponseWriter, r *http.Request, email string) bool {
+	address, source := s.loginKeys(r, email)
+	if failures, _ := s.limiter.Hits("admin_login_failures:"+address, adminLoginFailureWindow); failures >= adminLoginFailuresPerUser {
+		if mine, retry := s.limiter.Hits("admin_login_source_failures:"+source, adminLoginFailureWindow); mine > 0 {
+			tooManyLogins(w, retry)
+			return false
+		}
+	}
+	if ok, retry := s.limiter.Allow("admin_login_source:"+source, adminLoginPerSource, adminLoginSourceWindow); !ok {
+		tooManyLogins(w, retry)
+		return false
+	}
+	return true
+}
+
+// loginFailed — қате құпиясөз не белгісіз пошта: поштаның және осы көздің сәтсіздігі.
+func (s *Server) loginFailed(r *http.Request, email string) {
+	address, source := s.loginKeys(r, email)
+	s.limiter.Allow("admin_login_failures:"+address, adminLoginFailuresPerUser, adminLoginFailureWindow)
+	s.limiter.Allow("admin_login_source_failures:"+source, adminLoginPerSource, adminLoginFailureWindow)
+}
+
+func tooManyLogins(w http.ResponseWriter, retry time.Duration) {
+	seconds := max(int(retry.Seconds()), 1)
+	w.Header().Set("Retry-After", strconv.Itoa(seconds))
+	httpx.Error(w, http.StatusTooManyRequests, httpx.CodeRateLimited, "Too many requests. Try again shortly.",
+		map[string]any{"retry_after_seconds": seconds})
+}
+
+// sessionCSRF — форма (csrf) не тақырып (X-CSRF-Token) сессияның токенімен сәйкес пе.
+func sessionCSRF(r *http.Request, session repository.AdminSession) bool {
+	token := r.FormValue("csrf")
+	if token == "" {
+		token = r.Header.Get("X-CSRF-Token")
+	}
+	return token != "" && subtle.ConstantTimeCompare([]byte(token), []byte(session.CSRFToken)) == 1
+}
+
+// endSession — шығу: сессия болса, CSRF тексеріп жабады. false — 403 жазылды.
+//
+// Without the check any page could sign an admin out with a hidden form.
+func (s *Server) endSession(w http.ResponseWriter, r *http.Request) bool {
+	cookie, err := r.Cookie(s.cfg.Admin.CookieName)
+	if err != nil {
+		return true
+	}
+	_, session, err := s.admin.Authenticate(r.Context(), cookie.Value)
+	if err != nil {
+		return true // nothing open: clearing the cookie is all there is to do
+	}
+	if !sessionCSRF(r, session) {
+		http.Error(w, "csrf token mismatch", http.StatusForbidden)
+		return false
+	}
+	_ = s.admin.Logout(r.Context(), session.ID)
+	return true
+}
+
 type loginView struct {
 	T       func(string) string
 	Locale  string
@@ -158,10 +244,16 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "csrf token mismatch", http.StatusForbidden)
 		return
 	}
+	if !s.allowLoginFor(w, r, r.FormValue("email")) {
+		return
+	}
 
 	session, err := s.admin.Login(r.Context(), r.FormValue("email"), r.FormValue("password"),
 		clientIP(r, s.cfg.App.TrustProxy), r.UserAgent())
 	if err != nil {
+		if errors.Is(err, domain.ErrUnauthorized) {
+			s.loginFailed(r, r.FormValue("email"))
+		}
 		s.log.Warn("admin login failed", "ip", clientIP(r, s.cfg.App.TrustProxy))
 		http.Redirect(w, r, "/admin/login?error=1", http.StatusSeeOther)
 		return
@@ -176,10 +268,8 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
-	if cookie, err := r.Cookie(s.cfg.Admin.CookieName); err == nil {
-		if _, session, err := s.admin.Authenticate(r.Context(), cookie.Value); err == nil {
-			_ = s.admin.Logout(r.Context(), session.ID)
-		}
+	if !s.endSession(w, r) {
+		return
 	}
 	s.clearCookie(w)
 	http.Redirect(w, r, "/admin/login", http.StatusSeeOther)

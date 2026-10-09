@@ -17,7 +17,11 @@ data class AIFeatures(
     /** `POST /api/v1/ai/polish`. */
     val instructionPolish: Boolean,
     /** `POST /api/v1/analytics/events`: the app's product events. */
-    val productEvents: Boolean = false
+    val productEvents: Boolean = false,
+    /** `preferred_language` on `/me`: the language of the account's notifications. */
+    val preferredLanguage: Boolean = false,
+    /** `POST /api/v1/ai/reports`: the Report control under a reply or a written message. */
+    val aiReports: Boolean = false
 ) {
     companion object {
         val NONE = AIFeatures(replyPreferences = false, senderProfile = false, instructionPolish = false)

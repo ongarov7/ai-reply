@@ -18,6 +18,9 @@ packages:
   GoogleSignIn:
     url: https://github.com/google/GoogleSignIn-iOS
     from: 9.2.0
+  Firebase:
+    url: https://github.com/firebase/firebase-ios-sdk
+    from: 12.0.0
 
 settings:
   base:
@@ -40,8 +43,21 @@ targets:
       properties:
         CFBundleDisplayName: AI Reply
         CFBundleShortVersionString: "1.0"
-        CFBundleVersion: "5"
+        CFBundleVersion: "6"
         AIReplySignInWithApple: $(AIREPLY_SIGN_IN_WITH_APPLE)
+        AIReplyPushNotifications: $(AIREPLY_PUSH_NOTIFICATIONS)
+        # "<team id>.", for the installation id's app-only keychain group.
+        AIReplyAppIdentifierPrefix: $(AppIdentifierPrefix)
+        # Firebase Cloud Messaging: the options come from the build settings
+        # below unless a GoogleService-Info.plist is added to the app.
+        AIReplyFirebaseAppID: $(FIREBASE_GOOGLE_APP_ID)
+        AIReplyFirebaseSenderID: $(FIREBASE_GCM_SENDER_ID)
+        AIReplyFirebaseAPIKey: $(FIREBASE_API_KEY)
+        AIReplyFirebaseProjectID: $(FIREBASE_PROJECT_ID)
+        # The app forwards the APNs token and handles taps itself, and asks
+        # for an FCM token only after the legal consent.
+        FirebaseAppDelegateProxyEnabled: false
+        FirebaseMessagingAutoInitEnabled: false
         # Google Sign-In: both values come from the build settings below.
         GIDClientID: $(GOOGLE_IOS_CLIENT_ID)
         ITSAppUsesNonExemptEncryption: false
@@ -50,8 +66,8 @@ targets:
             CFBundleURLName: google-sign-in
             CFBundleURLSchemes:
               - $(GOOGLE_IOS_REVERSED_CLIENT_ID)
-        NSMicrophoneUsageDescription: AI Reply uses the microphone only while you are dictating a reply, and only after you tap the voice button.
-        NSSpeechRecognitionUsageDescription: AI Reply uses Apple speech recognition to turn your dictated reply into text.
+        NSMicrophoneUsageDescription: "AI Reply uses the microphone only while you dictate in the app: a message to reply to, your profile or a template. Recording starts when you tap the microphone button."
+        NSSpeechRecognitionUsageDescription: "AI Reply turns your dictation into text with Apple speech recognition. When on-device recognition is unavailable for your language, Apple's speech service processes the audio, and AI Reply receives only the text."
         UILaunchScreen: {}
         UIRequiresFullScreen: true
         UISupportedInterfaceOrientations:
@@ -59,6 +75,9 @@ targets:
     entitlements:
       path: Config/AIReply.entitlements
       properties:
+        # Push notifications. "development" here; exporting for the App Store
+        # (or TestFlight) re-signs it as "production".
+        aps-environment: development
         com.apple.developer.applesignin:
           - Default
         com.apple.security.application-groups:
@@ -69,15 +88,25 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: kz.ai-reply.reply.keyboard.keyboard
         PRODUCT_NAME: AIReply
+        ENABLE_USER_SCRIPT_SANDBOXING: "NO"
         DEVELOPMENT_TEAM: 2PK6339Q47
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_IDENTITY: "iPhone Developer"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "1"
-        # Sign in with Apple needs a paid Apple Developer team. Debug builds leave
-        # it out so a free Personal Team can still install the app on a phone;
-        # set both lines to the Release values to test Apple sign-in in Debug.
+        # Sign in with Apple: Debug builds hide the button (configs below) but
+        # sign with the same entitlements as Release.
         AIREPLY_SIGN_IN_WITH_APPLE: "YES"
+        # Push notifications (aps-environment is in the entitlements of both
+        # configurations). The app asks for a token only when this is YES and
+        # Firebase is configured.
+        AIREPLY_PUSH_NOTIFICATIONS: "YES"
+        # Firebase iOS app of this bundle id (not secrets; they ship in the
+        # app). Empty keeps push off unless GoogleService-Info.plist is added.
+        FIREBASE_GOOGLE_APP_ID: ""
+        FIREBASE_GCM_SENDER_ID: ""
+        FIREBASE_API_KEY: ""
+        FIREBASE_PROJECT_ID: ""
         # iOS OAuth client from Google Cloud Console (not a secret; it ships in
         # the app). Empty keeps "Continue with Google" hidden in Release builds.
         GOOGLE_IOS_CLIENT_ID: ""
@@ -87,12 +116,39 @@ targets:
       configs:
         Debug:
           AIREPLY_SIGN_IN_WITH_APPLE: "NO"
-          CODE_SIGN_ENTITLEMENTS: Config/AIReply-NoAppleSignIn.entitlements
+    # Firebase: Config/Firebase/GoogleService-Info.plist is copied into the app
+    # when it exists (shared client config; see docs/FIREBASE_SETUP.md). The script reads
+    # a file that may be absent, so it cannot run in the script sandbox.
+    postBuildScripts:
+      - name: Firebase config
+        basedOnDependencyAnalysis: false
+        script: |
+          SRC="${PROJECT_DIR}/Config/Firebase/GoogleService-Info.plist"
+          DST="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/GoogleService-Info.plist"
+          if [ ! -f "$SRC" ]; then
+            rm -f "$DST"
+            echo "note: Firebase is not configured yet (no Config/Firebase/GoogleService-Info.plist); push stays off in this build."
+            exit 0
+          fi
+          if ! /usr/bin/plutil -lint -s "$SRC"; then
+            echo "error: Config/Firebase/GoogleService-Info.plist is not a valid property list."
+            exit 1
+          fi
+          BUNDLE_ID=$(/usr/libexec/PlistBuddy -c "Print :BUNDLE_ID" "$SRC" 2>/dev/null || true)
+          if [ -n "$BUNDLE_ID" ] && [ "$BUNDLE_ID" != "$PRODUCT_BUNDLE_IDENTIFIER" ]; then
+            echo "error: GoogleService-Info.plist belongs to $BUNDLE_ID, but this app is $PRODUCT_BUNDLE_IDENTIFIER."
+            exit 1
+          fi
+          /bin/cp "$SRC" "$DST"
     dependencies:
       - target: ReplyKeyboard
         embed: true
       - package: GoogleSignIn
         product: GoogleSignIn
+      - package: Firebase
+        product: FirebaseCore
+      - package: Firebase
+        product: FirebaseMessaging
 
   AIReplyTests:
     type: bundle.unit-test
@@ -119,7 +175,7 @@ targets:
       properties:
         CFBundleDisplayName: AI Reply
         CFBundleShortVersionString: "1.0"
-        CFBundleVersion: "5"
+        CFBundleVersion: "6"
         NSExtension:
           NSExtensionAttributes:
             IsASCIICapable: true
