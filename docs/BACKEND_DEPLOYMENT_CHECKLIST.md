@@ -94,7 +94,7 @@ Resend is already present in the pasted server environment. Confirm the new rota
    ```
 
    The existing Dockerfile runs the backend as UID 10001, which must be able to read the file. Keep the host directory root-owned and inaccessible to other host users. This assumes the existing rootful Docker setup without user-namespace remapping; mapped/rootless setups need matching host ownership. Do not send the key through Git or bake it into an image.
-3. After the file exists, uncomment the read-only bind block in `ai-reply-back-end/docker-compose.yml`, under the existing backend `volumes`, keeping the database volume:
+3. The read-only bind block is now enabled in `ai-reply-back-end/docker-compose.yml` at the owner's explicit request after confirming the server upload. Before starting, verify the host file exists and is readable by UID 10001. The existing database volume stays mounted alongside it:
 
    ```yaml
    - type: bind

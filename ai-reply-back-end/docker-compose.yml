@@ -1,4 +1,5 @@
-# Жергілікті іске қосу: cp .env.example .env && docker compose up --build
+# Docker deployment: configure .env and place the private Firebase JSON at the
+# host path below before starting. The key is mounted, never copied into the image.
 #
 # Порттың жалғыз көзі — .env ішіндегі APP_PORT. Compose оны осы файлдағы
 # ${APP_PORT} үшін де, контейнер ортасы үшін де сол .env-тен оқиды, сондықтан
@@ -21,16 +22,16 @@ services:
     volumes:
       - aireply-data:/app/data
       # Firebase Admin service account (push), read-only, kept outside the repo.
-      # Uncomment this block once the file exists on the host and set
+      # Place the file on the host before starting and set
       # FIREBASE_SERVICE_ACCOUNT_FILE=/run/secrets/firebase-service-account.json
       # in .env (docs/FIREBASE_SETUP.md). The runtime user is UID 10001;
       # give it read access to the host file. Refuse a missing source file.
-      # - type: bind
-      #   source: /srv/ai-reply/secrets/ai-reply-4bf8f-31db4f3ee80d.json
-      #   target: /run/secrets/firebase-service-account.json
-      #   read_only: true
-      #   bind:
-      #     create_host_path: false
+      - type: bind
+        source: /srv/ai-reply/secrets/ai-reply-4bf8f-31db4f3ee80d.json
+        target: /run/secrets/firebase-service-account.json
+        read_only: true
+        bind:
+          create_host_path: false
     restart: unless-stopped
 
 volumes:
