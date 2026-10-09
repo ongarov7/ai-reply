@@ -61,13 +61,18 @@ python3 tools/validate_firebase_config.py
 ## 4. Сервер (бэкенд)
 
 1. Для backend подготовлен отдельный service account `ai-reply-fcm-sender@ai-reply-4bf8f.iam.gserviceaccount.com`. Ему назначена только роль **Firebase Cloud Messaging API Admin** (`roles/firebasecloudmessaging.admin`). JSON-ключ — **секрет**, его нельзя добавлять в клиентские файлы или Git. Статус роли и локального ключа указан в `FIREBASE_RELEASE_CHECKLIST.md`.
-2. Локальный файл `ai-reply-back-end/secrets/firebase-service-account.json` уже создан и игнорируется Git. Перенос на второй ноутбук или сервер — отдельно защищённым каналом (например SSH/SCP после проверки хоста), без вставки ключа в чат. Положить файл на сервер **вне репозитория и вне Docker-образа**, например `/srv/ai-reply/secrets/firebase-service-account.json`, с правами `chmod 600`. В `.gitignore` уже есть `ai-reply-back-end/secrets/` и `*firebase-adminsdk*.json`, в `.dockerignore` — то же самое: файл не попадёт ни в git, ни в образ, даже если оказался рядом с кодом.
+2. Локальный файл `ai-reply-back-end/secrets/firebase-service-account.json` уже создан и игнорируется Git. Перенос на второй ноутбук или сервер — отдельно защищённым каналом (например SSH/SCP после проверки хоста), без вставки ключа в чат. Положить файл на сервер **вне репозитория и вне Docker-образа**. Исходное имя `ai-reply-4bf8f-31db4f3ee80d.json` можно сохранить: на сервере создать `/srv/ai-reply/secrets` и загрузить файл туда. Для существующего Dockerfile файл должен читаться UID `10001`: на обычном rootful Linux Docker выполнить `chown 10001:10001 /srv/ai-reply/secrets/ai-reply-4bf8f-31db4f3ee80d.json` и `chmod 600` для этого файла; каталог оставить root-owned с правами `700`. При rootless/user-namespace remapping права нужно согласовать с отображением UID. В `.gitignore` и `.dockerignore` уже исключены secrets и этот исходный JSON: он не должен попасть ни в Git, ни в образ.
 3. Передать файл серверу одним из двух способов (оба уже поддерживаются в `config/config.go`, задать можно только один):
-   - **Файл:** `FIREBASE_SERVICE_ACCOUNT_FILE=/run/secrets/firebase-service-account.json`. В Docker файл монтируется только для чтения. Раскомментировать строку в `docker-compose.yml` (секция `volumes` сервиса):
+   - **Файл:** `FIREBASE_SERVICE_ACCOUNT_FILE=/run/secrets/firebase-service-account.json`. В Docker файл монтируется только для чтения. После загрузки файла раскомментировать блок в `docker-compose.yml` (секция `volumes` сервиса, сохранить существующий том базы):
      ```yaml
-     - /srv/ai-reply/secrets/firebase-service-account.json:/run/secrets/firebase-service-account.json:ro
+     - type: bind
+       source: /srv/ai-reply/secrets/ai-reply-4bf8f-31db4f3ee80d.json
+       target: /run/secrets/firebase-service-account.json
+       read_only: true
+       bind:
+         create_host_path: false
      ```
-     Не раскомментируйте строку, пока файла на хосте нет: Docker создаст на его месте пустую папку.
+     `create_host_path: false` запрещает создавать пустую папку вместо отсутствующего файла. Проверка конфигурации без вывода секретов: `docker compose config --quiet`. Полная последовательность подготовки и проверки нового контейнера описана в `docs/BACKEND_DEPLOYMENT_CHECKLIST.md`; сервер Codex не изменял.
    - **Три переменные:** `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` (поля `project_id`, `client_email`, `private_key` из того же JSON). Ключ передаётся одной строкой с `\n` в кавычках или в base64.
 4. Включить отправку: `PUSH_NOTIFICATIONS_ENABLED=true`.
 5. Проверки при старте:

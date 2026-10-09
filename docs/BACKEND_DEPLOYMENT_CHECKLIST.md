@@ -83,21 +83,38 @@ Resend is already present in the pasted server environment. Confirm the new rota
 ## Owner's executable deployment steps
 
 1. Back up the existing SQLite database consistently, including committed WAL data. Preserve the current data volume and user records. The new backend includes migrations 0011–0014; do not initialize an empty replacement database.
-2. Transfer the private FCM service-account file through a secure channel to `/srv/ai-reply/secrets/firebase-service-account.json`. Set file permissions to 600 and ensure the container user can read it. Do not send the key through Git or bake it into an image.
-3. After the file exists, enable the existing read-only volume mapping in `ai-reply-back-end/docker-compose.yml`:
-
-   ```yaml
-   - /srv/ai-reply/secrets/firebase-service-account.json:/run/secrets/firebase-service-account.json:ro
-   ```
-
-4. Apply the environment changes above and replace placeholders with actual values. Preserve `SQLITE_PATH` and the data volume. Validate with the new backend binary before starting it:
+2. On the Linux Docker host, create `/srv/ai-reply/secrets` outside the checkout, then transfer the private FCM service-account file there through a secure channel. Its original filename can stay `ai-reply-4bf8f-31db4f3ee80d.json`. These are commands for the owner, not commands Codex has run on the server:
 
    ```sh
-   cd ai-reply-back-end
-   go run ./cmd/server -env /path/to/server/.env -check
+   mkdir -p /srv/ai-reply/secrets
+   chmod 700 /srv/ai-reply/secrets
+   # After uploading the JSON:
+   chown 10001:10001 /srv/ai-reply/secrets/ai-reply-4bf8f-31db4f3ee80d.json
+   chmod 600 /srv/ai-reply/secrets/ai-reply-4bf8f-31db4f3ee80d.json
    ```
 
-   `-check` only loads and validates configuration: it opens no database, port or provider connection. Resolve all errors and inspect warnings. A previous binary may not support `-check`.
+   The existing Dockerfile runs the backend as UID 10001, which must be able to read the file. Keep the host directory root-owned and inaccessible to other host users. This assumes the existing rootful Docker setup without user-namespace remapping; mapped/rootless setups need matching host ownership. Do not send the key through Git or bake it into an image.
+3. After the file exists, uncomment the read-only bind block in `ai-reply-back-end/docker-compose.yml`, under the existing backend `volumes`, keeping the database volume:
+
+   ```yaml
+   - type: bind
+     source: /srv/ai-reply/secrets/ai-reply-4bf8f-31db4f3ee80d.json
+     target: /run/secrets/firebase-service-account.json
+     read_only: true
+     bind:
+       create_host_path: false
+   ```
+
+4. Apply the environment changes above and replace placeholders with actual values. Preserve the existing Compose project name and data volume. From the existing deployment directory (for the owner's server, `/home/ai-reply/ai-reply-back-end`), validate and build before starting the service:
+
+   ```sh
+   cd /home/ai-reply/ai-reply-back-end
+   docker compose config --quiet
+   docker compose build backend
+   docker compose run --rm --no-deps backend -check
+   ```
+
+   `config --quiet` validates without printing the rendered environment or secrets. The one-off container uses the new image, real environment and read-only JSON mount; `-check` opens no database, port or provider connection. Resolve all errors and inspect warnings. These commands do not restart the running service. A previous binary may not support `-check`.
 
 5. Deploy/restart through your existing server procedure. Codex has not deployed or restarted the live backend. Confirm `/healthz`, `/api/v1/config`, `/privacy`, `/support` and `/account/delete`, then test OTP delivery, Google/Apple sign-in, AI consent refusal, Free limits, hidden subscription plans and deletion with a test account.
 6. Test push on physical devices after Firebase APNs setup and backend activation: permissions allowed/denied, token renewal, foreground/background/tap, logout and deletion. Use a single test installation; do not broadcast to production users for this check.
