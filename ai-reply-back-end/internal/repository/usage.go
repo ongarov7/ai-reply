@@ -219,15 +219,16 @@ func (s *Store) Stats(ctx context.Context, from, to time.Time, today string) (St
 		`SELECT COALESCE(SUM(used),0) FROM usage_daily WHERE usage_date = ?`, today).Scan(&st.RequestsToday); err != nil {
 		return st, err
 	}
-	// Polish (нұсқауды түзету) — генерация емес: санға да, кідіріске де
-	// кірмейді, бірақ токен мен құн шынайы шығын болғандықтан есептеледі.
+	// Polish (нұсқауды түзету) пен transcribe (дауыс → мәтін) — генерация емес:
+	// санға да, кідіріске де кірмейді, бірақ токен мен құн шынайы шығын
+	// болғандықтан есептеледі.
 	if err := r.QueryRowContext(ctx, `
-		SELECT COALESCE(SUM(CASE WHEN mode <> 'polish' THEN 1 ELSE 0 END),0),
+		SELECT COALESCE(SUM(CASE WHEN mode NOT IN ('polish','transcribe') THEN 1 ELSE 0 END),0),
 		       COALESCE(SUM(input_tokens),0), COALESCE(SUM(output_tokens),0),
 		       COALESCE(SUM(total_tokens),0), COALESCE(SUM(cost_micros),0),
-		       COALESCE(SUM(CASE WHEN mode <> 'polish' AND status = 'success' THEN 1 ELSE 0 END),0),
-		       COALESCE(SUM(CASE WHEN mode <> 'polish' AND status <> 'success' THEN 1 ELSE 0 END),0),
-		       COALESCE(CAST(AVG(CASE WHEN mode <> 'polish' THEN latency_ms END) AS INTEGER),0)
+		       COALESCE(SUM(CASE WHEN mode NOT IN ('polish','transcribe') AND status = 'success' THEN 1 ELSE 0 END),0),
+		       COALESCE(SUM(CASE WHEN mode NOT IN ('polish','transcribe') AND status <> 'success' THEN 1 ELSE 0 END),0),
+		       COALESCE(CAST(AVG(CASE WHEN mode NOT IN ('polish','transcribe') THEN latency_ms END) AS INTEGER),0)
 		FROM ai_usage_events WHERE created_at BETWEEN ? AND ?`, ms(from), ms(to)).
 		Scan(&st.RequestsMonth, &st.InputTokens, &st.OutputTokens, &st.TotalTokens, &st.CostMicros,
 			&st.Succeeded, &st.Failed, &st.AvgLatencyMS); err != nil {
@@ -256,12 +257,12 @@ func (s *Store) SeriesRegistrations(ctx context.Context, from, to time.Time) ([]
 		GROUP BY 1 ORDER BY 1`, from, to)
 }
 
-// SeriesGenerations — күндік генерация саны (жауап пен жаңа хабарлама; polish емес).
+// SeriesGenerations — күндік генерация саны (жауап пен жаңа хабарлама; polish пен transcribe емес).
 func (s *Store) SeriesGenerations(ctx context.Context, from, to time.Time) ([]Point, error) {
 	return s.series(ctx, `
 		SELECT strftime('%Y-%m-%d', created_at/1000, 'unixepoch'), COUNT(*)
 		FROM ai_usage_events
-		WHERE created_at BETWEEN ? AND ? AND status = 'success' AND mode <> 'polish'
+		WHERE created_at BETWEEN ? AND ? AND status = 'success' AND mode NOT IN ('polish','transcribe')
 		GROUP BY 1 ORDER BY 1`, from, to)
 }
 

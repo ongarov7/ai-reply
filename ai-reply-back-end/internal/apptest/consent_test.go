@@ -3,7 +3,9 @@ package apptest
 import (
 	"net/http"
 	"testing"
+	"time"
 
+	"github.com/aireply/ai-reply-back-end/internal/audio/audiotest"
 	"github.com/aireply/ai-reply-back-end/internal/legal"
 )
 
@@ -19,12 +21,13 @@ func (h *harness) signInWithoutConsent(address string) session {
 		userID: verify.str("user", "id")}
 }
 
-// aiCalls — үш AI эндпоинті: әрқайсысы келісімсіз тоқтауы керек.
+// aiCalls — OpenAI-ға мәтін не дауыс жіберетін төрт эндпоинт: әрқайсысы келісімсіз тоқтауы керек.
 func (h *harness) aiCalls(access string) map[string]response {
 	return map[string]response{
-		"reply":   h.generate(access, "Сәлем, бағасы қанша?"),
-		"compose": h.compose(access, map[string]any{"instruction": "Әріптесімді туған күнімен құттықта", "language": "kk"}),
-		"polish":  h.polish(access, map[string]any{"text": "ертең кездесейік па", "input_language": "kk"}),
+		"reply":      h.generate(access, "Сәлем, бағасы қанша?"),
+		"compose":    h.compose(access, map[string]any{"instruction": "Әріптесімді туған күнімен құттықта", "language": "kk"}),
+		"polish":     h.polish(access, map[string]any{"text": "ертең кездесейік па", "input_language": "kk"}),
+		"transcribe": h.transcribe(access, audiotest.M4A(2*time.Second, nil), voiceFields()),
 	}
 }
 

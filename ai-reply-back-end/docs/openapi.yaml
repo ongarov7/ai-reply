@@ -591,6 +591,49 @@ paths:
         "429": { description: RATE_LIMITED — отдельный лимит RATE_POLISH_PER_MINUTE }
         "502": { description: AI_PROVIDER_UNAVAILABLE }
         "504": { description: AI_TIMEOUT }
+  /api/v1/ai/transcribe:
+    post:
+      summary: Голосовой ввод клавиатуры — запись → текст (квота ответов не тратится)
+      description: >-
+        Работает, когда features.voice_transcription = true; иначе 404 NOT_FOUND. Формат записи
+        определяется по байтам (MP4/M4A или WAV), длительность — из контейнера (0,2…41 с).
+        Тот же request_id того же пользователя не вызывает OpenAI повторно: идущий запрос
+        ожидается, успешный результат возвращается 10 минут, ошибки не запоминаются.
+        Запись и текст не сохраняются и не логируются. Потолок — LIMIT_TRANSCRIBE_PER_DAY (100)
+        на пользователя за сутки сервера.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [audio, duration_ms, request_id]
+              properties:
+                audio: { type: string, format: binary, description: "M4A/MP4 или WAV (PCM), не больше 4 MiB; Content-Type части не читается" }
+                duration_ms: { type: integer, minimum: 300, maximum: 40500, description: "длительность активного звука по часам клиента" }
+                request_id: { type: string, pattern: "^[A-Za-z0-9-]{8,64}$", description: "ключ идемпотентности, новый на каждую запись" }
+                languages: { type: string, example: "kk,ru", description: "подсказки через запятую, самый вероятный первым: kk, ru, en, uz; неизвестные отбрасываются, максимум 3" }
+                purpose: { type: string, enum: [dictation, instruction], default: dictation }
+      responses:
+        "200":
+          description: "text может быть пустым; duration_ms — из контейнера"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [text, languages, duration_ms]
+                properties:
+                  text: { type: string }
+                  languages: { type: array, items: { type: string }, example: [kk] }
+                  duration_ms: { type: integer, example: 3021 }
+        "400": { description: "INVALID_REQUEST (details.field = request_id | duration_ms | purpose | languages; для записи details { field: audio, reason: required | too_large | format | unreadable | too_short | too_long, max_seconds: 40, max_bytes: 4194304 })" }
+        "401": { description: UNAUTHORIZED }
+        "403": { description: CONSENT_REQUIRED }
+        "404": { description: NOT_FOUND — голосовой ввод выключен (TRANSCRIBE_ENABLED=false) }
+        "429": { description: "RATE_LIMITED — лимит RATE_TRANSCRIBE_PER_MINUTE или OpenAI; VOICE_LIMIT_REACHED — LIMIT_TRANSCRIBE_PER_DAY, details { daily_limit, resets_at }" }
+        "502": { description: AI_PROVIDER_UNAVAILABLE }
+        "504": { description: AI_TIMEOUT }
   /api/v1/ai/reports:
     post:
       summary: Пожаловаться на сгенерированный текст (features.ai_reports)
@@ -831,6 +874,7 @@ components:
             reply_preferences: { type: boolean, description: "profile.reply_language в /ai/reply" }
             sender_profile: { type: boolean, description: "grammatical_gender и input_language в /ai/*, grammatical_gender и onboarding_version в /me" }
             instruction_polish: { type: boolean, description: "POST /api/v1/ai/polish доступен" }
+            voice_transcription: { type: boolean, description: "POST /api/v1/ai/transcribe доступен (ключ OpenAI задан и TRANSCRIBE_ENABLED не false)" }
             product_events: { type: boolean, description: "POST /api/v1/analytics/events доступен" }
             installations: { type: boolean, description: "POST /api/v1/installations и /notifications/opened доступны" }
             push_notifications: { type: boolean, description: "push включён и FCM настроен (Android и iOS)" }

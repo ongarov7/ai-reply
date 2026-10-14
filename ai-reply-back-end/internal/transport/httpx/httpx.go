@@ -53,6 +53,9 @@ const (
 
 	// Ағымдағы шарттарға келісім жоқ: қолданба келісім экранына қайтады.
 	CodeConsentRequired = "CONSENT_REQUIRED"
+
+	// Дауысты мәтінге айналдырудың тәуліктік шегі толды (жауап квотасынан бөлек).
+	CodeVoiceLimit = "VOICE_LIMIT_REACHED"
 )
 
 // ErrorBody — қате конверті.
@@ -134,6 +137,8 @@ func Translate(err error) (int, string, string) {
 		return http.StatusTooManyRequests, CodeDailyLimit, "Daily generation limit reached."
 	case errors.Is(err, domain.ErrMonthlyLimit):
 		return http.StatusTooManyRequests, CodeMonthlyLimit, "Monthly generation limit reached."
+	case errors.Is(err, domain.ErrVoiceLimit):
+		return http.StatusTooManyRequests, CodeVoiceLimit, "Daily voice transcription limit reached."
 	case errors.Is(err, domain.ErrSubscriptionGone):
 		return http.StatusPaymentRequired, CodeSubExpired, "The subscription has expired."
 	case errors.Is(err, domain.ErrPaymentRequired):

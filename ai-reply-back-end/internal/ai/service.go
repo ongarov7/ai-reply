@@ -41,12 +41,21 @@ type Service struct {
 	quota    QuotaEvents
 	// polishPerDay — бір қолданушының сервер күніндегі polish шегі (0 — шексіз).
 	polishPerDay int
+	// transcriber — дауыс → мәтін провайдері (nil — мүмкіндік жоқ).
+	transcriber Transcriber
+	// transcribePerDay — бір қолданушының сервер күніндегі дауыс шегі (0 — шексіз).
+	transcribePerDay int
+	// voice — request_id бойынша қайталанбайтын дауыс шақырулары (жадта).
+	voice *voiceCache
 }
 
 // New — шлюз. Тексеруден өтпеген жауапты түзету әдепкіде қосулы.
 func New(repo *repository.Store, subs *subscriptions.Service, provider Provider, limits LimitsSource, log *slog.Logger) *Service {
-	return &Service{repo: repo, subs: subs, provider: provider, limits: limits, log: log,
+	s := &Service{repo: repo, subs: subs, provider: provider, limits: limits, log: log,
 		clock: traits.SystemClock{}, repair: true}
+	// The cache reads the service's clock on every call, so WithClock covers it too.
+	s.voice = newVoiceCache(voiceCacheTTL, voiceCacheEntries, func() time.Time { return s.clock.Now() })
+	return s
 }
 
 // WithClock — тестке.
@@ -100,11 +109,12 @@ type Result struct {
 }
 
 // Сұраныс режимдері. Usage оқиғасында сақталады; reply мен compose бір
-// квотаны жұмсайды, polish квотаға кірмейді.
+// квотаны жұмсайды, polish пен transcribe квотаға кірмейді.
 const (
-	ModeReply   = "reply"
-	ModeCompose = "compose"
-	ModePolish  = "polish"
+	ModeReply      = "reply"
+	ModeCompose    = "compose"
+	ModePolish     = "polish"
+	ModeTranscribe = "transcribe"
 )
 
 // bookkeepingTimeout — провайдерден кейінгі есепке (квотаны қайтару, токендер, оқиға) берілетін уақыт.

@@ -15,7 +15,7 @@ const requestIDKey ctxKey = "request_id"
 // Тыйым салынған кілттер: мұндай өріс журналға түссе, мәні алмастырылады.
 var forbidden = map[string]bool{
 	"message": true, "source_text": true, "instruction": true, "reply": true,
-	"prompt": true, "text": true, "body": true, "content": true,
+	"prompt": true, "text": true, "body": true, "content": true, "transcript": true, "audio": true,
 	"otp": true, "otp_code": true, "verification_code": true,
 	"password": true, "token": true, "access_token": true, "refresh_token": true,
 	"authorization": true, "api_key": true, "openai_api_key": true, "push_token": true,

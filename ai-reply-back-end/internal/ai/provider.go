@@ -34,15 +34,20 @@ type Provider interface {
 	Generate(ctx context.Context, prompt Prompt) (Completion, error)
 }
 
-// OpenAI — Responses API клиенті. Кілт тек осы жерде оқылады.
+// OpenAI — Responses API және дауысты мәтінге айналдыру клиенті. Кілт тек осы жерде оқылады.
 type OpenAI struct {
 	cfg    config.OpenAI
 	client *http.Client
+	// audio — дауыс жүктеуге: уақытты сұраныс контексі шектейді (speechTimeout),
+	// OPENAI_TIMEOUT емес — 4 MiB жүктеу мен жауап мәтіндік генерациядан ұзағырақ.
+	audio         *http.Client
+	speechTimeout time.Duration
 }
 
 // NewOpenAI — клиент.
 func NewOpenAI(cfg config.OpenAI) *OpenAI {
-	return &OpenAI{cfg: cfg, client: &http.Client{Timeout: cfg.Timeout}}
+	return &OpenAI{cfg: cfg, client: &http.Client{Timeout: cfg.Timeout}, audio: &http.Client{},
+		speechTimeout: speechTimeout}
 }
 
 // Name — провайдер аты.

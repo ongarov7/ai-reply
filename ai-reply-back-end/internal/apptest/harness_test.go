@@ -102,6 +102,97 @@ func (f *fakeProvider) Generate(ctx context.Context, prompt ai.Prompt) (ai.Compl
 	}, nil
 }
 
+// fakeSpeech — OpenAI /audio/transcriptions орнына httptest сервері.
+//
+// The harness wires the real ai.OpenAI client to it, so the multipart body,
+// languages[], the prompt and the one retry after a 400 are what a test sees.
+type fakeSpeech struct {
+	mu      sync.Mutex
+	server  *httptest.Server
+	calls   []speechRequest
+	replies []speechReply
+	// hold — келесі сұраныс осы арна жабылғанша жауап бермейді; entered сұраныс келгенде жабылады.
+	hold, entered chan struct{}
+}
+
+// speechRequest — провайдерге келген бір сұраныс (өрістер және файл).
+type speechRequest struct {
+	fields      map[string][]string
+	fileName    string
+	contentType string
+	file        []byte
+}
+
+type speechReply struct {
+	status int
+	body   string
+}
+
+const speechTranscript = "Сәлем! Ертең кездесейік."
+
+func newFakeSpeech(t *testing.T) *fakeSpeech {
+	f := &fakeSpeech{}
+	f.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		req := speechRequest{}
+		if r.URL.Path != "/audio/transcriptions" || r.Header.Get("Authorization") != "Bearer sk-test-key" {
+			t.Errorf("speech request: %s %q", r.URL.Path, r.Header.Get("Authorization"))
+		}
+		if err := r.ParseMultipartForm(8 << 20); err == nil {
+			req.fields = r.MultipartForm.Value
+			if files := r.MultipartForm.File["file"]; len(files) == 1 {
+				req.fileName, req.contentType = files[0].Filename, files[0].Header.Get("Content-Type")
+				if file, err := files[0].Open(); err == nil {
+					req.file, _ = io.ReadAll(file)
+					_ = file.Close()
+				}
+			}
+		}
+		f.mu.Lock()
+		f.calls = append(f.calls, req)
+		reply := speechReply{http.StatusOK, `{"text":"  ` + speechTranscript + ` ","languages":[{"code":"kk"}],"usage":{"input_tokens":30,"output_tokens":8}}`}
+		if len(f.replies) > 0 {
+			reply, f.replies = f.replies[0], f.replies[1:]
+		}
+		hold, entered := f.hold, f.entered
+		f.hold, f.entered = nil, nil
+		f.mu.Unlock()
+		if hold != nil {
+			close(entered)
+			select {
+			case <-hold:
+			case <-r.Context().Done():
+				return
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(reply.status)
+		_, _ = io.WriteString(w, reply.body)
+	}))
+	t.Cleanup(f.server.Close)
+	return f
+}
+
+// respond — келесі жауаптар (реті бойынша), кейін — әдепкі сәтті жауап.
+func (f *fakeSpeech) respond(replies ...speechReply) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.replies = append(f.replies, replies...)
+}
+
+// holdNext — келесі сұраныс release жабылғанша жауап бермейді; entered — ол келді.
+func (f *fakeSpeech) holdNext() (entered <-chan struct{}, release chan<- struct{}) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.hold, f.entered = make(chan struct{}), make(chan struct{})
+	return f.entered, f.hold
+}
+
+func (f *fakeSpeech) requests() []speechRequest {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]speechRequest(nil), f.calls...)
+}
+
 // fakePush — FCM орнына (Android және iOS): не жіберілгенін жазады, жауапты тест таңдайды.
 type fakePush struct {
 	mu      sync.Mutex
@@ -205,6 +296,7 @@ type harness struct {
 	store         *repository.Store
 	db            *database.DB
 	provider      *fakeProvider
+	speech        *fakeSpeech // дауыс → мәтін провайдерінің жалған сервері
 	clock         *traits.FixedClock
 	logs          *bytes.Buffer
 	dbPath        string
@@ -260,7 +352,8 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 		"RATE_GENERIC_PER_MINUTE": "1000", "OTP_MAX_ATTEMPTS": "5", "PUSH_NOTIFICATIONS_ENABLED": "true",
 		// The fake provider answers the same text to every prompt, so the
 		// language check would "repair" most of them. Repair tests switch it on.
-		"AI_REPAIR_ENABLED": "false",
+		"AI_REPAIR_ENABLED":          "false",
+		"RATE_TRANSCRIBE_PER_MINUTE": "1000",
 	}
 	for _, opt := range opts {
 		opt(env)
@@ -318,8 +411,12 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 	}).WithEmail(mail, fakeEmailRenderer{})
 	events := notifications.NewEvents(notifySvc).
 		WithDemoPayments(cfg.Payments.DemoCheckout && !cfg.App.IsProduction())
+	speech := newFakeSpeech(t)
+	speechConfig := cfg.OpenAI
+	speechConfig.BaseURL = speech.server.URL
 	aiSvc := ai.New(store, subSvc, provider, limitSvc, log).WithClock(clock).WithRepair(cfg.AI.RepairEnabled).
-		WithQuotaEvents(events).WithPolishDailyLimit(cfg.Limits.PolishPerDay)
+		WithQuotaEvents(events).WithPolishDailyLimit(cfg.Limits.PolishPerDay).
+		WithTranscriber(ai.NewOpenAI(speechConfig)).WithTranscribeDailyLimit(cfg.Limits.TranscribePerDay)
 	paymentSvc := payments.New(store, subSvc, payments.DemoProvider{}, cfg.Payments.Mode).WithEvents(events).
 		WithDemoCheckout(cfg.Payments.DemoCheckout).WithProduction(cfg.App.IsProduction())
 	eventSvc := productevents.New(store, log).WithClock(clock)
@@ -356,7 +453,7 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 	server := httptest.NewServer(handler)
 
 	h := &harness{t: t, cfg: cfg, server: server, store: store, db: db,
-		provider: provider, clock: clock, logs: logs, dbPath: dbPath, admin: adminSvc, limits: limitSvc,
+		provider: provider, speech: speech, clock: clock, logs: logs, dbPath: dbPath, admin: adminSvc, limits: limitSvc,
 		authSvc: authSvc, users: userSvc, installations: installSvc, notify: notifySvc, events: events, push: fcm, mail: mail,
 		pushClock: pushClock}
 	t.Cleanup(func() {

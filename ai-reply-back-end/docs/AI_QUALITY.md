@@ -241,6 +241,18 @@ Leipzig (CC BY); вручную их не правят. В казахском с
 («Айгерим», «WhatsApp»), текст в кавычках; длина вне 0.6–1.6×; сменился язык;
 появился перенос строки; ответ обрезан. Отказ — это `changed: false`, не ошибка.
 
+## Голосовой ввод
+
+`POST /api/v1/ai/transcribe` — запись клавиатуры → текст через `OPENAI_TRANSCRIBE_MODEL`
+(`gpt-transcribe`). Модели уходят все подсказки языков (`languages[]`, без поля `language`) и
+короткий `prompt` версии `transcribe_v1` на языке первой подсказки — только описание: «короткое
+голосовое сообщение для мессенджера» (`dictation`) или «указание ИИ-ассистенту, как ответить»
+(`instruction`), какой язык звучит и с какими вкраплениями; казахский перечисляет буквы
+ә ғ қ ң ө ұ ү һ і, которые модели иначе заменяют русскими двойниками. Ни перевода, ни
+переписывания промпт не просит — модель записывает то, что слышит. Тексты — `voicePrompts`
+в `internal/ai/transcribe.go`. Если OpenAI отверг подсказки (`400`), запрос повторяется один
+раз без `languages[]` и `prompt`.
+
 ## Версии
 
 | Константа | Значение | Где |
@@ -249,6 +261,7 @@ Leipzig (CC BY); вручную их не правят. В казахском с
 | `PromptVersionCompose` | `compose_v2` | `/ai/compose` |
 | `PromptVersionPolish` | `polish_v1` | `/ai/polish` |
 | `PromptVersionRepair` | `repair_v1` | исправляющая попытка; в событии — `reply_v2+repair_v1` |
+| `PromptVersionTranscribe` | `transcribe_v1` | `prompt` голосового ввода `/ai/transcribe` |
 
 Версия пишется в `ai_usage_events.prompt_version` (миграция `0009`) и в логи
 `ai_reply_generated` / `ai_reply_failed`. **Любое изменение текста правила —
@@ -262,6 +275,10 @@ Leipzig (CC BY); вручную их не правят. В казахском с
 | `AI_REPAIR_ENABLED` | `true` | одна исправляющая попытка при найденной проблеме |
 | `AI_POLISH_ENABLED` | `true` | `POST /ai/polish` и `features.instruction_polish` |
 | `RATE_POLISH_PER_MINUTE` | `20` | отдельный лимит polish на пользователя |
+| `TRANSCRIBE_ENABLED` | `true` | `POST /ai/transcribe` и `features.voice_transcription` (нужен `OPENAI_API_KEY`) |
+| `OPENAI_TRANSCRIBE_MODEL` | `gpt-transcribe` | модель голосового ввода |
+| `RATE_TRANSCRIBE_PER_MINUTE` | `10` | отдельный лимит голосового ввода на пользователя |
+| `LIMIT_TRANSCRIBE_PER_DAY` | `100` | дневной потолок голосового ввода на пользователя → `429 VOICE_LIMIT_REACHED` |
 | `OPENAI_TEMPERATURE` | `0.7` | `none` — поле не отправляется (для reasoning-моделей) |
 
 ## Набор оценки

@@ -374,11 +374,13 @@ type UsageEvent struct {
 	Platform     string
 	AppVersion   string
 	Language     string
-	SourceChars  int
-	// Mode — reply | compose | polish. Reply мен compose бір квотаны жұмсайды,
-	// polish квотаға кірмейді.
+	// SourceChars — пайдаланушы мәтінінің ұзындығы; transcribe режимінде —
+	// дауыс жазбасының секунды (жоғары қарай дөңгелектелген).
+	SourceChars int
+	// Mode — reply | compose | polish | transcribe. Reply мен compose бір
+	// квотаны жұмсайды, polish пен transcribe квотаға кірмейді.
 	Mode string
-	// PromptVersion — reply_v2, reply_v2+repair_v1, compose_v2, polish_v1 …
+	// PromptVersion — reply_v2, reply_v2+repair_v1, compose_v2, polish_v1, transcribe_v1 …
 	PromptVersion string
 	CreatedAt     time.Time
 }
@@ -471,7 +473,46 @@ var (
 	// бос немесе әкімші бекіткен шектен ұзын. Екеуі де INVALID_REQUEST.
 	ErrInstructionMissing = fmt.Errorf("%w: instruction is empty", ErrInvalidRequest)
 	ErrInstructionTooLong = fmt.Errorf("%w: instruction too long", ErrInvalidRequest)
+
+	// ErrVoiceLimit — дауысты мәтінге айналдырудың бір қолданушыға тәуліктік
+	// шегі толды (LIMIT_TRANSCRIBE_PER_DAY). Жауап квотасына қатысы жоқ.
+	ErrVoiceLimit = errors.New("voice transcription daily limit reached")
 )
+
+// VoiceLimitError — дауыс шегі: қанша және қашан жаңарады (429 VOICE_LIMIT_REACHED).
+type VoiceLimitError struct {
+	Limit    int
+	ResetsAt time.Time
+}
+
+func (e *VoiceLimitError) Error() string { return ErrVoiceLimit.Error() }
+func (e *VoiceLimitError) Unwrap() error { return ErrVoiceLimit }
+
+// Details — клиентке кететін қосымша мәлімет.
+func (e *VoiceLimitError) Details() map[string]any {
+	return map[string]any{"daily_limit": e.Limit, "resets_at": e.ResetsAt.Format(time.RFC3339)}
+}
+
+// AudioError — дауыс жазбасы жарамсыз (400 INVALID_REQUEST, details.field = "audio").
+//
+// Reason is required, too_large, format, unreadable, too_short or too_long;
+// the limits travel with every reason, so a client shows the server's numbers
+// rather than the ones it was built with.
+type AudioError struct {
+	Reason     string
+	MaxSeconds int
+	MaxBytes   int
+}
+
+func (e *AudioError) Error() string { return "invalid audio: " + e.Reason }
+
+// Unwrap — ErrInvalidRequest: код INVALID_REQUEST, басқа өрістердегідей.
+func (e *AudioError) Unwrap() error { return ErrInvalidRequest }
+
+// Details — қай өріс, неге, шектер (жазбаның өзі емес).
+func (e *AudioError) Details() map[string]any {
+	return map[string]any{"field": "audio", "reason": e.Reason, "max_seconds": e.MaxSeconds, "max_bytes": e.MaxBytes}
+}
 
 // RetryAfterError — қатемен бірге қайта сұрауға болатын уақыт.
 //

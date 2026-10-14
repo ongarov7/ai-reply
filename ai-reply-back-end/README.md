@@ -107,7 +107,8 @@ internal/
   users/             профиль, согласие, удаление аккаунта
   plans/             каталог тарифов
   subscriptions/     подписки и расчёт текущего лимита (entitlement)
-  ai/                промпт, клиент OpenAI Responses API, шлюз с учётом токенов
+  ai/                промпт, клиент OpenAI Responses API, шлюз с учётом токенов, голос → текст
+  audio/             формат и длительность голосовой записи по её байтам (M4A/MP4, WAV)
   productevents/     события онбординга и настроек из приложений: закрытый список, только счётчики
   reports/           жалобы на AI-ответы (приложения → админка «Жалобы»)
   retention/         удаление просроченных кодов, сессий, установок и метаданных (RETENTION_*)
@@ -142,6 +143,11 @@ internal/
   телефоне, раскладке и инструкции), род отправителя для русских форм, очистка
   вывода, проверка и одна исправляющая попытка, подсказка `/ai/polish` без квоты,
   набор оценки (`internal/ai/eval`) — [docs/AI_QUALITY.md](docs/AI_QUALITY.md);
+- голосовой ввод клавиатуры: `POST /api/v1/ai/transcribe` (multipart, M4A или WAV до 40 с
+  активного звука) → OpenAI `/audio/transcriptions` (`OPENAI_TRANSCRIBE_MODEL`, по умолчанию
+  `gpt-transcribe`) с подсказками языков; формат и длительность сервер читает из самого
+  контейнера, повтор `request_id` не вызывает OpenAI второй раз. Квоту ответов не тратит:
+  свой лимит в минуту (`RATE_TRANSCRIBE_PER_MINUTE`) и в сутки (`LIMIT_TRANSCRIBE_PER_DAY`);
 - лимиты живут в БД: 30 → 50 в день меняется в админке без релиза приложения;
 - события онбординга и настроек (`POST /api/v1/analytics/events`): закрытый список
   имён и значений, счётчики по именам в дашборде админки;
@@ -169,6 +175,7 @@ internal/
 | Текст виден администратору | НЕТ — кроме жалоб (`/api/v1/admin/reports`): причина, комментарий пользователя и сгенерированный ответ, если пользователь оставил «Отправить текст ответа вместе с жалобой»; скопированное сообщение и инструкция туда не попадают |
 | Текст в логах | НЕТ — логируются только метаданные |
 | Текст подсказки `/ai/polish` (заметка и исправленный вариант) в БД или логах | НЕТ — только длина, токены и `mode = 'polish'` |
+| Голосовая запись `/ai/transcribe` и её расшифровка на диске, в БД или логах | НЕТ — запись только в памяти на время запроса; в БД — `mode = 'transcribe'` и длительность в секундах; готовый текст до 10 минут держится в памяти процесса для повтора того же `request_id` |
 | Род отправителя в логах, событиях или admin JSON | НЕТ — хранится только в профиле и идёт в промпт |
 | Свободный текст в продуктовых событиях | НЕТ — только имена, коды, числа 0…1000 и bool из закрытого списка сервера |
 | Push-токен в логах / админке | НЕТ — в БД зашифрован, наружу только отпечаток `fcm:1a2b3c4d` |
@@ -177,8 +184,8 @@ internal/
 Тест `TestMessageContentIsNeverPersisted` отправляет уникальную строку через
 `/api/v1/ai/reply` и ищет её в файле БД, WAL и логах — любой найденный след
 роняет сборку. `TestComposeContentIsNeverPersisted` и `TestPolishTextIsNeverPersisted`
-делают то же для «Создать» и для подсказки polish, `TestProductEventsNeverStoreText`
-— для продуктовых событий.
+делают то же для «Создать» и для подсказки polish, `TestVoiceIsNeverPersisted` — для
+голосовой записи и её расшифровки, `TestProductEventsNeverStoreText` — для продуктовых событий.
 
 ## Push-уведомления
 
@@ -356,7 +363,9 @@ make secrets     # сгенерировать JWT/legacy секреты
 `SIMULATOR_ENABLED` (пусто — только development/test), `APP_STORE_URL` / `PLAY_STORE_URL`,
 `PAYMENT_DEMO_CHECKOUT=false`, `LIMIT_POLISH_PER_DAY=100`, `RATE_AI_REPORTS_PER_HOUR=20`,
 `RETENTION_OTP_DAYS=30`, `RETENTION_REFRESH_TOKENS_DAYS=30`, `RETENTION_ANON_INSTALLATIONS_DAYS=180`,
-`RETENTION_PRODUCT_EVENTS_DAYS=400`, `RETENTION_AI_USAGE_EVENTS_DAYS=400`.
+`RETENTION_PRODUCT_EVENTS_DAYS=400`, `RETENTION_AI_USAGE_EVENTS_DAYS=400`; голосовой ввод —
+`TRANSCRIBE_ENABLED=true`, `OPENAI_TRANSCRIBE_MODEL=gpt-transcribe`, `RATE_TRANSCRIBE_PER_MINUTE=10`,
+`LIMIT_TRANSCRIBE_PER_DAY=100` (ключ тот же `OPENAI_API_KEY`).
 
 Предупреждения при старте (`configuration warning: …`, сервер работает): пустой
 `LEGAL_OPERATOR_NAME` в production; Apple-вход без ключа отзыва; `APPLE_CLIENT_ID` не похож

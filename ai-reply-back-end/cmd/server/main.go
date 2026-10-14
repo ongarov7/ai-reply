@@ -171,7 +171,9 @@ func run(envFile string) error {
 		MaxOutputTokens:  cfg.OpenAI.MaxOutputTokens,
 	})
 	aiSvc := ai.New(store, subSvc, provider, limitSvc, log).WithRepair(cfg.AI.RepairEnabled).WithQuotaEvents(notifyEvents).
-		WithPolishDailyLimit(cfg.Limits.PolishPerDay)
+		WithPolishDailyLimit(cfg.Limits.PolishPerDay).
+		// The same OpenAI client and key: /audio/transcriptions with OPENAI_TRANSCRIBE_MODEL.
+		WithTranscriber(provider).WithTranscribeDailyLimit(cfg.Limits.TranscribePerDay)
 	// No live provider exists yet (StoreKit / Play Billing come later), so
 	// nothing can be bought unless a development server opts into demo checkout.
 	paymentSvc := payments.New(store, subSvc, payments.DemoProvider{}, cfg.Payments.Mode).

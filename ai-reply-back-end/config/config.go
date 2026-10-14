@@ -157,6 +157,8 @@ type OpenAI struct {
 	// Temperature — nil болса өріс сұранысқа мүлде қосылмайды: reasoning
 	// модельдері оны қабылдамайды (OPENAI_TEMPERATURE=none).
 	Temperature *float64
+	// TranscribeModel — дауысты мәтінге айналдыратын модель (OPENAI_TRANSCRIBE_MODEL).
+	TranscribeModel string
 }
 
 // AI — генерация сапасы мен қосымша AI мүмкіндіктері.
@@ -165,6 +167,14 @@ type AI struct {
 	RepairEnabled bool
 	// PolishEnabled — POST /api/v1/ai/polish (нұсқауды түзету ұсынысы).
 	PolishEnabled bool
+	// TranscribeEnabled — POST /api/v1/ai/transcribe (пернетақтадағы дауыс → мәтін).
+	TranscribeEnabled bool
+}
+
+// VoiceTranscription — POST /api/v1/ai/transcribe жұмыс істей ме: OpenAI кілті
+// бар және TRANSCRIBE_ENABLED=false емес (features.voice_transcription).
+func (c Config) VoiceTranscription() bool {
+	return c.AI.TranscribeEnabled && c.OpenAI.APIKey != ""
 }
 
 // Analytics — қолданбалардың өнім оқиғалары.
@@ -227,6 +237,9 @@ type Limits struct {
 	RequestBodyBytes int64
 	// PolishPerDay — бір қолданушының сервер күніндегі polish шегі (шығын шегі; біткенде ұсыныс жоқ).
 	PolishPerDay int
+	// TranscribePerDay — бір қолданушының сервер күніндегі дауыс жазбасы шегі
+	// (біткенде 429 VOICE_LIMIT_REACHED; жауап квотасына кірмейді).
+	TranscribePerDay int
 	// OTPRequestPerHour, OTPVerifyPerHour — IP бойынша және әдейі кең: оператордың
 	// NAT-ы артында көп адам бір мекенжайда. Нақты қорғаныс — поштаға қойылған шектер.
 	OTPRequestPerHour int
@@ -238,6 +251,8 @@ type Limits struct {
 	ReportsPerHour    int
 	AdminLoginPerHour int
 	GenericPerMinute  int
+	// TranscribePerMinute — дауыс жазбасының жеке шелегі: бір қолданушыға минутына.
+	TranscribePerMinute int
 }
 
 type Log struct {
@@ -363,6 +378,8 @@ func Load(envFile string) (Config, error) {
 		AI: AI{
 			RepairEnabled: boolean("AI_REPAIR_ENABLED", true),
 			PolishEnabled: boolean("AI_POLISH_ENABLED", true),
+			// OpenAI кілті бар кезде әдепкі қосулы; false — 404 және features.voice_transcription=false.
+			TranscribeEnabled: boolean("TRANSCRIBE_ENABLED", true),
 		},
 		Analytics: Analytics{ProductEventsEnabled: boolean("PRODUCT_EVENTS_ENABLED", true)},
 		Admin: Admin{
@@ -391,6 +408,9 @@ func Load(envFile string) (Config, error) {
 			ReportsPerHour:    num("RATE_AI_REPORTS_PER_HOUR", 20),
 			AdminLoginPerHour: num("RATE_ADMIN_LOGIN_PER_HOUR", 10),
 			GenericPerMinute:  num("RATE_GENERIC_PER_MINUTE", 60),
+			// Дауыс жазбасы: өз шелегі және тәуліктік шек (polish сияқты, квотадан бөлек).
+			TranscribePerMinute: num("RATE_TRANSCRIBE_PER_MINUTE", 10),
+			TranscribePerDay:    num("LIMIT_TRANSCRIBE_PER_DAY", 100),
 		},
 		Log:  Log{Level: str("LOG_LEVEL", "info"), Format: str("LOG_FORMAT", "json")},
 		Push: pushFromEnv(),
@@ -429,6 +449,7 @@ func OpenAIFromEnv() OpenAI {
 		MaxOutputTokens: num("OPENAI_MAX_OUTPUT_TOKENS", 180),
 		Timeout:         dur("OPENAI_TIMEOUT", 20*time.Second),
 		Temperature:     temperature("OPENAI_TEMPERATURE", 0.7),
+		TranscribeModel: str("OPENAI_TRANSCRIBE_MODEL", "gpt-transcribe"),
 	}
 }
 

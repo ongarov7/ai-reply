@@ -28,6 +28,8 @@ const (
 	PromptVersionCompose = "compose_v2"
 	PromptVersionPolish  = "polish_v1"
 	PromptVersionRepair  = "repair_v1"
+	// PromptVersionTranscribe — дауыс жазбасының контекст сөйлемдері (VoicePrompt).
+	PromptVersionTranscribe = "transcribe_v1"
 )
 
 // Business — қолданушының бизнес контексі.

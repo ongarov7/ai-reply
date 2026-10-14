@@ -165,6 +165,36 @@ func TestAIQualityDefaults(t *testing.T) {
 	}
 }
 
+// Дауыс → мәтін: кілт бар болса әдепкі қосулы, өз шелегі мен тәуліктік шегі бар.
+func TestVoiceTranscriptionDefaults(t *testing.T) {
+	setValidEnv(t)
+	unset(t, "TRANSCRIBE_ENABLED", "OPENAI_TRANSCRIBE_MODEL", "RATE_TRANSCRIBE_PER_MINUTE", "LIMIT_TRANSCRIBE_PER_DAY")
+	cfg, err := Load("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.VoiceTranscription() || cfg.OpenAI.TranscribeModel != "gpt-transcribe" ||
+		cfg.Limits.TranscribePerMinute != 10 || cfg.Limits.TranscribePerDay != 100 {
+		t.Fatalf("defaults: enabled %v, model %q, %d/min, %d/day", cfg.VoiceTranscription(),
+			cfg.OpenAI.TranscribeModel, cfg.Limits.TranscribePerMinute, cfg.Limits.TranscribePerDay)
+	}
+	t.Setenv("TRANSCRIBE_ENABLED", "false")
+	t.Setenv("OPENAI_TRANSCRIBE_MODEL", "gpt-transcribe-mini")
+	t.Setenv("RATE_TRANSCRIBE_PER_MINUTE", "4")
+	t.Setenv("LIMIT_TRANSCRIBE_PER_DAY", "30")
+	cfg, err = Load("")
+	if err != nil || cfg.VoiceTranscription() || cfg.OpenAI.TranscribeModel != "gpt-transcribe-mini" ||
+		cfg.Limits.TranscribePerMinute != 4 || cfg.Limits.TranscribePerDay != 30 {
+		t.Fatalf("overrides: %v enabled %v, model %q, %d/min, %d/day", err, cfg.VoiceTranscription(),
+			cfg.OpenAI.TranscribeModel, cfg.Limits.TranscribePerMinute, cfg.Limits.TranscribePerDay)
+	}
+	// Кілтсіз мүмкіндік жоқ (сервер оны тексеруден өткізбейді, бірақ жалау өзі де айтады).
+	cfg.AI.TranscribeEnabled, cfg.OpenAI.APIKey = true, ""
+	if cfg.VoiceTranscription() {
+		t.Fatal("no OpenAI key, no voice transcription")
+	}
+}
+
 func TestProductEventDefaults(t *testing.T) {
 	setValidEnv(t)
 	cfg, err := Load("")

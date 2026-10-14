@@ -225,6 +225,9 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 			"sender_profile": true,
 			// POST /api/v1/ai/polish — a cleaner version of the user's own note.
 			"instruction_polish": s.cfg.AI.PolishEnabled,
+			// POST /api/v1/ai/transcribe — the keyboard's voice input (an OpenAI
+			// key is set and TRANSCRIBE_ENABLED is not false).
+			"voice_transcription": s.voiceEnabled(),
 			// POST /api/v1/analytics/events — onboarding and settings events.
 			"product_events": s.cfg.Analytics.ProductEventsEnabled,
 			// Sign-in methods this server accepts right now.

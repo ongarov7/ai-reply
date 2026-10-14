@@ -276,8 +276,9 @@ func (s *Server) handleUserDetail(w http.ResponseWriter, r *http.Request) {
 			"cost_usd": float64(e.CostMicros) / 1_000_000, "latency_ms": e.LatencyMS,
 			"platform": e.Platform, "language": e.Language,
 			// Only flags: the privacy guard keeps words like "reply" out of this payload.
-			"compose": e.Mode == "compose",
-			"polish":  e.Mode == "polish",
+			"compose":    e.Mode == "compose",
+			"polish":     e.Mode == "polish",
+			"transcribe": e.Mode == "transcribe",
 		})
 	}
 	devices := make([]map[string]any, 0, len(detail.Devices))

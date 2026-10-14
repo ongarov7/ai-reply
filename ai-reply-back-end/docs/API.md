@@ -16,7 +16,7 @@
 `ACCOUNT_DISABLED`, `DAILY_LIMIT_REACHED`, `MONTHLY_LIMIT_REACHED`,
 `SUBSCRIPTION_EXPIRED`, `RATE_LIMITED`, `AI_PROVIDER_UNAVAILABLE`, `AI_TIMEOUT`,
 `AI_EMPTY_RESPONSE`, `PAYMENT_REQUIRED`, `PLAN_UNAVAILABLE`, `PURCHASES_DISABLED`,
-`CONSENT_REQUIRED`, `NOT_FOUND`, `CONFLICT`, `INTERNAL_ERROR`,
+`CONSENT_REQUIRED`, `NOT_FOUND`, `CONFLICT`, `INTERNAL_ERROR`, `VOICE_LIMIT_REACHED`,
 `PUSH_DISABLED` (409, только админ-панель: отправка push выключена или FCM не настроен).
 
 Коды, на которые приложения реагируют своим текстом:
@@ -26,6 +26,7 @@
 | `DAILY_LIMIT_REACHED` | 429 | дневной лимит ответов исчерпан | «Ответы на сегодня закончились…» |
 | `MONTHLY_LIMIT_REACHED` | 429 | месячный лимит тарифа исчерпан (`monthly_message_limit > 0`) | своё сообщение «…на этот месяц» |
 | `CONSENT_REQUIRED` | 403 | нет согласия на **текущие** версии условий и политики (не давали, старая версия или отозвано) | возвращается на экран согласия; клавиатура просит открыть приложение |
+| `VOICE_LIMIT_REACHED` | 429 | дневной лимит голосового ввода исчерпан (`LIMIT_TRANSCRIBE_PER_DAY`, квота ответов ни при чём); `details { daily_limit, resets_at }` | клавиатура сообщает, что голосовой ввод на сегодня закончился; набор текстом и ответы работают |
 
 Старые сборки и `CONSENT_REQUIRED`: сборки до `ea80a49` (iOS, в том числе TestFlight build 4)
 и до `e28bf9d` (Android) этого кода не знают и читают `403` как недействительную сессию: после
@@ -198,6 +199,7 @@ HMAC, лимиты). Новые сборки их не вызывают.
 ```json
 { "features": { "email_otp": true, "google_sign_in": true, "apple_sign_in": true, "compose": true,
                 "reply_preferences": true, "sender_profile": true, "instruction_polish": true,
+                "voice_transcription": true,
                 "product_events": true, "installations": true, "push_notifications": true,
                 "preferred_language": true, "purchases": false, "ai_reports": true, "account_deletion": true },
   "payment_mode": "off",
@@ -211,6 +213,9 @@ HMAC, лимиты). Новые сборки их не вызывают.
 - `features.purchases` — купить тариф можно прямо сейчас (переключатель в админке +
   проверенная интеграция оплаты). Релизные сборки кнопку покупки не показывают вовсе
   (StoreKit / Play Billing пока нет); debug-сборки — только у тарифа с `purchasable: true`.
+- `features.voice_transcription` — голосовой ввод клавиатуры (`POST /api/v1/ai/transcribe`):
+  `true`, когда задан `OPENAI_API_KEY` и `TRANSCRIBE_ENABLED` не `false`. При `false` клавиатура
+  не показывает микрофон (эндпоинт отвечает `404 NOT_FOUND`).
 - `features.ai_reports` — показывать кнопку «Пожаловаться» (`POST /api/v1/ai/reports`).
 - `features.account_deletion` — показывать «Удалить аккаунт».
 - `payment_mode` — строка `off | demo | live` (по умолчанию `off`).
@@ -219,8 +224,8 @@ HMAC, лимиты). Новые сборки их не вызывают.
 
 ### Согласие на условия и AI-обработку
 
-Версии условий и политики — `2026-10-08`. `POST /api/v1/ai/reply`, `/ai/compose` и
-`/ai/polish` отвечают `403 CONSENT_REQUIRED`, если у аккаунта нет действующей записи
+Версии условий и политики — `2026-10-08`. `POST /api/v1/ai/reply`, `/ai/compose`,
+`/ai/polish` и `/ai/transcribe` отвечают `403 CONSENT_REQUIRED`, если у аккаунта нет действующей записи
 `legal_consents` ровно для текущих `terms_version` **и** `privacy_version` (не давал,
 принимал прошлую версию или отозвал). Проверка — до квоты и провайдера: ничего не
 резервируется и в OpenAI не уходит.
@@ -581,6 +586,58 @@ markdown, приписка модели «Примечание: …» о сам�
   (токены и стоимость учитываются в `usage_daily` / `usage_monthly`, `used` не растёт).
   Графики «генераций» в админке polish не считают.
 
+### POST /api/v1/ai/transcribe
+
+Голосовой ввод клавиатуры: запись → текст, который человек проверяет и правит сам. Это не
+генерация: квота ответов не резервируется и не тратится, ответ AI строится только по
+отдельному нажатию. Токен и согласие обязательны (как у `/ai/polish`). Работает, когда
+`features.voice_transcription = true`, иначе `404 NOT_FOUND`.
+
+`multipart/form-data`, тело целиком не больше 5 MiB:
+
+| Поле | Обязательно | Что |
+|---|---|---|
+| `audio` | да | файл записи, ≤ 4 MiB. Формат определяется по байтам, `Content-Type` части не читается: MP4/M4A (байты 4..8 — `ftyp`) или WAV (`RIFF`…`WAVE`, PCM) |
+| `duration_ms` | да | целое 300…40500 — длительность активного звука по часам клиента (только для логов) |
+| `request_id` | да | `^[A-Za-z0-9-]{8,64}$` — ключ идемпотентности, новый на каждую запись |
+| `languages` | нет | подсказки через запятую, самый вероятный первым: `kk`, `ru`, `en`, `uz`. Регистр не важен, `kk-KZ` → `kk`, повторы и неизвестные коды молча отбрасываются, максимум 3 |
+| `purpose` | нет | `dictation` (по умолчанию — текст сообщения) или `instruction` (указание ассистенту, как ответить) |
+
+→ `200 { "text": "Сәлем! Ертең кездесейік.", "languages": ["kk"], "duration_ms": 3021 }`
+
+- `text` — обрезан по краям, может быть пустым (тишина). `languages` — языки, которые
+  распознала модель (может быть `[]`). `duration_ms` — длительность **из контейнера**
+  (MP4: `moov/mvhd` версии 0 и 1, не меньше любого трека по `mdhd`/`stts`; WAV: размер `data` /
+  byte rate из `fmt`), а не цифра клиента.
+- Ошибки поля — `400 INVALID_REQUEST` с `details.field` (`request_id`, `duration_ms`, `purpose`,
+  `languages` — длиннее 256 байт). Запись: `details { field: "audio", reason, max_seconds: 40,
+  max_bytes: 4194304 }`, где `reason` — `required` (нет части), `too_large` (> 4 MiB),
+  `format` (не M4A/WAV, фрагментированный MP4, сжатый WAV), `unreadable` (длительность не
+  читается), `too_short` (< 0,2 с), `too_long` (> 41 с). Тело не `multipart` — `400 INVALID_REQUEST`.
+- `429 RATE_LIMITED` — своя корзина `RATE_TRANSCRIBE_PER_MINUTE` (10 в минуту на пользователя,
+  не делит лимит с генерацией и polish); `429 VOICE_LIMIT_REACHED` — `LIMIT_TRANSCRIBE_PER_DAY`
+  (100 на пользователя за сутки сервера, считаются вызовы провайдера, в том числе неудачные),
+  `details { daily_limit, resets_at }`. Ответ AI при этом работает как обычно.
+- От провайдера: `502 AI_PROVIDER_UNAVAILABLE`, `504 AI_TIMEOUT` (30 с на запрос, включая
+  повтор; клиент отключился — запрос в OpenAI тоже отменяется), `429 RATE_LIMITED` (OpenAI ответил 429).
+- Повтор: тот же `request_id` того же пользователя, пока первый запрос ещё идёт, ждёт его
+  результат; успешный результат 10 минут возвращается повторам без нового вызова OpenAI и
+  без учёта в дневном лимите. Ошибки не запоминаются — повтор с тем же `request_id` после
+  ошибки снова идёт в OpenAI. Кэш в памяти процесса (как rate limit): один инстанс.
+- В OpenAI: `POST {OPENAI_BASE_URL}/audio/transcriptions`, `model = OPENAI_TRANSCRIBE_MODEL`
+  (`gpt-transcribe`), `response_format = json`, файл `voice.m4a` (`audio/mp4`) или `voice.wav`
+  (`audio/wav`), `languages[]` — все подсказки (поле `language` не отправляется никогда),
+  `prompt` — короткое описание на языке первой подсказки (сообщение для мессенджера или
+  указание ассистенту; казахский перечисляет буквы ә ғ қ ң ө ұ ү һ і; ни слова о переводе или
+  переписывании). Без подсказок нет ни `languages[]`, ни `prompt`. Если OpenAI ответил `400`,
+  запрос повторяется ровно один раз без `languages[]` и `prompt`.
+- Ни запись, ни текст не пишутся на диск, в БД и в логи: тело читается `MultipartReader` в
+  память с жёстким лимитом. В `ai_usage_events` — `mode = 'transcribe'`,
+  `prompt_version = 'transcribe_v1'`, модель, длительность в секундах (в `source_chars`),
+  язык, задержка, статус и токены, если OpenAI их вернул (`used` не растёт). Графики
+  «генераций» в админке голос не считают. Лог `ai_voice_transcribed` / `ai_voice_failed`:
+  user_id, байты, длительность из контейнера и от клиента, подсказки, задержка, статус.
+
 ### POST /api/v1/ai/reports
 
 Жалоба на сгенерированный текст (кнопка «Пожаловаться» в приложении и клавиатуре;
@@ -606,10 +663,13 @@ markdown, приписка модели «Примечание: …» о сам�
 
 Каждое событие `ai_usage_events` хранит `prompt_version`: `reply_v2`,
 `reply_v2+repair_v1` (принят исправленный ответ), `compose_v2`, `compose_v2+repair_v1`,
-`polish_v1`. В admin JSON это поле не выводится. Структурные логи без текста и без рода:
+`polish_v1`, `transcribe_v1`. В admin JSON это поле не выводится. Структурные логи без текста и без рода:
 `ai_reply_generated` (mode, prompt_version, target_language, language_source,
 latency_ms, токены, repaired, truncated; у polish — changed), `ai_reply_failed`
-(mode, prompt_version, code, latency_ms), `ai_reply_repaired` (коды проблем, accepted).
+(mode, prompt_version, code, latency_ms), `ai_reply_repaired` (коды проблем, accepted);
+у голоса — `ai_voice_transcribed` / `ai_voice_failed` (bytes, duration_ms, client_duration_ms,
+languages, purpose, latency_ms, status, code, retried), `ai_voice_reused` (повтор `request_id`) и
+`ai_voice_rejected` (reason, bytes, duration_ms — запись не прошла проверку контейнера).
 Подробно — [AI_QUALITY.md](AI_QUALITY.md).
 
 ## Продуктовые события

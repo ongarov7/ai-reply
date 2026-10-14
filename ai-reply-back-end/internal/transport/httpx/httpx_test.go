@@ -1,10 +1,44 @@
 package httpx
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
+	"time"
+
+	"github.com/aireply/ai-reply-back-end/internal/domain"
 )
+
+// Дауыс қателері: шек — 429 VOICE_LIMIT_REACHED, жазба — 400 INVALID_REQUEST және details.field = audio.
+func TestFailCarriesVoiceErrorDetails(t *testing.T) {
+	resets := time.Date(2026, 3, 11, 0, 0, 0, 0, time.FixedZone("ALMT", 5*3600))
+	for _, c := range []struct {
+		err     error
+		status  int
+		code    string
+		details map[string]any
+	}{
+		{&domain.VoiceLimitError{Limit: 100, ResetsAt: resets}, http.StatusTooManyRequests, CodeVoiceLimit,
+			map[string]any{"daily_limit": float64(100), "resets_at": "2026-03-11T00:00:00+05:00"}},
+		{&domain.AudioError{Reason: "too_long", MaxSeconds: 40, MaxBytes: 4 << 20}, http.StatusBadRequest, CodeInvalidRequest,
+			map[string]any{"field": "audio", "reason": "too_long", "max_seconds": float64(40), "max_bytes": float64(4 << 20)}},
+	} {
+		w := httptest.NewRecorder()
+		Fail(w, c.err)
+		var body errorEnvelope
+		if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+			t.Fatal(err)
+		}
+		if w.Code != c.status || body.Error.Code != c.code || !reflect.DeepEqual(body.Error.Details, c.details) {
+			t.Errorf("%v: %d %+v", c.err, w.Code, body.Error)
+		}
+		if w.Header().Get("Retry-After") != "" {
+			t.Errorf("%v: no Retry-After for a daily cap", c.err)
+		}
+	}
+}
 
 // TRUST_PROXY: X-Forwarded-For-тің оң жақтағы (прокси қосқан) мәні; X-Real-IP оқылмайды.
 func TestClientIPUsesTheProxyAppendedAddress(t *testing.T) {

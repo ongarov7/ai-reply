@@ -106,6 +106,8 @@ func (s *Server) Register(mux *http.ServeMux) {
 	aiLimit := middleware.RateLimit(s.limiter, "ai", limits.AIPerMinute, time.Minute, perUser)
 	// Polish үзіліс сайын шақырылады: жеке шелек, генерация лимитін жемейді.
 	polishLimit := middleware.RateLimit(s.limiter, "polish", limits.PolishPerMinute, time.Minute, perUser)
+	// Дауыс жазбасы: өз шелегі, генерация мен polish лимитін жемейді.
+	transcribeLimit := middleware.RateLimit(s.limiter, "transcribe", limits.TranscribePerMinute, time.Minute, perUser)
 	// Өнім оқиғалары: өз шелегі, басқа сұраныстардың лимитін жемейді.
 	eventsLimit := middleware.RateLimit(s.limiter, "events", limits.EventsPerMinute, time.Minute, perUser)
 	// Шағымдар: сағатына бір қолданушыға шектеулі (өз шелегі).
@@ -167,6 +169,8 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /api/v1/ai/compose", s.requireUser(s.requireConsent(aiLimit(http.HandlerFunc(s.handleCompose)))))
 	// Нұсқауды түзету ұсынысы. Квотасыз; өшірулі болса 404 NOT_FOUND.
 	mux.Handle("POST /api/v1/ai/polish", s.requireUser(s.requireConsent(polishLimit(http.HandlerFunc(s.handlePolish)))))
+	// Пернетақтадағы дауыс → мәтін (multipart). Квотасыз; күндік шегі өзінікі; өшірулі болса 404.
+	mux.Handle("POST /api/v1/ai/transcribe", s.requireUser(s.requireConsent(transcribeLimit(http.HandlerFunc(s.handleTranscribe)))))
 	// AI жауабына шағым. Келісімсіз де қабылданады: шағым OpenAI-ға кетпейді.
 	mux.Handle("POST /api/v1/ai/reports", s.requireUser(reportsLimit(http.HandlerFunc(s.handleAIReport))))
 
