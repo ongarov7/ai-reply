@@ -312,6 +312,9 @@ class HostField(private val connectionProvider: () -> InputConnection?) {
     fun textBeforeCursor(limit: Int = contextWindow): String =
         connection?.getTextBeforeCursor(limit, 0)?.toString().orEmpty()
 
+    fun textAfterCursor(limit: Int = contextWindow): String =
+        connection?.getTextAfterCursor(limit, 0)?.toString().orEmpty()
+
     /**
      * Conservative check, matching iOS: a host can legitimately return nothing
      * for either side, and treating "no context" as "empty" is the safe reading.

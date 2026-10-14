@@ -64,8 +64,8 @@ class ReplyToCopiedTest {
     @Test
     fun `a dictated request is carried over the same way`() {
         h.openCreate()
-        h.startListening("скажи что согласен")
-        h.stopWith("скажи что согласен")
+        h.startRecording()
+        h.finishWith("скажи что согласен")
         h.panels.replyToCopied(h.friend, secureField = false, acquire = clipboard(copied))
         assertEquals("Скажи что согласен", h.replies.session!!.instruction.text)
         assertTrue(h.replyRequests.isEmpty())
@@ -108,7 +108,7 @@ class ReplyToCopiedTest {
     @Test
     fun `while the microphone is on it waits for the words`() {
         h.openCreate()
-        h.startListening("вежливо")
+        h.startRecording()
         assertEquals(CopiedReply.Refused, h.panels.replyToCopied(h.friend, secureField = false, acquire = clipboard(copied)))
         assertEquals(0, reads)
         assertNotNull(h.compose.session)

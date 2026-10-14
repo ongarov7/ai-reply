@@ -41,12 +41,10 @@ import kz.yerek.aireply.R
 import kz.yerek.aireply.ai.AIReplyError
 import kz.yerek.aireply.ai.AIReportDraft
 import kz.yerek.aireply.ai.AppStrings
+import kz.yerek.aireply.core.text.codePointLength
 import kz.yerek.aireply.keyboard.KeyboardTheme
 import kz.yerek.aireply.keyboard.reply.ComposeSession
 import kz.yerek.aireply.keyboard.reply.ReplyComposerFlow
-import kz.yerek.aireply.keyboard.voice.DictationNotice
-import kz.yerek.aireply.keyboard.voice.VoiceStatusText
-import kz.yerek.aireply.voice.VoiceState
 
 /** Everything the Create panel draws, gathered by the service. */
 class CreateModel(
@@ -58,11 +56,11 @@ class CreateModel(
     val maxFieldLines: Int,
     /** Suggestions and the polish chip, shown in the intents' place. */
     val assist: TypingAssist = TypingAssist.NONE,
-    /** The microphone, shared with the reply composer. */
-    val voice: VoiceState = VoiceState.Idle,
-    /** The last dictation reached the request's limit. */
-    val voiceNotice: DictationNotice? = null,
-    /** Lines of the dictation status: fewer on a phone on its side. */
+    /** The request's character limit, from the server. */
+    val instructionLimit: Int = 400,
+    /** Voice input for the request, shared with the reply composer. */
+    val voice: VoiceUi = VoiceUi.IDLE,
+    /** Lines of the voice line: fewer on a phone on its side. */
     val voiceLines: Int = 2,
     /**
      * A short, wide window (a phone on its side): the line under the request
@@ -96,7 +94,9 @@ class CreateActions(
     val onMic: () -> Unit = {},
     /** Answer the copied message with this request instead. */
     val onReplyToCopied: () -> Unit = {},
-    val report: ReportActions = ReportActions.NONE
+    val report: ReportActions = ReportActions.NONE,
+    /** Pause, Resume, Done, Cancel, Try again and Undo of a recording. */
+    val voice: VoiceActions = VoiceActions.NONE
 )
 
 /**
@@ -215,6 +215,8 @@ fun CreatePanel(
 
         when {
             flow.isConflict -> ConflictRow(actions.onConflict, strings, theme)
+            model.voice.showsControls && stage == ReplyComposerFlow.Stage.Composing ->
+                PanelVoiceControls(model.voice, actions.voice, strings, theme)
             flow.showsReply -> ResultRow(
                 flow = flow,
                 draftText = session.draft.text,
@@ -314,11 +316,20 @@ private fun CreateLine(model: CreateModel, actions: CreateActions, strings: AppS
     }
 }
 
-/** The dictation status when there is one, otherwise "Reply to copied". */
+/** The voice line when voice has something to say, otherwise "Reply to copied". */
 @Composable
 private fun CreateLineContent(model: CreateModel, actions: CreateActions, strings: AppStrings, theme: KeyboardTheme) {
-    if (VoiceStatusText.message(model.voice, model.voiceNotice) != null) {
-        VoiceStatusLine(model.voice, model.voiceNotice, strings, theme, lines = model.voiceLines)
+    val request = model.session.instruction.text
+    if (voiceLineShows(model.voice, request, model.instructionLimit)) {
+        VoiceLine(
+            voice = model.voice,
+            instruction = request,
+            limit = model.instructionLimit,
+            actions = actions.voice,
+            strings = strings,
+            theme = theme,
+            lines = model.voiceLines
+        )
     } else {
         AssistPill(
             text = strings[R.string.kb_reply_to_copied],
@@ -343,8 +354,10 @@ private fun CreateComposingRow(
 ) {
     val flow = model.session.flow
     val generating = flow.isGenerating
-    // While the microphone is on, Write waits for the words being spoken.
-    val canWrite = !generating && model.session.instruction.text.isNotBlank() && !model.voice.isActive
+    // A request past its limit (dictated words are never cut) waits to be shortened.
+    val request = model.session.instruction.text
+    val canWrite = !generating && request.isNotBlank() && request.codePointLength() <= model.instructionLimit &&
+        !model.voice.showsControls
     Row(
         modifier = Modifier.fillMaxWidth().height(ROW_HEIGHT),
         verticalAlignment = Alignment.CenterVertically,
@@ -360,7 +373,7 @@ private fun CreateComposingRow(
             onIntent = actions.onIntent,
             modifier = Modifier.weight(1f)
         )
-        MicButton(model.voice, strings, theme, enabled = !generating, onClick = actions.onMic)
+        if (model.voice.offered) MicButton(strings, theme, enabled = !generating, onClick = actions.onMic)
         ActionPill(
             label = when {
                 generating -> strings[R.string.kb_stop]

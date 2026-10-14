@@ -7,12 +7,13 @@ import kotlin.math.min
 /**
  * The persona row above the keys, start to end:
  *
- *     [✨] [Friend] [Client] [Business] [Work] [your own…]
+ *     [✨] [Friend] [Client] [Business] [Work] [your own…] [🎙]
  *
  * ✨ (Create: write a new message with AI) is pinned at the leading edge, so
- * no number of personas can push it off the row or cover it. Everything to
- * its right belongs to the chips - and, while a word is being typed, to the
- * suggestion strip, which takes exactly the chips' place.
+ * no number of personas can push it off the row or cover it. 🎙 (voice input
+ * into the app's field), where it is offered, is pinned at the trailing edge
+ * the same way. Everything between belongs to the chips - and, while a word
+ * is being typed, to the suggestion strip, which takes exactly the chips' place.
  *
  * Plain numbers in dp, so JVM tests can pin the row; `PersonaRow` in
  * ReplyPanel.kt draws exactly this.
@@ -20,9 +21,12 @@ import kotlin.math.min
 object PersonaRowLayout {
 
     /** What the row holds, in the order it is drawn and read by TalkBack. */
-    enum class Slot { CREATE, CHIPS }
+    enum class Slot { CREATE, CHIPS, MIC }
 
+    /** The row without 🎙: a password field, or no voice input offered. */
     val order: List<Slot> = listOf(Slot.CREATE, Slot.CHIPS)
+
+    fun order(hasMic: Boolean): List<Slot> = if (hasMic) order + Slot.MIC else order
 
     const val HEIGHT = 44f
 
@@ -32,7 +36,10 @@ object PersonaRowLayout {
     /** The ✨ disc. */
     const val CREATE_SIZE = 30f
 
-    /** Between ✨ and the chips (or the suggestions). */
+    /** The 🎙 disc: ✨'s size, so the row stays balanced. */
+    const val MIC_SIZE = CREATE_SIZE
+
+    /** Between ✨ and the chips (or the suggestions), and between them and 🎙. */
     const val SLOT_GAP = 6f
 
     const val CHIP_GAP = 6f
@@ -46,8 +53,9 @@ object PersonaRowLayout {
     /** Where the chips (and the suggestions) start, from the row's leading edge. */
     const val CHIPS_START = SIDE_PADDING + CREATE_SIZE + SLOT_GAP
 
-    /** The width the chips - or the suggestions - get in a row [rowWidth] wide. */
-    fun chipsWidth(rowWidth: Float): Float = max(0f, rowWidth - CHIPS_START - SIDE_PADDING)
+    /** The width the chips - or the suggestions - get in a row [rowWidth] wide, with or without 🎙. */
+    fun chipsWidth(rowWidth: Float, hasMic: Boolean = false): Float =
+        max(0f, rowWidth - CHIPS_START - SIDE_PADDING - if (hasMic) SLOT_GAP + MIC_SIZE else 0f)
 
     /**
      * Chip widths for labels [textWidths] wide in [available] dp: the roomiest

@@ -2,12 +2,11 @@ package kz.yerek.aireply
 
 import kz.yerek.aireply.core.lang.KeyboardLanguage
 import kz.yerek.aireply.keyboard.reply.ReplyComposerFlow
-import kz.yerek.aireply.keyboard.voice.DictationNotice
-import kz.yerek.aireply.keyboard.voice.VoiceAnnouncement
-import kz.yerek.aireply.keyboard.voice.VoiceStatusText
+import kz.yerek.aireply.keyboard.voice.DictationEvent
+import kz.yerek.aireply.keyboard.voice.DictationMessage
+import kz.yerek.aireply.keyboard.voice.DictationPhase
 import kz.yerek.aireply.voice.MicPermission
-import kz.yerek.aireply.voice.VoiceFailure
-import kz.yerek.aireply.voice.VoiceState
+import kz.yerek.aireply.voice.TranscriptionPurpose
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -15,14 +14,15 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The microphone in the ✨ Create panel (and the same one in the reply
- * composer), driven through a fake recogniser.
+ * The microphone in the two AI panels - ✨ Create and the reply composer -
+ * recording an instruction: «Ответь клиенту на казахском, вежливо и коротко».
  *
- * What these pin, from the customer's request: the user can dictate the
- * request - «вежливо откажи», «скажи, что согласен», «да» - in the language
- * of the layout on screen; the words land in the request at the caret and
- * stay editable; NOTHING is ever sent because of dictation; and every way of
- * leaving ends the recording cleanly.
+ * What these pin, from the customer's request: the words come back from the
+ * server and land in the request at the caret, whole and editable; NOTHING AI
+ * is ever sent because of voice - Reply and Write wait while a recording is
+ * on or being recognised, and are tapped by the user; an instruction past
+ * its limit is never cut, it waits to be shortened; and every way of leaving
+ * ends the recording cleanly.
  */
 class CreateDictationTest {
 
@@ -33,28 +33,23 @@ class CreateDictationTest {
     // ---------------------------------------------------------------- basics
 
     @Test
-    fun `dictating fills the request, live words first, and sends nothing`() {
+    fun `a recorded request is recognised into the field and nothing AI is sent`() {
         h.openCreate()
-        h.panels.microphoneTapped()
-        h.settle()
-        assertEquals(VoiceState.Starting, h.dictation.state)
+        h.startRecording(4_000)
+        assertEquals(DictationPhase.RECORDING, h.dictation.phase)
+        assertTrue("no live words: nothing is in the field yet", request.isEmpty())
 
-        h.client.ready()
-        h.client.hears("вежливо")
+        h.dictation.finish()
         h.settle()
-        assertEquals(VoiceState.Listening("вежливо"), h.dictation.state)
-        assertEquals("the field waits for the final words", "", request)
-
-        h.client.hears("вежливо откажи")
+        assertEquals(DictationPhase.TRANSCRIBING, h.dictation.phase)
+        h.transcriber.answers("ответь клиенту вежливо и коротко")
         h.settle()
-        assertEquals(VoiceState.Listening("вежливо откажи"), h.dictation.state)
 
-        h.stopWith("вежливо откажи")
-        assertEquals("Вежливо откажи", request)
-        assertEquals(VoiceState.Idle, h.dictation.state)
-        assertEquals(1, h.client.stops)
+        assertEquals("Ответь клиенту вежливо и коротко", request)
+        assertEquals(DictationPhase.REVIEWING, h.dictation.phase)
         assertEquals("still Create, still the request", ReplyComposerFlow.Stage.Composing, h.compose.flow.stage)
-        assertTrue("dictation never sends", h.composeRequests.isEmpty())
+        assertEquals(TranscriptionPurpose.INSTRUCTION, h.transcriber.requests.single().purpose)
+        assertTrue("voice never writes", h.composeRequests.isEmpty())
         assertTrue(h.replyRequests.isEmpty())
     }
 
@@ -62,309 +57,155 @@ class CreateDictationTest {
     fun `the words go in at the caret and stay editable`() {
         h.openCreate("Скажи, что согласен")
         h.compose.session!!.instruction.moveCursor("Скажи,".length)
-        h.startListening()
-        h.stopWith("да")
+        h.startRecording()
+        h.finishWith("да")
         assertEquals("Скажи, да что согласен", request)
         assertEquals("Скажи, да".length, h.compose.session!!.instruction.cursor)
 
-        // Typing carries on from there.
+        // Typing carries on from there, and settles the review.
         h.compose.session!!.instruction.insert(",")
+        h.dictation.userEdited()
         assertEquals("Скажи, да, что согласен", request)
+        assertEquals(DictationPhase.IDLE, h.dictation.phase)
     }
 
     @Test
-    fun `a recogniser that ends by itself delivers the same way`() {
+    fun `Undo takes the dictated words back out`() {
+        h.openCreate("Поздравь")
+        h.startRecording()
+        h.finishWith("коллегу с днём рождения")
+        assertEquals("Поздравь коллегу с днём рождения", request)
+        assertTrue(h.dictation.canUndo)
+        h.dictation.undo()
+        assertEquals("Поздравь", request)
+        assertEquals(DictationPhase.IDLE, h.dictation.phase)
+        assertFalse(h.dictation.canUndo)
+    }
+
+    @Test
+    fun `an edit settles the words - no Undo over the user's own typing`() {
         h.openCreate()
-        h.startListening("да")
-        h.client.finalResult("да")
-        h.settle()
-        assertEquals("Да", request)
-        assertEquals(VoiceState.Idle, h.dictation.state)
-    }
-
-    @Test
-    fun `while the words are being recognised another tap does nothing`() {
-        h.openCreate()
-        h.startListening("да")
-        h.panels.microphoneTapped()
-        h.settle()
-        assertEquals(VoiceState.Processing, h.dictation.state)
-        h.panels.microphoneTapped()
-        h.settle()
-        assertEquals(1, h.client.stops)
-        assertEquals(1, h.client.languages.size)
-        h.client.finalResult("да")
-        h.settle()
-        assertEquals("Да", request)
-    }
-
-    @Test
-    fun `one recogniser serves every recording until the keyboard goes away`() {
-        h.openCreate()
-        h.startListening()
-        h.stopWith("да")
-        h.startListening()
-        h.stopWith("конечно")
-        assertEquals("Да конечно", request)
-        assertEquals(1, h.clients.size)
-    }
-
-    // ---------------------------------------------------------------- errors
-
-    @Test
-    fun `nothing heard says so and leaves the request as it was`() {
-        h.openCreate("Откажи")
-        h.startListening()
-        h.panels.microphoneTapped()
-        h.settle()
-        h.client.fails(VoiceFailure.NO_SPEECH)
-        h.settle()
-        assertEquals("Откажи", request)
-        assertEquals(VoiceState.Failed(VoiceFailure.NO_SPEECH, "ru-RU"), h.dictation.state)
-        assertEquals(R.string.voice_kb_no_speech, VoiceStatusText.message(h.dictation.state, null)?.id)
-        assertFalse("Write is available again", h.dictation.isActive)
-
-        // Typing moves on: the message goes.
-        h.dictation.userEdited()
-        assertEquals(VoiceState.Idle, h.dictation.state)
-    }
-
-    @Test
-    fun `no network, a busy microphone and an unknown language each end the recording with their message`() {
-        h.openCreate()
-        val expected = mapOf(
-            VoiceFailure.NETWORK to R.string.kb_err_offline,
-            VoiceFailure.BUSY to R.string.voice_kb_busy,
-            VoiceFailure.GENERIC to R.string.voice_kb_failed
-        )
-        for ((reason, message) in expected) {
-            h.startListening()
-            h.client.fails(reason)
-            h.settle()
-            assertFalse(h.dictation.isActive)
-            assertEquals(message, VoiceStatusText.message(h.dictation.state, null)?.id)
-            assertEquals("", request)
-        }
-    }
-
-    @Test
-    fun `Kazakh unavailable on the phone names Kazakh, and switching the layout clears it`() {
-        h.layout = KeyboardLanguage.KAZAKH
-        h.openCreate()
-        h.startListening()
-        h.client.fails(VoiceFailure.LANGUAGE_UNAVAILABLE)
-        h.settle()
-        assertEquals(VoiceState.Failed(VoiceFailure.LANGUAGE_UNAVAILABLE, "kk-KZ"), h.dictation.state)
-        assertEquals(R.string.voice_kb_language_unavailable_kk, VoiceStatusText.message(h.dictation.state, null)?.id)
-
-        h.layout = KeyboardLanguage.RUSSIAN
-        h.panels.layoutChanged()
-        assertEquals(VoiceState.Idle, h.dictation.state)
-
-        h.startListening()
-        h.stopWith("откажи")
-        assertEquals(listOf("kk-KZ", "ru-RU"), h.client.languages)
-        assertEquals("Откажи", request)
-    }
-
-    // --------------------------------------------------------------- limit
-
-    @Test
-    fun `dictation never passes the request limit and says so`() {
-        val h = PanelsHarness(instructionLimit = 20)
-        h.openCreate("Ответь коротко:")
-        h.startListening()
-        h.stopWith("да конечно приду завтра")
-        val text = h.compose.session!!.instruction.text
-        assertEquals("Ответь коротко: да", text)
-        assertEquals(DictationNotice(20), h.dictation.notice)
-        assertEquals(R.string.kb_compose_err_too_long, VoiceStatusText.message(h.dictation.state, h.dictation.notice)?.id)
-        assertEquals(20, VoiceStatusText.message(h.dictation.state, h.dictation.notice)?.argument)
-
-        h.dictation.userEdited()
-        assertNull(h.dictation.notice)
-    }
-
-    // -------------------------------------------------------------- language
-
-    @Test
-    fun `the recogniser listens in the language of the layout, in Create`() {
-        h.openCreate()
-        for ((layout, tag) in listOf(
-            KeyboardLanguage.KAZAKH to "kk-KZ",
-            KeyboardLanguage.RUSSIAN to "ru-RU",
-            KeyboardLanguage.ENGLISH to "en-US"
-        )) {
-            h.layout = layout
-            h.startListening()
-            h.stopWith("ok")
-            assertEquals(tag, h.client.languages.last())
-        }
-    }
-
-    @Test
-    fun `and the same in the reply composer`() {
-        h.openReply()
-        for ((layout, tag) in listOf(
-            KeyboardLanguage.KAZAKH to "kk-KZ",
-            KeyboardLanguage.RUSSIAN to "ru-RU",
-            KeyboardLanguage.ENGLISH to "en-US"
-        )) {
-            h.layout = layout
-            h.startListening()
-            h.stopWith("ok")
-            assertEquals(tag, h.client.languages.last())
-        }
-        assertEquals("Ok ok ok", h.replies.session!!.instruction.text)
-        assertTrue(h.replyRequests.isEmpty())
-    }
-
-    // ------------------------------------------------------------- stopping
-
-    @Test
-    fun `switching the layout stops the recording and keeps its words`() {
-        h.openCreate()
-        h.startListening("скажи что согласен")
-        h.layout = KeyboardLanguage.ENGLISH
-        h.panels.layoutChanged()
-        h.settle()
-        assertEquals(1, h.client.stops)
-        assertEquals(VoiceState.Processing, h.dictation.state)
-        h.client.finalResult("скажи что согласен")
-        h.settle()
-        assertEquals("Скажи что согласен", request)
-    }
-
-    @Test
-    fun `hiding the keyboard releases the microphone and drops what was not delivered`() {
-        h.openCreate("Откажи")
-        h.startListening("вежливо")
-        val first = h.client
-        h.panels.keyboardHidden(h.now)
-        assertEquals(1, first.releases)
-        assertEquals(VoiceState.Idle, h.dictation.state)
-
-        // The keyboard comes back: the request is there, untouched; a new
-        // recording gets a fresh recogniser.
-        h.panels.keyboardShown(h.now + 1_000, secureField = false)
-        assertEquals("Откажи", request)
-        h.startListening()
-        assertEquals(2, h.clients.size)
-        h.stopWith("вежливо")
+        h.startRecording()
+        h.finishWith("откажи")
+        h.compose.session!!.instruction.insert(" вежливо")
+        assertFalse("the text is no longer what voice left", h.dictation.canUndo)
+        h.dictation.undo()
         assertEquals("Откажи вежливо", request)
     }
 
     @Test
-    fun `closing the panel drops the recording and nothing lands later`() {
+    fun `a second recording adds to the first`() {
         h.openCreate()
-        h.startListening("вежливо откажи")
-        val session = h.compose.session!!
-        h.panels.closeAll()
-        assertEquals(1, h.client.cancels)
-        assertEquals(VoiceState.Idle, h.dictation.state)
-        assertNull(h.compose.session)
-
-        // A late result from the platform would find nowhere to go.
-        h.client.finalResult("вежливо откажи")
-        h.settle()
-        assertEquals("", session.instruction.text)
-        assertTrue(h.inserted.isEmpty())
+        h.startRecording()
+        h.finishWith("да")
+        h.startRecording()
+        h.finishWith("конечно")
+        assertEquals("Да конечно", request)
+        assertEquals(2, h.recorders.size)
+        assertEquals("a fresh id for fresh audio", 2, h.transcriber.requests.map { it.requestId }.distinct().size)
     }
 
-    @Test
-    fun `words for a request that is no longer being written are dropped`() {
-        h.openCreate("Откажи")
-        h.startListening("вежливо")
-        h.panels.layoutChanged()
-        h.settle()
-        // However the panel left the request stage, the late words must not
-        // slip into a field nobody is looking at.
-        val session = h.compose.session!!
-        session.flow = session.flow.startingGeneration()!!
-        h.client.finalResult("вежливо")
-        h.settle()
-        assertEquals("Откажи", session.instruction.text)
-        assertTrue(h.inserted.isEmpty())
-    }
+    // ----------------------------------------------------------- the limit
 
     @Test
-    fun `New drops the recording with the request`() {
-        h.openCreate("Откажи")
-        h.startListening("вежливо")
-        h.panels.startOver()
-        assertEquals(1, h.client.cancels)
-        assertEquals("", request)
-        assertEquals(VoiceState.Idle, h.dictation.state)
-    }
-
-    @Test
-    fun `opening a persona drops the recording, and no reply gets its words`() {
-        h.openCreate()
-        h.startListening("вежливо")
-        h.panels.openReply(h.friend) { kz.yerek.aireply.keyboard.input.ContextTextProvider.Result.Failure(kz.yerek.aireply.ai.AIReplyError.NoSourceMessage) }
-        assertEquals(1, h.client.cancels)
-        assertNull(h.compose.session)
-        h.client.finalResult("вежливо")
-        h.settle()
-        assertEquals("", h.replies.session!!.instruction.text)
-        assertTrue(h.replyRequests.isEmpty())
-    }
-
-    @Test
-    fun `putting a reply aside drops its recording`() {
-        h.openReply()
-        h.startListening("да")
-        h.panels.putReplyAside()
-        assertEquals(1, h.client.cancels)
-        assertTrue(h.replies.isSuspended)
-        assertEquals(VoiceState.Idle, h.dictation.state)
-    }
-
-    @Test
-    fun `turning the phone stops the recording like Stop`() {
-        h.openCreate()
-        h.startListening("да")
-        h.dictation.stop()
-        h.settle()
-        h.client.finalResult("да")
-        h.settle()
-        assertEquals("Да", request)
-    }
-
-    // ------------------------------------------------- Write while recording
-
-    @Test
-    fun `Write waits while the microphone is on, and sends the dictated words after`() {
-        h.openCreate("Откажи")
-        h.startListening("вежливо")
-        assertFalse(h.panels.canStartRequest)
+    fun `dictated words are never cut - the request is kept whole and waits to be shortened`() {
+        val h = PanelsHarness(instructionLimit = 20)
+        h.openCreate("Ответь коротко:")
+        h.startRecording()
+        h.finishWith("да конечно приду завтра")
+        val text = h.compose.session!!.instruction.text
+        assertEquals("Ответь коротко: да конечно приду завтра", text)
+        assertEquals(DictationMessage.TooLong(20), h.dictation.message)
 
         h.panels.primaryTapped()
         h.settle()
-        assertTrue("no request while recording", h.composeRequests.isEmpty())
-        assertEquals(ReplyComposerFlow.Stage.Composing, h.compose.flow.stage)
+        assertTrue("an over-limit request is not sent", h.composeRequests.isEmpty())
 
-        h.stopWith("вежливо")
+        h.compose.session!!.instruction.set("Ответь коротко: да")
+        h.dictation.userEdited()
+        assertNull(h.dictation.message)
+        h.panels.primaryTapped()
+        h.settle()
+        assertEquals(listOf("Ответь коротко: да"), h.composeRequests.map { it.instruction })
+    }
+
+    @Test
+    fun `exactly at the limit is fine, and is sent when Reply is tapped`() {
+        val h = PanelsHarness(instructionLimit = 20)
+        h.openReply(text = "Скажи что,")
+        h.startRecording()
+        h.finishWith("приду в 9")
+        val instruction = h.replies.session!!.instruction.text
+        assertEquals("Скажи что, приду в 9", instruction)
+        assertEquals(20, instruction.codePointCount(0, instruction.length))
+        assertNull(h.dictation.message)
+        h.panels.primaryTapped()
+        h.settle()
+        assertEquals("Скажи что, приду в 9", h.replyRequests.single().instruction)
+    }
+
+    @Test
+    fun `a reply's instruction past the limit is not sent either - never clipped`() {
+        val h = PanelsHarness(instructionLimit = 20)
+        h.openReply(text = "Скажи что")
+        h.startRecording()
+        h.finishWith("я обязательно приду завтра вечером")
+        h.panels.primaryTapped()
+        h.settle()
+        assertTrue(h.replyRequests.isEmpty())
+    }
+
+    // ------------------------------------------------- Reply / Write wait
+
+    @Test
+    fun `Write waits while recording and recognising, and sends the words only when tapped`() {
+        h.openCreate("Откажи")
+        h.startRecording()
+        assertFalse(h.panels.canStartRequest)
+        h.panels.primaryTapped()
+        h.settle()
+        assertTrue("no request while recording", h.composeRequests.isEmpty())
+
+        h.dictation.finish()
+        h.settle()
+        h.panels.primaryTapped()
+        h.settle()
+        assertTrue("none while recognising", h.composeRequests.isEmpty())
+
+        h.transcriber.answers("вежливо")
+        h.settle()
         assertTrue(h.panels.canStartRequest)
         assertTrue("and none by itself after", h.composeRequests.isEmpty())
 
         h.panels.primaryTapped()
         h.settle()
         assertEquals(listOf("Откажи вежливо"), h.composeRequests.map { it.instruction })
+        assertEquals("the review is settled by Write", DictationPhase.IDLE, h.dictation.phase)
     }
 
     @Test
     fun `Reply waits the same way in the reply composer`() {
         h.openReply(text = "Скажи что")
-        h.startListening("свободен")
+        h.startRecording()
         h.panels.primaryTapped()
         h.settle()
         assertTrue(h.replyRequests.isEmpty())
-        h.stopWith("свободен")
+        h.finishWith("свободен")
         assertTrue(h.replyRequests.isEmpty())
         h.panels.primaryTapped()
         h.settle()
         assertEquals("Скажи что свободен", h.replyRequests.single().instruction)
+    }
+
+    @Test
+    fun `Cancel before Write sends nothing at all`() {
+        h.openCreate("Откажи")
+        h.startRecording()
+        h.dictation.cancel()
+        assertTrue(h.transcriber.requests.isEmpty())
+        assertTrue(h.composeRequests.isEmpty())
+        assertEquals("Откажи", request)
+        assertTrue(h.panels.canStartRequest)
     }
 
     @Test
@@ -374,7 +215,137 @@ class CreateDictationTest {
         assertTrue(h.compose.flow.isGenerating)
         h.panels.microphoneTapped()
         h.settle()
-        assertTrue("no recogniser was even made", h.clients.isEmpty())
+        assertTrue("no recorder was even made", h.recorders.isEmpty())
+    }
+
+    // -------------------------------------------------------------- languages
+
+    @Test
+    fun `the layout on screen is the first hint, the user's other layouts follow`() {
+        h.openCreate()
+        for ((layout, hints) in listOf(
+            KeyboardLanguage.KAZAKH to listOf("kk", "ru", "en"),
+            KeyboardLanguage.RUSSIAN to listOf("ru", "kk", "en"),
+            KeyboardLanguage.ENGLISH to listOf("en", "kk", "ru")
+        )) {
+            h.layout = layout
+            h.startRecording()
+            h.finishWith("ok")
+            assertEquals(hints, h.transcriber.requests.last().languages)
+        }
+    }
+
+    @Test
+    fun `Kazakh always brings Russian along - a single layout is the only hint otherwise`() {
+        h.openReply()
+        h.layouts = listOf(KeyboardLanguage.KAZAKH)
+        h.layout = KeyboardLanguage.KAZAKH
+        h.startRecording()
+        h.finishWith("иә")
+        assertEquals(listOf("kk", "ru"), h.transcriber.requests.last().languages)
+
+        h.layouts = listOf(KeyboardLanguage.ENGLISH)
+        h.layout = KeyboardLanguage.ENGLISH
+        h.startRecording()
+        h.finishWith("yes")
+        assertEquals(listOf("en"), h.transcriber.requests.last().languages)
+    }
+
+    @Test
+    fun `switching the layout before Done changes the hints, not the recording`() {
+        h.openCreate()
+        h.layout = KeyboardLanguage.RUSSIAN
+        h.startRecording()
+        h.layout = KeyboardLanguage.KAZAKH
+        h.panels.layoutChanged()
+        assertEquals(DictationPhase.RECORDING, h.dictation.phase)
+        h.finishWith("рақмет")
+        assertEquals("kk", h.transcriber.requests.single().languages.first())
+    }
+
+    // ------------------------------------------------------------- leaving
+
+    @Test
+    fun `hiding the keyboard pauses the recording - back, it can be finished`() {
+        h.openCreate("Откажи")
+        h.startRecording(5_000)
+        h.panels.keyboardHidden(h.now)
+        assertEquals(DictationPhase.PAUSED, h.dictation.phase)
+        assertFalse(h.recorder.running)
+        h.panels.keyboardShown(h.now + 1_000, secureField = false)
+        assertEquals(DictationPhase.PAUSED, h.dictation.phase)
+        h.finishWith("вежливо")
+        assertEquals("Откажи вежливо", request)
+    }
+
+    @Test
+    fun `words recognised while the keyboard is away still land in the parked request`() {
+        h.openCreate("Откажи")
+        h.startRecording()
+        h.dictation.finish()
+        h.settle()
+        h.panels.keyboardHidden(h.now)
+        h.transcriber.answers("вежливо")
+        h.settle()
+        h.panels.keyboardShown(h.now + 1_000, secureField = false)
+        assertEquals("Откажи вежливо", request)
+    }
+
+    @Test
+    fun `closing the panel drops the recording and nothing lands later`() {
+        h.openCreate()
+        h.startRecording()
+        h.dictation.finish()
+        h.settle()
+        val session = h.compose.session!!
+        h.panels.closeAll()
+        h.settle()
+        assertEquals(1, h.transcriber.cancelled)
+        assertEquals(DictationPhase.IDLE, h.dictation.phase)
+        assertNull(h.compose.session)
+        assertEquals("", session.instruction.text)
+        assertTrue(h.changed.isEmpty())
+    }
+
+    @Test
+    fun `New drops the recording with the request`() {
+        h.openCreate("Откажи")
+        h.startRecording()
+        h.panels.startOver()
+        assertTrue(h.recorder.discards >= 1)
+        assertEquals("", request)
+        assertEquals(DictationPhase.IDLE, h.dictation.phase)
+        assertTrue(h.transcriber.requests.isEmpty())
+    }
+
+    @Test
+    fun `opening a persona drops the recording, and no reply gets its words`() {
+        h.openCreate()
+        h.startRecording()
+        h.panels.openReply(h.friend) { kz.yerek.aireply.keyboard.input.ContextTextProvider.Result.Failure(kz.yerek.aireply.ai.AIReplyError.NoSourceMessage) }
+        assertEquals(DictationPhase.IDLE, h.dictation.phase)
+        assertNull(h.compose.session)
+        assertTrue(h.transcriber.requests.isEmpty())
+        assertEquals("", h.replies.session!!.instruction.text)
+    }
+
+    @Test
+    fun `putting a reply aside drops its recording`() {
+        h.openReply()
+        h.startRecording()
+        h.panels.putReplyAside()
+        assertTrue(h.replies.isSuspended)
+        assertEquals(DictationPhase.IDLE, h.dictation.phase)
+    }
+
+    @Test
+    fun `a password field ends Create and its recording`() {
+        h.openCreate("Откажи")
+        h.startRecording()
+        h.panels.keyboardShown(h.now, secureField = true)
+        assertNull(h.compose.session)
+        assertEquals(DictationPhase.IDLE, h.dictation.phase)
+        assertTrue(h.transcriber.requests.isEmpty())
     }
 
     // ------------------------------------------------------------ permission
@@ -391,15 +362,13 @@ class CreateDictationTest {
 
         h.mic.answers(MicPermission.Outcome.GRANTED)
         h.settle()
-        assertTrue("nothing records while the keyboard is away", h.clients.isEmpty())
+        assertTrue("nothing records while the keyboard is away", h.recorders.isEmpty())
 
         h.now += 500
         h.panels.keyboardShown(h.now, secureField = false)
         h.settle()
-        assertEquals(listOf("ru-RU"), h.client.languages)
-        h.client.ready()
-        h.stopWith("да")
-        assertEquals("Да", request)
+        assertEquals(1, h.recorders.size)
+        assertEquals(DictationPhase.STARTING, h.dictation.phase)
     }
 
     @Test
@@ -414,20 +383,19 @@ class CreateDictationTest {
         h.now += 60_000
         h.panels.keyboardShown(h.now, secureField = false)
         h.settle()
-        assertTrue(h.clients.isEmpty())
-        assertEquals(VoiceState.Idle, h.dictation.state)
+        assertTrue(h.recorders.isEmpty())
+        assertEquals(DictationPhase.IDLE, h.dictation.phase)
     }
 
     @Test
-    fun `a refusal shows the permission message, and a final refusal points to Settings`() {
+    fun `a refusal says so, and a final refusal points to Settings`() {
         h.mic.granted = false
         h.openCreate()
         h.panels.microphoneTapped()
         h.settle()
         h.mic.answers(MicPermission.Outcome.DENIED)
         h.settle()
-        assertEquals(VoiceState.PermissionRequired, h.dictation.state)
-        assertEquals(R.string.voice_kb_permission_needed, VoiceStatusText.message(h.dictation.state, null)?.id)
+        assertEquals(DictationMessage.PermissionRequired, h.dictation.message)
 
         h.now += 5_000
         h.panels.microphoneTapped()
@@ -435,13 +403,12 @@ class CreateDictationTest {
         assertEquals("asked again", 2, h.mic.requests)
         h.mic.answers(MicPermission.Outcome.PERMANENTLY_DENIED)
         h.settle()
-        assertEquals(VoiceState.PermissionDenied, h.dictation.state)
-        assertEquals(R.string.voice_kb_permission_denied, VoiceStatusText.message(h.dictation.state, null)?.id)
+        assertEquals(DictationMessage.PermissionDenied, h.dictation.message)
 
         h.panels.microphoneTapped()
         assertEquals(1, h.mic.settingsOpened)
         assertEquals(2, h.mic.requests)
-        assertTrue(h.clients.isEmpty())
+        assertTrue(h.recorders.isEmpty())
         assertEquals("", request)
     }
 
@@ -459,34 +426,13 @@ class CreateDictationTest {
     // --------------------------------------------------------- accessibility
 
     @Test
-    fun `a screen reader hears listening and stopped, never the words`() {
+    fun `a screen reader hears what happens, never the words`() {
         h.openCreate()
-        h.startListening("вежливо откажи")
-        h.stopWith("вежливо откажи")
-        assertEquals(listOf(VoiceAnnouncement.Listening, VoiceAnnouncement.Stopped), h.announcements)
-
-        h.announcements.clear()
-        h.startListening()
-        h.client.fails(VoiceFailure.NO_SPEECH)
-        h.settle()
+        h.startRecording()
+        h.finishWith("вежливо откажи")
         assertEquals(
-            listOf(
-                VoiceAnnouncement.Listening,
-                VoiceAnnouncement.Message(VoiceState.Failed(VoiceFailure.NO_SPEECH, "ru-RU"), null)
-            ),
-            h.announcements
+            listOf(DictationEvent.Recording, DictationEvent.Recognizing, DictationEvent.Inserted),
+            h.events
         )
-    }
-
-    // -------------------------------------------------------------- secure
-
-    @Test
-    fun `a password field ends Create and its recording`() {
-        h.openCreate("Откажи")
-        h.startListening("вежливо")
-        h.panels.keyboardShown(h.now, secureField = true)
-        assertNull(h.compose.session)
-        assertEquals(VoiceState.Idle, h.dictation.state)
-        assertEquals(1, h.client.cancels)
     }
 }

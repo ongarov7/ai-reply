@@ -2,6 +2,7 @@ package kz.yerek.aireply.keyboard
 
 import android.content.Context
 import android.media.AudioManager
+import android.os.Build
 import android.provider.Settings
 import android.view.HapticFeedbackConstants
 import android.view.View
@@ -38,6 +39,21 @@ class KeyFeedback(context: Context) {
         // No FLAG_IGNORE_GLOBAL_SETTING: if the user turned keypress haptics
         // off, this must stay silent.
         if (hapticsEnabled) view?.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+    }
+
+    /**
+     * A light tick when voice input has 10 or 5 seconds left, a firmer one at
+     * the limit. Vibration only, never a sound, and only where key vibration
+     * is on - the same two switches as a key press.
+     */
+    fun onVoiceTimeLeft(view: View?, atLimit: Boolean) {
+        if (!hapticsEnabled) return
+        val effect = when {
+            !atLimit -> HapticFeedbackConstants.CLOCK_TICK
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> HapticFeedbackConstants.CONFIRM
+            else -> HapticFeedbackConstants.KEYBOARD_TAP
+        }
+        view?.performHapticFeedback(effect)
     }
 
     private companion object {

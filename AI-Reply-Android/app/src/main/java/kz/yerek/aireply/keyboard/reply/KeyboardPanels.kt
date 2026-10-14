@@ -3,6 +3,7 @@ package kz.yerek.aireply.keyboard.reply
 import kz.yerek.aireply.ai.AILimits
 import kz.yerek.aireply.ai.AIReplyError
 import kz.yerek.aireply.core.lang.KeyboardLanguage
+import kz.yerek.aireply.core.text.codePointLength
 import kz.yerek.aireply.domain.model.RelationshipKind
 import kz.yerek.aireply.domain.model.ReplyConfiguration
 import kz.yerek.aireply.domain.model.ReplyTemplate
@@ -18,14 +19,17 @@ import kz.yerek.aireply.voice.RecognitionLanguage
  * goes, what ends it, when a request may start, and the step from Create to
  * a reply to the copied message.
  *
- *  * Dictation writes into the instruction of the panel on screen while that
- *    instruction is being written, in the language of the layout on screen -
- *    the same for the reply composer and Create.
- *  * Write and Reply wait while the microphone is on: the words being spoken
- *    belong in the request, and a request is never started for the user.
+ *  * Voice input records for the instruction of the panel on screen while
+ *    that instruction is being written; its words are recognised with the
+ *    layout on screen (and the user's other layouts) as hints - the same for
+ *    the reply composer and Create.
+ *  * Write and Reply wait while a recording is on or being recognised: the
+ *    words belong in the request, and a request is never started for the
+ *    user. An instruction past its limit waits to be shortened - dictated
+ *    words are never cut to fit.
  *  * Closing a panel, New, another persona or leaving Create for a reply drop
- *    a recording; a layout switch ends it and keeps the words; the keyboard
- *    going away releases the microphone at once.
+ *    a recording; the keyboard going away pauses one (the microphone closes
+ *    at once) and a request already sent runs on.
  *
  * Pure keyboard state, no Android: the service supplies the clipboard read
  * and the layout.
@@ -35,7 +39,9 @@ class KeyboardPanels(
     val compose: ComposeSessionController,
     val dictation: DictationController,
     private val layout: () -> KeyboardLanguage,
-    private val instructionLimit: () -> Int = { AILimits.current.instructionCharacters }
+    private val instructionLimit: () -> Int = { AILimits.current.instructionCharacters },
+    /** The user's layouts, the languages they write in: hints for recognising speech. */
+    private val layouts: () -> Collection<KeyboardLanguage> = { KeyboardLanguage.CYCLE_ORDER }
 ) {
 
     init {
@@ -65,35 +71,51 @@ class KeyboardPanels(
             return session.instruction.takeIf { session.flow.stage == ReplyComposerFlow.Stage.Composing }
         }
 
-    /** Write and Reply are available: the microphone is not running. */
-    val canStartRequest: Boolean get() = !dictation.isActive
+    /** Write and Reply are available: no recording is on or being recognised. */
+    val canStartRequest: Boolean get() = !dictation.holdsRequests
+
+    /** Languages to recognise speech in, the layout on screen first. */
+    val languageHints: List<String> get() = RecognitionLanguage.hints(layout(), layouts())
 
     // ------------------------------------------------------------ microphone
 
     /** The mic button, in either panel. */
     fun microphoneTapped() {
         val field = dictationField ?: return
-        dictation.toggle(DictationTarget(field, instructionLimit()), RecognitionLanguage.tagFor(layout()))
+        dictation.start(DictationTarget.Instruction(field, instructionLimit()), languageHints)
     }
 
-    /** ҚАЗ / РУС / ENG changed: a recording ends with what was heard. */
-    fun layoutChanged() = dictation.layoutChanged()
+    /** ҚАЗ / РУС / ENG changed: a recording not yet sent is recognised with the new layout first. */
+    fun layoutChanged() = dictation.layoutChanged(languageHints)
 
     // -------------------------------------------------------------- requests
 
-    /** Write / Reply, Stop, Try again. Never starts a request while the microphone is on. */
+    /**
+     * Write / Reply, Stop, Try again. Never starts a request while a recording
+     * is on or being recognised, nor with an instruction past its limit.
+     */
     fun primaryTapped() {
         when {
             compose.isActive -> when {
                 compose.flow.isGenerating -> compose.stop()
-                canStartRequest -> compose.generate()
+                canStartRequest && fitsLimit(compose.session?.instruction?.text) -> {
+                    dictation.requestStarted()
+                    compose.generate()
+                }
             }
             replies.isComposing -> when {
                 replies.flow.isGenerating -> replies.stop()
-                canStartRequest -> replies.generate()
+                canStartRequest && fitsLimit(replies.session?.instruction?.text) -> {
+                    dictation.requestStarted()
+                    replies.generate()
+                }
             }
         }
     }
+
+    /** An instruction is checked here, against the limit on screen - never cut to fit. */
+    private fun fitsLimit(instruction: String?): Boolean =
+        instruction == null || instruction.codePointLength() <= instructionLimit()
 
     // ---------------------------------------------------------------- panels
 
@@ -158,7 +180,7 @@ class KeyboardPanels(
     ): CopiedReply {
         val created = compose.session ?: return CopiedReply.Refused
         if (secureField || template == null) return CopiedReply.Refused
-        if (created.flow.stage != ReplyComposerFlow.Stage.Composing || dictation.isActive) return CopiedReply.Refused
+        if (created.flow.stage != ReplyComposerFlow.Stage.Composing || dictation.holdsRequests) return CopiedReply.Refused
 
         return when (val result = acquire()) {
             is ContextTextProvider.Result.Failure -> {
@@ -179,9 +201,9 @@ class KeyboardPanels(
 
     // ------------------------------------------------------------- lifecycle
 
-    /** The keyboard went away: the microphone is released, the panels are kept for a while. */
+    /** The keyboard went away: the microphone closes, the panels are kept for a while. */
     fun keyboardHidden(now: Long) {
-        dictation.release()
+        dictation.hidden()
         replies.park(now)
         compose.park(now)
     }

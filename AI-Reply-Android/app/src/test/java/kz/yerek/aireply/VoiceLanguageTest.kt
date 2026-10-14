@@ -1,11 +1,13 @@
 package kz.yerek.aireply
 
+import kz.yerek.aireply.ai.AIReplyError
 import kz.yerek.aireply.core.lang.KeyboardLanguage
-import kz.yerek.aireply.keyboard.voice.DictationNotice
+import kz.yerek.aireply.keyboard.voice.DictationMessage
+import kz.yerek.aireply.keyboard.voice.DictationPhase
+import kz.yerek.aireply.keyboard.voice.VoiceMessage
 import kz.yerek.aireply.keyboard.voice.VoiceStatusText
 import kz.yerek.aireply.voice.RecognitionLanguage
-import kz.yerek.aireply.voice.VoiceFailure
-import kz.yerek.aireply.voice.VoiceState
+import kz.yerek.aireply.voice.RecorderFailure
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -13,8 +15,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Which language the recogniser listens in (the layout on screen, ҚАЗ / РУС /
- * ENG) and what the status line says - one table for both panels.
+ * Which languages a recording is recognised in (the layout on screen first,
+ * ҚАЗ / РУС / ENG) and what the voice controls say - one table for the app's
+ * field and both panels.
  */
 class VoiceLanguageTest {
 
@@ -42,25 +45,66 @@ class VoiceLanguageTest {
     }
 
     @Test
-    fun `an unavailable language is named in the message`() {
-        fun unavailable(tag: String?) =
-            VoiceStatusText.message(VoiceState.Failed(VoiceFailure.LANGUAGE_UNAVAILABLE, tag), null)?.id
-        assertEquals(R.string.voice_kb_language_unavailable_kk, unavailable("kk-KZ"))
-        assertEquals(R.string.voice_kb_language_unavailable_ru, unavailable("ru-RU"))
-        assertEquals(R.string.voice_kb_language_unavailable_en, unavailable("en-US"))
-        assertEquals(R.string.voice_kb_unavailable, unavailable(null))
+    fun `transcription hints start with the layout on screen`() {
+        val all = KeyboardLanguage.CYCLE_ORDER
+        assertEquals(listOf("kk", "ru", "en"), RecognitionLanguage.hints(KeyboardLanguage.KAZAKH, all))
+        assertEquals(listOf("ru", "kk", "en"), RecognitionLanguage.hints(KeyboardLanguage.RUSSIAN, all))
+        assertEquals(listOf("en", "kk", "ru"), RecognitionLanguage.hints(KeyboardLanguage.ENGLISH, all))
+        // Kazakh speech mixes in Russian, so Russian is always a hint for it.
+        assertEquals(listOf("kk", "ru"), RecognitionLanguage.hints(KeyboardLanguage.KAZAKH, listOf(KeyboardLanguage.KAZAKH)))
+        assertEquals(listOf("ru"), RecognitionLanguage.hints(KeyboardLanguage.RUSSIAN, listOf(KeyboardLanguage.RUSSIAN)))
+        assertEquals(listOf("en", "ru"), RecognitionLanguage.hints(KeyboardLanguage.ENGLISH, listOf(KeyboardLanguage.RUSSIAN)))
     }
 
     @Test
-    fun `the status line says something only while there is something to say`() {
-        assertNull(VoiceStatusText.message(VoiceState.Idle, null))
-        assertEquals(R.string.voice_kb_listening, VoiceStatusText.message(VoiceState.Starting, null)?.id)
-        assertEquals(R.string.voice_kb_listening, VoiceStatusText.message(VoiceState.Listening("да"), null)?.id)
-        assertEquals(R.string.voice_kb_processing, VoiceStatusText.message(VoiceState.Processing, null)?.id)
-        assertEquals(R.string.voice_kb_unavailable, VoiceStatusText.message(VoiceState.Failed(VoiceFailure.UNAVAILABLE), null)?.id)
-        // The limit notice shows once the microphone is idle, never over a recording.
-        assertEquals(R.string.kb_compose_err_too_long, VoiceStatusText.message(VoiceState.Idle, DictationNotice(400))?.id)
-        assertEquals(R.string.voice_kb_listening, VoiceStatusText.message(VoiceState.Starting, DictationNotice(400))?.id)
+    fun `the status follows the recording, the limit announced at the start and counted down at the end`() {
+        fun status(phase: DictationPhase, captured: Long, limitReached: Boolean = false, message: DictationMessage? = null) =
+            VoiceStatusText.status(phase, captured, 40_000, limitReached, message, forHost = true)
+        assertEquals(VoiceMessage.Text(R.string.voice_rec_limit_hint, 40), status(DictationPhase.STARTING, 0))
+        assertEquals(VoiceMessage.Text(R.string.voice_rec_limit_hint, 40), status(DictationPhase.RECORDING, 1_000))
+        assertEquals(VoiceMessage.Text(R.string.voice_rec_recording), status(DictationPhase.RECORDING, 18_000))
+        assertEquals(VoiceMessage.Text(R.string.voice_rec_left, 10), status(DictationPhase.RECORDING, 30_000))
+        assertEquals(VoiceMessage.Text(R.string.voice_rec_left, 10), status(DictationPhase.RECORDING, 30_001))
+        assertEquals(VoiceMessage.Text(R.string.voice_rec_left, 5), status(DictationPhase.RECORDING, 35_000))
+        assertEquals(VoiceMessage.Text(R.string.voice_rec_left, 1), status(DictationPhase.RECORDING, 39_999))
+        assertEquals(VoiceMessage.Text(R.string.voice_rec_paused), status(DictationPhase.PAUSED, 15_000))
+        assertEquals(VoiceMessage.Text(R.string.voice_rec_limit_reached), status(DictationPhase.PAUSED, 40_000, limitReached = true))
+        assertEquals(VoiceMessage.Text(R.string.voice_rec_recognizing), status(DictationPhase.TRANSCRIBING, 12_000))
+        assertEquals(VoiceMessage.Text(R.string.voice_rec_retrying), status(DictationPhase.RECOVERING, 12_000))
+        assertEquals(
+            VoiceMessage.Error(AIReplyError.Offline),
+            status(DictationPhase.ERROR, 12_000, message = DictationMessage.Failed(AIReplyError.Offline))
+        )
+        assertEquals(VoiceMessage.Text(R.string.voice_rec_ready), status(DictationPhase.REVIEWING, 12_000))
+        assertNull(status(DictationPhase.IDLE, 0))
+        assertEquals(VoiceMessage.Text(R.string.voice_kb_no_speech), status(DictationPhase.IDLE, 0, message = DictationMessage.NothingHeard))
+    }
+
+    @Test
+    fun `the timer reads minutes and seconds of the forty`() {
+        assertEquals("00:00 / 00:40", VoiceStatusText.timer(0, 40_000))
+        assertEquals("00:18 / 00:40", VoiceStatusText.timer(18_900, 40_000))
+        assertEquals("00:40 / 00:40", VoiceStatusText.timer(40_000, 40_000))
+        assertEquals(22, VoiceStatusText.secondsLeft(40_000 - 18_000))
+        assertEquals(1, VoiceStatusText.secondsLeft(1))
+        assertEquals(0, VoiceStatusText.secondsLeft(0))
+    }
+
+    @Test
+    fun `every message has its sentence`() {
+        assertEquals(VoiceMessage.Text(R.string.voice_kb_permission_needed), VoiceStatusText.message(DictationMessage.PermissionRequired))
+        assertEquals(VoiceMessage.Text(R.string.voice_kb_permission_denied), VoiceStatusText.message(DictationMessage.PermissionDenied))
+        assertEquals(
+            VoiceMessage.Text(R.string.voice_rec_interrupted),
+            VoiceStatusText.message(DictationMessage.Microphone(RecorderFailure.INTERRUPTED))
+        )
+        assertEquals(
+            VoiceMessage.Text(R.string.voice_rec_mic_unavailable),
+            VoiceStatusText.message(DictationMessage.Microphone(RecorderFailure.UNAVAILABLE))
+        )
+        assertEquals(VoiceMessage.Text(R.string.voice_rec_too_short), VoiceStatusText.message(DictationMessage.TooShort))
+        assertEquals(VoiceMessage.Text(R.string.kb_compose_err_too_long, 400), VoiceStatusText.message(DictationMessage.TooLong(400)))
+        assertEquals(VoiceMessage.Error(AIReplyError.VoiceLimitReached), VoiceStatusText.message(DictationMessage.Failed(AIReplyError.VoiceLimitReached)))
     }
 
     @Test

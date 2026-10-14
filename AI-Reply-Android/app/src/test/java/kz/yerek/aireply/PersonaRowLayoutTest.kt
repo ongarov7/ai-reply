@@ -69,4 +69,17 @@ class PersonaRowLayoutTest {
     fun `no personas, no chips`() {
         assertEquals(emptyList<Float>(), PersonaRowLayout.chipWidths(emptyList(), 300f))
     }
+
+    @Test
+    fun `the mic mirrors create at the trailing edge and the chips keep the space between`() {
+        assertEquals(listOf(Slot.CREATE, Slot.CHIPS, Slot.MIC), PersonaRowLayout.order(hasMic = true))
+        assertEquals(listOf(Slot.CREATE, Slot.CHIPS), PersonaRowLayout.order(hasMic = false))
+        assertEquals(PersonaRowLayout.CREATE_SIZE, PersonaRowLayout.MIC_SIZE)
+        for (width in listOf(320f, 360f, 411f, 600f)) {
+            val withMic = PersonaRowLayout.chipsWidth(width, hasMic = true)
+            val end = PersonaRowLayout.CHIPS_START + withMic + PersonaRowLayout.SLOT_GAP + PersonaRowLayout.MIC_SIZE
+            assertEquals("w=$width", width - PersonaRowLayout.SIDE_PADDING, end, 0.001f)
+            assertEquals(PersonaRowLayout.chipsWidth(width) - PersonaRowLayout.SLOT_GAP - PersonaRowLayout.MIC_SIZE, withMic, 0.001f)
+        }
+    }
 }

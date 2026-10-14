@@ -104,4 +104,24 @@ class DictationInsertionTest {
         // The emoji is one character (two UTF-16 units): "😊 да" is 4 of 4.
         assertEquals("😊 да|" to Result.INSERTED, dictate("😊", "да", limit = 4))
     }
+
+    // ------------------------------------------------------- the app's field
+
+    @Test
+    fun `the app's field gets the same spacing and capitals, as one commit`() {
+        fun place(before: String, heard: String, after: String = "") = DictationInsertion.place(before, after, heard)
+        assertEquals(DictationInsertion.Placement("Сәлем, қалайсың?", 16), place("", "сәлем, қалайсың?"))
+        assertEquals(DictationInsertion.Placement(" ертең келемін", 14), place("Сәлем,", "ертең келемін"))
+        assertEquals(DictationInsertion.Placement("Буду в 9", 8), place("Привет. ", "буду в 9"))
+        assertEquals(DictationInsertion.Placement("I'm late ", 8), place("", "I'm late", after = "sorry"))
+        assertEquals(null, place("Hi ", "   "))
+    }
+
+    @Test
+    fun `without a limit nothing is cut`() {
+        assertEquals(
+            "Ответь коротко: да конечно приду завтра|" to Result.INSERTED,
+            dictate("Ответь коротко:", "да конечно приду завтра", limit = null)
+        )
+    }
 }

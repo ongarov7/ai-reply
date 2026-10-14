@@ -1,13 +1,15 @@
 package kz.yerek.aireply
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kz.yerek.aireply.ai.AIConfiguration
+import kz.yerek.aireply.ai.AIReplyError
+import kz.yerek.aireply.ai.AIReplyException
 import kz.yerek.aireply.ai.AIReplyService
 import kz.yerek.aireply.ai.ComposeService
 import kz.yerek.aireply.ai.ComposeTransport
@@ -22,56 +24,134 @@ import kz.yerek.aireply.keyboard.reply.ComposeSessionController
 import kz.yerek.aireply.keyboard.reply.KeyboardPanels
 import kz.yerek.aireply.keyboard.reply.ReplySessionController
 import kz.yerek.aireply.keyboard.voice.DictationController
+import kz.yerek.aireply.keyboard.voice.DictationEvent
+import kz.yerek.aireply.keyboard.voice.HostDictation
 import kz.yerek.aireply.keyboard.voice.MicAccess
-import kz.yerek.aireply.keyboard.voice.VoiceAnnouncement
 import kz.yerek.aireply.voice.MicPermission
-import kz.yerek.aireply.voice.SpeechRecognitionClient
-import kz.yerek.aireply.voice.VoiceFailure
-import kz.yerek.aireply.voice.VoiceState
+import kz.yerek.aireply.voice.RecordedAudio
+import kz.yerek.aireply.voice.RecorderFailure
+import kz.yerek.aireply.voice.TranscriptionRequest
+import kz.yerek.aireply.voice.VoiceRecorder
+import kz.yerek.aireply.voice.VoiceTranscriber
+import java.io.File
+import kotlin.math.min
 
 /**
- * A recogniser the test speaks for: it records what the keyboard asked of it,
- * and moves through the states the platform one does when told to.
+ * A microphone the test speaks for. It keeps the real recorder's promises:
+ * time is the audio captured, nothing is captured while paused, and capture
+ * stops by itself - for good - at the limit.
  */
-class FakeSpeechClient : SpeechRecognitionClient {
-    private val flow = MutableStateFlow<VoiceState>(VoiceState.Idle)
-    override val state: StateFlow<VoiceState> = flow
+class FakeRecorder : VoiceRecorder {
+    private var listener: VoiceRecorder.Listener? = null
+    private var maxMs = 0L
+    private var captured = 0L
 
-    val languages = mutableListOf<String>()
-    var stops = 0
-    var cancels = 0
-    var releases = 0
+    /** The microphone is open. */
+    var running = false
+        private set
 
-    override fun start(languageTag: String) {
-        if (flow.value.isActive) return
-        languages += languageTag
-        flow.value = VoiceState.Starting
+    var starts = 0
+    var pauses = 0
+    var resumes = 0
+    var finishes = 0
+    var discards = 0
+    var startFailure: RecorderFailure? = null
+    var resumeFailure: RecorderFailure? = null
+    /** Holds finish() until completed: encoding in progress. */
+    var encoding: CompletableDeferred<Unit>? = null
+
+    override val capturedMs: Long get() = captured
+
+    override fun start(maxMs: Long, listener: VoiceRecorder.Listener): RecorderFailure? {
+        starts++
+        startFailure?.let { return it }
+        this.maxMs = maxMs
+        this.listener = listener
+        running = true
+        return null
     }
 
-    override fun stop() {
-        stops++
-        if (flow.value.isActive) flow.value = VoiceState.Processing
+    /** The first audio arrives. */
+    fun capturing() {
+        check(running) { "the microphone is closed" }
+        listener!!.onCapturing()
     }
 
-    override fun cancel() {
-        cancels++
-        flow.value = VoiceState.Idle
+    /** [ms] more of audio - all of it, or up to the limit, where capture stops by itself. Nothing while closed. */
+    fun record(ms: Long, level: Float = 0.5f) {
+        if (!running) return
+        captured += min(ms, maxMs - captured)
+        listener!!.onProgress(captured, level)
+        if (captured >= maxMs) {
+            running = false
+            listener!!.onLimitReached()
+        }
     }
 
-    override fun reset() {
-        if (flow.value is VoiceState.Done || flow.value is VoiceState.Failed) flow.value = VoiceState.Idle
+    /** The microphone stops under the recording: a call, a revoked permission. */
+    fun fails(reason: RecorderFailure) {
+        running = false
+        listener!!.onFailure(reason)
     }
 
-    override fun release() {
-        releases++
-        flow.value = VoiceState.Idle
+    override fun pause() {
+        pauses++
+        running = false
     }
 
-    // What the platform recogniser would report.
-    fun ready() { flow.value = VoiceState.Listening() }
-    fun hears(partial: String) { flow.value = VoiceState.Listening(partial) }
-    fun finalResult(text: String) { flow.value = VoiceState.Done(text) }
-    fun fails(reason: VoiceFailure) { flow.value = VoiceState.Failed(reason, languages.lastOrNull()) }
+    override fun resume(): RecorderFailure? {
+        resumes++
+        resumeFailure?.let { return it }
+        running = captured < maxMs
+        return null
+    }
+
+    override suspend fun finish(): RecordedAudio? {
+        finishes++
+        running = false
+        encoding?.await()
+        return if (captured < DictationController.MIN_RECORDING_MS) null else RecordedAudio(File("voice-test.m4a"), "audio/mp4", captured)
+    }
+
+    override fun discard() {
+        discards++
+        running = false
+    }
+}
+
+/** The server's transcription, answered by the test. Every request is kept. */
+class FakeTranscriber : VoiceTranscriber {
+    override var isOffered = true
+    var problem: AIReplyError? = null
+    val requests = mutableListOf<TranscriptionRequest>()
+    var cancelled = 0
+    private var pending: CompletableDeferred<String>? = null
+
+    override fun readiness(): AIReplyError? = problem
+
+    override suspend fun transcribe(request: TranscriptionRequest): String {
+        requests += request
+        val answer = CompletableDeferred<String>()
+        pending = answer
+        try {
+            return answer.await()
+        } catch (cancellation: CancellationException) {
+            cancelled++
+            // The request is gone: an answer can no longer arrive.
+            answer.cancel()
+            throw cancellation
+        }
+    }
+
+    val isWaiting: Boolean get() = pending?.isActive == true
+
+    fun answers(text: String) {
+        checkNotNull(pending) { "nothing was sent" }.complete(text)
+    }
+
+    fun fails(error: AIReplyError) {
+        checkNotNull(pending) { "nothing was sent" }.completeExceptionally(AIReplyException(error))
+    }
 }
 
 /** The microphone permission, answered by the test. */
@@ -100,10 +180,20 @@ class FakeMic(var granted: Boolean = true) : MicAccess {
     }
 }
 
+/** The app's text field: the words it was given, and whether the keyboard is over it. */
+class FakeHostField(var live: Boolean = true) : HostDictation {
+    val inserted = mutableListOf<String>()
+    override val isLive: Boolean get() = live
+    override fun insert(text: String): Boolean {
+        inserted += text
+        return true
+    }
+}
+
 /**
- * Both AI panels, the microphone and the services behind them, the way the
- * keyboard service wires them - with fakes where the platform would be.
- * Every request that would reach the network is counted.
+ * Both AI panels, voice input and the services behind them, the way the
+ * keyboard service wires them - with fakes where the platform and the server
+ * would be. Every request that would reach the network is counted.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class PanelsHarness(instructionLimit: Int = 400) {
@@ -141,27 +231,39 @@ class PanelsHarness(instructionLimit: Int = 400) {
         uiLanguage = AppLanguage.RUSSIAN
     }
 
-    val clients = mutableListOf<FakeSpeechClient>()
+    val recorders = mutableListOf<FakeRecorder>()
+    /** The next microphone refuses to open, with this reason. */
+    var nextStartFailure: RecorderFailure? = null
+    val transcriber = FakeTranscriber()
     val mic = FakeMic()
     var now = 10_000L
     var layout = KeyboardLanguage.RUSSIAN
-    val announcements = mutableListOf<VoiceAnnouncement>()
-    val inserted = mutableListOf<String>()
+    var layouts: List<KeyboardLanguage> = KeyboardLanguage.CYCLE_ORDER
+    val events = mutableListOf<DictationEvent>()
+    val changed = mutableListOf<String>()
+    private var ids = 0
 
     val dictation = DictationController(
         scope = scope,
-        newClient = { FakeSpeechClient().also { clients += it } },
+        newRecorder = { FakeRecorder().also { it.startFailure = nextStartFailure; recorders += it } },
+        transcriber = transcriber,
         mic = mic,
-        clock = { now }
+        clock = { now },
+        newRequestId = { "request-${++ids}" }
     ).apply {
-        onAnnounce = { announcements += it }
-        onInserted = { field -> inserted += field.text }
+        onEvent = { events += it }
+        onInstructionChanged = { field -> changed += field.text }
     }
 
-    val panels = KeyboardPanels(replies, compose, dictation, layout = { layout }, instructionLimit = { instructionLimit })
+    val panels = KeyboardPanels(
+        replies, compose, dictation,
+        layout = { layout },
+        instructionLimit = { instructionLimit },
+        layouts = { layouts }
+    )
 
-    /** The recogniser in use. */
-    val client: FakeSpeechClient get() = clients.last()
+    /** The microphone of the recording in progress. */
+    val recorder: FakeRecorder get() = recorders.last()
 
     val friend get() = ReplyConfiguration.INITIAL.visibleTemplates.first { it.id == "friend" }
 
@@ -171,6 +273,13 @@ class PanelsHarness(instructionLimit: Int = 400) {
     }
 
     fun settle() = scope.runCurrent()
+
+    /** Lets [ms] of the test's time pass - delays included - and the clock with it. */
+    fun passes(ms: Long) {
+        now += ms
+        scope.advanceTimeBy(ms)
+        scope.runCurrent()
+    }
 
     /** Create open, with [text] typed in the request. */
     fun openCreate(text: String = "") {
@@ -184,20 +293,20 @@ class PanelsHarness(instructionLimit: Int = 400) {
         replies.session!!.instruction.set(text)
     }
 
-    /** Mic tapped, the recogniser ready and hearing [partial]. */
-    fun startListening(partial: String = "") {
+    /** Mic tapped in the panel on screen, the microphone open and [ms] recorded. */
+    fun startRecording(ms: Long = 2_000L) {
         panels.microphoneTapped()
         settle()
-        client.ready()
-        if (partial.isNotEmpty()) client.hears(partial)
+        recorder.capturing()
+        recorder.record(ms)
         settle()
     }
 
-    /** Mic tapped again and the recogniser delivering [text]. */
-    fun stopWith(text: String) {
-        panels.microphoneTapped()
+    /** Done, and the server hearing [text]. */
+    fun finishWith(text: String) {
+        dictation.finish()
         settle()
-        client.finalResult(text)
+        transcriber.answers(text)
         settle()
     }
 }

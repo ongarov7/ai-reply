@@ -38,7 +38,6 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -73,16 +72,13 @@ import kz.yerek.aireply.R
 import kz.yerek.aireply.ai.AIReplyService
 import kz.yerek.aireply.ai.AIReportDraft
 import kz.yerek.aireply.ai.AppStrings
+import kz.yerek.aireply.core.text.codePointLength
 import kz.yerek.aireply.domain.model.TemplateSummary
 import kz.yerek.aireply.keyboard.KeyboardTheme
 import kz.yerek.aireply.keyboard.autocorrect.Suggestion
 import kz.yerek.aireply.keyboard.layout.PersonaRowLayout
 import kz.yerek.aireply.keyboard.reply.ReplyComposerFlow
 import kz.yerek.aireply.keyboard.reply.ReplySession
-import kz.yerek.aireply.keyboard.voice.DictationNotice
-import kz.yerek.aireply.keyboard.voice.VoiceMessage
-import kz.yerek.aireply.keyboard.voice.VoiceStatusText
-import kz.yerek.aireply.voice.VoiceState
 
 /** Which of the composer's fields the keys are editing. */
 enum class PanelFocus { SOURCE, INSTRUCTION, DRAFT }
@@ -97,15 +93,16 @@ class ComposerModel(
     val focus: PanelFocus,
     val sourceExpanded: Boolean,
     val sourceLimit: Int,
-    val voice: VoiceState,
+    /** The instruction's character limit, from the server. */
+    val instructionLimit: Int,
+    /** Voice input for the instruction: idle, its controls, or what came of it. */
+    val voice: VoiceUi,
     val intents: List<QuickIntent>,
     /** The tallest the reply field may be, from the screen the keyboard is on. */
     val maxFieldLines: Int,
     /** Suggestions and the polish chip, shown in the intents' place. */
     val assist: TypingAssist = TypingAssist.NONE,
-    /** The last dictation reached the instruction's limit. */
-    val voiceNotice: DictationNotice? = null,
-    /** Lines of the dictation status: fewer on a phone on its side. */
+    /** Lines of the voice line: fewer on a phone on its side. */
     val voiceLines: Int = 2,
     /** The server takes reports and a reply the model wrote is on screen: the flag shows. */
     val canReport: Boolean = false,
@@ -134,9 +131,12 @@ class ComposerActions(
     val onPreviousVersion: () -> Unit,
     val onNextVersion: () -> Unit,
     val onConflict: (ReplyComposerFlow.ConflictChoice) -> Unit,
+    /** The microphone: dictate the instruction. */
     val onMic: () -> Unit,
     val assist: TypingAssistActions,
-    val report: ReportActions = ReportActions.NONE
+    val report: ReportActions = ReportActions.NONE,
+    /** Pause, Resume, Done, Cancel, Try again and Undo of a recording. */
+    val voice: VoiceActions = VoiceActions.NONE
 )
 
 // ----------------------------------------------------------------- persona row
@@ -154,6 +154,10 @@ class ComposerActions(
  * While a word is being typed and there is something to suggest, the word
  * suggestions take exactly the personas' place - "✨" stays where it is and
  * stays tappable, and the row keeps its height.
+ *
+ * 🎙 (voice input into the app's field) mirrors "✨" at the trailing edge,
+ * where it is offered: never in a password field, never where the app asked
+ * for no microphone.
  */
 @Composable
 fun PersonaRow(
@@ -167,7 +171,9 @@ fun PersonaRow(
     onCreate: () -> Unit,
     modifier: Modifier = Modifier,
     suggestions: List<Suggestion> = emptyList(),
-    onPick: (Suggestion) -> Unit = {}
+    onPick: (Suggestion) -> Unit = {},
+    /** 🎙 at the trailing edge: voice input into the app's field; null where it is not offered. */
+    onMic: (() -> Unit)? = null
 ) {
     Box(
         modifier = modifier
@@ -193,9 +199,10 @@ fun PersonaRow(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            PersonaRowLayout.order.forEachIndexed { index, slot ->
+            PersonaRowLayout.order(hasMic = onMic != null).forEachIndexed { index, slot ->
                 if (index > 0) Spacer(Modifier.width(PersonaRowLayout.SLOT_GAP.dp))
                 when (slot) {
+                    PersonaRowLayout.Slot.MIC -> if (onMic != null) HostMicButton(strings, theme, onMic)
                     // A plain disc; only the glyph carries the accent.
                     PersonaRowLayout.Slot.CREATE -> CircleIcon(
                         icon = Icons.Filled.AutoAwesome,
@@ -417,8 +424,16 @@ fun ComposerPanel(
             )
         }
 
-        if (composingLike && !flow.isConflict) {
-            VoiceStatusLine(model.voice, model.voiceNotice, strings, theme, lines = model.voiceLines)
+        if (composingLike && !flow.isConflict && voiceLineShows(model.voice, session.instruction.text, model.instructionLimit)) {
+            VoiceLine(
+                voice = model.voice,
+                instruction = session.instruction.text,
+                limit = model.instructionLimit,
+                actions = actions.voice,
+                strings = strings,
+                theme = theme,
+                lines = model.voiceLines
+            )
         }
 
         when {
@@ -436,6 +451,9 @@ fun ComposerPanel(
                 onNextVersion = actions.onNextVersion,
                 onInsert = actions.onInsert
             )
+            // A recording's controls take the row: Reply waits for the words.
+            model.voice.showsControls && stage == ReplyComposerFlow.Stage.Composing ->
+                PanelVoiceControls(model.voice, actions.voice, strings, theme)
             else -> ComposingRow(model, actions, strings, theme, errorMessage != null)
         }
     }
@@ -642,8 +660,9 @@ private fun ComposingRow(
     val generating = flow.isGenerating
     val hasSource = model.session.source.text.isNotBlank()
     val overLimit = AIReplyService.characterCount(model.session.source.text) > model.sourceLimit
-    // While the microphone is on, Reply waits for the words being spoken.
-    val canGenerate = !generating && hasSource && !overLimit && !model.voice.isActive
+    // An instruction past its limit (dictated words are never cut) waits to be shortened.
+    val instructionOver = model.session.instruction.text.codePointLength() > model.instructionLimit
+    val canGenerate = !generating && hasSource && !overLimit && !instructionOver && !model.voice.showsControls
 
     Row(
         modifier = Modifier.fillMaxWidth().height(ROW_HEIGHT),
@@ -660,7 +679,7 @@ private fun ComposingRow(
             onIntent = actions.onIntent,
             modifier = Modifier.weight(1f)
         )
-        MicButton(model.voice, strings, theme, enabled = !generating, onClick = actions.onMic)
+        if (model.voice.offered) MicButton(strings, theme, enabled = !generating, onClick = actions.onMic)
         ActionPill(
             label = when {
                 generating -> strings[R.string.kb_stop]
@@ -956,81 +975,25 @@ internal fun CircleIcon(
 }
 
 /**
- * The microphone, the same in the reply composer and in Create: a mic to start,
- * an accent Stop while listening, a spinner while the words are recognised.
+ * The microphone, the same in the reply composer and in Create: records the
+ * instruction. While it records, the row turns into the recording's controls.
  */
 @Composable
 internal fun MicButton(
-    voice: VoiceState,
     strings: AppStrings,
     theme: KeyboardTheme,
     enabled: Boolean,
     onClick: () -> Unit
 ) {
-    val listening = voice is VoiceState.Listening || voice is VoiceState.Starting
     CircleIcon(
-        icon = if (listening) Icons.Filled.Stop else Icons.Filled.Mic,
-        description = when {
-            listening -> strings[R.string.voice_kb_stop]
-            voice is VoiceState.Processing -> strings[R.string.voice_kb_processing]
-            else -> strings[R.string.voice_kb_start]
-        },
+        icon = Icons.Filled.Mic,
+        description = strings[R.string.voice_kb_start],
         theme = theme,
         size = 32.dp,
         iconSize = 18.dp,
-        selected = listening,
-        busy = voice is VoiceState.Processing,
         enabled = enabled,
         onClick = onClick
     )
-}
-
-/**
- * One line under the instruction while the microphone is doing anything, or
- * has something to say: the user must never be unsure whether they are being
- * recorded. While listening it shows the words as they are recognised - the
- * newest ones, if they no longer fit.
- *
- * Its height is fixed at [lines] lines whenever it shows, so recognised words
- * arriving never move the panel; the screen reader hears the state from the
- * service's announcements, never the running transcript.
- */
-@Composable
-internal fun VoiceStatusLine(
-    voice: VoiceState,
-    notice: DictationNotice?,
-    strings: AppStrings,
-    theme: KeyboardTheme,
-    modifier: Modifier = Modifier,
-    lines: Int = 2
-) {
-    val message = VoiceStatusText.message(voice, notice) ?: return
-    val partial = (voice as? VoiceState.Listening)?.partial?.trim().orEmpty()
-    val style = TextStyle(fontSize = 11.5.sp, lineHeight = VOICE_LINE_SP.sp)
-    val measurer = rememberTextMeasurer()
-    BoxWithConstraints(
-        modifier = modifier.fillMaxWidth().height(voiceLineHeight(lines)),
-        contentAlignment = Alignment.CenterStart
-    ) {
-        val width = constraints.maxWidth
-        val text = if (partial.isEmpty()) {
-            strings.text(message)
-        } else {
-            remember(partial, width, lines) {
-                VoiceStatusText.tail(partial) { candidate ->
-                    measurer.measure(candidate, style, constraints = Constraints(maxWidth = width)).lineCount <= lines
-                }
-            }
-        }
-        Text(
-            text = text,
-            style = style,
-            color = if (voice is VoiceState.Listening) theme.primaryText else theme.secondaryText,
-            maxLines = lines,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.fillMaxWidth()
-        )
-    }
 }
 
 /**
@@ -1040,9 +1003,6 @@ internal fun VoiceStatusLine(
 @Composable
 internal fun voiceLineHeight(lines: Int): Dp =
     with(LocalDensity.current) { (lines * VOICE_LINE_SP).sp.toDp() } + VOICE_LINE_HEADROOM
-
-internal fun AppStrings.text(message: VoiceMessage): String =
-    message.argument?.let { get(message.id, it) } ?: get(message.id)
 
 val PERSONA_ROW_HEIGHT = PersonaRowLayout.HEIGHT.dp
 internal val ROW_HEIGHT = 34.dp

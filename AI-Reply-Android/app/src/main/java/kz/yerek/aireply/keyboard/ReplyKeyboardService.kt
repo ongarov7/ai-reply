@@ -97,14 +97,24 @@ import kz.yerek.aireply.keyboard.ui.ReportActions
 import kz.yerek.aireply.keyboard.ui.TypingAssist
 import kz.yerek.aireply.keyboard.ui.TypingAssistActions
 import kz.yerek.aireply.keyboard.ui.text
+import kz.yerek.aireply.keyboard.ui.HostVoiceBar
+import kz.yerek.aireply.keyboard.ui.VoiceActions
+import kz.yerek.aireply.keyboard.ui.VoiceMeter
+import kz.yerek.aireply.keyboard.ui.VoiceUi
 import kz.yerek.aireply.keyboard.voice.DictationController
+import kz.yerek.aireply.keyboard.voice.DictationEvent
+import kz.yerek.aireply.keyboard.voice.DictationInsertion
+import kz.yerek.aireply.keyboard.voice.DictationTarget
+import kz.yerek.aireply.keyboard.voice.HostDictation
 import kz.yerek.aireply.keyboard.voice.MicAccess
-import kz.yerek.aireply.keyboard.voice.VoiceAnnouncement
 import kz.yerek.aireply.keyboard.voice.VoiceStatusText
 import kz.yerek.aireply.platform.ReplyLog
 import kz.yerek.aireply.ui.design.AIReplyTheme
-import kz.yerek.aireply.voice.AndroidSpeechRecognitionClient
+import kz.yerek.aireply.voice.AudioRecordVoiceRecorder
 import kz.yerek.aireply.voice.MicPermission
+import kz.yerek.aireply.voice.RecognitionLanguage
+import kz.yerek.aireply.voice.VoiceFiles
+import java.io.File
 import java.util.concurrent.Executors
 
 /**
@@ -127,10 +137,11 @@ import java.util.concurrent.Executors
  *    words typed into other apps never leave it.
  *  * The clipboard is read only on an explicit tap (a persona, Paste, or
  *    Reply to copied in Create).
- *  * Dictation fills a field and nothing else: the recogniser listens in the
- *    language of the layout on screen, the words land at the caret, and Write
- *    or Reply still has to be tapped. The microphone is released whenever the
- *    keyboard goes away.
+ *  * Voice input fills a field and nothing else. It records only while its
+ *    controls are on screen, 40 seconds at most; Done sends the finished
+ *    recording through the AI Reply server to OpenAI `gpt-transcribe`, the
+ *    words land at the caret, and Write or Reply still has to be tapped. The
+ *    microphone closes whenever the keyboard goes away.
  *  * The user's words are never lost: an edited reply survives Regenerate,
  *    a failure keeps the instruction, and Insert puts exactly the text on
  *    screen into the field - after asking, if the field has text already.
@@ -183,6 +194,12 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
     private var fieldKind by mutableStateOf(FieldKind.TEXT)
     /** `features.ai_reports`, as the app or the last refresh stored it. */
     private var reportsEnabled by mutableStateOf(false)
+    /** The server transcribes speech (`features.voice_transcription`), or a DEBUG mock stands in. */
+    private var voiceOffered by mutableStateOf(false)
+    /** The app's field takes voice input: plain text, not a password, no "no microphone" from the app. */
+    private var hostTakesVoice by mutableStateOf(false)
+    /** Between onStartInputView and onFinishInputView. */
+    private var keyboardVisible = false
 
     private var hostCapitalization = Capitalization.SENTENCES
     private var smartCorrection = true
@@ -207,14 +224,17 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         compose.onAsyncChange = { refreshAutoShift() }
         dictation = DictationController(
             scope = scope,
-            newClient = { AndroidSpeechRecognitionClient(this) },
+            newRecorder = { AudioRecordVoiceRecorder(this, voiceDirectory) },
+            transcriber = services.voiceTranscriber,
             mic = microphone,
-            clock = SystemClock::uptimeMillis
+            clock = SystemClock::elapsedRealtime
         ).apply {
-            onInserted = ::dictationInserted
-            onAnnounce = ::announce
+            onInstructionChanged = ::dictationInserted
+            onEvent = ::voiceEvent
         }
-        panels = KeyboardPanels(replies, compose, dictation, layout = { language })
+        panels = KeyboardPanels(replies, compose, dictation, layout = { language }, layouts = { enabledLanguages })
+        // Recordings a keyboard killed mid-way left behind.
+        scope.launch(Dispatchers.IO) { VoiceFiles.sweep(voiceDirectory) }
         reports = AIReportController(scope, services.aiReportSender, BuildConfig.VERSION_NAME)
         orientation = resources.configuration.orientation
         surface = KeySurfaceController(this)
@@ -292,7 +312,9 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
             shift.reset()
         }
         // A recent panel returns; in a password field, none does. A recording
-        // the microphone dialog interrupted may start now.
+        // the microphone dialog interrupted may start now; one for a field
+        // that is no longer this one is dropped.
+        keyboardVisible = true
         panels.keyboardShown(SystemClock.uptimeMillis(), isSecureField)
         refreshAutoShift()
         viewHost.onShown()
@@ -308,20 +330,18 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         // An unfinished reply or Create is kept in memory for a few minutes,
         // so a trip to another chat does not cost the instruction. A running
         // request is stopped: no spinner survives the keyboard going away.
-        // The microphone is released rather than held across every app.
+        // A recording pauses: the microphone is never open without the keyboard.
+        keyboardVisible = false
         panels.keyboardHidden(SystemClock.uptimeMillis())
         // A report half written is dropped; one already sent still arrives.
         reports.close()
     }
 
-    /**
-     * Turning the phone ends a recording the way Stop does: the words heard so
-     * far land in the field, and the microphone closes.
-     */
+    /** Turning the phone pauses a recording: the audio and the time left are kept. */
     override fun onConfigurationChanged(newConfig: Configuration) {
         if (newConfig.orientation != orientation) {
             orientation = newConfig.orientation
-            dictation.stop()
+            dictation.pause()
         }
         super.onConfigurationChanged(newConfig)
     }
@@ -359,7 +379,6 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
     }
 
     override fun onDestroy() {
-        dictation.cancel()
         dictation.release()
         polish.dismiss()
         autocorrect.clear()
@@ -409,6 +428,9 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         }
 
         val strings = remember(uiLanguage) { services.strings(uiLanguage) }
+        val voice = voiceUi()
+        // A recording of the app's field belongs to the persona row's bar, not to a panel.
+        val panelVoice = if (dictation.target is DictationTarget.Host) VoiceUi.IDLE else voice
         val intents = remember(uiLanguage) { quickIntents(strings) }
         val createIntents = remember(uiLanguage) { composeIntents(strings) }
         val flow = activeFlow
@@ -458,8 +480,8 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
                                     ),
                                     maxFieldLines = if (screenHeight >= 700f) 7 else 4,
                                     assist = typingAssist(created.instruction),
-                                    voice = dictation.state,
-                                    voiceNotice = dictation.notice,
+                                    instructionLimit = AILimits.current.instructionCharacters,
+                                    voice = panelVoice,
                                     voiceLines = voiceLines,
                                     compact = PanelFit.compactCreate(sizing.isLandscape),
                                     canReport = reportsEnabled && created.flow.reportableText != null,
@@ -481,11 +503,11 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
                                 focus = focus,
                                 sourceExpanded = sourceExpanded,
                                 sourceLimit = AILimits.current.sourceCharacters,
-                                voice = dictation.state,
+                                instructionLimit = AILimits.current.instructionCharacters,
+                                voice = panelVoice,
                                 intents = intents,
                                 maxFieldLines = if (screenHeight >= 700f) 5 else 3,
                                 assist = typingAssist(session.instruction),
-                                voiceNotice = dictation.notice,
                                 voiceLines = voiceLines,
                                 canReport = reportsEnabled && session.flow.reportableText != null,
                                 report = reports.draft?.takeIf {
@@ -498,6 +520,9 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
                             theme = theme,
                             modifier = Modifier
                         )
+                    } else if (dictation.showsHostBar) {
+                        // Voice input for the app's field, at the row's height.
+                        HostVoiceBar(voice, voiceActions, strings, theme)
                     } else {
                         PersonaRow(
                             chips = chips,
@@ -513,7 +538,8 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
                             } else {
                                 emptyList()
                             },
-                            onPick = ::pickSuggestion
+                            onPick = ::pickSuggestion,
+                            onMic = if (voiceOffered && hostTakesVoice && !isSecureField) ::startHostDictation else null
                         )
                     }
                 }
@@ -573,9 +599,10 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
             onPreviousVersion = replies::showPreviousVersion,
             onNextVersion = replies::showNextVersion,
             onConflict = ::resolveConflict,
-            onMic = panels::microphoneTapped,
+            onMic = ::startPanelDictation,
             assist = assistActions,
-            report = reportActions
+            report = reportActions,
+            voice = voiceActions
         )
     }
 
@@ -617,9 +644,29 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
             onNextVersion = compose::showNextVersion,
             onConflict = ::resolveConflict,
             assist = assistActions,
-            onMic = panels::microphoneTapped,
+            onMic = ::startPanelDictation,
             onReplyToCopied = ::replyToCopied,
-            report = reportActions
+            report = reportActions,
+            voice = voiceActions
+        )
+    }
+
+    /** Pause, Resume, Done, Cancel, Try again, Insert and Undo - for the app's field and the panels alike. */
+    private val voiceActions by lazy {
+        VoiceActions(
+            onPause = dictation::pause,
+            onResume = dictation::resume,
+            onFinish = dictation::finish,
+            onCancel = {
+                dictation.cancel()
+                refreshAutoShift()
+            },
+            onRetry = dictation::retry,
+            onInsert = {
+                dictation.insertReviewed()
+                refreshAutoShift()
+            },
+            onUndo = dictation::undo
         )
     }
 
@@ -739,6 +786,11 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
     }
 
     override fun onKeyCommit(key: KeyboardKey) {
+        // Typing takes over from a recording: it pauses, so the keys are not recorded.
+        when (key) {
+            is KeyboardKey.Character, KeyboardKey.Backspace, KeyboardKey.Space, KeyboardKey.Return -> dictation.keyPressed()
+            else -> Unit
+        }
         when (key) {
             is KeyboardKey.Character -> typeCharacter(key.value)
             KeyboardKey.Shift -> {
@@ -759,6 +811,7 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
     }
 
     override fun onTextCommit(text: String) {
+        dictation.keyPressed()
         prepareComposerForTyping()
         insert(text)
         shift.characterTyped()
@@ -766,6 +819,7 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
     }
 
     override fun onDelete(word: Boolean) {
+        dictation.keyPressed()
         prepareComposerForTyping()
         when (target) {
             Target.HOST -> when {
@@ -796,6 +850,7 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
     }
 
     override fun onMoveCursor(offset: Int) {
+        dictation.keyPressed()
         when (target) {
             Target.HOST -> {
                 autocorrect.endWord()
@@ -979,6 +1034,9 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
             variation == InputType.TYPE_TEXT_VARIATION_URI -> FieldKind.URL
             else -> FieldKind.TEXT
         }
+        // Voice into a plain text field only - never a password, an address or
+        // a number, and never where the app asked keyboards for no microphone.
+        hostTakesVoice = textClass && !isSecureField && fieldKind == FieldKind.TEXT && !refusesMicrophone(info)
         hostCapitalization = when {
             !textClass || isSecureField || fieldKind != FieldKind.TEXT -> Capitalization.NONE
             type and InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS != 0 -> Capitalization.CHARACTERS
@@ -1231,33 +1289,125 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         override fun openSettings() = KeyboardStatus.openAppSettings(this@ReplyKeyboardService)
     }
 
-    /** Dictated words landed in [field]: the strip and any polish offer were about the old text. */
+    /** Dictated words landed in [field], or Undo took them out: the strip and any polish offer were about the old text. */
     private fun dictationInserted(field: KeyboardTextFieldState) {
         autocorrect.clear()
         polish.dismiss()
-        // Not "by the user" for the polish: dictation sends nothing anywhere.
+        // Not "by the user" for the polish: voice input sends nothing anywhere.
         fieldEdited(field, byUser = false)
         if (field === replies.session?.instruction) focus = PanelFocus.INSTRUCTION
         refreshAutoShift()
     }
 
+    /** The mic in either panel: records the instruction. The strip and a polish offer step aside. */
+    private fun startPanelDictation() {
+        leaveFields()
+        panels.microphoneTapped()
+        refreshAutoShift()
+    }
+
+    /** 🎙 on the persona row: records for the app's field, which gets the words at its caret. */
+    private fun startHostDictation() {
+        val info = hostField.editorInfo ?: return
+        if (isSecureField || !hostTakesVoice || isComposing) return
+        // The word being typed stays exactly as typed; the words go in after it.
+        autocorrect.endWord()
+        polish.dismiss()
+        dictation.start(
+            DictationTarget.Host(HostVoiceTarget(FieldIdentity.of(info))),
+            RecognitionLanguage.hints(language, enabledLanguages)
+        )
+    }
+
+    /**
+     * The app's field a recording was made for. Words go in only while the
+     * keyboard is on screen over that same field - never into another one.
+     */
+    private inner class HostVoiceTarget(private val identity: FieldIdentity) : HostDictation {
+        override val isLive: Boolean
+            get() = keyboardVisible && !isComposing && currentInputConnection != null &&
+                hostField.editorInfo?.let(FieldIdentity::of) == identity
+
+        override fun insert(text: String): Boolean {
+            if (!isLive) return false
+            autocorrect.endWord()
+            val placement = DictationInsertion.place(
+                before = hostField.textBeforeCursor(AUTOSHIFT_WINDOW),
+                after = hostField.textAfterCursor(1),
+                heard = text
+            ) ?: return false
+            hostField.commitText(placement.text)
+            refreshAutoShift()
+            return true
+        }
+    }
+
+    /** Which field of which app: enough to tell "the same field, shown again" from another one. */
+    private data class FieldIdentity(val packageName: String?, val fieldId: Int, val fieldName: String?, val inputType: Int) {
+        companion object {
+            fun of(info: EditorInfo) = FieldIdentity(info.packageName, info.fieldId, info.fieldName, info.inputType)
+        }
+    }
+
+    /** The app asked keyboards for no voice key (Google's long-standing private option). */
+    private fun refusesMicrophone(info: EditorInfo?): Boolean {
+        val options = info?.privateImeOptions ?: return false
+        return options.split(',', ';', ' ').any { it == "nm" || it.endsWith("noMicrophoneKey") }
+    }
+
+    /** What the voice controls draw; the time and the loudness are read only where they are drawn. */
+    private fun voiceUi(): VoiceUi = VoiceUi(
+        phase = dictation.phase,
+        message = dictation.message,
+        maxMs = dictation.maxRecordingMs,
+        limitReached = dictation.limitReached,
+        canPause = dictation.canPause,
+        canResume = dictation.canResume,
+        canFinish = dictation.canFinish,
+        canUndo = dictation.canUndo,
+        showsControls = dictation.showsControls,
+        meter = voiceMeter,
+        pendingText = dictation.pendingText,
+        offered = voiceOffered
+    )
+
+    private val voiceMeter = object : VoiceMeter {
+        override val capturedMs: Long get() = dictation.capturedMs
+        override val level: Float get() = dictation.level
+    }
+
+    /** A tick at 10 and 5 seconds left and at the limit, and the screen reader's sentence. */
+    private fun voiceEvent(event: DictationEvent) {
+        if (event is DictationEvent.TimeLeft) feedback.onVoiceTimeLeft(inputView, atLimit = event.secondsLeft == 0)
+        announce(event)
+    }
+
     /**
      * Tells a screen reader what the microphone did. Only while one is on, and
-     * never the words being recognised.
+     * never the words recognised.
      */
-    private fun announce(event: VoiceAnnouncement) {
+    private fun announce(event: DictationEvent) {
         val view = inputView ?: return
         val manager = getSystemService(ACCESSIBILITY_SERVICE) as? AccessibilityManager ?: return
         if (!manager.isEnabled) return
         val strings = announcementStrings?.takeIf { it.first == uiLanguage }?.second
             ?: services.strings(uiLanguage).also { announcementStrings = uiLanguage to it }
+        val seconds = VoiceStatusText.seconds(dictation.maxRecordingMs)
         val text = when (event) {
-            VoiceAnnouncement.Listening -> strings[R.string.voice_kb_listening]
-            VoiceAnnouncement.Stopped -> strings[R.string.voice_kb_stopped]
-            is VoiceAnnouncement.Message -> VoiceStatusText.message(event.state, event.notice)?.let { strings.text(it) }
-        } ?: return
+            DictationEvent.Recording ->
+                "${strings[R.string.voice_rec_recording]}. ${strings.get(R.string.voice_rec_limit_full, seconds)}"
+            DictationEvent.Paused -> strings[R.string.voice_rec_paused]
+            DictationEvent.Recognizing -> strings[R.string.voice_rec_recognizing]
+            DictationEvent.Inserted -> strings[R.string.voice_rec_added]
+            DictationEvent.Cancelled -> strings[R.string.voice_kb_stopped]
+            is DictationEvent.TimeLeft ->
+                if (event.secondsLeft == 0) strings[R.string.voice_rec_limit_reached] else strings.get(R.string.voice_rec_left, event.secondsLeft)
+            is DictationEvent.Message -> strings.text(VoiceStatusText.message(event.message))
+        }
         view.announceForAccessibility(text)
     }
+
+    private val voiceDirectory: File get() = File(cacheDir, "voice")
 
     // ----------------------------------------------------------- configuration
 
@@ -1297,6 +1447,7 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
             // New versions stop Reply and Write here until the app has them accepted.
             services.legalConsentStore.rememberConfig(config.legal ?: LegalConfigDto.PRODUCTION)
             reportsEnabled = AILimits.features.aiReports
+            voiceOffered = services.voiceTranscriber.isOffered
         }
     }
 
@@ -1322,6 +1473,7 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         }
         appearance = services.settings.appearance
         reportsEnabled = AILimits.features.aiReports
+        voiceOffered = services.voiceTranscriber.isOffered
         feedback.hapticsEnabled = services.settings.keyboardHaptics
         smartCorrection = services.settings.smartCorrection
         enabledLanguages = services.settings.enabledKeyboardLanguages

@@ -21,6 +21,21 @@ object RecognitionLanguage {
         KeyboardLanguage.ENGLISH -> "en-US"
     }
 
+    /**
+     * The languages a recording is probably in, the most likely first, as
+     * ISO 639-1 hints for transcription: the layout on screen, then the
+     * user's other layouts - the languages they write in. Kazakh speech
+     * mixes in Russian so often that Russian always follows Kazakh.
+     */
+    fun hints(layout: KeyboardLanguage, enabled: Collection<KeyboardLanguage>): List<String> {
+        val ordered = buildList {
+            add(layout)
+            if (layout == KeyboardLanguage.KAZAKH) add(KeyboardLanguage.RUSSIAN)
+            KeyboardLanguage.CYCLE_ORDER.filterTo(this) { it in enabled }
+        }
+        return ordered.map { it.code }.distinct().take(MAX_HINTS)
+    }
+
     /** The layout a tag was made for, to name the language in a message. */
     fun layoutFor(tag: String?): KeyboardLanguage? {
         val language = tag?.let { Locale.forLanguageTag(it).language }?.takeIf { it.isNotEmpty() } ?: return null
@@ -37,4 +52,6 @@ object RecognitionLanguage {
         val offered = Locale.forLanguageTag(available.replace('_', '-')).language
         return wanted.isNotEmpty() && wanted.equals(offered, ignoreCase = true)
     }
+
+    private const val MAX_HINTS = 3
 }
