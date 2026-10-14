@@ -42,7 +42,7 @@ class LegalConsentTest {
         val store = LegalConsentStore(InMemoryPreferences())
         assertEquals(LegalConfigDto.PRODUCTION, store.latestConfig())
         assertEquals("2026-10-08", store.latestConfig().termsVersion)
-        assertEquals("2026-10-08", store.latestConfig().privacyVersion)
+        assertEquals("2026-10-14", store.latestConfig().privacyVersion)
         assertFalse(store.hasAcceptedLatest())
 
         store.accept(LegalConfigDto.PRODUCTION, "kk", "1.0")
