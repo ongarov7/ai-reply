@@ -87,7 +87,8 @@ data class AILimits(
                     instructionPolish = announced?.instructionPolish ?: false,
                     productEvents = announced?.productEvents ?: false,
                     preferredLanguage = announced?.preferredLanguage ?: false,
-                    aiReports = announced?.aiReports ?: false
+                    aiReports = announced?.aiReports ?: false,
+                    voiceTranscription = announced?.voiceTranscription ?: false
                 )
             )
         }
@@ -116,6 +117,7 @@ data class AILimits(
                 ?.putBoolean(KEY_PRODUCT_EVENTS, features.productEvents)
                 ?.putBoolean(KEY_PREFERRED_LANGUAGE, features.preferredLanguage)
                 ?.putBoolean(KEY_AI_REPORTS, features.aiReports)
+                ?.putBoolean(KEY_VOICE_TRANSCRIPTION, features.voiceTranscription)
                 ?.apply()
         }
 
@@ -127,7 +129,8 @@ data class AILimits(
                 instructionPolish = preferences.getBoolean(KEY_INSTRUCTION_POLISH, false),
                 productEvents = preferences.getBoolean(KEY_PRODUCT_EVENTS, false),
                 preferredLanguage = preferences.getBoolean(KEY_PREFERRED_LANGUAGE, false),
-                aiReports = preferences.getBoolean(KEY_AI_REPORTS, false)
+                aiReports = preferences.getBoolean(KEY_AI_REPORTS, false),
+                voiceTranscription = preferences.getBoolean(KEY_VOICE_TRANSCRIPTION, false)
             )
         }
 
@@ -147,5 +150,6 @@ data class AILimits(
         private const val KEY_PRODUCT_EVENTS = "ai.features.productEvents"
         private const val KEY_PREFERRED_LANGUAGE = "ai.features.preferredLanguage"
         private const val KEY_AI_REPORTS = "ai.features.aiReports"
+        private const val KEY_VOICE_TRANSCRIPTION = "ai.features.voiceTranscription"
     }
 }

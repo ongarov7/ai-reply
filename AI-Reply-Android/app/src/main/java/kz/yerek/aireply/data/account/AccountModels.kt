@@ -238,7 +238,9 @@ data class ServerFeaturesDto(
     /** `POST /api/v1/ai/reports`: a user can report a reply or a message the AI wrote. */
     @SerialName("ai_reports") val aiReports: Boolean = false,
     /** `DELETE /api/v1/me` and its POST alias `/api/v1/me/delete`. */
-    @SerialName("account_deletion") val accountDeletion: Boolean = false
+    @SerialName("account_deletion") val accountDeletion: Boolean = false,
+    /** `POST /api/v1/ai/transcribe` exists and is switched on: voice input goes through the server. */
+    @SerialName("voice_transcription") val voiceTranscription: Boolean = false
 )
 
 /** Non-secret server configuration the client is allowed to know. */

@@ -11,12 +11,15 @@ import kz.yerek.aireply.ai.AIReplyService
 import kz.yerek.aireply.ai.AIReportSender
 import kz.yerek.aireply.ai.AccountComposeTransport
 import kz.yerek.aireply.ai.AccountReplyTransport
+import kz.yerek.aireply.ai.AccountTranscriptionTransport
 import kz.yerek.aireply.ai.AppStrings
 import kz.yerek.aireply.ai.ComposeService
 import kz.yerek.aireply.ai.DebugComposeMock
 import kz.yerek.aireply.ai.DebugReplyMock
+import kz.yerek.aireply.ai.DebugTranscribeMock
 import kz.yerek.aireply.ai.ReplyPromptBuilder
 import kz.yerek.aireply.ai.ReplyDraftNormalizer
+import kz.yerek.aireply.ai.VoiceTranscriptionService
 import kz.yerek.aireply.analytics.ProductEventReporter
 import kz.yerek.aireply.analytics.ProductEventsTransport
 import kz.yerek.aireply.core.lang.AppLanguage
@@ -48,6 +51,7 @@ import kz.yerek.aireply.push.PushCoordinator
 import kz.yerek.aireply.push.PushStateStore
 import kz.yerek.aireply.ui.feature.account.AccountController
 import kz.yerek.aireply.ui.navigation.PendingNavigation
+import kz.yerek.aireply.voice.VoiceTranscriber
 import java.util.TimeZone
 
 /**
@@ -313,6 +317,25 @@ class ServiceLocator(context: Context) {
             },
             transportOverride = if (BuildConfig.DEBUG) {
                 { _: ComposeService.Request -> if (settings.debugMockReplies) DebugComposeMock() else null }
+            } else {
+                null
+            }
+        )
+    }
+
+    /**
+     * Voice input: the keyboard records, the server transcribes, the user
+     * reads the words before anything else happens. In DEBUG builds the canned
+     * stand-in under the developer switch that serves canned replies.
+     */
+    val voiceTranscriber: VoiceTranscriber by lazy {
+        VoiceTranscriptionService(
+            configuration = aiConfiguration,
+            accountTransport = { baseUrl ->
+                AccountTranscriptionTransport(baseUrl = baseUrl, session = accountSession)
+            },
+            transportOverride = if (BuildConfig.DEBUG) {
+                { if (settings.debugMockReplies) DebugTranscribeMock() else null }
             } else {
                 null
             }

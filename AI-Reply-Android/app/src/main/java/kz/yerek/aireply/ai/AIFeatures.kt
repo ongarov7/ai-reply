@@ -21,7 +21,9 @@ data class AIFeatures(
     /** `preferred_language` on `/me`: the language of the account's notifications. */
     val preferredLanguage: Boolean = false,
     /** `POST /api/v1/ai/reports`: the Report control under a reply or a written message. */
-    val aiReports: Boolean = false
+    val aiReports: Boolean = false,
+    /** `POST /api/v1/ai/transcribe`: the keyboard's microphone records and the server transcribes. */
+    val voiceTranscription: Boolean = false
 ) {
     companion object {
         val NONE = AIFeatures(replyPreferences = false, senderProfile = false, instructionPolish = false)

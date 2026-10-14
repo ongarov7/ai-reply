@@ -6,6 +6,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import java.io.IOException
+import java.io.OutputStream
 import java.net.ConnectException
 import java.net.HttpURLConnection
 import java.net.NoRouteToHostException
@@ -65,6 +66,12 @@ sealed interface ApiError {
     data class MonthlyLimitReached(val resetsAt: String?) : ApiError
 
     /**
+     * Today's voice input is spent: a daily cap of its own, apart from the
+     * replies' quota. It comes back tomorrow, not in a few seconds.
+     */
+    data object VoiceLimitReached : ApiError
+
+    /**
      * The account has not accepted the current terms and privacy policy (or
      * withdrew its consent): AI requests wait until the app records it again.
      */
@@ -109,7 +116,7 @@ fun ApiError.raise(): Nothing = throw ApiException(this)
  * WHY HttpURLConnection, AGAIN. Same reason as [kz.yerek.aireply.ai.ReplyNetworking]:
  * this package is reachable from the input method, and a networking library
  * there is thousands of classes loaded while the user stares at a blank key
- * strip. Four verbs, one JSON codec, no interceptors.
+ * strip. Four verbs, one JSON codec, one multipart upload, no interceptors.
  *
  * PATCH is deliberately absent: HttpURLConnection refuses it outright, so the
  * profile update goes through the server's POST alias instead of a reflection
@@ -144,19 +151,74 @@ class ApiClient(
         body: String? = null,
         token: String? = null,
         headers: Map<String, String> = emptyMap()
+    ): String = exchange(
+        method = method,
+        path = path,
+        payload = body?.let { text ->
+            Payload(JSON_CONTENT_TYPE) { stream -> stream.write(text.toByteArray(Charsets.UTF_8)) }
+        },
+        token = token,
+        headers = headers,
+        readTimeoutMs = timeoutMs
+    )
+
+    /**
+     * POSTs [form] as `multipart/form-data` and returns the body, or throws
+     * [ApiException]: the same headers, error mapping and cancellation as
+     * [request], and the same token handling, because the caller wraps it in
+     * [AccountSession.authenticated] exactly like a JSON call.
+     *
+     * The length is known before the first byte, so the files stream from
+     * disk in fixed-length mode instead of being buffered whole. A retry after
+     * a token refresh writes the form again from the start.
+     *
+     * [readTimeoutMs] is for this one call (a transcription takes longer than
+     * a JSON answer); connecting keeps the client's own timeout.
+     */
+    suspend fun postMultipart(
+        path: String,
+        form: MultipartBody,
+        token: String? = null,
+        readTimeoutMs: Int = timeoutMs
+    ): String = exchange(
+        method = "POST",
+        path = path,
+        payload = Payload(form.contentType, length = { form.contentLength }, write = form::writeTo),
+        token = token,
+        headers = emptyMap(),
+        readTimeoutMs = readTimeoutMs
+    )
+
+    /** What a request sends: its type, how to write it and, when known up front, its length. */
+    private class Payload(
+        val contentType: String,
+        /** Null: buffered and measured by the platform, as every JSON body is. */
+        val length: (() -> Long)? = null,
+        val write: (OutputStream) -> Unit
+    )
+
+    /** One HTTP exchange; the single place headers, errors and cancellation are handled. */
+    private suspend fun exchange(
+        method: String,
+        path: String,
+        payload: Payload?,
+        token: String?,
+        headers: Map<String, String>,
+        readTimeoutMs: Int
     ): String = withContext(Dispatchers.IO) {
         val url = baseUrl.trimEnd('/') + "/" + path.trimStart('/')
         val connection = try {
             openConnection(URL(url)).apply {
                 requestMethod = method
                 connectTimeout = timeoutMs
-                readTimeout = timeoutMs
+                readTimeout = readTimeoutMs
                 useCaches = false
                 setRequestProperty("Accept", "application/json")
-                if (body != null) setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                if (payload != null) setRequestProperty("Content-Type", payload.contentType)
                 if (token != null) setRequestProperty("Authorization", "Bearer $token")
                 headers.forEach { (name, value) -> setRequestProperty(name, value) }
-                doOutput = body != null
+                doOutput = payload != null
+                payload?.length?.let { length -> setFixedLengthStreamingMode(length()) }
             }
         } catch (throwable: Exception) {
             // A malformed URL or a header value the platform refuses: the
@@ -171,8 +233,8 @@ class ApiClient(
         }
 
         try {
-            if (body != null) {
-                connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+            if (payload != null) {
+                connection.outputStream.use { payload.write(it) }
             }
 
             val status = connection.responseCode
@@ -200,6 +262,8 @@ class ApiClient(
 
     companion object {
         const val DEFAULT_TIMEOUT_MS = 25_000
+
+        private const val JSON_CONTENT_TYPE = "application/json; charset=utf-8"
 
         private val envelopeJson = Json { ignoreUnknownKeys = true }
 
@@ -232,6 +296,7 @@ class ApiClient(
                     resetsAt = details?.resetsAt
                 )
                 "MONTHLY_LIMIT_REACHED" -> return ApiError.MonthlyLimitReached(details?.resetsAt)
+                "VOICE_LIMIT_REACHED" -> return ApiError.VoiceLimitReached
                 "CONSENT_REQUIRED" -> return ApiError.ConsentRequired
                 "SUBSCRIPTION_EXPIRED" -> return ApiError.SubscriptionExpired
                 "PAYMENT_REQUIRED" -> return ApiError.PaymentRequired

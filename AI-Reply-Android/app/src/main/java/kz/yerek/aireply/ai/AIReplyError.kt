@@ -51,6 +51,12 @@ sealed interface AIReplyError {
     data object MonthlyQuotaExhausted : AIReplyError
 
     /**
+     * Today's voice input is spent: a daily cap of its own, apart from the
+     * replies. It comes back tomorrow, so it is not [RateLimited] either.
+     */
+    data object VoiceLimitReached : AIReplyError
+
+    /**
      * The current terms, privacy policy and AI processing are not accepted on
      * this phone, or the server says the account's consent is missing. The
      * app has to be opened to accept them again.
