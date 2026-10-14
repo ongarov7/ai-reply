@@ -1,5 +1,6 @@
 package kz.yerek.aireply.ai
 
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -43,10 +44,15 @@ class AccountTranscriptionTransport(
 
         val client = clientFactory(baseUrl)
         val form = form(request)
+        // One deadline over all of it: a write never times out on its own, and
+        // an uplink that stalls mid-upload would otherwise leave the keyboard
+        // recognising forever. The cancellation closes the connection.
         val payload = try {
-            session.authenticated { token ->
-                client.postMultipart("api/v1/ai/transcribe", form, token, readTimeoutMs)
-            }
+            withTimeoutOrNull(TOTAL_TIMEOUT_MS) {
+                session.authenticated { token ->
+                    client.postMultipart("api/v1/ai/transcribe", form, token, readTimeoutMs)
+                }
+            } ?: AIReplyError.TimedOut.raise()
         } catch (exception: ApiException) {
             throw AIReplyException(map(exception.error))
         }
@@ -69,6 +75,9 @@ class AccountTranscriptionTransport(
     companion object {
         /** Upload, `gpt-transcribe` and the answer for up to 40 s of audio, with room to spare. */
         const val READ_TIMEOUT_MS = 45_000
+
+        /** The whole request, a token refresh included: past this it has failed, whatever the socket says. */
+        const val TOTAL_TIMEOUT_MS = 75_000L
 
         private val json = Json {
             ignoreUnknownKeys = true

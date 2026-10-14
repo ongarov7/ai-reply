@@ -1,8 +1,11 @@
 package kz.yerek.aireply.data.account
 
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import java.io.IOException
@@ -226,10 +229,17 @@ class ApiClient(
             throw ApiException(mapTransportError(throwable))
         }
 
-        // Cancellation is real, not cooperative-only: the socket read is
-        // unblocked as soon as the calling coroutine goes away.
-        val disconnectOnCancel = coroutineContext[Job]?.invokeOnCompletion { cause ->
-            if (cause != null) runCatching { connection.disconnect() }
+        // Cancellation is real, not cooperative-only. A completion handler
+        // would run only once this block returns - after the blocked write or
+        // read it was meant to interrupt. A child waiting for cancellation
+        // runs on another IO thread the moment the caller goes away, and
+        // closing the connection there unblocks the socket here.
+        val disconnectOnCancel = launch(start = CoroutineStart.UNDISPATCHED) {
+            try {
+                awaitCancellation()
+            } finally {
+                runCatching { connection.disconnect() }
+            }
         }
 
         try {
@@ -253,9 +263,11 @@ class ApiClient(
         } catch (api: ApiException) {
             throw api
         } catch (throwable: Throwable) {
+            // A socket closed by the cancellation above is the cancellation.
+            ensureActive()
             throw ApiException(mapTransportError(throwable))
         } finally {
-            disconnectOnCancel?.dispose()
+            disconnectOnCancel.cancel()
             runCatching { connection.disconnect() }
         }
     }
