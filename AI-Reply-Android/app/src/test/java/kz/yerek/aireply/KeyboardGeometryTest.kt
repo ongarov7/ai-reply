@@ -5,6 +5,7 @@ import kz.yerek.aireply.core.lang.KeyboardPlane
 import kz.yerek.aireply.keyboard.KeyboardKey
 import kz.yerek.aireply.keyboard.layout.KeyboardGeometry
 import kz.yerek.aireply.keyboard.layout.KeyboardLayout
+import kz.yerek.aireply.keyboard.layout.KeyboardPage
 import kz.yerek.aireply.keyboard.layout.KeyboardSizing
 import kz.yerek.aireply.keyboard.layout.PageLayout
 import kz.yerek.aireply.keyboard.layout.PageOptions
@@ -93,5 +94,153 @@ class KeyboardGeometryTest {
         val page = layout(KeyboardLanguage.ENGLISH, KeyboardPlane.LETTERS, 393f)
         assertNotNull(page.keyIndex(-20f, 10f))
         assertNotNull(page.keyIndex(10f, page.height + 30f))
+    }
+
+    // ------------------------------------------------- pads and passwords
+
+    /** Phones from 320 dp to a small tablet, upright, and phones on their side. */
+    private val screens: List<Pair<KeyboardSizing, Float>> =
+        listOf(320f, 360f, 411f, 600f).map { KeyboardSizing(it, isLandscape = false, density = 2.625f) to it * 2f } +
+            listOf(640f to 360f, 780f to 360f, 915f to 412f).map { (width, height) ->
+                KeyboardSizing(width, isLandscape = true, density = 2.625f) to height
+            }
+
+    private val pads = listOf(KeyboardPlane.PHONE_PAD, KeyboardPlane.NUMBER_PAD, KeyboardPlane.DATE_PAD)
+
+    /** Every page a pad or a password field can show, every number flag included. */
+    private fun fieldPages(language: KeyboardLanguage): List<KeyboardPage> =
+        pads.flatMap { plane ->
+            listOf(false, true).flatMap { signed ->
+                listOf(false, true).map { decimal ->
+                    KeyboardLayout.page(language, plane, PageOptions(signed = signed, decimal = decimal))
+                }
+            }
+        } + KeyboardLayout.page(language, KeyboardPlane.LETTERS, PageOptions(numberRow = true))
+
+    private fun area(sizing: KeyboardSizing, screenHeight: Float, languages: List<KeyboardLanguage>) =
+        sizing.keyAreaHeight(KeyboardLayout.maximumRowCount(languages), screenHeight)
+
+    private fun assertTiles(layout: PageLayout, label: String) {
+        var y = 0.5f
+        while (y < layout.height) {
+            var x = 0.5f
+            while (x < layout.width) {
+                assertEquals("$label at ($x, $y)", 1, layout.keys.count { it.hitFrame.contains(x, y) })
+                x += 2.3f
+            }
+            y += 1.9f
+        }
+    }
+
+    private fun assertNoOverlaps(layout: PageLayout, label: String) {
+        layout.keys.forEachIndexed { i, a ->
+            assertTrue("$label: ${a.key} is inside its touch area", a.hitFrame.left <= a.frame.left && a.frame.right <= a.hitFrame.right)
+            assertTrue("$label: ${a.key} is on the page", a.frame.left >= 0f && a.frame.right <= layout.width && a.frame.bottom <= layout.height)
+            layout.keys.drop(i + 1).forEach { b ->
+                val overlapX = minOf(a.frame.right, b.frame.right) - maxOf(a.frame.left, b.frame.left)
+                val overlapY = minOf(a.frame.bottom, b.frame.bottom) - maxOf(a.frame.top, b.frame.top)
+                assertTrue("$label: ${a.key} and ${b.key} overlap", overlapX <= 0.01f || overlapY <= 0.01f)
+            }
+        }
+    }
+
+    @Test
+    fun `the pads and a password's number row tile the area with no gaps and no overlaps`() {
+        for ((sizing, screenHeight) in screens) for (language in KeyboardLanguage.entries) {
+            val height = area(sizing, screenHeight, KeyboardLanguage.CYCLE_ORDER)
+            fieldPages(language).forEach { page ->
+                val label = "$language ${page.plane} w=${sizing.width} landscape=${sizing.isLandscape}"
+                val layout = KeyboardGeometry.layout(page, sizing, height)
+                assertTiles(layout, label)
+                assertNoOverlaps(layout, label)
+            }
+        }
+    }
+
+    /**
+     * The one-height promise, for every set of layouts a user can switch on:
+     * every page they can meet - letters, ?123, =\<, the pads, a password's
+     * letters where its number row fits - lays out inside the same area.
+     */
+    @Test
+    fun `every page of every layout set fits the same height`() {
+        val sets = (1 until (1 shl 3)).map { mask -> KeyboardLanguage.CYCLE_ORDER.filterIndexed { i, _ -> mask and (1 shl i) != 0 } }
+        for ((sizing, screenHeight) in screens) for (languages in sets) {
+            val height = area(sizing, screenHeight, languages)
+            for (language in languages) {
+                val pages = KeyboardPlane.entries.map { KeyboardLayout.page(language, it, PageOptions(signed = true, decimal = true)) } +
+                    listOfNotNull(
+                        KeyboardLayout.page(language, KeyboardPlane.LETTERS, PageOptions(numberRow = true))
+                            .takeIf { KeyboardLayout.numberRowFits(language, languages) }
+                    )
+                pages.forEach { page ->
+                    val label = "$languages $language ${page.plane} rows=${page.rows.size} w=${sizing.width}"
+                    assertTrue(label, page.rows.size <= KeyboardLayout.maximumRowCount(languages))
+                    val layout = KeyboardGeometry.layout(page, sizing, height)
+                    assertEquals(label, height, layout.height, 0.001f)
+                    assertTrue(label, layout.keys.all { it.frame.top >= sizing.topInset - 0.5f })
+                    assertTrue(label, layout.keys.all { it.frame.bottom <= height - sizing.bottomInset + 0.5f })
+                    // No page squeezes its keys below the tallest page's.
+                    val tallest = KeyboardLayout.maximumRowCount(languages)
+                    val floor = KeyboardGeometry.rowMetrics(tallest, height - sizing.topInset - sizing.bottomInset, sizing).key - 0.01f
+                    assertTrue("$label key ${layout.rowMetrics.key}", layout.rowMetrics.key >= floor)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `pad keys are big, digits wider than the side keys`() {
+        for ((sizing, screenHeight) in screens) for (plane in pads) {
+            val layout = KeyboardGeometry.layout(
+                KeyboardLayout.page(KeyboardLanguage.ENGLISH, plane, PageOptions()), sizing,
+                area(sizing, screenHeight, KeyboardLanguage.CYCLE_ORDER)
+            )
+            val five = layout.keys.first { it.key == KeyboardKey.Character("5") }
+            val delete = layout.keys.first { it.key == KeyboardKey.Backspace }
+            val label = "$plane w=${sizing.width} landscape=${sizing.isLandscape}"
+            assertTrue("$label: ${five.frame.height}", five.frame.height >= if (sizing.isLandscape) 34f else 44f)
+            assertTrue("$label: ${five.frame.width}", five.frame.width >= 60f)
+            assertTrue(label, five.frame.width > delete.frame.width * 1.2f)
+        }
+    }
+
+    @Test
+    fun `pad columns line up from the top row to the zero row`() {
+        val sizing = KeyboardSizing(393f, isLandscape = false, density = 2.625f)
+        val height = area(sizing, 850f, KeyboardLanguage.CYCLE_ORDER)
+        val tolerance = 1f / sizing.density + 0.01f
+        for (plane in pads) for (signed in listOf(false, true)) for (decimal in listOf(false, true)) {
+            val layout = KeyboardGeometry.layout(
+                KeyboardLayout.page(KeyboardLanguage.RUSSIAN, plane, PageOptions(signed = signed, decimal = decimal)),
+                sizing, height
+            )
+            fun frame(value: String) = layout.keys.first { it.key == KeyboardKey.Character(value) }.frame
+            val label = "$plane signed=$signed decimal=$decimal"
+            // Every row has the same column edges: 1 over 4 over 7, 3 over 6 over 9.
+            assertEquals(label, frame("1").left, frame("7").left, tolerance)
+            assertEquals(label, frame("3").right, frame("9").right, tolerance)
+            assertEquals(label, frame("2").left, frame("8").left, tolerance)
+            // The zero row fills exactly the three digit columns.
+            val zeroRow = layout.keys.filter { it.row == 3 && it.key is KeyboardKey.Character && it.frame.left >= frame("7").left - tolerance }
+            assertEquals(label, frame("7").left, zeroRow.minOf { it.frame.left }, tolerance)
+            assertEquals(label, frame("9").right, zeroRow.maxOf { it.frame.right }, tolerance)
+            // Return and delete keep the right column on every row.
+            val enter = layout.keys.first { it.key == KeyboardKey.Return }.frame
+            val delete = layout.keys.first { it.key == KeyboardKey.Backspace }.frame
+            assertEquals(label, enter.left, delete.left, tolerance)
+            assertEquals(label, sizing.width - sizing.sideInset, enter.right, tolerance)
+        }
+    }
+
+    @Test
+    fun `a tap where a number field has no point types zero, not return`() {
+        val sizing = KeyboardSizing(360f, isLandscape = false, density = 3f)
+        val height = area(sizing, 760f, KeyboardLanguage.CYCLE_ORDER)
+        val plain = KeyboardGeometry.layout(KeyboardLayout.page(KeyboardLanguage.KAZAKH, KeyboardPlane.NUMBER_PAD, PageOptions()), sizing, height)
+        val nine = plain.keys.first { it.key == KeyboardKey.Character("9") }.frame
+        val zeroY = plain.keys.first { it.key == KeyboardKey.Character("0") }.frame.centerY
+        assertEquals(KeyboardKey.Character("0"), plain.keys[plain.keyIndex(nine.right - 2f, zeroY)!!].key)
+        assertEquals(KeyboardKey.Character("0"), plain.keys[plain.keyIndex(nine.left + 2f, zeroY)!!].key)
     }
 }

@@ -78,7 +78,10 @@ class KeyboardLayoutTest {
         assertEquals("1234567890", numbers[0].joinToString(""))
         assertEquals("@#\$_&-+()/", numbers[1].joinToString(""))
         val symbols = page(KeyboardLanguage.ENGLISH, KeyboardPlane.SYMBOLS).characterRows
-        assertEquals("~`|•√π÷×¶∆", symbols[0].joinToString(""))
+        // `<` and `>` where Gboard has `¶` and `∆`, which are long presses.
+        assertEquals("~`|•√π÷×<>", symbols[0].joinToString(""))
+        assertTrue("¶" in KeyboardLayout.alternates("•", KeyboardLanguage.ENGLISH))
+        assertTrue("∆" in KeyboardLayout.alternates("π", KeyboardLanguage.ENGLISH))
     }
 
     @Test

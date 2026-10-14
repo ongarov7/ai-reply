@@ -1,5 +1,6 @@
 package kz.yerek.aireply.keyboard.layout
 
+import kz.yerek.aireply.keyboard.KeyVisualStyle
 import kz.yerek.aireply.keyboard.KeyboardKey
 import kotlin.math.max
 import kotlin.math.min
@@ -97,7 +98,9 @@ data class LaidOutKey(
     val hitFrame: Box,
     val row: Int,
     val alternates: List<String>,
-    val hint: String?
+    val hint: String?,
+    /** [KeySlot.style]: how the key is drawn when its place does not say. */
+    val style: KeyVisualStyle? = null
 )
 
 data class PageLayout(
@@ -187,14 +190,18 @@ object KeyboardGeometry {
             val unit = (innerWidth - (columns - 1) * gap) / columns
 
             // Gaps sit only between two KEYS. A spacer is itself the space
-            // between its neighbours, so it never gets a gap of its own.
+            // between its neighbours, so it never gets a gap of its own. A
+            // flexible key standing in for several takes their gaps too.
             var fixedWidth = 0f
             var flexibleWeight = 0f
             var gapCount = 0
             row.slots.forEachIndexed { index, slot ->
                 when (val w = slot.width) {
                     is KeyWidth.Units -> fixedWidth += w.units * unit
-                    is KeyWidth.Flexible -> flexibleWeight += max(w.weight, 0f)
+                    is KeyWidth.Flexible -> {
+                        flexibleWeight += max(w.weight, 0f)
+                        gapCount += max(w.gaps, 0)
+                    }
                 }
                 if (index > 0 && slot.key != null && row.slots[index - 1].key != null) gapCount++
             }
@@ -212,7 +219,8 @@ object KeyboardGeometry {
                 val slotWidth = when (val w = slot.width) {
                     is KeyWidth.Units -> w.units * unit
                     is KeyWidth.Flexible ->
-                        if (flexibleWeight > 0f) flexibleWidth * max(w.weight, 0f) / flexibleWeight else 0f
+                        (if (flexibleWeight > 0f) flexibleWidth * max(w.weight, 0f) / flexibleWeight else 0f) +
+                            max(w.gaps, 0) * gap
                 }
                 if (slot.key != null) placed += PlacedSlot(slot, sizing.pixel(x), sizing.pixel(x + slotWidth))
                 x += slotWidth
@@ -236,7 +244,8 @@ object KeyboardGeometry {
                     hitFrame = Box(left, bandTop, right, bandBottom),
                     row = rowIndex,
                     alternates = key.slot.alternates,
-                    hint = key.slot.hint
+                    hint = key.slot.hint,
+                    style = key.slot.style
                 )
             }
 

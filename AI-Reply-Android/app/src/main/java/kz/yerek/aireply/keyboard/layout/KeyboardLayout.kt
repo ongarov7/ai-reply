@@ -2,6 +2,7 @@ package kz.yerek.aireply.keyboard.layout
 
 import kz.yerek.aireply.core.lang.KeyboardLanguage
 import kz.yerek.aireply.core.lang.KeyboardPlane
+import kz.yerek.aireply.keyboard.KeyVisualStyle
 import kz.yerek.aireply.keyboard.KeyboardKey
 
 // ------------------------------------------------------------------- model
@@ -11,8 +12,15 @@ sealed interface KeyWidth {
     /** Multiples of the row's key unit. */
     data class Units(val units: Float) : KeyWidth
 
-    /** A share of whatever width is left once the fixed slots are placed. */
-    data class Flexible(val weight: Float) : KeyWidth
+    /**
+     * A share of whatever width is left once the fixed slots are placed.
+     *
+     * [gaps] is for a key standing in for several flexible keys of the rows
+     * around it - the number pad's `0` when there is no `-` or `.` beside
+     * it: it also takes the gaps between the keys it replaces, so its edges
+     * line up with theirs exactly.
+     */
+    data class Flexible(val weight: Float, val gaps: Int = 0) : KeyWidth
 }
 
 /**
@@ -25,7 +33,13 @@ data class KeySlot(
     /** Offered on a long press, in the order the panel shows them. */
     val alternates: List<String> = emptyList(),
     /** The small caption in the corner: what a long press types first. */
-    val hint: String? = null
+    val hint: String? = null,
+    /**
+     * How a character or space key is drawn, when its place on the page does
+     * not say: on a number pad the digits are drawn like letters wherever
+     * they are, and the side columns like the controls. Null everywhere else.
+     */
+    val style: KeyVisualStyle? = null
 ) {
     companion object {
         val ONE = KeyWidth.Units(1f)
@@ -47,7 +61,10 @@ data class KeyRow(
 data class KeyboardPage(
     val language: KeyboardLanguage,
     val plane: KeyboardPlane,
-    /** 10 for Latin, numbers and symbols; 11 for the Cyrillic layouts. */
+    /**
+     * 10 for Latin, numbers and symbols; 11 for the Cyrillic layouts; the
+     * pads' 6, which sizes their side columns.
+     */
     val columns: Int,
     val rows: List<KeyRow>
 ) {
@@ -65,7 +82,16 @@ data class PageOptions(
     val showsGlobeKey: Boolean = false,
     /** ҚАЗ / РУС / ENG. Hidden when only one layout is switched on. */
     val showsLanguageKey: Boolean = true,
-    val field: FieldKind = FieldKind.TEXT
+    val field: FieldKind = FieldKind.TEXT,
+    /** The number pad's `-`: the field takes negative numbers. */
+    val signed: Boolean = false,
+    /** The number pad's `.` (`,` on a long press): the field takes fractions. */
+    val decimal: Boolean = false,
+    /**
+     * A row of digits over the letters, as Gboard has in password fields.
+     * The caller asks for it only where [KeyboardLayout.numberRowFits].
+     */
+    val numberRow: Boolean = false
 )
 
 // ----------------------------------------------------------------- layouts
@@ -88,6 +114,11 @@ data class PageOptions(
  * ?123 and =\< are Gboard's two punctuation pages. The currency key is `₸` on
  * the Kazakh and Russian layouts and `$` on the English one; the other
  * currencies are a long press away.
+ *
+ * A field that only takes numbers opens on a pad instead ([padPage]): a
+ * phone keypad, a number pad or a date pad, with big keys and ABC to escape
+ * to the letters. A password field gets Gboard's row of digits over the
+ * letters, where the keyboard's one height has room for it ([numberRowFits]).
  */
 object KeyboardLayout {
 
@@ -128,17 +159,27 @@ object KeyboardLayout {
         listOf("*", "\"", "'", ":", ";", "!", "?")
     )
 
-    /** Gboard's =\< page, without its bottom row. */
+    /**
+     * Gboard's =\< page, without its bottom row - with `<` and `>` on keys of
+     * their own where Gboard has `¶` and `∆` (now long presses on `•` and
+     * `π`): the page is named after `<`, and with it every printable ASCII
+     * character has a key, not only a long press.
+     */
     fun symbols(language: KeyboardLanguage): List<List<String>> = listOf(
-        listOf("~", "`", "|", "•", "√", "π", "÷", "×", "¶", "∆"),
+        listOf("~", "`", "|", "•", "√", "π", "÷", "×", "<", ">"),
         listOf("£", if (language == KeyboardLanguage.ENGLISH) "¢" else "$", "€", "¥", "^", "°", "=", "{", "}", "\\"),
         listOf("%", "©", "®", "™", "✓", "[", "]")
     )
 
-    /** Rows on a page, the bottom row included. */
+    /**
+     * Rows on a page, the bottom row included. The pads have four whatever
+     * the field, so they always fit the shared height. A password field's
+     * number row is one more, and only asked for where [numberRowFits].
+     */
     fun rowCount(language: KeyboardLanguage, plane: KeyboardPlane): Int = when (plane) {
         KeyboardPlane.LETTERS -> letters(language).size + 1
         KeyboardPlane.NUMBERS, KeyboardPlane.SYMBOLS -> 4
+        KeyboardPlane.PHONE_PAD, KeyboardPlane.NUMBER_PAD, KeyboardPlane.DATE_PAD -> PAD_ROWS.size + 1
     }
 
     /**
@@ -151,6 +192,23 @@ object KeyboardLayout {
         return all.maxOf { rowCount(it, KeyboardPlane.LETTERS) }
     }
 
+    /**
+     * Whether [language]'s letters take a number row in a password field
+     * without the keyboard growing and without any key getting shorter: the
+     * page with the extra row must have no more rows than the tallest page of
+     * the [enabled] layouts already has.
+     *
+     * With Kazakh on (the default) the keyboard is five rows high, so the
+     * English and Russian password pages get their digits on top for free.
+     * Kazakh's own page already has five rows - a sixth would take every key
+     * down to 31 dp on a 320 dp phone - and a keyboard of English and Russian
+     * only is four rows high, where a fifth would take them to 33 dp. There
+     * the digits stay where they always are: a long press on the top row,
+     * with the digit drawn in the key's corner, and ?123.
+     */
+    fun numberRowFits(language: KeyboardLanguage, enabled: Collection<KeyboardLanguage>): Boolean =
+        rowCount(language, KeyboardPlane.LETTERS) + 1 <= maximumRowCount(enabled)
+
     // --------------------------------------------------------------- pages
 
     fun page(language: KeyboardLanguage, plane: KeyboardPlane, options: PageOptions): KeyboardPage =
@@ -158,6 +216,24 @@ object KeyboardLayout {
             KeyboardPlane.LETTERS -> lettersPage(language, options)
             KeyboardPlane.NUMBERS -> punctuationPage(language, plane, numbers(language), options)
             KeyboardPlane.SYMBOLS -> punctuationPage(language, plane, symbols(language), options)
+            KeyboardPlane.PHONE_PAD -> padPage(
+                language, plane,
+                side = listOf("+", "(", ")", "-"),
+                beforeZero = "*", afterZero = "#",
+                // The dialler's habit: a held 0 is +.
+                zeroAlternates = listOf("+")
+            )
+            KeyboardPlane.NUMBER_PAD -> padPage(
+                language, plane,
+                side = emptyList(),
+                beforeZero = "-".takeIf { options.signed },
+                afterZero = ".".takeIf { options.decimal }
+            )
+            KeyboardPlane.DATE_PAD -> padPage(
+                language, plane,
+                side = listOf(".", "/", ":", "-"),
+                beforeZero = null, afterZero = null
+            )
         }
 
     private fun lettersPage(language: KeyboardLanguage, options: PageOptions): KeyboardPage {
@@ -165,10 +241,17 @@ object KeyboardLayout {
         val result = mutableListOf<KeyRow>()
         val edge = KeySlot.spacer(KeyWidth.Flexible(1f))
 
+        // A password's digits get a row of their own, across the 10-column
+        // grid on every layout, and the corner hints they replace go.
+        if (options.numberRow) {
+            result += KeyRow(characterSlots(DIGITS.map { it.toString() }, language), unitColumns = 10)
+        }
+        val hints = !options.numberRow
+
         when (language) {
             KeyboardLanguage.ENGLISH -> {
                 val modifier = KeyWidth.Units(MODIFIER_UNITS)
-                result += KeyRow(characterSlots(rows[0], language, withDigits = true))
+                result += KeyRow(characterSlots(rows[0], language, withDigits = hints))
                 result += KeyRow(listOf(edge) + characterSlots(rows[1], language) + edge)
                 result += KeyRow(
                     listOf(KeySlot(KeyboardKey.Shift, modifier), edge) +
@@ -182,7 +265,7 @@ object KeyboardLayout {
                 // Russian and the one under the Kazakh letters in Kazakh.
                 val digitRow = if (language == KeyboardLanguage.KAZAKH) 1 else 0
                 rows.forEachIndexed { index, row ->
-                    val keys = characterSlots(row, language, withDigits = index == digitRow)
+                    val keys = characterSlots(row, language, withDigits = hints && index == digitRow)
                     result += when {
                         index == rows.lastIndex ->
                             KeyRow(listOf(KeySlot(KeyboardKey.Shift)) + keys + KeySlot(KeyboardKey.Backspace))
@@ -224,6 +307,90 @@ object KeyboardLayout {
             bottomRow(language, KeyboardPlane.LETTERS, options)
         )
         return KeyboardPage(language, plane, columns = 10, rows = result)
+    }
+
+    /** The pads' digits above the row with `0`. */
+    private val PAD_ROWS: List<List<String>> = listOf(
+        listOf("1", "2", "3"),
+        listOf("4", "5", "6"),
+        listOf("7", "8", "9")
+    )
+
+    /**
+     * The pads' grid: a side column is one key of a six-column row, and the
+     * three digit columns share what is left - so a digit is about a third
+     * wider than a side key, Gboard's proportions.
+     */
+    private const val PAD_COLUMNS = 6
+
+    /**
+     * A pad: a dialler's grid of big keys, as the system keyboards have for
+     * these fields.
+     *
+     * ```
+     *   +  1  2  3  ABC        1  2  3  ABC        .  1  2  3  ABC
+     *   (  4  5  6   ␣         4  5  6   ␣         /  4  5  6   ␣
+     *   )  7  8  9   ⌫         7  8  9   ⌫         :  7  8  9   ⌫
+     *   -  *  0  #   ⏎         -  0  .   ⏎         -  [  0  ]   ⏎
+     *       phone            number, signed           date
+     *                         and decimal
+     * ```
+     *
+     * Three big columns of digits, drawn like letters; the field's own
+     * characters down the left ([side]), drawn like the controls; and down
+     * the right the column every pad shares - ABC back to the letters, space,
+     * then delete over return, as on the letters.
+     *
+     * [beforeZero] and [afterZero] flank `0`, under `7` and `9`. When a number
+     * field takes no `-` or no `.`, the `0` grows over the empty place rather
+     * than leaving a hole: a hole's touches belong to its neighbours, and a
+     * stray tap beside `0` must type `0`, not press return.
+     *
+     * No layout key and no globe: a pad has no language, and ABC leads to
+     * both. Long presses offer only what such a field takes: `+` on the
+     * phone's `0`, `,` on the decimal point.
+     */
+    private fun padPage(
+        language: KeyboardLanguage,
+        plane: KeyboardPlane,
+        side: List<String>,
+        beforeZero: String?,
+        afterZero: String?,
+        zeroAlternates: List<String> = emptyList()
+    ): KeyboardPage {
+        val column = KeyWidth.Units(1f)
+
+        fun digit(value: String, width: KeyWidth = KeyWidth.Flexible(1f), alternates: List<String> = emptyList()) =
+            KeySlot(
+                key = KeyboardKey.Character(value),
+                width = width,
+                alternates = alternates,
+                hint = alternates.firstOrNull(),
+                style = KeyVisualStyle.LETTER
+            )
+
+        val zeroSpan = 1 + listOf(beforeZero, afterZero).count { it == null }
+        val zeroRow = listOfNotNull(
+            beforeZero?.let { digit(it) },
+            digit("0", KeyWidth.Flexible(zeroSpan.toFloat(), gaps = zeroSpan - 1), zeroAlternates),
+            afterZero?.let { digit(it, alternates = if (it == ".") listOf(",") else emptyList()) }
+        )
+        val grid = PAD_ROWS.map { row -> row.map { digit(it) } } + listOf(zeroRow)
+        val right = listOf(
+            KeySlot(KeyboardKey.Plane(KeyboardPlane.LETTERS), column),
+            KeySlot(KeyboardKey.Space, column, style = KeyVisualStyle.SPECIAL),
+            KeySlot(KeyboardKey.Backspace, column),
+            KeySlot(KeyboardKey.Return, column)
+        )
+        require(side.isEmpty() || side.size == grid.size) { "a pad's side column fills every row" }
+
+        val rows = grid.mapIndexed { index, digits ->
+            val left = side.getOrNull(index)
+                ?.let { listOf(KeySlot(KeyboardKey.Character(it), column, style = KeyVisualStyle.SPECIAL)) }
+                .orEmpty()
+            KeyRow(left + digits + right[index])
+        }
+        return KeyboardPage(language, plane, columns = PAD_COLUMNS, rows = rows)
     }
 
     private fun characterSlots(
@@ -330,7 +497,11 @@ object KeyboardLayout {
         ")" to listOf(">", "]", "}"),
         "+" to listOf("±"),
         "=" to listOf("≠", "≈", "∞"),
-        "@" to listOf("#")
+        "@" to listOf("#"),
+        "<" to listOf("≤", "«"),
+        ">" to listOf("≥", "»"),
+        "•" to listOf("·", "¶"),
+        "π" to listOf("∆")
     )
 }
 
@@ -360,6 +531,8 @@ data class KeyboardLabels(val language: KeyboardLanguage) {
         KeyboardPlane.LETTERS -> letters
         KeyboardPlane.NUMBERS -> "?123"
         KeyboardPlane.SYMBOLS -> "=\\<"
+        // No key leads to a pad - the field opens on it - but a name it has.
+        KeyboardPlane.PHONE_PAD, KeyboardPlane.NUMBER_PAD, KeyboardPlane.DATE_PAD -> "123"
     }
 
     val badge: String get() = language.badge

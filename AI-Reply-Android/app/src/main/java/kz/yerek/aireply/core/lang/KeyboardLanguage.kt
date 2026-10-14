@@ -49,9 +49,24 @@ enum class KeyboardLanguage(val code: String) {
     }
 }
 
-/** Letters, and the two punctuation planes behind ?123 and =\<. */
+/**
+ * Letters, the two punctuation planes behind ?123 and =\<, and the number
+ * pads a field that only takes numbers opens on.
+ */
 enum class KeyboardPlane {
     LETTERS,
     NUMBERS,
-    SYMBOLS
+    SYMBOLS,
+
+    /** A dialler's keypad, for phone numbers: `* 0 #`, `+ ( ) -`. */
+    PHONE_PAD,
+
+    /** Digits for number fields - amounts, codes, PINs - with `-` and `.` only where the field takes them. */
+    NUMBER_PAD,
+
+    /** Digits and the date and time separators `. / : -`. */
+    DATE_PAD;
+
+    /** One of the pads: no letters, no shift, no language. */
+    val isPad: Boolean get() = this == PHONE_PAD || this == NUMBER_PAD || this == DATE_PAD
 }

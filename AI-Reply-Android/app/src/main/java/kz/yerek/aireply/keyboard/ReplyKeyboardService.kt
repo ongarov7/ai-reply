@@ -65,6 +65,7 @@ import kz.yerek.aireply.keyboard.input.KeyboardStatus
 import kz.yerek.aireply.keyboard.input.KeyboardTextFieldState
 import kz.yerek.aireply.keyboard.layout.AutoCapitalization
 import kz.yerek.aireply.keyboard.layout.Capitalization
+import kz.yerek.aireply.keyboard.layout.FieldKeys
 import kz.yerek.aireply.keyboard.layout.FieldKind
 import kz.yerek.aireply.keyboard.layout.KeyboardGeometry
 import kz.yerek.aireply.keyboard.layout.KeyboardLabels
@@ -191,7 +192,8 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
     private var showsGlobeKey by mutableStateOf(false)
     private var isSecureField by mutableStateOf(false)
     private var returnFace by mutableStateOf(ReturnFace.NEWLINE)
-    private var fieldKind by mutableStateOf(FieldKind.TEXT)
+    /** What the host field takes: its pad, its bottom-row key, a password's number row. */
+    private var fieldKeys by mutableStateOf(FieldKeys())
     /** `features.ai_reports`, as the app or the last refresh stored it. */
     private var reportsEnabled by mutableStateOf(false)
     /** The server transcribes speech (`features.voice_transcription`), or a DEBUG mock stands in. */
@@ -303,6 +305,7 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         if (restarting || info == null || info !== hostField.editorInfo) hostInput++
         hostField.startInput(info, restarting)
         isSecureField = hostField.isSecureField
+        val previousField = fieldKeys
         readField(info)
 
         refreshSettings()
@@ -312,19 +315,19 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         loadConfigurationIfNeeded()
         refreshLimitsIfStale()
 
-        val numeric = when ((info?.inputType ?: 0) and InputType.TYPE_MASK_CLASS) {
-            InputType.TYPE_CLASS_NUMBER, InputType.TYPE_CLASS_PHONE, InputType.TYPE_CLASS_DATETIME -> true
-            else -> false
-        }
-        if (!restarting) {
-            plane = if (numeric) KeyboardPlane.NUMBERS else KeyboardPlane.LETTERS
-            shift.reset()
-        }
         // A recent panel returns; in a password field, none does. A recording
         // the microphone dialog interrupted may start now; one for a field
         // that is no longer this one is dropped.
         keyboardVisible = true
         panels.keyboardShown(SystemClock.uptimeMillis(), isSecureField)
+        // The field's own page - a number pad for numbers, phones and dates -
+        // after the panels, which type letters. A restart of the same field
+        // keeps the page the user chose.
+        val opening = fieldKeys.startPlane(plane, previousField, restarting, isComposing)
+        if (!restarting || opening != plane) {
+            plane = opening
+            shift.reset()
+        }
         refreshAutoShift()
         viewHost.onShown()
     }
@@ -430,7 +433,12 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
             showsGlobeKey = showsGlobeKey,
             showsLanguageKey = enabledLanguages.size > 1,
             // The composer's fields are plain text whatever the host field is.
-            field = if (composing) FieldKind.TEXT else fieldKind
+            field = if (composing) FieldKind.TEXT else fieldKeys.kind,
+            signed = fieldKeys.signed,
+            decimal = fieldKeys.decimal,
+            // Gboard's digits over the letters in a password field, where the
+            // keyboard's one height has room for them.
+            numberRow = !composing && fieldKeys.password && KeyboardLayout.numberRowFits(language, enabledLanguages)
         )
         val page = remember(language, plane, options, sizing, areaHeight) {
             KeyboardGeometry.layout(KeyboardLayout.page(language, plane, options), sizing, areaHeight)
@@ -899,7 +907,9 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
     private fun typeSpace() {
         prepareComposerForTyping()
         val now = SystemClock.uptimeMillis()
-        if (SpaceShortcut.shouldInsertPeriod(textBeforeCursor(), now - lastSpaceTap)) {
+        // No ". " in a number, phone or date field: digits are not a sentence.
+        val sentences = target != Target.HOST || !fieldKeys.isNumeric
+        if (sentences && SpaceShortcut.shouldInsertPeriod(textBeforeCursor(), now - lastSpaceTap)) {
             // ". " - the system keyboards' behaviour.
             when (target) {
                 Target.HOST -> hostField.batch {
@@ -917,8 +927,8 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
             insert(" ")
             lastSpaceTap = now
         }
-        // Back to letters after a space on ?123, as Gboard does.
-        if (plane != KeyboardPlane.LETTERS) plane = KeyboardPlane.LETTERS
+        // Back to letters after a space on ?123, as Gboard does; a pad stays.
+        if (plane == KeyboardPlane.NUMBERS || plane == KeyboardPlane.SYMBOLS) plane = KeyboardPlane.LETTERS
         refreshAutoShift()
     }
 
@@ -1024,12 +1034,13 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
     }
 
     private fun switchLanguage(next: KeyboardLanguage) {
-        if (next == language && plane == KeyboardPlane.LETTERS) return
+        if (next == language && (plane == KeyboardPlane.LETTERS || plane.isPad)) return
         // A recording in the old layout's language ends here, keeping its words.
         if (next != language) panels.layoutChanged()
         language = next
         autocorrect.switchLanguage(next)
-        plane = KeyboardPlane.LETTERS
+        // A pad has no language (the system's switcher can still change it): it stays.
+        if (!plane.isPad) plane = KeyboardPlane.LETTERS
         // Off the main thread: it only matters to the next launch.
         scope.launch(Dispatchers.IO) { services.settings.keyboardLanguage = next }
         refreshAutoShift()
@@ -1040,20 +1051,13 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
     /** What the host field is and wants, from its EditorInfo. */
     private fun readField(info: EditorInfo?) {
         val type = info?.inputType ?: 0
-        val variation = type and InputType.TYPE_MASK_VARIATION
         val textClass = (type and InputType.TYPE_MASK_CLASS) == InputType.TYPE_CLASS_TEXT
-        fieldKind = when {
-            !textClass -> FieldKind.TEXT
-            variation == InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS ||
-                variation == InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS -> FieldKind.EMAIL
-            variation == InputType.TYPE_TEXT_VARIATION_URI -> FieldKind.URL
-            else -> FieldKind.TEXT
-        }
+        fieldKeys = FieldKeys.of(type)
         // Voice into a plain text field only - never a password, an address or
         // a number, and never where the app asked keyboards for no microphone.
-        hostTakesVoice = textClass && !isSecureField && fieldKind == FieldKind.TEXT && !refusesMicrophone(info)
+        hostTakesVoice = textClass && !isSecureField && fieldKeys.kind == FieldKind.TEXT && !refusesMicrophone(info)
         hostCapitalization = when {
-            !textClass || isSecureField || fieldKind != FieldKind.TEXT -> Capitalization.NONE
+            !textClass || isSecureField || fieldKeys.kind != FieldKind.TEXT -> Capitalization.NONE
             type and InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS != 0 -> Capitalization.CHARACTERS
             type and InputType.TYPE_TEXT_FLAG_CAP_WORDS != 0 -> Capitalization.WORDS
             // Most messengers set no flag at all but expect sentence case.
@@ -1095,6 +1099,8 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         // Opening never generates - it only shows the composer.
         panels.openReply(template) { contextProvider.acquire(this, currentInputConnection, isSecureField) }
         if (resuming) {
+            // Back to the instruction from a number field: letters, not its pad.
+            if (plane.isPad) plane = KeyboardPlane.LETTERS
             refreshAutoShift()
             return
         }

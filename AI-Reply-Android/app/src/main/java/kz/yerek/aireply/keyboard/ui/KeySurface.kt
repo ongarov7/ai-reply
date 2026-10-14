@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardCapslock
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SpaceBar
 import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.runtime.Composable
@@ -54,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kz.yerek.aireply.core.lang.KeyboardLanguage
 import kz.yerek.aireply.core.lang.KeyboardPlane
+import kz.yerek.aireply.keyboard.KeyVisualStyle
 import kz.yerek.aireply.keyboard.KeyboardKey
 import kz.yerek.aireply.keyboard.KeyboardTheme
 import kz.yerek.aireply.keyboard.layout.Box as KeyBox
@@ -122,7 +124,8 @@ fun KeySurface(
             search = rememberVectorPainter(Icons.Filled.Search),
             go = rememberVectorPainter(Icons.AutoMirrored.Filled.ArrowForward),
             done = rememberVectorPainter(Icons.Filled.Check),
-            previous = rememberVectorPainter(Icons.AutoMirrored.Filled.ArrowBack)
+            previous = rememberVectorPainter(Icons.AutoMirrored.Filled.ArrowBack),
+            space = rememberVectorPainter(Icons.Filled.SpaceBar)
         )
 
         Box(modifier.fillMaxWidth().height(state.layout.height.dp)) {
@@ -204,20 +207,34 @@ private class KeyIcons(
     val search: VectorPainter,
     val go: VectorPainter,
     val done: VectorPainter,
-    val previous: VectorPainter
+    val previous: VectorPainter,
+    /** The pads' space key: a narrow side key, with no language to name. */
+    val space: VectorPainter
 )
 
 private enum class Face { LETTER, SPECIAL, ENGAGED, PROMINENT }
 
 private fun faceOf(key: LaidOutKey, state: KeySurfaceState, lastRow: Int): Face = when (val k = key.key) {
-    is KeyboardKey.Character ->
+    is KeyboardKey.Character -> when {
+        // A pad says: digits like letters, its side columns like the controls.
+        key.style != null -> key.style.face
         // Gboard draws the punctuation beside space like the other controls.
-        if (key.row == lastRow && k.value.length <= 2) Face.SPECIAL else Face.LETTER
-    KeyboardKey.Space -> Face.LETTER
+        key.row == lastRow && k.value.length <= 2 -> Face.SPECIAL
+        else -> Face.LETTER
+    }
+    KeyboardKey.Space -> key.style?.face ?: Face.LETTER
     KeyboardKey.Shift -> if (state.shiftMode != ShiftState.Mode.OFF) Face.ENGAGED else Face.SPECIAL
     KeyboardKey.Return -> if (state.returnProminent && state.returnEnabled) Face.PROMINENT else Face.SPECIAL
     else -> Face.SPECIAL
 }
+
+private val KeyVisualStyle.face: Face
+    get() = when (this) {
+        KeyVisualStyle.LETTER -> Face.LETTER
+        KeyVisualStyle.SPECIAL -> Face.SPECIAL
+        KeyVisualStyle.ENGAGED -> Face.ENGAGED
+        KeyVisualStyle.PROMINENT -> Face.PROMINENT
+    }
 
 private fun DrawScope.drawPage(
     state: KeySurfaceState,
@@ -233,6 +250,7 @@ private fun DrawScope.drawPage(
     val radius = CornerRadius(if (state.layout.rowMetrics.key >= 44f) 7f * dp else 6f * dp)
     val shifted = state.shiftMode != ShiftState.Mode.OFF
     val compactLetters = state.layout.page.columns >= 11
+    val pad = state.layout.page.plane.isPad
 
     state.layout.keys.forEachIndexed { index, key ->
         val face = faceOf(key, state, lastRow)
@@ -267,6 +285,8 @@ private fun DrawScope.drawPage(
                     k.value
                 }
                 val fontSize = when {
+                    // A pad's digits are a dialler's: large on large keys.
+                    pad -> if (key.style == KeyVisualStyle.LETTER) 26f else 22f
                     key.row == lastRow -> 22f
                     compactLetters -> 21f
                     else -> 23f
@@ -276,10 +296,14 @@ private fun DrawScope.drawPage(
                     drawCorner(measurer, hint, frame, theme.secondaryText.copy(alpha = labelAlpha), keyAlpha)
                 }
             }
-            KeyboardKey.Space -> drawCentered(
-                measurer, state.spaceCaption, center,
-                TextStyle(fontSize = 13.sp, color = theme.secondaryText.copy(alpha = labelAlpha)), keyAlpha
-            )
+            KeyboardKey.Space -> if (pad) {
+                drawIcon(icons.space, center, 22f, content, keyAlpha)
+            } else {
+                drawCentered(
+                    measurer, state.spaceCaption, center,
+                    TextStyle(fontSize = 13.sp, color = theme.secondaryText.copy(alpha = labelAlpha)), keyAlpha
+                )
+            }
             KeyboardKey.Shift -> drawIcon(
                 when (state.shiftMode) {
                     ShiftState.Mode.OFF -> icons.shift
@@ -313,8 +337,10 @@ private fun DrawScope.drawPage(
         }
     }
 
-    // The balloon over the key being typed.
-    visual.preview?.let { index ->
+    // The balloon over the key being typed. Not on a pad: its keys are far
+    // wider than a fingertip, and a balloon that size would cover a third of
+    // the row above.
+    visual.preview?.takeIf { !pad }?.let { index ->
         val key = state.layout.keys.getOrNull(index) ?: return@let
         val character = (key.key as? KeyboardKey.Character)?.value ?: return@let
         val text = if (shifted && character.firstOrNull()?.isLetter() == true &&
