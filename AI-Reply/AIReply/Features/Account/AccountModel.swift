@@ -720,11 +720,12 @@ final class AccountModel {
             return
         }
         LegalConsentStore.restore(consent)
-        hasAcceptedLegal = true
+        hasAcceptedLegal = LegalConsentStore.hasAccepted(legalConfig)
     }
 
     private func syncPendingLegalConsent() async {
         guard AccountCredentials.isSignedIn,
+              LegalConsentStore.hasAccepted(legalConfig),
               let record = LegalConsentStore.load(),
               record.isPendingSync,
               record.termsVersion == legalConfig.termsVersion,
@@ -732,7 +733,7 @@ final class AccountModel {
         do {
             let saved = try await service.recordLegalConsent(record)
             LegalConsentStore.restore(saved)
-            hasAcceptedLegal = true
+            hasAcceptedLegal = LegalConsentStore.hasAccepted(legalConfig)
         } catch {
             // The local acceptance remains pending and is retried on refresh.
         }

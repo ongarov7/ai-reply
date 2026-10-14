@@ -74,7 +74,7 @@ func TestAIRefusedAfterLegalVersionChange(t *testing.T) {
 		t.Fatalf("old consent accepted: %d %s", res.status, res.raw)
 	}
 	config := h.do(http.MethodGet, "/api/v1/config", nil, nil)
-	if config.str("legal", "terms_version") != "2026-10-08" || config.str("legal", "privacy_version") != "2026-10-08" {
+	if config.str("legal", "terms_version") != legal.TermsVersion || config.str("legal", "privacy_version") != legal.PrivacyVersion {
 		t.Fatalf("legal versions = %s", config.raw)
 	}
 

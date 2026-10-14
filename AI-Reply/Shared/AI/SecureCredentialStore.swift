@@ -39,12 +39,15 @@ struct StoredLegalConsent: Codable, Equatable, Sendable {
     let platform: String
     let appVersion: String
     var isPendingSync: Bool
+    /// A server legal record alone does not prove this device showed the AI disclosure.
+    var aiSharingDisclosureVersion: String? = nil
 }
 
 /// Non-secret acceptance state shared by the host app and its keyboard.
 ///
 /// Келісім күйі App Group-та: пернетақта AI сұранысынан бұрын тексереді.
 enum LegalConsentStore {
+    static let aiSharingDisclosureVersion = "2026-10-14"
     private static let key = "account.legalConsent.v1"
     /// The versions the server publishes now, from the last config read by
     /// the app or the keyboard.
@@ -59,7 +62,8 @@ enum LegalConsentStore {
     static func hasAccepted(_ config: AccountAPI.LegalConfig,
                             defaults: UserDefaults = AppGroup.defaults) -> Bool {
         guard let record = load(defaults: defaults) else { return false }
-        return record.termsVersion == config.termsVersion
+        return record.aiSharingDisclosureVersion == aiSharingDisclosureVersion
+            && record.termsVersion == config.termsVersion
             && record.privacyVersion == config.privacyVersion
     }
 
@@ -73,7 +77,8 @@ enum LegalConsentStore {
             locale: locale,
             platform: "ios",
             appVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "",
-            isPendingSync: true
+            isPendingSync: true,
+            aiSharingDisclosureVersion: aiSharingDisclosureVersion
         )
         save(record, defaults: defaults)
         return record
@@ -81,6 +86,10 @@ enum LegalConsentStore {
 
     static func restore(_ consent: AccountAPI.LegalConsent,
                         defaults: UserDefaults = AppGroup.defaults) {
+        let local = load(defaults: defaults)
+        let disclosureVersion = local?.termsVersion == consent.termsVersion
+            && local?.privacyVersion == consent.privacyVersion
+            ? local?.aiSharingDisclosureVersion : nil
         save(StoredLegalConsent(
             termsVersion: consent.termsVersion,
             privacyVersion: consent.privacyVersion,
@@ -88,7 +97,8 @@ enum LegalConsentStore {
             locale: consent.locale,
             platform: consent.platform,
             appVersion: consent.appVersion ?? "",
-            isPendingSync: false
+            isPendingSync: false,
+            aiSharingDisclosureVersion: disclosureVersion
         ), defaults: defaults)
     }
 
@@ -116,7 +126,8 @@ enum LegalConsentStore {
     static func hasAcceptedCurrentVersions(defaults: UserDefaults = AppGroup.defaults) -> Bool {
         guard let record = load(defaults: defaults) else { return false }
         let current = currentVersions(defaults: defaults)
-        return record.termsVersion == current.terms && record.privacyVersion == current.privacy
+        return record.aiSharingDisclosureVersion == aiSharingDisclosureVersion
+            && record.termsVersion == current.terms && record.privacyVersion == current.privacy
     }
 
     // MARK: Removal

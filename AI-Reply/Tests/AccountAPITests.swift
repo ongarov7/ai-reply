@@ -352,8 +352,7 @@ final class AccountReleaseTests: XCTestCase {
         let defaults = freshDefaults()
         XCTAssertFalse(LegalConsentStore.hasAcceptedCurrentVersions(defaults: defaults), "nothing accepted")
 
-        let current = AccountAPI.LegalConfig(termsVersion: "2026-10-08", privacyVersion: "2026-10-08",
-                                             termsURL: "", privacyURL: "")
+        let current = AccountAPI.LegalConfig.production
         LegalConsentStore.accept(current, locale: "kk", defaults: defaults)
         XCTAssertTrue(LegalConsentStore.hasAcceptedCurrentVersions(defaults: defaults),
                       "before any config, this build's own versions count")
@@ -378,6 +377,35 @@ final class AccountReleaseTests: XCTestCase {
         LegalConsentStore.markSynced(defaults: defaults)
         LegalConsentStore.forgetAfterServerRefusal(defaults: defaults)
         XCTAssertNil(LegalConsentStore.load(defaults: defaults))
+    }
+
+    func testLegacyAcceptanceDoesNotAuthorizeAISharingAfterUpdate() throws {
+        let defaults = freshDefaults()
+        LegalConsentStore.accept(.production, locale: "en", defaults: defaults)
+        var old = try XCTUnwrap(LegalConsentStore.load(defaults: defaults))
+        old.aiSharingDisclosureVersion = nil
+        defaults.set(try JSONEncoder().encode(old), forKey: "account.legalConsent.v1")
+        XCTAssertFalse(LegalConsentStore.hasAccepted(.production, defaults: defaults))
+        XCTAssertFalse(LegalConsentStore.hasAcceptedCurrentVersions(defaults: defaults))
+    }
+
+    func testServerLegalRecordCannotGrantAISharingOnThisDevice() {
+        let defaults = freshDefaults()
+        let consent = AccountAPI.LegalConsent(
+            termsVersion: AccountAPI.LegalConfig.production.termsVersion,
+            privacyVersion: AccountAPI.LegalConfig.production.privacyVersion,
+            acceptedAt: "2026-10-14T00:00:00Z", locale: "en", platform: "ios", appVersion: "1.0")
+        LegalConsentStore.restore(consent, defaults: defaults)
+        XCTAssertFalse(LegalConsentStore.hasAcceptedCurrentVersions(defaults: defaults))
+
+        LegalConsentStore.accept(.production, locale: "en", defaults: defaults)
+        LegalConsentStore.restore(consent, defaults: defaults)
+        XCTAssertTrue(LegalConsentStore.hasAcceptedCurrentVersions(defaults: defaults),
+                      "sync preserves explicit permission given on this device")
+        LegalConsentStore.clear(defaults: defaults)
+        LegalConsentStore.restore(consent, defaults: defaults)
+        XCTAssertFalse(LegalConsentStore.hasAcceptedCurrentVersions(defaults: defaults),
+                       "a restored account record cannot undo withdrawal")
     }
 
     func testRequestsStopBeforeTheNetworkWithoutASessionOrConsent() {

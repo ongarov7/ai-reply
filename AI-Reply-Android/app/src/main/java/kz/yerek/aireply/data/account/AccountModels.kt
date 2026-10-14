@@ -197,7 +197,7 @@ data class LegalConfigDto(
     companion object {
         val PRODUCTION = LegalConfigDto(
             termsVersion = "2026-10-08",
-            privacyVersion = "2026-10-08",
+            privacyVersion = "2026-10-14",
             termsUrl = "https://ai-reply.kz/offer",
             privacyUrl = "https://ai-reply.kz/privacy",
             supportUrl = "https://ai-reply.kz/support",

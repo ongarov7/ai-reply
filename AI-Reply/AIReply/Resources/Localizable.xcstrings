@@ -3055,25 +3055,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "When you tap Reply or Write, AI Reply sends the message you copied or selected, your instruction and your profile details through our server to OpenAI to write the text. With Smart correction on, your instruction is also sent while you type it. Our server does not save the messages, instructions or generated texts; your profile is kept in your account until you delete it."
+            "value" : "Reply: your copied or selected message, instruction, chosen template, profile (description, role, tone, business details, reply language and grammatical gender) and working-hours context, when you tap Reply.\n\nWrite: your instruction and grammatical gender, when you tap Write.\n\nSmart correction: the instruction in AI Reply’s own field while you type, if enabled. Messages and profile text may contain personal data about you or other people."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "«Жауап беру» немесе «Жазу» батырмасын басқанда AI Reply мәтін жазу үшін көшірілген не белгіленген хабарламаны, нұсқауыңызды және профиль деректерін біздің сервер арқылы OpenAI-ға жібереді. Ақылды түзету қосулы болса, нұсқау теру кезінде де жіберіледі. Біздің сервер хабарламаларды, нұсқауларды және дайын мәтіндерді сақтамайды; профиль тіркелгіңізді жойғанша сонда сақталады."
+            "value" : "«Жауап беру»: басқан кезде көшірілген не белгіленген хабарлама, нұсқау, таңдалған үлгі, профиль (сипаттама, рөл, үн, бизнес деректері, жауап тілі және грамматикалық тек) және жұмыс уақытының мәнмәтіні.\n\n«Жазу»: басқан кезде нұсқау мен грамматикалық тек.\n\nАқылды түзету: қосулы болса, AI Reply өрісіндегі нұсқау теру кезінде. Хабарлама мен профильде сіздің және басқа адамдардың жеке деректері болуы мүмкін."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Когда вы нажимаете «Ответить» или «Написать», AI Reply отправляет скопированное или выделенное сообщение, вашу инструкцию и данные профиля через наш сервер в OpenAI, чтобы написать текст. Если включена умная коррекция, инструкция отправляется и во время набора. Наш сервер не сохраняет сообщения, инструкции и готовые тексты; профиль хранится в вашем аккаунте, пока вы его не удалите."
+            "value" : "«Ответить»: скопированное или выделенное сообщение, инструкция, выбранный шаблон, профиль (описание, роль, тон, сведения о бизнесе, язык ответа и грамматический род) и контекст рабочего времени — при нажатии.\n\n«Написать»: инструкция и грамматический род — при нажатии.\n\nУмная коррекция: инструкция в поле AI Reply во время набора, если функция включена. Сообщения и профиль могут содержать персональные данные о вас и других людях."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "«Javob berish» yoki «Yozish» tugmasini bosganingizda AI Reply matn yozish uchun nusxalangan yoki belgilangan xabarni, koʻrsatmangizni va profil maʼlumotlaringizni serverimiz orqali OpenAI’ga yuboradi. Aqlli tuzatish yoqilgan boʻlsa, koʻrsatma yozish paytida ham yuboriladi. Serverimiz xabarlar, koʻrsatmalar va tayyor matnlarni saqlamaydi; profil hisobingizni oʻchirmaguningizcha unda saqlanadi."
+            "value" : "«Javob berish»: bosilganda nusxalangan yoki belgilangan xabar, koʻrsatma, tanlangan shablon, profil (tavsif, rol, ohang, biznes maʼlumotlari, javob tili va grammatik jins) va ish vaqti konteksti.\n\n«Yozish»: bosilganda koʻrsatma va grammatik jins.\n\nAqlli tuzatish: yoqilgan boʻlsa, AI Reply maydonidagi koʻrsatma yozish paytida. Xabarlar va profilda siz va boshqa odamlar haqidagi shaxsiy maʼlumotlar boʻlishi mumkin."
           }
         }
       }
@@ -3084,25 +3084,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "I agree that these texts are sent to OpenAI to write replies."
+            "value" : "I explicitly agree to send the data described above to OpenAI for AI processing."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Жауап жазу үшін бұл мәтіндердің OpenAI-ға жіберілуіне келісемін."
+            "value" : "Жоғарыда аталған деректерді AI өңдеу үшін OpenAI-ға жіберуге нақты келісемін."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Я соглашаюсь на отправку этих текстов в OpenAI для написания ответов."
+            "value" : "Я явно соглашаюсь на передачу перечисленных выше данных в OpenAI для AI-обработки."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Javob yozish uchun bu matnlar OpenAI’ga yuborilishiga roziman."
+            "value" : "Yuqorida koʻrsatilgan maʼlumotlarni AI qayta ishlashi uchun OpenAI’ga yuborishga aniq roziman."
           }
         }
       }
@@ -3113,25 +3113,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Please review the documents that govern AI Reply and explain how your data is handled."
+            "value" : "AI features in the app and keyboard need your permission to send personal data to a third-party AI service."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Reply жұмысын реттейтін және деректердің қалай өңделетінін түсіндіретін құжаттармен танысыңыз."
+            "value" : "Қосымша мен пернетақтаның AI мүмкіндіктері үшін жеке деректерді сыртқы AI қызметіне жіберуге рұқсатыңыз қажет."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ознакомьтесь с документами, которые регулируют работу AI Reply и объясняют обработку данных."
+            "value" : "Для AI-функций приложения и клавиатуры нужно ваше разрешение на передачу персональных данных стороннему AI-сервису."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Reply ishini tartibga soluvchi va maʼlumotlaringiz qanday qayta ishlanishini tushuntiruvchi hujjatlarni koʻrib chiqing."
+            "value" : "Ilova va klaviaturadagi AI funksiyalari uchun shaxsiy maʼlumotlarni uchinchi tomon AI xizmatiga yuborishga ruxsatingiz kerak."
           }
         }
       }
@@ -3171,25 +3171,141 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Accept and continue"
+            "value" : "Agree and continue"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Қабылдау және жалғастыру"
+            "value" : "Келісу және жалғастыру"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Принять и продолжить"
+            "value" : "Согласиться и продолжить"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Qabul qilish va davom etish"
+            "value" : "Rozilik berish va davom etish"
+          }
+        }
+      }
+    },
+    "legal.consent.data.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What is sent and when"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не және қашан жіберіледі"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Что и когда отправляется"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nima va qachon yuboriladi"
+          }
+        }
+      }
+    },
+    "legal.consent.decline" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Do not agree"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Келіспеймін"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не согласен"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rozi emasman"
+          }
+        }
+      }
+    },
+    "legal.consent.declined.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No AI request will be sent. AI features require permission to process this data. You can return and agree later."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI сұраныстары жіберілмейді. AI мүмкіндіктеріне осы деректерді өңдеуге рұқсат қажет. Кейін оралып, келісім бере аласыз."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI-запросы не будут отправляться. Для AI-функций нужно разрешение на обработку этих данных. Вы можете вернуться и дать согласие позже."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI soʻrovlari yuborilmaydi. AI funksiyalari bu maʼlumotlarni qayta ishlashga ruxsat talab qiladi. Keyin qaytib rozilik berishingiz mumkin."
+          }
+        }
+      }
+    },
+    "legal.consent.declined.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI sharing is disabled"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI-ға жіберу өшірулі"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Передача в AI отключена"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI’ga yuborish oʻchirilgan"
           }
         }
       }
@@ -3223,31 +3339,147 @@
         }
       }
     },
+    "legal.consent.processing.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply does not save these request texts. OpenAI may retain API content for abuse monitoring under its policies; API data is not used for model training by default. No AI request is sent without your agreement. You can withdraw it in Settings → Privacy."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply осы сұраныстардың мәтіндерін сақтамайды. OpenAI өз ережелері бойынша API мазмұнын теріс пайдалануды тексеру үшін уақытша сақтауы мүмкін; әдепкіде API деректері модель үйретуге қолданылмайды. Келісіміңізсіз AI сұраныстары жіберілмейді. Келісімді Параметрлер → Құпиялылық бөлімінде қайтара аласыз."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply не сохраняет тексты этих запросов. OpenAI может временно хранить содержимое API-запросов для проверки злоупотреблений по своим правилам; по умолчанию данные API не используются для обучения моделей. Без вашего согласия AI-запросы не отправляются. Отозвать согласие можно в Настройки → Конфиденциальность."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply bu soʻrov matnlarini saqlamaydi. OpenAI oʻz qoidalariga koʻra API mazmunini suiisteʼmolni tekshirish uchun vaqtincha saqlashi mumkin; API maʼlumotlari odatda modelni oʻqitish uchun ishlatilmaydi. Roziligingizsiz AI soʻrovlari yuborilmaydi. Rozilikni Sozlamalar → Maxfiylik boʻlimida qaytarib olishingiz mumkin."
+          }
+        }
+      }
+    },
+    "legal.consent.processing.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Processing and your choice"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Өңдеу және таңдауыңыз"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Обработка и ваш выбор"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qayta ishlash va tanlovingiz"
+          }
+        }
+      }
+    },
+    "legal.consent.recipient.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAI (USA), through the AI Reply server, to generate replies, messages and text corrections."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Жауап, хабарлама жазу және мәтінді түзету үшін AI Reply сервері арқылы OpenAI (АҚШ) алады."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAI (США) через сервер AI Reply — для создания ответов, сообщений и исправления текста."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Javoblar, xabarlar va matn tuzatishlarini yaratish uchun AI Reply serveri orqali OpenAI (AQSH)."
+          }
+        }
+      }
+    },
+    "legal.consent.recipient.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Who receives the data"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Деректі кім алады"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Кто получает данные"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Maʼlumotni kim oladi"
+          }
+        }
+      }
+    },
     "legal.consent.title" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Before you continue"
+            "value" : "Share data with OpenAI?"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Жалғастырмас бұрын"
+            "value" : "OpenAI-ға дерек жіберу"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Перед продолжением"
+            "value" : "Передача данных в OpenAI"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Davom etishdan oldin"
+            "value" : "OpenAI’ga maʼlumot yuborish"
           }
         }
       }

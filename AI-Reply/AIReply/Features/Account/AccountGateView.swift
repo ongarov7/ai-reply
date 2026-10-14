@@ -62,6 +62,7 @@ private struct LegalConsentView: View {
     /// The second, separate consent: the texts go to the AI provider.
     @State private var isAIAccepted = false
     @State private var isSubmitting = false
+    @State private var isShowingDecline = false
 
     var body: some View {
         AuthScreen {
@@ -74,6 +75,14 @@ private struct LegalConsentView: View {
                         .foregroundStyle(.secondary)
                 }
 
+                VStack(alignment: .leading, spacing: DS.Spacing.m) {
+                    disclosure("legal.consent.recipient.title", body: "legal.consent.recipient.body")
+                    disclosure("legal.consent.data.title", body: "legal.consent.ai")
+                    disclosure("legal.consent.processing.title", body: "legal.consent.processing.body")
+                }
+                .padding(DS.Spacing.m)
+                .background(RoundedRectangle(cornerRadius: DS.Radius.large).fill(Color.dsSurface))
+
                 VStack(spacing: 0) {
                     legalLink("legal.terms", urlString: account.legalConfig.termsURL)
                     Divider().padding(.leading, 44)
@@ -84,12 +93,6 @@ private struct LegalConsentView: View {
                     RoundedRectangle(cornerRadius: DS.Radius.large, style: .continuous)
                         .fill(Color.dsSurface)
                 )
-
-                // What happens to the texts, said before anyone agrees to it.
-                Text("legal.consent.ai")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
 
                 checkbox("legal.consent.checkbox", isOn: $isAccepted)
                 checkbox("legal.consent.aiCheckbox", isOn: $isAIAccepted)
@@ -106,6 +109,15 @@ private struct LegalConsentView: View {
                 }
                 .buttonStyle(.dsPrimary)
                 .disabled(!isAccepted || !isAIAccepted || isSubmitting)
+                .accessibilityIdentifier("consent.accept")
+
+                Button("legal.consent.decline") {
+                    isAIAccepted = false
+                    isShowingDecline = true
+                }
+                .frame(maxWidth: .infinity, minHeight: DS.Layout.minimumTouchTarget)
+                .disabled(isSubmitting)
+                .accessibilityIdentifier("consent.decline")
 
                 Text("legal.consent.footer")
                     .font(.caption)
@@ -122,6 +134,18 @@ private struct LegalConsentView: View {
                     .buttonStyle(ExitActionButtonStyle())
                 }
             }
+        }
+        .alert("legal.consent.declined.title", isPresented: $isShowingDecline) {
+            Button("common.done", role: .cancel) { }
+        } message: {
+            Text("legal.consent.declined.body")
+        }
+    }
+
+    private func disclosure(_ title: LocalizedStringKey, body: LocalizedStringKey) -> some View {
+        VStack(alignment: .leading, spacing: DS.Spacing.xs) {
+            Text(title).font(.subheadline.weight(.semibold)).accessibilityAddTraits(.isHeader)
+            Text(body).font(.subheadline).fixedSize(horizontal: false, vertical: true)
         }
     }
 

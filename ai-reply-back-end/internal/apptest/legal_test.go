@@ -82,7 +82,7 @@ func TestConfigAnnouncesLegalLinksAndFeatures(t *testing.T) {
 		{"legal", "account_deletion_url"}: "http://localhost:8084/account/delete",
 		{"legal", "ai_provider"}:          "OpenAI",
 		{"legal", "terms_version"}:        "2026-10-08",
-		{"legal", "privacy_version"}:      "2026-10-08",
+		{"legal", "privacy_version"}:      legal.PrivacyVersion,
 		{"payment_mode", ""}:              "demo",
 	} {
 		keys := []string{path[0]}

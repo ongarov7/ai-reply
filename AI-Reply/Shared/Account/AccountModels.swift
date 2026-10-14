@@ -274,7 +274,7 @@ extension AccountAPI {
 
         static let production = LegalConfig(
             termsVersion: "2026-10-08",
-            privacyVersion: "2026-10-08",
+            privacyVersion: "2026-10-14",
             termsURL: "https://ai-reply.kz/offer",
             privacyURL: "https://ai-reply.kz/privacy"
         )

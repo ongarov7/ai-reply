@@ -376,8 +376,13 @@ final class LocalizationTests: XCTestCase {
     func testThePrivacyTextsMatchTheConsent() {
         let settings = AppSettings(store: SharedSettings(defaults: UserDefaults(suiteName: "LocalizationTests.\(UUID())")!))
         settings.setLanguage(.english)
-        XCTAssertTrue(settings.localized("legal.consent.ai").contains("the message you copied or selected"))
-        XCTAssertTrue(settings.localized("legal.consent.ai").contains("your profile is kept in your account until you delete it"))
+        let disclosure = settings.localized("legal.consent.ai")
+        for data in ["copied or selected message", "instruction", "chosen template", "profile", "business details",
+                     "grammatical gender", "working-hours context", "while you type"] {
+            XCTAssertTrue(disclosure.contains(data), "AI disclosure must explain \(data)")
+        }
+        XCTAssertTrue(settings.localized("legal.consent.processing.body").contains("withdraw"))
+        XCTAssertTrue(settings.localized("legal.consent.declined.body").contains("No AI request"))
         for key in ["settings.privacy.body", "onboarding.fullAccess.warning"] {
             XCTAssertTrue(settings.localized(key).contains("unless you select it yourself and tap Reply"), key)
             XCTAssertFalse(settings.localized(key).contains("never sent"), key)
@@ -392,7 +397,7 @@ final class LocalizationTests: XCTestCase {
         settings.setLanguage(.kazakh)
         for key in ["settings.account", "settings.account.delete", "settings.account.delete.confirm",
                     "settings.account.delete.body", "account.delete.done", "account.delete.failed",
-                    "account.delete.appleRequired", "settings.privacy.withdraw.body", "legal.consent.ai"] {
+                    "account.delete.appleRequired", "settings.privacy.withdraw.body"] {
             let text = settings.localized(key).lowercased()
             XCTAssertTrue(text.contains("тіркелгі"), key)
             XCTAssertFalse(text.contains("аккаунт"), key)
@@ -404,7 +409,7 @@ final class LocalizationTests: XCTestCase {
         let settings = AppSettings(store: SharedSettings(defaults: UserDefaults(suiteName: "LocalizationTests.\(UUID())")!))
         for language in AppLanguage.allCases {
             settings.setLanguage(language)
-            for key in ["legal.consent.ai", "legal.consent.aiCheckbox", "settings.privacy.body",
+            for key in ["legal.consent.recipient.body", "legal.consent.aiCheckbox", "settings.privacy.body",
                         "home.privacy.body", "onboarding.fullAccess.warning"] {
                 XCTAssertTrue(settings.localized(key).contains("OpenAI"), "\(key) in \(language.rawValue)")
             }
