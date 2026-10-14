@@ -245,4 +245,30 @@
     <string name="settings_version">Нұсқа %1$s (%2$d)</string>
     <string name="common_link_failed">Телефонда бұл сілтемені ашатын қолданба жоқ.</string>
 
+    <!-- Keyboard voice recording (gpt-transcribe, 2026-10) -->
+    <string name="voice_kb_dictate">Дауыспен енгізу</string>
+    <string name="voice_rec_limit_hint">%1$d секундқа дейін</string>
+    <string name="voice_rec_limit_full">Жазудың ең ұзақ уақыты: %1$d секунд</string>
+    <string name="voice_rec_starting">Микрофон қосылып жатыр…</string>
+    <string name="voice_rec_recording">Жазылып жатыр</string>
+    <string name="voice_rec_paused">Үзіліс</string>
+    <string name="voice_rec_left">%1$d с қалды</string>
+    <string name="voice_rec_limit_reached">Жазу уақыты бітті</string>
+    <string name="voice_rec_recognizing">Сөз танылып жатыр…</string>
+    <string name="voice_rec_retrying">Байланыс жоқ. Қайта көріп жатырмыз…</string>
+    <string name="voice_rec_pause">Жазуды кідірту</string>
+    <string name="voice_rec_resume">Жазуды жалғастыру</string>
+    <string name="voice_rec_done">Дайын</string>
+    <string name="voice_rec_done_description">Жазуды аяқтап, сөзді тану</string>
+    <string name="voice_rec_cancel">Жазудан бас тарту</string>
+    <string name="voice_rec_timer">%2$d секундтың %1$d секунды жазылды</string>
+    <string name="voice_rec_ready">Сөз танылды. Кірістіру керек пе?</string>
+    <string name="voice_rec_too_short">Жазба тым қысқа. Қайталап көріңіз.</string>
+    <string name="voice_rec_interrupted">Үзіліс: микрофонды қоңырау немесе басқа қолданба пайдаланып жатыр.</string>
+    <string name="voice_rec_mic_unavailable">Микрофон қазір істемей тұр. Қайталап көріңіз.</string>
+    <string name="voice_rec_added">Дауыспен қосылды</string>
+    <string name="voice_rec_undo">Алып тастау</string>
+    <string name="voice_rec_undo_description">Дауыспен қосылған мәтінді алып тастау</string>
+    <string name="kb_err_voice_limit">Бүгінгі дауыспен енгізу таусылды. Ертең қайта қолжетімді болады.</string>
+
 </resources>

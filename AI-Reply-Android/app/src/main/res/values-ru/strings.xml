@@ -170,7 +170,7 @@
     <string name="setup_checklist_microphone">Доступ к микрофону</string>
     <string name="setup_checklist_speech">Распознавание речи</string>
     <string name="setup_voice_title">Голосовой ввод</string>
-    <string name="setup_voice_body">Голосовой ввод использует распознавание речи Android. Доступность и обработка аудио на устройстве зависят от устройства и выбранной службы распознавания.</string>
+    <string name="setup_voice_body">В клавиатуре голосовой ввод записывает звук, только пока открыта панель записи, и не дольше 40 секунд. Запись отправляется через сервер AI Reply в OpenAI для преобразования в текст и не хранится.</string>
     <string name="setup_voice_enable">Разрешить доступ к микрофону</string>
     <string name="setup_steps_footer">iOS позволяет открыть только страницу самого приложения, поэтому список клавиатур нужно открыть вручную.</string>
     <string name="setup_steps_title">Как добавить</string>

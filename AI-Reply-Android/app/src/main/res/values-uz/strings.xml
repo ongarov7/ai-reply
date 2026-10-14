@@ -120,7 +120,7 @@
     <string name="setup_state_unavailable">Mavjud emas</string>
     <string name="setup_steps_title">Qanday yoqiladi</string>
     <string name="setup_voice_title">Ovozli kiritish</string>
-    <string name="setup_voice_body">Ovozli kiritish Android nutqni aniqlash xizmatidan foydalanadi. Mavjudlik va audioning qurilmada qayta ishlanishi qurilma hamda tanlangan xizmatga bogʻliq.</string>
+    <string name="setup_voice_body">Klaviaturada ovozli kiritish ovozni faqat yozish paneli ochiq turganda va 40 soniyadan oshmasdan yozadi. Yozuv matnga aylantirish uchun AI Reply serveri orqali OpenAI xizmatiga yuboriladi va saqlanmaydi.</string>
     <string name="setup_voice_enable">Mikrofonga ruxsat berish</string>
 
     <string name="templates_add">Yangi shablon</string>

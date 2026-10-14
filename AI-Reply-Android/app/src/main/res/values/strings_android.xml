@@ -274,4 +274,30 @@
     <string name="settings_version">Version %1$s (%2$d)</string>
     <string name="common_link_failed">No app on this phone can open the link.</string>
 
+    <!-- Keyboard voice recording (gpt-transcribe, 2026-10) -->
+    <string name="voice_kb_dictate">Voice input</string>
+    <string name="voice_rec_limit_hint">Up to %1$d seconds</string>
+    <string name="voice_rec_limit_full">Maximum recording duration: %1$d seconds</string>
+    <string name="voice_rec_starting">Turning on the microphone…</string>
+    <string name="voice_rec_recording">Recording</string>
+    <string name="voice_rec_paused">Paused</string>
+    <string name="voice_rec_left">%1$d s left</string>
+    <string name="voice_rec_limit_reached">Recording limit reached</string>
+    <string name="voice_rec_recognizing">Recognizing speech…</string>
+    <string name="voice_rec_retrying">No connection. Trying again…</string>
+    <string name="voice_rec_pause">Pause recording</string>
+    <string name="voice_rec_resume">Resume recording</string>
+    <string name="voice_rec_done">Done</string>
+    <string name="voice_rec_done_description">Finish recording and recognize speech</string>
+    <string name="voice_rec_cancel">Cancel recording</string>
+    <string name="voice_rec_timer">%1$d of %2$d seconds recorded</string>
+    <string name="voice_rec_ready">Speech recognized. Insert it?</string>
+    <string name="voice_rec_too_short">The recording is too short. Try again.</string>
+    <string name="voice_rec_interrupted">Paused: a call or another app is using the microphone.</string>
+    <string name="voice_rec_mic_unavailable">The microphone isn\'t working right now. Try again.</string>
+    <string name="voice_rec_added">Added from voice</string>
+    <string name="voice_rec_undo">Undo</string>
+    <string name="voice_rec_undo_description">Remove the text added from voice</string>
+    <string name="kb_err_voice_limit">You\'ve used today\'s voice input. It comes back tomorrow.</string>
+
 </resources>

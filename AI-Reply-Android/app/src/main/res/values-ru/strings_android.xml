@@ -245,4 +245,30 @@
     <string name="settings_version">Версия %1$s (%2$d)</string>
     <string name="common_link_failed">На телефоне нет приложения, которое может открыть ссылку.</string>
 
+    <!-- Keyboard voice recording (gpt-transcribe, 2026-10) -->
+    <string name="voice_kb_dictate">Голосовой ввод</string>
+    <string name="voice_rec_limit_hint">До %1$d секунд</string>
+    <string name="voice_rec_limit_full">Максимальная длительность записи: %1$d секунд</string>
+    <string name="voice_rec_starting">Включаем микрофон…</string>
+    <string name="voice_rec_recording">Идёт запись</string>
+    <string name="voice_rec_paused">Пауза</string>
+    <string name="voice_rec_left">Осталось %1$d с</string>
+    <string name="voice_rec_limit_reached">Достигнут лимит записи</string>
+    <string name="voice_rec_recognizing">Распознаём речь…</string>
+    <string name="voice_rec_retrying">Нет связи. Пробуем ещё раз…</string>
+    <string name="voice_rec_pause">Приостановить запись</string>
+    <string name="voice_rec_resume">Продолжить запись</string>
+    <string name="voice_rec_done">Готово</string>
+    <string name="voice_rec_done_description">Закончить запись и распознать речь</string>
+    <string name="voice_rec_cancel">Отменить запись</string>
+    <string name="voice_rec_timer">Записано %1$d из %2$d с</string>
+    <string name="voice_rec_ready">Речь распознана. Вставить?</string>
+    <string name="voice_rec_too_short">Запись слишком короткая. Попробуйте ещё раз.</string>
+    <string name="voice_rec_interrupted">Пауза: микрофон занят звонком или другим приложением.</string>
+    <string name="voice_rec_mic_unavailable">Микрофон сейчас не работает. Попробуйте ещё раз.</string>
+    <string name="voice_rec_added">Добавлено голосом</string>
+    <string name="voice_rec_undo">Убрать</string>
+    <string name="voice_rec_undo_description">Убрать текст, добавленный голосом</string>
+    <string name="kb_err_voice_limit">Голосовой ввод на сегодня исчерпан. Завтра он снова будет доступен.</string>
+
 </resources>

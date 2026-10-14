@@ -235,4 +235,30 @@
     <string name="settings_version">Versiya %1$s (%2$d)</string>
     <string name="common_link_failed">Telefonda bu havolani ochadigan ilova yoʻq.</string>
 
+    <!-- Keyboard voice recording (gpt-transcribe, 2026-10) -->
+    <string name="voice_kb_dictate">Ovozli kiritish</string>
+    <string name="voice_rec_limit_hint">%1$d soniyagacha</string>
+    <string name="voice_rec_limit_full">Yozuvning eng uzun davomiyligi: %1$d soniya</string>
+    <string name="voice_rec_starting">Mikrofon yoqilmoqda…</string>
+    <string name="voice_rec_recording">Yozilmoqda</string>
+    <string name="voice_rec_paused">Pauza</string>
+    <string name="voice_rec_left">%1$d s qoldi</string>
+    <string name="voice_rec_limit_reached">Yozish vaqti tugadi</string>
+    <string name="voice_rec_recognizing">Nutq aniqlanmoqda…</string>
+    <string name="voice_rec_retrying">Aloqa yoʻq. Qayta urinilmoqda…</string>
+    <string name="voice_rec_pause">Yozishni toʻxtatib turish</string>
+    <string name="voice_rec_resume">Yozishni davom ettirish</string>
+    <string name="voice_rec_done">Tayyor</string>
+    <string name="voice_rec_done_description">Yozishni tugatib, nutqni aniqlash</string>
+    <string name="voice_rec_cancel">Yozishni bekor qilish</string>
+    <string name="voice_rec_timer">%2$d soniyadan %1$d soniyasi yozildi</string>
+    <string name="voice_rec_ready">Nutq aniqlandi. Kiritilsinmi?</string>
+    <string name="voice_rec_too_short">Yozuv juda qisqa. Qayta urinib koʻring.</string>
+    <string name="voice_rec_interrupted">Pauza: mikrofon qoʻngʻiroq yoki boshqa ilova bilan band.</string>
+    <string name="voice_rec_mic_unavailable">Mikrofon hozir ishlamayapti. Qayta urinib koʻring.</string>
+    <string name="voice_rec_added">Ovoz bilan qoʻshildi</string>
+    <string name="voice_rec_undo">Olib tashlash</string>
+    <string name="voice_rec_undo_description">Ovoz bilan qoʻshilgan matnni olib tashlash</string>
+    <string name="kb_err_voice_limit">Bugungi ovozli kiritish tugadi. Ertaga yana mavjud boʻladi.</string>
+
 </resources>

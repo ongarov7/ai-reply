@@ -170,7 +170,7 @@
     <string name="setup_checklist_microphone">Microphone access</string>
     <string name="setup_checklist_speech">Speech recognition</string>
     <string name="setup_voice_title">Voice input</string>
-    <string name="setup_voice_body">Voice input uses Android speech recognition. Availability and whether audio is processed on device depend on your device and selected recognition service.</string>
+    <string name="setup_voice_body">In the keyboard, voice input records only while the recording panel is on screen, for up to 40 seconds. The recording is sent through the AI Reply server to OpenAI to turn it into text and is not stored.</string>
     <string name="setup_voice_enable">Allow microphone access</string>
     <string name="setup_steps_footer">iOS only lets an app open its own settings page, so the keyboard list has to be opened by hand.</string>
     <string name="setup_steps_title">How to add it</string>

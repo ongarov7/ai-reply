@@ -170,7 +170,7 @@
     <string name="setup_checklist_microphone">Микрофонға рұқсат</string>
     <string name="setup_checklist_speech">Сөйлеуді тану</string>
     <string name="setup_voice_title">Дауыспен енгізу</string>
-    <string name="setup_voice_body">Дауыспен енгізу Android сөйлеуді тану қызметін пайдаланады. Қолжетімділік және дыбыстың құрылғыда өңделуі құрылғы мен таңдалған тану қызметіне байланысты.</string>
+    <string name="setup_voice_body">Пернетақтада дауыспен енгізу дыбысты тек жазу панелі ашық тұрғанда және 40 секундтан аспай жазады. Жазба мәтінге айналдыру үшін AI Reply сервері арқылы OpenAI қызметіне жіберіледі және сақталмайды.</string>
     <string name="setup_voice_enable">Микрофонға рұқсат беру</string>
     <string name="setup_steps_footer">iOS тек қолданбаның өз бетін аша алады, сондықтан пернетақталар тізімін қолмен ашу керек.</string>
     <string name="setup_steps_title">Қалай қосу керек</string>
