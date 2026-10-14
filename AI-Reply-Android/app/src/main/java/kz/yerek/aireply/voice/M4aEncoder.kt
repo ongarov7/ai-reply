@@ -64,7 +64,8 @@ internal object M4aEncoder {
             var lastPtsUs = 0L
             var idle = 0
 
-            while (true) {
+            var outputDone = false
+            while (!outputDone) {
                 checkpoint()
 
                 if (!inputDone) {
@@ -88,44 +89,52 @@ internal object M4aEncoder {
                     }
                 }
 
-                val out = codec.dequeueOutputBuffer(info, if (inputDone) TIMEOUT_US else 0L)
-                when {
-                    out == MediaCodec.INFO_TRY_AGAIN_LATER -> {
+                // Every frame that is ready, before feeding more: taking one
+                // per pass left the input waiting on a full codec, ~10 ms a
+                // frame - six seconds for 40 s of audio on a slow phone.
+                while (true) {
+                    val out = codec.dequeueOutputBuffer(info, if (inputDone) TIMEOUT_US else 0L)
+                    if (out == MediaCodec.INFO_TRY_AGAIN_LATER) {
                         if (inputDone && ++idle > MAX_IDLE_POLLS) error("encoder stalled")
+                        break
                     }
-
-                    out == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
-                        idle = 0
-                        check(track < 0) { "output format changed twice" }
-                        track = muxer.addTrack(codec.outputFormat)
-                        muxer.start()
-                        muxerStarted = true
-                    }
-
-                    out >= 0 -> {
-                        idle = 0
-                        val buffer = checkNotNull(codec.getOutputBuffer(out)) { "no output buffer" }
-                        // The codec config (the AAC header) reaches the muxer
-                        // through the output format, not as a sample.
-                        val isConfig = info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG != 0
-                        if (!isConfig && info.size > 0) {
-                            check(muxerStarted) { "audio before the output format" }
-                            // The MPEG-4 writer refuses audio that goes back in time.
-                            if (info.presentationTimeUs < lastPtsUs) {
-                                info.set(info.offset, info.size, lastPtsUs, info.flags)
-                            }
-                            lastPtsUs = info.presentationTimeUs
-                            buffer.position(info.offset)
-                            buffer.limit(info.offset + info.size)
-                            muxer.writeSampleData(track, buffer, info)
+                    when {
+                        out == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
+                            idle = 0
+                            check(track < 0) { "output format changed twice" }
+                            track = muxer.addTrack(codec.outputFormat)
+                            muxer.start()
+                            muxerStarted = true
                         }
-                        codec.releaseOutputBuffer(out, false)
-                        if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) break
-                    }
 
-                    // INFO_OUTPUT_BUFFERS_CHANGED: getOutputBuffer(index) already
-                    // returns the current buffers, nothing to do.
-                    else -> Unit
+                        out >= 0 -> {
+                            idle = 0
+                            val buffer = checkNotNull(codec.getOutputBuffer(out)) { "no output buffer" }
+                            // The codec config (the AAC header) reaches the muxer
+                            // through the output format, not as a sample.
+                            val isConfig = info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG != 0
+                            if (!isConfig && info.size > 0) {
+                                check(muxerStarted) { "audio before the output format" }
+                                // The MPEG-4 writer refuses audio that goes back in time.
+                                if (info.presentationTimeUs < lastPtsUs) {
+                                    info.set(info.offset, info.size, lastPtsUs, info.flags)
+                                }
+                                lastPtsUs = info.presentationTimeUs
+                                buffer.position(info.offset)
+                                buffer.limit(info.offset + info.size)
+                                muxer.writeSampleData(track, buffer, info)
+                            }
+                            codec.releaseOutputBuffer(out, false)
+                            if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) {
+                                outputDone = true
+                                break
+                            }
+                        }
+
+                        // INFO_OUTPUT_BUFFERS_CHANGED: getOutputBuffer(index) already
+                        // returns the current buffers, nothing to do.
+                        else -> Unit
+                    }
                 }
             }
 
