@@ -42,8 +42,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -118,7 +116,9 @@ class VoiceActions(
     val onCancel: () -> Unit,
     val onRetry: () -> Unit,
     val onInsert: () -> Unit,
-    val onUndo: () -> Unit
+    val onUndo: () -> Unit,
+    /** A recording for the app's field that could not start: try again, as 🎙 would. */
+    val onRestart: () -> Unit = {}
 ) {
     companion object {
         val NONE = VoiceActions({}, {}, {}, {}, {}, {}, {})
@@ -135,7 +135,11 @@ class VoiceActions(
  *          ━━━━━━━━━━━━━━━━━━━━━━──────────────
  *
  * Recognising swaps the timer for a spinner, a failure for its sentence and
- * Try again, words waiting for the app's field for a preview and Insert.
+ * Try again, words waiting for the app's field for a preview and Insert. A
+ * recording that could not start says why here too, for a few seconds.
+ *
+ * Under [COMPACT_WIDTH] (a 360dp phone) Done is a tick and the timer reads
+ * "0:18/0:40", so the status always has room to be read.
  */
 @Composable
 fun HostVoiceBar(
@@ -145,14 +149,17 @@ fun HostVoiceBar(
     theme: KeyboardTheme,
     modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(PERSONA_ROW_HEIGHT)
-            .padding(horizontal = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        VoiceControlsRow(voice, actions, strings, theme, showsStatus = true, buttonSize = 34.dp)
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        val compact = maxWidth < COMPACT_WIDTH
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(PERSONA_ROW_HEIGHT)
+                .padding(horizontal = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            VoiceControlsRow(voice, actions, strings, theme, showsStatus = true, buttonSize = 34.dp, compact = compact)
+        }
     }
 }
 
@@ -171,11 +178,14 @@ internal fun PanelVoiceControls(
     theme: KeyboardTheme,
     modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = modifier.fillMaxWidth().height(ROW_HEIGHT),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        VoiceControlsRow(voice, actions, strings, theme, showsStatus = false, buttonSize = 32.dp)
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        val compact = maxWidth < COMPACT_WIDTH - 40.dp
+        Row(
+            modifier = Modifier.fillMaxWidth().height(ROW_HEIGHT),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            VoiceControlsRow(voice, actions, strings, theme, showsStatus = false, buttonSize = 32.dp, compact = compact)
+        }
     }
 }
 
@@ -187,7 +197,8 @@ private fun androidx.compose.foundation.layout.RowScope.VoiceControlsRow(
     strings: AppStrings,
     theme: KeyboardTheme,
     showsStatus: Boolean,
-    buttonSize: Dp
+    buttonSize: Dp,
+    compact: Boolean
 ) {
     CircleIcon(
         icon = Icons.Filled.Close,
@@ -202,9 +213,9 @@ private fun androidx.compose.foundation.layout.RowScope.VoiceControlsRow(
         when (voice.phase) {
             DictationPhase.FINALIZING, DictationPhase.TRANSCRIBING, DictationPhase.RECOVERING ->
                 WorkingState(voice, strings, theme)
-            DictationPhase.ERROR -> ProblemState(voice, strings, theme)
+            DictationPhase.ERROR, DictationPhase.IDLE -> ProblemState(voice, strings, theme)
             DictationPhase.REVIEWING -> PendingState(voice, strings, theme)
-            else -> RecordingState(voice, strings, theme, showsStatus)
+            else -> RecordingState(voice, strings, theme, showsStatus, compact)
         }
     }
     Spacer(Modifier.width(8.dp))
@@ -221,8 +232,17 @@ private fun androidx.compose.foundation.layout.RowScope.VoiceControlsRow(
                 onClick = if (paused) actions.onResume else actions.onPause
             )
             Spacer(Modifier.width(6.dp))
-            DoneButton(voice, strings, theme, actions.onFinish)
+            DoneButton(voice, strings, theme, compact, actions.onFinish)
         }
+        // The app's field: a recording that could not start, tried again as 🎙 would.
+        DictationPhase.IDLE -> ActionPill(
+            label = strings[R.string.kb_retry],
+            enabled = true,
+            theme = theme,
+            quiet = true,
+            modifier = Modifier.widthIn(min = 64.dp),
+            onClick = actions.onRestart
+        )
         DictationPhase.ERROR -> ActionPill(
             label = strings[R.string.kb_retry],
             enabled = true,
@@ -247,12 +267,12 @@ private fun androidx.compose.foundation.layout.RowScope.VoiceControlsRow(
  * the moment the microphone opens is not a recording.
  */
 @Composable
-private fun DoneButton(voice: VoiceUi, strings: AppStrings, theme: KeyboardTheme, onClick: () -> Unit) {
+private fun DoneButton(voice: VoiceUi, strings: AppStrings, theme: KeyboardTheme, compact: Boolean, onClick: () -> Unit) {
     val ready = voice.canFinish && voice.meter.capturedMs >= DictationController.MIN_RECORDING_MS
     Row(
         modifier = Modifier
             .height(32.dp)
-            .widthIn(min = 72.dp)
+            .widthIn(min = if (compact) 44.dp else 72.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(if (ready) theme.accent else theme.accent.copy(alpha = 0.35f))
             .clickable(enabled = ready, role = Role.Button, onClick = onClick)
@@ -261,16 +281,18 @@ private fun DoneButton(voice: VoiceUi, strings: AppStrings, theme: KeyboardTheme
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(Icons.Filled.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
-        Spacer(Modifier.width(4.dp))
-        Text(
-            text = strings[R.string.voice_rec_done],
-            fontSize = 15.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = Color.White,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
+        Icon(Icons.Filled.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(if (compact) 18.dp else 15.dp))
+        if (!compact) {
+            Spacer(Modifier.width(4.dp))
+            Text(
+                text = strings[R.string.voice_rec_done],
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }
 
@@ -282,7 +304,7 @@ private fun DoneButton(voice: VoiceUi, strings: AppStrings, theme: KeyboardTheme
  * 5 s and the limit; here it is only drawn.
  */
 @Composable
-private fun RecordingState(voice: VoiceUi, strings: AppStrings, theme: KeyboardTheme, showsStatus: Boolean) {
+private fun RecordingState(voice: VoiceUi, strings: AppStrings, theme: KeyboardTheme, showsStatus: Boolean, compact: Boolean) {
     val captured = voice.meter.capturedMs
     val left = voice.maxMs - captured
     val urgent = voice.phase == DictationPhase.RECORDING && left <= VoiceStatusText.URGENT_MS
@@ -321,7 +343,7 @@ private fun RecordingState(voice: VoiceUi, strings: AppStrings, theme: KeyboardT
                 Spacer(Modifier.weight(1f))
             }
             Text(
-                text = VoiceStatusText.timer(captured, voice.maxMs),
+                text = if (compact) VoiceStatusText.shortTimer(captured, voice.maxMs) else VoiceStatusText.timer(captured, voice.maxMs),
                 fontSize = 12.sp,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = if (counting) FontWeight.SemiBold else FontWeight.Normal,
@@ -344,10 +366,8 @@ private fun RecordingState(voice: VoiceUi, strings: AppStrings, theme: KeyboardT
 @Composable
 private fun WorkingState(voice: VoiceUi, strings: AppStrings, theme: KeyboardTheme) {
     val status = VoiceStatusText.status(voice.phase, voice.meter.capturedMs, voice.maxMs, voice.limitReached, voice.message, forHost = true)
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
-    ) {
+    // No live region: the service announces each step once.
+    Row(verticalAlignment = Alignment.CenterVertically) {
         CircularProgressIndicator(modifier = Modifier.size(15.dp), strokeWidth = 2.dp, color = theme.accent)
         Spacer(Modifier.width(9.dp))
         Text(
@@ -502,30 +522,44 @@ internal fun VoiceLine(
     strings: AppStrings,
     theme: KeyboardTheme,
     modifier: Modifier = Modifier,
-    lines: Int = 2
+    lines: Int = 2,
+    /**
+     * Drawn in place of "Added from voice" while the words are only being
+     * reviewed: Create keeps "Reply to copied" within reach.
+     */
+    whileReviewing: (@Composable () -> Unit)? = null
 ) {
     val status = VoiceStatusText.status(
         voice.phase, voice.meter.capturedMs, voice.maxMs, voice.limitReached, voice.message, forHost = false
     ) ?: overLimitMessage(instruction, limit)
     val count = instruction.codePointLength()
     val over = count > limit
+    val quietReview = voice.phase == DictationPhase.REVIEWING && voice.message == null && !over
+    // At least a pill's height: Undo is never squeezed, even on one line.
+    val height = voiceLineHeight(lines).coerceAtLeast(if (voice.canUndo || whileReviewing != null) 28.dp else 0.dp)
     Row(
-        modifier = modifier.fillMaxWidth().height(voiceLineHeight(lines)),
+        modifier = modifier.fillMaxWidth().height(height),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = status?.let { strings.text(it) }.orEmpty(),
-            fontSize = 11.5.sp,
-            lineHeight = 14.sp,
-            color = when {
-                voice.phase == DictationPhase.ERROR || (over && voice.message !is DictationMessage.Failed) -> theme.destructive
-                voice.phase == DictationPhase.RECORDING -> theme.primaryText
-                else -> theme.secondaryText
-            },
-            maxLines = lines,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite }
-        )
+        if (quietReview && whileReviewing != null) {
+            Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) { whileReviewing() }
+        } else {
+            // No live region: the service announces the steps once each,
+            // never the countdown second by second.
+            Text(
+                text = status?.let { strings.text(it) }.orEmpty(),
+                fontSize = 11.5.sp,
+                lineHeight = 14.sp,
+                color = when {
+                    voice.phase == DictationPhase.ERROR || (over && voice.message !is DictationMessage.Failed) -> theme.destructive
+                    voice.phase == DictationPhase.RECORDING -> theme.primaryText
+                    else -> theme.secondaryText
+                },
+                maxLines = lines,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+        }
         if (voice.canUndo) {
             Spacer(Modifier.width(6.dp))
             AssistPill(
@@ -573,6 +607,9 @@ internal fun AppStrings.text(message: VoiceMessage): String = when (message) {
     is VoiceMessage.Text -> message.argument?.let { get(message.id, it) } ?: get(message.id)
     is VoiceMessage.Error -> message(message.error)
 }
+
+/** Narrower than this, the host bar shows a tick for Done and the short timer. */
+private val COMPACT_WIDTH = 400.dp
 
 /** Silence still shows a sliver of each bar. */
 private const val MIN_BAR = 0.18f

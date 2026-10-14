@@ -292,6 +292,7 @@
     <string name="voice_rec_cancel">Cancel recording</string>
     <string name="voice_rec_timer">%1$d of %2$d seconds recorded</string>
     <string name="voice_rec_ready">Speech recognized. Insert it?</string>
+    <string name="voice_rec_not_saved">Couldn\'t save the recording. Free up some space and try again.</string>
     <string name="voice_rec_too_short">The recording is too short. Try again.</string>
     <string name="voice_rec_interrupted">Paused: a call or another app is using the microphone.</string>
     <string name="voice_rec_mic_unavailable">The microphone isn\'t working right now. Try again.</string>

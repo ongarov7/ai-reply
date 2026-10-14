@@ -45,6 +45,7 @@ object VoiceStatusText {
         )
         DictationMessage.TooShort -> VoiceMessage.Text(R.string.voice_rec_too_short)
         DictationMessage.NothingHeard -> VoiceMessage.Text(R.string.voice_kb_no_speech)
+        DictationMessage.NotSaved -> VoiceMessage.Text(R.string.voice_rec_not_saved)
         is DictationMessage.Failed -> VoiceMessage.Error(message.error)
         is DictationMessage.TooLong -> VoiceMessage.Text(R.string.kb_compose_err_too_long, message.limit)
     }
@@ -89,6 +90,14 @@ object VoiceStatusText {
 
     /** "00:18 / 00:40": the audio recorded and the most a recording holds. */
     fun timer(capturedMs: Long, maxMs: Long): String = "${clock(capturedMs)} / ${clock(maxMs)}"
+
+    /** "0:18/0:40": the same, for a narrow bar. */
+    fun shortTimer(capturedMs: Long, maxMs: Long): String = "${short(capturedMs)}/${short(maxMs)}"
+
+    private fun short(ms: Long): String {
+        val total = seconds(ms)
+        return String.format(Locale.ROOT, "%d:%02d", total / 60, total % 60)
+    }
 
     /** Whole seconds recorded, for the screen reader. */
     fun seconds(ms: Long): Int = (ms.coerceAtLeast(0L) / 1000).toInt()

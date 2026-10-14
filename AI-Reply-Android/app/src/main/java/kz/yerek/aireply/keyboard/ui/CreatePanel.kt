@@ -320,6 +320,18 @@ private fun CreateLine(model: CreateModel, actions: CreateActions, strings: AppS
 @Composable
 private fun CreateLineContent(model: CreateModel, actions: CreateActions, strings: AppStrings, theme: KeyboardTheme) {
     val request = model.session.instruction.text
+    val replyToCopied: @Composable () -> Unit = {
+        AssistPill(
+            text = strings[R.string.kb_reply_to_copied],
+            description = strings[R.string.kb_reply_to_copied_description],
+            icon = {
+                Icon(Icons.AutoMirrored.Filled.Reply, null, tint = theme.primaryText, modifier = Modifier.size(15.dp))
+            },
+            theme = theme,
+            enabled = model.session.flow.stage == ReplyComposerFlow.Stage.Composing && !model.voice.showsControls,
+            onClick = actions.onReplyToCopied
+        )
+    }
     if (voiceLineShows(model.voice, request, model.instructionLimit)) {
         VoiceLine(
             voice = model.voice,
@@ -328,19 +340,12 @@ private fun CreateLineContent(model: CreateModel, actions: CreateActions, string
             actions = actions.voice,
             strings = strings,
             theme = theme,
-            lines = model.voiceLines
+            lines = model.voiceLines,
+            // Dictating the request and then answering the copied message stays one tap away.
+            whileReviewing = replyToCopied
         )
     } else {
-        AssistPill(
-            text = strings[R.string.kb_reply_to_copied],
-            description = strings[R.string.kb_reply_to_copied_description],
-            icon = {
-                Icon(Icons.AutoMirrored.Filled.Reply, null, tint = theme.primaryText, modifier = Modifier.size(15.dp))
-            },
-            theme = theme,
-            enabled = model.session.flow.stage == ReplyComposerFlow.Stage.Composing,
-            onClick = actions.onReplyToCopied
-        )
+        replyToCopied()
     }
 }
 

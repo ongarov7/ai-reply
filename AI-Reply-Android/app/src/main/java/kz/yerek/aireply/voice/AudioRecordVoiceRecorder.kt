@@ -22,6 +22,7 @@ import kotlinx.coroutines.withContext
 import kz.yerek.aireply.platform.ReplyLog
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
 
 /**
  * [VoiceRecorder] on [AudioRecord]: raw PCM from the microphone into memory,
@@ -141,6 +142,12 @@ class AudioRecordVoiceRecorder(
         if (current == null) return
         stopRun()
         ReplyLog.event { "voice: paused with $capturedMs ms" }
+        // The reader may have filled the buffer a moment before: its report of
+        // the limit belonged to the run just stopped, so it is made again.
+        if (synchronized(lock) { pcm?.isFull == true }) {
+            val id = generation
+            handler.post { if (id == generation) listener?.onLimitReached() }
+        }
     }
 
     override fun resume(): RecorderFailure? {
@@ -204,9 +211,11 @@ class AudioRecordVoiceRecorder(
     // ----------------------------------------------------------- the file
 
     /**
-     * Off the main thread: M4A, or WAV when no AAC encoder works. Null when
-     * neither could be written (a full disk). A cancelled coroutine stops the
-     * work between blocks and leaves no partial file.
+     * Off the main thread: M4A, or WAV when no AAC encoder works. Throws
+     * [IOException] when neither could be written (a full disk) - never null,
+     * which means "too short" - so the audio stays for another try. A
+     * cancelled coroutine stops the work between blocks and leaves no
+     * partial file.
      */
     private suspend fun write(
         samples: ShortArray,
@@ -214,7 +223,7 @@ class AudioRecordVoiceRecorder(
         durationMs: Long,
         m4a: File,
         wav: File
-    ): RecordedAudio? {
+    ): RecordedAudio {
         val context = currentCoroutineContext()
         val checkpoint = { context.ensureActive() }
         val startedAt = SystemClock.elapsedRealtime()
@@ -247,7 +256,7 @@ class AudioRecordVoiceRecorder(
         } catch (e: Exception) {
             ReplyLog.warn(e) { "voice: could not write the recording" }
             wav.delete()
-            return null
+            throw IOException("the recording could not be written", e)
         }
     }
 

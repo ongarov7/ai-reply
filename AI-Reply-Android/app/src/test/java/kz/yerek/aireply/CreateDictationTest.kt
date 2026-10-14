@@ -62,11 +62,13 @@ class CreateDictationTest {
         assertEquals("Скажи, да что согласен", request)
         assertEquals("Скажи, да".length, h.compose.session!!.instruction.cursor)
 
-        // Typing carries on from there, and settles the review.
+        // Typing carries on from there; the line under the request stays (no
+        // height change on a keystroke), Undo goes.
         h.compose.session!!.instruction.insert(",")
         h.dictation.userEdited()
         assertEquals("Скажи, да, что согласен", request)
-        assertEquals(DictationPhase.IDLE, h.dictation.phase)
+        assertEquals(DictationPhase.REVIEWING, h.dictation.phase)
+        assertFalse(h.dictation.canUndo)
     }
 
     @Test

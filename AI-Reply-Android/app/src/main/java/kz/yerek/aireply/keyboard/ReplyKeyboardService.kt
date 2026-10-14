@@ -200,6 +200,13 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
     private var hostTakesVoice by mutableStateOf(false)
     /** Between onStartInputView and onFinishInputView. */
     private var keyboardVisible = false
+    /**
+     * Moves on whenever the app hands the keyboard a different input - another
+     * field, or the same one restarted - and not when the keyboard is merely
+     * shown again over the same one. Voice words go in by themselves only
+     * within one value of it.
+     */
+    private var hostInput = 0
 
     private var hostCapitalization = Capitalization.SENTENCES
     private var smartCorrection = true
@@ -292,6 +299,8 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
+        // Shown again over the same field, the app passes the same EditorInfo.
+        if (restarting || info == null || info !== hostField.editorInfo) hostInput++
         hostField.startInput(info, restarting)
         isSecureField = hostField.isSecureField
         readField(info)
@@ -430,7 +439,7 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         val strings = remember(uiLanguage) { services.strings(uiLanguage) }
         val voice = voiceUi()
         // A recording of the app's field belongs to the persona row's bar, not to a panel.
-        val panelVoice = if (dictation.target is DictationTarget.Host) VoiceUi.IDLE else voice
+        val panelVoice = if (dictation.target is DictationTarget.Host || dictation.messageForHost) VoiceUi.IDLE else voice
         val intents = remember(uiLanguage) { quickIntents(strings) }
         val createIntents = remember(uiLanguage) { composeIntents(strings) }
         val flow = activeFlow
@@ -666,7 +675,8 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
                 dictation.insertReviewed()
                 refreshAutoShift()
             },
-            onUndo = dictation::undo
+            onUndo = dictation::undo,
+            onRestart = ::startHostDictation
         )
     }
 
@@ -782,15 +792,20 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
     }
 
     override fun onKeyDown(key: KeyboardKey) {
+        // Typing takes over from a recording: it pauses before the click and
+        // the vibration, so neither ends up in the audio.
+        if (key.types) dictation.keyPressed()
         feedback.onKeyPress(inputView)
     }
 
+    /** A key that edits text, as opposed to Shift, the planes, the layout and the globe. */
+    private val KeyboardKey.types: Boolean
+        get() = this is KeyboardKey.Character || this == KeyboardKey.Backspace ||
+            this == KeyboardKey.Space || this == KeyboardKey.Return
+
     override fun onKeyCommit(key: KeyboardKey) {
-        // Typing takes over from a recording: it pauses, so the keys are not recorded.
-        when (key) {
-            is KeyboardKey.Character, KeyboardKey.Backspace, KeyboardKey.Space, KeyboardKey.Return -> dictation.keyPressed()
-            else -> Unit
-        }
+        // The accessibility path has no key-down: the recording pauses here too.
+        if (key.types) dictation.keyPressed()
         when (key) {
             is KeyboardKey.Character -> typeCharacter(key.value)
             KeyboardKey.Shift -> {
@@ -1178,14 +1193,9 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
             ?: return
         val current = field.text.trim()
         val combined = if (current.isEmpty()) intent.phrase else "$current ${intent.phrase}"
-        val limit = AILimits.current.instructionCharacters
-        field.set(
-            if (combined.codePointCount(0, combined.length) <= limit) {
-                combined
-            } else {
-                combined.substring(0, combined.offsetByCodePoints(0, limit))
-            }
-        )
+        // Never cut: past the limit the panel says so and Reply / Write wait
+        // until it is shortened - the same as for dictated words.
+        field.set(combined)
         focus = PanelFocus.INSTRUCTION
         autocorrect.clear()
         fieldEdited(field)
@@ -1314,22 +1324,27 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         autocorrect.endWord()
         polish.dismiss()
         dictation.start(
-            DictationTarget.Host(HostVoiceTarget(FieldIdentity.of(info))),
+            DictationTarget.Host(HostVoiceTarget(hostInput, info.packageName)),
             RecognitionLanguage.hints(language, enabledLanguages)
         )
     }
 
     /**
-     * The app's field a recording was made for. Words go in only while the
-     * keyboard is on screen over that same field - never into another one.
+     * The app's field a recording was made for. Its words go in by themselves
+     * only while the keyboard is on screen over that very input ([input]);
+     * a field id says little - WebView and Compose give every field the same
+     * one - so the input's identity is what counts. Elsewhere in the same app
+     * they wait for an explicit Insert; in another app they are dropped.
      */
-    private inner class HostVoiceTarget(private val identity: FieldIdentity) : HostDictation {
+    private inner class HostVoiceTarget(private val input: Int, private val packageName: String?) : HostDictation {
         override val isLive: Boolean
-            get() = keyboardVisible && !isComposing && currentInputConnection != null &&
-                hostField.editorInfo?.let(FieldIdentity::of) == identity
+            get() = keyboardVisible && !isComposing && currentInputConnection != null && hostInput == input
+
+        override val isSameApp: Boolean
+            get() = hostField.editorInfo?.packageName == packageName && !isSecureField
 
         override fun insert(text: String): Boolean {
-            if (!isLive) return false
+            if (!keyboardVisible || isComposing || isSecureField || currentInputConnection == null) return false
             autocorrect.endWord()
             val placement = DictationInsertion.place(
                 before = hostField.textBeforeCursor(AUTOSHIFT_WINDOW),
@@ -1339,13 +1354,6 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
             hostField.commitText(placement.text)
             refreshAutoShift()
             return true
-        }
-    }
-
-    /** Which field of which app: enough to tell "the same field, shown again" from another one. */
-    private data class FieldIdentity(val packageName: String?, val fieldId: Int, val fieldName: String?, val inputType: Int) {
-        companion object {
-            fun of(info: EditorInfo) = FieldIdentity(info.packageName, info.fieldId, info.fieldName, info.inputType)
         }
     }
 

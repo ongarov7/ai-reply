@@ -2,6 +2,7 @@ package kz.yerek.aireply
 
 import kotlinx.coroutines.CompletableDeferred
 import kz.yerek.aireply.ai.AIReplyError
+import kz.yerek.aireply.keyboard.voice.DictationController
 import kz.yerek.aireply.keyboard.voice.DictationEvent
 import kz.yerek.aireply.keyboard.voice.DictationMessage
 import kz.yerek.aireply.keyboard.voice.DictationPhase
@@ -439,11 +440,12 @@ class VoiceSessionTest {
     }
 
     @Test
-    fun `back over another field, the recording is dropped`() {
+    fun `back in another app, the recording is dropped`() {
         startHost()
         h.recorder.record(9_000)
         d.hidden()
         field.live = false
+        field.sameApp = false
         d.shown()
         assertEquals(DictationPhase.IDLE, d.phase)
         assertTrue(h.recorder.discards >= 1)
@@ -451,12 +453,20 @@ class VoiceSessionTest {
     }
 
     @Test
-    fun `another field while the keyboard stays up drops the recording too`() {
+    fun `another field of the same app pauses the recording, and its words wait for Insert`() {
         startHost()
         h.recorder.record(9_000)
+        // WebView and Compose give every field one id: only the input itself tells them apart.
         field.live = false
         d.shown()
-        assertEquals(DictationPhase.IDLE, d.phase)
+        assertEquals(DictationPhase.PAUSED, d.phase)
+        assertFalse("nothing records into another field", h.recorder.running)
+        h.finishWith("Сәлем")
+        assertTrue("never in by itself", field.inserted.isEmpty())
+        assertEquals(DictationPhase.REVIEWING, d.phase)
+        assertEquals("Сәлем", d.pendingText)
+        d.insertReviewed()
+        assertEquals("the user chose to put them here", listOf("Сәлем"), field.inserted)
     }
 
     @Test
@@ -499,12 +509,74 @@ class VoiceSessionTest {
         h.settle()
         d.hidden()
         field.live = false
+        field.sameApp = false
         h.transcriber.answers("Сәлем")
         h.settle()
         d.shown()
         assertEquals(DictationPhase.IDLE, d.phase)
         assertNull(d.pendingText)
         assertTrue(field.inserted.isEmpty())
+    }
+
+    @Test
+    fun `a 🎙 that cannot start says why in the persona row's place, for a while`() {
+        h.transcriber.problem = AIReplyError.ConsentRequired
+        d.start(DictationTarget.Host(field), listOf("kk"))
+        assertTrue(d.messageForHost)
+        assertTrue("the bar holds the message", d.showsHostBar)
+        h.passes(DictationController.HOST_MESSAGE_MS)
+        assertNull(d.message)
+        assertFalse(d.showsHostBar)
+    }
+
+    @Test
+    fun `typing in the app's field clears that message at once`() {
+        h.nextStartFailure = RecorderFailure.UNAVAILABLE
+        d.start(DictationTarget.Host(field), listOf("ru"))
+        assertTrue(d.showsHostBar)
+        d.keyPressed()
+        assertNull(d.message)
+        assertFalse(d.showsHostBar)
+    }
+
+    @Test
+    fun `nothing heard for the app's field is shown too`() {
+        startHost()
+        h.recorder.record(3_000)
+        h.finishWith("")
+        assertEquals(DictationMessage.NothingHeard, d.message)
+        assertTrue(d.showsHostBar)
+    }
+
+    @Test
+    fun `Done works while the microphone reopens after a pause`() {
+        startHost()
+        h.recorder.record(10_000)
+        d.pause()
+        d.resume()
+        assertEquals(DictationPhase.STARTING, d.phase)
+        assertTrue("10 s are held already", d.canFinish)
+        h.finishWith("Келемін")
+        assertEquals(listOf("Келемін"), field.inserted)
+    }
+
+    @Test
+    fun `a recording that cannot be written keeps its audio for Try again`() {
+        val failing = PanelsHarness()
+        failing.dictation.start(DictationTarget.Host(field), listOf("ru"))
+        failing.recorder.capturing()
+        failing.recorder.record(5_000)
+        failing.recorder.failWrite = true
+        failing.dictation.finish()
+        failing.settle()
+        assertEquals(DictationPhase.ERROR, failing.dictation.phase)
+        assertEquals(DictationMessage.NotSaved, failing.dictation.message)
+        assertEquals(0, failing.recorder.discards)
+        failing.recorder.failWrite = false
+        failing.dictation.retry()
+        failing.settle()
+        assertEquals(2, failing.recorder.finishes)
+        assertEquals(DictationPhase.TRANSCRIBING, failing.dictation.phase)
     }
 
     @Test

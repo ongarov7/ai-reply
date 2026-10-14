@@ -263,6 +263,7 @@
     <string name="voice_rec_cancel">Отменить запись</string>
     <string name="voice_rec_timer">Записано %1$d из %2$d с</string>
     <string name="voice_rec_ready">Речь распознана. Вставить?</string>
+    <string name="voice_rec_not_saved">Не удалось сохранить запись. Освободите место и попробуйте ещё раз.</string>
     <string name="voice_rec_too_short">Запись слишком короткая. Попробуйте ещё раз.</string>
     <string name="voice_rec_interrupted">Пауза: микрофон занят звонком или другим приложением.</string>
     <string name="voice_rec_mic_unavailable">Микрофон сейчас не работает. Попробуйте ещё раз.</string>

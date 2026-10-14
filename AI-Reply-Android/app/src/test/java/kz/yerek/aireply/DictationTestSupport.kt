@@ -59,6 +59,8 @@ class FakeRecorder : VoiceRecorder {
     var resumeFailure: RecorderFailure? = null
     /** Holds finish() until completed: encoding in progress. */
     var encoding: CompletableDeferred<Unit>? = null
+    /** finish() fails the way a full disk does. */
+    var failWrite = false
 
     override val capturedMs: Long get() = captured
 
@@ -110,6 +112,7 @@ class FakeRecorder : VoiceRecorder {
         finishes++
         running = false
         encoding?.await()
+        if (failWrite) throw java.io.IOException("disk full")
         return if (captured < DictationController.MIN_RECORDING_MS) null else RecordedAudio(File("voice-test.m4a"), "audio/mp4", captured)
     }
 
@@ -180,10 +183,11 @@ class FakeMic(var granted: Boolean = true) : MicAccess {
     }
 }
 
-/** The app's text field: the words it was given, and whether the keyboard is over it. */
-class FakeHostField(var live: Boolean = true) : HostDictation {
+/** The app's text field: the words it was given, whether the keyboard is over it, and over the same app. */
+class FakeHostField(var live: Boolean = true, var sameApp: Boolean = true) : HostDictation {
     val inserted = mutableListOf<String>()
     override val isLive: Boolean get() = live
+    override val isSameApp: Boolean get() = sameApp
     override fun insert(text: String): Boolean {
         inserted += text
         return true

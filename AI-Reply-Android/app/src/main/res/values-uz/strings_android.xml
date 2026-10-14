@@ -253,6 +253,7 @@
     <string name="voice_rec_cancel">Yozishni bekor qilish</string>
     <string name="voice_rec_timer">%2$d soniyadan %1$d soniyasi yozildi</string>
     <string name="voice_rec_ready">Nutq aniqlandi. Kiritilsinmi?</string>
+    <string name="voice_rec_not_saved">Yozuvni saqlab boʻlmadi. Joy boʻshatib, qayta urinib koʻring.</string>
     <string name="voice_rec_too_short">Yozuv juda qisqa. Qayta urinib koʻring.</string>
     <string name="voice_rec_interrupted">Pauza: mikrofon qoʻngʻiroq yoki boshqa ilova bilan band.</string>
     <string name="voice_rec_mic_unavailable">Mikrofon hozir ishlamayapti. Qayta urinib koʻring.</string>

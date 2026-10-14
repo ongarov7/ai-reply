@@ -40,10 +40,21 @@ sealed interface DictationTarget {
 
 /** The app's text field, as dictation needs it; the keyboard service implements it over its InputConnection. */
 interface HostDictation {
-    /** Still the field the recording was made for, with the keyboard on screen over it. */
+    /**
+     * The very field the recording was made for - the same input, not just
+     * a field that looks like it - with the keyboard on screen over it.
+     * Only then do the words go in by themselves.
+     */
     val isLive: Boolean
 
-    /** Puts [text] in at the caret, spaced and capitalised the way typing would; false when it could not. */
+    /**
+     * Still the app the recording was made in. Another field of it may have
+     * the keyboard now: the words wait there for an explicit Insert. Another
+     * app drops them.
+     */
+    val isSameApp: Boolean
+
+    /** Puts [text] in at the caret of the field on screen, spaced and capitalised the way typing would. */
     fun insert(text: String): Boolean
 }
 
@@ -107,6 +118,9 @@ sealed interface DictationMessage {
 
     /** The recording was transcribed and held no words. */
     data object NothingHeard : DictationMessage
+
+    /** The audio could not be written to a file (a full disk); it is kept for Try again. */
+    data object NotSaved : DictationMessage
 
     /** Transcription failed, or could not be asked for (sign-in, consent, today's limit). */
     data class Failed(val error: AIReplyError) : DictationMessage
@@ -206,6 +220,10 @@ class DictationController(
     var message: DictationMessage? by mutableStateOf(null)
         private set
 
+    /** [message] is about a recording for the app's field: it shows in the persona row's place. */
+    var messageForHost: Boolean by mutableStateOf(false)
+        private set
+
     /** Words for the app's field, waiting for Insert ([DictationPhase.REVIEWING] only). */
     var pendingText: String? by mutableStateOf(null)
         private set
@@ -227,15 +245,25 @@ class DictationController(
     val holdsRequests: Boolean
         get() = showsControls && target is DictationTarget.Instruction
 
-    /** A recording of the app's field is on screen, in place of the persona row. */
+    /**
+     * A recording of the app's field is on screen in place of the persona
+     * row - or what came of one that could not start or ended without words.
+     */
     val showsHostBar: Boolean
-        get() = target is DictationTarget.Host && (showsControls || phase == DictationPhase.REVIEWING)
+        get() = if (target is DictationTarget.Host) {
+            showsControls || phase == DictationPhase.REVIEWING
+        } else {
+            phase == DictationPhase.IDLE && messageForHost && message != null
+        }
 
     val canPause: Boolean get() = phase == DictationPhase.RECORDING || phase == DictationPhase.STARTING
 
     val canResume: Boolean get() = phase == DictationPhase.PAUSED && !limitReached
 
-    val canFinish: Boolean get() = phase == DictationPhase.RECORDING || phase == DictationPhase.PAUSED
+    /** Done: recording, paused - or reopening the microphone after a pause, with audio already held. */
+    val canFinish: Boolean
+        get() = phase == DictationPhase.RECORDING || phase == DictationPhase.PAUSED ||
+            (phase == DictationPhase.STARTING && capturedMs >= MIN_RECORDING_MS)
 
     /** Undo takes the dictated words back out of the instruction. */
     val canUndo: Boolean
@@ -271,6 +299,9 @@ class DictationController(
     private var askedAt = Long.MIN_VALUE / 2
     private var shown = false
     private var hiddenAt = 0L
+    /** The latest attempt was for the app's field: its messages belong to the persona row's place. */
+    private var attemptForHost = false
+    private var messageClear: Job? = null
 
     // ------------------------------------------------------------ user taps
 
@@ -284,6 +315,7 @@ class DictationController(
         settleReview()
         if (phase == DictationPhase.REVIEWING) cancel()
         if (!transcriber.isOffered) return
+        attemptForHost = target is DictationTarget.Host
         transcriber.readiness()?.let { problem ->
             show(DictationMessage.Failed(problem))
             return
@@ -348,6 +380,7 @@ class DictationController(
         }
         review = null
         message = null
+        messageClear?.cancel()
     }
 
     /** ERROR: send the same recording again. */
@@ -370,7 +403,8 @@ class DictationController(
         val host = current.target as? DictationTarget.Host ?: return
         val text = pendingText ?: return
         if (current.phase != DictationPhase.REVIEWING) return
-        if (!host.field.isLive) return
+        // Explicit: into the field on screen, as long as it is the same app.
+        if (!shown || !host.field.isSameApp) return
         if (host.field.insert(text)) onEvent(DictationEvent.Inserted)
         end(current)
     }
@@ -392,11 +426,15 @@ class DictationController(
     /** A key is about to be typed: a recording in progress pauses, so the keystrokes are not recorded. */
     fun keyPressed() {
         if (canPause) pause()
+        // Typing moves on from what the last attempt had to say.
+        if (session == null && message != null) message = null
     }
 
     /** The user edited a field, tapped an intent or took a polish: old messages go, and a review is settled. */
     fun userEdited() {
-        settleReview()
+        // A review stays until Reply, Write, a new recording or closing - an
+        // edit only takes Undo away (the text is no longer what voice left),
+        // so the line under the instruction never disappears on a keystroke.
         // A failed transcription keeps saying why: it is what Try again is about.
         if (phase != DictationPhase.ERROR) message = null
     }
@@ -435,9 +473,16 @@ class DictationController(
         val current = session
         if (current != null) {
             val stale = wasHidden && hiddenAt != 0L && clock() - hiddenAt > HIDDEN_LIFETIME_MS
-            if (stale || !targetIsLive(current.target)) {
-                ReplyLog.event { "voice: dropped, the field is gone" }
-                cancel()
+            val target = current.target
+            when {
+                stale || (target is DictationTarget.Instruction && !isLive(target.field)) ||
+                    (target is DictationTarget.Host && !target.field.isSameApp) -> {
+                    ReplyLog.event { "voice: dropped, the field is gone" }
+                    cancel()
+                }
+                // Another field of the same app: nothing records into it,
+                // and the words will wait for an explicit Insert.
+                target is DictationTarget.Host && !target.field.isLive && canPause -> pause()
             }
         }
         startPending()
@@ -551,9 +596,11 @@ class DictationController(
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (failure: Exception) {
+                // A full disk, say: the audio is still held, Try again writes it again.
                 ReplyLog.warn(failure) { "voice: the recording could not be written" }
-                end(current)
-                show(DictationMessage.Microphone(RecorderFailure.UNAVAILABLE))
+                if (session !== current) return@run
+                moveTo(current, DictationPhase.ERROR)
+                show(DictationMessage.NotSaved)
                 return@run
             }
             if (session !== current) return@run
@@ -693,7 +740,16 @@ class DictationController(
 
     private fun show(next: DictationMessage) {
         message = next
+        messageForHost = attemptForHost
         onEvent(DictationEvent.Message(next))
+        messageClear?.cancel()
+        // In the persona row's place a message does not stay for good.
+        if (attemptForHost && session == null) {
+            messageClear = scope.launch {
+                delay(HOST_MESSAGE_MS)
+                if (message === next && session == null) message = null
+            }
+        }
     }
 
     private fun messageFor(failure: RecorderFailure): DictationMessage = when (failure) {
@@ -701,9 +757,15 @@ class DictationController(
         else -> DictationMessage.Microphone(failure)
     }
 
+    /**
+     * Whether a recording the permission dialog interrupted may still start:
+     * the instruction is still on screen, or the keyboard is back in the
+     * same app (the dialog itself restarts the app's input, so the field is
+     * rarely the same instance - its words then wait for Insert).
+     */
     private fun targetIsLive(target: DictationTarget): Boolean = when (target) {
         is DictationTarget.Instruction -> isLive(target.field)
-        is DictationTarget.Host -> target.field.isLive
+        is DictationTarget.Host -> target.field.isSameApp
     }
 
     // ------------------------------------------------------------ permission
@@ -756,6 +818,9 @@ class DictationController(
         /** Before the one automatic retry of a failed upload. */
         const val RETRY_DELAY_MS = 1_500L
 
+        /** How long a message about the app's field holds the persona row's place. */
+        const val HOST_MESSAGE_MS = 6_000L
+
         private val CONTROL_PHASES = setOf(
             DictationPhase.STARTING, DictationPhase.RECORDING, DictationPhase.PAUSED,
             DictationPhase.FINALIZING, DictationPhase.TRANSCRIBING, DictationPhase.RECOVERING,
@@ -768,7 +833,11 @@ class DictationController(
             DictationPhase.REVIEWING, DictationPhase.ERROR
         )
 
-        /** Worth one quiet retry: the connection, not the request, failed. */
-        private val RETRIED = setOf(AIReplyError.Offline, AIReplyError.TimedOut, AIReplyError.ServiceUnavailable)
+        /**
+         * Worth one quiet retry: the connection, not the request, failed.
+         * Anything the server answered - a refusal, a limit, a 5xx - waits for
+         * Try again rather than uploading the same audio twice by itself.
+         */
+        private val RETRIED = setOf(AIReplyError.Offline, AIReplyError.TimedOut)
     }
 }

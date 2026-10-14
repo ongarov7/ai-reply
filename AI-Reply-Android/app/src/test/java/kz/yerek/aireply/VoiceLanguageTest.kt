@@ -88,6 +88,8 @@ class VoiceLanguageTest {
         assertEquals(22, VoiceStatusText.secondsLeft(40_000 - 18_000))
         assertEquals(1, VoiceStatusText.secondsLeft(1))
         assertEquals(0, VoiceStatusText.secondsLeft(0))
+        assertEquals("0:18/0:40", VoiceStatusText.shortTimer(18_900, 40_000))
+        assertEquals("0:40/0:40", VoiceStatusText.shortTimer(40_000, 40_000))
     }
 
     @Test
@@ -103,6 +105,7 @@ class VoiceLanguageTest {
             VoiceStatusText.message(DictationMessage.Microphone(RecorderFailure.UNAVAILABLE))
         )
         assertEquals(VoiceMessage.Text(R.string.voice_rec_too_short), VoiceStatusText.message(DictationMessage.TooShort))
+        assertEquals(VoiceMessage.Text(R.string.voice_rec_not_saved), VoiceStatusText.message(DictationMessage.NotSaved))
         assertEquals(VoiceMessage.Text(R.string.kb_compose_err_too_long, 400), VoiceStatusText.message(DictationMessage.TooLong(400)))
         assertEquals(VoiceMessage.Error(AIReplyError.VoiceLimitReached), VoiceStatusText.message(DictationMessage.Failed(AIReplyError.VoiceLimitReached)))
     }

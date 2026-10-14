@@ -263,6 +263,7 @@
     <string name="voice_rec_cancel">Жазудан бас тарту</string>
     <string name="voice_rec_timer">%2$d секундтың %1$d секунды жазылды</string>
     <string name="voice_rec_ready">Сөз танылды. Кірістіру керек пе?</string>
+    <string name="voice_rec_not_saved">Жазбаны сақтау мүмкін болмады. Орын босатып, қайталап көріңіз.</string>
     <string name="voice_rec_too_short">Жазба тым қысқа. Қайталап көріңіз.</string>
     <string name="voice_rec_interrupted">Үзіліс: микрофонды қоңырау немесе басқа қолданба пайдаланып жатыр.</string>
     <string name="voice_rec_mic_unavailable">Микрофон қазір істемей тұр. Қайталап көріңіз.</string>
