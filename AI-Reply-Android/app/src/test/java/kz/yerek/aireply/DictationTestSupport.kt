@@ -105,8 +105,17 @@ class FakeRecorder : VoiceRecorder {
         resumes++
         resumeFailure?.let { return it }
         running = captured < maxMs
+        // At the limit the real recorder keeps the microphone closed and says so again.
+        if (!running) listener?.onLimitReached()
         return null
     }
+
+    // Callbacks a stopped run of the real recorder could still have in flight;
+    // the controller must ignore them once the session moved on.
+    fun lateProgress(ms: Long) = listener?.onProgress(ms, 0.9f)
+    fun lateCapturing() = listener?.onCapturing()
+    fun lateLimit() = listener?.onLimitReached()
+    fun lateFailure(reason: RecorderFailure) = listener?.onFailure(reason)
 
     override suspend fun finish(): RecordedAudio? {
         finishes++

@@ -257,12 +257,15 @@ class VoiceSessionTest {
         val encoding = CompletableDeferred<Unit>()
         h.recorder.encoding = encoding
         d.finish()
+        h.settle()
         assertEquals(DictationPhase.FINALIZING, d.phase)
+        assertEquals("the file is being written", 1, h.recorder.finishes)
         d.cancel()
         encoding.complete(Unit)
         h.settle()
         assertTrue(h.transcriber.requests.isEmpty())
         assertEquals(DictationPhase.IDLE, d.phase)
+        assertTrue(h.recorder.discards >= 1)
     }
 
     @Test
@@ -577,6 +580,73 @@ class VoiceSessionTest {
         failing.settle()
         assertEquals(2, failing.recorder.finishes)
         assertEquals(DictationPhase.TRANSCRIBING, failing.dictation.phase)
+    }
+
+    @Test
+    fun `late reports from the microphone change nothing once the recording moved on`() {
+        startHost()
+        h.recorder.record(8_000)
+        d.pause()
+        h.recorder.lateProgress(9_000)
+        h.recorder.lateCapturing()
+        h.recorder.lateFailure(RecorderFailure.UNAVAILABLE)
+        assertEquals(DictationPhase.PAUSED, d.phase)
+        assertEquals(8_000, d.capturedMs)
+        assertNull(d.message)
+
+        val recorder = h.recorder
+        d.cancel()
+        recorder.lateProgress(20_000)
+        recorder.lateLimit()
+        recorder.lateFailure(RecorderFailure.INTERRUPTED)
+        assertEquals(DictationPhase.IDLE, d.phase)
+        assertEquals(0, d.capturedMs)
+        assertNull(d.message)
+        h.settle()
+        assertTrue(h.transcriber.requests.isEmpty())
+    }
+
+    @Test
+    fun `the limit reported again after a pause still finishes the recording`() {
+        startHost()
+        h.recorder.record(39_950)
+        d.pause()
+        // The reader filled the buffer just as Pause was tapped: the recorder says so again.
+        h.recorder.lateLimit()
+        h.settle()
+        assertTrue(d.limitReached)
+        assertEquals(DictationPhase.TRANSCRIBING, d.phase)
+    }
+
+    @Test
+    fun `a recording left behind the keyboard expires on its own`() {
+        startHost()
+        h.recorder.record(5_000)
+        d.hidden()
+        h.passes(DictationController.HIDDEN_LIFETIME_MS)
+        assertEquals(DictationPhase.IDLE, d.phase)
+        assertTrue(h.recorder.discards >= 1)
+    }
+
+    @Test
+    fun `an error putting the words in is not an upload to retry`() {
+        val throwing = object : kz.yerek.aireply.keyboard.voice.HostDictation {
+            override val isLive = true
+            override val isSameApp = true
+            override fun insert(text: String): Boolean = error("the app's field went away")
+        }
+        d.start(DictationTarget.Host(throwing), listOf("ru"))
+        h.recorder.capturing()
+        h.recorder.record(3_000)
+        d.finish()
+        h.settle()
+        try {
+            h.transcriber.answers("Сәлем")
+            h.settle()
+        } catch (expected: IllegalStateException) {
+            // Surfaces as a crash in a test; the point is what was NOT done.
+        }
+        assertEquals("never sent twice", 1, h.transcriber.requests.size)
     }
 
     @Test

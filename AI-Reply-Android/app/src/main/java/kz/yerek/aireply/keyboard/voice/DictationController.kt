@@ -302,6 +302,7 @@ class DictationController(
     /** The latest attempt was for the app's field: its messages belong to the persona row's place. */
     private var attemptForHost = false
     private var messageClear: Job? = null
+    private var expiry: Job? = null
 
     // ------------------------------------------------------------ user taps
 
@@ -461,6 +462,17 @@ class DictationController(
         shown = false
         hiddenAt = clock()
         if (canPause) pause()
+        // A recording left behind does not stay in memory for good.
+        expiry?.cancel()
+        if (session != null) {
+            expiry = scope.launch {
+                delay(HIDDEN_LIFETIME_MS)
+                if (!shown) {
+                    ReplyLog.event { "voice: dropped, left behind too long" }
+                    cancel()
+                }
+            }
+        }
     }
 
     /**
@@ -470,6 +482,7 @@ class DictationController(
     fun shown() {
         val wasHidden = !shown
         shown = true
+        expiry?.cancel()
         val current = session
         if (current != null) {
             val stale = wasHidden && hiddenAt != 0L && clock() - hiddenAt > HIDDEN_LIFETIME_MS
@@ -520,6 +533,10 @@ class DictationController(
 
         private val isCurrent: Boolean get() = session === owner && owner.phase != DictationPhase.CANCELED
 
+        /** Capturing, or about to: anything about audio at another time is a report from a run that ended. */
+        private val isCapturing: Boolean
+            get() = isCurrent && (owner.phase == DictationPhase.RECORDING || owner.phase == DictationPhase.STARTING)
+
         override fun onCapturing() {
             if (!isCurrent || owner.phase != DictationPhase.STARTING) return
             moveTo(owner, DictationPhase.RECORDING)
@@ -527,28 +544,26 @@ class DictationController(
         }
 
         override fun onProgress(capturedMs: Long, level: Float) {
-            if (!isCurrent) return
+            if (!isCapturing) return
             this@DictationController.capturedMs = capturedMs.coerceIn(0L, maxRecordingMs)
             if (owner.phase == DictationPhase.RECORDING) this@DictationController.level = level.coerceIn(0f, 1f)
             announceTimeLeft(owner)
         }
 
         override fun onLimitReached() {
-            if (!isCurrent) return
+            // Recording, reopening, or paused just as the buffer filled (the
+            // recorder reports that again); never once the file is on its way.
+            if (!isCurrent || owner.phase !in LIMIT_PHASES) return
             capturedMs = maxRecordingMs
             limitReached = true
             level = 0f
             announceTimeLeft(owner)
-            if (owner.phase == DictationPhase.RECORDING || owner.phase == DictationPhase.STARTING ||
-                owner.phase == DictationPhase.PAUSED
-            ) {
-                ReplyLog.event { "voice: the ${maxRecordingMs / 1000}s limit, finishing" }
-                finalize(owner)
-            }
+            ReplyLog.event { "voice: the ${maxRecordingMs / 1000}s limit, finishing" }
+            finalize(owner)
         }
 
         override fun onFailure(reason: RecorderFailure) {
-            if (!isCurrent) return
+            if (!isCapturing) return
             ReplyLog.event { "voice: microphone stopped, $reason" }
             level = 0f
             if (capturedMs >= MIN_RECORDING_MS) {
@@ -622,13 +637,14 @@ class DictationController(
     private suspend fun transcribe(current: Session, audio: RecordedAudio) {
         while (session === current) {
             moveTo(current, DictationPhase.TRANSCRIBING)
+            // Only the request is inside the try: once the words are back,
+            // nothing that happens putting them in is an upload to retry.
+            var text = ""
             val error = try {
-                val text = transcriber.transcribe(
+                text = transcriber.transcribe(
                     TranscriptionRequest(audio, current.requestId, current.languages, current.target.purpose)
                 )
-                if (session !== current) return
-                deliver(current, text)
-                return
+                null
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (failure: AIReplyException) {
@@ -638,6 +654,10 @@ class DictationController(
                 AIReplyError.ServiceUnavailable
             }
             if (session !== current) return
+            if (error == null) {
+                deliver(current, text)
+                return
+            }
             ReplyLog.event { "voice: transcription failed, ${error::class.simpleName}" }
             if (error !in RETRIED || current.retried) {
                 moveTo(current, DictationPhase.ERROR)
@@ -826,6 +846,8 @@ class DictationController(
             DictationPhase.FINALIZING, DictationPhase.TRANSCRIBING, DictationPhase.RECOVERING,
             DictationPhase.ERROR
         )
+
+        private val LIMIT_PHASES = setOf(DictationPhase.RECORDING, DictationPhase.STARTING, DictationPhase.PAUSED)
 
         /** The hints can no longer change: the audio is on its way. */
         private val SENT_PHASES = setOf(
