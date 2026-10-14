@@ -746,3 +746,12 @@ Remaining external steps, in order:
 Do not claim China was excluded, the policy was published, or build 7 was submitted until each corresponding external action has been verified.
 
 China availability follow-up: the owner explicitly approved exclusion of China mainland. App Store Connect saved the change, and a fresh UI read verified 174 storefronts and China mainland status «Недоступно». No other country was deselected. The live backend still reports privacy version `2026-10-08`; policy deployment, upload/selection of build 7 and resubmission remain outstanding. No App Review message was sent.
+
+
+### Main push and build 7 upload — 14 October 2026
+
+At the owner's explicit request, the verified review fixes were committed as `d223b8a9806f7349f1d6db26d20f344f2861a951` and pushed normally to `origin/main`. Fetch confirmed no remote divergence before the commit. Pre-existing Android README edits and untracked credentials/older output directories were preserved and excluded from the commit. The recorded source hashes and local IPA hash matched the prepared build before upload; committing did not change its source code.
+
+The existing signed 1.0 (7) archive was uploaded using Xcode's existing account authentication, with automatic build-number management disabled. Xcode completed successfully at **2026-10-14 09:07:05 +05:00**, returning **“Upload succeeded”** and **“Uploaded package is processing.”** The upload log and updated provenance are under `outputs/app-review-2026-10-14`. Apple has accepted the upload; completion of processing and build selection are not yet verified. No App Review reply, build selection or resubmission was performed.
+
+The owner deployed the backend on the server with `make docker`, whose target runs `docker compose up -d --build`. A public config check initially returned HTTP 502. Subsequent GET checks succeeded: `/healthz` returned `{"ok":true}`, `/api/v1/config` reported privacy version `2026-10-14`, and `/privacy?lang=en` published the new date, OpenAI disclosure and same-or-equal protection requirement. Backend deployment was owner-operated; no production files or settings were changed by Codex.
