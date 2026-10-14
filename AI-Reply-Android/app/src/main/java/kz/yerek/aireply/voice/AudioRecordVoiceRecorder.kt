@@ -41,10 +41,17 @@ import java.io.FileOutputStream
  * [VoiceRecorder.Listener.onLimitReached] posted: a busy main thread can delay
  * that callback, never add audio to the recording.
  *
+ * NEVER ON THE MAIN THREAD. Creating an [AudioRecord] and starting it can
+ * take seconds on a slow audio HAL; done on the main thread that would
+ * freeze the keyboard, and Android may take the keyboard away. So [start] and
+ * [resume] only check what is instant (the permission, a call) and hand the
+ * opening to the run's own thread; a microphone that will not open is
+ * reported through [VoiceRecorder.Listener.onFailure].
+ *
  * NOTHING STALE. Every run carries a number, and stopping a run moves
  * [generation] on, so a callback from a run that was paused, failed or
  * discarded is never delivered. A run that delivers no audio within
- * [WATCHDOG_MS] is given up on as [RecorderFailure.UNAVAILABLE].
+ * [WATCHDOG_MS] of being asked for is given up on as [RecorderFailure.UNAVAILABLE].
  *
  * CALLS. A call in progress when starting or resuming refuses with
  * [RecorderFailure.INTERRUPTED]. A call starting while capturing (API 31+),
@@ -55,8 +62,9 @@ import java.io.FileOutputStream
  * THREADS.
  * - Main thread: every public method, every listener callback, and every field
  *   not named below.
- * - One reader thread per run: reads its [AudioRecord], measures the level,
- *   appends under [lock], and releases the [AudioRecord] when the run ends.
+ * - One reader thread per run: opens and starts its [AudioRecord], reads it,
+ *   measures the level, appends under [lock], and releases the [AudioRecord]
+ *   when the run ends.
  * - [lock] guards [pcm] and each run's `active` flag. The main thread clears
  *   the flag under it before closing the microphone, so once a run is stopped
  *   not one more of its samples is kept.
@@ -83,9 +91,11 @@ class AudioRecordVoiceRecorder(
     private var maxMs = 0L
 
     /**
-     * The capture rate, fixed by the run [start] opens; 0 before that. Resumes
-     * ask for the same rate, so the audio stays one format.
+     * The capture rate, fixed by the first run that opens; 0 before that.
+     * Resumes ask for the same rate, so the audio stays one format. Written by
+     * that run's reader thread, under [lock].
      */
+    @Volatile
     private var sampleRate = 0
 
     /** The run capturing now, if any. */
@@ -135,7 +145,7 @@ class AudioRecordVoiceRecorder(
 
     override fun resume(): RecorderFailure? {
         // Never started, or discarded: there is no recording to add to.
-        if (listener == null || sampleRate == 0) return RecorderFailure.UNAVAILABLE
+        if (listener == null) return RecorderFailure.UNAVAILABLE
         if (current != null) return null
         if (synchronized(lock) { pcm?.isFull == true }) {
             // Already at the limit: nothing more could be kept, so the
@@ -144,7 +154,8 @@ class AudioRecordVoiceRecorder(
             handler.post { if (id == generation) listener?.onLimitReached() }
             return null
         }
-        val failure = open(listOf(sampleRate))
+        // Paused before the microphone ever opened: no format is fixed yet.
+        val failure = open(if (sampleRate == 0) CAPTURE_RATES else listOf(sampleRate))
         if (failure != null) ReplyLog.event { "voice: recorder did not resume, $failure" }
         return failure
     }
@@ -245,58 +256,23 @@ class AudioRecordVoiceRecorder(
     private fun heldSamples(): Int = synchronized(lock) { pcm?.size ?: 0 }
 
     /**
-     * Opens the microphone at the first of [rates] that works and starts a
-     * run. Null when capturing; the reason otherwise, with the microphone
-     * closed again.
+     * Starts a run that opens the microphone at the first of [rates] that
+     * works. Null when the run is on its way; the reason when it could not
+     * even be asked for. Opening itself happens on the run's thread.
      */
     private fun open(rates: List<Int>): RecorderFailure? {
         if (!MicPermission.isGranted(appContext)) return RecorderFailure.PERMISSION
         // A call holds the microphone: there would be silence, or nothing.
         if (inCallMode()) return RecorderFailure.INTERRUPTED
 
-        val record = try {
-            createRecord(rates)
-        } catch (e: SecurityException) {
-            return RecorderFailure.PERMISSION
-        } ?: return RecorderFailure.UNAVAILABLE
-
-        val refused = try {
-            record.startRecording()
-            // Before Android 10, a microphone another app holds will not start.
-            if (record.recordingState == AudioRecord.RECORDSTATE_RECORDING) null else RecorderFailure.INTERRUPTED
-        } catch (e: SecurityException) {
-            RecorderFailure.PERMISSION
-        } catch (e: Exception) {
-            ReplyLog.warn(e) { "voice: startRecording refused" }
-            RecorderFailure.UNAVAILABLE
-        }
-        if (refused != null) {
-            runCatching { record.release() }
-            return refused
-        }
-
-        val rate = record.sampleRate
-        if (sampleRate == 0) {
-            sampleRate = rate
-            val limit = PcmAudio.msToSamples(maxMs, rate).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
-            synchronized(lock) { pcm = PcmBuffer(limit, initialCapacity = rate) }
-        }
-
-        val run = Run(++generation, record, rate)
+        val run = Run(++generation, rates)
         current = run
         val started = runCatching { run.start() }
         if (started.isFailure) {
             ReplyLog.warn(started.exceptionOrNull()) { "voice: no reader thread" }
             current = null
             generation++
-            run.release()
             return RecorderFailure.UNAVAILABLE
-        }
-
-        if (watchForInterruptions(run)) {
-            ReplyLog.event { "voice: the microphone is silenced for another app" }
-            stopRun()
-            return RecorderFailure.INTERRUPTED
         }
 
         val check = Runnable {
@@ -308,6 +284,12 @@ class AudioRecordVoiceRecorder(
         watchdog = check
         handler.postDelayed(check, WATCHDOG_MS)
         return null
+    }
+
+    /** On the main thread, once [run]'s microphone is capturing: calls and silencing end it. */
+    private fun capturing(run: Run) {
+        if (run.id != generation) return
+        if (watchForInterruptions(run)) interrupted(run.id, "the microphone is silenced for another app")
     }
 
     /**
@@ -435,11 +417,16 @@ class AudioRecordVoiceRecorder(
      */
     private inner class Run(
         val id: Int,
-        private val record: AudioRecord,
-        private val rate: Int
+        private val rates: List<Int>
     ) : Runnable {
 
-        val sessionId: Int = record.audioSessionId
+        /** The microphone's session, once it is open: how Android names this recording. */
+        @Volatile
+        var sessionId: Int = 0
+            private set
+
+        /** Null until the reader opened it. Guarded by this run's monitor. */
+        private var record: AudioRecord? = null
 
         /**
          * Cleared once, under [lock], by whichever thread ends the run first.
@@ -461,12 +448,15 @@ class AudioRecordVoiceRecorder(
 
         fun start() = thread.start()
 
-        /** Stops capturing: the microphone closes now. Any thread, any number of times. */
+        /**
+         * Stops capturing: the microphone closes now - or, still opening, it
+         * is closed the moment it opens. Any thread, any number of times.
+         */
         fun closeMicrophone() {
             synchronized(this) {
                 if (stopped || released) return
                 stopped = true
-                runCatching { record.stop() }
+                runCatching { record?.stop() }
             }
         }
 
@@ -476,12 +466,14 @@ class AudioRecordVoiceRecorder(
                 closeMicrophone()
                 if (released) return
                 released = true
-                runCatching { record.release() }
+                runCatching { record?.release() }
             }
         }
 
         override fun run() {
             runCatching { Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO) }
+            val record = openMicrophone() ?: return
+            val rate = record.sampleRate
             val chunk = ShortArray(PcmAudio.chunkSamples(rate))
             val meter = LevelMeter()
             var lastProgressAt = 0L
@@ -568,6 +560,75 @@ class AudioRecordVoiceRecorder(
             }
         }
 
+        /**
+         * Opens and starts the microphone, here on the reader thread. Null when
+         * it did not - the failure is reported - or when the run was stopped
+         * meanwhile, in which case the microphone is closed again at once.
+         */
+        private fun openMicrophone(): AudioRecord? {
+            val made = try {
+                createRecord(rates)
+            } catch (e: SecurityException) {
+                refuse(RecorderFailure.PERMISSION)
+                return null
+            }
+            if (made == null) {
+                refuse(RecorderFailure.UNAVAILABLE)
+                return null
+            }
+            synchronized(this) {
+                if (stopped) {
+                    // Paused or cancelled while it was opening.
+                    released = true
+                    runCatching { made.release() }
+                    return null
+                }
+                record = made
+            }
+            val refused = try {
+                made.startRecording()
+                // Before Android 10, a microphone another app holds will not start.
+                if (made.recordingState == AudioRecord.RECORDSTATE_RECORDING) null else RecorderFailure.INTERRUPTED
+            } catch (e: SecurityException) {
+                RecorderFailure.PERMISSION
+            } catch (e: Exception) {
+                ReplyLog.warn(e) { "voice: startRecording refused" }
+                RecorderFailure.UNAVAILABLE
+            }
+            if (refused != null) {
+                release()
+                refuse(refused)
+                return null
+            }
+            // Stopped while starting: it is not to stay open even for a moment.
+            if (synchronized(this) { stopped }) {
+                release()
+                return null
+            }
+            val rate = made.sampleRate
+            synchronized(lock) {
+                if (pcm == null) {
+                    sampleRate = rate
+                    val limit = PcmAudio.msToSamples(maxMs, rate).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+                    pcm = PcmBuffer(limit, initialCapacity = rate)
+                }
+            }
+            sessionId = made.audioSessionId
+            handler.post { capturing(this) }
+            return made
+        }
+
+        /** The microphone would not open: reported on the main thread, unless the run was stopped by then. */
+        private fun refuse(reason: RecorderFailure) {
+            synchronized(lock) { active = false }
+            ReplyLog.event { "voice: recorder did not open, $reason" }
+            handler.post {
+                if (id != generation) return@post
+                stopRun()
+                listener?.onFailure(reason)
+            }
+        }
+
         /** The reader ends the run itself; false when the main thread already had. */
         private fun endHere(): Boolean = synchronized(lock) {
             if (!active) return@synchronized false
@@ -599,8 +660,11 @@ class AudioRecordVoiceRecorder(
 
         const val PROGRESS_INTERVAL_MS = 50L
 
-        /** A microphone that opened but delivers nothing for this long is not going to. */
-        const val WATCHDOG_MS = 2_000L
+        /**
+         * A microphone asked for that delivers nothing for this long is not
+         * going to - opening included, which a slow audio HAL can drag out.
+         */
+        const val WATCHDOG_MS = 5_000L
 
         /** Less than this is a tap, not a recording: nothing is sent. */
         const val MIN_AUDIO_MS = 300L
