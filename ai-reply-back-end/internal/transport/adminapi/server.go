@@ -12,6 +12,7 @@ import (
 
 	"github.com/aireply/ai-reply-back-end/config"
 	"github.com/aireply/ai-reply-back-end/internal/admin"
+	"github.com/aireply/ai-reply-back-end/internal/credits"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
 	"github.com/aireply/ai-reply-back-end/internal/limits"
 	"github.com/aireply/ai-reply-back-end/internal/middleware"
@@ -38,6 +39,7 @@ type Server struct {
 	notify   *notifications.Service
 	payments *payments.Service
 	reports  *reports.Service
+	credits  *credits.Service
 	limiter  *middleware.Limiter
 	log      *slog.Logger
 }
@@ -52,6 +54,8 @@ type Deps struct {
 	Payments *payments.Service
 	// Reports — AI жауаптарына шағымдар (Шағымдар беті).
 	Reports *reports.Service
+	// Credits — сәлемдесу бонусының баптауы, қолмен берілетін кредиттер.
+	Credits *credits.Service
 	// Limiter — науқан жіберу мен алдын ала санаудың әкімші шелектері (nil — өз шектегіші).
 	Limiter *middleware.Limiter
 	Log     *slog.Logger
@@ -64,7 +68,7 @@ func New(d Deps) *Server {
 		limiter = middleware.NewLimiter()
 	}
 	return &Server{cfg: d.Config, admin: d.Admin, limits: d.Limits, notify: d.Notifications, payments: d.Payments,
-		reports: d.Reports, limiter: limiter, log: d.Log}
+		reports: d.Reports, credits: d.Credits, limiter: limiter, log: d.Log}
 }
 
 // Register — маршруттар.
@@ -90,6 +94,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /api/v1/admin/reports", s.guard(s.handleReports))
 	mux.Handle("POST /api/v1/admin/reports/{id}/resolve", s.guard(s.handleResolveReport))
 	s.registerNotifications(mux)
+	s.registerCredits(mux)
 }
 
 // guard — cookie сессиясы + күй өзгертетін сұраныстарда CSRF тақырыбы.
@@ -239,7 +244,7 @@ func (s *Server) handleUsers(w http.ResponseWriter, r *http.Request) {
 	loc := s.cfg.App.Location()
 	out := make([]map[string]any, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, map[string]any{
+		item := map[string]any{
 			"id":           row.User.ID,
 			"identifier":   maskIdentifier(row.User),
 			"plan_code":    row.PlanCode,
@@ -253,7 +258,10 @@ func (s *Server) handleUsers(w http.ResponseWriter, r *http.Request) {
 			"created_at":   row.User.CreatedAt.In(loc).Format("2006-01-02 15:04"),
 			"last_active":  optionalTime(row.User.LastActiveAt, loc),
 			"status":       row.User.Status,
-		})
+		}
+		// The plan's day (without the monthly cap) plus pass, welcome bonus and credits.
+		item["remaining_total"] = max(row.DailyLimit-row.UsedToday, 0) + row.ExtraRemaining
+		out = append(out, item)
 	}
 	httpx.JSON(w, http.StatusOK, map[string]any{
 		"users": out, "total": total, "page": page, "limit": limit,
@@ -309,6 +317,10 @@ func (s *Server) handleUserDetail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	subscription := subscriptionState(detail, s.admin.Now(), loc)
+	grants := make([]map[string]any, 0, len(detail.Grants))
+	for _, g := range detail.Grants {
+		grants = append(grants, s.grantDTO(g))
+	}
 
 	httpx.JSON(w, http.StatusOK, map[string]any{
 		"user": map[string]any{
@@ -333,6 +345,9 @@ func (s *Server) handleUserDetail(w http.ResponseWriter, r *http.Request) {
 			"resets_at": detail.Entitlement.ResetsAt.In(loc).Format("2006-01-02 15:04"),
 		},
 		"subscription": subscription,
+		"balances":     s.balancesPayload(detail.Entitlement),
+		"grants":       grants,
+		"ledger":       s.ledgerPayload(detail.Ledger),
 		"events":       events,
 		"devices":      devices,
 		"payments":     payments,

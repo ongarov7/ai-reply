@@ -197,6 +197,8 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		"ai_limits":    aiLimits,
 		"pricing":      rows,
 		"purchases":    s.purchasesPayload(r),
+		// Welcome bonus of new accounts (0 = off); a change affects only later sign-ups.
+		"welcome_bonus": s.welcomeBonusPayload(r),
 	})
 }
 

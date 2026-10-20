@@ -207,7 +207,7 @@ func run(envFile string) error {
 
 	adminapi.New(adminapi.Deps{
 		Config: cfg, Admin: adminSvc, Limits: limitSvc, Notifications: notifySvc, Payments: paymentSvc,
-		Reports: reportSvc, Limiter: limiter, Log: log,
+		Reports: reportSvc, Credits: creditSvc, Limiter: limiter, Log: log,
 	}).Register(mux)
 
 	simulatorapi.New(simulatorapi.Deps{

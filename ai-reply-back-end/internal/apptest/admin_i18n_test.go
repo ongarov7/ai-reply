@@ -78,6 +78,10 @@ func adminKeyFamilies() map[string][]string {
 		"admin.reports.reason.": domain.ReportReasons,
 		"admin.reports.status.": domain.ReportStatuses,
 		"admin.reports.mode.":   domain.ReportModes,
+		// Credits on the user page: grant kinds, ledger entries, grant states.
+		"admin.credits.kind.":   domain.GrantKinds,
+		"admin.credits.entry.":  domain.LedgerEntries,
+		"admin.credits.status.": {domain.GrantActive, domain.GrantRevoked},
 		// Dashboard range buttons.
 		"common.": {"today", "7d", "30d", "month", "prev_month"},
 	}
@@ -163,6 +167,8 @@ func TestAdminScriptStatusListsMatchTheBackend(t *testing.T) {
 		"CAMPAIGN_STATUSES": domain.CampaignStatuses,
 		"DELIVERY_STATUSES": domain.DeliveryStatuses,
 		"PUSH_STATUSES":     {domain.PushNone, domain.PushActive, domain.PushInvalid, domain.PushReplaced},
+		"GRANT_KINDS":       domain.GrantKinds,
+		"LEDGER_ENTRIES":    domain.LedgerEntries,
 	} {
 		if got := list(name); !reflect.DeepEqual(got, want) {
 			t.Errorf("%s = %v, backend has %v", name, got, want)

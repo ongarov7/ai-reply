@@ -258,10 +258,12 @@ type UserRow struct {
 	UsedToday    int
 	TokensMonth  int
 	SubExpiresAt *time.Time
+	// ExtraRemaining — тарифтен тыс қалдық: pass, бонус, кредиттер (now сәтінде).
+	ExtraRemaining int
 }
 
 // ListUsers — сүзгі, іздеу, беттеу.
-func (s *Store) ListUsers(ctx context.Context, f UserFilter, today, month string) ([]UserRow, int, error) {
+func (s *Store) ListUsers(ctx context.Context, f UserFilter, today, month string, now time.Time) ([]UserRow, int, error) {
 	where := []string{"u.deleted_at IS NULL"}
 	args := []any{}
 	if q := strings.TrimSpace(f.Search); q != "" {
@@ -319,13 +321,16 @@ func (s *Store) ListUsers(ctx context.Context, f UserFilter, today, month string
 	query := `SELECT ` + userColumns + `,
 		COALESCE(p.code, ''), COALESCE(p.name_en, ''), COALESCE(sub.status, ''),
 		COALESCE(p.daily_message_limit, 0), COALESCE(ud.used, 0),
-		COALESCE(um.input_tokens, 0) + COALESCE(um.output_tokens, 0), sub.expires_at ` +
+		COALESCE(um.input_tokens, 0) + COALESCE(um.output_tokens, 0), sub.expires_at,
+		COALESCE((SELECT SUM(g.units_remaining) FROM credit_grants g
+		          WHERE g.user_id = u.id AND g.status = 'active' AND g.units_remaining > 0
+		            AND g.starts_at <= ? AND (g.expires_at IS NULL OR g.expires_at > ?)), 0) ` +
 		strings.ReplaceAll(base, "FROM users u", "FROM users u") +
 		fmt.Sprintf(" ORDER BY %s %s LIMIT ? OFFSET ?", sortColumn, direction)
 	// userColumns u. префиксімен жазылуы керек
 	query = strings.Replace(query, "SELECT "+userColumns, "SELECT "+prefixColumns(userColumns, "u."), 1)
 
-	rowsArgs := append(append([]any{today, month}, args...), f.Page.Limit, f.Page.Offset)
+	rowsArgs := append(append([]any{ms(now), ms(now), today, month}, args...), f.Page.Limit, f.Page.Offset)
 	rows, err := s.db.Reader().QueryContext(ctx, query, rowsArgs...)
 	if err != nil {
 		return nil, 0, err
@@ -347,7 +352,8 @@ func (s *Store) ListUsers(ctx context.Context, f UserFilter, today, month string
 		if err := rows.Scan(&r.User.ID, &phone, &email, &r.User.Status, &r.User.Locale, &r.User.Timezone,
 			&r.User.Platform, &r.User.AppVersion, &r.User.OSVersion, &r.User.Kind, &legacy,
 			&created, &updated, &lastActive, &r.User.PreferredLanguage,
-			&r.PlanCode, &r.PlanName, &r.SubStatus, &r.DailyLimit, &r.UsedToday, &r.TokensMonth, &expires); err != nil {
+			&r.PlanCode, &r.PlanName, &r.SubStatus, &r.DailyLimit, &r.UsedToday, &r.TokensMonth, &expires,
+			&r.ExtraRemaining); err != nil {
 			return nil, 0, err
 		}
 		r.User.Phone, r.User.Email, r.User.LegacyClient = text(phone), text(email), text(legacy)

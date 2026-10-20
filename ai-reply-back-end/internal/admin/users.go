@@ -19,12 +19,18 @@ type UserDetail struct {
 	Events        []domain.UsageEvent
 	Sessions      []repository.RefreshToken
 	Payments      []domain.Payment
+	// Grants, Ledger — кредиттер (бонус, әкімші, пакет, pass) және соңғы журнал жазбалары.
+	Grants []domain.CreditGrant
+	Ledger []domain.LedgerEntry
 }
+
+// creditRows — әкімші картасындағы кредит пен журнал жолдарының саны.
+const creditRows = 50
 
 // Users — сүзгіленген тізім.
 func (s *Service) Users(ctx context.Context, f repository.UserFilter) ([]repository.UserRow, int, error) {
 	date, month := s.subs.TodayKeys()
-	return s.repo.ListUsers(ctx, f, date, month)
+	return s.repo.ListUsers(ctx, f, date, month, s.subs.Now())
 }
 
 // UserDetail — бір қолданушының метадерегі.
@@ -53,6 +59,12 @@ func (s *Service) UserDetail(ctx context.Context, id string) (UserDetail, error)
 		return UserDetail{}, err
 	}
 	if detail.Payments, err = s.repo.PaymentsByUser(ctx, id, 20); err != nil {
+		return UserDetail{}, err
+	}
+	if detail.Grants, err = s.repo.CreditGrants(ctx, id, creditRows); err != nil {
+		return UserDetail{}, err
+	}
+	if detail.Ledger, err = s.repo.CreditLedger(ctx, id, creditRows); err != nil {
 		return UserDetail{}, err
 	}
 	return detail, nil

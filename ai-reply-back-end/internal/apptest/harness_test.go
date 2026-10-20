@@ -462,7 +462,7 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 		Ping:    func(ctx context.Context) error { return db.Reader().PingContext(ctx) },
 		Credits: creditSvc}).Register(mux)
 	adminapi.New(adminapi.Deps{Config: cfg, Admin: adminSvc, Limits: limitSvc, Notifications: notifySvc,
-		Payments: paymentSvc, Reports: reportSvc, Limiter: limiter, Log: log}).Register(mux)
+		Payments: paymentSvc, Reports: reportSvc, Credits: creditSvc, Limiter: limiter, Log: log}).Register(mux)
 	simulatorapi.New(simulatorapi.Deps{Config: cfg, Admin: adminSvc, Simulator: simulatorSvc,
 		Limiter: limiter, Log: log}).Register(mux)
 	webServer, err := web.New(web.Deps{Config: cfg, Admin: adminSvc, Plans: planSvc, Payments: paymentSvc,

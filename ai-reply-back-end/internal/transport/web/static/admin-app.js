@@ -132,7 +132,10 @@
     "not an id": "admin.error.reason.id",
     "at most 500 people": "admin.error.reason.recipients_count",
     "not an e-mail address": "admin.error.reason.email",
-    "send an Idempotency-Key header": "admin.error.reason.idempotency"
+    "send an Idempotency-Key header": "admin.error.reason.idempotency",
+    "range": "admin.error.reason.range",
+    "required": "admin.error.reason.required",
+    "too_long": "admin.error.reason.too_long"
   };
 
   var FIELD_KEYS = {
@@ -145,7 +148,8 @@
     "audience.user_ids": "admin.push.audience.people", "audience.emails": "admin.push.audience.people",
     status: "admin.users.col_status", platform: "admin.users.col_platform", push_status: "admin.push.device.push",
     auth: "admin.push.device.account", channel: "admin.push.delivery.channel", source: "admin.push.delivery.source",
-    type: "admin.push.delivery.type", locale: "common.language"
+    type: "admin.push.delivery.type", locale: "common.language",
+    units: "admin.credits.units", reason: "admin.credits.reason"
   };
 
   function fieldLabel(field) {
@@ -174,6 +178,7 @@
         return fieldLabel(details.field) + ": " +
           (REASON_KEYS[details.reason] ? t(REASON_KEYS[details.reason]) : t("admin.error.reason.unknown_value"));
       case "CONFLICT":
+        if (details.field === "grant_id") return t("admin.credits.already_revoked");
         return details.field === "idempotency_key" ? t("admin.error.idempotency_conflict") : t("admin.error.conflict");
       case "NOT_FOUND":
         return t("admin.error.not_found");
@@ -611,6 +616,7 @@
                 <td>
                   <div class="usage"><b>{{ row.used_today }}</b> / {{ row.daily_limit }}</div>
                   <div class="meter"><span :style="{ width: usageWidth(row) + '%' }"></span></div>
+                  <small class="muted">{{ t('admin.credits.remaining_total') }}: {{ nf(row.remaining_total) }}</small>
                 </td>
                 <td>{{ nf(row.tokens_month) }}</td>
                 <td>{{ row.platform || '—' }} <span class="mono" v-if="row.app_version">{{ row.app_version }}</span></td>
@@ -631,12 +637,19 @@
       </div>`
   };
 
+  // Кредит түрлері мен журнал жазбалары (domain.GrantKinds, domain.LedgerEntries).
+  var GRANT_KINDS = ["pass", "welcome", "admin", "pack"];
+  var LEDGER_ENTRIES = ["grant", "consume", "refund", "revoke"];
+
   var UserDetail = {
     props: { id: String },
-    data: function () { return { loading: true, data: null, plans: [], planID: "", expires: "" }; },
+    data: function () {
+      return { loading: true, data: null, plans: [], planID: "", expires: "",
+               grant: { units: 10, reason: "" }, granting: false };
+    },
     mounted: function () { this.load(); },
     methods: {
-      t: t, nf: nf, money: money,
+      t: t, tf: tf, nf: nf, money: money,
       async load() {
         this.loading = true;
         try {
@@ -660,6 +673,41 @@
         this.act("/status", { status: next }, "common.confirm");
       },
       savePlan() { this.act("/plan", { plan_id: this.planID, expires_at: this.expires }); },
+      subscriptionStatus() {
+        var status = this.data.subscription.status;
+        return status === "none" ? t("admin.user.sub_none") : status;
+      },
+      kindLabel(kind) { return GRANT_KINDS.indexOf(kind) >= 0 ? t("admin.credits.kind." + kind) : kind; },
+      entryLabel(entry) { return LEDGER_ENTRIES.indexOf(entry) >= 0 ? t("admin.credits.entry." + entry) : entry; },
+      grantStatus(g) { return t("admin.credits.status." + (g.status === "revoked" ? "revoked" : "active")); },
+      byLabel(by) { return by === "admin" ? t("admin.credits.by_admin") : t("admin.credits.by_system"); },
+      grantInvalid() {
+        var units = this.grant.units, reason = (this.grant.reason || "").trim();
+        return !(Number.isInteger(units) && units >= 1 && units <= 10000) || !reason || reason.length > 200;
+      },
+      async giveCredits() {
+        if (this.grantInvalid()) { toast("danger", t("admin.credits.grant_invalid")); return; }
+        if (!window.confirm(tf("admin.credits.grant_confirm", { units: this.grant.units }))) return;
+        this.granting = true;
+        try {
+          await api("/users/" + this.id + "/credits", { method: "POST",
+            body: { units: this.grant.units, reason: this.grant.reason.trim() } });
+          toast("ok", t("common.saved"));
+          this.grant = { units: 10, reason: "" };
+          this.load();
+        } catch (e) { toast("danger", errorText(e)); }
+        this.granting = false;
+      },
+      async revokeCredits(g) {
+        var reason = window.prompt(tf("admin.credits.revoke_confirm", { units: g.units_remaining }), "");
+        if (reason === null) return;
+        try {
+          await api("/users/" + this.id + "/credits/" + g.id + "/revoke", { method: "POST",
+            body: { reason: reason.trim() } });
+          toast("ok", t("common.saved"));
+          this.load();
+        } catch (e) { toast("danger", errorText(e)); }
+      },
       usagePercent() {
         var e = this.data.entitlement;
         return e.daily_limit ? Math.min(100, Math.round(e.used_today / e.daily_limit * 100)) : 0;
@@ -700,9 +748,68 @@
                   <dd>{{ data.user.preferred_language ? data.user.preferred_language.toUpperCase() : t('admin.user.not_set') }}</dd>
                   <dt>{{ t('admin.users.col_plan') }}</dt><dd>{{ data.entitlement.plan_name }}
                     <span class="mono">{{ data.entitlement.plan_code }}</span></dd>
-                  <dt>{{ t('admin.users.col_sub') }}</dt><dd>{{ data.subscription.status }}
+                  <dt>{{ t('admin.users.col_sub') }}</dt><dd>{{ subscriptionStatus() }}
                     <span v-if="data.subscription.expires_at">· {{ data.subscription.expires_at }}</span></dd>
                 </dl>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-head"><h2>{{ t('admin.credits.title') }}</h2>
+                <div class="right"><span class="badge badge-brand">{{ t('admin.credits.remaining_total') }}:
+                  {{ nf(data.balances.remaining_total) }}</span></div></div>
+              <div class="card-body">
+                <dl class="kv">
+                  <dt>{{ t('admin.credits.welcome') }}</dt>
+                  <dd>{{ data.balances.welcome ? tf('admin.credits.welcome_of',
+                    { remaining: data.balances.welcome.remaining, total: data.balances.welcome.total }) : t('admin.credits.none') }}</dd>
+                  <dt>{{ t('admin.credits.credits') }}</dt>
+                  <dd>{{ nf(data.balances.credits) }}
+                    <span class="muted">({{ t('admin.credits.kind.admin') }}: {{ nf(data.balances.admin) }} ·
+                      {{ t('admin.credits.kind.pack') }}: {{ nf(data.balances.packs) }})</span></dd>
+                  <dt>{{ t('admin.credits.kind.pass') }}</dt>
+                  <dd>{{ data.balances.pass ? tf('admin.credits.pass_until',
+                    { remaining: data.balances.pass.remaining, date: data.balances.pass.expires_at }) : t('admin.credits.none') }}</dd>
+                </dl>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>{{ t('admin.credits.col_kind') }}</th><th>{{ t('admin.credits.units') }}</th>
+                    <th>{{ t('admin.users.col_status') }}</th><th>{{ t('admin.audit.when') }}</th>
+                    <th>{{ t('admin.credits.reason') }}</th><th></th></tr></thead>
+                  <tbody>
+                    <tr v-for="g in data.grants" :key="g.id">
+                      <td>{{ kindLabel(g.kind) }}<div class="muted small">{{ byLabel(g.by) }}</div></td>
+                      <td><b>{{ nf(g.units_remaining) }}</b> / {{ nf(g.units_total) }}</td>
+                      <td><span :class="'badge ' + (g.status === 'active' ? 'badge-ok' : 'badge-muted')">{{ grantStatus(g) }}</span>
+                        <div class="muted small" v-if="g.expires_at">{{ t('admin.credits.expires') }} {{ g.expires_at }}</div></td>
+                      <td class="mono">{{ g.created_at }}</td>
+                      <td>{{ g.reason || '—' }}<div class="muted small" v-if="g.revoke_reason">{{ g.revoke_reason }}</div></td>
+                      <td><button v-if="g.status === 'active'" class="btn btn-sm btn-danger" @click="revokeCredits(g)">
+                        {{ t('admin.credits.revoke') }}</button></td>
+                    </tr>
+                    <tr v-if="!data.grants.length"><td colspan="6" class="empty">{{ t('common.empty') }}</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-head"><h2>{{ t('admin.credits.ledger') }}</h2></div>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>{{ t('admin.audit.when') }}</th><th>{{ t('admin.credits.col_entry') }}</th>
+                    <th>{{ t('admin.credits.col_kind') }}</th><th>{{ t('admin.credits.delta') }}</th>
+                    <th>{{ t('admin.credits.reason') }}</th></tr></thead>
+                  <tbody>
+                    <tr v-for="(e, i) in data.ledger" :key="i">
+                      <td class="mono">{{ e.at }}</td><td>{{ entryLabel(e.entry) }}</td><td>{{ kindLabel(e.kind) }}</td>
+                      <td class="mono">{{ e.delta > 0 ? '+' + e.delta : e.delta }}</td>
+                      <td>{{ e.reason || '—' }}<div class="muted small">{{ byLabel(e.by) }}</div></td>
+                    </tr>
+                    <tr v-if="!data.ledger.length"><td colspan="5" class="empty">{{ t('common.empty') }}</td></tr>
+                  </tbody>
+                </table>
               </div>
             </div>
 
@@ -767,6 +874,20 @@
                 <button class="btn btn-danger" style="width:100%"
                         @click="act('/revoke-sessions', {}, 'admin.user.revoke')">
                   {{ t('admin.user.revoke') }} ({{ data.sessions.length }})</button>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-head"><h2>{{ t('admin.credits.grant') }}</h2></div>
+              <div class="card-body">
+                <p class="muted" style="margin-top:0">{{ t('admin.credits.grant_hint') }}</p>
+                <label class="field"><span>{{ t('admin.credits.units') }}</span>
+                  <input type="number" step="1" min="1" max="10000" v-model.number="grant.units"></label>
+                <label class="field"><span>{{ t('admin.credits.reason') }}</span>
+                  <textarea rows="2" maxlength="200" v-model="grant.reason"></textarea>
+                  <small>{{ (grant.reason || '').length }} / 200</small></label>
+                <button class="btn btn-primary" style="width:100%" :disabled="granting || grantInvalid()" @click="giveCredits">
+                  {{ t('admin.credits.grant_button') }}</button>
               </div>
             </div>
 
@@ -1080,17 +1201,19 @@
       return {
         data: null,
         form: { model: "", input_per_1m: 0.15, output_per_1m: 0.6, effective_from: "" },
-        limits: {}, limitFields: LIMIT_FIELDS, savingLimits: false
+        limits: {}, limitFields: LIMIT_FIELDS, savingLimits: false,
+        welcomeUnits: 0, savingWelcome: false
       };
     },
     mounted: function () { this.load(); },
     methods: {
-      t: t,
+      t: t, tf: tf,
       async load() {
         try {
           this.data = await api("/settings");
           this.form.model = this.data.model;
           this.fillLimits(this.data.ai_limits);
+          if (this.data.welcome_bonus) this.welcomeUnits = this.data.welcome_bonus.units;
         }
         catch (e) { toast("danger", t("common.error")); }
       },
@@ -1118,6 +1241,23 @@
         } catch (e) {
           toast("danger", e.details && e.details.reason === "checkout_unavailable"
             ? t("admin.settings.purchases_unavailable") : t("common.error"));
+        }
+      },
+      welcomeInvalid() {
+        var r = this.data.welcome_bonus.range, value = this.welcomeUnits;
+        return !(Number.isInteger(value) && value >= r.min && value <= r.max);
+      },
+      async saveWelcome() {
+        if (this.welcomeInvalid()) { toast("danger", t("admin.settings.limit_invalid")); return; }
+        this.savingWelcome = true;
+        try {
+          this.data.welcome_bonus = await api("/settings/welcome-bonus", { method: "POST", body: { units: this.welcomeUnits } });
+          this.welcomeUnits = this.data.welcome_bonus.units;
+          toast("ok", t("common.saved"));
+        } catch (e) {
+          toast("danger", errorText(e));
+        } finally {
+          this.savingWelcome = false;
         }
       },
       async saveLimits() {
@@ -1175,6 +1315,25 @@
               @click="setPurchases(true)">{{ t('admin.settings.purchases_on') }}</button>
             <button v-else class="btn btn-danger" @click="setPurchases(false)">{{ t('admin.settings.purchases_off_btn') }}</button>
             <p class="muted" v-if="!data.purchases.checkout_available">{{ t('admin.settings.purchases_unavailable') }}</p>
+          </div>
+        </div>
+        <div class="card" v-if="data.welcome_bonus">
+          <div class="card-head"><h2>{{ t('admin.settings.welcome_bonus') }}</h2></div>
+          <div class="card-body">
+            <p class="muted" style="margin-top:0">{{ t('admin.settings.welcome_bonus_hint') }}</p>
+            <div class="form-grid">
+              <label class="field">
+                <span>{{ t('admin.settings.welcome_bonus_units') }}
+                  <span :class="'badge ' + (welcomeUnits > 0 ? 'badge-ok' : 'badge-muted')">
+                    {{ welcomeUnits > 0 ? 'on' : 'off' }}</span></span>
+                <input type="number" step="1" :min="data.welcome_bonus.range.min" :max="data.welcome_bonus.range.max"
+                  v-model.number="welcomeUnits" :aria-invalid="welcomeInvalid()">
+                <small class="muted">{{ t('admin.settings.limit_default') }}: {{ data.welcome_bonus.default }} ·
+                  {{ t('admin.settings.limit_range') }}: {{ data.welcome_bonus.range.min }}–{{ data.welcome_bonus.range.max }}</small>
+              </label>
+            </div>
+            <p class="muted" v-if="data.welcome_bonus.since">{{ tf('admin.settings.welcome_bonus_since', { date: data.welcome_bonus.since }) }}</p>
+            <button class="btn btn-primary" :disabled="savingWelcome" @click="saveWelcome">{{ t('common.save') }}</button>
           </div>
         </div>
         <div class="card" v-if="data.ai_limits">
