@@ -55,9 +55,22 @@ struct KeyboardCheckField: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.s) {
-            Text("keyboardCheck.prompt")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+            // The answer takes the prompt's place above the field: below
+            // it, the keyboard being checked would cover it, and a line
+            // added above would push the field under that keyboard.
+            if let result {
+                Label {
+                    Text(result.text).font(.subheadline)
+                } icon: {
+                    Image(systemName: result.symbol).foregroundStyle(result.tint)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityAddTraits(.updatesFrequently)
+            } else {
+                Text("keyboardCheck.prompt")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
             TextField("keyboardCheck.placeholder", text: $text, axis: .vertical)
                 .lineLimit(1...3)
                 .focused(focus)
@@ -67,14 +80,6 @@ struct KeyboardCheckField: View {
                     RoundedRectangle(cornerRadius: DS.Radius.medium, style: .continuous)
                         .fill(Color(.tertiarySystemFill))
                 )
-            if let result {
-                Label {
-                    Text(result.text).font(.footnote)
-                } icon: {
-                    Image(systemName: result.symbol).foregroundStyle(result.tint)
-                }
-                .accessibilityElement(children: .combine)
-            }
         }
         .onChange(of: focus.wrappedValue) { _, focused in
             guard focused else { return }
