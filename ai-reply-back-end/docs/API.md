@@ -993,7 +993,7 @@ credits, admin, packs, pass { expires_at, remaining } | null, remaining_total }`
 |---|---|---|
 | GET | `/support/summary` | `{ "open", "unread" }` — открытые чаты и чаты с непрочитанным для оператора (значок в меню, опрос раз в 30 с) |
 | GET | `/support/conversations?status=open\|resolved\|all&unread=1&q=&page=` | список, свежие первыми (25 на страницу): `id`, `user_id`, `identifier` (маска), `status`, `unread`, `user_unread`, `last_message_at`, `last_sender`, `preview` (120 символов); `q` — телефон, почта или id (`%` и `_` буквально) |
-| GET | `/support/conversations/{id}?before=\|after=&limit=` | `conversation`, `user` (маска, тариф, платформа/версия/ОС последней установки, `last_seen`), `diagnostics` (пока `null`), `messages`, `has_more` |
+| GET | `/support/conversations/{id}?before=\|after=&limit=` | `conversation`, `user` (маска, тариф, платформа/версия/ОС последней установки, `last_seen`), `diagnostics` (устройства с диагностикой клавиатуры и разрешений — как `devices` в `/users/{id}/diagnostics`; `null`, если недоступна), `messages`, `has_more` |
 | POST | `/support/conversations/{id}/messages` | `{ "text" }` → `201 { "message" }`: ответ оператора, сообщения пользователя считаются прочитанными, уходит push; 60 в минуту на админа; аудит `support.reply` (только `length`) |
 | POST | `/support/conversations/{id}/resolve` · `/reopen` | `{ "ok", "changed" }`; аудит `support.resolve` / `support.reopen` при изменении |
 | POST | `/support/conversations/{id}/read` | отметить сообщения пользователя прочитанными |

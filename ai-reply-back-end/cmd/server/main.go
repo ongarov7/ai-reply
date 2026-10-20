@@ -185,9 +185,10 @@ func run(envFile string) error {
 		WithEvents(notifyEvents).WithDemoCheckout(cfg.Payments.DemoCheckout).WithProduction(cfg.App.IsProduction())
 	eventSvc := productevents.New(store, log)
 	reportSvc := reports.New(store, log)
-	// Support chat: an operator reply sends one support_reply push per unread burst.
-	supportSvc := support.New(store, subSvc, log).WithNotifier(notifyEvents)
 	adminSvc := admin.New(store, subSvc, planSvc, cfg, log).WithEvents(notifyEvents)
+	// Support chat: an operator reply sends one support_reply push per unread burst;
+	// the conversation page shows the person's keyboard and permission diagnostics.
+	supportSvc := support.New(store, subSvc, log).WithNotifier(notifyEvents).WithDiagnostics(adminSvc.SupportDiagnostics)
 	simulatorSvc := simulator.New(simulator.Deps{
 		Repo: store, Users: userSvc, Subs: subSvc, Plans: planSvc, AI: aiSvc, Limits: limitSvc,
 		Config: cfg, Log: log,

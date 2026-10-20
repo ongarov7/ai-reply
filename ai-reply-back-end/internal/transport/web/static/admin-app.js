@@ -3006,7 +3006,8 @@
     computed: {
       length: function () { return runeLength(this.text.trim()); },
       canSend: function () { return !this.busy && this.length > 0 && this.length <= SUPPORT_TEXT_MAX; },
-      diagnostics: function () { return this.data && this.data.diagnostics ? flatten(this.data.diagnostics, "") : []; }
+      // The person's devices with their keyboard and permission state (as on the user page).
+      devices: function () { return this.data && Array.isArray(this.data.diagnostics) ? this.data.diagnostics : []; }
     },
     mounted: function () {
       var self = this;
@@ -3016,6 +3017,7 @@
     },
     unmounted: function () { clearInterval(this.timer); },
     methods: Object.assign({}, helpers, {
+      diagBadge: diagBadge, diagLabel: diagLabel,
       path: function (suffix) { return "/support/conversations/" + encodeURIComponent(this.id) + (suffix || ""); },
       async load() {
         this.loading = true;
@@ -3097,8 +3099,21 @@
               <dd>{{ platformName(data.user.platform) }} <span class="mono">{{ data.user.app_version }}</span> {{ data.user.os_version }}</dd>
               <dt>{{ t('admin.support.last_seen') }}</dt><dd>{{ data.user.last_seen || '—' }}</dd>
               <dt>{{ t('admin.support.diagnostics') }}</dt>
-              <dd><div v-for="p in diagnostics" :key="p.key"><span class="muted">{{ p.key }}:</span> {{ p.value }}</div>
-                <span v-if="!diagnostics.length" class="muted">{{ t('admin.support.no_diagnostics') }}</span></dd>
+              <dd><div v-for="d in devices" :key="d.id" class="small" style="margin-bottom:6px">
+                  <b>{{ d.device || platformName(d.platform) }}</b> · <span class="mono">{{ d.app_version }}</span>
+                  <div v-if="!d.diagnostics.reported" class="muted">{{ t('admin.diag.not_reported') }}</div>
+                  <template v-else>
+                    <div>{{ t('admin.diag.col.keyboard') }}: <span :class="'badge ' + diagBadge(d.diagnostics.keyboard_setup_status)">{{ diagLabel('keyboard_setup_status', d.diagnostics.keyboard_setup_status) }}</span></div>
+                    <div>{{ t('admin.diag.col.full_access') }}: <span :class="'badge ' + diagBadge(d.diagnostics.full_access_status)">{{ diagLabel('full_access_status', d.diagnostics.full_access_status) }}</span></div>
+                    <div>{{ t('admin.diag.col.clipboard') }}: <span :class="'badge ' + diagBadge(d.diagnostics.clipboard_status)">{{ diagLabel('clipboard_status', d.diagnostics.clipboard_status) }}</span></div>
+                    <div>{{ t('admin.diag.col.onboarding') }}: <span :class="'badge ' + diagBadge(d.diagnostics.onboarding_status)">{{ diagLabel('onboarding_status', d.diagnostics.onboarding_status) }}</span></div>
+                    <div class="muted">{{ t('admin.diag.col.reported') }}: <span class="mono">{{ d.diagnostics.reported_at }}</span>
+                      <span v-if="d.diagnostics.stale" class="badge badge-muted">{{ t('admin.diag.stale') }}</span></div>
+                  </template>
+                  <div>{{ t('admin.diag.col.notifications') }}:
+                    <span :class="'badge ' + diagBadge(d.diagnostics.notification_authorization_status)">{{ diagLabel('notification_authorization_status', d.diagnostics.notification_authorization_status) }}</span></div>
+                </div>
+                <span v-if="!devices.length" class="muted">{{ t('admin.support.no_diagnostics') }}</span></dd>
             </dl>
           </div>
           <div class="support-thread">

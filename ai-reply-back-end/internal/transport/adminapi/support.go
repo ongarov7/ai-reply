@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/aireply/ai-reply-back-end/internal/domain"
+	"github.com/aireply/ai-reply-back-end/internal/repository"
 	"github.com/aireply/ai-reply-back-end/internal/support"
 	"github.com/aireply/ai-reply-back-end/internal/traits"
 	"github.com/aireply/ai-reply-back-end/internal/transport/httpx"
@@ -126,10 +127,27 @@ func (s *Server) handleSupportConversation(w http.ResponseWriter, r *http.Reques
 	httpx.JSON(w, http.StatusOK, map[string]any{
 		"conversation": s.supportConversationOut(detail.Conversation),
 		"user":         user,
-		"diagnostics":  detail.Diagnostics,
+		"diagnostics":  s.supportDiagnosticsOut(detail.Diagnostics),
 		"messages":     out,
 		"has_more":     more,
 	})
+}
+
+// supportDiagnosticsOut — the person's devices with their keyboard and
+// permission state, as "devices" of /users/{id}/diagnostics; null when the
+// diagnostics source is not wired or failed.
+func (s *Server) supportDiagnosticsOut(v any) any {
+	rows, ok := v.([]repository.DiagnosticsRow)
+	if !ok {
+		return v
+	}
+	devices := make([]map[string]any, 0, len(rows))
+	for _, row := range rows {
+		dto := s.installationDTO(row.Installation)
+		dto["diagnostics"] = s.diagnosticsDTO(row.Installation, row.Diagnostics)
+		devices = append(devices, dto)
+	}
+	return devices
 }
 
 // handleSupportReply — оператордың жауабы {text}. Аудитке тек ұзындығы жазылады, мәтіні емес.

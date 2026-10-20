@@ -445,8 +445,9 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 		WithDemoCheckout(cfg.Payments.DemoCheckout).WithProduction(cfg.App.IsProduction())
 	eventSvc := productevents.New(store, log).WithClock(clock)
 	reportSvc := reports.New(store, log).WithClock(clock)
-	supportSvc := support.New(store, subSvc, log).WithClock(clock).WithNotifier(events)
 	adminSvc := admin.New(store, subSvc, planSvc, cfg, log).WithEvents(events)
+	supportSvc := support.New(store, subSvc, log).WithClock(clock).WithNotifier(events).
+		WithDiagnostics(adminSvc.SupportDiagnostics)
 	simulatorSvc := simulator.New(simulator.Deps{
 		Repo: store, Users: userSvc, Subs: subSvc, Plans: planSvc, AI: aiSvc, Limits: limitSvc,
 		Config: cfg, Log: log,

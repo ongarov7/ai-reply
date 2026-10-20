@@ -312,6 +312,42 @@ func TestSupportReplyNotifiesOncePerUnreadBurst(t *testing.T) {
 	}
 }
 
+// Сөйлесу бетінде қолданушы құрылғыларының пернетақта мен рұқсат күйі көрінеді.
+func TestSupportConversationShowsPermissionDiagnostics(t *testing.T) {
+	h := newHarness(t)
+	s := h.signIn("support.diag@example.com")
+	h.mustRegister(installation(installID(408), domain.PlatformIOS, fcmToken(408)), s.access)
+	body := diagnosticsBody()
+	body["full_access_status"] = "observed_denied"
+	if res := h.reportDiagnostics(installID(408), body, s.access); res.status != http.StatusOK {
+		t.Fatalf("diagnostics: %d %s", res.status, res.raw)
+	}
+	h.mustSupportSend(s.access, "Қою жұмыс істемейді")
+	bare := h.signIn("support.nodevice@example.com")
+	h.mustSupportSend(bare.access, "Құрылғысыз сұрақ")
+	admin := h.signInAdmin()
+
+	detail := h.supportAdmin(admin, http.MethodGet, "/conversations/"+h.supportConversationID(s.access), nil)
+	mustStatus(t, detail, http.StatusOK, "")
+	devices, _ := detail.body["diagnostics"].([]any)
+	if len(devices) != 1 {
+		t.Fatalf("diagnostics: %s", detail.raw)
+	}
+	device := devices[0].(map[string]any)
+	diag, _ := device["diagnostics"].(map[string]any)
+	if device["platform"] != domain.PlatformIOS || diag["reported"] != true || diag["keyboard_setup_status"] != "not_verified" ||
+		diag["full_access_status"] != "observed_denied" || diag["onboarding_status"] != "in_progress" ||
+		diag["notification_authorization_status"] == nil {
+		t.Fatalf("device diagnostics: %v", device)
+	}
+
+	empty := h.supportAdmin(admin, http.MethodGet, "/conversations/"+h.supportConversationID(bare.access), nil)
+	mustStatus(t, empty, http.StatusOK, "")
+	if list, ok := empty.body["diagnostics"].([]any); !ok || len(list) != 0 {
+		t.Fatalf("no devices: %s", empty.raw)
+	}
+}
+
 // Шешілді / қайта ашу, жазу шешілген сөйлесуді ашады, тізім сүзгілері мен белгі.
 func TestSupportResolveReopenAndList(t *testing.T) {
 	h := newHarness(t)
