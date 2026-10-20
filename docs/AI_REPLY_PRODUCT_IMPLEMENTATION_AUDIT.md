@@ -263,7 +263,7 @@ Work runs in three streams (backend, iOS, Android); each step is committed separ
 | iOS keyboard: recipient labels/icons, paste denial, status evidence, limit message, emoji page | done |
 | Backend: permission diagnostics, reminders, push fixes | done |
 | Backend: support chat (user + admin) | done |
-| Backend: purchases (StoreKit 2 / Play verification, products, admin) | next |
-| iOS / Android app: strict native style, onboarding, «Создать ответ», «Подключи AI Reply», permissions section | next |
+| Backend: purchases (StoreKit 2 / Play verification, products, admin) | done |
+| iOS / Android app: strict native style, onboarding, «Создать ответ», «Подключи AI Reply», permissions section | in progress |
 | iOS / Android app: balance, exhausted sheet, purchases, support chat, diagnostics reporting | next |
 | End-to-end check against a local backend, final report | last |
