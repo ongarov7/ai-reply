@@ -6,6 +6,7 @@ struct HomeView: View {
     @Environment(ReplyConfigurationModel.self) private var model
     @Environment(AccountModel.self) private var account
     @Environment(PushNotificationsModel.self) private var notifications
+    @Environment(SupportInbox.self) private var support
 
     /// Re-read on appearance and on every return to the foreground -
     /// typically from iOS Settings, or from another app where the keyboard
@@ -43,8 +44,17 @@ struct HomeView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 NavigationLink(value: AppRoute.settings) {
                     Image(systemName: "gearshape")
+                        // An operator's reply waits in Settings ▸ «Чат с оператором».
+                        .overlay(alignment: .topTrailing) {
+                            if support.unreadCount > 0 {
+                                Circle()
+                                    .fill(Color.accentColor)
+                                    .frame(width: 8, height: 8)
+                                    .offset(x: 3, y: -2)
+                            }
+                        }
                 }
-                .accessibilityLabel("common.settings")
+                .accessibilityLabel(support.unreadCount > 0 ? Text("support.unread.settings") : Text("common.settings"))
             }
         }
         .onAppear {

@@ -16,6 +16,7 @@ struct SettingsView: View {
     @Environment(KeyboardStatusMonitor.self) private var keyboard
     @Environment(PushNotificationsModel.self) private var notifications
     @Environment(AppRouter.self) private var router
+    @Environment(SupportInbox.self) private var support
     @Environment(\.openURL) private var openURL
 
     @State private var isShowingPasteHelp = false
@@ -159,12 +160,22 @@ struct SettingsView: View {
             }
 
             Section {
+                // A person answers here; the site keeps the help pages.
+                if support.isAvailable {
+                    NavigationLink {
+                        SupportChatView()
+                    } label: {
+                        Label("support.title", systemImage: "bubble.left.and.bubble.right")
+                    }
+                    .badge(support.unreadCount)
+                }
                 Button {
                     openLegal(account.legalConfig.resolvedSupportURL)
                 } label: {
                     Label("settings.support", systemImage: "questionmark.circle")
                 }
             }
+            .task { await support.refresh() }
 
             if !AppGroup.isAvailable || !model.isPersistent {
                 Section {

@@ -64,6 +64,11 @@ struct BalanceSummary: Equatable {
         rows.filter { if case .today = $0 { return false } else { return true } }
     }
 
+    static func date(_ iso: String) -> Date? { ServerTime.date(iso) }
+}
+
+/// The server's timestamps.
+enum ServerTime {
     /// RFC 3339 with or without fractions, any offset.
     static func date(_ iso: String) -> Date? {
         let parser = ISO8601DateFormatter()

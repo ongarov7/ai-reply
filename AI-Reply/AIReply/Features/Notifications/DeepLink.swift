@@ -8,8 +8,8 @@ import Foundation
 /// "notifications" is the notifications part of Settings; "keyboard" and
 /// "permissions" both open «Настройка клавиатуры и разрешений»;
 /// "onboarding" shows the guide over Home; "purchase" opens «Докупить
-/// ответы» while purchases are on, the plans otherwise. "support" has no
-/// screen in this build yet and opens Home, as an unknown screen does.
+/// ответы» while purchases are on, the plans otherwise; "support" opens
+/// «Чат с оператором» on a server with the chat, Home otherwise.
 enum AppScreen: String, CaseIterable, Sendable {
     case home, subscription, settings, notifications, templates, profile, keyboard, compose
     case onboarding, permissions
@@ -81,22 +81,27 @@ enum DeepLink {
 ///
 /// FCM delivers the message's data as flat keys next to `aps`: `nid`
 /// (notification), `did` (this delivery), `type`, `category`, `link`,
-/// plus custom ones the app ignores. Anything missing or of the wrong type is
-/// simply absent.
+/// `conversation_id` (an operator's reply), plus custom ones the app
+/// ignores. Anything missing or of the wrong type is simply absent.
 struct NotificationPayload: Equatable, Sendable {
     let notificationID: String?
     let deliveryID: String?
     let type: String?
     let category: String?
     let link: String?
+    /// The support conversation an operator answered in.
+    let conversationID: String?
+
+    static let supportReplyType = "support_reply"
 
     init(notificationID: String? = nil, deliveryID: String? = nil, type: String? = nil,
-         category: String? = nil, link: String? = nil) {
+         category: String? = nil, link: String? = nil, conversationID: String? = nil) {
         self.notificationID = notificationID
         self.deliveryID = deliveryID
         self.type = type
         self.category = category
         self.link = link
+        self.conversationID = conversationID
     }
 
     init(userInfo: [AnyHashable: Any]) {
@@ -112,8 +117,13 @@ struct NotificationPayload: Equatable, Sendable {
             }
         }
         self.init(notificationID: text("nid"), deliveryID: text("did"), type: text("type"),
-                  category: text("category"), link: text("link"))
+                  category: text("category"), link: text("link"), conversationID: text("conversation_id"))
     }
 
-    var destination: DeepLinkDestination { DeepLink.destination(for: link) }
+    /// An operator answered: the chat, whatever the link says.
+    var isSupportReply: Bool { type == Self.supportReplyType || conversationID != nil }
+
+    var destination: DeepLinkDestination {
+        isSupportReply ? .screen(.support) : DeepLink.destination(for: link)
+    }
 }

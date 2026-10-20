@@ -124,6 +124,72 @@ struct DebugExhaustedHost: View {
     }
 }
 
+/// A conversation with an operator, imitated.
+struct DebugSupportTransport: SupportTransport {
+    let isEmpty: Bool
+
+    private static func stamp(daysAgo: Int, hour: Int, minute: Int) -> String {
+        let day = Calendar.current.date(byAdding: .day, value: -daysAgo, to: Date()) ?? Date()
+        let date = Calendar.current.date(bySettingHour: hour, minute: minute, second: 0, of: day) ?? day
+        return ISO8601DateFormatter().string(from: date)
+    }
+
+    private var messages: [SupportAPI.Message] {
+        guard !isEmpty else { return [] }
+        let russian = SharedSettings.shared.effectiveAppLanguage == .russian
+        let texts = russian ? [
+            "Здравствуйте! Клавиатура не видит скопированное сообщение. Что делать?",
+            "Здравствуйте! Откройте Настройки → AI Reply → «Вставка из других приложений» и выберите «Разрешить». Потом скопируйте сообщение ещё раз.",
+            "Получилось, спасибо!",
+            "Рады помочь. Если появятся вопросы — пишите сюда."
+        ] : [
+            "Hello! The keyboard does not see the message I copied. What should I do?",
+            "Hello! Open Settings → AI Reply → Paste from Other Apps and choose Allow. Then copy the message again.",
+            "It works now, thank you!",
+            "Glad to help. Write here if anything else comes up."
+        ]
+        return [
+            SupportAPI.Message(id: "m1", sender: "user", text: texts[0], createdAt: Self.stamp(daysAgo: 1, hour: 18, minute: 2), readAt: nil),
+            SupportAPI.Message(id: "m2", sender: "operator", text: texts[1], createdAt: Self.stamp(daysAgo: 1, hour: 18, minute: 10),
+                               readAt: Self.stamp(daysAgo: 1, hour: 18, minute: 12)),
+            SupportAPI.Message(id: "m3", sender: "user", text: texts[2], createdAt: Self.stamp(daysAgo: 0, hour: 9, minute: 15), readAt: nil),
+            SupportAPI.Message(id: "m4", sender: "operator", text: texts[3], createdAt: Self.stamp(daysAgo: 0, hour: 9, minute: 16),
+                               readAt: nil)
+        ]
+    }
+
+    func conversation() async throws -> SupportAPI.Conversation? {
+        isEmpty ? nil : SupportAPI.Conversation(id: "c1", status: "open", unreadCount: 1)
+    }
+
+    func messages(_ cursor: SupportAPI.Cursor, limit: Int) async throws -> SupportAPI.Page {
+        SupportAPI.Page(messages: cursor == .latest ? messages : [], hasMore: false)
+    }
+
+    func send(text: String, clientMessageID: String) async throws -> SupportAPI.Message {
+        SupportAPI.Message(id: clientMessageID, sender: "user", text: text,
+                           createdAt: ISO8601DateFormatter().string(from: Date()), readAt: nil)
+    }
+
+    func markRead(upTo messageID: String) async throws -> Int { 0 }
+}
+
+/// «Чат с оператором» over the sample conversation.
+struct DebugSupportHost: View {
+    @State private var inbox: SupportInbox
+
+    init(isEmpty: Bool) {
+        let inbox = SupportInbox(transport: DebugSupportTransport(isEmpty: isEmpty))
+        inbox.accountDidChange(isSignedIn: true, hasAcceptedLegal: true, features: DebugSamples.features)
+        _inbox = State(initialValue: inbox)
+    }
+
+    var body: some View {
+        NavigationStack { SupportChatView() }
+            .environment(inbox)
+    }
+}
+
 /// Home over the sample balance.
 struct DebugBalanceHost: View {
     @Environment(AccountModel.self) private var account

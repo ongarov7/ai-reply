@@ -88,6 +88,7 @@ struct AIReplyApp: App {
             .environment(services.router)
             .environment(services.notifications)
             .environment(services.purchases)
+            .environment(services.support)
             // A gender picked on another device arrives with /me; one picked
             // here and not yet confirmed is retried on every return.
             .onChange(of: account.profile) {
@@ -184,6 +185,9 @@ enum DebugScreen: String {
     /// «Лимит ответов исчерпан» over «Создать ответ»; `-AIReplyDebugOffer
     /// plans` shows it without «Докупить ответы».
     case exhausted
+    /// «Чат с оператором» over sample messages; `-AIReplyDebugChat empty`
+    /// shows a chat with none yet.
+    case support
 
     static var requested: DebugScreen? {
         let arguments = CommandLine.arguments
@@ -241,6 +245,7 @@ private struct DebugScreenHost: View {
                                             resendAvailableAt: Date().addingTimeInterval(32))) { _ in }
         case .balance:   DebugBalanceHost()
         case .purchase:  DebugPurchaseHost()
+        case .support:   DebugSupportHost(isEmpty: DebugScreen.value(after: "-AIReplyDebugChat") == "empty")
         case .exhausted: DebugExhaustedHost(offersPurchase: DebugScreen.value(after: "-AIReplyDebugOffer") != "plans")
         }
     }

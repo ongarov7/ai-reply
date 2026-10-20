@@ -207,12 +207,36 @@ final class DeepLinkTests: XCTestCase {
         XCTAssertEqual(AppRouter.path(for: .pasteHelp), [.pasteHelp])
         XCTAssertEqual(AppRouter.path(for: .compose), [.compose])
         XCTAssertEqual(AppRouter.path(for: .onboarding), [])
-        XCTAssertEqual(AppRouter.path(for: .support), [], "no screen yet: Home")
+        XCTAssertEqual(AppRouter.path(for: .support), [], "no chat on this server: Home")
+        XCTAssertEqual(AppRouter.path(for: .support, availability: .init(supportChat: true)), [.support])
         XCTAssertEqual(AppRouter.path(for: .purchase), [.subscription], "purchases closed: the plans")
         XCTAssertEqual(AppRouter.path(for: .purchase, availability: .init(purchases: true)), [.purchase])
         for screen in AppScreen.allCases {
             XCTAssertEqual(AppRouter.presentsTutorial(screen), screen == .onboarding, screen.rawValue)
         }
+    }
+
+    /// An operator's reply opens the chat: by its `conversation_id`, by its
+    /// type, or by its link.
+    @MainActor
+    func testAnOperatorsReplyOpensTheChat() {
+        let payload = NotificationPayload(userInfo: [
+            "aps": ["alert": ["title": "Ответ поддержки", "body": "Оператор ответил на ваш вопрос."]],
+            "nid": "n1", "did": "d1", "type": "support_reply", "category": "account",
+            "link": "aireply://support", "conversation_id": "c_42"
+        ])
+        XCTAssertEqual(payload.conversationID, "c_42")
+        XCTAssertTrue(payload.isSupportReply)
+        XCTAssertEqual(payload.destination, .screen(.support))
+        XCTAssertEqual(NotificationPayload(link: "", conversationID: "c_42").destination, .screen(.support))
+        XCTAssertEqual(NotificationPayload(type: "subscription_expiring", link: "aireply://subscription").destination,
+                       .screen(.subscription))
+
+        let router = AppRouter()
+        router.availability = AppRouter.Availability(supportChat: true)
+        router.mainInterfaceDidAppear()
+        router.open(payload.destination)
+        XCTAssertEqual(router.path, [.support])
     }
 
     /// `aireply://purchase` opens «Докупить ответы» only while the server

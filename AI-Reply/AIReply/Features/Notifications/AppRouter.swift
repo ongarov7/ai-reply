@@ -17,6 +17,8 @@ enum AppRoute: Hashable {
     case compose
     /// «Докупить ответы».
     case purchase
+    /// «Чат с оператором».
+    case support
 
     @MainActor @ViewBuilder
     var destination: some View {
@@ -31,6 +33,7 @@ enum AppRoute: Hashable {
         case .pasteHelp:            PasteHelpView()
         case .compose:              ComposeView()
         case .purchase:             PurchaseView()
+        case .support:              SupportChatView()
         }
     }
 }
@@ -161,8 +164,8 @@ final class AppRouter {
         case .onboarding:    return []
         // Purchases closed: the plans, where the other ways to more replies are.
         case .purchase:      return availability.purchases ? [.purchase] : [.subscription]
-        // No screen yet in this build: Home, as an older build does.
-        case .support:       return []
+        // No chat on this server: Home, as an older build does.
+        case .support:       return availability.supportChat ? [.support] : []
         }
     }
 }

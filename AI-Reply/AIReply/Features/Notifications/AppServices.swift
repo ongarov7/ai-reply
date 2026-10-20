@@ -46,6 +46,8 @@ final class AppServices {
     let notifications: PushNotificationsModel
     /// Reply packs and the pass; follows the App Store's transactions from launch.
     let purchases = PurchaseStore()
+    /// Whether the chat with an operator exists, and its unread replies.
+    let support = SupportInbox()
 
     /// The app's interface language, from `AppSettings`.
     var appLanguage: () -> String = { SharedSettings.shared.effectiveAppLanguage.rawValue }
@@ -138,9 +140,11 @@ final class AppServices {
         notifications.setServerDeliversPush(state.features.map { $0.pushNotifications ?? false })
         purchases.accountDidChange(isSignedIn: state.isSignedIn && state.isBootstrapComplete,
                                    userID: state.userID, features: state.features)
+        support.accountDidChange(isSignedIn: state.isSignedIn, hasAcceptedLegal: state.hasAcceptedLegal,
+                                 features: state.features)
         router.availability = AppRouter.Availability(
             purchases: state.isSignedIn && state.features?.iapIOS == true,
-            supportChat: false
+            supportChat: support.isAvailable
         )
 
         requestDeviceTokenIfPossible()
@@ -159,6 +163,16 @@ final class AppServices {
         requestInstallationSync(routine: true)
         // A purchase the server had not confirmed yet is sent again.
         Task { await purchases.processUnfinished() }
+        // An operator may have answered meanwhile.
+        Task { await support.refresh() }
+    }
+
+    /// A notification arrived while the app is open. Whether iOS shows its
+    /// banner: an operator's reply is not bannered over the chat itself,
+    /// which shows it at once.
+    func notificationWillPresent(_ payload: NotificationPayload) -> Bool {
+        guard payload.isSupportReply else { return true }
+        return support.replyArrived()
     }
 
     /// The installation to name on the logout request, so the server detaches
@@ -184,6 +198,7 @@ final class AppServices {
     /// A notification was tapped (or, in DEBUG with auto-open, arrived).
     func notificationOpened(_ payload: NotificationPayload) {
         router.open(payload.destination)
+        if payload.isSupportReply { Task { await support.refresh() } }
         if let deliveryID = payload.deliveryID, !openedDeliveries.contains(deliveryID) {
             // A handful at most; a tap arriving before the account is loaded waits for it.
             openedDeliveries = Array((openedDeliveries + [deliveryID]).suffix(10))
@@ -372,13 +387,16 @@ final class NotificationCenterDelegate: NSObject, UNUserNotificationCenterDelega
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 willPresent notification: UNNotification,
                                 withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        let payload = NotificationPayload(userInfo: notification.request.content.userInfo)
         #if DEBUG
         if DebugLaunchOptions.autoOpensPushes {
-            let payload = NotificationPayload(userInfo: notification.request.content.userInfo)
             Task { @MainActor in AppServices.shared.notificationOpened(payload) }
         }
         #endif
-        completionHandler([.banner, .list, .sound])
+        Task { @MainActor in
+            let showsBanner = AppServices.shared.notificationWillPresent(payload)
+            completionHandler(showsBanner ? [.banner, .list, .sound] : [.list])
+        }
     }
 
     /// A tap: from a cold start, from the background or on screen.
