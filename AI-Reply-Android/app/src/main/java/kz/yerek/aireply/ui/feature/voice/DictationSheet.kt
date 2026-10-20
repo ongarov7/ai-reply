@@ -135,13 +135,9 @@ fun DictationSheet(
                 modifier = Modifier
                     .size(72.dp)
                     .clip(CircleShape)
-                    .background(
-                        if (listening) {
-                            MaterialTheme.colorScheme.error
-                        } else {
-                            MaterialTheme.colorScheme.primary
-                        }
-                    )
+                    // The same blue while recording: the stop glyph and the status
+                    // line say it is on; red is kept for things that went wrong.
+                    .background(MaterialTheme.colorScheme.primary)
                     .clickable {
                         isEditing = false
                         when {

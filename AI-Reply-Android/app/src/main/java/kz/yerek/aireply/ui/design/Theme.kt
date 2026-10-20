@@ -33,38 +33,89 @@ val LocalExtraColors = staticCompositionLocalOf {
     )
 }
 
+/*
+ * Every role is set, not only the ones the screens name: Material's
+ * components reach for secondaryContainer (segmented buttons), the
+ * surfaceContainer family (dialogs, sheets, menus, a scrolled top bar) and
+ * surfaceTint, and their defaults are a lilac palette that has nothing to do
+ * with this app. Here they are the same blue and the same greys.
+ */
 private val LightScheme = lightColorScheme(
     primary = AppColors.AccentLight,
     onPrimary = Color.White,
-    primaryContainer = AppColors.AccentLight.copy(alpha = 0.12f),
-    onPrimaryContainer = AppColors.AccentLight,
+    primaryContainer = AppColors.AccentFillLight,
+    onPrimaryContainer = AppColors.TextPrimaryLight,
+    inversePrimary = AppColors.AccentDark,
+    secondary = AppColors.AccentLight,
+    onSecondary = Color.White,
+    secondaryContainer = AppColors.AccentFillLight,
+    onSecondaryContainer = AppColors.TextPrimaryLight,
+    tertiary = AppColors.AccentLight,
+    onTertiary = Color.White,
+    tertiaryContainer = AppColors.AccentFillLight,
+    onTertiaryContainer = AppColors.TextPrimaryLight,
     background = AppColors.BackgroundLight,
     onBackground = AppColors.TextPrimaryLight,
     surface = AppColors.SurfaceLight,
     onSurface = AppColors.TextPrimaryLight,
     surfaceVariant = AppColors.BackgroundLight,
     onSurfaceVariant = AppColors.TextSecondaryLight,
+    surfaceTint = Color.Transparent,
+    inverseSurface = AppColors.SurfaceDark,
+    inverseOnSurface = AppColors.TextPrimaryDark,
     outline = AppColors.SeparatorLight,
     outlineVariant = AppColors.SeparatorLight,
     error = AppColors.DangerLight,
-    onError = Color.White
+    onError = Color.White,
+    errorContainer = AppColors.DangerLight.copy(alpha = 0.12f),
+    onErrorContainer = AppColors.DangerLight,
+    scrim = Color.Black.copy(alpha = 0.32f),
+    surfaceBright = AppColors.SurfaceLight,
+    surfaceDim = AppColors.BackgroundLight,
+    surfaceContainerLowest = AppColors.SurfaceLight,
+    surfaceContainerLow = AppColors.BackgroundLight,
+    surfaceContainer = AppColors.BackgroundLight,
+    surfaceContainerHigh = AppColors.RaisedLight,
+    surfaceContainerHighest = AppColors.RaisedLight
 )
 
 private val DarkScheme = darkColorScheme(
     primary = AppColors.AccentDark,
     onPrimary = Color.White,
-    primaryContainer = AppColors.AccentDark.copy(alpha = 0.18f),
-    onPrimaryContainer = AppColors.AccentDark,
+    primaryContainer = AppColors.AccentFillDark,
+    onPrimaryContainer = AppColors.TextPrimaryDark,
+    inversePrimary = AppColors.AccentLight,
+    secondary = AppColors.AccentDark,
+    onSecondary = Color.White,
+    secondaryContainer = AppColors.AccentFillDark,
+    onSecondaryContainer = AppColors.TextPrimaryDark,
+    tertiary = AppColors.AccentDark,
+    onTertiary = Color.White,
+    tertiaryContainer = AppColors.AccentFillDark,
+    onTertiaryContainer = AppColors.TextPrimaryDark,
     background = AppColors.BackgroundDark,
     onBackground = AppColors.TextPrimaryDark,
     surface = AppColors.SurfaceDark,
     onSurface = AppColors.TextPrimaryDark,
     surfaceVariant = AppColors.SurfaceDark,
     onSurfaceVariant = AppColors.TextSecondaryDark,
+    surfaceTint = Color.Transparent,
+    inverseSurface = AppColors.SurfaceLight,
+    inverseOnSurface = AppColors.TextPrimaryLight,
     outline = AppColors.SeparatorDark,
     outlineVariant = AppColors.SeparatorDark,
     error = AppColors.DangerDark,
-    onError = Color.White
+    onError = Color.White,
+    errorContainer = AppColors.DangerDark.copy(alpha = 0.18f),
+    onErrorContainer = AppColors.DangerDark,
+    scrim = Color.Black.copy(alpha = 0.5f),
+    surfaceBright = AppColors.RaisedDark,
+    surfaceDim = AppColors.BackgroundDark,
+    surfaceContainerLowest = AppColors.BackgroundDark,
+    surfaceContainerLow = AppColors.SurfaceDark,
+    surfaceContainer = AppColors.BackgroundDark,
+    surfaceContainerHigh = AppColors.RaisedDark,
+    surfaceContainerHighest = AppColors.RaisedDark
 )
 
 /**

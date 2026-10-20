@@ -313,9 +313,22 @@
     <string name="subscription_current">Текущий тариф</string>
     <string name="subscription_remaining">осталось сегодня</string>
     <string name="subscription_used_today">Использовано %1$d из %2$d за сегодня</string>
+    <string name="subscription_remaining_month">осталось в этом месяце</string>
+    <string name="subscription_used_month">Использовано %1$d из %2$d в этом месяце</string>
     <string name="subscription_renews">Действует до %1$s</string>
     <string name="subscription_available">Доступные тарифы</string>
-    <string name="subscription_per_day">%1$d ответов в день</string>
+    <plurals name="subscription_per_day">
+        <item quantity="one">%1$d ответ в день</item>
+        <item quantity="few">%1$d ответа в день</item>
+        <item quantity="many">%1$d ответов в день</item>
+        <item quantity="other">%1$d ответа в день</item>
+    </plurals>
+    <plurals name="subscription_per_month">
+        <item quantity="one">%1$d ответ в месяц</item>
+        <item quantity="few">%1$d ответа в месяц</item>
+        <item quantity="many">%1$d ответов в месяц</item>
+        <item quantity="other">%1$d ответа в месяц</item>
+    </plurals>
     <string name="subscription_current_badge">Текущий</string>
     <string name="subscription_choose">Выбрать</string>
     <string name="settings_account">Аккаунт</string>
@@ -326,6 +339,7 @@
     <string name="settings_account_signed_out">Вы не вошли</string>
     <string name="settings_account_footer">Клавиатура использует тот же аккаунт. После выхода ответы не будут генерироваться до повторного входа.</string>
     <string name="home_usage_title">Ответы сегодня</string>
+    <string name="home_usage_title_month">Ответы в этом месяце</string>
     <string name="home_usage_left">осталось из %1$d</string>
     <string name="kb_err_sign_in_required">Откройте приложение AI Reply и войдите, чтобы продолжить.</string>
     <string name="kb_err_quota_exhausted">Доступные ответы закончились.</string>

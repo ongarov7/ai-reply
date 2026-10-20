@@ -205,9 +205,10 @@ internal fun DeleteAccountDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
     )
 }
 
+/** "Free · 7/10": the plan, and what is left of a counted allowance (never "0/0"). */
 private fun planSummary(state: AccountController.State, language: String): String {
     val plan = state.subscription?.plan ?: return ""
     val name = plan.localizedName(language)
-    if (state.usage.dailyLimit <= 0) return name
-    return "$name · ${state.usage.remainingToday}/${state.usage.dailyLimit}"
+    val summary = UsageSummary.of(state.usage) ?: return name
+    return "$name · ${summary.remaining}/${summary.limit}"
 }

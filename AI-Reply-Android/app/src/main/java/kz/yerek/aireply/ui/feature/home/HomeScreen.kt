@@ -44,6 +44,7 @@ import kz.yerek.aireply.ui.design.ReadableColumn
 import kz.yerek.aireply.ui.feature.setup.KeyboardSetupAction
 import kz.yerek.aireply.ui.design.Spacing
 import kz.yerek.aireply.ui.design.StepRow
+import kz.yerek.aireply.ui.feature.account.UsageSummary
 import kz.yerek.aireply.ui.navigation.Routes
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -217,19 +218,20 @@ private fun UsageCard(onOpen: (String) -> Unit) {
 
     if (!state.isSignedIn) return
 
-    val cached = services.usageCache.current()
-    val remaining = if (state.usage.dailyLimit > 0) state.usage.remainingToday else cached.remainingToday
-    val limit = if (state.usage.dailyLimit > 0) state.usage.dailyLimit else cached.dailyLimit
+    val summary = UsageSummary.of(state.usage, services.usageCache.current())
 
     AppCard(modifier = Modifier.clickable { onOpen(Routes.Subscription) }) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
                 Text(
-                    stringResource(R.string.home_usage_title),
+                    stringResource(
+                        if (summary?.period == UsageSummary.Period.MONTH) R.string.home_usage_title_month
+                        else R.string.home_usage_title
+                    ),
                     style = MaterialTheme.typography.titleSmall
                 )
                 Text(
@@ -239,18 +241,21 @@ private fun UsageCard(onOpen: (String) -> Unit) {
                 )
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        remaining.toString(),
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = if (remaining > 0) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.error
-                    )
-                    Text(
-                        stringResource(R.string.home_usage_left, limit),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = LocalExtraColors.current.textSecondary
-                    )
+                // No number at all rather than a zero that is not one.
+                if (summary != null) {
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            summary.remaining.toString(),
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = if (summary.hasReplies) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            stringResource(R.string.home_usage_left, summary.limit),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = LocalExtraColors.current.textSecondary
+                        )
+                    }
                 }
                 Spacer(Modifier.size(Spacing.xs))
                 Icon(

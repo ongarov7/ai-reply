@@ -24,17 +24,39 @@ class LocalizationParityTest {
 
     private val base = File("src/main/res")
 
+    /** Every `strings*.xml` of a folder, so a new file cannot slip past these checks. */
+    private fun files(folder: String): List<File> =
+        File(base, folder).listFiles { file -> file.name.startsWith("strings") && file.extension == "xml" }
+            ?.sortedBy { it.name }
+            .orEmpty()
+
     private fun strings(folder: String): Map<String, String> {
         val result = LinkedHashMap<String, String>()
-        listOf("strings.xml", "strings_android.xml").forEach { name ->
-            val file = File(base, "$folder/$name")
-            if (!file.exists()) return@forEach
+        files(folder).forEach { file ->
             val document = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(file)
             val nodes = document.getElementsByTagName("string")
             for (index in 0 until nodes.length) {
                 val element = nodes.item(index) as org.w3c.dom.Element
                 if (element.getAttribute("translatable") == "false") continue
                 result[element.getAttribute("name")] = element.textContent
+            }
+        }
+        return result
+    }
+
+    /** `<plurals>`: name → quantity → text. */
+    private fun plurals(folder: String): Map<String, Map<String, String>> {
+        val result = LinkedHashMap<String, Map<String, String>>()
+        files(folder).forEach { file ->
+            val document = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(file)
+            val nodes = document.getElementsByTagName("plurals")
+            for (index in 0 until nodes.length) {
+                val element = nodes.item(index) as org.w3c.dom.Element
+                val items = element.getElementsByTagName("item")
+                result[element.getAttribute("name")] = (0 until items.length).associate { item ->
+                    val node = items.item(item) as org.w3c.dom.Element
+                    node.getAttribute("quantity") to node.textContent
+                }
             }
         }
         return result
@@ -96,6 +118,39 @@ class LocalizationParityTest {
                 if (language == "uz" && key !in table) return@forEach
                 val actual = specifier.findAll(table[key].orEmpty()).map { it.value }.toSet()
                 assertEquals("$key ($language)", expected, actual)
+            }
+        }
+    }
+
+    /**
+     * Plurals: Russian and Kazakh have every one, each language has the
+     * quantities its grammar asks for (Russian one / few / many), and every
+     * quantity keeps the English specifiers - a count written as a plain
+     * string reads «1 ответов».
+     */
+    @Test
+    fun `plurals are complete in every language`() {
+        val englishPlurals = plurals("values")
+        assertTrue("expected the reply counts", "subscription_per_day" in englishPlurals)
+        val required = mapOf(
+            "values" to setOf("one", "other"),
+            "values-ru" to setOf("one", "few", "many", "other"),
+            "values-kk" to setOf("one", "other"),
+            "values-uz" to setOf("one", "other")
+        )
+        val specifier = Regex("""%(\d+\$)?[sdf]""")
+        required.forEach { (folder, quantities) ->
+            val table = plurals(folder)
+            if (folder != "values-uz") {
+                assertEquals("$folder misses plurals", emptySet<String>(), englishPlurals.keys - table.keys)
+            }
+            assertEquals("$folder adds plurals", emptySet<String>(), table.keys - englishPlurals.keys)
+            table.forEach { (name, items) ->
+                assertTrue("$name ($folder): ${items.keys}", items.keys.containsAll(quantities))
+                val expected = specifier.findAll(englishPlurals.getValue(name).getValue("other")).map { it.value }.toSet()
+                items.forEach { (quantity, text) ->
+                    assertEquals("$name/$quantity ($folder)", expected, specifier.findAll(text).map { it.value }.toSet())
+                }
             }
         }
     }

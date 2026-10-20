@@ -314,9 +314,18 @@
     <string name="subscription_current">Current plan</string>
     <string name="subscription_remaining">left today</string>
     <string name="subscription_used_today">Used %1$d of %2$d today</string>
+    <string name="subscription_remaining_month">left this month</string>
+    <string name="subscription_used_month">Used %1$d of %2$d this month</string>
     <string name="subscription_renews">Valid until %1$s</string>
     <string name="subscription_available">Available plans</string>
-    <string name="subscription_per_day">%1$d replies a day</string>
+    <plurals name="subscription_per_day">
+        <item quantity="one">%1$d reply a day</item>
+        <item quantity="other">%1$d replies a day</item>
+    </plurals>
+    <plurals name="subscription_per_month">
+        <item quantity="one">%1$d reply a month</item>
+        <item quantity="other">%1$d replies a month</item>
+    </plurals>
     <string name="subscription_current_badge">Current</string>
     <string name="subscription_choose">Choose</string>
     <string name="settings_account">Account</string>
@@ -327,6 +336,7 @@
     <string name="settings_account_signed_out">Not signed in</string>
     <string name="settings_account_footer">The keyboard uses the same account. Signing out stops replies until you sign in again.</string>
     <string name="home_usage_title">Replies today</string>
+    <string name="home_usage_title_month">Replies this month</string>
     <string name="home_usage_left">of %1$d left</string>
     <string name="kb_err_sign_in_required">Open the AI Reply app and sign in to keep replying.</string>
     <string name="kb_err_quota_exhausted">You have used your available replies.</string>

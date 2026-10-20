@@ -313,9 +313,18 @@
     <string name="subscription_current">Ағымдағы тариф</string>
     <string name="subscription_remaining">бүгін қалды</string>
     <string name="subscription_used_today">Бүгін %2$d-тің %1$d-і қолданылды</string>
+    <string name="subscription_remaining_month">осы айда қалды</string>
+    <string name="subscription_used_month">Осы айда %2$d-тің %1$d-і қолданылды</string>
     <string name="subscription_renews">%1$s дейін жарамды</string>
     <string name="subscription_available">Қолжетімді тарифтер</string>
-    <string name="subscription_per_day">Күніне %1$d жауап</string>
+    <plurals name="subscription_per_day">
+        <item quantity="one">Күніне %1$d жауап</item>
+        <item quantity="other">Күніне %1$d жауап</item>
+    </plurals>
+    <plurals name="subscription_per_month">
+        <item quantity="one">Айына %1$d жауап</item>
+        <item quantity="other">Айына %1$d жауап</item>
+    </plurals>
     <string name="subscription_current_badge">Ағымдағы</string>
     <string name="subscription_choose">Таңдау</string>
     <string name="settings_account">Тіркелгі</string>
@@ -326,6 +335,7 @@
     <string name="settings_account_signed_out">Кірмегенсіз</string>
     <string name="settings_account_footer">Пернетақта да осы тіркелгіні пайдаланады. Шыққаннан кейін қайта кіргенше жауаптар жасалмайды.</string>
     <string name="home_usage_title">Бүгінгі жауаптар</string>
+    <string name="home_usage_title_month">Осы айдағы жауаптар</string>
     <string name="home_usage_left">%1$d-тен қалды</string>
     <string name="kb_err_sign_in_required">Жалғастыру үшін AI Reply қолданбасын ашып, кіріңіз.</string>
     <string name="kb_err_quota_exhausted">Қолжетімді жауаптар бітті.</string>

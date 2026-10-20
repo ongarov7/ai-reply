@@ -3,7 +3,7 @@ package kz.yerek.aireply.ui.design
 import androidx.compose.ui.graphics.Color
 
 /**
- * The palette, reverse-engineered from the iOS app.
+ * The palette, the iOS app's system colours written out.
  *
  * iOS spends most of its colour budget on semantic system colours
  * (`systemGroupedBackground`, `secondarySystemGroupedBackground`, `separator`),
@@ -12,20 +12,29 @@ import androidx.compose.ui.graphics.Color
  * Material's generated tonal palettes — which would produce a different app
  * that happened to use the same accent.
  *
- * The accent is the app's own, from `AccentColor.colorset`, and dynamic colour
- * is deliberately off: the product has an identity, and inheriting the user's
- * wallpaper would erase the one thing that makes the two platforms recognisably
- * the same app.
+ * The accent is the system blue the iOS app uses (light #007AFF, dark
+ * #0A84FF), and dynamic colour is deliberately off: the product has an
+ * identity, and inheriting the user's wallpaper would erase the one thing that
+ * makes the two platforms recognisably the same app. Red is kept for real
+ * errors; a gradient appears only in the app mark.
  */
 object AppColors {
 
     // Brand ------------------------------------------------------------------
 
-    /** AccentColor, light appearance: sRGB 0.286 / 0.435 / 0.925. */
-    val AccentLight = Color(0xFF496FEC)
+    /** systemBlue, light appearance. */
+    val AccentLight = Color(0xFF007AFF)
 
-    /** AccentColor, dark appearance: sRGB 0.404 / 0.545 / 1.000. */
-    val AccentDark = Color(0xFF678BFF)
+    /** systemBlue, dark appearance. */
+    val AccentDark = Color(0xFF0A84FF)
+
+    /**
+     * A quiet blue fill - a selected card, a suggested reply - solid rather
+     * than the accent at low alpha, so it reads the same on the page and on a
+     * card.
+     */
+    val AccentFillLight = Color(0xFFE5F1FF)
+    val AccentFillDark = Color(0xFF15365A)
 
     /** The app mark's gradient, top and bottom. */
     val MarkGradientTop = Color(0xFF5B4BE8)
@@ -39,6 +48,9 @@ object AppColors {
     /** secondarySystemGroupedBackground — the raised card surface */
     val SurfaceLight = Color(0xFFFFFFFF)
 
+    /** tertiarySystemGroupedBackground: a dialog or a sheet over the page. */
+    val RaisedLight = Color(0xFFFFFFFF)
+
     val SeparatorLight = Color(0xFFC6C6C8)
     val TextPrimaryLight = Color(0xFF000000)
     val TextSecondaryLight = Color(0xFF8A8A8E)
@@ -48,6 +60,7 @@ object AppColors {
 
     val BackgroundDark = Color(0xFF000000)
     val SurfaceDark = Color(0xFF1C1C1E)
+    val RaisedDark = Color(0xFF2C2C2E)
     val SeparatorDark = Color(0xFF38383A)
     val TextPrimaryDark = Color(0xFFFFFFFF)
     val TextSecondaryDark = Color(0xFF98989F)

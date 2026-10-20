@@ -3,6 +3,7 @@ package kz.yerek.aireply.ui.feature.account
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.LinearProgressIndicator
@@ -15,6 +16,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -60,6 +62,8 @@ fun SubscriptionScreen(onBack: () -> Unit) {
     val appLanguage = services.settings.effectiveAppLanguage
     val language = appLanguage.code
 
+    val summary = UsageSummary.of(state.usage, services.usageCache.current())
+
     LaunchedEffect(Unit) {
         account.loadPlans()
         account.refresh()
@@ -84,42 +88,49 @@ fun SubscriptionScreen(onBack: () -> Unit) {
                             style = MaterialTheme.typography.titleMedium
                         )
                     }
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(
-                            state.usage.remainingToday.toString(),
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (state.usage.remainingToday > 0) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.error
-                            }
-                        )
-                        Text(
-                            stringResource(R.string.subscription_remaining),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    // A plan counted by the month shows the month; one not counted, no number.
+                    if (summary != null) {
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                                summary.remaining.toString(),
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (summary.hasReplies) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                }
+                            )
+                            Text(
+                                stringResource(
+                                    if (summary.period == UsageSummary.Period.MONTH) R.string.subscription_remaining_month
+                                    else R.string.subscription_remaining
+                                ),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
 
-                LinearProgressIndicator(
-                    progress = {
-                        val limit = state.usage.dailyLimit
-                        if (limit <= 0) 0f else (state.usage.usedToday.toFloat() / limit).coerceIn(0f, 1f)
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = Spacing.s)
-                )
-
-                Footnote(
-                    stringResource(
-                        R.string.subscription_used_today,
-                        state.usage.usedToday,
-                        state.usage.dailyLimit
+                if (summary != null) {
+                    LinearProgressIndicator(
+                        progress = { summary.used.toFloat() / summary.limit },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = Spacing.s),
+                        trackColor = MaterialTheme.colorScheme.background,
+                        drawStopIndicator = {}
                     )
-                )
+                    Footnote(
+                        stringResource(
+                            if (summary.period == UsageSummary.Period.MONTH) R.string.subscription_used_month
+                            else R.string.subscription_used_today,
+                            summary.used,
+                            summary.limit
+                        )
+                    )
+                }
                 state.subscription?.expiresAt?.let { formatExpiry(it, appLanguage.locale) }?.let { expiry ->
                     Footnote(stringResource(R.string.subscription_renews, expiry))
                 }
@@ -184,11 +195,13 @@ private fun PlanRow(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                stringResource(R.string.subscription_per_day, plan.dailyLimit),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary
-            )
+            planAllowance(plan)?.let { allowance ->
+                Text(
+                    allowance,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            } ?: Spacer(Modifier.weight(1f))
             if (isCurrent) {
                 Text(
                     stringResource(R.string.subscription_current_badge),
@@ -202,6 +215,14 @@ private fun PlanRow(
             }
         }
     }
+}
+
+/** "30 replies a day", "300 replies a month", or nothing for a plan that counts neither. */
+@Composable
+private fun planAllowance(plan: PlanDto): String? = when {
+    plan.dailyLimit > 0 -> pluralStringResource(R.plurals.subscription_per_day, plan.dailyLimit, plan.dailyLimit)
+    plan.monthlyLimit > 0 -> pluralStringResource(R.plurals.subscription_per_month, plan.monthlyLimit, plan.monthlyLimit)
+    else -> null
 }
 
 /**

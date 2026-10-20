@@ -1,8 +1,16 @@
 package kz.yerek.aireply.ui.common
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -28,6 +36,11 @@ import kz.yerek.aireply.R
  *
  * Inline rather than large-title, matching the iOS screens, all of which use
  * `.navigationBarTitleDisplayMode(.inline)`.
+ *
+ * Edge to edge: the bars' insets come through the Scaffold, and the body also
+ * makes room for the on-screen keyboard, so a field near the bottom of a form
+ * stays above it. A [bottomBar] (a screen's main action) sits on the
+ * navigation bar, or on the keyboard while it is open.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,10 +49,20 @@ fun AppScreen(
     onBack: (() -> Unit)? = null,
     actions: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {},
     scrollable: Boolean = true,
+    bottomBar: (@Composable () -> Unit)? = null,
     content: @Composable (PaddingValues) -> Unit
 ) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        bottomBar = {
+            if (bottomBar != null) {
+                Box(
+                    modifier = Modifier
+                        .background(MaterialTheme.colorScheme.background)
+                        .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime))
+                ) { bottomBar() }
+            }
+        },
         topBar = {
             TopAppBar(
                 title = {
@@ -63,6 +86,7 @@ fun AppScreen(
                 actions = actions,
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
+                    scrolledContainerColor = MaterialTheme.colorScheme.background,
                     titleContentColor = MaterialTheme.colorScheme.onBackground
                 )
             )
@@ -72,6 +96,8 @@ fun AppScreen(
             Box(
                 modifier = Modifier
                     .padding(padding)
+                    .consumeWindowInsets(padding)
+                    .imePadding()
                     .verticalScroll(rememberScrollState())
             ) {
                 content(PaddingValues(0.dp))

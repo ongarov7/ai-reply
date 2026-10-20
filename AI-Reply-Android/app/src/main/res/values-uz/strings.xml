@@ -33,6 +33,7 @@
     <string name="home_title">AI Reply</string>
     <string name="home_tryit">Javobni sinash</string>
     <string name="home_usage_title">Bugungi javoblar</string>
+    <string name="home_usage_title_month">Bu oydagi javoblar</string>
     <string name="home_usage_left">%1$d tadan qoldi</string>
 
     <string name="hours_closed">Yopiq</string>
@@ -237,9 +238,18 @@
     <string name="subscription_current">Joriy tarif</string>
     <string name="subscription_remaining">bugun qoldi</string>
     <string name="subscription_used_today">Bugun %2$d tadan %1$d tasi ishlatildi</string>
+    <string name="subscription_remaining_month">bu oy qoldi</string>
+    <string name="subscription_used_month">Bu oy %2$d tadan %1$d tasi ishlatildi</string>
     <string name="subscription_renews">%1$s gacha amal qiladi</string>
     <string name="subscription_available">Mavjud tariflar</string>
-    <string name="subscription_per_day">Kuniga %1$d ta javob</string>
+    <plurals name="subscription_per_day">
+        <item quantity="one">Kuniga %1$d ta javob</item>
+        <item quantity="other">Kuniga %1$d ta javob</item>
+    </plurals>
+    <plurals name="subscription_per_month">
+        <item quantity="one">Oyiga %1$d ta javob</item>
+        <item quantity="other">Oyiga %1$d ta javob</item>
+    </plurals>
     <string name="subscription_current_badge">Joriy</string>
     <string name="subscription_choose">Tanlash</string>
 
