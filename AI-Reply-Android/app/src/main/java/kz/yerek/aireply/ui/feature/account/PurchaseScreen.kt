@@ -40,6 +40,7 @@ import kz.yerek.aireply.R
 import kz.yerek.aireply.billing.BillingState
 import kz.yerek.aireply.billing.OfferedProduct
 import kz.yerek.aireply.billing.PurchaseNotice
+import kz.yerek.aireply.debug.DebugSamples
 import kz.yerek.aireply.ui.LocalServices
 import kz.yerek.aireply.ui.common.AppScreen
 import kz.yerek.aireply.ui.common.Footnote
@@ -69,7 +70,7 @@ fun PurchaseScreen(onBack: () -> Unit, onOpenPlans: () -> Unit) {
     val billing = services.billing
     val state by billing.state.collectAsStateWithLifecycle()
     val account by services.account.state.collectAsStateWithLifecycle()
-    val balance = BalanceSummary.of(account.usage)
+    val balance = BalanceSummary.of(if (services.sampleData) DebugSamples.usage else account.usage)
 
     LaunchedEffect(Unit) {
         billing.load()
@@ -165,7 +166,12 @@ private fun ProductCard(product: OfferedProduct, state: BillingState, onBuy: (Ac
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
                 Text(product.name, style = MaterialTheme.typography.titleSmall)
                 Text(
-                    if (product.kind == OfferedProduct.Kind.PACK) "$units · $terms" else terms,
+                    // A pack named by its count ("20 ответов") is not told its count twice.
+                    when {
+                        product.kind == OfferedProduct.Kind.PASS -> terms
+                        product.name.trim().equals(units, ignoreCase = true) -> terms
+                        else -> "$units · $terms"
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = LocalExtraColors.current.textSecondary
                 )

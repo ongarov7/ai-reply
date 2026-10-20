@@ -99,7 +99,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit, focusSection: S
     var haptics by remember { mutableStateOf(services.settings.keyboardHaptics) }
     var smartCorrection by remember { mutableStateOf(services.settings.smartCorrection) }
     var mockReplies by remember { mutableStateOf(services.settings.debugMockReplies) }
-    var sampleStore by remember { mutableStateOf(services.settings.debugSampleStore) }
+    var sampleData by remember { mutableStateOf(services.settings.debugSampleData) }
     var confirmingWithdrawal by remember { mutableStateOf(false) }
     var withdrawalError by remember { mutableStateOf<Int?>(null) }
     val pageLanguage = services.settings.effectiveAppLanguage.code
@@ -282,7 +282,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit, focusSection: S
                 Footnote(stringResource(R.string.settings_tutorial_footer))
                 RowGroup {
                     // The chat only on a server that has it; the support page always.
-                    if (accountState.isSignedIn && accountState.features?.supportChat == true) {
+                    if (services.supportOffered) {
                         NavigationRow(
                             Icons.Outlined.SupportAgent,
                             stringResource(R.string.support_title),
@@ -330,15 +330,15 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit, focusSection: S
                     Footnote(stringResource(R.string.settings_debug_push_footer))
                     RowGroup {
                         SwitchRow(
-                            label = stringResource(R.string.settings_debug_sample_store),
-                            checked = sampleStore,
+                            label = stringResource(R.string.settings_debug_sample_data),
+                            checked = sampleData,
                             enabled = true
                         ) { checked ->
-                            sampleStore = checked
-                            services.settings.debugSampleStore = checked
+                            sampleData = checked
+                            services.settings.debugSampleData = checked
                         }
                     }
-                    Footnote(stringResource(R.string.settings_debug_sample_store_footer))
+                    Footnote(stringResource(R.string.settings_debug_sample_data_footer))
                 }
             }
 

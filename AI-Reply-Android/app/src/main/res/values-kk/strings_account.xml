@@ -44,8 +44,8 @@
     <string name="purchase_retry">Қайталау</string>
     <string name="purchase_see_plans">Тарифтерді көру</string>
     <string name="purchase_footer">Төлем Google Play арқылы, Google Play тіркелгіңіздің валютасында өтеді. Сатып алынған жауаптар тариф, рұқсаттама және тегін жауаптардан кейін жұмсалады.</string>
-    <string name="settings_debug_sample_store">Сынақ сатып алу каталогы</string>
-    <string name="settings_debug_sample_store_footer">Тек жөндеу нұсқасында, қолданбаны қайта іске қосқаннан кейін. «Жауап сатып алу» үлгі өнімдерді және Google Play мен серверсіз бірден өтетін сатып алуды көрсетеді.</string>
+    <string name="settings_debug_sample_data">Тіркелгінің сынақ деректері</string>
+    <string name="settings_debug_sample_data_footer">Тек жөндеу нұсқасында, қолданбаны қайта іске қосқаннан кейін. Баланс, «Жауап сатып алу» және оператормен чат үлгі деректерді тіркелгісіз, Google Play мен серверсіз көрсетеді.</string>
 
     <!-- Exhausted sheet -->
     <string name="exhausted_body">Қолжетімді жауаптарды пайдаланып болдыңыз. Қосымша жауап алуға немесе басқа тариф таңдауға болады.</string>

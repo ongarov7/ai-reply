@@ -32,6 +32,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import kz.yerek.aireply.R
+import kz.yerek.aireply.debug.DebugSamples
 import kz.yerek.aireply.ui.LocalServices
 import kz.yerek.aireply.ui.common.AppScreen
 import kz.yerek.aireply.ui.common.Footnote
@@ -230,10 +231,12 @@ private fun UsageCard(onOpen: (String) -> Unit) {
 
     LaunchedEffect(Unit) { services.account.refresh() }
 
-    if (!state.isSignedIn) return
+    // DEBUG builds with the sample data: the card as a server with the balance would fill it.
+    val usage = if (services.sampleData) DebugSamples.usage else state.usage
+    if (!state.isSignedIn && !services.sampleData) return
 
     val cached = services.usageCache.current()
-    val balance = BalanceSummary.of(state.usage, cached)
+    val balance = BalanceSummary.of(usage, cached)
     if (balance.hasBalance) {
         BalanceCard(balance, state.subscription?.plan?.localizedName(language).orEmpty()) { onOpen(Routes.Subscription) }
         return

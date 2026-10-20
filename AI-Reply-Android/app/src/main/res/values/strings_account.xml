@@ -49,8 +49,8 @@
     <string name="purchase_retry">Try again</string>
     <string name="purchase_see_plans">See plans</string>
     <string name="purchase_footer">Payment goes through Google Play, in your Google Play currency. Bought replies are used after the plan’s, the pass’s and the free ones.</string>
-    <string name="settings_debug_sample_store">Sample purchase catalogue</string>
-    <string name="settings_debug_sample_store_footer">Debug build only, after a restart of the app. Buy replies shows sample products and a purchase that completes at once, without Google Play or the server.</string>
+    <string name="settings_debug_sample_data">Sample account data</string>
+    <string name="settings_debug_sample_data_footer">Debug build only, after a restart of the app. The balance, Buy replies and the support chat show sample data, without an account, Google Play or the server.</string>
 
     <!-- Exhausted sheet -->
     <string name="exhausted_body">You have used your available replies. You can get more replies or choose another plan.</string>

@@ -23,7 +23,6 @@ import kz.yerek.aireply.ai.VoiceTranscriptionService
 import kz.yerek.aireply.analytics.ProductEventReporter
 import kz.yerek.aireply.analytics.ProductEventsTransport
 import kz.yerek.aireply.billing.BillingRepository
-import kz.yerek.aireply.billing.DebugStore
 import kz.yerek.aireply.billing.PlayStoreClient
 import kz.yerek.aireply.billing.PurchaseApi
 import kz.yerek.aireply.core.lang.AppLanguage
@@ -31,6 +30,7 @@ import kz.yerek.aireply.core.lang.KeyboardLanguage
 import kz.yerek.aireply.core.lang.LocalizedContext
 import kz.yerek.aireply.core.lang.TemplateNaming
 import kz.yerek.aireply.data.account.AccountCredentials
+import kz.yerek.aireply.debug.DebugSamples
 import kz.yerek.aireply.data.account.AccountObserver
 import kz.yerek.aireply.data.account.AccountService
 import kz.yerek.aireply.data.account.AccountSession
@@ -176,7 +176,7 @@ class ServiceLocator(context: Context) {
             // At start-up the features arrive after the first resume: purchases Play holds go now,
             // and the chat's badge is read.
             resumePurchases()
-            if (features?.supportChat == true) support.refreshUnread()
+            if (supportOffered) support.refreshUnread()
             diagnostics.onResume()
         }
         override fun onLegalAccepted() = push.onLegalAccepted()
@@ -311,13 +311,26 @@ class ServiceLocator(context: Context) {
     /** A screen asked for from outside the navigation graph: a tapped notification. */
     val navigation: PendingNavigation by lazy { PendingNavigation() }
 
+    // ------------------------------------------------------- sample data
+
+    /**
+     * DEBUG builds with Settings ▸ Developer ▸ sample account data: the
+     * balance, «Докупить ответы» and the support chat without an account,
+     * Google Play or the server. Read once, at start.
+     */
+    val sampleData: Boolean by lazy { BuildConfig.DEBUG && settings.debugSampleData }
+
     // --------------------------------------------------------- support chat
+
+    /** The chat is offered: the server has it (or the debug sample). */
+    val supportOffered: Boolean
+        get() = sampleData || (account.state.value.isSignedIn && account.state.value.features?.supportChat == true)
 
     /** «Чат с оператором» and its unread count. The app only; nothing runs without `features.support_chat`. */
     val support: SupportChatController by lazy {
         supportCreated = true
         SupportChatController(
-            api = object : SupportApi {
+            api = if (sampleData) DebugSamples.supportApi() else object : SupportApi {
                 override suspend fun conversation() = accountService.supportConversation()
                 override suspend fun messages(before: String?, after: String?, limit: Int) =
                     accountService.supportMessages(before, after, limit)
@@ -325,7 +338,7 @@ class ServiceLocator(context: Context) {
                     accountService.sendSupportMessage(text, clientMessageId)
                 override suspend fun markRead(upToMessageId: String) = accountService.markSupportRead(upToMessageId)
             },
-            isEnabled = { account.state.value.isSignedIn && account.state.value.features?.supportChat == true },
+            isEnabled = { supportOffered },
             scope = scope
         )
     }
@@ -335,16 +348,9 @@ class ServiceLocator(context: Context) {
 
     // ------------------------------------------------------------ purchases
 
-    /**
-     * DEBUG builds with Settings ▸ Developer ▸ the sample catalogue: the
-     * purchase screen without Google Play or the server. Read once, when
-     * [billing] is first built.
-     */
-    private val sampleStore: Boolean by lazy { BuildConfig.DEBUG && settings.debugSampleStore }
-
     /** Whether «Докупить ответы» is offered at all: the server sells on Android (or the debug sample). */
     val purchasesOffered: Boolean
-        get() = sampleStore || account.state.value.features?.iapAndroid == true
+        get() = sampleData || account.state.value.features?.iapAndroid == true
 
     /**
      * Buying replies through Google Play. The app only, never the keyboard;
@@ -353,13 +359,13 @@ class ServiceLocator(context: Context) {
     val billing: BillingRepository by lazy {
         billingCreated = true
         BillingRepository(
-            store = if (sampleStore) DebugStore.client(scope) else PlayStoreClient(appContext),
-            api = if (sampleStore) DebugStore.api() else object : PurchaseApi {
+            store = if (sampleData) DebugSamples.storeClient(scope) else PlayStoreClient(appContext),
+            api = if (sampleData) DebugSamples.purchaseApi() else object : PurchaseApi {
                 override suspend fun catalog() = accountService.iapProducts()
                 override suspend fun verify(productId: String, purchaseToken: String) =
                     accountService.verifyGooglePurchase(productId, purchaseToken)
             },
-            isEnabled = { account.state.value.isSignedIn && purchasesOffered },
+            isEnabled = { sampleData || (account.state.value.isSignedIn && purchasesOffered) },
             onUsage = { usage -> account.applyUsage(usage) },
             refreshUsage = { account.refreshUsage() },
             scope = scope

@@ -48,8 +48,8 @@
     <string name="purchase_retry">Повторить</string>
     <string name="purchase_see_plans">Посмотреть тарифы</string>
     <string name="purchase_footer">Оплата проходит через Google Play, в валюте твоего аккаунта Google Play. Купленные ответы расходуются после ответов тарифа, пропуска и бесплатных.</string>
-    <string name="settings_debug_sample_store">Тестовый каталог покупок</string>
-    <string name="settings_debug_sample_store_footer">Только в отладочной сборке, после перезапуска приложения. «Докупить ответы» показывает примеры товаров и покупку, которая сразу проходит, без Google Play и сервера.</string>
+    <string name="settings_debug_sample_data">Тестовые данные аккаунта</string>
+    <string name="settings_debug_sample_data_footer">Только в отладочной сборке, после перезапуска приложения. Баланс, «Докупить ответы» и чат с оператором показывают примеры, без аккаунта, Google Play и сервера.</string>
 
     <!-- Exhausted sheet -->
     <string name="exhausted_body">Доступные ответы закончились. Можешь получить дополнительные ответы или выбрать другой тариф.</string>

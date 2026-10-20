@@ -86,7 +86,7 @@ fun SupportChatScreen(onBack: () -> Unit) {
     val state by chat.state.collectAsStateWithLifecycle()
     val account by services.account.state.collectAsStateWithLifecycle()
     val lifecycle = LocalLifecycleOwner.current
-    val enabled = account.features?.supportChat == true
+    val enabled = services.supportOffered
 
     LaunchedEffect(lifecycle, enabled) {
         if (!enabled) return@LaunchedEffect
