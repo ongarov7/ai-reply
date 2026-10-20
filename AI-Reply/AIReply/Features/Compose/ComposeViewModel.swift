@@ -27,13 +27,21 @@ final class ComposeViewModel {
     /// to its consent screen.
     private(set) var failure: AIReplyError?
     private(set) var didCopy = false
+    /// «Лимит ответов исчерпан», after a generation refused for a spent limit.
+    private(set) var exhausted: ExhaustedOffer?
 
-    @ObservationIgnored private let service = AIReplyService()
+    @ObservationIgnored private let service: AIReplyService
     @ObservationIgnored private let settings: SharedSettings
+    /// What the server said about the limit that refused the last request.
+    @ObservationIgnored private let limitRefusal: () -> LimitRefusal?
     @ObservationIgnored private var task: Task<Void, Never>?
 
-    init(settings: SharedSettings = .shared) {
+    init(settings: SharedSettings = .shared,
+         service: AIReplyService = AIReplyService(),
+         limitRefusal: @escaping () -> LimitRefusal? = { AccountUsageCache.lastLimitRefusal() }) {
         self.settings = settings
+        self.service = service
+        self.limitRefusal = limitRefusal
     }
 
     var characterCount: Int { AIReplyService.characterCount(message) }
@@ -113,7 +121,9 @@ final class ComposeViewModel {
     /// - Parameter language: drives which localized error sentence is shown, and
     ///   which name a template is referred to by. It does NOT decide the reply's
     ///   language: that follows the incoming message.
-    func generate(configuration: ReplyConfiguration, language: AppLanguage) {
+    ///   - purchasesEnabled: replies can be bought on iOS right now, so a
+    ///     spent limit may offer «Докупить ответы».
+    func generate(configuration: ReplyConfiguration, language: AppLanguage, purchasesEnabled: Bool = false) {
         guard let templateID = selectedTemplateID,
               let template = configuration.template(id: templateID) else { return }
 
@@ -122,6 +132,7 @@ final class ComposeViewModel {
         task?.cancel()
         errorMessage = nil
         failure = nil
+        exhausted = nil
         reply = ""
         isGenerating = true
 
@@ -147,8 +158,15 @@ final class ComposeViewModel {
                 guard mapped != .cancelled else { return }
                 self.failure = mapped
                 self.errorMessage = strings.message(for: mapped)
+                self.exhausted = ExhaustedOffer.decide(failure: mapped, refusal: self.limitRefusal(),
+                                                       purchasesEnabled: purchasesEnabled)
             }
         }
+    }
+
+    /// The sheet was closed; the error line under the reply stays.
+    func dismissExhausted() {
+        exhausted = nil
     }
 
     func cancel() {

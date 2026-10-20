@@ -111,6 +111,19 @@ struct DebugPurchaseHost: View {
     }
 }
 
+/// The exhausted sheet over «Создать ответ», as after a refused Reply.
+struct DebugExhaustedHost: View {
+    let offersPurchase: Bool
+    @State private var isShowing = true
+
+    var body: some View {
+        NavigationStack { ComposeView() }
+            .sheet(isPresented: $isShowing) {
+                ExhaustedSheetView(offer: ExhaustedOffer(offersPurchase: offersPurchase), onBuy: {}, onPlans: {})
+            }
+    }
+}
+
 /// Home over the sample balance.
 struct DebugBalanceHost: View {
     @Environment(AccountModel.self) private var account

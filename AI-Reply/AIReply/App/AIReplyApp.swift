@@ -181,6 +181,9 @@ enum DebugScreen: String {
     case balance
     /// «Докупить ответы» over a sample catalogue (no App Store, no server).
     case purchase
+    /// «Лимит ответов исчерпан» over «Создать ответ»; `-AIReplyDebugOffer
+    /// plans` shows it without «Докупить ответы».
+    case exhausted
 
     static var requested: DebugScreen? {
         let arguments = CommandLine.arguments
@@ -207,7 +210,7 @@ enum DebugScreen: String {
         value(after: "-AIReplyDebugGender").flatMap(GrammaticalGender.init(rawValue:))
     }
 
-    private static func value(after name: String) -> String? {
+    static func value(after name: String) -> String? {
         let arguments = CommandLine.arguments
         guard let index = arguments.firstIndex(of: name), index + 1 < arguments.count else { return nil }
         return arguments[index + 1]
@@ -238,6 +241,7 @@ private struct DebugScreenHost: View {
                                             resendAvailableAt: Date().addingTimeInterval(32))) { _ in }
         case .balance:   DebugBalanceHost()
         case .purchase:  DebugPurchaseHost()
+        case .exhausted: DebugExhaustedHost(offersPurchase: DebugScreen.value(after: "-AIReplyDebugOffer") != "plans")
         }
     }
 }

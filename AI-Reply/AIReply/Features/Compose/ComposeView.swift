@@ -18,8 +18,12 @@ struct ComposeView: View {
     @Environment(ReplyConfigurationModel.self) private var model
     @Environment(AppSettings.self) private var settings
     @Environment(AccountModel.self) private var account
+    @Environment(PurchaseStore.self) private var purchases
+    @Environment(AppRouter.self) private var router
 
     @State private var viewModel = ComposeViewModel()
+    /// Where the exhausted sheet's choice leads, once the sheet is down.
+    @State private var routeAfterSheet: AppRoute?
     @State private var isDictating = false
     @State private var isReporting = false
     @FocusState private var isFocused: Bool
@@ -65,6 +69,18 @@ struct ComposeView: View {
         }
         .sheet(isPresented: $isReporting) {
             AIReportSheet(mode: .reply, text: viewModel.reply)
+        }
+        // The replies are spent: what can be done, over this screen, which
+        // stays as it is.
+        .sheet(item: exhaustedBinding, onDismiss: {
+            if let route = routeAfterSheet {
+                routeAfterSheet = nil
+                router.path.append(route)
+            }
+        }) { offer in
+            ExhaustedSheetView(offer: offer,
+                               onBuy: { leaveSheet(for: .purchase) },
+                               onPlans: { leaveSheet(for: .subscription) })
         }
         // The terms were not accepted on the server: back to the consent screen.
         .onChange(of: viewModel.failure) { _, failure in
@@ -290,7 +306,17 @@ struct ComposeView: View {
 
     private func generate() {
         isFocused = false
-        viewModel.generate(configuration: model.configuration, language: settings.effectiveLanguage)
+        viewModel.generate(configuration: model.configuration, language: settings.effectiveLanguage,
+                           purchasesEnabled: purchases.isEnabled)
+    }
+
+    private var exhaustedBinding: Binding<ExhaustedOffer?> {
+        Binding(get: { viewModel.exhausted }, set: { if $0 == nil { viewModel.dismissExhausted() } })
+    }
+
+    private func leaveSheet(for route: AppRoute) {
+        routeAfterSheet = route
+        viewModel.dismissExhausted()
     }
 
     private var reportStrings: ReportStrings { ReportStrings.forLanguage(settings.effectiveLanguage) }

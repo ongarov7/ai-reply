@@ -23,9 +23,12 @@ enum AccountUsageCache {
         static let welcomeRemaining = "account.usage.welcomeRemaining"
         static let welcomeTotal = "account.usage.welcomeTotal"
         static let credits = "account.usage.credits"
+        /// The last limit refusal and when it came.
+        static let limitRefusal = "account.limit.refusal"
+        static let limitRefusedAt = "account.limit.refusedAt"
 
         static let all = [dailyLimit, usedToday, remaining, resetsAt, planName, updatedAt,
-                          remainingTotal, welcomeRemaining, welcomeTotal, credits]
+                          remainingTotal, welcomeRemaining, welcomeTotal, credits, limitRefusal, limitRefusedAt]
     }
 
     /// A snapshot as the UI wants it.
@@ -74,6 +77,24 @@ enum AccountUsageCache {
 
     private static func integer(_ key: String, _ defaults: UserDefaults) -> Int? {
         (defaults.object(forKey: key) as? NSNumber)?.intValue
+    }
+
+    /// A generation was refused for a spent limit: what the server said
+    /// about it, so the screen that asked can offer what fits.
+    static func storeLimitRefusal(_ refusal: LimitRefusal, now: Date = Date(), defaults: UserDefaults = AppGroup.defaults) {
+        guard let data = try? JSONEncoder().encode(refusal) else { return }
+        defaults.set(data, forKey: Key.limitRefusal)
+        defaults.set(now.timeIntervalSince1970, forKey: Key.limitRefusedAt)
+    }
+
+    /// The last limit refusal, if it came within `maxAge`: the answer to the
+    /// request that just failed, not one from yesterday.
+    static func lastLimitRefusal(maxAge: TimeInterval = 120, now: Date = Date(),
+                                 defaults: UserDefaults = AppGroup.defaults) -> LimitRefusal? {
+        let at = defaults.double(forKey: Key.limitRefusedAt)
+        guard at > 0, now.timeIntervalSince1970 - at <= maxAge, now.timeIntervalSince1970 >= at - 5,
+              let data = defaults.data(forKey: Key.limitRefusal) else { return nil }
+        return try? JSONDecoder().decode(LimitRefusal.self, from: data)
     }
 
     static func storePlanCode(_ code: String, defaults: UserDefaults = AppGroup.defaults) {

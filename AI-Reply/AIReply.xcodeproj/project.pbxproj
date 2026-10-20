@@ -268,6 +268,8 @@
 		1C024BB7533067F19B2529CA /* PurchaseStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2782AB288AE617EDA7400F25 /* PurchaseStore.swift */; };
 		ED04328DDD15F0A22748F3B7 /* PurchaseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89BB4E548C5A1807961D48FF /* PurchaseView.swift */; };
 		C2F18E43516E28096F887E5E /* PurchaseStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47571D600E43E204FB203137 /* PurchaseStoreTests.swift */; };
+		D0F888C754C511BAD697D580 /* ExhaustedSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AABD973C29775CF8B24A002 /* ExhaustedSheet.swift */; };
+		530C3325871409A3409879ED /* ExhaustedSheetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F32D82C072D0BB512F670F89 /* ExhaustedSheetTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -503,6 +505,8 @@
 		2782AB288AE617EDA7400F25 /* PurchaseStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurchaseStore.swift; sourceTree = "<group>"; };
 		89BB4E548C5A1807961D48FF /* PurchaseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurchaseView.swift; sourceTree = "<group>"; };
 		47571D600E43E204FB203137 /* PurchaseStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurchaseStoreTests.swift; sourceTree = "<group>"; };
+		2AABD973C29775CF8B24A002 /* ExhaustedSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExhaustedSheet.swift; sourceTree = "<group>"; };
+		F32D82C072D0BB512F670F89 /* ExhaustedSheetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExhaustedSheetTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -526,6 +530,7 @@
 				EDF4053B99B2FD53E93B6A75 /* StoreKitClient.swift */,
 				2782AB288AE617EDA7400F25 /* PurchaseStore.swift */,
 				89BB4E548C5A1807961D48FF /* PurchaseView.swift */,
+				2AABD973C29775CF8B24A002 /* ExhaustedSheet.swift */,
 			);
 			path = Store;
 			sourceTree = "<group>";
@@ -741,6 +746,7 @@
 				63333DA3CF26D22FBD3FE8F0 /* BalanceTests.swift */,
 				626C504F1201997F388B5000 /* IdempotentGenerationTests.swift */,
 				47571D600E43E204FB203137 /* PurchaseStoreTests.swift */,
+				F32D82C072D0BB512F670F89 /* ExhaustedSheetTests.swift */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -1159,6 +1165,7 @@
 				107AD2C8CC69E8F96DFDB07A /* BalanceTests.swift in Sources */,
 				78E25949DDAB442F504D0836 /* IdempotentGenerationTests.swift in Sources */,
 				C2F18E43516E28096F887E5E /* PurchaseStoreTests.swift in Sources */,
+				530C3325871409A3409879ED /* ExhaustedSheetTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1371,6 +1378,7 @@
 				F85E9B7DFED6B46453D057DA /* StoreKitClient.swift in Sources */,
 				1C024BB7533067F19B2529CA /* PurchaseStore.swift in Sources */,
 				ED04328DDD15F0A22748F3B7 /* PurchaseView.swift in Sources */,
+				D0F888C754C511BAD697D580 /* ExhaustedSheet.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

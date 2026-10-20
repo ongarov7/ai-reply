@@ -256,8 +256,11 @@ struct AccountReplyTransport: ReplyTransport {
 
     /// A consent the server no longer has is forgotten here too, so the
     /// keyboard stops asking and the app shows its consent screen again.
+    /// A spent limit is kept with what the server said about buying more,
+    /// for the screen that asked.
     static func noteRefusal(_ error: APIError) {
         if error == .consentRequired { LegalConsentStore.forgetAfterServerRefusal() }
+        if let refusal = error.limitRefusal { AccountUsageCache.storeLimitRefusal(refusal) }
     }
 
     /// Backend failures become the closed set the UI already knows how to show.

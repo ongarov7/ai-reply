@@ -33,10 +33,11 @@ enum APIError: Error, Equatable, Sendable {
     case invalidIDToken
     /// The sign-in provider is not configured on the server, or unreachable.
     case authProviderUnavailable
-    /// Daily quota is spent. `resetsAt` is ISO-8601 from the server.
-    case dailyLimitReached(limit: Int, usedToday: Int, resetsAt: String?)
+    /// Daily quota is spent, and nothing else is left (a pass, free or
+    /// purchased replies). `resetsAt` is ISO-8601 from the server.
+    case dailyLimitReached(limit: Int, usedToday: Int, resetsAt: String?, refusal: LimitRefusal = .unknown)
     /// The plan's replies for this month are spent: tomorrow does not help.
-    case monthlyLimitReached
+    case monthlyLimitReached(refusal: LimitRefusal = .unknown)
     /// The account has not accepted the current terms and privacy policy,
     /// so the AI endpoints refuse until the app records a new consent.
     case consentRequired
@@ -76,6 +77,15 @@ enum APIError: Error, Equatable, Sendable {
     /// The client could not make sense of the response at all.
     case malformedResponse
 
+    /// What a limit refusal said beyond its counters; nil for any other error.
+    var limitRefusal: LimitRefusal? {
+        switch self {
+        case .dailyLimitReached(_, _, _, let refusal): return refusal
+        case .monthlyLimitReached(let refusal):        return refusal
+        default:                                       return nil
+        }
+    }
+
     /// Whether retrying the same request could plausibly succeed.
     var isTransient: Bool {
         switch self {
@@ -84,6 +94,22 @@ enum APIError: Error, Equatable, Sendable {
         default: return false
         }
     }
+}
+
+/// What `DAILY_LIMIT_REACHED` / `MONTHLY_LIMIT_REACHED` say beyond the
+/// counters (contract §3.2), from a server with `features.credits`. An older
+/// server sends none of it, which reads as "nothing to buy".
+///
+/// Лимит қатесі: сатып алуға бола ма, басқа жауаптар қалды ма.
+struct LimitRefusal: Codable, Equatable, Sendable {
+    /// The app may offer to buy more replies on this platform.
+    var canBuy = false
+    var welcomeRemaining: Int?
+    var creditsRemaining: Int?
+    /// A pass is running whose replies are spent.
+    var passActive = false
+
+    static let unknown = LimitRefusal()
 }
 
 /// Thin HTTP client for the AI Reply backend.
@@ -225,9 +251,17 @@ struct APIClient: Sendable {
             let attemptsRemaining: Int?
             /// Why a field was refused or conflicted (`in_progress`, `used`, …).
             let reason: String?
+            let welcomeRemaining: Int?
+            let creditsRemaining: Int?
+            let passActive: Bool?
+            let canBuy: Bool?
 
             enum CodingKeys: String, CodingKey {
                 case reason
+                case welcomeRemaining = "welcome_remaining"
+                case creditsRemaining = "credits_remaining"
+                case passActive = "pass_active"
+                case canBuy = "can_buy"
                 case dailyLimit = "daily_limit"
                 case usedToday = "used_today"
                 case resetsAt = "resets_at"
@@ -238,6 +272,13 @@ struct APIClient: Sendable {
             }
         }
         let error: Payload
+    }
+
+    private static func refusal(_ details: ErrorEnvelope.Details?) -> LimitRefusal {
+        LimitRefusal(canBuy: details?.canBuy ?? false,
+                     welcomeRemaining: details?.welcomeRemaining,
+                     creditsRemaining: details?.creditsRemaining,
+                     passActive: details?.passActive ?? false)
     }
 
     static func mapServerError(status: Int, data: Data, headers: HTTPURLResponse) -> APIError {
@@ -263,8 +304,9 @@ struct APIClient: Sendable {
         case "DAILY_LIMIT_REACHED":
             return .dailyLimitReached(limit: details?.dailyLimit ?? 0,
                                       usedToday: details?.usedToday ?? 0,
-                                      resetsAt: details?.resetsAt)
-        case "MONTHLY_LIMIT_REACHED":           return .monthlyLimitReached
+                                      resetsAt: details?.resetsAt,
+                                      refusal: refusal(details))
+        case "MONTHLY_LIMIT_REACHED":           return .monthlyLimitReached(refusal: refusal(details))
         case "CONSENT_REQUIRED":                return .consentRequired
         case "SUBSCRIPTION_EXPIRED":            return .subscriptionExpired
         case "PAYMENT_REQUIRED":                return .paymentRequired

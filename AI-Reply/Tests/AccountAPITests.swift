@@ -34,7 +34,7 @@ final class AccountAPITests: XCTestCase {
                            details: "\"daily_limit\": 7, \"used_today\": 7, \"resets_at\": \"2026-03-11T19:00:00Z\""),
             headers: response(429)
         )
-        guard case let .dailyLimitReached(limit, used, resetsAt) = error else {
+        guard case let .dailyLimitReached(limit, used, resetsAt, _) = error else {
             return XCTFail("expected a quota error, got \(error)")
         }
         XCTAssertEqual(limit, 7)
@@ -331,10 +331,10 @@ final class AccountReleaseTests: XCTestCase {
 
     func testMonthlyQuotaAndConsentHaveTheirOwnErrors() {
         XCTAssertEqual(APIClient.mapServerError(status: 429, data: envelope("MONTHLY_LIMIT_REACHED"), headers: response(429)),
-                       .monthlyLimitReached)
+                       .monthlyLimitReached())
         XCTAssertEqual(APIClient.mapServerError(status: 403, data: envelope("CONSENT_REQUIRED"), headers: response(403)),
                        .consentRequired)
-        XCTAssertEqual(AccountReplyTransport.map(.monthlyLimitReached), .monthlyQuotaExhausted)
+        XCTAssertEqual(AccountReplyTransport.map(.monthlyLimitReached()), .monthlyQuotaExhausted)
         XCTAssertEqual(AccountReplyTransport.map(.consentRequired), .consentRequired)
         XCTAssertEqual(AccountComposeTransport.map(.consentRequired), .consentRequired)
         for language in AppLanguage.allCases {
