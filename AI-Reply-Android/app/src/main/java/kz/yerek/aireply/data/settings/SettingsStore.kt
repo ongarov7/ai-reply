@@ -124,12 +124,28 @@ class SettingsStore internal constructor(
         }
         set(value) {
             if (value.isNullOrEmpty()) {
-                prefs.edit().remove(KEY_TEMPLATE_SUMMARIES).apply()
+                prefs.edit().remove(KEY_TEMPLATE_SUMMARIES).remove(KEY_TEMPLATE_SUMMARIES_VERSION).apply()
                 return
             }
             val encoded = runCatching { json.encodeToString(value) }.getOrNull() ?: return
-            prefs.edit().putString(KEY_TEMPLATE_SUMMARIES, encoded).apply()
+            // Every writer resolves the names with this build's strings, so the
+            // version goes in with them.
+            prefs.edit()
+                .putString(KEY_TEMPLATE_SUMMARIES, encoded)
+                .putInt(KEY_TEMPLATE_SUMMARIES_VERSION, TEMPLATE_NAMES_VERSION)
+                .apply()
         }
+
+    /**
+     * The cached chip names were resolved with this build's built-in names.
+     * False after an update that renamed them (Business and Work became
+     * Partner and Colleague in version 2): the cache is rebuilt once before
+     * the keyboard draws from it. Nothing cached is current too - there is
+     * nothing stale to show.
+     */
+    val templateSummariesAreCurrent: Boolean
+        get() = !prefs.contains(KEY_TEMPLATE_SUMMARIES) ||
+            prefs.getInt(KEY_TEMPLATE_SUMMARIES_VERSION, 1) >= TEMPLATE_NAMES_VERSION
 
     fun migrateToBackendOnly() {
         if (prefs.getBoolean(KEY_BACKEND_ONLY_MIGRATED, false)) return
@@ -351,6 +367,14 @@ class SettingsStore internal constructor(
         const val KEY_APP_LANGUAGE = "shared.appLanguage"
         const val KEY_APPEARANCE = "shared.appearance"
         const val KEY_TEMPLATE_SUMMARIES = "shared.templateSummaries"
+        const val KEY_TEMPLATE_SUMMARIES_VERSION = "shared.templateSummariesVersion"
+
+        /**
+         * The built-in names' version. Raise it whenever a built-in label
+         * changes, so the keyboard never draws a name this build no longer has.
+         * 1: Friend, Client, Business, Work. 2: Friend, Client, Colleague, Partner.
+         */
+        const val TEMPLATE_NAMES_VERSION = 2
         const val KEY_SEEN_SETUP = "shared.seenKeyboardSetup"
         const val KEY_ENABLED_LAYOUTS = "shared.enabledKeyboardLanguages"
         const val KEY_LAST_TEMPLATE = "shared.lastTemplateID"

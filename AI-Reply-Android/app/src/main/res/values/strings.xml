@@ -100,7 +100,7 @@
     <string name="onboarding_usage_step_copy">Press and hold the message in WhatsApp, Telegram or Instagram and choose Copy</string>
     <string name="onboarding_usage_step_insert">Edit the draft if you want, tap Insert, and send it yourself</string>
     <string name="onboarding_usage_step_open">Tap the message field and switch to the AI\u00A0Reply keyboard</string>
-    <string name="onboarding_usage_step_template">Tap the template that fits: Friend, Client, Business or Work</string>
+    <string name="onboarding_usage_step_template">Tap the template that fits: Friend, Client, Colleague or Partner</string>
     <string name="onboarding_usage_title">Copy, then reply</string>
     <string name="onboarding_welcome_body">AI\u00A0Reply writes replies from your keyboard in WhatsApp, Telegram, Instagram, Messages and other apps. Copy a message, choose who you\'re replying to, and the reply is ready.</string>
     <string name="onboarding_welcome_point_copy">Copy a message in any chat app</string>
@@ -127,11 +127,16 @@
     <string name="profile_title">Profile</string>
     <string name="profile_tone">Preferred tone</string>
 
-    <string name="relationship_business">Business</string>
+    <string name="relationship_business">Partner</string>
     <string name="relationship_client">Client</string>
     <string name="relationship_custom">Custom</string>
     <string name="relationship_friend">Friend</string>
-    <string name="relationship_work">Work</string>
+    <string name="relationship_work">Colleague</string>
+    <!-- Who the reply goes to, for "Who are you replying to?". English needs no case. -->
+    <string name="relationship_friend_dative">Friend</string>
+    <string name="relationship_client_dative">Client</string>
+    <string name="relationship_work_dative">Colleague</string>
+    <string name="relationship_business_dative">Partner</string>
 
     <string name="settings_appearance">Appearance</string>
     <string name="settings_appearance_dark">Dark</string>

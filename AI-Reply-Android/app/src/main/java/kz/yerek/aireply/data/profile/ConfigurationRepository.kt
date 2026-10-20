@@ -89,6 +89,21 @@ class ConfigurationRepository(
         _configuration.value = store.load()
     }
 
+    /**
+     * Rebuilds the keyboard's chip cache once, when it holds names resolved
+     * by an older build ([SettingsStore.templateSummariesAreCurrent]): after
+     * the update that renamed Business and Work to Partner and Colleague, a
+     * cache written before it would otherwise show the old names until the
+     * user next edits a template. Synchronous - the keyboard calls it before
+     * its first frame, and only while the cache is stale, so once per install.
+     *
+     * Ескі атаулар сақталып қалса, пернетақта алғашқы кадрдан бұрын бір рет жаңартады.
+     */
+    fun refreshTemplateSummariesIfStale() {
+        if (settings.templateSummariesAreCurrent) return
+        settings.templateSummaries = summaries(current)
+    }
+
     // --------------------------------------------------------------- writing
 
     private fun persist(configuration: ReplyConfiguration) {
@@ -98,20 +113,23 @@ class ConfigurationRepository(
 
         // The keyboard draws its chip row from this summary before the full file
         // is read, so it is refreshed with every save rather than derived later.
-        // Resolving the three names needs three localized Contexts, which is
+        // Resolving the names needs a localized Context per language, which is
         // real work, so it happens off the caller's thread.
         scope.launch(Dispatchers.Default) {
-            settings.templateSummaries = normalized.visibleTemplates.map { template ->
-                TemplateSummary(
-                    id = template.id,
-                    names = AppLanguage.entries.associate { language ->
-                        language.code to TemplateNaming.displayName(
-                            LocalizedContext.wrap(appContext, language),
-                            template
-                        )
-                    }
-                )
-            }
+            settings.templateSummaries = summaries(normalized)
+        }
+    }
+
+    /** The visible templates in bar order, each named in every app language. */
+    private fun summaries(configuration: ReplyConfiguration): List<TemplateSummary> {
+        val contexts = AppLanguage.entries.associateWith { language -> LocalizedContext.wrap(appContext, language) }
+        return configuration.visibleTemplates.map { template ->
+            TemplateSummary(
+                id = template.id,
+                names = contexts.entries.associate { (language, context) ->
+                    language.code to TemplateNaming.displayName(context, template)
+                }
+            )
         }
     }
 }

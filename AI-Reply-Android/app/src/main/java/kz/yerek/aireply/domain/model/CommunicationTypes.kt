@@ -61,6 +61,13 @@ enum class WorkingHoursBehaviour(val raw: String) {
 /**
  * The relationship a template describes. Drives the built-in behaviour the
  * product specifies for each one.
+ *
+ * The raw values are older than the names users see: `work` is shown as
+ * Colleague (Коллега) and `business` as Partner (Партнёр). The server already
+ * reads them that way, and the values are in every saved configuration and on
+ * the wire, so only the labels moved - never the values.
+ *
+ * Сақталған мәндер өзгермейді: work - әріптес, business - серіктес.
  */
 @Serializable
 enum class RelationshipKind(val raw: String) {
@@ -101,8 +108,12 @@ enum class RelationshipKind(val raw: String) {
         }
 
     companion object {
-        /** The four the app ships with, in bar order. `CUSTOM` is not one of them. */
-        val builtIns: List<RelationshipKind> = listOf(FRIEND, CLIENT, BUSINESS, WORK)
+        /**
+         * The four the app ships with, in bar order for a new install: Friend,
+         * Client, Colleague, Partner. `CUSTOM` is not one of them. A saved
+         * configuration keeps its own order - this only seeds a fresh one.
+         */
+        val builtIns: List<RelationshipKind> = listOf(FRIEND, CLIENT, WORK, BUSINESS)
 
         fun fromRaw(raw: String?): RelationshipKind? = entries.firstOrNull { it.raw == raw }
     }

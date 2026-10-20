@@ -100,7 +100,7 @@
     <string name="onboarding_usage_step_copy">Нажмите и удерживайте сообщение в WhatsApp, Telegram или Instagram и выберите «Копировать»</string>
     <string name="onboarding_usage_step_insert">При необходимости отредактируйте черновик, нажмите «Вставить» и отправьте сами</string>
     <string name="onboarding_usage_step_open">Нажмите на поле ввода и переключитесь на клавиатуру AI\u00A0Reply</string>
-    <string name="onboarding_usage_step_template">Нажмите подходящий шаблон: «Друг», «Клиент», «Бизнес» или «Работа»</string>
+    <string name="onboarding_usage_step_template">Нажмите подходящий шаблон: «Друг», «Клиент», «Коллега» или «Партнёр»</string>
     <string name="onboarding_usage_title">Скопируйте и ответьте</string>
     <string name="onboarding_welcome_body">AI\u00A0Reply пишет ответы прямо с клавиатуры — в WhatsApp, Telegram, Instagram, «Сообщениях» и других приложениях. Скопируйте сообщение, выберите, кому отвечаете, — и ответ готов.</string>
     <string name="onboarding_welcome_point_copy">Скопируйте сообщение в любом мессенджере</string>
@@ -127,11 +127,15 @@
     <string name="profile_title">Профиль</string>
     <string name="profile_tone">Предпочитаемый тон</string>
 
-    <string name="relationship_business">Бизнес</string>
+    <string name="relationship_business">Партнёр</string>
     <string name="relationship_client">Клиент</string>
     <string name="relationship_custom">Свой</string>
     <string name="relationship_friend">Друг</string>
-    <string name="relationship_work">Работа</string>
+    <string name="relationship_work">Коллега</string>
+    <string name="relationship_friend_dative">Другу</string>
+    <string name="relationship_client_dative">Клиенту</string>
+    <string name="relationship_work_dative">Коллеге</string>
+    <string name="relationship_business_dative">Партнёру</string>
 
     <string name="settings_appearance">Оформление</string>
     <string name="settings_appearance_dark">Тёмное</string>

@@ -100,7 +100,7 @@
     <string name="onboarding_usage_step_copy">WhatsApp, Telegram немесе Instagram-да хабарламаны басып тұрып, «Көшіру» пәрменін таңдаңыз</string>
     <string name="onboarding_usage_step_insert">Қажет болса жауапты өңдеп, «Кірістіру» түймесін басыңыз да, өзіңіз жіберіңіз</string>
     <string name="onboarding_usage_step_open">Хабарлама өрісін басып, AI\u00A0Reply пернетақтасына ауысыңыз</string>
-    <string name="onboarding_usage_step_template">Қажетті үлгіні таңдаңыз: «Дос», «Клиент», «Бизнес» немесе «Жұмыс»</string>
+    <string name="onboarding_usage_step_template">Қажетті үлгіні таңдаңыз: «Дос», «Клиент», «Әріптес» немесе «Серіктес»</string>
     <string name="onboarding_usage_title">Көшіріп, жауап беріңіз</string>
     <string name="onboarding_welcome_body">AI\u00A0Reply жауапты тікелей пернетақтадан жазады — WhatsApp, Telegram, Instagram, «Хабарлар» және басқа қолданбаларда. Хабарламаны көшіріп, кімге жауап беретініңізді таңдаңыз — жауап дайын.</string>
     <string name="onboarding_welcome_point_copy">Кез келген мессенджерде хабарламаны көшіріңіз</string>
@@ -127,11 +127,15 @@
     <string name="profile_title">Профиль</string>
     <string name="profile_tone">Қалаулы үн</string>
 
-    <string name="relationship_business">Бизнес</string>
+    <string name="relationship_business">Серіктес</string>
     <string name="relationship_client">Клиент</string>
     <string name="relationship_custom">Өзімнің</string>
     <string name="relationship_friend">Дос</string>
-    <string name="relationship_work">Жұмыс</string>
+    <string name="relationship_work">Әріптес</string>
+    <string name="relationship_friend_dative">Досқа</string>
+    <string name="relationship_client_dative">Клиентке</string>
+    <string name="relationship_work_dative">Әріптеске</string>
+    <string name="relationship_business_dative">Серіктеске</string>
 
     <string name="settings_appearance">Безендіру</string>
     <string name="settings_appearance_dark">Күңгірт</string>

@@ -60,7 +60,7 @@
     <string name="onboarding_usage_step_copy">WhatsApp, Telegram yoki Instagramda xabarni bosib turing va Nusxalashni tanlang</string>
     <string name="onboarding_usage_step_insert">Qoralamani tekshiring, Kiritish tugmasini bosing va oʻzingiz yuboring</string>
     <string name="onboarding_usage_step_open">Xabar maydoniga bosing va AI\u00A0Reply klaviaturasiga oʻting</string>
-    <string name="onboarding_usage_step_template">Mos shablonni tanlang: Doʻst, Mijoz, Biznes yoki Ish</string>
+    <string name="onboarding_usage_step_template">Mos shablonni tanlang: Doʻst, Mijoz, Hamkasb yoki Hamkor</string>
     <string name="onboarding_usage_title">Nusxalang va javob bering</string>
     <string name="onboarding_welcome_body">AI\u00A0Reply javoblarni toʻgʻridan-toʻgʻri klaviaturadan yozadi — WhatsApp, Telegram, Instagram, Xabarlar va boshqa ilovalarda. Xabarni nusxalang, kimga javob berayotganingizni tanlang — javob tayyor.</string>
     <string name="onboarding_welcome_point_copy">Istalgan chat ilovasida xabarni nusxalang</string>
@@ -87,11 +87,15 @@
     <string name="profile_title">Profil</string>
     <string name="profile_tone">Afzal ohang</string>
 
-    <string name="relationship_business">Biznes</string>
+    <string name="relationship_business">Hamkor</string>
     <string name="relationship_client">Mijoz</string>
     <string name="relationship_custom">Boshqa</string>
     <string name="relationship_friend">Doʻst</string>
-    <string name="relationship_work">Ish</string>
+    <string name="relationship_work">Hamkasb</string>
+    <string name="relationship_friend_dative">Doʻst</string>
+    <string name="relationship_client_dative">Mijoz</string>
+    <string name="relationship_work_dative">Hamkasb</string>
+    <string name="relationship_business_dative">Hamkor</string>
 
     <string name="settings_appearance">Koʻrinish</string>
     <string name="settings_appearance_dark">Qorongʻi</string>

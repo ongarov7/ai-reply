@@ -268,6 +268,12 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         language = services.settings.keyboardLanguage
         uiLanguage = services.settings.effectiveAppLanguage
         appearance = services.settings.appearance
+        // Chip names cached by a build before the recipients were renamed are
+        // rebuilt before the first frame draws them - a file read once per
+        // install, never on a key press.
+        if (!services.settings.templateSummariesAreCurrent) {
+            runCatching { services.configuration.refreshTemplateSummariesIfStale() }
+        }
         chips = cachedChips()
         selectedTemplateId = services.settings.lastTemplateId
 
