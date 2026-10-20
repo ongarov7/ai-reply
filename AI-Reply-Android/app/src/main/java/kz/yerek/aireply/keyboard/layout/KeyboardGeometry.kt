@@ -119,13 +119,19 @@ data class PageLayout(
     val panels: List<LaidOutPanel> = emptyList()
 ) {
     /**
-     * The key under a point. Anything inside the page resolves to a key; a
-     * point outside it (a touch that slid off an edge) to the nearest one.
+     * The key under a point. A point inside the page resolves to a key, or
+     * to nothing where a [panel][panelAt] owns it; a point outside the page
+     * (a touch that slid off an edge) to the nearest key.
+     *
+     * A panel is never "near" a key: the emoji grid and its bar are the
+     * panels' ground, so a finger that slides there from ABC is over no key
+     * at all - not over ⌫, whose frame happens to be the closest.
      */
     fun keyIndex(x: Float, y: Float): Int? {
         if (keys.isEmpty()) return null
         val hit = keys.indexOfFirst { it.hitFrame.contains(x, y) }
         if (hit >= 0) return hit
+        if (panelAt(x, y) != null) return null
         var best = -1
         var bestDistance = Float.MAX_VALUE
         keys.forEachIndexed { index, key ->
@@ -139,6 +145,9 @@ data class PageLayout(
         }
         return best.takeIf { it >= 0 }
     }
+
+    /** The panel that owns a point, or null where the keys do. */
+    fun panelAt(x: Float, y: Float): LaidOutPanel? = panels.firstOrNull { it.hitFrame.contains(x, y) }
 }
 
 /** A key slot with its horizontal extent, while a row is being placed. */

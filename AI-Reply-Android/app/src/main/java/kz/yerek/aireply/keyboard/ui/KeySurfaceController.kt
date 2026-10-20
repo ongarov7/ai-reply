@@ -52,6 +52,10 @@ interface KeySurfaceListener {
  *    keyboard picker;
  *  * holding the language key lists the layouts that are on.
  *
+ * A page's panels (the emoji grid and its categories bar) are not keys and
+ * not near any: a finger that slides from ABC into one is over nothing, and
+ * lifting it there types nothing - least of all the ⌫ beside the bar.
+ *
  * Coordinates are dp, in the page's own frame. Times come from the caller,
  * so the logic is deterministic.
  */
@@ -95,7 +99,9 @@ class KeySurfaceController(private val listener: KeySurfaceListener) {
         var nextRepeatAt: Long = Long.MAX_VALUE,
         var longPressAt: Long = Long.MAX_VALUE,
         var alternates: List<String> = emptyList(),
-        var panel: AlternatesPanel? = null
+        var panel: AlternatesPanel? = null,
+        /** Slid off its key into a page panel: lifting here types nothing. */
+        var overPanel: Boolean = false
     )
 
     private val tracks = LinkedHashMap<Long, Track>()
@@ -108,7 +114,9 @@ class KeySurfaceController(private val listener: KeySurfaceListener) {
 
         // Rollover: a finger still resting on a letter is typed now, before
         // the new one, so fast two-thumb typing keeps its order.
-        tracks.values.filter { it.mode == Mode.NORMAL && page.keys.getOrNull(it.keyIndex)?.key?.isCharacter == true }
+        tracks.values.filter {
+            it.mode == Mode.NORMAL && !it.overPanel && page.keys.getOrNull(it.keyIndex)?.key?.isCharacter == true
+        }
             .forEach { commit(it) }
 
         val key = page.keys[index]
@@ -167,8 +175,19 @@ class KeySurfaceController(private val listener: KeySurfaceListener) {
                 }
                 // Slide to correct: the key under the finger is the one that
                 // will be typed. Sliding does not restart the long press.
+                if (page.panelAt(x, y) != null) {
+                    // Into the emoji grid or its bar: no key is under the
+                    // finger, and none is held long either.
+                    if (!track.overPanel) {
+                        track.overPanel = true
+                        track.longPressAt = Long.MAX_VALUE
+                        refreshVisual()
+                    }
+                    return
+                }
                 val index = page.keyIndex(x, y) ?: return
-                if (index != track.keyIndex) {
+                if (index != track.keyIndex || track.overPanel) {
+                    track.overPanel = false
                     track.keyIndex = index
                     track.longPressAt = time + LONG_PRESS_MS
                     refreshVisual()
@@ -182,9 +201,10 @@ class KeySurfaceController(private val listener: KeySurfaceListener) {
         val track = tracks.remove(id) ?: return
         when (track.mode) {
             Mode.NORMAL -> {
-                // Slid well off the top into the reply panel: a change of
-                // mind, not a keystroke.
-                if (y > -CANCEL_ABOVE_DP) commit(track)
+                // Slid well off the top into the reply panel, or into a page
+                // panel: a change of mind, not a keystroke.
+                val overPanel = track.overPanel || layout?.panelAt(x, y) != null
+                if (y > -CANCEL_ABOVE_DP && !overPanel) commit(track)
             }
             Mode.ALTERNATES -> track.panel?.selectedText?.let { text ->
                 val key = layout?.keys?.getOrNull(track.keyIndex)?.key
@@ -270,11 +290,14 @@ class KeySurfaceController(private val listener: KeySurfaceListener) {
 
     private fun refreshVisual() {
         val page = layout
-        val pressed = tracks.values.filter { it.mode != Mode.DONE || page?.keys?.getOrNull(it.keyIndex)?.key == KeyboardKey.Shift }
-            .map { it.keyIndex }.toSet()
+        // A finger over a panel holds no key down: the key it left lets go.
+        val pressed = tracks.values.filter {
+            !it.overPanel && (it.mode != Mode.DONE || page?.keys?.getOrNull(it.keyIndex)?.key == KeyboardKey.Shift)
+        }.map { it.keyIndex }.toSet()
         // The balloon: the character under the most recent finger still typing.
         val preview = tracks.values.lastOrNull { track ->
-            track.mode == Mode.NORMAL && page?.keys?.getOrNull(track.keyIndex)?.key is KeyboardKey.Character
+            track.mode == Mode.NORMAL && !track.overPanel &&
+                page?.keys?.getOrNull(track.keyIndex)?.key is KeyboardKey.Character
         }?.keyIndex
         val panel = tracks.values.lastOrNull { it.mode == Mode.ALTERNATES }?.panel
         val trackpad = tracks.values.any { it.mode == Mode.TRACKPAD }
