@@ -167,9 +167,10 @@ struct EmojiCatalog: Equatable, Sendable {
 
 /// The emoji used last, most recent first.
 ///
-/// Stored on this device only, in the keyboard's own container: never the
-/// App Group, never a backup of anything typed, never sent anywhere. It also
-/// works without Full Access, when the App Group cannot be written.
+/// Stored on this device only, in the keyboard's own container
+/// (`FileRecentEmojiStore`): never the App Group, never a backup, never sent
+/// anywhere. It also works without Full Access, when the App Group cannot be
+/// written.
 struct RecentEmoji: Equatable, Sendable {
 
     static let capacity = 30
@@ -195,23 +196,119 @@ protocol RecentEmojiStore: Sendable {
     func save(_ items: [String])
 }
 
-/// `UserDefaults.standard` of the process: the keyboard extension's own
-/// container. Tests pass a suite.
-struct DefaultsRecentEmojiStore: RecentEmojiStore, @unchecked Sendable {
+/// A small file in the process's own Application Support - in the keyboard,
+/// the extension's container, which it can write without Full Access.
+///
+/// Not `UserDefaults.standard`: that plist is part of the extension's
+/// backup domain, and the recents are something typed (contract §3.10: on
+/// the device only, no App Group, no backup). The file is marked excluded
+/// from backup after every write, because an atomic write puts a new file in
+/// place and the mark does not carry over; its folder is marked too. Not
+/// Caches either: iOS empties
+/// those when storage runs low, and the recents would vanish for no reason
+/// the user can see. Tests pass a directory of their own.
+struct FileRecentEmojiStore: RecentEmojiStore {
 
-    static let key = "keyboard.recentEmoji"
+    static let fileName = "recent-emoji.json"
 
-    private let defaults: UserDefaults
+    /// Where the keyboard keeps them: this process's Application Support,
+    /// never the App Group container.
+    static var defaultDirectory: URL {
+        URL.applicationSupportDirectory.appending(path: "Keyboard", directoryHint: .isDirectory)
+    }
 
-    init(defaults: UserDefaults = .standard) {
-        self.defaults = defaults
+    let fileURL: URL
+
+    init(directory: URL = Self.defaultDirectory) {
+        fileURL = directory.appending(path: Self.fileName, directoryHint: .notDirectory)
     }
 
     func load() -> [String] {
-        RecentEmoji(items: defaults.stringArray(forKey: Self.key) ?? []).items
+        guard let data = try? Data(contentsOf: fileURL),
+              let items = try? JSONDecoder().decode([String].self, from: data) else { return [] }
+        return RecentEmoji(items: items).items
     }
 
     func save(_ items: [String]) {
-        defaults.set(Array(items.prefix(RecentEmoji.capacity)), forKey: Self.key)
+        guard let data = try? JSONEncoder().encode(Array(items.prefix(RecentEmoji.capacity))) else { return }
+        let directory = fileURL.deletingLastPathComponent()
+        do {
+            // The folder first: a folder out of backups keeps what is in it
+            // out too, so the new file is never in a backup, not even
+            // between the write and its own mark.
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try Self.excludeFromBackup(directory)
+            try data.write(to: fileURL, options: .atomic)
+            try Self.excludeFromBackup(fileURL)
+        } catch {
+            // A lost write costs nothing the user typed, only the order of
+            // the recents the next time the keyboard starts.
+        }
+    }
+
+    private static func excludeFromBackup(_ url: URL) throws {
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        var url = url
+        try url.setResourceValues(values)
+    }
+}
+
+/// Saves the recents off the main thread: in order, and only the newest.
+///
+/// Every tap on an emoji saves the whole list. On a concurrent queue an older
+/// list could be written after a newer one, and the keyboard would start next
+/// time without the last emoji typed. Here one serial queue writes, and a
+/// list asked for while an earlier one is still waiting replaces it: a quick
+/// run of taps costs one or two writes, and the newest list is always the one
+/// that stays.
+///
+/// One per process (`keyboard`): iOS can make a new keyboard view controller
+/// for every appearance in the same process, and the new one must read what
+/// the old one was still saving.
+final class RecentEmojiWriter: @unchecked Sendable {
+
+    /// The keyboard's own: its container, out of backups.
+    static let keyboard = RecentEmojiWriter(store: FileRecentEmojiStore())
+
+    let store: RecentEmojiStore
+    private let queue = DispatchQueue(label: "kz.ai-reply.keyboard.recent-emoji", qos: .utility)
+    private let lock = NSLock()
+    /// The list waiting for the queue. Set means a write is scheduled that
+    /// has not taken it yet. Guarded by `lock`.
+    private var pending: [String]?
+
+    init(store: RecentEmojiStore) {
+        self.store = store
+    }
+
+    /// The saved recents, counting a save still on its way.
+    func load() -> [String] {
+        lock.lock()
+        let waiting = pending
+        lock.unlock()
+        if let waiting { return RecentEmoji(items: waiting).items }
+        // A write that already took its list finishes first.
+        return queue.sync { store.load() }
+    }
+
+    func save(_ items: [String]) {
+        lock.lock()
+        let isScheduled = pending != nil
+        pending = items
+        lock.unlock()
+        guard !isScheduled else { return }
+        queue.async { [self] in
+            lock.lock()
+            let newest = pending
+            pending = nil
+            lock.unlock()
+            if let newest { store.save(newest) }
+        }
+    }
+
+    /// Returns once every save asked for so far is written. For tests.
+    func waitUntilSaved() {
+        queue.sync {}
     }
 }

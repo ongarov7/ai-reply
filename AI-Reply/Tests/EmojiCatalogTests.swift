@@ -140,20 +140,114 @@ final class EmojiCatalogTests: XCTestCase {
     }
 
     func testRecentsSurviveARelaunch() throws {
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: "EmojiCatalogTests.\(UUID().uuidString)"))
-        let store = DefaultsRecentEmojiStore(defaults: defaults)
+        let directory = try temporaryDirectory()
+        let store = FileRecentEmojiStore(directory: directory)
         XCTAssertEqual(store.load(), [])
         var recents = RecentEmoji(items: store.load())
         recents.record("🇰🇿")
         recents.record("❤️")
         store.save(recents.items)
-        XCTAssertEqual(DefaultsRecentEmojiStore(defaults: defaults).load(), ["❤️", "🇰🇿"])
-        XCTAssertNotNil(defaults.stringArray(forKey: DefaultsRecentEmojiStore.key))
+        XCTAssertEqual(FileRecentEmojiStore(directory: directory).load(), ["❤️", "🇰🇿"])
+
+        try Data("not a list".utf8).write(to: store.fileURL)
+        XCTAssertEqual(store.load(), [], "a damaged file is no recents, never a crash")
     }
 
-    /// The keyboard's own container: the App Group never sees them.
-    func testRecentsNeverGoToTheAppGroup() {
-        XCTAssertFalse(DefaultsRecentEmojiStore.key.hasPrefix("shared."))
-        XCTAssertNil(SharedSettings.shared.defaults.object(forKey: DefaultsRecentEmojiStore.key))
+    /// Contract §3.10: on the device only. The file and its folder are out
+    /// of backups after every write (an atomic write replaces the file, and
+    /// the mark with it), and the keyboard keeps them in its own container,
+    /// not the App Group's.
+    func testRecentsStayOutOfBackupsAndTheAppGroup() throws {
+        let store = FileRecentEmojiStore(directory: try temporaryDirectory())
+        for items in [["😀"], ["👍", "😀"]] {
+            store.save(items)
+            for url in [store.fileURL, store.fileURL.deletingLastPathComponent()] {
+                let values = try url.resourceValues(forKeys: [.isExcludedFromBackupKey])
+                XCTAssertEqual(values.isExcludedFromBackup, true, url.lastPathComponent)
+            }
+        }
+
+        // What the keyboard itself uses: the file store in this process's
+        // Application Support - the extension's container in the keyboard.
+        let keyboard = try XCTUnwrap(RecentEmojiWriter.keyboard.store as? FileRecentEmojiStore)
+        let shipped = keyboard.fileURL.standardizedFileURL.path
+        XCTAssertEqual(shipped, FileRecentEmojiStore().fileURL.standardizedFileURL.path)
+        XCTAssertTrue(shipped.hasPrefix(URL.applicationSupportDirectory.standardizedFileURL.path + "/"), shipped)
+        if let group = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: AppGroup.identifier) {
+            XCTAssertFalse(shipped.hasPrefix(group.standardizedFileURL.path))
+        }
     }
+
+    /// Saved after every pick, off the main thread: a quick run of picks
+    /// still leaves the newest list on disk, never an older one written late.
+    func testTheNewestRecentsAreTheOnesSaved() throws {
+        let store = FileRecentEmojiStore(directory: try temporaryDirectory())
+        let writer = RecentEmojiWriter(store: store)
+        var recents = RecentEmoji()
+        for index in 0..<40 {
+            recents.record(String(UnicodeScalar(0x1F600 + index)!))
+            writer.save(recents.items)
+        }
+        writer.waitUntilSaved()
+        XCTAssertEqual(store.load(), recents.items)
+        XCTAssertEqual(RecentEmojiWriter(store: store).load(), recents.items, "the next keyboard reads them")
+    }
+
+    /// Picks made while a write is still running are not each written: the
+    /// newest one waits, replaces the ones before it, and is written next.
+    /// A keyboard that starts meanwhile reads it already.
+    func testPicksDuringAWriteAreCoalescedIntoTheNewest() {
+        let store = BlockingRecentEmojiStore()
+        let writer = RecentEmojiWriter(store: store)
+        writer.save(["😀"])
+        store.waitUntilWriting()
+
+        writer.save(["👍", "😀"])
+        writer.save(["❤️", "👍", "😀"])
+        writer.save(["🇰🇿", "❤️", "👍", "😀"])
+        XCTAssertEqual(writer.load(), ["🇰🇿", "❤️", "👍", "😀"], "a save on its way is what a new keyboard reads")
+
+        store.finishWriting()
+        writer.waitUntilSaved()
+        XCTAssertEqual(store.saved, [["😀"], ["🇰🇿", "❤️", "👍", "😀"]])
+    }
+
+    private func temporaryDirectory() throws -> URL {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "EmojiCatalogTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+        addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
+        return directory
+    }
+}
+
+/// Holds its first write until the test lets it finish, and keeps every list
+/// it was given, in order.
+private final class BlockingRecentEmojiStore: RecentEmojiStore, @unchecked Sendable {
+
+    private let lock = NSLock()
+    private let writing = DispatchSemaphore(value: 0)
+    private let release = DispatchSemaphore(value: 0)
+    private var lists: [[String]] = []
+
+    var saved: [[String]] {
+        lock.lock()
+        defer { lock.unlock() }
+        return lists
+    }
+
+    func load() -> [String] { saved.last ?? [] }
+
+    func save(_ items: [String]) {
+        lock.lock()
+        let isFirst = lists.isEmpty
+        lists.append(items)
+        lock.unlock()
+        if isFirst {
+            writing.signal()
+            release.wait()
+        }
+    }
+
+    func waitUntilWriting() { writing.wait() }
+    func finishWriting() { release.signal() }
 }

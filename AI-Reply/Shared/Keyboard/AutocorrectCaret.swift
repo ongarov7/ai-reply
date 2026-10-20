@@ -39,6 +39,14 @@ struct AutocorrectCaret: Equatable, Sendable {
         isTypingWord = false
     }
 
+    /// An emoji from the emoji page went in at the caret. It is no part of a
+    /// word and it ends the one before it: that word gets no strip and no
+    /// correction any more - not even after a backspace takes the emoji back
+    /// out. `typed(_:)` would keep the word going, so the keyboard calls this.
+    mutating func typedEmoji() {
+        isTypingWord = false
+    }
+
     /// Whether the strip may show and a separator may correct at the caret.
     func allowsCorrection(caretInsideWord: Bool) -> Bool {
         isTypingWord && !caretInsideWord

@@ -106,10 +106,11 @@ final class KeyboardViewController: UIInputViewController {
     /// The emoji list, read from the keyboard's bundle when the emoji page
     /// first opens, and dropped with the page on a memory warning.
     private var emojiCatalog: EmojiCatalog?
-    /// Recently used emoji: the keyboard's own container, never the App
-    /// Group. Read on the first open of the emoji page.
-    private let recentEmojiStore: RecentEmojiStore = DefaultsRecentEmojiStore()
-    private lazy var recentEmoji = RecentEmoji(items: recentEmojiStore.load())
+    /// Recently used emoji: a file in the keyboard's own container, out of
+    /// backups, never the App Group. Read on the first open of the emoji
+    /// page, saved off the main thread after every pick, newest last.
+    private let recentEmojiWriter = RecentEmojiWriter.keyboard
+    private lazy var recentEmoji = RecentEmoji(items: recentEmojiWriter.load())
     /// The recents the open emoji page shows. Taken when the page opens, so
     /// an emoji typed now does not move the grid under the finger.
     private var shownRecentEmoji: [String] = []
@@ -1515,12 +1516,10 @@ extension KeyboardViewController: EmojiKeyboardViewDelegate {
         guard target != .nowhere else { return }
         autocorrect.keepCorrection()
         insert(emoji)
-        wordTyping.reset()
+        wordTyping.typedEmoji()
         lastSpaceTap = 0
         recentEmoji.record(emoji)
-        let items = recentEmoji.items
-        let store = recentEmojiStore
-        DispatchQueue.global(qos: .utility).async { store.save(items) }
+        recentEmojiWriter.save(recentEmoji.items)
         refreshSuggestions()
     }
 }

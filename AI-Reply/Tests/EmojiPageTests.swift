@@ -262,13 +262,28 @@ final class EmojiPageTests: XCTestCase {
         XCTAssertEqual(TextDeletion.wordLength(before: "привет 😀😀"), 2, "held delete takes the emoji run")
     }
 
-    /// An emoji is not part of a word: no strip after it, no correction.
+    /// An emoji is not part of a word: no strip after it, no correction -
+    /// what the keyboard does on a pick (`typedEmoji`) after a word typed
+    /// letter by letter.
     func testAnEmojiEndsTheWord() {
         XCTAssertNil(TypedWord(before: "привт😀"))
         XCTAssertNil(TypedWord(before: "helo 🇰🇿"))
         var caret = AutocorrectCaret()
-        caret.typed("😀")
-        XCTAssertFalse(caret.allowsCorrection(caretInsideWord: false))
+        for letter in ["п", "р", "и", "в", "т"] { caret.typed(letter) }
+        XCTAssertTrue(caret.allowsCorrection(caretInsideWord: false), "a word is being typed")
+
+        var picked = caret
+        picked.typedEmoji()
+        XCTAssertFalse(picked.allowsCorrection(caretInsideWord: false))
+        // Backspace takes the emoji out and leaves «привт» before the caret:
+        // still nothing to correct, as the word was ended.
+        XCTAssertNotNil(TypedWord(before: "привт"))
+        XCTAssertFalse(picked.allowsCorrection(caretInsideWord: false))
+
+        // Typing an emoji as if it were a key would have kept the word going.
+        var typed = caret
+        typed.typed("😀")
+        XCTAssertTrue(typed.allowsCorrection(caretInsideWord: false))
         // A keycap starts with a digit: it reads as one, which correction
         // leaves alone.
         if let keycap = TypedWord(before: "1️⃣") {
