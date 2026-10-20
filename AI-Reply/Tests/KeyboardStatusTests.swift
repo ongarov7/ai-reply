@@ -116,6 +116,65 @@ final class KeyboardStatusTests: XCTestCase {
         XCTAssertEqual(pasted.lastKeyboardCheckAt, minuteAgo)
     }
 
+    // MARK: What the screens show
+
+    /// A recent check is shown as done, with its time.
+    func testRecentChecksAreConfirmedWithTheirTime() {
+        let fresh = status(heartbeatAt: hourAgo)
+        XCTAssertEqual(fresh.keyboardSighting(now: now), .confirmed(at: hourAgo))
+        XCTAssertEqual(fresh.fullAccessSighting(now: now), .confirmed(at: hourAgo))
+        XCTAssertTrue(fresh.fullAccessSighting(now: now).isConfirmed)
+
+        let edge = now.addingTimeInterval(-KeyboardStatus.freshness + 60)
+        XCTAssertEqual(status(heartbeatAt: edge).fullAccessSighting(now: now), .confirmed(at: edge))
+    }
+
+    /// Full Access turned off while the app was not running leaves nothing
+    /// behind: the keyboard cannot write without it. So a month-old "yes" is
+    /// never shown as done - only as when it was last confirmed.
+    func testAnOldFullAccessCheckIsNotShownAsDone() {
+        let old = status(heartbeatAt: monthAgo)
+        XCTAssertEqual(old.fullAccessStatus, .verifiedEnabled, "the evidence itself is kept")
+        XCTAssertEqual(old.fullAccessSighting(now: now), .outdated(at: monthAgo))
+        XCTAssertEqual(old.keyboardSighting(now: now), .outdated(at: monthAgo))
+        XCTAssertFalse(old.fullAccessSighting(now: now).isConfirmed)
+        XCTAssertFalse(old.keyboardSighting(now: now).isConfirmed)
+    }
+
+    func testWithoutFullAccessIsDeniedAndNothingSeenIsUnknown() {
+        let limited = status(heartbeatAt: hourAgo, limitedSignalAt: minuteAgo)
+        XCTAssertEqual(limited.fullAccessSighting(now: now), .denied(at: minuteAgo))
+        XCTAssertEqual(limited.keyboardSighting(now: now), .confirmed(at: minuteAgo))
+
+        XCTAssertEqual(KeyboardStatus.none.keyboardSighting(now: now), .unknown)
+        XCTAssertEqual(KeyboardStatus.none.fullAccessSighting(now: now), .unknown)
+    }
+
+    /// No new evidence, only time passing: the next refresh (a return to the
+    /// app) turns a confirmed check into an outdated one.
+    func testMonitorAgesItsSightingsOnRefresh() {
+        let shared = SharedSettings(defaults: UserDefaults(suiteName: "KeyboardStatusTests.shared.\(UUID())")!)
+        let local = UserDefaults(suiteName: "KeyboardStatusTests.local.\(UUID())")!
+        let monitor = KeyboardStatusMonitor(settings: shared, defaults: local, observesKeyboard: false)
+        XCTAssertEqual(monitor.fullAccessSighting, .unknown)
+        XCTAssertEqual(monitor.keyboardSighting, .unknown)
+
+        shared.markKeyboardActive(hasFullAccess: true, at: hourAgo)
+        monitor.refresh(now: now)
+        XCTAssertEqual(monitor.fullAccessSighting, .confirmed(at: hourAgo))
+        XCTAssertEqual(monitor.keyboardSighting, .confirmed(at: hourAgo))
+
+        let later = hourAgo.addingTimeInterval(KeyboardStatus.freshness + 1)
+        monitor.refresh(now: later)
+        XCTAssertEqual(monitor.fullAccessSighting, .outdated(at: hourAgo))
+        XCTAssertEqual(monitor.keyboardSighting, .outdated(at: hourAgo))
+
+        // The keyboard shows up again without Full Access.
+        monitor.keyboardDidAppear(hasFullAccess: false, now: later)
+        XCTAssertEqual(monitor.fullAccessSighting, .denied(at: later))
+        XCTAssertEqual(monitor.keyboardSighting, .confirmed(at: later))
+    }
+
     func testStatusesUseTheDiagnosticsWireValues() {
         XCTAssertEqual(PermissionEvidence.allCases.map(\.rawValue),
                        ["unknown", "not_verified", "verified_enabled", "observed_denied", "user_reported_disabled", "unsupported"])

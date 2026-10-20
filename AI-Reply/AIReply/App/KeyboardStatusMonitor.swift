@@ -126,7 +126,38 @@ struct KeyboardStatus: Equatable {
     /// say is history, and is shown as "last seen …".
     func isStale(now: Date = Date()) -> Bool {
         guard let last = lastKeyboardCheckAt else { return true }
-        return now.timeIntervalSince(last) > Self.freshness
+        return !Self.isFresh(last, now: now)
+    }
+
+    // MARK: What the screens show
+
+    /// The keyboard itself: seen within `freshness`, seen only before that,
+    /// or never. iOS never says it was removed, so it is never "denied".
+    func keyboardSighting(now: Date = Date()) -> KeyboardSighting {
+        guard let seen = keyboardLastSeenAt else { return .unknown }
+        return Self.isFresh(seen, now: now) ? .confirmed(at: seen) : .outdated(at: seen)
+    }
+
+    /// Full Access: a verification counts as current only within
+    /// `freshness`. Turning it off is invisible to the app unless it runs
+    /// at that moment - the keyboard cannot write without it - so an older
+    /// "yes" is shown with its date and setup is offered again. A sighting
+    /// without it needs no such care: the keyboard's next run with Full
+    /// Access replaces it on its own.
+    func fullAccessSighting(now: Date = Date()) -> KeyboardSighting {
+        switch fullAccessStatus {
+        case .verifiedEnabled:
+            guard let verified = fullAccessVerifiedAt else { return .unknown }
+            return Self.isFresh(verified, now: now) ? .confirmed(at: verified) : .outdated(at: verified)
+        case .observedDenied:
+            return limitedSeenAt.map { .denied(at: $0) } ?? .unknown
+        default:
+            return .unknown
+        }
+    }
+
+    private static func isFresh(_ date: Date, now: Date) -> Bool {
+        now.timeIntervalSince(date) <= freshness
     }
 
     /// The keyboard has reported itself at least once.
@@ -134,6 +165,31 @@ struct KeyboardStatus: Equatable {
 
     private static func latest(_ dates: Date?...) -> Date? {
         dates.compactMap { $0 }.max()
+    }
+}
+
+/// What a screen may say about the keyboard or its Full Access: what the
+/// keyboard was seen doing, and when.
+///
+/// Пернетақта күйі экранда: тек көрген нәрсе және қашан көргені.
+///
+/// Only `confirmed` is shown as done (a green tick, setup no longer offered),
+/// and always with its time. `outdated` is something seen longer ago than
+/// `KeyboardStatus.freshness`: history, said as "last confirmed …", never as
+/// the state now.
+enum KeyboardSighting: Equatable {
+    /// Never seen either way.
+    case unknown
+    /// Seen on, recently enough to count.
+    case confirmed(at: Date)
+    /// Seen on, but only longer ago than `freshness`.
+    case outdated(at: Date)
+    /// Seen off: the keyboard ran without Full Access.
+    case denied(at: Date)
+
+    var isConfirmed: Bool {
+        if case .confirmed = self { return true }
+        return false
     }
 }
 
@@ -151,6 +207,11 @@ struct KeyboardStatus: Equatable {
 final class KeyboardStatusMonitor {
 
     private(set) var status: KeyboardStatus
+    /// What the screens show, aged at the last `refresh`. Stored rather than
+    /// computed so a sighting that grows old turns grey on the next refresh
+    /// (every return to the app) even when no new evidence arrived.
+    private(set) var keyboardSighting: KeyboardSighting
+    private(set) var fullAccessSighting: KeyboardSighting
 
     @ObservationIgnored private let settings: SharedSettings
     @ObservationIgnored private let defaults: UserDefaults
@@ -168,7 +229,11 @@ final class KeyboardStatusMonitor {
     init(settings: SharedSettings = .shared, defaults: UserDefaults = .standard, observesKeyboard: Bool = true) {
         self.settings = settings
         self.defaults = defaults
-        self.status = Self.read(settings: settings, defaults: defaults)
+        let status = Self.read(settings: settings, defaults: defaults)
+        let now = Date()
+        self.status = status
+        self.keyboardSighting = status.keyboardSighting(now: now)
+        self.fullAccessSighting = status.fullAccessSighting(now: now)
         if observesKeyboard { startObserving() }
     }
 
@@ -179,11 +244,15 @@ final class KeyboardStatusMonitor {
         )
     }
 
-    func refresh() {
+    func refresh(now: Date = Date()) {
         let next = Self.read(settings: settings, defaults: defaults)
         // Assigned only on a change, so a once-a-second refresh does not
         // redraw every screen that shows the status.
         if next != status { status = next }
+        let keyboard = next.keyboardSighting(now: now)
+        if keyboard != keyboardSighting { keyboardSighting = keyboard }
+        let fullAccess = next.fullAccessSighting(now: now)
+        if fullAccess != fullAccessSighting { fullAccessSighting = fullAccess }
         if status.isEnabled { ProductEvents.trackOnce(.keyboardEnabledDetected) }
         if status.fullAccessStatus == .verifiedEnabled { ProductEvents.trackOnce(.fullAccessEnabledDetected) }
     }
@@ -203,7 +272,7 @@ final class KeyboardStatusMonitor {
     /// is throttled, and "without" could not be written by the keyboard at all.
     func keyboardDidAppear(hasFullAccess: Bool, now: Date = Date()) {
         defaults.set(now.timeIntervalSince1970, forKey: hasFullAccess ? Key.fullAccessSeenAt : Key.limitedSeenAt)
-        refresh()
+        refresh(now: now)
     }
 
     private static func read(settings: SharedSettings, defaults: UserDefaults) -> KeyboardStatus {

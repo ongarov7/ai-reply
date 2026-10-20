@@ -242,6 +242,26 @@ final class LocalizationTests: XCTestCase {
         }
     }
 
+    /// The keyboard status lines carry the time they were seen: the keys
+    /// SwiftUI builds from `"… \(date, format:)"` exist, and every language
+    /// keeps the date's slot.
+    func testDatedKeyboardStatusKeysKeepTheirDate() throws {
+        let keys = ["setup.status.keyboard.on %@", "setup.status.keyboard.outdated %@",
+                    "setup.status.fullAccess.on %@", "setup.status.fullAccess.outdated %@",
+                    "home.keyboard.lastSeen %@", "home.keyboard.fullAccessOn %@",
+                    "home.keyboard.fullAccessOutdated %@"]
+        for language in ["en", "ru", "kk", "uz"] {
+            let path = try XCTUnwrap(
+                Bundle.main.path(forResource: "Localizable", ofType: "strings", inDirectory: "\(language).lproj")
+            )
+            let table = try XCTUnwrap(NSDictionary(contentsOfFile: path) as? [String: String])
+            for key in keys {
+                let value = try XCTUnwrap(table[key], "\(key) missing in \(language)")
+                XCTAssertEqual(value.components(separatedBy: "%@").count, 2, "\(key) in \(language)")
+            }
+        }
+    }
+
     /// Catches a key that was added to ru/kk by copying the English value.
     func testUserFacingScreensAreActuallyTranslated() throws {
         let suspects = [

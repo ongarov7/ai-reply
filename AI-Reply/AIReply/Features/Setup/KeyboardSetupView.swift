@@ -52,34 +52,20 @@ struct KeyboardSetupView: View {
 
     // MARK: Checklist
 
+    /// The same two lines as Settings and onboarding: what the keyboard was
+    /// seen doing, and when.
     private var checklist: some View {
         DSSection(title: "setup.checklist.title") {
             VStack(alignment: .leading, spacing: DS.Spacing.s) {
-                ChecklistRow(
-                    title: "setup.checklist.added",
-                    state: keyboard.status.isEnabled ? .done : .unknown
-                )
-                ChecklistRow(
-                    title: "setup.checklist.fullAccess",
-                    state: fullAccessState
-                )
-                if !keyboard.status.isEnabled {
+                KeyboardStatusRow(kind: .keyboard, sighting: keyboard.keyboardSighting)
+                KeyboardStatusRow(kind: .fullAccess, sighting: keyboard.fullAccessSighting)
+                if keyboard.keyboardSighting == .unknown {
                     Text("setup.checklist.unknown.footer")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
             }
             .dsCard()
-        }
-    }
-
-    /// Full Access is only knowable once the keyboard has run at least once.
-    /// Before that the honest answer is "not known yet", not "off".
-    private var fullAccessState: ChecklistRow.State {
-        switch keyboard.status.fullAccessStatus {
-        case .verifiedEnabled: return .done
-        case .observedDenied:  return .missing
-        default:               return .unknown
         }
     }
 
@@ -138,58 +124,6 @@ struct KeyboardSetupView: View {
 }
 
 // MARK: - Rows
-
-/// One line of the setup checklist.
-struct ChecklistRow: View {
-
-    enum State {
-        case done
-        case missing
-        /// iOS has not told us, and we are not going to pretend it has.
-        case unknown
-    }
-
-    let title: LocalizedStringKey
-    let state: State
-
-    var body: some View {
-        HStack(spacing: DS.Spacing.s) {
-            Image(systemName: symbol)
-                .foregroundStyle(tint)
-                .frame(width: 22)
-            Text(title).foregroundStyle(.primary)
-            Spacer()
-            Text(statusKey)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-        }
-        .accessibilityElement(children: .combine)
-    }
-
-    private var symbol: String {
-        switch state {
-        case .done:    return "checkmark.circle.fill"
-        case .missing: return "exclamationmark.circle"
-        case .unknown: return "questionmark.circle"
-        }
-    }
-
-    private var tint: Color {
-        switch state {
-        case .done:    return .green
-        case .missing: return .orange
-        case .unknown: return .secondary
-        }
-    }
-
-    private var statusKey: LocalizedStringKey {
-        switch state {
-        case .done:    return "setup.state.done"
-        case .missing: return "setup.state.missing"
-        case .unknown: return "setup.state.unknown"
-        }
-    }
-}
 
 private struct PrivacyPoint: View {
     let key: LocalizedStringKey

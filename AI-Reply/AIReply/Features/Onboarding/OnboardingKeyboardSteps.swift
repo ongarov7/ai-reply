@@ -61,7 +61,7 @@ struct OnboardingFullAccessStep: View {
             }
             .dsCard()
 
-            if keyboard.status.fullAccessStatus != .verifiedEnabled {
+            if !keyboard.fullAccessSighting.isConfirmed {
                 VStack(alignment: .leading, spacing: DS.Spacing.s) {
                     Text("setup.fullAccess.manual")
                         .font(.footnote)
@@ -79,7 +79,7 @@ struct OnboardingFullAccessStep: View {
             }
         }
         .onAppear {
-            if keyboard.status.fullAccessStatus != .verifiedEnabled { offersTestField = true }
+            if !keyboard.fullAccessSighting.isConfirmed { offersTestField = true }
         }
         .task { await keyboard.followLiveUpdates() }
     }
@@ -95,8 +95,8 @@ private struct OnboardingStatusCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.s) {
-            KeyboardStatusRow(kind: kind, status: keyboard.status)
-            if !isConfirmed {
+            KeyboardStatusRow(kind: kind, sighting: sighting)
+            if !sighting.isConfirmed {
                 Text(footer)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -107,10 +107,10 @@ private struct OnboardingStatusCard: View {
         .dsCard()
     }
 
-    private var isConfirmed: Bool {
+    private var sighting: KeyboardSighting {
         switch kind {
-        case .keyboard:   return keyboard.status.isEnabled
-        case .fullAccess: return keyboard.status.fullAccessStatus == .verifiedEnabled
+        case .keyboard:   return keyboard.keyboardSighting
+        case .fullAccess: return keyboard.fullAccessSighting
         }
     }
 }

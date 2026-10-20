@@ -66,8 +66,8 @@ struct SettingsView: View {
             }
 
             Section {
-                KeyboardStatusRow(kind: .keyboard, status: keyboard.status)
-                KeyboardStatusRow(kind: .fullAccess, status: keyboard.status)
+                KeyboardStatusRow(kind: .keyboard, sighting: keyboard.keyboardSighting)
+                KeyboardStatusRow(kind: .fullAccess, sighting: keyboard.fullAccessSighting)
                 NavigationLink { KeyboardSetupView() } label: {
                     Label("settings.setup.guide", systemImage: "keyboard")
                 }

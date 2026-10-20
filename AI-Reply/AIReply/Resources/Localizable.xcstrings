@@ -2002,31 +2002,89 @@
         }
       }
     },
-    "home.keyboard.fullAccessOn" : {
+    "home.keyboard.fullAccessOn %@" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Full Access is on"
+            "value" : "Full Access confirmed %@"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Толық рұқсат қосулы"
+            "value" : "Толық рұқсат %@ расталды"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Полный доступ включён"
+            "value" : "Полный доступ подтверждён %@"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Toʻliq ruxsat yoqilgan"
+            "value" : "Toʻliq ruxsat %@ tasdiqlangan"
+          }
+        }
+      }
+    },
+    "home.keyboard.fullAccessOutdated %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Full Access last confirmed %@ — open the AI Reply keyboard to check again"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Толық рұқсат соңғы рет %@ расталды — қайта тексеру үшін AI Reply пернетақтасын ашыңыз"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Полный доступ последний раз подтверждён %@ — откройте клавиатуру AI Reply, чтобы проверить снова"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toʻliq ruxsat oxirgi marta %@ tasdiqlangan — qayta tekshirish uchun AI Reply klaviaturasini oching"
+          }
+        }
+      }
+    },
+    "home.keyboard.lastSeen %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply keyboard last seen %@"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply пернетақтасы соңғы рет %@ анықталды"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Клавиатура AI Reply последний раз обнаружена %@"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply klaviaturasi oxirgi marta %@ aniqlangan"
           }
         }
       }
@@ -8327,64 +8385,6 @@
         }
       }
     },
-    "setup.checklist.added" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Keyboard added and enabled"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Пернетақта қосылған"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Клавиатура добавлена и включена"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Klaviatura qoʻshilgan va yoqilgan"
-          }
-        }
-      }
-    },
-    "setup.checklist.fullAccess" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Full Access"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Толық рұқсат"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Полный доступ"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Toʻliq ruxsat"
-          }
-        }
-      }
-    },
     "setup.checklist.title" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8762,93 +8762,6 @@
         }
       }
     },
-    "setup.state.done" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ready"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Дайын"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Готово"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tayyor"
-          }
-        }
-      }
-    },
-    "setup.state.missing" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Not enabled"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Қосылмаған"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Не включено"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Yoqilmagan"
-          }
-        }
-      }
-    },
-    "setup.state.unknown" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Not known yet"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Әзірге белгісіз"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Пока неизвестно"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hozircha nomaʼlum"
-          }
-        }
-      }
-    },
     "setup.status.fullAccess" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8907,31 +8820,60 @@
         }
       }
     },
-    "setup.status.fullAccess.on" : {
+    "setup.status.fullAccess.on %@" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Enabled"
+            "value" : "Enabled — checked %@"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Қосулы"
+            "value" : "Қосулы — %@ тексерілді"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Включён"
+            "value" : "Включён — проверено %@"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Yoqilgan"
+            "value" : "Yoqilgan — %@ tekshirildi"
+          }
+        }
+      }
+    },
+    "setup.status.fullAccess.outdated %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last confirmed %@. Open the AI Reply keyboard to check again."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Соңғы рет %@ расталды. Қайта тексеру үшін AI Reply пернетақтасын ашыңыз."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Последний раз подтверждён %@. Откройте клавиатуру AI Reply, чтобы проверить снова."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oxirgi marta %@ tasdiqlangan. Qayta tekshirish uchun AI Reply klaviaturasini oching."
           }
         }
       }
@@ -8994,31 +8936,60 @@
         }
       }
     },
-    "setup.status.keyboard.on" : {
+    "setup.status.keyboard.on %@" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Enabled"
+            "value" : "Enabled — checked %@"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Қосулы"
+            "value" : "Қосулы — %@ тексерілді"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Включена"
+            "value" : "Включена — проверено %@"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Yoqilgan"
+            "value" : "Yoqilgan — %@ tekshirildi"
+          }
+        }
+      }
+    },
+    "setup.status.keyboard.outdated %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last seen %@. Open the AI Reply keyboard to check again."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Соңғы рет %@ анықталды. Қайта тексеру үшін AI Reply пернетақтасын ашыңыз."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Последний раз обнаружена %@. Откройте клавиатуру AI Reply, чтобы проверить снова."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oxirgi marta %@ aniqlangan. Qayta tekshirish uchun AI Reply klaviaturasini oching."
           }
         }
       }

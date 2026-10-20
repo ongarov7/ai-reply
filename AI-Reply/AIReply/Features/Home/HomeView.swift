@@ -145,28 +145,32 @@ struct HomeView: View {
         .buttonStyle(.plain)
     }
 
+    /// What the keyboard was seen doing, and when. A Full Access check
+    /// older than `KeyboardStatus.freshness` is said with its date and no
+    /// longer counts as done: the user may have turned it off since, which
+    /// the keyboard cannot report.
     private var keyboardCard: some View {
         DSSection(title: "home.keyboard.title") {
             VStack(alignment: .leading, spacing: DS.Spacing.s) {
                 Label {
                     Text(keyboardStateKey).foregroundStyle(.primary)
                 } icon: {
-                    Image(systemName: keyboard.status.isEnabled ? "checkmark.circle.fill" : "keyboard")
-                        .foregroundStyle(keyboard.status.isEnabled ? Color.green : Color.secondary)
+                    Image(systemName: keyboard.keyboardSighting.isConfirmed ? "checkmark.circle.fill" : "keyboard")
+                        .foregroundStyle(keyboard.keyboardSighting.isConfirmed ? Color.green : Color.secondary)
                 }
                 .font(.body.weight(.medium))
 
-                if keyboard.status.isEnabled {
+                if let fullAccessKey {
                     Label {
                         Text(fullAccessKey).foregroundStyle(.primary)
                     } icon: {
-                        Image(systemName: hasFullAccess ? "lock.open.fill" : "lock.fill")
-                            .foregroundStyle(hasFullAccess ? Color.green : Color.orange)
+                        Image(systemName: fullAccessSymbol)
+                            .foregroundStyle(fullAccessTint)
                     }
                     .font(.subheadline)
                 }
 
-                if !keyboard.status.isEnabled {
+                if keyboard.keyboardSighting == .unknown {
                     KeyboardSetupSteps().padding(.top, DS.Spacing.xxs)
                 }
 
@@ -184,14 +188,12 @@ struct HomeView: View {
         }
     }
 
-    /// The keyboard has not reported in yet, or it runs without Full Access.
-    /// Both are only ever cleared by the keyboard itself reporting its state,
-    /// so a "done" here is something it actually observed.
+    /// Done only once the keyboard recently reported itself WITH Full
+    /// Access - which needs it to be set up, too. Never seen, seen without
+    /// it, or confirmed only long ago: the setup button stays.
     private var needsKeyboardSetup: Bool {
-        !keyboard.status.isEnabled || !hasFullAccess
+        !keyboard.fullAccessSighting.isConfirmed
     }
-
-    private var hasFullAccess: Bool { keyboard.status.fullAccessStatus == .verifiedEnabled }
 
     private var howItWorks: some View {
         DSSection(title: "home.howItWorks.title") {
@@ -217,10 +219,40 @@ struct HomeView: View {
     /// as `String` rather than `LocalizedStringKey`, which compiles happily and
     /// then ships the raw key to the user instead of the translation.
     private var keyboardStateKey: LocalizedStringKey {
-        keyboard.status.isEnabled ? "home.keyboard.ready" : "home.keyboard.notReady"
+        switch keyboard.keyboardSighting {
+        case .confirmed:          return "home.keyboard.ready"
+        case .outdated(let date): return "home.keyboard.lastSeen \(date, format: sightingFormat)"
+        case .denied, .unknown:   return "home.keyboard.notReady"
+        }
     }
 
-    private var fullAccessKey: LocalizedStringKey {
-        hasFullAccess ? "home.keyboard.fullAccessOn" : "home.keyboard.fullAccessOff"
+    /// Nothing until the keyboard was seen at all.
+    private var fullAccessKey: LocalizedStringKey? {
+        switch keyboard.fullAccessSighting {
+        case .confirmed(let date): return "home.keyboard.fullAccessOn \(date, format: sightingFormat)"
+        case .outdated(let date):  return "home.keyboard.fullAccessOutdated \(date, format: sightingFormat)"
+        case .denied:              return "home.keyboard.fullAccessOff"
+        case .unknown:             return nil
+        }
+    }
+
+    private var fullAccessSymbol: String {
+        switch keyboard.fullAccessSighting {
+        case .confirmed:          return "lock.open.fill"
+        case .outdated, .unknown: return "clock.arrow.circlepath"
+        case .denied:             return "lock.fill"
+        }
+    }
+
+    private var fullAccessTint: Color {
+        switch keyboard.fullAccessSighting {
+        case .confirmed:          return .green
+        case .outdated, .unknown: return .secondary
+        case .denied:             return .orange
+        }
+    }
+
+    private var sightingFormat: Date.FormatStyle {
+        KeyboardSightingDate.style.locale(settings.locale)
     }
 }
