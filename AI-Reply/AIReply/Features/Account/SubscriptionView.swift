@@ -52,19 +52,22 @@ struct SubscriptionView: View {
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: DS.Spacing.xxs) {
-                    Text(verbatim: "\(account.usage.remainingToday)")
-                        .font(.system(size: 34, weight: .semibold, design: .rounded))
-                        .foregroundStyle(account.usage.remainingToday > 0 ? Color.accentColor : Color.red)
+                    // A dash until the server has answered, never a red zero.
+                    Text(verbatim: usageIsKnown ? "\(account.usage.remainingToday)" : "—")
+                        .font(.largeTitle.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(usageIsKnown ? Color.primary : Color.secondary)
                     Text("subscription.remaining").font(.caption).foregroundStyle(.secondary)
                 }
             }
 
             ProgressView(value: progress)
-                .tint(account.usage.remainingToday > 0 ? Color.accentColor : Color.red)
+                .tint(Color.accentColor)
 
-            Text("subscription.usedToday \(account.usage.usedToday) \(account.usage.dailyLimit)")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+            if usageIsKnown {
+                Text("subscription.usedToday \(account.usage.usedToday) \(account.usage.dailyLimit)")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
 
             if let expiry = account.subscription?.expiresAt, !expiry.isEmpty {
                 Label(LocalizedStringKey("subscription.renews \(formatted(expiry))"), systemImage: "calendar")
@@ -160,6 +163,9 @@ struct SubscriptionView: View {
     private var planName: String {
         account.subscription?.plan.localizedName(settings.effectiveLanguage.rawValue) ?? ""
     }
+
+    /// The server's numbers have arrived (`Usage.unknown` has no limit).
+    private var usageIsKnown: Bool { account.usage.dailyLimit > 0 }
 
     private var progress: Double {
         guard account.usage.dailyLimit > 0 else { return 0 }

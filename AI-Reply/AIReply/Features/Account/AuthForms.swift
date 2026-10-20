@@ -101,7 +101,7 @@ struct OTPCodeField: View {
         TextField("", text: $code, prompt: Text(verbatim: "····"))
             .keyboardType(.numberPad)
             .textContentType(.oneTimeCode)
-            .font(.system(size: 30, weight: .semibold, design: .rounded).monospacedDigit())
+            .font(.title.weight(.semibold).monospacedDigit())
             .multilineTextAlignment(.center)
             .kerning(12)
             .focused(isFocused)

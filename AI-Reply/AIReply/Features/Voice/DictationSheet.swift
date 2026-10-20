@@ -66,7 +66,8 @@ struct DictationSheet: View {
                         .font(.system(size: 28, weight: .semibold))
                         .foregroundStyle(.white)
                         .frame(width: 76, height: 76)
-                        .background(Circle().fill(model.isRecording ? Color.red : Color.accentColor))
+                        // Blue in both states: the glyph says whether it records.
+                        .background(Circle().fill(Color.accentColor))
                 }
                 .accessibilityLabel(model.isRecording ? "voice.stop" : "voice.tapToSpeak")
 

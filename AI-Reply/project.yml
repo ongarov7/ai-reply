@@ -97,6 +97,8 @@ targets:
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_IDENTITY: "iPhone Developer"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # The accent of every tint and button: system blue, light and dark.
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         TARGETED_DEVICE_FAMILY: "1"
         # Sign in with Apple: Debug builds hide the button (configs below) but
         # sign with the same entitlements as Release.

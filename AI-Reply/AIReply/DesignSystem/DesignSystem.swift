@@ -2,11 +2,18 @@ import SwiftUI
 
 /// A deliberately small design system.
 ///
+/// Жүйелік түстер мен шрифттер: көк акцент, сұр фон, ақ карточкалар.
+///
 /// Semantic system colours and Dynamic Type text styles already do most of the
 /// work, and reproducing them behind custom names would only make the app drift
 /// away from the platform. What lives here is the handful of decisions SwiftUI
-/// does not make for us: vertical rhythm, corner radius, and the two button
+/// does not make for us: vertical rhythm, corner radius, and the few button
 /// shapes this app actually uses.
+///
+/// The look is the one of Apple's own apps: system blue (the AccentColor
+/// asset: #007AFF light, #0A84FF dark), grouped backgrounds with white
+/// rounded cards, SF Symbols and SF text styles. No gradients (the app mark is
+/// the one exception), no red outside real errors, no decorative motion.
 enum DS {
 
     enum Spacing {
@@ -30,6 +37,8 @@ enum DS {
         static let readableWidth: CGFloat = 560
         /// Apple's minimum comfortable hit target.
         static let minimumTouchTarget: CGFloat = 44
+        /// The height of a screen's main button, as in Apple's own setup flows.
+        static let primaryButtonHeight: CGFloat = 50
     }
 }
 
@@ -154,7 +163,9 @@ struct DSPrimaryButtonStyle: ButtonStyle {
             configuration.label
                 .font(.body.weight(.semibold))
                 .foregroundStyle(Color.white)
-                .frame(maxWidth: .infinity, minHeight: DS.Layout.minimumTouchTarget)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, DS.Spacing.m)
+                .frame(maxWidth: .infinity, minHeight: DS.Layout.primaryButtonHeight)
                 .background(
                     RoundedRectangle(cornerRadius: DS.Radius.medium, style: .continuous)
                         .fill(Color.accentColor)
@@ -189,6 +200,55 @@ struct DSSecondaryButtonStyle: ButtonStyle {
     }
 }
 
+/// A text-only button: the quiet second choice under a primary one
+/// («Сначала попробовать», «Пропустить»).
+struct DSTextButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        StyleBody(configuration: configuration)
+    }
+
+    private struct StyleBody: View {
+        let configuration: ButtonStyleConfiguration
+        @Environment(\.isEnabled) private var isEnabled
+
+        var body: some View {
+            configuration.label
+                .font(.body)
+                .foregroundStyle(Color.accentColor)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity, minHeight: DS.Layout.minimumTouchTarget)
+                .contentShape(Rectangle())
+                .opacity(isEnabled ? (configuration.isPressed ? 0.5 : 1) : 0.4)
+        }
+    }
+}
+
+/// An outlined button inside a card, e.g. «Копировать».
+struct DSOutlineButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        StyleBody(configuration: configuration)
+    }
+
+    private struct StyleBody: View {
+        let configuration: ButtonStyleConfiguration
+        @Environment(\.isEnabled) private var isEnabled
+
+        var body: some View {
+            configuration.label
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.accentColor)
+                .padding(.horizontal, DS.Spacing.m)
+                .frame(minHeight: DS.Layout.minimumTouchTarget)
+                .overlay(
+                    RoundedRectangle(cornerRadius: DS.Radius.medium, style: .continuous)
+                        .strokeBorder(Color.accentColor, lineWidth: 1)
+                )
+                .contentShape(RoundedRectangle(cornerRadius: DS.Radius.medium, style: .continuous))
+                .opacity(isEnabled ? (configuration.isPressed ? 0.5 : 1) : 0.4)
+        }
+    }
+}
+
 extension ButtonStyle where Self == DSPrimaryButtonStyle {
     static var dsPrimary: DSPrimaryButtonStyle { DSPrimaryButtonStyle() }
 }
@@ -197,29 +257,64 @@ extension ButtonStyle where Self == DSSecondaryButtonStyle {
     static var dsSecondary: DSSecondaryButtonStyle { DSSecondaryButtonStyle() }
 }
 
+extension ButtonStyle where Self == DSTextButtonStyle {
+    static var dsText: DSTextButtonStyle { DSTextButtonStyle() }
+}
+
+extension ButtonStyle where Self == DSOutlineButtonStyle {
+    static var dsOutline: DSOutlineButtonStyle { DSOutlineButtonStyle() }
+}
+
 // MARK: - Numbered step
 
-/// One step of the keyboard setup instructions.
+/// One numbered step of an instruction: the number in a blue disc, the
+/// text, and an optional line under it.
 struct DSStepRow: View {
     let index: Int
     let text: LocalizedStringKey
+    var detail: LocalizedStringKey?
 
     /// Grows with the number inside it, so large text never spills out.
-    @ScaledMetric(relativeTo: .footnote) private var badgeSize: CGFloat = 22
+    @ScaledMetric(relativeTo: .footnote) private var badgeSize: CGFloat = 24
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.s) {
             Text("\(index)")
                 .font(.footnote.weight(.semibold))
                 .monospacedDigit()
-                .foregroundStyle(Color.dsSurface)
+                .foregroundStyle(Color.white)
                 .frame(width: badgeSize, height: badgeSize)
-                .background(Circle().fill(Color.primary))
+                .background(Circle().fill(Color.accentColor))
                 .accessibilityHidden(true)
-            Text(text)
-                .font(.body)
-                .foregroundStyle(.primary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(text)
+                    .font(.body)
+                    .foregroundStyle(.primary)
+                if let detail {
+                    Text(detail)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// An SF Symbol in a light grey disc: the welcome screen's three steps and
+/// the chat sketches' avatar.
+struct DSSymbolDisc: View {
+    let symbol: String
+    var size: CGFloat = 44
+    var tint: Color = .secondary
+
+    var body: some View {
+        Image(systemName: symbol)
+            .font(.system(size: size * 0.42, weight: .medium))
+            .foregroundStyle(tint)
+            .frame(width: size, height: size)
+            .background(Circle().fill(Color(.tertiarySystemFill)))
+            .accessibilityHidden(true)
     }
 }

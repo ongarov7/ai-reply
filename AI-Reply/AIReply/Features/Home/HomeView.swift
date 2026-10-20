@@ -83,9 +83,12 @@ struct HomeView: View {
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 0) {
-                    Text(verbatim: "\(account.usage.remainingToday)")
-                        .font(.system(size: 28, weight: .semibold, design: .rounded))
-                        .foregroundStyle(account.usage.remainingToday > 0 ? Color.accentColor : Color.red)
+                    // A dash until the server has answered: a zero before
+                    // the first /me would read as "nothing left". A real zero
+                    // is a number like any other, not an error.
+                    Text(verbatim: usageIsKnown ? "\(account.usage.remainingToday)" : "—")
+                        .font(.title.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(usageIsKnown ? Color.primary : Color.secondary)
                     Text("home.usage.left").font(.caption2).foregroundStyle(.secondary)
                 }
                 Image(systemName: "chevron.right").font(.footnote).foregroundStyle(.secondary)
@@ -94,6 +97,9 @@ struct HomeView: View {
         }
         .buttonStyle(.plain)
     }
+
+    /// The server's numbers have arrived (`Usage.unknown` has no limit).
+    private var usageIsKnown: Bool { account.usage.dailyLimit > 0 }
 
     private var planName: String {
         account.subscription?.plan.localizedName(settings.effectiveLanguage.rawValue) ?? ""
