@@ -136,7 +136,8 @@ final class InstructionPolisher {
     private var waiting: Task<Void, Never>?
     private var undoExpiry: Task<Void, Never>?
     private var ticket = 0
-    private var failures = 0
+    /// Failures in a row since the last answer. Read by tests.
+    private(set) var failures = 0
     private var lastRequested: String?
     /// What the field held before a suggestion was used, and the suggestion.
     private var applied: (previous: String, suggestion: String)?

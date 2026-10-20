@@ -134,7 +134,9 @@ final class InstructionPolishTests: XCTestCase {
         try await waitUntil { transport.requests.count == 1 }
         polisher.instructionDidChange(note + " завтра", inputLanguage: .russian, limit: 400)
         try await waitUntil { transport.requests.count == 2 }
-        try await Task.sleep(for: .milliseconds(30))
+        // The second failure is counted when its answer comes back, which
+        // under load can take longer than any fixed pause.
+        try await waitUntil { polisher.failures == InstructionPolishRules.failureLimit }
         polisher.instructionDidChange(note + " завтра могу", inputLanguage: .russian, limit: 400)
         try await Task.sleep(for: .milliseconds(120))
         XCTAssertEqual(transport.requests.count, 2, "stopped after two failures")
