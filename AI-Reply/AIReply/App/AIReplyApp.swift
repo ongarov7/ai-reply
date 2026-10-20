@@ -10,7 +10,7 @@ struct AIReplyApp: App {
     @State private var settings: AppSettings
     @State private var configuration: ReplyConfigurationModel
     @State private var account: AccountModel
-    @State private var keyboardStatus = KeyboardStatusMonitor()
+    @State private var keyboardStatus: KeyboardStatusMonitor
     @Environment(\.scenePhase) private var scenePhase
 
     private let services = AppServices.shared
@@ -55,9 +55,21 @@ struct AIReplyApp: App {
                 Task { await account.refresh() }
             }
         }
+        let keyboardStatus = KeyboardStatusMonitor()
+        // What the server's reminders may rely on: what the keyboard was
+        // seen doing and how this device's onboarding stands.
+        AppServices.shared.diagnosticsReport = { [weak keyboardStatus, weak configuration] in
+            guard let keyboardStatus, let configuration else { return nil }
+            keyboardStatus.refresh()
+            return PermissionDiagnosticsReport.make(
+                keyboard: keyboardStatus.status,
+                onboarding: OnboardingStatus.current(completedVersion: configuration.profile.completedOnboardingVersion)
+            )
+        }
         _settings = State(initialValue: settings)
         _configuration = State(initialValue: configuration)
         _account = State(initialValue: account)
+        _keyboardStatus = State(initialValue: keyboardStatus)
     }
 
     var body: some Scene {

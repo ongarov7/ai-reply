@@ -54,11 +54,15 @@ final class AppServices {
     /// Runs after a tapped notification was handled; the app refreshes the
     /// account, so a quota or plan notification opens on current numbers.
     var onNotificationOpened: (() -> Void)?
+    /// What the app sees of its keyboard and onboarding right now, for the
+    /// permission diagnostics. Set by the app's root.
+    var diagnosticsReport: (@MainActor () -> PermissionDiagnosticsReport?)?
 
     private let store: NotificationSettingsStore
     private let identity: InstallationIdentity
     private let registrar: InstallationRegistrar
     private let openedReporter: NotificationOpenedReporting
+    private let diagnostics = PermissionDiagnosticsReporter()
     private let notificationDelegate = NotificationCenterDelegate()
 
     private var isStarted = false
@@ -309,6 +313,21 @@ final class AppServices {
                 return
             }
         } while syncAgain
+        // The installation exists on the server now: its diagnostics can follow.
+        await reportDiagnostics()
+    }
+
+    /// The keyboard, Full Access, paste and onboarding statuses, when the
+    /// server takes them (`features.permission_diagnostics`) and they changed
+    /// or the last report is a day old. Enums and dates only.
+    private func reportDiagnostics() async {
+        guard account.hasAcceptedLegal, account.features?.permissionDiagnostics == true,
+              let installationID = identity.id, let report = diagnosticsReport?() else { return }
+        let outcome = await diagnostics.report(report, installationID: installationID,
+                                               isSignedIn: AccountCredentials.isSignedIn, accountID: account.userID)
+        if case .failed(let failure) = outcome {
+            ReplyLog.event("diagnostics: report failed: \(failure)")
+        }
     }
 
     /// Everything the server should know right now, or nil while the app may
