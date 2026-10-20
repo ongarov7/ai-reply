@@ -108,7 +108,9 @@ class ComposerModel(
     /** The server takes reports and a reply the model wrote is on screen: the flag shows. */
     val canReport: Boolean = false,
     /** The report being written about that reply; it takes the reply's place. */
-    val report: AIReportDraft? = null
+    val report: AIReportDraft? = null,
+    /** A short, wide window (a phone on its side): the limit notice is one row. */
+    val compact: Boolean = false
 )
 
 class ComposerActions(
@@ -332,6 +334,9 @@ private fun PersonaChips(
  * stage change), never on a keystroke: the fields scroll instead of growing,
  * so the keys never move under the user's thumbs. The "field is not empty"
  * question takes the reply's place at the reply's height for the same reason.
+ *
+ * Capped from outside at the room above the keys ([modifier]) - a phone on
+ * its side has little - the fields are what give way: they scroll.
  */
 @Composable
 fun ComposerPanel(
@@ -361,7 +366,7 @@ fun ComposerPanel(
         Header(model, actions, strings, theme)
 
         if (model.sourceExpanded && !flow.isConflict) {
-            SourceCard(model, actions, strings, theme)
+            SourceCard(model, actions, strings, theme, Modifier.weight(1f, fill = false))
         }
 
         model.report?.let { report ->
@@ -369,7 +374,7 @@ fun ComposerPanel(
             return@Column
         }
 
-        BoxWithConstraints(Modifier.fillMaxWidth()) {
+        BoxWithConstraints(Modifier.fillMaxWidth().weight(1f, fill = false)) {
             val fieldHeight = draftFieldHeight(flow, maxWidth, model.maxFieldLines)
             when {
                 flow.isConflict -> Box(
@@ -425,12 +430,15 @@ fun ComposerPanel(
             }
         }
 
-        if (!flow.isConflict) {
-            when {
-                flow.error?.isLimit == true -> LimitNotice(strings, theme, actions.onOpenApp)
-                errorMessage != null -> NoticeLine(errorMessage, flow.error, theme)
-            }
-        }
+        PanelNotice(
+            notice = noticeKind(flow, errorMessage),
+            text = errorMessage,
+            error = flow.error,
+            compact = model.compact,
+            strings = strings,
+            theme = theme,
+            onOpenApp = actions.onOpenApp
+        )
 
         if (composingLike && !flow.isConflict && voiceLineShows(model.voice, session.instruction.text, model.instructionLimit)) {
             VoiceLine(
@@ -607,12 +615,18 @@ private fun Header(model: ComposerModel, actions: ComposerActions, strings: AppS
 }
 
 @Composable
-private fun SourceCard(model: ComposerModel, actions: ComposerActions, strings: AppStrings, theme: KeyboardTheme) {
+private fun SourceCard(
+    model: ComposerModel,
+    actions: ComposerActions,
+    strings: AppStrings,
+    theme: KeyboardTheme,
+    modifier: Modifier = Modifier
+) {
     val flow = model.session.flow
     val composing = flow.stage == ReplyComposerFlow.Stage.Composing
     val lines = if (flow.showsReply) 3 else 4
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .heightIn(max = (lines * 19 + 12).dp)
             .clip(RoundedCornerShape(9.dp))

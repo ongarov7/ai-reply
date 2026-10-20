@@ -2,8 +2,10 @@ package kz.yerek.aireply
 
 import kz.yerek.aireply.ai.AIReplyError
 import kz.yerek.aireply.keyboard.KeyboardAppLink
+import kz.yerek.aireply.keyboard.layout.PanelFit
 import kz.yerek.aireply.keyboard.reply.ReplyComposerFlow
 import kz.yerek.aireply.keyboard.ui.isLimit
+import kz.yerek.aireply.keyboard.ui.noticeKind
 import kz.yerek.aireply.keyboard.ui.offersRetry
 import kz.yerek.aireply.push.AppLink
 import kz.yerek.aireply.push.AppLinks
@@ -47,6 +49,18 @@ class LimitNoticeTest {
             .startingGeneration()!!.failing(AIReplyError.MonthlyQuotaExhausted)
         assertEquals("the reply on screen can still be inserted", ReplyComposerFlow.Stage.Result, withReply.stage)
         assertEquals("Привет!", withReply.draftText)
+    }
+
+    @Test
+    fun `the panels show the limit notice for spent replies, a line for the rest, nothing over the question`() {
+        val spent = ReplyComposerFlow().startingGeneration()!!.failing(AIReplyError.QuotaExhausted)
+        assertEquals(PanelFit.Notice.LIMIT, noticeKind(spent, "Лимит"))
+        val offline = ReplyComposerFlow().startingGeneration()!!.failing(AIReplyError.Offline)
+        assertEquals(PanelFit.Notice.LINE, noticeKind(offline, "Нет соединения"))
+        assertEquals("a notice with nothing to say is none", PanelFit.Notice.NONE, noticeKind(offline, null))
+        assertEquals(PanelFit.Notice.NONE, noticeKind(ReplyComposerFlow(), null))
+        val asking = spent.copy(stage = ReplyComposerFlow.Stage.Conflict(wasEditing = false))
+        assertEquals("the \"field is not empty\" question has the panel to itself", PanelFit.Notice.NONE, noticeKind(asking, "Лимит"))
     }
 
     @Test

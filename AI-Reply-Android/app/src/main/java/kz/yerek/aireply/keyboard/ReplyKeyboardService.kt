@@ -6,12 +6,17 @@ import android.os.Build
 import android.os.SystemClock
 import android.text.InputType
 import android.view.View
+import android.view.WindowManager
 import android.view.accessibility.AccessibilityManager
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputMethodManager
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -22,6 +27,7 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -105,6 +111,8 @@ import kz.yerek.aireply.keyboard.ui.KeySurfaceController
 import kz.yerek.aireply.keyboard.ui.KeySurfaceListener
 import kz.yerek.aireply.keyboard.ui.KeySurfaceState
 import kz.yerek.aireply.keyboard.ui.KeyboardRoot
+import kz.yerek.aireply.keyboard.ui.noticeKind
+import kz.yerek.aireply.keyboard.ui.noticeText
 import kz.yerek.aireply.keyboard.ui.PanelFocus
 import kz.yerek.aireply.keyboard.ui.PersonaRow
 import kz.yerek.aireply.keyboard.ui.QuickIntent
@@ -450,12 +458,34 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
     /** Never take over the whole screen in landscape: it would hide the chat. */
     override fun onEvaluateFullscreenMode(): Boolean = false
 
+    /**
+     * The tallest the keyboard's window can be, dp: the display less the
+     * status bar (or a cutout above it). Null before Android 11, which does
+     * not say; the panels then go by what the window was measured to have.
+     *
+     * Not the window's own measure: its first pass runs against the whole
+     * display, status bar included, and the next against the height the
+     * first one asked for - planning a panel by either leaves a band under
+     * the keys or takes lines from the request for nothing.
+     */
+    private fun windowHeightDp(): Float? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return null
+        return runCatching {
+            val metrics = getSystemService(WindowManager::class.java).currentWindowMetrics
+            val top = metrics.windowInsets.getInsetsIgnoringVisibility(
+                android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.displayCutout()
+            ).top
+            (metrics.bounds.height() - top) / resources.displayMetrics.density
+        }.getOrNull()
+    }
+
     // ------------------------------------------------------------ composition
 
     @Composable
     private fun KeyboardContent() {
         val configuration = LocalConfiguration.current
         val density = LocalDensity.current.density
+        val fontScale = LocalDensity.current.fontScale
 
         val theme = KeyboardTheme.resolve(
             systemIsDark = (configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
@@ -469,6 +499,12 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
 
         val width = configuration.screenWidthDp.toFloat()
         val screenHeight = configuration.screenHeightDp.toFloat()
+        // The tallest the window can be and what lies under the keys: what
+        // the panels plan with ([PanelFit.roomAbove]), once per window.
+        val windowHeight = remember(configuration.orientation, configuration.screenWidthDp, configuration.screenHeightDp, density) {
+            windowHeightDp()
+        }
+        val navigationBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding().value
         val sizing = KeyboardSizing(width, KeyboardSizing.isLandscape(width, screenHeight), density)
         // ONE height for every page of every enabled layout.
         val areaHeight = sizing.keyAreaHeight(KeyboardLayout.maximumRowCount(enabledLanguages), screenHeight)
@@ -534,63 +570,75 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
                     val session = replies.session
                     val created = compose.session
                     val voiceLines = PanelFit.voiceLines(sizing.isLandscape)
-                    if (created != null) {
-                        // The window's height less the keys: what Create may take,
+                    val compact = PanelFit.compact(sizing.isLandscape)
+                    if (created != null || (session != null && composing)) {
+                        // The window's height less the keys: what a panel may take,
                         // so on a phone on its side the space bar stays on screen.
-                        // It changes with the window, never with a keystroke.
+                        // It changes with the window, never with a keystroke. Create
+                        // plans its request field for it; either panel is capped at
+                        // it, and its fields give way for whatever else is on show.
                         BoxWithConstraints(Modifier.fillMaxWidth()) {
-                            val room = if (constraints.hasBoundedHeight) maxHeight.value - areaHeight else Float.POSITIVE_INFINITY
-                            CreatePanel(
-                                model = CreateModel(
-                                    session = created,
-                                    intents = createIntents,
-                                    instructionLines = PanelFit.createInstructionLines(
-                                        room,
-                                        preferred = if (screenHeight >= 700f) 4 else 3,
-                                        compact = PanelFit.compactCreate(sizing.isLandscape)
+                            val measured = if (constraints.hasBoundedHeight) maxHeight.value - areaHeight else Float.POSITIVE_INFINITY
+                            val room = PanelFit.roomAbove(windowHeight, navigationBar, areaHeight) ?: measured
+                            val cap = minOf(room, measured)
+                            val fit = if (cap.isFinite()) Modifier.heightIn(max = cap.coerceAtLeast(0f).dp) else Modifier
+                            if (created != null) {
+                                val notice = noticeKind(created.flow, noticeText(strings, created.flow.error, created.clipboardMiss))
+                                CreatePanel(
+                                    model = CreateModel(
+                                        session = created,
+                                        intents = createIntents,
+                                        instructionLines = PanelFit.createInstructionLines(
+                                            room,
+                                            preferred = if (screenHeight >= 700f) 4 else 3,
+                                            compact = compact,
+                                            notice = PanelFit.createNotice(notice, compact, fontScale)
+                                        ),
+                                        maxFieldLines = if (screenHeight >= 700f) 7 else 4,
+                                        assist = typingAssist(created.instruction),
+                                        instructionLimit = AILimits.current.instructionCharacters,
+                                        voice = panelVoice,
+                                        voiceLines = voiceLines,
+                                        compact = compact,
+                                        canReport = reportsEnabled && created.flow.reportableText != null,
+                                        report = reports.draft?.takeIf {
+                                            it.mode == AIReportMode.COMPOSE && reportsEnabled &&
+                                                created.flow.reportableText != null
+                                        }
                                     ),
-                                    maxFieldLines = if (screenHeight >= 700f) 7 else 4,
-                                    assist = typingAssist(created.instruction),
-                                    instructionLimit = AILimits.current.instructionCharacters,
-                                    voice = panelVoice,
-                                    voiceLines = voiceLines,
-                                    compact = PanelFit.compactCreate(sizing.isLandscape),
-                                    canReport = reportsEnabled && created.flow.reportableText != null,
-                                    report = reports.draft?.takeIf {
-                                        it.mode == AIReportMode.COMPOSE && reportsEnabled &&
-                                            created.flow.reportableText != null
-                                    }
-                                ),
-                                actions = createActions,
-                                strings = strings,
-                                theme = theme
-                            )
+                                    actions = createActions,
+                                    strings = strings,
+                                    theme = theme,
+                                    modifier = fit
+                                )
+                            } else if (session != null) {
+                                ComposerPanel(
+                                    model = ComposerModel(
+                                        personaName = TemplateNaming.displayName(services.localized(uiLanguage), session.template),
+                                        session = session,
+                                        focus = focus,
+                                        sourceExpanded = sourceExpanded,
+                                        sourceLimit = AILimits.current.sourceCharacters,
+                                        instructionLimit = AILimits.current.instructionCharacters,
+                                        voice = panelVoice,
+                                        intents = intents,
+                                        maxFieldLines = if (screenHeight >= 700f) 5 else 3,
+                                        assist = typingAssist(session.instruction),
+                                        voiceLines = voiceLines,
+                                        canReport = reportsEnabled && session.flow.reportableText != null,
+                                        report = reports.draft?.takeIf {
+                                            it.mode == AIReportMode.REPLY && reportsEnabled &&
+                                                session.flow.reportableText != null
+                                        },
+                                        compact = compact
+                                    ),
+                                    actions = composerActions,
+                                    strings = strings,
+                                    theme = theme,
+                                    modifier = fit
+                                )
+                            }
                         }
-                    } else if (session != null && composing) {
-                        ComposerPanel(
-                            model = ComposerModel(
-                                personaName = TemplateNaming.displayName(services.localized(uiLanguage), session.template),
-                                session = session,
-                                focus = focus,
-                                sourceExpanded = sourceExpanded,
-                                sourceLimit = AILimits.current.sourceCharacters,
-                                instructionLimit = AILimits.current.instructionCharacters,
-                                voice = panelVoice,
-                                intents = intents,
-                                maxFieldLines = if (screenHeight >= 700f) 5 else 3,
-                                assist = typingAssist(session.instruction),
-                                voiceLines = voiceLines,
-                                canReport = reportsEnabled && session.flow.reportableText != null,
-                                report = reports.draft?.takeIf {
-                                    it.mode == AIReportMode.REPLY && reportsEnabled &&
-                                        session.flow.reportableText != null
-                                }
-                            ),
-                            actions = composerActions,
-                            strings = strings,
-                            theme = theme,
-                            modifier = Modifier
-                        )
                     } else if (dictation.showsHostBar) {
                         // Voice input for the app's field, at the row's height.
                         HostVoiceBar(voice, voiceActions, strings, theme)

@@ -42,6 +42,7 @@ import kz.yerek.aireply.ai.AIReportDraft
 import kz.yerek.aireply.ai.AppStrings
 import kz.yerek.aireply.core.text.codePointLength
 import kz.yerek.aireply.keyboard.KeyboardTheme
+import kz.yerek.aireply.keyboard.layout.PanelFit
 import kz.yerek.aireply.keyboard.reply.ComposeSession
 import kz.yerek.aireply.keyboard.reply.ReplyComposerFlow
 
@@ -63,7 +64,8 @@ class CreateModel(
     val voiceLines: Int = 2,
     /**
      * A short, wide window (a phone on its side): the line under the request
-     * moves up into the header, where there is width to spare.
+     * moves up into the header, where there is width to spare, and so does
+     * the limit notice, as one row.
      */
     val compact: Boolean = false,
     /** The server takes reports and a message the model wrote is on screen: the flag shows. */
@@ -112,6 +114,11 @@ class CreateActions(
  * the line under the request is always there while it is written, holding
  * "Reply to copied" or, while the microphone has something to say, the
  * dictation status.
+ *
+ * Capped from outside at the room above the keys ([modifier]), the message
+ * field is what gives way: it is the panel's one flexible row and scrolls.
+ * On a phone on its side spent replies are said in the header, in the line's
+ * place ([PanelFit.createLimitInHeader]), so they cost the field nothing.
  */
 @Composable
 fun CreatePanel(
@@ -129,6 +136,8 @@ fun CreatePanel(
     // "Copy a message first" is about Reply to copied, not a failed Write:
     // the button keeps saying Write.
     val writeFailed = errorMessage != null && flow.error?.offersRetry == true
+    val notice = noticeKind(flow, errorMessage)
+    val limitInHeader = PanelFit.createLimitInHeader(notice, model.compact)
 
     Column(
         modifier = modifier
@@ -139,14 +148,14 @@ fun CreatePanel(
             .padding(horizontal = 8.dp, vertical = 5.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        CreateHeader(model, actions, strings, theme)
+        CreateHeader(model, actions, strings, theme, limit = limitInHeader)
 
         model.report?.let { report ->
             ReportPanel(report, strings, theme, actions.report)
             return@Column
         }
 
-        BoxWithConstraints(Modifier.fillMaxWidth()) {
+        BoxWithConstraints(Modifier.fillMaxWidth().weight(1f, fill = false)) {
             val fieldHeight = draftFieldHeight(flow, maxWidth, model.maxFieldLines, minLines = 3)
             when {
                 flow.isConflict -> Box(
@@ -199,12 +208,15 @@ fun CreatePanel(
             }
         }
 
-        if (!flow.isConflict) {
-            when {
-                flow.error?.isLimit == true -> LimitNotice(strings, theme, actions.onOpenApp)
-                errorMessage != null -> NoticeLine(errorMessage, flow.error, theme)
-            }
-        }
+        PanelNotice(
+            notice = if (limitInHeader) PanelFit.Notice.NONE else notice,
+            text = errorMessage,
+            error = flow.error,
+            compact = model.compact,
+            strings = strings,
+            theme = theme,
+            onOpenApp = actions.onOpenApp
+        )
 
         if (!flow.showsReply && !flow.isConflict && !model.compact) CreateLine(model, actions, strings, theme)
 
@@ -230,8 +242,18 @@ fun CreatePanel(
     }
 }
 
+/**
+ * Title, New and Close. On a phone on its side it also holds the line under
+ * the request, or, with the replies spent ([limit]), the limit notice's row.
+ */
 @Composable
-private fun CreateHeader(model: CreateModel, actions: CreateActions, strings: AppStrings, theme: KeyboardTheme) {
+private fun CreateHeader(
+    model: CreateModel,
+    actions: CreateActions,
+    strings: AppStrings,
+    theme: KeyboardTheme,
+    limit: Boolean
+) {
     val flow = model.session.flow
     Row(
         modifier = Modifier.fillMaxWidth().height(30.dp),
@@ -240,6 +262,7 @@ private fun CreateHeader(model: CreateModel, actions: CreateActions, strings: Ap
         Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = theme.accent, modifier = Modifier.padding(start = 2.dp).size(17.dp))
         Spacer(Modifier.width(6.dp))
         val lineInHeader = model.compact && !flow.showsReply && !flow.isConflict
+        val slot = lineInHeader || limit
         Text(
             text = strings[R.string.kb_compose_title],
             fontSize = 14.sp,
@@ -247,12 +270,16 @@ private fun CreateHeader(model: CreateModel, actions: CreateActions, strings: Ap
             color = theme.primaryText,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = (if (lineInHeader) Modifier else Modifier.weight(1f)).semantics { heading() }
+            modifier = (if (slot) Modifier else Modifier.weight(1f)).semantics { heading() }
         )
-        if (lineInHeader) {
+        if (slot) {
             Spacer(Modifier.width(12.dp))
             Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                CreateLineContent(model, actions, strings, theme)
+                if (lineInHeader) {
+                    CreateLineContent(model, actions, strings, theme, limit)
+                } else {
+                    LimitRow(strings, theme, compact = true, onOpenApp = actions.onOpenApp)
+                }
             }
             Spacer(Modifier.width(6.dp))
         }
@@ -311,9 +338,19 @@ private fun CreateLine(model: CreateModel, actions: CreateActions, strings: AppS
     }
 }
 
-/** The voice line when voice has something to say, otherwise "Reply to copied". */
+/**
+ * The voice line when voice has something to say, otherwise "Reply to copied" -
+ * or, with the replies spent ([limit], a phone on its side), the limit notice's
+ * row: answering the copied message would be refused the same way.
+ */
 @Composable
-private fun CreateLineContent(model: CreateModel, actions: CreateActions, strings: AppStrings, theme: KeyboardTheme) {
+private fun CreateLineContent(
+    model: CreateModel,
+    actions: CreateActions,
+    strings: AppStrings,
+    theme: KeyboardTheme,
+    limit: Boolean = false
+) {
     val request = model.session.instruction.text
     val replyToCopied: @Composable () -> Unit = {
         AssistPill(
@@ -339,6 +376,8 @@ private fun CreateLineContent(model: CreateModel, actions: CreateActions, string
             // Dictating the request and then answering the copied message stays one tap away.
             whileReviewing = replyToCopied
         )
+    } else if (limit) {
+        LimitRow(strings, theme, compact = true, onOpenApp = actions.onOpenApp)
     } else {
         replyToCopied()
     }
