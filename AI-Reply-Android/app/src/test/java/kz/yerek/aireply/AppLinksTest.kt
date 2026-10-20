@@ -44,9 +44,9 @@ class AppLinksTest {
         )
         assertEquals(AppLink.Screen(AppScreen.PASTE_HELP), AppLinks.parse("aireply://paste_help"))
         assertEquals(
-            "the keyboard's limit link reaches the plans until the purchase screen exists",
-            Routes.Subscription,
-            (AppLinks.parse(KeyboardAppLink.limit) as AppLink.Screen).screen.let(PendingNavigation::routeFor)
+            "the keyboard's limit link reaches the purchase screen",
+            Routes.Purchase,
+            (AppLinks.parse(KeyboardAppLink.PURCHASE) as AppLink.Screen).screen.let(PendingNavigation::routeFor)
         )
         assertEquals(
             "the old keyboard link opens the permissions section too",
@@ -184,7 +184,7 @@ class AppLinksTest {
             AppScreen.PERMISSIONS to "permissions",
             AppScreen.PASTE_HELP to "paste_help",
             AppScreen.SUPPORT to Routes.Home,
-            AppScreen.PURCHASE to Routes.Subscription
+            AppScreen.PURCHASE to "purchase"
         )
         assertEquals(AppScreen.entries.toSet(), expected.keys)
         expected.forEach { (screen, route) -> assertEquals(screen.key, route, PendingNavigation.routeFor(screen)) }

@@ -13,7 +13,9 @@ data class RecordedRequest(
     val method: String,
     val path: String,
     val headers: Map<String, String>,
-    val body: String
+    val body: String,
+    /** The raw query string, or null. */
+    val query: String? = null
 ) {
     fun header(name: String): String? = headers.entries.firstOrNull { it.key.equals(name, ignoreCase = true) }?.value
 }
@@ -44,7 +46,7 @@ class FakeServer(private val handler: (RecordedRequest) -> FakeResponse) {
         private fun respond(): FakeResponse {
             answer?.let { return it }
             val headers = requestProperties.mapValues { (_, values) -> values.joinToString(",") }
-            val request = RecordedRequest(requestMethod, url.path, headers, sent.toString(Charsets.UTF_8.name()))
+            val request = RecordedRequest(requestMethod, url.path, headers, sent.toString(Charsets.UTF_8.name()), url.query)
             requests += request
             return handler(request).also { answer = it }
         }

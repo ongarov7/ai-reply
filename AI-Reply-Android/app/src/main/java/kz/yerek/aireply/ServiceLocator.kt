@@ -22,6 +22,10 @@ import kz.yerek.aireply.ai.ReplyDraftNormalizer
 import kz.yerek.aireply.ai.VoiceTranscriptionService
 import kz.yerek.aireply.analytics.ProductEventReporter
 import kz.yerek.aireply.analytics.ProductEventsTransport
+import kz.yerek.aireply.billing.BillingRepository
+import kz.yerek.aireply.billing.DebugStore
+import kz.yerek.aireply.billing.PlayStoreClient
+import kz.yerek.aireply.billing.PurchaseApi
 import kz.yerek.aireply.core.lang.AppLanguage
 import kz.yerek.aireply.core.lang.KeyboardLanguage
 import kz.yerek.aireply.core.lang.LocalizedContext
@@ -161,11 +165,18 @@ class ServiceLocator(context: Context) {
 
     /** Hands account transitions to [push] without constructing it before it is needed. */
     private val accountObserver = object : AccountObserver {
-        override fun onServerFeatures(features: ServerFeaturesDto?) = push.onServerFeatures(features)
+        override fun onServerFeatures(features: ServerFeaturesDto?) {
+            push.onServerFeatures(features)
+            // At start-up the features arrive after the first resume: purchases Play holds go now.
+            resumePurchases()
+        }
         override fun onLegalAccepted() = push.onLegalAccepted()
         override fun onSignedIn(userId: String) = push.onSignedIn(userId)
         override fun onAccountLoaded(userId: String) = push.onAccountLoaded(userId)
-        override fun onSignedOut(userInitiated: Boolean) = push.onSignedOut(userInitiated)
+        override fun onSignedOut(userInitiated: Boolean) {
+            push.onSignedOut(userInitiated)
+            if (billingCreated) billing.reset()
+        }
     }
 
     /**
@@ -258,6 +269,47 @@ class ServiceLocator(context: Context) {
 
     /** A screen asked for from outside the navigation graph: a tapped notification. */
     val navigation: PendingNavigation by lazy { PendingNavigation() }
+
+    // ------------------------------------------------------------ purchases
+
+    /**
+     * DEBUG builds with Settings ▸ Developer ▸ the sample catalogue: the
+     * purchase screen without Google Play or the server. Read once, when
+     * [billing] is first built.
+     */
+    private val sampleStore: Boolean by lazy { BuildConfig.DEBUG && settings.debugSampleStore }
+
+    /** Whether «Докупить ответы» is offered at all: the server sells on Android (or the debug sample). */
+    val purchasesOffered: Boolean
+        get() = sampleStore || account.state.value.features?.iapAndroid == true
+
+    /**
+     * Buying replies through Google Play. The app only, never the keyboard;
+     * Play is not bound until purchases are offered and a screen asks.
+     */
+    val billing: BillingRepository by lazy {
+        billingCreated = true
+        BillingRepository(
+            store = if (sampleStore) DebugStore.client(scope) else PlayStoreClient(appContext),
+            api = if (sampleStore) DebugStore.api() else object : PurchaseApi {
+                override suspend fun catalog() = accountService.iapProducts()
+                override suspend fun verify(productId: String, purchaseToken: String) =
+                    accountService.verifyGooglePurchase(productId, purchaseToken)
+            },
+            isEnabled = { account.state.value.isSignedIn && purchasesOffered },
+            onUsage = { usage -> account.applyUsage(usage) },
+            refreshUsage = { account.refreshUsage() },
+            scope = scope
+        )
+    }
+
+    @Volatile
+    private var billingCreated = false
+
+    /** Back in the app: purchases Play still holds go to the server, once billing exists or is offered. */
+    fun resumePurchases() {
+        if (billingCreated || (account.state.value.isSignedIn && purchasesOffered)) billing.resume()
+    }
 
     /** Platform, version, locale and time zone — nothing that identifies a person. */
     fun deviceDescriptor(): DeviceDescriptor = DeviceDescriptor(

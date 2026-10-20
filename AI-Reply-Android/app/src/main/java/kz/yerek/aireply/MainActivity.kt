@@ -121,6 +121,8 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch { services.account.reloadConfigIfStale() }
         // The notification permission may have changed in system settings.
         services.push.onResume()
+        // A purchase paid meanwhile, or never handed over, goes to the server.
+        services.resumePurchases()
     }
 
     override fun onStop() {

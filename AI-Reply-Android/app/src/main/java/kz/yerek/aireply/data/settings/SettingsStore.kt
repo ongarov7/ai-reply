@@ -351,6 +351,15 @@ class SettingsStore internal constructor(
         get() = prefs.getBoolean(KEY_DEBUG_FORCE_PUSH, false)
         set(value) = prefs.edit().putBoolean(KEY_DEBUG_FORCE_PUSH, value).apply()
 
+    /**
+     * DEBUG BUILDS ONLY: «Докупить ответы» shows sample products and a
+     * purchase that completes at once, without Google Play or the server.
+     * Read when the app starts. Ignored in release builds.
+     */
+    var debugSampleStore: Boolean
+        get() = prefs.getBoolean(KEY_DEBUG_SAMPLE_STORE, false)
+        set(value) = prefs.edit().putBoolean(KEY_DEBUG_SAMPLE_STORE, value).apply()
+
     // ---------------------------------------------------------- notifications
 
     /**
@@ -396,6 +405,7 @@ class SettingsStore internal constructor(
         const val KEY_SMART_CORRECTION = "shared.smartCorrection"
         const val KEY_DEBUG_MOCK = "debug.mockReplies"
         const val KEY_DEBUG_FORCE_PUSH = "debug.forcePushPrompt"
+        const val KEY_DEBUG_SAMPLE_STORE = "debug.sampleStore"
         const val KEY_NOTIFICATIONS_ENABLED = "notifications.enabled"
 
         const val KEY_AI_MODE = "ai.transportMode"

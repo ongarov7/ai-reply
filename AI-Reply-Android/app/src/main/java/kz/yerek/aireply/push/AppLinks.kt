@@ -24,7 +24,7 @@ enum class AppScreen(val key: String) {
     PASTE_HELP("paste_help"),
     /** The support chat; Home until this build has it. */
     SUPPORT("support"),
-    /** Buying replies; Home until this build has it. */
+    /** «Докупить ответы»: packs and the pass. */
     PURCHASE("purchase");
 
     companion object {

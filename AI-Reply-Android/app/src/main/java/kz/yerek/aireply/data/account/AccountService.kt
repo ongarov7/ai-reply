@@ -3,6 +3,9 @@ package kz.yerek.aireply.data.account
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kz.yerek.aireply.billing.GooglePurchaseRequest
+import kz.yerek.aireply.billing.IapCatalogDto
+import kz.yerek.aireply.billing.PurchaseResultDto
 import kz.yerek.aireply.data.legal.StoredLegalConsent
 
 /**
@@ -294,6 +297,24 @@ class AccountService(
         val body = json.encodeToString(AIReportRequest.serializer(), report)
         decode(AIReportResultDto.serializer(), client().request("POST", "api/v1/ai/reports", body, token)).id
     }
+
+    // ------------------------------------------------ purchases (Google Play)
+
+    /** What is on sale for Android, and the account token purchases are bound to. */
+    suspend fun iapProducts(): IapCatalogDto = session.authenticated { token ->
+        decode(IapCatalogDto.serializer(), client().request("GET", "api/v1/iap/products?platform=android", token = token))
+    }
+
+    /**
+     * Hands a Play purchase to the server, which verifies it with Google,
+     * grants the replies and consumes it. 202 (a pending payment) answers
+     * `pending`; a repeat answers `already_granted`.
+     */
+    suspend fun verifyGooglePurchase(productId: String, purchaseToken: String): PurchaseResultDto =
+        session.authenticated { token ->
+            val body = json.encodeToString(GooglePurchaseRequest.serializer(), GooglePurchaseRequest(productId, purchaseToken))
+            decode(PurchaseResultDto.serializer(), client().request("POST", "api/v1/iap/google/purchases", body, token))
+        }
 
     // --------------------------------------- subscription (demo payment flow)
 

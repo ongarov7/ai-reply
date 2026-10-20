@@ -11,4 +11,44 @@
     <string name="balance_pass">Пропуск до %1$s</string>
     <string name="settings_account_plan_available">%1$s · доступно %2$d</string>
 
+    <!-- Purchases -->
+    <string name="purchase_title">Докупить ответы</string>
+    <string name="purchase_intro">Ответы из пакета не сгорают. Пропуск даёт ответы на ограниченное время.</string>
+    <string name="purchase_packs">Пакеты ответов</string>
+    <string name="purchase_passes">Пропуск</string>
+    <plurals name="purchase_units">
+        <item quantity="one">%d ответ</item>
+        <item quantity="few">%d ответа</item>
+        <item quantity="many">%d ответов</item>
+        <item quantity="other">%d ответа</item>
+    </plurals>
+    <plurals name="purchase_hours">
+        <item quantity="one">%d час</item>
+        <item quantity="few">%d часа</item>
+        <item quantity="many">%d часов</item>
+        <item quantity="other">%d часа</item>
+    </plurals>
+    <string name="purchase_pack_terms">Не сгорают</string>
+    <string name="purchase_pass_terms">%1$s на %2$s</string>
+    <string name="purchase_pass_conditions">Пропуск начинается сразу после покупки, а если уже идёт другой — когда тот закончится. Неиспользованные ответы пропуска сгорают в конце срока.</string>
+    <string name="purchase_buy_label">Купить: %1$s, %2$s</string>
+    <string name="purchase_pending_badge">Ожидает оплаты</string>
+    <string name="purchase_notice_granted">Ответы начислены.</string>
+    <string name="purchase_notice_pending">Оплата ожидает подтверждения. Ответы начислятся, когда Google Play её подтвердит.</string>
+    <string name="purchase_notice_cancelled">Покупка отменена.</string>
+    <string name="purchase_notice_failed">Google Play не смог провести покупку. Попробуй ещё раз.</string>
+    <string name="purchase_notice_unavailable">Google Play сейчас недоступен. Проверь подключение и попробуй ещё раз.</string>
+    <string name="purchase_notice_not_confirmed">Покупка не подтверждена, ответы не начислены.</string>
+    <string name="purchase_notice_other_account">Эта покупка относится к другому аккаунту AI Reply. Войди в него, чтобы её использовать.</string>
+    <string name="purchase_notice_retry_later">Покупка оплачена, но ещё не начислена. AI Reply завершит её, когда ты снова откроешь приложение.</string>
+    <string name="purchase_unavailable_title">Покупки сейчас недоступны</string>
+    <string name="purchase_unavailable_body">Проверь подключение к интернету и вход в Google Play, затем попробуй снова.</string>
+    <string name="purchase_off_body">Докупить ответы в приложении пока нельзя. Можно выбрать другой тариф.</string>
+    <string name="purchase_empty">Сейчас нечего купить.</string>
+    <string name="purchase_retry">Повторить</string>
+    <string name="purchase_see_plans">Посмотреть тарифы</string>
+    <string name="purchase_footer">Оплата проходит через Google Play, в валюте твоего аккаунта Google Play. Купленные ответы расходуются после ответов тарифа, пропуска и бесплатных.</string>
+    <string name="settings_debug_sample_store">Тестовый каталог покупок</string>
+    <string name="settings_debug_sample_store_footer">Только в отладочной сборке, после перезапуска приложения. «Докупить ответы» показывает примеры товаров и покупку, которая сразу проходит, без Google Play и сервера.</string>
+
 </resources>

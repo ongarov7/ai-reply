@@ -11,4 +11,40 @@
     <string name="balance_pass">Рұқсаттама: %1$s дейін</string>
     <string name="settings_account_plan_available">%1$s · %2$d қолжетімді</string>
 
+    <!-- Purchases -->
+    <string name="purchase_title">Жауап сатып алу</string>
+    <string name="purchase_intro">Пакеттегі жауаптар күймейді. Рұқсаттама жауаптарды белгілі бір уақытқа береді.</string>
+    <string name="purchase_packs">Жауап пакеттері</string>
+    <string name="purchase_passes">Рұқсаттама</string>
+    <plurals name="purchase_units">
+        <item quantity="one">%d жауап</item>
+        <item quantity="other">%d жауап</item>
+    </plurals>
+    <plurals name="purchase_hours">
+        <item quantity="one">%d сағат</item>
+        <item quantity="other">%d сағат</item>
+    </plurals>
+    <string name="purchase_pack_terms">Күймейді</string>
+    <string name="purchase_pass_terms">%1$s, мерзімі — %2$s</string>
+    <string name="purchase_pass_conditions">Рұқсаттама сатып алғаннан кейін бірден басталады, ал басқасы жүріп жатса — ол біткенде. Мерзім соңында қолданылмаған жауаптары күйеді.</string>
+    <string name="purchase_buy_label">Сатып алу: %1$s, %2$s</string>
+    <string name="purchase_pending_badge">Төлем күтілуде</string>
+    <string name="purchase_notice_granted">Жауаптар қосылды.</string>
+    <string name="purchase_notice_pending">Төлем расталуын күтуде. Google Play растағанда жауаптар қосылады.</string>
+    <string name="purchase_notice_cancelled">Сатып алу тоқтатылды.</string>
+    <string name="purchase_notice_failed">Google Play сатып алуды өткізе алмады. Қайта көріңіз.</string>
+    <string name="purchase_notice_unavailable">Google Play қазір қолжетімсіз. Байланысты тексеріп, қайта көріңіз.</string>
+    <string name="purchase_notice_not_confirmed">Сатып алу расталмады, жауаптар қосылмады.</string>
+    <string name="purchase_notice_other_account">Бұл сатып алу басқа AI Reply тіркелгісіне тиесілі. Оны пайдалану үшін сол тіркелгіге кіріңіз.</string>
+    <string name="purchase_notice_retry_later">Сатып алу төленді, бірақ әлі қосылмады. Қолданбаны қайта ашқанда AI Reply оны аяқтайды.</string>
+    <string name="purchase_unavailable_title">Қазір сатып алу қолжетімсіз</string>
+    <string name="purchase_unavailable_body">Интернетке қосылуды және Google Play-ге кіруді тексеріп, қайта көріңіз.</string>
+    <string name="purchase_off_body">Қолданбада жауап сатып алу әзірге мүмкін емес. Басқа тариф таңдауға болады.</string>
+    <string name="purchase_empty">Қазір сатылымда ештеңе жоқ.</string>
+    <string name="purchase_retry">Қайталау</string>
+    <string name="purchase_see_plans">Тарифтерді көру</string>
+    <string name="purchase_footer">Төлем Google Play арқылы, Google Play тіркелгіңіздің валютасында өтеді. Сатып алынған жауаптар тариф, рұқсаттама және тегін жауаптардан кейін жұмсалады.</string>
+    <string name="settings_debug_sample_store">Сынақ сатып алу каталогы</string>
+    <string name="settings_debug_sample_store_footer">Тек жөндеу нұсқасында, қолданбаны қайта іске қосқаннан кейін. «Жауап сатып алу» үлгі өнімдерді және Google Play мен серверсіз бірден өтетін сатып алуды көрсетеді.</string>
+
 </resources>

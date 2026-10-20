@@ -31,6 +31,7 @@ import kz.yerek.aireply.ui.common.AppScreen
 import kz.yerek.aireply.ui.common.Footnote
 import kz.yerek.aireply.ui.design.AppCard
 import kz.yerek.aireply.ui.design.AppSection
+import kz.yerek.aireply.ui.design.PrimaryButton
 import kz.yerek.aireply.ui.design.ReadableColumn
 import kz.yerek.aireply.ui.design.Spacing
 import java.time.LocalDate
@@ -55,7 +56,7 @@ import java.util.Locale
  * them for a plan the server marks purchasable.
  */
 @Composable
-fun SubscriptionScreen(onBack: () -> Unit) {
+fun SubscriptionScreen(onBack: () -> Unit, onBuy: () -> Unit = {}) {
     val services = LocalServices.current
     val account = services.account
     val state by account.state.collectAsStateWithLifecycle()
@@ -145,6 +146,11 @@ fun SubscriptionScreen(onBack: () -> Unit) {
                         BalanceRows(balance)
                     }
                 }
+            }
+
+            // Packs and the pass, only where the server sells them on Android.
+            if (services.purchasesOffered) {
+                PrimaryButton(stringResource(R.string.purchase_title), onClick = onBuy)
             }
 
             // Only worth a section when there is something besides the current plan.

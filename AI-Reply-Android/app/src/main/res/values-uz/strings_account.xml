@@ -11,4 +11,38 @@
     <string name="balance_pass">Ruxsatnoma: %1$s gacha</string>
     <string name="settings_account_plan_available">%1$s · %2$d ta mavjud</string>
 
+    <!-- Purchases -->
+    <string name="purchase_title">Javob sotib olish</string>
+    <string name="purchase_intro">Paketdagi javoblar kuymaydi. Ruxsatnoma javoblarni maʼlum vaqtga beradi.</string>
+    <string name="purchase_packs">Javob paketlari</string>
+    <string name="purchase_passes">Ruxsatnoma</string>
+    <plurals name="purchase_units">
+        <item quantity="one">%d ta javob</item>
+        <item quantity="other">%d ta javob</item>
+    </plurals>
+    <plurals name="purchase_hours">
+        <item quantity="one">%d soat</item>
+        <item quantity="other">%d soat</item>
+    </plurals>
+    <string name="purchase_pack_terms">Kuymaydi</string>
+    <string name="purchase_pass_terms">%1$s, muddati — %2$s</string>
+    <string name="purchase_pass_conditions">Ruxsatnoma xariddan soʻng darhol boshlanadi, boshqasi davom etayotgan boʻlsa — u tugaganda. Muddat oxirida ishlatilmagan javoblari kuyadi.</string>
+    <string name="purchase_buy_label">Sotib olish: %1$s, %2$s</string>
+    <string name="purchase_pending_badge">Toʻlov kutilmoqda</string>
+    <string name="purchase_notice_granted">Javoblar qoʻshildi.</string>
+    <string name="purchase_notice_pending">Toʻlov tasdiqlanishi kutilmoqda. Google Play tasdiqlaganda javoblar qoʻshiladi.</string>
+    <string name="purchase_notice_cancelled">Xarid bekor qilindi.</string>
+    <string name="purchase_notice_failed">Google Play xaridni amalga oshira olmadi. Qayta urinib koʻring.</string>
+    <string name="purchase_notice_unavailable">Google Play hozir mavjud emas. Ulanishni tekshirib, qayta urinib koʻring.</string>
+    <string name="purchase_notice_not_confirmed">Xarid tasdiqlanmadi, javoblar qoʻshilmadi.</string>
+    <string name="purchase_notice_other_account">Bu xarid boshqa AI Reply hisobiga tegishli. Undan foydalanish uchun oʻsha hisobga kiring.</string>
+    <string name="purchase_notice_retry_later">Xarid toʻlangan, lekin hali qoʻshilmagan. Ilovani qayta ochganingizda AI Reply uni yakunlaydi.</string>
+    <string name="purchase_unavailable_title">Hozir xarid qilib boʻlmaydi</string>
+    <string name="purchase_unavailable_body">Internetga ulanishni va Google Play’ga kirganingizni tekshirib, qayta urinib koʻring.</string>
+    <string name="purchase_off_body">Ilovada javob sotib olish hozircha mumkin emas. Boshqa tarif tanlash mumkin.</string>
+    <string name="purchase_empty">Hozircha sotuvda hech narsa yoʻq.</string>
+    <string name="purchase_retry">Qayta urinish</string>
+    <string name="purchase_see_plans">Tariflarni koʻrish</string>
+    <string name="purchase_footer">Toʻlov Google Play orqali, Google Play hisobingiz valyutasida amalga oshiriladi. Sotib olingan javoblar tarif, ruxsatnoma va bepul javoblardan keyin sarflanadi.</string>
+
 </resources>

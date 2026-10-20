@@ -16,4 +16,40 @@
     <string name="balance_pass">Pass until %1$s</string>
     <string name="settings_account_plan_available">%1$s · %2$d available</string>
 
+    <!-- Purchases -->
+    <string name="purchase_title">Buy replies</string>
+    <string name="purchase_intro">Replies from a pack never expire. A pass gives replies for a set time.</string>
+    <string name="purchase_packs">Reply packs</string>
+    <string name="purchase_passes">Pass</string>
+    <plurals name="purchase_units">
+        <item quantity="one">%d reply</item>
+        <item quantity="other">%d replies</item>
+    </plurals>
+    <plurals name="purchase_hours">
+        <item quantity="one">%d hour</item>
+        <item quantity="other">%d hours</item>
+    </plurals>
+    <string name="purchase_pack_terms">Never expire</string>
+    <string name="purchase_pass_terms">%1$s for %2$s</string>
+    <string name="purchase_pass_conditions">A pass starts right after the purchase, or when the pass you have now ends. Its replies left at the end are gone.</string>
+    <string name="purchase_buy_label">Buy %1$s for %2$s</string>
+    <string name="purchase_pending_badge">Payment pending</string>
+    <string name="purchase_notice_granted">Replies added.</string>
+    <string name="purchase_notice_pending">The payment is pending. The replies are added when Google Play confirms it.</string>
+    <string name="purchase_notice_cancelled">Purchase cancelled.</string>
+    <string name="purchase_notice_failed">Google Play could not complete the purchase. Try again.</string>
+    <string name="purchase_notice_unavailable">Google Play is not available right now. Check the connection and try again.</string>
+    <string name="purchase_notice_not_confirmed">The purchase was not confirmed, so no replies were added.</string>
+    <string name="purchase_notice_other_account">This purchase belongs to another AI Reply account. Sign in to that account to use it.</string>
+    <string name="purchase_notice_retry_later">The purchase is paid but not added yet. AI Reply finishes it the next time you open the app.</string>
+    <string name="purchase_unavailable_title">Purchases are not available right now</string>
+    <string name="purchase_unavailable_body">Check the connection and that Google Play is signed in, then try again.</string>
+    <string name="purchase_off_body">Replies cannot be bought in the app yet. You can choose another plan.</string>
+    <string name="purchase_empty">Nothing is on sale right now.</string>
+    <string name="purchase_retry">Try again</string>
+    <string name="purchase_see_plans">See plans</string>
+    <string name="purchase_footer">Payment goes through Google Play, in your Google Play currency. Bought replies are used after the plan’s, the pass’s and the free ones.</string>
+    <string name="settings_debug_sample_store">Sample purchase catalogue</string>
+    <string name="settings_debug_sample_store_footer">Debug build only, after a restart of the app. Buy replies shows sample products and a purchase that completes at once, without Google Play or the server.</string>
+
 </resources>

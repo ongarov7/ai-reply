@@ -23,9 +23,11 @@ object Routes {
     const val Permissions = "permissions"
     /** How paste works on Android. */
     const val PasteHelp = "paste_help"
+    /** «Докупить ответы»: packs and the pass through Google Play. */
+    const val Purchase = "purchase"
 
     /** DEBUG builds: the screens that can be opened before sign-in for a review (see MainActivity). */
-    val Reviewable = setOf(Home, Settings, Compose, Permissions, PasteHelp, KeyboardSetup, Profile, Templates, WorkingHours, Subscription)
+    val Reviewable = setOf(Home, Settings, Compose, Permissions, PasteHelp, KeyboardSetup, Profile, Templates, WorkingHours, Subscription, Purchase)
 
     fun templateEditor(id: String) = "$TemplateEditor/$id"
     const val TemplateEditorPattern = "$TemplateEditor/{id}"

@@ -45,9 +45,8 @@ class PendingNavigation {
             AppScreen.PASTE_HELP -> Routes.PasteHelp
             // Not in this build yet: the app opens, as an older build does for any new screen.
             AppScreen.SUPPORT -> Routes.Home
-            // Until the purchase screen exists, the plans: the keyboard's «Открыть AI Reply»
-            // on a spent limit must reach more replies, never Home.
-            AppScreen.PURCHASE -> Routes.Subscription
+            // With purchases off the screen says so and leads to the plans: never Home.
+            AppScreen.PURCHASE -> Routes.Purchase
         }
 
         /**

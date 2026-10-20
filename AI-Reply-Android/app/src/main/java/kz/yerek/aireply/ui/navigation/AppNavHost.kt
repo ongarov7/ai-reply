@@ -26,6 +26,7 @@ import kz.yerek.aireply.ui.feature.account.AccountController
 import kz.yerek.aireply.ui.feature.account.EmailSignInScreen
 import kz.yerek.aireply.ui.feature.account.RegistrationStepScreen
 import kz.yerek.aireply.ui.feature.account.LegalConsentScreen
+import kz.yerek.aireply.ui.feature.account.PurchaseScreen
 import kz.yerek.aireply.ui.feature.account.SignInScreen
 import kz.yerek.aireply.ui.feature.account.SubscriptionScreen
 import kz.yerek.aireply.ui.feature.account.VerifyCodeScreen
@@ -154,7 +155,20 @@ fun AppNavHost(debugScreen: String? = null) {
         composable(Routes.Profile) { ProfileScreen(onBack = navController::popBackStack) }
         composable(Routes.WorkingHours) { WorkingHoursScreen(onBack = navController::popBackStack) }
         composable(Routes.KeyboardSetup) { KeyboardSetupScreen(onBack = navController::popBackStack) }
-        composable(Routes.Subscription) { SubscriptionScreen(onBack = navController::popBackStack) }
+        composable(Routes.Subscription) {
+            SubscriptionScreen(onBack = navController::popBackStack, onBuy = { navController.navigate(Routes.Purchase) })
+        }
+        composable(Routes.Purchase) {
+            PurchaseScreen(
+                onBack = navController::popBackStack,
+                onOpenPlans = {
+                    // From the plan screen, back there; from anywhere else, on to it.
+                    if (!navController.popBackStack(Routes.Subscription, inclusive = false)) {
+                        navController.navigate(Routes.Subscription)
+                    }
+                }
+            )
+        }
         composable(Routes.Permissions) {
             PermissionsScreen(
                 onBack = navController::popBackStack,
