@@ -685,7 +685,7 @@
  "sim.keyboard.b_instruction": "what the user wants to say, in their own words.",
  "sim.keyboard.b_mic": "Android only: dictate the instruction; recognition happens on the device.",
  "sim.keyboard.b_quote": "the text the reply is written for, quoted as data and never obeyed as an instruction.",
- "sim.keyboard.b_templates": "client, partner, colleague, friend — each carries its own tone and length.",
+ "sim.keyboard.b_templates": "friend, client, colleague, partner — each carries its own tone and length.",
  "sim.keyboard.lede": "The keyboard is the product. Everything a user needs happens without leaving the messenger.",
  "sim.keyboard.limits_body": "The copied message is capped at 400 characters and the instruction at 400, enforced on the server and adjustable in the admin panel. Replies are one to four short sentences — messenger length, not email length.",
  "sim.keyboard.limits_title": "Hard limits",

@@ -685,7 +685,7 @@
  "sim.keyboard.b_instruction": "nima deyish kerakligini o‘z so‘zingiz bilan.",
  "sim.keyboard.b_mic": "faqat Android: ko‘rsatmani ayting, tanib olish qurilmada ketadi.",
  "sim.keyboard.b_quote": "javob yoziladigan matn: u ma’lumot sifatida keltiriladi, ko‘rsatma sifatida bajarilmaydi.",
- "sim.keyboard.b_templates": "mijoz, hamkor, hamkasb, do‘st — har birining o‘z ohangi va uzunligi bor.",
+ "sim.keyboard.b_templates": "doʻst, mijoz, hamkasb, hamkor — har birining o‘z ohangi va uzunligi bor.",
  "sim.keyboard.lede": "Klaviaturaning o‘zi — mahsulot. Kerakli hamma narsa messenjerdan chiqmasdan bajariladi.",
  "sim.keyboard.limits_body": "Nusxalangan xabar — 400 belgigacha, ko‘rsatma — 400 gacha; buni server tekshiradi, cheklov esa admin panelida o‘zgaradi. Javob — bir-to‘rt qisqa gap: xat emas, messenjer uzunligi.",
  "sim.keyboard.limits_title": "Qat’iy cheklovlar",

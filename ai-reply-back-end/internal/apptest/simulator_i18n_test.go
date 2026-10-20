@@ -179,3 +179,33 @@ func TestSimulatorLocalesHaveTheSameKeys(t *testing.T) {
 		}
 	}
 }
+
+// Пернетақта сипаттамасы алушыларды чиптердегідей атайды және сол ретпен.
+// The anatomy line lists the sim.template.* labels in keyboard.js TEMPLATES
+// order, spelled as on the chips (uz doʻst with U+02BB), so a reorder or a
+// renamed chip cannot leave the explanation behind.
+func TestSimulatorTemplateListFollowsTheChips(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "transport", "web", "static", "simulator", "keyboard.js"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	match := regexp.MustCompile(`var TEMPLATES = \[([^\]]*)\]`).FindSubmatch(raw)
+	if match == nil {
+		t.Fatal("keyboard.js has no TEMPLATES list")
+	}
+	ids := regexp.MustCompile(`"([a-z]+)"`).FindAllStringSubmatch(string(match[1]), -1)
+	if len(ids) != 4 || ids[0][1] != "friend" {
+		t.Fatalf("TEMPLATES = %s, want the four built-ins starting with friend", match[1])
+	}
+	for _, locale := range domain.Locales {
+		messages := loadLocale(t, locale)
+		names := make([]string, 0, len(ids))
+		for _, id := range ids {
+			names = append(names, strings.ToLower(messages["sim.template."+id[1]]))
+		}
+		want := strings.Join(names, ", ") + " — "
+		if got := messages["sim.keyboard.b_templates"]; !strings.HasPrefix(strings.ToLower(got), want) {
+			t.Errorf("%s sim.keyboard.b_templates = %q, want it to start with %q", locale, got, want)
+		}
+	}
+}
