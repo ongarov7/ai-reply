@@ -587,6 +587,11 @@ func TestQuotaNoticesWaitForTheWelcomeBonus(t *testing.T) {
 	if h.notices(s.userID, domain.TypeQuotaExhausted) != 1 || h.notices(s.userID, domain.TypeQuotaLow) != 0 {
 		t.Fatal("the exhausted notice did not come once the bonus was spent")
 	}
+	// The push lives to the end of its day in Almaty (14:00 now), as any quota notice.
+	h.tick()
+	if out := h.pushesOf(domain.TypeQuotaExhausted); len(out) != 1 || out[0].TTL != 10*time.Hour {
+		t.Fatalf("exhausted push = %+v", out)
+	}
 	mustStatus(t, h.generate(s.access, "Артық"), http.StatusTooManyRequests, "DAILY_LIMIT_REACHED")
 	if h.notices(s.userID, domain.TypeQuotaExhausted) != 1 {
 		t.Fatal("the exhausted notice came twice")

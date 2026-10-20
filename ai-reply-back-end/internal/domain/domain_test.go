@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"slices"
 	"testing"
 	"time"
 )
@@ -38,5 +39,28 @@ func TestRemainingTotalAddsTheExtraBuckets(t *testing.T) {
 	spent := b.Spent()
 	if spent.Extra() != 0 || !spent.HasWelcome || spent.WelcomeTotal != 50 || !spent.PassActive || spent.PassExpiresAt != &end {
 		t.Fatalf("spent = %+v", spent)
+	}
+}
+
+// Deep link экрандары мен автоматты түрлер бір-бір реттен (бірнеше тармақ бір тізімге қосқан).
+func TestLinkScreensAndAutomaticTypesAreListedOnce(t *testing.T) {
+	for name, list := range map[string][]string{"LinkScreens": LinkScreens, "AutomaticNotificationTypes": AutomaticNotificationTypes} {
+		seen := map[string]bool{}
+		for _, v := range list {
+			if seen[v] {
+				t.Errorf("%s lists %q twice", name, v)
+			}
+			seen[v] = true
+		}
+	}
+	for _, screen := range []string{"onboarding", "permissions", "paste_help", "support", "purchase", "keyboard"} {
+		if !slices.Contains(LinkScreens, screen) {
+			t.Errorf("LinkScreens has no %q", screen)
+		}
+	}
+	for _, kind := range append(append([]string{}, AdminReminderTypes...), TypeSupportReply, TypeQuotaLow) {
+		if !slices.Contains(AutomaticNotificationTypes, kind) {
+			t.Errorf("AutomaticNotificationTypes has no %q", kind)
+		}
 	}
 }
