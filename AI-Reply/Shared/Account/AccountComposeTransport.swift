@@ -11,10 +11,15 @@ struct AccountComposeTransport: ComposeTransport {
 
     private let session: AccountSession
     private let onUsage: (@Sendable (AccountAPI.Usage) -> Void)?
+    /// This action's key: a transport is made for one tap on Write or
+    /// Regenerate. nil for a server that takes none.
+    let idempotencyKey: IdempotencyKey?
 
-    init(session: AccountSession = .shared, onUsage: (@Sendable (AccountAPI.Usage) -> Void)? = nil) {
+    init(session: AccountSession = .shared, onUsage: (@Sendable (AccountAPI.Usage) -> Void)? = nil,
+         idempotencyKey: IdempotencyKey? = IdempotencyKey.forAction()) {
         self.session = session
         self.onUsage = onUsage
+        self.idempotencyKey = idempotencyKey
     }
 
     /// The wire format, exposed so tests can pin it without a server.
@@ -55,11 +60,15 @@ struct AccountComposeTransport: ComposeTransport {
         guard let baseURL = AIConfiguration.shared.backendBaseURL else { throw AIReplyError.notConfigured }
         guard session.isSignedIn else { throw AIReplyError.authenticationFailed }
 
-        let client = APIClient(baseURL: baseURL)
         let body = Self.body(for: request)
+        let session = self.session
         do {
-            let response: AccountAPI.ComposeResponse = try await session.authenticated { token in
-                try await client.post("api/v1/ai/compose", body: body, token: token)
+            // The same key on every automatic retry of this one tap.
+            let response: AccountAPI.ComposeResponse = try await IdempotentGeneration.run(key: idempotencyKey) { headers in
+                let client = APIClient(baseURL: baseURL, headers: headers)
+                return try await session.authenticated { token in
+                    try await client.post("api/v1/ai/compose", body: body, token: token)
+                }
             }
             onUsage?(response.usage)
             let text = ReplyNetworking.unwrapQuotes(response.text.trimmingCharacters(in: .whitespacesAndNewlines))

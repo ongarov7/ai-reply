@@ -260,6 +260,9 @@
 		84F80AD89B955ADE9E787B90 /* BalanceSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 294937702348AB8BD23AD36A /* BalanceSummary.swift */; };
 		F0B3F31ECC7FC25CF40A6730 /* DebugPreviews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A03EC78FD6C7E23ADF340031 /* DebugPreviews.swift */; };
 		107AD2C8CC69E8F96DFDB07A /* BalanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63333DA3CF26D22FBD3FE8F0 /* BalanceTests.swift */; };
+		49735F832440D079095A5B97 /* IdempotentGeneration.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCD7EF8C6C739F02684EC025 /* IdempotentGeneration.swift */; };
+		BDB8A0F778B029EE9F70204E /* IdempotentGeneration.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCD7EF8C6C739F02684EC025 /* IdempotentGeneration.swift */; };
+		78E25949DDAB442F504D0836 /* IdempotentGenerationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 626C504F1201997F388B5000 /* IdempotentGenerationTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -488,6 +491,8 @@
 		294937702348AB8BD23AD36A /* BalanceSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalanceSummary.swift; sourceTree = "<group>"; };
 		A03EC78FD6C7E23ADF340031 /* DebugPreviews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugPreviews.swift; sourceTree = "<group>"; };
 		63333DA3CF26D22FBD3FE8F0 /* BalanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalanceTests.swift; sourceTree = "<group>"; };
+		BCD7EF8C6C739F02684EC025 /* IdempotentGeneration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdempotentGeneration.swift; sourceTree = "<group>"; };
+		626C504F1201997F388B5000 /* IdempotentGenerationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdempotentGenerationTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -713,6 +718,7 @@
 				1C7BF0E701DE12AC67EF64F9 /* EmojiPageTests.swift */,
 				D7B75D514737294D9F090817 /* ComposeRecipientTests.swift */,
 				63333DA3CF26D22FBD3FE8F0 /* BalanceTests.swift */,
+				626C504F1201997F388B5000 /* IdempotentGenerationTests.swift */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -830,6 +836,7 @@
 				529BEB6124D96188138ECB04 /* AccountUsageCache.swift */,
 				94119A8D52BF1767B41BF8FE /* APIClient.swift */,
 				2C627773261B58DC45585ADB /* AccountPolishTransport.swift */,
+				BCD7EF8C6C739F02684EC025 /* IdempotentGeneration.swift */,
 			);
 			path = Account;
 			sourceTree = "<group>";
@@ -1127,6 +1134,7 @@
 				07C2781A7D97BA519F4F5657 /* EmojiPageTests.swift in Sources */,
 				AE273F46E8285DAB6423B51B /* ComposeRecipientTests.swift in Sources */,
 				107AD2C8CC69E8F96DFDB07A /* BalanceTests.swift in Sources */,
+				78E25949DDAB442F504D0836 /* IdempotentGenerationTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1208,6 +1216,7 @@
 				EE255AFCFDA0B09C82D4B35A /* EmojiCatalog.swift in Sources */,
 				D3076F12FF75E6715B086204 /* EmojiPageLayout.swift in Sources */,
 				229B82F0F189E7A56F1861EC /* EmojiKeyboardView.swift in Sources */,
+				BDB8A0F778B029EE9F70204E /* IdempotentGeneration.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1333,6 +1342,7 @@
 				39757DE09E8F2660D27FD8B5 /* OnboardingConnectStep.swift in Sources */,
 				84F80AD89B955ADE9E787B90 /* BalanceSummary.swift in Sources */,
 				F0B3F31ECC7FC25CF40A6730 /* DebugPreviews.swift in Sources */,
+				49735F832440D079095A5B97 /* IdempotentGeneration.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

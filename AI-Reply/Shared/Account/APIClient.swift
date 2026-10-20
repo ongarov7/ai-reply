@@ -57,6 +57,11 @@ enum APIError: Error, Equatable, Sendable {
     case instructionMissing
     case notFound
     case conflict
+    /// 409 on a generation: the same Idempotency-Key is still being answered.
+    case generationInProgress
+    /// 409 on a generation: this Idempotency-Key was paid for and replayed
+    /// already; only a new action (a new key) generates again.
+    case generationKeyUsed
     case server
     /// The client could not make sense of the response at all.
     case malformedResponse
@@ -200,8 +205,11 @@ struct APIClient: Sendable {
             let field: String?
             let maxCharacters: Int?
             let attemptsRemaining: Int?
+            /// Why a field was refused or conflicted (`in_progress`, `used`, …).
+            let reason: String?
 
             enum CodingKeys: String, CodingKey {
+                case reason
                 case dailyLimit = "daily_limit"
                 case usedToday = "used_today"
                 case resetsAt = "resets_at"
@@ -255,7 +263,15 @@ struct APIClient: Sendable {
             }
             return .invalidRequest
         case "NOT_FOUND":                       return .notFound
-        case "CONFLICT":                        return .conflict
+        case "CONFLICT":
+            if details?.field == "idempotency_key" {
+                switch details?.reason {
+                case "in_progress": return .generationInProgress
+                case "used":        return .generationKeyUsed
+                default:            break
+                }
+            }
+            return .conflict
         default: break
         }
 

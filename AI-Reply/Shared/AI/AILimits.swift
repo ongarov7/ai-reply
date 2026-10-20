@@ -53,6 +53,7 @@ extension AILimits {
         static let senderProfile = "ai.features.senderProfile"
         static let instructionPolish = "ai.features.instructionPolish"
         static let aiReports = "ai.features.aiReports"
+        static let idempotentGeneration = "ai.features.idempotentGeneration"
     }
 
     private static let lock = NSLock()
@@ -141,6 +142,13 @@ extension AILimits {
         AppGroup.defaults.bool(forKey: Key.aiReports)
     }
 
+    /// Whether `/ai/reply` and `/ai/compose` take an `Idempotency-Key`: only
+    /// then does a generation carry one, and only then is it ever retried
+    /// by itself.
+    static var serverSupportsIdempotentGeneration: Bool {
+        AppGroup.defaults.bool(forKey: Key.idempotentGeneration)
+    }
+
     /// Stores the request-shaping flags. Anything the server did not publish
     /// is false: a field is only ever sent to a server that asked for it.
     static func storeFeatures(_ features: AccountAPI.Features?, defaults: UserDefaults = AppGroup.defaults) {
@@ -148,6 +156,7 @@ extension AILimits {
         defaults.set(features?.senderProfile ?? false, forKey: Key.senderProfile)
         defaults.set(features?.instructionPolish ?? false, forKey: Key.instructionPolish)
         defaults.set(features?.aiReports ?? false, forKey: Key.aiReports)
+        defaults.set(features?.idempotentGeneration ?? false, forKey: Key.idempotentGeneration)
     }
 
     /// Everything `/api/v1/config` publishes that the reply flow uses,

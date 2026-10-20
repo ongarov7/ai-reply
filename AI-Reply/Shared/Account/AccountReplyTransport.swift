@@ -55,15 +55,20 @@ struct AccountReplyTransport: ReplyTransport {
     private let context: RequestContext
     private let session: AccountSession
     private let onUsage: (@Sendable (AccountAPI.Usage) -> Void)?
+    /// This action's key: a transport is made for one tap on Reply or
+    /// Regenerate. nil for a server that takes none.
+    let idempotencyKey: IdempotencyKey?
 
     init(
         context: RequestContext,
         session: AccountSession = .shared,
-        onUsage: (@Sendable (AccountAPI.Usage) -> Void)? = nil
+        onUsage: (@Sendable (AccountAPI.Usage) -> Void)? = nil,
+        idempotencyKey: IdempotencyKey? = IdempotencyKey.forAction()
     ) {
         self.context = context
         self.session = session
         self.onUsage = onUsage
+        self.idempotencyKey = idempotencyKey
     }
 
     // MARK: Wire format
@@ -220,12 +225,16 @@ struct AccountReplyTransport: ReplyTransport {
         }
         guard session.isSignedIn else { throw AIReplyError.authenticationFailed }
 
-        let client = APIClient(baseURL: baseURL)
         let body = Self.body(for: context)
+        let session = self.session
 
         do {
-            let response: AccountAPI.ReplyResponse = try await session.authenticated { token in
-                try await client.post("api/v1/ai/reply", body: body, token: token)
+            // The same key on every automatic retry of this one tap.
+            let response: AccountAPI.ReplyResponse = try await IdempotentGeneration.run(key: idempotencyKey) { headers in
+                let client = APIClient(baseURL: baseURL, headers: headers)
+                return try await session.authenticated { token in
+                    try await client.post("api/v1/ai/reply", body: body, token: token)
+                }
             }
             onUsage?(response.usage)
 
@@ -266,6 +275,9 @@ struct AccountReplyTransport: ReplyTransport {
         case .dailyLimitReached, .subscriptionExpired, .paymentRequired:
             return .quotaExhausted
         case .monthlyLimitReached:     return .monthlyQuotaExhausted
+        // Our own earlier attempt was still being written after the waits:
+        // like an answer that did not come in time.
+        case .generationInProgress:    return .timedOut
         case .consentRequired:         return .consentRequired
         case .rateLimited:             return .rateLimited
         case .emptyResponse:           return .emptyResponse
