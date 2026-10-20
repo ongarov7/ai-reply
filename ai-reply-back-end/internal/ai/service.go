@@ -85,6 +85,8 @@ type Request struct {
 	Business      WorkingHours
 	Platform      string
 	AppVersion    string
+	// IdempotencyKey — Idempotency-Key тақырыбы ("" — кілтсіз): бір әрекетке бір төлем.
+	IdempotencyKey string
 }
 
 // Result — клиентке қайтатын нәтиже.
@@ -106,6 +108,11 @@ type Result struct {
 	SourceLimit int
 	// InstructionLimit — compose нұсқауы шектен асқанда (ErrInstructionTooLong).
 	InstructionLimit int
+	// Balance — тарифтен тыс қалдық осы сұраныстан кейін (лимит қатесінде — бос).
+	Balance domain.CreditBalance
+	// Bucket — генерацияны не төледі: daily | pass | welcome | admin | pack
+	// (кілт қайталанғанда — алғашқы төлемнің бөлігі).
+	Bucket string
 }
 
 // Сұраныс режимдері. Usage оқиғасында сақталады; reply мен compose бір
@@ -141,6 +148,8 @@ type call struct {
 	AppVersion string
 	// Chars — пайдаланушы мәтінінің ұзындығы (хабарлама не нұсқау), тек сан.
 	Chars int
+	// Key — Idempotency-Key ("" — кілтсіз).
+	Key string
 }
 
 // Reply — негізгі сценарий.
@@ -186,12 +195,19 @@ func (s *Service) Reply(ctx context.Context, req Request) (Result, error) {
 		Platform:   req.Platform,
 		AppVersion: req.AppVersion,
 		Chars:      traits.RuneLen(source),
+		Key:        req.IdempotencyKey,
 	}, prompt, started)
 }
 
 // generate — reply мен compose-қа ортақ жол: квота брондау → провайдер, тазарту,
 // тексеру, қажет болса түзету (Complete) → токен есебі → оқиға → журнал.
 // Түзету болса да квота бір рет жұмсалады, ал екі шақырудың токені есептеледі.
+//
+// The reservation picks the bucket (plan, pass, welcome, admin, pack) and is
+// committed once the text is ready or refunded to the same bucket when it is
+// not. A key that already paid generates again without a charge (Replay); its
+// failure only gives the free regeneration back. Neither the text nor the
+// key's outcome is cached: a replay is a fresh generation.
 func (s *Service) generate(ctx context.Context, c call, prompt Prompt, started time.Time) (Result, error) {
 	entitlement, err := s.subs.Entitlement(ctx, c.User.ID)
 	if err != nil {
@@ -199,9 +215,18 @@ func (s *Service) generate(ctx context.Context, c call, prompt Prompt, started t
 	}
 	date, month := s.subs.Keys(started)
 
-	usedDay, usedMonth, err := s.repo.ReserveQuota(ctx, c.User.ID, date, month,
-		entitlement.DailyLimit, entitlement.MonthlyLimit)
+	res, err := s.repo.ReserveGeneration(ctx, repository.ReserveInput{
+		UserID: c.User.ID, Key: c.Key, Mode: c.Mode, Date: date, Month: month,
+		DailyLimit: entitlement.DailyLimit, MonthlyLimit: entitlement.MonthlyLimit, Now: started,
+	})
 	if err != nil {
+		if !isQuotaRefusal(err) {
+			// A duplicate key or a database error: nothing was charged and
+			// nothing reached the provider.
+			return Result{}, err
+		}
+		// Every bucket was empty at that moment; only the pass window remains.
+		entitlement.Balance = entitlement.Balance.Spent()
 		s.record(ctx, c, entitlement, "error", errorCode(err), prompt.Version, Completion{}, 0)
 		s.quotaRefused(ctx, c.User, entitlement, date, month, err)
 		return Result{
@@ -210,6 +235,7 @@ func (s *Service) generate(ctx context.Context, c call, prompt Prompt, started t
 			MonthlyLimit: entitlement.MonthlyLimit,
 			UsedMonth:    entitlement.UsedMonth,
 			ResetsAt:     entitlement.ResetsAt,
+			Balance:      entitlement.Balance,
 		}, err
 	}
 
@@ -223,12 +249,18 @@ func (s *Service) generate(ctx context.Context, c call, prompt Prompt, started t
 
 	if providerErr != nil {
 		// Жауап алынбады — бронды қайтарамыз (қайталау кезінде екі рет есептелмейді).
-		if err := s.repo.RefundQuota(ctx, c.User.ID, date, month); err != nil {
-			s.log.Error("quota refund failed", "user_id", c.User.ID, "error", err.Error())
-		}
+		s.release(ctx, c, res)
 		s.record(ctx, c, entitlement, "error", errorCode(providerErr), prompt.Version, Completion{}, latency)
 		s.logFailure(c, prompt.Version, errorCode(providerErr), latency)
 		return Result{}, providerErr
+	}
+	if !res.Replay {
+		if ok, err := s.repo.CommitGeneration(ctx, res.ID, s.clock.Now()); err != nil {
+			s.log.Error("generation commit failed", "user_id", c.User.ID, "error", err.Error())
+		} else if !ok {
+			// The stale sweep gave it back already: the person got this one for free.
+			s.log.Warn("generation commit found no reservation", "user_id", c.User.ID, "bucket", res.Bucket)
+		}
 	}
 	if outcome.RepairAttempted {
 		s.log.Info("ai_reply_repaired", "user_id", c.User.ID, "mode", c.Mode,
@@ -246,11 +278,12 @@ func (s *Service) generate(ctx context.Context, c call, prompt Prompt, started t
 		"target_language", prompt.Quality.Target.Lang, "language_source", prompt.Quality.Target.Source,
 		"platform", c.Platform, "app_version", c.AppVersion, "latency_ms", latency,
 		"input_tokens", completion.InputTokens, "output_tokens", completion.OutputTokens,
-		"repaired", outcome.Repaired, "truncated", outcome.Truncated)
+		"repaired", outcome.Repaired, "truncated", outcome.Truncated,
+		"bucket", res.Bucket, "replay", res.Replay)
 
 	usage := entitlement
-	usage.UsedToday, usage.UsedMonth = usedDay, usedMonth
-	if s.quota != nil {
+	usage.UsedToday, usage.UsedMonth, usage.Balance = res.UsedToday, res.UsedMonth, res.Balance
+	if s.quota != nil && !res.Replay {
 		s.quota.QuotaUsed(ctx, c.User, usage, date, month)
 	}
 
@@ -267,7 +300,27 @@ func (s *Service) generate(ctx context.Context, c call, prompt Prompt, started t
 		UsedMonth:        usage.UsedMonth,
 		ResetsAt:         entitlement.ResetsAt,
 		LatencyMS:        latency,
+		Balance:          usage.Balance,
+		Bucket:           res.Bucket,
 	}, nil
+}
+
+// release — жауап жоқ: брон төлеген бөлікке қайтады, тегін қайталау кілтке қайтарылады.
+func (s *Service) release(ctx context.Context, c call, res repository.Reservation) {
+	if res.Replay {
+		if err := s.repo.ReleaseReplay(ctx, res.ID, s.clock.Now()); err != nil {
+			s.log.Error("replay release failed", "user_id", c.User.ID, "error", err.Error())
+		}
+		return
+	}
+	if _, err := s.repo.RefundGeneration(ctx, res.ID, s.clock.Now()); err != nil {
+		s.log.Error("quota refund failed", "user_id", c.User.ID, "bucket", res.Bucket, "error", err.Error())
+	}
+}
+
+// isQuotaRefusal — барлық бөлік бос (DAILY_LIMIT_REACHED / MONTHLY_LIMIT_REACHED).
+func isQuotaRefusal(err error) bool {
+	return errors.Is(err, domain.ErrDailyLimit) || errors.Is(err, domain.ErrMonthlyLimit)
 }
 
 // quotaRefused — брон лимитке тірелді: квота бітті деген хабарлама (сол күннің кілтімен,

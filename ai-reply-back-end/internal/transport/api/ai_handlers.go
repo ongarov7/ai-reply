@@ -1,8 +1,11 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"net/http"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/aireply/ai-reply-back-end/internal/ai"
@@ -47,6 +50,24 @@ type replyResponse struct {
 	Usage            usageDTO `json:"usage"`
 }
 
+// idempotencyKeyPattern — Idempotency-Key пішіні (transcribe request_id-мен бірдей).
+var idempotencyKeyPattern = regexp.MustCompile(`^[A-Za-z0-9-]{8,64}$`)
+
+// idempotencyKey — Idempotency-Key тақырыбы: "" — жоқ, қате пішін — 400 (idempotency_key, format).
+//
+// A header, not a body field: bodies are decoded strictly, and an older
+// server simply ignores an unknown header (features.idempotent_generation).
+func idempotencyKey(r *http.Request) (string, error) {
+	key := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
+	if key == "" {
+		return "", nil
+	}
+	if !idempotencyKeyPattern.MatchString(key) {
+		return "", domain.InvalidField("idempotency_key", "format")
+	}
+	return key, nil
+}
+
 // handleReply — негізгі AI эндпоинті.
 //
 // Мәтін тек жадта өңделеді: сұраныс денесі журналға да, дерекқорға да жазылмайды.
@@ -54,6 +75,11 @@ func (s *Server) handleReply(w http.ResponseWriter, r *http.Request) {
 	user, _ := UserFrom(r.Context())
 	var body replyRequest
 	if err := httpx.Decode(w, r, s.cfg.Limits.RequestBodyBytes, &body); err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	key, err := idempotencyKey(r)
+	if err != nil {
 		httpx.Fail(w, err)
 		return
 	}
@@ -98,23 +124,24 @@ func (s *Server) handleReply(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result, err := s.ai.Reply(r.Context(), ai.Request{
-		User:          user,
-		DeviceID:      DeviceFrom(r.Context()),
-		SourceText:    body.SourceText,
-		Instruction:   body.Instruction,
-		Language:      body.Language,
-		InputLanguage: ai.InputLanguage(body.InputLanguage),
-		TemplateID:    body.TemplateID,
-		Profile:       promptProfile,
-		Template:      body.Template.toDomain(promptProfile.PreferredTone),
-		Business:      body.Business.toDomain(),
-		Platform:      traits.Clamp(body.Platform, 16),
-		AppVersion:    traits.Clamp(body.AppVersion, 32),
+		User:           user,
+		DeviceID:       DeviceFrom(r.Context()),
+		SourceText:     body.SourceText,
+		Instruction:    body.Instruction,
+		Language:       body.Language,
+		InputLanguage:  ai.InputLanguage(body.InputLanguage),
+		TemplateID:     body.TemplateID,
+		Profile:        promptProfile,
+		Template:       body.Template.toDomain(promptProfile.PreferredTone),
+		Business:       body.Business.toDomain(),
+		Platform:       traits.Clamp(body.Platform, 16),
+		AppVersion:     traits.Clamp(body.AppVersion, 32),
+		IdempotencyKey: key,
 	})
 	if err != nil {
 		status, code, message := httpx.Translate(err)
-		details := map[string]any{}
-		limitDetails(details, code, result)
+		details := errorDetails(err)
+		s.limitDetails(r.Context(), details, code, user, requestPlatform(r, body.Platform), result)
 		// Still INVALID_REQUEST for old clients; new ones read the real limit
 		// here instead of assuming the number they were built with.
 		if errors.Is(err, domain.ErrSourceTooLong) {
@@ -171,6 +198,11 @@ func (s *Server) handleCompose(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, err)
 		return
 	}
+	key, err := idempotencyKey(r)
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
 
 	// Жыныс: сұраныстағы жарамды мән → сақталған профиль → unspecified.
 	profile, err := s.users.Profile(r.Context(), user.ID)
@@ -193,11 +225,12 @@ func (s *Server) handleCompose(w http.ResponseWriter, r *http.Request) {
 		Regenerate:        body.Regenerate,
 		Platform:          traits.Clamp(body.Platform, 16),
 		AppVersion:        traits.Clamp(body.AppVersion, 32),
+		IdempotencyKey:    key,
 	})
 	if err != nil {
 		status, code, message := httpx.Translate(err)
-		details := map[string]any{}
-		limitDetails(details, code, result)
+		details := errorDetails(err)
+		s.limitDetails(r.Context(), details, code, user, requestPlatform(r, body.Platform), result)
 		switch {
 		case errors.Is(err, domain.ErrInstructionMissing):
 			details["field"] = "instruction"
@@ -219,9 +252,9 @@ func (s *Server) handleCompose(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// resultUsage — генерациядан кейінгі санағыштар (GET /me/usage-пен бірдей өрістер).
+// resultUsage — генерациядан кейінгі санағыштар (GET /me/usage-пен бірдей өрістер және bucket).
 func (s *Server) resultUsage(result ai.Result) usageDTO {
-	return usageDTO{
+	dto := usageDTO{
 		DailyLimit:     result.DailyLimit,
 		UsedToday:      result.UsedToday,
 		RemainingToday: result.Remaining,
@@ -229,12 +262,32 @@ func (s *Server) resultUsage(result ai.Result) usageDTO {
 		UsedMonth:      result.UsedMonth,
 		ResetsAt:       result.ResetsAt.Format(time.RFC3339),
 		Timezone:       s.cfg.App.Timezone,
+		Bucket:         result.Bucket,
 	}
+	dto.withBalance(result.Balance, s.cfg.App.Location())
+	return dto
+}
+
+// errorDetails — қатенің өз details-і (мысалы, Idempotency-Key қайшылығының field/reason).
+func errorDetails(err error) map[string]any {
+	details := map[string]any{}
+	var d interface{ Details() map[string]any }
+	if errors.As(err, &d) {
+		for k, v := range d.Details() {
+			details[k] = v
+		}
+	}
+	return details
 }
 
 // limitDetails — DAILY_LIMIT_REACHED / MONTHLY_LIMIT_REACHED қатесіндегі санағыштар.
 // monthly_limit пен used_month тек айлық шек бар тарифте (0 емес) қосылады.
-func limitDetails(details map[string]any, code string, result ai.Result) {
+//
+// welcome_remaining, credits_remaining and pass_active describe the extra
+// buckets (empty by definition when the limit is hit, except a pass that is
+// still running); can_buy says the app may offer to buy more replies.
+func (s *Server) limitDetails(ctx context.Context, details map[string]any, code string, user domain.User,
+	platform string, result ai.Result) {
 	if code != httpx.CodeDailyLimit && code != httpx.CodeMonthlyLimit {
 		return
 	}
@@ -245,6 +298,26 @@ func limitDetails(details map[string]any, code string, result ai.Result) {
 		details["monthly_limit"] = result.MonthlyLimit
 		details["used_month"] = result.UsedMonth
 	}
+	details["welcome_remaining"] = result.Balance.WelcomeRemaining
+	details["credits_remaining"] = result.Balance.Credits()
+	details["pass_active"] = result.Balance.PassActive
+	details["can_buy"] = s.canBuy(ctx, user, platform)
+}
+
+// requestPlatform — сұраныстағы платформа, болмаса токендегісі.
+func requestPlatform(r *http.Request, declared string) string {
+	if p := strings.ToLower(strings.TrimSpace(declared)); p != "" {
+		return traits.Clamp(p, 16)
+	}
+	return PlatformFrom(r.Context())
+}
+
+// canBuy — қолданба осы платформада жауап сатып алуды ұсына ала ма (PurchaseOptions; әзірге жоқ).
+func (s *Server) canBuy(ctx context.Context, user domain.User, platform string) bool {
+	if s.purchases == nil {
+		return false
+	}
+	return s.purchases.CanBuy(ctx, user, platform)
 }
 
 // polishRequest — нұсқау өрісіндегі мәтін (features.instruction_polish).
@@ -339,6 +412,6 @@ func (s *Server) handleConfirmPayment(w http.ResponseWriter, r *http.Request) {
 	}
 	httpx.JSON(w, http.StatusOK, map[string]any{
 		"subscription": s.subscriptionDTO(entitlement),
-		"usage":        toUsageDTO(entitlement, s.cfg.App.Timezone),
+		"usage":        s.usage(entitlement),
 	})
 }

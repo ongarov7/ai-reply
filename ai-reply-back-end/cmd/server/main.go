@@ -20,6 +20,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/auth"
 	"github.com/aireply/ai-reply-back-end/internal/auth/appleid"
 	"github.com/aireply/ai-reply-back-end/internal/auth/idtoken"
+	"github.com/aireply/ai-reply-back-end/internal/credits"
 	"github.com/aireply/ai-reply-back-end/internal/database"
 	"github.com/aireply/ai-reply-back-end/internal/email"
 	"github.com/aireply/ai-reply-back-end/internal/installations"
@@ -134,7 +135,10 @@ func run(envFile string) error {
 		return err
 	}
 	sender := auth.NewSender(cfg.Auth.OTPChannel, log)
-	authSvc := auth.New(store, cfg.Auth, sender, subSvc, log)
+	// Welcome bonus, admin credits and the ledger; a reservation still open
+	// after StaleAfter(OPENAI_TIMEOUT) is refunded by the 15-minute sweep.
+	creditSvc := credits.New(store, log).WithStaleAfter(credits.StaleAfter(cfg.OpenAI.Timeout))
+	authSvc := auth.New(store, cfg.Auth, sender, subSvc, log).WithWelcome(creditSvc)
 	// Account-deletion codes are issued in the background; let them finish
 	// before the database closes.
 	defer authSvc.Wait()
@@ -197,7 +201,8 @@ func run(envFile string) error {
 		Config: cfg, Auth: authSvc, Users: userSvc, Plans: planSvc, Subs: subSvc,
 		AI: aiSvc, Limits: limitSvc, Payments: paymentSvc, Events: eventSvc,
 		Installations: installSvc, Notifications: notifySvc, Reports: reportSvc, Limiter: limiter, Log: log,
-		Ping: func(ctx context.Context) error { return db.Reader().PingContext(ctx) },
+		Ping:    func(ctx context.Context) error { return db.Reader().PingContext(ctx) },
+		Credits: creditSvc,
 	}).Register(mux)
 
 	adminapi.New(adminapi.Deps{
@@ -236,7 +241,7 @@ func run(envFile string) error {
 	}
 
 	for _, worker := range []func(context.Context){
-		func(ctx context.Context) { expireSubscriptions(ctx, subSvc, notifyEvents, log) },
+		func(ctx context.Context) { expireSubscriptions(ctx, subSvc, notifyEvents, creditSvc, log) },
 		notifySvc.Run,
 		notifySvc.RunRetention,
 		// Spent codes, dead sessions, abandoned installations, old metadata (RETENTION_*).
@@ -375,8 +380,10 @@ func configurePush(cfg config.Push, log *slog.Logger) (push.Provider, error) {
 }
 
 // expireSubscriptions — мерзімі өткен жазылымдарды белгілейтін, мерзімі туралы
-// еске салатын және жазылмай қалған «тариф қосылды» хабарын жіберетін фон тапсырмасы.
-func expireSubscriptions(ctx context.Context, subs *subscriptions.Service, events *notifications.Events, log *slog.Logger) {
+// еске салатын, жазылмай қалған «тариф қосылды» хабарын жіберетін және иесіз
+// қалған генерация брондарын қайтаратын фон тапсырмасы.
+func expireSubscriptions(ctx context.Context, subs *subscriptions.Service, events *notifications.Events,
+	creditSvc *credits.Service, log *slog.Logger) {
 	ticker := time.NewTicker(15 * time.Minute)
 	defer ticker.Stop()
 	for {
@@ -387,6 +394,11 @@ func expireSubscriptions(ctx context.Context, subs *subscriptions.Service, event
 		}
 		events.SweepSubscriptions(ctx)
 		events.ReconcileActivations(ctx)
+		// A process that died mid-generation left its reservation open: the
+		// person gets the unit back instead of paying for a reply never sent.
+		if _, err := creditSvc.RefundStale(ctx); err != nil && ctx.Err() == nil {
+			log.Error("stale reservation sweep failed", "error", err.Error())
+		}
 		select {
 		case <-ctx.Done():
 			return

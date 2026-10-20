@@ -55,6 +55,29 @@ func TestQuotaNoticeArithmetic(t *testing.T) {
 	}
 }
 
+// Pass, бонус не кредит қалғанда «аз қалды» да, «бітті» де айтылмайды.
+func TestQuotaNoticeWaitsForTheExtraBuckets(t *testing.T) {
+	e := NewEvents(testService())
+	for name, balance := range map[string]domain.CreditBalance{
+		"welcome left": {HasWelcome: true, WelcomeTotal: 50, WelcomeRemaining: 1},
+		"credits left": {Admin: 2},
+		"pass left":    {PassActive: true, PassRemaining: 3},
+	} {
+		for _, used := range []int{6, 7} {
+			if n, ok := e.quotaNotice("user-1", domain.Entitlement{DailyLimit: 7, UsedToday: used, Balance: balance},
+				"2026-03-10", "2026-03"); ok {
+				t.Errorf("%s, %d of 7 used: unexpected %s", name, used, n.IdempotencyKey)
+			}
+		}
+	}
+	// Spent, with only the pass window left: the plan's own notice again.
+	n, ok := e.quotaNotice("user-1", domain.Entitlement{DailyLimit: 7, UsedToday: 7,
+		Balance: domain.CreditBalance{HasWelcome: true, WelcomeTotal: 50, PassActive: true}}, "2026-03-10", "2026-03")
+	if !ok || n.IdempotencyKey != "quota_exhausted:day:2026-03-10" {
+		t.Fatalf("spent: %+v %v", n, ok)
+	}
+}
+
 // Жадтағы жиын күн ауысқанда басынан басталады.
 func TestRecentKeysStartOverEachDay(t *testing.T) {
 	var r recentKeys

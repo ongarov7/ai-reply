@@ -9,6 +9,8 @@ import (
 	"github.com/aireply/ai-reply-back-end/config"
 	"github.com/aireply/ai-reply-back-end/internal/ai"
 	"github.com/aireply/ai-reply-back-end/internal/auth"
+	"github.com/aireply/ai-reply-back-end/internal/credits"
+	"github.com/aireply/ai-reply-back-end/internal/domain"
 	"github.com/aireply/ai-reply-back-end/internal/installations"
 	"github.com/aireply/ai-reply-back-end/internal/limits"
 	"github.com/aireply/ai-reply-back-end/internal/middleware"
@@ -25,6 +27,15 @@ import (
 // Pinger — дерекқордың дайындығын тексеру.
 type Pinger func(context.Context) error
 
+// PurchaseOptions — лимит біткенде қолданба жауап сатып алуды ұсына ала ма (details.can_buy).
+//
+// The store purchases (0018_iap) implement it per platform: products an
+// admin configured, a verified store integration and the iap_* switch. Until
+// then nothing is wired in and can_buy is always false.
+type PurchaseOptions interface {
+	CanBuy(ctx context.Context, user domain.User, platform string) bool
+}
+
 // Server — мобильді API.
 type Server struct {
 	cfg           config.Config
@@ -39,6 +50,8 @@ type Server struct {
 	installations *installations.Service
 	notifications *notifications.Service
 	reports       *reports.Service
+	credits       *credits.Service
+	purchases     PurchaseOptions
 	limiter       *middleware.Limiter
 	ping          Pinger
 	log           *slog.Logger
@@ -62,6 +75,10 @@ type Deps struct {
 	Limiter *middleware.Limiter
 	Ping    Pinger
 	Log     *slog.Logger
+	// Credits — сәлемдесу бонусы, кредиттер және олардың журналы.
+	Credits *credits.Service
+	// Purchases — лимит қатесіндегі can_buy (nil — сатып алу жоқ).
+	Purchases PurchaseOptions
 }
 
 // New — API сервері.
@@ -70,7 +87,7 @@ func New(d Deps) *Server {
 		cfg: d.Config, auth: d.Auth, users: d.Users, plans: d.Plans, subs: d.Subs,
 		ai: d.AI, limits: d.Limits, payments: d.Payments, events: d.Events,
 		installations: d.Installations, notifications: d.Notifications, reports: d.Reports,
-		limiter: d.Limiter, ping: d.Ping, log: d.Log,
+		credits: d.Credits, purchases: d.Purchases, limiter: d.Limiter, ping: d.Ping, log: d.Log,
 	}
 }
 
@@ -133,6 +150,8 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /api/v1/me", s.requireUser(http.HandlerFunc(s.handleUpdateMe)))
 	mux.Handle("GET /api/v1/me/usage", s.requireUser(http.HandlerFunc(s.handleUsage)))
 	mux.Handle("GET /api/v1/me/subscription", s.requireUser(http.HandlerFunc(s.handleSubscription)))
+	// Бонус, кредиттер және соңғы 50 журнал жазбасы.
+	mux.Handle("GET /api/v1/me/credits", s.requireUser(http.HandlerFunc(s.handleCredits)))
 	mux.Handle("GET /api/v1/me/devices", s.requireUser(http.HandlerFunc(s.handleListDevices)))
 	mux.Handle("POST /api/v1/me/consents", s.requireUser(http.HandlerFunc(s.handleSaveLegalConsent)))
 	// Келісімді кері қайтару: AI тоқтайды, тіркелгі қалады.

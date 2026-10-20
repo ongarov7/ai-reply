@@ -87,6 +87,8 @@ type ComposeRequest struct {
 	Regenerate        bool
 	Platform          string
 	AppVersion        string
+	// IdempotencyKey — Idempotency-Key тақырыбы ("" — кілтсіз): бір әрекетке бір төлем.
+	IdempotencyKey string
 }
 
 // Compose — нұсқау бойынша жаңа хабарлама.
@@ -125,6 +127,7 @@ func (s *Service) Compose(ctx context.Context, req ComposeRequest) (Result, erro
 		Platform:   req.Platform,
 		AppVersion: req.AppVersion,
 		Chars:      traits.RuneLen(instruction),
+		Key:        req.IdempotencyKey,
 	}, prompt, started)
 }
 

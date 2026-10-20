@@ -158,12 +158,20 @@ func matchClause(q AudienceQuery) (string, []any) {
 
 // quotaClause — бүгінгі қалдық: has_remaining (шектен көп), near_exhaustion
 // (0 < қалдық ≤ шек), exhausted (қалдық жоқ). Шек = max(1, ceil(лимит × % / 100)).
+//
+// The remaining count is the combined one, as in the automatic quota notices:
+// what is left of the plan today plus an active pass, the welcome bonus and
+// credits. Someone whose plan is used up but who still has bonus replies is
+// not "exhausted".
 func quotaClause(q AudienceQuery) (string, []any) {
 	limit := `COALESCE((SELECT p.daily_message_limit FROM plans p WHERE p.id = ` + currentPlan + `), 0)`
 	limitArgs := []any{ms(q.Now), q.DefaultPlanID}
 	used := `COALESCE((SELECT ud.used FROM usage_daily ud WHERE ud.user_id = u.id AND ud.usage_date = ?), 0)`
-	remaining := "(" + limit + " - " + used + ")"
-	remainingArgs := append(append([]any{}, limitArgs...), q.Today)
+	extra := `COALESCE((SELECT SUM(g.units_remaining) FROM credit_grants g
+		WHERE g.user_id = u.id AND g.status = 'active' AND g.units_remaining > 0
+		  AND g.starts_at <= ? AND (g.expires_at IS NULL OR g.expires_at > ?)), 0)`
+	remaining := "(MAX(" + limit + " - " + used + ", 0) + " + extra + ")"
+	remainingArgs := append(append([]any{}, limitArgs...), q.Today, ms(q.Now), ms(q.Now))
 	threshold := "MAX(1, (" + limit + " * ? + 99) / 100)"
 	thresholdArgs := append(append([]any{}, limitArgs...), q.QuotaLowPercent)
 

@@ -186,8 +186,10 @@ func (e *Events) expiryNotice(kind string, n repository.SubscriptionNotice) User
 // handled by this process is skipped from memory; only then one idempotent
 // database write with a short timeout. "Low" is 0 < remaining ≤ threshold
 // and "exhausted" is remaining = 0, once per day (and once per month when
-// the plan has a monthly limit). An admin quota reset does not re-arm the
-// notices of the same day.
+// the plan has a monthly limit). Nothing is announced while a pass, the
+// welcome bonus or credits can still pay: the combined remaining is then
+// above zero, and the texts speak of the plan's numbers. An admin quota reset
+// does not re-arm the notices of the same day.
 func (e *Events) QuotaUsed(ctx context.Context, user domain.User, usage domain.Entitlement, date, month string) {
 	if user.ID == "" || user.Kind != "account" {
 		return
@@ -214,6 +216,10 @@ func (e *Events) QuotaUsed(ctx context.Context, user domain.User, usage domain.E
 // quotaNotice — қай квота хабарламасы керек (бір сұранысқа ең көбі біреу):
 // айлық бітті → күндік бітті → айлық аз қалды → күндік аз қалды.
 func (e *Events) quotaNotice(userID string, usage domain.Entitlement, date, month string) (UserNotification, bool) {
+	if usage.Balance.Extra() > 0 {
+		// Extra buckets pay after the plan: neither "low" nor "exhausted" yet.
+		return UserNotification{}, false
+	}
 	percent := e.svc.cfg.QuotaLowPercent
 	day := quotaLevelOf(usage.DailyLimit, usage.UsedToday, percent)
 	mon := quotaLevelOf(usage.MonthlyLimit, usage.UsedMonth, percent)

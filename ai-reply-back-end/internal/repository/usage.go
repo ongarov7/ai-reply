@@ -3,90 +3,18 @@ package repository
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"time"
 
 	"github.com/aireply/ai-reply-back-end/internal/domain"
 	"github.com/aireply/ai-reply-back-end/internal/traits"
 )
 
-// ReserveQuota — квотаны АЛДЫН АЛА бір атомарлы транзакцияда брондайды.
-//
-// The counter is incremented before the provider is called, guarded by
-// `used < limit` inside the UPDATE itself. Two parallel requests on the last
-// remaining generation therefore cannot both succeed: the second UPDATE
-// matches no row and comes back as a limit error. A provider failure refunds
-// the reservation, so a user is only ever charged for a generation they got.
-// The returned counters are the values right after this reservation, read in
-// the same transaction: two parallel requests never see the same count.
-func (s *Store) ReserveQuota(ctx context.Context, userID, date, month string, dailyLimit, monthlyLimit int) (day, mon int, err error) {
-	if dailyLimit <= 0 {
-		return 0, 0, domain.ErrDailyLimit
-	}
-	now := ms(time.Now())
-	err = s.db.Tx(ctx, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO usage_daily (user_id, usage_date, used, updated_at)
-			VALUES (?, ?, 0, ?) ON CONFLICT (user_id, usage_date) DO NOTHING`,
-			userID, date, now); err != nil {
-			return err
-		}
-		err := tx.QueryRowContext(ctx, `
-			UPDATE usage_daily SET used = used + 1, updated_at = ?
-			WHERE user_id = ? AND usage_date = ? AND used < ? RETURNING used`, now, userID, date, dailyLimit).Scan(&day)
-		if errors.Is(err, sql.ErrNoRows) {
-			return domain.ErrDailyLimit
-		}
-		if err != nil {
-			return err
-		}
-
-		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO usage_monthly (user_id, usage_month, used, updated_at)
-			VALUES (?, ?, 0, ?) ON CONFLICT (user_id, usage_month) DO NOTHING`,
-			userID, month, now); err != nil {
-			return err
-		}
-		if monthlyLimit > 0 {
-			err = tx.QueryRowContext(ctx, `
-				UPDATE usage_monthly SET used = used + 1, updated_at = ?
-				WHERE user_id = ? AND usage_month = ? AND used < ? RETURNING used`, now, userID, month, monthlyLimit).Scan(&mon)
-			if errors.Is(err, sql.ErrNoRows) {
-				return domain.ErrMonthlyLimit // транзакция кері қайтарылады, күндік те есептелмейді
-			}
-			return err
-		}
-		return tx.QueryRowContext(ctx, `
-			UPDATE usage_monthly SET used = used + 1, updated_at = ? WHERE user_id = ? AND usage_month = ? RETURNING used`,
-			now, userID, month).Scan(&mon)
-	})
-	if err != nil {
-		return 0, 0, err
-	}
-	return day, mon, nil
-}
-
-// RefundQuota — провайдер қатесінде бронды қайтарады (қолданушы алмаған жауап үшін төлемейді).
-func (s *Store) RefundQuota(ctx context.Context, userID, date, month string) error {
-	now := ms(time.Now())
-	return s.db.Tx(ctx, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, `
-			UPDATE usage_daily SET used = used - 1, updated_at = ?
-			WHERE user_id = ? AND usage_date = ? AND used > 0`, now, userID, date); err != nil {
-			return err
-		}
-		_, err := tx.ExecContext(ctx, `
-			UPDATE usage_monthly SET used = used - 1, updated_at = ?
-			WHERE user_id = ? AND usage_month = ? AND used > 0`, now, userID, month)
-		return err
-	})
-}
-
 // AddTokens — сәтті сұраныстың токен/құн метадерегі.
 //
 // Upsert, not UPDATE: a polish request reserves no quota, so the day's row
-// may not exist yet, and its tokens must still be counted. `used` is never
-// touched here — only ReserveQuota and RefundQuota move it.
+// may not exist yet, and its tokens must still be counted. `used` and
+// `extra_used` are never touched here — only ReserveGeneration and
+// RefundGeneration move them.
 func (s *Store) AddTokens(ctx context.Context, userID, date, month string, in, out int, costMicros int64) error {
 	now := ms(time.Now())
 	return s.db.Tx(ctx, func(tx *sql.Tx) error {

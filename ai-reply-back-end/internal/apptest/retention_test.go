@@ -59,11 +59,19 @@ func TestRetentionRemovesOnlyExpiredRows(t *testing.T) {
 		exec(`INSERT INTO ai_usage_events (id, user_id, status, created_at) VALUES (?, ?, 'success', ?)`,
 			id, s.userID, created)
 	}
+	// Finished reservations go with the request metadata; one still reserved is the sweep's, not retention's.
+	for id, row := range map[string][2]any{
+		"ur-old": {"committed", ago(401)}, "ur-refunded-old": {"refunded", ago(500)},
+		"ur-recent": {"committed", ago(399)}, "ur-reserved-old": {"reserved", ago(401)},
+	} {
+		exec(`INSERT INTO usage_reservations (id, user_id, mode, bucket, usage_date, usage_month, status, created_at, updated_at)
+			VALUES (?, ?, 'reply', 'daily', '2025-01-01', '2025-01', ?, ?, ?)`, id, s.userID, row[0], row[1], row[1])
+	}
 
 	svc := retention.New(h.store, h.cfg.Retention, discardLog()).WithClock(h.clock)
 	got := svc.Sweep(ctx)
 	want := retention.Result{"otp_codes": 1, "refresh_tokens": 2, "app_installations": 1,
-		"product_events": 1, "ai_usage_events": 1}
+		"product_events": 1, "ai_usage_events": 1, "usage_reservations": 2}
 	if len(got) != len(want) {
 		t.Fatalf("removed %v, want %v", got, want)
 	}
@@ -72,13 +80,17 @@ func TestRetentionRemovesOnlyExpiredRows(t *testing.T) {
 			t.Errorf("%s: removed %d, want %d", table, got[table], n)
 		}
 	}
-	for _, gone := range []string{"otp-old", "rt-expired-old", "rt-revoked-old", "inst-anon-old", "pe-old", "ue-old"} {
+	for _, gone := range []string{"otp-old", "rt-expired-old", "rt-revoked-old", "inst-anon-old", "pe-old", "ue-old",
+		"ur-old", "ur-refunded-old"} {
 		n := h.scalar(`SELECT (SELECT COUNT(*) FROM otp_codes WHERE id = ?1) + (SELECT COUNT(*) FROM refresh_tokens WHERE id = ?1)
 			+ (SELECT COUNT(*) FROM app_installations WHERE id = ?1) + (SELECT COUNT(*) FROM product_events WHERE id = ?1)
-			+ (SELECT COUNT(*) FROM ai_usage_events WHERE id = ?1)`, gone)
+			+ (SELECT COUNT(*) FROM ai_usage_events WHERE id = ?1) + (SELECT COUNT(*) FROM usage_reservations WHERE id = ?1)`, gone)
 		if n != 0 {
 			t.Errorf("%s is still there", gone)
 		}
+	}
+	if n := h.scalar(`SELECT COUNT(*) FROM usage_reservations WHERE id IN ('ur-recent', 'ur-reserved-old')`); n != 2 {
+		t.Errorf("retention removed a recent or an open reservation (%d left of 2)", n)
 	}
 	if again := svc.Sweep(ctx); len(again) != 0 {
 		t.Fatalf("a second pass removed %v", again)

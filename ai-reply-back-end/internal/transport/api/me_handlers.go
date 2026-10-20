@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"time"
 
+	"github.com/aireply/ai-reply-back-end/internal/credits"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
 	"github.com/aireply/ai-reply-back-end/internal/legal"
 	"github.com/aireply/ai-reply-back-end/internal/phone"
@@ -28,6 +30,8 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 
 // writeMe — /me жауабын жинайды (пошта қосылғаннан кейін де осы пішін қайтады).
 func (s *Server) writeMe(w http.ResponseWriter, r *http.Request, user domain.User) {
+	// Тіркелу кезінде берілмей қалған бонус осы жерде қалпына келеді.
+	s.ensureWelcome(r.Context(), user)
 	profile, err := s.users.Profile(r.Context(), user.ID)
 	if err != nil {
 		httpx.Fail(w, err)
@@ -47,9 +51,56 @@ func (s *Server) writeMe(w http.ResponseWriter, r *http.Request, user domain.Use
 		User:         s.userDTO(r.Context(), user, profile),
 		Profile:      toProfileDTO(profile),
 		Subscription: s.subscriptionDTO(entitlement),
-		Usage:        toUsageDTO(entitlement, s.cfg.App.Timezone),
+		Usage:        s.usage(entitlement),
 		LegalConsent: consent,
 	})
+}
+
+// usage — квота және баланс (/me, /me/usage, сессия, төлем).
+func (s *Server) usage(e domain.Entitlement) usageDTO {
+	return toUsageDTO(e, s.cfg.App.Timezone, s.cfg.App.Location())
+}
+
+// ensureWelcome — сәлемдесу бонусының жалқау жөндеуі (қатесі журналда ғана).
+func (s *Server) ensureWelcome(ctx context.Context, user domain.User) {
+	if s.credits != nil {
+		s.credits.EnsureWelcome(ctx, user)
+	}
+}
+
+type creditsResponse struct {
+	Balance creditsBalanceDTO `json:"balance"`
+	Entries []ledgerEntryDTO  `json:"entries"`
+}
+
+// handleCredits — бонус, кредиттер, pass және журналдың соңғы 50 жазбасы.
+func (s *Server) handleCredits(w http.ResponseWriter, r *http.Request) {
+	user, _ := UserFrom(r.Context())
+	if s.credits == nil {
+		httpx.Fail(w, domain.ErrNotFound)
+		return
+	}
+	balance, err := s.credits.Balance(r.Context(), user.ID)
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	ledger, err := s.credits.Ledger(r.Context(), user.ID, credits.LedgerLimit)
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	usage := usageDTO{}
+	usage.withBalance(balance, s.cfg.App.Location())
+	out := creditsResponse{
+		Balance: creditsBalanceDTO{Welcome: usage.Welcome, Credits: usage.Credits, Pass: usage.Pass},
+		Entries: make([]ledgerEntryDTO, 0, len(ledger)),
+	}
+	for _, e := range ledger {
+		out.Entries = append(out.Entries, ledgerEntryDTO{Entry: e.Entry, Delta: e.Delta, Kind: e.Kind,
+			CreatedAt: e.CreatedAt.Format(time.RFC3339)})
+	}
+	httpx.JSON(w, http.StatusOK, out)
 }
 
 // userDTO — қолданушы және оның кіру тәсілдері (email, google, apple, phone).
@@ -158,7 +209,7 @@ func (s *Server) handleUsage(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, err)
 		return
 	}
-	httpx.JSON(w, http.StatusOK, toUsageDTO(entitlement, s.cfg.App.Timezone))
+	httpx.JSON(w, http.StatusOK, s.usage(entitlement))
 }
 
 // handleSubscription — ағымдағы тариф.
@@ -197,6 +248,11 @@ type countryDTO struct {
 	Dial    string `json:"dial_code"`
 	Name    string `json:"name"`
 	Example string `json:"example"`
+}
+
+// welcomeBonusOn — жаңа тіркелгілер бонус ала ма.
+func (s *Server) welcomeBonusOn(ctx context.Context) bool {
+	return s.credits != nil && s.credits.WelcomeSettings(ctx).Units > 0
 }
 
 // handleConfig — клиентке қажет сервер параметрлері (құпиясыз).
@@ -247,6 +303,13 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 			"ai_reports": true,
 			// DELETE /api/v1/me and POST /api/v1/me/delete.
 			"account_deletion": true,
+			// New accounts get the welcome bonus (admin setting welcome_bonus_units > 0).
+			"welcome_bonus": s.welcomeBonusOn(r.Context()),
+			// usage.welcome, credits, pass, remaining_total, bucket; GET /api/v1/me/credits;
+			// limit errors carry welcome_remaining, credits_remaining, pass_active, can_buy.
+			"credits": true,
+			// Idempotency-Key on /ai/reply and /ai/compose: one charge per user action.
+			"idempotent_generation": true,
 		},
 		"demo_mode":    s.cfg.Auth.DemoMode,
 		"payment_mode": s.payments.Mode(),

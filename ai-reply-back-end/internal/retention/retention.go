@@ -56,6 +56,9 @@ func (s *Service) rules() []rule {
 		{"app_installations", s.cfg.AnonInstallationsDays, s.repo.DeleteStaleAnonymousInstallations},
 		{"product_events", s.cfg.ProductEventsDays, s.repo.DeleteOldProductEvents},
 		{"ai_usage_events", s.cfg.AIUsageEventsDays, s.repo.DeleteOldAIUsageEvents},
+		// Finished generation reservations are request metadata too: same window.
+		// The credit ledger and the grants stay until the account is deleted.
+		{"usage_reservations", s.cfg.AIUsageEventsDays, s.repo.DeleteOldUsageReservations},
 	}
 }
 

@@ -35,6 +35,12 @@ func DeviceFrom(ctx context.Context) string {
 	return v
 }
 
+// PlatformFrom — токендегі платформа (ios | android | legacy), "" — белгісіз.
+func PlatformFrom(ctx context.Context) string {
+	v, _ := ctx.Value(platformKey).(string)
+	return v
+}
+
 // bearer — Authorization тақырыбынан токен.
 func bearer(r *http.Request) string {
 	header := strings.TrimSpace(r.Header.Get("Authorization"))

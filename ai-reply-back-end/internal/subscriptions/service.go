@@ -202,6 +202,11 @@ func (s *Service) Entitlement(ctx context.Context, userID string) (domain.Entitl
 	if err != nil {
 		return domain.Entitlement{}, err
 	}
+	// Pass, бонус және кредиттер — тарифтің үстінен (usage.welcome, credits, pass).
+	balance, err := s.repo.CreditBalance(ctx, userID, now)
+	if err != nil {
+		return domain.Entitlement{}, err
+	}
 
 	return domain.Entitlement{
 		Plan:         plan,
@@ -211,6 +216,7 @@ func (s *Service) Entitlement(ctx context.Context, userID string) (domain.Entitl
 		UsedToday:    usedDay,
 		UsedMonth:    usedMonth,
 		ResetsAt:     s.NextReset(now),
+		Balance:      balance,
 	}, nil
 }
 

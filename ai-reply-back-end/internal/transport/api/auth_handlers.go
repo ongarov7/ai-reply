@@ -149,6 +149,8 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 // writeSession — сессия жауабын жинау (профиль, тариф, квота бірден келеді).
 func (s *Server) writeSession(w http.ResponseWriter, r *http.Request, session auth.Session) {
 	ctx := r.Context()
+	// Тіркелу кезінде берілмей қалған бонус осы жерде қалпына келеді.
+	s.ensureWelcome(ctx, session.User)
 	profile, err := s.users.Profile(ctx, session.User.ID)
 	if err != nil {
 		httpx.Fail(w, err)
@@ -175,7 +177,7 @@ func (s *Server) writeSession(w http.ResponseWriter, r *http.Request, session au
 		User:             s.userDTO(ctx, session.User, profile),
 		Profile:          toProfileDTO(profile),
 		Subscription:     s.subscriptionDTO(entitlement),
-		Usage:            toUsageDTO(entitlement, s.cfg.App.Timezone),
+		Usage:            s.usage(entitlement),
 		LegalConsent:     consent,
 	})
 }

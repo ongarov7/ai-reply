@@ -20,6 +20,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/admin"
 	"github.com/aireply/ai-reply-back-end/internal/ai"
 	"github.com/aireply/ai-reply-back-end/internal/auth"
+	"github.com/aireply/ai-reply-back-end/internal/credits"
 	"github.com/aireply/ai-reply-back-end/internal/database"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
 	"github.com/aireply/ai-reply-back-end/internal/email"
@@ -302,6 +303,7 @@ type harness struct {
 	dbPath        string
 	admin         *admin.Service
 	limits        *limits.Service
+	credits       *credits.Service
 	authSvc       *auth.Service
 	users         *users.Service
 	installations *installations.Service
@@ -321,6 +323,17 @@ type harnessOption func(env map[string]string)
 // withEnv — ортадағы бір мәнді ауыстырады.
 func withEnv(key, value string) harnessOption {
 	return func(env map[string]string) { env[key] = value }
+}
+
+// welcomeBonusEnv — тестке ғана: жаңа тіркелгінің бонусы (welcome_bonus_units баптауы).
+const welcomeBonusEnv = "TEST_WELCOME_BONUS_UNITS"
+
+// withWelcomeBonus — жаңа тіркелгілер units бонус алады.
+//
+// Off (0) by default: the quota, notice and limit tests are about the plan,
+// and a bonus would quietly pay for the generations they expect refused.
+func withWelcomeBonus(units int) harnessOption {
+	return withEnv(welcomeBonusEnv, strconv.Itoa(units))
 }
 
 const (
@@ -354,6 +367,7 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 		// language check would "repair" most of them. Repair tests switch it on.
 		"AI_REPAIR_ENABLED":          "false",
 		"RATE_TRANSCRIBE_PER_MINUTE": "1000",
+		welcomeBonusEnv:              "0",
 	}
 	for _, opt := range opts {
 		opt(env)
@@ -375,6 +389,12 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 		t.Fatalf("migrate: %v", err)
 	}
 
+	// The migration writes the production default (50); a test opts in with withWelcomeBonus.
+	if _, err := db.Writer().Exec(`UPDATE system_settings SET value = ? WHERE key = ?`,
+		env[welcomeBonusEnv], credits.SettingWelcomeUnits); err != nil {
+		t.Fatalf("welcome bonus: %v", err)
+	}
+
 	// Тест моделінің бағасы (нақты бағалар дерекқорда тұрады, кодта емес).
 	if err := repository.New(db).SavePricing(context.Background(), repository.Pricing{
 		Model: "test-model", InputPer1M: 0.15, OutputPer1M: 0.60, Currency: "USD",
@@ -391,7 +411,10 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 	planSvc := plans.New(store)
 	subSvc := subscriptions.New(store, planSvc, cfg.App.Location()).WithClock(clock)
 	userSvc := users.New(store).WithLogger(log).WithClock(clock)
-	authSvc := auth.New(store, cfg.Auth, auth.StubSender{Log: log}, subSvc, log).WithClock(clock)
+	creditSvc := credits.New(store, log).WithClock(clock).WithTTL(0).
+		WithStaleAfter(credits.StaleAfter(cfg.OpenAI.Timeout))
+	authSvc := auth.New(store, cfg.Auth, auth.StubSender{Log: log}, subSvc, log).WithClock(clock).
+		WithWelcome(creditSvc)
 	provider := &fakeProvider{reply: "Сәлеметсіз бе! Бағаны нақтылап, бірер минуттан соң жазамын."}
 	limitSvc := limits.New(store, limits.Limits{
 		SourceChars:      cfg.Limits.SourceTextChars,
@@ -436,7 +459,8 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 	api.New(api.Deps{Config: cfg, Auth: authSvc, Users: userSvc, Plans: planSvc, Subs: subSvc,
 		AI: aiSvc, Limits: limitSvc, Payments: paymentSvc, Events: eventSvc, Installations: installSvc,
 		Notifications: notifySvc, Reports: reportSvc, Limiter: limiter, Log: log,
-		Ping: func(ctx context.Context) error { return db.Reader().PingContext(ctx) }}).Register(mux)
+		Ping:    func(ctx context.Context) error { return db.Reader().PingContext(ctx) },
+		Credits: creditSvc}).Register(mux)
 	adminapi.New(adminapi.Deps{Config: cfg, Admin: adminSvc, Limits: limitSvc, Notifications: notifySvc,
 		Payments: paymentSvc, Reports: reportSvc, Limiter: limiter, Log: log}).Register(mux)
 	simulatorapi.New(simulatorapi.Deps{Config: cfg, Admin: adminSvc, Simulator: simulatorSvc,
@@ -454,6 +478,7 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 
 	h := &harness{t: t, cfg: cfg, server: server, store: store, db: db,
 		provider: provider, speech: speech, clock: clock, logs: logs, dbPath: dbPath, admin: adminSvc, limits: limitSvc,
+		credits: creditSvc,
 		authSvc: authSvc, users: userSvc, installations: installSvc, notify: notifySvc, events: events, push: fcm, mail: mail,
 		pushClock: pushClock}
 	t.Cleanup(func() {

@@ -64,7 +64,8 @@ func (h *harness) rowsByUser(userID string) map[string]int {
 }
 
 // fullAccount — әр кестеде ізі бар тіркелгі: телефон мен пошта, профиль, жауаптар,
-// өнім оқиғалары, push орнатуы, баптаулар, хабарлама, төлем, шағым.
+// өнім оқиғалары, push орнатуы, баптаулар, хабарлама, төлем, шағым, кредит және оның журналы.
+// Сәлемдесу бонусы тек withWelcomeBonus қосылған жинақта болады.
 func (h *harness) fullAccount(phone, address string) session {
 	h.t.Helper()
 	s := h.signIn(phone)
@@ -88,15 +89,22 @@ func (h *harness) fullAccount(phone, address string) session {
 }
 
 func TestAccountDeletionRemovesEveryUserRow(t *testing.T) {
-	h := newHarness(t)
+	h := newHarness(t, withWelcomeBonus(50))
 	s := h.fullAccount("+7 701 909 10 11", "aigerim.delete@example.com")
 	other := h.signIn("+7 701 909 10 12")
+	// Credits too: the welcome bonus and an admin grant, their ledger and a reservation the bonus paid.
+	now := h.clock.Now()
+	h.addGrant(s.userID, domain.GrantAdmin, 3, now, nil, now)
+	h.useQuota(s.userID, 30) // the standard plan bought above
+	if res := h.generate(s.access, "Тағы бір сұрақ"); res.str("usage", "bucket") != "welcome" {
+		t.Fatalf("generation from the bonus: %s", res.raw)
+	}
 
 	before := h.rowsByUser(s.userID)
 	for _, table := range []string{"users", "user_profiles", "auth_identities", "devices", "refresh_tokens",
 		"subscriptions", "usage_daily", "usage_monthly", "ai_usage_events", "payments", "legal_consents",
 		"product_events", "app_installations", "notification_preferences", "notifications",
-		"notification_deliveries", "ai_reports"} {
+		"notification_deliveries", "ai_reports", "credit_grants", "credit_ledger", "usage_reservations"} {
 		if before[table] == 0 {
 			t.Fatalf("%s has no row for the account before deletion — the test would prove nothing (%v)", table, before)
 		}

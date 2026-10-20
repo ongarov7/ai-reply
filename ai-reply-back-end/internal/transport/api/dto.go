@@ -139,6 +139,8 @@ type subscriptionDTO struct {
 	Source    string  `json:"source,omitempty"`
 }
 
+// usageDTO — квота және баланс. Ескі өрістердің мағынасы өзгермейді:
+// remaining_today — тек тарифтің бүгінгі қалдығы.
 type usageDTO struct {
 	DailyLimit     int    `json:"daily_limit"`
 	UsedToday      int    `json:"used_today"`
@@ -147,10 +149,30 @@ type usageDTO struct {
 	UsedMonth      int    `json:"used_month"`
 	ResetsAt       string `json:"resets_at"`
 	Timezone       string `json:"timezone"`
+	// Welcome — сәлемдесу бонусы; тіркелгіде жоқ болса өріс жоқ.
+	Welcome *welcomeDTO `json:"welcome,omitempty"`
+	// Credits — әкімші кредиттері мен сатып алынған пакеттердің қалдығы.
+	Credits int `json:"credits"`
+	// Pass — қазір жарамды pass; жоқ болса өріс жоқ.
+	Pass *passDTO `json:"pass,omitempty"`
+	// RemainingTotal — тариф + pass + бонус + кредиттер.
+	RemainingTotal int `json:"remaining_total"`
+	// Bucket — тек reply/compose жауабында: генерацияны не төледі.
+	Bucket string `json:"bucket,omitempty"`
 }
 
-func toUsageDTO(e domain.Entitlement, tz string) usageDTO {
-	return usageDTO{
+type welcomeDTO struct {
+	Total     int `json:"total"`
+	Remaining int `json:"remaining"`
+}
+
+type passDTO struct {
+	ExpiresAt string `json:"expires_at"`
+	Remaining int    `json:"remaining"`
+}
+
+func toUsageDTO(e domain.Entitlement, tz string, loc *time.Location) usageDTO {
+	dto := usageDTO{
 		DailyLimit:     e.DailyLimit,
 		UsedToday:      e.UsedToday,
 		RemainingToday: e.Remaining(),
@@ -159,6 +181,35 @@ func toUsageDTO(e domain.Entitlement, tz string) usageDTO {
 		ResetsAt:       e.ResetsAt.Format(time.RFC3339),
 		Timezone:       tz,
 	}
+	dto.withBalance(e.Balance, loc)
+	return dto
+}
+
+// withBalance — тарифтен тыс бөліктер; remaining_total тарифтің қалдығын қосып есептейді.
+func (u *usageDTO) withBalance(b domain.CreditBalance, loc *time.Location) {
+	if b.HasWelcome {
+		u.Welcome = &welcomeDTO{Total: b.WelcomeTotal, Remaining: b.WelcomeRemaining}
+	}
+	u.Credits = b.Credits()
+	if b.PassActive && b.PassExpiresAt != nil {
+		u.Pass = &passDTO{ExpiresAt: b.PassExpiresAt.In(loc).Format(time.RFC3339), Remaining: b.PassRemaining}
+	}
+	u.RemainingTotal = u.RemainingToday + b.Extra()
+}
+
+// creditsBalanceDTO — GET /me/credits балансы (usage-тегі өрістермен бірдей).
+type creditsBalanceDTO struct {
+	Welcome *welcomeDTO `json:"welcome,omitempty"`
+	Credits int         `json:"credits"`
+	Pass    *passDTO    `json:"pass,omitempty"`
+}
+
+// ledgerEntryDTO — кредит журналының бір жазбасы (брон идентификаторынсыз).
+type ledgerEntryDTO struct {
+	Entry     string `json:"entry"`
+	Delta     int    `json:"delta"`
+	Kind      string `json:"kind"`
+	CreatedAt string `json:"created_at"`
 }
 
 type deviceDTO struct {

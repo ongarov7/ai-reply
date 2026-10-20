@@ -22,6 +22,11 @@ type Provisioner interface {
 	EnsureSubscription(ctx context.Context, userID string) error
 }
 
+// WelcomeGranter — жаңа тіркелгіге сәлемдесу бонусы (credits қызметі). Бір рет қана береді.
+type WelcomeGranter interface {
+	GrantWelcome(ctx context.Context, user domain.User) (bool, error)
+}
+
 // Service — кіру сценарийлері.
 type Service struct {
 	repo   *repository.Store
@@ -40,6 +45,8 @@ type Service struct {
 	apple  IDTokenVerifier
 	// background — фонда шығарылып жатқан жою кодтары (Wait).
 	background sync.WaitGroup
+	// welcome — сәлемдесу бонусы (nil — жоқ).
+	welcome WelcomeGranter
 }
 
 // New — қызметті құрады.
@@ -52,6 +59,9 @@ func New(repo *repository.Store, cfg config.Auth, sender Sender, prov Provisione
 
 // WithClock — тестте уақытты басқару үшін.
 func (s *Service) WithClock(c traits.Clock) *Service { s.clock = c; return s }
+
+// WithWelcome — жаңа тіркелгінің бонусы (nil — жоқ).
+func (s *Service) WithWelcome(w WelcomeGranter) *Service { s.welcome = w; return s }
 
 // WithRandom — тестте код генераторын бекіту үшін.
 func (s *Service) WithRandom(r io.Reader) *Service { s.random = r; return s }
@@ -281,12 +291,22 @@ func (s *Service) touchUser(ctx context.Context, user domain.User, info DeviceIn
 		domain.NormalizeLocale(info.Locale), info.Timezone)
 }
 
-// provision — жаңа тіркелгіге бастапқы тариф береді және нұсқаны статистикаға жазады.
+// provision — жаңа тіркелгіге бастапқы тариф пен сәлемдесу бонусын береді, нұсқаны статистикаға жазады.
+//
+// The bonus never fails a sign-in: an error is logged and /me or the next
+// session response repairs it (credits.EnsureWelcome).
 func (s *Service) provision(ctx context.Context, user domain.User, info DeviceInfo) error {
+	var err error
 	if s.prov != nil {
-		if err := s.prov.EnsureSubscription(ctx, user.ID); err != nil {
-			return err
+		err = s.prov.EnsureSubscription(ctx, user.ID)
+	}
+	if s.welcome != nil {
+		if _, werr := s.welcome.GrantWelcome(ctx, user); werr != nil {
+			s.log.Error("welcome bonus at sign-up failed", "user_id", user.ID, "error", werr.Error())
 		}
+	}
+	if err != nil {
+		return err
 	}
 	_ = s.repo.RecordAppVersion(ctx, info.Platform, info.AppVersion, "")
 	return nil
