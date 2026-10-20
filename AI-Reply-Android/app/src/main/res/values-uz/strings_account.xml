@@ -45,4 +45,11 @@
     <string name="purchase_see_plans">Tariflarni koʻrish</string>
     <string name="purchase_footer">Toʻlov Google Play orqali, Google Play hisobingiz valyutasida amalga oshiriladi. Sotib olingan javoblar tarif, ruxsatnoma va bepul javoblardan keyin sarflanadi.</string>
 
+    <!-- Exhausted sheet -->
+    <string name="exhausted_body">Mavjud javoblardan foydalanib boʻldingiz. Qoʻshimcha javoblar olishingiz yoki boshqa tarif tanlashingiz mumkin.</string>
+    <string name="exhausted_body_male">Mavjud javoblardan foydalanib boʻldingiz. Qoʻshimcha javoblar olishingiz yoki boshqa tarif tanlashingiz mumkin.</string>
+    <string name="exhausted_body_female">Mavjud javoblardan foydalanib boʻldingiz. Qoʻshimcha javoblar olishingiz yoki boshqa tarif tanlashingiz mumkin.</string>
+    <string name="exhausted_body_plans">Mavjud javoblar tugadi. Boshqa tarif tanlashingiz mumkin.</string>
+    <string name="exhausted_later">Keyinroq</string>
+
 </resources>

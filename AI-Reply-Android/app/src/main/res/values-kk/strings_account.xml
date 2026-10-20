@@ -47,4 +47,11 @@
     <string name="settings_debug_sample_store">Сынақ сатып алу каталогы</string>
     <string name="settings_debug_sample_store_footer">Тек жөндеу нұсқасында, қолданбаны қайта іске қосқаннан кейін. «Жауап сатып алу» үлгі өнімдерді және Google Play мен серверсіз бірден өтетін сатып алуды көрсетеді.</string>
 
+    <!-- Exhausted sheet -->
+    <string name="exhausted_body">Қолжетімді жауаптарды пайдаланып болдыңыз. Қосымша жауап алуға немесе басқа тариф таңдауға болады.</string>
+    <string name="exhausted_body_male">Қолжетімді жауаптарды пайдаланып болдыңыз. Қосымша жауап алуға немесе басқа тариф таңдауға болады.</string>
+    <string name="exhausted_body_female">Қолжетімді жауаптарды пайдаланып болдыңыз. Қосымша жауап алуға немесе басқа тариф таңдауға болады.</string>
+    <string name="exhausted_body_plans">Қолжетімді жауаптар бітті. Басқа тариф таңдауға болады.</string>
+    <string name="exhausted_later">Кейінірек</string>
+
 </resources>

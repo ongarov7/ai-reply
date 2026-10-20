@@ -51,4 +51,11 @@
     <string name="settings_debug_sample_store">Тестовый каталог покупок</string>
     <string name="settings_debug_sample_store_footer">Только в отладочной сборке, после перезапуска приложения. «Докупить ответы» показывает примеры товаров и покупку, которая сразу проходит, без Google Play и сервера.</string>
 
+    <!-- Exhausted sheet -->
+    <string name="exhausted_body">Доступные ответы закончились. Можешь получить дополнительные ответы или выбрать другой тариф.</string>
+    <string name="exhausted_body_male">Ты использовал доступные ответы. Можешь получить дополнительные ответы или выбрать другой тариф.</string>
+    <string name="exhausted_body_female">Ты использовала доступные ответы. Можешь получить дополнительные ответы или выбрать другой тариф.</string>
+    <string name="exhausted_body_plans">Доступные ответы закончились. Можешь выбрать другой тариф.</string>
+    <string name="exhausted_later">Позже</string>
+
 </resources>

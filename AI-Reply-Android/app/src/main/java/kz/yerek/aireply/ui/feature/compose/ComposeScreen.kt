@@ -80,6 +80,8 @@ import kz.yerek.aireply.ui.design.LocalExtraColors
 import kz.yerek.aireply.ui.design.PrimaryButton
 import kz.yerek.aireply.ui.design.ReadableColumn
 import kz.yerek.aireply.ui.design.Spacing
+import kz.yerek.aireply.ui.feature.account.ExhaustedRules
+import kz.yerek.aireply.ui.feature.account.ExhaustedSheet
 import kz.yerek.aireply.ui.feature.voice.DictationSheet
 import kz.yerek.aireply.ui.navigation.Routes
 
@@ -149,6 +151,9 @@ fun ComposeScreen(onBack: () -> Unit, onOpen: (String) -> Unit = {}) {
     var reply by remember { mutableStateOf("") }
     var generating by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    // Spent replies are a fact, not a failure: a quiet line, and the sheet with the ways on.
+    var errorIsLimit by remember { mutableStateOf(false) }
+    var exhausted by remember { mutableStateOf<Boolean?>(null) }
     var pasteNotice by remember { mutableStateOf<PasteNotice?>(null) }
     var copied by remember { mutableStateOf(false) }
     var dictatingMessage by remember { mutableStateOf(false) }
@@ -169,6 +174,7 @@ fun ComposeScreen(onBack: () -> Unit, onOpen: (String) -> Unit = {}) {
         // racing it, so rapid taps cannot produce two answers or two bills.
         job?.cancel()
         error = null
+        errorIsLimit = false
         reply = ""
         generating = true
         // A report is about the reply it was opened on.
@@ -194,6 +200,14 @@ fun ComposeScreen(onBack: () -> Unit, onOpen: (String) -> Unit = {}) {
                 val mapped = (exception as? AIReplyException)?.error ?: AIReplyError.ServiceUnavailable
                 if (mapped != AIReplyError.Cancelled) {
                     error = services.strings(services.settings.effectiveAppLanguage).message(mapped)
+                }
+                if (ExhaustedRules.isLimit(mapped)) {
+                    errorIsLimit = true
+                    // The value is whether «Докупить ответы» is offered.
+                    exhausted = ExhaustedRules.offersPurchase(
+                        purchasesOffered = services.purchasesOffered,
+                        canBuy = (exception as? AIReplyException)?.canBuy == true
+                    )
                 }
             }
         }
@@ -356,7 +370,7 @@ fun ComposeScreen(onBack: () -> Unit, onOpen: (String) -> Unit = {}) {
                         Text(
                             it,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error
+                            color = if (errorIsLimit) LocalExtraColors.current.textSecondary else MaterialTheme.colorScheme.error
                         )
                     }
                 }
@@ -431,6 +445,22 @@ fun ComposeScreen(onBack: () -> Unit, onOpen: (String) -> Unit = {}) {
             delay(2_000)
             copied = false
         }
+    }
+
+    exhausted?.let { offersPurchase ->
+        ExhaustedSheet(
+            offersPurchase = offersPurchase,
+            gender = configuration.profile.grammaticalGender,
+            onBuy = {
+                exhausted = null
+                onOpen(Routes.Purchase)
+            },
+            onPlans = {
+                exhausted = null
+                onOpen(Routes.Subscription)
+            },
+            onDismiss = { exhausted = null }
+        )
     }
 
     reports.draft?.let { draft ->

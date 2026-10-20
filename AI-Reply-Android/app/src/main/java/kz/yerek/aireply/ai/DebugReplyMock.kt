@@ -20,7 +20,8 @@ class DebugReplyMock(private val instruction: String) : ReplyTransport {
         val tags = instruction.lowercase()
         delay(if ("#slow" in tags) 6_000L else 700L)
         if ("#offline" in tags) AIReplyError.Offline.raise()
-        if ("#quota" in tags) AIReplyError.QuotaExhausted.raise()
+        // As a server that sells more replies on Android answers.
+        if ("#quota" in tags) throw AIReplyException(AIReplyError.QuotaExhausted, canBuy = true)
         val index = served.getAndIncrement() % REPLIES.size
         return GeneratedReply(text = REPLIES[index])
     }

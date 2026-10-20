@@ -774,12 +774,13 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
 
     /**
      * "Open AI Reply" under «Лимит ответов исчерпан»: where the app has more
-     * replies ([KeyboardAppLink.limit]). The panel is kept as it is, so after
+     * replies ([KeyboardAppLink.limit] - the purchase screen when the server
+     * sells them, else the plans). The panel is kept as it is, so after
      * buying the same request is one tap away.
      */
     private fun openPurchase() {
         leaveFields()
-        KeyboardAppLink.open(this, KeyboardAppLink.limit)
+        KeyboardAppLink.open(this, KeyboardAppLink.limit(AILimits.features))
     }
 
     /** Pause, Resume, Done, Cancel, Try again, Insert and Undo - for the app's field and the panels alike. */

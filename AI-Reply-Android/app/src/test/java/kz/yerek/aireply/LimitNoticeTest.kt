@@ -1,5 +1,6 @@
 package kz.yerek.aireply
 
+import kz.yerek.aireply.ai.AIFeatures
 import kz.yerek.aireply.ai.AIReplyError
 import kz.yerek.aireply.keyboard.KeyboardAppLink
 import kz.yerek.aireply.keyboard.layout.PanelFit
@@ -65,24 +66,28 @@ class LimitNoticeTest {
 
     @Test
     fun `Open AI Reply goes through the push link path to a screen with more replies`() {
-        val extras = KeyboardAppLink.extras(KeyboardAppLink.limit)
-        assertEquals(KeyboardAppLink.limit, extras[PushPayload.KEY_LINK])
-        // MainActivity handles intents that carry a notification id.
-        val payload = PushPayload.from(extras)
-        assertNotNull(payload)
-        val screen = (payload!!.link as AppLink.Screen).screen
-        // Home sells nothing and changes no plan: the purchase screen once
-        // the app has one, the plans until then.
-        assertNotEquals(AppScreen.HOME, screen)
-        assertEquals(AppScreen.fromKey("purchase") ?: AppScreen.SUBSCRIPTION, screen)
-        assertNull("not a notification: nothing is reported as opened", payload.openedRequest("installation-1"))
+        val selling = AIFeatures.NONE.copy(iapAndroid = true)
+        listOf(selling to AppScreen.PURCHASE, AIFeatures.NONE to AppScreen.SUBSCRIPTION).forEach { (features, expected) ->
+            val link = KeyboardAppLink.limit(features)
+            val extras = KeyboardAppLink.extras(link)
+            assertEquals(link, extras[PushPayload.KEY_LINK])
+            // MainActivity handles intents that carry a notification id.
+            val payload = PushPayload.from(extras)
+            assertNotNull(payload)
+            val screen = (payload!!.link as AppLink.Screen).screen
+            // Home sells nothing and changes no plan: the purchase screen when
+            // the server sells replies here, the plans otherwise.
+            assertNotEquals(AppScreen.HOME, screen)
+            assertEquals(expected, screen)
+            assertNull("not a notification: nothing is reported as opened", payload.openedRequest("installation-1"))
+        }
     }
 
     @Test
     fun `the plans link and the purchase link are the contract's`() {
         assertEquals(AppLink.Screen(AppScreen.SUBSCRIPTION), AppLinks.parse(KeyboardAppLink.SUBSCRIPTION))
+        assertEquals(AppLink.Screen(AppScreen.PURCHASE), AppLinks.parse(KeyboardAppLink.PURCHASE))
         assertEquals("aireply://purchase", KeyboardAppLink.PURCHASE)
-        if (AppScreen.fromKey("purchase") != null) assertEquals(KeyboardAppLink.PURCHASE, KeyboardAppLink.limit)
     }
 
     @Test

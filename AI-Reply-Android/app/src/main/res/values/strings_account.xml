@@ -52,4 +52,11 @@
     <string name="settings_debug_sample_store">Sample purchase catalogue</string>
     <string name="settings_debug_sample_store_footer">Debug build only, after a restart of the app. Buy replies shows sample products and a purchase that completes at once, without Google Play or the server.</string>
 
+    <!-- Exhausted sheet -->
+    <string name="exhausted_body">You have used your available replies. You can get more replies or choose another plan.</string>
+    <string name="exhausted_body_male">You have used your available replies. You can get more replies or choose another plan.</string>
+    <string name="exhausted_body_female">You have used your available replies. You can get more replies or choose another plan.</string>
+    <string name="exhausted_body_plans">You have used your available replies. You can choose another plan.</string>
+    <string name="exhausted_later">Later</string>
+
 </resources>

@@ -3,9 +3,8 @@ package kz.yerek.aireply.keyboard
 import android.content.Context
 import android.content.Intent
 import kz.yerek.aireply.MainActivity
-import kz.yerek.aireply.push.AppLink
+import kz.yerek.aireply.ai.AIFeatures
 import kz.yerek.aireply.push.AppLinks
-import kz.yerek.aireply.push.AppScreen
 import kz.yerek.aireply.push.PushPayload
 
 /**
@@ -25,15 +24,15 @@ object KeyboardAppLink {
     /** The app's screen for buying replies (contract §3.5). */
     const val PURCHASE = "aireply://purchase"
 
-    /** The plans: the tariffs, and where more replies are until the app has [PURCHASE]. */
+    /** The plans: the tariffs, and where more replies are while nothing can be bought. */
     const val SUBSCRIPTION = "aireply://subscription"
 
     /**
-     * Where «Открыть AI Reply» goes: the purchase screen once this build's
-     * app has one, the plans until then. Never Home - an unknown screen opens
+     * Where «Открыть AI Reply» goes: the purchase screen when the server sells
+     * replies on Android ([AIFeatures.iapAndroid]), the plans otherwise. Never
      * Home, which neither sells replies nor changes the plan.
      */
-    val limit: String = if (AppLinks.parse(PURCHASE) == AppLink.Screen(AppScreen.HOME)) SUBSCRIPTION else PURCHASE
+    fun limit(features: AIFeatures): String = if (features.iapAndroid) PURCHASE else SUBSCRIPTION
 
     /** Stands in for a notification id: this link came from the keyboard. */
     const val SOURCE = "keyboard"
