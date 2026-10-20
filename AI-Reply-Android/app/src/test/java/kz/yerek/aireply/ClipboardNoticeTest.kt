@@ -145,6 +145,32 @@ class ClipboardNoticeTest {
     }
 
     @Test
+    fun `a late read that finds nothing opens as quietly as an empty clipboard`() {
+        val pending = ContextTextProvider.Result.Deferred {
+            ContextTextProvider.Result.Failure(AIReplyError.NoSourceMessage, ClipboardMiss.NOTHING_COPIED)
+        }
+        h.panels.openReply(h.friend) { pending }
+        val session = h.replies.session!!
+        h.panels.lateSource(session, pending.read(), replacing = false)
+        assertNull("the same as a clip that was empty on the tap", session.flow.error)
+        assertNull(session.clipboardMiss)
+
+        // An unreadable clip is still said: the user did copy something.
+        h.panels.lateSource(session, ContextTextProvider.Result.Failure(AIReplyError.ClipboardUnavailable, ClipboardMiss.UNREADABLE), replacing = false)
+        assertEquals(ClipboardMiss.UNREADABLE, session.clipboardMiss)
+    }
+
+    @Test
+    fun `a late Paste that finds nothing says so, as an immediate one does`() {
+        h.openReply(message = "старое")
+        val session = h.replies.session!!
+        h.panels.lateSource(session, ContextTextProvider.Result.Failure(AIReplyError.NoSourceMessage, ClipboardMiss.NOTHING_COPIED), replacing = true)
+        assertEquals("старое", session.source.text)
+        assertEquals(AIReplyError.NoSourceMessage, session.flow.error)
+        assertEquals(ClipboardMiss.NOTHING_COPIED, session.clipboardMiss)
+    }
+
+    @Test
     fun `a late Paste replaces the message, a late failure only says so`() {
         h.openReply(message = "старое")
         val session = h.replies.session!!

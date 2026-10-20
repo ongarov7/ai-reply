@@ -180,13 +180,19 @@ class KeyboardPanels(
      * [session] it was started for (by a persona or by Paste). It lands only
      * while that session is the one on screen; text arriving for a message
      * field the user has typed into meanwhile is dropped - their words win.
+     *
+     * Nothing to read after a persona tap is as quiet as an empty clipboard
+     * read at once ([ReplySessionController.open]): how the copying app
+     * stored the clip must not change what the user is told. After Paste
+     * ([replacing]) it is said, as an immediate empty Paste says it.
      */
     fun lateSource(session: ReplySession, result: ContextTextProvider.Result, replacing: Boolean) {
         if (replies.session !== session || !replies.isComposing) return
         if (!replacing && session.source.text.isNotBlank()) return
         when (result) {
             is ContextTextProvider.Result.Success -> replies.replaceSource(result.context.text)
-            is ContextTextProvider.Result.Failure -> replies.showError(result.error, result.miss)
+            is ContextTextProvider.Result.Failure ->
+                if (replacing || result.error != AIReplyError.NoSourceMessage) replies.showError(result.error, result.miss)
             is ContextTextProvider.Result.Deferred -> Unit
         }
     }
