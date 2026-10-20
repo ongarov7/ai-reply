@@ -132,11 +132,16 @@ func TestChecksSeparateGoodOutputsFromBadOnes(t *testing.T) {
 		{"en-short-thanks", "Anytime! Glad it helped.", nil},
 		{"en-short-thanks", "You are very welcome! I am really glad that everything worked out for you in the end.", []string{CheckMaxChars}},
 		// Алушы мәнері: клиент пен серіктеске — Вы/Сіз, ол «ты» деп жазса да;
-		// әріптеске — оның өз мәнері; досқа — еркін.
+		// әріптеске — оның өз мәнері; досқа — еркін, ол «Вы» деп жазса да.
 		{"ru-client-informal-incoming", "Здравствуйте! Да, завтра привезём Ваш заказ.", nil},
 		{"ru-client-informal-incoming", "Привет! Да, завтра привезём тебе заказ.", []string{CheckFormality}},
 		{"kk-client-informal-incoming", "Сәлеметсіз бе! Тапсырысыңызды бүгін кешке жібереміз.", nil},
 		{"kk-client-informal-incoming", "Сәлем! Саған бүгін кешке жібереміз.", []string{CheckFormality}},
+		{"ru-partner-informal-incoming", "Добрый день! Да, подписал, пришлю Вам сегодня до вечера.", nil},
+		{"ru-partner-informal-incoming", "Привет! Да, подписал, скину тебе сегодня.", []string{CheckFormality}},
+		{"ru-friend-formal-incoming", "Да, приду, только чуть опоздаю!", nil},
+		{"ru-friend-formal-incoming", "Да, приду к Вам, только чуть опоздаю.", []string{CheckFormality}},
+		{"ru-friend-formal-incoming", "Да, приду, буду рад! Только чуть опоздаю.", []string{CheckGender}},
 		{"ru-partner-alias", "Добрый день! Пришлю подписанный договор в четверг.", nil},
 		{"ru-partner-alias", "Привет! Скину тебе договор в четверг.", []string{CheckFormality}},
 		{"ru-partner-alias", "Добрый день! Будем иметь возможность прислать договор в четверг.", []string{CheckMustNotInclude}},

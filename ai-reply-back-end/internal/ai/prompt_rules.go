@@ -63,10 +63,12 @@ var (
 	//
 	// The hints set the register only (ты/Вы, сен/Сіз, casual or formal
 	// wording); they never name or choose the reply language, which the
-	// copied message decides (LANGUAGE).
+	// copied message decides (LANGUAGE). Client and partner are always
+	// formal and a friend always informal, whatever the incoming message
+	// uses; only a colleague's register follows the message.
 	relationshipHints = map[string]string{
 		"friend": "Replying to a FRIEND. Casual, warm and short, the way friends text each other. Match the emotional tone of the incoming message and keep any humour. " +
-			"Address them informally in whatever language the reply is in: ты, сен, relaxed everyday wording with contractions; use Вы or Сіз only if the friend writes that way. " +
+			"Always address the friend informally in whatever language the reply is in: ты, сен, relaxed everyday wording with contractions, even when the friend writes formally or uses Вы or Сіз. " +
 			"No corporate or customer-service wording.",
 		"client": "Replying to a CLIENT or customer of the user. Polite, professional and helpful, concise; customer-focused but not servile and not bureaucratic. " +
 			"Always address the client formally in whatever language the reply is in: Вы, Сіз, courteous plain wording, even when the client writes casually or uses ты or сен. " +
@@ -75,7 +77,7 @@ var (
 			"Mirror the colleague's register: ты or сен when they write that way, Вы or Сіз when they write formally or the message does not show it; plain friendly workplace wording. " +
 			"No customer-service phrases and no officialese.",
 		"business": "Replying to a BUSINESS PARTNER, someone the user does business with as an equal, such as a supplier, a contractor or a partner company. Formal, respectful and confident, peer to peer. " +
-			"Address them formally in whatever language the reply is in: Вы, Сіз, courteous professional wording; keep ты or сен only if the partner clearly writes that way, and stay businesslike even then. " +
+			"Always address the partner formally in whatever language the reply is in: Вы, Сіз, courteous professional wording, even when the partner writes casually or uses ты or сен. " +
 			"Precise about agreements, terms, dates and next steps, without inventing any. Not customer-service language, not servile, not overly friendly.",
 		"custom": "Replying with a template the user defined. Follow the preferences in <template_instructions>.",
 	}

@@ -554,6 +554,32 @@
     }
   },
   {
+    "id": "ru-partner-informal-incoming",
+    "mode": "reply",
+    "incoming": "Привет, договор подписал? Скинешь сегодня?",
+    "instruction": "Да, подписал, пришлю сегодня до вечера",
+    "template_id": "business",
+    "gender": "male",
+    "input_language": "ru",
+    "expectations": {
+      "language": "ru", "gender_agreement": true, "no_meta": true, "max_sentences": 3, "max_chars": 200,
+      "must_include_any": ["сегодня"], "no_digits": true, "formality": "formal"
+    }
+  },
+  {
+    "id": "ru-friend-formal-incoming",
+    "mode": "reply",
+    "incoming": "Добрый вечер! Вы завтра придёте к нам на ужин?",
+    "instruction": "Да, приду, только чуть опоздаю",
+    "template_id": "friend",
+    "gender": "female",
+    "input_language": "ru",
+    "expectations": {
+      "language": "ru", "gender_agreement": true, "no_meta": true, "max_sentences": 2, "max_chars": 140,
+      "must_include_any": ["приду", "буду"], "no_digits": true, "formality": "informal"
+    }
+  },
+  {
     "id": "ru-partner-alias",
     "mode": "reply",
     "incoming": "Добрый день! Когда сможем получить подписанный договор?",

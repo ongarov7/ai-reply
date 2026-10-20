@@ -126,14 +126,14 @@ func TestRelationshipAliasesMatchCanonicalHints(t *testing.T) {
 	}
 }
 
-// Әр алушыға өз сөйлеу мәнері: клиент пен серіктеске — Вы/Сіз, досқа —
-// ты/сен, әріптеске — оның өз мәнері. The hints set the register only and
-// never name a reply language: the copied message decides it.
+// Әр алушыға өз сөйлеу мәнері: клиент пен серіктеске — әрқашан Вы/Сіз,
+// досқа — әрқашан ты/сен, әріптеске — оның өз мәнері. The hints set the
+// register only and never name a reply language: the copied message decides it.
 func TestRelationshipHintsStateRegister(t *testing.T) {
 	for id, words := range map[string][]string{
-		"client":   {"Вы", "Сіз", "formally", "even when the client writes casually"},
-		"business": {"Вы", "Сіз", "formally", "only if the partner clearly writes that way"},
-		"friend":   {"ты", "сен", "informally", "Casual, warm"},
+		"client":   {"Вы", "Сіз", "Always address the client formally", "even when the client writes casually"},
+		"business": {"Вы", "Сіз", "Always address the partner formally", "even when the partner writes casually"},
+		"friend":   {"ты", "сен", "Always address the friend informally", "even when the friend writes formally", "Casual, warm"},
 		"work":     {"Mirror", "ты or сен", "Вы or Сіз", "Collaborative"},
 	} {
 		hint := relationshipHints[id]
@@ -141,6 +141,14 @@ func TestRelationshipHintsStateRegister(t *testing.T) {
 			if !strings.Contains(hint, word) {
 				t.Errorf("%s hint lacks %q", id, word)
 			}
+		}
+	}
+	// Only a colleague's register follows the incoming message (contract
+	// §3.1): client, partner and friend have no "only if they write that
+	// way" exception.
+	for _, id := range []string{"client", "business", "friend"} {
+		if hint := relationshipHints[id]; strings.Contains(hint, "only if") || strings.Contains(hint, "Mirror") {
+			t.Errorf("%s hint lets the incoming register override it: %q", id, hint)
 		}
 	}
 	for id, hint := range relationshipHints {
@@ -154,13 +162,21 @@ func TestRelationshipHintsStateRegister(t *testing.T) {
 		t.Error("the client hint must keep promises to the profile and the instruction")
 	}
 
-	// A client who writes ты still gets the formal hint, and the style rules
-	// let the relationship decide over the incoming register.
-	in := replyInput()
-	in.Message = "Привет, а доставка завтра будет?"
-	p := BuildPrompt(in)
-	if !strings.Contains(p.Developer, relationshipHints["client"]) || !strings.Contains(p.Developer, "unless the relationship above says otherwise") {
-		t.Fatal("a casual client message must still get the formal client hint")
+	// A client or partner who writes ты still gets the formal hint, a friend
+	// who writes Вы the informal one, and the style rules let the
+	// relationship decide over the incoming register.
+	for _, c := range []struct{ id, message, hint string }{
+		{"client", "Привет, а доставка завтра будет?", "client"},
+		{"partner", "Привет, договор подписал? Скинешь сегодня?", "business"},
+		{"business", "Сәлем, келісімшартты бүгін жібересің бе?", "business"},
+		{"friend", "Добрый вечер! Вы завтра придёте к нам?", "friend"},
+	} {
+		in := replyInput()
+		in.TemplateID, in.Template.Relationship, in.Message = c.id, c.id, c.message
+		p := BuildPrompt(in)
+		if !strings.Contains(p.Developer, relationshipHints[c.hint]) || !strings.Contains(p.Developer, "unless the relationship above says otherwise") {
+			t.Errorf("%s: %q must still get the %s hint", c.id, c.message, c.hint)
+		}
 	}
 }
 
