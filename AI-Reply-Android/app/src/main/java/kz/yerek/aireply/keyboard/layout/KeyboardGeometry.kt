@@ -103,12 +103,20 @@ data class LaidOutKey(
     val style: KeyVisualStyle? = null
 )
 
+/**
+ * A panel of the page, positioned: drawn by Compose over the key canvas, and
+ * owning every touch in [hitFrame] the way a key owns its own.
+ */
+data class LaidOutPanel(val kind: PanelKind, val frame: Box, val hitFrame: Box)
+
 data class PageLayout(
     val page: KeyboardPage,
     val keys: List<LaidOutKey>,
     val width: Float,
     val height: Float,
-    val rowMetrics: RowMetrics
+    val rowMetrics: RowMetrics,
+    /** The emoji grid and its categories bar; empty on every other page. */
+    val panels: List<LaidOutPanel> = emptyList()
 ) {
     /**
      * The key under a point. Anything inside the page resolves to a key; a
@@ -166,23 +174,37 @@ object KeyboardGeometry {
         val width = sizing.width
         val innerWidth = width - sizing.sideInset * 2
         val available = areaHeight - sizing.topInset - sizing.bottomInset
-        val metrics = rowMetrics(page.rows.size, available, sizing)
+        // A panel over the rows (the emoji grid) takes rows' worth of height,
+        // so the page's own rows land where the letters page has them.
+        val above = if (page.panelAbove != null) page.panelRows.coerceAtLeast(0) else 0
+        val rowCount = above + page.rows.size
+        val metrics = rowMetrics(rowCount, available, sizing)
 
         val keys = mutableListOf<LaidOutKey>()
+        val panels = mutableListOf<LaidOutPanel>()
         var rowTop = sizing.topInset
 
         // Where one row's touch band ends and the next one's begins: half the
         // row gap each side, computed ONCE per boundary so the bands meet
         // exactly, and the outer rows reach the very top and bottom.
-        val tops = page.rows.indices.map { sizing.topInset + it * (metrics.key + metrics.gap) }
-        val boundaries = page.rows.indices.map { index ->
+        val tops = (0 until rowCount).map { sizing.topInset + it * (metrics.key + metrics.gap) }
+        val boundaries = (0 until rowCount).map { index ->
             when (index) {
-                page.rows.lastIndex -> areaHeight
+                rowCount - 1 -> areaHeight
                 else -> sizing.pixel(tops[index] + metrics.key + metrics.gap / 2f)
             }
         }
 
+        if (above > 0) {
+            panels += LaidOutPanel(
+                kind = page.panelAbove!!,
+                frame = Box(sizing.sideInset, sizing.pixel(tops[0]), width - sizing.sideInset, sizing.pixel(tops[above - 1] + metrics.key)),
+                hitFrame = Box(0f, 0f, width, boundaries[above - 1])
+            )
+        }
+
         page.rows.forEachIndexed { rowIndex, row ->
+            val band = above + rowIndex
             // A row on its own grid (the bottom row) also takes that grid's
             // gap, so it is identical on every layout.
             val columns = max(row.unitColumns ?: page.columns, 1)
@@ -203,11 +225,11 @@ object KeyboardGeometry {
                         gapCount += max(w.gaps, 0)
                     }
                 }
-                if (index > 0 && slot.key != null && row.slots[index - 1].key != null) gapCount++
+                if (index > 0 && slot.isSolid && row.slots[index - 1].isSolid) gapCount++
             }
             val flexibleWidth = max(0f, innerWidth - fixedWidth - gapCount * gap)
 
-            rowTop = tops[rowIndex]
+            rowTop = tops[band]
             val top = sizing.pixel(rowTop)
             val bottom = sizing.pixel(rowTop + metrics.key)
             var x = sizing.sideInset
@@ -215,19 +237,19 @@ object KeyboardGeometry {
             val placed = mutableListOf<PlacedSlot>()
 
             row.slots.forEachIndexed { index, slot ->
-                if (index > 0 && slot.key != null && row.slots[index - 1].key != null) x += gap
+                if (index > 0 && slot.isSolid && row.slots[index - 1].isSolid) x += gap
                 val slotWidth = when (val w = slot.width) {
                     is KeyWidth.Units -> w.units * unit
                     is KeyWidth.Flexible ->
                         (if (flexibleWeight > 0f) flexibleWidth * max(w.weight, 0f) / flexibleWeight else 0f) +
                             max(w.gaps, 0) * gap
                 }
-                if (slot.key != null) placed += PlacedSlot(slot, sizing.pixel(x), sizing.pixel(x + slotWidth))
+                if (slot.isSolid) placed += PlacedSlot(slot, sizing.pixel(x), sizing.pixel(x + slotWidth))
                 x += slotWidth
             }
 
-            val bandTop = if (rowIndex == 0) 0f else boundaries[rowIndex - 1]
-            val bandBottom = boundaries[rowIndex]
+            val bandTop = if (band == 0) 0f else boundaries[band - 1]
+            val bandBottom = boundaries[band]
 
             placed.forEachIndexed { index, key ->
                 // Horizontal: the midpoint to each neighbour, and the screen
@@ -238,19 +260,26 @@ object KeyboardGeometry {
                 } else {
                     sizing.pixel((key.right + placed[index + 1].left) / 2f)
                 }
-                keys += LaidOutKey(
-                    key = key.slot.key!!,
-                    frame = Box(key.left, top, key.right, bottom),
-                    hitFrame = Box(left, bandTop, right, bandBottom),
-                    row = rowIndex,
-                    alternates = key.slot.alternates,
-                    hint = key.slot.hint,
-                    style = key.slot.style
-                )
+                val frame = Box(key.left, top, key.right, bottom)
+                val hitFrame = Box(left, bandTop, right, bandBottom)
+                val panel = key.slot.panel
+                if (panel != null) {
+                    panels += LaidOutPanel(panel, frame, hitFrame)
+                } else {
+                    keys += LaidOutKey(
+                        key = key.slot.key!!,
+                        frame = frame,
+                        hitFrame = hitFrame,
+                        row = rowIndex,
+                        alternates = key.slot.alternates,
+                        hint = key.slot.hint,
+                        style = key.slot.style
+                    )
+                }
             }
 
         }
 
-        return PageLayout(page, keys, width, areaHeight, metrics)
+        return PageLayout(page, keys, width, areaHeight, metrics, panels)
     }
 }

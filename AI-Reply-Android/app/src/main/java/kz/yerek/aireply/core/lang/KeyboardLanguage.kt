@@ -50,13 +50,19 @@ enum class KeyboardLanguage(val code: String) {
 }
 
 /**
- * Letters, the two punctuation planes behind ?123 and =\<, and the number
- * pads a field that only takes numbers opens on.
+ * Letters, the two punctuation planes behind ?123 and =\<, the emoji page,
+ * and the number pads a field that only takes numbers opens on.
  */
 enum class KeyboardPlane {
     LETTERS,
     NUMBERS,
     SYMBOLS,
+
+    /**
+     * The emoji grid, with ABC, the categories and delete under it. Reached
+     * from the letters' emoji key; never a field's own page, and not a pad.
+     */
+    EMOJI,
 
     /** A dialler's keypad, for phone numbers: `* 0 #`, `+ ( ) -`. */
     PHONE_PAD,

@@ -43,6 +43,12 @@ data class FieldKeys(
     val isNumeric: Boolean get() = plane.isPad
 
     /**
+     * Emoji belong here: a plain text field. Not an e-mail address, a URL, a
+     * password or a number - Gboard leaves its emoji key out of those too.
+     */
+    val takesEmoji: Boolean get() = kind == FieldKind.TEXT && !password && !isNumeric
+
+    /**
      * The page to show as this field starts, [current] being the page up now
      * and [previous] the field before this one.
      *
@@ -55,9 +61,13 @@ data class FieldKeys(
      *  * While an AI panel is open the keys type into the panel's fields,
      *    which are text: the letters, or the page the user picked there -
      *    never a pad.
+     *  * The emoji page never carries over into a field that takes no emoji
+     *    (a password, an address, a number): that field's own page opens.
+     *    A restart of a chat's field keeps it, as it keeps ?123.
      */
     fun startPlane(current: KeyboardPlane, previous: FieldKeys, restarting: Boolean, composing: Boolean): KeyboardPlane =
         when {
+            current == KeyboardPlane.EMOJI && !composing && !takesEmoji -> plane
             composing -> if (restarting && !current.isPad) current else KeyboardPlane.LETTERS
             restarting && previous.plane == plane -> current
             else -> plane

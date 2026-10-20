@@ -9,6 +9,7 @@ import kz.yerek.aireply.keyboard.layout.KeyboardPage
 import kz.yerek.aireply.keyboard.layout.KeyboardSizing
 import kz.yerek.aireply.keyboard.layout.PageLayout
 import kz.yerek.aireply.keyboard.layout.PageOptions
+import kz.yerek.aireply.keyboard.layout.PanelKind
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -16,6 +17,10 @@ import org.junit.Test
 
 /** Key frames and hit boxes: no dead zones, one height, sensible sizes. */
 class KeyboardGeometryTest {
+
+    /** Who owns a point: the keys and the panels (the emoji grid and its bar) together. */
+    private fun PageLayout.owners(x: Float, y: Float): Int =
+        keys.count { it.hitFrame.contains(x, y) } + panels.count { it.hitFrame.contains(x, y) }
 
     private val widths = listOf(320f, 360f, 393f, 411f, 480f)
 
@@ -34,8 +39,7 @@ class KeyboardGeometryTest {
             while (y < page.height) {
                 var x = 0.5f
                 while (x < page.width) {
-                    val owners = page.keys.count { it.hitFrame.contains(x, y) }
-                    assertEquals("$language $plane w=$width at ($x, $y)", 1, owners)
+                    assertEquals("$language $plane w=$width at ($x, $y)", 1, page.owners(x, y))
                     x += 1.7f
                 }
                 y += 1.3f
@@ -125,7 +129,7 @@ class KeyboardGeometryTest {
         while (y < layout.height) {
             var x = 0.5f
             while (x < layout.width) {
-                assertEquals("$label at ($x, $y)", 1, layout.keys.count { it.hitFrame.contains(x, y) })
+                assertEquals("$label at ($x, $y)", 1, layout.owners(x, y))
                 x += 2.3f
             }
             y += 1.9f
@@ -180,6 +184,8 @@ class KeyboardGeometryTest {
                     assertEquals(label, height, layout.height, 0.001f)
                     assertTrue(label, layout.keys.all { it.frame.top >= sizing.topInset - 0.5f })
                     assertTrue(label, layout.keys.all { it.frame.bottom <= height - sizing.bottomInset + 0.5f })
+                    assertTrue(label, layout.panels.all { it.frame.top >= sizing.topInset - 0.5f })
+                    assertTrue(label, layout.panels.all { it.frame.bottom <= height - sizing.bottomInset + 0.5f })
                     // No page squeezes its keys below the tallest page's.
                     val tallest = KeyboardLayout.maximumRowCount(languages)
                     val floor = KeyboardGeometry.rowMetrics(tallest, height - sizing.topInset - sizing.bottomInset, sizing).key - 0.01f
@@ -242,5 +248,90 @@ class KeyboardGeometryTest {
         val zeroY = plain.keys.first { it.key == KeyboardKey.Character("0") }.frame.centerY
         assertEquals(KeyboardKey.Character("0"), plain.keys[plain.keyIndex(nine.right - 2f, zeroY)!!].key)
         assertEquals(KeyboardKey.Character("0"), plain.keys[plain.keyIndex(nine.left + 2f, zeroY)!!].key)
+    }
+
+    // ------------------------------------------------------------- emoji
+
+    /** The emoji page and the letters with the emoji key, beside the letters as they always were. */
+    @Test
+    fun `the emoji page tiles its area, panels included`() {
+        for ((sizing, screenHeight) in screens) for (language in KeyboardLanguage.entries) {
+            val height = area(sizing, screenHeight, KeyboardLanguage.CYCLE_ORDER)
+            listOf(
+                KeyboardLayout.page(language, KeyboardPlane.EMOJI, PageOptions()),
+                KeyboardLayout.page(language, KeyboardPlane.LETTERS, PageOptions(showsEmojiKey = true, showsGlobeKey = true))
+            ).forEach { page ->
+                val label = "$language ${page.plane} w=${sizing.width} landscape=${sizing.isLandscape}"
+                val layout = KeyboardGeometry.layout(page, sizing, height)
+                assertTiles(layout, label)
+                assertNoOverlaps(layout, label)
+                layout.panels.forEach { panel ->
+                    assertTrue("$label: ${panel.kind} inside its touch area",
+                        panel.hitFrame.left <= panel.frame.left && panel.frame.right <= panel.hitFrame.right &&
+                            panel.hitFrame.top <= panel.frame.top && panel.frame.bottom <= panel.hitFrame.bottom)
+                }
+            }
+        }
+    }
+
+    /**
+     * ABC is where ?123 is and delete where return is: the emoji page's
+     * bottom row is the letters' own, for every layout set, so the keys
+     * under the thumbs do not move when the page changes.
+     */
+    @Test
+    fun `the emoji page's bottom row sits exactly where the letters' does`() {
+        val sets = (1 until (1 shl 3)).map { mask -> KeyboardLanguage.CYCLE_ORDER.filterIndexed { i, _ -> mask and (1 shl i) != 0 } }
+        for ((sizing, screenHeight) in screens) for (languages in sets) for (language in languages) {
+            val height = area(sizing, screenHeight, languages)
+            val letters = KeyboardGeometry.layout(
+                KeyboardLayout.page(language, KeyboardPlane.LETTERS, PageOptions(showsEmojiKey = true)), sizing, height
+            )
+            val emoji = KeyboardGeometry.layout(KeyboardLayout.page(language, KeyboardPlane.EMOJI, PageOptions()), sizing, height)
+            val label = "$languages $language w=${sizing.width} landscape=${sizing.isLandscape}"
+            val numbers = letters.keys.first { it.key == KeyboardKey.Plane(KeyboardPlane.NUMBERS) }
+            val enter = letters.keys.first { it.key == KeyboardKey.Return }
+            val abc = emoji.keys.first { it.key == KeyboardKey.Plane(KeyboardPlane.LETTERS) }
+            val delete = emoji.keys.first { it.key == KeyboardKey.Backspace }
+            val pixel = 1f / sizing.density + 0.01f
+            fun same(a: kz.yerek.aireply.keyboard.layout.Box, b: kz.yerek.aireply.keyboard.layout.Box) {
+                assertEquals(label, a.left, b.left, pixel)
+                assertEquals(label, a.top, b.top, pixel)
+                assertEquals(label, a.right, b.right, pixel)
+                assertEquals(label, a.bottom, b.bottom, pixel)
+            }
+            same(numbers.frame, abc.frame)
+            same(enter.frame, delete.frame)
+            same(numbers.hitFrame, abc.hitFrame)
+            assertEquals(label, letters.rowMetrics, emoji.rowMetrics)
+
+            val bar = emoji.panels.single { it.kind == PanelKind.EMOJI_CATEGORIES }
+            val grid = emoji.panels.single { it.kind == PanelKind.EMOJI_GRID }
+            assertEquals(label, abc.frame.top, bar.frame.top, 0.001f)
+            assertEquals(label, abc.frame.bottom, bar.frame.bottom, 0.001f)
+            assertTrue(label, bar.frame.left > abc.frame.right && bar.frame.right < delete.frame.left)
+            // The grid takes every row above, from the top of the area.
+            assertEquals(label, 0f, grid.hitFrame.top, 0.001f)
+            assertEquals(label, abc.hitFrame.top, grid.hitFrame.bottom, 0.001f)
+            assertEquals(label, sizing.width, grid.hitFrame.width, 0.001f)
+        }
+    }
+
+    @Test
+    fun `the emoji key leaves the space bar wide enough`() {
+        for (width in widths) {
+            val sizing = KeyboardSizing(width, isLandscape = false, density = 2.625f)
+            val height = sizing.keyAreaHeight(KeyboardLayout.maximumRowCount(KeyboardLanguage.CYCLE_ORDER))
+            val crowded = PageOptions(showsGlobeKey = true, showsLanguageKey = true, showsEmojiKey = true)
+            val layout = KeyboardGeometry.layout(KeyboardLayout.page(KeyboardLanguage.KAZAKH, KeyboardPlane.LETTERS, crowded), sizing, height)
+            val space = layout.keys.first { it.key == KeyboardKey.Space }
+            val numbers = layout.keys.first { it.key == KeyboardKey.Plane(KeyboardPlane.NUMBERS) }
+            val unit = numbers.frame.width / KeyboardLayout.MODIFIER_UNITS
+            assertTrue("w=$width space=${space.frame.width}", space.frame.width >= 85f)
+            assertTrue("w=$width space=${space.frame.width} unit=$unit", space.frame.width >= unit * 3f)
+            // The emoji key is a whole key, the size of the comma's.
+            val emoji = layout.keys.first { it.key == KeyboardKey.Plane(KeyboardPlane.EMOJI) }
+            assertTrue("w=$width", emoji.frame.width >= unit - 0.5f)
+        }
     }
 }

@@ -24,8 +24,21 @@ sealed interface KeyWidth {
 }
 
 /**
- * One position on a row: a key, or an empty spacer that only takes width.
- * Spacers draw nothing and own no touches - the neighbouring keys do.
+ * A part of a page that is not drawn as keys: Compose lays it over the key
+ * canvas and takes every touch inside its area.
+ */
+enum class PanelKind {
+    /** The emoji grid, above the emoji page's bottom row. */
+    EMOJI_GRID,
+
+    /** The emoji categories, between ABC and delete. */
+    EMOJI_CATEGORIES
+}
+
+/**
+ * One position on a row: a key, a [panel], or an empty spacer that only
+ * takes width. Spacers draw nothing and own no touches - the neighbouring
+ * keys do. A panel owns its touches like a key.
  */
 data class KeySlot(
     val key: KeyboardKey?,
@@ -39,11 +52,17 @@ data class KeySlot(
      * not say: on a number pad the digits are drawn like letters wherever
      * they are, and the side columns like the controls. Null everywhere else.
      */
-    val style: KeyVisualStyle? = null
+    val style: KeyVisualStyle? = null,
+    /** Not a key but a panel standing in a key's place on the row. */
+    val panel: PanelKind? = null
 ) {
+    /** Takes touches and gaps like a key: a key or a panel, not a spacer. */
+    val isSolid: Boolean get() = key != null || panel != null
+
     companion object {
         val ONE = KeyWidth.Units(1f)
         fun spacer(width: KeyWidth) = KeySlot(null, width)
+        fun panel(kind: PanelKind, width: KeyWidth) = KeySlot(null, width, panel = kind)
     }
 }
 
@@ -66,7 +85,15 @@ data class KeyboardPage(
      * pads' 6, which sizes their side columns.
      */
     val columns: Int,
-    val rows: List<KeyRow>
+    val rows: List<KeyRow>,
+    /** A panel over the rows - the emoji grid - in [panelRows] rows' worth of height. */
+    val panelAbove: PanelKind? = null,
+    /**
+     * The rows of height [panelAbove] takes, as if they were key rows: the
+     * page is laid out as `panelRows + rows.size` rows, so its own rows sit
+     * exactly where the letters page has its bottom ones.
+     */
+    val panelRows: Int = 0
 ) {
     val characterRows: List<List<String>>
         get() = rows.map { row ->
@@ -91,7 +118,13 @@ data class PageOptions(
      * A row of digits over the letters, as Gboard has in password fields.
      * The caller asks for it only where [KeyboardLayout.numberRowFits].
      */
-    val numberRow: Boolean = false
+    val numberRow: Boolean = false,
+    /**
+     * The emoji key right after ?123 on the letters. Off by default and off
+     * where emoji do not belong: e-mail, URL and password fields; pads have
+     * no bottom row to put it in.
+     */
+    val showsEmojiKey: Boolean = false
 )
 
 // ----------------------------------------------------------------- layouts
@@ -114,6 +147,10 @@ data class PageOptions(
  * ?123 and =\< are Gboard's two punctuation pages. The currency key is `₸` on
  * the Kazakh and Russian layouts and `$` on the English one; the other
  * currencies are a long press away.
+ *
+ * The emoji key sits right after ?123 on the letters ([PageOptions.showsEmojiKey]);
+ * its page ([emojiPage]) is the emoji grid over a bottom row of ABC, the
+ * categories and delete, at the letters' own height.
  *
  * A field that only takes numbers opens on a pad instead ([padPage]): a
  * phone keypad, a number pad or a date pad, with big keys and ABC to escape
@@ -179,6 +216,8 @@ object KeyboardLayout {
     fun rowCount(language: KeyboardLanguage, plane: KeyboardPlane): Int = when (plane) {
         KeyboardPlane.LETTERS -> letters(language).size + 1
         KeyboardPlane.NUMBERS, KeyboardPlane.SYMBOLS -> 4
+        // The grid takes the letters' rows above the bottom one.
+        KeyboardPlane.EMOJI -> rowCount(language, KeyboardPlane.LETTERS)
         KeyboardPlane.PHONE_PAD, KeyboardPlane.NUMBER_PAD, KeyboardPlane.DATE_PAD -> PAD_ROWS.size + 1
     }
 
@@ -216,6 +255,7 @@ object KeyboardLayout {
             KeyboardPlane.LETTERS -> lettersPage(language, options)
             KeyboardPlane.NUMBERS -> punctuationPage(language, plane, numbers(language), options)
             KeyboardPlane.SYMBOLS -> punctuationPage(language, plane, symbols(language), options)
+            KeyboardPlane.EMOJI -> emojiPage(language)
             KeyboardPlane.PHONE_PAD -> padPage(
                 language, plane,
                 side = listOf("+", "(", ")", "-"),
@@ -307,6 +347,34 @@ object KeyboardLayout {
             bottomRow(language, KeyboardPlane.LETTERS, options)
         )
         return KeyboardPage(language, plane, columns = 10, rows = result)
+    }
+
+    /**
+     * The emoji page: the grid over one row of ABC, the categories and
+     * delete - ABC where ?123 is and delete where return is, on the bottom
+     * row's 10-column grid, at the height and place of the letters' bottom
+     * row. ABC goes back to the letters as they were.
+     *
+     * Эмодзи беті: тор, астында ABC, санаттар және өшіру.
+     */
+    private fun emojiPage(language: KeyboardLanguage): KeyboardPage {
+        val modifier = KeyWidth.Units(MODIFIER_UNITS)
+        val bar = KeyRow(
+            listOf(
+                KeySlot(KeyboardKey.Plane(KeyboardPlane.LETTERS), modifier),
+                KeySlot.panel(PanelKind.EMOJI_CATEGORIES, KeyWidth.Flexible(1f)),
+                KeySlot(KeyboardKey.Backspace, modifier)
+            ),
+            unitColumns = 10
+        )
+        return KeyboardPage(
+            language = language,
+            plane = KeyboardPlane.EMOJI,
+            columns = 10,
+            rows = listOf(bar),
+            panelAbove = PanelKind.EMOJI_GRID,
+            panelRows = rowCount(language, KeyboardPlane.LETTERS) - 1
+        )
     }
 
     /** The pads' digits above the row with `0`. */
@@ -410,12 +478,15 @@ object KeyboardLayout {
     }
 
     /**
-     * ?123 / ABC, the comma (or the globe when Android asks for one), the
-     * layout key, space, the full stop and return - sized on the 10-column
-     * grid so the row is identical on every layout.
+     * ?123 / ABC, the emoji key (letters only), the comma (or the globe when
+     * Android asks for one), the layout key, space, the full stop and return -
+     * sized on the 10-column grid so the row is identical on every layout.
      */
     private fun bottomRow(language: KeyboardLanguage, planeKey: KeyboardPlane, options: PageOptions): KeyRow {
         val slots = mutableListOf(KeySlot(KeyboardKey.Plane(planeKey), KeyWidth.Units(MODIFIER_UNITS)))
+
+        // The letters' row only: ?123 and =\< stay exactly as they were.
+        if (options.showsEmojiKey && planeKey == KeyboardPlane.NUMBERS) slots += KeySlot(KeyboardKey.Plane(KeyboardPlane.EMOJI))
 
         // The left of space holds one key: the system keyboard switch when
         // Android wants one offered, otherwise the field's own character.
@@ -531,9 +602,17 @@ data class KeyboardLabels(val language: KeyboardLanguage) {
         KeyboardPlane.LETTERS -> letters
         KeyboardPlane.NUMBERS -> "?123"
         KeyboardPlane.SYMBOLS -> "=\\<"
+        // Drawn as a face; the name is what TalkBack reads.
+        KeyboardPlane.EMOJI -> emoji
         // No key leads to a pad - the field opens on it - but a name it has.
         KeyboardPlane.PHONE_PAD, KeyboardPlane.NUMBER_PAD, KeyboardPlane.DATE_PAD -> "123"
     }
+
+    val emoji: String
+        get() = when (language) {
+            KeyboardLanguage.ENGLISH -> "Emoji"
+            KeyboardLanguage.RUSSIAN, KeyboardLanguage.KAZAKH -> "Эмодзи"
+        }
 
     val badge: String get() = language.badge
 
