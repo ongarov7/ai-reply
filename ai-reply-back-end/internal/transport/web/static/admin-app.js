@@ -46,6 +46,7 @@
     if (parts[1] === "audit") return { name: "audit" };
     if (parts[1] === "reports") return { name: "reports" };
     if (parts[1] === "settings") return { name: "settings" };
+    if (parts[1] === "diagnostics") return { name: "diagnostics" };
     if (parts[1] === "notifications") {
       if (parts[2] === "new") return { name: "notifications", tab: "create" };
       if (parts[2] === "campaigns" && parts[3]) return { name: "notifications", tab: "campaign", id: parts[3] };
@@ -787,6 +788,8 @@
               </div>
             </div>
 
+            <user-diagnostics :id="data.user.id" :active="data.user.status === 'active'"/>
+
             <div class="card">
               <div class="card-head"><h2>{{ t('admin.user.payments') }}</h2></div>
               <div class="table-wrap">
@@ -1197,6 +1200,7 @@
             <button class="btn btn-primary" :disabled="savingLimits" @click="saveLimits">{{ t('common.save') }}</button>
           </div>
         </div>
+        <reminder-settings/>
         <div class="card">
           <div class="card-head"><h2>{{ t('admin.settings.pricing') }}</h2></div>
           <div class="table-wrap">
@@ -1238,12 +1242,14 @@
   var DEFAULT_PUSH_META = {
     status: { enabled: false, worker: false, fcm: false, email: false, link_hosts: [] },
     categories: ["subscription", "system", "marketing"],
-    screens: ["home", "subscription", "settings", "notifications", "templates", "profile", "keyboard", "compose"],
+    screens: ["home", "subscription", "settings", "notifications", "templates", "profile", "keyboard", "compose",
+      "onboarding", "permissions", "paste_help", "support", "purchase"],
     content_locales: ["kk", "ru", "en", "uz"], required_locales: ["kk", "ru", "en"], fallback_locale: "ru",
     languages: ["kk", "ru", "en", "uz"], segments: ["all", "free", "paid", "demo"],
     subscription: ["active", "expired"], quota: ["has_remaining", "near_exhaustion", "exhausted"],
     platforms: ["android", "ios"], channels: ["push", "email"],
-    types: ["subscription_activated", "subscription_expiring", "subscription_expired", "quota_low", "quota_exhausted"],
+    types: ["subscription_activated", "subscription_expiring", "subscription_expired", "quota_low", "quota_exhausted",
+      "onboarding_incomplete", "keyboard_setup_incomplete", "clipboard_help", "account_info"],
     limits: { title: 80, body: 400, data_keys: 10, recipients: 500 }
   };
   var DATA_KEY_PATTERN = /^[a-z][a-z0-9_]{0,31}$/;
@@ -1351,6 +1357,7 @@
     if (a.platforms && a.platforms.length) out.push(t("admin.push.audience.platforms") + ": " + a.platforms.map(platformName).join(", "));
     if (a.languages && a.languages.length) out.push(t("admin.push.audience.languages") + ": " + a.languages.map(langName).join(", "));
     if (a.quota) out.push(t("admin.push.audience.quota") + ": " + t("admin.push.quota." + a.quota));
+    if (a.diagnostics) out.push(t("admin.nav.diagnostics") + ": " + t("admin.diag.filter." + a.diagnostics));
     var people = (a.user_ids || []).length + (a.emails || []).length;
     if (people) out.push(tf("admin.push.summary.people", { n: people }));
     if (!out.length) out.push(t("admin.push.summary.everyone"));
@@ -2554,6 +2561,261 @@
       </div>`
   };
 
+  /* -------------------------------------------------------- diagnostics */
+  // Пернетақта мен рұқсаттар диагностикасы: тек күйлер мен уақыт, буфер мазмұны ешқашан.
+  var DIAGNOSTIC_STATUSES = ["unknown", "not_verified", "verified_enabled", "observed_denied", "user_reported_disabled", "unsupported"];
+  var DIAGNOSTIC_FILTERS = ["", "setup_incomplete", "keyboard_not_verified", "paste_problems", "full_access_disabled",
+    "notifications_disabled", "unknown"];
+  var REMINDER_TYPES = ["onboarding_incomplete", "keyboard_setup_incomplete", "clipboard_help", "account_info"];
+
+  // diagBadge — расталған сәтсіздік қызыл, «белгісіз» бөлек сұр (ол дәлел емес).
+  function diagBadge(v) {
+    if (v === "verified_enabled" || v === "completed") return "badge-ok";
+    if (v === "observed_denied" || v === "user_reported_disabled") return "badge-danger";
+    if (v === "not_verified" || v === "not_started" || v === "in_progress") return "badge-warn";
+    return "badge-muted";
+  }
+  function diagLabel(field, v) {
+    if (!v) return "—";
+    return field === "onboarding_status" ? t("admin.diag.onboarding." + v) : t("admin.diag.status." + v);
+  }
+  // sendReminder — еске салу науқаны (Idempotency-Key бір әрекетке бір).
+  async function sendReminder(type, audience, key) {
+    return api("/notifications/reminders", { method: "POST", body: { type: type, audience: audience },
+      headers: { "Idempotency-Key": key } });
+  }
+
+  var DiagnosticsPage = {
+    mixins: [listView({ endpoint: "/diagnostics", rowsKey: "rows", limit: 50, defaults: { filter: "", platform: "", q: "" } })],
+    data: function () {
+      return { counts: {}, chips: DIAGNOSTIC_FILTERS, types: REMINDER_TYPES, reminderType: "keyboard_setup_incomplete",
+        sending: false, idemKey: uuid() };
+    },
+    methods: Object.assign({}, helpers, {
+      diagBadge: diagBadge, diagLabel: diagLabel, uuid: uuid,
+      async load() {
+        this.loading = true;
+        this.error = "";
+        try {
+          var data = await api("/diagnostics" + toQuery(Object.assign({}, this.filters, { page: this.page, limit: this.limit })));
+          this.rows = data.rows || [];
+          this.total = data.total || 0;
+          this.counts = data.counts || {};
+        } catch (e) {
+          this.rows = [];
+          this.total = 0;
+          this.error = errorText(e);
+        }
+        this.loading = false;
+      },
+      pick(f) { this.filters.filter = f; this.idemKey = uuid(); this.search(); },
+      async remind() {
+        var audience = { diagnostics: this.filters.filter };
+        if (this.filters.platform) audience.platforms = [this.filters.platform];
+        var ask = tf("admin.diag.reminder_confirm", { type: t("admin.push.type." + this.reminderType), n: nf(this.total) });
+        if (!window.confirm(ask)) return;
+        this.sending = true;
+        try {
+          var campaign = await sendReminder(this.reminderType, audience, this.idemKey);
+          toast("ok", t("admin.diag.reminder_sent"));
+          navigate("/admin/notifications/campaigns/" + campaign.id);
+        } catch (e) {
+          toast("danger", errorText(e));
+        } finally {
+          this.sending = false;
+        }
+      }
+    }),
+    template: `
+      <div class="card">
+        <div class="card-head"><h2>{{ t('admin.diag.title') }}</h2></div>
+        <div class="card-body">
+          <p class="muted" style="margin-top:0">{{ t('admin.diag.hint') }}</p>
+          <div class="chips">
+            <button type="button" v-for="f in chips" :key="f" :class="'chip' + (filters.filter === f ? ' is-on' : '')"
+                    @click="pick(f)">{{ t('admin.diag.filter.' + (f || 'all')) }}
+              <span class="badge badge-muted">{{ nf(counts[f || 'all'] || 0) }}</span></button>
+          </div>
+        </div>
+        <form class="filter-grid" @submit.prevent="search">
+          <label><span>{{ t('admin.users.col_platform') }}</span>
+            <select v-model="filters.platform" @change="search">
+              <option value="">{{ t('common.all') }}</option>
+              <option value="ios">iOS</option><option value="android">Android</option>
+            </select></label>
+          <label><span>{{ t('common.search') }}</span>
+            <input type="text" v-model.trim="filters.q" spellcheck="false" :placeholder="t('admin.diag.search_hint')"></label>
+          <div class="filter-actions">
+            <button type="submit" class="btn btn-sm btn-primary">{{ t('common.search') }}</button>
+            <button type="button" class="btn btn-sm" @click="reset">{{ t('common.reset') }}</button>
+          </div>
+        </form>
+        <div class="card-body" v-if="filters.filter && filters.filter !== 'unknown' && filters.filter !== 'notifications_disabled'">
+          <div class="form-grid">
+            <label class="field"><span>{{ t('admin.diag.reminder_type') }}</span>
+              <select v-model="reminderType" @change="idemKey = uuid()">
+                <option v-for="k in types" :key="k" :value="k">{{ t('admin.push.type.' + k) }}</option>
+              </select></label>
+          </div>
+          <button type="button" class="btn btn-primary" :disabled="sending || !total" @click="remind">{{ t('admin.diag.reminder') }}</button>
+          <p class="hint">{{ t('admin.diag.reminder_hint') }}</p>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>{{ t('admin.diag.col.device') }}</th><th>{{ t('admin.push.delivery.user') }}</th>
+              <th>{{ t('admin.diag.col.keyboard') }}</th><th>{{ t('admin.diag.col.full_access') }}</th>
+              <th>{{ t('admin.diag.col.clipboard') }}</th><th>{{ t('admin.diag.col.onboarding') }}</th>
+              <th>{{ t('admin.diag.col.notifications') }}</th><th>{{ t('admin.diag.col.reported') }}</th></tr></thead>
+            <tbody>
+              <tr v-if="loading" v-for="n in 5" :key="'s' + n"><td colspan="8"><div class="skeleton-row"></div></td></tr>
+              <tr v-else v-for="r in rows" :key="r.id">
+                <td>{{ r.device || platformName(r.platform) }}
+                  <div class="mono small">{{ platformName(r.platform) }} {{ r.app_version }} · {{ r.installation_id }}</div></td>
+                <td><a v-if="r.user_id" class="link" :href="userLink(r.user_id)" @click.prevent="go(userLink(r.user_id))">{{ r.user }}</a>
+                  <span v-else class="muted">{{ t('admin.diag.anonymous') }}</span></td>
+                <td><span :class="'badge ' + diagBadge(r.diagnostics.keyboard_setup_status)">{{ diagLabel('keyboard_setup_status', r.diagnostics.keyboard_setup_status) }}</span>
+                  <div class="muted small">{{ t('admin.diag.col.selected') }}: {{ diagLabel('keyboard_selected_status', r.diagnostics.keyboard_selected_status) }}</div>
+                  <div class="muted small" v-if="r.diagnostics.last_keyboard_check_at">{{ t('admin.diag.col.last_check') }}: {{ r.diagnostics.last_keyboard_check_at }}</div></td>
+                <td><span :class="'badge ' + diagBadge(r.diagnostics.full_access_status)">{{ diagLabel('full_access_status', r.diagnostics.full_access_status) }}</span></td>
+                <td><span :class="'badge ' + diagBadge(r.diagnostics.clipboard_status)">{{ diagLabel('clipboard_status', r.diagnostics.clipboard_status) }}</span>
+                  <div class="muted small" v-if="r.diagnostics.last_successful_paste_at">{{ t('admin.diag.col.last_paste') }}: {{ r.diagnostics.last_successful_paste_at }}</div></td>
+                <td><span :class="'badge ' + diagBadge(r.diagnostics.onboarding_status)">{{ diagLabel('onboarding_status', r.diagnostics.onboarding_status) }}</span></td>
+                <td><span :class="'badge ' + diagBadge(r.diagnostics.notification_authorization_status)">{{ diagLabel('notification_authorization_status', r.diagnostics.notification_authorization_status) }}</span></td>
+                <td class="mono nowrap">{{ r.diagnostics.reported_at }}
+                  <div class="small">{{ t('admin.diag.source.' + (r.diagnostics.status_source || 'unknown')) }}</div>
+                  <span v-if="r.diagnostics.stale" class="badge badge-muted">{{ t('admin.diag.stale') }}</span></td>
+              </tr>
+              <tr v-if="!loading && !rows.length"><td colspan="8" class="empty">
+                <span v-if="error" class="load-error" role="alert">{{ error }}
+                  <button type="button" class="btn btn-sm" @click="load">{{ t('common.refresh') }}</button></span>
+                <span v-else>{{ t('common.empty') }}</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <pager :page="page" :limit="limit" :total="total" @move="move"/>
+      </div>`
+  };
+
+  // UserDiagnostics — қолданушы бетіндегі «Пернетақта мен рұқсаттар» карточкасы.
+  var UserDiagnostics = {
+    props: { id: String, active: Boolean },
+    data: function () {
+      return { data: null, types: REMINDER_TYPES, reminderType: "keyboard_setup_incomplete", sending: false, idemKey: uuid() };
+    },
+    mounted: function () { this.load(); },
+    methods: Object.assign({}, helpers, {
+      diagBadge: diagBadge, diagLabel: diagLabel, uuid: uuid,
+      async load() {
+        try { this.data = await api("/users/" + encodeURIComponent(this.id) + "/diagnostics"); }
+        catch (e) { this.data = { devices: [], reminders: [] }; toast("danger", errorText(e)); }
+      },
+      async remind() {
+        if (!window.confirm(t("admin.diag.reminder") + ": " + t("admin.push.type." + this.reminderType) + "?")) return;
+        this.sending = true;
+        try {
+          await sendReminder(this.reminderType, { user_ids: [this.id] }, this.idemKey);
+          this.idemKey = uuid();
+          toast("ok", t("admin.diag.reminder_sent"));
+          this.load();
+        } catch (e) {
+          toast("danger", errorText(e));
+        } finally {
+          this.sending = false;
+        }
+      }
+    }),
+    template: `
+      <div class="card" v-if="data">
+        <div class="card-head"><h2>{{ t('admin.diag.user_card') }}</h2></div>
+        <div class="card-body">
+          <div v-for="d in data.devices" :key="d.id" style="margin-bottom:12px">
+            <b>{{ d.device || platformName(d.platform) }}</b> · <span class="mono small">{{ platformName(d.platform) }} {{ d.app_version }}</span>
+            <div v-if="!d.diagnostics.reported" class="muted small">{{ t('admin.diag.not_reported') }}</div>
+            <dl class="kv" v-else>
+              <dt>{{ t('admin.diag.col.keyboard') }}</dt><dd><span :class="'badge ' + diagBadge(d.diagnostics.keyboard_setup_status)">{{ diagLabel('keyboard_setup_status', d.diagnostics.keyboard_setup_status) }}</span></dd>
+              <dt>{{ t('admin.diag.col.full_access') }}</dt><dd><span :class="'badge ' + diagBadge(d.diagnostics.full_access_status)">{{ diagLabel('full_access_status', d.diagnostics.full_access_status) }}</span></dd>
+              <dt>{{ t('admin.diag.col.clipboard') }}</dt><dd><span :class="'badge ' + diagBadge(d.diagnostics.clipboard_status)">{{ diagLabel('clipboard_status', d.diagnostics.clipboard_status) }}</span></dd>
+              <dt>{{ t('admin.diag.col.onboarding') }}</dt><dd><span :class="'badge ' + diagBadge(d.diagnostics.onboarding_status)">{{ diagLabel('onboarding_status', d.diagnostics.onboarding_status) }}</span></dd>
+              <dt>{{ t('admin.diag.col.reported') }}</dt><dd class="mono">{{ d.diagnostics.reported_at }}
+                <span v-if="d.diagnostics.stale" class="badge badge-muted">{{ t('admin.diag.stale') }}</span></dd>
+            </dl>
+            <div class="small">{{ t('admin.diag.col.notifications') }}:
+              <span :class="'badge ' + diagBadge(d.diagnostics.notification_authorization_status)">{{ diagLabel('notification_authorization_status', d.diagnostics.notification_authorization_status) }}</span></div>
+          </div>
+          <div v-if="!data.devices.length" class="muted">{{ t('common.empty') }}</div>
+          <div v-if="data.reminders.length">
+            <h3 class="small">{{ t('admin.diag.reminders') }}</h3>
+            <div v-for="r in data.reminders" :key="r.type" class="small">
+              {{ t('admin.push.type.' + r.type) }} · {{ t('admin.diag.sent_count') }}: {{ r.send_count }}
+              <span v-if="r.last_sent_at"> · {{ r.last_sent_at }} ({{ r.last_source }})</span>
+              <span v-if="r.resolved_at" class="badge badge-ok">{{ t('admin.diag.resolved') }}</span>
+            </div>
+          </div>
+          <div v-if="active" style="margin-top:12px">
+            <label class="field"><span>{{ t('admin.diag.reminder_type') }}</span>
+              <select v-model="reminderType" @change="idemKey = uuid()">
+                <option v-for="k in types" :key="k" :value="k">{{ t('admin.push.type.' + k) }}</option>
+              </select></label>
+            <button type="button" class="btn btn-block" :disabled="sending" @click="remind">{{ t('admin.diag.reminder') }}</button>
+          </div>
+        </div>
+      </div>`
+  };
+
+  // ReminderSettings — баптаулар бетіндегі еске салулар карточкасы (әдепкіде өшірулі).
+  var ReminderSettings = {
+    data: function () { return { data: null, form: null, saving: false }; },
+    mounted: function () { this.load(); },
+    methods: {
+      t: t,
+      async load() {
+        try { this.fill(await api("/settings/reminders")); } catch (e) { toast("danger", errorText(e)); }
+      },
+      fill(data) {
+        this.data = data;
+        this.form = JSON.parse(JSON.stringify(data.current));
+      },
+      async save() {
+        this.saving = true;
+        try {
+          this.fill(await api("/settings/reminders", { method: "POST", body: this.form }));
+          toast("ok", t("common.saved"));
+        } catch (e) {
+          toast("danger", errorText(e));
+        } finally {
+          this.saving = false;
+        }
+      }
+    },
+    template: `
+      <div class="card" v-if="form">
+        <div class="card-head"><h2>{{ t('admin.reminders.title') }}</h2></div>
+        <div class="card-body">
+          <p class="muted" style="margin-top:0">{{ t('admin.reminders.hint') }}</p>
+          <label class="chip" :class="{ 'is-on': form.enabled }" style="margin-bottom:14px">
+            <input type="checkbox" v-model="form.enabled"> {{ t('admin.reminders.enabled') }}</label>
+          <div class="form-grid" v-for="k in data.types" :key="k">
+            <label class="field"><span>{{ t('admin.push.type.' + k) }} · {{ t('admin.reminders.cooldown') }}</span>
+              <input type="number" step="1" :min="data.ranges.cooldown_hours.min" :max="data.ranges.cooldown_hours.max"
+                v-model.number="form.types[k].cooldown_hours"></label>
+            <label class="field"><span>{{ t('admin.reminders.max_sends') }}</span>
+              <input type="number" step="1" :min="data.ranges.max_sends.min" :max="data.ranges.max_sends.max"
+                v-model.number="form.types[k].max_sends"></label>
+          </div>
+          <div class="form-grid">
+            <label class="field"><span>{{ t('admin.reminders.min_age') }}</span>
+              <input type="number" step="1" :min="data.ranges.min_account_age_hours.min" :max="data.ranges.min_account_age_hours.max"
+                v-model.number="form.min_account_age_hours"></label>
+            <label class="field"><span>{{ t('admin.reminders.quiet_start') }}</span>
+              <input type="number" step="1" min="0" max="23" v-model.number="form.quiet_start_hour"></label>
+            <label class="field"><span>{{ t('admin.reminders.quiet_end') }}</span>
+              <input type="number" step="1" min="0" max="23" v-model.number="form.quiet_end_hour"></label>
+          </div>
+          <button class="btn btn-primary" :disabled="saving" @click="save">{{ t('common.save') }}</button>
+        </div>
+      </div>`
+  };
+
   /* --------------------------------------------------------------- shell */
   var App = {
     components: { Dashboard: Dashboard, Users: Users, UserDetail: UserDetail, Plans: Plans,
@@ -2564,7 +2826,8 @@
         return {
           dashboard: t("admin.nav.dashboard"), users: t("admin.users.title"), user: t("admin.user.detail"),
           plans: t("admin.plans.title"), audit: t("admin.audit.title"), reports: t("admin.reports.title"),
-          settings: t("admin.settings.title"), notifications: t("admin.notifications.title")
+          settings: t("admin.settings.title"), notifications: t("admin.notifications.title"),
+          diagnostics: t("admin.diag.title")
         }[state.route.name];
       }
     },
@@ -2600,6 +2863,10 @@
              :aria-current="isActive('notifications') ? 'page' : null" @click.prevent="go('/admin/notifications')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9a6 6 0 1 1 12 0c0 5 2 6 2 6H4s2-1 2-6M10 20a2 2 0 0 0 4 0"/></svg>
             {{ t('admin.nav.notifications') }}</a>
+          <a class="item" href="/admin/diagnostics" :class="{ 'is-active': isActive('diagnostics') }"
+             :aria-current="isActive('diagnostics') ? 'page' : null" @click.prevent="go('/admin/diagnostics')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"/></svg>
+            {{ t('admin.nav.diagnostics') }}</a>
           <a class="item" href="/admin/reports" :class="{ 'is-active': isActive('reports') }"
              :aria-current="isActive('reports') ? 'page' : null" @click.prevent="go('/admin/reports')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg>
@@ -2643,6 +2910,7 @@
             <reports v-else-if="state.route.name === 'reports'"/>
             <settings v-else-if="state.route.name === 'settings'"/>
             <notifications v-else-if="state.route.name === 'notifications'" :route="state.route" :seq="state.routeSeq"/>
+            <diagnostics-page v-else-if="state.route.name === 'diagnostics'" :key="state.routeSeq"/>
           </main>
         </div>
 
@@ -2654,6 +2922,9 @@
 
   state.locales = boot.locales;
   var app = Vue.createApp(App);
+  app.component("diagnostics-page", DiagnosticsPage);
+  app.component("user-diagnostics", UserDiagnostics);
+  app.component("reminder-settings", ReminderSettings);
   app.config.globalProperties.t = t;
   app.config.globalProperties.tf = tf;
   app.mount("#app");

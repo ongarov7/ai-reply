@@ -74,6 +74,11 @@ func adminKeyFamilies() map[string][]string {
 		"admin.push.channel.": {domain.ChannelPush, domain.ChannelEmail},
 		"admin.push.source.":  {repository.SourceCampaign, repository.SourceAutomatic},
 		"admin.push.type.":    append([]string{domain.TypeCampaign}, domain.AutomaticNotificationTypes...),
+		// Keyboard and permission diagnostics.
+		"admin.diag.status.":     domain.DiagnosticStatuses,
+		"admin.diag.onboarding.": domain.OnboardingStatuses,
+		"admin.diag.filter.":     append([]string{"all"}, domain.DiagnosticFilters...),
+		"admin.diag.source.":     {domain.SourceAppCheck, domain.SourceKeyboardCheck, domain.SourceUserReport, "unknown"},
 		// Reports on AI replies.
 		"admin.reports.reason.": domain.ReportReasons,
 		"admin.reports.status.": domain.ReportStatuses,
@@ -163,6 +168,10 @@ func TestAdminScriptStatusListsMatchTheBackend(t *testing.T) {
 		"CAMPAIGN_STATUSES": domain.CampaignStatuses,
 		"DELIVERY_STATUSES": domain.DeliveryStatuses,
 		"PUSH_STATUSES":     {domain.PushNone, domain.PushActive, domain.PushInvalid, domain.PushReplaced},
+		// Diagnostics: the statuses, the filter chips (after "" = all) and the admin reminder types.
+		"DIAGNOSTIC_STATUSES": domain.DiagnosticStatuses,
+		"DIAGNOSTIC_FILTERS":  domain.DiagnosticFilters,
+		"REMINDER_TYPES":      domain.AdminReminderTypes,
 	} {
 		if got := list(name); !reflect.DeepEqual(got, want) {
 			t.Errorf("%s = %v, backend has %v", name, got, want)
