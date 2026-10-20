@@ -7,23 +7,28 @@ protocol TemplateBarViewDelegate: AnyObject {
 }
 
 /// The only thing the row needs to draw one persona: an identifier to report
-/// back and a name to show.
+/// back, a name to show and the icon in front of it.
 ///
 /// Deliberately NOT a `ReplyTemplate`: the row has no business holding a
-/// user's instructions or business rules, and two strings are what let it be
-/// drawn from the App Group summary on the very first frame.
+/// user's instructions or business rules, and three strings are what let it
+/// be drawn from the App Group summary on the very first frame.
 struct TemplateChip: Equatable {
     let id: String
     let name: String
+    /// An SF Symbol (`RelationshipKind.symbolName`).
+    let symbolName: String
 }
 
-/// The persona row above the keys:  ✨ | Дос | Клиент | Бизнес | Жұмыс
+/// The persona row above the keys:  ✨ | Дос | Клиент | Әріптес | Серіктес
 ///
 /// * 36pt tall, and ADAPTIVE to the width: personas that fit share the row
 ///   evenly; when space is short their padding tightens first; only when they
 ///   still do not fit does the row scroll (with a fade at the trailing edge,
 ///   never a cut label). The keys below never shrink. `PersonaRowLayout`
 ///   does the arithmetic.
+/// * Each persona has its icon in front of the name when the row has room
+///   for it; the icons go first, before any padding is given up for good or
+///   the row scrolls. Same pill, same height, same ✨.
 /// * The persona used last is shown selected, so the row says who the user
 ///   was talking to a moment ago.
 /// * "✨" (Create) is pinned at the LEADING edge, outside the personas, so it
@@ -49,12 +54,16 @@ final class TemplateBarView: UIView {
     private let fadeMask = CAGradientLayer()
 
     private let pillFont = UIFont.systemFont(ofSize: 14, weight: .medium)
+    /// Between a pill's icon and its name.
+    private let iconPadding: CGFloat = 4
 
     private var theme = KeyboardTheme(isDark: true)
     private var strings = AIReplyStrings.forLanguage(.english)
     private var chips: [TemplateChip] = []
     private var selectedID: String?
     private var pills: [UIButton] = []
+    /// Whether the last layout had room for the icons.
+    private var showsIcons = false
 
     // MARK: Init
 
@@ -117,7 +126,17 @@ final class TemplateBarView: UIView {
             let name = chips.indices.contains(index) ? chips[index].name : ""
             return ceil((name as NSString).size(withAttributes: [.font: pillFont]).width)
         }
-        let layout = PersonaRowLayout(width: bounds.width, height: bounds.height, textWidths: texts)
+        let icons = pills.indices.map { index -> CGFloat in
+            guard chips.indices.contains(index), let image = icon(for: chips[index]) else { return 0 }
+            return ceil(image.size.width) + iconPadding
+        }
+        let layout = PersonaRowLayout(width: bounds.width, height: bounds.height, textWidths: texts, iconWidths: icons)
+        if layout.showsIcons != showsIcons {
+            showsIcons = layout.showsIcons
+            for (index, pill) in pills.enumerated() where chips.indices.contains(index) {
+                applyIcon(chips[index], to: pill)
+            }
+        }
         createButton.frame = layout.createFrame
         scrollView.frame = layout.personasFrame
         hintLabel.frame = layout.personasFrame.insetBy(dx: 12, dy: 0)
@@ -200,6 +219,7 @@ final class TemplateBarView: UIView {
         if sameSet, !pills.isEmpty {
             for (index, pill) in pills.enumerated() where index < chips.count {
                 applyTitle(chips[index].name, to: pill)
+                applyIcon(chips[index], to: pill)
             }
         } else {
             rebuildPills()
@@ -215,6 +235,7 @@ final class TemplateBarView: UIView {
             let pill = makePill()
             pill.tag = index
             applyTitle(chip.name, to: pill)
+            applyIcon(chip, to: pill)
             pill.addTarget(self, action: #selector(templateTapped(_:)), for: .touchUpInside)
             scrollView.addSubview(pill)
             pills.append(pill)
@@ -257,6 +278,18 @@ final class TemplateBarView: UIView {
         button.configuration?.attributedTitle = AttributedString(title, attributes: attributes)
         button.accessibilityLabel = title
         setNeedsLayout()
+    }
+
+    /// The icon goes in only while the row has room for every one of them;
+    /// the name is what VoiceOver reads either way.
+    private func applyIcon(_ chip: TemplateChip, to button: UIButton) {
+        button.configuration?.image = showsIcons ? icon(for: chip) : nil
+        button.configuration?.imagePlacement = .leading
+        button.configuration?.imagePadding = iconPadding
+    }
+
+    private func icon(for chip: TemplateChip) -> UIImage? {
+        KeySymbolCache.image(name: chip.symbolName, pointSize: 12, weight: .medium)
     }
 
     private func restyle() {

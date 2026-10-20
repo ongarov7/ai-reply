@@ -118,15 +118,20 @@ struct KeyboardPageLayout: Equatable, Sendable {
     }
 }
 
-/// The persona row above the keys:  ✨ | Дос | Клиент | Бизнес | Жұмыс
+/// The persona row above the keys:  ✨ | Дос | Клиент | Әріптес | Серіктес
 ///
 /// * ✨ (Create) is pinned at the LEADING edge, outside the personas, so it is
 ///   never scrolled away, faded or covered - not even by the suggestion strip.
 /// * The personas take the rest of the width. A set that fits is stretched
 ///   evenly (up to `maximumStretch` each); when space is short their padding
 ///   tightens first; only when they still do not fit does the row scroll.
+/// * Each persona can carry its icon in front of the name. The icons are the
+///   first thing to go: every padding is tried with them, then every padding
+///   without them, and only then does the row scroll. They never change a
+///   pill's height or move ✨.
 ///
-/// Pure geometry: the keyboard measures the names, this places everything.
+/// Pure geometry: the keyboard measures the names and the icons, this places
+/// everything.
 struct PersonaRowLayout: Equatable, Sendable {
 
     static let height: CGFloat = 36
@@ -152,11 +157,17 @@ struct PersonaRowLayout: Equatable, Sendable {
     /// Width of the scrollable content: wider than the viewport only when the
     /// pills do not fit.
     let contentWidth: CGFloat
+    /// Whether the pills have room for their icons. Never true for a row
+    /// that scrolls.
+    let showsIcons: Bool
 
     var scrolls: Bool { contentWidth > personasFrame.width + 0.5 }
 
-    /// - Parameter textWidths: each persona's measured title width, in order.
-    init(width: CGFloat, height: CGFloat = PersonaRowLayout.height, textWidths: [CGFloat]) {
+    /// - Parameters:
+    ///   - textWidths: each persona's measured title width, in order.
+    ///   - iconWidths: each persona's icon plus the gap before its title, in
+    ///     the same order; empty for a row without icons.
+    init(width: CGFloat, height: CGFloat = PersonaRowLayout.height, textWidths: [CGFloat], iconWidths: [CGFloat] = []) {
         let width = max(width, 0)
         let y = ((height - Self.pillHeight) / 2).rounded()
         createFrame = CGRect(x: Self.edgeInset, y: y, width: Self.actionWidth, height: Self.pillHeight)
@@ -170,14 +181,22 @@ struct PersonaRowLayout: Equatable, Sendable {
         guard !textWidths.isEmpty, available > 0 else {
             pillFrames = []
             contentWidth = personasFrame.width
+            showsIcons = false
             return
         }
         let texts = textWidths.map { max(0, ceil($0)) }
+        let icons = iconWidths.count == texts.count ? iconWidths.map { max(0, ceil($0)) } : texts.map { _ in 0 }
         let gaps = Self.spacing * CGFloat(texts.count - 1)
-        let total = texts.reduce(0, +)
-        let padding = Self.paddings.first { total + $0 * 2 * CGFloat(texts.count) + gaps <= available }
-            ?? Self.paddings.last ?? 8
-        var widths = texts.map { $0 + padding * 2 }
+        let textTotal = texts.reduce(0, +)
+        let iconTotal = icons.reduce(0, +)
+        func fits(padding: CGFloat, withIcons: Bool) -> Bool {
+            textTotal + (withIcons ? iconTotal : 0) + padding * 2 * CGFloat(texts.count) + gaps <= available
+        }
+        let withIcons = iconTotal > 0 ? Self.paddings.first { fits(padding: $0, withIcons: true) } : nil
+        let withoutIcons = Self.paddings.first { fits(padding: $0, withIcons: false) }
+        let padding = withIcons ?? withoutIcons ?? Self.paddings.last ?? 8
+        showsIcons = withIcons != nil
+        var widths = zip(texts, icons).map { text, icon in text + (withIcons != nil ? icon : 0) + padding * 2 }
         let used = widths.reduce(0, +) + gaps
         if used <= available {
             let extra = min(Self.maximumStretch, ((available - used) / CGFloat(widths.count)).rounded(.down))

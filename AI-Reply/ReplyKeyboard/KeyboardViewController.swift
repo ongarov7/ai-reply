@@ -327,22 +327,22 @@ final class KeyboardViewController: UIInputViewController {
     /// the user shows in the keyboard; hidden ones stay in the app.
     private func applyChips(from configuration: ReplyConfiguration?) {
         let selected = SharedSettings.shared.lastTemplateID
+        let language = uiLanguage
+        let chip = { (template: ReplyTemplate) in
+            TemplateChip(id: template.id, name: template.displayName(appLanguage: language),
+                         symbolName: template.relationship.symbolName)
+        }
         if let configuration {
-            actionBar.setChips(
-                configuration.visibleTemplates.map { TemplateChip(id: $0.id, name: $0.displayName(appLanguage: uiLanguage)) },
-                selectedID: selected
-            )
+            actionBar.setChips(configuration.visibleTemplates.map(chip), selectedID: selected)
         } else if let summaries = SharedSettings.shared.templateSummaries {
             actionBar.setChips(
-                summaries.map { TemplateChip(id: $0.id, name: $0.name(for: uiLanguage)) },
+                summaries.map {
+                    TemplateChip(id: $0.id, name: $0.name(for: language), symbolName: $0.relationship.symbolName)
+                },
                 selectedID: selected
             )
         } else {
-            let defaults = ReplyConfiguration.initial.visibleTemplates
-            actionBar.setChips(
-                defaults.map { TemplateChip(id: $0.id, name: $0.displayName(appLanguage: uiLanguage)) },
-                selectedID: selected
-            )
+            actionBar.setChips(ReplyConfiguration.initial.visibleTemplates.map(chip), selectedID: selected)
         }
     }
 

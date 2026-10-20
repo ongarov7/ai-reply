@@ -45,7 +45,7 @@ protocol KeyboardActionBarDelegate: AnyObject {
 
 /// The area above the keys. Two shapes:
 ///
-/// * PERSONAS - a 36pt row: ✨ Create | Дос | Клиент | Бизнес | Жұмыс. This
+/// * PERSONAS - a 36pt row: ✨ Create | Дос | Клиент | Әріптес | Серіктес. This
 ///   is the keyboard at rest; its height is what gets cached for the next
 ///   launch. While a word is typed into the host app the suggestion strip
 ///   takes the pills' place - only theirs: ✨ stays exactly where it is.

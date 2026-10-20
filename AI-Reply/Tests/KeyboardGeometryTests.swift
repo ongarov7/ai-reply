@@ -1,3 +1,4 @@
+import UIKit
 import XCTest
 @testable import AIReply
 
@@ -124,8 +125,10 @@ final class KeyboardGeometryTests: XCTestCase {
 
     // MARK: Persona row
 
-    /// Roughly "Друг", "Клиент", "Бизнес", "Работа" at the row's 14pt font.
-    private let fourPersonas: [CGFloat] = [33, 47, 50, 50]
+    /// Roughly "Друг", "Клиент", "Коллега", "Партнёр" at the row's 14pt font.
+    private let fourPersonas: [CGFloat] = [33, 47, 56, 58]
+    /// Roughly their icons at 12pt, each with the 4pt gap before the name.
+    private let fourIcons: [CGFloat] = [20, 14, 17, 25]
 
     /// ✨ comes first, at the leading edge; the personas follow it, in order,
     /// and fill the rest of the row. There is no other action on the row.
@@ -202,6 +205,95 @@ final class KeyboardGeometryTests: XCTestCase {
         let row = PersonaRowLayout(width: 390, textWidths: [])
         XCTAssertTrue(row.pillFrames.isEmpty)
         XCTAssertFalse(row.scrolls)
+        XCTAssertFalse(row.showsIcons)
         XCTAssertEqual(row.createFrame.minX, PersonaRowLayout.edgeInset)
+    }
+
+    // MARK: Persona icons
+
+    /// Icons first, then every padding without them, then scrolling: on a Max
+    /// phone the four fit with icons; on the 393 and 375 phones they keep
+    /// their names and lose the icons; at 320 they scroll, without icons.
+    func testIconsAreTheFirstThingTheRowGivesUp() {
+        let wide = PersonaRowLayout(width: 430, textWidths: fourPersonas, iconWidths: fourIcons)
+        XCTAssertTrue(wide.showsIcons)
+        XCTAssertFalse(wide.scrolls)
+        XCTAssertEqual(wide.pillFrames[0].width, fourPersonas[0] + fourIcons[0] + 8 * 2 + stretch(of: wide, padding: 8, icons: true), accuracy: 0.01)
+
+        let regular = PersonaRowLayout(width: 393, textWidths: fourPersonas, iconWidths: fourIcons)
+        XCTAssertFalse(regular.showsIcons, "no padding has room for the icons at 393")
+        XCTAssertFalse(regular.scrolls)
+        XCTAssertEqual(regular.pillFrames[0].width, fourPersonas[0] + 14 * 2 + stretch(of: regular, padding: 14, icons: false), accuracy: 0.01)
+
+        let compact = PersonaRowLayout(width: 375, textWidths: fourPersonas, iconWidths: fourIcons)
+        XCTAssertFalse(compact.showsIcons)
+        XCTAssertFalse(compact.scrolls)
+        XCTAssertEqual(compact.pillFrames[0].width, fourPersonas[0] + 11 * 2 + stretch(of: compact, padding: 11, icons: false), accuracy: 0.01)
+
+        let narrow = PersonaRowLayout(width: 320, textWidths: fourPersonas, iconWidths: fourIcons)
+        XCTAssertFalse(narrow.showsIcons, "a row that scrolls never shows icons")
+        XCTAssertTrue(narrow.scrolls)
+        XCTAssertEqual(narrow.pillFrames.map(\.width), fourPersonas.map { $0 + PersonaRowLayout.paddings.last! * 2 })
+    }
+
+    /// The extra each pill got from stretching, given the padding the row chose.
+    private func stretch(of row: PersonaRowLayout, padding: CGFloat, icons: Bool) -> CGFloat {
+        let content = zip(fourPersonas, fourIcons).map { $0 + (icons ? $1 : 0) + padding * 2 }.reduce(0, +)
+        let available = row.personasFrame.width - PersonaRowLayout.spacing / 2 - PersonaRowLayout.edgeInset
+        let slack = available - content - PersonaRowLayout.spacing * 3
+        return min(PersonaRowLayout.maximumStretch, (slack / 4).rounded(.down))
+    }
+
+    /// Icons never change a pill's height, the row's height or where ✨ is.
+    func testIconsNeverMoveCreateOrChangeHeights() {
+        for width in portraitWidths {
+            let plain = PersonaRowLayout(width: width, textWidths: fourPersonas)
+            let withIcons = PersonaRowLayout(width: width, textWidths: fourPersonas, iconWidths: fourIcons)
+            XCTAssertEqual(withIcons.createFrame, plain.createFrame, "w=\(width)")
+            XCTAssertEqual(withIcons.personasFrame, plain.personasFrame, "w=\(width)")
+            for pill in withIcons.pillFrames {
+                XCTAssertEqual(pill.height, PersonaRowLayout.pillHeight)
+                XCTAssertEqual(pill.minY, plain.pillFrames[0].minY)
+            }
+            if !withIcons.showsIcons {
+                XCTAssertEqual(withIcons.pillFrames, plain.pillFrames, "no icons means exactly the row without them, w=\(width)")
+            }
+        }
+    }
+
+    /// The real built-in names and icons, measured the way `TemplateBarView`
+    /// measures them, in every app language and on the widths that matter:
+    /// a row that shows icons never scrolls and never runs past its inset; a
+    /// row that scrolls has dropped them.
+    func testRealNamesFitOrFallBack() throws {
+        let font = UIFont.systemFont(ofSize: 14, weight: .medium)
+        let symbols = UIImage.SymbolConfiguration(pointSize: 12, weight: .medium)
+        let templates = ReplyConfiguration.initial.visibleTemplates
+        let icons = try templates.map { template -> CGFloat in
+            let image = try XCTUnwrap(UIImage(systemName: template.relationship.symbolName, withConfiguration: symbols))
+            return ceil(image.size.width) + 4
+        }
+        for language in AppLanguage.allCases {
+            let texts = templates.map {
+                ceil(($0.displayName(appLanguage: language) as NSString).size(withAttributes: [.font: font]).width)
+            }
+            for width: CGFloat in [320, 375, 393, 430] {
+                let row = PersonaRowLayout(width: width, textWidths: texts, iconWidths: icons)
+                let label = "\(language.rawValue) w=\(width)"
+                XCTAssertFalse(row.showsIcons && row.scrolls, label)
+                for (index, pill) in row.pillFrames.enumerated() {
+                    let content = texts[index] + (row.showsIcons ? icons[index] : 0)
+                    XCTAssertGreaterThanOrEqual(pill.width, content + PersonaRowLayout.paddings.last! * 2 - 0.01, "\(label): a cut name")
+                }
+                if !row.scrolls {
+                    XCTAssertLessThanOrEqual(row.personasFrame.minX + row.pillFrames.last!.maxX,
+                                             width - PersonaRowLayout.edgeInset + 0.01, label)
+                }
+                let withoutIcons = PersonaRowLayout(width: width, textWidths: texts)
+                if row.scrolls { XCTAssertTrue(withoutIcons.scrolls, "\(label): scrolled while names alone fit") }
+            }
+            // Every language's four fit without scrolling from 375pt up.
+            XCTAssertFalse(PersonaRowLayout(width: 375, textWidths: texts, iconWidths: icons).scrolls, language.rawValue)
+        }
     }
 }
