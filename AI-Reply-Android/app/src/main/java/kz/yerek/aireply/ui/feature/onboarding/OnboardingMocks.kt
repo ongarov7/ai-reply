@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -25,6 +26,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,14 +34,17 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kz.yerek.aireply.R
 import kz.yerek.aireply.core.lang.TemplateNaming
 import kz.yerek.aireply.domain.model.RelationshipKind
+import kz.yerek.aireply.ui.common.RelationshipIcons
 import kz.yerek.aireply.ui.design.LocalExtraColors
 import kz.yerek.aireply.ui.design.Radius
 import kz.yerek.aireply.ui.design.Spacing
@@ -235,6 +240,9 @@ internal fun MockAction(
  * The real keyboard's row: "✨" (write with AI) at the leading edge, the
  * personas to its right. "✨" is only a picture here - the onboarding is about
  * replying - so screen readers skip it.
+ *
+ * Like the real row, the chips show their recipient's icon when all four fit
+ * with it, and drop the icons before they would scroll.
  */
 @Composable
 private fun PersonaRow(selected: RelationshipKind?, onPersona: ((RelationshipKind) -> Unit)?) {
@@ -258,38 +266,53 @@ private fun PersonaRow(selected: RelationshipKind?, onPersona: ((RelationshipKin
                 modifier = Modifier.size(17.dp)
             )
         }
-        Row(
-            modifier = Modifier
-                .weight(1f)
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            RelationshipKind.builtIns.forEach { kind ->
-                val isSelected = kind == selected
-                val chip = Modifier
-                    .clip(CircleShape)
-                    .background(
-                        if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
-                    )
-                Box(
-                    modifier = Modifier
-                        .then(if (onPersona != null) Modifier.minimumInteractiveComponentSize() else Modifier)
-                        .then(chip)
-                        .then(
-                            if (onPersona != null) {
-                                Modifier.clickable(role = Role.Button) { onPersona(kind) }
-                            } else {
-                                Modifier
-                            }
+        val labels = RelationshipKind.builtIns.map { kind -> stringResource(TemplateNaming.resource(kind)) }
+        val style = MaterialTheme.typography.labelLarge
+        val measurer = rememberTextMeasurer()
+        BoxWithConstraints(Modifier.weight(1f)) {
+            val available = constraints.maxWidth
+            val density = LocalDensity.current
+            val showsIcons = remember(labels, style, available) {
+                with(density) {
+                    val chrome = (Spacing.s * 2 + MOCK_ICON_SIZE + Spacing.xxs).roundToPx()
+                    val gaps = Spacing.xs.roundToPx() * (labels.size - 1)
+                    labels.sumOf { measurer.measure(it, style).size.width + chrome } + gaps <= available
+                }
+            }
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                RelationshipKind.builtIns.forEachIndexed { index, kind ->
+                    val isSelected = kind == selected
+                    val content = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                    val chip = Modifier
+                        .clip(CircleShape)
+                        .background(
+                            if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
                         )
-                        .padding(horizontal = Spacing.s, vertical = Spacing.xxs + 2.dp)
-                ) {
-                    Text(
-                        stringResource(TemplateNaming.resource(kind)),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
-                    )
+                    Row(
+                        modifier = Modifier
+                            .then(if (onPersona != null) Modifier.minimumInteractiveComponentSize() else Modifier)
+                            .then(chip)
+                            .then(
+                                if (onPersona != null) {
+                                    Modifier.clickable(role = Role.Button) { onPersona(kind) }
+                                } else {
+                                    Modifier
+                                }
+                            )
+                            .padding(horizontal = Spacing.s, vertical = Spacing.xxs + 2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.xxs),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val icon = RelationshipIcons.of(kind)
+                        if (showsIcons && icon != null) {
+                            Icon(icon, contentDescription = null, tint = content, modifier = Modifier.size(MOCK_ICON_SIZE))
+                        }
+                        Text(labels[index], style = style, color = content)
+                    }
                 }
             }
         }
@@ -326,5 +349,6 @@ private fun MockKeys() {
 
 /** A chip's height: labelLarge's 20 dp line and 6 dp above and below. */
 private val MOCK_CHIP_HEIGHT = 32.dp
+private val MOCK_ICON_SIZE = 16.dp
 private val KEY_ROWS = listOf(10, 9, 7)
 private val KEYS_HEIGHT = 84.dp

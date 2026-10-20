@@ -79,6 +79,7 @@ import kz.yerek.aireply.keyboard.autocorrect.Suggestion
 import kz.yerek.aireply.keyboard.layout.PersonaRowLayout
 import kz.yerek.aireply.keyboard.reply.ReplyComposerFlow
 import kz.yerek.aireply.keyboard.reply.ReplySession
+import kz.yerek.aireply.ui.common.RelationshipIcons
 
 /** Which of the composer's fields the keys are editing. */
 enum class PanelFocus { SOURCE, INSTRUCTION, DRAFT }
@@ -251,18 +252,21 @@ private fun PersonaChips(
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
     val names = chips.map { it.names[languageCode] ?: it.id }
+    // Built-ins carry their recipient's icon; a custom template has none.
+    val icons = remember(chips) { chips.map { RelationshipIcons.forTemplateId(it.id) } }
     BoxWithConstraints(modifier) {
         // A little under the real width, so pixel rounding never leaves a
         // set that fits one pixel short of the edge (and fading for nothing).
         val available = maxWidth - 2.dp
-        // Text widths, then the roomiest padding at which the whole set fits.
-        val widths = remember(names, available) {
+        // Text widths, then the roomiest padding at which the whole set fits:
+        // with the icons if it does, else without them, and only then scrolling.
+        val fit = remember(names, icons, available) {
             val text = names.map { name ->
                 with(density) {
                     measurer.measure(name, TextStyle(fontSize = 14.sp, fontWeight = FontWeight.SemiBold)).size.width.toDp().value
                 }
             }
-            PersonaRowLayout.chipWidths(text, available.value).map { it.dp }
+            PersonaRowLayout.chipFit(text, icons.map { it != null }, available.value)
         }
         Box(Modifier.fillMaxWidth()) {
             Row(
@@ -273,21 +277,28 @@ private fun PersonaChips(
                 chips.forEachIndexed { index, chip ->
                     val selected = chip.id == selectedId
                     val name = names[index]
-                    Box(
+                    val content = if (selected) Color.White else theme.primaryText
+                    Row(
                         modifier = Modifier
                             .height(30.dp)
-                            .width(widths.getOrElse(index) { 64.dp })
+                            .width(fit.widths.getOrNull(index)?.dp ?: 64.dp)
                             .clip(RoundedCornerShape(15.dp))
                             .background(if (selected) theme.accent else theme.fieldBackground)
                             .clickable(role = Role.Button) { onSelect(chip.id) }
                             .semantics { contentDescription = name },
-                        contentAlignment = Alignment.Center
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
+                        val icon = icons[index]
+                        if (fit.showsIcons && icon != null) {
+                            Icon(icon, contentDescription = null, tint = content, modifier = Modifier.size(PersonaRowLayout.ICON_SIZE.dp))
+                            Spacer(Modifier.width(PersonaRowLayout.ICON_GAP.dp))
+                        }
                         Text(
                             text = name,
                             fontSize = 14.sp,
                             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                            color = if (selected) Color.White else theme.primaryText,
+                            color = content,
                             maxLines = 1
                         )
                     }
