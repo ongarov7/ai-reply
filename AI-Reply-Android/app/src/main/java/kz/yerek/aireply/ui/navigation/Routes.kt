@@ -25,7 +25,7 @@ object Routes {
     const val PasteHelp = "paste_help"
 
     /** DEBUG builds: the screens that can be opened before sign-in for a review (see MainActivity). */
-    val Reviewable = setOf(Compose, Permissions, PasteHelp, KeyboardSetup)
+    val Reviewable = setOf(Home, Settings, Compose, Permissions, PasteHelp, KeyboardSetup, Profile, Templates, WorkingHours, Subscription)
 
     fun templateEditor(id: String) = "$TemplateEditor/$id"
     const val TemplateEditorPattern = "$TemplateEditor/{id}"

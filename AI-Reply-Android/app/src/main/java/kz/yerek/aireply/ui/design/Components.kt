@@ -126,7 +126,7 @@ fun SecondaryButton(
     }
 }
 
-/** One step of a numbered instruction list. */
+/** One step of a numbered instruction list: the number in a quiet accent circle. */
 @Composable
 fun StepRow(index: Int, text: String, modifier: Modifier = Modifier) {
     Row(
@@ -138,13 +138,13 @@ fun StepRow(index: Int, text: String, modifier: Modifier = Modifier) {
             modifier = Modifier
                 .size(22.dp)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.onSurface),
+                .background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = index.toString(),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.surface
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary
             )
         }
         Text(text, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
