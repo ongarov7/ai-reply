@@ -251,4 +251,19 @@ Numbers are fixed so parallel work never collides: `0015_credits.sql`,
 
 ## 5. Progress
 Work runs in three streams (backend, iOS, Android); each step is committed separately and pushed to
-`origin/main` once its tests pass.
+`origin/main` once its tests pass. Backend deploy and store builds are done by the owner.
+
+| Step | State |
+|---|---|
+| Audit and contracts | done |
+| Shared emoji catalog (`tools/emoji`) | done |
+| Backend: recipient register rules, colleague/partner aliases, landing names | done, in review |
+| Backend: welcome bonus, credit ledger, idempotent generation, admin balances | in progress |
+| Android keyboard: recipient labels/icons, clipboard fixes, limit message, emoji page | in progress |
+| iOS keyboard: recipient labels/icons, paste denial, status evidence, limit message, emoji page | in progress |
+| Backend: permission diagnostics, reminders, push fixes | next |
+| Backend: support chat (user + admin) | next |
+| Backend: purchases (StoreKit 2 / Play verification, products, admin) | next |
+| iOS / Android app: strict native style, onboarding, «Создать ответ», «Подключи AI Reply», permissions section | next |
+| iOS / Android app: balance, exhausted sheet, purchases, support chat, diagnostics reporting | next |
+| End-to-end check against a local backend, final report | last |
