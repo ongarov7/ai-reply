@@ -230,7 +230,7 @@ final class LocalizationTests: XCTestCase {
         let settings = AppSettings(store: SharedSettings(defaults: UserDefaults(suiteName: "LocalizationTests.\(UUID())")!))
         settings.setLanguage(.kazakh)
         XCTAssertEqual(String(format: settings.localized("onboarding.tutorial.header %lld %lld"), 1, 3),
-                       "Қалай қолдану · 1/3")
+                       "Қалай пайдалану · 1/3")
 
         for language in AppLanguage.allCases {
             settings.setLanguage(language)

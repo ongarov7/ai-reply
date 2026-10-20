@@ -401,6 +401,9 @@ On success the **reply composer** opens (section 9).
 - Message content is never logged. `ReplyLog` is `#if DEBUG` only and emits at
   most `Reply action invoked`, `selectedText available: false`,
   `clipboard string available: true, length: 127`.
+- The containing app never reads the clipboard itself. «Создать ответ» takes a
+  message through SwiftUI's `PasteButton` (labelled by iOS, never prompts); the
+  tutorial's Copy buttons only write.
 
 ### Full Access
 
@@ -677,7 +680,11 @@ Behaviour:
 * **Permission.** Never asked at launch. Home shows a soft card to a signed-in
   user while it is undetermined; Settings ▸ Notifications has the iOS status,
   the in-app switch and the account's categories (security always on).
-* **Taps.** `aireply://<screen>` opens that screen (unknown → Home);
+* **Taps.** `aireply://<screen>` opens that screen (unknown → Home): `home`,
+  `subscription`, `settings`, `notifications`, `templates`, `profile`,
+  `compose`, `keyboard` and `permissions` (both «Настройка клавиатуры и
+  разрешений»), `paste_help`, `onboarding` (the guide over Home); `support`
+  and `purchase` open Home until those screens ship;
   `https://ai-reply.kz/...` opens in an in-app browser; anything else just opens
   the app. A destination waits behind consent, sign-in and onboarding (15
   minutes at most). A tap with a delivery id is reported to
@@ -693,7 +700,11 @@ section whatever the state; `-AIReplyOpenLink subscription` (or a full link, or
 `-AIReplyDebugProvisionalPush YES` gets provisional permission without an
 alert so `xcrun simctl push` is delivered, and `-AIReplyDebugAutoOpenPush YES`
 treats it as tapped; `-AIReplyDebugScreen notifications` opens Settings at the
-notifications section.
+notifications section. `-AIReplyDebugScreen compose | permissions | paste_help`
+open those screens; `-AIReplyDebugScreen onboarding` opens the guide, with
+`-AIReplyDebugStep tutorial_copy | tutorial_recipient | tutorial_reply |
+permissions`, `-AIReplyDebugPath setup_first | try_first` and
+`-AIReplyDebugGender male | female | unspecified`.
 
 ---
 

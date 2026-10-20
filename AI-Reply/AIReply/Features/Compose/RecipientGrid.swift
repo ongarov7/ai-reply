@@ -62,21 +62,22 @@ private struct RecipientCard: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: DS.Spacing.s) {
+            HStack(spacing: DS.Spacing.xs) {
                 Image(systemName: item.symbol)
                     .font(.body.weight(.medium))
                     .foregroundStyle(isSelected ? Color.white : Color.accentColor)
-                    .frame(width: 24)
+                    .frame(minWidth: 26)
                     .accessibilityHidden(true)
+                // One line, a little smaller if it must: «Серіктеске» on an
+                // SE. Accessibility sizes get a column of their own instead.
                 Text(verbatim: item.name)
                     .font(.body.weight(.semibold))
                     .foregroundStyle(isSelected ? Color.white : Color.primary)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.85)
-                    .multilineTextAlignment(.leading)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, DS.Spacing.m)
+            .padding(.horizontal, DS.Spacing.s)
             .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: DS.Radius.medium, style: .continuous)

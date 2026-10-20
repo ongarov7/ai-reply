@@ -1637,7 +1637,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Хабарлама қос немесе мысал таңда"
+            "value" : "Хабарлама қосыңыз немесе мысал таңдаңыз"
           }
         },
         "ru" : {
@@ -1649,7 +1649,7 @@
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Xabar qoʻsh yoki misol tanla"
+            "value" : "Xabar qoʻshing yoki misol tanlang"
           }
         }
       }
@@ -1695,7 +1695,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Жауап бергің келетін хабарламаны қой"
+            "value" : "Жауап бергіңіз келетін хабарламаны қойыңыз"
           }
         },
         "ru" : {
@@ -1707,7 +1707,7 @@
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Javob bermoqchi boʻlgan xabaringni joylashtir"
+            "value" : "Javob bermoqchi boʻlgan xabaringizni joylashtiring"
           }
         }
       }
@@ -2913,7 +2913,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Reply пернетақтасы әлі шықпады. 🌐 түймесін басып тұрып, AI Reply-ды таңда."
+            "value" : "AI Reply пернетақтасы әлі шықпады. 🌐 түймесін басып тұрып, AI Reply-ды таңдаңыз."
           }
         },
         "ru" : {
@@ -2925,7 +2925,7 @@
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Reply klaviaturasi hali chiqmadi. 🌐 tugmasini bosib tur va AI Replyni tanla."
+            "value" : "AI Reply klaviaturasi hali chiqmadi. 🌐 tugmasini bosib turing va AI Replyni tanlang."
           }
         }
       }
@@ -2942,7 +2942,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Бірдеңе жаз…"
+            "value" : "Бірдеңе жазыңыз…"
           }
         },
         "ru" : {
@@ -2954,7 +2954,7 @@
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Biror narsa yoz…"
+            "value" : "Biror narsa yozing…"
           }
         }
       }
@@ -2971,7 +2971,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Өрісті басып, 🌐 түймесімен AI Reply-ға ауыс."
+            "value" : "Өрісті басып, 🌐 түймесімен AI Reply-ға ауысыңыз."
           }
         },
         "ru" : {
@@ -2983,7 +2983,7 @@
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Maydonni bos va 🌐 tugmasi bilan AI Replyga oʻt."
+            "value" : "Maydonni bosing va 🌐 tugmasi bilan AI Replyga oʻting."
           }
         }
       }
@@ -3725,7 +3725,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Жауаптарды тікелей чатта жасау үшін пернетақтаны қос."
+            "value" : "Жауаптарды тікелей чатта жасау үшін пернетақтаны қосыңыз."
           }
         },
         "ru" : {
@@ -3737,7 +3737,7 @@
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Javoblarni toʻgʻridan-toʻgʻri yozishmada yaratish uchun klaviaturani qoʻsh."
+            "value" : "Javoblarni toʻgʻridan-toʻgʻri yozishmada yaratish uchun klaviaturani qoʻshing."
           }
         }
       }
@@ -3748,13 +3748,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Set up AI Reply"
+            "value" : "Connect AI Reply"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Reply-ды қос"
+            "value" : "AI Reply-ды қосыңыз"
           }
         },
         "ru" : {
@@ -3766,7 +3766,7 @@
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Replyni ula"
+            "value" : "AI Replyni ulang"
           }
         }
       }
@@ -4073,7 +4073,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Reply сенің атыңнан жазады. Орыс тілінде кейбір сөздер сөйлеушінің жынысына қарай өзгереді: «рад» не «рада», «сделал» не «сделала». Бұл тек орысша жауаптарға әсер етеді."
+            "value" : "AI Reply сіздің атыңыздан жазады. Орыс тілінде кейбір сөздер сөйлеушінің жынысына қарай өзгереді: «рад» не «рада», «сделал» не «сделала». Бұл тек орысша жауаптарға әсер етеді."
           }
         },
         "ru" : {
@@ -4085,7 +4085,7 @@
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Reply sening noming bilan yozadi. Rus tilida baʼzi soʻzlar soʻzlovchining jinsiga qarab oʻzgaradi: «рад» yoki «рада», «сделал» yoki «сделала». Bu faqat ruscha javoblarga taʼsir qiladi."
+            "value" : "AI Reply siz nomingizdan yozadi. Rus tilida baʼzi soʻzlar soʻzlovchining jinsiga qarab oʻzgaradi: «рад» yoki «рада», «сделал» yoki «сделала». Bu faqat ruscha javoblarga taʼsir qiladi."
           }
         }
       }
@@ -4160,7 +4160,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Мұны кейін профильде өзгертуге болады. Өткізіп жіберсең, жауаптар бейтарап жазылады."
+            "value" : "Мұны кейін профильде өзгертуге болады. Өткізіп жіберсеңіз, жауаптар бейтарап жазылады."
           }
         },
         "ru" : {
@@ -4172,7 +4172,7 @@
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Buni keyinroq profilda oʻzgartirish mumkin. Oʻtkazib yuborsang, javoblar betaraf yoziladi."
+            "value" : "Buni keyinroq profilda oʻzgartirish mumkin. Oʻtkazib yuborsangiz, javoblar betaraf yoziladi."
           }
         }
       }
@@ -4247,7 +4247,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Орысша жауаптар сенің атыңнан қалай жазылсын?"
+            "value" : "Орысша жауаптар сіздің атыңыздан қалай жазылсын?"
           }
         },
         "ru" : {
@@ -4259,7 +4259,7 @@
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Javoblar sening noming bilan qanday yozilsin?"
+            "value" : "Javoblar siz nomingizdan qanday yozilsin?"
           }
         }
       }
@@ -4392,7 +4392,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Кез келген мессенджерде хабарламаны басып тұрып, «Көшіру» таңда. Осы жерде байқап көр."
+            "value" : "Кез келген мессенджерде хабарламаны басып тұрып, «Көшіру» таңдаңыз. Осы жерде байқап көріңіз."
           }
         },
         "ru" : {
@@ -4404,7 +4404,7 @@
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Istalgan messenjerda xabarni bosib tur va nusxa ol. Shu yerda sinab koʻr."
+            "value" : "Istalgan messenjerda xabarni bosib turing va nusxa oling. Shu yerda sinab koʻring."
           }
         }
       }
@@ -4450,7 +4450,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Хабарламаны көшір"
+            "value" : "Хабарламаны көшіріңіз"
           }
         },
         "ru" : {
@@ -4462,7 +4462,7 @@
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Xabarni nusxala"
+            "value" : "Xabarni nusxalang"
           }
         }
       }
@@ -4479,7 +4479,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Қалай қолдану · %1$lld/%2$lld"
+            "value" : "Қалай пайдалану · %1$lld/%2$lld"
           }
         },
         "ru" : {
@@ -4508,7 +4508,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Reply пернетақтасында кімге жауап беретініңді бас."
+            "value" : "AI Reply пернетақтасында кімге жауап беретініңізді басыңыз."
           }
         },
         "ru" : {
@@ -4520,7 +4520,7 @@
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Reply klaviaturasida kimga javob berayotganingni bos."
+            "value" : "AI Reply klaviaturasida kimga javob berayotganingizni bosing."
           }
         }
       }
@@ -4566,7 +4566,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Әңгімелесушіні таңда"
+            "value" : "Әңгімелесушіні таңдаңыз"
           }
         },
         "ru" : {
@@ -4578,7 +4578,7 @@
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Suhbatdoshni tanla"
+            "value" : "Suhbatdoshni tanlang"
           }
         }
       }
@@ -4595,7 +4595,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Әр түрлі әңгімелесушіні таңдап көр — жауап өзгереді. Бұл мысал: ештеңе жіберілмейді, жауап лимиті жұмсалмайды."
+            "value" : "Әр түрлі әңгімелесушіні таңдап көріңіз — жауап өзгереді. Бұл мысал: ештеңе жіберілмейді, жауап лимиті жұмсалмайды."
           }
         },
         "ru" : {
@@ -4607,7 +4607,7 @@
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Turli suhbatdoshlarni tanlab koʻr — javob oʻzgaradi. Bu misol: hech narsa yuborilmaydi, javoblar limiti sarflanmaydi."
+            "value" : "Turli suhbatdoshlarni tanlab koʻring — javob oʻzgaradi. Bu misol: hech narsa yuborilmaydi, javoblar limiti sarflanmaydi."
           }
         }
       }
@@ -4624,7 +4624,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Кез келген мессенджерде дәл осылай: жауапты тексеріп, өзің жібер."
+            "value" : "Кез келген мессенджерде дәл осылай: жауапты тексеріп, өзіңіз жіберіңіз."
           }
         },
         "ru" : {
@@ -4636,7 +4636,7 @@
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Istalgan messenjerda xuddi shunday: javobni tekshir va oʻzing yubor."
+            "value" : "Istalgan messenjerda xuddi shunday: javobni tekshiring va oʻzingiz yuboring."
           }
         }
       }
@@ -4653,7 +4653,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Шықты!"
+            "value" : "Тамаша, шықты!"
           }
         },
         "ru" : {
@@ -4665,7 +4665,7 @@
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Uddalading!"
+            "value" : "Ajoyib, chiqdi!"
           }
         }
       }
@@ -4711,7 +4711,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Өзің байқап көр"
+            "value" : "Өзіңіз байқап көріңіз"
           }
         },
         "ru" : {
@@ -4723,7 +4723,7 @@
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Oʻzing sinab koʻr"
+            "value" : "Oʻzingiz sinab koʻring"
           }
         }
       }
@@ -4798,7 +4798,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Әңгімелесушіні таңда."
+            "value" : "Әңгімелесушіні таңдаңыз."
           }
         },
         "ru" : {
@@ -4810,7 +4810,7 @@
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Suhbatdoshni tanla."
+            "value" : "Suhbatdoshni tanlang."
           }
         }
       }
@@ -4827,7 +4827,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Хабарламаны көшір."
+            "value" : "Хабарламаны көшіріңіз."
           }
         },
         "ru" : {
@@ -4839,7 +4839,7 @@
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Xabarni nusxala."
+            "value" : "Xabarni nusxalang."
           }
         }
       }
@@ -4856,7 +4856,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Жауап ал."
+            "value" : "Жауап алыңыз."
           }
         },
         "ru" : {
@@ -4868,7 +4868,7 @@
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Javob ol."
+            "value" : "Javob oling."
           }
         }
       }
@@ -5030,7 +5030,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Клиенттерге сенімді жауап бер, жақындарыңмен оңай сөйлес. Тікелей пернетақтадан."
+            "value" : "Клиенттерге сенімді жауап беріңіз, жақындарыңызбен оңай сөйлесіңіз. Тікелей пернетақтадан."
           }
         },
         "ru" : {
@@ -5042,7 +5042,7 @@
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mijozlarga ishonch bilan javob ber, yaqinlaring bilan oson muloqot qil. Toʻgʻridan-toʻgʻri klaviaturadan."
+            "value" : "Mijozlarga ishonch bilan javob bering, yaqinlaringiz bilan oson muloqot qiling. Toʻgʻridan-toʻgʻri klaviaturadan."
           }
         }
       }
@@ -5059,7 +5059,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Хат алмасудағы жеке көмекшің"
+            "value" : "Хат алмасудағы жеке көмекшіңіз"
           }
         },
         "ru" : {
@@ -5071,7 +5071,7 @@
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Yozishmalardagi shaxsiy yordamching"
+            "value" : "Yozishmalardagi shaxsiy yordamchingiz"
           }
         }
       }
@@ -5117,7 +5117,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Кімге жауап беретініңді таңдағанда не «Хабарламаны қою» түймесін басқанда, AI Reply пернетақтасы көшірілген хабарламаны оқиды, ал iOS әр жолы қоюға рұқсат сұрауы мүмкін. Реттеулерде бір рет рұқсат бер — iOS бұдан былай сұрамайды."
+            "value" : "Кімге жауап беретініңізді таңдағанда не «Хабарламаны қою» түймесін басқанда, AI Reply пернетақтасы көшірілген хабарламаны оқиды, ал iOS әр жолы қоюға рұқсат сұрауы мүмкін. Реттеулерде бір рет рұқсат беріңіз — iOS бұдан былай сұрамайды."
           }
         },
         "ru" : {
@@ -5129,7 +5129,7 @@
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Kimga javob berayotganingni tanlaganingda yoki «Xabarni joylash»ni bosganingda AI Reply klaviaturasi nusxalangan xabarni oʻqiydi va iOS har safar joylashga ruxsat soʻrashi mumkin. Sozlamalarda bir marta ruxsat ber — iOS boshqa soʻramaydi."
+            "value" : "Kimga javob berayotganingizni tanlaganingizda yoki «Xabarni joylash»ni bosganingizda AI Reply klaviaturasi nusxalangan xabarni oʻqiydi va iOS har safar joylashga ruxsat soʻrashi mumkin. Sozlamalarda bir marta ruxsat bering — iOS boshqa soʻramaydi."
           }
         }
       }
@@ -5204,7 +5204,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Мұндай жол жоқ па? Ол AI Reply қоюды алғаш сұрағаннан кейін пайда болады. Оған дейін iOS өзі сұрайды — «Қоюға рұқсат ету» түймесін бас."
+            "value" : "Мұндай жол жоқ па? Ол AI Reply қоюды алғаш сұрағаннан кейін пайда болады. Оған дейін iOS өзі сұрайды — «Қоюға рұқсат ету» түймесін басыңыз."
           }
         },
         "ru" : {
@@ -5216,7 +5216,7 @@
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bunday qator yoʻqmi? U AI Reply birinchi marta joylashni soʻragandan keyin paydo boʻladi. Ungacha iOS oʻzi soʻraydi — Allow Paste ni bos."
+            "value" : "Bunday qator yoʻqmi? U AI Reply birinchi marta joylashni soʻragandan keyin paydo boʻladi. Ungacha iOS oʻzi soʻraydi — Allow Paste ni bosing."
           }
         }
       }
@@ -5233,7 +5233,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Бұл баптауды тек өзің өзгерте аласың. Ешбір қолданба, оның ішінде AI Reply да, сенің орныңа рұқсат бере алмайды."
+            "value" : "Бұл баптауды тек өзіңіз өзгерте аласыз. Ешбір қолданба, оның ішінде AI Reply да, сіздің орныңызға рұқсат бере алмайды."
           }
         },
         "ru" : {
@@ -5245,7 +5245,7 @@
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bu sozlamani faqat oʻzing oʻzgartira olasan. Hech bir ilova, jumladan AI Reply ham, sen uchun ruxsat bera olmaydi."
+            "value" : "Bu sozlamani faqat oʻzingiz oʻzgartira olasiz. Hech bir ilova, jumladan AI Reply ham, siz uchun ruxsat bera olmaydi."
           }
         }
       }
@@ -5291,7 +5291,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "«Рұқсат бар» таңда"
+            "value" : "«Рұқсат бар» таңдаңыз"
           }
         },
         "ru" : {
@@ -5303,7 +5303,7 @@
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Allow ni tanla"
+            "value" : "Allow ni tanlang"
           }
         }
       }
@@ -5320,7 +5320,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "«Басқа қолданбалардан көшіріп қою» бөлімін бас"
+            "value" : "«Басқа қолданбалардан көшіріп қою» бөлімін басыңыз"
           }
         },
         "ru" : {
@@ -5332,7 +5332,7 @@
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Paste from Other Apps boʻlimini bos"
+            "value" : "Paste from Other Apps boʻlimini bosing"
           }
         }
       }
@@ -5552,7 +5552,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Оны тек өзің iOS реттеулерінде қоса аласың. Ешбір қолданба мұны сенің орныңа жасай алмайды."
+            "value" : "Оны тек өзіңіз iOS реттеулерінде қоса аласыз. Ешбір қолданба мұны сіздің орныңызға жасай алмайды."
           }
         },
         "ru" : {
@@ -5564,7 +5564,7 @@
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Uni faqat oʻzing iOS sozlamalarida yoqa olasan. Hech bir ilova buni sen uchun qila olmaydi."
+            "value" : "Uni faqat oʻzingiz iOS sozlamalarida yoqa olasiz. Hech bir ilova buni siz uchun qila olmaydi."
           }
         }
       }
@@ -8945,7 +8945,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Reply-ды қос"
+            "value" : "AI Reply-ды қосыңыз"
           }
         },
         "ru" : {
@@ -8957,7 +8957,7 @@
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Replyni yoq"
+            "value" : "AI Replyni yoqing"
           }
         }
       }
@@ -8974,7 +8974,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "«Толық рұқсат» қосқышын қос"
+            "value" : "«Толық рұқсат» қосқышын қосыңыз"
           }
         },
         "ru" : {
@@ -8986,7 +8986,7 @@
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Allow Full Access ni yoq"
+            "value" : "Allow Full Access ni yoqing"
           }
         }
       }
@@ -9003,7 +9003,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "«Пернетақталар» бөлімін таңда"
+            "value" : "«Пернетақталар» бөлімін таңдаңыз"
           }
         },
         "ru" : {
@@ -9015,7 +9015,7 @@
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Keyboards boʻlimini tanla"
+            "value" : "Keyboards boʻlimini tanlang"
           }
         }
       }
@@ -9032,7 +9032,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Реттеулерді аш"
+            "value" : "Реттеулерді ашыңыз"
           }
         },
         "ru" : {
@@ -9044,7 +9044,7 @@
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sozlamalarni och"
+            "value" : "Sozlamalarni oching"
           }
         }
       }
