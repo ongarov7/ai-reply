@@ -34,7 +34,7 @@
     ]
   };
 
-  var TEMPLATES = ["client", "business", "work", "friend"];
+  var TEMPLATES = ["friend", "client", "work", "business"];
 
   SIM.register("sim-keyboard", {
     props: {

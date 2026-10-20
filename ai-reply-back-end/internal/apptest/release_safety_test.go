@@ -17,13 +17,18 @@ import (
 // ---------------------------------------------------------------- landing
 
 // Лендинг осы шығарылымда шын болмайтын нәрсені айтпайды; дүкен сілтемелері берілсе — нақты сілтеме.
+// Алушылар қолданбадағыдай аталады және сол ретпен: Друг, Клиент, Коллега, Партнёр.
 func TestLandingClaimsMatchTheRelease(t *testing.T) {
 	h := newHarness(t)
 	for locale, needles := range map[string][]string{
-		"en": {"Your own instructions", "Give Friend, Client, Business and Work your own notes and rules", "platforms: iPhone and Android"},
-		"ru": {"Свои указания", "«Друг», «Клиент», «Бизнес» и «Работа»", "платформы: iPhone и Android"},
-		"kk": {"Өз нұсқауларыңыз", "«Дос», «Клиент», «Бизнес» және «Жұмыс»", "платформа: iPhone және Android"},
-		"uz": {"Oʻz koʻrsatmalaringiz", "«Doʻst», «Mijoz», «Biznes» va «Ish»", "platforma: iPhone va Android"},
+		"en": {"Your own instructions", "Give Friend, Client, Colleague and Partner your own notes and rules",
+			"Friend, client, colleague, partner — each with its own tone and rules", "platforms: iPhone and Android"},
+		"ru": {"Свои указания", "«Друг», «Клиент», «Коллега» и «Партнёр»",
+			"Друг, клиент, коллега, партнёр — для каждого свой тон", "платформы: iPhone и Android"},
+		"kk": {"Өз нұсқауларыңыз", "«Дос», «Клиент», «Әріптес» және «Серіктес»",
+			"Дос, клиент, әріптес, серіктес — әрқайсысына өз мәнері", "платформа: iPhone және Android"},
+		"uz": {"Oʻz koʻrsatmalaringiz", "«Doʻst», «Mijoz», «Hamkasb» va «Hamkor»",
+			"Doʻst, mijoz, hamkasb, hamkor — har biriga oʻz uslubi", "platforma: iPhone va Android"},
 	} {
 		_, page := fetch(t, h, "/?lang="+locale)
 		page = html.UnescapeString(page)
@@ -33,7 +38,8 @@ func TestLandingClaimsMatchTheRelease(t *testing.T) {
 			}
 		}
 		for _, stale := range []string{"data-count=\"12\"", "Saved templates", "Готовые шаблоны", "Дайын үлгілер", "Tayyor shablonlar",
-			"countries supported", "стран поддерживаются", "ел нөмірлері", "mamlakat raqamlari", "phone number", "номер телефона", "телефон нөмірі", "telefon raqami"} {
+			"countries supported", "стран поддерживаются", "ел нөмірлері", "mamlakat raqamlari", "phone number", "номер телефона", "телефон нөмірі", "telefon raqami",
+			"Business and Work", "«Бизнес» и «Работа»", "«Бизнес» және «Жұмыс»", "«Biznes» va «Ish»"} {
 			if strings.Contains(page, stale) {
 				t.Errorf("%s landing still says %q", locale, stale)
 			}
