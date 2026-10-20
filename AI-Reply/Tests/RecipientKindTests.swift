@@ -110,7 +110,7 @@ final class RecipientKindTests: XCTestCase {
         XCTAssertEqual(names(.russian), ["Другу", "Клиенту", "Коллеге", "Партнёру"])
         XCTAssertEqual(names(.kazakh), ["Досқа", "Клиентке", "Әріптеске", "Серіктеске"])
         XCTAssertEqual(names(.english), ["Friend", "Client", "Colleague", "Partner"])
-        XCTAssertEqual(names(.uzbek), ["Do\u{02BB}st", "Mijoz", "Hamkasb", "Hamkor"])
+        XCTAssertEqual(names(.uzbek), ["Do\u{02BB}stga", "Mijozga", "Hamkasbga", "Hamkorga"])
 
         var renamed = ReplyTemplate.builtIn(.client, sortIndex: 1)
         renamed.setName("Покупатели")

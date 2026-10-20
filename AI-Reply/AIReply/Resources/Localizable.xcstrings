@@ -1573,7 +1573,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Generate reply"
+            "value" : "Create a reply"
           }
         },
         "kk" : {
@@ -1585,7 +1585,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Сгенерировать ответ"
+            "value" : "Создать ответ"
           }
         },
         "uz" : {
@@ -1602,25 +1602,54 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "This uses the same profile, template and time context the keyboard uses."
+            "value" : "The reply uses the same profile, templates and working hours as the keyboard."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Пернетақтадағыдай профиль, үлгі және уақыт контексті қолданылады."
+            "value" : "Жауап пернетақтадағыдай профильді, үлгілерді және жұмыс уақытын ескереді."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Используется тот же профиль, шаблон и контекст времени, что и в клавиатуре."
+            "value" : "Ответ учитывает тот же профиль, шаблоны и рабочее время, что и клавиатура."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bu klaviaturadagi profil, shablon va vaqt kontekstidan foydalanadi."
+            "value" : "Javob klaviaturadagi kabi profil, shablonlar va ish vaqtini hisobga oladi."
+          }
+        }
+      }
+    },
+    "compose.hint.empty" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add a message or try an example"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Хабарлама қос немесе мысал таңда"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Добавь сообщение или выбери пример"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xabar qoʻsh yoki misol tanla"
           }
         }
       }
@@ -1660,54 +1689,83 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Paste or dictate the message you want to reply to"
+            "value" : "Paste the message you want to reply to"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Жауап бергіңіз келетін хабарламаны қойыңыз немесе айтып жазыңыз"
+            "value" : "Жауап бергің келетін хабарламаны қой"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Вставьте или надиктуйте сообщение, на которое хотите ответить"
+            "value" : "Вставь сообщение, на которое хочешь ответить"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Javob bermoqchi boʻlgan xabarni joylang yoki ayting"
+            "value" : "Javob bermoqchi boʻlgan xabaringni joylashtir"
           }
         }
       }
     },
-    "compose.paste" : {
+    "compose.paste.empty" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Paste"
+            "value" : "There's no text on the clipboard."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Қою"
+            "value" : "Алмасу буферінде мәтін жоқ."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Вставить"
+            "value" : "В буфере обмена нет текста."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Joylash"
+            "value" : "Almashinuv buferida matn yoʻq."
+          }
+        }
+      }
+    },
+    "compose.recipients" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Who are we replying to?"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Кімге жауап береміз?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Кому отвечаем?"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kimga javob beramiz?"
           }
         }
       }
@@ -1770,31 +1828,60 @@
         }
       }
     },
-    "compose.template" : {
+    "compose.sample" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Replying to"
+            "value" : "Try an example"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Кімге жауап"
+            "value" : "Мысалмен байқап көру"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Отвечаете"
+            "value" : "Попробовать на примере"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Kimga javob"
+            "value" : "Misolda sinab koʻrish"
+          }
+        }
+      }
+    },
+    "compose.sample.message" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hello! Could you tell me whether you deliver to Astana and how much it costs?"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сәлеметсіз бе! Астанаға жеткізу бар ма және бағасы қанша екенін айтып жібересіз бе?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Добрый день! Подскажите, пожалуйста, есть ли доставка в Астану и сколько она стоит?"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Assalomu alaykum! Ayting-chi, Toshkentga yetkazib berish bormi va u qancha turadi?"
           }
         }
       }
@@ -1805,25 +1892,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Try a reply"
+            "value" : "Create a reply"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Жауапты байқау"
+            "value" : "Жауап жасау"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Попробовать ответ"
+            "value" : "Создать ответ"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Javobni sinash"
+            "value" : "Javob yaratish"
           }
         }
       }
@@ -2765,25 +2852,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Try a reply"
+            "value" : "Create a reply"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Жауапты байқау"
+            "value" : "Жауап жасау"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Попробовать ответ"
+            "value" : "Создать ответ"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Javobni sinash"
+            "value" : "Javob yaratish"
           }
         }
       }

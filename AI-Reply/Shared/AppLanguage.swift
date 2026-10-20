@@ -86,9 +86,10 @@ extension ReplyTemplate {
     /// The name as the answer to «Кому отвечаем?» ("who are we replying
     /// to?") in the app's recipient grid: Другу, Клиенту, Коллеге, Партнёру.
     ///
-    /// Russian and Kazakh put the recipient in the dative; English and Uzbek
-    /// read right with the plain name. A name the user typed is theirs and is
-    /// never declined.
+    /// Russian, Kazakh and Uzbek put the recipient in the dative («Kimga
+    /// javob beramiz?» - Doʻstga, as Android says it); English reads right
+    /// with the plain name. A name the user typed is theirs and is never
+    /// declined.
     func recipientName(appLanguage: AppLanguage) -> String {
         guard !hasCustomName else { return displayName(appLanguage: appLanguage) }
         return Self.builtInRecipientName(relationship, appLanguage: appLanguage)
@@ -107,6 +108,11 @@ extension ReplyTemplate {
         case (.client, .kazakh):    return "Клиентке"
         case (.work, .kazakh):      return "Әріптеске"
         case (.business, .kazakh):  return "Серіктеске"
+        // U+02BB, as `displayName(appLanguage:)` spells Doʻst.
+        case (.friend, .uzbek):     return "Do\u{02BB}stga"
+        case (.client, .uzbek):     return "Mijozga"
+        case (.work, .uzbek):       return "Hamkasbga"
+        case (.business, .uzbek):   return "Hamkorga"
         default:                    return nil
         }
     }

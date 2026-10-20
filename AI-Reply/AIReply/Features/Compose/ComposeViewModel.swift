@@ -2,8 +2,10 @@ import Foundation
 import Observation
 import UIKit
 
-/// Drives the in-app reply flow: type or dictate a message, choose a template,
-/// generate.
+/// Drives «Создать ответ»: paste, type or dictate a message, choose who it
+/// is for, generate.
+///
+/// «Создать ответ» экраны: хабарлама, кімге жауап беретіні, жауап.
 ///
 /// It calls the SAME `AIReplyService` the keyboard calls, with the same profile,
 /// the same template and the same working-hours context, so what the user sees
@@ -13,7 +15,11 @@ import UIKit
 final class ComposeViewModel {
 
     var message: String = ""
-    var selectedTemplateID: String?
+    /// Who the reply is for: the keyboard's selected persona too
+    /// (`SharedSettings.lastTemplateID`), so both start where the other left.
+    private(set) var selectedTemplateID: String?
+    /// Why a paste brought nothing, as a catalog key; cleared by any edit.
+    private(set) var pasteNoticeKey: String?
     private(set) var reply: String = ""
     private(set) var isGenerating = false
     private(set) var errorMessage: String?
@@ -23,7 +29,12 @@ final class ComposeViewModel {
     private(set) var didCopy = false
 
     @ObservationIgnored private let service = AIReplyService()
+    @ObservationIgnored private let settings: SharedSettings
     @ObservationIgnored private var task: Task<Void, Never>?
+
+    init(settings: SharedSettings = .shared) {
+        self.settings = settings
+    }
 
     var characterCount: Int { AIReplyService.characterCount(message) }
     var characterLimit: Int { AIConfiguration.maximumMessageCharacters }
@@ -33,10 +44,52 @@ final class ComposeViewModel {
         !isGenerating && !isOverLimit && characterCount > 0 && selectedTemplateID != nil
     }
 
-    func pasteFromClipboard() {
-        guard UIPasteboard.general.hasStrings, let value = UIPasteboard.general.string else { return }
-        message = value
+    // MARK: Recipient
+
+    /// The keyboard's last persona when it is still shown, else the first.
+    /// Nothing is written here: only the user's own choice changes what the
+    /// keyboard has selected.
+    func restoreRecipient(visible templates: [ReplyTemplate]) {
+        let ids = templates.map(\.id)
+        if let current = selectedTemplateID, ids.contains(current) { return }
+        if let saved = settings.lastTemplateID, ids.contains(saved) {
+            selectedTemplateID = saved
+        } else {
+            selectedTemplateID = ids.first
+        }
+    }
+
+    func selectRecipient(_ id: String) {
+        selectedTemplateID = id
+        settings.setLastTemplateID(id)
+    }
+
+    // MARK: Message
+
+    /// What the system Paste button handed over. iOS gives it only on the
+    /// user's tap and never asks for permission; the app itself never reads
+    /// the clipboard.
+    func paste(_ text: String?) {
+        let trimmed = text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !trimmed.isEmpty else {
+            pasteNoticeKey = "compose.paste.empty"
+            return
+        }
+        message = trimmed
+        pasteNoticeKey = nil
         errorMessage = nil
+        ProductEvents.track(.pasteSucceeded)
+    }
+
+    /// «Попробовать на примере».
+    func useSample(_ text: String) {
+        message = text
+        pasteNoticeKey = nil
+        errorMessage = nil
+    }
+
+    func messageDidChange() {
+        pasteNoticeKey = nil
     }
 
     func appendDictated(_ transcript: String) {

@@ -1,12 +1,18 @@
 import SwiftUI
 
-/// The in-app reply flow: paste or dictate a message, pick who it is from,
-/// generate a reply.
+/// «Создать ответ»: the incoming message, who it is for, the reply.
+///
+/// «Создать ответ»: кіріс хабарлама, кімге жауап, дайын жауап.
 ///
 /// It exists for two reasons. It is how the microphone reaches the AI at all,
 /// since a keyboard extension cannot capture audio. And it lets someone check
 /// their profile and templates produce the replies they expect without
 /// switching to WhatsApp to find out.
+///
+/// The message comes in through the system Paste button, which iOS fills on
+/// the user's tap without asking - the app never reads the clipboard
+/// itself - or by typing, dictating, or an example. The recipient is the
+/// keyboard's own selected persona (`SharedSettings.lastTemplateID`).
 struct ComposeView: View {
 
     @Environment(ReplyConfigurationModel.self) private var model
@@ -19,19 +25,38 @@ struct ComposeView: View {
     @FocusState private var isFocused: Bool
 
     var body: some View {
-        Form {
-            messageSection
-            templateSection
-            generateSection
-            if !viewModel.reply.isEmpty { replySection }
+        ScrollView {
+            VStack(alignment: .leading, spacing: DS.Spacing.l) {
+                VStack(alignment: .leading, spacing: DS.Spacing.xs) {
+                    messageCard
+                    Button("compose.sample") {
+                        viewModel.useSample(settings.localized("compose.sample.message"))
+                    }
+                    .font(.subheadline)
+                    .frame(minHeight: DS.Layout.minimumTouchTarget)
+                }
+                recipients
+                if !viewModel.reply.isEmpty { replyCard }
+                if let error = viewModel.errorMessage {
+                    Label(error, systemImage: "exclamationmark.triangle")
+                        .font(.footnote)
+                        .foregroundStyle(Color.orange)
+                }
+            }
+            .padding(DS.Spacing.l)
+            .frame(maxWidth: DS.Layout.readableWidth, alignment: .leading)
+            .frame(maxWidth: .infinity)
         }
+        .scrollDismissesKeyboard(.interactively)
+        .background(Color.dsBackground)
+        .safeAreaInset(edge: .bottom) { createBar }
         .navigationTitle("compose.title")
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear {
-            if viewModel.selectedTemplateID == nil {
-                viewModel.selectedTemplateID = model.visibleTemplates.first?.id
-            }
+        .onAppear { viewModel.restoreRecipient(visible: model.visibleTemplates) }
+        .onChange(of: model.visibleTemplates.map(\.id)) {
+            viewModel.restoreRecipient(visible: model.visibleTemplates)
         }
+        .onChange(of: viewModel.message) { viewModel.messageDidChange() }
         .onDisappear { viewModel.cancel() }
         .sheet(isPresented: $isDictating) {
             DictationSheet(language: settings.effectiveLanguage) { transcript in
@@ -49,12 +74,22 @@ struct ComposeView: View {
         }
     }
 
-    // MARK: Sections
+    // MARK: Message
 
-    private var messageSection: some View {
-        Section {
+    private var messageCard: some View {
+        VStack(alignment: .leading, spacing: DS.Spacing.s) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("compose.message")
+                    .font(.headline)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer(minLength: DS.Spacing.s)
+                counter
+            }
+
             TextEditor(text: $viewModel.message)
-                .frame(minHeight: 110)
+                .font(.body)
+                .scrollContentBackground(.hidden)
+                .frame(minHeight: 120)
                 .focused($isFocused)
                 .overlay(alignment: .topLeading) {
                     if viewModel.message.isEmpty {
@@ -66,112 +101,196 @@ struct ComposeView: View {
                     }
                 }
 
-            HStack(spacing: DS.Spacing.m) {
-                Text(counterText)
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(viewModel.isOverLimit ? Color.red : .secondary)
-                Spacer()
-                Button {
-                    viewModel.pasteFromClipboard()
-                } label: {
-                    Label("compose.paste", systemImage: "doc.on.clipboard").font(.subheadline)
-                }
-                Button {
-                    isFocused = false
-                    isDictating = true
-                } label: {
-                    Label("profile.dictate", systemImage: "mic.fill").font(.subheadline)
-                }
+            // The system's own Paste button, labelled by iOS: it pastes on
+            // the user's tap and never shows the "Allow Paste" question.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: DS.Spacing.s) { inputButtons }
+                VStack(alignment: .leading, spacing: DS.Spacing.s) { inputButtons }
+            }
+
+            if let key = viewModel.pasteNoticeKey {
+                Text(LocalizedStringKey(key))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
 
             if viewModel.isOverLimit {
                 // The exact wording the keyboard shows, so the rule reads the
                 // same wherever the user meets it.
                 Text(AIReplyStrings.forLanguage(settings.effectiveLanguage).messageTooLong(limit: viewModel.characterLimit))
-                    .font(.caption)
+                    .font(.footnote)
                     .foregroundStyle(Color.red)
             }
-        } header: {
-            Text("compose.message")
         }
+        .dsCard()
     }
 
-    private var templateSection: some View {
-        Section("compose.template") {
-            Picker("compose.template", selection: $viewModel.selectedTemplateID) {
-                ForEach(model.visibleTemplates) { template in
-                    Text(template.displayName(appLanguage: settings.effectiveLanguage))
-                        .tag(String?.some(template.id))
-                }
-            }
-            .labelsHidden()
-            .pickerStyle(.segmented)
+    @ViewBuilder
+    private var inputButtons: some View {
+        PasteButton(payloadType: String.self) { strings in
+            Task { @MainActor in viewModel.paste(strings.first) }
         }
+        .labelStyle(.titleAndIcon)
+        .buttonBorderShape(.capsule)
+        .tint(Color.accentColor)
+
+        Button {
+            isFocused = false
+            isDictating = true
+        } label: {
+            Label("profile.dictate", systemImage: "mic")
+        }
+        .buttonStyle(.bordered)
+        .buttonBorderShape(.capsule)
     }
 
-    private var generateSection: some View {
-        Section {
-            Button {
-                isFocused = false
-                viewModel.generate(configuration: model.configuration, language: settings.effectiveLanguage)
-            } label: {
-                HStack {
-                    if viewModel.isGenerating { ProgressView().padding(.trailing, DS.Spacing.xs) }
-                    Text(viewModel.isGenerating ? "compose.generate" : "compose.generate")
-                }
-                .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.dsPrimary)
-            .disabled(!viewModel.canGenerate)
-            .listRowInsets(EdgeInsets())
-            .listRowBackground(Color.clear)
+    private var counter: some View {
+        Text(counterText)
+            .font(.caption.monospacedDigit())
+            .foregroundStyle(viewModel.isOverLimit ? Color.red : .secondary)
+    }
 
-            if let error = viewModel.errorMessage {
-                Label(error, systemImage: "exclamationmark.triangle")
-                    .font(.footnote)
-                    .foregroundStyle(Color.orange)
+    // MARK: Recipient
+
+    private var recipients: some View {
+        VStack(alignment: .leading, spacing: DS.Spacing.s) {
+            Text("compose.recipients")
+                .font(.headline)
+                .accessibilityAddTraits(.isHeader)
+
+            RecipientGrid(
+                items: RecipientGrid.items(for: model.visibleTemplates, language: settings.effectiveLanguage),
+                selection: viewModel.selectedTemplateID,
+                onSelect: viewModel.selectRecipient
+            )
+
+            if !customTemplates.isEmpty {
+                VStack(spacing: 0) {
+                    ForEach(Array(customTemplates.enumerated()), id: \.element.id) { index, template in
+                        if index > 0 { Divider().padding(.leading, 52) }
+                        customRow(template)
+                    }
+                }
+                .background(
+                    RoundedRectangle(cornerRadius: DS.Radius.medium, style: .continuous).fill(Color.dsSurface)
+                )
             }
-        } footer: {
+
             Text("compose.hint")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
         }
     }
 
-    private var replySection: some View {
-        Section("compose.result") {
+    /// Templates the user made: a row each under the grid.
+    private var customTemplates: [ReplyTemplate] {
+        model.visibleTemplates.filter { !$0.isBuiltIn }
+    }
+
+    private func customRow(_ template: ReplyTemplate) -> some View {
+        let isSelected = viewModel.selectedTemplateID == template.id
+        return Button {
+            viewModel.selectRecipient(template.id)
+        } label: {
+            HStack(spacing: DS.Spacing.s) {
+                Image(systemName: template.relationship.symbolName)
+                    .foregroundStyle(Color.accentColor)
+                    .frame(width: 24)
+                    .accessibilityHidden(true)
+                Text(verbatim: template.recipientName(appLanguage: settings.effectiveLanguage))
+                    .foregroundStyle(.primary)
+                Spacer(minLength: 0)
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(Color.accentColor)
+                        .accessibilityHidden(true)
+                }
+            }
+            .padding(.horizontal, DS.Spacing.m)
+            .frame(minHeight: DS.Layout.minimumTouchTarget + 4)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+    }
+
+    // MARK: Reply
+
+    private var replyCard: some View {
+        VStack(alignment: .leading, spacing: DS.Spacing.s) {
+            Text("compose.result")
+                .font(.headline)
+                .accessibilityAddTraits(.isHeader)
             Text(viewModel.reply)
                 .font(.body)
                 .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-            HStack {
+            HStack(spacing: DS.Spacing.s) {
                 Button {
                     viewModel.copyReply()
                 } label: {
                     Label(viewModel.didCopy ? "compose.copied" : "common.copy",
                           systemImage: viewModel.didCopy ? "checkmark" : "doc.on.doc")
-                    .font(.subheadline)
                 }
-                Spacer()
-                Button {
-                    viewModel.generate(configuration: model.configuration, language: settings.effectiveLanguage)
-                } label: {
-                    Label("compose.regenerate", systemImage: "arrow.clockwise").font(.subheadline)
-                }
-                .disabled(viewModel.isGenerating)
-            }
-            // Each button its own tap target inside the row.
-            .buttonStyle(.borderless)
+                .buttonStyle(.dsOutline)
 
-            if account.features?.aiReports == true {
                 Button {
-                    isReporting = true
+                    generate()
                 } label: {
-                    Label(reportStrings.report, systemImage: "flag").font(.subheadline)
+                    Label("compose.regenerate", systemImage: "arrow.clockwise")
+                        .font(.subheadline)
                 }
                 .buttonStyle(.borderless)
-                .foregroundStyle(.secondary)
                 .disabled(viewModel.isGenerating)
+
+                Spacer(minLength: 0)
+
+                if account.features?.aiReports == true {
+                    Button {
+                        isReporting = true
+                    } label: {
+                        Image(systemName: "flag")
+                    }
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel(Text(verbatim: reportStrings.report))
+                    .disabled(viewModel.isGenerating)
+                }
             }
         }
+        .dsCard()
+    }
+
+    // MARK: Create
+
+    private var createBar: some View {
+        VStack(spacing: DS.Spacing.xs) {
+            if viewModel.characterCount == 0 {
+                Text("compose.hint.empty")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            Button(action: generate) {
+                HStack(spacing: DS.Spacing.xs) {
+                    if viewModel.isGenerating { ProgressView().tint(.white) }
+                    Text("compose.generate")
+                }
+            }
+            .buttonStyle(.dsPrimary)
+            .disabled(!viewModel.canGenerate)
+        }
+        .padding(.horizontal, DS.Spacing.l)
+        .padding(.vertical, DS.Spacing.s)
+        .frame(maxWidth: DS.Layout.readableWidth)
+        .frame(maxWidth: .infinity)
+        .background(Color.dsBackground)
+    }
+
+    private func generate() {
+        isFocused = false
+        viewModel.generate(configuration: model.configuration, language: settings.effectiveLanguage)
     }
 
     private var reportStrings: ReportStrings { ReportStrings.forLanguage(settings.effectiveLanguage) }
