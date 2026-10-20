@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -41,10 +42,12 @@ import kz.yerek.aireply.ui.design.Spacing
  */
 @Composable
 internal fun ColumnScope.WelcomeStep(gender: GrammaticalGender?) {
+    // A narrow phone gets a step smaller title, so the example and the three moves stay in view.
+    val compact = LocalConfiguration.current.screenWidthDp < COMPACT_WIDTH_DP
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s)) {
         Text(
             stringResource(R.string.onboarding_welcome_headline),
-            style = MaterialTheme.typography.displaySmall,
+            style = if (compact) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.displaySmall,
             modifier = Modifier.semantics { heading() }
         )
         Text(
@@ -112,3 +115,5 @@ private fun Chevron() {
         modifier = Modifier.padding(top = 12.dp).size(20.dp)
     )
 }
+
+private const val COMPACT_WIDTH_DP = 380
