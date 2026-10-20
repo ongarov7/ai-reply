@@ -24,6 +24,7 @@ Two things in one APK:
 ### The reply flow
 
 ```
+
 you copy a message          →  long press, Copy, in any chat app
 switch to the AI keyboard   →  the persona row sits above the keys
 tap who it is from          →  Friend · Client · Business · Work · your own

@@ -35,3 +35,6 @@ android-shot*.png
 
 # Files the Claude desktop app saves into this folder
 Claude outputs/
+
+# Generated release/review artifacts and local signing files stay on this machine.
+/outputs/

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "307300959376",
+    "project_id": "ai-reply-4bf8f",
+    "storage_bucket": "ai-reply-4bf8f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:307300959376:android:250a4b3bef59d0129b4415",
+        "android_client_info": {
+          "package_name": "kz.yerek.aireply"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBHVukUNkq1n2QDvCM2xEJOFIORbw0O148"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

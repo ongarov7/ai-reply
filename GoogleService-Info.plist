@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>API_KEY</key>
+	<string>AIzaSyD44u6Gyx5kz0UTkdxMUslAX8rEVrMNKzI</string>
+	<key>GCM_SENDER_ID</key>
+	<string>307300959376</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>kz.ai-reply.reply.keyboard.keyboard</string>
+	<key>PROJECT_ID</key>
+	<string>ai-reply-4bf8f</string>
+	<key>STORAGE_BUCKET</key>
+	<string>ai-reply-4bf8f.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:307300959376:ios:eba12e693c10e0e19b4415</string>
+</dict>
+</plist>
