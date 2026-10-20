@@ -24,15 +24,15 @@
 
     <string name="compose_copied">Скопировано</string>
     <string name="compose_counter">%1$d / %2$d</string>
-    <string name="compose_generate">Сгенерировать ответ</string>
+    <string name="compose_generate">Создать ответ</string>
     <string name="compose_hint">Используется тот же профиль, шаблон и контекст времени, что и в клавиатуре.</string>
     <string name="compose_message">Входящее сообщение</string>
-    <string name="compose_message_placeholder">Вставьте или надиктуйте сообщение, на которое хотите ответить</string>
+    <string name="compose_message_placeholder">Вставь или надиктуй сообщение, на которое нужно ответить</string>
     <string name="compose_paste">Вставить</string>
     <string name="compose_regenerate">Сгенерировать заново</string>
     <string name="compose_result">Ответ</string>
-    <string name="compose_template">Отвечаете</string>
-    <string name="compose_title">Попробовать ответ</string>
+    <string name="compose_template">Кому отвечаем?</string>
+    <string name="compose_title">Создать ответ</string>
 
     <string name="home_howitworks_body">Скопируйте сообщение в WhatsApp, Telegram, Instagram или любом другом приложении, переключитесь на клавиатуру AI Reply, выберите, кому отвечаете, и нажмите «Ответить».</string>
     <string name="home_howitworks_fullaccess">iOS требует «Полный доступ», чтобы сторонняя клавиатура могла читать скопированный текст. Клавиатура обращается к буферу обмена только после нажатия «Ответить» — и никогда в фоне.</string>
@@ -59,7 +59,7 @@
     <string name="home_setup_title">Подключение клавиатуры</string>
     <string name="home_subtitle">Готовые ответы прямо с клавиатуры.</string>
     <string name="home_title">AI Reply</string>
-    <string name="home_tryit">Попробовать ответ</string>
+    <string name="home_tryit">Создать ответ</string>
 
     <string name="hours_closed">Выходной</string>
     <string name="hours_enable">Использовать рабочее время</string>

@@ -144,7 +144,9 @@ fun AppNavHost(debugScreen: String? = null) {
             )
         }
 
-        composable(Routes.Compose) { ComposeScreen(onBack = navController::popBackStack) }
+        composable(Routes.Compose) {
+            ComposeScreen(onBack = navController::popBackStack, onOpen = { route -> navController.navigate(route) })
+        }
         composable(Routes.Profile) { ProfileScreen(onBack = navController::popBackStack) }
         composable(Routes.WorkingHours) { WorkingHoursScreen(onBack = navController::popBackStack) }
         composable(Routes.KeyboardSetup) { KeyboardSetupScreen(onBack = navController::popBackStack) }

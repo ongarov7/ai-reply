@@ -57,4 +57,13 @@
     <string name="paste_help_last">Last successful paste: %1$s</string>
     <string name="paste_help_never">No paste in AI Reply on this phone yet.</string>
 
+    <!-- Create a reply -->
+    <string name="compose_dictate">Dictate</string>
+    <string name="compose_example">Try an example</string>
+    <string name="compose_example_message">Good afternoon! Could you tell me how much delivery to Almaty costs and when you could bring it?</string>
+    <string name="compose_hint_empty">Add a message or try the example</string>
+    <string name="compose_paste_empty">There is no text on the clipboard. Copy the message, then tap Paste.</string>
+    <string name="compose_paste_private">The copied text is marked private, such as a password, so AI Reply does not paste it. Copy the message itself.</string>
+    <string name="compose_paste_unreadable">The copied text could not be read. Copy the message again.</string>
+
 </resources>

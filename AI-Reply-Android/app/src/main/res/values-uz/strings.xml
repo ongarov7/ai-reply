@@ -18,8 +18,8 @@
     <string name="compose_paste">Joylash</string>
     <string name="compose_regenerate">Qayta yaratish</string>
     <string name="compose_result">Javob</string>
-    <string name="compose_template">Kimga javob</string>
-    <string name="compose_title">Javobni sinash</string>
+    <string name="compose_template">Kimga javob beramiz?</string>
+    <string name="compose_title">Javob yaratish</string>
 
     <string name="home_howitworks_body">WhatsApp, Telegram, Instagram yoki boshqa ilovada xabarni nusxalang, AI Reply klaviaturasiga oʻting, kimga javob berayotganingizni tanlang va «Javob berish»ni bosing.</string>
     <string name="home_howitworks_title">Qanday ishlaydi</string>
@@ -31,7 +31,7 @@
     <string name="home_profile_title">Sizning sozlamalaringiz</string>
     <string name="home_subtitle">Yaxshi javoblar bevosita klaviaturangizda.</string>
     <string name="home_title">AI Reply</string>
-    <string name="home_tryit">Javobni sinash</string>
+    <string name="home_tryit">Javob yaratish</string>
     <string name="home_usage_title">Bugungi javoblar</string>
     <string name="home_usage_title_month">Bu oydagi javoblar</string>
     <string name="home_usage_left">%1$d tadan qoldi</string>

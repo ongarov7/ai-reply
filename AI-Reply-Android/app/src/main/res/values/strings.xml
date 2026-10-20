@@ -24,15 +24,15 @@
 
     <string name="compose_copied">Copied</string>
     <string name="compose_counter">%1$d / %2$d</string>
-    <string name="compose_generate">Generate reply</string>
+    <string name="compose_generate">Create reply</string>
     <string name="compose_hint">This uses the same profile, template and time context the keyboard uses.</string>
     <string name="compose_message">Incoming message</string>
     <string name="compose_message_placeholder">Paste or dictate the message you want to reply to</string>
     <string name="compose_paste">Paste</string>
     <string name="compose_regenerate">Regenerate</string>
     <string name="compose_result">Reply</string>
-    <string name="compose_template">Replying to</string>
-    <string name="compose_title">Try a reply</string>
+    <string name="compose_template">Who are you replying to?</string>
+    <string name="compose_title">Create a reply</string>
 
     <string name="home_howitworks_body">Copy a message in WhatsApp, Telegram, Instagram or any other app, switch to the AI Reply keyboard, tap who you are replying to, then tap Reply.</string>
     <string name="home_howitworks_fullaccess">iOS requires Allow Full Access before any third-party keyboard can read copied text. The keyboard reads the clipboard only when you tap Reply — never in the background.</string>
@@ -59,7 +59,7 @@
     <string name="home_setup_title">Set up the keyboard</string>
     <string name="home_subtitle">Better replies, straight from your keyboard.</string>
     <string name="home_title">AI Reply</string>
-    <string name="home_tryit">Try a reply</string>
+    <string name="home_tryit">Create a reply</string>
 
     <string name="hours_closed">Closed</string>
     <string name="hours_enable">Use working hours</string>

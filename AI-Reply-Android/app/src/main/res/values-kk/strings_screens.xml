@@ -57,4 +57,13 @@
     <string name="paste_help_last">Соңғы сәтті қою: %1$s</string>
     <string name="paste_help_never">Бұл телефонда AI Reply ішінде әлі қою болған жоқ.</string>
 
+    <!-- Create a reply -->
+    <string name="compose_dictate">Айтып жазу</string>
+    <string name="compose_example">Мысалмен байқау</string>
+    <string name="compose_example_message">Қайырлы күн! Алматыға жеткізу қанша тұрады және қашан әкеле аласыздар?</string>
+    <string name="compose_hint_empty">Хабарлама қосыңыз немесе мысалды таңдаңыз</string>
+    <string name="compose_paste_empty">Алмасу буферінде мәтін жоқ. Хабарламаны көшіріп, «Қою» түймесін басыңыз.</string>
+    <string name="compose_paste_private">Көшірілген мәтін құпия деп белгіленген (мысалы, құпиясөз), сондықтан AI Reply оны қоймайды. Хабарламаның өзін көшіріңіз.</string>
+    <string name="compose_paste_unreadable">Көшірілген мәтінді оқу мүмкін болмады. Хабарламаны қайта көшіріңіз.</string>
+
 </resources>

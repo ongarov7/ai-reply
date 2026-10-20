@@ -57,4 +57,13 @@
     <string name="paste_help_last">Последняя удачная вставка: %1$s</string>
     <string name="paste_help_never">На этом телефоне вставки в AI Reply ещё не было.</string>
 
+    <!-- Create a reply -->
+    <string name="compose_dictate">Надиктовать</string>
+    <string name="compose_example">Попробовать на примере</string>
+    <string name="compose_example_message">Добрый день! Подскажите, пожалуйста, сколько стоит доставка в Алматы и когда сможете привезти?</string>
+    <string name="compose_hint_empty">Добавь сообщение или выбери пример</string>
+    <string name="compose_paste_empty">В буфере обмена нет текста. Скопируй сообщение и нажми «Вставить».</string>
+    <string name="compose_paste_private">Скопированный текст помечен как личный (например, пароль), поэтому AI Reply его не вставляет. Скопируй само сообщение.</string>
+    <string name="compose_paste_unreadable">Не удалось прочитать скопированный текст. Скопируй сообщение ещё раз.</string>
+
 </resources>

@@ -142,6 +142,17 @@ class ContextTextProvider(
     )
 
     /**
+     * The app's own Paste button (Create a reply): the copied clip only, by
+     * the same rules - no selection, never a secure field. The app is the
+     * focused one when the user taps, which is when Android lets it read.
+     */
+    fun acquireClipboard(context: Context): Result = read(
+        isSecureField = false,
+        selection = { null },
+        clip = { SystemClip.of(context) }
+    )
+
+    /**
      * What a tap finds, in the order it looks: a password field refuses, a
      * selection in the field wins, then the copied clip ([clip] is null
      * without a clipboard). Only the tap's own reads run here; text behind a

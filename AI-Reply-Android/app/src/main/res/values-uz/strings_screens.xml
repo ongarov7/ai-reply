@@ -57,4 +57,13 @@
     <string name="paste_help_last">Oxirgi muvaffaqiyatli joylash: %1$s</string>
     <string name="paste_help_never">Bu telefonda AI Replyda hali joylash boʻlmagan.</string>
 
+    <!-- Create a reply -->
+    <string name="compose_dictate">Aytib yozish</string>
+    <string name="compose_example">Misolda sinab koʻrish</string>
+    <string name="compose_example_message">Assalomu alaykum! Toshkentga yetkazib berish qancha turadi va qachon olib kela olasiz?</string>
+    <string name="compose_hint_empty">Xabar qoʻshing yoki misolni tanlang</string>
+    <string name="compose_paste_empty">Almashish buferida matn yoʻq. Xabarni nusxalang va «Joylash»ni bosing.</string>
+    <string name="compose_paste_private">Nusxalangan matn maxfiy deb belgilangan (masalan, parol), shuning uchun AI Reply uni joylamaydi. Xabarning oʻzini nusxalang.</string>
+    <string name="compose_paste_unreadable">Nusxalangan matnni oʻqib boʻlmadi. Xabarni qaytadan nusxalang.</string>
+
 </resources>

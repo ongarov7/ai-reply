@@ -31,8 +31,8 @@
     <string name="compose_paste">Қою</string>
     <string name="compose_regenerate">Қайта жасау</string>
     <string name="compose_result">Жауап</string>
-    <string name="compose_template">Кімге жауап</string>
-    <string name="compose_title">Жауапты байқау</string>
+    <string name="compose_template">Кімге жауап береміз?</string>
+    <string name="compose_title">Жауап жасау</string>
 
     <string name="home_howitworks_body">WhatsApp, Telegram, Instagram немесе кез келген басқа қолданбада хабарламаны көшіріңіз, AI Reply пернетақтасына ауысып, кімге жауап беретініңізді таңдаңыз да, «Жауап беру» түймесін басыңыз.</string>
     <string name="home_howitworks_fullaccess">iOS-та кез келген бөгде пернетақта көшірілген мәтінді оқуы үшін «Толық рұқсат» қажет. Пернетақта алмасу буферін тек «Жауап беру» түймесін басқанда ғана оқиды — фонда ешқашан оқымайды.</string>
@@ -59,7 +59,7 @@
     <string name="home_setup_title">Пернетақтаны қосу</string>
     <string name="home_subtitle">Дайын жауаптар — тікелей пернетақтадан.</string>
     <string name="home_title">AI Reply</string>
-    <string name="home_tryit">Жауапты байқау</string>
+    <string name="home_tryit">Жауап жасау</string>
 
     <string name="hours_closed">Демалыс</string>
     <string name="hours_enable">Жұмыс уақытын қолдану</string>

@@ -74,7 +74,7 @@
     <string name="android_open_settings">Открыть настройки приложения</string>
 
     <string name="compose_instruction">Инструкция</string>
-    <string name="compose_instruction_placeholder">Необязательно: скажите, как ответить</string>
+    <string name="compose_instruction_placeholder">Необязательно: скажи, как ответить</string>
     <string name="compose_dictate_instruction">Продиктовать инструкцию</string>
 
     <string name="cd_back">Назад</string>
