@@ -13,9 +13,19 @@ enum class AppScreen(val key: String) {
     NOTIFICATIONS("notifications"),
     TEMPLATES("templates"),
     PROFILE("profile"),
-    /** The keyboard setup screen. */
+    /** Older links for the keyboard setup: now the permissions section, like [PERMISSIONS]. */
     KEYBOARD("keyboard"),
-    COMPOSE("compose");
+    COMPOSE("compose"),
+    /** The onboarding again: the real run for someone who left it with «Позже», else the tutorial. */
+    ONBOARDING("onboarding"),
+    /** «Настройка клавиатуры и разрешений». */
+    PERMISSIONS("permissions"),
+    /** How paste works on Android. */
+    PASTE_HELP("paste_help"),
+    /** The support chat; Home until this build has it. */
+    SUPPORT("support"),
+    /** Buying replies; Home until this build has it. */
+    PURCHASE("purchase");
 
     companion object {
         fun fromKey(key: String): AppScreen? = entries.firstOrNull { it.key == key }

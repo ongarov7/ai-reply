@@ -39,8 +39,15 @@ class PendingNavigation {
             AppScreen.NOTIFICATIONS -> Routes.settings(Routes.SectionNotifications)
             AppScreen.TEMPLATES -> Routes.Templates
             AppScreen.PROFILE -> Routes.Profile
-            AppScreen.KEYBOARD -> Routes.KeyboardSetup
+            AppScreen.KEYBOARD, AppScreen.PERMISSIONS -> Routes.Permissions
             AppScreen.COMPOSE -> Routes.Compose
+            AppScreen.ONBOARDING -> Routes.Tutorial
+            AppScreen.PASTE_HELP -> Routes.PasteHelp
+            // Not in this build yet: the app opens, as an older build does for any new screen.
+            AppScreen.SUPPORT -> Routes.Home
+            // Until the purchase screen exists, the plans: the keyboard's «Открыть AI Reply»
+            // on a spent limit must reach more replies, never Home.
+            AppScreen.PURCHASE -> Routes.Subscription
         }
 
         /**

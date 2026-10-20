@@ -1,5 +1,6 @@
 package kz.yerek.aireply
 
+import kz.yerek.aireply.keyboard.KeyboardAppLink
 import kz.yerek.aireply.push.AppLink
 import kz.yerek.aireply.push.AppLinks
 import kz.yerek.aireply.push.AppScreen
@@ -29,6 +30,29 @@ class AppLinksTest {
         }
         assertEquals(AppLink.Screen(AppScreen.SETTINGS), AppLinks.parse("AIREPLY://Settings"))
         assertEquals(AppLink.Screen(AppScreen.SUBSCRIPTION), AppLinks.parse("  aireply://subscription/  "))
+    }
+
+    @Test
+    fun `the screens the server names are the contract's`() {
+        // ai-reply-back-end internal/domain/notifications.go and the admin keep the same list.
+        assertEquals(
+            setOf(
+                "home", "subscription", "settings", "notifications", "templates", "profile", "keyboard", "compose",
+                "onboarding", "permissions", "paste_help", "support", "purchase"
+            ),
+            AppScreen.entries.map { it.key }.toSet()
+        )
+        assertEquals(AppLink.Screen(AppScreen.PASTE_HELP), AppLinks.parse("aireply://paste_help"))
+        assertEquals(
+            "the keyboard's limit link reaches the plans until the purchase screen exists",
+            Routes.Subscription,
+            (AppLinks.parse(KeyboardAppLink.limit) as AppLink.Screen).screen.let(PendingNavigation::routeFor)
+        )
+        assertEquals(
+            "the old keyboard link opens the permissions section too",
+            PendingNavigation.routeFor(AppScreen.PERMISSIONS),
+            PendingNavigation.routeFor(AppScreen.KEYBOARD)
+        )
     }
 
     @Test
@@ -154,8 +178,13 @@ class AppLinksTest {
             AppScreen.NOTIFICATIONS to "settings?section=notifications",
             AppScreen.TEMPLATES to Routes.Templates,
             AppScreen.PROFILE to Routes.Profile,
-            AppScreen.KEYBOARD to Routes.KeyboardSetup,
-            AppScreen.COMPOSE to Routes.Compose
+            AppScreen.KEYBOARD to "permissions",
+            AppScreen.COMPOSE to Routes.Compose,
+            AppScreen.ONBOARDING to Routes.Tutorial,
+            AppScreen.PERMISSIONS to "permissions",
+            AppScreen.PASTE_HELP to "paste_help",
+            AppScreen.SUPPORT to Routes.Home,
+            AppScreen.PURCHASE to Routes.Subscription
         )
         assertEquals(AppScreen.entries.toSet(), expected.keys)
         expected.forEach { (screen, route) -> assertEquals(screen.key, route, PendingNavigation.routeFor(screen)) }
