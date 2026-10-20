@@ -13,3 +13,5 @@ Leipzig Corpora Collection: From 100 to 200 Languages.* Proceedings of LREC 2012
 Changes: filtered to the letters of each language, offensive words removed from
 suggestions, ranked by frequency, and converted to a word list and a Bloom filter
 (`tools/dictionaries/build_dictionaries.py`).
+
+**Emoji order**: the keyboard emoji catalog (`emoji-catalog.txt`) follows the Unicode CLDR emoji ordering, © Unicode, Inc., Unicode License v3 (https://www.unicode.org/license.txt).
