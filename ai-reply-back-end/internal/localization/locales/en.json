@@ -1106,13 +1106,11 @@
  "admin.support.reopen": "Reopen",
  "admin.support.resolved_toast": "The conversation is marked as resolved.",
  "admin.support.reopened_toast": "The conversation is open again.",
- "admin.support.user": "Account",
  "admin.support.plan": "Plan",
  "admin.support.device": "Device",
  "admin.support.last_seen": "Last seen",
  "admin.support.diagnostics": "Permissions",
  "admin.support.no_diagnostics": "The app has not reported its permissions.",
- "admin.support.open_user": "Open account",
  "pricing.subtitle_free": "AI Reply is free. The free plan has a daily reply limit that renews every night.",
  "pricing.cta_free": "Get the app",
  "delete.kept_body_no_expiry": "Nothing that identifies you. The record of the app installation on your phone (platform, app and system version, device model) loses its link to the account and its push token. The log of administrator actions may keep the random account number, without your e-mail or other details. The keyboard keeps working for typing."

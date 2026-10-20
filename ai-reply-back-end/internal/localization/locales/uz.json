@@ -1106,13 +1106,11 @@
  "admin.support.reopen": "Qayta ochish",
  "admin.support.resolved_toast": "Suhbat hal qilingan deb belgilandi.",
  "admin.support.reopened_toast": "Suhbat qayta ochildi.",
- "admin.support.user": "Hisob",
  "admin.support.plan": "Tarif",
  "admin.support.device": "Qurilma",
  "admin.support.last_seen": "Oxirgi faollik",
  "admin.support.diagnostics": "Ruxsatlar",
  "admin.support.no_diagnostics": "Ilova ruxsatlar haqida maʼlumot yubormagan.",
- "admin.support.open_user": "Hisobni ochish",
  "pricing.subtitle_free": "AI Reply bepul. Bepul tarifda kunlik javoblar limiti bor, u har kecha yangilanadi.",
  "pricing.cta_free": "Ilovani yuklab olish",
  "delete.kept_body_no_expiry": "Sizni aniqlaydigan hech narsa qolmaydi. Telefondagi ilova oʻrnatilishi yozuvi (platforma, ilova va tizim versiyasi, qurilma modeli) hisob bilan bogʻlanishini va push-tokenini yoʻqotadi. Administratorlar harakatlari jurnalida hisobning tasodifiy raqami qolishi mumkin — pochtangiz va boshqa maʼlumotlarsiz. Klaviatura matn yozish uchun ishlashda davom etadi."
