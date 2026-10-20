@@ -191,7 +191,7 @@ struct HomeView: View {
         !keyboard.status.isEnabled || !hasFullAccess
     }
 
-    private var hasFullAccess: Bool { keyboard.status.fullAccess == .on }
+    private var hasFullAccess: Bool { keyboard.status.fullAccessStatus == .verifiedEnabled }
 
     private var howItWorks: some View {
         DSSection(title: "home.howItWorks.title") {

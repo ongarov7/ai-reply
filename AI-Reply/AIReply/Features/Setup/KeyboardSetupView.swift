@@ -76,10 +76,10 @@ struct KeyboardSetupView: View {
     /// Full Access is only knowable once the keyboard has run at least once.
     /// Before that the honest answer is "not known yet", not "off".
     private var fullAccessState: ChecklistRow.State {
-        switch keyboard.status.fullAccess {
-        case .on:      return .done
-        case .off:     return .missing
-        case .unknown: return .unknown
+        switch keyboard.status.fullAccessStatus {
+        case .verifiedEnabled: return .done
+        case .observedDenied:  return .missing
+        default:               return .unknown
         }
     }
 

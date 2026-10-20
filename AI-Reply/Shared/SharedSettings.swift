@@ -34,6 +34,8 @@ struct SharedSettings {
         static let appearance = "shared.appearance"
         static let keyboardLastSeen = "shared.keyboardLastSeen"
         static let keyboardFullAccess = "shared.keyboardFullAccess"
+        static let keyboardPasteSucceededAt = "shared.keyboardPasteSucceededAt"
+        static let keyboardPasteDeniedAt = "shared.keyboardPasteDeniedAt"
         static let keyboardHeight = "shared.keyboardHeight"
         static let keyboardWidth = "shared.keyboardWidth"
         static let enabledKeyboardLanguages = "shared.enabledKeyboardLanguages"
@@ -158,29 +160,65 @@ struct SharedSettings {
 
     // MARK: Keyboard status
 
-    /// When the keyboard extension last actually ran.
+    /// When the keyboard extension last wrote its heartbeat.
     ///
     /// There is no public API that tells the containing app whether its own
     /// keyboard has been enabled in iOS Settings - `UITextInputMode` exposes
     /// languages, not extension identifiers. A timestamp the extension writes
     /// itself is the honest way to answer it: if the keyboard has run, the user
-    /// has enabled it. It is never a guess presented as a fact.
+    /// has enabled it. It says when, never that it is still so.
     var keyboardLastSeen: Date? {
-        let stamp = defaults.double(forKey: Key.keyboardLastSeen)
-        return stamp > 0 ? Date(timeIntervalSince1970: stamp) : nil
+        date(forKey: Key.keyboardLastSeen)
     }
 
-    /// Full Access as the keyboard last observed it. Only meaningful together
-    /// with `keyboardLastSeen`.
+    /// The Full Access flag written with the heartbeat. Without Full Access
+    /// the App Group is read-only to the keyboard, so the current keyboard
+    /// writes the heartbeat only with it; a `false` here can only come from
+    /// an older build. Only meaningful together with `keyboardLastSeen`.
     var keyboardHasFullAccess: Bool {
         defaults.bool(forKey: Key.keyboardFullAccess)
     }
 
-    /// Called by the extension once it is on screen. Writes only a timestamp
+    /// Called by the extension once it is on screen, and only with Full
+    /// Access - without it the write cannot land. Writes only a timestamp
     /// and a permission flag - never anything the user typed or copied.
-    func markKeyboardActive(hasFullAccess: Bool) {
-        defaults.set(Date().timeIntervalSince1970, forKey: Key.keyboardLastSeen)
+    func markKeyboardActive(hasFullAccess: Bool, at date: Date = Date()) {
+        defaults.set(date.timeIntervalSince1970, forKey: Key.keyboardLastSeen)
         defaults.set(hasFullAccess, forKey: Key.keyboardFullAccess)
+    }
+
+    /// What happened the last time the keyboard read the clipboard on the
+    /// user's tap.
+    enum PasteOutcome: Sendable {
+        /// The copied text was read.
+        case succeeded
+        /// iOS had text but returned none: the user (or the "Paste from
+        /// Other Apps" setting) refused the paste.
+        case denied
+    }
+
+    /// The last paste the keyboard managed. A read needs Full Access, so the
+    /// keyboard can always record it.
+    var keyboardPasteSucceededAt: Date? {
+        date(forKey: Key.keyboardPasteSucceededAt)
+    }
+
+    /// The last paste iOS refused the keyboard.
+    var keyboardPasteDeniedAt: Date? {
+        date(forKey: Key.keyboardPasteDeniedAt)
+    }
+
+    /// Timestamps only: nothing about what was, or was not, copied.
+    func recordPaste(_ outcome: PasteOutcome, at date: Date = Date()) {
+        switch outcome {
+        case .succeeded: defaults.set(date.timeIntervalSince1970, forKey: Key.keyboardPasteSucceededAt)
+        case .denied:    defaults.set(date.timeIntervalSince1970, forKey: Key.keyboardPasteDeniedAt)
+        }
+    }
+
+    private func date(forKey key: String) -> Date? {
+        let stamp = defaults.double(forKey: key)
+        return stamp > 0 ? Date(timeIntervalSince1970: stamp) : nil
     }
 
     // MARK: Keyboard height

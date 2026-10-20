@@ -77,10 +77,10 @@ struct KeyboardStatusRow: View {
         case .keyboard:
             return status.isEnabled ? .yes : .unknown
         case .fullAccess:
-            switch status.fullAccess {
-            case .on:      return .yes
-            case .off:     return .no
-            case .unknown: return .unknown
+            switch status.fullAccessStatus {
+            case .verifiedEnabled: return .yes
+            case .observedDenied:  return .no
+            default:               return .unknown
             }
         }
     }

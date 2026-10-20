@@ -347,14 +347,19 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     /// Lets the containing app show a truthful keyboard status: a throttled
-    /// App Group heartbeat (it only lands with Full Access), then a Darwin
-    /// notification, which gets through either way. Off the main thread, and
-    /// in that order, so the app reads the fresh heartbeat when it is woken.
+    /// App Group heartbeat, then a Darwin notification, which gets through
+    /// either way. Off the main thread, and in that order, so the app reads
+    /// the fresh heartbeat when it is woken.
+    ///
+    /// The heartbeat is written only with Full Access: without it the App
+    /// Group is read-only to the keyboard, the write would not land, and the
+    /// stored "with Full Access" would stay behind looking current. The app
+    /// learns of the limited mode from the notification instead.
     private func reportActivityToContainingApp() {
         let fullAccess = hasFullAccess
         let settings = SharedSettings.shared
         let isStale = settings.keyboardLastSeen.map { Date().timeIntervalSince($0) > 300 } ?? true
-        let needsHeartbeat = isStale || settings.keyboardHasFullAccess != fullAccess
+        let needsHeartbeat = fullAccess && (isStale || !settings.keyboardHasFullAccess)
         DispatchQueue.global(qos: .utility).async {
             if needsHeartbeat { settings.markKeyboardActive(hasFullAccess: fullAccess) }
             KeyboardPresence.post(hasFullAccess: fullAccess)

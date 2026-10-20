@@ -61,7 +61,7 @@ struct OnboardingFullAccessStep: View {
             }
             .dsCard()
 
-            if keyboard.status.fullAccess != .on {
+            if keyboard.status.fullAccessStatus != .verifiedEnabled {
                 VStack(alignment: .leading, spacing: DS.Spacing.s) {
                     Text("setup.fullAccess.manual")
                         .font(.footnote)
@@ -79,7 +79,7 @@ struct OnboardingFullAccessStep: View {
             }
         }
         .onAppear {
-            if keyboard.status.fullAccess != .on { offersTestField = true }
+            if keyboard.status.fullAccessStatus != .verifiedEnabled { offersTestField = true }
         }
         .task { await keyboard.followLiveUpdates() }
     }
@@ -110,7 +110,7 @@ private struct OnboardingStatusCard: View {
     private var isConfirmed: Bool {
         switch kind {
         case .keyboard:   return keyboard.status.isEnabled
-        case .fullAccess: return keyboard.status.fullAccess == .on
+        case .fullAccess: return keyboard.status.fullAccessStatus == .verifiedEnabled
         }
     }
 }
