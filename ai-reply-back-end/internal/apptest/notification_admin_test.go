@@ -368,7 +368,10 @@ func TestNotificationAdminMetadata(t *testing.T) {
 		"content_locales": "kk,ru,en,uz", "required_locales": "kk,ru,en", "languages": "kk,ru,en,uz",
 		"segments": "all,free,paid,demo", "subscription": "active,expired",
 		"quota": "has_remaining,near_exhaustion,exhausted", "platforms": "android,ios",
-		"types": "subscription_activated,subscription_expiring,subscription_expired,quota_low,quota_exhausted",
+		"types": "subscription_activated,subscription_expiring,subscription_expired,quota_low,quota_exhausted," +
+			"onboarding_incomplete,keyboard_setup_incomplete,clipboard_help,account_info,support_reply",
+		"reminder_types":     "onboarding_incomplete,keyboard_setup_incomplete,clipboard_help,account_info",
+		"diagnostic_filters": "setup_incomplete,keyboard_not_verified,paste_problems,full_access_disabled,notifications_disabled,unknown",
 	} {
 		if got := join(key); got != want {
 			t.Errorf("%s = %s, want %s", key, got, want)

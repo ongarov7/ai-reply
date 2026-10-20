@@ -143,6 +143,11 @@ func matchClause(q AudienceQuery) (string, []any) {
 		where = append(where, clause)
 		args = append(args, quotaArgs...)
 	}
+	if f.Diagnostics != "" {
+		// The same fixed fragment as the admin diagnostics list (only validated filter names reach here).
+		where = append(where, `EXISTS (SELECT 1 FROM installation_diagnostics d WHERE d.installation_id = i.id AND `+
+			diagnosticsFilterClause(f.Diagnostics)+`)`)
+	}
 	if f.Specific() {
 		if len(q.Recipients) == 0 {
 			where = append(where, "0 = 1")

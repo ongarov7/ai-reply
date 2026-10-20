@@ -81,11 +81,36 @@ const (
 	TypeSubscriptionExpired   = "subscription_expired"
 	TypeQuotaLow              = "quota_low"
 	TypeQuotaExhausted        = "quota_exhausted"
+	// Еске салулар: тек жаңа диагностика дәлелімен (account_info — тек әкімшіден).
+	TypeOnboardingIncomplete    = "onboarding_incomplete"
+	TypeKeyboardSetupIncomplete = "keyboard_setup_incomplete"
+	TypeClipboardHelp           = "clipboard_help"
+	TypeAccountInfo             = "account_info"
+	// TypeSupportReply — оператор қолдау чатында жауап берді.
+	TypeSupportReply = "support_reply"
 )
 
 // AutomaticNotificationTypes — сервер өзі жіберетін түрлер (әкімші сүзгісі үшін).
 var AutomaticNotificationTypes = []string{
 	TypeSubscriptionActivated, TypeSubscriptionExpiring, TypeSubscriptionExpired, TypeQuotaLow, TypeQuotaExhausted,
+	TypeOnboardingIncomplete, TypeKeyboardSetupIncomplete, TypeClipboardHelp, TypeAccountInfo,
+	TypeSupportReply,
+}
+
+// ReminderTypes — автоматты еске салу шолуы жіберетін түрлер.
+var ReminderTypes = []string{TypeOnboardingIncomplete, TypeKeyboardSetupIncomplete, TypeClipboardHelp}
+
+// AdminReminderTypes — әкімші «еске салу жіберу» әрекетімен жібере алатын түрлер.
+var AdminReminderTypes = []string{TypeOnboardingIncomplete, TypeKeyboardSetupIncomplete, TypeClipboardHelp, TypeAccountInfo}
+
+// IsReminderType — еске салу түрі ме (автоматты не әкімшінікі).
+func IsReminderType(v string) bool {
+	for _, t := range AdminReminderTypes {
+		if t == v {
+			return true
+		}
+	}
+	return false
 }
 
 // Жеткізу арналары.
@@ -261,6 +286,8 @@ type Notification struct {
 	Data           map[string]string
 	Params         map[string]string
 	CreatedAt      time.Time
+	// NotBefore — a push deferred out of quiet hours goes out from here; its TTL counts from it.
+	NotBefore *time.Time
 }
 
 // Delivery — бір хабарламаның бір арнамен жеткізілуі (outbox жолы).
@@ -329,6 +356,8 @@ type AudienceFilter struct {
 	Quota        string   `json:"quota,omitempty"`     // has_remaining | near_exhaustion | exhausted (today)
 	UserIDs      []string `json:"user_ids,omitempty"`
 	Emails       []string `json:"emails,omitempty"`
+	// Diagnostics — DiagnosticFilters-тің бірі: тек сол күйі байқалған орнатулар.
+	Diagnostics string `json:"diagnostics,omitempty"`
 	// RedactedPeople — сүзгіден алынған жойылған тіркелгілер саны (тек тіркелгі жойылғанда қойылады).
 	//
 	// When an account is deleted its id and e-mails are taken out of every
@@ -407,6 +436,9 @@ type Campaign struct {
 	CompletedAt    *time.Time
 	CancelledAt    *time.Time
 	FinalStats     *DeliveryStats
+
+	// NotificationType — notifications.type of the fan-out: "campaign", or a reminder type.
+	NotificationType string
 }
 
 // TextFor — тілге жіберілетін мәтін: сол тіл толық болса — сол, әйтпесе қор тіл,
@@ -558,4 +590,5 @@ func VersionNumber(v string) int64 {
 // LinkScreens — deep link экрандары: қосымша оларды өз навигациясына аударады.
 var LinkScreens = []string{
 	"home", "subscription", "settings", "notifications", "templates", "profile", "keyboard", "compose",
+	"onboarding", "permissions", "paste_help", "support", "purchase",
 }

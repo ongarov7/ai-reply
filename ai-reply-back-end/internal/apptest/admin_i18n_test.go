@@ -74,6 +74,11 @@ func adminKeyFamilies() map[string][]string {
 		"admin.push.channel.": {domain.ChannelPush, domain.ChannelEmail},
 		"admin.push.source.":  {repository.SourceCampaign, repository.SourceAutomatic},
 		"admin.push.type.":    append([]string{domain.TypeCampaign}, domain.AutomaticNotificationTypes...),
+		// Keyboard and permission diagnostics.
+		"admin.diag.status.":     domain.DiagnosticStatuses,
+		"admin.diag.onboarding.": domain.OnboardingStatuses,
+		"admin.diag.filter.":     append([]string{"all"}, domain.DiagnosticFilters...),
+		"admin.diag.source.":     {domain.SourceAppCheck, domain.SourceKeyboardCheck, domain.SourceUserReport, "unknown"},
 		// Reports on AI replies.
 		"admin.reports.reason.": domain.ReportReasons,
 		"admin.reports.status.": domain.ReportStatuses,
@@ -82,6 +87,8 @@ func adminKeyFamilies() map[string][]string {
 		"admin.credits.kind.":   domain.GrantKinds,
 		"admin.credits.entry.":  domain.LedgerEntries,
 		"admin.credits.status.": {domain.GrantActive, domain.GrantRevoked},
+		// Support chat.
+		"admin.support.status.": domain.SupportStatuses,
 		// Dashboard range buttons.
 		"common.": {"today", "7d", "30d", "month", "prev_month"},
 	}
@@ -169,6 +176,11 @@ func TestAdminScriptStatusListsMatchTheBackend(t *testing.T) {
 		"PUSH_STATUSES":     {domain.PushNone, domain.PushActive, domain.PushInvalid, domain.PushReplaced},
 		"GRANT_KINDS":       domain.GrantKinds,
 		"LEDGER_ENTRIES":    domain.LedgerEntries,
+		// Diagnostics: the statuses, the filter chips (after "" = all) and the admin reminder types.
+		"DIAGNOSTIC_STATUSES": domain.DiagnosticStatuses,
+		"DIAGNOSTIC_FILTERS":  domain.DiagnosticFilters,
+		"REMINDER_TYPES":      domain.AdminReminderTypes,
+		"SUPPORT_STATUSES":    domain.SupportStatuses,
 	} {
 		if got := list(name); !reflect.DeepEqual(got, want) {
 			t.Errorf("%s = %v, backend has %v", name, got, want)

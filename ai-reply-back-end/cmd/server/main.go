@@ -38,6 +38,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/retention"
 	"github.com/aireply/ai-reply-back-end/internal/simulator"
 	"github.com/aireply/ai-reply-back-end/internal/subscriptions"
+	"github.com/aireply/ai-reply-back-end/internal/support"
 	"github.com/aireply/ai-reply-back-end/internal/transport/adminapi"
 	"github.com/aireply/ai-reply-back-end/internal/transport/api"
 	"github.com/aireply/ai-reply-back-end/internal/transport/simulatorapi"
@@ -185,6 +186,9 @@ func run(envFile string) error {
 	eventSvc := productevents.New(store, log)
 	reportSvc := reports.New(store, log)
 	adminSvc := admin.New(store, subSvc, planSvc, cfg, log).WithEvents(notifyEvents)
+	// Support chat: an operator reply sends one support_reply push per unread burst;
+	// the conversation page shows the person's keyboard and permission diagnostics.
+	supportSvc := support.New(store, subSvc, log).WithNotifier(notifyEvents).WithDiagnostics(adminSvc.SupportDiagnostics)
 	simulatorSvc := simulator.New(simulator.Deps{
 		Repo: store, Users: userSvc, Subs: subSvc, Plans: planSvc, AI: aiSvc, Limits: limitSvc,
 		Config: cfg, Log: log,
@@ -200,14 +204,15 @@ func run(envFile string) error {
 	api.New(api.Deps{
 		Config: cfg, Auth: authSvc, Users: userSvc, Plans: planSvc, Subs: subSvc,
 		AI: aiSvc, Limits: limitSvc, Payments: paymentSvc, Events: eventSvc,
-		Installations: installSvc, Notifications: notifySvc, Reports: reportSvc, Limiter: limiter, Log: log,
+		Installations: installSvc, Notifications: notifySvc, Reports: reportSvc, Support: supportSvc,
+		Limiter: limiter, Log: log,
 		Ping:    func(ctx context.Context) error { return db.Reader().PingContext(ctx) },
 		Credits: creditSvc,
 	}).Register(mux)
 
 	adminapi.New(adminapi.Deps{
 		Config: cfg, Admin: adminSvc, Limits: limitSvc, Notifications: notifySvc, Payments: paymentSvc,
-		Reports: reportSvc, Credits: creditSvc, Limiter: limiter, Log: log,
+		Reports: reportSvc, Credits: creditSvc, Support: supportSvc, Limiter: limiter, Log: log,
 	}).Register(mux)
 
 	simulatorapi.New(simulatorapi.Deps{
@@ -242,6 +247,7 @@ func run(envFile string) error {
 
 	for _, worker := range []func(context.Context){
 		func(ctx context.Context) { expireSubscriptions(ctx, subSvc, notifyEvents, creditSvc, log) },
+		func(ctx context.Context) { sweepReminders(ctx, notifyEvents) },
 		notifySvc.Run,
 		notifySvc.RunRetention,
 		// Spent codes, dead sessions, abandoned installations, old metadata (RETENTION_*).
@@ -377,6 +383,20 @@ func configurePush(cfg config.Push, log *slog.Logger) (push.Provider, error) {
 		return nil, nil
 	}
 	return provider, nil
+}
+
+// sweepReminders — диагностика дәлелі бар тіркелгілерге еске салу (30 минут сайын, reminders.enabled болса).
+func sweepReminders(ctx context.Context, events *notifications.Events) {
+	ticker := time.NewTicker(30 * time.Minute)
+	defer ticker.Stop()
+	for {
+		events.SweepReminders(ctx)
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
 }
 
 // expireSubscriptions — мерзімі өткен жазылымдарды белгілейтін, мерзімі туралы

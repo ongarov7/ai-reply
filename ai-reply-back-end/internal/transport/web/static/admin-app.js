@@ -22,7 +22,9 @@
     // re-read their filters from the address bar after back/forward too.
     routeSeq: 0,
     toasts: [],
-    sidebarOpen: false
+    sidebarOpen: false,
+    // supportUnread — conversations with messages no operator has read (sidebar badge).
+    supportUnread: 0
   });
 
   function t(key) {
@@ -45,7 +47,9 @@
     if (parts[1] === "plans") return { name: "plans" };
     if (parts[1] === "audit") return { name: "audit" };
     if (parts[1] === "reports") return { name: "reports" };
+    if (parts[1] === "support") return parts[2] ? { name: "support", id: parts[2] } : { name: "support" };
     if (parts[1] === "settings") return { name: "settings" };
+    if (parts[1] === "diagnostics") return { name: "diagnostics" };
     if (parts[1] === "notifications") {
       if (parts[2] === "new") return { name: "notifications", tab: "create" };
       if (parts[2] === "campaigns" && parts[3]) return { name: "notifications", tab: "campaign", id: parts[3] };
@@ -908,6 +912,8 @@
               </div>
             </div>
 
+            <user-diagnostics :id="data.user.id" :active="data.user.status === 'active'"/>
+
             <div class="card">
               <div class="card-head"><h2>{{ t('admin.user.payments') }}</h2></div>
               <div class="table-wrap">
@@ -1356,6 +1362,7 @@
             <button class="btn btn-primary" :disabled="savingLimits" @click="saveLimits">{{ t('common.save') }}</button>
           </div>
         </div>
+        <reminder-settings/>
         <div class="card">
           <div class="card-head"><h2>{{ t('admin.settings.pricing') }}</h2></div>
           <div class="table-wrap">
@@ -1397,12 +1404,14 @@
   var DEFAULT_PUSH_META = {
     status: { enabled: false, worker: false, fcm: false, email: false, link_hosts: [] },
     categories: ["subscription", "system", "marketing"],
-    screens: ["home", "subscription", "settings", "notifications", "templates", "profile", "keyboard", "compose"],
+    screens: ["home", "subscription", "settings", "notifications", "templates", "profile", "keyboard", "compose",
+      "onboarding", "permissions", "paste_help", "support", "purchase"],
     content_locales: ["kk", "ru", "en", "uz"], required_locales: ["kk", "ru", "en"], fallback_locale: "ru",
     languages: ["kk", "ru", "en", "uz"], segments: ["all", "free", "paid", "demo"],
     subscription: ["active", "expired"], quota: ["has_remaining", "near_exhaustion", "exhausted"],
     platforms: ["android", "ios"], channels: ["push", "email"],
-    types: ["subscription_activated", "subscription_expiring", "subscription_expired", "quota_low", "quota_exhausted"],
+    types: ["subscription_activated", "subscription_expiring", "subscription_expired", "quota_low", "quota_exhausted",
+      "onboarding_incomplete", "keyboard_setup_incomplete", "clipboard_help", "account_info", "support_reply"],
     limits: { title: 80, body: 400, data_keys: 10, recipients: 500 }
   };
   var DATA_KEY_PATTERN = /^[a-z][a-z0-9_]{0,31}$/;
@@ -1510,6 +1519,7 @@
     if (a.platforms && a.platforms.length) out.push(t("admin.push.audience.platforms") + ": " + a.platforms.map(platformName).join(", "));
     if (a.languages && a.languages.length) out.push(t("admin.push.audience.languages") + ": " + a.languages.map(langName).join(", "));
     if (a.quota) out.push(t("admin.push.audience.quota") + ": " + t("admin.push.quota." + a.quota));
+    if (a.diagnostics) out.push(t("admin.nav.diagnostics") + ": " + t("admin.diag.filter." + a.diagnostics));
     var people = (a.user_ids || []).length + (a.emails || []).length;
     if (people) out.push(tf("admin.push.summary.people", { n: people }));
     if (!out.length) out.push(t("admin.push.summary.everyone"));
@@ -2713,17 +2723,506 @@
       </div>`
   };
 
+  /* -------------------------------------------------------- diagnostics */
+  // Пернетақта мен рұқсаттар диагностикасы: тек күйлер мен уақыт, буфер мазмұны ешқашан.
+  var DIAGNOSTIC_STATUSES = ["unknown", "not_verified", "verified_enabled", "observed_denied", "user_reported_disabled", "unsupported"];
+  var DIAGNOSTIC_FILTERS = ["", "setup_incomplete", "keyboard_not_verified", "paste_problems", "full_access_disabled",
+    "notifications_disabled", "unknown"];
+  var REMINDER_TYPES = ["onboarding_incomplete", "keyboard_setup_incomplete", "clipboard_help", "account_info"];
+
+  // diagBadge — расталған сәтсіздік қызыл, «белгісіз» бөлек сұр (ол дәлел емес).
+  function diagBadge(v) {
+    if (v === "verified_enabled" || v === "completed") return "badge-ok";
+    if (v === "observed_denied" || v === "user_reported_disabled") return "badge-danger";
+    if (v === "not_verified" || v === "not_started" || v === "in_progress") return "badge-warn";
+    return "badge-muted";
+  }
+  function diagLabel(field, v) {
+    if (!v) return "—";
+    return field === "onboarding_status" ? t("admin.diag.onboarding." + v) : t("admin.diag.status." + v);
+  }
+  // sendReminder — еске салу науқаны (Idempotency-Key бір әрекетке бір).
+  async function sendReminder(type, audience, key) {
+    return api("/notifications/reminders", { method: "POST", body: { type: type, audience: audience },
+      headers: { "Idempotency-Key": key } });
+  }
+
+  var DiagnosticsPage = {
+    mixins: [listView({ endpoint: "/diagnostics", rowsKey: "rows", limit: 50, defaults: { filter: "", platform: "", q: "" } })],
+    data: function () {
+      return { counts: {}, chips: DIAGNOSTIC_FILTERS, types: REMINDER_TYPES, reminderType: "keyboard_setup_incomplete",
+        sending: false, idemKey: uuid() };
+    },
+    methods: Object.assign({}, helpers, {
+      diagBadge: diagBadge, diagLabel: diagLabel, uuid: uuid,
+      async load() {
+        this.loading = true;
+        this.error = "";
+        try {
+          var data = await api("/diagnostics" + toQuery(Object.assign({}, this.filters, { page: this.page, limit: this.limit })));
+          this.rows = data.rows || [];
+          this.total = data.total || 0;
+          this.counts = data.counts || {};
+        } catch (e) {
+          this.rows = [];
+          this.total = 0;
+          this.error = errorText(e);
+        }
+        this.loading = false;
+      },
+      pick(f) { this.filters.filter = f; this.idemKey = uuid(); this.search(); },
+      async remind() {
+        var audience = { diagnostics: this.filters.filter };
+        if (this.filters.platform) audience.platforms = [this.filters.platform];
+        var ask = tf("admin.diag.reminder_confirm", { type: t("admin.push.type." + this.reminderType), n: nf(this.total) });
+        if (!window.confirm(ask)) return;
+        this.sending = true;
+        try {
+          var campaign = await sendReminder(this.reminderType, audience, this.idemKey);
+          toast("ok", t("admin.diag.reminder_sent"));
+          navigate("/admin/notifications/campaigns/" + campaign.id);
+        } catch (e) {
+          toast("danger", errorText(e));
+        } finally {
+          this.sending = false;
+        }
+      }
+    }),
+    template: `
+      <div class="card">
+        <div class="card-head"><h2>{{ t('admin.diag.title') }}</h2></div>
+        <div class="card-body">
+          <p class="muted" style="margin-top:0">{{ t('admin.diag.hint') }}</p>
+          <div class="chips">
+            <button type="button" v-for="f in chips" :key="f" :class="'chip' + (filters.filter === f ? ' is-on' : '')"
+                    @click="pick(f)">{{ t('admin.diag.filter.' + (f || 'all')) }}
+              <span class="badge badge-muted">{{ nf(counts[f || 'all'] || 0) }}</span></button>
+          </div>
+        </div>
+        <form class="filter-grid" @submit.prevent="search">
+          <label><span>{{ t('admin.users.col_platform') }}</span>
+            <select v-model="filters.platform" @change="search">
+              <option value="">{{ t('common.all') }}</option>
+              <option value="ios">iOS</option><option value="android">Android</option>
+            </select></label>
+          <label><span>{{ t('common.search') }}</span>
+            <input type="text" v-model.trim="filters.q" spellcheck="false" :placeholder="t('admin.diag.search_hint')"></label>
+          <div class="filter-actions">
+            <button type="submit" class="btn btn-sm btn-primary">{{ t('common.search') }}</button>
+            <button type="button" class="btn btn-sm" @click="reset">{{ t('common.reset') }}</button>
+          </div>
+        </form>
+        <div class="card-body" v-if="filters.filter && filters.filter !== 'unknown' && filters.filter !== 'notifications_disabled'">
+          <div class="form-grid">
+            <label class="field"><span>{{ t('admin.diag.reminder_type') }}</span>
+              <select v-model="reminderType" @change="idemKey = uuid()">
+                <option v-for="k in types" :key="k" :value="k">{{ t('admin.push.type.' + k) }}</option>
+              </select></label>
+          </div>
+          <button type="button" class="btn btn-primary" :disabled="sending || !total" @click="remind">{{ t('admin.diag.reminder') }}</button>
+          <p class="hint">{{ t('admin.diag.reminder_hint') }}</p>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>{{ t('admin.diag.col.device') }}</th><th>{{ t('admin.push.delivery.user') }}</th>
+              <th>{{ t('admin.diag.col.keyboard') }}</th><th>{{ t('admin.diag.col.full_access') }}</th>
+              <th>{{ t('admin.diag.col.clipboard') }}</th><th>{{ t('admin.diag.col.onboarding') }}</th>
+              <th>{{ t('admin.diag.col.notifications') }}</th><th>{{ t('admin.diag.col.reported') }}</th></tr></thead>
+            <tbody>
+              <tr v-if="loading" v-for="n in 5" :key="'s' + n"><td colspan="8"><div class="skeleton-row"></div></td></tr>
+              <tr v-else v-for="r in rows" :key="r.id">
+                <td>{{ r.device || platformName(r.platform) }}
+                  <div class="mono small">{{ platformName(r.platform) }} {{ r.app_version }} · {{ r.installation_id }}</div></td>
+                <td><a v-if="r.user_id" class="link" :href="userLink(r.user_id)" @click.prevent="go(userLink(r.user_id))">{{ r.user }}</a>
+                  <span v-else class="muted">{{ t('admin.diag.anonymous') }}</span></td>
+                <td><span :class="'badge ' + diagBadge(r.diagnostics.keyboard_setup_status)">{{ diagLabel('keyboard_setup_status', r.diagnostics.keyboard_setup_status) }}</span>
+                  <div class="muted small">{{ t('admin.diag.col.selected') }}: {{ diagLabel('keyboard_selected_status', r.diagnostics.keyboard_selected_status) }}</div>
+                  <div class="muted small" v-if="r.diagnostics.last_keyboard_check_at">{{ t('admin.diag.col.last_check') }}: {{ r.diagnostics.last_keyboard_check_at }}</div></td>
+                <td><span :class="'badge ' + diagBadge(r.diagnostics.full_access_status)">{{ diagLabel('full_access_status', r.diagnostics.full_access_status) }}</span></td>
+                <td><span :class="'badge ' + diagBadge(r.diagnostics.clipboard_status)">{{ diagLabel('clipboard_status', r.diagnostics.clipboard_status) }}</span>
+                  <div class="muted small" v-if="r.diagnostics.last_successful_paste_at">{{ t('admin.diag.col.last_paste') }}: {{ r.diagnostics.last_successful_paste_at }}</div></td>
+                <td><span :class="'badge ' + diagBadge(r.diagnostics.onboarding_status)">{{ diagLabel('onboarding_status', r.diagnostics.onboarding_status) }}</span></td>
+                <td><span :class="'badge ' + diagBadge(r.diagnostics.notification_authorization_status)">{{ diagLabel('notification_authorization_status', r.diagnostics.notification_authorization_status) }}</span></td>
+                <td class="mono nowrap">{{ r.diagnostics.reported_at }}
+                  <div class="small">{{ t('admin.diag.source.' + (r.diagnostics.status_source || 'unknown')) }}</div>
+                  <span v-if="r.diagnostics.stale" class="badge badge-muted">{{ t('admin.diag.stale') }}</span></td>
+              </tr>
+              <tr v-if="!loading && !rows.length"><td colspan="8" class="empty">
+                <span v-if="error" class="load-error" role="alert">{{ error }}
+                  <button type="button" class="btn btn-sm" @click="load">{{ t('common.refresh') }}</button></span>
+                <span v-else>{{ t('common.empty') }}</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <pager :page="page" :limit="limit" :total="total" @move="move"/>
+      </div>`
+  };
+
+  // UserDiagnostics — қолданушы бетіндегі «Пернетақта мен рұқсаттар» карточкасы.
+  var UserDiagnostics = {
+    props: { id: String, active: Boolean },
+    data: function () {
+      return { data: null, types: REMINDER_TYPES, reminderType: "keyboard_setup_incomplete", sending: false, idemKey: uuid() };
+    },
+    mounted: function () { this.load(); },
+    methods: Object.assign({}, helpers, {
+      diagBadge: diagBadge, diagLabel: diagLabel, uuid: uuid,
+      async load() {
+        try { this.data = await api("/users/" + encodeURIComponent(this.id) + "/diagnostics"); }
+        catch (e) { this.data = { devices: [], reminders: [] }; toast("danger", errorText(e)); }
+      },
+      async remind() {
+        if (!window.confirm(t("admin.diag.reminder") + ": " + t("admin.push.type." + this.reminderType) + "?")) return;
+        this.sending = true;
+        try {
+          await sendReminder(this.reminderType, { user_ids: [this.id] }, this.idemKey);
+          this.idemKey = uuid();
+          toast("ok", t("admin.diag.reminder_sent"));
+          this.load();
+        } catch (e) {
+          toast("danger", errorText(e));
+        } finally {
+          this.sending = false;
+        }
+      }
+    }),
+    template: `
+      <div class="card" v-if="data">
+        <div class="card-head"><h2>{{ t('admin.diag.user_card') }}</h2></div>
+        <div class="card-body">
+          <div v-for="d in data.devices" :key="d.id" style="margin-bottom:12px">
+            <b>{{ d.device || platformName(d.platform) }}</b> · <span class="mono small">{{ platformName(d.platform) }} {{ d.app_version }}</span>
+            <div v-if="!d.diagnostics.reported" class="muted small">{{ t('admin.diag.not_reported') }}</div>
+            <dl class="kv" v-else>
+              <dt>{{ t('admin.diag.col.keyboard') }}</dt><dd><span :class="'badge ' + diagBadge(d.diagnostics.keyboard_setup_status)">{{ diagLabel('keyboard_setup_status', d.diagnostics.keyboard_setup_status) }}</span></dd>
+              <dt>{{ t('admin.diag.col.full_access') }}</dt><dd><span :class="'badge ' + diagBadge(d.diagnostics.full_access_status)">{{ diagLabel('full_access_status', d.diagnostics.full_access_status) }}</span></dd>
+              <dt>{{ t('admin.diag.col.clipboard') }}</dt><dd><span :class="'badge ' + diagBadge(d.diagnostics.clipboard_status)">{{ diagLabel('clipboard_status', d.diagnostics.clipboard_status) }}</span></dd>
+              <dt>{{ t('admin.diag.col.onboarding') }}</dt><dd><span :class="'badge ' + diagBadge(d.diagnostics.onboarding_status)">{{ diagLabel('onboarding_status', d.diagnostics.onboarding_status) }}</span></dd>
+              <dt>{{ t('admin.diag.col.reported') }}</dt><dd class="mono">{{ d.diagnostics.reported_at }}
+                <span v-if="d.diagnostics.stale" class="badge badge-muted">{{ t('admin.diag.stale') }}</span></dd>
+            </dl>
+            <div class="small">{{ t('admin.diag.col.notifications') }}:
+              <span :class="'badge ' + diagBadge(d.diagnostics.notification_authorization_status)">{{ diagLabel('notification_authorization_status', d.diagnostics.notification_authorization_status) }}</span></div>
+          </div>
+          <div v-if="!data.devices.length" class="muted">{{ t('common.empty') }}</div>
+          <div v-if="data.reminders.length">
+            <h3 class="small">{{ t('admin.diag.reminders') }}</h3>
+            <div v-for="r in data.reminders" :key="r.type" class="small">
+              {{ t('admin.push.type.' + r.type) }} · {{ t('admin.diag.sent_count') }}: {{ r.send_count }}
+              <span v-if="r.last_sent_at"> · {{ r.last_sent_at }} ({{ r.last_source }})</span>
+              <span v-if="r.resolved_at" class="badge badge-ok">{{ t('admin.diag.resolved') }}</span>
+            </div>
+          </div>
+          <div v-if="active" style="margin-top:12px">
+            <label class="field"><span>{{ t('admin.diag.reminder_type') }}</span>
+              <select v-model="reminderType" @change="idemKey = uuid()">
+                <option v-for="k in types" :key="k" :value="k">{{ t('admin.push.type.' + k) }}</option>
+              </select></label>
+            <button type="button" class="btn btn-block" :disabled="sending" @click="remind">{{ t('admin.diag.reminder') }}</button>
+          </div>
+        </div>
+      </div>`
+  };
+
+  // ReminderSettings — баптаулар бетіндегі еске салулар карточкасы (әдепкіде өшірулі).
+  var ReminderSettings = {
+    data: function () { return { data: null, form: null, saving: false }; },
+    mounted: function () { this.load(); },
+    methods: {
+      t: t,
+      async load() {
+        try { this.fill(await api("/settings/reminders")); } catch (e) { toast("danger", errorText(e)); }
+      },
+      fill(data) {
+        this.data = data;
+        this.form = JSON.parse(JSON.stringify(data.current));
+      },
+      async save() {
+        this.saving = true;
+        try {
+          this.fill(await api("/settings/reminders", { method: "POST", body: this.form }));
+          toast("ok", t("common.saved"));
+        } catch (e) {
+          toast("danger", errorText(e));
+        } finally {
+          this.saving = false;
+        }
+      }
+    },
+    template: `
+      <div class="card" v-if="form">
+        <div class="card-head"><h2>{{ t('admin.reminders.title') }}</h2></div>
+        <div class="card-body">
+          <p class="muted" style="margin-top:0">{{ t('admin.reminders.hint') }}</p>
+          <label class="chip" :class="{ 'is-on': form.enabled }" style="margin-bottom:14px">
+            <input type="checkbox" v-model="form.enabled"> {{ t('admin.reminders.enabled') }}</label>
+          <div class="form-grid" v-for="k in data.types" :key="k">
+            <label class="field"><span>{{ t('admin.push.type.' + k) }} · {{ t('admin.reminders.cooldown') }}</span>
+              <input type="number" step="1" :min="data.ranges.cooldown_hours.min" :max="data.ranges.cooldown_hours.max"
+                v-model.number="form.types[k].cooldown_hours"></label>
+            <label class="field"><span>{{ t('admin.reminders.max_sends') }}</span>
+              <input type="number" step="1" :min="data.ranges.max_sends.min" :max="data.ranges.max_sends.max"
+                v-model.number="form.types[k].max_sends"></label>
+          </div>
+          <div class="form-grid">
+            <label class="field"><span>{{ t('admin.reminders.min_age') }}</span>
+              <input type="number" step="1" :min="data.ranges.min_account_age_hours.min" :max="data.ranges.min_account_age_hours.max"
+                v-model.number="form.min_account_age_hours"></label>
+            <label class="field"><span>{{ t('admin.reminders.quiet_start') }}</span>
+              <input type="number" step="1" min="0" max="23" v-model.number="form.quiet_start_hour"></label>
+            <label class="field"><span>{{ t('admin.reminders.quiet_end') }}</span>
+              <input type="number" step="1" min="0" max="23" v-model.number="form.quiet_end_hour"></label>
+          </div>
+          <button class="btn btn-primary" :disabled="saving" @click="save">{{ t('common.save') }}</button>
+        </div>
+      </div>`
+  };
+
+  /* ------------------------------------------------------------ support */
+  // Қолдау чаты. Хабарлама мәтіні тек {{ }} арқылы шығады (ешқашан v-html емес);
+  // жол ауыстырулар white-space: pre-line арқылы сақталады.
+  var SUPPORT_STATUSES = ["open", "resolved"];
+  var SUPPORT_TEXT_MAX = 2000;
+
+  // refreshSupportBadge — бүйір мәзірдегі «оқылмаған сөйлесулер» саны.
+  function refreshSupportBadge() {
+    api("/support/summary").then(function (data) { state.supportUnread = data.unread || 0; }, function () {});
+  }
+
+  // mergeMessages — жаңа хабарламаларды қосады (екі сұраныс қатар келсе, қайталанбайды).
+  function mergeMessages(current, incoming) {
+    var seen = {};
+    current.forEach(function (m) { seen[m.id] = true; });
+    return current.concat(incoming.filter(function (m) { return !seen[m.id]; }));
+  }
+
+  var SupportThread = {
+    props: { id: String },
+    emits: ["changed"],
+    data: function () {
+      return { loading: true, data: null, messages: [], hasMore: false, older: false, text: "", busy: false,
+               max: SUPPORT_TEXT_MAX };
+    },
+    computed: {
+      length: function () { return runeLength(this.text.trim()); },
+      canSend: function () { return !this.busy && this.length > 0 && this.length <= SUPPORT_TEXT_MAX; },
+      // The person's devices with their keyboard and permission state (as on the user page).
+      devices: function () { return this.data && Array.isArray(this.data.diagnostics) ? this.data.diagnostics : []; }
+    },
+    mounted: function () {
+      var self = this;
+      this.load();
+      // While the conversation is open new messages appear without a reload.
+      this.timer = setInterval(function () { if (!document.hidden) self.poll(); }, 10000);
+    },
+    unmounted: function () { clearInterval(this.timer); },
+    methods: Object.assign({}, helpers, {
+      diagBadge: diagBadge, diagLabel: diagLabel,
+      path: function (suffix) { return "/support/conversations/" + encodeURIComponent(this.id) + (suffix || ""); },
+      async load() {
+        this.loading = true;
+        try {
+          var data = await api(this.path());
+          this.data = data; this.messages = data.messages; this.hasMore = data.has_more;
+          await this.markRead();
+        } catch (e) { toast("danger", errorText(e)); }
+        this.loading = false;
+      },
+      async poll() {
+        if (this.loading || !this.data) return;
+        var last = this.messages.length ? this.messages[this.messages.length - 1].id : "";
+        try {
+          var data = await api(this.path(last ? "?after=" + encodeURIComponent(last) : ""));
+          this.data.conversation = data.conversation; this.data.user = data.user;
+          this.messages = mergeMessages(this.messages, data.messages);
+          await this.markRead();
+        } catch (e) { /* the next tick tries again */ }
+      },
+      async loadOlder() {
+        if (!this.messages.length) return;
+        this.older = true;
+        try {
+          var data = await api(this.path("?before=" + encodeURIComponent(this.messages[0].id)));
+          this.messages = mergeMessages(data.messages, this.messages); this.hasMore = data.has_more;
+        } catch (e) { toast("danger", errorText(e)); }
+        this.older = false;
+      },
+      async markRead() {
+        if (!this.data || !this.data.conversation.unread) return;
+        try {
+          await api(this.path("/read"), { method: "POST", body: {} });
+          this.data.conversation.unread = 0;
+          this.$emit("changed");
+        } catch (e) { /* the badge catches up on its next poll */ }
+      },
+      async send() {
+        if (!this.canSend) return;
+        this.busy = true;
+        try {
+          var data = await api(this.path("/messages"), { method: "POST", body: { text: this.text.trim() } });
+          this.text = "";
+          this.messages = mergeMessages(this.messages, [data.message]);
+          toast("ok", t("admin.support.sent_toast"));
+          this.$emit("changed");
+        } catch (e) { toast("danger", errorText(e)); }
+        this.busy = false;
+      },
+      async setStatus(action) {
+        this.busy = true;
+        try {
+          await api(this.path("/" + action), { method: "POST", body: {} });
+          this.data.conversation.status = action === "resolve" ? "resolved" : "open";
+          toast("ok", t(action === "resolve" ? "admin.support.resolved_toast" : "admin.support.reopened_toast"));
+          this.$emit("changed");
+        } catch (e) { toast("danger", errorText(e)); }
+        this.busy = false;
+      }
+    }),
+    template: `
+      <div class="card support-card">
+        <div v-if="loading && !data" class="card-body"><div class="skeleton-row"></div></div>
+        <template v-else-if="data">
+          <div class="card-head">
+            <h2><a :href="userLink(data.user.id)" @click.prevent="go(userLink(data.user.id))">{{ data.user.identifier }}</a></h2>
+            <div class="right">
+              <span :class="'badge ' + (data.conversation.status === 'open' ? 'badge-warn' : 'badge-ok')">
+                {{ t('admin.support.status.' + data.conversation.status) }}</span>
+              <button v-if="data.conversation.status === 'open'" class="btn btn-sm" :disabled="busy"
+                      @click="setStatus('resolve')">{{ t('admin.support.resolve') }}</button>
+              <button v-else class="btn btn-sm" :disabled="busy" @click="setStatus('reopen')">{{ t('admin.support.reopen') }}</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <dl class="kv">
+              <dt>{{ t('admin.support.plan') }}</dt><dd>{{ data.user.plan_name || data.user.plan_code || '—' }}</dd>
+              <dt>{{ t('admin.support.device') }}</dt>
+              <dd>{{ platformName(data.user.platform) }} <span class="mono">{{ data.user.app_version }}</span> {{ data.user.os_version }}</dd>
+              <dt>{{ t('admin.support.last_seen') }}</dt><dd>{{ data.user.last_seen || '—' }}</dd>
+              <dt>{{ t('admin.support.diagnostics') }}</dt>
+              <dd><div v-for="d in devices" :key="d.id" class="small" style="margin-bottom:6px">
+                  <b>{{ d.device || platformName(d.platform) }}</b> · <span class="mono">{{ d.app_version }}</span>
+                  <div v-if="!d.diagnostics.reported" class="muted">{{ t('admin.diag.not_reported') }}</div>
+                  <template v-else>
+                    <div>{{ t('admin.diag.col.keyboard') }}: <span :class="'badge ' + diagBadge(d.diagnostics.keyboard_setup_status)">{{ diagLabel('keyboard_setup_status', d.diagnostics.keyboard_setup_status) }}</span></div>
+                    <div>{{ t('admin.diag.col.full_access') }}: <span :class="'badge ' + diagBadge(d.diagnostics.full_access_status)">{{ diagLabel('full_access_status', d.diagnostics.full_access_status) }}</span></div>
+                    <div>{{ t('admin.diag.col.clipboard') }}: <span :class="'badge ' + diagBadge(d.diagnostics.clipboard_status)">{{ diagLabel('clipboard_status', d.diagnostics.clipboard_status) }}</span></div>
+                    <div>{{ t('admin.diag.col.onboarding') }}: <span :class="'badge ' + diagBadge(d.diagnostics.onboarding_status)">{{ diagLabel('onboarding_status', d.diagnostics.onboarding_status) }}</span></div>
+                    <div class="muted">{{ t('admin.diag.col.reported') }}: <span class="mono">{{ d.diagnostics.reported_at }}</span>
+                      <span v-if="d.diagnostics.stale" class="badge badge-muted">{{ t('admin.diag.stale') }}</span></div>
+                  </template>
+                  <div>{{ t('admin.diag.col.notifications') }}:
+                    <span :class="'badge ' + diagBadge(d.diagnostics.notification_authorization_status)">{{ diagLabel('notification_authorization_status', d.diagnostics.notification_authorization_status) }}</span></div>
+                </div>
+                <span v-if="!devices.length" class="muted">{{ t('admin.support.no_diagnostics') }}</span></dd>
+            </dl>
+          </div>
+          <div class="support-thread">
+            <div v-if="hasMore" class="support-older">
+              <button class="btn btn-sm" :disabled="older" @click="loadOlder">{{ t('admin.support.load_older') }}</button></div>
+            <div v-for="m in messages" :key="m.id" :class="'support-bubble support-' + m.sender">
+              <div class="support-meta">{{ m.sender === 'user' ? t('admin.support.sender.user') : t('admin.support.sender.operator') }}
+                · {{ m.created_at }}<span v-if="m.read_at"> · {{ t('admin.support.read_mark') }}</span></div>
+              <div class="support-text">{{ m.text }}</div>
+            </div>
+            <div v-if="!messages.length" class="empty">{{ t('common.empty') }}</div>
+          </div>
+          <div class="card-body support-reply">
+            <textarea v-model="text" rows="4" :maxlength="max" :placeholder="t('admin.support.reply_placeholder')"
+                      :aria-label="t('admin.support.reply_placeholder')" @keydown.ctrl.enter="send" @keydown.meta.enter="send"></textarea>
+            <div class="support-actions">
+              <span class="muted">{{ tf('admin.support.length', { n: length, max: max }) }}</span>
+              <button class="btn btn-primary" :disabled="!canSend" @click="send">{{ t('admin.support.send') }}</button>
+            </div>
+          </div>
+        </template>
+      </div>`
+  };
+
+  var Support = {
+    props: { route: Object },
+    components: { SupportThread: SupportThread },
+    data: function () {
+      return { loading: true, rows: [], total: 0, page: 1, limit: 25, status: "open", unread: false, q: "",
+               statuses: SUPPORT_STATUSES };
+    },
+    mounted: function () {
+      var self = this;
+      this.load();
+      this.timer = setInterval(function () { if (!document.hidden) self.load(true); }, 30000);
+    },
+    unmounted: function () { clearInterval(this.timer); },
+    methods: Object.assign({}, helpers, {
+      async load(quiet) {
+        if (!quiet) this.loading = true;
+        try {
+          var params = new URLSearchParams({ page: this.page, status: this.status || "all" });
+          if (this.unread) params.set("unread", "1");
+          if (this.q.trim()) params.set("q", this.q.trim());
+          var data = await api("/support/conversations?" + params.toString());
+          this.rows = data.conversations; this.total = data.total; this.limit = data.limit;
+        } catch (e) { if (!quiet) toast("danger", errorText(e)); }
+        this.loading = false;
+      },
+      filter() { this.page = 1; this.load(); },
+      move(delta) { this.page = Math.max(1, this.page + delta); this.load(); },
+      changed() { this.load(true); refreshSupportBadge(); }
+    }),
+    template: `
+      <div class="detail-grid support-grid">
+        <div class="card">
+          <div class="card-head"><h2>{{ t('admin.support.title') }}</h2>
+            <div class="right"><span class="badge badge-muted">{{ t('common.total') }}: {{ nf(total) }}</span></div></div>
+          <div class="card-body filters-row">
+            <select v-model="status" @change="filter" :aria-label="t('admin.reports.col_status')">
+              <option v-for="s in statuses" :key="s" :value="s">{{ t('admin.support.status.' + s) }}</option>
+              <option value="all">{{ t('common.all') }}</option>
+            </select>
+            <label class="checkline support-check"><input type="checkbox" v-model="unread" @change="filter">
+              {{ t('admin.support.unread_only') }}</label>
+            <input type="text" v-model="q" @keyup.enter="filter" @change="filter" :placeholder="t('admin.support.search')"
+                   :aria-label="t('admin.support.search')">
+          </div>
+          <div class="card-body muted support-hint">{{ t('admin.support.hint') }}</div>
+          <div class="support-list">
+            <template v-if="loading"><div v-for="n in 4" :key="'s' + n" class="support-row"><div class="skeleton-row"></div></div></template>
+            <template v-else>
+              <a v-for="row in rows" :key="row.id" :href="'/admin/support/' + row.id"
+                 :class="'support-row' + (route.id === row.id ? ' is-active' : '')"
+                 @click.prevent="go('/admin/support/' + encodeURIComponent(row.id))">
+                <div class="support-row-head"><b>{{ row.identifier }}</b>
+                  <span v-if="row.unread" class="badge badge-danger">{{ tf('admin.support.unread_count', { n: row.unread }) }}</span>
+                  <span :class="'badge ' + (row.status === 'open' ? 'badge-warn' : 'badge-ok')">{{ t('admin.support.status.' + row.status) }}</span>
+                  <span class="mono muted support-when">{{ row.last_message_at }}</span></div>
+                <div class="support-preview"><span v-if="row.last_sender === 'operator'" class="muted">
+                  {{ t('admin.support.sender.operator') }}: </span>{{ row.preview }}</div>
+              </a>
+              <div v-if="!rows.length" class="empty">{{ t('common.empty') }}</div>
+            </template>
+          </div>
+          <div class="pagination">
+            <button class="btn btn-sm" :disabled="page === 1" @click="move(-1)">{{ t('common.prev') }}</button>
+            <span>{{ t('common.page') }} {{ page }}</span>
+            <button class="btn btn-sm" :disabled="page * limit >= total" @click="move(1)">{{ t('common.next') }}</button>
+          </div>
+        </div>
+        <support-thread v-if="route.id" :id="route.id" :key="route.id" @changed="changed"/>
+        <div v-else class="card"><div class="empty">{{ t('admin.support.select') }}</div></div>
+      </div>`
+  };
   /* --------------------------------------------------------------- shell */
   var App = {
     components: { Dashboard: Dashboard, Users: Users, UserDetail: UserDetail, Plans: Plans,
-                  Audit: Audit, Reports: Reports, Settings: Settings, Notifications: Notifications },
+                  Audit: Audit, Reports: Reports, Settings: Settings, Notifications: Notifications,
+                  Support: Support },
     data: function () { return { state: state }; },
     computed: {
       title: function () {
         return {
           dashboard: t("admin.nav.dashboard"), users: t("admin.users.title"), user: t("admin.user.detail"),
           plans: t("admin.plans.title"), audit: t("admin.audit.title"), reports: t("admin.reports.title"),
-          settings: t("admin.settings.title"), notifications: t("admin.notifications.title")
+          settings: t("admin.settings.title"), notifications: t("admin.notifications.title"),
+          diagnostics: t("admin.diag.title"),
+          support: t("admin.support.title")
         }[state.route.name];
       }
     },
@@ -2739,6 +3238,12 @@
       },
       logout: function () { document.getElementById("logout-form").submit(); }
     },
+    mounted: function () {
+      // Operators learn about new support messages here only: poll while the panel is open.
+      refreshSupportBadge();
+      this.supportTimer = setInterval(function () { if (!document.hidden) refreshSupportBadge(); }, 30000);
+    },
+    unmounted: function () { clearInterval(this.supportTimer); },
     template: `
       <div class="shell">
         <aside class="sidebar" :class="{ 'is-open': state.sidebarOpen }">
@@ -2759,10 +3264,18 @@
              :aria-current="isActive('notifications') ? 'page' : null" @click.prevent="go('/admin/notifications')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9a6 6 0 1 1 12 0c0 5 2 6 2 6H4s2-1 2-6M10 20a2 2 0 0 0 4 0"/></svg>
             {{ t('admin.nav.notifications') }}</a>
+          <a class="item" href="/admin/diagnostics" :class="{ 'is-active': isActive('diagnostics') }"
+             :aria-current="isActive('diagnostics') ? 'page' : null" @click.prevent="go('/admin/diagnostics')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"/></svg>
+            {{ t('admin.nav.diagnostics') }}</a>
           <a class="item" href="/admin/reports" :class="{ 'is-active': isActive('reports') }"
              :aria-current="isActive('reports') ? 'page' : null" @click.prevent="go('/admin/reports')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg>
             {{ t('admin.nav.reports') }}</a>
+          <a class="item" href="/admin/support" :class="{ 'is-active': isActive('support') }"
+             :aria-current="isActive('support') ? 'page' : null" @click.prevent="go('/admin/support')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>
+            {{ t('admin.nav.support') }}<span v-if="state.supportUnread" class="nav-badge">{{ state.supportUnread }}</span></a>
           <a class="item" href="/admin/audit" :class="{ 'is-active': isActive('audit') }"
              :aria-current="isActive('audit') ? 'page' : null" @click.prevent="go('/admin/audit')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg>
@@ -2800,8 +3313,10 @@
             <plans v-else-if="state.route.name === 'plans'"/>
             <audit v-else-if="state.route.name === 'audit'"/>
             <reports v-else-if="state.route.name === 'reports'"/>
+            <support v-else-if="state.route.name === 'support'" :route="state.route"/>
             <settings v-else-if="state.route.name === 'settings'"/>
             <notifications v-else-if="state.route.name === 'notifications'" :route="state.route" :seq="state.routeSeq"/>
+            <diagnostics-page v-else-if="state.route.name === 'diagnostics'" :key="state.routeSeq"/>
           </main>
         </div>
 
@@ -2813,6 +3328,9 @@
 
   state.locales = boot.locales;
   var app = Vue.createApp(App);
+  app.component("diagnostics-page", DiagnosticsPage);
+  app.component("user-diagnostics", UserDiagnostics);
+  app.component("reminder-settings", ReminderSettings);
   app.config.globalProperties.t = t;
   app.config.globalProperties.tf = tf;
   app.mount("#app");

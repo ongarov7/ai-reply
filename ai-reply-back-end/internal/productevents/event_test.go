@@ -12,8 +12,9 @@ import (
 // The catalog holds exactly the events the iOS and Android apps record.
 func TestCatalogMatchesTheAppEvents(t *testing.T) {
 	want := []string{"autocorrect_disabled", "autocorrect_enabled", "full_access_enabled_detected", "gender_selected",
-		"keyboard_enabled_detected", "onboarding_completed", "onboarding_keyboard_step_viewed",
-		"onboarding_practice_completed", "onboarding_reopened", "onboarding_started", "onboarding_step_viewed",
+		"keyboard_enabled_detected", "keyboard_settings_opened", "onboarding_completed", "onboarding_keyboard_step_viewed",
+		"onboarding_practice_completed", "onboarding_reopened", "onboarding_resumed", "onboarding_skipped",
+		"onboarding_started", "onboarding_step_viewed", "paste_denied_observed", "paste_succeeded",
 		"paste_tutorial_viewed"}
 	if got := Names(); !slices.Equal(got, want) {
 		t.Fatalf("Names() = %v", got)

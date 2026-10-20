@@ -175,6 +175,7 @@ func (e *Events) expiryNotice(kind string, n repository.SubscriptionNotice) User
 		BodyKey:        "push." + kind + ".body",
 		Params:         map[string]string{"date": e.date(n.ExpiresAt)},
 		ParamsFor:      planName(n.PlanName),
+		Defer:          true,
 	}
 }
 
