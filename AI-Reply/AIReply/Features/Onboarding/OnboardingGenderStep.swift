@@ -6,28 +6,41 @@ import SwiftUI
 struct OnboardingGenderStep: View {
 
     @Binding var selection: GrammaticalGender?
+    /// Moves on with the answer; enabled once there is one.
+    let onNext: () -> Void
+    /// Skip is an answer too: neutral wording.
+    let onSkip: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.l) {
-            OnboardingStepTitle("onboarding.gender.title", "onboarding.gender.body")
+        OnboardingPage {
+            VStack(alignment: .leading, spacing: DS.Spacing.l) {
+                OnboardingStepTitle("onboarding.gender.title", "onboarding.gender.body")
 
-            VStack(spacing: DS.Spacing.s) {
-                GenderChoiceCard(
-                    title: "onboarding.gender.male",
-                    example: "onboarding.gender.male.example",
-                    isSelected: selection == .male
-                ) { selection = .male }
-                GenderChoiceCard(
-                    title: "onboarding.gender.female",
-                    example: "onboarding.gender.female.example",
-                    isSelected: selection == .female
-                ) { selection = .female }
+                VStack(spacing: DS.Spacing.s) {
+                    GenderChoiceCard(
+                        title: "onboarding.gender.male",
+                        example: "onboarding.gender.male.example",
+                        isSelected: selection == .male
+                    ) { selection = .male }
+                    GenderChoiceCard(
+                        title: "onboarding.gender.female",
+                        example: "onboarding.gender.female.example",
+                        isSelected: selection == .female
+                    ) { selection = .female }
+                }
+
+                Text("onboarding.gender.footer")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
-
-            Text("onboarding.gender.footer")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+        } buttons: {
+            Button("onboarding.next", action: onNext)
+                .buttonStyle(.dsPrimary)
+                .disabled(selection == nil)
+            Button("onboarding.skip", action: onSkip)
+                .buttonStyle(.dsText)
         }
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

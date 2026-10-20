@@ -1,123 +1,230 @@
 import Foundation
 
-/// Which onboarding steps a user sees, where an unfinished one resumes and
-/// when it is done.
+/// Which onboarding steps a user sees, in which order, where an unfinished
+/// one resumes and when it is done.
 ///
-/// Онбординг логикасы: қай қадам көрсетіледі, қайдан жалғасады, қашан бітеді.
+/// Онбординг логикасы: қай қадам, қай ретпен, қайдан жалғасады, қашан бітеді.
 /// UI жоқ, сондықтан толық тестіленеді.
 ///
-/// Every step can be skipped, and the whole guide can be left from the welcome
-/// and keyboard steps; reaching the end and leaving early both complete it.
+/// Version 3: a welcome screen with two ways in - «Настроить клавиатуру»
+/// (connect the keyboard, then the tutorial) or «Сначала попробовать» (the
+/// tutorial, then the keyboard) - a three-step tutorial on local examples,
+/// and «Подключи AI Reply». The gender question, when the profile has none,
+/// comes right before the tutorial, whose sample replies speak for the user.
+/// Every step can be left; «Позже» on the welcome screen ends the guide.
 struct OnboardingFlow: Equatable {
 
-    /// Raised when the guide changes enough that every device should see it
-    /// once more. A device that finished the first guide has version 1.
-    static let currentVersion = 2
+    /// What a finished run records. A device that finished ANY version -
+    /// the first guide (1), v2 or this one - never sees the guide by itself
+    /// again; Settings reopens it.
+    static let currentVersion = 3
 
-    /// Stable ids: saved for resuming and reported in analytics.
-    enum Step: String, CaseIterable, Sendable {
+    static func needsOnboarding(completedVersion: Int) -> Bool {
+        completedVersion < 1
+    }
+
+    /// Stable ids: saved for resuming and reported as the `step` of product
+    /// events (the server allow-lists them).
+    enum Step: String, CaseIterable, Hashable, Sendable {
         case welcome
         case gender
-        case keyboard
-        case fullAccess
-        case copyReply
-        case practice
+        case tutorialCopy = "tutorial_copy"
+        case tutorialRecipient = "tutorial_recipient"
+        case tutorialReply = "tutorial_reply"
+        /// «Подключи AI Reply».
+        case permissions
 
-        fileprivate var order: Int { Self.allCases.firstIndex(of: self) ?? 0 }
+        static let tutorial: [Step] = [.tutorialCopy, .tutorialRecipient, .tutorialReply]
+
+        var isTutorial: Bool { Self.tutorial.contains(self) }
+
+        /// A step as saved, including the ids onboarding v2 saved: a run
+        /// left on its keyboard steps resumes on «Подключи AI Reply», one
+        /// left on its tutorial or practice on the tutorial.
+        init?(saved raw: String) {
+            if let step = Step(rawValue: raw) {
+                self = step
+                return
+            }
+            switch raw {
+            case "keyboard", "fullAccess": self = .permissions
+            case "copyReply":              self = .tutorialCopy
+            case "practice":               self = .tutorialReply
+            default:                       return nil
+            }
+        }
+
+        /// v2's ids, whose run had the keyboard first.
+        static func isLegacy(_ raw: String) -> Bool {
+            ["keyboard", "fullAccess", "copyReply", "practice"].contains(raw)
+        }
+    }
+
+    /// The welcome screen's two ways in.
+    enum Path: String, Sendable {
+        /// «Настроить клавиатуру»: the keyboard, then the tutorial.
+        case setupFirst = "setup_first"
+        /// «Сначала попробовать»: the tutorial, then the keyboard.
+        case tryFirst = "try_first"
     }
 
     enum Mode: Equatable {
         /// Shown by itself after sign-in until it is finished or skipped.
         case firstRun
-        /// Reopened from Settings: no questions, and nothing is reset or
-        /// recorded - Done just closes it.
+        /// Reopened from Settings or `aireply://onboarding`: no questions,
+        /// and closing it changes nothing.
         case tutorial
     }
 
     let mode: Mode
-    let steps: [Step]
-    private(set) var current: Step
+    /// The gender question is among the steps: a first run whose profile
+    /// had none when the run began.
+    let asksGender: Bool
+    private(set) var path: Path
+    /// The steps on the navigation stack above the welcome screen; the last
+    /// one is on screen.
+    private(set) var stack: [Step] = []
 
     /// - Parameters:
-    ///   - asksGender: whether the profile has never had a gender. The
-    ///     question is asked once, and never in the tutorial.
+    ///   - asksGender: whether the profile has never had a gender. Asked
+    ///     once, and never in the tutorial.
     ///   - saved: where a first run was when the app last closed. A step
     ///     that is no longer shown resumes at the next one that is.
-    init(mode: Mode, asksGender: Bool, resumingAt saved: Step? = nil) {
+    init(mode: Mode, asksGender: Bool, path: Path = .tryFirst, resumingAt saved: Step? = nil) {
         self.mode = mode
-        let steps = Step.allCases.filter { $0 != .gender || (mode == .firstRun && asksGender) }
-        self.steps = steps
-        let resumable = mode == .firstRun ? saved : nil
-        current = resumable.flatMap { saved in steps.first { $0.order >= saved.order } } ?? steps[0]
+        self.asksGender = mode == .firstRun && asksGender
+        self.path = path
+        guard mode == .firstRun, let saved, saved != .welcome else { return }
+        let steps = self.steps
+        let everything = Self.steps(asksGender: true, path: path)
+        guard let from = everything.firstIndex(of: saved),
+              let resumed = everything[from...].first(where: steps.contains),
+              let position = steps.firstIndex(of: resumed) else { return }
+        stack = Array(steps[1...position])
     }
 
     /// The first run as it stands now: a fresh one asks the gender question
     /// when the profile has none, and an unfinished one resumes where it
-    /// stopped with the steps it started with - so answering the question
-    /// does not take its step away and "Step 3 of 5" never becomes "of 4".
+    /// stopped, on its path and with the steps it started with - answering
+    /// the question does not take its step away.
     static func firstRun(profileHasGender: Bool, resume: OnboardingResumeStore = OnboardingResumeStore()) -> OnboardingFlow {
         OnboardingFlow(
             mode: .firstRun,
             asksGender: resume.askedGender ?? !profileHasGender,
+            path: resume.path ?? .tryFirst,
             resumingAt: resume.step
         )
     }
 
-    static func needsOnboarding(completedVersion: Int) -> Bool {
-        completedVersion < currentVersion
+    static func steps(asksGender: Bool, path: Path) -> [Step] {
+        let tutorial = (asksGender ? [Step.gender] : []) + Step.tutorial
+        switch path {
+        case .setupFirst: return [.welcome, .permissions] + tutorial
+        case .tryFirst:   return [.welcome] + tutorial + [.permissions]
+        }
     }
 
-    var index: Int { steps.firstIndex(of: current) ?? 0 }
-    var isFirst: Bool { index == 0 }
-    var isLast: Bool { index == steps.count - 1 }
+    var steps: [Step] { Self.steps(asksGender: asksGender, path: path) }
+    var current: Step { stack.last ?? .welcome }
 
-    /// "Step 2 of 5". The welcome screen is not counted: numbering starts at
-    /// the first thing the user actually does.
-    var progress: (position: Int, count: Int)? {
-        guard current != .welcome else { return nil }
-        let counted = steps.filter { $0 != .welcome }
-        guard let position = counted.firstIndex(of: current) else { return nil }
-        return (position + 1, counted.count)
+    /// Nothing comes after `step`: its main button finishes.
+    func isLast(_ step: Step) -> Bool { steps.last == step }
+
+    /// Whether `later` is still ahead of `step` (the tutorial's first step
+    /// promises the keyboard only when it is).
+    func comes(_ later: Step, after step: Step) -> Bool {
+        guard let index = steps.firstIndex(of: step) else { return false }
+        return steps[(index + 1)...].contains(later)
     }
 
-    /// The small "Skip tutorial" button: on the first screens of a first run,
-    /// where someone who has done this before decides.
-    var offersSkipTutorial: Bool {
-        mode == .firstRun && (current == .welcome || current == .keyboard)
+    /// "1 из 3" for the tutorial's steps.
+    static func tutorialPosition(of step: Step) -> Int? {
+        Step.tutorial.firstIndex(of: step).map { $0 + 1 }
     }
-
-    /// Skip moves past one step. Not on the welcome screen, whose button only
-    /// starts, and not on the last step, whose button already finishes.
-    var canSkipStep: Bool { current != .welcome && !isLast }
 
     /// What to save so a relaunch resumes here. Nothing for the tutorial,
     /// which starts from the top every time it is opened.
     var resumeStep: Step? { mode == .firstRun ? current : nil }
 
+    // MARK: Moving
+
+    /// One of the welcome screen's buttons: the path, and its first step.
+    mutating func start(_ path: Path) {
+        self.path = path
+        stack = [steps[1]]
+    }
+
     /// Moves to the next step. False when there is none: the flow is done.
     mutating func advance() -> Bool {
-        guard !isLast else { return false }
-        current = steps[index + 1]
+        guard let index = steps.firstIndex(of: current), index + 1 < steps.count else { return false }
+        stack.append(steps[index + 1])
+        return true
+    }
+
+    /// «Пропустить» in the tutorial: past its remaining steps. False when
+    /// nothing follows them: the flow is done.
+    mutating func skipTutorial() -> Bool {
+        guard let index = steps.firstIndex(of: current),
+              let next = steps[(index + 1)...].first(where: { !$0.isTutorial }) else { return false }
+        stack.append(next)
         return true
     }
 
     mutating func goBack() {
-        guard !isFirst else { return }
-        current = steps[index - 1]
+        if !stack.isEmpty { stack.removeLast() }
+    }
+
+    /// The navigation stack after the system's back button or swipe: only
+    /// ever a shorter stack, so anything else is ignored.
+    mutating func setStack(_ next: [Step]) {
+        guard next.count <= stack.count, Array(stack.prefix(next.count)) == next else { return }
+        stack = next
     }
 }
 
-/// Where an unfinished first-run onboarding resumes after the app was closed.
-/// Device-local, and cleared once the onboarding completes.
+/// How a device's onboarding stands, as the diagnostics API spells it
+/// (contract §3.4).
+enum OnboardingStatus: String, Sendable {
+    case notStarted = "not_started"
+    case inProgress = "in_progress"
+    case completed
+    case skipped
+
+    /// A device that finished an earlier version, before outcomes were
+    /// kept, counts as completed.
+    static func current(completedVersion: Int, resume: OnboardingResumeStore = OnboardingResumeStore()) -> OnboardingStatus {
+        if completedVersion > 0 { return resume.outcome == .skipped ? .skipped : .completed }
+        return resume.step == nil ? .notStarted : .inProgress
+    }
+}
+
+/// Where an unfinished first-run onboarding resumes after the app was
+/// closed, and how the last one ended. Device-local.
 struct OnboardingResumeStore {
+
+    enum Outcome: String {
+        /// Gone through to the end.
+        case completed
+        /// Left early: «Позже», or a skip that ended it.
+        case skipped
+    }
 
     var defaults: UserDefaults = .standard
 
     private static let stepKey = "onboarding.resumeStep"
     private static let askedGenderKey = "onboarding.resumeAskedGender"
+    private static let pathKey = "onboarding.resumePath"
+    private static let outcomeKey = "onboarding.outcome"
 
     var step: OnboardingFlow.Step? {
-        defaults.string(forKey: Self.stepKey).flatMap(OnboardingFlow.Step.init(rawValue:))
+        defaults.string(forKey: Self.stepKey).flatMap(OnboardingFlow.Step.init(saved:))
+    }
+
+    /// The saved run's path. A run saved by v2 had the keyboard first.
+    var path: OnboardingFlow.Path? {
+        if let raw = defaults.string(forKey: Self.pathKey) { return OnboardingFlow.Path(rawValue: raw) }
+        guard let step = defaults.string(forKey: Self.stepKey), OnboardingFlow.Step.isLegacy(step) else { return nil }
+        return .setupFirst
     }
 
     /// Whether the unfinished run has the gender question among its steps.
@@ -126,16 +233,26 @@ struct OnboardingResumeStore {
         defaults.object(forKey: Self.askedGenderKey) as? Bool
     }
 
+    var outcome: Outcome? {
+        defaults.string(forKey: Self.outcomeKey).flatMap(Outcome.init(rawValue:))
+    }
+
     /// Remembers the current step of a first run. The tutorial is never
     /// resumed, so it saves nothing.
     func save(_ flow: OnboardingFlow) {
         guard let step = flow.resumeStep else { return }
         defaults.set(step.rawValue, forKey: Self.stepKey)
-        defaults.set(flow.steps.contains(.gender), forKey: Self.askedGenderKey)
+        defaults.set(flow.asksGender, forKey: Self.askedGenderKey)
+        defaults.set(flow.path.rawValue, forKey: Self.pathKey)
+    }
+
+    func record(_ outcome: Outcome) {
+        defaults.set(outcome.rawValue, forKey: Self.outcomeKey)
     }
 
     func clear() {
-        defaults.removeObject(forKey: Self.stepKey)
-        defaults.removeObject(forKey: Self.askedGenderKey)
+        for key in [Self.stepKey, Self.askedGenderKey, Self.pathKey] {
+            defaults.removeObject(forKey: key)
+        }
     }
 }

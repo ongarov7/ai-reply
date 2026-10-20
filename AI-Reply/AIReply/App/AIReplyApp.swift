@@ -178,9 +178,25 @@ enum DebugScreen: String {
     /// `-AIReplyDebugStep <step id>` next to `onboarding`: the step it opens
     /// on, so each one can be reviewed in each language without tapping there.
     static var onboardingStep: OnboardingFlow.Step? {
+        value(after: "-AIReplyDebugStep").flatMap(OnboardingFlow.Step.init(saved:))
+    }
+
+    /// `-AIReplyDebugPath setup_first | try_first`: the welcome screen's
+    /// choice the opened step sits on (try_first when absent).
+    static var onboardingPath: OnboardingFlow.Path {
+        value(after: "-AIReplyDebugPath").flatMap(OnboardingFlow.Path.init(rawValue:)) ?? .tryFirst
+    }
+
+    /// `-AIReplyDebugGender male | female | unspecified`: the gender the
+    /// opened guide has already (no question then).
+    static var onboardingGender: GrammaticalGender? {
+        value(after: "-AIReplyDebugGender").flatMap(GrammaticalGender.init(rawValue:))
+    }
+
+    private static func value(after name: String) -> String? {
         let arguments = CommandLine.arguments
-        guard let index = arguments.firstIndex(of: "-AIReplyDebugStep"), index + 1 < arguments.count else { return nil }
-        return OnboardingFlow.Step(rawValue: arguments[index + 1])
+        guard let index = arguments.firstIndex(of: name), index + 1 < arguments.count else { return nil }
+        return arguments[index + 1]
     }
 }
 
@@ -200,14 +216,29 @@ private struct DebugScreenHost: View {
         case .profile:   NavigationStack { ProfileEditorView() }
         case .templates: NavigationStack { TemplateEditorView(templateID: "client") }
         case .onboarding:
-            OnboardingView(flow: OnboardingFlow(mode: .firstRun, asksGender: true,
-                                                resumingAt: DebugScreen.onboardingStep))
+            DebugOnboardingHost()
         case .signIn:    SignInView { _ in }
         case .email:     EmailSignInView()
         case .code:
             VerifyCodeView(challenge: .init(email: "aigerim@example.kz",
                                             resendAvailableAt: Date().addingTimeInterval(32))) { _ in }
         }
+    }
+}
+
+/// The first-run guide on the step and path the launch arguments name.
+private struct DebugOnboardingHost: View {
+    @Environment(ReplyConfigurationModel.self) private var model
+
+    var body: some View {
+        OnboardingView(flow: OnboardingFlow(mode: .firstRun, asksGender: DebugScreen.onboardingGender == nil,
+                                            path: DebugScreen.onboardingPath,
+                                            resumingAt: DebugScreen.onboardingStep))
+            .onAppear {
+                if let gender = DebugScreen.onboardingGender {
+                    model.updateProfile { $0.grammaticalGender = gender }
+                }
+            }
     }
 }
 

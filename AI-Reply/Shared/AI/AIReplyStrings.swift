@@ -95,7 +95,7 @@ struct AIReplyStrings: Sendable {
     /// iOS refused the paste. Names the setting with the words iOS itself
     /// uses in that language - the keyboard cannot open Settings - and the
     /// way round it: typing the message. The path is the one the app's own
-    /// paste help (`setup.paste.footer`) names; iOS has no Uzbek, so Uzbek
+    /// paste help (`pasteHelp.path`) names; iOS has no Uzbek, so Uzbek
     /// names the English labels.
     let pasteDenied: String
     /// Takes the limit, which the server publishes and an administrator can

@@ -1,15 +1,17 @@
 import SwiftUI
 
-/// First run, and the "How to use AI Reply" tutorial Settings reopens.
+/// First run, and the «Как пользоваться AI Reply» guide Settings reopens.
 ///
 /// Алғашқы іске қосу нұсқаулығы: әр қадамды өткізіп жіберуге болады, қолданба
 /// жабылса, сол қадамнан жалғасады.
 ///
-/// Which steps there are, where a first run resumes and when it is done is
-/// `OnboardingFlow`'s business; this view shows the current step and moves
-/// the flow. Every step can be skipped. A first run is complete when the user
-/// reaches Done or leaves with "Skip tutorial"; the tutorial records nothing
-/// and Done just closes it.
+/// Which steps there are, in which order, where a first run resumes and when
+/// it is done is `OnboardingFlow`'s business; this view puts the steps on a
+/// navigation stack (the system back button and swipe go one step back) and
+/// moves the flow. A first run is complete when the user reaches its end or
+/// leaves with «Позже»; reopened, the guide records nothing but that it was
+/// gone through, and closing it changes nothing. Credits and quota are never
+/// touched: the tutorial runs on local examples.
 ///
 /// The interface language follows the device's preferred language on first
 /// launch (kk / ru / uz / anything else becomes English), and Settings ▸
@@ -19,11 +21,14 @@ struct OnboardingView: View {
     @Environment(ReplyConfigurationModel.self) private var model
     @Environment(AccountModel.self) private var account
     @Environment(AppSettings.self) private var settings
+    @Environment(AppRouter.self) private var router
     @Environment(\.dismiss) private var dismiss
 
     @State private var flow: OnboardingFlow
     /// The answer on the gender step, recorded when the user moves on.
     @State private var gender: GrammaticalGender?
+    /// Who the tutorial's example is answered for; shared by its steps 2 and 3.
+    @State private var recipient: RelationshipKind?
     @State private var hasStarted = false
 
     private let resumeStore = OnboardingResumeStore()
@@ -33,21 +38,26 @@ struct OnboardingView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-
-            ScrollView {
-                step
-                    .padding(DS.Spacing.l)
-                    .frame(maxWidth: DS.Layout.readableWidth, alignment: .leading)
-                    .frame(maxWidth: .infinity)
+        NavigationStack(path: stack) {
+            OnboardingWelcomeStep(
+                samples: samples,
+                isTutorial: flow.mode == .tutorial,
+                onSetup: { flow.start(.setupFirst) },
+                onTry: { flow.start(.tryFirst) },
+                onLater: { leave(from: .welcome) }
+            )
+            .navigationDestination(for: OnboardingFlow.Step.self) { step in
+                page(step)
+                    .toolbar {
+                        if flow.mode == .tutorial {
+                            ToolbarItem(placement: .topBarTrailing) {
+                                Button { dismiss() } label: { Image(systemName: "xmark") }
+                                    .accessibilityLabel("common.close")
+                            }
+                        }
+                    }
             }
-            // A new step starts at its top, not where the last one was scrolled.
-            .id(flow.current)
-
-            footer
         }
-        .background(Color.dsBackground)
         .onAppear(perform: start)
         .onChange(of: flow.current) { _, step in show(step) }
         // A choice that arrives from the account after the step was built -
@@ -57,136 +67,33 @@ struct OnboardingView: View {
         }
     }
 
+    private var stack: Binding<[OnboardingFlow.Step]> {
+        Binding(get: { flow.stack }, set: { flow.setStack($0) })
+    }
+
+    private var samples: OnboardingSamples {
+        OnboardingSamples(settings: settings, gender: model.profile.grammaticalGender)
+    }
+
     // MARK: Steps
 
     @ViewBuilder
-    private var step: some View {
-        let samples = OnboardingSamples(settings: settings, gender: model.profile.grammaticalGender)
-        switch flow.current {
-        case .welcome:    OnboardingWelcomeStep(samples: samples)
-        case .gender:     OnboardingGenderStep(selection: $gender)
-        case .keyboard:   OnboardingKeyboardStep()
-        case .fullAccess: OnboardingFullAccessStep()
-        case .copyReply:  OnboardingCopyReplyStep(samples: samples)
-        case .practice:   OnboardingPracticeStep(samples: samples)
+    private func page(_ step: OnboardingFlow.Step) -> some View {
+        switch step {
+        case .welcome:
+            EmptyView()
+        case .gender:
+            OnboardingGenderStep(selection: $gender, onNext: answerGender, onSkip: skipGender)
+        case .tutorialCopy:
+            TutorialCopyStep(samples: samples, mentionsKeyboard: flow.comes(.permissions, after: step),
+                             onNext: next, onSkip: skipTutorial)
+        case .tutorialRecipient:
+            TutorialRecipientStep(selection: $recipient, onNext: next, onSkip: skipTutorial)
+        case .tutorialReply:
+            TutorialReplyStep(samples: samples, selection: $recipient, onDone: next)
+        case .permissions:
+            OnboardingConnectStep(isLast: flow.isLast(step), onDone: next, onLater: { leave(from: .permissions) })
         }
-    }
-
-    // MARK: Header
-
-    /// Progress on the left, the way out on the right; when the text is too
-    /// large for both on one line, the way out moves under the progress.
-    private var header: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .center, spacing: DS.Spacing.s) {
-                progress
-                Spacer(minLength: 0)
-                exit.fixedSize()
-            }
-            VStack(alignment: .leading, spacing: DS.Spacing.xxs) {
-                progress
-                exit
-            }
-        }
-        .padding(.horizontal, DS.Spacing.l)
-        .padding(.top, DS.Spacing.xs)
-        .frame(minHeight: DS.Layout.minimumTouchTarget)
-    }
-
-    @ViewBuilder
-    private var progress: some View {
-        if let progress = flow.progress {
-            VStack(alignment: .leading, spacing: DS.Spacing.xxs) {
-                ProgressView(value: Double(progress.position), total: Double(progress.count))
-                    .frame(minWidth: 120)
-                Text(String(format: settings.localized("onboarding.step"), progress.position, progress.count))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .accessibilityElement(children: .combine)
-        }
-    }
-
-    /// Close for the tutorial; "Skip tutorial" where a first run offers it.
-    @ViewBuilder
-    private var exit: some View {
-        if flow.mode == .tutorial {
-            Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.body.weight(.semibold))
-                    .frame(width: DS.Layout.minimumTouchTarget, height: DS.Layout.minimumTouchTarget)
-            }
-            .accessibilityLabel("common.close")
-        } else if flow.offersSkipTutorial {
-            Button { finish(skipped: true) } label: {
-                // Under the progress at the largest sizes, where it may take
-                // two lines: both start where the progress starts.
-                Text("onboarding.skipTutorial").multilineTextAlignment(.leading)
-            }
-            .font(.subheadline)
-            .frame(minHeight: DS.Layout.minimumTouchTarget)
-        }
-    }
-
-    // MARK: Footer
-
-    /// One row while the buttons fit; at large text sizes the main button
-    /// takes its own row, and at the largest the quiet ones stack too. In a
-    /// row they never wrap: a word broken over two lines reads as two buttons.
-    private var footer: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: DS.Spacing.s) {
-                backButton.fixedSize()
-                Spacer(minLength: 0)
-                skipButton.fixedSize()
-                primaryButton.frame(maxWidth: 180)
-            }
-            VStack(spacing: DS.Spacing.s) {
-                primaryButton
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: DS.Spacing.s) {
-                        backButton.fixedSize()
-                        Spacer(minLength: 0)
-                        skipButton.fixedSize()
-                    }
-                    VStack(spacing: DS.Spacing.xs) {
-                        skipButton
-                        backButton
-                    }
-                }
-            }
-        }
-        .padding(DS.Spacing.l)
-        .background(.bar)
-    }
-
-    @ViewBuilder
-    private var backButton: some View {
-        if !flow.isFirst {
-            Button("onboarding.back") { withAnimation { flow.goBack() } }
-                .buttonStyle(.dsSecondary)
-        }
-    }
-
-    @ViewBuilder
-    private var skipButton: some View {
-        if flow.canSkipStep {
-            Button("onboarding.skip", action: skip)
-                .buttonStyle(.dsSecondary)
-        }
-    }
-
-    private var primaryButton: some View {
-        Button(primaryTitle, action: next)
-            .buttonStyle(.dsPrimary)
-            // The gender step moves on with an answer, or with Skip.
-            .disabled(flow.current == .gender && gender == nil)
-    }
-
-    private var primaryTitle: LocalizedStringKey {
-        if flow.current == .welcome { return "onboarding.start" }
-        guard flow.isLast else { return "onboarding.next" }
-        return flow.mode == .tutorial ? "common.done" : "onboarding.finish"
     }
 
     // MARK: Flow
@@ -194,8 +101,9 @@ struct OnboardingView: View {
     private func start() {
         guard !hasStarted else { return }
         hasStarted = true
-        // A first run resumed after a relaunch already started once.
-        if flow.mode == .tutorial || resumeStore.step == nil {
+        if flow.mode == .firstRun, resumeStore.step != nil {
+            ProductEvents.track(.onboardingResumed)
+        } else {
             ProductEvents.track(.onboardingStarted, [
                 "version": .int(OnboardingFlow.currentVersion),
                 "trigger": .code(flow.mode == .tutorial ? "settings" : "auto")
@@ -215,38 +123,52 @@ struct OnboardingView: View {
     }
 
     private func next() {
-        if flow.current == .gender, let gender, gender != model.profile.grammaticalGender {
+        if !flow.advance() { finish(skipped: false) }
+    }
+
+    private func answerGender() {
+        if let gender, gender != model.profile.grammaticalGender {
             ProfileSync(configuration: model, account: account).choose(gender, source: .onboarding)
         }
-        moveOn()
+        next()
     }
 
     /// Skip on the gender step is an answer too: neutral wording - unless
     /// the profile already holds a male or female answer (given before, or
     /// brought from another device), which Skip never erases.
-    private func skip() {
-        if flow.current == .gender,
-           let answer = ProfileSync.skippedAnswer(current: model.profile.grammaticalGender) {
+    private func skipGender() {
+        if let answer = ProfileSync.skippedAnswer(current: model.profile.grammaticalGender) {
             ProfileSync(configuration: model, account: account).choose(answer, source: .onboarding)
         }
-        moveOn()
+        next()
     }
 
-    private func moveOn() {
-        var next = flow
-        if next.advance() {
-            withAnimation { flow = next }
-        } else {
-            finish(skipped: false)
+    /// «Пропустить» in the tutorial: on to what follows it, or the end.
+    private func skipTutorial() {
+        ProductEvents.track(.onboardingSkipped, ["step": .code(flow.current.rawValue)])
+        if !flow.skipTutorial() { finish(skipped: true) }
+    }
+
+    /// «Позже» on the welcome screen ends the guide; «Настроить позже» on
+    /// the keyboard step moves past it.
+    private func leave(from step: OnboardingFlow.Step) {
+        if flow.mode == .tutorial, step == .welcome {
+            dismiss()
+            return
         }
+        ProductEvents.track(.onboardingSkipped, ["step": .code(step.rawValue)])
+        if step == .welcome || !flow.advance() { finish(skipped: true) }
     }
 
     private func finish(skipped: Bool) {
         guard flow.mode == .firstRun else {
+            // Gone through to the end: a guide once skipped counts as done.
+            if !skipped { resumeStore.record(.completed) }
             dismiss()
             return
         }
         resumeStore.clear()
+        resumeStore.record(skipped ? .skipped : .completed)
         ProductEvents.track(.onboardingCompleted, [
             "version": .int(OnboardingFlow.currentVersion),
             "skipped": .bool(skipped)
@@ -255,29 +177,9 @@ struct OnboardingView: View {
         // failure is not retried.
         let account = self.account
         Task { _ = await account.updateSenderProfile(onboardingVersion: OnboardingFlow.currentVersion) }
+        // A link to this guide that waited behind it has been answered.
+        router.firstRunOnboardingDidFinish()
         // Last: this swaps the root over to Home.
         model.completeOnboarding()
-    }
-}
-
-/// A step's heading and the sentence under it.
-struct OnboardingStepTitle: View {
-    let heading: LocalizedStringKey
-    let prompt: LocalizedStringKey
-
-    init(_ heading: LocalizedStringKey, _ prompt: LocalizedStringKey) {
-        self.heading = heading
-        self.prompt = prompt
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.xs) {
-            Text(heading)
-                .font(.title2.weight(.semibold))
-                .accessibilityAddTraits(.isHeader)
-            Text(prompt)
-                .font(.body)
-                .foregroundStyle(.secondary)
-        }
     }
 }

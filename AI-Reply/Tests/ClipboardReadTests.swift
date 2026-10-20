@@ -86,11 +86,9 @@ final class ClipboardReadTests: XCTestCase {
         for language in AppLanguage.allCases {
             settings.setLanguage(language)
             let path = Self.pasteSettingPath[language]!
-            // The app keeps "AI Reply" on one line with a no-break space.
-            let help = settings.localized("setup.paste.footer").replacingOccurrences(of: "\u{00A0}", with: " ")
-            XCTAssertTrue(help.contains(path), "app, \(language.rawValue): \(help)")
             XCTAssertTrue(AIReplyStrings.forLanguage(language).pasteDenied.contains(path), "keyboard, \(language.rawValue)")
-            // The paste help page names the same path and iOS's own option.
+            // The app's paste help page names the same path and iOS's own
+            // option. It keeps "AI Reply" on one line with a no-break space.
             let page = settings.localized("pasteHelp.path").replacingOccurrences(of: "\u{00A0}", with: " ")
             XCTAssertTrue(page.contains(path), "paste help, \(language.rawValue): \(page)")
             let option = language == .russian ? "«Разрешать»" : language == .kazakh ? "«Рұқсат бар»" : "Allow"

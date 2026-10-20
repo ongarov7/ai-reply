@@ -219,24 +219,22 @@ final class LocalizationTests: XCTestCase {
             XCTAssertEqual(settings.localized("onboarding.next"), value, language.rawValue)
         }
         settings.setLanguage(.russian)
-        XCTAssertEqual(String(format: settings.localized("onboarding.step"), 2, 5), "Шаг 2 из 5")
+        XCTAssertEqual(String(format: settings.localized("onboarding.tutorial.header %lld %lld"), 2, 3),
+                       "Как пользоваться · 2 из 3")
     }
 
-    /// Copy kept in step with Android: the Kazakh step counter needs no
-    /// suffix that agrees with the number ("3-сі" was wrong for 1, 3, 4, 5),
-    /// the Kazakh copy-reply step says the keyboard cannot read your chats,
-    /// and the clipboard note names both ways the copied message is read.
+    /// The Kazakh tutorial counter needs no suffix that agrees with the
+    /// number ("3-сі" was wrong for 1, 3, 4, 5), and the paste help names
+    /// both ways the keyboard reads the copied message.
     func testOnboardingCopyMatchesAndroid() {
         let settings = AppSettings(store: SharedSettings(defaults: UserDefaults(suiteName: "LocalizationTests.\(UUID())")!))
         settings.setLanguage(.kazakh)
-        XCTAssertEqual(String(format: settings.localized("onboarding.step"), 1, 5), "1-қадам, барлығы 5")
-        XCTAssertEqual(String(format: settings.localized("onboarding.step"), 3, 4), "3-қадам, барлығы 4")
-        XCTAssertTrue(settings.localized("onboarding.usage.prompt").contains("чаттарыңызды"))
-        XCTAssertFalse(settings.localized("onboarding.usage.prompt").contains("жазбаларыңызды"))
+        XCTAssertEqual(String(format: settings.localized("onboarding.tutorial.header %lld %lld"), 1, 3),
+                       "Қалай қолдану · 1/3")
 
         for language in AppLanguage.allCases {
             settings.setLanguage(language)
-            let note = settings.localized("setup.paste.body")
+            let note = settings.localized("pasteHelp.body")
             XCTAssertTrue(note.contains(AIReplyStrings.forLanguage(language).pasteMessage),
                           "the clipboard note leaves out Paste message in \(language.rawValue)")
         }
@@ -246,8 +244,10 @@ final class LocalizationTests: XCTestCase {
     /// SwiftUI builds from `"… \(date, format:)"` exist, and every language
     /// keeps the date's slot.
     func testDatedKeyboardStatusKeysKeepTheirDate() throws {
-        let keys = ["setup.status.keyboard.on %@", "setup.status.keyboard.outdated %@",
-                    "setup.status.fullAccess.on %@", "setup.status.fullAccess.outdated %@",
+        let keys = ["permissions.keyboard.on %@", "permissions.keyboard.outdated %@",
+                    "permissions.fullAccess.on %@", "permissions.fullAccess.outdated %@",
+                    "permissions.fullAccess.off %@", "permissions.paste.on %@",
+                    "permissions.paste.outdated %@", "permissions.paste.off %@",
                     "home.keyboard.lastSeen %@", "home.keyboard.fullAccessOn %@",
                     "home.keyboard.fullAccessOutdated %@"]
         for language in ["en", "ru", "kk", "uz"] {
@@ -266,17 +266,17 @@ final class LocalizationTests: XCTestCase {
     func testUserFacingScreensAreActuallyTranslated() throws {
         let suspects = [
             "permissions.section", "permissions.paste", "pasteHelp.title", "pasteHelp.onlyYou",
-            "keyboardCheck.notYet", "setup.connect.fullAccess", "setup.paste.body",
-            "onboarding.keyboard.title", "onboarding.usage.title",
-            "onboarding.gender.title", "onboarding.fullAccess.prompt", "onboarding.practice.title",
-            "onboarding.sample.practice.incoming", "setup.status.keyboard.unknown",
+            "keyboardCheck.notYet", "setup.connect.fullAccess", "pasteHelp.body",
+            "onboarding.welcome.title", "onboarding.welcome.subtitle", "onboarding.tutorial.copy.title",
+            "onboarding.gender.title", "onboarding.connect.subtitle", "onboarding.tutorial.reply.body",
+            "onboarding.demo.message", "onboarding.demo.reply.client", "compose.message.placeholder",
             "settings.smartCorrection", "settings.smartCorrection.footer", "settings.tutorial",
             "profile.gender", "profile.gender.footer",
             "profile.role", "profile.rules", "templates.section.style",
-            "settings.privacy.body", "home.privacy.body", "onboarding.fullAccess.warning",
+            "settings.privacy.body", "home.privacy.body", "onboarding.connect.why.body",
             "profile.replyLanguage.auto", "profile.replyLanguage.footer",
             "voice.suggestions.title", "voice.suggestions.rules.footer", "voice.status.failed",
-            "onboarding.fullAccess.statusFooter"
+            "permissions.section.footer"
         ]
 
         func value(_ key: String, _ language: String) throws -> String {

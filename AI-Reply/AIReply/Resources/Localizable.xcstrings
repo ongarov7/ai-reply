@@ -3977,263 +3977,379 @@
         }
       }
     },
-    "onboarding.back" : {
+    "onboarding.connect.data" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Back"
+            "value" : "How your data is handled"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Артқа"
+            "value" : "Деректер қалай өңделеді"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Назад"
+            "value" : "Как обрабатываются данные"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Orqaga"
+            "value" : "Maʼlumotlar qanday qayta ishlanadi"
           }
         }
       }
     },
-    "onboarding.copyReply.stage.copy" : {
+    "onboarding.connect.later" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Press and hold the message, then tap Copy."
+            "value" : "Set up later"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Хабарламаны басып тұрып, «Көшіру» дегенді таңдаңыз."
+            "value" : "Кейін баптау"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Нажмите и удерживайте сообщение, затем выберите «Копировать»."
+            "value" : "Настроить позже"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Xabarni bosib turing va «Nusxalash»ni tanlang."
+            "value" : "Keyinroq sozlash"
           }
         }
       }
     },
-    "onboarding.copyReply.stage.inserted" : {
+    "onboarding.connect.nav" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The reply is in the message field. Send it yourself."
+            "value" : "Setup"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Жауап хабарлама өрісінде тұр. Оны өзіңіз жіберіңіз."
+            "value" : "Қосу"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ответ уже в поле ввода. Отправьте его сами."
+            "value" : "Подключение"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Javob xabar maydonida. Uni oʻzingiz yuboring."
+            "value" : "Ulash"
           }
         }
       }
     },
-    "onboarding.copyReply.stage.instruction" : {
+    "onboarding.connect.subtitle" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "If you like, say how to answer, then tap Reply."
+            "value" : "Add the keyboard to create replies right in your chats."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Қаласаңыз, қалай жауап беру керегін жазып, «Жауап беру» түймесін басыңыз."
+            "value" : "Жауаптарды тікелей чатта жасау үшін пернетақтаны қос."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "При желании напишите, как ответить, и нажмите «Ответить»."
+            "value" : "Добавь клавиатуру, чтобы создавать ответы прямо в переписке."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Xohlasangiz, qanday javob berishni yozing va «Javob berish»ni bosing."
+            "value" : "Javoblarni toʻgʻridan-toʻgʻri yozishmada yaratish uchun klaviaturani qoʻsh."
           }
         }
       }
     },
-    "onboarding.copyReply.stage.persona" : {
+    "onboarding.connect.title" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tap who you're replying to. AI Reply reads the message you copied."
+            "value" : "Set up AI Reply"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Кімге жауап беретініңізді таңдаңыз — AI Reply көшірілген хабарламаны оқиды."
+            "value" : "AI Reply-ды қос"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Выберите, кому отвечаете, — AI Reply прочитает скопированное сообщение."
+            "value" : "Подключи AI Reply"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Kimga javob berayotganingizni tanlang — AI Reply nusxalangan xabarni oʻqiydi."
+            "value" : "AI Replyni ula"
           }
         }
       }
     },
-    "onboarding.copyReply.stage.reply" : {
+    "onboarding.connect.trouble" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Check the reply and tap Insert."
+            "value" : "Having trouble?"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Жауапты тексеріп, «Кірістіру» түймесін басыңыз."
+            "value" : "Шықпай жатыр ма?"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Проверьте ответ и нажмите «Вставить»."
+            "value" : "Не получается?"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Javobni tekshiring va «Kiritish»ni bosing."
+            "value" : "Chiqmayaptimi?"
           }
         }
       }
     },
-    "onboarding.copyReply.stage.switch" : {
+    "onboarding.connect.why.body" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tap the message field and switch to AI Reply with 🌐."
+            "value" : "To connect to the service that writes the replies."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Хабарлама өрісін басып, 🌐 пернесімен AI Reply-ға ауысыңыз."
+            "value" : "Жауаптарды жасайтын қызметке қосылу үшін."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Нажмите на поле ввода и переключитесь на AI Reply кнопкой 🌐."
+            "value" : "Для подключения к сервису, который создаёт ответы."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Xabar maydonini bosing va 🌐 tugmasi bilan AI Replyga oʻting."
+            "value" : "Javoblarni yaratadigan xizmatga ulanish uchun."
           }
         }
       }
     },
-    "onboarding.copyReply.tapHint" : {
+    "onboarding.connect.why.title" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Shows the next step"
+            "value" : "Why Full Access?"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Келесі қадамды көрсетеді"
+            "value" : "Толық рұқсат не үшін керек?"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Показывает следующий шаг"
+            "value" : "Зачем нужен полный доступ?"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Keyingi qadamni koʻrsatadi"
+            "value" : "Toʻliq ruxsat nima uchun kerak?"
           }
         }
       }
     },
-    "onboarding.finish" : {
+    "onboarding.demo.message" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Finish"
+            "value" : "Good afternoon! Could you tell me more?"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Дайын"
+            "value" : "Қайырлы күн! Толығырақ білуге бола ма?"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Готово"
+            "value" : "Добрый день! Можно узнать подробнее?"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tugatish"
+            "value" : "Assalomu alaykum! Batafsil bilsam boʻladimi?"
+          }
+        }
+      }
+    },
+    "onboarding.demo.reply.client" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hello! Of course. Let me know what you'd like to learn more about, and I'll walk you through it."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сәлеметсіз бе! Әрине. Сізді не қызықтыратынын айтсаңыз, бәрін толық түсіндіріп беремін."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Здравствуйте! Конечно. Подскажите, что именно вас интересует, — и я всё подробно расскажу."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Assalomu alaykum! Albatta. Sizni aynan nima qiziqtirayotganini aytsangiz, hammasini batafsil tushuntirib beraman."
+          }
+        }
+      }
+    },
+    "onboarding.demo.reply.colleague" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hi! Sure. What exactly do you need to know?"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Қайырлы күн! Иә, әрине. Нақты нені білу керек?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Добрый день! Да, конечно. Что именно нужно уточнить?"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Assalomu alaykum! Ha, albatta. Aynan nimani aniqlashtirish kerak?"
+          }
+        }
+      }
+    },
+    "onboarding.demo.reply.friend" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hey! Sure, happy to tell you. What would you like to know?"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сәлем! Әрине, айтып берейін. Нақты не қызықтырады?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Привет! Конечно, расскажу. Что именно тебе интересно?"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salom! Albatta, aytib beraman. Aynan nima qiziqtiryapti?"
+          }
+        }
+      }
+    },
+    "onboarding.demo.reply.partner" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Good afternoon! We'd be glad to share the details. When would be a good time for a call?"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Қайырлы күн! Толығырақ қуана айтып береміз. Сізге қашан қоңырау шалған ыңғайлы?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Добрый день! С удовольствием расскажем подробнее. Когда вам удобно созвониться?"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Assalomu alaykum! Batafsil maʼlumot berishdan mamnunmiz. Sizga qachon qoʻngʻiroqlashish qulay?"
           }
         }
       }
@@ -4267,93 +4383,6 @@
         }
       }
     },
-    "onboarding.fullAccess.prompt" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI Reply needs Full Access to send your request to the AI service and bring the reply back, and to read the message you copied when you pick who you're replying to or tap Paste message. iOS gives the clipboard and the internet only to keyboards with Full Access."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Толық рұқсат AI Reply-ға сұранысыңызды AI қызметіне жіберіп, жауап алу үшін керек. Сондай-ақ ол кімге жауап беретініңізді таңдағанда не «Хабарламаны қою» түймесін басқанда көшірілген хабарламаны оқи алады. iOS алмасу буфері мен интернетті тек толық рұқсаты бар пернетақталарға ашады."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Полный доступ нужен AI Reply, чтобы отправлять ваш запрос AI-сервису и получать ответ, а также читать скопированное сообщение, когда вы выбираете, кому отвечаете, или нажимаете «Вставить сообщение». Буфер обмена и интернет iOS открывает только клавиатурам с полным доступом."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI Reply soʻrovingizni AI xizmatiga yuborib, javobni qaytarishi hamda kimga javob berayotganingizni tanlaganingizda yoki «Xabarni joylash»ni bosganingizda nusxalangan xabarni oʻqishi uchun toʻliq ruxsat kerak. iOS bufer va internetni faqat toʻliq ruxsatli klaviaturalarga beradi."
-          }
-        }
-      }
-    },
-    "onboarding.fullAccess.statusFooter" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iOS doesn't tell apps about Full Access. This turns green once you open the AI Reply keyboard after turning it on — for example in the field at the bottom of this screen."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iOS қолданбаларға толық рұқсат туралы хабарламайды. Оны қосқаннан кейін AI Reply пернетақтасын ашқанда күй жасылға ауысады — мысалы, осы экранның төменгі жағындағы өрісте."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iOS не сообщает приложениям о полном доступе. Статус станет зелёным, когда вы откроете клавиатуру AI Reply после его включения — например, в поле внизу этого экрана."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iOS ilovalarga toʻliq ruxsat haqida xabar bermaydi. Uni yoqqaningizdan keyin AI Reply klaviaturasini ochganingizda holat yashil boʻladi — masalan, shu ekranning pastidagi maydonda."
-          }
-        }
-      }
-    },
-    "onboarding.fullAccess.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Allow Full Access"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Толық рұқсат беріңіз"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Разрешите полный доступ"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Toʻliq ruxsat bering"
-          }
-        }
-      }
-    },
     "onboarding.fullAccess.warning" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4383,60 +4412,31 @@
         }
       }
     },
-    "onboarding.fullAccess.without" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Without it the keyboard still types normally, and typo fixes still work on your phone."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Онсыз да пернетақта әдеттегідей жаза береді, ал қателер телефонның өзінде түзетіледі."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Без него клавиатура всё равно печатает как обычно, а опечатки исправляются прямо на телефоне."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Usiz ham klaviatura odatdagidek yozadi, xatolar esa telefonning oʻzida tuzatiladi."
-          }
-        }
-      }
-    },
     "onboarding.gender.body" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Reply writes in your name. In Russian, some words change with the speaker's gender: «рад» or «рада», «сделал» or «сделала». This only affects replies in Russian."
+            "value" : "AI Reply writes in your name. In Russian, some words change with the speaker's gender: «рад» or «рада», «сделал» or «сделала». This only affects replies in Russian."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Reply сіздің атыңыздан жазады. Орыс тілінде кейбір сөздер сөйлеушінің жынысына қарай өзгереді: «рад» не «рада», «сделал» не «сделала». Бұл тек орысша жауаптарға әсер етеді."
+            "value" : "AI Reply сенің атыңнан жазады. Орыс тілінде кейбір сөздер сөйлеушінің жынысына қарай өзгереді: «рад» не «рада», «сделал» не «сделала». Бұл тек орысша жауаптарға әсер етеді."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Reply пишет ответы от вашего лица, а в русском языке некоторые слова меняются в зависимости от пола: «рад» или «рада», «сделал» или «сделала»."
+            "value" : "AI Reply пишет ответы от твоего лица, а в русском языке некоторые слова зависят от пола: «рад» или «рада», «сделал» или «сделала»."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Reply siz nomingizdan yozadi. Rus tilida baʼzi soʻzlar soʻzlovchining jinsiga qarab oʻzgaradi: «рад» yoki «рада», «сделал» yoki «сделала». Bu faqat ruscha javoblarga taʼsir qiladi."
+            "value" : "AI Reply sening noming bilan yozadi. Rus tilida baʼzi soʻzlar soʻzlovchining jinsiga qarab oʻzgaradi: «рад» yoki «рада», «сделал» yoki «сделала». Bu faqat ruscha javoblarga taʼsir qiladi."
           }
         }
       }
@@ -4511,19 +4511,19 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Мұны кейін профиль баптауларында өзгертуге болады. Өткізіп жіберсеңіз, жауаптар бейтарап жазылады."
+            "value" : "Мұны кейін профильде өзгертуге болады. Өткізіп жіберсең, жауаптар бейтарап жазылады."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Это можно изменить позже в настройках профиля. Если пропустить, ответы будут звучать нейтрально."
+            "value" : "Это можно изменить позже в профиле. Если пропустить, ответы будут звучать нейтрально."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Buni keyinroq profil sozlamalarida oʻzgartirish mumkin. Oʻtkazib yuborsangiz, javoblar betaraf yoziladi."
+            "value" : "Buni keyinroq profilda oʻzgartirish mumkin. Oʻtkazib yuborsang, javoblar betaraf yoziladi."
           }
         }
       }
@@ -4598,193 +4598,48 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Орысша жауаптар сіздің атыңыздан қалай жазылсын?"
+            "value" : "Орысша жауаптар сенің атыңнан қалай жазылсын?"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Как писать от вашего лица?"
+            "value" : "Как писать от твоего лица?"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Javoblar siz nomingizdan qanday yozilsin?"
+            "value" : "Javoblar sening noming bilan qanday yozilsin?"
           }
         }
       }
     },
-    "onboarding.keyboard.otherWay" : {
+    "onboarding.later" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Another way to add it"
+            "value" : "Later"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Басқа жолы"
+            "value" : "Кейінірек"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Другой способ"
+            "value" : "Позже"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Boshqa usul"
-          }
-        }
-      }
-    },
-    "onboarding.keyboard.prompt" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Only you can add a keyboard on iPhone. It takes a few taps in Settings, and we'll show you where."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iPhone-ға пернетақтаны тек өзіңіз қоса аласыз — ол үшін параметрлерде бірнеше рет басу жеткілікті. Қай жерде екенін көрсетеміз."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Добавить клавиатуру на iPhone можете только вы — это несколько нажатий в настройках. Покажем, где именно."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iPhone’ga klaviaturani faqat oʻzingiz qoʻsha olasiz — sozlamalarda bir necha marta bosish kifoya. Qayerdaligini koʻrsatamiz."
-          }
-        }
-      }
-    },
-    "onboarding.keyboard.statusFooter" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iOS doesn't tell apps whether their keyboard is on. This turns green once you open the AI Reply keyboard — for example in the field at the bottom of this screen."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iOS қолданбаға оның пернетақтасы қосулы ма, жоқ па, хабарламайды. AI Reply пернетақтасын бір рет ашқаныңызда күй жасылға ауысады — мысалы, осы экранның төменгі жағындағы өрісте."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iOS не сообщает приложениям, включена ли их клавиатура. Статус станет зелёным, как только вы откроете клавиатуру AI Reply — например, в поле внизу этого экрана."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iOS ilovaga uning klaviaturasi yoqilganini bildirmaydi. AI Reply klaviaturasini bir marta ochganingizda holat yashil boʻladi — masalan, shu ekranning pastidagi maydonda."
-          }
-        }
-      }
-    },
-    "onboarding.keyboard.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Turn on the AI Reply keyboard"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI Reply пернетақтасын қосыңыз"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Включите клавиатуру AI Reply"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI Reply klaviaturasini yoqing"
-          }
-        }
-      }
-    },
-    "onboarding.mock.copied" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Copied"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Көшірілді"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Скопировано"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nusxalandi"
-          }
-        }
-      }
-    },
-    "onboarding.mock.field" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Message"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Хабарлама"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Сообщение"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Xabar"
+            "value" : "Keyinroq"
           }
         }
       }
@@ -4818,640 +4673,31 @@
         }
       }
     },
-    "onboarding.practice.done.body" : {
+    "onboarding.replyOption" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The reply is in the message field: you check it and send it yourself. It works the same in any chat."
+            "value" : "Suggested reply"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Жауап хабарлама өрісінде тұр — оны тексеріп, өзіңіз жібересіз. Кез келген чатта дәл осылай."
+            "value" : "Жауап нұсқасы"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ответ уже в поле ввода — проверьте его и отправьте сами. В любом мессенджере всё работает так же."
+            "value" : "Вариант ответа"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Javob xabar maydonida — uni tekshirib, oʻzingiz yuborasiz. Har qanday chatda xuddi shunday."
-          }
-        }
-      }
-    },
-    "onboarding.practice.done.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You're ready to use AI Reply"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Бәрі дайын — AI Reply-ды пайдалана беріңіз"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Всё готово — пользуйтесь AI Reply"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hammasi tayyor — AI Replydan foydalanishingiz mumkin"
-          }
-        }
-      }
-    },
-    "onboarding.practice.hint.copy" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A friend wrote to you. Copy the message: tap Copy."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Досыңыздан хабарлама келді. Оны көшіріңіз — «Көшіру» түймесін басыңыз."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Вам написал друг. Скопируйте сообщение — нажмите «Копировать»."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Doʻstingiz yozdi. Xabarni nusxalang — «Nusxalash»ni bosing."
-          }
-        }
-      }
-    },
-    "onboarding.practice.hint.insert" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Read it through and tap Insert."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Жауапты оқып шығып, «Кірістіру» түймесін басыңыз."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Прочитайте ответ и нажмите «Вставить»."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Javobni oʻqib chiqing va «Kiritish»ni bosing."
-          }
-        }
-      }
-    },
-    "onboarding.practice.hint.persona" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tap who you're replying to — say, Friend."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Кімге жауап беретініңізді таңдаңыз — мысалы, «Дос»."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Выберите, кому отвечаете, — например, «Друг»."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kimga javob berayotganingizni tanlang — masalan, «Doʻst»."
-          }
-        }
-      }
-    },
-    "onboarding.practice.hint.reply" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI Reply already has the copied message. Tap Reply."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI Reply көшірілген хабарламаны алды. «Жауап беру» түймесін басыңыз."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI Reply уже видит скопированное сообщение. Нажмите «Ответить»."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI Reply nusxalangan xabarni oldi. «Javob berish»ni bosing."
-          }
-        }
-      }
-    },
-    "onboarding.practice.hint.switch" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Copied. Now switch to the AI Reply keyboard."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Көшірілді. Енді AI Reply пернетақтасына ауысыңыз."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Скопировано. Теперь переключитесь на клавиатуру AI Reply."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nusxalandi. Endi AI Reply klaviaturasiga oʻting."
-          }
-        }
-      }
-    },
-    "onboarding.practice.hint.writing" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Writing a reply…"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Жауап жазылып жатыр…"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Пишем ответ…"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Javob yozilmoqda…"
-          }
-        }
-      }
-    },
-    "onboarding.practice.openKeyboard" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Switch to AI Reply"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI Reply-ға ауысу"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Перейти на AI Reply"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI Replyga oʻtish"
-          }
-        }
-      }
-    },
-    "onboarding.practice.prompt" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A practice chat right here. Nothing is sent anywhere, and it doesn't use up your replies."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Осы жердегі жаттығу чаты. Ештеңе ешқайда жіберілмейді, жауаптар лимиті де жұмсалмайды."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Тренировочный чат прямо здесь: ничего никуда не отправляется, а лимит ответов не тратится."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Shu yerdagi mashq chati. Hech narsa hech qayerga yuborilmaydi va javoblar limiti sarflanmaydi."
-          }
-        }
-      }
-    },
-    "onboarding.practice.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Try it yourself"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Өзіңіз байқап көріңіз"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Попробуйте сами"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Oʻzingiz sinab koʻring"
-          }
-        }
-      }
-    },
-    "onboarding.sample.practice.incoming" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hey! It's been ages. How are you?"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Сәлем! Көптен бері хабарласпадық. Қалайсың?"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Привет! Давно не общались. Как ты?"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Salom! Ancha vaqtdan beri gaplashmadik. Qalaysan?"
-          }
-        }
-      }
-    },
-    "onboarding.sample.practice.reply.female" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hey! It really has been a while. So good to hear from you! How are you doing?"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Сәлем! Иә, расында көп уақыт өтті. Хабарласқаныңа қуаныштымын! Өзің қалайсың?"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Привет! Да, действительно давно. Рада тебя слышать! Как у тебя дела?"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Salom! Ha, rostdan ham ancha boʻldi. Sendan xabar kelganidan xursandman! Oʻzing qalaysan?"
-          }
-        }
-      }
-    },
-    "onboarding.sample.practice.reply.male" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hey! It really has been a while. So good to hear from you! How are you doing?"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Сәлем! Иә, расында көп уақыт өтті. Хабарласқаныңа қуаныштымын! Өзің қалайсың?"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Привет! Да, действительно давно. Рад тебя слышать! Как у тебя дела?"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Salom! Ha, rostdan ham ancha boʻldi. Sendan xabar kelganidan xursandman! Oʻzing qalaysan?"
-          }
-        }
-      }
-    },
-    "onboarding.sample.practice.reply.unspecified" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hey! It really has been a while. So good to hear from you! How are you doing?"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Сәлем! Иә, расында көп уақыт өтті. Хабарласқаныңа қуаныштымын! Өзің қалайсың?"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Привет! Да, действительно давно. Очень приятно тебя слышать! Как у тебя дела?"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Salom! Ha, rostdan ham ancha boʻldi. Sendan xabar kelganidan xursandman! Oʻzing qalaysan?"
-          }
-        }
-      }
-    },
-    "onboarding.sample.tutorial.incoming" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hi! How much does your service cost?"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Қайырлы күн! Қызметіңіз қанша тұрады?"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Добрый день! Хотел узнать, сколько стоит ваша услуга?"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Assalomu alaykum! Xizmatingiz qancha turadi?"
-          }
-        }
-      }
-    },
-    "onboarding.sample.tutorial.instruction.female" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Politely say I'm busy today but can call tomorrow."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Бүгін бос емес екенімді, бірақ ертең қоңырауласа алатынымды сыпайы айт."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Вежливо скажи, что сегодня я занята, но могу созвониться завтра."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bugun band ekanimni, lekin ertaga qoʻngʻiroq qila olishimni muloyim ayt."
-          }
-        }
-      }
-    },
-    "onboarding.sample.tutorial.instruction.male" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Politely say I'm busy today but can call tomorrow."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Бүгін бос емес екенімді, бірақ ертең қоңырауласа алатынымды сыпайы айт."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Вежливо скажи, что сегодня я занят, но могу созвониться завтра."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bugun band ekanimni, lekin ertaga qoʻngʻiroq qila olishimni muloyim ayt."
-          }
-        }
-      }
-    },
-    "onboarding.sample.tutorial.instruction.unspecified" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Politely say I'm busy today but can call tomorrow."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Бүгін бос емес екенімді, бірақ ертең қоңырауласа алатынымды сыпайы айт."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Вежливо скажи, что сегодня не получится, но могу созвониться завтра."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bugun band ekanimni, lekin ertaga qoʻngʻiroq qila olishimni muloyim ayt."
-          }
-        }
-      }
-    },
-    "onboarding.sample.tutorial.reply.female" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hi! Sorry, I can't talk today, but I'd be happy to call tomorrow and go over the details."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Қайырлы күн! Өкінішке қарай, бүгін сөйлесе алмаймын. Ертең хабарласайық — бәрін толық талқылаймыз."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Добрый день! Сегодня, к сожалению, не получится созвониться. Давайте свяжемся завтра — буду рада обсудить детали."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Assalomu alaykum! Afsuski, bugun gaplasha olmayman. Ertaga bogʻlanaylik — hammasini batafsil muhokama qilamiz."
-          }
-        }
-      }
-    },
-    "onboarding.sample.tutorial.reply.male" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hi! Sorry, I can't talk today, but I'd be happy to call tomorrow and go over the details."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Қайырлы күн! Өкінішке қарай, бүгін сөйлесе алмаймын. Ертең хабарласайық — бәрін толық талқылаймыз."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Добрый день! Сегодня, к сожалению, не получится созвониться. Давайте свяжемся завтра — буду рад обсудить детали."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Assalomu alaykum! Afsuski, bugun gaplasha olmayman. Ertaga bogʻlanaylik — hammasini batafsil muhokama qilamiz."
-          }
-        }
-      }
-    },
-    "onboarding.sample.tutorial.reply.unspecified" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hi! Sorry, I can't talk today, but I'd be happy to call tomorrow and go over the details."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Қайырлы күн! Өкінішке қарай, бүгін сөйлесе алмаймын. Ертең хабарласайық — бәрін толық талқылаймыз."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Добрый день! Сегодня, к сожалению, не получится созвониться. Давайте свяжемся завтра и всё обсудим."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Assalomu alaykum! Afsuski, bugun gaplasha olmayman. Ertaga bogʻlanaylik — hammasini batafsil muhokama qilamiz."
+            "value" : "Javob varianti"
           }
         }
       }
@@ -5485,408 +4731,669 @@
         }
       }
     },
-    "onboarding.skipTutorial" : {
+    "onboarding.tutorial.copy.body" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Skip tutorial"
+            "value" : "In any messenger, touch and hold a message, then tap Copy. Try it here."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Нұсқаулықты өткізіп жіберу"
+            "value" : "Кез келген мессенджерде хабарламаны басып тұрып, «Көшіру» таңда. Осы жерде байқап көр."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Пропустить обучение"
+            "value" : "В любом мессенджере нажми на сообщение и удерживай, затем выбери «Копировать». Попробуй здесь."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Qoʻllanmani oʻtkazib yuborish"
+            "value" : "Istalgan messenjerda xabarni bosib tur va nusxa ol. Shu yerda sinab koʻr."
           }
         }
       }
     },
-    "onboarding.start" : {
+    "onboarding.tutorial.copy.next" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Get started"
+            "value" : "Next, we'll show you how to open the AI Reply keyboard."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Бастау"
+            "value" : "Әрі қарай AI Reply пернетақтасын қалай ашуды көрсетеміз."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Начать"
+            "value" : "Дальше покажем, как открыть клавиатуру AI Reply."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Boshlash"
+            "value" : "Keyin AI Reply klaviaturasini qanday ochishni koʻrsatamiz."
           }
         }
       }
     },
-    "onboarding.status.checkAgain" : {
+    "onboarding.tutorial.copy.title" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Check again"
+            "value" : "Copy the message"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Қайта тексеру"
+            "value" : "Хабарламаны көшір"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Проверить ещё раз"
+            "value" : "Скопируй сообщение"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Qayta tekshirish"
+            "value" : "Xabarni nusxala"
           }
         }
       }
     },
-    "onboarding.step" : {
+    "onboarding.tutorial.header %lld %lld" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Step %1$d of %2$d"
+            "value" : "How to use · %1$lld of %2$lld"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$d-қадам, барлығы %2$d"
+            "value" : "Қалай қолдану · %1$lld/%2$lld"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Шаг %1$d из %2$d"
+            "value" : "Как пользоваться · %1$lld из %2$lld"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%2$d qadamdan %1$d-qadam"
+            "value" : "Qanday foydalanish · %1$lld/%2$lld"
           }
         }
       }
     },
-    "onboarding.test.hint" : {
+    "onboarding.tutorial.recipient.body" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Press and hold 🌐 to pick a keyboard from the list."
+            "value" : "In the AI Reply keyboard, tap who you're replying to."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Тізімнен пернетақта таңдау үшін 🌐 пернесін басып тұрыңыз."
+            "value" : "AI Reply пернетақтасында кімге жауап беретініңді бас."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Удерживайте 🌐, чтобы выбрать клавиатуру из списка."
+            "value" : "В клавиатуре AI Reply нажми, кому отвечаешь."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Roʻyxatdan klaviatura tanlash uchun 🌐 tugmasini bosib turing."
+            "value" : "AI Reply klaviaturasida kimga javob berayotganingni bos."
           }
         }
       }
     },
-    "onboarding.test.placeholder" : {
+    "onboarding.tutorial.recipient.hint" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Type something…"
+            "value" : "AI Reply adjusts the tone and formality to the person."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Бірдеңе жазыңыз…"
+            "value" : "AI Reply үн мен ресмилік деңгейін әңгімелесушіге қарай бейімдейді."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Напишите что-нибудь…"
+            "value" : "AI Reply подстроит тон и степень официальности под собеседника."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Biror narsa yozing…"
+            "value" : "AI Reply ohang va rasmiylik darajasini suhbatdoshga moslaydi."
           }
         }
       }
     },
-    "onboarding.test.prompt" : {
+    "onboarding.tutorial.recipient.title" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Try it here: tap the field and switch to AI Reply with 🌐."
+            "value" : "Choose who it's for"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Осында байқап көріңіз: өрісті басып, 🌐 пернесімен AI Reply-ға ауысыңыз."
+            "value" : "Әңгімелесушіні таңда"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Попробуйте здесь: нажмите на поле и переключитесь на AI Reply кнопкой 🌐."
+            "value" : "Выбери собеседника"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Shu yerda sinab koʻring: maydonni bosing va 🌐 tugmasi bilan AI Replyga oʻting."
+            "value" : "Suhbatdoshni tanla"
           }
         }
       }
     },
-    "onboarding.usage.prompt" : {
+    "onboarding.tutorial.reply.body" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The keyboard replies to the message you copied yourself. It cannot read your chats."
+            "value" : "Pick different people and watch the reply change. It's an example: nothing is sent and no replies are used."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Пернетақта өзіңіз көшірген хабарламаға жауап береді. Ол чаттарыңызды оқи алмайды."
+            "value" : "Әр түрлі әңгімелесушіні таңдап көр — жауап өзгереді. Бұл мысал: ештеңе жіберілмейді, жауап лимиті жұмсалмайды."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Клавиатура отвечает на сообщение, которое вы скопировали сами. Читать переписку она не может."
+            "value" : "Выбирай разных собеседников — ответ меняется. Это пример: ничего не отправляется, лимит ответов не тратится."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Klaviatura faqat siz nusxalagan xabarga javob beradi. U chatlaringizni oʻqiy olmaydi."
+            "value" : "Turli suhbatdoshlarni tanlab koʻr — javob oʻzgaradi. Bu misol: hech narsa yuborilmaydi, javoblar limiti sarflanmaydi."
           }
         }
       }
     },
-    "onboarding.usage.title" : {
+    "onboarding.tutorial.reply.done.body" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Copy, then reply"
+            "value" : "It works the same in any messenger: check the reply and send it yourself."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Көшіріп, жауап беріңіз"
+            "value" : "Кез келген мессенджерде дәл осылай: жауапты тексеріп, өзің жібер."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Скопируйте и ответьте"
+            "value" : "Так же это работает в любом мессенджере: проверь ответ и отправь его сам."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nusxalang va javob bering"
+            "value" : "Istalgan messenjerda xuddi shunday: javobni tekshir va oʻzing yubor."
           }
         }
       }
     },
-    "onboarding.welcome.body" : {
+    "onboarding.tutorial.reply.done.title" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Reply writes replies for you in WhatsApp, Telegram, Instagram, Messages and other apps where third-party keyboards work. Copied text is sent only when you ask for a reply."
+            "value" : "You did it!"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Reply WhatsApp, Telegram, Instagram, «Хабарлар» және бөгде пернетақталар жұмыс істейтін басқа қолданбаларда сіздің орныңызға жауап жазады. Көшірілген мәтін тек сіз жауап сұрағанда жіберіледі."
+            "value" : "Шықты!"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Reply пишет ответы за вас в WhatsApp, Telegram, Instagram, «Сообщениях» и других приложениях, где работают сторонние клавиатуры. Скопированный текст отправляется, только когда вы просите ответ."
+            "value" : "Получилось!"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Reply siz uchun WhatsApp, Telegram, Instagram, Messages va tashqi klaviaturalar ishlaydigan boshqa ilovalarda javob yozadi. Nusxalangan matn faqat javob soʻraganingizda yuboriladi."
+            "value" : "Uddalading!"
           }
         }
       }
     },
-    "onboarding.welcome.mock %@" : {
+    "onboarding.tutorial.reply.ready" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A chat with the AI Reply keyboard. Above the keys: the Write with AI button on the left, then %@."
+            "value" : "Reply ready"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Reply пернетақтасы ашық тұрған чат. Пернелердің үстінде: сол жақта «AI-мен жазу» түймесі, одан кейін %@."
+            "value" : "Жауап дайын"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Чат с клавиатурой AI Reply. Над клавишами: слева кнопка «Написать с AI», за ней %@."
+            "value" : "Ответ готов"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Reply klaviaturasi ochiq chat. Tugmalar ustida: chapda «AI bilan yozish» tugmasi, keyin %@."
+            "value" : "Javob tayyor"
           }
         }
       }
     },
-    "onboarding.welcome.point.copy" : {
+    "onboarding.tutorial.reply.title" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Copy a message in any chat app"
+            "value" : "Try it yourself"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Кез келген мессенджерде хабарламаны көшіріңіз"
+            "value" : "Өзің байқап көр"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Скопируйте сообщение в любом мессенджере"
+            "value" : "Попробуй сам"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Istalgan chat ilovasida xabarni nusxalang"
+            "value" : "Oʻzing sinab koʻr"
           }
         }
       }
     },
-    "onboarding.welcome.point.edit" : {
+    "onboarding.tutorial.start" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Edit the reply before you send it yourself"
+            "value" : "Start using AI Reply"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Жауапты өңдеп, өзіңіз жіберіңіз"
+            "value" : "Қолдануды бастау"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Отредактируйте ответ и отправьте его сами"
+            "value" : "Начать пользоваться"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Javobni yuborishdan oldin tahrirlang"
+            "value" : "Foydalanishni boshlash"
           }
         }
       }
     },
-    "onboarding.welcome.point.templates" : {
+    "onboarding.welcome.example" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Choose who you are replying to"
+            "value" : "For example"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Кімге жауап беретініңізді таңдаңыз"
+            "value" : "Мысалы"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Выберите, кому вы отвечаете"
+            "value" : "Например"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Kimga javob berayotganingizni tanlang"
+            "value" : "Masalan"
+          }
+        }
+      }
+    },
+    "onboarding.welcome.flow.choose" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose who it's for."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Әңгімелесушіні таңда."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Выбери собеседника."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suhbatdoshni tanla."
+          }
+        }
+      }
+    },
+    "onboarding.welcome.flow.copy" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy the message."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Хабарламаны көшір."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скопируй сообщение."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xabarni nusxala."
+          }
+        }
+      }
+    },
+    "onboarding.welcome.flow.reply" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Get a reply."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Жауап ал."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Получи ответ."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Javob ol."
+          }
+        }
+      }
+    },
+    "onboarding.welcome.incoming" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hi! It's been a while. How are you?"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сәлем! Көптен бері сөйлеспедік. Қалайсың?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Привет! Давно не общались. Как ты?"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salom! Ancha vaqtdan beri gaplashmadik. Qalaysan?"
+          }
+        }
+      }
+    },
+    "onboarding.welcome.reply.female" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hi! So good to hear from you. How have you been?"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сәлем! Хабарласқаныңа қуаныштымын. Жағдайың қалай?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Привет! Рада тебя слышать. Расскажи, как твои дела?"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salom! Sendan xabar kelganidan xursandman. Ishlaring qalay?"
+          }
+        }
+      }
+    },
+    "onboarding.welcome.reply.male" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hi! So good to hear from you. How have you been?"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сәлем! Хабарласқаныңа қуаныштымын. Жағдайың қалай?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Привет! Рад тебя слышать. Расскажи, как твои дела?"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salom! Sendan xabar kelganidan xursandman. Ishlaring qalay?"
+          }
+        }
+      }
+    },
+    "onboarding.welcome.reply.unspecified" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hi! So good to hear from you. How have you been?"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сәлем! Хабарласқаныңа қуаныштымын. Жағдайың қалай?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Привет! Очень приятно тебя слышать. Расскажи, как твои дела?"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salom! Sendan xabar kelganidan xursandman. Ishlaring qalay?"
+          }
+        }
+      }
+    },
+    "onboarding.welcome.setup" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set up the keyboard"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пернетақтаны баптау"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Настроить клавиатуру"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Klaviaturani sozlash"
+          }
+        }
+      }
+    },
+    "onboarding.welcome.subtitle" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reply to clients with confidence and chat easily with the people close to you. Right from the keyboard."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Клиенттерге сенімді жауап бер, жақындарыңмен оңай сөйлес. Тікелей пернетақтадан."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Отвечай уверенно клиентам и легко общайся с близкими. Прямо с клавиатуры."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mijozlarga ishonch bilan javob ber, yaqinlaring bilan oson muloqot qil. Toʻgʻridan-toʻgʻri klaviaturadan."
           }
         }
       }
@@ -5897,25 +5404,54 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Reply from your keyboard"
+            "value" : "Your personal assistant for messaging"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Пернетақтадан бірден жауап беріңіз"
+            "value" : "Хат алмасудағы жеке көмекшің"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Отвечайте прямо с клавиатуры"
+            "value" : "Твой личный ассистент в переписке"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Klaviaturadan turib javob bering"
+            "value" : "Yozishmalardagi shaxsiy yordamching"
+          }
+        }
+      }
+    },
+    "onboarding.welcome.tryFirst" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Try it first"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Алдымен байқап көру"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сначала попробовать"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avval sinab koʻrish"
           }
         }
       }
@@ -5926,25 +5462,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "To reply, the AI Reply keyboard reads the message you copied, and iOS may ask every time whether it may paste. Allow it once in Settings and iOS stops asking."
+            "value" : "When you pick who you're replying to or tap Paste message, the AI Reply keyboard reads the message you copied, and iOS may ask every time whether it may paste. Allow it once in Settings and iOS stops asking."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Жауап беру үшін AI Reply пернетақтасы көшірілген хабарламаны оқиды, ал iOS әр жолы қоюға рұқсат сұрауы мүмкін. Реттеулерде бір рет рұқсат бер — iOS бұдан былай сұрамайды."
+            "value" : "Кімге жауап беретініңді таңдағанда не «Хабарламаны қою» түймесін басқанда, AI Reply пернетақтасы көшірілген хабарламаны оқиды, ал iOS әр жолы қоюға рұқсат сұрауы мүмкін. Реттеулерде бір рет рұқсат бер — iOS бұдан былай сұрамайды."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Чтобы ответить, клавиатура AI Reply читает скопированное сообщение, и iOS может каждый раз спрашивать, разрешить ли вставку. Разреши её один раз в настройках — и iOS перестанет спрашивать."
+            "value" : "Когда ты выбираешь, кому отвечаешь, или нажимаешь «Вставить сообщение», клавиатура AI Reply читает скопированное сообщение — и iOS может каждый раз спрашивать, разрешить ли вставку. Разреши её один раз в настройках, и iOS перестанет спрашивать."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Javob berish uchun AI Reply klaviaturasi nusxalangan xabarni oʻqiydi va iOS har safar joylashga ruxsat soʻrashi mumkin. Sozlamalarda bir marta ruxsat ber — iOS boshqa soʻramaydi."
+            "value" : "Kimga javob berayotganingni tanlaganingda yoki «Xabarni joylash»ni bosganingda AI Reply klaviaturasi nusxalangan xabarni oʻqiydi va iOS har safar joylashga ruxsat soʻrashi mumkin. Sozlamalarda bir marta ruxsat ber — iOS boshqa soʻramaydi."
           }
         }
       }
@@ -9893,180 +9429,6 @@
         }
       }
     },
-    "setup.fullAccess.manual" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Only you can turn it on: Settings ▸ AI Reply ▸ Keyboards ▸ Allow Full Access. No app can enable it for you."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Оны тек өзіңіз қоса аласыз: «Реттеулер» ▸ AI Reply ▸ «Пернетақталар» ▸ «Толық рұқсат». Мұны ешбір қолданба сіздің орныңызға жасай алмайды."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Включить его можете только вы: «Настройки» ▸ AI Reply ▸ «Клавиатуры» ▸ «Полный доступ». Ни одно приложение не сделает это за вас."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Buni faqat siz yoqa olasiz: Sozlamalar ▸ AI Reply ▸ Klaviaturalar ▸ Toʻliq ruxsat."
-          }
-        }
-      }
-    },
-    "setup.fullAccess.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Full Access"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Толық рұқсат"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Полный доступ"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Toʻliq ruxsat"
-          }
-        }
-      }
-    },
-    "setup.fullAccess.why" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Full Access lets the keyboard read the message you copied and reach the internet to write a reply. Without it the keyboard still types normally."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Толық рұқсат пернетақтаға сіз көшірген хабарламаны оқып, жауап алу үшін интернетке шығуға мүмкіндік береді. Онсыз да пернетақта әдеттегідей жаза береді."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Полный доступ нужен, чтобы клавиатура могла прочитать скопированное сообщение и обратиться в интернет за ответом. Без него клавиатура печатает как обычная."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Toʻliq ruxsat klaviaturaga siz nusxalagan xabarni oʻqish va javob yaratish uchun internetga ulanish imkonini beradi. Usiz ham klaviatura odatdagidek yozadi."
-          }
-        }
-      }
-    },
-    "setup.paste.body" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "When you pick who you're replying to or tap Paste message, AI Reply reads the message you copied. If iOS asks whether AI Reply may paste from WhatsApp, tap Allow Paste."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Кімге жауап беретініңізді таңдағанда не «Хабарламаны қою» түймесін басқанда, AI Reply көшірілген хабарламаны оқиды. iOS AI Reply-ға WhatsApp-тан қоюға рұқсат бересіз бе деп сұраса, «Қоюға рұқсат ету» түймесін басыңыз."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Когда вы выбираете, кому отвечаете, или нажимаете «Вставить сообщение», AI Reply читает скопированное сообщение. Если iOS спросит, разрешить ли AI Reply вставку из WhatsApp, нажмите «Разрешить вставку»."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kimga javob berayotganingizni tanlaganingizda yoki «Xabarni joylash»ni bosganingizda AI Reply nusxalangan xabarni oʻqiydi. iOS AI Replyga WhatsAppdan joylashga ruxsat berasizmi deb soʻrasa, «Joylashga ruxsat berish»ni bosing."
-          }
-        }
-      }
-    },
-    "setup.paste.footer" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iOS asks this itself, and only after you tap. On iOS versions that have it, you can change your answer later in Settings ▸ AI Reply ▸ Paste from Other Apps."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Бұл сұрақты iOS өзі қояды, тек сіз басқаннан кейін. Мұндай баптауы бар iOS нұсқаларында жауабыңызды кейін өзгертуге болады: «Реттеулер» ▸ AI Reply ▸ «Басқа қолданбалардан көшіріп қою»."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Этот вопрос iOS задаёт сама и только после вашего нажатия. В версиях iOS, где есть такая настройка, ответ можно изменить позже: «Настройки» ▸ AI Reply ▸ «Вставка из других приложений»."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bu savolni iOS oʻzi beradi, faqat siz bosganingizdan keyin. Bunday sozlamasi bor iOS versiyalarida javobingizni keyinroq oʻzgartirish mumkin: Settings ▸ AI Reply ▸ Paste from Other Apps."
-          }
-        }
-      }
-    },
-    "setup.paste.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Paste permission"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Қою рұқсаты"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Разрешение на вставку"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Joylashga ruxsat"
-          }
-        }
-      }
-    },
     "setup.privacy.clipboard" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -10208,267 +9570,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Maxfiylik"
-          }
-        }
-      }
-    },
-    "setup.status.fullAccess" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Full Access"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Толық рұқсат"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Полный доступ"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Toʻliq ruxsat"
-          }
-        }
-      }
-    },
-    "setup.status.fullAccess.off" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Needed for replies"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Жауап алу үшін қажет"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Нужен для ответов"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Javoblar uchun kerak"
-          }
-        }
-      }
-    },
-    "setup.status.fullAccess.on %@" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Enabled — checked %@"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Қосулы — %@ тексерілді"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Включён — проверено %@"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Yoqilgan — %@ tekshirildi"
-          }
-        }
-      }
-    },
-    "setup.status.fullAccess.outdated %@" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Last confirmed %@. Open the AI Reply keyboard to check again."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Соңғы рет %@ расталды. Қайта тексеру үшін AI Reply пернетақтасын ашыңыз."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Последний раз подтверждён %@. Откройте клавиатуру AI Reply, чтобы проверить снова."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Oxirgi marta %@ tasdiqlangan. Qayta tekshirish uchun AI Reply klaviaturasini oching."
-          }
-        }
-      }
-    },
-    "setup.status.fullAccess.unknown" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Not confirmed yet"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Әзірге расталмады"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Пока не подтверждён"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hali tasdiqlanmagan"
-          }
-        }
-      }
-    },
-    "setup.status.keyboard" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI Reply keyboard"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI Reply пернетақтасы"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Клавиатура AI Reply"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI Reply klaviaturasi"
-          }
-        }
-      }
-    },
-    "setup.status.keyboard.on %@" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Enabled — checked %@"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Қосулы — %@ тексерілді"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Включена — проверено %@"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Yoqilgan — %@ tekshirildi"
-          }
-        }
-      }
-    },
-    "setup.status.keyboard.outdated %@" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Last seen %@. Open the AI Reply keyboard to check again."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Соңғы рет %@ анықталды. Қайта тексеру үшін AI Reply пернетақтасын ашыңыз."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Последний раз обнаружена %@. Откройте клавиатуру AI Reply, чтобы проверить снова."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Oxirgi marta %@ aniqlangan. Qayta tekshirish uchun AI Reply klaviaturasini oching."
-          }
-        }
-      }
-    },
-    "setup.status.keyboard.unknown" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Not detected yet"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Әзірге анықталмады"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Пока не обнаружена"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hali aniqlanmadi"
           }
         }
       }

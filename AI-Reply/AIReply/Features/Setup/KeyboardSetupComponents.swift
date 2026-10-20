@@ -2,8 +2,8 @@ import SwiftUI
 import UIKit
 
 /// The pieces every keyboard-setup screen shares: Home's keyboard card, the
-/// setup guide, Settings and the onboarding steps say the same thing the same
-/// way.
+/// permissions section, Settings and «Подключи AI Reply» say the same thing
+/// the same way.
 
 /// The steps for adding the keyboard in iOS Settings.
 struct KeyboardSetupSteps: View {
@@ -43,80 +43,6 @@ struct OpenKeyboardSettingsButton: View {
         guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
         ProductEvents.track(.keyboardSettingsOpened)
         UIApplication.shared.open(url)
-    }
-}
-
-/// One line of what the app knows about its keyboard: enabled, and Full
-/// Access. Title over state, so a long translation wraps instead of clipping.
-///
-/// Says what the keyboard was seen doing and when (`KeyboardSighting`):
-/// green only for a recent sighting, and then with its time; an older one is
-/// "last confirmed …" in grey, never the state now.
-struct KeyboardStatusRow: View {
-
-    enum Kind {
-        case keyboard
-        case fullAccess
-    }
-
-    let kind: Kind
-    let sighting: KeyboardSighting
-
-    @Environment(\.locale) private var locale
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.s) {
-            Image(systemName: symbol)
-                .foregroundStyle(tint)
-                .frame(width: 22)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).foregroundStyle(.primary)
-                Text(state).font(.footnote).foregroundStyle(.secondary)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .combine)
-    }
-
-    private var symbol: String {
-        switch sighting {
-        case .confirmed: return "checkmark.circle.fill"
-        case .denied:    return "exclamationmark.circle"
-        case .outdated:  return "clock.arrow.circlepath"
-        case .unknown:   return kind == .keyboard ? "keyboard" : "questionmark.circle"
-        }
-    }
-
-    private var tint: Color {
-        switch sighting {
-        case .confirmed:          return .green
-        case .denied:             return .orange
-        case .outdated, .unknown: return .secondary
-        }
-    }
-
-    private var title: LocalizedStringKey {
-        kind == .keyboard ? "setup.status.keyboard" : "setup.status.fullAccess"
-    }
-
-    private var state: LocalizedStringKey {
-        let format = KeyboardSightingDate.style.locale(locale)
-        switch (kind, sighting) {
-        case (.keyboard, .confirmed(let date)):
-            return "setup.status.keyboard.on \(date, format: format)"
-        case (.keyboard, .outdated(let date)):
-            return "setup.status.keyboard.outdated \(date, format: format)"
-        case (.keyboard, _):
-            return "setup.status.keyboard.unknown"
-        case (.fullAccess, .confirmed(let date)):
-            return "setup.status.fullAccess.on \(date, format: format)"
-        case (.fullAccess, .outdated(let date)):
-            return "setup.status.fullAccess.outdated \(date, format: format)"
-        case (.fullAccess, .denied):
-            return "setup.status.fullAccess.off"
-        case (.fullAccess, .unknown):
-            return "setup.status.fullAccess.unknown"
-        }
     }
 }
 
