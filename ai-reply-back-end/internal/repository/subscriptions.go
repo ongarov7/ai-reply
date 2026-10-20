@@ -88,9 +88,10 @@ func replaceSubscription(ctx context.Context, tx *sql.Tx, userID string, next do
 // CompletePayment — төлемді «сәтті» деп белгілеп, тарифті бір транзакцияда ауыстырады.
 //
 // The payment status and the subscription change together or not at all, so
-// "succeeded" always means the plan was given. applied=false: the payment was
-// already succeeded (a parallel or earlier confirm finished it) and nothing
-// was written.
+// "succeeded" always means the plan was given. Only a created or pending
+// payment is completed: a failed or refunded one never gives a plan.
+// applied=false: the payment was not in one of those states (a parallel or
+// earlier confirm finished it, or it failed) and nothing was written.
 func (s *Store) CompletePayment(ctx context.Context, paymentID, ref string, next domain.Subscription) (bool, domain.Subscription, error) {
 	if next.ID == "" {
 		next.ID = traits.NewID()
@@ -104,7 +105,7 @@ func (s *Store) CompletePayment(ctx context.Context, paymentID, ref string, next
 	err := s.db.Tx(ctx, func(tx *sql.Tx) error {
 		res, err := tx.ExecContext(ctx, `
 			UPDATE payments SET status = 'succeeded', provider_ref = ?, updated_at = ?
-			WHERE id = ? AND status <> 'succeeded'`, ref, ms(now), paymentID)
+			WHERE id = ? AND status IN ('created','pending')`, ref, ms(now), paymentID)
 		if err != nil {
 			return err
 		}

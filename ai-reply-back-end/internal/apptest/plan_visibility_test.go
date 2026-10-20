@@ -496,3 +496,27 @@ func TestPlanVisibilityMigrationKeepsSubscriptions(t *testing.T) {
 		t.Fatalf("purchases_enabled = %s", got)
 	}
 }
+
+// Сәтсіз не қайтарылған төлем ешқашан тариф бермейді (провайдер не айтса да).
+func TestAFailedOrRefundedPaymentIsNeverCompleted(t *testing.T) {
+	h := newHarness(t)
+	s := h.signIn("payment-state@example.com")
+	h.openStore("standard")
+	for _, status := range []string{"failed", "refunded"} {
+		checkout := h.checkout(s, "standard")
+		id := checkout.str("payment_id")
+		mustStatus(t, checkout, http.StatusOK, "")
+		h.exec(`UPDATE payments SET status = ? WHERE id = ?`, status, id)
+		res := h.do(http.MethodPost, "/api/v1/payments/"+id+"/confirm", map[string]any{}, h.auth(s.access))
+		mustStatus(t, res, http.StatusConflict, "CONFLICT")
+		if res.str("error", "details", "field") != "payment" || res.str("error", "details", "reason") != status {
+			t.Fatalf("%s: %s", status, res.raw)
+		}
+		if got := h.text(`SELECT status FROM payments WHERE id = ?`, id); got != status {
+			t.Fatalf("%s payment became %q", status, got)
+		}
+		if plan := h.do(http.MethodGet, "/api/v1/me/subscription", nil, h.auth(s.access)).str("plan", "code"); plan != "free" {
+			t.Fatalf("%s payment gave plan %q", status, plan)
+		}
+	}
+}

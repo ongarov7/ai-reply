@@ -5,7 +5,9 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/aireply/ai-reply-back-end/internal/domain"
 	"github.com/aireply/ai-reply-back-end/internal/traits"
 )
 
@@ -198,5 +200,84 @@ func TestAdminCanRevokeSessions(t *testing.T) {
 		map[string]any{"refresh_token": session.refresh}, nil)
 	if after.status != http.StatusUnauthorized {
 		t.Fatalf("revoked refresh still works: %d", after.status)
+	}
+}
+
+// Әкімші іздеуі % пен _ таңбаларын әріп ретінде іздейді (ListInstallations сияқты).
+func TestAdminUserSearchMatchesWildcardsLiterally(t *testing.T) {
+	h := newHarness(t)
+	h.signIn("under_score@example.com")
+	h.signIn("underxscore@example.com")
+	headers := h.signInAdmin().headers(h.cfg.Admin.CookieName)
+	for q, want := range map[string]float64{"under_score": 1, "underxscore": 1, "%25": 0, "under%25": 0} {
+		res := h.do(http.MethodGet, "/api/v1/admin/users?q="+q, nil, headers)
+		if res.status != http.StatusOK || res.num("total") != want {
+			t.Errorf("q=%s matched %v users, want %v", q, res.num("total"), want)
+		}
+	}
+}
+
+// Әкімші картасы жазылымның шын күйін көрсетеді: мерзімі өткені «expired», жоғы «none».
+func TestAdminUserDetailShowsTheRealSubscriptionState(t *testing.T) {
+	h := newHarness(t)
+	s := h.signIn("sub-state@example.com")
+	headers := h.signInAdmin().headers(h.cfg.Admin.CookieName)
+	detail := func() response {
+		t.Helper()
+		res := h.do(http.MethodGet, "/api/v1/admin/users/"+s.userID, nil, headers)
+		mustStatus(t, res, http.StatusOK, "")
+		return res
+	}
+	if res := detail(); res.str("subscription", "status") != "active" || res.body["subscription"].(map[string]any)["usable"] != true {
+		t.Fatalf("free plan: %s", res.raw)
+	}
+	h.exec(`DELETE FROM subscriptions WHERE user_id = ?`, s.userID)
+	h.subscribe(s.userID, "pro", h.clock.Now().Add(-time.Hour))
+	if res := detail(); res.str("subscription", "status") != "expired" || res.str("entitlement", "plan_code") != "free" ||
+		res.body["subscription"].(map[string]any)["usable"] != false || res.str("subscription", "expires_at") == "" {
+		t.Fatalf("lapsed plan: %s", res.raw)
+	}
+	h.exec(`DELETE FROM subscriptions WHERE user_id = ?`, s.userID)
+	if res := detail(); res.str("subscription", "status") != "none" {
+		t.Fatalf("no subscription: %s", res.raw)
+	}
+}
+
+// Дашборд: «бүгін» — қолданба белдеуінің күні; лимитке тірелу сәтсіз генерация емес.
+func TestDashboardCountsTheAppDayAndKeepsRefusalsApart(t *testing.T) {
+	h := newHarness(t)
+	s := h.signIn("+7 706 222 33 01")
+	for i := 0; i < 6; i++ {
+		mustStatus(t, h.generate(s.access, "Сұраныс"), http.StatusOK, "")
+	}
+	h.provider.err = domain.ErrProviderDown
+	mustStatus(t, h.generate(s.access, "Құлады"), http.StatusBadGateway, "AI_PROVIDER_UNAVAILABLE")
+	h.provider.err = nil
+	mustStatus(t, h.generate(s.access, "Жетінші"), http.StatusOK, "")
+	mustStatus(t, h.generate(s.access, "Артық"), http.StatusTooManyRequests, "DAILY_LIMIT_REACHED")
+	mustStatus(t, h.generate(s.access, "Тағы артық"), http.StatusTooManyRequests, "DAILY_LIMIT_REACHED")
+
+	headers := h.signInAdmin().headers(h.cfg.Admin.CookieName)
+	stats := func() response {
+		t.Helper()
+		res := h.do(http.MethodGet, "/api/v1/admin/dashboard?range=30d", nil, headers)
+		mustStatus(t, res, http.StatusOK, "")
+		return res
+	}
+	before := stats()
+	if before.num("stats", "failed") != 1 || before.num("stats", "refused") != 2 || before.num("stats", "succeeded") != 7 ||
+		before.num("stats", "requests_today") != 7 {
+		t.Fatalf("stats = %s", before.raw)
+	}
+
+	// Local midnight in Asia/Almaty is 19:00 UTC of the day before.
+	local := h.clock.Now().In(h.cfg.App.Location())
+	midnight := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, h.cfg.App.Location())
+	for id, at := range map[string]time.Time{"u-yesterday": midnight.Add(-time.Minute), "u-today": midnight.Add(time.Minute)} {
+		h.exec(`INSERT INTO users (id, email, status, created_at, updated_at) VALUES (?, ?, 'active', ?, ?)`,
+			id, id+"@example.com", at.UnixMilli(), at.UnixMilli())
+	}
+	if delta := stats().num("stats", "new_today") - before.num("stats", "new_today"); delta != 1 {
+		t.Fatalf("new_today grew by %v, want 1 (only the account after local midnight)", delta)
 	}
 }

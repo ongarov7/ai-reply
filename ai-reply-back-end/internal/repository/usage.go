@@ -108,22 +108,27 @@ type Stats struct {
 	CostMicros     int64
 	Succeeded      int
 	Failed         int
-	AvgLatencyMS   int
-	IOSUsers       int
-	AndroidUsers   int
+	// Refused — лимитке тірелген сұраныстар: олар сәтсіз генерация емес.
+	Refused      int
+	AvgLatencyMS int
+	IOSUsers     int
+	AndroidUsers int
 }
 
 // Stats — көрсетілген кезең бойынша метрика (мазмұнсыз).
-func (s *Store) Stats(ctx context.Context, from, to time.Time, today string) (Stats, error) {
+//
+// today is the usage_daily key and dayStart the same day's local midnight,
+// both in the app timezone, so every "today" tile counts the same day the
+// quota does.
+func (s *Store) Stats(ctx context.Context, from, to time.Time, today string, dayStart time.Time) (Stats, error) {
 	var st Stats
 	r := s.db.Reader()
 
 	if err := r.QueryRowContext(ctx, `SELECT COUNT(*) FROM users WHERE deleted_at IS NULL`).Scan(&st.TotalUsers); err != nil {
 		return st, err
 	}
-	dayStart := startOfDayMillis(time.Now())
 	if err := r.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM users WHERE created_at >= ? AND deleted_at IS NULL`, dayStart).Scan(&st.NewUsersToday); err != nil {
+		`SELECT COUNT(*) FROM users WHERE created_at >= ? AND deleted_at IS NULL`, ms(dayStart)).Scan(&st.NewUsersToday); err != nil {
 		return st, err
 	}
 	if err := r.QueryRowContext(ctx,
@@ -144,22 +149,28 @@ func (s *Store) Stats(ctx context.Context, from, to time.Time, today string) (St
 	}
 	st.FreeUsers = st.TotalUsers - st.PaidUsers
 	if err := r.QueryRowContext(ctx,
-		`SELECT COALESCE(SUM(used),0) FROM usage_daily WHERE usage_date = ?`, today).Scan(&st.RequestsToday); err != nil {
+		`SELECT COALESCE(SUM(used + extra_used),0) FROM usage_daily WHERE usage_date = ?`, today).Scan(&st.RequestsToday); err != nil {
 		return st, err
 	}
 	// Polish (нұсқауды түзету) пен transcribe (дауыс → мәтін) — генерация емес:
 	// санға да, кідіріске де кірмейді, бірақ токен мен құн шынайы шығын
-	// болғандықтан есептеледі.
+	// болғандықтан есептеледі. Лимитке тірелген сұраныс провайдерге жетпейді:
+	// ол сәтсіз генерация да емес, кідіріске де кірмейді (Refused).
 	if err := r.QueryRowContext(ctx, `
 		SELECT COALESCE(SUM(CASE WHEN mode NOT IN ('polish','transcribe') THEN 1 ELSE 0 END),0),
 		       COALESCE(SUM(input_tokens),0), COALESCE(SUM(output_tokens),0),
 		       COALESCE(SUM(total_tokens),0), COALESCE(SUM(cost_micros),0),
 		       COALESCE(SUM(CASE WHEN mode NOT IN ('polish','transcribe') AND status = 'success' THEN 1 ELSE 0 END),0),
-		       COALESCE(SUM(CASE WHEN mode NOT IN ('polish','transcribe') AND status <> 'success' THEN 1 ELSE 0 END),0),
-		       COALESCE(CAST(AVG(CASE WHEN mode NOT IN ('polish','transcribe') THEN latency_ms END) AS INTEGER),0)
+		       COALESCE(SUM(CASE WHEN mode NOT IN ('polish','transcribe') AND status <> 'success'
+		                          AND error_code NOT IN (`+limitCodes+`) THEN 1 ELSE 0 END),0),
+		       COALESCE(SUM(CASE WHEN mode NOT IN ('polish','transcribe') AND status <> 'success'
+		                          AND error_code IN (`+limitCodes+`) THEN 1 ELSE 0 END),0),
+		       COALESCE(CAST(AVG(CASE WHEN mode NOT IN ('polish','transcribe')
+		                              AND NOT (status <> 'success' AND error_code IN (`+limitCodes+`))
+		                              THEN latency_ms END) AS INTEGER),0)
 		FROM ai_usage_events WHERE created_at BETWEEN ? AND ?`, ms(from), ms(to)).
 		Scan(&st.RequestsMonth, &st.InputTokens, &st.OutputTokens, &st.TotalTokens, &st.CostMicros,
-			&st.Succeeded, &st.Failed, &st.AvgLatencyMS); err != nil {
+			&st.Succeeded, &st.Failed, &st.Refused, &st.AvgLatencyMS); err != nil {
 		return st, err
 	}
 	if err := r.QueryRowContext(ctx,
@@ -317,7 +328,5 @@ func collectPoints(rows *sql.Rows, err error) ([]Point, error) {
 	return out, rows.Err()
 }
 
-func startOfDayMillis(t time.Time) int64 {
-	y, m, d := t.UTC().Date()
-	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC).UnixMilli()
-}
+// limitCodes — квота бас тартуларының кодтары (ai_usage_events.error_code).
+const limitCodes = `'DAILY_LIMIT_REACHED','MONTHLY_LIMIT_REACHED'`

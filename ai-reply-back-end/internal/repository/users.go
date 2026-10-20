@@ -33,7 +33,10 @@ func scanUser(row interface{ Scan(...any) error }) (domain.User, error) {
 	return u, nil
 }
 
-// CreateUser — жаңа есептік жазба.
+// CreateUser — жаңа есептік жазба және бос профилі бір транзакцияда.
+//
+// Both rows exist afterwards or neither does, like CreateUserWithIdentities:
+// a failure in between can no longer leave an account without its profile.
 func (s *Store) CreateUser(ctx context.Context, u domain.User) (domain.User, error) {
 	if u.ID == "" {
 		u.ID = traits.NewID()
@@ -51,23 +54,25 @@ func (s *Store) CreateUser(ctx context.Context, u domain.User) (domain.User, err
 	}
 	u.Locale = domain.NormalizeLocale(u.Locale)
 
-	_, err := s.db.Writer().ExecContext(ctx, `
-		INSERT INTO users (id, phone, email, status, locale, timezone, platform, app_version, os_version,
-		                   kind, legacy_client, created_at, updated_at, last_active_at)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		u.ID, nullText(u.Phone), nullText(u.Email), u.Status, u.Locale, u.Timezone, u.Platform,
-		u.AppVersion, u.OSVersion, u.Kind, nullText(u.LegacyClient), ms(u.CreatedAt), ms(u.UpdatedAt),
-		msPtr(u.LastActiveAt))
-	if err != nil {
-		if isUnique(err) {
-			return domain.User{}, domain.ErrConflict
+	err := s.db.Tx(ctx, func(tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO users (id, phone, email, status, locale, timezone, platform, app_version, os_version,
+			                   kind, legacy_client, created_at, updated_at, last_active_at)
+			VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			u.ID, nullText(u.Phone), nullText(u.Email), u.Status, u.Locale, u.Timezone, u.Platform,
+			u.AppVersion, u.OSVersion, u.Kind, nullText(u.LegacyClient), ms(u.CreatedAt), ms(u.UpdatedAt),
+			msPtr(u.LastActiveAt)); err != nil {
+			return err
 		}
-		return domain.User{}, err
+		// Бос профиль бірден жасалады — кейін NULL тексерудің қажеті болмайды.
+		_, err := tx.ExecContext(ctx,
+			`INSERT INTO user_profiles (user_id, updated_at) VALUES (?, ?)`, u.ID, ms(now))
+		return err
+	})
+	if isUnique(err) {
+		return domain.User{}, domain.ErrConflict
 	}
-	// Бос профиль бірден жасалады — кейін NULL тексерудің қажеті болмайды.
-	_, err = s.db.Writer().ExecContext(ctx,
-		`INSERT INTO user_profiles (user_id, updated_at) VALUES (?, ?)`, u.ID, ms(now))
-	if err != nil && !isUnique(err) {
+	if err != nil {
 		return domain.User{}, err
 	}
 	return u, nil
@@ -259,9 +264,10 @@ type UserRow struct {
 func (s *Store) ListUsers(ctx context.Context, f UserFilter, today, month string) ([]UserRow, int, error) {
 	where := []string{"u.deleted_at IS NULL"}
 	args := []any{}
-	if f.Search != "" {
-		where = append(where, "(u.phone LIKE ? OR u.email LIKE ? OR u.id LIKE ?)")
-		like := "%" + strings.TrimSpace(f.Search) + "%"
+	if q := strings.TrimSpace(f.Search); q != "" {
+		// "%" and "_" are matched literally, as in ListInstallations.
+		where = append(where, `(u.phone LIKE ? ESCAPE '\' OR u.email LIKE ? ESCAPE '\' OR u.id LIKE ? ESCAPE '\')`)
+		like := "%" + escapeLike(q) + "%"
 		args = append(args, like, like, like)
 	}
 	if f.Status != "" {

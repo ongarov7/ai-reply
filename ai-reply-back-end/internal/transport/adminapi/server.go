@@ -187,6 +187,8 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 			"input_tokens": dashboard.Stats.InputTokens, "output_tokens": dashboard.Stats.OutputTokens,
 			"total_tokens": dashboard.Stats.TotalTokens, "cost_usd": dashboard.CostUSD,
 			"succeeded": dashboard.Stats.Succeeded, "failed": dashboard.Stats.Failed,
+			// Limit refusals: not failed generations (they never reach the provider).
+			"refused":        dashboard.Stats.Refused,
 			"avg_latency_ms": dashboard.Stats.AvgLatencyMS,
 			"ios_users":      dashboard.Stats.IOSUsers, "android_users": dashboard.Stats.AndroidUsers,
 		},
@@ -306,15 +308,7 @@ func (s *Server) handleUserDetail(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	subscription := map[string]any{"status": domain.SubActive}
-	if sub := detail.Entitlement.Subscription; sub != nil {
-		subscription["status"] = sub.Status
-		subscription["source"] = sub.Source
-		subscription["started_at"] = sub.StartedAt.In(loc).Format("2006-01-02")
-		if sub.ExpiresAt != nil {
-			subscription["expires_at"] = sub.ExpiresAt.In(loc).Format("2006-01-02")
-		}
-	}
+	subscription := subscriptionState(detail, s.admin.Now(), loc)
 
 	httpx.JSON(w, http.StatusOK, map[string]any{
 		"user": map[string]any{
@@ -344,6 +338,35 @@ func (s *Server) handleUserDetail(w http.ResponseWriter, r *http.Request) {
 		"payments":     payments,
 		"sessions":     sessions,
 	})
+}
+
+// subscriptionState — жазылымның шын күйі: жарамды жазылым, болмаса соңғы жазба
+// (мерзімі өткені «expired»), мүлде жоқ болса «none».
+//
+// A lapsed paid plan used to show as "active": the person is on the free plan
+// then, and the admin must see that the subscription ended.
+func subscriptionState(detail admin.UserDetail, now time.Time, loc *time.Location) map[string]any {
+	sub := detail.Entitlement.Subscription
+	usable := sub != nil
+	if sub == nil && len(detail.Subscriptions) > 0 {
+		latest := detail.Subscriptions[0] // newest first
+		sub = &latest
+	}
+	if sub == nil {
+		return map[string]any{"status": "none", "usable": false}
+	}
+	status := sub.Status
+	if !usable && (status == domain.SubActive || status == domain.SubTrial) && sub.ExpiresAt != nil && now.After(*sub.ExpiresAt) {
+		status = domain.SubExpired
+	}
+	out := map[string]any{
+		"status": status, "source": sub.Source, "usable": usable,
+		"started_at": sub.StartedAt.In(loc).Format("2006-01-02"),
+	}
+	if sub.ExpiresAt != nil {
+		out["expires_at"] = sub.ExpiresAt.In(loc).Format("2006-01-02")
+	}
+	return out
 }
 
 func (s *Server) handleUserStatus(w http.ResponseWriter, r *http.Request) {

@@ -211,3 +211,24 @@ func TestProfileUpdateAcceptsPostAlias(t *testing.T) {
 		t.Fatalf("onboarding flag not stored: %v", done)
 	}
 }
+
+// Профиль жазылмаса — тіркелгі де жоқ (жартылай тіркелгі қалмайды).
+func TestAFailedProfileWriteLeavesNoHalfAccount(t *testing.T) {
+	h := newHarness(t)
+	h.exec(`CREATE TRIGGER fail_profile BEFORE INSERT ON user_profiles BEGIN SELECT RAISE(ABORT, 'disk full'); END`)
+	mustStatus(t, h.do(http.MethodPost, "/api/v1/auth/request-otp",
+		map[string]any{"identifier": "+7 701 444 00 11", "locale": "kk"}, nil), http.StatusOK, "")
+	verify := h.do(http.MethodPost, "/api/v1/auth/verify-otp", map[string]any{
+		"identifier": "+7 701 444 00 11", "code": "1111", "device": map[string]any{"platform": "android"},
+	}, nil)
+	if verify.status != http.StatusInternalServerError {
+		t.Fatalf("sign-in with a failing profile write: %d %s", verify.status, verify.raw)
+	}
+	if n := h.scalar(`SELECT COUNT(*) FROM users WHERE phone = '+77014440011'`); n != 0 {
+		t.Fatalf("%d account(s) left without a profile", n)
+	}
+	h.exec(`DROP TRIGGER fail_profile`)
+	if s := h.signIn("+7 701 444 00 11"); !s.isNew {
+		t.Fatal("the retried sign-in did not create the account")
+	}
+}

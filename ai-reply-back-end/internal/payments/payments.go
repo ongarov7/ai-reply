@@ -234,6 +234,11 @@ func (s *Service) Confirm(ctx context.Context, userID, paymentID string) (domain
 		// gave, without restarting its period or sending a second notice.
 		return s.subs.Current(ctx, userID)
 	}
+	if !confirmable(payment.Status) {
+		// A failed or refunded payment never turns into a plan, whatever the
+		// provider answers now: the person starts a new checkout.
+		return domain.Subscription{}, domain.ConflictField("payment", payment.Status)
+	}
 	// Demo money is not real: once buying is switched off, an unfinished demo
 	// payment can no longer turn into a plan. A live provider's payment that
 	// the store confirms is honoured, because the person has paid.
@@ -263,6 +268,10 @@ func (s *Service) Confirm(ctx context.Context, userID, paymentID string) (domain
 	}
 	if !applied {
 		// A parallel confirm finished it first: same answer, no second notice.
+		// Anything else moved it out of created/pending and gives no plan.
+		if current, err := s.repo.Payment(ctx, payment.ID); err == nil && current.Status != "succeeded" {
+			return domain.Subscription{}, domain.ConflictField("payment", current.Status)
+		}
 		return s.subs.Current(ctx, userID)
 	}
 	if s.events != nil && s.announces() {
@@ -271,6 +280,9 @@ func (s *Service) Confirm(ctx context.Context, userID, paymentID string) (domain
 	}
 	return sub, nil
 }
+
+// confirmable — тек басталған не күтудегі төлем аяқталады (created | pending).
+func confirmable(status string) bool { return status == "created" || status == "pending" }
 
 // completeTimeout — төлемді аяқтау жазуларына берілетін уақыт (сұраныстан тәуелсіз).
 const completeTimeout = 10 * time.Second

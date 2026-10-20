@@ -61,7 +61,10 @@ type Dashboard struct {
 // Dashboard — барлық көрсеткішті жинау.
 func (s *Service) Dashboard(ctx context.Context, rng Range) (Dashboard, error) {
 	today, _ := s.subs.TodayKeys()
-	stats, err := s.repo.Stats(ctx, rng.From, rng.To, today)
+	// The quota's local midnight: "new users today" counts the same day as the requests tile.
+	local := s.Now().In(s.subs.Location())
+	dayStart := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, s.subs.Location())
+	stats, err := s.repo.Stats(ctx, rng.From, rng.To, today, dayStart)
 	if err != nil {
 		return Dashboard{}, err
 	}
