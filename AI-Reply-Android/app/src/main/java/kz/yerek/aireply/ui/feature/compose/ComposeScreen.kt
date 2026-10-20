@@ -143,9 +143,9 @@ fun ComposeScreen(onBack: () -> Unit, onOpen: (String) -> Unit = {}) {
 
     var message by remember { mutableStateOf("") }
     var instruction by remember { mutableStateOf("") }
-    var chosenId by remember {
-        mutableStateOf(initialRecipient(configuration.visibleTemplates.map { it.id }, services.settings.lastTemplateId))
-    }
+    // The keyboard's selection; resolved against the shown templates below, so
+    // it still applies when the configuration arrives after the first frame.
+    var chosenId by remember { mutableStateOf(services.settings.lastTemplateId) }
     var reply by remember { mutableStateOf("") }
     var generating by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -157,7 +157,7 @@ fun ComposeScreen(onBack: () -> Unit, onOpen: (String) -> Unit = {}) {
 
     DisposableEffect(Unit) { onDispose { job?.cancel() } }
 
-    // A template hidden meanwhile falls back to the first one shown.
+    // A template hidden or deleted meanwhile falls back to the first one shown.
     val templateId = initialRecipient(configuration.visibleTemplates.map { it.id }, chosenId)
     val count = AIReplyService.characterCount(message)
     val overLimit = count > AIConfiguration.maxMessageCharacters
