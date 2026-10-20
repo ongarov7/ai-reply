@@ -78,7 +78,7 @@ class RecipientTypesTest {
             "values" to listOf("Friend", "Client", "Colleague", "Partner"),
             "values-ru" to listOf("Другу", "Клиенту", "Коллеге", "Партнёру"),
             "values-kk" to listOf("Досқа", "Клиентке", "Әріптеске", "Серіктеске"),
-            "values-uz" to listOf("Doʻst", "Mijoz", "Hamkasb", "Hamkor")
+            "values-uz" to listOf("Doʻstga", "Mijozga", "Hamkasbga", "Hamkorga")
         )
         val keys = listOf("friend", "client", "work", "business")
         for ((folder, names) in expected) {

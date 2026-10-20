@@ -92,10 +92,11 @@
     <string name="relationship_custom">Boshqa</string>
     <string name="relationship_friend">Doʻst</string>
     <string name="relationship_work">Hamkasb</string>
-    <string name="relationship_friend_dative">Doʻst</string>
-    <string name="relationship_client_dative">Mijoz</string>
-    <string name="relationship_work_dative">Hamkasb</string>
-    <string name="relationship_business_dative">Hamkor</string>
+    <!-- «Kimga javob beramiz?»: the dative, with -ga. -->
+    <string name="relationship_friend_dative">Doʻstga</string>
+    <string name="relationship_client_dative">Mijozga</string>
+    <string name="relationship_work_dative">Hamkasbga</string>
+    <string name="relationship_business_dative">Hamkorga</string>
 
     <string name="settings_appearance">Koʻrinish</string>
     <string name="settings_appearance_dark">Qorongʻi</string>
