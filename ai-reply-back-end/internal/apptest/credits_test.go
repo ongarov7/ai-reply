@@ -208,25 +208,36 @@ func TestCreditsAreSpentInOrder(t *testing.T) {
 	newer := h.addGrant(s.userID, domain.GrantPack, 1, now, nil, now.Add(-time.Hour))
 	end := now.Add(23 * time.Hour)
 	h.addGrant(s.userID, domain.GrantPass, 2, now.Add(-time.Hour), &end, now)
-	// A pass that has not started yet and one that is over are not spent.
+	// A pass waiting behind the running one is not spent while that one has
+	// units, and starts (keeping its 25 hours) once it is used up; one that is
+	// over is never spent.
 	later, past := now.Add(48*time.Hour), now.Add(-time.Minute)
-	h.addGrant(s.userID, domain.GrantPass, 5, end, &later, now)
+	waiting := h.addGrant(s.userID, domain.GrantPass, 5, end, &later, now)
 	h.addGrant(s.userID, domain.GrantPass, 5, now.Add(-25*time.Hour), &past, now)
 
 	want := []string{"daily", "daily", "daily", "daily", "daily", "daily", "daily",
-		"pass", "pass", "welcome", "welcome", "admin", "admin", "pack", "pack"}
+		"pass", "pass", "pass", "pass", "pass", "pass", "pass", "welcome", "welcome", "admin", "admin", "pack", "pack"}
 	for i, bucket := range want {
 		res := h.generate(s.access, "Сәлеметсіз бе, бағасы қанша?")
 		if res.status != http.StatusOK || res.str("usage", "bucket") != bucket {
 			t.Fatalf("generation %d: %d bucket %q, want %q (%s)", i+1, res.status, res.str("usage", "bucket"), bucket, res.raw)
 		}
-		if left := len(want) - i - 1; res.num("usage", "remaining_total") != float64(left) {
+		left := len(want) - i - 1
+		if i < 8 {
+			left -= 5 // the waiting pass counts once it has started
+		}
+		if res.num("usage", "remaining_total") != float64(left) {
 			t.Fatalf("generation %d: remaining_total = %v, want %d", i+1, res.num("usage", "remaining_total"), left)
 		}
 		if i >= 7 && (res.num("usage", "used_today") != 7 || res.num("usage", "remaining_today") != 0) {
 			t.Fatalf("generation %d: extra buckets moved the plan counters: %s", i+1, res.raw)
 		}
-		if i == 13 && (h.scalar(`SELECT units_remaining FROM credit_grants WHERE id = ?`, older.ID) != 0 ||
+		if starts := h.scalar(`SELECT starts_at FROM credit_grants WHERE id = ?`, waiting.ID); (i == 7 && starts != int(end.UnixMilli())) ||
+			(i == 8 && (starts != int(now.UnixMilli()) ||
+				h.scalar(`SELECT expires_at FROM credit_grants WHERE id = ?`, waiting.ID) != int(now.Add(25*time.Hour).UnixMilli()))) {
+			t.Fatalf("generation %d: the waiting pass starts at %d", i+1, starts)
+		}
+		if i == 18 && (h.scalar(`SELECT units_remaining FROM credit_grants WHERE id = ?`, older.ID) != 0 ||
 			h.scalar(`SELECT units_remaining FROM credit_grants WHERE id = ?`, newer.ID) != 1) {
 			t.Fatal("the newer pack was spent before the older one")
 		}
@@ -250,16 +261,16 @@ func TestCreditsAreSpentInOrder(t *testing.T) {
 		t.Fatalf("/me/usage = %s", usage.raw)
 	}
 	date, month := h.todayKeys()
-	if h.scalar(`SELECT extra_used FROM usage_daily WHERE user_id = ? AND usage_date = ?`, s.userID, date) != 8 ||
+	if h.scalar(`SELECT extra_used FROM usage_daily WHERE user_id = ? AND usage_date = ?`, s.userID, date) != 13 ||
 		h.scalar(`SELECT used FROM usage_monthly WHERE user_id = ? AND usage_month = ?`, s.userID, month) != 7 ||
-		h.scalar(`SELECT extra_used FROM usage_monthly WHERE user_id = ? AND usage_month = ?`, s.userID, month) != 8 {
+		h.scalar(`SELECT extra_used FROM usage_monthly WHERE user_id = ? AND usage_month = ?`, s.userID, month) != 13 {
 		t.Fatal("extra_used does not count the extra buckets")
 	}
-	if n := h.scalar(`SELECT COUNT(*) FROM credit_ledger WHERE user_id = ? AND entry = 'consume' AND delta = -1`, s.userID); n != 8 {
-		t.Fatalf("%d consume entries, want 8", n)
+	if n := h.scalar(`SELECT COUNT(*) FROM credit_ledger WHERE user_id = ? AND entry = 'consume' AND delta = -1`, s.userID); n != 13 {
+		t.Fatalf("%d consume entries, want 13", n)
 	}
-	if n := h.scalar(`SELECT COUNT(*) FROM credit_grants WHERE user_id = ? AND units_remaining = 5`, s.userID); n != 2 {
-		t.Fatal("a pass outside its window was spent")
+	if n := h.scalar(`SELECT COUNT(*) FROM credit_grants WHERE user_id = ? AND units_remaining = 5`, s.userID); n != 1 {
+		t.Fatal("a pass that is over was spent")
 	}
 }
 

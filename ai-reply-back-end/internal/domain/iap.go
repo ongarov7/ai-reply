@@ -57,8 +57,8 @@ const (
 	PurchaseReasonMalformed    = "malformed"        // JWS / token is not what a store sends
 	PurchaseReasonSignature    = "signature"        // the JWS signature or certificate chain does not verify
 	PurchaseReasonBundle       = "bundle_mismatch"  // another app's transaction
-	PurchaseReasonEnvironment  = "environment"      // Sandbox on a server that does not accept it
-	PurchaseReasonProduct      = "product_unknown"  // no product with this store id
+	PurchaseReasonEnvironment  = "environment"      // Sandbox / a Google license test on a server that does not accept it
+	PurchaseReasonProduct      = "product_unknown"  // no product with this store id, or Google names another product
 	PurchaseReasonAccount      = "account_mismatch" // appAccountToken / obfuscatedAccountId is not this account's
 	PurchaseReasonRevoked      = "revoked"          // refunded or revoked by the store
 	PurchaseReasonType         = "product_type"     // not a consumable / non-renewing subscription

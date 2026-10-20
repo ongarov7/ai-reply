@@ -174,9 +174,11 @@ func (s *Service) AnyConfigured() bool { return s.apple != nil || s.google != ni
 
 // Status — әкімші бетіне: не бапталған (құпиясыз).
 type Status struct {
-	Apple         bool
-	Google        bool
-	AppleSandbox  bool
+	Apple        bool
+	Google       bool
+	AppleSandbox bool
+	// GoogleTest — Google лицензия тестерлерінің сатып алулары қабылданады.
+	GoogleTest    bool
 	BundleID      string
 	PackageName   string
 	VoidedPolling bool
@@ -185,7 +187,7 @@ type Status struct {
 // Status — интеграциялардың күйі.
 func (s *Service) Status() Status {
 	return Status{Apple: s.apple != nil, Google: s.google != nil, AppleSandbox: s.cfg.AppleAcceptSandbox,
-		BundleID: s.cfg.AppleBundleID, PackageName: s.cfg.GooglePackageName,
+		GoogleTest: s.cfg.GoogleAcceptTest, BundleID: s.cfg.AppleBundleID, PackageName: s.cfg.GooglePackageName,
 		VoidedPolling: s.google != nil && s.cfg.GoogleVoidedPoll > 0}
 }
 

@@ -780,8 +780,10 @@ paths:
       description: >-
         purchases.products.get: obfuscatedExternalAccountId = account_token, purchaseState 0
         (2 — 202 pending, ничего не начислено), не потреблена другим, product_id — товар из
-        админки. Сначала начисление, затем consume; неудачный consume повторяет фоновая задача.
-        purchaseType 0 (лицензионный тестер) — environment Test. Лимит RATE_IAP_PER_MINUTE.
+        админки, productId в ответе Google (если есть) тот же. Сначала начисление, затем consume;
+        неудачный consume повторяет фоновая задача. purchaseType 0 (лицензионный тестер) —
+        только при GOOGLE_PLAY_ACCEPT_TEST=true (по умолчанию в production — нет), environment
+        Test. Лимит RATE_IAP_PER_MINUTE.
       security: [{ bearerAuth: [] }]
       requestBody:
         required: true
@@ -805,7 +807,7 @@ paths:
           content:
             application/json:
               schema: { type: object, properties: { status: { type: string, enum: [pending] } } }
-        "400": { description: "PURCHASE_INVALID, details.reason = malformed | product_unknown | not_found | account_mismatch | canceled | already_consumed | revoked | unsupported_type; INVALID_REQUEST (details.field = product_id | purchase_token)" }
+        "400": { description: "PURCHASE_INVALID, details.reason = malformed | product_unknown | not_found | account_mismatch | environment | canceled | already_consumed | revoked | unsupported_type; INVALID_REQUEST (details.field = product_id | purchase_token)" }
         "401": { description: UNAUTHORIZED }
         "403": { description: "IAP_UNAVAILABLE — Google Play не подключён на сервере" }
         "409": { description: PURCHASE_BELONGS_TO_ANOTHER_ACCOUNT }
@@ -817,8 +819,9 @@ paths:
       description: >-
         Публичный; подпись signedPayload проверяется той же цепочкой Apple. После проверки —
         всегда 200, каждое notificationUUID обрабатывается один раз. REFUND / REVOKE снимают
-        остаток покупки (баланс не уходит в минус), REFUND_REVERSED возвращает снятое, TEST,
-        CONSUMPTION_REQUEST, REFUND_DECLINED — только в журнал.
+        остаток покупки (баланс не уходит в минус), REFUND_REVERSED возвращает снятое (или
+        снимает запись раннего возврата неотправленной транзакции), TEST, CONSUMPTION_REQUEST,
+        REFUND_DECLINED — только в журнал.
       requestBody:
         required: true
         content:
@@ -1026,7 +1029,7 @@ paths:
       summary: Товары (архивные в конце) и состояние магазинов
       security: [{ adminSession: [] }]
       responses:
-        "200": { description: "{ products: [{ id, code, kind, units, duration_hours, apple_product_id, google_product_id, name, is_active, sort_order, archived, archived_at, sales, offered_ios, offered_android, created_at, updated_at }], iap: { enabled, configured, apple, google, apple_sandbox, bundle_id, package_name, voided_polling, available_ios, available_android, notification_url, ranges } }" }
+        "200": { description: "{ products: [{ id, code, kind, units, duration_hours, apple_product_id, google_product_id, name, is_active, sort_order, archived, archived_at, sales, offered_ios, offered_android, created_at, updated_at }], iap: { enabled, configured, apple, google, apple_sandbox, google_test, bundle_id, package_name, voided_polling, available_ios, available_android, notification_url, ranges } }" }
     post:
       tags: [admin]
       summary: Создать товар; аудит iap_product.create

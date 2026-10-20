@@ -891,6 +891,24 @@ func TestProductionRefusesSandboxPurchasesByDefault(t *testing.T) {
 	}
 }
 
+// Production-да Google лицензия тестерінің тегін сатып алуы тек GOOGLE_PLAY_ACCEPT_TEST=true болса қабылданады.
+func TestProductionRefusesGoogleTestPurchasesByDefault(t *testing.T) {
+	t.Setenv("GOOGLE_PLAY_ACCEPT_TEST", "")
+	for env, want := range map[string]bool{"production": false, "staging": true, "test": true, "development": true} {
+		if got := iapFromEnv(env); got.GoogleAcceptTest != want {
+			t.Errorf("APP_ENV=%s: GoogleAcceptTest %v, want %v", env, got.GoogleAcceptTest, want)
+		}
+	}
+	t.Setenv("GOOGLE_PLAY_ACCEPT_TEST", "true")
+	if got := iapFromEnv("production"); !got.GoogleAcceptTest {
+		t.Fatal("an explicit true is ignored")
+	}
+	t.Setenv("GOOGLE_PLAY_ACCEPT_TEST", "false")
+	if got := iapFromEnv("staging"); got.GoogleAcceptTest {
+		t.Fatal("an explicit false is ignored")
+	}
+}
+
 // Жартылай берілген Google кілті, файл мен айнымалылар бірге, қате аралық — баптау қатесі.
 func TestIAPRejectsHalfConfiguredGoogleAndBadValues(t *testing.T) {
 	dir := t.TempDir()

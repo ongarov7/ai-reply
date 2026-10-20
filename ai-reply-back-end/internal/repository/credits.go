@@ -58,6 +58,8 @@ const grantOrder = `CASE kind WHEN 'pass' THEN 0 WHEN 'welcome' THEN 1 WHEN 'adm
 // in the UPDATE itself, so parallel requests can never take the same unit
 // and no balance goes below zero. With nothing left the error is
 // ErrDailyLimit, or ErrMonthlyLimit when the monthly cap closed the plan.
+// Taking the last unit of a pass starts the pass waiting behind it
+// (startWaitingPasses), so paid units never sit idle behind an empty pass.
 //
 // With a key: a key that is still running answers ConflictField
 // (idempotency_key, in_progress); a key that already paid for a generation is
@@ -125,7 +127,10 @@ func (s *Store) ReserveGeneration(ctx context.Context, in ReserveInput) (Reserva
 			}
 			out.Bucket = domain.BucketDaily
 		} else {
-			var kind string
+			var (
+				kind string
+				left int
+			)
 			err := tx.QueryRowContext(ctx, `
 				UPDATE credit_grants SET units_remaining = units_remaining - 1, updated_at = ?
 				WHERE id = (SELECT id FROM credit_grants
@@ -134,7 +139,7 @@ func (s *Store) ReserveGeneration(ctx context.Context, in ReserveInput) (Reserva
 				              AND starts_at <= ? AND (expires_at IS NULL OR expires_at > ?)
 				            ORDER BY `+grantOrder+` LIMIT 1)
 				  AND units_remaining > 0
-				RETURNING id, kind`, now, in.UserID, now, now).Scan(&out.GrantID, &kind)
+				RETURNING id, kind, units_remaining`, now, in.UserID, now, now).Scan(&out.GrantID, &kind, &left)
 			if errors.Is(err, sql.ErrNoRows) {
 				return closed
 			}
@@ -142,6 +147,11 @@ func (s *Store) ReserveGeneration(ctx context.Context, in ReserveInput) (Reserva
 				return err
 			}
 			out.Bucket = kind
+			if kind == domain.GrantPass && left == 0 {
+				if _, err := startWaitingPasses(ctx, tx, in.UserID, in.Now); err != nil {
+					return err
+				}
+			}
 			if err := insertLedger(ctx, tx, domain.LedgerEntry{
 				UserID: in.UserID, GrantID: out.GrantID, Entry: domain.LedgerConsume, Kind: kind, Delta: -1,
 				CreatedAt: in.Now,
@@ -514,6 +524,11 @@ func (s *Store) RevokeCreditGrant(ctx context.Context, userID, grantID, by, reas
 			return domain.ErrNotFound
 		}
 		g = list[0]
+		if g.Kind == domain.GrantPass {
+			if _, err := startWaitingPasses(ctx, tx, userID, now); err != nil {
+				return err
+			}
+		}
 		return insertLedger(ctx, tx, domain.LedgerEntry{UserID: userID, GrantID: grantID, Entry: domain.LedgerRevoke,
 			Kind: g.Kind, Delta: -revoked, Actor: by, Reason: reason, CreatedAt: now}, "")
 	})
@@ -521,6 +536,70 @@ func (s *Store) RevokeCreditGrant(ctx context.Context, userID, grantID, by, reas
 		return domain.CreditGrant{}, 0, err
 	}
 	return g, revoked, nil
+}
+
+// startWaitingPasses — кезектегі pass бірлігі қалған алдыңғы pass біткенде (болмаса қазір) басталады.
+//
+// A pass bought while another one runs waits for that one to end. When the
+// one in front is used up or revoked before its time is over, waiting for its
+// end would leave paid units unusable: every waiting pass is moved to start
+// when the latest pass in front of it that still has units ends, or now, and
+// keeps its length. A pass only ever moves earlier. The result is where a pass
+// bought now starts: the end of the last pass that still has units, or now.
+// It runs inside the caller's transaction.
+func startWaitingPasses(ctx context.Context, tx *sql.Tx, userID string, now time.Time) (time.Time, error) {
+	at := ms(now)
+	var running sql.NullInt64
+	if err := tx.QueryRowContext(ctx, `
+		SELECT MAX(expires_at) FROM credit_grants
+		WHERE user_id = ? AND kind = 'pass' AND status = 'active' AND units_remaining > 0
+		  AND starts_at <= ? AND expires_at > ?`, userID, at, at).Scan(&running); err != nil {
+		return time.Time{}, err
+	}
+	cursor := at
+	if running.Valid && running.Int64 > cursor {
+		cursor = running.Int64
+	}
+	rows, err := tx.QueryContext(ctx, `
+		SELECT id, starts_at, expires_at FROM credit_grants
+		WHERE user_id = ? AND kind = 'pass' AND status = 'active' AND units_remaining > 0
+		  AND starts_at > ? AND expires_at IS NOT NULL
+		ORDER BY starts_at, id`, userID, at)
+	if err != nil {
+		return time.Time{}, err
+	}
+	type waiting struct {
+		id              string
+		starts, expires int64
+	}
+	var queue []waiting
+	for rows.Next() {
+		var w waiting
+		if err := rows.Scan(&w.id, &w.starts, &w.expires); err != nil {
+			rows.Close()
+			return time.Time{}, err
+		}
+		queue = append(queue, w)
+	}
+	if err := rows.Close(); err != nil {
+		return time.Time{}, err
+	}
+	if err := rows.Err(); err != nil {
+		return time.Time{}, err
+	}
+	for _, w := range queue {
+		if w.starts > cursor {
+			length := w.expires - w.starts
+			w.starts, w.expires = cursor, cursor+length
+			if _, err := tx.ExecContext(ctx, `
+				UPDATE credit_grants SET starts_at = ?, expires_at = ?, updated_at = ? WHERE id = ?`,
+				w.starts, w.expires, at, w.id); err != nil {
+				return time.Time{}, err
+			}
+		}
+		cursor = max(cursor, w.expires)
+	}
+	return timeFrom(cursor), nil
 }
 
 const grantColumns = `id, user_id, kind, units_total, units_remaining, starts_at, expires_at, status,

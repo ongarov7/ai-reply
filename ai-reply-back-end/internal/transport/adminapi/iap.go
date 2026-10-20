@@ -33,7 +33,7 @@ func (s *Server) iapPayload(r *http.Request) map[string]any {
 	st := s.iap.Status()
 	return map[string]any{
 		"enabled": s.iap.Enabled(r.Context()), "configured": s.iap.AnyConfigured(),
-		"apple": st.Apple, "google": st.Google, "apple_sandbox": st.AppleSandbox,
+		"apple": st.Apple, "google": st.Google, "apple_sandbox": st.AppleSandbox, "google_test": st.GoogleTest,
 		"bundle_id": st.BundleID, "package_name": st.PackageName, "voided_polling": st.VoidedPolling,
 		"available_ios":     s.iap.Available(r.Context(), domain.PlatformIOS),
 		"available_android": s.iap.Available(r.Context(), domain.PlatformAndroid),

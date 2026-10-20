@@ -332,6 +332,9 @@ type IAP struct {
 	GooglePackageName  string
 	GoogleClientEmail  string
 	GooglePrivateKey   string // PEM; "\n" escapes and base64 are turned into a normal key
+	// GoogleAcceptTest — Google Play лицензия тестерлерінің тегін сатып алулары (purchaseType 0) қабылдана ма.
+	// Әдепкі: production-да false, басқа ортада true. Тестер шын кредит алады, әр жауап OpenAI-ға төленеді.
+	GoogleAcceptTest bool
 	// GoogleServiceAccountFile — the JSON file the two values came from ("" — from the variables).
 	GoogleServiceAccountFile string
 	// GoogleVoidedPoll — қайтарылған сатып алуларды қаншалықты жиі сұрау (0 — сұралмайды).
@@ -804,7 +807,9 @@ func iapFromEnv(appEnv string) IAP {
 		GooglePackageName:  str("GOOGLE_PLAY_PACKAGE_NAME", "kz.yerek.aireply"),
 		GoogleClientEmail:  str("GOOGLE_PLAY_CLIENT_EMAIL", ""),
 		GooglePrivateKey:   PEM(str("GOOGLE_PLAY_PRIVATE_KEY", "")),
-		GoogleVoidedPoll:   time.Hour,
+		// License testers pay nothing: production refuses their purchases unless the owner says so.
+		GoogleAcceptTest: boolean("GOOGLE_PLAY_ACCEPT_TEST", appEnv != "production"),
+		GoogleVoidedPoll: time.Hour,
 	}
 	switch raw := strings.ToLower(str("IAP_GOOGLE_VOIDED_POLL", "")); raw {
 	case "":

@@ -507,6 +507,65 @@ func TestRefundNotificationRevokesWhatIsLeft(t *testing.T) {
 	}
 }
 
+// Қосымша жібермей тұрып келген қайтару болдырылмаса, иесіз белгі өшеді: транзакция сатып алушыға беріледі.
+func TestReversedEarlyRefundLetsThePurchaseThrough(t *testing.T) {
+	h := newHarness(t, withIAP(t))
+	h.openIAP()
+	s := h.signIn("iap-early-refund@example.com")
+	other := h.signIn("iap-early-refund-other@example.com")
+	signed := h.appleTx(s.userID, "2000000000000700", packApple, nil)
+	refunded := h.appleTx(s.userID, "2000000000000700", packApple, func(tx *appstoretest.Transaction) {
+		tx.RevocationDate = h.clock.Now().UnixMilli()
+	})
+
+	mustStatus(t, h.appleNotification("REFUND", "6b8f2d3e-0000-4000-8000-000000000700", refunded), http.StatusOK, "")
+	if h.scalar(`SELECT COUNT(*) FROM iap_purchases WHERE transaction_id = '2000000000000700' AND user_id IS NULL
+		AND status = 'refunded'`) != 1 {
+		t.Fatal("no placeholder for the early refund")
+	}
+	mustStatus(t, h.appleNotification("REFUND_REVERSED", "6b8f2d3e-0000-4000-8000-000000000701", signed), http.StatusOK, "")
+	if h.scalar(`SELECT COUNT(*) FROM iap_purchases WHERE transaction_id = '2000000000000700'`) != 0 ||
+		h.text(`SELECT outcome FROM iap_notifications WHERE notification_id = '6b8f2d3e-0000-4000-8000-000000000701'`) != "cleared" {
+		t.Fatal("the reversed refund left its placeholder")
+	}
+
+	// Still bound to the buyer: another account's post is refused and changes nothing.
+	if stolen := h.postApple(other.access, signed); stolen.status != http.StatusBadRequest ||
+		stolen.str("error", "details", "reason") != "account_mismatch" {
+		t.Fatalf("another account: %s", stolen.raw)
+	}
+	res := h.postApple(s.access, signed)
+	if res.status != http.StatusOK || res.str("status") != "granted" || res.num("usage", "credits") != 50 {
+		t.Fatalf("post after the reversal: %d %s", res.status, res.raw)
+	}
+	if h.creditsLeft(other.access) != 0 {
+		t.Fatal("credits moved to another account")
+	}
+
+	// A reversal for a transaction nobody has seen at all changes nothing.
+	mustStatus(t, h.appleNotification("REFUND_REVERSED", "6b8f2d3e-0000-4000-8000-000000000702",
+		h.appleTx(s.userID, "2000000000000701", packApple, nil)), http.StatusOK, "")
+	if h.text(`SELECT outcome FROM iap_notifications WHERE notification_id = '6b8f2d3e-0000-4000-8000-000000000702'`) != "unchanged" ||
+		h.scalar(`SELECT COUNT(*) FROM iap_purchases WHERE transaction_id = '2000000000000701'`) != 0 {
+		t.Fatal("a reversal of an unknown transaction wrote something")
+	}
+
+	// The purchase of a deleted account is a financial record, not a placeholder: it stays.
+	gone := h.signIn("iap-early-refund-gone@example.com")
+	goneTx := h.appleTx(gone.userID, "2000000000000702", packApple, nil)
+	mustStatus(t, h.postApple(gone.access, goneTx), http.StatusOK, "")
+	mustStatus(t, h.do(http.MethodDelete, "/api/v1/me", nil, h.auth(gone.access)), http.StatusOK, "")
+	mustStatus(t, h.appleNotification("REFUND", "6b8f2d3e-0000-4000-8000-000000000703",
+		h.appleTx(gone.userID, "2000000000000702", packApple, func(tx *appstoretest.Transaction) {
+			tx.RevocationDate = h.clock.Now().UnixMilli()
+		})), http.StatusOK, "")
+	mustStatus(t, h.appleNotification("REFUND_REVERSED", "6b8f2d3e-0000-4000-8000-000000000704", goneTx), http.StatusOK, "")
+	if h.scalar(`SELECT COUNT(*) FROM iap_purchases WHERE transaction_id = '2000000000000702' AND user_id IS NULL
+		AND units = 50`) != 1 {
+		t.Fatal("the purchase of a deleted account was removed")
+	}
+}
+
 // Pass: екіншісі біріншісі біткенде басталады, әрқайсысы өз мерзімінде бітеді.
 func TestPassesStackAndExpire(t *testing.T) {
 	h := newHarness(t, withIAP(t))
@@ -544,6 +603,99 @@ func TestPassesStackAndExpire(t *testing.T) {
 	usage = h.do(http.MethodGet, "/api/v1/me/usage", nil, h.auth(s.access))
 	if usage.body["pass"] != nil {
 		t.Fatalf("a pass outlived its time: %s", usage.raw)
+	}
+}
+
+// Бірлігі біткен pass келесісін ұстамайды: кейін сатып алынғаны да, кезектегісі де бірден басталады.
+func TestUsedUpPassDoesNotHoldTheNextOne(t *testing.T) {
+	h := newHarness(t, withIAP(t))
+	admin := h.signInAdmin()
+	h.createProduct(admin, map[string]any{"code": "pass_2", "kind": "pass", "units": 2, "duration_hours": 24,
+		"apple_product_id": "kz.aireply.pass2", "is_active": true})
+	mustStatus(t, h.adminCall(admin, http.MethodPost, "/settings/iap", map[string]any{"enabled": true}), http.StatusOK, "")
+	loc := h.cfg.App.Location()
+	buy := func(s session, transactionID string) response {
+		t.Helper()
+		res := h.postApple(s.access, h.appleTx(s.userID, transactionID, "kz.aireply.pass2",
+			func(tx *appstoretest.Transaction) { tx.Type = "Non-Renewing Subscription" }))
+		if res.status != http.StatusOK || res.str("status") != "granted" {
+			t.Fatalf("buy %s: %d %s", transactionID, res.status, res.raw)
+		}
+		return res
+	}
+	useUp := func(s session) {
+		t.Helper()
+		for i := 0; i < 2; i++ {
+			if res := h.generate(s.access, "Pass бірлігі "+strconv.Itoa(i)); res.str("usage", "bucket") != "pass" {
+				t.Fatalf("generation %d: %s", i, res.raw)
+			}
+		}
+	}
+	passStarts := func(transactionID string) int64 {
+		t.Helper()
+		return int64(h.scalar(`SELECT g.starts_at FROM credit_grants g JOIN iap_purchases p ON p.id = g.iap_purchase_id
+			WHERE p.transaction_id = ?`, transactionID))
+	}
+
+	// The exhausted sheet offers to buy: the new pass starts now, not when the used-up one ends.
+	s := h.signIn("iap-pass-used-up@example.com")
+	buy(s, "2000000000000600")
+	h.useQuota(s.userID, 7)
+	useUp(s)
+	h.clock.Advance(5 * time.Minute)
+	if details := h.limitDetails(s.access); details["pass_active"] != true || details["can_buy"] != true {
+		t.Fatalf("limit details with a used-up pass: %v", details)
+	}
+	again := buy(s, "2000000000000601")
+	if again.num("usage", "pass", "remaining") != 2 ||
+		again.str("usage", "pass", "expires_at") != h.clock.Now().Add(24*time.Hour).In(loc).Format(time.RFC3339) {
+		t.Fatalf("a pass bought after the last one was used up: %s", again.raw)
+	}
+	if res := h.generate(s.access, "Жаңа pass"); res.status != http.StatusOK || res.str("usage", "bucket") != "pass" {
+		t.Fatalf("generation right after the purchase: %d %s", res.status, res.raw)
+	}
+
+	// A pass waiting behind another one starts as soon as that one is used up.
+	q := h.signIn("iap-pass-queued@example.com")
+	buy(q, "2000000000000602")
+	buy(q, "2000000000000603")
+	if passStarts("2000000000000603") != h.clock.Now().Add(24*time.Hour).UnixMilli() {
+		t.Fatal("the second pass does not wait for the first one")
+	}
+	h.useQuota(q.userID, 7)
+	h.clock.Advance(5 * time.Minute)
+	useUp(q)
+	if passStarts("2000000000000603") != h.clock.Now().UnixMilli() {
+		t.Fatal("the waiting pass did not start when the first one was used up")
+	}
+	usage := h.do(http.MethodGet, "/api/v1/me/usage", nil, h.auth(q.access))
+	if usage.num("pass", "remaining") != 2 || usage.str("pass", "expires_at") != h.clock.Now().Add(24*time.Hour).In(loc).Format(time.RFC3339) {
+		t.Fatalf("usage after the first pass was used up: %s", usage.raw)
+	}
+	if res := h.generate(q.access, "Кезектегі pass"); res.status != http.StatusOK || res.str("usage", "bucket") != "pass" {
+		t.Fatalf("generation from the waiting pass: %d %s", res.status, res.raw)
+	}
+
+	// A refund of the running pass and an administrator's revocation free the one behind it too.
+	r := h.signIn("iap-pass-refunded@example.com")
+	buy(r, "2000000000000604")
+	buy(r, "2000000000000605")
+	h.clock.Advance(5 * time.Minute)
+	refunded := h.appleTx(r.userID, "2000000000000604", "kz.aireply.pass2", func(tx *appstoretest.Transaction) {
+		tx.Type, tx.RevocationDate = "Non-Renewing Subscription", h.clock.Now().UnixMilli()
+	})
+	mustStatus(t, h.appleNotification("REFUND", "6b8f2d3e-0000-4000-8000-000000000600", refunded), http.StatusOK, "")
+	if passStarts("2000000000000605") != h.clock.Now().UnixMilli() {
+		t.Fatal("the waiting pass did not start when the first one was refunded")
+	}
+	buy(r, "2000000000000606")
+	h.clock.Advance(5 * time.Minute)
+	grantID := h.text(`SELECT g.id FROM credit_grants g JOIN iap_purchases p ON p.id = g.iap_purchase_id
+		WHERE p.transaction_id = '2000000000000605'`)
+	mustStatus(t, h.adminCall(admin, http.MethodPost, "/users/"+r.userID+"/credits/"+grantID+"/revoke",
+		map[string]any{"reason": "Тест"}), http.StatusOK, "")
+	if passStarts("2000000000000606") != h.clock.Now().UnixMilli() {
+		t.Fatal("the waiting pass did not start when the running one was revoked")
 	}
 }
 
@@ -672,6 +824,9 @@ func TestGooglePurchasesThatDoNotVerifyGrantNothing(t *testing.T) {
 		return token
 	}
 	rewarded := 2
+	// A cheap pack's token posted under the pass's product id: Google names the pack.
+	otherProduct := playToken(18)
+	h.playPurchase(s.userID, passGoogle, otherProduct, func(p *googleplay.ProductPurchase) { p.ProductID = packGoogle })
 	for _, tc := range []struct {
 		name, product, token, reason string
 	}{
@@ -683,6 +838,7 @@ func TestGooglePurchasesThatDoNotVerifyGrantNothing(t *testing.T) {
 		{"rewarded", packGoogle, put(13, func(p *googleplay.ProductPurchase) { p.PurchaseType = &rewarded }), "unsupported_type"},
 		{"unknown token", packGoogle, playToken(14), "not_found"},
 		{"unknown product", "pack_999", put(15, nil), "product_unknown"},
+		{"another product's token", passGoogle, otherProduct, "product_unknown"},
 		{"malformed token", packGoogle, "bad token!", "malformed"},
 	} {
 		res := h.postGoogle(s.access, tc.product, tc.token)
@@ -744,6 +900,71 @@ func TestGoogleConsumeIsRetriedByTheWorker(t *testing.T) {
 	}
 	if h.dbContains(token) {
 		t.Fatal("the raw token reached the database")
+	}
+}
+
+// Ұзақ pending болған сатып алу: тұтынуды қайталау мерзімі берілген сәттен басталады, алғаш көрген сәттен емес.
+func TestGoogleConsumeRetryCountsFromTheGrant(t *testing.T) {
+	h := newHarness(t, withIAP(t))
+	h.openIAP()
+	s := h.signIn("iap-consume-late@example.com")
+	token := playToken(21)
+	h.playPurchase(s.userID, packGoogle, token, func(p *googleplay.ProductPurchase) { p.PurchaseState = googleplay.StatePending })
+	mustStatus(t, h.postGoogle(s.access, packGoogle, token), http.StatusAccepted, "")
+
+	h.clock.Advance(5 * 24 * time.Hour)
+	s = h.refresh(s)
+	h.play.Update(packGoogle, token, func(p *googleplay.ProductPurchase) { p.PurchaseState = googleplay.StatePurchased })
+	h.play.FailConsumes(1)
+	if res := h.postGoogle(s.access, packGoogle, token); res.status != http.StatusOK || res.str("status") != "granted" {
+		t.Fatalf("paid after five days: %d %s", res.status, res.raw)
+	}
+
+	h.iap.Tick(context.Background()) // just granted: the request itself just tried
+	if h.play.ConsumeCalls.Load() != 1 || h.text(`SELECT purchase_token_sealed FROM iap_purchases WHERE transaction_id = ?`,
+		sha256Hex(token)) == "" {
+		t.Fatalf("the worker gave up on a fresh grant: %d consume calls", h.play.ConsumeCalls.Load())
+	}
+	h.clock.Advance(2 * time.Minute)
+	h.iap.Tick(context.Background())
+	if h.play.Purchase(packGoogle, token).ConsumptionState != googleplay.Consumed ||
+		h.scalar(`SELECT COUNT(*) FROM iap_purchases WHERE transaction_id = ? AND consumed_at IS NOT NULL
+			AND purchase_token_sealed IS NULL`, sha256Hex(token)) != 1 {
+		t.Fatal("the worker did not consume a purchase granted after a long pending")
+	}
+}
+
+// Google лицензия тестерінің сатып алуы тек GOOGLE_PLAY_ACCEPT_TEST қосулы серверде беріледі.
+func TestGoogleTestPurchasesNeedTheSwitch(t *testing.T) {
+	h := newHarness(t, withIAP(t), withEnv("GOOGLE_PLAY_ACCEPT_TEST", "false"))
+	admin := h.openIAP()
+	s := h.signIn("iap-google-test@example.com")
+	test, pending, promo := playToken(50), playToken(51), playToken(52)
+	h.playPurchase(s.userID, packGoogle, test, func(p *googleplay.ProductPurchase) { p.PurchaseType = new(int) })
+	h.playPurchase(s.userID, packGoogle, pending, func(p *googleplay.ProductPurchase) {
+		p.PurchaseType, p.PurchaseState = new(int), googleplay.StatePending
+	})
+	promoType := googleplay.TypePromo
+	h.playPurchase(s.userID, packGoogle, promo, func(p *googleplay.ProductPurchase) { p.PurchaseType = &promoType })
+
+	for name, token := range map[string]string{"test": test, "pending test": pending} {
+		res := h.postGoogle(s.access, packGoogle, token)
+		if res.status != http.StatusBadRequest || res.errorCode() != "PURCHASE_INVALID" ||
+			res.str("error", "details", "reason") != "environment" {
+			t.Errorf("%s: %d %s", name, res.status, res.raw)
+		}
+	}
+	if h.scalar(`SELECT COUNT(*) FROM iap_purchases`)+h.scalar(`SELECT COUNT(*) FROM credit_grants`) != 0 ||
+		h.play.ConsumeCalls.Load() != 0 {
+		t.Fatal("a refused test purchase was recorded or consumed")
+	}
+	if res := h.postGoogle(s.access, packGoogle, promo); res.status != http.StatusOK || res.str("status") != "granted" ||
+		h.text(`SELECT environment FROM iap_purchases WHERE transaction_id = ?`, sha256Hex(promo)) != "Promo" {
+		t.Fatalf("a promo code purchase: %d %s", res.status, res.raw)
+	}
+	status := h.adminCall(admin, http.MethodGet, "/iap/products", nil)
+	if iap, _ := status.body["iap"].(map[string]any); iap["google_test"] != false || iap["apple_sandbox"] != true {
+		t.Fatalf("iap status %v", status.body["iap"])
 	}
 }
 
@@ -864,6 +1085,7 @@ func TestAdminManagesIAPProductsWithAudit(t *testing.T) {
 		t.Fatalf("row %v", row)
 	}
 	if iap, _ := list.body["iap"].(map[string]any); iap["apple"] != true || iap["google"] != true ||
+		iap["apple_sandbox"] != true || iap["google_test"] != true ||
 		iap["notification_url"] != h.cfg.App.PublicBaseURL+"/api/v1/iap/apple/notifications" {
 		t.Fatalf("iap status %v", list.body["iap"])
 	}

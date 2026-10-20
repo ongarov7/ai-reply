@@ -108,6 +108,7 @@ func appleRevokeReason(kind string, tx appstore.Transaction) string {
 const (
 	OutcomeRevoked    = "revoked"
 	OutcomeRestored   = "restored"
+	OutcomeCleared    = "cleared" // REFUND_REVERSED of a transaction the app had not posted: its tombstone is gone
 	OutcomeLogged     = "logged"
 	OutcomeIgnored    = "ignored"
 	OutcomeUnknown    = "unknown_transaction"
@@ -122,8 +123,9 @@ const (
 // verify is refused. After verification the answer is always a success
 // (Apple stops retrying), and a notification UUID is processed once.
 // REFUND / REVOKE revoke what is left of the purchase, REFUND_REVERSED gives
-// it back, TEST and CONSUMPTION_REQUEST are logged (no App Store Server API
-// call is made). The outcome is returned for the log.
+// it back (or removes the tombstone an early REFUND left, so the app's post
+// is granted), TEST and CONSUMPTION_REQUEST are logged (no App Store Server
+// API call is made). The outcome is returned for the log.
 func (s *Service) HandleAppleNotification(ctx context.Context, signedPayload string) (string, error) {
 	if s.apple == nil {
 		return "", domain.ErrIAPUnavailable
@@ -178,15 +180,20 @@ func (s *Service) appleNotification(ctx context.Context, n appstore.Notification
 	}
 	now := s.clock.Now()
 	if n.NotificationType == appstore.NotificationRefundReversed {
-		restored, units, err := s.repo.RestorePurchase(ctx, domain.ProviderAppStore, tx.TransactionID, now)
+		res, err := s.repo.RestorePurchase(ctx, domain.ProviderAppStore, tx.TransactionID, now)
 		if err != nil {
 			return "", "", err
 		}
-		if !restored {
+		switch {
+		case res.Cleared:
+			s.log.Info("iap refund reversed before the transaction was posted", "provider", domain.ProviderAppStore,
+				"transaction_id", tx.TransactionID)
+			return OutcomeCleared, tx.TransactionID, nil
+		case !res.Restored:
 			return OutcomeUnchanged, tx.TransactionID, nil
 		}
 		s.log.Info("iap refund reversed", "provider", domain.ProviderAppStore, "transaction_id", tx.TransactionID,
-			"units_restored", units)
+			"units_restored", res.Units)
 		return OutcomeRestored, tx.TransactionID, nil
 	}
 

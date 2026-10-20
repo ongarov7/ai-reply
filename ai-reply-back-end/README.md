@@ -239,9 +239,11 @@ iOS — StoreKit 2 (consumable и non-renewing subscription), Android — Google
   Ключ App Store Server API не нужен. Возвраты приходят как App Store Server Notifications V2.
 - **Google.** `purchases.products.get` через сервисный аккаунт (тот же JWT → OAuth, что у
   FCM, `internal/googleauth`); `obfuscatedExternalAccountId` должен быть токеном аккаунта.
+  `productId` в ответе Google должен совпасть с присланным `product_id`.
   Сначала начисление, потом сервер потребляет покупку (consume); неудачное потребление
-  повторяет фоновая задача каждые 15 минут — неподтверждённую покупку Google сам вернёт
-  через 3 дня. Возвраты — опрос `voidedpurchases` (`IAP_GOOGLE_VOIDED_POLL`, по умолчанию раз в час).
+  повторяет фоновая задача каждые 15 минут, считая от начисления (pending — от оплаты), —
+  неподтверждённую покупку Google сам вернёт через 3 дня. Возвраты — опрос `voidedpurchases`
+  (`IAP_GOOGLE_VOIDED_POLL`, по умолчанию раз в час).
 - **Привязка к аккаунту.** `GET /api/v1/iap/products` отдаёт `account_token` — UUID из
   HMAC id аккаунта (ключ выводится из `JWT_ACCESS_SECRET`). iOS передаёт его в
   `appAccountToken`, Android — в `setObfuscatedAccountId`. Чужую транзакцию нельзя
@@ -250,17 +252,22 @@ iOS — StoreKit 2 (consumable и non-renewing subscription), Android — Google
   покупки, сделанные до смены и не отправленные на сервер, будут отклонены.
 - **Возвраты.** Отзывается то, что осталось от покупки; потраченное остаётся потраченным,
   баланс не уходит в минус. Возврат по транзакции, которую сервер ещё не видел, записывается
-  заранее — потом её не начислить. `REFUND_REVERSED` возвращает снятое.
+  заранее — потом её не начислить. `REFUND_REVERSED` возвращает снятое, а заранее записанный
+  возврат снимает: такая транзакция потом начисляется своему аккаунту.
+- **Пропуск.** Купленный во время другого начинается, когда тот закончится; пропуск без
+  оставшихся ответов не держит ни новый, ни ждущий в очереди — они начинаются сразу.
 - **Sandbox.** TestFlight и App Review покупают в Sandbox на production-сервере. В production
   Sandbox принимается только при `APPLE_IAP_ACCEPT_SANDBOX=true` (без него — предупреждение
   при старте); такие покупки записываются с `environment = Sandbox` и в выручку админки не
-  входят, как и тестовые покупки Google (`Test`).
+  входят, как и тестовые покупки Google (`Test`). Лицензионные тестеры Google платят ноль, а
+  ответы получают настоящие, поэтому в production их покупки принимаются только при
+  `GOOGLE_PLAY_ACCEPT_TEST=true` (иначе `PURCHASE_INVALID`, `environment`).
 - **Удаление аккаунта.** Запись о покупке остаётся (финансовая запись) с `user_id = NULL`;
   начисление и журнал удаляются вместе с аккаунтом.
 
 Переменные: `APPLE_IAP_ENABLED`, `APPLE_IAP_BUNDLE_ID` (по умолчанию
 `kz.ai-reply.reply.keyboard.keyboard`), `APPLE_IAP_ACCEPT_SANDBOX`, `GOOGLE_PLAY_PACKAGE_NAME`
-(по умолчанию `kz.yerek.aireply`), `GOOGLE_PLAY_SERVICE_ACCOUNT_FILE` или вместе
+(по умолчанию `kz.yerek.aireply`), `GOOGLE_PLAY_ACCEPT_TEST`, `GOOGLE_PLAY_SERVICE_ACCOUNT_FILE` или вместе
 `GOOGLE_PLAY_CLIENT_EMAIL` + `GOOGLE_PLAY_PRIVATE_KEY`, `IAP_GOOGLE_VOIDED_POLL`,
 `RATE_IAP_PER_MINUTE`. Половина ключа Google — сервер не стартует.
 
@@ -281,7 +288,8 @@ iOS — StoreKit 2 (consumable и non-renewing subscription), Android — Google
    заказами и подписками». Можно тот же аккаунт, что для Firebase. Лицензионные тестеры —
    Play Console ▸ Настройки ▸ Тестирование лицензий.
 5. `.env`: `APPLE_IAP_ENABLED=true`, Google-ключ, `APPLE_IAP_ACCEPT_SANDBOX=true` на время
-   ревью; `-check` покажет, что подключено.
+   ревью, `GOOGLE_PLAY_ACCEPT_TEST=true` на время проверки лицензионными тестерами; `-check`
+   покажет, что подключено.
 6. Админка ▸ «Покупки»: создать товары (количество ответов, для пропуска — часы, Product ID,
    названия на 4 языках, «Продаётся»), затем «Настройки» ▸ «Покупки в приложении» ▸ включить.
 
@@ -451,7 +459,8 @@ make secrets     # сгенерировать JWT/legacy секреты
 `TRANSCRIBE_ENABLED=true`, `OPENAI_TRANSCRIBE_MODEL=gpt-transcribe`, `RATE_TRANSCRIBE_PER_MINUTE=10`,
 `LIMIT_TRANSCRIBE_PER_DAY=100` (ключ тот же `OPENAI_API_KEY`); покупки в приложении —
 `APPLE_IAP_ENABLED=false`, `APPLE_IAP_BUNDLE_ID`, `APPLE_IAP_ACCEPT_SANDBOX` (пусто — `false` в
-production), `GOOGLE_PLAY_PACKAGE_NAME`, `GOOGLE_PLAY_SERVICE_ACCOUNT_FILE` /
+production), `GOOGLE_PLAY_PACKAGE_NAME`, `GOOGLE_PLAY_ACCEPT_TEST` (пусто — `false` в production),
+`GOOGLE_PLAY_SERVICE_ACCOUNT_FILE` /
 `GOOGLE_PLAY_CLIENT_EMAIL` / `GOOGLE_PLAY_PRIVATE_KEY` (пусто — Google выключен; половина
 ключа или файл вместе с переменными — отказ при старте), `IAP_GOOGLE_VOIDED_POLL=1h`
 (15m…24h или `off`), `RATE_IAP_PER_MINUTE=20`.

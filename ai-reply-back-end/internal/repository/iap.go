@@ -223,11 +223,13 @@ type GrantResult struct {
 // the existing row: granted again → GrantResult.Granted false; bound to
 // another account (or to a deleted one) → ErrPurchaseOwnedElsewhere; already
 // refunded or revoked → PurchaseInvalid(revoked); a pending row of this
-// account is completed here. A pack never expires. A pass starts now or when
-// the account's latest active pass ends, whichever is later, and lasts
-// Duration. The grant and its ledger entry are written in the same
-// transaction, so a purchase can never be recorded without its units or
-// granted twice.
+// account is completed here, and its created_at becomes the grant time, so
+// the consume retry counts from the grant (UnconsumedPurchases). A pack never
+// expires. A pass starts now or when the account's latest pass that still has
+// units ends, whichever is later, and lasts Duration: a pass that is used up
+// never holds a new one back (startWaitingPasses). The grant and its ledger
+// entry are written in the same transaction, so a purchase can never be
+// recorded without its units or granted twice.
 func (s *Store) GrantPurchase(ctx context.Context, in PurchaseGrant) (GrantResult, error) {
 	var out GrantResult
 	p := in.Purchase
@@ -264,13 +266,15 @@ func (s *Store) GrantPurchase(ctx context.Context, in PurchaseGrant) (GrantResul
 				out.Purchase = existing
 				return nil
 			}
-			// A pending purchase of this account was paid: it is granted now.
+			// A pending purchase of this account was paid: it is granted now, and
+			// from now on (created_at) the consume retry measures its grace and give-up.
 			if _, err := tx.ExecContext(ctx, `
 				UPDATE iap_purchases SET status = ?, environment = ?, store_product_id = ?, product_code = ?,
-				       order_id = ?, quantity = ?, units = ?, purchase_token_sealed = ?, purchased_at = ?, updated_at = ?
+				       order_id = ?, quantity = ?, units = ?, purchase_token_sealed = ?, purchased_at = ?,
+				       created_at = ?, updated_at = ?
 				WHERE id = ? AND status = ?`,
 				domain.PurchaseGranted, p.Environment, p.StoreProductID, p.ProductCode, p.OrderID, p.Quantity, p.Units,
-				nullText(in.SealedToken), msPtr(p.PurchasedAt), now, existing.ID, domain.PurchasePending); err != nil {
+				nullText(in.SealedToken), msPtr(p.PurchasedAt), now, now, existing.ID, domain.PurchasePending); err != nil {
 				return err
 			}
 			id = existing.ID
@@ -279,15 +283,8 @@ func (s *Store) GrantPurchase(ctx context.Context, in PurchaseGrant) (GrantResul
 		starts := in.Now
 		var expires *time.Time
 		if in.Kind == domain.GrantPass {
-			var latest sql.NullInt64
-			if err := tx.QueryRowContext(ctx, `
-				SELECT MAX(expires_at) FROM credit_grants
-				WHERE user_id = ? AND kind = 'pass' AND status = 'active' AND expires_at > ?`,
-				p.UserID, now).Scan(&latest); err != nil {
+			if starts, err = startWaitingPasses(ctx, tx, p.UserID, in.Now); err != nil {
 				return err
-			}
-			if latest.Valid && latest.Int64 > now {
-				starts = timeFrom(latest.Int64)
 			}
 			end := starts.Add(in.Duration)
 			expires = &end
@@ -460,6 +457,11 @@ func (s *Store) RevokePurchase(ctx context.Context, in PurchaseRevocation) (Revo
 			return err
 		}
 		out.UnitsRemoved = max(remaining, 0)
+		if kind == domain.GrantPass {
+			if _, err := startWaitingPasses(ctx, tx, userID, in.Now); err != nil {
+				return err
+			}
+		}
 		return insertLedger(ctx, tx, domain.LedgerEntry{UserID: userID, GrantID: grantID, Entry: domain.LedgerRevoke,
 			Kind: kind, Delta: -out.UnitsRemoved, Actor: "system", Reason: in.Reason, CreatedAt: in.Now}, "")
 	})
@@ -469,13 +471,26 @@ func (s *Store) RevokePurchase(ctx context.Context, in PurchaseRevocation) (Revo
 	return out, nil
 }
 
+// RestoreResult — REFUND_REVERSED нәтижесі.
+type RestoreResult struct {
+	// Restored — транзакция қайта granted болды.
+	Restored bool
+	// Units — кредитке қайтарылғаны.
+	Units int
+	// Cleared — ерте келген қайтарудың иесіз белгісі өшірілді: қосымша жібергенде транзакция беріледі.
+	Cleared bool
+}
+
 // RestorePurchase — дүкен қайтаруды болдырмады (REFUND_REVERSED): транзакция қайта granted.
 //
 // The grant gets back what the store revocation took from it, when the
 // store (not an administrator) revoked it. A pass whose time is over stays
-// over. false: nothing to restore.
-func (s *Store) RestorePurchase(ctx context.Context, provider, transactionID string, now time.Time) (bool, int, error) {
-	restored, units := false, 0
+// over. A refund that came before the app posted the transaction left a
+// tombstone (no account, nothing granted, RevokePurchase): it is removed, so
+// the app's post grants the transaction normally, still only to the account
+// its appAccountToken names. A deleted account's purchase stays as it is.
+func (s *Store) RestorePurchase(ctx context.Context, provider, transactionID string, now time.Time) (RestoreResult, error) {
+	var out RestoreResult
 	at := ms(now)
 	err := s.db.Tx(ctx, func(tx *sql.Tx) error {
 		existing, err := purchaseInTx(ctx, tx, provider, transactionID)
@@ -488,15 +503,26 @@ func (s *Store) RestorePurchase(ctx context.Context, provider, transactionID str
 		if existing.Status != domain.PurchaseRefunded && existing.Status != domain.PurchaseRevoked {
 			return nil
 		}
+		if existing.UserID == "" && existing.Units == 0 {
+			res, err := tx.ExecContext(ctx, `
+				DELETE FROM iap_purchases WHERE id = ? AND user_id IS NULL AND units = 0
+				  AND NOT EXISTS (SELECT 1 FROM credit_grants WHERE iap_purchase_id = iap_purchases.id)`, existing.ID)
+			if err != nil {
+				return err
+			}
+			n, err := res.RowsAffected()
+			out.Cleared = n == 1
+			return err
+		}
 		if existing.UserID == "" || existing.Units == 0 {
-			return nil // a tombstone or a deleted account: nothing to give back to
+			return nil // a deleted account: nothing to give back to
 		}
 		if _, err := tx.ExecContext(ctx, `
 			UPDATE iap_purchases SET status = 'granted', revoked_at = NULL, revoke_reason = '', updated_at = ? WHERE id = ?`,
 			at, existing.ID); err != nil {
 			return err
 		}
-		restored = true
+		out.Restored = true
 		var (
 			grantID, kind, revokedBy, userID string
 			total                            int
@@ -519,17 +545,20 @@ func (s *Store) RestorePurchase(ctx context.Context, provider, transactionID str
 			ORDER BY created_at DESC, rowid DESC LIMIT 1`, grantID).Scan(&taken); err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
-		units = min(max(int(-taken.Int64), 0), total)
+		out.Units = min(max(int(-taken.Int64), 0), total)
 		if _, err := tx.ExecContext(ctx, `
 			UPDATE credit_grants SET status = 'active', units_remaining = ?, revoked_at = NULL, revoked_by = '',
 			       revoke_reason = '', updated_at = ?
-			WHERE id = ?`, units, at, grantID); err != nil {
+			WHERE id = ?`, out.Units, at, grantID); err != nil {
 			return err
 		}
 		return insertLedger(ctx, tx, domain.LedgerEntry{UserID: userID, GrantID: grantID, Entry: domain.LedgerGrant,
-			Kind: kind, Delta: units, Actor: "system", Reason: "refund_reversed", CreatedAt: now}, "")
+			Kind: kind, Delta: out.Units, Actor: "system", Reason: "refund_reversed", CreatedAt: now}, "")
 	})
-	return restored, units, err
+	if err != nil {
+		return RestoreResult{}, err
+	}
+	return out, nil
 }
 
 // UnconsumedPurchase — сервер әлі тұтынбаған Google сатып алуы (қайталау үшін).
@@ -538,10 +567,15 @@ type UnconsumedPurchase struct {
 	StoreProductID string
 	TransactionID  string
 	SealedToken    string
-	CreatedAt      time.Time
+	// GrantedAt — қашан берілді (created_at: pending жол төленгенде жаңарады).
+	GrantedAt time.Time
 }
 
-// UnconsumedPurchases — берілген, бірақ тұтынылмаған сатып алулар (ескісі бірінші).
+// UnconsumedPurchases — before-тан бұрын берілген, бірақ тұтынылмаған сатып алулар (ескісі бірінші).
+//
+// created_at of a granted row is its grant time: GrantPurchase writes it
+// when a pending row is paid, so a purchase that stayed pending for days is
+// not mistaken for one the store has already refunded.
 func (s *Store) UnconsumedPurchases(ctx context.Context, provider string, before time.Time, limit int) ([]UnconsumedPurchase, error) {
 	rows, err := s.db.Reader().QueryContext(ctx, `
 		SELECT id, store_product_id, transaction_id, COALESCE(purchase_token_sealed, ''), created_at FROM iap_purchases
@@ -561,7 +595,7 @@ func (s *Store) UnconsumedPurchases(ctx context.Context, provider string, before
 		if err := rows.Scan(&u.ID, &u.StoreProductID, &u.TransactionID, &u.SealedToken, &created); err != nil {
 			return nil, err
 		}
-		u.CreatedAt = timeFrom(created)
+		u.GrantedAt = timeFrom(created)
 		out = append(out, u)
 	}
 	return out, rows.Err()

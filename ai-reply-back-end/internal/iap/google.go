@@ -13,9 +13,10 @@ import (
 
 // Google Play жұмысшысының шектері.
 const (
-	// consumeGrace — сұраныс өзі тұтынып үлгерсін: жұмысшы бұдан жаңа жолды алмайды.
+	// consumeGrace — сұраныс өзі тұтынып үлгерсін: жұмысшы бұдан жаңа берілгенді алмайды.
 	consumeGrace = time.Minute
 	// consumeGiveUp — Google тұтынылмаған сатып алуды 3 күннен кейін қайтарады; одан кейін қайталау мағынасыз.
+	// Both count from the grant, not from when a pending purchase was first seen.
 	consumeGiveUp = 4 * 24 * time.Hour
 	consumeBatch  = 50
 	// voidedWindow — Google қайтарылғандарды 30 күн сақтайды; voidedOverlap — әр сұраудың артқа қарауы.
@@ -35,9 +36,12 @@ func (s *Service) playUnavailable(err error, userID string) error {
 // VerifyGoogle — Play Billing сатып алуы: purchases.products.get, береді, содан кейін тұтынады.
 //
 // Rules: the token and product id are well-formed, the product is one an
-// administrator configured, Google knows the purchase, its
-// obfuscatedExternalAccountId is this account's token, it is purchased
-// (state 0; pending gives 202 and a pending row bound to the account) and not
+// administrator configured, Google knows the purchase and names the same
+// product (the product id comes from the client, so a token of a cheaper
+// product posted under a dearer id is refused even if Google answered), its
+// obfuscatedExternalAccountId is this account's token, a license tester's
+// purchase only where GOOGLE_PLAY_ACCEPT_TEST is on, it is purchased (state
+// 0; pending gives 202 and a pending row bound to the account) and not
 // consumed by someone else. The grant comes first and the consume second: a
 // failed consume never loses a paid purchase, the worker retries it.
 func (s *Service) VerifyGoogle(ctx context.Context, user domain.User, productID, token string) (Result, error) {
@@ -65,15 +69,22 @@ func (s *Service) VerifyGoogle(ctx context.Context, user domain.User, productID,
 	case err != nil:
 		return Result{}, s.playUnavailable(err, user.ID)
 	}
+	if p.ProductID != "" && p.ProductID != productID {
+		return refuse(domain.PurchaseReasonProduct)
+	}
 	if p.ObfuscatedExternalAccountID == "" || p.ObfuscatedExternalAccountID != s.AccountToken(user.ID) {
 		return refuse(domain.PurchaseReasonAccount)
 	}
 	if p.PurchaseType != nil && *p.PurchaseType == googleplay.TypeRewarded {
 		return refuse(domain.PurchaseReasonPurchaseType)
 	}
+	environment := googleEnvironment(p)
+	if environment == domain.EnvironmentTest && !s.cfg.GoogleAcceptTest {
+		return refuse(domain.PurchaseReasonEnvironment)
+	}
 	txn := tokenHash(token)
 	record := domain.IAPPurchase{
-		UserID: user.ID, Provider: domain.ProviderGooglePlay, Environment: googleEnvironment(p),
+		UserID: user.ID, Provider: domain.ProviderGooglePlay, Environment: environment,
 		StoreProductID: productID, ProductCode: product.Code, TransactionID: txn, OrderID: p.OrderID,
 		Quantity: p.Units(), PurchasedAt: p.PurchasedAt(),
 	}
@@ -183,7 +194,7 @@ func (s *Service) RetryConsumes(ctx context.Context) (int, error) {
 		if ctx.Err() != nil {
 			return consumed, ctx.Err()
 		}
-		if now.Sub(row.CreatedAt) > consumeGiveUp {
+		if now.Sub(row.GrantedAt) > consumeGiveUp {
 			s.log.Warn("google play purchase was never consumed; giving up", "purchase_id", row.ID)
 			if err := s.repo.ForgetPurchaseToken(ctx, row.ID, now); err != nil {
 				return consumed, err

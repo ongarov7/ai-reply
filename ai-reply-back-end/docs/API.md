@@ -931,7 +931,9 @@ Consumable, пропуск — Non-Renewing Subscription), Android — Google Pl
 - Тела запросов строгие (неизвестное поле — `400 INVALID_REQUEST`), кроме уведомлений Apple.
 - `usage` — тот же объект, что в `/me` (`credits` включает купленные пакеты, `pass` — идущий
   пропуск). Пропуск, купленный во время другого, начинается, когда тот закончится, и до этого
-  в `usage.pass` не виден.
+  в `usage.pass` не виден. Пропуск без оставшихся ответов никого не держит: купленный после
+  него начинается сразу, а ждущий в очереди стартует (с той же длительностью), как только в
+  идущем кончились ответы или его отозвали (возврат, администратор).
 - Лимит — `RATE_IAP_PER_MINUTE` (20) на аккаунт для двух POST подтверждения; согласие на
   AI-обработку не требуется (текст никуда не уходит).
 
@@ -967,7 +969,7 @@ Consumable, пропуск — Non-Renewing Subscription), Android — Google Pl
 | Код | HTTP | Когда | Что делать клиенту |
 |---|---|---|---|
 | `IAP_UNAVAILABLE` | 403 | магазин этой платформы не подключён на сервере; для `products` — продажи на платформе закрыты | скрыть покупки; транзакцию не завершать |
-| `PURCHASE_INVALID` | 400 | магазин не подтвердил покупку: `details.reason` — `malformed`, `signature`, `bundle_mismatch`, `environment` (Sandbox на сервере, который его не принимает), `product_type`, `product_unknown`, `account_mismatch`, `revoked`, `canceled`, `not_found`, `already_consumed`, `unsupported_type`, `quantity` | показать «покупка не подтверждена»; не повторять |
+| `PURCHASE_INVALID` | 400 | магазин не подтвердил покупку: `details.reason` — `malformed`, `signature`, `bundle_mismatch`, `environment` (Sandbox или тестовая покупка Google на сервере, который их не принимает), `product_type`, `product_unknown`, `account_mismatch`, `revoked`, `canceled`, `not_found`, `already_consumed`, `unsupported_type`, `quantity` | показать «покупка не подтверждена»; не повторять |
 | `PURCHASE_BELONGS_TO_ANOTHER_ACCOUNT` | 409 | транзакция уже начислена другому (или удалённому) аккаунту | предложить войти в тот аккаунт |
 | `STORE_UNAVAILABLE` | 503 | API Google временно не ответил | повторить позже; ничего не потреблять |
 | `RATE_LIMITED` | 429 | больше `RATE_IAP_PER_MINUTE` в минуту | повторить позже |
@@ -985,10 +987,13 @@ Consumable, пропуск — Non-Renewing Subscription), Android — Google Pl
   Начисление — `units × quantity`. Запросов к Apple нет.
 - **Google**: `purchases.products.get` (androidpublisher v3) сервисным аккаунтом;
   `obfuscatedExternalAccountId = account_token`, `purchaseState = 0` (`2` — pending, `1` —
-  отменён), не потреблён кем-то другим, `product_id` — товар из админки. `purchaseType = 0`
-  (лицензионный тестер) записывается как `environment = Test`, `1` (промокод) — `Promo`.
-  Сначала начисление, потом `consume`; неудачный consume повторяется каждые 15 минут
-  (Google возвращает деньги за неподтверждённую покупку через 3 дня).
+  отменён), не потреблён кем-то другим, `product_id` — товар из админки, и `productId` в ответе
+  Google (если есть) тот же (иначе `product_unknown`). `purchaseType = 0` (лицензионный
+  тестер, бесплатно) принимается только при `GOOGLE_PLAY_ACCEPT_TEST=true` (по умолчанию в
+  production — нет, иначе `environment`) и записывается как `environment = Test`, `1`
+  (промокод) — `Promo`. Сначала начисление, потом `consume`; неудачный consume повторяется
+  каждые 15 минут, считая от начисления (pending-покупка — от оплаты), до 4 суток (Google
+  возвращает деньги за неподтверждённую покупку через 3 дня).
 - Одна транзакция начисляется один раз: `UNIQUE (provider, transaction_id)`, где
   `transaction_id` — `transactionId` Apple или SHA-256 токена Google (сам токен в открытом
   виде не хранится; до consume — зашифрованная копия, потом стирается). Транзакция,
@@ -1004,7 +1009,9 @@ Consumable, пропуск — Non-Renewing Subscription), Android — Google Pl
   `refunded` / `revoked`, остаток начисления снимается (потраченное остаётся, баланс не
   уходит в минус, в журнале `revoke` с остатком); `REFUND_REVERSED` возвращает снятое;
   `TEST`, `CONSUMPTION_REQUEST`, `REFUND_DECLINED` — только в журнал. Возврат транзакции,
-  которую сервер ещё не видел, записывается заранее: потом её не начислить.
+  которую сервер ещё не видел, записывается заранее: потом её не начислить. Если Apple такой
+  возврат отменит (`REFUND_REVERSED`), запись снимается (в журнале уведомлений — `cleared`), и
+  транзакция начисляется, когда приложение её отправит, — только аккаунту из `appAccountToken`.
 - Google: опрос `purchases.voidedpurchases` раз в `IAP_GOOGLE_VOIDED_POLL` (по умолчанию час;
   первый опрос после старта — за 30 дней, дальше — за 72 часа); результат тот же.
 
@@ -1018,7 +1025,8 @@ Consumable, пропуск — Non-Renewing Subscription), Android — Google Pl
   Sandbox, URL выше; активный Paid Applications Agreement.
 - Play Console: **одноразовые товары** (managed products) с теми же Product ID; сервисный
   аккаунт Google Cloud, приглашённый в Play Console с правами «Просмотр финансовых данных» и
-  «Управление заказами и подписками»; лицензионные тестеры для проверки.
+  «Управление заказами и подписками»; лицензионные тестеры для проверки (их покупки на
+  production-сервере принимаются только при `GOOGLE_PLAY_ACCEPT_TEST=true`).
 - Сервер: `APPLE_IAP_ENABLED=true`, `GOOGLE_PLAY_SERVICE_ACCOUNT_FILE` (или
   `GOOGLE_PLAY_CLIENT_EMAIL` + `GOOGLE_PLAY_PRIVATE_KEY`), на время ревью
   `APPLE_IAP_ACCEPT_SANDBOX=true`; затем в админке товары и переключатель продаж.
@@ -1093,11 +1101,11 @@ credits, admin, packs, pass { expires_at, remaining } | null, remaining_total }`
 
 | Метод | Путь | Что делает |
 |---|---|---|
-| GET | `/iap/products` | все товары (архивные в конце): `id`, `code`, `kind`, `units`, `duration_hours`, `apple_product_id`, `google_product_id`, `name { kk, ru, en, uz }`, `is_active`, `sort_order`, `archived`, `archived_at`, `sales` (начисленные покупки), `offered_ios`, `offered_android`; и `iap { enabled, configured, apple, google, apple_sandbox, bundle_id, package_name, voided_polling, available_ios, available_android, notification_url, ranges }` |
+| GET | `/iap/products` | все товары (архивные в конце): `id`, `code`, `kind`, `units`, `duration_hours`, `apple_product_id`, `google_product_id`, `name { kk, ru, en, uz }`, `is_active`, `sort_order`, `archived`, `archived_at`, `sales` (начисленные покупки), `offered_ios`, `offered_android`; и `iap { enabled, configured, apple, google, apple_sandbox, google_test, bundle_id, package_name, voided_polling, available_ios, available_android, notification_url, ranges }` |
 | POST | `/iap/products` | создать: `code` (`^[a-z0-9][a-z0-9_]{1,39}$`, уникален), `kind` `pack \| pass`, `units` 1…100000, `duration_hours` 1…720 только у пропуска (у пакета `0`), `apple_product_id` (`[A-Za-z0-9._-]`, до 100), `google_product_id` (`^[a-z0-9][a-z0-9._]{0,99}$`), `name` (до 60 символов на язык), `is_active` (нужен хотя бы один Product ID), `sort_order` 0…10000 → `201 { "product" }`; занятый код или Product ID — `409 CONFLICT` (`details.field`, `reason: taken`); аудит `iap_product.create` |
 | PATCH | `/iap/products/{id}` | то же тело (строку списка можно отправить как есть); `code` и `kind` не меняются (`400`, `reason: immutable`); новое количество и часы — только для новых покупок; архивный — `409`; аудит `iap_product.update { before, after }` |
 | POST | `/iap/products/{id}/archive` | в архив: больше не продаётся, Product ID остаётся занятым (оплаченные покупки находят свой товар); повтор — `409`; аудит `iap_product.archive` |
-| GET | `/iap/purchases?provider=&status=&environment=&user_id=&page=&limit=` | покупки, новые первыми: `id`, `user_id` (`""` — аккаунт удалён), `identifier` (маска), `provider`, `environment`, `product_code`, `store_product_id`, `transaction_id`, `order_id`, `quantity`, `units`, `status` `pending \| granted \| refunded \| revoked \| rejected`, `consumed`, `purchased_at`, `created_at`, `revoked_at`, `revoke_reason`; и `stats` — группы `{ provider, environment, status, count, units }` (выручка — только `Production`) |
+| GET | `/iap/purchases?provider=&status=&environment=&user_id=&page=&limit=` | покупки, новые первыми: `id`, `user_id` (`""` — аккаунт удалён), `identifier` (маска), `provider`, `environment`, `product_code`, `store_product_id`, `transaction_id`, `order_id`, `quantity`, `units`, `status` `pending \| granted \| refunded \| revoked \| rejected`, `consumed`, `purchased_at`, `created_at` (у начисленной — время начисления, в том числе для оплаченной позже pending-покупки), `revoked_at`, `revoke_reason`; и `stats` — группы `{ provider, environment, status, count, units }` (выручка — только `Production`) |
 | POST | `/settings/iap` | `{ "enabled": bool }` — продажи; включить без подключённого магазина — `409 IAP_UNAVAILABLE` (`reason: store_not_configured`); аудит `settings.iap.update { before, after }`; `GET /settings` отдаёт `iap` (как выше) |
 
 `users/{id}` отдаёт `iap_purchases` (до 50, новые первыми): `id`, `provider`, `environment`,

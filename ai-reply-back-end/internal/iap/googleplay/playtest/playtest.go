@@ -3,7 +3,8 @@
 // The token endpoint checks the service-account assertion (RS256, the
 // androidpublisher scope, aud = its own URL); the purchase endpoints serve the
 // purchases a test put there and change their state the way Google does:
-// consume sets consumptionState 1, the voided list returns what the test voided.
+// get names the product (productId) unless the test set one, consume sets
+// consumptionState 1, the voided list returns what the test voided.
 package playtest
 
 import (
@@ -232,6 +233,9 @@ func (s *Server) handle(t testing.TB, pub *rsa.PublicKey, w http.ResponseWriter,
 	case !consume && r.Method == http.MethodGet:
 		s.GetCalls.Add(1)
 		out := *p
+		if out.ProductID == "" {
+			out.ProductID = productID // Google names the product; a test sets another one to fake a mix-up
+		}
 		raw, _ := json.Marshal(out)
 		_, _ = w.Write(raw)
 	default:

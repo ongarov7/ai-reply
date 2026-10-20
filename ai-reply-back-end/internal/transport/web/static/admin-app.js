@@ -3377,6 +3377,8 @@
               <dd><span :class="'badge ' + (iap.google ? 'badge-ok' : 'badge-muted')">
                 {{ iap.google ? t('admin.iap.configured') : t('admin.iap.not_configured') }}</span>
                 <span class="mono muted">{{ iap.package_name }}</span>
+                <span v-if="iap.google" :class="'badge ' + (iap.google_test ? 'badge-warn' : 'badge-muted')">
+                  {{ t('admin.iap.env.test') }}: {{ iap.google_test ? t('admin.iap.accepted') : t('admin.iap.refused') }}</span>
                 <span v-if="iap.google" :class="'badge ' + (iap.voided_polling ? 'badge-ok' : 'badge-warn')">
                   {{ t('admin.iap.voided_polling') }}: {{ iap.voided_polling ? t('admin.iap.on') : t('admin.iap.off') }}</span></dd>
               <dt>{{ t('admin.iap.notification_url') }}</dt><dd class="mono">{{ iap.notification_url }}</dd>

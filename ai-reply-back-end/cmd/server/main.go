@@ -78,8 +78,9 @@ func checkConfig(envFile string) int {
 	}
 	fmt.Printf("configuration OK (APP_ENV=%s)\nsign-in client ids: google=%v apple=%v\n",
 		cfg.App.Env, cfg.OAuth.GoogleClientIDs, cfg.OAuth.AppleClientIDs)
-	fmt.Printf("in-app purchases: app_store=%v (bundle %s, sandbox %v) google_play=%v (package %s)\n",
-		cfg.IAP.Apple(), cfg.IAP.AppleBundleID, cfg.IAP.AppleAcceptSandbox, cfg.IAP.Google(), cfg.IAP.GooglePackageName)
+	fmt.Printf("in-app purchases: app_store=%v (bundle %s, sandbox %v) google_play=%v (package %s, test %v)\n",
+		cfg.IAP.Apple(), cfg.IAP.AppleBundleID, cfg.IAP.AppleAcceptSandbox, cfg.IAP.Google(), cfg.IAP.GooglePackageName,
+		cfg.IAP.GoogleAcceptTest)
 	return 0
 }
 
