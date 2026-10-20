@@ -25,7 +25,7 @@ func TestCasesAreWellFormed(t *testing.T) {
 			t.Errorf("missing or duplicate id %q", c.ID)
 		case c.Mode != "reply" && c.Mode != "compose":
 			t.Errorf("%s: mode %q", c.ID, c.Mode)
-		case c.Mode == "reply" && (c.Incoming == "" || !slices.Contains([]string{"friend", "client", "business", "work"}, c.TemplateID)):
+		case c.Mode == "reply" && (c.Incoming == "" || !slices.Contains([]string{"friend", "client", "business", "work", "colleague", "partner"}, c.TemplateID)):
 			t.Errorf("%s: a reply case needs an incoming message and a built-in template", c.ID)
 		case c.Mode == "compose" && (c.Instruction == "" || c.Incoming != ""):
 			t.Errorf("%s: a compose case has an instruction and no incoming message", c.ID)
@@ -131,6 +131,21 @@ func TestChecksSeparateGoodOutputsFromBadOnes(t *testing.T) {
 		{"ru-abbreviated-request-en", "Привет! Всё хорошо, вечером дома.", []string{CheckLanguage, CheckMustIncludeAny}},
 		{"en-short-thanks", "Anytime! Glad it helped.", nil},
 		{"en-short-thanks", "You are very welcome! I am really glad that everything worked out for you in the end.", []string{CheckMaxChars}},
+		// Алушы мәнері: клиент пен серіктеске — Вы/Сіз, ол «ты» деп жазса да;
+		// әріптеске — оның өз мәнері; досқа — еркін.
+		{"ru-client-informal-incoming", "Здравствуйте! Да, завтра привезём Ваш заказ.", nil},
+		{"ru-client-informal-incoming", "Привет! Да, завтра привезём тебе заказ.", []string{CheckFormality}},
+		{"kk-client-informal-incoming", "Сәлеметсіз бе! Тапсырысыңызды бүгін кешке жібереміз.", nil},
+		{"kk-client-informal-incoming", "Сәлем! Саған бүгін кешке жібереміз.", []string{CheckFormality}},
+		{"ru-partner-alias", "Добрый день! Пришлю подписанный договор в четверг.", nil},
+		{"ru-partner-alias", "Привет! Скину тебе договор в четверг.", []string{CheckFormality}},
+		{"ru-partner-alias", "Добрый день! Будем иметь возможность прислать договор в четверг.", []string{CheckMustNotInclude}},
+		{"ru-colleague-alias-mirror", "Да, скину через час.", nil},
+		{"ru-colleague-alias-mirror", "Да, скину Вам через час.", []string{CheckFormality}},
+		{"kk-colleague-formal-mirror", "Иә, түске дейін жіберемін.", nil},
+		{"kk-colleague-formal-mirror", "Иә, саған түске дейін жіберемін.", []string{CheckFormality}},
+		{"en-friend-casual", "Yep, see you at 8!", nil},
+		{"en-friend-casual", "Dear friend, I would be delighted to join you at 8. Kind regards.", []string{CheckMustNotInclude}},
 	}
 	for _, s := range samples {
 		c, ok := byID[s.caseID]
@@ -195,6 +210,32 @@ func TestLivePromptsAreBuiltForEveryCase(t *testing.T) {
 			!strings.Contains(p.User, text) || strings.Contains(p.Developer, text) {
 			t.Errorf("%s: prompt %s, quality %+v, tokens %d", c.ID, p.Version, p.Quality, p.MaxOutputTokens)
 		}
+	}
+}
+
+// Бүркеншік атпен (colleague, partner) жазылған жағдай канондық кілттегідей
+// промпт құрады: newer clients may send the new names, old ones never stop
+// sending work and business.
+func TestAliasCasesBuildTheCanonicalPrompt(t *testing.T) {
+	cases, err := Cases()
+	if err != nil {
+		t.Fatal(err)
+	}
+	aliases := map[string]bool{}
+	for _, c := range cases {
+		canonical := ai.CanonicalRelationship(c.TemplateID)
+		if c.Mode != "reply" || canonical == c.TemplateID {
+			continue
+		}
+		aliases[c.TemplateID] = true
+		same := c
+		same.TemplateID = canonical
+		if got, want := livePrompt(c, 180), livePrompt(same, 180); got.Developer != want.Developer || got.User != want.User {
+			t.Errorf("%s: %q builds another prompt than %q", c.ID, c.TemplateID, canonical)
+		}
+	}
+	if !aliases["colleague"] || !aliases["partner"] {
+		t.Fatalf("alias cases %v, want colleague and partner", aliases)
 	}
 }
 

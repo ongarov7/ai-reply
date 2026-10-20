@@ -478,6 +478,16 @@ FCM-токене, смене языка, разрешения или внутр�
 Профиль берётся с сервера; блок `profile` в запросе допускается для клиентов,
 которые держат его локально, и имеет приоритет.
 
+`template_id` — id шаблона: у встроенных он равен `template.relationship`
+(`friend` — «Друг», `client` — «Клиент», `work` — «Коллега», `business` —
+«Партнёр»), у своих шаблонов — UUID с `relationship: "custom"`. Эти значения не
+меняются никогда. Сервер дополнительно принимает `colleague` (= `work`) и
+`partner` (= `business`); неизвестное значение получает стиль своего шаблона.
+Регистр задаёт сервер: клиенту — всегда «Вы» / «Сіз», даже если он пишет на «ты»;
+партнёру — «Вы» / «Сіз», пока он сам явно не пишет на «ты»; другу — «ты» / «сен»;
+коллеге — как пишет он сам. Язык ответа от этого не меняется.
+Подробно — [AI_QUALITY.md](AI_QUALITY.md#кому-отвечаем).
+
 Поля под `features.sender_profile` (без флага клиент их не шлёт):
 
 - `input_language` — раскладка клавиатуры в момент нажатия Reply (`kk` | `ru` | `en`).
@@ -661,8 +671,9 @@ markdown, приписка модели «Примечание: …» о сам�
 
 ### Версии промптов и логи
 
-Каждое событие `ai_usage_events` хранит `prompt_version`: `reply_v2`,
-`reply_v2+repair_v1` (принят исправленный ответ), `compose_v2`, `compose_v2+repair_v1`,
+Каждое событие `ai_usage_events` хранит `prompt_version`: `reply_v3`,
+`reply_v3+repair_v1` (принят исправленный ответ; в событиях до регистра по получателю —
+`reply_v2`, `reply_v2+repair_v1`), `compose_v2`, `compose_v2+repair_v1`,
 `polish_v1`, `transcribe_v1`. В admin JSON это поле не выводится. Структурные логи без текста и без рода:
 `ai_reply_generated` (mode, prompt_version, target_language, language_source,
 latency_ms, токены, repaired, truncated; у polish — changed), `ai_reply_failed`

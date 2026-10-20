@@ -34,7 +34,8 @@ type Case struct {
 	Mode        string `json:"mode"`
 	Incoming    string `json:"incoming"`
 	Instruction string `json:"instruction"`
-	// TemplateID — friend | client | business | work (reply үшін).
+	// TemplateID — friend | client | business | work (reply үшін); colleague
+	// пен partner — work пен business-тің бүркеншік аттары.
 	TemplateID string `json:"template_id"`
 	// Gender — male | female | unspecified.
 	Gender string `json:"gender"`

@@ -214,7 +214,7 @@ func TestPromptVersionIsRecordedButNotShownToAdmins(t *testing.T) {
 		t.Fatalf("events: %v %d", err, len(events))
 	}
 	versions := map[string]string{events[0].Mode: events[0].PromptVersion, events[1].Mode: events[1].PromptVersion}
-	if versions["reply"] != "reply_v2" || versions["compose"] != "compose_v2" {
+	if versions["reply"] != "reply_v3" || versions["compose"] != "compose_v2" {
 		t.Fatalf("versions = %v", versions)
 	}
 
@@ -233,7 +233,7 @@ func TestPromptVersionIsRecordedButNotShownToAdmins(t *testing.T) {
 			t.Fatalf("logs contain %q", leak)
 		}
 	}
-	if !strings.Contains(h.logs.String(), `"prompt_version":"reply_v2"`) {
+	if !strings.Contains(h.logs.String(), `"prompt_version":"reply_v3"`) {
 		t.Fatal("the success log has no prompt version")
 	}
 }
@@ -259,7 +259,7 @@ func TestReplyRepairFixesTheSenderGender(t *testing.T) {
 	}
 
 	events, _ := h.store.UserEvents(context.Background(), session.userID, 10)
-	if len(events) != 1 || events[0].PromptVersion != "reply_v2+repair_v1" || events[0].TotalTokens != 320 {
+	if len(events) != 1 || events[0].PromptVersion != "reply_v3+repair_v1" || events[0].TotalTokens != 320 {
 		t.Fatalf("one event with both calls' tokens: %+v", events)
 	}
 	if usage := h.do(http.MethodGet, "/api/v1/me/usage", nil, h.auth(session.access)); usage.num("used_today") != 1 {
@@ -289,7 +289,7 @@ func TestReplyRepairThatStillFailsKeepsTheOriginal(t *testing.T) {
 		t.Fatalf("reply: %d %s", res.status, res.raw)
 	}
 	events, _ := h.store.UserEvents(context.Background(), session.userID, 10)
-	if h.provider.calls != 2 || len(events) != 1 || events[0].PromptVersion != "reply_v2" || res.num("usage", "used_today") != 1 {
+	if h.provider.calls != 2 || len(events) != 1 || events[0].PromptVersion != "reply_v3" || res.num("usage", "used_today") != 1 {
 		t.Fatalf("calls %d, events %+v", h.provider.calls, events)
 	}
 }

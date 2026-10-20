@@ -94,7 +94,9 @@ ROLE → PRODUCT RULES → LANGUAGE → SENDER → STYLE → OUTPUT
   «рад/рада», «сделал/сделала»; при `unspecified` — нейтральные формулировки.
   Касается только отправителя, не получателя.
 - **STYLE** — отношение, тон, длина и эмодзи из enum'ов шаблона, общие правила
-  живой переписки.
+  живой переписки. Отношение выбирается по ключу `friend` / `client` / `work`
+  («Коллега», алиас `colleague`) / `business` («Партнёр», алиас `partner`), иначе
+  `custom`; оно задаёт регистр (клиенту и партнёру — «Вы» / «Сіз»), но не язык.
 - **OUTPUT** — только текст сообщения: без кавычек, «Ответ:», вступлений, markdown.
 
 User-сообщение: `<working_hours>`, `<user_profile>`, `<business_context>`,
@@ -121,7 +123,7 @@ User-сообщение: `<working_hours>`, `<user_profile>`, `<business_context
 `ai_usage_events` как у polish) и `POST /audio/transcriptions` с `languages[]` и коротким
 `prompt` на языке первой подсказки; на `400` — ровно один повтор без них.
 
-Каждый промпт имеет версию (`reply_v2`, `compose_v2`, `polish_v1`, `repair_v1`, `transcribe_v1`); она
+Каждый промпт имеет версию (`reply_v3`, `compose_v2`, `polish_v1`, `repair_v1`, `transcribe_v1`); она
 пишется в `ai_usage_events.prompt_version` и в логи. Изменили текст правила —
 поднимите версию и прогоните набор оценки. Подробно — [AI_QUALITY.md](AI_QUALITY.md).
 

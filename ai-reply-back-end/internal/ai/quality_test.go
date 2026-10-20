@@ -238,7 +238,7 @@ func TestCompleteRepairsAnOutputThatFailsTheCheck(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out.Text != "Пожалуйста! Рад был помочь." || !out.Repaired || out.Version != "reply_v2+repair_v1" {
+	if out.Text != "Пожалуйста! Рад был помочь." || !out.Repaired || out.Version != "reply_v3+repair_v1" {
 		t.Fatalf("outcome = %+v", out)
 	}
 	if !reflect.DeepEqual(out.Issues, []Issue{IssueGender}) {

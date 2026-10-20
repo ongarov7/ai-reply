@@ -71,7 +71,7 @@ func livePrompt(c Case, maxOutputTokens int) ai.Prompt {
 	}
 	template := ai.Template{Relationship: c.TemplateID, Tone: "professional", ReplyLength: "short",
 		EmojiPolicy: "minimal", WorkingHoursBehavior: "mention_when_relevant"}
-	switch c.TemplateID {
+	switch ai.CanonicalRelationship(c.TemplateID) {
 	case "friend":
 		template.Tone, template.EmojiPolicy, template.WorkingHoursBehavior = "friendly", "allowed", "ignore"
 	case "business":

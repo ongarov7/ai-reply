@@ -24,7 +24,7 @@ import (
 // Промпт нұсқалары. Мәтін өзгерсе — нұсқа да өзгереді (usage оқиғасында,
 // журналда және сапа бағалауында көрінеді).
 const (
-	PromptVersionReply   = "reply_v2"
+	PromptVersionReply   = "reply_v3"
 	PromptVersionCompose = "compose_v2"
 	PromptVersionPolish  = "polish_v1"
 	PromptVersionRepair  = "repair_v1"
@@ -244,9 +244,9 @@ func BuildPrompt(in PromptInput) Prompt {
 // replyStyle — STYLE бөлімі тек enum кестелерінен құралады; шаблон аты мен
 // нұсқаулары user хабарында қалады.
 func replyStyle(in PromptInput) string {
-	relationship := relationshipHints[in.TemplateID]
+	relationship := relationshipHint(in.TemplateID)
 	if relationship == "" {
-		relationship = relationshipHints[in.Template.Relationship]
+		relationship = relationshipHint(in.Template.Relationship)
 	}
 	if relationship == "" {
 		relationship = relationshipHints["custom"]

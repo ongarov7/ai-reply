@@ -57,14 +57,57 @@ var (
 		"short":  "One or two short sentences.",
 		"medium": "Two to four sentences.",
 	}
+	// relationshipHints — алушыға қарай сөйлеу мәнері. Кілттер — сымдағы және
+	// сақталған мәндер, ешқашан өзгермейді: work — «Коллега», business —
+	// «Партнёр».
+	//
+	// The hints set the register only (ты/Вы, сен/Сіз, casual or formal
+	// wording); they never name or choose the reply language, which the
+	// copied message decides (LANGUAGE).
 	relationshipHints = map[string]string{
-		"friend":   "Replying to a FRIEND. Casual, warm, concise. Match the emotional tone of the incoming message and keep any humour. No corporate wording.",
-		"client":   "Replying to a CLIENT or customer. Professional, polite, helpful, concise. Customer-facing but not servile. Promise nothing that is not in the profile.",
-		"business": "Replying to a BUSINESS PARTNER. Professional, confident, peer to peer. Not customer-service language and not unnecessarily friendly.",
-		"work":     "Replying to a WORK COLLEAGUE. Clear, efficient, polite, concise. Comfortable with scheduling and task context.",
-		"custom":   "Replying with a template the user defined. Follow the preferences in <template_instructions>.",
+		"friend": "Replying to a FRIEND. Casual, warm and short, the way friends text each other. Match the emotional tone of the incoming message and keep any humour. " +
+			"Address them informally in whatever language the reply is in: ты, сен, relaxed everyday wording with contractions; use Вы or Сіз only if the friend writes that way. " +
+			"No corporate or customer-service wording.",
+		"client": "Replying to a CLIENT or customer of the user. Polite, professional and helpful, concise; customer-focused but not servile and not bureaucratic. " +
+			"Always address the client formally in whatever language the reply is in: Вы, Сіз, courteous plain wording, even when the client writes casually or uses ты or сен. " +
+			"Answer what they asked and, when it fits, say what happens next. Promise nothing that is not in the profile or the instruction.",
+		"work": "Replying to a COLLEAGUE, someone the user works with. Collaborative, friendly and to the point: clear about tasks, times and who does what, ready to help or agree on next steps. " +
+			"Mirror the colleague's register: ты or сен when they write that way, Вы or Сіз when they write formally or the message does not show it; plain friendly workplace wording. " +
+			"No customer-service phrases and no officialese.",
+		"business": "Replying to a BUSINESS PARTNER, someone the user does business with as an equal, such as a supplier, a contractor or a partner company. Formal, respectful and confident, peer to peer. " +
+			"Address them formally in whatever language the reply is in: Вы, Сіз, courteous professional wording; keep ты or сен only if the partner clearly writes that way, and stay businesslike even then. " +
+			"Precise about agreements, terms, dates and next steps, without inventing any. Not customer-service language, not servile, not overly friendly.",
+		"custom": "Replying with a template the user defined. Follow the preferences in <template_instructions>.",
+	}
+
+	// relationshipAliases — клиенттердің жаңа атаулары. Old builds keep
+	// sending work and business; newer ones may send colleague and partner.
+	// Both resolve to the same hint, so stored values never need to change.
+	relationshipAliases = map[string]string{
+		"colleague": "work",
+		"partner":   "business",
 	}
 )
+
+// CanonicalRelationship — алушы түрінің сақталатын мәні: colleague → work,
+// partner → business.
+//
+// The value is trimmed and lower-cased. Anything that is not an alias is
+// returned that way and nothing more: a canonical value, "custom", a custom
+// template's UUID or an unknown value (which then gets the custom hint).
+func CanonicalRelationship(id string) string {
+	key := strings.ToLower(strings.TrimSpace(id))
+	if canonical, ok := relationshipAliases[key]; ok {
+		return canonical
+	}
+	return key
+}
+
+// relationshipHint — кілт не бүркеншік ат бойынша серверлік мәнер жолы
+// (белгісіз болса бос).
+func relationshipHint(id string) string {
+	return relationshipHints[CanonicalRelationship(id)]
+}
 
 const composeRole = `ROLE
 You are AI Reply, a writing assistant inside a mobile keyboard. The user describes a message they want to send, and you write that message for them, as the user, in the first person.`

@@ -95,7 +95,7 @@ func TestReplyRepairRewritesARussianAnswerIntoKazakh(t *testing.T) {
 		t.Fatalf("repair prompt: %+v", repair)
 	}
 	events, _ := h.store.UserEvents(context.Background(), session.userID, 10)
-	if len(events) != 1 || events[0].PromptVersion != "reply_v2+repair_v1" {
+	if len(events) != 1 || events[0].PromptVersion != "reply_v3+repair_v1" {
 		t.Fatalf("events: %+v", events)
 	}
 	logs := h.logs.String()

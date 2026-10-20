@@ -380,7 +380,7 @@ type UsageEvent struct {
 	// Mode — reply | compose | polish | transcribe. Reply мен compose бір
 	// квотаны жұмсайды, polish пен transcribe квотаға кірмейді.
 	Mode string
-	// PromptVersion — reply_v2, reply_v2+repair_v1, compose_v2, polish_v1, transcribe_v1 …
+	// PromptVersion — reply_v3, reply_v3+repair_v1, compose_v2, polish_v1, transcribe_v1 …
 	PromptVersion string
 	CreatedAt     time.Time
 }

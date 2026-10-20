@@ -361,11 +361,13 @@ func applyOverride(p *ai.Profile, o Override) {
 }
 
 // template — симулятордағы қарым-қатынас түрін мобильді шаблонға айналдыру.
+// colleague және partner — work пен business-тің бүркеншік аттары.
 func template(id, fallbackTone string) ai.Template {
 	tone := fallbackTone
 	if tone == "" {
 		tone = "natural"
 	}
+	id = ai.CanonicalRelationship(id)
 	switch id {
 	case "client", "business", "work", "friend":
 	default:
