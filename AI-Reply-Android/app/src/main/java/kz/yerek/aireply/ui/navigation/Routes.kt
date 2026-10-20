@@ -19,6 +19,13 @@ object Routes {
     const val Settings = "settings"
     const val KeyboardSetup = "setup"
     const val Subscription = "subscription"
+    /** «Настройка клавиатуры и разрешений» on its own screen. */
+    const val Permissions = "permissions"
+    /** How paste works on Android. */
+    const val PasteHelp = "paste_help"
+
+    /** DEBUG builds: the screens that can be opened before sign-in for a review (see MainActivity). */
+    val Reviewable = setOf(Compose, Permissions, PasteHelp, KeyboardSetup)
 
     fun templateEditor(id: String) = "$TemplateEditor/$id"
     const val TemplateEditorPattern = "$TemplateEditor/{id}"

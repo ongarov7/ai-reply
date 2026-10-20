@@ -12,7 +12,6 @@ import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Description
@@ -62,12 +61,11 @@ import kz.yerek.aireply.ui.common.RowDividerIndented
 import kz.yerek.aireply.ui.common.RowGroup
 import kz.yerek.aireply.ui.common.openWebPage
 import kz.yerek.aireply.ui.common.privacyStatement
-import kz.yerek.aireply.ui.common.rememberKeyboardStatus
 import kz.yerek.aireply.ui.design.AppCard
 import kz.yerek.aireply.ui.design.AppSection
 import kz.yerek.aireply.ui.design.ReadableColumn
 import kz.yerek.aireply.ui.design.Spacing
-import kz.yerek.aireply.ui.feature.setup.KeyboardStatusRows
+import kz.yerek.aireply.ui.feature.setup.KeyboardPermissionsContent
 import kz.yerek.aireply.ui.navigation.Routes
 
 /**
@@ -97,7 +95,6 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit, focusSection: S
     var layouts by remember { mutableStateOf(services.settings.enabledKeyboardLanguages) }
     var haptics by remember { mutableStateOf(services.settings.keyboardHaptics) }
     var smartCorrection by remember { mutableStateOf(services.settings.smartCorrection) }
-    val keyboardStatus by rememberKeyboardStatus()
     var mockReplies by remember { mutableStateOf(services.settings.debugMockReplies) }
     var confirmingWithdrawal by remember { mutableStateOf(false) }
     var withdrawalError by remember { mutableStateOf<Int?>(null) }
@@ -125,15 +122,8 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit, focusSection: S
                 }
             }
 
-            AppSection(stringResource(R.string.settings_setup)) {
-                AppCard { KeyboardStatusRows(keyboardStatus) }
-                RowGroup {
-                    NavigationRow(
-                        Icons.Filled.Keyboard,
-                        stringResource(R.string.settings_setup_guide)
-                    ) { onOpen(Routes.KeyboardSetup) }
-                }
-                Footnote(stringResource(R.string.settings_setup_footer))
+            AppSection(stringResource(R.string.permissions_title)) {
+                KeyboardPermissionsContent(onOpen)
             }
 
             AppSection(stringResource(R.string.settings_keyboard)) {

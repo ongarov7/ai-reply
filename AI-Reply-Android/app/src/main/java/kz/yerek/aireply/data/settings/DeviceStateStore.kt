@@ -116,6 +116,18 @@ class DeviceStateStore internal constructor(private val prefs: SharedPreferences
         return true
     }
 
+    /**
+     * When the app last read the keyboard's state from the system - enabled,
+     * chosen as default - in epoch milliseconds; null before the first read.
+     * Shown as «Последняя проверка» and reported with the diagnostics.
+     */
+    val lastKeyboardCheckAt: Long?
+        get() = prefs.getLong(KEY_KEYBOARD_CHECK, 0L).takeIf { it > 0L }
+
+    fun noteKeyboardCheck(at: Long) {
+        prefs.edit().putLong(KEY_KEYBOARD_CHECK, at).apply()
+    }
+
     /** The backing file, for once-per-install flags such as [kz.yerek.aireply.analytics.ProductEvents]. */
     val sharedPreferences: SharedPreferences get() = prefs
 
@@ -132,5 +144,6 @@ class DeviceStateStore internal constructor(private val prefs: SharedPreferences
         private const val KEY_LANGUAGE_PENDING_SYNC = "profile.languagePendingSync"
         private const val KEY_LAST_PASTE = "diagnostics.lastSuccessfulPasteAt"
         private const val KEY_KEYBOARD_SHOWN = "diagnostics.keyboardLastShownAt"
+        private const val KEY_KEYBOARD_CHECK = "diagnostics.lastKeyboardCheckAt"
     }
 }

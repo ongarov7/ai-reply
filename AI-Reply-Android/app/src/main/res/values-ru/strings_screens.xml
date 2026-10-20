@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The app's screens from the October 2026 redesign: the onboarding, Create a
+    reply, the keyboard and permissions section and the paste page.
+    The same keys in the same order in every language, so a missing one is easy
+    to see; the Russian copy is the owner's.
+-->
+<resources>
+
+    <!-- Shared -->
+    <string name="evidence_today">сегодня, %1$s</string>
+
+    <!-- Keyboard and permissions -->
+    <string name="permissions_title">Настройка клавиатуры и разрешений</string>
+    <string name="permissions_intro">Что Android сообщает прямо сейчас — и что сделать, если что-то ещё не настроено.</string>
+    <string name="permissions_keyboard_enabled">Клавиатура включена</string>
+    <string name="permissions_keyboard_default">Выбрана по умолчанию</string>
+    <string name="permissions_paste">Вставка</string>
+    <string name="permissions_notifications">Уведомления</string>
+    <string name="permissions_last_check">Последняя проверка</string>
+    <string name="permissions_recheck">Проверить снова</string>
+    <string name="permissions_value_yes">Да</string>
+    <string name="permissions_value_not_enabled">Нет: включи AI Reply в списке клавиатур</string>
+    <string name="permissions_value_enable_first">Сначала включи клавиатуру</string>
+    <string name="permissions_value_other_keyboard">Сейчас по умолчанию другая клавиатура</string>
+    <string name="permissions_value_paste_seen">Работает · последняя вставка %1$s</string>
+    <string name="permissions_value_paste_not_yet">Ещё не проверено: скопируй сообщение и нажми на собеседника в клавиатуре</string>
+    <string name="permissions_value_notifications_off">Выключены в настройках телефона</string>
+    <string name="permissions_action_keyboard_settings">Открыть настройки клавиатур</string>
+    <string name="permissions_action_choose">Выбрать AI Reply</string>
+    <string name="permissions_action_paste_help">Как работает вставка</string>
+    <string name="permissions_help">Не получается?</string>
+    <string name="permissions_footer">Статусы обновляются, когда ты возвращаешься в приложение. О клавиатуре сообщает сам Android; вставка отмечается после первой удачной вставки на этом телефоне.</string>
+
+    <!-- Not working? (keyboard troubleshooting) -->
+    <string name="keyboard_help_not_listed_title">AI Reply нет в списке</string>
+    <string name="keyboard_help_not_listed_body">Открой настройки клавиатур и найди раздел «Экранная клавиатура» или «Управление клавиатурами» — названия зависят от телефона. Если AI Reply там нет, перезагрузи телефон.</string>
+    <string name="keyboard_help_warning_title">Android показывает предупреждение</string>
+    <string name="keyboard_help_warning_body">Оно появляется для любой клавиатуры, которая не встроена в телефон. Нажми «ОК», чтобы включить AI Reply: текст уходит только когда ты нажимаешь «Ответить» или «Написать».</string>
+    <string name="keyboard_help_other_title">Всё ещё открывается другая клавиатура</string>
+    <string name="keyboard_help_other_body">Нажми «Выбрать AI Reply» или во время набора — значок клавиатуры в панели навигации. На некоторых телефонах для этого нужно удерживать пробел.</string>
+    <string name="keyboard_help_paste_title">Скопированное сообщение не появляется</string>
+    <string name="keyboard_help_paste_body">Копируй сам текст сообщения, а не фото или файл. Текст, который другое приложение пометило как личный (например, пароль), не читается.</string>
+
+    <!-- Paste from other apps -->
+    <string name="paste_help_title">Вставка из других приложений</string>
+    <string name="paste_help_intro">AI Reply отвечает на скопированное сообщение. Вот как это устроено на Android.</string>
+    <string name="paste_help_steps_title">Как вставить</string>
+    <string name="paste_help_step_copy">В чате нажми и удерживай сообщение, затем выбери «Копировать».</string>
+    <string name="paste_help_step_switch">Нажми на поле ввода и переключись на AI Reply.</string>
+    <string name="paste_help_step_recipient">Нажми, кому отвечаешь: в этот момент AI Reply прочитает скопированное.</string>
+    <string name="paste_help_rules_title">Как Android защищает буфер обмена</string>
+    <string name="paste_help_rule_focus">Android даёт читать буфер обмена только приложению на экране или клавиатуре, которая сейчас используется. Поэтому AI Reply читает его как клавиатура и только по твоему нажатию — никогда в фоне.</string>
+    <string name="paste_help_rule_private">Текст, который другое приложение пометило как личный (пароль, код из банка), скрыт от других приложений. AI Reply его тоже не читает — скопируй само сообщение.</string>
+    <string name="paste_help_rule_notice">Начиная с Android 12 телефон может ненадолго показать, что AI Reply вставил текст из буфера обмена. Так система подтверждает твоё нажатие.</string>
+    <string name="paste_help_rule_no_switch">Отдельного переключателя «Разрешить вставку» на Android нет — включать ничего не нужно.</string>
+    <string name="paste_help_last">Последняя удачная вставка: %1$s</string>
+    <string name="paste_help_never">На этом телефоне вставки в AI Reply ещё не было.</string>
+
+</resources>

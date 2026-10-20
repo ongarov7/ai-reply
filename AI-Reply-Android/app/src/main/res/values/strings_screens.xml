@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The app's screens from the October 2026 redesign: the onboarding, Create a
+    reply, the keyboard and permissions section and the paste page.
+    The same keys in the same order in every language, so a missing one is easy
+    to see; the Russian copy is the owner's.
+-->
+<resources>
+
+    <!-- Shared -->
+    <string name="evidence_today">today, %1$s</string>
+
+    <!-- Keyboard and permissions -->
+    <string name="permissions_title">Keyboard and permissions</string>
+    <string name="permissions_intro">What Android reports right now, and what to do about anything that is not set up yet.</string>
+    <string name="permissions_keyboard_enabled">Keyboard enabled</string>
+    <string name="permissions_keyboard_default">Chosen as default</string>
+    <string name="permissions_paste">Paste</string>
+    <string name="permissions_notifications">Notifications</string>
+    <string name="permissions_last_check">Last check</string>
+    <string name="permissions_recheck">Check again</string>
+    <string name="permissions_value_yes">Yes</string>
+    <string name="permissions_value_not_enabled">No: turn on AI Reply in the list of keyboards</string>
+    <string name="permissions_value_enable_first">Turn the keyboard on first</string>
+    <string name="permissions_value_other_keyboard">Another keyboard is the default now</string>
+    <string name="permissions_value_paste_seen">Works · last paste %1$s</string>
+    <string name="permissions_value_paste_not_yet">Not checked yet: copy a message and tap a recipient in the keyboard</string>
+    <string name="permissions_value_notifications_off">Off in phone settings</string>
+    <string name="permissions_action_keyboard_settings">Open keyboard settings</string>
+    <string name="permissions_action_choose">Choose AI Reply</string>
+    <string name="permissions_action_paste_help">How paste works</string>
+    <string name="permissions_help">Not working?</string>
+    <string name="permissions_footer">The statuses are read again whenever you come back to the app. Android reports the keyboard itself; paste shows as working after the first successful paste on this phone.</string>
+
+    <!-- Not working? (keyboard troubleshooting) -->
+    <string name="keyboard_help_not_listed_title">AI Reply is not in the list</string>
+    <string name="keyboard_help_not_listed_body">Open keyboard settings and look under On-screen keyboard or Manage keyboards; the names differ from phone to phone. If AI Reply is still missing, restart the phone.</string>
+    <string name="keyboard_help_warning_title">Android shows a warning</string>
+    <string name="keyboard_help_warning_body">It appears for every keyboard that did not come with the phone. Tap OK to turn AI Reply on: it sends text only when you tap Reply or Write.</string>
+    <string name="keyboard_help_other_title">Another keyboard still opens</string>
+    <string name="keyboard_help_other_body">Tap Choose AI Reply, or, while typing, tap the keyboard icon in the navigation bar. On some phones you press and hold the space bar instead.</string>
+    <string name="keyboard_help_paste_title">The copied message does not appear</string>
+    <string name="keyboard_help_paste_body">Copy the text of the message, not a photo or a file. Text another app marked private, such as a password, is never read.</string>
+
+    <!-- Paste from other apps -->
+    <string name="paste_help_title">Paste from other apps</string>
+    <string name="paste_help_intro">AI Reply replies to the message you copy. This is how Android handles it.</string>
+    <string name="paste_help_steps_title">How to paste</string>
+    <string name="paste_help_step_copy">In the chat, press and hold the message and tap Copy.</string>
+    <string name="paste_help_step_switch">Tap the message field and switch to AI Reply.</string>
+    <string name="paste_help_step_recipient">Tap who you are replying to: AI Reply reads the copied text at that moment.</string>
+    <string name="paste_help_rules_title">How Android protects the clipboard</string>
+    <string name="paste_help_rule_focus">Android lets only the app on screen, or the keyboard in use, read the clipboard. So AI Reply reads it as your keyboard and only when you tap: never in the background.</string>
+    <string name="paste_help_rule_private">Text another app marks private, like a password or a bank code, is hidden from other apps. AI Reply does not read it either: copy the message itself.</string>
+    <string name="paste_help_rule_notice">From Android 12 the phone may briefly say that AI Reply pasted from the clipboard. That is the system confirming your tap.</string>
+    <string name="paste_help_rule_no_switch">There is no separate “allow paste” switch on Android: nothing needs to be turned on.</string>
+    <string name="paste_help_last">Last successful paste: %1$s</string>
+    <string name="paste_help_never">No paste in AI Reply on this phone yet.</string>
+
+</resources>

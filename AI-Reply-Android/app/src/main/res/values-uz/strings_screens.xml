@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The app's screens from the October 2026 redesign: the onboarding, Create a
+    reply, the keyboard and permissions section and the paste page.
+    The same keys in the same order in every language, so a missing one is easy
+    to see; the Russian copy is the owner's.
+-->
+<resources>
+
+    <!-- Shared -->
+    <string name="evidence_today">bugun, %1$s</string>
+
+    <!-- Keyboard and permissions -->
+    <string name="permissions_title">Klaviatura va ruxsatlarni sozlash</string>
+    <string name="permissions_intro">Android hozir nimani bildiryapti va hali sozlanmagan narsa boʻlsa, nima qilish kerak.</string>
+    <string name="permissions_keyboard_enabled">Klaviatura yoqilgan</string>
+    <string name="permissions_keyboard_default">Standart sifatida tanlangan</string>
+    <string name="permissions_paste">Joylash</string>
+    <string name="permissions_notifications">Bildirishnomalar</string>
+    <string name="permissions_last_check">Oxirgi tekshiruv</string>
+    <string name="permissions_recheck">Qayta tekshirish</string>
+    <string name="permissions_value_yes">Ha</string>
+    <string name="permissions_value_not_enabled">Yoʻq: klaviaturalar roʻyxatida AI Replyni yoqing</string>
+    <string name="permissions_value_enable_first">Avval klaviaturani yoqing</string>
+    <string name="permissions_value_other_keyboard">Hozir standart — boshqa klaviatura</string>
+    <string name="permissions_value_paste_seen">Ishlayapti · oxirgi joylash %1$s</string>
+    <string name="permissions_value_paste_not_yet">Hali tekshirilmagan: xabarni nusxalang va klaviaturada suhbatdoshni bosing</string>
+    <string name="permissions_value_notifications_off">Telefon sozlamalarida oʻchirilgan</string>
+    <string name="permissions_action_keyboard_settings">Klaviatura sozlamalarini ochish</string>
+    <string name="permissions_action_choose">AI Replyni tanlash</string>
+    <string name="permissions_action_paste_help">Joylash qanday ishlaydi</string>
+    <string name="permissions_help">Ishlamayaptimi?</string>
+    <string name="permissions_footer">Holatlar ilovaga qaytganingizda qayta oʻqiladi. Klaviatura haqida Android oʻzi xabar beradi; joylash shu telefondagi birinchi muvaffaqiyatli joylashdan keyin belgilanadi.</string>
+
+    <!-- Not working? (keyboard troubleshooting) -->
+    <string name="keyboard_help_not_listed_title">Roʻyxatda AI Reply yoʻq</string>
+    <string name="keyboard_help_not_listed_body">Klaviatura sozlamalarini oching va «Ekran klaviaturasi» yoki «Klaviaturalarni boshqarish» boʻlimini toping — nomlari telefonga qarab farq qiladi. AI Reply hali ham boʻlmasa, telefonni qayta yoqing.</string>
+    <string name="keyboard_help_warning_title">Android ogohlantirish koʻrsatadi</string>
+    <string name="keyboard_help_warning_body">U telefonga oʻrnatilmagan har qanday klaviatura uchun chiqadi. AI Replyni yoqish uchun «OK»ni bosing: matn faqat «Javob berish» yoki «Yozish»ni bosganingizda yuboriladi.</string>
+    <string name="keyboard_help_other_title">Hali ham boshqa klaviatura ochilyapti</string>
+    <string name="keyboard_help_other_body">«AI Replyni tanlash»ni bosing yoki yozayotganda navigatsiya panelidagi klaviatura belgisini bosing. Baʼzi telefonlarda probel tugmasini bosib turish kerak.</string>
+    <string name="keyboard_help_paste_title">Nusxalangan xabar chiqmayapti</string>
+    <string name="keyboard_help_paste_body">Rasm yoki faylni emas, xabar matnini nusxalang. Boshqa ilova maxfiy deb belgilagan matn (masalan, parol) oʻqilmaydi.</string>
+
+    <!-- Paste from other apps -->
+    <string name="paste_help_title">Boshqa ilovalardan joylash</string>
+    <string name="paste_help_intro">AI Reply nusxalangan xabarga javob beradi. Android’da bu shunday ishlaydi.</string>
+    <string name="paste_help_steps_title">Qanday joylash kerak</string>
+    <string name="paste_help_step_copy">Chatda xabarni bosib turing va «Nusxalash»ni tanlang.</string>
+    <string name="paste_help_step_switch">Xabar maydonini bosing va AI Replyga oʻting.</string>
+    <string name="paste_help_step_recipient">Kimga javob berayotganingizni bosing: aynan shu paytda AI Reply nusxalangan matnni oʻqiydi.</string>
+    <string name="paste_help_rules_title">Android almashish buferini qanday himoya qiladi</string>
+    <string name="paste_help_rule_focus">Android almashish buferini faqat ekrandagi ilovaga yoki hozir ishlatilayotgan klaviaturaga oʻqishga ruxsat beradi. Shuning uchun AI Reply uni klaviatura sifatida va faqat siz bosganingizda oʻqiydi — hech qachon fonda emas.</string>
+    <string name="paste_help_rule_private">Boshqa ilova maxfiy deb belgilagan matn (parol, bank kodi) boshqa ilovalardan yashiriladi. AI Reply ham uni oʻqimaydi — xabarning oʻzini nusxalang.</string>
+    <string name="paste_help_rule_notice">Android 12 dan boshlab telefon AI Reply almashish buferidan matn joylaganini qisqa koʻrsatishi mumkin. Shu tarzda tizim bosganingizni tasdiqlaydi.</string>
+    <string name="paste_help_rule_no_switch">Android’da alohida «Joylashga ruxsat berish» tugmasi yoʻq — hech narsani yoqish shart emas.</string>
+    <string name="paste_help_last">Oxirgi muvaffaqiyatli joylash: %1$s</string>
+    <string name="paste_help_never">Bu telefonda AI Replyda hali joylash boʻlmagan.</string>
+
+</resources>

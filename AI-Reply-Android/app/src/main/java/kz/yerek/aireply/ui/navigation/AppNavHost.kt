@@ -20,6 +20,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import kz.yerek.aireply.BuildConfig
+import kz.yerek.aireply.MainActivity
 import kz.yerek.aireply.ui.LocalServices
 import kz.yerek.aireply.ui.feature.account.AccountController
 import kz.yerek.aireply.ui.feature.account.EmailSignInScreen
@@ -37,6 +38,8 @@ import kz.yerek.aireply.ui.feature.onboarding.OnboardingScreen
 import kz.yerek.aireply.ui.feature.profile.ProfileScreen
 import kz.yerek.aireply.ui.feature.settings.SettingsScreen
 import kz.yerek.aireply.ui.feature.setup.KeyboardSetupScreen
+import kz.yerek.aireply.ui.feature.setup.PasteHelpScreen
+import kz.yerek.aireply.ui.feature.setup.PermissionsScreen
 import kz.yerek.aireply.ui.feature.templates.TemplateEditorScreen
 import kz.yerek.aireply.ui.feature.templates.TemplateListScreen
 
@@ -48,17 +51,22 @@ import kz.yerek.aireply.ui.feature.templates.TemplateListScreen
  * registration step, onboarding) is showing, and is opened on top of Home
  * once they are all behind. It never skips one.
  *
- * @param debugOnboarding DEBUG builds only: open the first run straight away,
- *   before sign-in, so it can be reviewed on an emulator without an account.
+ * @param debugScreen DEBUG builds only: open the first run
+ *   ([MainActivity.DEBUG_SCREEN_ONBOARDING]) or one of [Routes.Reviewable]
+ *   straight away, before sign-in, so it can be reviewed on an emulator
+ *   without an account.
  */
 @Composable
-fun AppNavHost(debugOnboarding: Boolean = false) {
+fun AppNavHost(debugScreen: String? = null) {
     val services = LocalServices.current
     val navController = rememberNavController()
 
     val accountState by services.account.state.collectAsStateWithLifecycle()
     var completingRegistration by rememberSaveable { mutableStateOf(false) }
-    var reviewingOnboarding by rememberSaveable { mutableStateOf(BuildConfig.DEBUG && debugOnboarding) }
+    var reviewingOnboarding by rememberSaveable {
+        mutableStateOf(BuildConfig.DEBUG && debugScreen == MainActivity.DEBUG_SCREEN_ONBOARDING)
+    }
+    val reviewRoute = debugScreen?.takeIf { BuildConfig.DEBUG && it in Routes.Reviewable }
 
     // Onboarding is per device: the keyboard is enabled per phone, so the
     // version lives in device storage that is never restored from a backup.
@@ -85,6 +93,7 @@ fun AppNavHost(debugOnboarding: Boolean = false) {
     }
 
     when {
+            reviewRoute != null -> Unit
             !accountState.bootstrapComplete -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
@@ -117,7 +126,7 @@ fun AppNavHost(debugOnboarding: Boolean = false) {
             }
     }
 
-    val start = if (needsOnboarding) Routes.Onboarding else Routes.Home
+    val start = reviewRoute ?: if (needsOnboarding) Routes.Onboarding else Routes.Home
 
     NavHost(navController = navController, startDestination = start) {
 
@@ -140,6 +149,13 @@ fun AppNavHost(debugOnboarding: Boolean = false) {
         composable(Routes.WorkingHours) { WorkingHoursScreen(onBack = navController::popBackStack) }
         composable(Routes.KeyboardSetup) { KeyboardSetupScreen(onBack = navController::popBackStack) }
         composable(Routes.Subscription) { SubscriptionScreen(onBack = navController::popBackStack) }
+        composable(Routes.Permissions) {
+            PermissionsScreen(
+                onBack = navController::popBackStack,
+                onOpen = { route -> navController.navigate(route) }
+            )
+        }
+        composable(Routes.PasteHelp) { PasteHelpScreen(onBack = navController::popBackStack) }
 
         composable(Routes.Templates) {
             TemplateListScreen(

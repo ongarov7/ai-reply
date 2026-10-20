@@ -74,8 +74,7 @@ class MainActivity : ComponentActivity() {
         // that opened it the first time; a new one arrives in onNewIntent.
         if (savedInstanceState == null) handleExternalIntent(intent)
 
-        val debugOnboarding = BuildConfig.DEBUG &&
-            intent?.getStringExtra(EXTRA_DEBUG_SCREEN) == DEBUG_SCREEN_ONBOARDING
+        val debugScreen = if (BuildConfig.DEBUG) intent?.getStringExtra(EXTRA_DEBUG_SCREEN) else null
 
         setContent {
             // Built once: a Flow made during composition would be rebuilt, and
@@ -100,7 +99,7 @@ class MainActivity : ComponentActivity() {
 
             CompositionLocalProvider(LocalServices provides services) {
                 AIReplyTheme(appearance = appearance) {
-                    AppNavHost(debugOnboarding = debugOnboarding)
+                    AppNavHost(debugScreen = debugScreen)
                 }
             }
         }
@@ -176,7 +175,9 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         /**
-         * DEBUG builds only, for reviewing a screen on an emulator:
+         * DEBUG builds only, for reviewing a screen on an emulator without an
+         * account: `onboarding` (the first run), or a route such as `compose`,
+         * `permissions`, `paste_help`:
          * `adb shell am start -n kz.yerek.aireply/.MainActivity --es kz.yerek.aireply.debugScreen onboarding`.
          */
         const val EXTRA_DEBUG_SCREEN = "kz.yerek.aireply.debugScreen"

@@ -29,7 +29,15 @@ enum class ProductEvent(val wireName: String) {
     /** `source` (`onboarding` | `settings`), `skipped`. Never the value chosen. */
     GENDER_SELECTED("gender_selected"),
     AUTOCORRECT_ENABLED("autocorrect_enabled"),
-    AUTOCORRECT_DISABLED("autocorrect_disabled")
+    AUTOCORRECT_DISABLED("autocorrect_disabled"),
+    /** The user tapped through to the system keyboard list. */
+    KEYBOARD_SETTINGS_OPENED("keyboard_settings_opened"),
+    /** Copied text reached the app on the user's Paste tap. Never the text. */
+    PASTE_SUCCEEDED("paste_succeeded"),
+    /** `step`: where «Позже» or «Пропустить» was tapped. */
+    ONBOARDING_SKIPPED("onboarding_skipped"),
+    /** A first run came back at its saved step after the app was closed. */
+    ONBOARDING_RESUMED("onboarding_resumed")
 }
 
 /** The only shapes a property can take. */
