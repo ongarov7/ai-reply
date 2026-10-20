@@ -38,14 +38,32 @@ final class ContextTextProvider {
 
         let pasteboard = UIPasteboard.general
         // `hasStrings` is a metadata query and does not trigger the system
-        // paste prompt; only reading `string` does.
-        guard pasteboard.hasStrings, let copied = Self.normalised(pasteboard.string) else {
+        // paste prompt; only reading `string` does, so it is read only when
+        // there is text to read.
+        let hasStrings = pasteboard.hasStrings
+        switch ClipboardRead.classify(hasStrings: hasStrings, string: hasStrings ? pasteboard.string : nil) {
+        case .text(let copied):
+            ReplyLog.event("source: clipboard, length \(copied.count)")
+            Self.record(.succeeded)
+            return .success(ReplyContext(text: copied, source: .clipboard))
+        case .empty:
             ReplyLog.event("clipboard: no usable text")
             return .failure(.noSourceMessage)
+        case .denied:
+            ReplyLog.event("clipboard: paste denied")
+            Self.record(.denied)
+            return .failure(.pasteDenied)
         }
+    }
 
-        ReplyLog.event("source: clipboard, length \(copied.count)")
-        return .success(ReplyContext(text: copied, source: .clipboard))
+    /// The paste's outcome, for the app's "Paste from Other Apps" status:
+    /// a timestamp and nothing else. Reaching this needs Full Access, so the
+    /// App Group write lands; it is made off the main thread.
+    private static func record(_ outcome: SharedSettings.PasteOutcome) {
+        let now = Date()
+        DispatchQueue.global(qos: .utility).async {
+            SharedSettings.shared.recordPaste(outcome, at: now)
+        }
     }
 
     private static func normalised(_ value: String?) -> String? {
@@ -172,7 +190,9 @@ final class ReplyFlowCoordinator {
             // An empty clipboard is not an error worth shouting about: the
             // composer opens anyway and its placeholder says what to do. Full
             // Access being off IS worth saying, because nothing the user does
-            // inside the keyboard can fix it.
+            // inside the keyboard can fix it - and so is a paste iOS refused:
+            // the user did copy, and needs to hear why nothing arrived and
+            // that the message can be typed instead.
             if error != .noSourceMessage { opened.flow.fail(error) }
         }
 

@@ -781,6 +781,10 @@ final class KeyboardViewController: UIInputViewController {
             errorMessage: (message?.isEmpty ?? true) ? nil : message,
             sourceLimit: AILimits.current.sourceCharacters,
             instructionLimit: ReplyInstruction.maximumCharacters,
+            // Retry only where trying again can work: never without Full
+            // Access, after a refused paste or with no message.
+            errorOffersRetry: flow.error?.offersRetry ?? true,
+            offersTypedSource: flow.error == .pasteDenied || flow.error == .noSourceMessage,
             offersReport: offersReport
         ))
         keysView.isInputDimmed = flow.isGenerating || actionBar.isReporting

@@ -244,6 +244,9 @@
 		FB68C3381390555C81D77917 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4871B7428808BDBAA314E78 /* DesignSystem.swift */; };
 		FEF45880C36B767675C5DCD3 /* CommunicationTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90E39000C4ED61ADBA6BA9DB /* CommunicationTypes.swift */; };
 		D619DEEFDE69A7C4F6141138 /* RecipientKindTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A02C735F304FB2B2AF2C2070 /* RecipientKindTests.swift */; };
+		12D3A3EB46A8AB52683C6064 /* ClipboardReadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4B988B1BC5083433075BE91 /* ClipboardReadTests.swift */; };
+		39D29941010777A15E65DF58 /* ClipboardRead.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CB5D31143D9B8B20256067B /* ClipboardRead.swift */; };
+		BB5CD7599C9920361661FCDF /* ClipboardRead.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CB5D31143D9B8B20256067B /* ClipboardRead.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -459,6 +462,8 @@
 		FE58C34E468563CEF001E34F /* ProductEvents.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ProductEvents.swift; sourceTree = "<group>"; };
 		FF45F7430763064DEBE1991B /* OnboardingGenderStep.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OnboardingGenderStep.swift; sourceTree = "<group>"; };
 		A02C735F304FB2B2AF2C2070 /* RecipientKindTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipientKindTests.swift; sourceTree = "<group>"; };
+		A4B988B1BC5083433075BE91 /* ClipboardReadTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardReadTests.swift; sourceTree = "<group>"; };
+		1CB5D31143D9B8B20256067B /* ClipboardRead.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardRead.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -666,6 +671,7 @@
 				00985BE1BD5750228F264479 /* PushNotificationsModelTests.swift */,
 				40C0C4C6C68D55BB47BC9602 /* PreferredLanguageSyncTests.swift */,
 				A02C735F304FB2B2AF2C2070 /* RecipientKindTests.swift */,
+				A4B988B1BC5083433075BE91 /* ClipboardReadTests.swift */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -735,6 +741,7 @@
 				278DFFC302B4619D7230AE43 /* Autocorrect */,
 				C8965D289FD9709E878F8C7F /* AutocorrectFieldPolicy.swift */,
 				35918D4FAC9C8A8307C26FAB /* AutocorrectCaret.swift */,
+				1CB5D31143D9B8B20256067B /* ClipboardRead.swift */,
 			);
 			path = Keyboard;
 			sourceTree = "<group>";
@@ -1071,6 +1078,7 @@
 				F89C7C6A308F40595E29AF7F /* PushNotificationsModelTests.swift in Sources */,
 				B8585584FDE8CD2FD6C6823B /* PreferredLanguageSyncTests.swift in Sources */,
 				D619DEEFDE69A7C4F6141138 /* RecipientKindTests.swift in Sources */,
+				12D3A3EB46A8AB52683C6064 /* ClipboardReadTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1148,6 +1156,7 @@
 				274E9F9E216F914F227317EF /* SuggestionStripView.swift in Sources */,
 				24D033B8F97E4A20BAFA5ED6 /* PolishChipView.swift in Sources */,
 				C4AD267D88390B5D3DA4B873 /* AutocorrectCaret.swift in Sources */,
+				BB5CD7599C9920361661FCDF /* ClipboardRead.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1267,6 +1276,7 @@
 				4A2FA1E819C7BCFE4889145A /* NotificationsAPI.swift in Sources */,
 				3E3B46404B896144141CEE7F /* PushNotificationsModel.swift in Sources */,
 				1C2C97DD362E4F5F9C503145 /* PreferredLanguageSync.swift in Sources */,
+				39D29941010777A15E65DF58 /* ClipboardRead.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

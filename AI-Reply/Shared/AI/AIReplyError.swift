@@ -9,6 +9,9 @@ import Foundation
 enum AIReplyError: Error, Equatable, Sendable {
     /// Nothing was copied, or the copied value held no text.
     case noSourceMessage
+    /// Something was copied, but iOS refused the keyboard the paste: the
+    /// user tapped "Don't Allow", or "Paste from Other Apps" is set to deny.
+    case pasteDenied
     /// The copied message is longer than the limit the server publishes
     /// (400 characters unless an administrator changed it).
     case messageTooLong(limit: Int)
@@ -43,4 +46,18 @@ enum AIReplyError: Error, Equatable, Sendable {
     case noInstruction
     /// Compose mode: the description is longer than the server's limit.
     case instructionTooLong(limit: Int)
+
+    /// Whether doing the same thing again can work, so the composer offers
+    /// Retry. Not when the keyboard itself is in the way (no Full Access),
+    /// when iOS refused the paste or nothing was copied, or when a text is
+    /// too long: Retry would only bring the same sentence back.
+    var offersRetry: Bool {
+        switch self {
+        case .noSourceMessage, .pasteDenied, .fullAccessRequired, .messageTooLong, .noInstruction, .instructionTooLong:
+            return false
+        case .notConfigured, .offline, .timedOut, .cancelled, .authenticationFailed, .rateLimited,
+             .quotaExhausted, .monthlyQuotaExhausted, .consentRequired, .emptyResponse, .serviceUnavailable:
+            return true
+        }
+    }
 }

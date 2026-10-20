@@ -104,6 +104,10 @@ final class ReplyComposerView: UIView {
         /// shown. Not when the error is about the copied message: Retry
         /// would write a new message, which is not what was just tried.
         var errorOffersRetry = true
+        /// The copied message could not be read - iOS refused the paste, or
+        /// nothing was copied - so the empty message card opens for typing
+        /// it instead, with Paste still in it.
+        var offersTypedSource = false
         /// The result offers Report: the server takes reports and the
         /// keyboard can reach it.
         var offersReport = false
@@ -119,6 +123,10 @@ final class ReplyComposerView: UIView {
     private var sourceLimit = AILimits.fallback.sourceCharacters
     private var instructionLimit = ReplyInstruction.maximumCharacters
     private var isSourceExpanded = false
+    /// Set once the copied message could not be read: from then on the empty
+    /// message card is for typing, and a tap on its preview opens it rather
+    /// than pasting again.
+    private var typingOffered = false
 
     private var theme = KeyboardTheme(isDark: false)
     private var strings = AIReplyStrings.forLanguage(.english)
@@ -351,7 +359,8 @@ final class ReplyComposerView: UIView {
         attachTap(to: draftView, action: #selector(draftTapped(_:)))
 
         errorLabel.font = .systemFont(ofSize: 12, weight: .medium)
-        errorLabel.numberOfLines = 2
+        // Three lines: a refused paste names the iOS setting to change.
+        errorLabel.numberOfLines = 3
         errorLabel.adjustsFontSizeToFitWidth = true
         errorLabel.minimumScaleFactor = 0.8
 
@@ -527,6 +536,13 @@ final class ReplyComposerView: UIView {
             draftView.setContentOffset(.zero, animated: false)
         }
 
+        let sourceIsEmpty = content.source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        if content.offersTypedSource, flow.stage == .composing, sourceIsEmpty, !isCompose {
+            typingOffered = true
+            isSourceExpanded = true
+            focus = .source
+        }
+
         switch flow.stage {
         case .composing:
             if focus != .source || !isSourceExpanded { focus = .instruction }
@@ -550,6 +566,7 @@ final class ReplyComposerView: UIView {
         errorMessage = nil
         errorOffersRetry = true
         isSourceExpanded = false
+        typingOffered = false
         conflictHeight = 0
         reportCloseTimer?.cancel()
         reportCloseTimer = nil
@@ -641,17 +658,18 @@ final class ReplyComposerView: UIView {
         // Header
         let trimmedSource = sourceText.trimmingCharacters(in: .whitespacesAndNewlines)
         let hasSource = !trimmedSource.isEmpty
+        let emptyAction = typingOffered ? strings.typeSourceMessage : strings.pasteMessage
         let preview = hasSource
             ? trimmedSource.split(whereSeparator: \.isNewline).joined(separator: " ")
-            : strings.pasteMessage
+            : emptyAction
         var attributes = AttributeContainer()
         attributes.font = .systemFont(ofSize: 13, weight: hasSource ? .regular : .medium)
         previewButton.configuration?.attributedTitle = AttributedString(preview, attributes: attributes)
         previewButton.configuration?.image = UIImage(
-            systemName: hasSource ? "chevron.down" : "doc.on.clipboard",
+            systemName: hasSource ? "chevron.down" : (typingOffered ? "square.and.pencil" : "doc.on.clipboard"),
             withConfiguration: UIImage.SymbolConfiguration(pointSize: 10, weight: .semibold)
         )
-        previewButton.accessibilityLabel = hasSource ? "\(strings.copiedMessage): \(preview)" : strings.pasteMessage
+        previewButton.accessibilityLabel = hasSource ? "\(strings.copiedMessage): \(preview)" : emptyAction
         previewButton.accessibilityHint = hasSource ? strings.showFullMessage : nil
         previewButton.isEnabled = !flow.isGenerating && !isConflict
 
@@ -675,7 +693,7 @@ final class ReplyComposerView: UIView {
         clearButton.accessibilityLabel = strings.clearSource
         pasteButton.isHidden = stage != .composing
         clearButton.isHidden = stage != .composing || !hasSource
-        sourceView.placeholder = strings.noSourceMessage
+        sourceView.placeholder = typingOffered ? strings.typeSourceMessage : strings.noSourceMessage
         sourceView.accessibilityLabel = strings.copiedMessage
 
         // Create: no persona and no message - a title, and New once there is
@@ -937,7 +955,7 @@ final class ReplyComposerView: UIView {
 
         if let message = errorMessage, !message.isEmpty {
             let fit = errorLabel.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude)).height
-            plan.error = min(32, max(15, ceil(fit)))
+            plan.error = min(46, max(15, ceil(fit)))
         }
         let errorBlock = plan.error > 0 ? plan.error + 4 : 0
 
@@ -1481,13 +1499,17 @@ final class ReplyComposerView: UIView {
 
     @objc private func previewTapped() {
         guard !flow.isGenerating, !isConflict else { return }
-        if sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        let isEmpty = sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        if isEmpty, !typingOffered {
             delegate?.composerDidTapPaste(self)
             return
         }
         isSourceExpanded = true
+        // After a paste that did not work the card opens to be typed into.
+        if isEmpty, flow.stage == .composing { focus = .source }
         refresh()
         remeasure()
+        if isEmpty { delegate?.composerDidMoveCaret(self) }
     }
 
     @objc private func collapseTapped() {

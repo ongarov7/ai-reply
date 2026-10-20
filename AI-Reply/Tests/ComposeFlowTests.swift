@@ -378,12 +378,31 @@ final class ComposeFlowTests: XCTestCase {
             XCTAssertEqual(coordinator.session?.notice(strings)?.text, strings.fullAccessRequired, language.rawValue)
         }
 
-        // Write without Full Access still gets Create's own sentence.
+        // Write without Full Access still gets Create's own sentence, and no
+        // Retry: trying again cannot reach the network either.
         coordinator.showError(.fullAccessRequired)
         let english = AIReplyStrings.forLanguage(.english)
         XCTAssertNil(coordinator.session?.copiedMessageError)
         XCTAssertEqual(coordinator.session?.notice(english),
-                       ComposeSession.Notice(text: english.compose.fullAccessRequired, offersRetry: true))
+                       ComposeSession.Notice(text: english.compose.fullAccessRequired, offersRetry: false))
+        try? await Task.sleep(for: .milliseconds(20))
+        XCTAssertTrue(scripted.requests.isEmpty)
+    }
+
+    /// iOS refused the paste: Create says so - and where to allow it - and
+    /// stays, with the instruction, and without Retry.
+    func testRefusedPasteIsExplainedInCreate() async {
+        coordinator.open()
+        coordinator.updateInstruction("да")
+        let reply = coordinator.replyToCopied(persona: friend, instructionLimit: 280) { .failure(.pasteDenied) }
+
+        XCTAssertNil(reply)
+        XCTAssertTrue(coordinator.isActive)
+        XCTAssertEqual(coordinator.session?.instruction, "да")
+        for language in AppLanguage.allCases {
+            let strings = AIReplyStrings.forLanguage(language)
+            XCTAssertEqual(coordinator.session?.notice(strings), ComposeSession.Notice(text: strings.pasteDenied, offersRetry: false))
+        }
         try? await Task.sleep(for: .milliseconds(20))
         XCTAssertTrue(scripted.requests.isEmpty)
     }

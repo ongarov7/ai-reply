@@ -35,8 +35,9 @@ struct ComposeSession: Equatable, Sendable {
     struct Notice: Equatable, Sendable {
         let text: String
         /// Whether the primary button offers Retry. Only for a failed
-        /// Write: after "Reply to copied" failed, Retry would write a new
-        /// message, which is not what was just tried.
+        /// Write that trying again can fix: after "Reply to copied" failed,
+        /// Retry would write a new message, which is not what was just
+        /// tried, and without Full Access it would fail the same way.
         let offersRetry: Bool
     }
 
@@ -50,7 +51,7 @@ struct ComposeSession: Equatable, Sendable {
         // The reply sentence for Full Access talks about a copied message;
         // writing has none.
         let text = error == .fullAccessRequired ? strings.compose.fullAccessRequired : strings.message(for: error)
-        return text.isEmpty ? nil : Notice(text: text, offersRetry: true)
+        return text.isEmpty ? nil : Notice(text: text, offersRetry: error.offersRetry)
     }
 }
 
