@@ -56,6 +56,12 @@ const (
 
 	// Дауысты мәтінге айналдырудың тәуліктік шегі толды (жауап квотасынан бөлек).
 	CodeVoiceLimit = "VOICE_LIMIT_REACHED"
+
+	// Қосымша ішіндегі сатып алулар (App Store, Google Play).
+	CodeIAPUnavailable         = "IAP_UNAVAILABLE"
+	CodePurchaseInvalid        = "PURCHASE_INVALID"
+	CodePurchaseOwnedElsewhere = "PURCHASE_BELONGS_TO_ANOTHER_ACCOUNT"
+	CodeStoreUnavailable       = "STORE_UNAVAILABLE"
 )
 
 // ErrorBody — қате конверті.
@@ -147,6 +153,14 @@ func Translate(err error) (int, string, string) {
 		return http.StatusConflict, CodePlanUnavailable, "This plan is not available."
 	case errors.Is(err, domain.ErrPurchasesDisabled):
 		return http.StatusForbidden, CodePurchasesDisabled, "Purchases are not available right now."
+	case errors.Is(err, domain.ErrIAPUnavailable):
+		return http.StatusForbidden, CodeIAPUnavailable, "In-app purchases are not available right now."
+	case errors.Is(err, domain.ErrPurchaseInvalid):
+		return http.StatusBadRequest, CodePurchaseInvalid, "The store did not confirm this purchase."
+	case errors.Is(err, domain.ErrPurchaseOwnedElsewhere):
+		return http.StatusConflict, CodePurchaseOwnedElsewhere, "This purchase belongs to another account."
+	case errors.Is(err, domain.ErrStoreUnavailable):
+		return http.StatusServiceUnavailable, CodeStoreUnavailable, "The store could not be reached. Try again later."
 	case errors.Is(err, domain.ErrRateLimited):
 		return http.StatusTooManyRequests, CodeRateLimited, "Too many requests. Try again shortly."
 	case errors.Is(err, domain.ErrProviderTimeout):

@@ -24,6 +24,11 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/database"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
 	"github.com/aireply/ai-reply-back-end/internal/email"
+	"github.com/aireply/ai-reply-back-end/internal/iap"
+	"github.com/aireply/ai-reply-back-end/internal/iap/appstore"
+	"github.com/aireply/ai-reply-back-end/internal/iap/appstore/appstoretest"
+	"github.com/aireply/ai-reply-back-end/internal/iap/googleplay"
+	"github.com/aireply/ai-reply-back-end/internal/iap/googleplay/playtest"
 	"github.com/aireply/ai-reply-back-end/internal/installations"
 	"github.com/aireply/ai-reply-back-end/internal/legal"
 	"github.com/aireply/ai-reply-back-end/internal/limits"
@@ -316,6 +321,11 @@ type harness struct {
 	// pushClock — installations and notifications only: backoff tests move it
 	// without expiring the access tokens that run on clock.
 	pushClock *traits.FixedClock
+	// iap — store purchases; apple signs transactions with a fake Apple-shaped chain the
+	// verifier trusts, play is the fake Google OAuth + androidpublisher (withIAP only).
+	iap   *iap.Service
+	apple *appstoretest.Chain
+	play  *playtest.Server
 }
 
 // harnessOption — жекелеген тесттің баптауы (мысалы, лимитті азайту).
@@ -448,6 +458,31 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 	adminSvc := admin.New(store, subSvc, planSvc, cfg, log).WithEvents(events)
 	supportSvc := support.New(store, subSvc, log).WithClock(clock).WithNotifier(events).
 		WithDiagnostics(adminSvc.SupportDiagnostics)
+	iapSvc, err := iap.New(iap.Deps{Repo: store, Config: cfg.IAP, Secret: cfg.Auth.AccessSecret, Log: log})
+	if err != nil {
+		t.Fatalf("iap: %v", err)
+	}
+	iapSvc.WithClock(clock).WithTTL(0)
+	var (
+		appleChain *appstoretest.Chain
+		play       *playtest.Server
+	)
+	if cfg.IAP.Apple() {
+		appleChain = appstoretest.NewChain(t, appstoretest.Options{})
+		verifier, err := appstore.New(appstore.WithRoot(appleChain.Root))
+		if err != nil {
+			t.Fatalf("apple verifier: %v", err)
+		}
+		iapSvc.WithAppleVerifier(verifier)
+	}
+	if cfg.IAP.Google() {
+		play = playtest.New(t, cfg.IAP.GooglePackageName)
+		client, err := googleplay.New(play.Config(t))
+		if err != nil {
+			t.Fatalf("google play: %v", err)
+		}
+		iapSvc.WithGooglePlay(client)
+	}
 	simulatorSvc := simulator.New(simulator.Deps{
 		Repo: store, Users: userSvc, Subs: subSvc, Plans: planSvc, AI: aiSvc, Limits: limitSvc,
 		Config: cfg, Log: log,
@@ -463,9 +498,10 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 		AI: aiSvc, Limits: limitSvc, Payments: paymentSvc, Events: eventSvc, Installations: installSvc,
 		Notifications: notifySvc, Reports: reportSvc, Support: supportSvc, Limiter: limiter, Log: log,
 		Ping:    func(ctx context.Context) error { return db.Reader().PingContext(ctx) },
-		Credits: creditSvc}).Register(mux)
+		Credits: creditSvc, IAP: iapSvc}).Register(mux)
 	adminapi.New(adminapi.Deps{Config: cfg, Admin: adminSvc, Limits: limitSvc, Notifications: notifySvc,
-		Payments: paymentSvc, Reports: reportSvc, Credits: creditSvc, Support: supportSvc, Limiter: limiter, Log: log}).Register(mux)
+		Payments: paymentSvc, Reports: reportSvc, Credits: creditSvc, Support: supportSvc, IAP: iapSvc,
+		Limiter: limiter, Log: log}).Register(mux)
 	simulatorapi.New(simulatorapi.Deps{Config: cfg, Admin: adminSvc, Simulator: simulatorSvc,
 		Limiter: limiter, Log: log}).Register(mux)
 	webServer, err := web.New(web.Deps{Config: cfg, Admin: adminSvc, Plans: planSvc, Payments: paymentSvc,
@@ -483,7 +519,7 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 		provider: provider, speech: speech, clock: clock, logs: logs, dbPath: dbPath, admin: adminSvc, limits: limitSvc,
 		credits: creditSvc,
 		authSvc: authSvc, users: userSvc, installations: installSvc, notify: notifySvc, events: events, push: fcm, mail: mail,
-		pushClock: pushClock}
+		pushClock: pushClock, iap: iapSvc, apple: appleChain, play: play}
 	t.Cleanup(func() {
 		server.Close()
 		_ = db.Close()

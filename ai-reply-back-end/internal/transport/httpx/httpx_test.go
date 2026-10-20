@@ -73,3 +73,29 @@ func TestClientIPUsesTheProxyAppendedAddress(t *testing.T) {
 		}
 	}
 }
+
+// Сатып алу қателері: себеп details.reason-да, басқа тіркелгі — 409, дүкен жоқ — 403, дүкен үнсіз — 503.
+func TestFailMapsPurchaseErrors(t *testing.T) {
+	for _, c := range []struct {
+		err     error
+		status  int
+		code    string
+		details map[string]any
+	}{
+		{domain.PurchaseInvalid(domain.PurchaseReasonAccount), http.StatusBadRequest, CodePurchaseInvalid,
+			map[string]any{"reason": "account_mismatch"}},
+		{domain.ErrPurchaseOwnedElsewhere, http.StatusConflict, CodePurchaseOwnedElsewhere, nil},
+		{domain.ErrIAPUnavailable, http.StatusForbidden, CodeIAPUnavailable, nil},
+		{domain.ErrStoreUnavailable, http.StatusServiceUnavailable, CodeStoreUnavailable, nil},
+	} {
+		w := httptest.NewRecorder()
+		Fail(w, c.err)
+		var body errorEnvelope
+		if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+			t.Fatal(err)
+		}
+		if w.Code != c.status || body.Error.Code != c.code || !reflect.DeepEqual(body.Error.Details, c.details) {
+			t.Errorf("%v: %d %+v", c.err, w.Code, body.Error)
+		}
+	}
+}

@@ -250,6 +250,11 @@ type countryDTO struct {
 	Example string `json:"example"`
 }
 
+// iapAvailable — бұл платформада пакет не pass сатып алуға бола ма.
+func (s *Server) iapAvailable(ctx context.Context, platform string) bool {
+	return s.iap != nil && s.iap.Available(ctx, platform)
+}
+
 // welcomeBonusOn — жаңа тіркелгілер бонус ала ма.
 func (s *Server) welcomeBonusOn(ctx context.Context) bool {
 	return s.credits != nil && s.credits.WelcomeSettings(ctx).Units > 0
@@ -316,6 +321,11 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 			"push_reminders": s.notifications != nil && s.notifications.RemindersEnabled(r.Context()),
 			// /api/v1/support/*: the chat with a support operator.
 			"support_chat": s.support != nil,
+			// Response packs and passes can be bought on this platform right now:
+			// the store integration is configured, an admin switched iap_enabled on
+			// and at least one active product has units and this store's id.
+			"iap_ios":     s.iapAvailable(r.Context(), domain.PlatformIOS),
+			"iap_android": s.iapAvailable(r.Context(), domain.PlatformAndroid),
 		},
 		"demo_mode":    s.cfg.Auth.DemoMode,
 		"payment_mode": s.payments.Mode(),

@@ -45,6 +45,7 @@
     if (parts.length <= 1) return { name: "dashboard" };
     if (parts[1] === "users") return parts[2] ? { name: "user", id: parts[2] } : { name: "users" };
     if (parts[1] === "plans") return { name: "plans" };
+    if (parts[1] === "purchases") return { name: "purchases", tab: parts[2] === "transactions" ? "transactions" : "products" };
     if (parts[1] === "audit") return { name: "audit" };
     if (parts[1] === "reports") return { name: "reports" };
     if (parts[1] === "support") return parts[2] ? { name: "support", id: parts[2] } : { name: "support" };
@@ -139,7 +140,12 @@
     "send an Idempotency-Key header": "admin.error.reason.idempotency",
     "range": "admin.error.reason.range",
     "required": "admin.error.reason.required",
-    "too_long": "admin.error.reason.too_long"
+    "too_long": "admin.error.reason.too_long",
+    "value": "admin.error.reason.unknown_value",
+    "format": "admin.iap.reason.format",
+    "pass_only": "admin.iap.reason.pass_only",
+    "store_id_required": "admin.iap.reason.store_id_required",
+    "immutable": "admin.iap.reason.immutable"
   };
 
   var FIELD_KEYS = {
@@ -153,11 +159,14 @@
     status: "admin.users.col_status", platform: "admin.users.col_platform", push_status: "admin.push.device.push",
     auth: "admin.push.device.account", channel: "admin.push.delivery.channel", source: "admin.push.delivery.source",
     type: "admin.push.delivery.type", locale: "common.language",
-    units: "admin.credits.units", reason: "admin.credits.reason"
+    units: "admin.credits.units", reason: "admin.credits.reason",
+    code: "admin.iap.code", kind: "admin.iap.kind", duration_hours: "admin.iap.duration",
+    apple_product_id: "admin.iap.apple_id", google_product_id: "admin.iap.google_id", is_active: "admin.iap.active",
+    sort_order: "admin.iap.sort", provider: "admin.iap.provider", environment: "admin.iap.environment"
   };
 
   function fieldLabel(field) {
-    var text = /^(title|body)\.([a-z]{2})$/.exec(field);
+    var text = /^(title|body|name)\.([a-z]{2})$/.exec(field);
     if (text) return t(FIELD_KEYS[text[1]]) + " (" + text[2].toUpperCase() + ")";
     if (field.indexOf("data.") === 0) return t("admin.push.form.data") + " «" + field.slice(5) + "»";
     return FIELD_KEYS[field] ? t(FIELD_KEYS[field]) : field;
@@ -181,8 +190,12 @@
         if (!details.field) return t("admin.error.invalid");
         return fieldLabel(details.field) + ": " +
           (REASON_KEYS[details.reason] ? t(REASON_KEYS[details.reason]) : t("admin.error.reason.unknown_value"));
+      case "IAP_UNAVAILABLE":
+        return t("admin.settings.iap_unavailable");
       case "CONFLICT":
         if (details.field === "grant_id") return t("admin.credits.already_revoked");
+        if (details.field === "product") return t("admin.iap.archived_locked");
+        if (details.reason === "taken") return fieldLabel(details.field) + ": " + t("admin.iap.taken");
         return details.field === "idempotency_key" ? t("admin.error.idempotency_conflict") : t("admin.error.conflict");
       case "NOT_FOUND":
         return t("admin.error.not_found");
@@ -641,6 +654,24 @@
       </div>`
   };
 
+  // Сатып алулар (domain.IAPProductKinds, IAPPurchaseStatuses, IAPProviders, IAPEnvironments).
+  var IAP_KINDS = ["pack", "pass"];
+  var IAP_STATUSES = ["pending", "granted", "refunded", "revoked", "rejected"];
+  var IAP_PROVIDERS = ["app_store", "google_play"];
+  var IAP_ENVIRONMENTS = ["Production", "Sandbox", "Test", "Promo"];
+
+  // iapHelpers — сатып алу беттері мен қолданушы картасының белгілері.
+  var iapHelpers = {
+    iapKind: function (k) { return IAP_KINDS.indexOf(k) >= 0 ? t("admin.iap.kind." + k) : k; },
+    iapStatus: function (s) { return IAP_STATUSES.indexOf(s) >= 0 ? t("admin.iap.status." + s) : s; },
+    iapProvider: function (p) { return IAP_PROVIDERS.indexOf(p) >= 0 ? t("admin.iap.provider." + p) : p; },
+    iapEnv: function (e) { return IAP_ENVIRONMENTS.indexOf(e) >= 0 ? t("admin.iap.env." + e.toLowerCase()) : (e || "—"); },
+    iapStatusBadge: function (s) {
+      return { granted: "badge-ok", pending: "badge-warn", refunded: "badge-danger", revoked: "badge-danger" }[s] || "badge-muted";
+    },
+    iapEnvBadge: function (e) { return e === "Production" ? "badge-muted" : "badge-warn"; }
+  };
+
   // Кредит түрлері мен журнал жазбалары (domain.GrantKinds, domain.LedgerEntries).
   var GRANT_KINDS = ["pass", "welcome", "admin", "pack"];
   var LEDGER_ENTRIES = ["grant", "consume", "refund", "revoke"];
@@ -654,6 +685,8 @@
     mounted: function () { this.load(); },
     methods: {
       t: t, tf: tf, nf: nf, money: money,
+      iapStatus: iapHelpers.iapStatus, iapProvider: iapHelpers.iapProvider, iapEnv: iapHelpers.iapEnv,
+      iapStatusBadge: iapHelpers.iapStatusBadge, iapEnvBadge: iapHelpers.iapEnvBadge,
       async load() {
         this.loading = true;
         try {
@@ -812,6 +845,32 @@
                       <td>{{ e.reason || '—' }}<div class="muted small">{{ byLabel(e.by) }}</div></td>
                     </tr>
                     <tr v-if="!data.ledger.length"><td colspan="5" class="empty">{{ t('common.empty') }}</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-head"><h2>{{ t('admin.iap.user_title') }}</h2>
+                <div class="right"><a class="btn btn-sm" :href="'/admin/purchases/transactions?user_id=' + encodeURIComponent(data.user.id)"
+                  @click.prevent="$root.go('/admin/purchases/transactions?user_id=' + encodeURIComponent(data.user.id))">
+                  {{ t('admin.iap.all') }}</a></div></div>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>{{ t('admin.audit.when') }}</th><th>{{ t('admin.iap.provider') }}</th>
+                    <th>{{ t('admin.iap.product') }}</th><th>{{ t('admin.credits.units') }}</th>
+                    <th>{{ t('admin.users.col_status') }}</th></tr></thead>
+                  <tbody>
+                    <tr v-for="p in (data.iap_purchases || [])" :key="p.id">
+                      <td class="mono">{{ p.created_at }}</td>
+                      <td class="nowrap">{{ iapProvider(p.provider) }}
+                        <span :class="'badge ' + iapEnvBadge(p.environment)">{{ iapEnv(p.environment) }}</span></td>
+                      <td>{{ p.product_code || '—' }}</td>
+                      <td>{{ nf(p.units) }}</td>
+                      <td><span :class="'badge ' + iapStatusBadge(p.status)">{{ iapStatus(p.status) }}</span>
+                        <div class="muted small" v-if="p.revoke_reason">{{ p.revoked_at }} · {{ p.revoke_reason }}</div></td>
+                    </tr>
+                    <tr v-if="!(data.iap_purchases || []).length"><td colspan="5" class="empty">{{ t('common.empty') }}</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -1240,6 +1299,12 @@
           toast("ok", t("common.saved")); this.load();
         } catch (e) { toast("danger", t("common.error")); }
       },
+      async setIAP(enabled) {
+        try {
+          this.data.iap = await api("/settings/iap", { method: "POST", body: { enabled: enabled } });
+          toast("ok", t("common.saved"));
+        } catch (e) { toast("danger", errorText(e)); }
+      },
       async setPurchases(enabled) {
         try {
           this.data.purchases = await api("/settings/purchases", { method: "POST", body: { enabled: enabled } });
@@ -1321,6 +1386,34 @@
               @click="setPurchases(true)">{{ t('admin.settings.purchases_on') }}</button>
             <button v-else class="btn btn-danger" @click="setPurchases(false)">{{ t('admin.settings.purchases_off_btn') }}</button>
             <p class="muted" v-if="!data.purchases.checkout_available">{{ t('admin.settings.purchases_unavailable') }}</p>
+          </div>
+        </div>
+        <div class="card" v-if="data.iap">
+          <div class="card-head"><h2>{{ t('admin.settings.iap') }}</h2></div>
+          <div class="card-body">
+            <p class="muted" style="margin-top:0">{{ t('admin.settings.iap_hint') }}</p>
+            <dl class="kv">
+              <dt>App Store</dt>
+              <dd><span :class="'badge ' + (data.iap.apple ? 'badge-ok' : 'badge-muted')">
+                {{ data.iap.apple ? t('admin.iap.configured') : t('admin.iap.not_configured') }}</span>
+                <span class="mono muted">{{ data.iap.bundle_id }}</span></dd>
+              <dt>Google Play</dt>
+              <dd><span :class="'badge ' + (data.iap.google ? 'badge-ok' : 'badge-muted')">
+                {{ data.iap.google ? t('admin.iap.configured') : t('admin.iap.not_configured') }}</span>
+                <span class="mono muted">{{ data.iap.package_name }}</span></dd>
+              <dt>{{ t('admin.iap.sales') }}</dt>
+              <dd><span :class="'badge ' + (data.iap.enabled ? 'badge-ok' : 'badge-muted')">
+                {{ data.iap.enabled ? t('admin.iap.on') : t('admin.iap.off') }}</span>
+                <span v-if="data.iap.available_ios" class="badge badge-brand">iOS</span>
+                <span v-if="data.iap.available_android" class="badge badge-brand">Android</span></dd>
+            </dl>
+            <button v-if="!data.iap.enabled" class="btn btn-primary" :disabled="!data.iap.configured"
+              @click="setIAP(true)">{{ t('admin.settings.iap_on') }}</button>
+            <button v-else class="btn btn-danger" @click="setIAP(false)">{{ t('admin.settings.iap_off') }}</button>
+            <a class="btn" href="/admin/purchases" @click.prevent="$root.go('/admin/purchases')">{{ t('admin.iap.open_products') }}</a>
+            <p class="muted" v-if="!data.iap.configured">{{ t('admin.settings.iap_unavailable') }}</p>
+            <p class="muted" v-else-if="data.iap.enabled && !data.iap.available_ios && !data.iap.available_android">
+              {{ t('admin.settings.iap_no_products') }}</p>
           </div>
         </div>
         <div class="card" v-if="data.welcome_bonus">
@@ -1579,6 +1672,7 @@
             this.rows = data[options.rowsKey] || [];
             this.total = data.total || 0;
             if (data.limit) this.limit = data.limit;
+            if (options.extra) options.extra(this, data);
           } catch (e) {
             // A failed load must never look like an empty list.
             this.rows = [];
@@ -3209,11 +3303,302 @@
         <div v-else class="card"><div class="empty">{{ t('admin.support.select') }}</div></div>
       </div>`
   };
+  /* ------------------------------------------------------------ purchases */
+  // IAPProducts — әкімші баптайтын тауарлар: дүкендегі Product ID және не береді (бағасы дүкенде).
+  var IAPProducts = {
+    data: function () {
+      return { loading: true, products: [], iap: null, editing: null, tab: "ru", saving: false, kinds: IAP_KINDS };
+    },
+    mounted: function () { this.load(); },
+    methods: Object.assign({}, helpers, iapHelpers, {
+      async load() {
+        this.loading = true;
+        try {
+          var data = await api("/iap/products");
+          this.products = data.products || []; this.iap = data.iap || null;
+        } catch (e) { toast("danger", errorText(e)); }
+        this.loading = false;
+      },
+      blank() {
+        return { id: "", code: "", kind: "pack", units: 50, duration_hours: 0, apple_product_id: "", google_product_id: "",
+                 name: { kk: "", ru: "", en: "", uz: "" }, is_active: false, sort_order: 10 };
+      },
+      create() { this.editing = this.blank(); this.tab = "ru"; },
+      edit(p) { this.editing = JSON.parse(JSON.stringify(p)); this.tab = "ru"; },
+      close() { this.editing = null; },
+      kindChanged() {
+        if (this.editing.kind === "pack") this.editing.duration_hours = 0;
+        else if (!this.editing.duration_hours) this.editing.duration_hours = 24;
+      },
+      range(key) { return (this.iap && this.iap.ranges && this.iap.ranges[key]) || { min: 1, max: key === "units" ? 100000 : 720 }; },
+      invalid() {
+        var p = this.editing, units = this.range("units"), hours = this.range("duration_hours");
+        if (!/^[a-z0-9][a-z0-9_]{1,39}$/.test(p.code || "")) return true;
+        if (!Number.isInteger(p.units) || p.units < units.min || p.units > units.max) return true;
+        if (p.kind === "pass" && (!Number.isInteger(p.duration_hours) || p.duration_hours < hours.min || p.duration_hours > hours.max)) return true;
+        return p.is_active && !p.apple_product_id && !p.google_product_id;
+      },
+      async save() {
+        if (this.invalid()) { toast("danger", t("admin.iap.form_invalid")); return; }
+        this.saving = true;
+        var body = this.editing;
+        if (body.kind === "pack") body.duration_hours = 0;
+        try {
+          if (body.id) await api("/iap/products/" + body.id, { method: "PATCH", body: body });
+          else await api("/iap/products", { method: "POST", body: body });
+          toast("ok", t("common.saved"));
+          this.close(); this.load();
+        } catch (e) { toast("danger", errorText(e)); }
+        this.saving = false;
+      },
+      async archive(p) {
+        if (!window.confirm(t("admin.iap.archive_confirm"))) return;
+        try {
+          await api("/iap/products/" + p.id + "/archive", { method: "POST", body: {} });
+          toast("ok", t("common.saved")); this.load();
+        } catch (e) { toast("danger", errorText(e)); }
+      }
+    }),
+    template: `
+      <div>
+        <div class="card" v-if="iap">
+          <div class="card-head"><h2>{{ t('admin.iap.stores') }}</h2>
+            <div class="right"><span :class="'badge ' + (iap.enabled ? 'badge-ok' : 'badge-muted')">
+              {{ t('admin.iap.sales') }}: {{ iap.enabled ? t('admin.iap.on') : t('admin.iap.off') }}</span></div></div>
+          <div class="card-body">
+            <dl class="kv">
+              <dt>App Store</dt>
+              <dd><span :class="'badge ' + (iap.apple ? 'badge-ok' : 'badge-muted')">
+                {{ iap.apple ? t('admin.iap.configured') : t('admin.iap.not_configured') }}</span>
+                <span class="mono muted">{{ iap.bundle_id }}</span>
+                <span v-if="iap.apple" :class="'badge ' + (iap.apple_sandbox ? 'badge-warn' : 'badge-muted')">
+                  Sandbox: {{ iap.apple_sandbox ? t('admin.iap.accepted') : t('admin.iap.refused') }}</span></dd>
+              <dt>Google Play</dt>
+              <dd><span :class="'badge ' + (iap.google ? 'badge-ok' : 'badge-muted')">
+                {{ iap.google ? t('admin.iap.configured') : t('admin.iap.not_configured') }}</span>
+                <span class="mono muted">{{ iap.package_name }}</span>
+                <span v-if="iap.google" :class="'badge ' + (iap.voided_polling ? 'badge-ok' : 'badge-warn')">
+                  {{ t('admin.iap.voided_polling') }}: {{ iap.voided_polling ? t('admin.iap.on') : t('admin.iap.off') }}</span></dd>
+              <dt>{{ t('admin.iap.notification_url') }}</dt><dd class="mono">{{ iap.notification_url }}</dd>
+            </dl>
+            <p class="muted" style="margin:0">{{ t('admin.iap.stores_hint') }}</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h2>{{ t('admin.iap.products') }}</h2>
+            <div class="right"><button class="btn btn-sm btn-primary" @click="create">+ {{ t('admin.iap.new') }}</button></div></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>{{ t('admin.iap.code') }}</th><th>{{ t('admin.iap.kind') }}</th><th>{{ t('admin.credits.units') }}</th>
+                <th>{{ t('admin.iap.duration') }}</th><th>App Store</th><th>Google Play</th>
+                <th>{{ t('admin.users.col_status') }}</th><th>{{ t('admin.iap.sold') }}</th><th></th></tr></thead>
+              <tbody>
+                <tr v-if="loading" v-for="n in 3" :key="'s' + n"><td colspan="9"><div class="skeleton-row"></div></td></tr>
+                <tr v-else v-for="p in products" :key="p.id">
+                  <td><b>{{ p.code }}</b><div class="muted small">{{ p.name[$root.state.locale] || p.name.ru || p.name.en }}</div></td>
+                  <td>{{ iapKind(p.kind) }}</td>
+                  <td><b>{{ nf(p.units) }}</b></td>
+                  <td>{{ p.kind === 'pass' ? tf('admin.iap.hours', { n: p.duration_hours }) : '—' }}</td>
+                  <td class="mono">{{ p.apple_product_id || '—' }}</td>
+                  <td class="mono">{{ p.google_product_id || '—' }}</td>
+                  <td class="nowrap"><span v-if="p.archived" class="badge badge-muted">{{ t('admin.iap.archived') }}</span>
+                    <span v-else :class="'badge ' + (p.is_active ? 'badge-ok' : 'badge-muted')">
+                      {{ p.is_active ? t('common.active') : t('common.disabled') }}</span>
+                    <span v-if="p.offered_ios" class="badge badge-brand">iOS</span>
+                    <span v-if="p.offered_android" class="badge badge-brand">Android</span></td>
+                  <td>{{ nf(p.sales) }}</td>
+                  <td style="text-align:right; white-space:nowrap"><template v-if="!p.archived">
+                    <button class="btn btn-sm" @click="edit(p)">{{ t('common.edit') }}</button>
+                    <button class="btn btn-sm btn-danger" @click="archive(p)">{{ t('common.archive') }}</button></template></td>
+                </tr>
+                <tr v-if="!loading && !products.length"><td colspan="9" class="empty">{{ t('admin.iap.no_products') }}</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="card-body"><p class="muted" style="margin:0">{{ t('admin.iap.products_hint') }}</p></div>
+        </div>
+
+        <div class="modal-backdrop" v-if="editing" @click.self="close">
+          <div class="modal">
+            <div class="modal-head">
+              <h2>{{ editing.id ? editing.code : t('admin.iap.new') }}</h2>
+              <button class="btn btn-sm" @click="close">✕</button>
+            </div>
+            <div class="modal-body">
+              <div class="form-grid">
+                <label class="field"><span>{{ t('admin.iap.code') }}</span>
+                  <input type="text" v-model.trim="editing.code" :disabled="!!editing.id" maxlength="40" placeholder="pack_50"
+                         spellcheck="false"></label>
+                <label class="field"><span>{{ t('admin.iap.kind') }}</span>
+                  <select v-model="editing.kind" :disabled="!!editing.id" @change="kindChanged">
+                    <option v-for="k in kinds" :key="k" :value="k">{{ iapKind(k) }}</option>
+                  </select></label>
+                <label class="field"><span>{{ t('admin.credits.units') }}</span>
+                  <input type="number" step="1" :min="range('units').min" :max="range('units').max" v-model.number="editing.units"></label>
+                <label class="field" v-if="editing.kind === 'pass'"><span>{{ t('admin.iap.duration') }}</span>
+                  <input type="number" step="1" :min="range('duration_hours').min" :max="range('duration_hours').max"
+                         v-model.number="editing.duration_hours"></label>
+                <label class="field"><span>{{ t('admin.iap.apple_id') }}</span>
+                  <input type="text" v-model.trim="editing.apple_product_id" maxlength="100" spellcheck="false"></label>
+                <label class="field"><span>{{ t('admin.iap.google_id') }}</span>
+                  <input type="text" v-model.trim="editing.google_product_id" maxlength="100" spellcheck="false"></label>
+                <label class="field"><span>{{ t('admin.iap.sort') }}</span>
+                  <input type="number" step="1" min="0" max="10000" v-model.number="editing.sort_order"></label>
+              </div>
+              <div class="tabs">
+                <button v-for="l in $root.state.locales" :key="l" :class="{ 'is-active': tab === l }"
+                        @click="tab = l">{{ l.toUpperCase() }}</button>
+              </div>
+              <label class="field"><span>{{ t('admin.iap.name') }}</span>
+                <input type="text" maxlength="60" v-model="editing.name[tab]"></label>
+              <label class="checkline"><input type="checkbox" v-model="editing.is_active"> {{ t('admin.iap.active') }}</label>
+              <p class="muted">{{ t('admin.iap.form_hint') }}</p>
+              <p class="muted" v-if="editing.id">{{ t('admin.iap.units_change_hint') }}</p>
+            </div>
+            <div class="modal-foot">
+              <button class="btn" @click="close">{{ t('common.cancel') }}</button>
+              <button class="btn btn-primary" :disabled="saving || invalid()" @click="save">{{ t('common.save') }}</button>
+            </div>
+          </div>
+        </div>
+      </div>`
+  };
+
+  // IAPPurchases — дүкен транзакциялары: сүзгілер, қайтарулар және нақты/тест сатылымының қорытындысы.
+  var IAPPurchases = {
+    mixins: [listView({ endpoint: "/iap/purchases", rowsKey: "purchases", limit: 50,
+      defaults: { provider: "", status: "", environment: "", user_id: "" },
+      extra: function (vm, data) { vm.stats = data.stats || []; } })],
+    data: function () {
+      return { stats: [], providers: IAP_PROVIDERS, statuses: IAP_STATUSES, environments: IAP_ENVIRONMENTS };
+    },
+    computed: {
+      summary: function () {
+        var out = {};
+        IAP_PROVIDERS.forEach(function (p) { out[p] = { paid: 0, units: 0, testing: 0, refunded: 0 }; });
+        (this.stats || []).forEach(function (g) {
+          var row = out[g.provider];
+          if (!row) return;
+          if (g.status === "granted" && g.environment === "Production") { row.paid += g.count; row.units += g.units; }
+          else if (g.status === "granted") row.testing += g.count;
+          else if (g.status === "refunded" || g.status === "revoked") row.refunded += g.count;
+        });
+        return out;
+      }
+    },
+    methods: Object.assign({}, helpers, iapHelpers, {
+      shortTxn: function (v) { return v && v.length > 20 ? v.slice(0, 12) + "…" : (v || "—"); }
+    }),
+    template: `
+      <div>
+        <div class="card">
+          <div class="card-head"><h2>{{ t('admin.iap.summary') }}</h2></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>{{ t('admin.iap.provider') }}</th><th>{{ t('admin.iap.paid') }}</th>
+                <th>{{ t('admin.iap.paid_units') }}</th><th>{{ t('admin.iap.testing') }}</th>
+                <th>{{ t('admin.iap.refunded') }}</th></tr></thead>
+              <tbody>
+                <tr v-for="p in providers" :key="p"><td>{{ iapProvider(p) }}</td><td><b>{{ nf(summary[p].paid) }}</b></td>
+                  <td>{{ nf(summary[p].units) }}</td><td>{{ nf(summary[p].testing) }}</td><td>{{ nf(summary[p].refunded) }}</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="card-body"><p class="muted" style="margin:0">{{ t('admin.iap.summary_hint') }}</p></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h2>{{ t('admin.iap.purchases') }}</h2></div>
+          <form class="filter-grid" @submit.prevent="search">
+            <label><span>{{ t('admin.iap.provider') }}</span>
+              <select v-model="filters.provider" @change="search">
+                <option value="">{{ t('common.all') }}</option>
+                <option v-for="p in providers" :key="p" :value="p">{{ iapProvider(p) }}</option>
+              </select></label>
+            <label><span>{{ t('admin.users.col_status') }}</span>
+              <select v-model="filters.status" @change="search">
+                <option value="">{{ t('common.all') }}</option>
+                <option v-for="s in statuses" :key="s" :value="s">{{ iapStatus(s) }}</option>
+              </select></label>
+            <label><span>{{ t('admin.iap.environment') }}</span>
+              <select v-model="filters.environment" @change="search">
+                <option value="">{{ t('common.all') }}</option>
+                <option v-for="e in environments" :key="e" :value="e">{{ iapEnv(e) }}</option>
+              </select></label>
+            <label><span>{{ t('admin.iap.filter_user') }}</span>
+              <input type="text" v-model.trim="filters.user_id" spellcheck="false" placeholder="UUID"></label>
+            <div class="filter-actions">
+              <button type="submit" class="btn btn-sm btn-primary">{{ t('common.search') }}</button>
+              <button type="button" class="btn btn-sm" @click="reset">{{ t('common.reset') }}</button>
+            </div>
+          </form>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>{{ t('admin.audit.when') }}</th><th>{{ t('admin.iap.user') }}</th><th>{{ t('admin.iap.provider') }}</th>
+                <th>{{ t('admin.iap.product') }}</th><th>{{ t('admin.credits.units') }}</th>
+                <th>{{ t('admin.users.col_status') }}</th><th>{{ t('admin.iap.transaction') }}</th></tr></thead>
+              <tbody>
+                <tr v-if="loading" v-for="n in 5" :key="'s' + n"><td colspan="7"><div class="skeleton-row"></div></td></tr>
+                <tr v-else v-for="p in rows" :key="p.id">
+                  <td class="mono nowrap">{{ p.created_at }}
+                    <div class="muted small" v-if="p.purchased_at && p.purchased_at !== p.created_at">{{ t('admin.iap.purchased') }} {{ p.purchased_at }}</div></td>
+                  <td><a v-if="p.user_id" class="link" :href="userLink(p.user_id)" @click.prevent="go(userLink(p.user_id))">{{ p.identifier }}</a>
+                    <span v-else class="muted">{{ t('admin.iap.deleted_account') }}</span></td>
+                  <td class="nowrap">{{ iapProvider(p.provider) }}
+                    <div><span :class="'badge ' + iapEnvBadge(p.environment)">{{ iapEnv(p.environment) }}</span></div></td>
+                  <td><b>{{ p.product_code || '—' }}</b><div class="mono muted small">{{ p.store_product_id }}</div></td>
+                  <td>{{ nf(p.units) }}<span v-if="p.quantity > 1" class="muted"> ({{ p.quantity }}×)</span></td>
+                  <td class="nowrap"><span :class="'badge ' + iapStatusBadge(p.status)">{{ iapStatus(p.status) }}</span>
+                    <div class="muted small" v-if="p.provider === 'google_play' && p.status === 'granted'">
+                      {{ p.consumed ? t('admin.iap.consumed') : t('admin.iap.not_consumed') }}</div>
+                    <div class="muted small" v-if="p.revoked_at">{{ p.revoked_at }} · {{ p.revoke_reason }}</div></td>
+                  <td class="mono small" :title="p.transaction_id">{{ shortTxn(p.transaction_id) }}
+                    <div class="muted" v-if="p.order_id">{{ p.order_id }}</div></td>
+                </tr>
+                <tr v-if="!loading && !rows.length"><td colspan="7" class="empty">
+                  <span v-if="error" class="load-error" role="alert">{{ error }}
+                    <button type="button" class="btn btn-sm" @click="load">{{ t('common.refresh') }}</button></span>
+                  <span v-else>{{ t('common.empty') }}</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <pager :page="page" :limit="limit" :total="total" @move="move"/>
+        </div>
+      </div>`
+  };
+
+  // Purchases — «Покупки» бөлімі: тауарлар және транзакциялар.
+  var Purchases = {
+    components: { IapProducts: IAPProducts, IapPurchases: IAPPurchases },
+    props: { route: { type: Object, required: true } },
+    computed: {
+      tabs: function () {
+        return [
+          { key: "products", path: "/admin/purchases", label: t("admin.iap.tab.products") },
+          { key: "transactions", path: "/admin/purchases/transactions", label: t("admin.iap.tab.transactions") }
+        ];
+      }
+    },
+    methods: Object.assign({}, helpers),
+    template: `
+      <div>
+        <div class="subnav-bar">
+          <nav class="subnav" :aria-label="t('admin.nav.purchases')">
+            <a v-for="item in tabs" :key="item.key" :href="item.path" :class="{ 'is-active': route.tab === item.key }"
+               :aria-current="route.tab === item.key ? 'page' : null" @click.prevent="go(item.path)">{{ item.label }}</a>
+          </nav>
+        </div>
+        <iap-purchases v-if="route.tab === 'transactions'"/>
+        <iap-products v-else/>
+      </div>`
+  };
+
   /* --------------------------------------------------------------- shell */
   var App = {
     components: { Dashboard: Dashboard, Users: Users, UserDetail: UserDetail, Plans: Plans,
                   Audit: Audit, Reports: Reports, Settings: Settings, Notifications: Notifications,
-                  Support: Support },
+                  Support: Support, Purchases: Purchases },
     data: function () { return { state: state }; },
     computed: {
       title: function () {
@@ -3222,7 +3607,7 @@
           plans: t("admin.plans.title"), audit: t("admin.audit.title"), reports: t("admin.reports.title"),
           settings: t("admin.settings.title"), notifications: t("admin.notifications.title"),
           diagnostics: t("admin.diag.title"),
-          support: t("admin.support.title")
+          support: t("admin.support.title"), purchases: t("admin.iap.title")
         }[state.route.name];
       }
     },
@@ -3260,6 +3645,10 @@
              :aria-current="isActive('plans') ? 'page' : null" @click.prevent="go('/admin/plans')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 12V5a2 2 0 0 1 2-2h7l9 9-9 9z"/><circle cx="7.5" cy="7.5" r="1.4"/></svg>
             {{ t('admin.nav.plans') }}</a>
+          <a class="item" href="/admin/purchases" :class="{ 'is-active': isActive('purchases') }"
+             :aria-current="isActive('purchases') ? 'page' : null" @click.prevent="go('/admin/purchases')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 7h14l-1.2 11.1a2 2 0 0 1-2 1.9H8.2a2 2 0 0 1-2-1.9z"/><path d="M9 7a3 3 0 0 1 6 0"/></svg>
+            {{ t('admin.nav.purchases') }}</a>
           <a class="item" href="/admin/notifications" :class="{ 'is-active': isActive('notifications') }"
              :aria-current="isActive('notifications') ? 'page' : null" @click.prevent="go('/admin/notifications')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9a6 6 0 1 1 12 0c0 5 2 6 2 6H4s2-1 2-6M10 20a2 2 0 0 0 4 0"/></svg>
@@ -3311,6 +3700,7 @@
             <users v-else-if="state.route.name === 'users'"/>
             <user-detail v-else-if="state.route.name === 'user'" :id="state.route.id" :key="state.route.id"/>
             <plans v-else-if="state.route.name === 'plans'"/>
+            <purchases v-else-if="state.route.name === 'purchases'" :route="state.route" :key="'purchases' + state.routeSeq"/>
             <audit v-else-if="state.route.name === 'audit'"/>
             <reports v-else-if="state.route.name === 'reports'"/>
             <support v-else-if="state.route.name === 'support'" :route="state.route"/>

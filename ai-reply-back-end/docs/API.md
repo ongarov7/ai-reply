@@ -17,7 +17,9 @@
 `SUBSCRIPTION_EXPIRED`, `RATE_LIMITED`, `AI_PROVIDER_UNAVAILABLE`, `AI_TIMEOUT`,
 `AI_EMPTY_RESPONSE`, `PAYMENT_REQUIRED`, `PLAN_UNAVAILABLE`, `PURCHASES_DISABLED`,
 `CONSENT_REQUIRED`, `NOT_FOUND`, `CONFLICT`, `INTERNAL_ERROR`, `VOICE_LIMIT_REACHED`,
-`PUSH_DISABLED` (409, только админ-панель: отправка push выключена или FCM не настроен).
+`PUSH_DISABLED` (409, только админ-панель: отправка push выключена или FCM не настроен),
+`IAP_UNAVAILABLE`, `PURCHASE_INVALID`, `PURCHASE_BELONGS_TO_ANOTHER_ACCOUNT`, `STORE_UNAVAILABLE`
+(покупки в приложении — см. «Покупки в приложении»).
 
 Коды, на которые приложения реагируют своим текстом:
 
@@ -204,7 +206,8 @@ HMAC, лимиты). Новые сборки их не вызывают.
                 "product_events": true, "installations": true, "push_notifications": true,
                 "preferred_language": true, "purchases": false, "ai_reports": true, "account_deletion": true,
                 "welcome_bonus": true, "credits": true, "idempotent_generation": true,
-                "permission_diagnostics": true, "push_reminders": false },
+                "permission_diagnostics": true, "push_reminders": false, "support_chat": true,
+                "iap_ios": false, "iap_android": false },
   "payment_mode": "off",
   "legal": { "terms_version": "2026-10-08", "privacy_version": "2026-10-08",
              "terms_url": "https://ai-reply.kz/offer", "privacy_url": "https://ai-reply.kz/privacy",
@@ -232,6 +235,10 @@ HMAC, лимиты). Новые сборки их не вызывают.
   `PUT /api/v1/installations/{installation_id}/diagnostics`.
 - `features.push_reminders` — админ включил напоминания (`reminders.enabled`).
 - `features.support_chat` — чат с поддержкой (`/api/v1/support/*`, см. «Чат поддержки»).
+- `features.iap_ios`, `features.iap_android` — на этой платформе можно купить пакет ответов
+  или пропуск: магазин подключён на сервере, администратор включил продажи и создал хотя бы
+  один активный товар с Product ID этого магазина (см. «Покупки в приложении»). Пока флаг
+  `false`, приложение не показывает покупки вовсе.
 - `payment_mode` — строка `off | demo | live` (по умолчанию `off`).
 - `legal.contact_email` — `CONTACT_EMAIL`, пустая строка, если не задан (тогда приложение
   ведёт на `support_url`). `legal.ai_provider` — кому уходят тексты (экран согласия).
@@ -370,7 +377,8 @@ HMAC, лимиты). Новые сборки их не вызывают.
 `429 DAILY_LIMIT_REACHED` / `MONTHLY_LIMIT_REACHED` приходит, только когда закончилось всё;
 коды прежние, в `details` добавлены `welcome_remaining`, `credits_remaining`,
 `pass_active` (идёт пропуск, у которого кончились ответы) и `can_buy` (можно предложить
-докупить ответы на этой платформе; пока покупок нет — всегда `false`).
+докупить ответы на этой платформе — то же, что `features.iap_ios` / `features.iap_android`
+для платформы запроса: `platform` из тела, иначе из токена).
 
 Бесплатные ответы: один раз на аккаунт (`kind = 'account'`), созданный не раньше
 `system_settings.welcome_bonus_since` (момент миграции `0015_credits`), в количестве
@@ -899,6 +907,122 @@ languages, purpose, latency_ms, status, code, retried), `ai_voice_reused` (по�
 - Хранение: таблицы `support_conversations` и `support_messages` (миграция `0017`) живут, пока
   существует аккаунт, и удаляются вместе с ним. Текст сообщений в лог не пишется — только id и длина.
 
+## Покупки в приложении
+
+Пакеты ответов (`kind = pack`, не сгорают) и пропуск (`kind = pass`: `units` ответов на
+`duration_hours` часов) продаются только через магазины: iOS — StoreKit 2 (пакет —
+Consumable, пропуск — Non-Renewing Subscription), Android — Google Play Billing (одноразовые
+товары). Цены сервер не знает: приложение показывает `displayPrice` / `formattedPrice`
+магазина. Включено, только когда `features.iap_ios` / `features.iap_android` = `true`.
+
+| Метод | Путь | Тело | Ответ |
+|---|---|---|---|
+| GET | `/api/v1/iap/products?platform=ios\|android` | — | `{ "products": [ { "code", "kind", "units", "duration_hours", "store_product_id", "name" } ], "account_token": "<uuid>" }` |
+| POST | `/api/v1/iap/apple/transactions` | `{ "signed_transaction": "<jwsRepresentation>" }` | `200 { "status": "granted" \| "already_granted", "usage": {…} }` |
+| POST | `/api/v1/iap/google/purchases` | `{ "product_id", "purchase_token" }` | `200` как выше, `202 { "status": "pending" }` |
+| POST | `/api/v1/iap/apple/notifications` | App Store Server Notifications V2: `{ "signedPayload" }` | `200 { "ok": true }` |
+
+- `products` — только товары, которые администратор настроил (количество ответов, Product ID
+  этого магазина), включил и не отправил в архив; порядок — `sort_order`. `name` — на языке
+  аккаунта (`preferred_language`, иначе `locale`), запасной — ru → en → код. Без `platform`
+  берётся платформа из токена. Пока продажи на платформе закрыты — `403 IAP_UNAVAILABLE`.
+- `account_token` — постоянный UUID аккаунта (HMAC id аккаунта ключом сервера): одинаковый на
+  всех устройствах и после переустановки, ничего не говорит об аккаунте.
+- Тела запросов строгие (неизвестное поле — `400 INVALID_REQUEST`), кроме уведомлений Apple.
+- `usage` — тот же объект, что в `/me` (`credits` включает купленные пакеты, `pass` — идущий
+  пропуск). Пропуск, купленный во время другого, начинается, когда тот закончится, и до этого
+  в `usage.pass` не виден.
+- Лимит — `RATE_IAP_PER_MINUTE` (20) на аккаунт для двух POST подтверждения; согласие на
+  AI-обработку не требуется (текст никуда не уходит).
+
+Порядок на iOS (StoreKit 2):
+
+1. `GET /api/v1/iap/products?platform=ios`, затем `Product.products(for: [store_product_id…])`
+   — цену и название показывает StoreKit.
+2. `product.purchase(options: [.appAccountToken(UUID(uuidString: account_token)!)])`.
+3. При `.success(.verified(transaction))` — `POST /api/v1/iap/apple/transactions` с
+   `verificationResult.jwsRepresentation`.
+4. `transaction.finish()` — **только после `200`** (`granted` или `already_granted`). Любой
+   другой ответ оставляет транзакцию незавершённой; при `PURCHASE_INVALID` с `reason`
+   `revoked`, `product_type` или `bundle_mismatch` её можно завершить — сервер её не начислит.
+5. На каждом запуске перебрать `Transaction.unfinished` и слушать `Transaction.updates`,
+   отправляя каждую так же (повтор безопасен — `already_granted`).
+
+Порядок на Android (Play Billing):
+
+1. `GET /api/v1/iap/products?platform=android`, затем `queryProductDetailsAsync` по
+   `store_product_id` (`ProductType.INAPP`).
+2. `BillingFlowParams.newBuilder()….setObfuscatedAccountId(account_token)` — строка ровно как
+   пришла.
+3. В `onPurchasesUpdated` для каждой покупки — `POST /api/v1/iap/google/purchases`
+   `{ "product_id": <products[0]>, "purchase_token": purchase.purchaseToken }`.
+4. **Клиент никогда не вызывает `consumeAsync` / `acknowledgePurchase`**: сервер сначала
+   начисляет, потом потребляет покупку сам и повторяет потребление в фоне.
+5. `202 pending` — оплата ещё не прошла (наличные, перевод): ничего не начислено; отправить
+   снова, когда `purchaseState` станет `PURCHASED`. На каждом запуске — `queryPurchasesAsync`
+   (`INAPP`) и отправить все покупки (уже начисленные вернут `already_granted`).
+
+Ошибки:
+
+| Код | HTTP | Когда | Что делать клиенту |
+|---|---|---|---|
+| `IAP_UNAVAILABLE` | 403 | магазин этой платформы не подключён на сервере; для `products` — продажи на платформе закрыты | скрыть покупки; транзакцию не завершать |
+| `PURCHASE_INVALID` | 400 | магазин не подтвердил покупку: `details.reason` — `malformed`, `signature`, `bundle_mismatch`, `environment` (Sandbox на сервере, который его не принимает), `product_type`, `product_unknown`, `account_mismatch`, `revoked`, `canceled`, `not_found`, `already_consumed`, `unsupported_type`, `quantity` | показать «покупка не подтверждена»; не повторять |
+| `PURCHASE_BELONGS_TO_ANOTHER_ACCOUNT` | 409 | транзакция уже начислена другому (или удалённому) аккаунту | предложить войти в тот аккаунт |
+| `STORE_UNAVAILABLE` | 503 | API Google временно не ответил | повторить позже; ничего не потреблять |
+| `RATE_LIMITED` | 429 | больше `RATE_IAP_PER_MINUTE` в минуту | повторить позже |
+
+Что проверяет сервер:
+
+- **Apple**: JWS `alg = ES256`, `x5c` из трёх сертификатов, цепочка до встроенного
+  Apple Root CA - G3 (SHA-256 `63343ABF…3E9179`, закреплён), маркеры Apple
+  (`1.2.840.113635.100.6.11.1` у листа, `1.2.840.113635.100.6.2.1` у промежуточного), цепочка
+  действительна на `signedDate`, подпись r‖s по `header.payload`; затем `bundleId =
+  APPLE_IAP_BUNDLE_ID`, `environment` — `Production`, `Sandbox` только при
+  `APPLE_IAP_ACCEPT_SANDBOX=true` (по умолчанию в production — нет), `type` — `Consumable` или
+  `Non-Renewing Subscription`, `appAccountToken = account_token`, нет `revocationDate`,
+  `productId` — товар из админки (в том числе выключенный или в архиве: оплаченное начисляется).
+  Начисление — `units × quantity`. Запросов к Apple нет.
+- **Google**: `purchases.products.get` (androidpublisher v3) сервисным аккаунтом;
+  `obfuscatedExternalAccountId = account_token`, `purchaseState = 0` (`2` — pending, `1` —
+  отменён), не потреблён кем-то другим, `product_id` — товар из админки. `purchaseType = 0`
+  (лицензионный тестер) записывается как `environment = Test`, `1` (промокод) — `Promo`.
+  Сначала начисление, потом `consume`; неудачный consume повторяется каждые 15 минут
+  (Google возвращает деньги за неподтверждённую покупку через 3 дня).
+- Одна транзакция начисляется один раз: `UNIQUE (provider, transaction_id)`, где
+  `transaction_id` — `transactionId` Apple или SHA-256 токена Google (сам токен в открытом
+  виде не хранится; до consume — зашифрованная копия, потом стирается). Транзакция,
+  привязанная к аккаунту, другому аккаунту не начисляется (`409`).
+
+Возвраты:
+
+- `POST /api/v1/iap/apple/notifications` — URL для App Store Connect ▸ App Information ▸
+  App Store Server Notifications, **Version 2**, Production и Sandbox:
+  `<PUBLIC_BASE_URL>/api/v1/iap/apple/notifications` (`https://ai-reply.kz/api/v1/iap/apple/notifications`).
+  Подпись проверяется той же цепочкой; неподписанное — `400`. После проверки ответ всегда
+  `200`, каждое `notificationUUID` обрабатывается один раз. `REFUND` / `REVOKE` — покупка
+  `refunded` / `revoked`, остаток начисления снимается (потраченное остаётся, баланс не
+  уходит в минус, в журнале `revoke` с остатком); `REFUND_REVERSED` возвращает снятое;
+  `TEST`, `CONSUMPTION_REQUEST`, `REFUND_DECLINED` — только в журнал. Возврат транзакции,
+  которую сервер ещё не видел, записывается заранее: потом её не начислить.
+- Google: опрос `purchases.voidedpurchases` раз в `IAP_GOOGLE_VOIDED_POLL` (по умолчанию час;
+  первый опрос после старта — за 30 дней, дальше — за 72 часа); результат тот же.
+
+Удаление аккаунта: запись о покупке остаётся с `user_id = NULL` (финансовая запись, без
+данных о человеке); начисление и журнал удаляются с аккаунтом. Таблицы — миграция `0018_iap`.
+
+Что создать владельцу (подробно — README, «Покупки в приложении»):
+
+- App Store Connect: пакеты — **Consumable**, пропуск — **Non-Renewing Subscription**, с теми
+  же Product ID, что в админке; App Store Server Notifications — **Version 2**, Production и
+  Sandbox, URL выше; активный Paid Applications Agreement.
+- Play Console: **одноразовые товары** (managed products) с теми же Product ID; сервисный
+  аккаунт Google Cloud, приглашённый в Play Console с правами «Просмотр финансовых данных» и
+  «Управление заказами и подписками»; лицензионные тестеры для проверки.
+- Сервер: `APPLE_IAP_ENABLED=true`, `GOOGLE_PLAY_SERVICE_ACCOUNT_FILE` (или
+  `GOOGLE_PLAY_CLIENT_EMAIL` + `GOOGLE_PLAY_PRIVATE_KEY`), на время ревью
+  `APPLE_IAP_ACCEPT_SANDBOX=true`; затем в админке товары и переключатель продаж.
+
 ## Платежи (demo)
 
 | Метод | Путь |
@@ -942,7 +1066,7 @@ access-токен `/api/v1` там отвечает `401`, чтобы польз
 `/api/v1/admin/*` — cookie-сессия + заголовок `X-CSRF-Token` на любые изменения.
 `session`, `dashboard`, `users`, `users/{id}`, `users/{id}/status|plan|reset-quota|revoke-sessions`,
 `plans` (GET/POST/PATCH/archive), `audit`, `settings`, `settings/pricing`, `notifications`, `locale`,
-`reports`.
+`reports`, `iap/products`, `iap/purchases`, `settings/iap`.
 `users/{id}` отдаёт `user.preferred_language`. Отключение пользователя и «отозвать сессии»
 отвязывают его установки (`devices_detached` в аудите).
 
@@ -964,6 +1088,21 @@ credits, admin, packs, pass { expires_at, remaining } | null, remaining_total }`
 | POST | `/settings/welcome-bonus` | `{ "units": 0…1000 }` — бесплатные ответы новых аккаунтов (`0` — выкл.); действует только на аккаунты, созданные после изменения (включение из `0` переносит `since` на этот момент); аудит `settings.welcome_bonus.update { before, after, since_before, since_after }`; `GET /settings` отдаёт `welcome_bonus { units, default, since, range }` |
 | POST | `/users/{id}/credits` | `{ "units": 1…10000, "reason": "…" }` (причина обязательна, до 200 символов) — начисление `admin` без срока; 60 в час на администратора; аудит `credits.grant { grant_id, kind, units, reason }` |
 | POST | `/users/{id}/credits/{grant_id}/revoke` | `{ "reason": "…" }` (необязательно) — остаток начисления любого вида обнуляется, потраченное остаётся; повтор — `409` (`details.field = grant_id`); аудит `credits.revoke { grant_id, kind, units_revoked, reason }` |
+
+### Покупки (`/api/v1/admin/iap…`)
+
+| Метод | Путь | Что делает |
+|---|---|---|
+| GET | `/iap/products` | все товары (архивные в конце): `id`, `code`, `kind`, `units`, `duration_hours`, `apple_product_id`, `google_product_id`, `name { kk, ru, en, uz }`, `is_active`, `sort_order`, `archived`, `archived_at`, `sales` (начисленные покупки), `offered_ios`, `offered_android`; и `iap { enabled, configured, apple, google, apple_sandbox, bundle_id, package_name, voided_polling, available_ios, available_android, notification_url, ranges }` |
+| POST | `/iap/products` | создать: `code` (`^[a-z0-9][a-z0-9_]{1,39}$`, уникален), `kind` `pack \| pass`, `units` 1…100000, `duration_hours` 1…720 только у пропуска (у пакета `0`), `apple_product_id` (`[A-Za-z0-9._-]`, до 100), `google_product_id` (`^[a-z0-9][a-z0-9._]{0,99}$`), `name` (до 60 символов на язык), `is_active` (нужен хотя бы один Product ID), `sort_order` 0…10000 → `201 { "product" }`; занятый код или Product ID — `409 CONFLICT` (`details.field`, `reason: taken`); аудит `iap_product.create` |
+| PATCH | `/iap/products/{id}` | то же тело (строку списка можно отправить как есть); `code` и `kind` не меняются (`400`, `reason: immutable`); новое количество и часы — только для новых покупок; архивный — `409`; аудит `iap_product.update { before, after }` |
+| POST | `/iap/products/{id}/archive` | в архив: больше не продаётся, Product ID остаётся занятым (оплаченные покупки находят свой товар); повтор — `409`; аудит `iap_product.archive` |
+| GET | `/iap/purchases?provider=&status=&environment=&user_id=&page=&limit=` | покупки, новые первыми: `id`, `user_id` (`""` — аккаунт удалён), `identifier` (маска), `provider`, `environment`, `product_code`, `store_product_id`, `transaction_id`, `order_id`, `quantity`, `units`, `status` `pending \| granted \| refunded \| revoked \| rejected`, `consumed`, `purchased_at`, `created_at`, `revoked_at`, `revoke_reason`; и `stats` — группы `{ provider, environment, status, count, units }` (выручка — только `Production`) |
+| POST | `/settings/iap` | `{ "enabled": bool }` — продажи; включить без подключённого магазина — `409 IAP_UNAVAILABLE` (`reason: store_not_configured`); аудит `settings.iap.update { before, after }`; `GET /settings` отдаёт `iap` (как выше) |
+
+`users/{id}` отдаёт `iap_purchases` (до 50, новые первыми): `id`, `provider`, `environment`,
+`product_code`, `quantity`, `units`, `status`, `consumed`, `purchased_at`, `created_at`,
+`revoked_at`, `revoke_reason` — без Product ID и id транзакций (они на странице «Покупки»).
 
 Дашборд: «сегодня» везде — день часового пояса приложения; отказы по лимиту не считаются
 неудачными генерациями (`stats.refused` отдельно от `stats.failed`, в среднюю задержку не

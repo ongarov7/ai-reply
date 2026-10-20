@@ -11,6 +11,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/auth"
 	"github.com/aireply/ai-reply-back-end/internal/credits"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
+	"github.com/aireply/ai-reply-back-end/internal/iap"
 	"github.com/aireply/ai-reply-back-end/internal/installations"
 	"github.com/aireply/ai-reply-back-end/internal/limits"
 	"github.com/aireply/ai-reply-back-end/internal/middleware"
@@ -30,9 +31,9 @@ type Pinger func(context.Context) error
 
 // PurchaseOptions — лимит біткенде қолданба жауап сатып алуды ұсына ала ма (details.can_buy).
 //
-// The store purchases (0018_iap) implement it per platform: products an
-// admin configured, a verified store integration and the iap_* switch. Until
-// then nothing is wired in and can_buy is always false.
+// iap.Service implements it per platform: products an admin configured, a
+// verified store integration and the iap_enabled switch. Without it can_buy is
+// always false.
 type PurchaseOptions interface {
 	CanBuy(ctx context.Context, user domain.User, platform string) bool
 }
@@ -52,6 +53,7 @@ type Server struct {
 	notifications *notifications.Service
 	reports       *reports.Service
 	credits       *credits.Service
+	iap           *iap.Service
 	purchases     PurchaseOptions
 	support       *support.Service
 	limiter       *middleware.Limiter
@@ -81,17 +83,24 @@ type Deps struct {
 	Log     *slog.Logger
 	// Credits — сәлемдесу бонусы, кредиттер және олардың журналы.
 	Credits *credits.Service
-	// Purchases — лимит қатесіндегі can_buy (nil — сатып алу жоқ).
+	// IAP — App Store / Google Play сатып алулары (/api/v1/iap/*, features.iap_ios, features.iap_android).
+	IAP *iap.Service
+	// Purchases — лимит қатесіндегі can_buy (nil — IAP-тан, ол да жоқ болса сатып алу жоқ).
 	Purchases PurchaseOptions
 }
 
 // New — API сервері.
 func New(d Deps) *Server {
+	purchases := d.Purchases
+	if purchases == nil && d.IAP != nil {
+		purchases = d.IAP
+	}
 	return &Server{
 		cfg: d.Config, auth: d.Auth, users: d.Users, plans: d.Plans, subs: d.Subs,
 		ai: d.AI, limits: d.Limits, payments: d.Payments, events: d.Events,
 		installations: d.Installations, notifications: d.Notifications, reports: d.Reports,
-		credits: d.Credits, purchases: d.Purchases, support: d.Support, limiter: d.Limiter, ping: d.Ping, log: d.Log,
+		credits: d.Credits, iap: d.IAP, purchases: purchases, support: d.Support, limiter: d.Limiter, ping: d.Ping,
+		log: d.Log,
 	}
 }
 
@@ -205,6 +214,9 @@ func (s *Server) Register(mux *http.ServeMux) {
 
 	// --- қолдау чаты: оператормен хат алмасу (features.support_chat)
 	s.registerSupport(mux, perUser)
+
+	// --- жауап пакеттері мен pass: App Store / Google Play (features.iap_ios, features.iap_android)
+	s.registerIAP(mux, perUser)
 
 	// --- төлемдер (демо адаптер)
 	mux.Handle("POST /api/v1/payments/checkout", s.requireUser(http.HandlerFunc(s.handleCheckout)))

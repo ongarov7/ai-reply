@@ -114,6 +114,10 @@ internal/
   reports/           жалобы на AI-ответы (приложения → админка «Жалобы»)
   retention/         удаление просроченных кодов, сессий, установок и метаданных (RETENTION_*)
   payments/          интерфейс эквайринга + demo-адаптер
+  iap/               покупки пакетов и пропуска: товары, account_token, начисление, возвраты
+    appstore/        проверка JWS StoreKit 2 и уведомлений App Store (встроенный Apple Root CA - G3)
+    googleplay/      Google Play Developer API: проверка, consume, voided purchases
+  googleauth/        JWT сервисного аккаунта Google → OAuth-токен (FCM и Google Play)
   installations/     реестр установок приложений, зашифрованные push-токены
   push/              FCM HTTP v1 без SDK (Android и iOS), классификация ошибок
   notifications/     уведомления, кампании, outbox-диспетчер (push и письма), бизнес-события
@@ -156,6 +160,8 @@ internal/
   имён и значений, счётчики по именам в дашборде админки;
 - админка: дашборд с графиками, пользователи, CRUD тарифов, аудит, настройки;
 - push-уведомления через FCM на Android и iOS — см. раздел ниже;
+- покупки в приложении: пакеты ответов и пропуск через StoreKit 2 и Google Play Billing,
+  проверка на сервере, возвраты, админ-страница «Покупки» — см. раздел ниже;
 - лендинг на 4 языках с анимированной демонстрацией работы клавиатуры;
 - вход по телефону из приложений убран; эндпоинты `/auth/request-otp` и
   `/auth/verify-otp` оставлены только для уже установленных сборок;
@@ -183,6 +189,8 @@ internal/
 | Свободный текст в продуктовых событиях | НЕТ — только имена, коды, числа 0…1000 и bool из закрытого списка сервера |
 | Push-токен в логах / админке | НЕТ — в БД зашифрован, наружу только отпечаток `fcm:1a2b3c4d` |
 | Ключ Firebase в приложениях | НЕТ — сервисный аккаунт только в `.env` сервера |
+| Purchase token Google в БД или логах | НЕТ в открытом виде — id транзакции это SHA-256 токена; до потребления сервером хранится копия, зашифрованная AES-GCM, затем стирается |
+| Подписанная транзакция Apple (JWS) в БД или логах | НЕТ — только `transactionId`, товар, среда и статус |
 
 Тест `TestMessageContentIsNeverPersisted` отправляет уникальную строку через
 `/api/v1/ai/reply` и ищет её в файле БД, WAL и логах — любой найденный след
@@ -210,6 +218,75 @@ Android, и на iOS (через APNs-ключ, загруженный в Fireba
 
 Подробно: [../docs/notifications.md](../docs/notifications.md), API — [docs/API.md](docs/API.md#установки-и-push-уведомления).
 
+## Покупки в приложении
+
+Пакеты ответов (не сгорают) и пропуск (ответы на N часов) продаются только через магазины:
+iOS — StoreKit 2 (consumable и non-renewing subscription), Android — Google Play Billing
+(одноразовые товары). Цен на сервере нет: приложение показывает цену магазина. Сервер
+проверяет каждую покупку сам и начисляет ответы одной транзакцией через журнал кредитов
+(`credit_grants` / `credit_ledger`); порядок списания — дневной лимит тарифа → пропуск →
+бесплатные ответы → начисления админа → пакеты.
+
+- **Выключено, пока не настроено.** Продажа на платформе открыта (`features.iap_ios` /
+  `features.iap_android`, `details.can_buy` в лимитных ошибках), только когда: магазин
+  подключён в `.env`, в админке на странице «Покупки» есть активный товар с количеством
+  ответов и Product ID этого магазина, и в «Настройках» включены продажи (`iap_enabled`).
+  Уже оплаченная покупка начисляется всегда, пока магазин подключён, — даже если продажи
+  выключили или товар отправили в архив.
+- **Apple.** `jwsRepresentation` транзакции проверяется по встроенному Apple Root CA - G3
+  (отпечаток SHA-256 закреплён в коде и в тесте): ES256, цепочка `x5c` с маркерами Apple,
+  действительная на `signedDate`; затем bundle id, среда, тип, `appAccountToken`, отзыв.
+  Ключ App Store Server API не нужен. Возвраты приходят как App Store Server Notifications V2.
+- **Google.** `purchases.products.get` через сервисный аккаунт (тот же JWT → OAuth, что у
+  FCM, `internal/googleauth`); `obfuscatedExternalAccountId` должен быть токеном аккаунта.
+  Сначала начисление, потом сервер потребляет покупку (consume); неудачное потребление
+  повторяет фоновая задача каждые 15 минут — неподтверждённую покупку Google сам вернёт
+  через 3 дня. Возвраты — опрос `voidedpurchases` (`IAP_GOOGLE_VOIDED_POLL`, по умолчанию раз в час).
+- **Привязка к аккаунту.** `GET /api/v1/iap/products` отдаёт `account_token` — UUID из
+  HMAC id аккаунта (ключ выводится из `JWT_ACCESS_SECRET`). iOS передаёт его в
+  `appAccountToken`, Android — в `setObfuscatedAccountId`. Чужую транзакцию нельзя
+  зачесть себе: `PURCHASE_INVALID` (`account_mismatch`) или
+  `409 PURCHASE_BELONGS_TO_ANOTHER_ACCOUNT`. Смена `JWT_ACCESS_SECRET` меняет все токены:
+  покупки, сделанные до смены и не отправленные на сервер, будут отклонены.
+- **Возвраты.** Отзывается то, что осталось от покупки; потраченное остаётся потраченным,
+  баланс не уходит в минус. Возврат по транзакции, которую сервер ещё не видел, записывается
+  заранее — потом её не начислить. `REFUND_REVERSED` возвращает снятое.
+- **Sandbox.** TestFlight и App Review покупают в Sandbox на production-сервере. В production
+  Sandbox принимается только при `APPLE_IAP_ACCEPT_SANDBOX=true` (без него — предупреждение
+  при старте); такие покупки записываются с `environment = Sandbox` и в выручку админки не
+  входят, как и тестовые покупки Google (`Test`).
+- **Удаление аккаунта.** Запись о покупке остаётся (финансовая запись) с `user_id = NULL`;
+  начисление и журнал удаляются вместе с аккаунтом.
+
+Переменные: `APPLE_IAP_ENABLED`, `APPLE_IAP_BUNDLE_ID` (по умолчанию
+`kz.ai-reply.reply.keyboard.keyboard`), `APPLE_IAP_ACCEPT_SANDBOX`, `GOOGLE_PLAY_PACKAGE_NAME`
+(по умолчанию `kz.yerek.aireply`), `GOOGLE_PLAY_SERVICE_ACCOUNT_FILE` или вместе
+`GOOGLE_PLAY_CLIENT_EMAIL` + `GOOGLE_PLAY_PRIVATE_KEY`, `IAP_GOOGLE_VOIDED_POLL`,
+`RATE_IAP_PER_MINUTE`. Половина ключа Google — сервер не стартует.
+
+Что создать владельцу:
+
+1. App Store Connect ▸ приложение ▸ «Покупки в приложении»: пакеты — **Consumable**,
+   пропуск — **Non-Renewing Subscription**; Product ID любой, но тот же, что в админке
+   (например `kz.ai_reply.pack50`, `kz.ai_reply.pass24h`); цены, локализации, скриншот для
+   ревью. Paid Applications Agreement и банковские данные должны быть активны.
+2. App Store Connect ▸ App Information ▸ App Store Server Notifications: **Version 2**,
+   Production и Sandbox URL — `https://ai-reply.kz/api/v1/iap/apple/notifications`
+   (`<PUBLIC_BASE_URL>/api/v1/iap/apple/notifications`, он же в админке на странице «Покупки»).
+3. Play Console ▸ Монетизация ▸ Товары ▸ **Одноразовые товары** (managed products): пакет и
+   пропуск с теми же Product ID, что в админке (`pack_50`, `pass_24h`; строчные буквы, цифры,
+   `_` и `.`), цены, активировать.
+4. Google Cloud: сервисный аккаунт и JSON-ключ; в Play Console ▸ Пользователи и разрешения
+   пригласить его email с доступом к приложению: «Просмотр финансовых данных» и «Управление
+   заказами и подписками». Можно тот же аккаунт, что для Firebase. Лицензионные тестеры —
+   Play Console ▸ Настройки ▸ Тестирование лицензий.
+5. `.env`: `APPLE_IAP_ENABLED=true`, Google-ключ, `APPLE_IAP_ACCEPT_SANDBOX=true` на время
+   ревью; `-check` покажет, что подключено.
+6. Админка ▸ «Покупки»: создать товары (количество ответов, для пропуска — часы, Product ID,
+   названия на 4 языках, «Продаётся»), затем «Настройки» ▸ «Покупки в приложении» ▸ включить.
+
+API и порядок вызовов на клиентах — [docs/API.md](docs/API.md#покупки-в-приложении).
+
 ## Команды
 
 ```bash
@@ -233,7 +310,11 @@ make secrets     # сгенерировать JWT/legacy секреты
 - `CONTACT_EMAIL` — реальный ящик поддержки (в production обязателен);
   `LEGAL_OPERATOR_NAME` и `LEGAL_OPERATOR_DETAILS` (наименование и реквизиты оператора) —
   обязательно до подачи в магазины: без них production стартует с предупреждением;
-- реальный эквайринг — один интерфейс `payments.Provider`;
+- реальный эквайринг тарифов — один интерфейс `payments.Provider` (покупки пакетов и
+  пропуска идут отдельно, через магазины — раздел «Покупки в приложении»);
+- покупки в приложении: товары в App Store Connect и Play Console, URL уведомлений App Store,
+  сервисный аккаунт Google с доступом в Play Console, переменные `APPLE_IAP_*` / `GOOGLE_PLAY_*`,
+  затем товары и переключатель в админке — список в разделе «Покупки в приложении»;
 - push: проект Firebase с приложениями `kz.yerek.aireply` и `kz.ai-reply.reply.keyboard.keyboard`,
   APNs-ключ в Firebase, сервисный аккаунт и `PUSH_NOTIFICATIONS_ENABLED=true` в `.env` —
   [../docs/notifications.md](../docs/notifications.md);
@@ -368,11 +449,17 @@ make secrets     # сгенерировать JWT/legacy секреты
 `RETENTION_OTP_DAYS=30`, `RETENTION_REFRESH_TOKENS_DAYS=30`, `RETENTION_ANON_INSTALLATIONS_DAYS=180`,
 `RETENTION_PRODUCT_EVENTS_DAYS=400`, `RETENTION_AI_USAGE_EVENTS_DAYS=400`; голосовой ввод —
 `TRANSCRIBE_ENABLED=true`, `OPENAI_TRANSCRIBE_MODEL=gpt-transcribe`, `RATE_TRANSCRIBE_PER_MINUTE=10`,
-`LIMIT_TRANSCRIBE_PER_DAY=100` (ключ тот же `OPENAI_API_KEY`).
+`LIMIT_TRANSCRIBE_PER_DAY=100` (ключ тот же `OPENAI_API_KEY`); покупки в приложении —
+`APPLE_IAP_ENABLED=false`, `APPLE_IAP_BUNDLE_ID`, `APPLE_IAP_ACCEPT_SANDBOX` (пусто — `false` в
+production), `GOOGLE_PLAY_PACKAGE_NAME`, `GOOGLE_PLAY_SERVICE_ACCOUNT_FILE` /
+`GOOGLE_PLAY_CLIENT_EMAIL` / `GOOGLE_PLAY_PRIVATE_KEY` (пусто — Google выключен; половина
+ключа или файл вместе с переменными — отказ при старте), `IAP_GOOGLE_VOIDED_POLL=1h`
+(15m…24h или `off`), `RATE_IAP_PER_MINUTE=20`.
 
 Предупреждения при старте (`configuration warning: …`, сервер работает): пустой
 `LEGAL_OPERATOR_NAME` в production; Apple-вход без ключа отзыва; `APPLE_CLIENT_ID` не похож
-на bundle id. Лимит входа в админку теперь в коде: 5 попыток за 15 минут на пару адрес+IP и
+на bundle id; `APPLE_IAP_ENABLED=true` в production без `APPLE_IAP_ACCEPT_SANDBOX=true`
+(покупки App Review и TestFlight будут отклонены). Лимит входа в админку теперь в коде: 5 попыток за 15 минут на пару адрес+IP и
 20 неудач в час на адрес — после этого отказ получают только IP, которые сами ошибались с
 этим адресом (`RATE_ADMIN_LOGIN_PER_HOUR` на IP — как раньше).
 

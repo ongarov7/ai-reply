@@ -32,6 +32,7 @@ type Config struct {
 	Push      Push
 	Legal     Legal
 	Retention Retention
+	IAP       IAP
 }
 
 type App struct {
@@ -255,6 +256,8 @@ type Limits struct {
 	TranscribePerMinute int
 	// SupportPerMinute — қолдау чатына жазу: бір қолданушыға минутына.
 	SupportPerMinute int
+	// IAPPerMinute — сатып алуды растау (App Store / Google Play): бір қолданушыға минутына.
+	IAPPerMinute int
 }
 
 type Log struct {
@@ -311,6 +314,41 @@ func (f FCM) partial() bool {
 	}
 	return set > 0 && set < 3
 }
+
+// IAP — қосымша ішіндегі сатып алулар: App Store (StoreKit 2) және Google Play Billing.
+//
+// Everything is off until configured: Apple verification needs
+// APPLE_IAP_ENABLED=true (the signed transactions verify against the embedded
+// Apple root, no key is needed), Google needs a service account with access to
+// the app in Play Console. Even then nothing is sold until an administrator
+// creates products and switches iap_enabled on. Prices never live here.
+type IAP struct {
+	AppleEnabled  bool
+	AppleBundleID string
+	// AppleAcceptSandbox — Sandbox транзакциялары (TestFlight, App Review) қабылдана ма.
+	// Әдепкі: production-да false, басқа ортада true. App Review production серверге
+	// Sandbox-тан сатып алады, сондықтан шолуға жібергенде true қою керек.
+	AppleAcceptSandbox bool
+	GooglePackageName  string
+	GoogleClientEmail  string
+	GooglePrivateKey   string // PEM; "\n" escapes and base64 are turned into a normal key
+	// GoogleServiceAccountFile — the JSON file the two values came from ("" — from the variables).
+	GoogleServiceAccountFile string
+	// GoogleVoidedPoll — қайтарылған сатып алуларды қаншалықты жиі сұрау (0 — сұралмайды).
+	GoogleVoidedPoll time.Duration
+	problems         []string
+}
+
+// Apple — App Store транзакцияларын тексеру қосулы.
+func (i IAP) Apple() bool { return i.AppleEnabled && i.AppleBundleID != "" }
+
+// Google — Google Play сатып алуларын тексеруге кілт бар.
+func (i IAP) Google() bool {
+	return i.GooglePackageName != "" && i.GoogleClientEmail != "" && i.GooglePrivateKey != ""
+}
+
+// Any — кемінде бір дүкен бапталған.
+func (i IAP) Any() bool { return i.Apple() || i.Google() }
 
 // Load — .env файлын (бар болса) оқып, ортадан баптауды жинайды.
 func Load(envFile string) (Config, error) {
@@ -414,6 +452,7 @@ func Load(envFile string) (Config, error) {
 			TranscribePerMinute: num("RATE_TRANSCRIBE_PER_MINUTE", 10),
 			TranscribePerDay:    num("LIMIT_TRANSCRIBE_PER_DAY", 100),
 			SupportPerMinute:    num("RATE_SUPPORT_PER_MINUTE", 20),
+			IAPPerMinute:        num("RATE_IAP_PER_MINUTE", 20),
 		},
 		Log:  Log{Level: str("LOG_LEVEL", "info"), Format: str("LOG_FORMAT", "json")},
 		Push: pushFromEnv(),
@@ -428,6 +467,7 @@ func Load(envFile string) (Config, error) {
 			ProductEventsDays:     days("RETENTION_PRODUCT_EVENTS_DAYS", 400),
 			AIUsageEventsDays:     days("RETENTION_AI_USAGE_EVENTS_DAYS", 400),
 		},
+		IAP: iapFromEnv(appEnv),
 	}
 
 	loc, err := time.LoadLocation(cfg.App.Timezone)
@@ -559,6 +599,7 @@ func (c Config) Validate() []string {
 		}
 	}
 	problems = append(problems, c.Push.validate()...)
+	problems = append(problems, c.IAP.validate()...)
 	return problems
 }
 
@@ -580,6 +621,11 @@ func (c Config) Warnings() []string {
 			warning += " (App Store guideline 5.1.1(v) expects the token to be revoked)"
 		}
 		warnings = append(warnings, warning)
+	}
+	if c.App.IsProduction() && c.IAP.Apple() && !c.IAP.AppleAcceptSandbox {
+		warnings = append(warnings, "APPLE_IAP_ENABLED=true but APPLE_IAP_ACCEPT_SANDBOX is not true: App Review and "+
+			"TestFlight buy in the Sandbox environment against this server and their purchases are refused "+
+			"(PURCHASE_INVALID environment); set it to true while a build with purchases is in review")
 	}
 	for _, id := range c.OAuth.AppleClientIDs {
 		if !looksLikeBundleID(id) {
@@ -709,9 +755,23 @@ func pushFromEnv() Push {
 // readServiceAccount — Firebase Console жүктеп берген JSON файлы. Қате мәтінінде
 // файлдың мазмұны (кілт) ешқашан болмайды.
 func readServiceAccount(path string) (FCM, error) {
+	account, err := readGoogleServiceAccount(path, "FIREBASE_SERVICE_ACCOUNT_FILE", true)
+	if err != nil {
+		return FCM{}, err
+	}
+	account.ServiceAccountFile = path
+	return account, nil
+}
+
+// readGoogleServiceAccount — Google Cloud қызметтік тіркелгісінің JSON файлы (Firebase не Play).
+//
+// variable names the setting in the error; withProject requires project_id
+// (Firebase needs it in the endpoint, Play does not). The key is never part of
+// an error.
+func readGoogleServiceAccount(path, variable string, withProject bool) (FCM, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		return FCM{}, fmt.Errorf("FIREBASE_SERVICE_ACCOUNT_FILE %q cannot be read", path)
+		return FCM{}, fmt.Errorf("%s %q cannot be read", variable, path)
 	}
 	var account struct {
 		Type        string `json:"type"`
@@ -719,16 +779,96 @@ func readServiceAccount(path string) (FCM, error) {
 		ClientEmail string `json:"client_email"`
 		PrivateKey  string `json:"private_key"`
 	}
-	if json.Unmarshal(raw, &account) != nil || account.ProjectID == "" || account.ClientEmail == "" ||
+	kind := "Google service-account"
+	if withProject {
+		kind = "Firebase service-account"
+	}
+	if json.Unmarshal(raw, &account) != nil || (withProject && account.ProjectID == "") || account.ClientEmail == "" ||
 		account.PrivateKey == "" || (account.Type != "" && account.Type != "service_account") {
-		return FCM{}, fmt.Errorf("FIREBASE_SERVICE_ACCOUNT_FILE %q is not a Firebase service-account JSON file", path)
+		return FCM{}, fmt.Errorf("%s %q is not a %s JSON file", variable, path, kind)
 	}
 	return FCM{
-		ProjectID:          strings.TrimSpace(account.ProjectID),
-		ClientEmail:        strings.TrimSpace(account.ClientEmail),
-		PrivateKey:         PEM(account.PrivateKey),
-		ServiceAccountFile: path,
+		ProjectID:   strings.TrimSpace(account.ProjectID),
+		ClientEmail: strings.TrimSpace(account.ClientEmail),
+		PrivateKey:  PEM(account.PrivateKey),
 	}, nil
+}
+
+// iapFromEnv — App Store және Google Play баптауы.
+func iapFromEnv(appEnv string) IAP {
+	i := IAP{
+		AppleEnabled:  boolean("APPLE_IAP_ENABLED", false),
+		AppleBundleID: str("APPLE_IAP_BUNDLE_ID", "kz.ai-reply.reply.keyboard.keyboard"),
+		// Production refuses Sandbox unless the owner says so (App Review buys in Sandbox).
+		AppleAcceptSandbox: boolean("APPLE_IAP_ACCEPT_SANDBOX", appEnv != "production"),
+		GooglePackageName:  str("GOOGLE_PLAY_PACKAGE_NAME", "kz.yerek.aireply"),
+		GoogleClientEmail:  str("GOOGLE_PLAY_CLIENT_EMAIL", ""),
+		GooglePrivateKey:   PEM(str("GOOGLE_PLAY_PRIVATE_KEY", "")),
+		GoogleVoidedPoll:   time.Hour,
+	}
+	switch raw := strings.ToLower(str("IAP_GOOGLE_VOIDED_POLL", "")); raw {
+	case "":
+	case "off", "0", "false":
+		i.GoogleVoidedPoll = 0
+	default:
+		v, err := time.ParseDuration(raw)
+		if err != nil || v < 15*time.Minute || v > 24*time.Hour {
+			i.problems = append(i.problems, "IAP_GOOGLE_VOIDED_POLL must be a duration between 15m and 24h, or off")
+		} else {
+			i.GoogleVoidedPoll = v
+		}
+	}
+	if path := str("GOOGLE_PLAY_SERVICE_ACCOUNT_FILE", ""); path != "" {
+		if i.GoogleClientEmail != "" || i.GooglePrivateKey != "" {
+			i.problems = append(i.problems,
+				"set either GOOGLE_PLAY_SERVICE_ACCOUNT_FILE or GOOGLE_PLAY_CLIENT_EMAIL and GOOGLE_PLAY_PRIVATE_KEY, not both")
+			return i
+		}
+		account, err := readGoogleServiceAccount(path, "GOOGLE_PLAY_SERVICE_ACCOUNT_FILE", false)
+		if err != nil {
+			i.problems = append(i.problems, err.Error())
+			return i
+		}
+		i.GoogleClientEmail, i.GooglePrivateKey, i.GoogleServiceAccountFile = account.ClientEmail, account.PrivateKey, path
+	}
+	return i
+}
+
+// validate — сатып алу баптауы. Жартылай берілген Google кілті — қате.
+func (i IAP) validate() []string {
+	problems := append([]string(nil), i.problems...)
+	if countSet(i.GoogleClientEmail, i.GooglePrivateKey) == 1 {
+		problems = append(problems, "GOOGLE_PLAY_CLIENT_EMAIL and GOOGLE_PLAY_PRIVATE_KEY must be set together")
+	}
+	if i.GoogleClientEmail != "" && !strings.Contains(i.GoogleClientEmail, "@") {
+		problems = append(problems, "GOOGLE_PLAY_CLIENT_EMAIL must be the service account e-mail")
+	}
+	if i.AppleEnabled && !looksLikeBundleID(i.AppleBundleID) {
+		problems = append(problems, "APPLE_IAP_BUNDLE_ID must be the iOS app's bundle id, e.g. kz.ai-reply.reply.keyboard.keyboard")
+	}
+	if i.Google() && !looksLikePackageName(i.GooglePackageName) {
+		problems = append(problems, "GOOGLE_PLAY_PACKAGE_NAME must be the Android application id, e.g. kz.yerek.aireply")
+	}
+	return problems
+}
+
+// looksLikePackageName — Android applicationId: кемінде екі бөлік, әр бөлік әріптен басталады.
+func looksLikePackageName(v string) bool {
+	parts := strings.Split(v, ".")
+	if len(parts) < 2 {
+		return false
+	}
+	for _, part := range parts {
+		if part == "" || !(part[0] >= 'a' && part[0] <= 'z' || part[0] >= 'A' && part[0] <= 'Z') {
+			return false
+		}
+		for _, r := range part {
+			if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '_') {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // validate — push баптауы. Толық бос провайдер жай ғана өшірулі; жартылай

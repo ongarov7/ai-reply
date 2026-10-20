@@ -312,7 +312,7 @@ func requestPlatform(r *http.Request, declared string) string {
 	return PlatformFrom(r.Context())
 }
 
-// canBuy — қолданба осы платформада жауап сатып алуды ұсына ала ма (PurchaseOptions; әзірге жоқ).
+// canBuy — қолданба осы платформада жауап сатып алуды ұсына ала ма (PurchaseOptions → iap.Available).
 func (s *Server) canBuy(ctx context.Context, user domain.User, platform string) bool {
 	if s.purchases == nil {
 		return false

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/aireply/ai-reply-back-end/internal/domain"
+	"github.com/aireply/ai-reply-back-end/internal/repository"
 )
 
 // fakeAppleRevoker — Apple-ге сұраныс жібермейді, қандай код келгенін жазады.
@@ -99,12 +100,23 @@ func TestAccountDeletionRemovesEveryUserRow(t *testing.T) {
 	if res := h.generate(s.access, "Тағы бір сұрақ"); res.str("usage", "bucket") != "welcome" {
 		t.Fatalf("generation from the bonus: %s", res.raw)
 	}
+	// A store purchase and its pack: the purchase is a financial record and stays, without the person.
+	purchased := now
+	if _, err := h.store.GrantPurchase(context.Background(), repository.PurchaseGrant{
+		Purchase: domain.IAPPurchase{UserID: s.userID, Provider: domain.ProviderAppStore, Environment: "Production",
+			StoreProductID: "kz.aireply.pack50", ProductCode: "pack_50", TransactionID: "2000000000777001",
+			Quantity: 1, Units: 50, PurchasedAt: &purchased},
+		Kind: domain.GrantPack, Now: now,
+	}); err != nil {
+		t.Fatalf("purchase: %v", err)
+	}
 
 	before := h.rowsByUser(s.userID)
 	for _, table := range []string{"users", "user_profiles", "auth_identities", "devices", "refresh_tokens",
 		"subscriptions", "usage_daily", "usage_monthly", "ai_usage_events", "payments", "legal_consents",
 		"product_events", "app_installations", "notification_preferences", "notifications",
-		"notification_deliveries", "ai_reports", "credit_grants", "credit_ledger", "usage_reservations"} {
+		"notification_deliveries", "ai_reports", "credit_grants", "credit_ledger", "usage_reservations",
+		"iap_purchases"} {
 		if before[table] == 0 {
 			t.Fatalf("%s has no row for the account before deletion — the test would prove nothing (%v)", table, before)
 		}
@@ -125,6 +137,10 @@ func TestAccountDeletionRemovesEveryUserRow(t *testing.T) {
 	}
 	if n := h.scalar(`SELECT COUNT(*) FROM otp_codes WHERE identity_value IN ('+77019091011', 'aigerim.delete@example.com')`); n != 0 {
 		t.Errorf("otp_codes keeps %d code(s) of the deleted account", n)
+	}
+	if n := h.scalar(`SELECT COUNT(*) FROM iap_purchases WHERE transaction_id = '2000000000777001' AND user_id IS NULL
+		AND status = 'granted'`); n != 1 {
+		t.Errorf("the store purchase must stay without its account (%d row)", n)
 	}
 	// The phone stays registered, anonymous and without a push token.
 	if n := h.scalar(`SELECT COUNT(*) FROM app_installations WHERE installation_id = ? AND user_id IS NULL

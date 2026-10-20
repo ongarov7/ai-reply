@@ -4,6 +4,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 // setValidEnv — Validate тексеруінен өтетін ең аз баптау.
@@ -831,5 +832,106 @@ func TestAppleClientIDMustLookLikeABundleID(t *testing.T) {
 		if warned == ok {
 			t.Errorf("APPLE_CLIENT_ID=%q: warned=%v", id, warned)
 		}
+	}
+}
+
+// Сатып алу әдепкіде өшірулі: Apple тек APPLE_IAP_ENABLED-пен, Google тек кілтпен.
+func TestIAPIsOffUntilConfigured(t *testing.T) {
+	setValidEnv(t)
+	cfg, err := Load("")
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.IAP.Apple() || cfg.IAP.Google() || cfg.IAP.Any() {
+		t.Fatalf("iap on by default: %+v", cfg.IAP.Apple())
+	}
+	if cfg.IAP.AppleBundleID != "kz.ai-reply.reply.keyboard.keyboard" || cfg.IAP.GooglePackageName != "kz.yerek.aireply" ||
+		!cfg.IAP.AppleAcceptSandbox || cfg.IAP.GoogleVoidedPoll != time.Hour || cfg.Limits.IAPPerMinute != 20 {
+		t.Fatalf("defaults: bundle %q package %q sandbox %v poll %v rate %d", cfg.IAP.AppleBundleID,
+			cfg.IAP.GooglePackageName, cfg.IAP.AppleAcceptSandbox, cfg.IAP.GoogleVoidedPoll, cfg.Limits.IAPPerMinute)
+	}
+
+	t.Setenv("APPLE_IAP_ENABLED", "true")
+	t.Setenv("GOOGLE_PLAY_CLIENT_EMAIL", "play@ai-reply.iam.gserviceaccount.com")
+	t.Setenv("GOOGLE_PLAY_PRIVATE_KEY", `-----BEGIN PRIVATE KEY-----\nAAAA\n-----END PRIVATE KEY-----`)
+	t.Setenv("IAP_GOOGLE_VOIDED_POLL", "off")
+	cfg, err = Load("")
+	if err != nil || !cfg.IAP.Apple() || !cfg.IAP.Google() || cfg.IAP.GoogleVoidedPoll != 0 ||
+		!strings.Contains(cfg.IAP.GooglePrivateKey, "\nAAAA\n") {
+		t.Fatalf("configured: %v", err)
+	}
+}
+
+// Production-да Sandbox тек APPLE_IAP_ACCEPT_SANDBOX=true болса қабылданады (App Review туралы ескерту бар).
+func TestProductionRefusesSandboxPurchasesByDefault(t *testing.T) {
+	if got := iapFromEnv("production"); got.AppleAcceptSandbox {
+		t.Fatal("production accepts Sandbox by default")
+	}
+	if got := iapFromEnv("staging"); !got.AppleAcceptSandbox {
+		t.Fatal("staging refuses Sandbox by default")
+	}
+	t.Setenv("APPLE_IAP_ACCEPT_SANDBOX", "true")
+	if got := iapFromEnv("production"); !got.AppleAcceptSandbox {
+		t.Fatal("an explicit true is ignored")
+	}
+
+	cfg := Config{App: App{Env: "production"}, IAP: IAP{AppleEnabled: true, AppleBundleID: "kz.ai-reply.reply.keyboard.keyboard"}}
+	found := false
+	for _, w := range cfg.Warnings() {
+		found = found || strings.Contains(w, "APPLE_IAP_ACCEPT_SANDBOX")
+	}
+	if !found {
+		t.Fatal("no warning about App Review purchases being refused")
+	}
+	cfg.IAP.AppleAcceptSandbox = true
+	for _, w := range cfg.Warnings() {
+		if strings.Contains(w, "APPLE_IAP_ACCEPT_SANDBOX") {
+			t.Fatal("warning with sandbox accepted")
+		}
+	}
+}
+
+// Жартылай берілген Google кілті, файл мен айнымалылар бірге, қате аралық — баптау қатесі.
+func TestIAPRejectsHalfConfiguredGoogleAndBadValues(t *testing.T) {
+	dir := t.TempDir()
+	valid := dir + "/play.json"
+	if err := os.WriteFile(valid, []byte(`{"type":"service_account","client_email":"play@ai-reply.iam.gserviceaccount.com",
+		"private_key":"-----BEGIN PRIVATE KEY-----\nc2VjcmV0LWtleQ==\n-----END PRIVATE KEY-----\n"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	reset := func() {
+		setValidEnv(t)
+		for _, key := range []string{"GOOGLE_PLAY_CLIENT_EMAIL", "GOOGLE_PLAY_PRIVATE_KEY", "GOOGLE_PLAY_SERVICE_ACCOUNT_FILE",
+			"IAP_GOOGLE_VOIDED_POLL", "APPLE_IAP_ENABLED", "APPLE_IAP_BUNDLE_ID", "GOOGLE_PLAY_PACKAGE_NAME"} {
+			t.Setenv(key, "")
+		}
+	}
+	for name, env := range map[string]map[string]string{
+		"email only":    {"GOOGLE_PLAY_CLIENT_EMAIL": "play@ai-reply.iam.gserviceaccount.com"},
+		"key only":      {"GOOGLE_PLAY_PRIVATE_KEY": `-----BEGIN PRIVATE KEY-----\nAAAA\n-----END PRIVATE KEY-----`},
+		"not an e-mail": {"GOOGLE_PLAY_CLIENT_EMAIL": "play", "GOOGLE_PLAY_PRIVATE_KEY": "-----BEGIN PRIVATE KEY-----\\nAAAA\\n-----END PRIVATE KEY-----"},
+		"file and vars": {"GOOGLE_PLAY_SERVICE_ACCOUNT_FILE": valid, "GOOGLE_PLAY_CLIENT_EMAIL": "play@x.iam.gserviceaccount.com"},
+		"missing file":  {"GOOGLE_PLAY_SERVICE_ACCOUNT_FILE": dir + "/nope.json"},
+		"poll too fast": {"IAP_GOOGLE_VOIDED_POLL": "1m"},
+		"poll garbage":  {"IAP_GOOGLE_VOIDED_POLL": "hourly"},
+		"bad bundle":    {"APPLE_IAP_ENABLED": "true", "APPLE_IAP_BUNDLE_ID": "ABCDE12345.kz.ai-reply.app"},
+		"bad package":   {"GOOGLE_PLAY_SERVICE_ACCOUNT_FILE": valid, "GOOGLE_PLAY_PACKAGE_NAME": "kz..aireply"},
+	} {
+		reset()
+		for key, value := range env {
+			t.Setenv(key, value)
+		}
+		_, err := Load("")
+		if err == nil || strings.Contains(err.Error(), "c2VjcmV0") {
+			t.Errorf("%s: err = %v", name, err)
+		}
+	}
+
+	reset()
+	t.Setenv("GOOGLE_PLAY_SERVICE_ACCOUNT_FILE", valid)
+	cfg, err := Load("")
+	if err != nil || !cfg.IAP.Google() || cfg.IAP.GoogleServiceAccountFile != valid ||
+		cfg.IAP.GoogleClientEmail != "play@ai-reply.iam.gserviceaccount.com" {
+		t.Fatalf("service account file: %v", err)
 	}
 }

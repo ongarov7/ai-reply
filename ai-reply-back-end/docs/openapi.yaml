@@ -718,6 +718,121 @@ paths:
         "401": { description: UNAUTHORIZED }
         "404": { description: NOT_FOUND — приём выключен (PRODUCT_EVENTS_ENABLED=false) }
         "429": { description: RATE_LIMITED — отдельный лимит RATE_EVENTS_PER_MINUTE }
+  /api/v1/iap/products:
+    get:
+      summary: Пакеты ответов и пропуск для этой платформы (features.iap_ios / features.iap_android)
+      description: >-
+        Только товары, которые администратор настроил (units и Product ID этого магазина),
+        включил и не отправил в архив. Цены — в StoreKit / Play Billing. account_token —
+        постоянный UUID аккаунта: iOS передаёт его в appAccountToken, Android — в
+        setObfuscatedAccountId. Без platform — платформа из токена.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: platform, in: query, required: false, schema: { type: string, enum: [ios, android] } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [products, account_token]
+                properties:
+                  products: { type: array, items: { $ref: "#/components/schemas/IAPProduct" } }
+                  account_token: { type: string, format: uuid }
+        "400": { description: "INVALID_REQUEST, details.field = platform" }
+        "401": { description: UNAUTHORIZED }
+        "403": { description: "IAP_UNAVAILABLE — продажи на этой платформе закрыты" }
+  /api/v1/iap/apple/transactions:
+    post:
+      summary: StoreKit 2 transaction.jwsRepresentation → начисление (transaction.finish() только после 200)
+      description: >-
+        Проверка: ES256, x5c до встроенного Apple Root CA - G3 с маркерами Apple, цепочка
+        действительна на signedDate; bundleId, environment (Sandbox — только при
+        APPLE_IAP_ACCEPT_SANDBOX=true), type Consumable | Non-Renewing Subscription,
+        appAccountToken = account_token, нет revocationDate, productId — товар из админки.
+        Одна транзакция начисляется один раз. Лимит RATE_IAP_PER_MINUTE на аккаунт.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [signed_transaction]
+              properties:
+                signed_transaction: { type: string, description: "VerificationResult<Transaction>.jwsRepresentation" }
+      responses:
+        "200":
+          description: Начислено сейчас (granted) или раньше (already_granted)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PurchaseResult" }
+        "400": { description: "PURCHASE_INVALID, details.reason = malformed | signature | bundle_mismatch | environment | product_type | account_mismatch | revoked | product_unknown | quantity; INVALID_REQUEST (details.field = signed_transaction) или неизвестное поле" }
+        "401": { description: UNAUTHORIZED }
+        "403": { description: "IAP_UNAVAILABLE — App Store не подключён на сервере" }
+        "409": { description: PURCHASE_BELONGS_TO_ANOTHER_ACCOUNT }
+        "429": { description: RATE_LIMITED }
+  /api/v1/iap/google/purchases:
+    post:
+      summary: Play Billing purchase token → начисление, затем сервер сам потребляет покупку (клиент не вызывает consume)
+      description: >-
+        purchases.products.get: obfuscatedExternalAccountId = account_token, purchaseState 0
+        (2 — 202 pending, ничего не начислено), не потреблена другим, product_id — товар из
+        админки. Сначала начисление, затем consume; неудачный consume повторяет фоновая задача.
+        purchaseType 0 (лицензионный тестер) — environment Test. Лимит RATE_IAP_PER_MINUTE.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [product_id, purchase_token]
+              properties:
+                product_id: { type: string, pattern: "^[a-z0-9][a-z0-9._]{0,99}$" }
+                purchase_token: { type: string, maxLength: 1024 }
+      responses:
+        "200":
+          description: Начислено сейчас (granted) или раньше (already_granted)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PurchaseResult" }
+        "202":
+          description: Оплата ещё не прошла
+          content:
+            application/json:
+              schema: { type: object, properties: { status: { type: string, enum: [pending] } } }
+        "400": { description: "PURCHASE_INVALID, details.reason = malformed | product_unknown | not_found | account_mismatch | canceled | already_consumed | revoked | unsupported_type; INVALID_REQUEST (details.field = product_id | purchase_token)" }
+        "401": { description: UNAUTHORIZED }
+        "403": { description: "IAP_UNAVAILABLE — Google Play не подключён на сервере" }
+        "409": { description: PURCHASE_BELONGS_TO_ANOTHER_ACCOUNT }
+        "429": { description: RATE_LIMITED }
+        "503": { description: "STORE_UNAVAILABLE — Google API не ответил; повторить позже" }
+  /api/v1/iap/apple/notifications:
+    post:
+      summary: App Store Server Notifications V2 (URL для App Store Connect, Production и Sandbox)
+      description: >-
+        Публичный; подпись signedPayload проверяется той же цепочкой Apple. После проверки —
+        всегда 200, каждое notificationUUID обрабатывается один раз. REFUND / REVOKE снимают
+        остаток покупки (баланс не уходит в минус), REFUND_REVERSED возвращает снятое, TEST,
+        CONSUMPTION_REQUEST, REFUND_DECLINED — только в журнал.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [signedPayload]
+              properties:
+                signedPayload: { type: string }
+      responses:
+        "200": { description: "{ ok: true }" }
+        "400": { description: "PURCHASE_INVALID (подпись не проверена) или INVALID_REQUEST" }
+        "403": { description: "IAP_UNAVAILABLE — App Store не подключён" }
+        "500": { description: "ошибка записи — Apple повторит" }
   /api/v1/admin/notifications:
     get:
       tags: [admin]
@@ -905,6 +1020,84 @@ paths:
         "200": { description: "{ grant, units_revoked }" }
         "404": { description: NOT_FOUND }
         "409": { description: "CONFLICT, details.field = grant_id, reason = revoked" }
+  /api/v1/admin/iap/products:
+    get:
+      tags: [admin]
+      summary: Товары (архивные в конце) и состояние магазинов
+      security: [{ adminSession: [] }]
+      responses:
+        "200": { description: "{ products: [{ id, code, kind, units, duration_hours, apple_product_id, google_product_id, name, is_active, sort_order, archived, archived_at, sales, offered_ios, offered_android, created_at, updated_at }], iap: { enabled, configured, apple, google, apple_sandbox, bundle_id, package_name, voided_polling, available_ios, available_android, notification_url, ranges } }" }
+    post:
+      tags: [admin]
+      summary: Создать товар; аудит iap_product.create
+      security: [{ adminSession: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/IAPProductInput" }
+      responses:
+        "201": { description: "{ product }" }
+        "400": { description: "INVALID_REQUEST, details.field = code | kind | units | duration_hours | apple_product_id | google_product_id | is_active | sort_order | name.<язык>" }
+        "409": { description: "CONFLICT, details.field = code | apple_product_id | google_product_id, reason = taken" }
+  /api/v1/admin/iap/products/{id}:
+    patch:
+      tags: [admin]
+      summary: Изменить товар (code и kind не меняются; новые units и часы — только для новых покупок); аудит iap_product.update { before, after }
+      security: [{ adminSession: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/IAPProductInput" }
+      responses:
+        "200": { description: "{ product }" }
+        "400": { description: "INVALID_REQUEST (как при создании; code, kind — reason = immutable)" }
+        "404": { description: NOT_FOUND }
+        "409": { description: "CONFLICT — товар в архиве (details.field = product) или Product ID занят" }
+  /api/v1/admin/iap/products/{id}/archive:
+    post:
+      tags: [admin]
+      summary: В архив (не продаётся, Product ID остаётся занятым); аудит iap_product.archive
+      security: [{ adminSession: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses: { "200": { description: "{ ok: true }" }, "404": { description: NOT_FOUND }, "409": { description: "CONFLICT — уже в архиве" } }
+  /api/v1/admin/iap/purchases:
+    get:
+      tags: [admin]
+      summary: Покупки, новые первыми, и сводка по магазинам, средам и статусам
+      security: [{ adminSession: [] }]
+      parameters:
+        - { name: provider, in: query, schema: { type: string, enum: [app_store, google_play] } }
+        - { name: status, in: query, schema: { type: string, enum: [pending, granted, refunded, revoked, rejected] } }
+        - { name: environment, in: query, schema: { type: string, enum: [Production, Sandbox, Test, Promo] } }
+        - { name: user_id, in: query, schema: { type: string } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100 } }
+      responses:
+        "200": { description: "{ purchases: [{ id, user_id, identifier, provider, environment, product_code, store_product_id, transaction_id, order_id, quantity, units, status, consumed, purchased_at, created_at, revoked_at, revoke_reason }], total, page, limit, stats: [{ provider, environment, status, count, units }] }" }
+        "400": { description: "INVALID_REQUEST, details.field = provider | status | environment" }
+  /api/v1/admin/settings/iap:
+    post:
+      tags: [admin]
+      summary: Продажи в приложении вкл/выкл; аудит settings.iap.update { before, after }
+      security: [{ adminSession: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [enabled]
+              properties:
+                enabled: { type: boolean }
+      responses:
+        "200": { description: "состояние iap, как в GET /iap/products" }
+        "409": { description: "IAP_UNAVAILABLE, details.reason = store_not_configured — ни один магазин не подключён" }
   /v1/auth/register:
     post:
       summary: "Совместимость: install_id → токен (старые сборки; только при LEGACY_API_ENABLED=true, по умолчанию выключено)"
@@ -983,6 +1176,8 @@ components:
             welcome_bonus: { type: boolean, description: "новые аккаунты получают бесплатные ответы (welcome_bonus_units > 0)" }
             credits: { type: boolean, description: "usage.welcome/credits/pass/remaining_total/bucket, GET /me/credits, расширенные details лимитных ошибок" }
             idempotent_generation: { type: boolean, description: "заголовок Idempotency-Key на /ai/reply и /ai/compose" }
+            iap_ios: { type: boolean, description: "можно купить пакет или пропуск в App Store: магазин подключён, продажи включены, есть активный товар с Apple Product ID" }
+            iap_android: { type: boolean, description: "то же для Google Play" }
         demo_mode: { type: boolean }
         payment_mode: { type: string, enum: [off, demo, live], description: "по умолчанию off" }
         legal: { $ref: "#/components/schemas/LegalConfig" }
@@ -1168,6 +1363,36 @@ components:
               delta: { type: integer }
               kind: { type: string, enum: [welcome, admin, pack, pass] }
               created_at: { type: string, format: date-time }
+    IAPProduct:
+      type: object
+      required: [code, kind, units, duration_hours, store_product_id, name]
+      properties:
+        code: { type: string, example: pack_50 }
+        kind: { type: string, enum: [pack, pass], description: "pack не сгорает; pass — units ответов на duration_hours часов" }
+        units: { type: integer, example: 50 }
+        duration_hours: { type: integer, description: "0 у пакета", example: 0 }
+        store_product_id: { type: string, description: "Product ID в App Store Connect / Play Console" }
+        name: { type: string, description: "на языке аккаунта; цену и название показывает магазин" }
+    IAPProductInput:
+      type: object
+      additionalProperties: false
+      required: [code, kind, units]
+      properties:
+        code: { type: string, pattern: "^[a-z0-9][a-z0-9_]{1,39}$" }
+        kind: { type: string, enum: [pack, pass] }
+        units: { type: integer, minimum: 1, maximum: 100000 }
+        duration_hours: { type: integer, minimum: 0, maximum: 720, description: "1…720 у пропуска, 0 у пакета" }
+        apple_product_id: { type: string, pattern: "^[A-Za-z0-9._-]{1,100}$" }
+        google_product_id: { type: string, pattern: "^[a-z0-9][a-z0-9._]{0,99}$" }
+        name: { type: object, properties: { kk: { type: string }, ru: { type: string }, en: { type: string }, uz: { type: string } }, description: "до 60 символов" }
+        is_active: { type: boolean, description: "нужен хотя бы один Product ID" }
+        sort_order: { type: integer, minimum: 0, maximum: 10000 }
+    PurchaseResult:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [granted, already_granted] }
+        usage: { $ref: "#/components/schemas/Usage" }
     DeleteAccountRequest:
       type: object
       additionalProperties: false

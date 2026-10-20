@@ -89,9 +89,23 @@ func adminKeyFamilies() map[string][]string {
 		"admin.credits.status.": {domain.GrantActive, domain.GrantRevoked},
 		// Support chat.
 		"admin.support.status.": domain.SupportStatuses,
+		// In-app purchases: product kinds, purchase states, stores and environments (lower case).
+		"admin.iap.kind.":     domain.IAPProductKinds,
+		"admin.iap.status.":   domain.IAPPurchaseStatuses,
+		"admin.iap.provider.": domain.IAPProviders,
+		"admin.iap.env.":      lowerAll(domain.IAPEnvironments),
 		// Dashboard range buttons.
 		"common.": {"today", "7d", "30d", "month", "prev_month"},
 	}
+}
+
+// lowerAll — enum мәндерінің кіші әріпті түрі (кілт бөлігі ретінде).
+func lowerAll(values []string) []string {
+	out := make([]string, 0, len(values))
+	for _, v := range values {
+		out = append(out, strings.ToLower(v))
+	}
+	return out
 }
 
 var adminPlaceholderPattern = regexp.MustCompile(`\{(\w+)\}`)
@@ -181,6 +195,9 @@ func TestAdminScriptStatusListsMatchTheBackend(t *testing.T) {
 		"DIAGNOSTIC_FILTERS":  domain.DiagnosticFilters,
 		"REMINDER_TYPES":      domain.AdminReminderTypes,
 		"SUPPORT_STATUSES":    domain.SupportStatuses,
+		"IAP_KINDS":           domain.IAPProductKinds,
+		"IAP_STATUSES":        domain.IAPPurchaseStatuses,
+		"IAP_PROVIDERS":       domain.IAPProviders,
 	} {
 		if got := list(name); !reflect.DeepEqual(got, want) {
 			t.Errorf("%s = %v, backend has %v", name, got, want)

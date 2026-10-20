@@ -199,6 +199,8 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		"purchases":    s.purchasesPayload(r),
 		// Welcome bonus of new accounts (0 = off); a change affects only later sign-ups.
 		"welcome_bonus": s.welcomeBonusPayload(r),
+		// In-app purchases: store integrations, the iap_enabled switch, the notification URL.
+		"iap": s.iapPayload(r),
 	})
 }
 

@@ -23,6 +23,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/credits"
 	"github.com/aireply/ai-reply-back-end/internal/database"
 	"github.com/aireply/ai-reply-back-end/internal/email"
+	"github.com/aireply/ai-reply-back-end/internal/iap"
 	"github.com/aireply/ai-reply-back-end/internal/installations"
 	"github.com/aireply/ai-reply-back-end/internal/limits"
 	"github.com/aireply/ai-reply-back-end/internal/localization"
@@ -77,6 +78,8 @@ func checkConfig(envFile string) int {
 	}
 	fmt.Printf("configuration OK (APP_ENV=%s)\nsign-in client ids: google=%v apple=%v\n",
 		cfg.App.Env, cfg.OAuth.GoogleClientIDs, cfg.OAuth.AppleClientIDs)
+	fmt.Printf("in-app purchases: app_store=%v (bundle %s, sandbox %v) google_play=%v (package %s)\n",
+		cfg.IAP.Apple(), cfg.IAP.AppleBundleID, cfg.IAP.AppleAcceptSandbox, cfg.IAP.Google(), cfg.IAP.GooglePackageName)
 	return 0
 }
 
@@ -189,6 +192,13 @@ func run(envFile string) error {
 	// Support chat: an operator reply sends one support_reply push per unread burst;
 	// the conversation page shows the person's keyboard and permission diagnostics.
 	supportSvc := support.New(store, subSvc, log).WithNotifier(notifyEvents).WithDiagnostics(adminSvc.SupportDiagnostics)
+	// Response packs and passes through StoreKit 2 and Play Billing: verified against Apple's
+	// root and the Play Developer API, granted through the credit ledger. Off until a store is
+	// configured, an admin creates products and switches iap_enabled on.
+	iapSvc, err := iap.New(iap.Deps{Repo: store, Config: cfg.IAP, Secret: cfg.Auth.AccessSecret, Log: log})
+	if err != nil {
+		return err
+	}
 	simulatorSvc := simulator.New(simulator.Deps{
 		Repo: store, Users: userSvc, Subs: subSvc, Plans: planSvc, AI: aiSvc, Limits: limitSvc,
 		Config: cfg, Log: log,
@@ -207,12 +217,12 @@ func run(envFile string) error {
 		Installations: installSvc, Notifications: notifySvc, Reports: reportSvc, Support: supportSvc,
 		Limiter: limiter, Log: log,
 		Ping:    func(ctx context.Context) error { return db.Reader().PingContext(ctx) },
-		Credits: creditSvc,
+		Credits: creditSvc, IAP: iapSvc,
 	}).Register(mux)
 
 	adminapi.New(adminapi.Deps{
 		Config: cfg, Admin: adminSvc, Limits: limitSvc, Notifications: notifySvc, Payments: paymentSvc,
-		Reports: reportSvc, Credits: creditSvc, Support: supportSvc, Limiter: limiter, Log: log,
+		Reports: reportSvc, Credits: creditSvc, Support: supportSvc, IAP: iapSvc, Limiter: limiter, Log: log,
 	}).Register(mux)
 
 	simulatorapi.New(simulatorapi.Deps{
@@ -250,6 +260,8 @@ func run(envFile string) error {
 		func(ctx context.Context) { sweepReminders(ctx, notifyEvents) },
 		notifySvc.Run,
 		notifySvc.RunRetention,
+		// Google Play: consume retries every 15 minutes, voided purchases every IAP_GOOGLE_VOIDED_POLL.
+		iapSvc.Run,
 		// Spent codes, dead sessions, abandoned installations, old metadata (RETENTION_*).
 		retention.New(store, cfg.Retention, log).Run,
 	} {
@@ -269,7 +281,8 @@ func run(envFile string) error {
 			"legacy_api", cfg.Auth.LegacyEnabled, "model", cfg.OpenAI.Model,
 			"email_otp", authSvc.EmailDelivery(), "google_sign_in", authSvc.GoogleEnabled(),
 			"apple_sign_in", authSvc.AppleEnabled(), "push", notifySvc.Ready(),
-			"notification_email", notifySvc.Status().Email)
+			"notification_email", notifySvc.Status().Email,
+			"iap_app_store", cfg.IAP.Apple(), "iap_google_play", cfg.IAP.Google())
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}

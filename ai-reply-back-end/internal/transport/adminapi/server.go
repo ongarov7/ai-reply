@@ -14,6 +14,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/admin"
 	"github.com/aireply/ai-reply-back-end/internal/credits"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
+	"github.com/aireply/ai-reply-back-end/internal/iap"
 	"github.com/aireply/ai-reply-back-end/internal/limits"
 	"github.com/aireply/ai-reply-back-end/internal/middleware"
 	"github.com/aireply/ai-reply-back-end/internal/notifications"
@@ -42,6 +43,7 @@ type Server struct {
 	reports  *reports.Service
 	credits  *credits.Service
 	support  *support.Service
+	iap      *iap.Service
 	limiter  *middleware.Limiter
 	log      *slog.Logger
 }
@@ -60,6 +62,8 @@ type Deps struct {
 	Credits *credits.Service
 	// Support — қолдау чаты (Қолдау беті).
 	Support *support.Service
+	// IAP — App Store / Google Play өнімдері мен сатып алулары («Покупки» беті).
+	IAP *iap.Service
 	// Limiter — науқан жіберу мен алдын ала санаудың әкімші шелектері (nil — өз шектегіші).
 	Limiter *middleware.Limiter
 	Log     *slog.Logger
@@ -72,7 +76,7 @@ func New(d Deps) *Server {
 		limiter = middleware.NewLimiter()
 	}
 	return &Server{cfg: d.Config, admin: d.Admin, limits: d.Limits, notify: d.Notifications, payments: d.Payments,
-		reports: d.Reports, credits: d.Credits, support: d.Support, limiter: limiter, log: d.Log}
+		reports: d.Reports, credits: d.Credits, support: d.Support, iap: d.IAP, limiter: limiter, log: d.Log}
 }
 
 // Register — маршруттар.
@@ -101,6 +105,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	s.registerCredits(mux)
 	s.registerDiagnostics(mux)
 	s.registerSupport(mux)
+	s.registerIAP(mux)
 }
 
 // guard — cookie сессиясы + күй өзгертетін сұраныстарда CSRF тақырыбы.
@@ -327,6 +332,17 @@ func (s *Server) handleUserDetail(w http.ResponseWriter, r *http.Request) {
 	for _, g := range detail.Grants {
 		grants = append(grants, s.grantDTO(g))
 	}
+	purchases := make([]map[string]any, 0)
+	if s.iap != nil {
+		list, err := s.iap.UserPurchases(r.Context(), detail.User.ID, userPurchaseRows)
+		if err != nil {
+			s.fail(w, err)
+			return
+		}
+		for _, p := range list {
+			purchases = append(purchases, s.userPurchaseDTO(p))
+		}
+	}
 
 	httpx.JSON(w, http.StatusOK, map[string]any{
 		"user": map[string]any{
@@ -354,10 +370,12 @@ func (s *Server) handleUserDetail(w http.ResponseWriter, r *http.Request) {
 		"balances":     s.balancesPayload(detail.Entitlement),
 		"grants":       grants,
 		"ledger":       s.ledgerPayload(detail.Ledger),
-		"events":       events,
-		"devices":      devices,
-		"payments":     payments,
-		"sessions":     sessions,
+		// App Store / Google Play purchases of the account, newest first.
+		"iap_purchases": purchases,
+		"events":        events,
+		"devices":       devices,
+		"payments":      payments,
+		"sessions":      sessions,
 	})
 }
 
