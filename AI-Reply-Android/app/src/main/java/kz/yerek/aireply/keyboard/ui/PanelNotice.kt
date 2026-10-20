@@ -82,8 +82,8 @@ internal fun NoticeLine(text: String, error: AIReplyError?, theme: KeyboardTheme
 
 /**
  * «Лимит ответов исчерпан»: what happened, where more replies are, and the
- * button that goes there - AI Reply's purchase screen ([onOpenApp]). The
- * keyboard sells nothing itself.
+ * button that goes there - AI Reply's purchase screen, or its plans while it
+ * has none ([onOpenApp]). The keyboard sells nothing itself.
  *
  * Жауаптар бітті: қосымшаны ашып, жауап сатып алуға не тариф таңдауға болады.
  */

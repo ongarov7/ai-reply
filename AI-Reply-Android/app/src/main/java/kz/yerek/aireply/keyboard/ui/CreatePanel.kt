@@ -96,7 +96,7 @@ class CreateActions(
     val report: ReportActions = ReportActions.NONE,
     /** Pause, Resume, Done, Cancel, Try again and Undo of a recording. */
     val voice: VoiceActions = VoiceActions.NONE,
-    /** The replies are spent: AI Reply opens on its purchase screen. */
+    /** The replies are spent: AI Reply opens where more replies are. */
     val onOpenApp: () -> Unit = {}
 )
 

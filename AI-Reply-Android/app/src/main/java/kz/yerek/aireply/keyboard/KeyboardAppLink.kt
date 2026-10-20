@@ -3,25 +3,37 @@ package kz.yerek.aireply.keyboard
 import android.content.Context
 import android.content.Intent
 import kz.yerek.aireply.MainActivity
+import kz.yerek.aireply.push.AppLink
+import kz.yerek.aireply.push.AppLinks
+import kz.yerek.aireply.push.AppScreen
 import kz.yerek.aireply.push.PushPayload
 
 /**
- * The keyboard opening a screen of the app - today only the purchase screen,
- * from «Лимит ответов исчерпан».
+ * The keyboard opening a screen of the app - today only where more replies
+ * are, from «Лимит ответов исчерпан».
  *
  * It goes through the very extras a tapped notification carries (`nid`,
- * `link`), so MainActivity validates the link with [kz.yerek.aireply.push.AppLinks]
- * and routes it like any push link: one way in, one allow-list. The id is
- * [SOURCE], not a notification's - with no delivery id nothing is reported to
- * the server as opened. A build that does not know `aireply://purchase` yet
- * opens Home, the same fallback as for any unknown screen.
+ * `link`), so MainActivity validates the link with [AppLinks] and routes it
+ * like any push link: one way in, one allow-list. The id is [SOURCE], not a
+ * notification's - with no delivery id nothing is reported to the server as
+ * opened.
  *
  * Пернетақтадан қосымшаның экранын push сілтемесі арқылы ашу.
  */
 object KeyboardAppLink {
 
-    /** The app's screen for buying replies or changing the plan (contract §3.5). */
+    /** The app's screen for buying replies (contract §3.5). */
     const val PURCHASE = "aireply://purchase"
+
+    /** The plans: the tariffs, and where more replies are until the app has [PURCHASE]. */
+    const val SUBSCRIPTION = "aireply://subscription"
+
+    /**
+     * Where «Открыть AI Reply» goes: the purchase screen once this build's
+     * app has one, the plans until then. Never Home - an unknown screen opens
+     * Home, which neither sells replies nor changes the plan.
+     */
+    val limit: String = if (AppLinks.parse(PURCHASE) == AppLink.Screen(AppScreen.HOME)) SUBSCRIPTION else PURCHASE
 
     /** Stands in for a notification id: this link came from the keyboard. */
     const val SOURCE = "keyboard"

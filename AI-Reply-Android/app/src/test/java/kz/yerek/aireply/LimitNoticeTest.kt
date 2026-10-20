@@ -7,9 +7,11 @@ import kz.yerek.aireply.keyboard.ui.isLimit
 import kz.yerek.aireply.keyboard.ui.offersRetry
 import kz.yerek.aireply.push.AppLink
 import kz.yerek.aireply.push.AppLinks
+import kz.yerek.aireply.push.AppScreen
 import kz.yerek.aireply.push.PushPayload
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -48,15 +50,25 @@ class LimitNoticeTest {
     }
 
     @Test
-    fun `Open AI Reply goes through the push link path to the purchase screen`() {
-        val extras = KeyboardAppLink.extras(KeyboardAppLink.PURCHASE)
-        assertEquals("aireply://purchase", extras[PushPayload.KEY_LINK])
+    fun `Open AI Reply goes through the push link path to a screen with more replies`() {
+        val extras = KeyboardAppLink.extras(KeyboardAppLink.limit)
+        assertEquals(KeyboardAppLink.limit, extras[PushPayload.KEY_LINK])
         // MainActivity handles intents that carry a notification id.
         val payload = PushPayload.from(extras)
         assertNotNull(payload)
-        assertTrue("a screen of the app, Home until the app knows purchase", payload!!.link is AppLink.Screen)
-        assertEquals(AppLinks.parse("aireply://purchase"), payload.link)
+        val screen = (payload!!.link as AppLink.Screen).screen
+        // Home sells nothing and changes no plan: the purchase screen once
+        // the app has one, the plans until then.
+        assertNotEquals(AppScreen.HOME, screen)
+        assertEquals(AppScreen.fromKey("purchase") ?: AppScreen.SUBSCRIPTION, screen)
         assertNull("not a notification: nothing is reported as opened", payload.openedRequest("installation-1"))
+    }
+
+    @Test
+    fun `the plans link and the purchase link are the contract's`() {
+        assertEquals(AppLink.Screen(AppScreen.SUBSCRIPTION), AppLinks.parse(KeyboardAppLink.SUBSCRIPTION))
+        assertEquals("aireply://purchase", KeyboardAppLink.PURCHASE)
+        if (AppScreen.fromKey("purchase") != null) assertEquals(KeyboardAppLink.PURCHASE, KeyboardAppLink.limit)
     }
 
     @Test
