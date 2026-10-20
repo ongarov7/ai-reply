@@ -257,12 +257,12 @@ Work runs in three streams (backend, iOS, Android); each step is committed separ
 |---|---|
 | Audit and contracts | done |
 | Shared emoji catalog (`tools/emoji`) | done |
-| Backend: recipient register rules, colleague/partner aliases, landing names | done, in review |
-| Backend: welcome bonus, credit ledger, idempotent generation, admin balances | in progress |
-| Android keyboard: recipient labels/icons, clipboard fixes, limit message, emoji page | in progress |
-| iOS keyboard: recipient labels/icons, paste denial, status evidence, limit message, emoji page | in progress |
-| Backend: permission diagnostics, reminders, push fixes | next |
-| Backend: support chat (user + admin) | next |
+| Backend: recipient register rules, colleague/partner aliases, landing names | done |
+| Backend: welcome bonus, credit ledger, idempotent generation, admin balances | done |
+| Android keyboard: recipient labels/icons, clipboard fixes, limit message, emoji page | done |
+| iOS keyboard: recipient labels/icons, paste denial, status evidence, limit message, emoji page | done |
+| Backend: permission diagnostics, reminders, push fixes | done |
+| Backend: support chat (user + admin) | done |
 | Backend: purchases (StoreKit 2 / Play verification, products, admin) | next |
 | iOS / Android app: strict native style, onboarding, «Создать ответ», «Подключи AI Reply», permissions section | next |
 | iOS / Android app: balance, exhausted sheet, purchases, support chat, diagnostics reporting | next |
