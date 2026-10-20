@@ -733,7 +733,7 @@ func TestPermissionAndInAppSwitchAreRespected(t *testing.T) {
 	off := installation(installID(18), "android", fcmToken(18))
 	off["notifications_enabled"] = false
 	h.mustRegister(off, s.access)
-	if res := h.notifyUser(s.userID, "perm:1"); res.Devices != 0 || res.Skipped != notifications.SkipNoDevices {
+	if res := h.notifyUser(s.userID, "perm:1"); res.Devices != 0 || res.Skipped != notifications.SkipNoReachableDevice {
 		t.Fatalf("queued %d deliveries without permission (%+v)", res.Devices, res)
 	}
 }

@@ -242,6 +242,7 @@ func run(envFile string) error {
 
 	for _, worker := range []func(context.Context){
 		func(ctx context.Context) { expireSubscriptions(ctx, subSvc, notifyEvents, creditSvc, log) },
+		func(ctx context.Context) { sweepReminders(ctx, notifyEvents) },
 		notifySvc.Run,
 		notifySvc.RunRetention,
 		// Spent codes, dead sessions, abandoned installations, old metadata (RETENTION_*).
@@ -377,6 +378,20 @@ func configurePush(cfg config.Push, log *slog.Logger) (push.Provider, error) {
 		return nil, nil
 	}
 	return provider, nil
+}
+
+// sweepReminders — диагностика дәлелі бар тіркелгілерге еске салу (30 минут сайын, reminders.enabled болса).
+func sweepReminders(ctx context.Context, events *notifications.Events) {
+	ticker := time.NewTicker(30 * time.Minute)
+	defer ticker.Stop()
+	for {
+		events.SweepReminders(ctx)
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
 }
 
 // expireSubscriptions — мерзімі өткен жазылымдарды белгілейтін, мерзімі туралы

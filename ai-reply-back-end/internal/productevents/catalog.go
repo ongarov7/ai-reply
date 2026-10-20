@@ -41,7 +41,7 @@ func code(values ...string) property { return property{kind: kindCode, codes: va
 // chosen and whether the user skipped.
 var catalog = map[string]map[string]property{
 	"onboarding_started":              {"version": integer(), "trigger": code("auto", "settings")},
-	"onboarding_step_viewed":          {"step": code("welcome", "gender", "keyboard", "fullAccess", "copyReply", "practice", "done")},
+	"onboarding_step_viewed":          {"step": code(onboardingSteps...)},
 	"onboarding_keyboard_step_viewed": {},
 	"keyboard_enabled_detected":       {},
 	"full_access_enabled_detected":    {},
@@ -52,7 +52,17 @@ var catalog = map[string]map[string]property{
 	"gender_selected":                 {"source": code("onboarding", "settings"), "skipped": flag()},
 	"autocorrect_enabled":             {},
 	"autocorrect_disabled":            {},
+	// Keyboard and paste permissions, the three-step tutorial (counting only).
+	"keyboard_settings_opened": {},
+	"paste_denied_observed":    {},
+	"paste_succeeded":          {},
+	"onboarding_skipped":       {"step": code(onboardingSteps...)},
+	"onboarding_resumed":       {},
 }
+
+// onboardingSteps — онбординг қадамдарының кодтары (tutorial_* — үш қадамды оқыту).
+var onboardingSteps = []string{"welcome", "gender", "keyboard", "fullAccess", "copyReply", "practice", "done",
+	"tutorial_copy", "tutorial_recipient", "tutorial_reply", "permissions"}
 
 // Names — рұқсат етілген оқиға атаулары, әліпби бойынша.
 func Names() []string {

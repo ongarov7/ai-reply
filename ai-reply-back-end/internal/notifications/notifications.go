@@ -98,6 +98,8 @@ type Service struct {
 	emailMu  sync.RWMutex
 	mailer   Mailer
 	renderer EmailRenderer
+
+	reminders *reminderSettings
 }
 
 // New — қызмет.
@@ -131,7 +133,8 @@ func New(d Deps) *Service {
 	return &Service{
 		repo: d.Repo, sealer: sealer, provider: d.Provider, plans: d.Plans, cfg: cfg, loc: loc,
 		translate: d.Translate, log: d.Log, clock: clock, wakeCh: make(chan struct{}, 1), jitter: randomJitter,
-		owner: fmt.Sprintf("%s:%d:%s", traits.Clamp(host, 32), os.Getpid(), traits.RandomToken(3)),
+		owner:     fmt.Sprintf("%s:%d:%s", traits.Clamp(host, 32), os.Getpid(), traits.RandomToken(3)),
+		reminders: &reminderSettings{store: d.Repo, ttl: 5 * time.Second},
 	}
 }
 
@@ -257,6 +260,12 @@ type UserNotification struct {
 	// account (a plan bought or assigned): the category switch silences only
 	// the push, never this e-mail.
 	Transactional bool
+	// Defer — a sweep notice, not a reply to something the person just did:
+	// inside the recipient's quiet hours the push waits until they end.
+	Defer bool
+	// Reminder — a reminder attempt: the ledger moves with the notification,
+	// and with no reachable device nothing is written.
+	Reminder *repository.ReminderMark
 }
 
 // NotifyResult — NotifyUser нәтижесі.
@@ -265,7 +274,7 @@ type NotifyResult struct {
 	Created        bool   // false: this event was already turned into a notification
 	Locale         string // the language the texts were produced in
 	Devices        int    // push deliveries queued now
-	Skipped        string // why no push was queued: push_disabled | disabled_by_user | no_devices | recipient_excluded
+	Skipped        string // why no push was queued: push_disabled | disabled_by_user | no_devices | no_reachable_device | recipient_excluded
 	Email          bool   // an e-mail delivery was queued now
 }
 
@@ -352,6 +361,11 @@ func (s *Service) NotifyUser(ctx context.Context, n UserNotification) (NotifyRes
 		} else if silenced && !n.Transactional {
 			channels.EmailSkip = SkipDisabledByUser
 		}
+	}
+
+	channels.Reminder = n.Reminder
+	if n.Defer && channels.PushSkip == "" {
+		channels.NotBefore = s.quietUntil(ctx, user.ID, s.clock.Now(), s.ReminderSettings(ctx))
 	}
 
 	q, _, err := s.audienceQuery(ctx, domain.AudienceFilter{}, content.Category)
@@ -490,6 +504,8 @@ type CampaignInput struct {
 	Link           string
 	Data           map[string]string
 	Audience       domain.AudienceFilter
+	// NotificationType — "" for an ordinary campaign; a reminder type for an admin reminder.
+	NotificationType string
 }
 
 var idempotencyKeyPattern = regexp.MustCompile(`^[A-Za-z0-9_:.-]{8,128}$`)
@@ -532,7 +548,10 @@ func (s *Service) CreateCampaign(ctx context.Context, adminID string, in Campaig
 		Name: name, Title: content[fallback].Title, Body: content[fallback].Body, Content: content,
 		FallbackLocale: fallback, Category: envelope.Category, Link: envelope.Link, Data: envelope.Data,
 		Audience: audience, Status: domain.CampaignDraft, CreatedBy: adminID, IdempotencyKey: idempotencyKey,
-		CreatedAt: s.clock.Now(),
+		CreatedAt: s.clock.Now(), NotificationType: domain.TypeCampaign,
+	}
+	if in.NotificationType != "" {
+		requested.NotificationType = in.NotificationType
 	}
 	campaign, created, err := s.repo.CreateCampaign(ctx, requested)
 	if err != nil {
@@ -563,7 +582,7 @@ func (s *Service) CampaignByIdempotencyKey(ctx context.Context, key string) (dom
 // campaignFingerprint — what a retried create must repeat exactly (content and audience).
 func campaignFingerprint(c domain.Campaign) string {
 	var b strings.Builder
-	for _, part := range []string{c.Name, c.Category, c.Link, c.FallbackLocale} {
+	for _, part := range []string{c.Name, c.Category, c.Link, c.FallbackLocale, c.NotificationType} {
 		b.WriteString(strconv.Quote(part))
 		b.WriteByte('|')
 	}

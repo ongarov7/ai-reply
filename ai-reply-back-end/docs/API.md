@@ -203,7 +203,8 @@ HMAC, лимиты). Новые сборки их не вызывают.
                 "voice_transcription": true,
                 "product_events": true, "installations": true, "push_notifications": true,
                 "preferred_language": true, "purchases": false, "ai_reports": true, "account_deletion": true,
-                "welcome_bonus": true, "credits": true, "idempotent_generation": true },
+                "welcome_bonus": true, "credits": true, "idempotent_generation": true,
+                "permission_diagnostics": true, "push_reminders": false },
   "payment_mode": "off",
   "legal": { "terms_version": "2026-10-08", "privacy_version": "2026-10-08",
              "terms_url": "https://ai-reply.kz/offer", "privacy_url": "https://ai-reply.kz/privacy",
@@ -227,6 +228,9 @@ HMAC, лимиты). Новые сборки их не вызывают.
   `credits_remaining`, `pass_active`, `can_buy`.
 - `features.idempotent_generation` — `/ai/reply` и `/ai/compose` принимают заголовок
   `Idempotency-Key` (см. ниже).
+- `features.permission_diagnostics` — приложение может слать
+  `PUT /api/v1/installations/{installation_id}/diagnostics`.
+- `features.push_reminders` — админ включил напоминания (`reminders.enabled`).
 - `payment_mode` — строка `off | demo | live` (по умолчанию `off`).
 - `legal.contact_email` — `CONTACT_EMAIL`, пустая строка, если не задан (тогда приложение
   ведёт на `support_url`). `legal.ai_provider` — кому уходят тексты (экран согласия).
@@ -439,6 +443,38 @@ FCM-токене, смене языка, разрешения или внутр�
 Отвязать установку от аккаунта. С токеном — только свою, без токена — как анонимная
 регистрация. → `{ "ok": true, "detached": true }`.
 
+### PUT /api/v1/installations/{installation_id}/diagnostics
+
+Что приложение последний раз видело на этом устройстве. Тот же лимит и необязательный вход,
+что у других запросов установки. Только статусы и время — никогда содержимое буфера. Тело
+строгое (неизвестное поле → `400`):
+
+```json
+{ "keyboard_setup_status": "verified_enabled", "keyboard_selected_status": "unsupported",
+  "full_access_status": "not_verified", "clipboard_status": "unknown", "onboarding_status": "in_progress",
+  "status_source": "app_check", "last_successful_paste_at": null,
+  "last_keyboard_check_at": "2026-10-20T10:00:00Z" }
+```
+→ те же поля, как сохранены, плюс `notification_authorization_status` (из установки:
+`verified_enabled` — разрешено, `observed_denied` — запрещено в системе, `not_verified` —
+ещё не спрашивали, `user_reported_disabled` — выключено в приложении, `unknown`) и
+`updated_at`.
+
+- Статусы: `unknown | not_verified | verified_enabled | observed_denied |
+  user_reported_disabled | unsupported`; пустой — `unknown`. Онбординг: `unknown |
+  not_started | in_progress | completed | skipped`. `status_source` (обязателен): `app_check |
+  keyboard_check | user_report`. Неизвестное значение → `400`, `details.field`.
+- Время — RFC 3339 или `null`; приводится к интервалу [первое появление установки, сейчас +
+  5 мин]. `last_successful_paste_at` хранится максимальное.
+- Установка должна быть зарегистрирована (`404`) и не принадлежать другому аккаунту — без
+  входа можно писать только в анонимную установку (`409 CONFLICT`, `details.field =
+  installation_id`).
+- Что значат статусы на iOS и Android — `docs/AI_REPLY_PRODUCT_IMPLEMENTATION_AUDIT.md` §3.4.
+  Клиент шлёт отчёт при выходе на передний план, если значения изменились или прошло 24 ч,
+  и только при `features.permission_diagnostics = true`.
+- Подтверждённый успех навсегда закрывает напоминание того же вида. Отчёты удаляются вместе
+  с установкой и при удалении аккаунта.
+
 ### GET · PUT /api/v1/me/notification-preferences
 
 ```json
@@ -472,7 +508,9 @@ FCM-токене, смене языка, разрешения или внутр�
 
 - Категории: `account`, `subscription`, `security` (не отключается), `system`, `marketing`.
   Важные — `account`, `subscription`, `security`.
-- Ссылки: `aireply://home|subscription|settings|notifications|templates|profile|keyboard|compose`
+- Ссылки: `aireply://home|subscription|settings|notifications|templates|profile|keyboard|compose|onboarding|permissions|paste_help|support|purchase`
+  (старые сборки открывают для новых экранов главный; `keyboard` в новых сборках открывает
+  раздел «Настройка клавиатуры и разрешений»)
   или `https://` на хост из `PUSH_LINK_HOSTS`; приложение проверяет ссылку ещё раз,
   остальное просто открывает приложение. Приложения открывают `https://` только на
   `ai-reply.kz` и его поддоменах, поэтому шире этого `PUSH_LINK_HOSTS` задавать бессмысленно.
@@ -486,6 +524,8 @@ FCM-токене, смене языка, разрешения или внутр�
 | `subscription_expired` | закончился за последние 24 ч, другого платного тарифа нет | push |
 | `quota_low` | после ответа осталось `0 < остаток ≤ max(1, ⌈лимит × PUSH_QUOTA_LOW_PERCENT / 100⌉)` (7 → 1, 30 → 3, 50 → 5) | push |
 | `quota_exhausted` | после ответа остаток 0 или запрос упёрся в лимит | push |
+| `onboarding_incomplete` · `keyboard_setup_incomplete` · `clipboard_help` | напоминание по свежему (≤ 14 дней) отчёту диагностики, если админ включил напоминания; категория `system`, ключ `<type>:<номер попытки>` | push |
+| `account_info` | только из админки («Отправить напоминание») | push |
 
 Пока остались пропуск, бесплатные ответы или кредиты, квотные уведомления не отправляются:
 `quota_exhausted` придёт, когда закончится всё. Фильтр аудитории `quota` в кампаниях тоже
@@ -510,7 +550,11 @@ FCM-токене, смене языка, разрешения или внутр�
 получают. Месячные — только при `monthly_message_limit > 0`; дата и месяц — в часовом поясе
 приложения (`DEFAULT_TIMEZONE`). Сбой уведомления никогда не ломает оплату, выдачу тарифа или
 ответ AI — он только пишется в журнал. Без настроенного push событие всё равно записывается
-(`skipped`, `push_disabled` / `no_devices`), письмо уходит, если настроен Resend.
+(`skipped`, `push_disabled` / `no_devices` / `no_reachable_device` — установки есть, но
+доставить нельзя), письмо уходит, если настроен Resend. Push, пролежавший в очереди дольше
+своего срока (квота — до конца дня/месяца, напоминание — 12 ч, остальное — 24 ч), не
+отправляется (`skipped expired`). Напоминания о сроке тарифа и из обхода ждут конца тихих
+часов получателя.
 
 ## Генерация ответа
 
@@ -808,10 +852,10 @@ languages, purpose, latency_ms, status, code, retried), `ai_voice_reused` (по�
 | Событие | `props` (все необязательны) |
 |---|---|
 | `onboarding_started` | `version`: 0…1000, `trigger`: `auto` \| `settings` |
-| `onboarding_step_viewed` | `step`: `welcome` \| `gender` \| `keyboard` \| `fullAccess` \| `copyReply` \| `practice` \| `done` |
+| `onboarding_step_viewed`, `onboarding_skipped` | `step`: `welcome` \| `gender` \| `keyboard` \| `fullAccess` \| `copyReply` \| `practice` \| `done` \| `tutorial_copy` \| `tutorial_recipient` \| `tutorial_reply` \| `permissions` |
 | `onboarding_completed` | `version`: 0…1000, `skipped`: bool |
 | `gender_selected` | `source`: `onboarding` \| `settings`, `skipped`: bool (сам род не передаётся) |
-| `onboarding_keyboard_step_viewed`, `keyboard_enabled_detected`, `full_access_enabled_detected`, `paste_tutorial_viewed`, `onboarding_practice_completed`, `onboarding_reopened`, `autocorrect_enabled`, `autocorrect_disabled` | — |
+| `onboarding_keyboard_step_viewed`, `keyboard_enabled_detected`, `full_access_enabled_detected`, `paste_tutorial_viewed`, `onboarding_practice_completed`, `onboarding_reopened`, `autocorrect_enabled`, `autocorrect_disabled`, `keyboard_settings_opened`, `paste_denied_observed`, `paste_succeeded`, `onboarding_resumed` | — |
 
 - `429 RATE_LIMITED` — отдельный лимит `RATE_EVENTS_PER_MINUTE` (по умолчанию 30
   запросов в минуту на пользователя), не делит лимит с генерацией.
@@ -923,6 +967,10 @@ credits, admin, packs, pass { expires_at, remaining } | null, remaining_total }`
 | POST | `/notifications/campaigns/{id}/send` · `/cancel` | отправить черновик / отменить (неотправленные доставки отменяются, отправка «в полёте» не повторяется) |
 | GET | `/notifications/deliveries?campaign_id=&user_id=&status=&platform=&channel=push\|email&type=&source=campaign\|automatic&locale=` | журнал доставок push и писем; `push` — отпечаток токена, на который ушла попытка |
 | GET | `/notifications/devices?q=&user_id=&platform=&push_status=&auth=&app_version=` | реестр установок: только отпечаток токена и первые 8 символов `installation_id` |
+| POST | `/notifications/reminders` | `{ "type": "keyboard_setup_incomplete", "audience": { "diagnostics": "keyboard_not_verified", "platforms": ["ios"] } }` → кампания с `notification_type` = тип напоминания (тексты `push.<type>.*` на четырёх языках, категория `system`); `Idempotency-Key` обязателен; аудитория — фильтр диагностики или `user_ids`/`emails` (иначе `400`); тип — `onboarding_incomplete`, `keyboard_setup_incomplete`, `clipboard_help`, `account_info`. Аудит `campaign.create` / `campaign.send` с `reminder_type` |
+| GET | `/diagnostics?filter=&platform=&q=&page=&limit=` | отчёты диагностики: строки как в реестре устройств (замаскированный пользователь) + `diagnostics`; `counts` по фильтрам; `filter`: `setup_incomplete`, `keyboard_not_verified`, `paste_problems`, `full_access_disabled`, `notifications_disabled`, `unknown` (пусто или `all` — все) |
+| GET | `/users/{id}/diagnostics` | `{ devices: [… + diagnostics], reminders: [{ type, send_count, last_sent_at, last_source, resolved_at }] }` |
+| GET · POST | `/settings/reminders` | `{ current, defaults, ranges, types }`; тело POST — `{ enabled, types: { <type>: { cooldown_hours, max_sends } }, min_account_age_hours, quiet_start_hour, quiet_end_hour }` (все три типа); аудит `settings.reminders.update` |
 
 Кампания:
 

@@ -58,6 +58,11 @@ type UserChannels struct {
 	// Email — one e-mail delivery; EmailSkip records it as skipped with that code.
 	Email     bool
 	EmailSkip string
+	// NotBefore — the push rows wait until then (quiet hours); zero sends now.
+	NotBefore time.Time
+	// Reminder — a reminder push: the ledger moves in this transaction, and
+	// with no device to reach nothing is written at all (no attempt is used).
+	Reminder *ReminderMark
 }
 
 // UserNotificationResult — CreateUserNotification не істегені.
@@ -74,6 +79,10 @@ type UserNotificationResult struct {
 func (s *Store) CreateUserNotification(ctx context.Context, n domain.Notification, q AudienceQuery, ch UserChannels) (UserNotificationResult, error) {
 	var out UserNotificationResult
 	now := ms(q.Now)
+	due := now
+	if ch.NotBefore.After(q.Now) {
+		due = ms(ch.NotBefore)
+	}
 	err := s.db.Tx(ctx, func(tx *sql.Tx) error {
 		out = UserNotificationResult{}
 		candidate := traits.NewID()
@@ -87,18 +96,41 @@ func (s *Store) CreateUserNotification(ctx context.Context, n domain.Notificatio
 			return tx.QueryRowContext(ctx, `SELECT id FROM notifications WHERE dedupe_key = ?`, n.DedupeKey).Scan(&out.ID)
 		}
 		out.ID, out.Created = candidate, true
+		if due != now {
+			if _, err := tx.ExecContext(ctx, `UPDATE notifications SET not_before = ? WHERE id = ?`, due, out.ID); err != nil {
+				return err
+			}
+		}
 
 		out.Skipped = ch.PushSkip
 		if ch.PushSkip == "" {
 			where, args := eligible(q)
-			res, err = tx.ExecContext(ctx, deliveryInsert+where, append([]any{out.ID, nil, now, now, now}, args...)...)
+			res, err = tx.ExecContext(ctx, deliveryInsert+where, append([]any{out.ID, nil, due, now, now}, args...)...)
 			if err != nil {
 				return err
 			}
 			affected, _ := res.RowsAffected()
 			out.Devices = int(affected)
 			if out.Devices == 0 {
+				// Installations that exist but cannot be reached (permission,
+				// in-app switch, dead token, unseen for long) are not "none".
 				out.Skipped = "no_devices"
+				var installed int
+				if err := tx.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM app_installations WHERE user_id = ?)`,
+					n.UserID).Scan(&installed); err != nil {
+					return err
+				}
+				if installed == 1 {
+					out.Skipped = "no_reachable_device"
+				}
+			}
+		}
+		if ch.Reminder != nil {
+			if out.Devices == 0 {
+				return errReminderNotSent
+			}
+			if err := markReminder(ctx, tx, n.UserID, out.ID, *ch.Reminder, now); err != nil {
+				return err
 			}
 		}
 		if out.Skipped != "" {
@@ -119,6 +151,9 @@ func (s *Store) CreateUserNotification(ctx context.Context, n domain.Notificatio
 		}
 		return nil
 	})
+	if errors.Is(err, errReminderNotSent) {
+		return UserNotificationResult{Skipped: out.Skipped}, nil
+	}
 	return out, err
 }
 
@@ -143,7 +178,7 @@ func insertOwnDelivery(ctx context.Context, tx *sql.Tx, notificationID, userID, 
 const campaignColumns = `id, name, title, body, content, fallback_locale, category, link, data, audience_filter,
 	status, created_by, COALESCE((SELECT a.email FROM admin_users a WHERE a.id = created_by), ''),
 	COALESCE(idempotency_key, ''), recipient_count, device_count, created_at, updated_at, queued_at,
-	started_at, completed_at, cancelled_at, final_stats`
+	started_at, completed_at, cancelled_at, final_stats, notification_type`
 
 func scanCampaign(row interface{ Scan(...any) error }) (domain.Campaign, error) {
 	var (
@@ -154,7 +189,7 @@ func scanCampaign(row interface{ Scan(...any) error }) (domain.Campaign, error) 
 	)
 	err := row.Scan(&c.ID, &c.Name, &c.Title, &c.Body, &content, &c.FallbackLocale, &c.Category, &c.Link, &data,
 		&audience, &c.Status, &c.CreatedBy, &c.CreatedByEmail, &c.IdempotencyKey, &c.RecipientCount, &c.DeviceCount,
-		&created, &updated, &queued, &started, &completed, &cancelledAt, &final)
+		&created, &updated, &queued, &started, &completed, &cancelledAt, &final, &c.NotificationType)
 	if err != nil {
 		return domain.Campaign{}, err
 	}
@@ -193,11 +228,11 @@ func (s *Store) CreateCampaign(ctx context.Context, c domain.Campaign) (domain.C
 	now := ms(c.CreatedAt)
 	_, err = s.db.Writer().ExecContext(ctx, `
 		INSERT INTO notification_campaigns (id, title, body, audience, status, created_by, created_at, updated_at,
-			name, category, link, data, audience_filter, content, fallback_locale, idempotency_key)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			name, category, link, data, audience_filter, content, fallback_locale, idempotency_key, notification_type)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		c.ID, c.Title, c.Body, summary, c.Status, c.CreatedBy, now, now,
 		c.Name, c.Category, c.Link, encodeData(c.Data), string(audience), string(content), c.FallbackLocale,
-		nullText(c.IdempotencyKey))
+		nullText(c.IdempotencyKey), campaignType(c))
 	if err != nil {
 		if isUnique(err) && c.IdempotencyKey != "" {
 			existing, lookupErr := s.CampaignByIdempotencyKey(ctx, c.IdempotencyKey)
@@ -353,7 +388,7 @@ func (s *Store) FanOutCampaign(ctx context.Context, c domain.Campaign, q Audienc
 			}
 			dedupe := "campaign:" + c.ID + ":" + lang
 			if _, err := tx.ExecContext(ctx, insertNotification,
-				traits.NewID(), dedupe, dedupe, c.ID, nil, c.Category, domain.TypeCampaign, lang,
+				traits.NewID(), dedupe, dedupe, c.ID, nil, c.Category, campaignType(c), lang,
 				text.Title, text.Body, c.Link, encodeData(c.Data), "{}", now); err != nil {
 				return err
 			}
@@ -393,9 +428,28 @@ func (s *Store) FanOutCampaign(ctx context.Context, c domain.Campaign, q Audienc
 		_, err = tx.ExecContext(ctx, `
 			UPDATE notification_campaigns SET recipient_count = ?, device_count = ?, updated_at = ? WHERE id = ?`,
 			users, devices, now, c.ID)
+		if err != nil || !domain.IsReminderType(c.NotificationType) {
+			return err
+		}
+		// An admin reminder counts in the ledger, so the automatic sweep keeps its cooldown.
+		_, err = tx.ExecContext(ctx, `
+			INSERT INTO notification_reminders (user_id, type, send_count, last_sent_at, last_source, updated_at)
+			SELECT DISTINCT user_id, ?, 1, ?, 'admin', ? FROM notification_deliveries
+			WHERE campaign_id = ? AND user_id IS NOT NULL
+			ON CONFLICT (user_id, type) DO UPDATE SET send_count = notification_reminders.send_count + 1,
+				last_sent_at = excluded.last_sent_at, last_source = excluded.last_source, updated_at = excluded.updated_at`,
+			c.NotificationType, now, now, c.ID)
 		return err
 	})
 	return claimed, devices, users, err
+}
+
+// campaignType — науқан хабарламаларының түрі (бос болса "campaign").
+func campaignType(c domain.Campaign) string {
+	if c.NotificationType == "" {
+		return domain.TypeCampaign
+	}
+	return c.NotificationType
 }
 
 // CampaignStats — науқан жеткізулерінің күйі (live, жолдардан есептеледі), тіл бойынша да.
@@ -650,13 +704,14 @@ func (s *Store) NotificationByID(ctx context.Context, id string) (domain.Notific
 		campaignID, userID sql.NullString
 		data, params       string
 		created            int64
+		notBefore          sql.NullInt64
 	)
 	err := s.db.Reader().QueryRowContext(ctx, `
 		SELECT id, dedupe_key, idempotency_key, campaign_id, user_id, category, type, locale, title, body,
-		       link, data, params, created_at
+		       link, data, params, created_at, not_before
 		FROM notifications WHERE id = ?`, id).
 		Scan(&n.ID, &n.DedupeKey, &n.IdempotencyKey, &campaignID, &userID, &n.Category, &n.Type, &n.Locale,
-			&n.Title, &n.Body, &n.Link, &data, &params, &created)
+			&n.Title, &n.Body, &n.Link, &data, &params, &created, &notBefore)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Notification{}, domain.ErrNotFound
 	}
@@ -665,7 +720,7 @@ func (s *Store) NotificationByID(ctx context.Context, id string) (domain.Notific
 	}
 	n.CampaignID, n.UserID = text(campaignID), text(userID)
 	n.Data, n.Params = decodeData(data), decodeData(params)
-	n.CreatedAt = timeFrom(created)
+	n.CreatedAt, n.NotBefore = timeFrom(created), timePtr(notBefore)
 	return n, nil
 }
 

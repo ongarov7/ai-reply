@@ -84,6 +84,13 @@ func (s *Store) DeleteUserAccount(ctx context.Context, userID string, now time.T
 			WHERE user_id = ? AND status IN ('queued','retrying')`, ms(now), userID); err != nil {
 			return err
 		}
+		// The phones stay as anonymous installations; what they reported about the
+		// person's keyboard and permissions goes with the account.
+		if _, err := tx.ExecContext(ctx, `
+			DELETE FROM installation_diagnostics WHERE installation_id IN (SELECT id FROM app_installations WHERE user_id = ?)`,
+			userID); err != nil {
+			return err
+		}
 		if _, err := tx.ExecContext(ctx, `
 			UPDATE app_installations SET
 				user_id = NULL, attached_at = NULL,

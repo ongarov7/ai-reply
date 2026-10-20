@@ -177,6 +177,9 @@ func (s *Server) Register(mux *http.ServeMux) {
 		s.installationLimit(s.optionalUser(http.HandlerFunc(s.handleRegisterInstallation))))
 	mux.Handle("POST /api/v1/installations/{installation_id}/detach",
 		s.installationLimit(s.optionalUser(http.HandlerFunc(s.handleDetachInstallation))))
+	// Пернетақта мен рұқсаттар диагностикасы (тек enum мен уақыт).
+	mux.Handle("PUT /api/v1/installations/{installation_id}/diagnostics",
+		s.installationLimit(s.optionalUser(http.HandlerFunc(s.handleInstallationDiagnostics))))
 	mux.Handle("GET /api/v1/me/notification-preferences", s.requireUser(http.HandlerFunc(s.handleNotificationPreferences)))
 	mux.Handle("PUT /api/v1/me/notification-preferences", s.requireUser(http.HandlerFunc(s.handleUpdateNotificationPreferences)))
 	mux.Handle("POST /api/v1/notifications/opened",

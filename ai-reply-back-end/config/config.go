@@ -741,6 +741,14 @@ func (p Push) validate() []string {
 	if p.QuotaLowPercent < 1 || p.QuotaLowPercent > 100 {
 		problems = append(problems, "PUSH_QUOTA_LOW_PERCENT must be between 1 and 100")
 	}
+	// A claimed batch has to finish inside the fixed 5 min lease (15 s per
+	// send at most), or a second process re-claims rows still waiting for a slot.
+	if p.BatchSize < 1 || p.BatchSize > 500 {
+		problems = append(problems, "PUSH_BATCH_SIZE must be between 1 and 500")
+	}
+	if p.Concurrency < 1 || p.Concurrency > 64 {
+		problems = append(problems, "PUSH_WORKER_CONCURRENCY must be between 1 and 64")
+	}
 	return problems
 }
 

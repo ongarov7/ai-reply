@@ -49,6 +49,9 @@ func (s *Server) handleNotifications(w http.ResponseWriter, r *http.Request) {
 		"platforms":        []string{domain.PlatformAndroid, domain.PlatformIOS},
 		"channels":         []string{domain.ChannelPush, domain.ChannelEmail},
 		"types":            domain.AutomaticNotificationTypes,
+		// The admin "send reminder" action and the diagnostics filters it targets.
+		"reminder_types":     domain.AdminReminderTypes,
+		"diagnostic_filters": domain.DiagnosticFilters,
 		"limits": map[string]int{
 			"title": notifications.MaxTitleRunes, "body": notifications.MaxBodyRunes,
 			"data_keys": notifications.MaxDataKeys, "recipients": notifications.MaxRecipients,
@@ -249,7 +252,8 @@ func (s *Server) allow(w http.ResponseWriter, key string, limit int, window time
 // емес, тек саны (толық сүзгі науқанның өзінде сақталады).
 func auditAudience(f domain.AudienceFilter) map[string]any {
 	out := map[string]any{}
-	for key, value := range map[string]string{"segment": f.Segment, "subscription": f.Subscription, "quota": f.Quota} {
+	for key, value := range map[string]string{"segment": f.Segment, "subscription": f.Subscription, "quota": f.Quota,
+		"diagnostics": f.Diagnostics} {
 		if value != "" {
 			out[key] = value
 		}

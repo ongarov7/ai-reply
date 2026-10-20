@@ -361,6 +361,12 @@ func TestSubscriptionRemindersAreSentOncePerPeriod(t *testing.T) {
 	if n := h.notices(s.userID, domain.TypeSubscriptionExpired); n != 1 {
 		t.Fatalf("expiry notices = %d", n)
 	}
+	// 03:00 in Almaty: the sweep notice waits for the end of the quiet hours (09:00).
+	h.tick()
+	if msgs := h.pushesOf(domain.TypeSubscriptionExpired); len(msgs) != 0 {
+		t.Fatalf("sent in quiet hours: %+v", msgs)
+	}
+	h.pushClock.Advance(6 * time.Hour)
 	h.tick()
 	if msgs := h.pushesOf(domain.TypeSubscriptionExpired); len(msgs) != 1 || msgs[0].Title != "Жазылым мерзімі аяқталды" {
 		t.Fatalf("expired = %+v", msgs)

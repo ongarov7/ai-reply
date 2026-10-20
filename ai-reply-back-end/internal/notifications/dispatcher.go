@@ -295,6 +295,10 @@ func (s *Service) deliver(ctx context.Context, d repository.ClaimedDelivery, not
 			o.code = "notification_lookup_failed"
 		case d.Channel == domain.ChannelEmail:
 			o = s.sendEmail(ctx, d, n, started)
+		case s.pushTTL(n, started) == 0:
+			// Outlived its window (a quota notice after the reset, a queue
+			// that waited for a worker): saying it now would be wrong.
+			o = outcome{status: domain.DeliverySkipped, code: SkipExpired}
 		default:
 			o = s.sendPush(ctx, d, n, started)
 		}
@@ -356,6 +360,17 @@ func (s *Service) sendPush(ctx context.Context, d repository.ClaimedDelivery, n 
 	case !s.Ready() || s.sealer == nil:
 		return skip("provider_unavailable")
 	}
+	if n.NotBefore != nil && domain.CategoryOptional(n.Category) {
+		// Deferred out of quiet hours: the person may have switched the category off meanwhile.
+		prefs, err := s.repo.NotificationPreferences(ctx, d.UserID)
+		if err != nil {
+			status, next := s.retry(d, 0)
+			return outcome{status: status, next: next, code: "preferences_lookup_failed", fingerprint: fingerprint}
+		}
+		if !domain.CategoryEnabled(n.Category, prefs) {
+			return skip(SkipDisabledByUser)
+		}
+	}
 	token, err := s.sealer.Open(target.TokenSealed)
 	if err != nil {
 		// The sealing key changed (JWT_ACCESS_SECRET rotated): the app sends
@@ -366,8 +381,12 @@ func (s *Service) sendPush(ctx context.Context, d repository.ClaimedDelivery, n 
 		return outcome{status: domain.DeliveryInvalidToken, code: "token_unreadable", fingerprint: fingerprint}
 	}
 
+	ttl := s.pushTTL(n, s.clock.Now())
+	if ttl == 0 {
+		return skip(SkipExpired)
+	}
 	msg := push.Message{
-		Title: n.Title, Body: n.Body, Category: n.Category, CollapseID: n.ID, TTL: DefaultTTL,
+		Title: n.Title, Body: n.Body, Category: n.Category, CollapseID: n.ID, TTL: ttl,
 		Important: domain.CategoryImportant(n.Category), Data: payloadData(n, d.ID),
 	}
 	sendCtx, cancel := context.WithTimeout(ctx, sendTimeout)
