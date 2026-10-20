@@ -64,7 +64,12 @@ class AIReplyService(
          * Injectable so working-hours behaviour is testable without waiting for
          * 18:30.
          */
-        val now: LocalDateTime = LocalDateTime.now()
+        val now: LocalDateTime = LocalDateTime.now(),
+        /**
+         * This action's [IdempotencyKey]. Null: the call is a new action and
+         * gets a fresh one - every tap is.
+         */
+        val idempotencyKey: String? = null
     )
 
     suspend fun generate(request: Request): GeneratedReply {
@@ -155,7 +160,8 @@ class AIReplyService(
                 profileTone = profile.preferredTone,
                 profileBusiness = profile.business,
                 grammaticalGender = profile.grammaticalGender,
-                inputLanguage = request.inputLanguage?.code
+                inputLanguage = request.inputLanguage?.code,
+                idempotencyKey = request.idempotencyKey ?: IdempotencyKey.create()
             )
         )
     }

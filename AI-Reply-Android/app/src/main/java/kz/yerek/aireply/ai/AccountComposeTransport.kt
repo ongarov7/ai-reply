@@ -28,20 +28,25 @@ class AccountComposeTransport(
     private val appVersion: String,
     /** The user's choice from the profile, read when the request is sent. */
     private val grammaticalGender: () -> GrammaticalGender?,
-    private val timeoutMs: Int = AIConfiguration.REQUEST_TIMEOUT_MS
+    private val timeoutMs: Int = AIConfiguration.REQUEST_TIMEOUT_MS,
+    /** How a request is sent; a test seam. */
+    private val clientFactory: (baseUrl: String, timeoutMs: Int) -> ApiClient = { url, timeout -> ApiClient(url, timeout) }
 ) : ComposeTransport {
 
     override suspend fun compose(request: ComposeService.Request): GeneratedReply {
         if (!session.isSignedIn) AIReplyError.AuthenticationFailed.raise()
 
-        val client = ApiClient(baseUrl, timeoutMs)
-        val body = encode(request, appVersion, grammaticalGender(), AILimits.features)
+        val client = clientFactory(baseUrl, timeoutMs)
+        val features = AILimits.features
+        val body = encode(request, appVersion, grammaticalGender(), features)
+        // Built once: the retry after a token refresh is the same action and sends the same key.
+        val headers = IdempotencyKey.headers(request.idempotencyKey, features)
         val payload = try {
             session.authenticated { token ->
-                client.request("POST", "api/v1/ai/compose", body, token)
+                client.request("POST", "api/v1/ai/compose", body, token, headers)
             }
         } catch (exception: ApiException) {
-            throw AIReplyException(map(exception.error))
+            throw AccountReplyTransport.failure(exception.error, ::map)
         }
 
         val decoded = runCatching {

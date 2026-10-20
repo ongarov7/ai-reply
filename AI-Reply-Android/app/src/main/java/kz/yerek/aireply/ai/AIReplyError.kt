@@ -76,7 +76,13 @@ sealed interface AIReplyError {
     data class InstructionTooLong(val limit: Int) : AIReplyError
 }
 
-/** Thrown across suspend boundaries; the payload is what the UI actually reads. */
-class AIReplyException(val error: AIReplyError) : Exception(error::class.simpleName)
+/**
+ * Thrown across suspend boundaries; the payload is what the UI actually reads.
+ *
+ * [canBuy]: a spent limit, and the server would sell more replies on this
+ * platform (`details.can_buy`). The app's exhausted sheet offers «Докупить
+ * ответы» only then.
+ */
+class AIReplyException(val error: AIReplyError, val canBuy: Boolean = false) : Exception(error::class.simpleName)
 
 fun AIReplyError.raise(): Nothing = throw AIReplyException(this)

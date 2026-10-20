@@ -41,7 +41,12 @@ class ComposeService(
          * The keyboard layout on screen when Write was tapped: the next hint
          * after the instruction's own language. Null outside the keyboard.
          */
-        val inputLanguage: KeyboardLanguage? = null
+        val inputLanguage: KeyboardLanguage? = null,
+        /**
+         * This action's [IdempotencyKey]. Null: the call is a new action and
+         * gets a fresh one - every tap is.
+         */
+        val idempotencyKey: String? = null
     )
 
     suspend fun compose(request: Request): GeneratedReply {
@@ -49,7 +54,10 @@ class ComposeService(
             is ValidationResult.Valid -> result.instruction
             is ValidationResult.Invalid -> result.error.raise()
         }
-        val prepared = request.copy(instruction = instruction)
+        val prepared = request.copy(
+            instruction = instruction,
+            idempotencyKey = request.idempotencyKey ?: IdempotencyKey.create()
+        )
 
         val override = transportOverride?.invoke(prepared)
         if (override == null) configuration.checkReady()

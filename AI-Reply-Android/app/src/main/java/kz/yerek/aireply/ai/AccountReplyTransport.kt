@@ -35,7 +35,9 @@ class AccountReplyTransport(
     private val session: AccountSession,
     private val usageCache: AccountUsageCache,
     private val context: RequestContext,
-    private val timeoutMs: Int = AIConfiguration.REQUEST_TIMEOUT_MS
+    private val timeoutMs: Int = AIConfiguration.REQUEST_TIMEOUT_MS,
+    /** How a request is sent; a test seam. */
+    private val clientFactory: (baseUrl: String, timeoutMs: Int) -> ApiClient = { url, timeout -> ApiClient(url, timeout) }
 ) : ReplyTransport {
 
     /**
@@ -70,21 +72,26 @@ class AccountReplyTransport(
         /** Null until the user was asked. Only the enum value is ever sent. */
         val grammaticalGender: GrammaticalGender? = null,
         /** The keyboard layout's code (`kk`, `ru`, `en`) when Reply was tapped. */
-        val inputLanguage: String? = null
+        val inputLanguage: String? = null,
+        /** This action's [IdempotencyKey]; a header, never part of the body. */
+        val idempotencyKey: String? = null
     )
 
     override suspend fun generate(prompt: ReplyPromptBuilder.Prompt): GeneratedReply {
         if (!session.isSignedIn) AIReplyError.AuthenticationFailed.raise()
 
-        val client = ApiClient(baseUrl, timeoutMs)
-        val body = encode(context, AILimits.features)
+        val client = clientFactory(baseUrl, timeoutMs)
+        val features = AILimits.features
+        val body = encode(context, features)
+        // Built once: the retry after a token refresh is the same action and sends the same key.
+        val headers = IdempotencyKey.headers(context.idempotencyKey, features)
 
         val payload = try {
             session.authenticated { token ->
-                client.request("POST", "api/v1/ai/reply", body, token)
+                client.request("POST", "api/v1/ai/reply", body, token, headers)
             }
         } catch (exception: ApiException) {
-            throw AIReplyException(map(exception.error))
+            throw failure(exception.error)
         }
 
         val decoded = runCatching {
@@ -168,6 +175,19 @@ class AccountReplyTransport(
     )
 
     companion object {
+        /**
+         * [map] as the exception the caller catches; a spent limit also says
+         * whether more replies can be bought here (`details.can_buy`).
+         */
+        fun failure(error: ApiError, map: (ApiError) -> AIReplyError = ::map): AIReplyException =
+            AIReplyException(map(error), canBuy = canBuy(error))
+
+        fun canBuy(error: ApiError): Boolean = when (error) {
+            is ApiError.DailyLimitReached -> error.canBuy
+            is ApiError.MonthlyLimitReached -> error.canBuy
+            else -> false
+        }
+
         private val json = Json {
             ignoreUnknownKeys = true
             encodeDefaults = true
@@ -258,6 +278,10 @@ class AccountReplyTransport(
             is ApiError.DailyLimitReached, is ApiError.SubscriptionExpired,
             is ApiError.PaymentRequired -> AIReplyError.QuotaExhausted
             is ApiError.RateLimited -> AIReplyError.RateLimited
+            // The same action is still being written: waiting a moment is the fix.
+            // A key that already paid for its replay: a new tap is a new action.
+            is ApiError.GenerationConflict ->
+                if (error.inProgress) AIReplyError.RateLimited else AIReplyError.ServiceUnavailable
             is ApiError.EmptyResponse -> AIReplyError.EmptyResponse
             is ApiError.SourceTooLong -> {
                 // The server is the source of truth: remember its limit, so
