@@ -7,7 +7,9 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+	"time"
 
+	"github.com/aireply/ai-reply-back-end/internal/credits"
 	"github.com/aireply/ai-reply-back-end/internal/database"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
 	"github.com/aireply/ai-reply-back-end/internal/repository"
@@ -247,5 +249,113 @@ func TestPushMigrationKeepsExistingAccounts(t *testing.T) {
 
 	if again, err := database.Migrate(ctx, db, migrations.FS); err != nil || len(again) != 0 {
 		t.Fatalf("second run applied %v (%v)", again, err)
+	}
+}
+
+// 0015 бар дерекқорға қолданылады: тіркелгілер мен санағыштар өзгермейді, extra_used 0,
+// бұрынғы тіркелгілер бонус алмайды (кіргенде де), қайта жүргізу ештеңе істемейді.
+func TestCreditsMigrationKeepsExistingAccounts(t *testing.T) {
+	ctx := context.Background()
+	db, err := database.Open(database.Options{Path: filepath.Join(t.TempDir(), "old.db"), MaxReadConns: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+
+	before := fstest.MapFS{}
+	entries, err := fs.ReadDir(migrations.FS, ".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".sql") && e.Name() < "0015" {
+			body, _ := fs.ReadFile(migrations.FS, e.Name())
+			before[e.Name()] = &fstest.MapFile{Data: body}
+		}
+	}
+	if _, err := database.Migrate(ctx, db, before); err != nil {
+		t.Fatalf("old migrations: %v", err)
+	}
+
+	seed := []string{
+		`INSERT INTO users (id, email, status, created_at, updated_at) VALUES ('u-old', 'old@example.com', 'active', 1000, 1000)`,
+		`INSERT INTO user_profiles (user_id, updated_at) VALUES ('u-old', 1000)`,
+		`INSERT INTO usage_daily (user_id, usage_date, used, input_tokens, updated_at) VALUES ('u-old', '2026-10-19', 5, 600, 1000)`,
+		`INSERT INTO usage_monthly (user_id, usage_month, used, updated_at) VALUES ('u-old', '2026-10', 41, 1000)`,
+		`INSERT INTO users (id, status, kind, legacy_client, created_at, updated_at)
+		 VALUES ('u-legacy', 'active', 'legacy_install', 'abc123', 2000, 2000)`,
+		`INSERT INTO system_settings (key, value, updated_at) VALUES ('purchases_enabled', 'false', 0)
+		 ON CONFLICT (key) DO NOTHING`,
+	}
+	for _, stmt := range seed {
+		if _, err := db.Writer().ExecContext(ctx, stmt); err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+	}
+
+	applied, err := database.Migrate(ctx, db, migrations.FS)
+	if err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	if len(applied) == 0 || applied[0] != "0015_credits.sql" {
+		t.Fatalf("applied = %v", applied)
+	}
+
+	scalar := func(query string) int {
+		t.Helper()
+		var n int
+		if err := db.Reader().QueryRow(query).Scan(&n); err != nil {
+			t.Fatalf("%s: %v", query, err)
+		}
+		return n
+	}
+	if scalar(`SELECT COUNT(*) FROM users`) != 2 ||
+		scalar(`SELECT used FROM usage_daily WHERE user_id = 'u-old'`) != 5 ||
+		scalar(`SELECT input_tokens FROM usage_daily WHERE user_id = 'u-old'`) != 600 ||
+		scalar(`SELECT used FROM usage_monthly WHERE user_id = 'u-old'`) != 41 {
+		t.Fatal("existing accounts or counters changed")
+	}
+	if scalar(`SELECT extra_used FROM usage_daily WHERE user_id = 'u-old'`) != 0 ||
+		scalar(`SELECT extra_used FROM usage_monthly WHERE user_id = 'u-old'`) != 0 {
+		t.Fatal("extra_used is not 0 on existing rows")
+	}
+	if scalar(`SELECT COUNT(*) FROM credit_grants`)+scalar(`SELECT COUNT(*) FROM credit_ledger`)+
+		scalar(`SELECT COUNT(*) FROM usage_reservations`) != 0 {
+		t.Fatal("the migration wrote grants, ledger rows or reservations")
+	}
+	if scalar(`SELECT CAST(value AS INTEGER) FROM system_settings WHERE key = 'welcome_bonus_units'`) != 50 {
+		t.Fatal("welcome_bonus_units is not 50")
+	}
+	since := scalar(`SELECT CAST(value AS INTEGER) FROM system_settings WHERE key = 'welcome_bonus_since'`)
+	if since < 1_700_000_000_000 {
+		t.Fatalf("welcome_bonus_since = %d, want the migration time in unix ms", since)
+	}
+
+	// The accounts that were there sign in later: no bonus, by the cutoff and by their kind.
+	store := repository.New(db)
+	svc := credits.New(store, discardLog())
+	for _, id := range []string{"u-old", "u-legacy"} {
+		user, err := store.UserByID(ctx, id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		svc.EnsureWelcome(ctx, user)
+		if granted, err := svc.GrantWelcome(ctx, user); err != nil || granted {
+			t.Fatalf("%s: granted=%v err=%v", id, granted, err)
+		}
+	}
+	if scalar(`SELECT COUNT(*) FROM credit_grants`) != 0 {
+		t.Fatal("an existing account got the welcome bonus")
+	}
+	balance, err := store.CreditBalance(ctx, "u-old", time.Now())
+	if err != nil || balance != (domain.CreditBalance{}) {
+		t.Fatalf("balance = %+v (%v)", balance, err)
+	}
+
+	if again, err := database.Migrate(ctx, db, migrations.FS); err != nil || len(again) != 0 {
+		t.Fatalf("second run applied %v (%v)", again, err)
+	}
+	if scalar(`SELECT COUNT(*) FROM system_settings WHERE key LIKE 'welcome_bonus_%'`) != 2 {
+		t.Fatal("the settings rows were duplicated")
 	}
 }

@@ -1,6 +1,9 @@
 package domain
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 // Айлық шек күндік қалдықты азайтады; шексіз ай (0) күндікке әсер етпейді.
 func TestEntitlementRemainingRespectsTheMonthlyCap(t *testing.T) {
@@ -20,5 +23,20 @@ func TestEntitlementRemainingRespectsTheMonthlyCap(t *testing.T) {
 		if got := tc.e.Remaining(); got != tc.want {
 			t.Errorf("%s: Remaining() = %d, want %d", name, got, tc.want)
 		}
+	}
+}
+
+// Барлық қалдық = тариф (remaining_today) + pass + бонус + кредиттер; Spent уақыт белгісін ғана қалдырады.
+func TestRemainingTotalAddsTheExtraBuckets(t *testing.T) {
+	end := time.Date(2026, 10, 21, 10, 0, 0, 0, time.UTC)
+	b := CreditBalance{HasWelcome: true, WelcomeTotal: 50, WelcomeRemaining: 35, Admin: 4, Packs: 6,
+		PassActive: true, PassRemaining: 10, PassExpiresAt: &end}
+	e := Entitlement{DailyLimit: 30, UsedToday: 1, MonthlyLimit: 100, UsedMonth: 97, Balance: b}
+	if e.Remaining() != 3 || b.Credits() != 10 || b.Extra() != 55 || e.RemainingTotal() != 58 {
+		t.Fatalf("remaining %d, credits %d, extra %d, total %d", e.Remaining(), b.Credits(), b.Extra(), e.RemainingTotal())
+	}
+	spent := b.Spent()
+	if spent.Extra() != 0 || !spent.HasWelcome || spent.WelcomeTotal != 50 || !spent.PassActive || spent.PassExpiresAt != &end {
+		t.Fatalf("spent = %+v", spent)
 	}
 }

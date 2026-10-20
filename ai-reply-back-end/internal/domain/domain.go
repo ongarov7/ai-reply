@@ -298,9 +298,14 @@ type Entitlement struct {
 	UsedToday    int
 	UsedMonth    int
 	ResetsAt     time.Time
+	// Balance — тарифтен тыс бөліктер (pass, бонус, кредиттер).
+	Balance CreditBalance
 }
 
-// Remaining — бүгін қалған генерация саны.
+// RemainingTotal — барлық бөлік бойынша қалғаны: тариф + pass + бонус + кредиттер.
+func (e Entitlement) RemainingTotal() int { return e.Remaining() + e.Balance.Extra() }
+
+// Remaining — бүгін қалған генерация саны (тек тариф: remaining_today).
 //
 // A monthly cap (MonthlyLimit > 0) can end the day early: what is left today
 // is never more than what is left this month.
