@@ -3107,6 +3107,180 @@
         }
       }
     },
+    "keyboardCheck.full" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The AI Reply keyboard works, and Full Access is on."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply пернетақтасы жұмыс істеп тұр, толық рұқсат қосулы."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Клавиатура AI Reply работает, полный доступ включён."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply klaviaturasi ishlayapti, toʻliq ruxsat yoqilgan."
+          }
+        }
+      }
+    },
+    "keyboardCheck.limited" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The AI Reply keyboard works, but without Full Access it can't write replies yet."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply пернетақтасы жұмыс істеп тұр, бірақ толық рұқсатсыз — жауаптар әзірге қолжетімсіз."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Клавиатура AI Reply работает, но без полного доступа — ответы пока недоступны."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply klaviaturasi ishlayapti, lekin toʻliq ruxsatsiz — javoblar hozircha mavjud emas."
+          }
+        }
+      }
+    },
+    "keyboardCheck.notYet" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The AI Reply keyboard hasn't appeared yet. Touch and hold 🌐 and pick AI Reply."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply пернетақтасы әлі шықпады. 🌐 түймесін басып тұрып, AI Reply-ды таңда."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Клавиатура AI Reply пока не появилась. Удерживай 🌐 и выбери AI Reply."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply klaviaturasi hali chiqmadi. 🌐 tugmasini bosib tur va AI Replyni tanla."
+          }
+        }
+      }
+    },
+    "keyboardCheck.placeholder" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Type something…"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Бірдеңе жаз…"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Напиши что-нибудь…"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Biror narsa yoz…"
+          }
+        }
+      }
+    },
+    "keyboardCheck.prompt" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap the field and switch to AI Reply with the 🌐 key."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Өрісті басып, 🌐 түймесімен AI Reply-ға ауыс."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нажми на поле и переключись на AI Reply кнопкой 🌐."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Maydonni bos va 🌐 tugmasi bilan AI Replyga oʻt."
+          }
+        }
+      }
+    },
+    "keyboardCheck.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keyboard check"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пернетақтаны тексеру"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Проверка клавиатуры"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Klaviatura tekshiruvi"
+          }
+        }
+      }
+    },
     "legal.consent.ai" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5659,6 +5833,1195 @@
         }
       }
     },
+    "pasteHelp.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To reply, the AI Reply keyboard reads the message you copied, and iOS may ask every time whether it may paste. Allow it once in Settings and iOS stops asking."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Жауап беру үшін AI Reply пернетақтасы көшірілген хабарламаны оқиды, ал iOS әр жолы қоюға рұқсат сұрауы мүмкін. Реттеулерде бір рет рұқсат бер — iOS бұдан былай сұрамайды."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Чтобы ответить, клавиатура AI Reply читает скопированное сообщение, и iOS может каждый раз спрашивать, разрешить ли вставку. Разреши её один раз в настройках — и iOS перестанет спрашивать."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Javob berish uchun AI Reply klaviaturasi nusxalangan xabarni oʻqiydi va iOS har safar joylashga ruxsat soʻrashi mumkin. Sozlamalarda bir marta ruxsat ber — iOS boshqa soʻramaydi."
+          }
+        }
+      }
+    },
+    "pasteHelp.manual" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can always type the message yourself instead: in the AI Reply keyboard or here in the app."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Хабарламаны әрқашан қолмен теруге болады — AI Reply пернетақтасында немесе осы қолданбада."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сообщение всегда можно набрать вручную — в клавиатуре AI Reply или здесь, в приложении."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xabarni har doim qoʻlda yozish mumkin — AI Reply klaviaturasida yoki shu ilovada."
+          }
+        }
+      }
+    },
+    "pasteHelp.nav" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paste"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Қою"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вставка"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Joylash"
+          }
+        }
+      }
+    },
+    "pasteHelp.noRow" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Don't see that row? It appears after AI Reply has asked to paste once. Until then iOS asks itself: tap Allow Paste."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Мұндай жол жоқ па? Ол AI Reply қоюды алғаш сұрағаннан кейін пайда болады. Оған дейін iOS өзі сұрайды — «Қоюға рұқсат ету» түймесін бас."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нет такой строки? Она появляется после первой просьбы AI Reply о вставке. До этого iOS спрашивает сама — нажми «Разрешить вставку»."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bunday qator yoʻqmi? U AI Reply birinchi marta joylashni soʻragandan keyin paydo boʻladi. Ungacha iOS oʻzi soʻraydi — Allow Paste ni bos."
+          }
+        }
+      }
+    },
+    "pasteHelp.onlyYou" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only you can change this setting. No app, AI Reply included, can allow it for you."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Бұл баптауды тек өзің өзгерте аласың. Ешбір қолданба, оның ішінде AI Reply да, сенің орныңа рұқсат бере алмайды."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Изменить эту настройку можешь только ты. Ни одно приложение, и AI Reply тоже, не может разрешить вставку за тебя."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu sozlamani faqat oʻzing oʻzgartira olasan. Hech bir ilova, jumladan AI Reply ham, sen uchun ruxsat bera olmaydi."
+          }
+        }
+      }
+    },
+    "pasteHelp.path" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In full: Settings ▸ AI Reply ▸ Paste from Other Apps ▸ Allow."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Толық жолы: «Реттеулер» ▸ AI Reply ▸ «Басқа қолданбалардан көшіріп қою» ▸ «Рұқсат бар»."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Полностью: «Настройки» ▸ AI Reply ▸ «Вставка из других приложений» ▸ «Разрешать»."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toʻliq yoʻl: Settings ▸ AI Reply ▸ Paste from Other Apps ▸ Allow."
+          }
+        }
+      }
+    },
+    "pasteHelp.step.allow" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose Allow"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«Рұқсат бар» таңда"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Выбери «Разрешать»"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow ni tanla"
+          }
+        }
+      }
+    },
+    "pasteHelp.step.row" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap Paste from Other Apps"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«Басқа қолданбалардан көшіріп қою» бөлімін бас"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нажми «Вставка из других приложений»"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paste from Other Apps boʻlimini bos"
+          }
+        }
+      }
+    },
+    "pasteHelp.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow pasting from other apps"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Басқа қолданбалардан қоюға рұқсат беру"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Разрешить вставку из других приложений"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Boshqa ilovalardan joylashga ruxsat berish"
+          }
+        }
+      }
+    },
+    "permissions.check" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check the keyboard"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пернетақтаны тексеру"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Проверить клавиатуру"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Klaviaturani tekshirish"
+          }
+        }
+      }
+    },
+    "permissions.details" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check and instructions"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тексеру және нұсқаулық"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Проверка и инструкция"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tekshirish va yoʻriqnoma"
+          }
+        }
+      }
+    },
+    "permissions.done" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Орындалды"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сделано"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bajarildi"
+          }
+        }
+      }
+    },
+    "permissions.fullAccess" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Full Access"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Толық рұқсат"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Полный доступ"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toʻliq ruxsat"
+          }
+        }
+      }
+    },
+    "permissions.fullAccess.off %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Off · seen %@"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Өшірулі · %@ байқалды"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Выключен · замечено %@"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oʻchirilgan · %@ aniqlangan"
+          }
+        }
+      }
+    },
+    "permissions.fullAccess.on %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On · checked %@"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Қосулы · %@ тексерілді"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Включён · проверено %@"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yoqilgan · %@ tekshirildi"
+          }
+        }
+      }
+    },
+    "permissions.fullAccess.onlyYou" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only you can turn it on, in iOS Settings. No app can do it for you."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оны тек өзің iOS реттеулерінде қоса аласың. Ешбір қолданба мұны сенің орныңа жасай алмайды."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Включить его можешь только ты, в настройках iOS. Ни одно приложение не сделает это за тебя."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uni faqat oʻzing iOS sozlamalarida yoqa olasan. Hech bir ilova buni sen uchun qila olmaydi."
+          }
+        }
+      }
+    },
+    "permissions.fullAccess.outdated %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last confirmed %@"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Соңғы рет %@ расталды"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Последний раз подтверждён %@"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oxirgi marta %@ tasdiqlangan"
+          }
+        }
+      }
+    },
+    "permissions.fullAccess.unknown" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not confirmed yet"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Әзірге расталмады"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пока не подтверждён"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hali tasdiqlanmagan"
+          }
+        }
+      }
+    },
+    "permissions.fullAccess.why" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Full Access lets the keyboard read the message you copied and reach the service that writes the reply. Without it, the keyboard still types as usual."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Толық рұқсат пернетақтаға көшірілген хабарламаны оқып, жауап жасайтын қызметке қосылуға мүмкіндік береді. Онсыз пернетақта әдеттегідей жаза береді."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Полный доступ нужен, чтобы клавиатура могла прочитать скопированное сообщение и подключиться к сервису, который создаёт ответ. Без него клавиатура печатает как обычная."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toʻliq ruxsat klaviaturaga nusxalangan xabarni oʻqish va javob yaratadigan xizmatga ulanish imkonini beradi. Usiz klaviatura odatdagidek yozaveradi."
+          }
+        }
+      }
+    },
+    "permissions.keyboard" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keyboard"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пернетақта"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Клавиатура"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Klaviatura"
+          }
+        }
+      }
+    },
+    "permissions.keyboard.on %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Added · checked %@"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Қосылған · %@ тексерілді"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Подключена · проверено %@"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qoʻshilgan · %@ tekshirildi"
+          }
+        }
+      }
+    },
+    "permissions.keyboard.outdated %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last seen %@"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Соңғы рет %@ анықталды"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Последний раз обнаружена %@"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oxirgi marta %@ aniqlangan"
+          }
+        }
+      }
+    },
+    "permissions.keyboard.unknown" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not seen yet"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Әзірге анықталмады"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пока не обнаружена"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hali aniqlanmagan"
+          }
+        }
+      }
+    },
+    "permissions.lastCheck" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last check"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Соңғы тексеру"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Последняя проверка"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oxirgi tekshiruv"
+          }
+        }
+      }
+    },
+    "permissions.lastCheck.never" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "None yet"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Әлі болған жоқ"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ещё не было"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hali boʻlmagan"
+          }
+        }
+      }
+    },
+    "permissions.notifications" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notifications"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Хабарламалар"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Уведомления"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bildirishnomalar"
+          }
+        }
+      }
+    },
+    "permissions.notifications.allowed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allowed"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Рұқсат етілген"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Разрешены"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ruxsat berilgan"
+          }
+        }
+      }
+    },
+    "permissions.notifications.denied" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Off in iOS Settings"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS параметрлерінде өшірулі"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Выключены в настройках iOS"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS sozlamalarida oʻchirilgan"
+          }
+        }
+      }
+    },
+    "permissions.notifications.notDetermined" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not turned on yet"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Әлі қосылмаған"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ещё не включены"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hali yoqilmagan"
+          }
+        }
+      }
+    },
+    "permissions.notifications.unknown" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Checking…"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тексеріп жатырмыз…"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Проверяем…"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tekshirilmoqda…"
+          }
+        }
+      }
+    },
+    "permissions.openSettings" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Settings"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Реттеулерді ашу"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Открыть настройки"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sozlamalarni ochish"
+          }
+        }
+      }
+    },
+    "permissions.paste" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paste from other apps"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Басқа қолданбалардан көшіріп қою"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вставка из других приложений"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Boshqa ilovalardan joylash"
+          }
+        }
+      }
+    },
+    "permissions.paste.howTo" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "How to allow"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Қалай рұқсат беру"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Как разрешить"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qanday ruxsat berish"
+          }
+        }
+      }
+    },
+    "permissions.paste.off %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS blocked a paste %@"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS %@ қоюға тыйым салды"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS запретила вставку %@"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS %@ joylashni taqiqladi"
+          }
+        }
+      }
+    },
+    "permissions.paste.on %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allowed · worked %@"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Рұқсат бар · %@ істеді"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Разрешена · сработала %@"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ruxsat bor · %@ ishladi"
+          }
+        }
+      }
+    },
+    "permissions.paste.outdated %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last worked %@"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Соңғы рет %@ істеді"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Последний раз сработала %@"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oxirgi marta %@ ishlagan"
+          }
+        }
+      }
+    },
+    "permissions.paste.unknown" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not checked yet"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Әзірге тексерілмеді"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пока не проверена"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hali tekshirilmagan"
+          }
+        }
+      }
+    },
+    "permissions.section" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keyboard and permission setup"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пернетақта мен рұқсаттарды баптау"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Настройка клавиатуры и разрешений"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Klaviatura va ruxsatlarni sozlash"
+          }
+        }
+      }
+    },
+    "permissions.section.footer" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS doesn't tell apps whether their keyboard is on. This is what the AI Reply keyboard last reported itself, and when."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS қолданбаларға пернетақтасы қосулы ма, жоқ па, айтпайды. Мұнда AI Reply пернетақтасының өзі соңғы рет не хабарлағаны және қашан екені көрсетілген."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS не сообщает приложениям, включена ли их клавиатура. Здесь — то, что клавиатура AI Reply сама сообщила в последний раз, и когда."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS ilovalarga ularning klaviaturasi yoqilganmi-yoʻqmi aytmaydi. Bu yerda AI Reply klaviaturasi oxirgi marta oʻzi nima xabar bergani va qachonligi koʻrsatilgan."
+          }
+        }
+      }
+    },
+    "permissions.steps.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "How to add the keyboard"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пернетақтаны қалай қосу керек"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Как подключить клавиатуру"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Klaviaturani qanday qoʻshish kerak"
+          }
+        }
+      }
+    },
+    "permissions.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keyboard & Permissions"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пернетақта және рұқсаттар"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Клавиатура и разрешения"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Klaviatura va ruxsatlar"
+          }
+        }
+      }
+    },
     "profile.about" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8095,93 +9458,6 @@
         }
       }
     },
-    "settings.setup" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Setup"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Баптау"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Настройка"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sozlash"
-          }
-        }
-      }
-    },
-    "settings.setup.footer" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Step-by-step instructions, Full Access and paste permission explained."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Қадамдық нұсқаулық, толық рұқсат пен басқа қолданбалардан қою туралы түсініктеме."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Пошаговая инструкция, полный доступ и разрешение на вставку."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bosqichma-bosqich yoʻriqnoma, toʻliq ruxsat va joylashga ruxsat haqida."
-          }
-        }
-      }
-    },
-    "settings.setup.guide" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Keyboard setup"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Пернетақтаны баптау"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Настройка клавиатуры"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Klaviaturani sozlash"
-          }
-        }
-      }
-    },
     "settings.smartCorrection" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8385,60 +9661,147 @@
         }
       }
     },
-    "setup.checklist.title" : {
+    "setup.connect.enable" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Status"
+            "value" : "Turn on AI Reply"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Күйі"
+            "value" : "AI Reply-ды қос"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Состояние"
+            "value" : "Включи AI Reply"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Holat"
+            "value" : "AI Replyni yoq"
           }
         }
       }
     },
-    "setup.checklist.unknown.footer" : {
+    "setup.connect.fullAccess" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iOS does not tell an app whether its own keyboard is enabled. This turns green the first time the keyboard runs."
+            "value" : "Turn on Allow Full Access"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iOS қолданбаға пернетақтасының қосылғанын хабарламайды. Белгі пернетақта алғаш іске қосылғанда пайда болады."
+            "value" : "«Толық рұқсат» қосқышын қос"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iOS не сообщает приложению, включена ли его клавиатура. Отметка появится после первого запуска клавиатуры."
+            "value" : "Включи «Полный доступ»"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iOS ilovaga oʻz klaviaturasi yoqilganini bildirmaydi. Klaviatura birinchi marta ishga tushganda bu holat yangilanadi."
+            "value" : "Allow Full Access ni yoq"
+          }
+        }
+      }
+    },
+    "setup.connect.keyboards" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap Keyboards"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«Пернетақталар» бөлімін таңда"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Выбери «Клавиатуры»"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keyboards boʻlimini tanla"
+          }
+        }
+      }
+    },
+    "setup.connect.open" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Settings"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Реттеулерді аш"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Открой настройки"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sozlamalarni och"
+          }
+        }
+      }
+    },
+    "setup.connect.open.detail" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The button below opens the AI Reply page."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Төмендегі түйме AI Reply бетін ашады."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Кнопка ниже откроет страницу AI Reply."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pastdagi tugma AI Reply sahifasini ochadi."
           }
         }
       }
@@ -9048,93 +10411,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "«Klaviaturalar» qatori yoʻqmi? Unda: Sozlamalar ▸ Asosiy ▸ Klaviatura ▸ Klaviaturalar ▸ Yangi klaviatura qoʻshish ▸ AI Reply."
-          }
-        }
-      }
-    },
-    "setup.steps.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "How to add it"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Қалай қосу керек"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Как добавить"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Qanday qoʻshiladi"
-          }
-        }
-      }
-    },
-    "setup.subtitle" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Add the keyboard in iPhone Settings to generate contextual replies in messaging apps."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Мессенджерлерде жауап беру үшін пернетақтаны iPhone баптауларынан қосыңыз."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Добавьте клавиатуру в настройках iPhone, чтобы отвечать на сообщения прямо в мессенджерах."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Messenjerlarda kontekstli javoblar yaratish uchun iPhone sozlamalarida klaviaturani qoʻshing."
-          }
-        }
-      }
-    },
-    "setup.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Keyboard setup"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Пернетақтаны баптау"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Настройка клавиатуры"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Klaviaturani sozlash"
           }
         }
       }

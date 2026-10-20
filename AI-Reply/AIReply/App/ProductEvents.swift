@@ -33,6 +33,15 @@ enum ProductEvent: String, CaseIterable, Sendable {
     case genderSelected = "gender_selected"
     case autocorrectEnabled = "autocorrect_enabled"
     case autocorrectDisabled = "autocorrect_disabled"
+    /// «Открыть настройки» on a keyboard or paste screen.
+    case keyboardSettingsOpened = "keyboard_settings_opened"
+    /// The system Paste button in «Создать ответ» delivered text.
+    case pasteSucceeded = "paste_succeeded"
+    /// `step`: the `OnboardingFlow.Step` id the user left from - «Позже»,
+    /// «Пропустить», «Настроить позже».
+    case onboardingSkipped = "onboarding_skipped"
+    /// An unfinished first run picked up again after a relaunch.
+    case onboardingResumed = "onboarding_resumed"
 }
 
 enum ProductEventValue: Equatable, Sendable {

@@ -90,6 +90,12 @@ final class ClipboardReadTests: XCTestCase {
             let help = settings.localized("setup.paste.footer").replacingOccurrences(of: "\u{00A0}", with: " ")
             XCTAssertTrue(help.contains(path), "app, \(language.rawValue): \(help)")
             XCTAssertTrue(AIReplyStrings.forLanguage(language).pasteDenied.contains(path), "keyboard, \(language.rawValue)")
+            // The paste help page names the same path and iOS's own option.
+            let page = settings.localized("pasteHelp.path").replacingOccurrences(of: "\u{00A0}", with: " ")
+            XCTAssertTrue(page.contains(path), "paste help, \(language.rawValue): \(page)")
+            let option = language == .russian ? "«Разрешать»" : language == .kazakh ? "«Рұқсат бар»" : "Allow"
+            XCTAssertTrue(page.contains(option), "paste help option, \(language.rawValue)")
+            XCTAssertTrue(settings.localized("pasteHelp.step.allow").contains(option), "paste help step, \(language.rawValue)")
         }
     }
 }

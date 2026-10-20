@@ -15,9 +15,11 @@ struct SettingsView: View {
     @Environment(AccountModel.self) private var account
     @Environment(KeyboardStatusMonitor.self) private var keyboard
     @Environment(PushNotificationsModel.self) private var notifications
+    @Environment(AppRouter.self) private var router
     @Environment(\.openURL) private var openURL
 
-    @State private var isShowingTutorial = false
+    @State private var isShowingPasteHelp = false
+    @State private var isShowingCheck = false
     @State private var isConfirmingWithdrawal = false
     /// Why the withdrawal did not reach the server, shown in an alert.
     @State private var withdrawalFailureKey: String?
@@ -38,9 +40,9 @@ struct SettingsView: View {
         .navigationBarTitleDisplayMode(.inline)
         // The app re-reads it on every return to the foreground as well.
         .onAppear { keyboard.refresh() }
-        .fullScreenCover(isPresented: $isShowingTutorial) {
-            OnboardingView(flow: OnboardingFlow(mode: .tutorial, asksGender: false))
-        }
+        .task { await notifications.refreshPermission() }
+        .navigationDestination(isPresented: $isShowingPasteHelp) { PasteHelpView() }
+        .navigationDestination(isPresented: $isShowingCheck) { PermissionsView(startsCheck: true) }
     }
 
     private var form: some View {
@@ -65,16 +67,12 @@ struct SettingsView: View {
                 Text("home.profile.title")
             }
 
+            PermissionStatusSection(onPasteHelp: { isShowingPasteHelp = true },
+                                    onCheck: { isShowingCheck = true })
             Section {
-                KeyboardStatusRow(kind: .keyboard, sighting: keyboard.keyboardSighting)
-                KeyboardStatusRow(kind: .fullAccess, sighting: keyboard.fullAccessSighting)
-                NavigationLink { KeyboardSetupView() } label: {
-                    Label("settings.setup.guide", systemImage: "keyboard")
+                NavigationLink { PermissionsView() } label: {
+                    Label("permissions.details", systemImage: "keyboard")
                 }
-            } header: {
-                Text("settings.setup")
-            } footer: {
-                Text("settings.setup.footer")
             }
 
             Section {
@@ -154,7 +152,7 @@ struct SettingsView: View {
             Section {
                 Button("settings.tutorial") {
                     ProductEvents.track(.onboardingReopened)
-                    isShowingTutorial = true
+                    router.showTutorial()
                 }
             } footer: {
                 Text("settings.tutorial.footer")

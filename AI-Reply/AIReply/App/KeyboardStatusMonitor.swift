@@ -156,6 +156,21 @@ struct KeyboardStatus: Equatable {
         }
     }
 
+    /// Paste from other apps: the keyboard's last paste on the user's tap.
+    /// A success within `freshness` is current; an older one is history. A
+    /// refusal is shown with its date until a later paste works.
+    func pasteSighting(now: Date = Date()) -> KeyboardSighting {
+        switch clipboardStatus {
+        case .verifiedEnabled:
+            guard let succeeded = pasteSucceededAt else { return .unknown }
+            return Self.isFresh(succeeded, now: now) ? .confirmed(at: succeeded) : .outdated(at: succeeded)
+        case .observedDenied:
+            return pasteDeniedAt.map { .denied(at: $0) } ?? .unknown
+        default:
+            return .unknown
+        }
+    }
+
     private static func isFresh(_ date: Date, now: Date) -> Bool {
         now.timeIntervalSince(date) <= freshness
     }
@@ -193,6 +208,12 @@ enum KeyboardSighting: Equatable {
     }
 }
 
+/// The keyboard announcing itself while the app was running.
+struct KeyboardSignal: Equatable, Sendable {
+    let at: Date
+    let hasFullAccess: Bool
+}
+
 /// Keeps `KeyboardStatus` current while the app runs.
 ///
 /// Пернетақта күйін бақылайды: Darwin хабарламасы, App Group белгісі және
@@ -212,6 +233,12 @@ final class KeyboardStatusMonitor {
     /// (every return to the app) even when no new evidence arrived.
     private(set) var keyboardSighting: KeyboardSighting
     private(set) var fullAccessSighting: KeyboardSighting
+    private(set) var pasteSighting: KeyboardSighting
+    /// The last time this run of the app HEARD the keyboard appear, and
+    /// whether it had Full Access then. Only a live signal proves the
+    /// keyboard is on screen right now, so the keyboard check waits for one
+    /// newer than the moment its field was focused.
+    private(set) var lastSignal: KeyboardSignal?
 
     @ObservationIgnored private let settings: SharedSettings
     @ObservationIgnored private let defaults: UserDefaults
@@ -234,6 +261,7 @@ final class KeyboardStatusMonitor {
         self.status = status
         self.keyboardSighting = status.keyboardSighting(now: now)
         self.fullAccessSighting = status.fullAccessSighting(now: now)
+        self.pasteSighting = status.pasteSighting(now: now)
         if observesKeyboard { startObserving() }
     }
 
@@ -253,6 +281,8 @@ final class KeyboardStatusMonitor {
         if keyboard != keyboardSighting { keyboardSighting = keyboard }
         let fullAccess = next.fullAccessSighting(now: now)
         if fullAccess != fullAccessSighting { fullAccessSighting = fullAccess }
+        let paste = next.pasteSighting(now: now)
+        if paste != pasteSighting { pasteSighting = paste }
         if status.isEnabled { ProductEvents.trackOnce(.keyboardEnabledDetected) }
         if status.fullAccessStatus == .verifiedEnabled { ProductEvents.trackOnce(.fullAccessEnabledDetected) }
     }
@@ -272,6 +302,7 @@ final class KeyboardStatusMonitor {
     /// is throttled, and "without" could not be written by the keyboard at all.
     func keyboardDidAppear(hasFullAccess: Bool, now: Date = Date()) {
         defaults.set(now.timeIntervalSince1970, forKey: hasFullAccess ? Key.fullAccessSeenAt : Key.limitedSeenAt)
+        lastSignal = KeyboardSignal(at: now, hasFullAccess: hasFullAccess)
         refresh(now: now)
     }
 

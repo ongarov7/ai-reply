@@ -5,10 +5,15 @@ import Foundation
 /// Хабарлама аша алатын экрандар. Тізімнен тыс мән — басты экран.
 ///
 /// The same list the server validates links against (`domain.LinkScreens`).
-/// "notifications" is the notifications part of Settings, "keyboard" the
-/// keyboard setup guide.
+/// "notifications" is the notifications part of Settings; "keyboard" and
+/// "permissions" both open «Настройка клавиатуры и разрешений»;
+/// "onboarding" shows the guide over Home. "support" and "purchase" have no
+/// screen in this build yet and open Home, as an unknown screen does.
 enum AppScreen: String, CaseIterable, Sendable {
     case home, subscription, settings, notifications, templates, profile, keyboard, compose
+    case onboarding, permissions
+    case pasteHelp = "paste_help"
+    case support, purchase
 }
 
 /// Where a notification's `link` leads, after the app's own check.

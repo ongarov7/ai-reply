@@ -202,8 +202,57 @@ final class DeepLinkTests: XCTestCase {
         XCTAssertEqual(AppRouter.path(for: .notifications), [.notificationSettings])
         XCTAssertEqual(AppRouter.path(for: .templates), [.templates])
         XCTAssertEqual(AppRouter.path(for: .profile), [.profile])
-        XCTAssertEqual(AppRouter.path(for: .keyboard), [.keyboardSetup])
+        XCTAssertEqual(AppRouter.path(for: .keyboard), [.permissions], "the old link opens the new section")
+        XCTAssertEqual(AppRouter.path(for: .permissions), [.permissions])
+        XCTAssertEqual(AppRouter.path(for: .pasteHelp), [.pasteHelp])
         XCTAssertEqual(AppRouter.path(for: .compose), [.compose])
+        XCTAssertEqual(AppRouter.path(for: .onboarding), [])
+        XCTAssertEqual(AppRouter.path(for: .support), [], "no screen yet: Home")
+        XCTAssertEqual(AppRouter.path(for: .purchase), [], "no screen yet: Home")
+        for screen in AppScreen.allCases {
+            XCTAssertEqual(AppRouter.presentsTutorial(screen), screen == .onboarding, screen.rawValue)
+        }
+    }
+
+    /// The app's screens are the server's `domain.LinkScreens`, spelled alike.
+    func testScreensMatchTheServersList() {
+        XCTAssertEqual(AppScreen.allCases.map(\.rawValue),
+                       ["home", "subscription", "settings", "notifications", "templates", "profile", "keyboard",
+                        "compose", "onboarding", "permissions", "paste_help", "support", "purchase"])
+        XCTAssertEqual(DeepLink.destination(for: "aireply://paste_help"), .screen(.pasteHelp))
+    }
+
+    /// `aireply://onboarding` shows the guide over Home, once the gates are
+    /// passed; a sign-out takes it down with everything else.
+    @MainActor
+    func testOnboardingLinkShowsTheGuideOverHome() {
+        let router = AppRouter()
+        router.open(.screen(.onboarding))
+        XCTAssertFalse(router.isShowingTutorial, "not around the gates")
+
+        router.mainInterfaceDidAppear()
+        XCTAssertTrue(router.isShowingTutorial)
+        XCTAssertEqual(router.path, [])
+
+        router.mainInterfaceDidDisappear()
+        XCTAssertFalse(router.isShowingTutorial)
+    }
+
+    /// The link waited behind the first-run guide, which the user has just
+    /// gone through: it is not shown a second time.
+    @MainActor
+    func testFinishingTheFirstRunAnswersAWaitingOnboardingLink() {
+        let router = AppRouter()
+        router.open(.screen(.onboarding))
+        router.firstRunOnboardingDidFinish()
+        router.mainInterfaceDidAppear()
+        XCTAssertFalse(router.isShowingTutorial)
+
+        router.mainInterfaceDidDisappear()
+        router.open(.screen(.subscription))
+        router.firstRunOnboardingDidFinish()
+        router.mainInterfaceDidAppear()
+        XCTAssertEqual(router.path, [.subscription], "other links still open")
     }
 
     #if DEBUG

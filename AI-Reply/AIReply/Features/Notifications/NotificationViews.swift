@@ -21,6 +21,11 @@ struct RootNavigationView: View {
         .sheet(item: $router.webPage) { page in
             SafariView(url: page.url).ignoresSafeArea()
         }
+        // The guide again, over everything: nothing is reset, and the screen
+        // underneath is still there when it closes.
+        .fullScreenCover(isPresented: $router.isShowingTutorial) {
+            OnboardingView(flow: OnboardingFlow(mode: .tutorial, asksGender: false))
+        }
     }
 }
 

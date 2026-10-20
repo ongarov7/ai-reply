@@ -212,6 +212,47 @@ final class KeyboardStatusTests: XCTestCase {
         XCTAssertEqual(relaunched.status, monitor.status)
     }
 
+    /// Paste from other apps, as the permissions section says it: the last
+    /// paste decides, a success counts as current only within `freshness`.
+    func testPasteSightingFollowsTheLastPaste() {
+        XCTAssertEqual(status().pasteSighting(now: now), .unknown)
+        XCTAssertEqual(status(pasteSucceededAt: hourAgo).pasteSighting(now: now), .confirmed(at: hourAgo))
+        XCTAssertEqual(status(pasteSucceededAt: monthAgo).pasteSighting(now: now), .outdated(at: monthAgo))
+        XCTAssertEqual(status(pasteSucceededAt: hourAgo, pasteDeniedAt: minuteAgo).pasteSighting(now: now),
+                       .denied(at: minuteAgo))
+        XCTAssertEqual(status(pasteSucceededAt: minuteAgo, pasteDeniedAt: hourAgo).pasteSighting(now: now),
+                       .confirmed(at: minuteAgo), "allowed again after a refusal")
+    }
+
+    /// Only a signal heard by this run is live; stored evidence is not.
+    func testMonitorRemembersTheLastLiveSignal() {
+        let shared = SharedSettings(defaults: UserDefaults(suiteName: "KeyboardStatusTests.shared.\(UUID())")!)
+        let local = UserDefaults(suiteName: "KeyboardStatusTests.local.\(UUID())")!
+        shared.markKeyboardActive(hasFullAccess: true, at: hourAgo)
+        let monitor = KeyboardStatusMonitor(settings: shared, defaults: local, observesKeyboard: false)
+        XCTAssertNil(monitor.lastSignal, "a heartbeat from earlier is not the keyboard on screen now")
+
+        monitor.keyboardDidAppear(hasFullAccess: false, now: minuteAgo)
+        XCTAssertEqual(monitor.lastSignal, KeyboardSignal(at: minuteAgo, hasFullAccess: false))
+        monitor.keyboardDidAppear(hasFullAccess: true, now: now)
+        XCTAssertEqual(monitor.lastSignal, KeyboardSignal(at: now, hasFullAccess: true))
+    }
+
+    /// The keyboard check answers only with a signal newer than the focus,
+    /// and says "not yet" only after waiting.
+    func testKeyboardCheckNeedsASignalAfterTheFocus() {
+        XCTAssertEqual(KeyboardCheckOutcome(focusedAt: nil, signal: nil, waitedLong: true), .idle)
+        XCTAssertEqual(KeyboardCheckOutcome(focusedAt: now, signal: nil, waitedLong: false), .waiting)
+        XCTAssertEqual(KeyboardCheckOutcome(focusedAt: now, signal: nil, waitedLong: true), .notYet)
+        let before = KeyboardSignal(at: minuteAgo, hasFullAccess: true)
+        XCTAssertEqual(KeyboardCheckOutcome(focusedAt: now, signal: before, waitedLong: true), .notYet,
+                       "a signal from before the focus is not an answer")
+        XCTAssertEqual(KeyboardCheckOutcome(focusedAt: minuteAgo, signal: KeyboardSignal(at: now, hasFullAccess: true),
+                                            waitedLong: false), .fullAccess)
+        XCTAssertEqual(KeyboardCheckOutcome(focusedAt: minuteAgo, signal: KeyboardSignal(at: now, hasFullAccess: false),
+                                            waitedLong: true), .limited)
+    }
+
     func testDarwinNamesMatchTheKeyboardsSide() {
         XCTAssertEqual(KeyboardPresence.name(hasFullAccess: true), "kz.ai-reply.keyboard.appeared.full")
         XCTAssertEqual(KeyboardPresence.name(hasFullAccess: false), "kz.ai-reply.keyboard.appeared.limited")

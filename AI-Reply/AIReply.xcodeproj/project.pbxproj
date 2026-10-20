@@ -114,7 +114,6 @@
 		6FCA6398A7ED53E311C79C7D /* WorkingHours.swift in Sources */ = {isa = PBXBuildFile; fileRef = 875E5668A47AB6015133C237 /* WorkingHours.swift */; };
 		70800FCEF0194F6A9097B159 /* AutocorrectSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89788A655DB0807BA5895C71 /* AutocorrectSession.swift */; };
 		733EBA1001B06E01604AE508 /* AIReplyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53F7E07689CE9B522244F3DA /* AIReplyService.swift */; };
-		75DDCB81954F51EC48AF2079 /* KeyboardSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBAAF2889377B145F06F16D7 /* KeyboardSetupView.swift */; };
 		76D892DCFAADEF33CA9681B3 /* KeyProximity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 489044653479EFBB25B09039 /* KeyProximity.swift */; };
 		770805D693631DAE55BF4447 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5743D20D5E9089DA32EC65B8 /* SettingsView.swift */; };
 		7755CDD235C27855B2A30599 /* SenderProfileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62438B476C9E509043DCECA9 /* SenderProfileTests.swift */; };
@@ -255,6 +254,8 @@
 		229B82F0F189E7A56F1861EC /* EmojiKeyboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36FE6EE935C7806BE534EA72 /* EmojiKeyboardView.swift */; };
 		8BF2CD244B8CAC4B7A1CF87A /* EmojiCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37CD9D812D3CE9D16F4ABE02 /* EmojiCatalogTests.swift */; };
 		07C2781A7D97BA519F4F5657 /* EmojiPageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C7BF0E701DE12AC67EF64F9 /* EmojiPageTests.swift */; };
+		8B36EF2F0EE8FC884245C33E /* PermissionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CBB5255CF437E619344E4C9 /* PermissionsView.swift */; };
+		E9037621A84EEEC30DD58234 /* PasteHelpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 035F2D7868B2C6591134CCCF /* PasteHelpView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -460,7 +461,6 @@
 		EA3BA9B7725EFFC1BE7076D7 /* AccountSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountSession.swift; sourceTree = "<group>"; };
 		EB09F1EF9F6C192C60D834B0 /* ComposeFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposeFlowTests.swift; sourceTree = "<group>"; };
 		EB7D2F1D37929DBD114C3D9A /* AIConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIConfiguration.swift; sourceTree = "<group>"; };
-		EBAAF2889377B145F06F16D7 /* KeyboardSetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardSetupView.swift; sourceTree = "<group>"; };
 		ED4D38573AC93304F5EC9EAC /* KeyProximity+Layout.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "KeyProximity+Layout.swift"; sourceTree = "<group>"; };
 		EDD410E882DB3BF768319AB5 /* KeyboardStatusTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeyboardStatusTests.swift; sourceTree = "<group>"; };
 		EF18A6CD460894E53B97B4B3 /* OnboardingMocks.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OnboardingMocks.swift; sourceTree = "<group>"; };
@@ -478,6 +478,8 @@
 		36FE6EE935C7806BE534EA72 /* EmojiKeyboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmojiKeyboardView.swift; sourceTree = "<group>"; };
 		37CD9D812D3CE9D16F4ABE02 /* EmojiCatalogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmojiCatalogTests.swift; sourceTree = "<group>"; };
 		1C7BF0E701DE12AC67EF64F9 /* EmojiPageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmojiPageTests.swift; sourceTree = "<group>"; };
+		8CBB5255CF437E619344E4C9 /* PermissionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsView.swift; sourceTree = "<group>"; };
+		035F2D7868B2C6591134CCCF /* PasteHelpView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasteHelpView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -569,8 +571,9 @@
 		235E59D67BFAA230C7F55B58 /* Setup */ = {
 			isa = PBXGroup;
 			children = (
-				EBAAF2889377B145F06F16D7 /* KeyboardSetupView.swift */,
 				9D4DB8F185DBA53A0520C38C /* KeyboardSetupComponents.swift */,
+				8CBB5255CF437E619344E4C9 /* PermissionsView.swift */,
+				035F2D7868B2C6591134CCCF /* PasteHelpView.swift */,
 			);
 			path = Setup;
 			sourceTree = "<group>";
@@ -1236,7 +1239,6 @@
 				B60B6256C32F1EBBAA35D8A9 /* KeyboardGeometry.swift in Sources */,
 				8158BCDC98DA0C126BABC4E1 /* KeyboardLanguage.swift in Sources */,
 				A1DC90C6B2F7EF3FF0CC3064 /* KeyboardLayout.swift in Sources */,
-				75DDCB81954F51EC48AF2079 /* KeyboardSetupView.swift in Sources */,
 				34771FFCD1C7BB7C8848EED3 /* KeyboardTyping.swift in Sources */,
 				346C1AA55F8448A33B9AE4E6 /* LinkEmailView.swift in Sources */,
 				D588EA316075FF99AECA5BD7 /* LocalizedDisplay.swift in Sources */,
@@ -1313,6 +1315,8 @@
 				39D29941010777A15E65DF58 /* ClipboardRead.swift in Sources */,
 				859ACF4D19AD947A23C1481E /* EmojiCatalog.swift in Sources */,
 				AD0B2E1D5A9B50D4C0C8E61B /* EmojiPageLayout.swift in Sources */,
+				8B36EF2F0EE8FC884245C33E /* PermissionsView.swift in Sources */,
+				E9037621A84EEEC30DD58234 /* PasteHelpView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

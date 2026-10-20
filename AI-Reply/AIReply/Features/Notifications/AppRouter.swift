@@ -11,7 +11,9 @@ enum AppRoute: Hashable {
     case templates
     case profile
     case workingHours
-    case keyboardSetup
+    /// «Настройка клавиатуры и разрешений».
+    case permissions
+    case pasteHelp
     case compose
 
     @MainActor @ViewBuilder
@@ -23,7 +25,8 @@ enum AppRoute: Hashable {
         case .templates:            TemplateListView()
         case .profile:              ProfileEditorView()
         case .workingHours:         WorkingHoursView()
-        case .keyboardSetup:        KeyboardSetupView()
+        case .permissions:          PermissionsView()
+        case .pasteHelp:            PasteHelpView()
         case .compose:              ComposeView()
         }
     }
@@ -54,6 +57,9 @@ final class AppRouter {
     var path: [AppRoute] = []
     /// A page on ai-reply.kz, shown in the in-app browser.
     var webPage: WebPage?
+    /// The guide («Как пользоваться AI Reply») over Home: from Settings or
+    /// from `aireply://onboarding`.
+    var isShowingTutorial = false
 
     private(set) var pending: DeepLinkDestination?
     @ObservationIgnored private var pendingSince: Date?
@@ -92,6 +98,20 @@ final class AppRouter {
         isMainInterfaceVisible = false
         path = []
         webPage = nil
+        isShowingTutorial = false
+    }
+
+    /// Settings ▸ «Как пользоваться AI Reply».
+    func showTutorial() {
+        isShowingTutorial = true
+    }
+
+    /// The first-run guide was just finished: a link to the guide that
+    /// waited behind it has been answered by the guide itself.
+    func firstRunOnboardingDidFinish() {
+        guard pending == .screen(.onboarding) else { return }
+        pending = nil
+        pendingSince = nil
     }
 
     private func apply(_ destination: DeepLinkDestination) {
@@ -103,7 +123,13 @@ final class AppRouter {
         case .screen(let screen):
             webPage = nil
             path = Self.path(for: screen)
+            if Self.presentsTutorial(screen) { isShowingTutorial = true }
         }
+    }
+
+    /// `aireply://onboarding` opens the guide over Home.
+    nonisolated static func presentsTutorial(_ screen: AppScreen) -> Bool {
+        screen == .onboarding
     }
 
     nonisolated static func path(for screen: AppScreen) -> [AppRoute] {
@@ -114,8 +140,13 @@ final class AppRouter {
         case .notifications: return [.notificationSettings]
         case .templates:     return [.templates]
         case .profile:       return [.profile]
-        case .keyboard:      return [.keyboardSetup]
+        case .keyboard:      return [.permissions]
+        case .permissions:   return [.permissions]
+        case .pasteHelp:     return [.pasteHelp]
         case .compose:       return [.compose]
+        case .onboarding:    return []
+        // No screen yet in this build: Home, as an older build does.
+        case .support, .purchase: return []
         }
     }
 }

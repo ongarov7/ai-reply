@@ -6,6 +6,7 @@ import SwiftUI
 struct OnboardingKeyboardStep: View {
 
     @Environment(KeyboardStatusMonitor.self) private var keyboard
+    @FocusState private var isChecking: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.l) {
@@ -30,7 +31,7 @@ struct OnboardingKeyboardStep: View {
                 }
             }
 
-            KeyboardTestField()
+            KeyboardCheckField(focus: $isChecking).dsCard()
         }
         // While this step is on screen the status follows the user's trip to
         // iOS Settings and back without them having to tap anything.
@@ -47,6 +48,7 @@ struct OnboardingFullAccessStep: View {
     /// Set once, while Full Access is not confirmed yet, and kept: the field
     /// must not vanish under the keyboard the user just opened in it.
     @State private var offersTestField = false
+    @FocusState private var isChecking: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.l) {
@@ -75,7 +77,7 @@ struct OnboardingFullAccessStep: View {
             // open it after turning the switch on, so the status can turn
             // green on this step.
             if offersTestField {
-                KeyboardTestField()
+                KeyboardCheckField(focus: $isChecking).dsCard()
             }
         }
         .onAppear {

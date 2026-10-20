@@ -156,7 +156,10 @@ struct AIReplyApp: App {
 #if DEBUG
 /// Which screen `-AIReplyDebugScreen <name>` should open.
 enum DebugScreen: String {
-    case keyboard, setup, home, settings, profile, templates
+    case keyboard, home, settings, profile, templates, compose
+    /// «Настройка клавиатуры и разрешений» ("setup" is the old name).
+    case permissions, setup
+    case pasteHelp = "paste_help"
     /// Settings, scrolled to its notifications section.
     case notifications
     /// The first-run onboarding, whatever was completed: from its first step,
@@ -187,7 +190,9 @@ private struct DebugScreenHost: View {
     var body: some View {
         switch screen {
         case .keyboard:  DebugKeyboardHost()
-        case .setup:     NavigationStack { KeyboardSetupView() }
+        case .permissions, .setup: NavigationStack { PermissionsView() }
+        case .pasteHelp: NavigationStack { PasteHelpView() }
+        case .compose:   NavigationStack { ComposeView() }
         // The router's own stack, so `-AIReplyOpenLink` can be tried here.
         case .home:      RootNavigationView()
         case .settings:  NavigationStack { SettingsView() }

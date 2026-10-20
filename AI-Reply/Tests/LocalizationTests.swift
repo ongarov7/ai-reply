@@ -265,7 +265,8 @@ final class LocalizationTests: XCTestCase {
     /// Catches a key that was added to ru/kk by copying the English value.
     func testUserFacingScreensAreActuallyTranslated() throws {
         let suspects = [
-            "setup.title", "setup.paste.body", "setup.fullAccess.why",
+            "permissions.section", "permissions.paste", "pasteHelp.title", "pasteHelp.onlyYou",
+            "keyboardCheck.notYet", "setup.connect.fullAccess", "setup.paste.body",
             "onboarding.keyboard.title", "onboarding.usage.title",
             "onboarding.gender.title", "onboarding.fullAccess.prompt", "onboarding.practice.title",
             "onboarding.sample.practice.incoming", "setup.status.keyboard.unknown",
