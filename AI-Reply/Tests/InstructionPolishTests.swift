@@ -130,13 +130,15 @@ final class InstructionPolishTests: XCTestCase {
     func testTwoFailuresInARowStopAsking() async throws {
         let transport = FakePolishTransport { _ in throw AIReplyError.serviceUnavailable }
         let polisher = makePolisher(transport)
+        // Each failure is counted when its answer comes back - only while no
+        // newer edit has replaced the request - which under load can take
+        // longer than any fixed pause. So each one is waited for, with room
+        // for a busy machine.
         polisher.instructionDidChange(note, inputLanguage: .russian, limit: 400)
-        try await waitUntil { transport.requests.count == 1 }
+        try await waitUntil(timeout: 10) { polisher.failures == 1 }
         polisher.instructionDidChange(note + " завтра", inputLanguage: .russian, limit: 400)
-        try await waitUntil { transport.requests.count == 2 }
-        // The second failure is counted when its answer comes back, which
-        // under load can take longer than any fixed pause.
-        try await waitUntil { polisher.failures == InstructionPolishRules.failureLimit }
+        try await waitUntil(timeout: 10) { polisher.failures == InstructionPolishRules.failureLimit }
+        XCTAssertEqual(transport.requests.count, 2)
         polisher.instructionDidChange(note + " завтра могу", inputLanguage: .russian, limit: 400)
         try await Task.sleep(for: .milliseconds(120))
         XCTAssertEqual(transport.requests.count, 2, "stopped after two failures")
