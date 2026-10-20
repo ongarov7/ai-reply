@@ -37,6 +37,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/retention"
 	"github.com/aireply/ai-reply-back-end/internal/simulator"
 	"github.com/aireply/ai-reply-back-end/internal/subscriptions"
+	"github.com/aireply/ai-reply-back-end/internal/support"
 	"github.com/aireply/ai-reply-back-end/internal/transport/adminapi"
 	"github.com/aireply/ai-reply-back-end/internal/transport/api"
 	"github.com/aireply/ai-reply-back-end/internal/transport/simulatorapi"
@@ -180,6 +181,8 @@ func run(envFile string) error {
 		WithEvents(notifyEvents).WithDemoCheckout(cfg.Payments.DemoCheckout).WithProduction(cfg.App.IsProduction())
 	eventSvc := productevents.New(store, log)
 	reportSvc := reports.New(store, log)
+	// Support chat: an operator reply sends one support_reply push per unread burst.
+	supportSvc := support.New(store, subSvc, log).WithNotifier(notifyEvents)
 	adminSvc := admin.New(store, subSvc, planSvc, cfg, log).WithEvents(notifyEvents)
 	simulatorSvc := simulator.New(simulator.Deps{
 		Repo: store, Users: userSvc, Subs: subSvc, Plans: planSvc, AI: aiSvc, Limits: limitSvc,
@@ -196,13 +199,14 @@ func run(envFile string) error {
 	api.New(api.Deps{
 		Config: cfg, Auth: authSvc, Users: userSvc, Plans: planSvc, Subs: subSvc,
 		AI: aiSvc, Limits: limitSvc, Payments: paymentSvc, Events: eventSvc,
-		Installations: installSvc, Notifications: notifySvc, Reports: reportSvc, Limiter: limiter, Log: log,
+		Installations: installSvc, Notifications: notifySvc, Reports: reportSvc, Support: supportSvc,
+		Limiter: limiter, Log: log,
 		Ping: func(ctx context.Context) error { return db.Reader().PingContext(ctx) },
 	}).Register(mux)
 
 	adminapi.New(adminapi.Deps{
 		Config: cfg, Admin: adminSvc, Limits: limitSvc, Notifications: notifySvc, Payments: paymentSvc,
-		Reports: reportSvc, Limiter: limiter, Log: log,
+		Reports: reportSvc, Support: supportSvc, Limiter: limiter, Log: log,
 	}).Register(mux)
 
 	simulatorapi.New(simulatorapi.Deps{

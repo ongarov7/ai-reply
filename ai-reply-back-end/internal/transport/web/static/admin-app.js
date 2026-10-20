@@ -22,7 +22,9 @@
     // re-read their filters from the address bar after back/forward too.
     routeSeq: 0,
     toasts: [],
-    sidebarOpen: false
+    sidebarOpen: false,
+    // supportUnread — conversations with messages no operator has read (sidebar badge).
+    supportUnread: 0
   });
 
   function t(key) {
@@ -45,6 +47,7 @@
     if (parts[1] === "plans") return { name: "plans" };
     if (parts[1] === "audit") return { name: "audit" };
     if (parts[1] === "reports") return { name: "reports" };
+    if (parts[1] === "support") return parts[2] ? { name: "support", id: parts[2] } : { name: "support" };
     if (parts[1] === "settings") return { name: "settings" };
     if (parts[1] === "notifications") {
       if (parts[2] === "new") return { name: "notifications", tab: "create" };
@@ -1238,12 +1241,14 @@
   var DEFAULT_PUSH_META = {
     status: { enabled: false, worker: false, fcm: false, email: false, link_hosts: [] },
     categories: ["subscription", "system", "marketing"],
-    screens: ["home", "subscription", "settings", "notifications", "templates", "profile", "keyboard", "compose"],
+    screens: ["home", "subscription", "settings", "notifications", "templates", "profile", "keyboard", "compose",
+      "support"],
     content_locales: ["kk", "ru", "en", "uz"], required_locales: ["kk", "ru", "en"], fallback_locale: "ru",
     languages: ["kk", "ru", "en", "uz"], segments: ["all", "free", "paid", "demo"],
     subscription: ["active", "expired"], quota: ["has_remaining", "near_exhaustion", "exhausted"],
     platforms: ["android", "ios"], channels: ["push", "email"],
-    types: ["subscription_activated", "subscription_expiring", "subscription_expired", "quota_low", "quota_exhausted"],
+    types: ["subscription_activated", "subscription_expiring", "subscription_expired", "quota_low", "quota_exhausted",
+      "support_reply"],
     limits: { title: 80, body: 400, data_keys: 10, recipients: 500 }
   };
   var DATA_KEY_PATTERN = /^[a-z][a-z0-9_]{0,31}$/;
@@ -2554,17 +2559,235 @@
       </div>`
   };
 
+  /* ------------------------------------------------------------ support */
+  // Қолдау чаты. Хабарлама мәтіні тек {{ }} арқылы шығады (ешқашан v-html емес);
+  // жол ауыстырулар white-space: pre-line арқылы сақталады.
+  var SUPPORT_STATUSES = ["open", "resolved"];
+  var SUPPORT_TEXT_MAX = 2000;
+
+  // refreshSupportBadge — бүйір мәзірдегі «оқылмаған сөйлесулер» саны.
+  function refreshSupportBadge() {
+    api("/support/summary").then(function (data) { state.supportUnread = data.unread || 0; }, function () {});
+  }
+
+  // mergeMessages — жаңа хабарламаларды қосады (екі сұраныс қатар келсе, қайталанбайды).
+  function mergeMessages(current, incoming) {
+    var seen = {};
+    current.forEach(function (m) { seen[m.id] = true; });
+    return current.concat(incoming.filter(function (m) { return !seen[m.id]; }));
+  }
+
+  var SupportThread = {
+    props: { id: String },
+    emits: ["changed"],
+    data: function () {
+      return { loading: true, data: null, messages: [], hasMore: false, older: false, text: "", busy: false,
+               max: SUPPORT_TEXT_MAX };
+    },
+    computed: {
+      length: function () { return runeLength(this.text.trim()); },
+      canSend: function () { return !this.busy && this.length > 0 && this.length <= SUPPORT_TEXT_MAX; },
+      diagnostics: function () { return this.data && this.data.diagnostics ? flatten(this.data.diagnostics, "") : []; }
+    },
+    mounted: function () {
+      var self = this;
+      this.load();
+      // While the conversation is open new messages appear without a reload.
+      this.timer = setInterval(function () { if (!document.hidden) self.poll(); }, 10000);
+    },
+    unmounted: function () { clearInterval(this.timer); },
+    methods: Object.assign({}, helpers, {
+      path: function (suffix) { return "/support/conversations/" + encodeURIComponent(this.id) + (suffix || ""); },
+      async load() {
+        this.loading = true;
+        try {
+          var data = await api(this.path());
+          this.data = data; this.messages = data.messages; this.hasMore = data.has_more;
+          await this.markRead();
+        } catch (e) { toast("danger", errorText(e)); }
+        this.loading = false;
+      },
+      async poll() {
+        if (this.loading || !this.data) return;
+        var last = this.messages.length ? this.messages[this.messages.length - 1].id : "";
+        try {
+          var data = await api(this.path(last ? "?after=" + encodeURIComponent(last) : ""));
+          this.data.conversation = data.conversation; this.data.user = data.user;
+          this.messages = mergeMessages(this.messages, data.messages);
+          await this.markRead();
+        } catch (e) { /* the next tick tries again */ }
+      },
+      async loadOlder() {
+        if (!this.messages.length) return;
+        this.older = true;
+        try {
+          var data = await api(this.path("?before=" + encodeURIComponent(this.messages[0].id)));
+          this.messages = mergeMessages(data.messages, this.messages); this.hasMore = data.has_more;
+        } catch (e) { toast("danger", errorText(e)); }
+        this.older = false;
+      },
+      async markRead() {
+        if (!this.data || !this.data.conversation.unread) return;
+        try {
+          await api(this.path("/read"), { method: "POST", body: {} });
+          this.data.conversation.unread = 0;
+          this.$emit("changed");
+        } catch (e) { /* the badge catches up on its next poll */ }
+      },
+      async send() {
+        if (!this.canSend) return;
+        this.busy = true;
+        try {
+          var data = await api(this.path("/messages"), { method: "POST", body: { text: this.text.trim() } });
+          this.text = "";
+          this.messages = mergeMessages(this.messages, [data.message]);
+          toast("ok", t("admin.support.sent_toast"));
+          this.$emit("changed");
+        } catch (e) { toast("danger", errorText(e)); }
+        this.busy = false;
+      },
+      async setStatus(action) {
+        this.busy = true;
+        try {
+          await api(this.path("/" + action), { method: "POST", body: {} });
+          this.data.conversation.status = action === "resolve" ? "resolved" : "open";
+          toast("ok", t(action === "resolve" ? "admin.support.resolved_toast" : "admin.support.reopened_toast"));
+          this.$emit("changed");
+        } catch (e) { toast("danger", errorText(e)); }
+        this.busy = false;
+      }
+    }),
+    template: `
+      <div class="card support-card">
+        <div v-if="loading && !data" class="card-body"><div class="skeleton-row"></div></div>
+        <template v-else-if="data">
+          <div class="card-head">
+            <h2><a :href="userLink(data.user.id)" @click.prevent="go(userLink(data.user.id))">{{ data.user.identifier }}</a></h2>
+            <div class="right">
+              <span :class="'badge ' + (data.conversation.status === 'open' ? 'badge-warn' : 'badge-ok')">
+                {{ t('admin.support.status.' + data.conversation.status) }}</span>
+              <button v-if="data.conversation.status === 'open'" class="btn btn-sm" :disabled="busy"
+                      @click="setStatus('resolve')">{{ t('admin.support.resolve') }}</button>
+              <button v-else class="btn btn-sm" :disabled="busy" @click="setStatus('reopen')">{{ t('admin.support.reopen') }}</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <dl class="kv">
+              <dt>{{ t('admin.support.plan') }}</dt><dd>{{ data.user.plan_name || data.user.plan_code || '—' }}</dd>
+              <dt>{{ t('admin.support.device') }}</dt>
+              <dd>{{ platformName(data.user.platform) }} <span class="mono">{{ data.user.app_version }}</span> {{ data.user.os_version }}</dd>
+              <dt>{{ t('admin.support.last_seen') }}</dt><dd>{{ data.user.last_seen || '—' }}</dd>
+              <dt>{{ t('admin.support.diagnostics') }}</dt>
+              <dd><div v-for="p in diagnostics" :key="p.key"><span class="muted">{{ p.key }}:</span> {{ p.value }}</div>
+                <span v-if="!diagnostics.length" class="muted">{{ t('admin.support.no_diagnostics') }}</span></dd>
+            </dl>
+          </div>
+          <div class="support-thread">
+            <div v-if="hasMore" class="support-older">
+              <button class="btn btn-sm" :disabled="older" @click="loadOlder">{{ t('admin.support.load_older') }}</button></div>
+            <div v-for="m in messages" :key="m.id" :class="'support-bubble support-' + m.sender">
+              <div class="support-meta">{{ m.sender === 'user' ? t('admin.support.sender.user') : t('admin.support.sender.operator') }}
+                · {{ m.created_at }}<span v-if="m.read_at"> · {{ t('admin.support.read_mark') }}</span></div>
+              <div class="support-text">{{ m.text }}</div>
+            </div>
+            <div v-if="!messages.length" class="empty">{{ t('common.empty') }}</div>
+          </div>
+          <div class="card-body support-reply">
+            <textarea v-model="text" rows="4" :maxlength="max" :placeholder="t('admin.support.reply_placeholder')"
+                      :aria-label="t('admin.support.reply_placeholder')" @keydown.ctrl.enter="send" @keydown.meta.enter="send"></textarea>
+            <div class="support-actions">
+              <span class="muted">{{ tf('admin.support.length', { n: length, max: max }) }}</span>
+              <button class="btn btn-primary" :disabled="!canSend" @click="send">{{ t('admin.support.send') }}</button>
+            </div>
+          </div>
+        </template>
+      </div>`
+  };
+
+  var Support = {
+    props: { route: Object },
+    components: { SupportThread: SupportThread },
+    data: function () {
+      return { loading: true, rows: [], total: 0, page: 1, limit: 25, status: "open", unread: false, q: "",
+               statuses: SUPPORT_STATUSES };
+    },
+    mounted: function () {
+      var self = this;
+      this.load();
+      this.timer = setInterval(function () { if (!document.hidden) self.load(true); }, 30000);
+    },
+    unmounted: function () { clearInterval(this.timer); },
+    methods: Object.assign({}, helpers, {
+      async load(quiet) {
+        if (!quiet) this.loading = true;
+        try {
+          var params = new URLSearchParams({ page: this.page, status: this.status || "all" });
+          if (this.unread) params.set("unread", "1");
+          if (this.q.trim()) params.set("q", this.q.trim());
+          var data = await api("/support/conversations?" + params.toString());
+          this.rows = data.conversations; this.total = data.total; this.limit = data.limit;
+        } catch (e) { if (!quiet) toast("danger", errorText(e)); }
+        this.loading = false;
+      },
+      filter() { this.page = 1; this.load(); },
+      move(delta) { this.page = Math.max(1, this.page + delta); this.load(); },
+      changed() { this.load(true); refreshSupportBadge(); }
+    }),
+    template: `
+      <div class="detail-grid support-grid">
+        <div class="card">
+          <div class="card-head"><h2>{{ t('admin.support.title') }}</h2>
+            <div class="right"><span class="badge badge-muted">{{ t('common.total') }}: {{ nf(total) }}</span></div></div>
+          <div class="card-body filters-row">
+            <select v-model="status" @change="filter" :aria-label="t('admin.reports.col_status')">
+              <option v-for="s in statuses" :key="s" :value="s">{{ t('admin.support.status.' + s) }}</option>
+              <option value="all">{{ t('common.all') }}</option>
+            </select>
+            <label class="checkline support-check"><input type="checkbox" v-model="unread" @change="filter">
+              {{ t('admin.support.unread_only') }}</label>
+            <input type="text" v-model="q" @keyup.enter="filter" @change="filter" :placeholder="t('admin.support.search')"
+                   :aria-label="t('admin.support.search')">
+          </div>
+          <div class="card-body muted support-hint">{{ t('admin.support.hint') }}</div>
+          <div class="support-list">
+            <template v-if="loading"><div v-for="n in 4" :key="'s' + n" class="support-row"><div class="skeleton-row"></div></div></template>
+            <template v-else>
+              <a v-for="row in rows" :key="row.id" :href="'/admin/support/' + row.id"
+                 :class="'support-row' + (route.id === row.id ? ' is-active' : '')"
+                 @click.prevent="go('/admin/support/' + encodeURIComponent(row.id))">
+                <div class="support-row-head"><b>{{ row.identifier }}</b>
+                  <span v-if="row.unread" class="badge badge-danger">{{ tf('admin.support.unread_count', { n: row.unread }) }}</span>
+                  <span :class="'badge ' + (row.status === 'open' ? 'badge-warn' : 'badge-ok')">{{ t('admin.support.status.' + row.status) }}</span>
+                  <span class="mono muted support-when">{{ row.last_message_at }}</span></div>
+                <div class="support-preview"><span v-if="row.last_sender === 'operator'" class="muted">
+                  {{ t('admin.support.sender.operator') }}: </span>{{ row.preview }}</div>
+              </a>
+              <div v-if="!rows.length" class="empty">{{ t('common.empty') }}</div>
+            </template>
+          </div>
+          <div class="pagination">
+            <button class="btn btn-sm" :disabled="page === 1" @click="move(-1)">{{ t('common.prev') }}</button>
+            <span>{{ t('common.page') }} {{ page }}</span>
+            <button class="btn btn-sm" :disabled="page * limit >= total" @click="move(1)">{{ t('common.next') }}</button>
+          </div>
+        </div>
+        <support-thread v-if="route.id" :id="route.id" :key="route.id" @changed="changed"/>
+        <div v-else class="card"><div class="empty">{{ t('admin.support.select') }}</div></div>
+      </div>`
+  };
   /* --------------------------------------------------------------- shell */
   var App = {
     components: { Dashboard: Dashboard, Users: Users, UserDetail: UserDetail, Plans: Plans,
-                  Audit: Audit, Reports: Reports, Settings: Settings, Notifications: Notifications },
+                  Audit: Audit, Reports: Reports, Settings: Settings, Notifications: Notifications,
+                  Support: Support },
     data: function () { return { state: state }; },
     computed: {
       title: function () {
         return {
           dashboard: t("admin.nav.dashboard"), users: t("admin.users.title"), user: t("admin.user.detail"),
           plans: t("admin.plans.title"), audit: t("admin.audit.title"), reports: t("admin.reports.title"),
-          settings: t("admin.settings.title"), notifications: t("admin.notifications.title")
+          settings: t("admin.settings.title"), notifications: t("admin.notifications.title"),
+          support: t("admin.support.title")
         }[state.route.name];
       }
     },
@@ -2580,6 +2803,12 @@
       },
       logout: function () { document.getElementById("logout-form").submit(); }
     },
+    mounted: function () {
+      // Operators learn about new support messages here only: poll while the panel is open.
+      refreshSupportBadge();
+      this.supportTimer = setInterval(function () { if (!document.hidden) refreshSupportBadge(); }, 30000);
+    },
+    unmounted: function () { clearInterval(this.supportTimer); },
     template: `
       <div class="shell">
         <aside class="sidebar" :class="{ 'is-open': state.sidebarOpen }">
@@ -2604,6 +2833,10 @@
              :aria-current="isActive('reports') ? 'page' : null" @click.prevent="go('/admin/reports')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg>
             {{ t('admin.nav.reports') }}</a>
+          <a class="item" href="/admin/support" :class="{ 'is-active': isActive('support') }"
+             :aria-current="isActive('support') ? 'page' : null" @click.prevent="go('/admin/support')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>
+            {{ t('admin.nav.support') }}<span v-if="state.supportUnread" class="nav-badge">{{ state.supportUnread }}</span></a>
           <a class="item" href="/admin/audit" :class="{ 'is-active': isActive('audit') }"
              :aria-current="isActive('audit') ? 'page' : null" @click.prevent="go('/admin/audit')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg>
@@ -2641,6 +2874,7 @@
             <plans v-else-if="state.route.name === 'plans'"/>
             <audit v-else-if="state.route.name === 'audit'"/>
             <reports v-else-if="state.route.name === 'reports'"/>
+            <support v-else-if="state.route.name === 'support'" :route="state.route"/>
             <settings v-else-if="state.route.name === 'settings'"/>
             <notifications v-else-if="state.route.name === 'notifications'" :route="state.route" :seq="state.routeSeq"/>
           </main>

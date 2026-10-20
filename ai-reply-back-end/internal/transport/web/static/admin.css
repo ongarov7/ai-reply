@@ -429,3 +429,25 @@ a.link:hover { text-decoration: underline; }
   .toolbar-right { margin-left: 0; width: 100%; flex-wrap: wrap; }
   .toolbar-right input[type=date] { flex: 1; min-width: 0; }
 }
+
+/* Support chat: bodies are plain text (white-space keeps the person's line breaks). */
+.nav-badge { margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--danger); color: #fff; font-size: 11.5px; font-weight: 700; display: inline-grid; place-items: center; }
+.support-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); align-items: start; }
+.support-check { margin-bottom: 0; }
+.support-hint { padding-top: 0; font-size: 13px; }
+.support-list { border-top: 1px solid var(--line-2); }
+.support-row { display: block; padding: 12px 20px; border-bottom: 1px solid var(--line-2); color: inherit; text-decoration: none; }
+.support-row:hover { background: var(--line-2); }
+.support-row.is-active { background: var(--brand-soft); }
+.support-row-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.support-when { margin-left: auto; font-size: 12px; }
+.support-preview { margin-top: 4px; font-size: 13.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.support-thread { display: flex; flex-direction: column; gap: 10px; padding: 16px 20px; max-height: 60vh; overflow-y: auto; border-top: 1px solid var(--line-2); border-bottom: 1px solid var(--line-2); }
+.support-older { text-align: center; }
+.support-bubble { max-width: 80%; padding: 9px 12px; border-radius: 12px; background: var(--line-2); }
+.support-bubble.support-operator { align-self: flex-end; background: var(--brand-soft); }
+.support-meta { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.support-text { white-space: pre-line; word-break: break-word; font-size: 14px; }
+.support-reply textarea { width: 100%; }
+.support-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
+@media (max-width: 1080px) { .support-grid { grid-template-columns: 1fr; } }

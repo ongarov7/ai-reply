@@ -81,11 +81,14 @@ const (
 	TypeSubscriptionExpired   = "subscription_expired"
 	TypeQuotaLow              = "quota_low"
 	TypeQuotaExhausted        = "quota_exhausted"
+	// TypeSupportReply — оператор қолдау чатында жауап берді.
+	TypeSupportReply = "support_reply"
 )
 
 // AutomaticNotificationTypes — сервер өзі жіберетін түрлер (әкімші сүзгісі үшін).
 var AutomaticNotificationTypes = []string{
 	TypeSubscriptionActivated, TypeSubscriptionExpiring, TypeSubscriptionExpired, TypeQuotaLow, TypeQuotaExhausted,
+	TypeSupportReply,
 }
 
 // Жеткізу арналары.
@@ -558,4 +561,5 @@ func VersionNumber(v string) int64 {
 // LinkScreens — deep link экрандары: қосымша оларды өз навигациясына аударады.
 var LinkScreens = []string{
 	"home", "subscription", "settings", "notifications", "templates", "profile", "keyboard", "compose",
+	"support",
 }

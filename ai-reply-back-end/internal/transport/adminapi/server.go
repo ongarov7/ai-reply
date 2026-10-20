@@ -19,6 +19,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/payments"
 	"github.com/aireply/ai-reply-back-end/internal/reports"
 	"github.com/aireply/ai-reply-back-end/internal/repository"
+	"github.com/aireply/ai-reply-back-end/internal/support"
 	"github.com/aireply/ai-reply-back-end/internal/traits"
 	"github.com/aireply/ai-reply-back-end/internal/transport/httpx"
 )
@@ -38,6 +39,7 @@ type Server struct {
 	notify   *notifications.Service
 	payments *payments.Service
 	reports  *reports.Service
+	support  *support.Service
 	limiter  *middleware.Limiter
 	log      *slog.Logger
 }
@@ -52,6 +54,8 @@ type Deps struct {
 	Payments *payments.Service
 	// Reports — AI жауаптарына шағымдар (Шағымдар беті).
 	Reports *reports.Service
+	// Support — қолдау чаты (Қолдау беті).
+	Support *support.Service
 	// Limiter — науқан жіберу мен алдын ала санаудың әкімші шелектері (nil — өз шектегіші).
 	Limiter *middleware.Limiter
 	Log     *slog.Logger
@@ -64,7 +68,7 @@ func New(d Deps) *Server {
 		limiter = middleware.NewLimiter()
 	}
 	return &Server{cfg: d.Config, admin: d.Admin, limits: d.Limits, notify: d.Notifications, payments: d.Payments,
-		reports: d.Reports, limiter: limiter, log: d.Log}
+		reports: d.Reports, support: d.Support, limiter: limiter, log: d.Log}
 }
 
 // Register — маршруттар.
@@ -90,6 +94,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /api/v1/admin/reports", s.guard(s.handleReports))
 	mux.Handle("POST /api/v1/admin/reports/{id}/resolve", s.guard(s.handleResolveReport))
 	s.registerNotifications(mux)
+	s.registerSupport(mux)
 }
 
 // guard — cookie сессиясы + күй өзгертетін сұраныстарда CSRF тақырыбы.

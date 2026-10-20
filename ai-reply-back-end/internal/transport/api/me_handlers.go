@@ -247,6 +247,8 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 			"ai_reports": true,
 			// DELETE /api/v1/me and POST /api/v1/me/delete.
 			"account_deletion": true,
+			// /api/v1/support/*: the chat with a support operator.
+			"support_chat": s.support != nil,
 		},
 		"demo_mode":    s.cfg.Auth.DemoMode,
 		"payment_mode": s.payments.Mode(),
