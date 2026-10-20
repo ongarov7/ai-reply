@@ -17,6 +17,15 @@ enum AccountUsageCache {
         static let resetsAt = "account.usage.resetsAt"
         static let planName = "account.usage.planCode"
         static let updatedAt = "account.usage.updatedAt"
+        /// The whole balance (plan + pass + welcome + credits); absent from
+        /// an older server.
+        static let remainingTotal = "account.usage.remainingTotal"
+        static let welcomeRemaining = "account.usage.welcomeRemaining"
+        static let welcomeTotal = "account.usage.welcomeTotal"
+        static let credits = "account.usage.credits"
+
+        static let all = [dailyLimit, usedToday, remaining, resetsAt, planName, updatedAt,
+                          remainingTotal, welcomeRemaining, welcomeTotal, credits]
     }
 
     /// A snapshot as the UI wants it.
@@ -27,9 +36,19 @@ enum AccountUsageCache {
         var resetsAt: String
         var planCode: String
         var updatedAt: Date?
+        /// Everything usable now, where the server sends the balance.
+        var remainingTotal: Int? = nil
+        var welcomeRemaining: Int? = nil
+        var welcomeTotal: Int? = nil
+        var credits: Int? = nil
 
-        var isKnown: Bool { dailyLimit > 0 }
-        var isExhausted: Bool { dailyLimit > 0 && remainingToday <= 0 }
+        var isKnown: Bool { dailyLimit > 0 || remainingTotal != nil }
+        /// Nothing at all is left: the plan's day, and - where the server
+        /// sends them - the free, purchased and pass replies too.
+        var isExhausted: Bool {
+            if let remainingTotal { return remainingTotal <= 0 }
+            return dailyLimit > 0 && remainingToday <= 0
+        }
     }
 
     static func store(_ usage: AccountAPI.Usage, defaults: UserDefaults = AppGroup.defaults) {
@@ -38,6 +57,23 @@ enum AccountUsageCache {
         defaults.set(usage.remainingToday, forKey: Key.remaining)
         defaults.set(usage.resetsAt, forKey: Key.resetsAt)
         defaults.set(Date().timeIntervalSince1970, forKey: Key.updatedAt)
+        store(usage.remainingTotal, forKey: Key.remainingTotal, defaults: defaults)
+        store(usage.welcome?.remaining, forKey: Key.welcomeRemaining, defaults: defaults)
+        store(usage.welcome?.total, forKey: Key.welcomeTotal, defaults: defaults)
+        store(usage.credits, forKey: Key.credits, defaults: defaults)
+    }
+
+    /// A value the server did not send is removed, not left from before.
+    private static func store(_ value: Int?, forKey key: String, defaults: UserDefaults) {
+        if let value {
+            defaults.set(value, forKey: key)
+        } else {
+            defaults.removeObject(forKey: key)
+        }
+    }
+
+    private static func integer(_ key: String, _ defaults: UserDefaults) -> Int? {
+        (defaults.object(forKey: key) as? NSNumber)?.intValue
     }
 
     static func storePlanCode(_ code: String, defaults: UserDefaults = AppGroup.defaults) {
@@ -54,12 +90,16 @@ enum AccountUsageCache {
             remainingToday: defaults.integer(forKey: Key.remaining),
             resetsAt: defaults.string(forKey: Key.resetsAt) ?? "",
             planCode: defaults.string(forKey: Key.planName) ?? "",
-            updatedAt: updated > 0 ? Date(timeIntervalSince1970: updated) : nil
+            updatedAt: updated > 0 ? Date(timeIntervalSince1970: updated) : nil,
+            remainingTotal: integer(Key.remainingTotal, defaults),
+            welcomeRemaining: integer(Key.welcomeRemaining, defaults),
+            welcomeTotal: integer(Key.welcomeTotal, defaults),
+            credits: integer(Key.credits, defaults)
         )
     }
 
     static func clear(defaults: UserDefaults = AppGroup.defaults) {
-        for key in [Key.dailyLimit, Key.usedToday, Key.remaining, Key.resetsAt, Key.planName, Key.updatedAt] {
+        for key in Key.all {
             defaults.removeObject(forKey: key)
         }
     }

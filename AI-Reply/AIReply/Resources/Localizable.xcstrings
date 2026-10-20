@@ -1074,6 +1074,180 @@
         }
       }
     },
+    "balance.pass %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pass until %@"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Рұқсаттама: %@ дейін"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пропуск до %@"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ruxsatnoma: %@ gacha"
+          }
+        }
+      }
+    },
+    "balance.purchased" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Purchased replies"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сатып алынған жауаптар"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Купленные ответы"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sotib olingan javoblar"
+          }
+        }
+      }
+    },
+    "balance.today" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Available today"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Бүгін қолжетімді"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сегодня доступно"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bugun mavjud"
+          }
+        }
+      }
+    },
+    "balance.welcome" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Welcome bonus"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сәлемдесу бонусы"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Приветственный бонус"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xush kelibsiz bonusi"
+          }
+        }
+      }
+    },
+    "balance.welcome.value %lld %lld" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld of %2$lld"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld / %2$lld"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld из %2$lld"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%2$lld tadan %1$lld ta"
+          }
+        }
+      }
+    },
+    "balance.welcomeTitle %lld %lld" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Free replies: %1$lld of %2$lld"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тегін жауаптар: %1$lld / %2$lld"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Бесплатные ответы: %1$lld из %2$lld"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bepul javoblar: %2$lld tadan %1$lld ta"
+          }
+        }
+      }
+    },
     "common.add" : {
       "extractionState" : "manual",
       "localizations" : {

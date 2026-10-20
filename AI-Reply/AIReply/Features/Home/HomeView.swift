@@ -70,36 +70,40 @@ struct HomeView: View {
         }
     }
 
-    /// What is left today, and a way to the plans. Shown only for accounts,
-    /// because only the server knows the number.
+    /// What can be used today and where it comes from, and a way to the
+    /// plans. Shown only for accounts, because only the server knows the
+    /// numbers: a dash until it has answered, and a spent part is a number
+    /// like any other, never a warning.
     private var usageCard: some View {
         NavigationLink(value: AppRoute.subscription) {
-            HStack(alignment: .center, spacing: DS.Spacing.m) {
-                VStack(alignment: .leading, spacing: DS.Spacing.xxs) {
-                    Text("home.usage.title").font(.subheadline.weight(.semibold))
-                    Text(verbatim: planName)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: DS.Spacing.xs) {
+                HStack(alignment: .center, spacing: DS.Spacing.m) {
+                    VStack(alignment: .leading, spacing: DS.Spacing.xxs) {
+                        Text(usageTitle).font(.subheadline.weight(.semibold))
+                        Text(verbatim: planName)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right").font(.footnote).foregroundStyle(.secondary)
                 }
-                Spacer()
-                VStack(alignment: .trailing, spacing: 0) {
-                    // A dash until the server has answered: a zero before
-                    // the first /me would read as "nothing left". A real zero
-                    // is a number like any other, not an error.
-                    Text(verbatim: usageIsKnown ? "\(account.usage.remainingToday)" : "—")
-                        .font(.title.weight(.semibold).monospacedDigit())
-                        .foregroundStyle(usageIsKnown ? Color.primary : Color.secondary)
-                    Text("home.usage.left").font(.caption2).foregroundStyle(.secondary)
-                }
-                Image(systemName: "chevron.right").font(.footnote).foregroundStyle(.secondary)
+                BalanceRows(rows: balance.rows, isKnown: balance.isKnown)
             }
             .dsCard()
         }
         .buttonStyle(.plain)
     }
 
-    /// The server's numbers have arrived (`Usage.unknown` has no limit).
-    private var usageIsKnown: Bool { account.usage.dailyLimit > 0 }
+    private var balance: BalanceSummary { BalanceSummary.make(account.usage) }
+
+    /// «Бесплатные ответы: 35 из 50» while a new account has free replies
+    /// left, otherwise the usual title.
+    private var usageTitle: LocalizedStringKey {
+        if let welcome = balance.welcomeHeadline {
+            return "balance.welcomeTitle \(welcome.remaining) \(welcome.total)"
+        }
+        return "home.usage.title"
+    }
 
     private var planName: String {
         account.subscription?.plan.localizedName(settings.effectiveLanguage.rawValue) ?? ""

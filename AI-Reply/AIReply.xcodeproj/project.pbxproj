@@ -257,6 +257,9 @@
 		54295BD7344FE27003AA2BCD /* OnboardingComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40206E7786C2577BC04695B9 /* OnboardingComponents.swift */; };
 		9690AD5DEF612D9C6388F1C4 /* OnboardingTutorialSteps.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EA42988ED78FA5DE8C85379 /* OnboardingTutorialSteps.swift */; };
 		39757DE09E8F2660D27FD8B5 /* OnboardingConnectStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = A023DF9955741BAD8F21B0FF /* OnboardingConnectStep.swift */; };
+		84F80AD89B955ADE9E787B90 /* BalanceSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 294937702348AB8BD23AD36A /* BalanceSummary.swift */; };
+		F0B3F31ECC7FC25CF40A6730 /* DebugPreviews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A03EC78FD6C7E23ADF340031 /* DebugPreviews.swift */; };
+		107AD2C8CC69E8F96DFDB07A /* BalanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63333DA3CF26D22FBD3FE8F0 /* BalanceTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -482,6 +485,9 @@
 		40206E7786C2577BC04695B9 /* OnboardingComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingComponents.swift; sourceTree = "<group>"; };
 		3EA42988ED78FA5DE8C85379 /* OnboardingTutorialSteps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingTutorialSteps.swift; sourceTree = "<group>"; };
 		A023DF9955741BAD8F21B0FF /* OnboardingConnectStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingConnectStep.swift; sourceTree = "<group>"; };
+		294937702348AB8BD23AD36A /* BalanceSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalanceSummary.swift; sourceTree = "<group>"; };
+		A03EC78FD6C7E23ADF340031 /* DebugPreviews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugPreviews.swift; sourceTree = "<group>"; };
+		63333DA3CF26D22FBD3FE8F0 /* BalanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalanceTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -523,6 +529,7 @@
 				3D9719EDC16411782850CAA7 /* SignInView.swift */,
 				0A50A25498D0D56F42A21BB7 /* SubscriptionView.swift */,
 				15CD3847DD4B5C1A78472A57 /* VerifyCodeView.swift */,
+				294937702348AB8BD23AD36A /* BalanceSummary.swift */,
 			);
 			path = Account;
 			sourceTree = "<group>";
@@ -705,6 +712,7 @@
 				37CD9D812D3CE9D16F4ABE02 /* EmojiCatalogTests.swift */,
 				1C7BF0E701DE12AC67EF64F9 /* EmojiPageTests.swift */,
 				D7B75D514737294D9F090817 /* ComposeRecipientTests.swift */,
+				63333DA3CF26D22FBD3FE8F0 /* BalanceTests.swift */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -762,6 +770,7 @@
 				B35D64896B53DDED1C60B67A /* KeyboardStatusMonitor.swift */,
 				644D5ED3E0D4A2A78D4D9917 /* ProfileSync.swift */,
 				606368722F05253C8C6518E8 /* PreferredLanguageSync.swift */,
+				A03EC78FD6C7E23ADF340031 /* DebugPreviews.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -1117,6 +1126,7 @@
 				8BF2CD244B8CAC4B7A1CF87A /* EmojiCatalogTests.swift in Sources */,
 				07C2781A7D97BA519F4F5657 /* EmojiPageTests.swift in Sources */,
 				AE273F46E8285DAB6423B51B /* ComposeRecipientTests.swift in Sources */,
+				107AD2C8CC69E8F96DFDB07A /* BalanceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1321,6 +1331,8 @@
 				54295BD7344FE27003AA2BCD /* OnboardingComponents.swift in Sources */,
 				9690AD5DEF612D9C6388F1C4 /* OnboardingTutorialSteps.swift in Sources */,
 				39757DE09E8F2660D27FD8B5 /* OnboardingConnectStep.swift in Sources */,
+				84F80AD89B955ADE9E787B90 /* BalanceSummary.swift in Sources */,
+				F0B3F31ECC7FC25CF40A6730 /* DebugPreviews.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -167,6 +167,8 @@ enum DebugScreen: String {
     case onboarding
     /// The sign-in flow's three screens, for review in each language.
     case signIn, email, code
+    /// Home with sample numbers: free, purchased and pass replies.
+    case balance
 
     static var requested: DebugScreen? {
         let arguments = CommandLine.arguments
@@ -222,6 +224,7 @@ private struct DebugScreenHost: View {
         case .code:
             VerifyCodeView(challenge: .init(email: "aigerim@example.kz",
                                             resendAvailableAt: Date().addingTimeInterval(32))) { _ in }
+        case .balance:   DebugBalanceHost()
         }
     }
 }

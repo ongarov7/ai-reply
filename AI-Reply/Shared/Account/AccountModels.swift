@@ -163,6 +163,12 @@ extension AccountAPI {
     }
 
     /// The only counter the app trusts: the server's.
+    ///
+    /// The first seven fields keep their old meaning: `remainingToday` is the
+    /// plan's daily allowance alone. The balance beyond the plan (contract
+    /// §3.2) comes from servers with `features.credits`; an older server
+    /// sends none of it, and each part that is missing or malformed is
+    /// simply nil instead of failing the whole account.
     struct Usage: Decodable, Sendable, Equatable {
         let dailyLimit: Int
         let usedToday: Int
@@ -171,6 +177,33 @@ extension AccountAPI {
         let usedMonth: Int
         let resetsAt: String
         let timezone: String
+        /// The free replies of a new account; nil when it never had any.
+        var welcome: Welcome? = nil
+        /// Administrator grants and purchased packs left.
+        var credits: Int? = nil
+        /// The pass running now; nil when there is none.
+        var pass: Pass? = nil
+        /// Plan + pass + welcome + credits: everything usable right now.
+        var remainingTotal: Int? = nil
+        /// What paid for this generation: daily | pass | welcome | admin |
+        /// pack. Only in reply and compose answers.
+        var bucket: String? = nil
+
+        struct Welcome: Decodable, Sendable, Equatable {
+            let total: Int
+            let remaining: Int
+        }
+
+        struct Pass: Decodable, Sendable, Equatable {
+            /// RFC 3339, in the server's time zone.
+            let expiresAt: String
+            let remaining: Int
+
+            enum CodingKeys: String, CodingKey {
+                case expiresAt = "expires_at"
+                case remaining
+            }
+        }
 
         enum CodingKeys: String, CodingKey {
             case dailyLimit = "daily_limit"
@@ -180,10 +213,22 @@ extension AccountAPI {
             case usedMonth = "used_month"
             case resetsAt = "resets_at"
             case timezone
+            case welcome, credits, pass, bucket
+            case remainingTotal = "remaining_total"
         }
 
         static let unknown = Usage(dailyLimit: 0, usedToday: 0, remainingToday: 0,
                                    monthlyLimit: 0, usedMonth: 0, resetsAt: "", timezone: "")
+
+        /// The server has answered: every real usage carries its reset time.
+        var isKnown: Bool { dailyLimit > 0 || !resetsAt.isEmpty }
+
+        /// What can be generated right now: the whole balance where the
+        /// server sends it, the plan's day otherwise.
+        var availableNow: Int { max(0, remainingTotal ?? remainingToday) }
+
+        /// The server sends the balance beyond the plan.
+        var hasBalance: Bool { remainingTotal != nil }
     }
 
     /// Everything /api/v1/me returns in one call.
@@ -341,6 +386,22 @@ extension AccountAPI {
         /// The administrator switched purchases on. Informational: the app
         /// reads `purchasable` on each plan.
         var purchases: Bool? = nil
+        /// New accounts get free replies (`usage.welcome`).
+        var welcomeBonus: Bool? = nil
+        /// `usage` carries the balance beyond the plan, and limit errors say
+        /// whether more can be bought (`details.can_buy`).
+        var credits: Bool? = nil
+        /// `/ai/reply` and `/ai/compose` take an `Idempotency-Key` header.
+        var idempotentGeneration: Bool? = nil
+        /// `PUT /api/v1/installations/{id}/diagnostics` exists.
+        var permissionDiagnostics: Bool? = nil
+        /// The administrator switched the reminder pushes on. Informational.
+        var pushReminders: Bool? = nil
+        /// The chat with an operator (`/api/v1/support/*`).
+        var supportChat: Bool? = nil
+        /// Reply packs and the pass can be bought on iOS right now. nil from
+        /// a server that has no purchases at all; false while they are closed.
+        var iapIOS: Bool? = nil
 
         enum CodingKeys: String, CodingKey {
             case replyPreferences = "reply_preferences"
@@ -357,6 +418,13 @@ extension AccountAPI {
             case aiReports = "ai_reports"
             case accountDeletion = "account_deletion"
             case purchases
+            case welcomeBonus = "welcome_bonus"
+            case credits
+            case idempotentGeneration = "idempotent_generation"
+            case permissionDiagnostics = "permission_diagnostics"
+            case pushReminders = "push_reminders"
+            case supportChat = "support_chat"
+            case iapIOS = "iap_ios"
         }
     }
 
@@ -382,6 +450,28 @@ extension AccountAPI {
             case text, usage
             case detectedLanguage = "detected_language"
         }
+    }
+}
+
+extension AccountAPI.Usage {
+
+    /// The plan's fields are required as before; the balance is read
+    /// leniently, part by part, so a new or broken field never costs the
+    /// account its numbers.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        dailyLimit = try container.decode(Int.self, forKey: .dailyLimit)
+        usedToday = try container.decode(Int.self, forKey: .usedToday)
+        remainingToday = try container.decode(Int.self, forKey: .remainingToday)
+        monthlyLimit = try container.decodeIfPresent(Int.self, forKey: .monthlyLimit) ?? 0
+        usedMonth = try container.decodeIfPresent(Int.self, forKey: .usedMonth) ?? 0
+        resetsAt = try container.decodeIfPresent(String.self, forKey: .resetsAt) ?? ""
+        timezone = try container.decodeIfPresent(String.self, forKey: .timezone) ?? ""
+        welcome = (try? container.decodeIfPresent(Welcome.self, forKey: .welcome)) ?? nil
+        credits = (try? container.decodeIfPresent(Int.self, forKey: .credits)) ?? nil
+        pass = (try? container.decodeIfPresent(Pass.self, forKey: .pass)) ?? nil
+        remainingTotal = (try? container.decodeIfPresent(Int.self, forKey: .remainingTotal)) ?? nil
+        bucket = (try? container.decodeIfPresent(String.self, forKey: .bucket)) ?? nil
     }
 }
 

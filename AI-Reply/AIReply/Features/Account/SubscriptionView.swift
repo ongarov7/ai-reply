@@ -52,21 +52,27 @@ struct SubscriptionView: View {
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: DS.Spacing.xxs) {
-                    // A dash until the server has answered, never a red zero.
-                    Text(verbatim: usageIsKnown ? "\(account.usage.remainingToday)" : "—")
+                    // Everything usable today, free and purchased replies
+                    // included. A dash until the server has answered.
+                    Text(verbatim: usageIsKnown ? "\(account.usage.availableNow)" : "—")
                         .font(.largeTitle.weight(.semibold).monospacedDigit())
                         .foregroundStyle(usageIsKnown ? Color.primary : Color.secondary)
                     Text("subscription.remaining").font(.caption).foregroundStyle(.secondary)
                 }
             }
 
-            ProgressView(value: progress)
-                .tint(Color.accentColor)
-
-            if usageIsKnown {
+            // The plan's own day: its allowance and what was used of it.
+            if account.usage.dailyLimit > 0 {
+                ProgressView(value: progress)
+                    .tint(Color.accentColor)
                 Text("subscription.usedToday \(account.usage.usedToday) \(account.usage.dailyLimit)")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+            }
+
+            if !balance.extraRows.isEmpty {
+                Divider()
+                BalanceRows(rows: balance.extraRows)
             }
 
             if let expiry = account.subscription?.expiresAt, !expiry.isEmpty {
@@ -164,8 +170,10 @@ struct SubscriptionView: View {
         account.subscription?.plan.localizedName(settings.effectiveLanguage.rawValue) ?? ""
     }
 
-    /// The server's numbers have arrived (`Usage.unknown` has no limit).
-    private var usageIsKnown: Bool { account.usage.dailyLimit > 0 }
+    /// The server's numbers have arrived.
+    private var usageIsKnown: Bool { account.usage.isKnown }
+
+    private var balance: BalanceSummary { BalanceSummary.make(account.usage) }
 
     private var progress: Double {
         guard account.usage.dailyLimit > 0 else { return 0 }

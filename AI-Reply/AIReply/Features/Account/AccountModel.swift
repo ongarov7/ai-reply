@@ -68,6 +68,10 @@ final class AccountModel {
     @ObservationIgnored private var hasServerLegalConfig = false
     /// A foreground reload of the legal versions is already out.
     @ObservationIgnored private var isReloadingLegalConfig = false
+    #if DEBUG
+    /// `-AIReplyDebugScreen balance`: sample numbers no refresh replaces.
+    @ObservationIgnored private var isDebugPreview = false
+    #endif
 
     @ObservationIgnored private let service: AccountService
 
@@ -197,6 +201,9 @@ final class AccountModel {
 
     /// Profile, plan and quota in one call. Safe to call on every appearance.
     func refresh() async {
+        #if DEBUG
+        if isDebugPreview { return }
+        #endif
         guard AccountCredentials.isSignedIn else {
             phase = .signedOut
             return
@@ -229,12 +236,28 @@ final class AccountModel {
     }
 
     func refreshUsage() async {
+        #if DEBUG
+        if isDebugPreview { return }
+        #endif
         guard AccountCredentials.isSignedIn else { return }
         if let fresh = try? await service.usage() {
             usage = fresh
             AccountUsageCache.store(fresh)
         }
     }
+
+    #if DEBUG
+    /// Shows sample numbers as a signed-in account, for screenshots of the
+    /// balance; nothing is stored and no request replaces them.
+    func showDebugPreview(usage: AccountAPI.Usage, subscription: AccountAPI.Subscription?,
+                          features: AccountAPI.Features? = nil) {
+        isDebugPreview = true
+        phase = .signedIn
+        self.usage = usage
+        self.subscription = subscription
+        if let features { self.features = features }
+    }
+    #endif
 
     // MARK: Sign-in: e-mail
 

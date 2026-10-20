@@ -66,6 +66,9 @@ struct AccountSettingsSection: View {
     private var planSummary: String {
         guard let plan = account.subscription?.plan else { return "" }
         let name = plan.localizedName(settings.effectiveLanguage.rawValue)
+        // With a balance beyond the plan, what can be used today in all;
+        // otherwise the plan's day as before.
+        if account.usage.hasBalance { return "\(name) · \(account.usage.availableNow)" }
         guard account.usage.dailyLimit > 0 else { return name }
         return "\(name) · \(account.usage.remainingToday)/\(account.usage.dailyLimit)"
     }
