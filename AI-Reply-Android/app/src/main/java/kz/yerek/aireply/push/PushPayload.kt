@@ -16,8 +16,13 @@ data class PushPayload(
     val deliveryId: String?,
     val type: String?,
     val category: String?,
-    val link: AppLink
+    val link: AppLink,
+    /** `support_reply`: the conversation the operator answered in. */
+    val conversationId: String? = null
 ) {
+    /** An operator answered in the support chat (contract §3.6). */
+    val isSupportReply: Boolean get() = type == TYPE_SUPPORT_REPLY
+
 
     /** The channel the server named for this category; the app uses the same rule. */
     val channelId: String get() = channelFor(category)
@@ -40,9 +45,12 @@ data class PushPayload(
         const val KEY_TYPE = "type"
         const val KEY_CATEGORY = "category"
         const val KEY_LINK = "link"
+        const val KEY_CONVERSATION_ID = "conversation_id"
+
+        const val TYPE_SUPPORT_REPLY = "support_reply"
 
         /** The keys the app reads; everything else in the payload is ignored. */
-        val KEYS = listOf(KEY_NOTIFICATION_ID, KEY_DELIVERY_ID, KEY_TYPE, KEY_CATEGORY, KEY_LINK)
+        val KEYS = listOf(KEY_NOTIFICATION_ID, KEY_DELIVERY_ID, KEY_TYPE, KEY_CATEGORY, KEY_LINK, KEY_CONVERSATION_ID)
 
         const val CHANNEL_GENERAL = "general"
         const val CHANNEL_IMPORTANT = "important"
@@ -59,12 +67,21 @@ data class PushPayload(
         fun from(data: Map<String, String?>): PushPayload? {
             val nid = data[KEY_NOTIFICATION_ID]?.trim()
             if (nid.isNullOrEmpty()) return null
+            val type = data[KEY_TYPE]?.trim()?.takeIf(String::isNotEmpty)
+            val conversation = data[KEY_CONVERSATION_ID]?.trim()?.takeIf(ID_PATTERN::matches)
+            val link = AppLinks.parse(data[KEY_LINK])
             return PushPayload(
                 notificationId = nid,
                 deliveryId = data[KEY_DELIVERY_ID]?.trim()?.takeIf(String::isNotEmpty),
-                type = data[KEY_TYPE]?.trim()?.takeIf(String::isNotEmpty),
+                type = type,
                 category = data[KEY_CATEGORY]?.trim()?.takeIf(String::isNotEmpty),
-                link = AppLinks.parse(data[KEY_LINK])
+                // An operator's reply opens the chat even if its link were missing.
+                link = if (link == AppLink.None && (type == TYPE_SUPPORT_REPLY || conversation != null)) {
+                    AppLink.Screen(AppScreen.SUPPORT)
+                } else {
+                    link
+                },
+                conversationId = conversation
             )
         }
     }

@@ -52,4 +52,24 @@
     <string name="exhausted_body_plans">Mavjud javoblar tugadi. Boshqa tarif tanlashingiz mumkin.</string>
     <string name="exhausted_later">Keyinroq</string>
 
+    <!-- Support chat -->
+    <string name="support_title">Operator bilan chat</string>
+    <string name="support_operator">AI Reply yordami</string>
+    <string name="support_empty">Assalomu alaykum! Qanday yordam bera olamiz? Savolingizni yozing, operator sizga javob beradi.</string>
+    <string name="support_input_hint">Xabar</string>
+    <string name="support_send">Yuborish</string>
+    <string name="support_sending">Yuborilmoqda…</string>
+    <string name="support_not_sent">Yuborilmadi</string>
+    <string name="support_rate_limited">Ketma-ket juda koʻp xabar. Bir daqiqa kuting.</string>
+    <string name="support_retry">Qayta yuborish</string>
+    <string name="support_too_long">Xabar %1$d belgidan uzun.</string>
+    <string name="support_load_failed">Chatni yuklab boʻlmadi. Ulanishni tekshiring.</string>
+    <string name="support_unavailable">Chat hozir mavjud emas. Bizga yordam sahifasi orqali yozishingiz mumkin.</string>
+    <string name="support_open_page">Yordam sahifasini ochish</string>
+    <string name="support_your_message">Sizning xabaringiz</string>
+    <plurals name="support_unread">
+        <item quantity="one">%d ta oʻqilmagan xabar</item>
+        <item quantity="other">%d ta oʻqilmagan xabar</item>
+    </plurals>
+
 </resources>

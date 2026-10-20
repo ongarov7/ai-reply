@@ -7,6 +7,15 @@ import kz.yerek.aireply.billing.GooglePurchaseRequest
 import kz.yerek.aireply.billing.IapCatalogDto
 import kz.yerek.aireply.billing.PurchaseResultDto
 import kz.yerek.aireply.data.legal.StoredLegalConsent
+import kz.yerek.aireply.data.support.SupportConversationDto
+import kz.yerek.aireply.data.support.SupportConversationEnvelope
+import kz.yerek.aireply.data.support.SupportMessageDto
+import kz.yerek.aireply.data.support.SupportMessageEnvelope
+import kz.yerek.aireply.data.support.SupportMessagesPage
+import kz.yerek.aireply.data.support.SupportReadRequest
+import kz.yerek.aireply.data.support.SupportReadResultDto
+import kz.yerek.aireply.data.support.SupportSendRequest
+import java.net.URLEncoder
 
 /**
  * What the client tells the server about itself.
@@ -315,6 +324,37 @@ class AccountService(
             val body = json.encodeToString(GooglePurchaseRequest.serializer(), GooglePurchaseRequest(productId, purchaseToken))
             decode(PurchaseResultDto.serializer(), client().request("POST", "api/v1/iap/google/purchases", body, token))
         }
+
+    // ---------------------------------------------------------- support chat
+
+    suspend fun supportConversation(): SupportConversationDto? = session.authenticated { token ->
+        decode(
+            SupportConversationEnvelope.serializer(),
+            client().request("GET", "api/v1/support/conversation", token = token)
+        ).conversation
+    }
+
+    suspend fun supportMessages(before: String?, after: String?, limit: Int): SupportMessagesPage =
+        session.authenticated { token ->
+            val query = buildList {
+                before?.let { add("before=" + URLEncoder.encode(it, "UTF-8")) }
+                after?.let { add("after=" + URLEncoder.encode(it, "UTF-8")) }
+                add("limit=$limit")
+            }.joinToString("&")
+            decode(SupportMessagesPage.serializer(), client().request("GET", "api/v1/support/messages?$query", token = token))
+        }
+
+    /** The text goes to the server and nowhere else; it is never logged. */
+    suspend fun sendSupportMessage(text: String, clientMessageId: String): SupportMessageDto =
+        session.authenticated { token ->
+            val body = json.encodeToString(SupportSendRequest.serializer(), SupportSendRequest(text, clientMessageId))
+            decode(SupportMessageEnvelope.serializer(), client().request("POST", "api/v1/support/messages", body, token)).message
+        }
+
+    suspend fun markSupportRead(upToMessageId: String): Int = session.authenticated { token ->
+        val body = json.encodeToString(SupportReadRequest.serializer(), SupportReadRequest(upToMessageId))
+        decode(SupportReadResultDto.serializer(), client().request("POST", "api/v1/support/read", body, token)).unreadCount
+    }
 
     // --------------------------------------- subscription (demo payment flow)
 

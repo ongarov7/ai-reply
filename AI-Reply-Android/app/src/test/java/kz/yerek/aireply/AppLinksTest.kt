@@ -183,7 +183,7 @@ class AppLinksTest {
             AppScreen.ONBOARDING to Routes.Tutorial,
             AppScreen.PERMISSIONS to "permissions",
             AppScreen.PASTE_HELP to "paste_help",
-            AppScreen.SUPPORT to Routes.Home,
+            AppScreen.SUPPORT to "support",
             AppScreen.PURCHASE to "purchase"
         )
         assertEquals(AppScreen.entries.toSet(), expected.keys)

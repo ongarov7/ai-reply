@@ -17,6 +17,8 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.PersonOutline
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -26,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import kz.yerek.aireply.R
@@ -64,15 +67,23 @@ fun HomeScreen(onOpen: (String) -> Unit) {
     val services = LocalServices.current
     val context = LocalContext.current
     val status by rememberKeyboardStatus()
+    val unread by services.support.unread.collectAsStateWithLifecycle()
 
     AppScreen(
         title = stringResource(R.string.home_title),
         actions = {
             IconButton(onClick = { onOpen(Routes.Settings) }) {
-                Icon(
-                    Icons.Filled.Settings,
-                    contentDescription = stringResource(R.string.cd_settings)
-                )
+                // An operator's unread reply waits in Settings ▸ Chat with support.
+                BadgedBox(badge = { if (unread > 0) Badge() }) {
+                    Icon(
+                        Icons.Filled.Settings,
+                        contentDescription = if (unread > 0) {
+                            stringResource(R.string.cd_settings) + ", " + pluralStringResource(R.plurals.support_unread, unread, unread)
+                        } else {
+                            stringResource(R.string.cd_settings)
+                        }
+                    )
+                }
             }
         }
     ) {

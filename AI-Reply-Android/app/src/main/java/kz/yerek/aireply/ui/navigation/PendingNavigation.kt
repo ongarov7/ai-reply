@@ -43,8 +43,8 @@ class PendingNavigation {
             AppScreen.COMPOSE -> Routes.Compose
             AppScreen.ONBOARDING -> Routes.Tutorial
             AppScreen.PASTE_HELP -> Routes.PasteHelp
-            // Not in this build yet: the app opens, as an older build does for any new screen.
-            AppScreen.SUPPORT -> Routes.Home
+            // With the chat off the screen says so and offers the support page.
+            AppScreen.SUPPORT -> Routes.Support
             // With purchases off the screen says so and leads to the plans: never Home.
             AppScreen.PURCHASE -> Routes.Purchase
         }

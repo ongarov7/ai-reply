@@ -58,4 +58,26 @@
     <string name="exhausted_body_plans">Доступные ответы закончились. Можешь выбрать другой тариф.</string>
     <string name="exhausted_later">Позже</string>
 
+    <!-- Support chat -->
+    <string name="support_title">Чат с оператором</string>
+    <string name="support_operator">Поддержка AI Reply</string>
+    <string name="support_empty">Здравствуйте! Чем можем помочь? Напишите свой вопрос, и оператор ответит вам.</string>
+    <string name="support_input_hint">Сообщение</string>
+    <string name="support_send">Отправить</string>
+    <string name="support_sending">Отправляется…</string>
+    <string name="support_not_sent">Не отправлено</string>
+    <string name="support_rate_limited">Слишком много сообщений подряд. Подожди минуту.</string>
+    <string name="support_retry">Повторить</string>
+    <string name="support_too_long">Сообщение длиннее %1$d символов.</string>
+    <string name="support_load_failed">Не удалось загрузить чат. Проверь подключение.</string>
+    <string name="support_unavailable">Чат сейчас недоступен. Можно написать нам через страницу поддержки.</string>
+    <string name="support_open_page">Открыть страницу поддержки</string>
+    <string name="support_your_message">Твоё сообщение</string>
+    <plurals name="support_unread">
+        <item quantity="one">%d непрочитанное сообщение</item>
+        <item quantity="few">%d непрочитанных сообщения</item>
+        <item quantity="many">%d непрочитанных сообщений</item>
+        <item quantity="other">%d непрочитанного сообщения</item>
+    </plurals>
+
 </resources>

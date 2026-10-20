@@ -54,4 +54,24 @@
     <string name="exhausted_body_plans">Қолжетімді жауаптар бітті. Басқа тариф таңдауға болады.</string>
     <string name="exhausted_later">Кейінірек</string>
 
+    <!-- Support chat -->
+    <string name="support_title">Оператормен чат</string>
+    <string name="support_operator">AI Reply қолдауы</string>
+    <string name="support_empty">Сәлеметсіз бе! Қалай көмектесе аламыз? Сұрағыңызды жазыңыз, оператор сізге жауап береді.</string>
+    <string name="support_input_hint">Хабарлама</string>
+    <string name="support_send">Жіберу</string>
+    <string name="support_sending">Жіберілуде…</string>
+    <string name="support_not_sent">Жіберілмеді</string>
+    <string name="support_rate_limited">Қатарынан тым көп хабарлама. Бір минут күтіңіз.</string>
+    <string name="support_retry">Қайталау</string>
+    <string name="support_too_long">Хабарлама %1$d таңбадан ұзын.</string>
+    <string name="support_load_failed">Чатты жүктеу мүмкін болмады. Байланысты тексеріңіз.</string>
+    <string name="support_unavailable">Чат қазір қолжетімсіз. Бізге қолдау беті арқылы жазуға болады.</string>
+    <string name="support_open_page">Қолдау бетін ашу</string>
+    <string name="support_your_message">Сіздің хабарламаңыз</string>
+    <plurals name="support_unread">
+        <item quantity="one">%d оқылмаған хабарлама</item>
+        <item quantity="other">%d оқылмаған хабарлама</item>
+    </plurals>
+
 </resources>

@@ -123,6 +123,8 @@ class MainActivity : ComponentActivity() {
         services.push.onResume()
         // A purchase paid meanwhile, or never handed over, goes to the server.
         services.resumePurchases()
+        // An operator may have answered meanwhile: the chat's badge.
+        if (services.account.state.value.features?.supportChat == true) services.support.refreshUnread()
     }
 
     override fun onStop() {

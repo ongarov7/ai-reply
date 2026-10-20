@@ -15,6 +15,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.HelpOutline
+import androidx.compose.material3.Badge
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -25,6 +26,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import kz.yerek.aireply.ui.design.LocalExtraColors
 import kz.yerek.aireply.ui.design.Radius
@@ -43,6 +46,9 @@ fun NavigationRow(
     enabled: Boolean = true,
     /** The row's action is on its way: a small spinner where the chevron is, so nothing moves. */
     busy: Boolean = false,
+    /** Something new behind the row (unread messages): a badge before the chevron, said as [badgeDescription]. */
+    badgeCount: Int = 0,
+    badgeDescription: String? = null,
     onClick: () -> Unit
 ) {
     val accent = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
@@ -75,6 +81,11 @@ fun NavigationRow(
                 style = MaterialTheme.typography.bodyMedium,
                 color = LocalExtraColors.current.textSecondary
             )
+        }
+        if (badgeCount > 0) {
+            Badge(modifier = Modifier.semantics { badgeDescription?.let { contentDescription = it } }) {
+                Text(if (badgeCount > 99) "99+" else badgeCount.toString())
+            }
         }
         if (busy) {
             CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = accent)

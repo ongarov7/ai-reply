@@ -22,7 +22,7 @@ enum class AppScreen(val key: String) {
     PERMISSIONS("permissions"),
     /** How paste works on Android. */
     PASTE_HELP("paste_help"),
-    /** The support chat; Home until this build has it. */
+    /** «Чат с оператором»; a `support_reply` push opens it. */
     SUPPORT("support"),
     /** «Докупить ответы»: packs and the pass. */
     PURCHASE("purchase");

@@ -89,6 +89,11 @@ class PushCoordinator(
     private val loadServerConfig: suspend () -> Unit,
     /** A Context in the app's interface language, for channel names and texts. */
     private val localized: () -> Context,
+    /**
+     * A `support_reply` push: true when the chat is on screen and read
+     * there, so no notification is shown for it.
+     */
+    private val onSupportReply: (PushPayload) -> Boolean = { false },
     private val scope: CoroutineScope,
     private val clock: () -> Long = System::currentTimeMillis
 ) : AccountObserver {
@@ -259,6 +264,7 @@ class PushCoordinator(
      */
     fun onMessageReceived(data: Map<String, String>, title: String?, body: String?): Boolean {
         val payload = PushPayload.from(data) ?: return false
+        if (payload.isSupportReply && onSupportReply(payload)) return false
         if (!settings.notificationsEnabled) return false
         return PushNotifier.show(appContext, localized(), payload, data, title, body)
     }

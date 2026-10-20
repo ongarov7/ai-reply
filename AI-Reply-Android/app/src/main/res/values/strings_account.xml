@@ -59,4 +59,24 @@
     <string name="exhausted_body_plans">You have used your available replies. You can choose another plan.</string>
     <string name="exhausted_later">Later</string>
 
+    <!-- Support chat -->
+    <string name="support_title">Chat with support</string>
+    <string name="support_operator">AI Reply Support</string>
+    <string name="support_empty">Hello! How can we help? Write your question and an operator will answer you.</string>
+    <string name="support_input_hint">Message</string>
+    <string name="support_send">Send</string>
+    <string name="support_sending">Sending…</string>
+    <string name="support_not_sent">Not sent</string>
+    <string name="support_rate_limited">Too many messages in a row. Wait a minute.</string>
+    <string name="support_retry">Retry</string>
+    <string name="support_too_long">The message is longer than %1$d characters.</string>
+    <string name="support_load_failed">The chat could not be loaded. Check the connection.</string>
+    <string name="support_unavailable">The chat is not available right now. You can write to us through the support page.</string>
+    <string name="support_open_page">Open the support page</string>
+    <string name="support_your_message">Your message</string>
+    <plurals name="support_unread">
+        <item quantity="one">%d unread message</item>
+        <item quantity="other">%d unread messages</item>
+    </plurals>
+
 </resources>

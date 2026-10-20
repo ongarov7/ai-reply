@@ -20,6 +20,7 @@ import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.PersonOutline
 import androidx.compose.material.icons.outlined.PrivacyTip
+import androidx.compose.material.icons.outlined.SupportAgent
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -40,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -80,6 +82,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit, focusSection: S
     val scope = rememberCoroutineScope()
     val accountState by services.account.state.collectAsStateWithLifecycle()
     val pushState by services.push.ui.collectAsStateWithLifecycle()
+    val unread by services.support.unread.collectAsStateWithLifecycle()
     val notificationsSection = remember { BringIntoViewRequester() }
 
     LaunchedEffect(focusSection) {
@@ -278,6 +281,16 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit, focusSection: S
                 }
                 Footnote(stringResource(R.string.settings_tutorial_footer))
                 RowGroup {
+                    // The chat only on a server that has it; the support page always.
+                    if (accountState.isSignedIn && accountState.features?.supportChat == true) {
+                        NavigationRow(
+                            Icons.Outlined.SupportAgent,
+                            stringResource(R.string.support_title),
+                            badgeCount = unread,
+                            badgeDescription = pluralStringResource(R.plurals.support_unread, unread, unread)
+                        ) { onOpen(Routes.Support) }
+                        RowDividerIndented()
+                    }
                     NavigationRow(
                         Icons.AutoMirrored.Outlined.HelpOutline,
                         stringResource(R.string.settings_support)

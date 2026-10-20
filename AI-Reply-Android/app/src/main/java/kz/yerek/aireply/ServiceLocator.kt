@@ -47,6 +47,7 @@ import kz.yerek.aireply.data.profile.ProfileSync
 import kz.yerek.aireply.data.secure.SecureCredentialStore
 import kz.yerek.aireply.data.settings.DeviceStateStore
 import kz.yerek.aireply.data.settings.SettingsStore
+import kz.yerek.aireply.data.support.SupportApi
 import kz.yerek.aireply.keyboard.autocorrect.PrefsLearnedWordsStore
 import kz.yerek.aireply.push.ClientContext
 import kz.yerek.aireply.push.HttpPushApi
@@ -54,6 +55,7 @@ import kz.yerek.aireply.push.InstallationIdStore
 import kz.yerek.aireply.push.PushCoordinator
 import kz.yerek.aireply.push.PushStateStore
 import kz.yerek.aireply.ui.feature.account.AccountController
+import kz.yerek.aireply.ui.feature.support.SupportChatController
 import kz.yerek.aireply.ui.navigation.PendingNavigation
 import kz.yerek.aireply.voice.VoiceTranscriber
 import java.util.TimeZone
@@ -167,8 +169,10 @@ class ServiceLocator(context: Context) {
     private val accountObserver = object : AccountObserver {
         override fun onServerFeatures(features: ServerFeaturesDto?) {
             push.onServerFeatures(features)
-            // At start-up the features arrive after the first resume: purchases Play holds go now.
+            // At start-up the features arrive after the first resume: purchases Play holds go now,
+            // and the chat's badge is read.
             resumePurchases()
+            if (features?.supportChat == true) support.refreshUnread()
         }
         override fun onLegalAccepted() = push.onLegalAccepted()
         override fun onSignedIn(userId: String) = push.onSignedIn(userId)
@@ -176,6 +180,7 @@ class ServiceLocator(context: Context) {
         override fun onSignedOut(userInitiated: Boolean) {
             push.onSignedOut(userInitiated)
             if (billingCreated) billing.reset()
+            if (supportCreated) support.reset()
         }
     }
 
@@ -263,12 +268,36 @@ class ServiceLocator(context: Context) {
             // A fresh Context each time: these are read off the main thread
             // (Firebase's service), where the shared cache below is not safe.
             localized = { LocalizedContext.wrap(appContext, settings.effectiveAppLanguage) },
+            // An operator's reply: read in the chat when it is on screen, else the badge and the notification.
+            onSupportReply = { support.onReplyPush() },
             scope = scope
         )
     }
 
     /** A screen asked for from outside the navigation graph: a tapped notification. */
     val navigation: PendingNavigation by lazy { PendingNavigation() }
+
+    // --------------------------------------------------------- support chat
+
+    /** «Чат с оператором» and its unread count. The app only; nothing runs without `features.support_chat`. */
+    val support: SupportChatController by lazy {
+        supportCreated = true
+        SupportChatController(
+            api = object : SupportApi {
+                override suspend fun conversation() = accountService.supportConversation()
+                override suspend fun messages(before: String?, after: String?, limit: Int) =
+                    accountService.supportMessages(before, after, limit)
+                override suspend fun send(text: String, clientMessageId: String) =
+                    accountService.sendSupportMessage(text, clientMessageId)
+                override suspend fun markRead(upToMessageId: String) = accountService.markSupportRead(upToMessageId)
+            },
+            isEnabled = { account.state.value.isSignedIn && account.state.value.features?.supportChat == true },
+            scope = scope
+        )
+    }
+
+    @Volatile
+    private var supportCreated = false
 
     // ------------------------------------------------------------ purchases
 
