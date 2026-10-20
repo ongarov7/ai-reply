@@ -37,7 +37,11 @@ targets:
     platform: iOS
     sources:
       - AIReply
-      - Shared
+      - path: Shared
+        # The emoji list is the keyboard's alone (a resource of ReplyKeyboard,
+        # which takes all of Shared).
+        excludes:
+          - Keyboard/Emoji/emoji-catalog.txt
     info:
       path: AIReply/Info.plist
       properties:

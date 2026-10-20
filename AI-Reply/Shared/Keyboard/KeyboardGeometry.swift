@@ -215,6 +215,42 @@ struct PersonaRowLayout: Equatable, Sendable {
 
 enum KeyboardGeometry {
 
+    /// One key unit of a grid with `columns` columns at this width.
+    static func unitWidth(columns: Int, sizing: KeyboardSizing) -> CGFloat {
+        let columns = max(columns, 1)
+        let innerWidth = sizing.width - sizing.sideInset * 2
+        return (innerWidth - CGFloat(columns - 1) * sizing.columnGap(columns: columns)) / CGFloat(columns)
+    }
+
+    // MARK: Emoji key
+
+    /// The narrowest the space bar may get for the emoji key to stay, in
+    /// units of the bottom row's grid.
+    static let minimumSpaceUnitsWithEmojiKey: CGFloat = 2.5
+
+    /// Whether the letters page has room for the emoji key with these
+    /// options (contract §3.10). Only in plain text fields; and where the
+    /// keyboard draws its own globe - phones with a Home button - only while
+    /// the space bar keeps at least 2.5 units. There the system globe still
+    /// reaches Apple's emoji keyboard, so nothing is lost when it goes.
+    static func fitsEmojiKey(options: KeyboardPageOptions, sizing: KeyboardSizing) -> Bool {
+        guard options.field == .text else { return false }
+        guard options.showsNextKeyboardKey else { return true }
+        var withEmoji = options
+        withEmoji.showsEmojiKey = true
+        return spaceBarUnits(options: withEmoji, sizing: sizing) >= minimumSpaceUnitsWithEmojiKey
+    }
+
+    /// The letters page's space bar, in units of its row's grid. The bottom
+    /// row is the same on every layout, so English stands for all of them.
+    static func spaceBarUnits(options: KeyboardPageOptions, sizing: KeyboardSizing) -> CGFloat {
+        let page = KeyboardLayout.page(language: .english, plane: .letters, options: options)
+        let laidOut = layout(page: page, sizing: sizing, areaHeight: sizing.keyAreaHeight(maximumRows: 4))
+        guard let space = laidOut.keys.first(where: { $0.action == .space }) else { return 0 }
+        let columns = page.rows.last?.unitColumns ?? page.columns
+        return space.frame.width / unitWidth(columns: columns, sizing: sizing)
+    }
+
     /// Row metrics for `rows` rows in `available` points.
     ///
     /// A page with fewer rows than the tallest page gets the difference: the
@@ -251,7 +287,7 @@ enum KeyboardGeometry {
             // gap, so it is identical on every layout.
             let columns = max(row.unitColumns ?? page.columns, 1)
             let gap = sizing.columnGap(columns: columns)
-            let unit = (innerWidth - CGFloat(columns - 1) * gap) / CGFloat(columns)
+            let unit = unitWidth(columns: columns, sizing: sizing)
 
             // Gaps sit only between two KEYS. A spacer is itself the space
             // between its neighbours, so it never gets a gap of its own.

@@ -161,7 +161,10 @@ final class ComposerTextView: UITextView {
         let current = currentText as NSString
         let location = clampedCaret(in: current)
         guard location > 0 else { return false }
-        let range = current.rangeOfComposedCharacterSequence(at: location - 1)
+        // One whole character, as Swift counts them: an emoji of several
+        // scalars goes in one backspace.
+        let length = max(1, TextDeletion.lastCharacterLength(before: current.substring(to: location)))
+        let range = NSRange(location: location - min(length, location), length: min(length, location))
         text = current.replacingCharacters(in: range, with: "")
         caret = range.location
         didEdit()

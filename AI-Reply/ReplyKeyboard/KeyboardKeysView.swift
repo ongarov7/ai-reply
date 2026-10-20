@@ -295,6 +295,12 @@ final class KeyboardKeysView: UIView {
                 cap.accessibilityText = spoken
             }
 
+        case .plane(.emoji):
+            // A face, like the iOS emoji key, on the same special key.
+            cap.style = .special
+            cap.setSymbol("face.smiling", pointSize: 18, weight: .regular)
+            cap.accessibilityText = labels.emojiAccessibility
+
         case .plane(let plane):
             cap.style = .special
             cap.setText(labels.planeKey(plane), font: controlFont)

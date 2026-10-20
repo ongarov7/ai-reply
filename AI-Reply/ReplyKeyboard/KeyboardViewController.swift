@@ -30,6 +30,9 @@ final class KeyboardViewController: UIInputViewController {
 
     private let actionBar = KeyboardActionBar()
     private let keysView = KeyboardKeysView()
+    /// The emoji page, made on the first tap of the emoji key and let go on
+    /// a memory warning while it is not on screen.
+    private var emojiView: EmojiKeyboardView?
 
     private var heightConstraint: NSLayoutConstraint?
     private var barHeightConstraint: NSLayoutConstraint?
@@ -99,6 +102,17 @@ final class KeyboardViewController: UIInputViewController {
         if replyCoordinator.isComposing { return .reply }
         return .none
     }
+
+    /// The emoji list, read from the keyboard's bundle when the emoji page
+    /// first opens, and dropped with the page on a memory warning.
+    private var emojiCatalog: EmojiCatalog?
+    /// Recently used emoji: the keyboard's own container, never the App
+    /// Group. Read on the first open of the emoji page.
+    private let recentEmojiStore: RecentEmojiStore = DefaultsRecentEmojiStore()
+    private lazy var recentEmoji = RecentEmoji(items: recentEmojiStore.load())
+    /// The recents the open emoji page shows. Taken when the page opens, so
+    /// an emoji typed now does not move the grid under the finger.
+    private var shownRecentEmoji: [String] = []
 
     private var configurationLoadedAt: TimeInterval = 0
     private var lastSpaceTap: TimeInterval = 0
@@ -186,6 +200,7 @@ final class KeyboardViewController: UIInputViewController {
             layoutKeyboard(force: true)
         }
         keysView.hapticsEnabled = SharedSettings.shared.keyboardHapticsActive(hasFullAccess: hasFullAccess)
+        emojiView?.hapticsEnabled = keysView.hapticsEnabled
         reportActivityToContainingApp()
         if hasFullAccess { AILimitsRefresher.refreshIfStale() }
         // Dictionaries load only now, in the background: the first frame
@@ -206,7 +221,7 @@ final class KeyboardViewController: UIInputViewController {
             replyCoordinator.park()
             composeCoordinator.park()
             actionBar.endComposing()
-            keysView.isInputDimmed = false
+            setInputDimmed(false)
             updateGeometry(animated: false)
         }
     }
@@ -383,6 +398,7 @@ final class KeyboardViewController: UIInputViewController {
         view.tintColor = theme.primaryText
         actionBar.configure(theme: theme, uiLanguage: uiLanguage)
         keysView.configure(theme: theme)
+        emojiView?.configure(theme: theme)
     }
 
     // MARK: Layout
@@ -400,13 +416,20 @@ final class KeyboardViewController: UIInputViewController {
         return sizing.keyAreaHeight(maximumRows: KeyboardLayout.maximumRowCount(languages: enabledLanguages))
     }
 
-    private var pageOptions: KeyboardPageOptions {
-        KeyboardPageOptions(
+    private func pageOptions(for sizing: KeyboardSizing) -> KeyboardPageOptions {
+        let type = textDocumentProxy.keyboardType ?? .default
+        var options = KeyboardPageOptions(
             showsNextKeyboardKey: showsGlobe,
             showsLanguageKey: enabledLanguages.count > 1,
             // The composer's fields are plain text whatever the host field is.
-            field: actionBar.isComposing ? .text : KeyboardFieldKind(textDocumentProxy.keyboardType ?? .default)
+            field: actionBar.isComposing ? .text : KeyboardFieldKind(type)
         )
+        // The emoji key: in plain text fields and in the composer; where the
+        // keyboard draws its own globe, only while the space bar keeps room.
+        let offersEmoji = actionBar.isComposing
+            || KeyboardFieldKind.offersEmoji(type, isSecure: textDocumentProxy.isSecureTextEntry ?? false)
+        options.showsEmojiKey = offersEmoji && KeyboardGeometry.fitsEmojiKey(options: options, sizing: sizing)
+        return options
     }
 
     private func layoutKeyboard(force: Bool) {
@@ -414,21 +437,85 @@ final class KeyboardViewController: UIInputViewController {
         let identity = PageIdentity(
             language: language,
             plane: plane,
-            options: pageOptions,
+            options: pageOptions(for: sizing),
             sizing: sizing,
             areaHeight: keyAreaHeight
         )
         if force || identity != shownPage {
+            let opensEmoji = plane == .emoji && shownPage?.plane != .emoji
             shownPage = identity
-            let spec = KeyboardLayout.page(language: language, plane: plane, options: identity.options)
-            let layout = KeyboardGeometry.layout(page: spec, sizing: sizing, areaHeight: identity.areaHeight)
-            UIView.performWithoutAnimation {
-                keysView.show(layout, labels: KeyboardLabels(language), languages: enabledLanguages, currentLanguage: language)
+            if plane == .emoji {
+                showEmojiPage(identity, opening: opensEmoji)
+            } else {
+                let spec = KeyboardLayout.page(language: language, plane: plane, options: identity.options)
+                let layout = KeyboardGeometry.layout(page: spec, sizing: sizing, areaHeight: identity.areaHeight)
+                UIView.performWithoutAnimation {
+                    keysView.show(layout, labels: KeyboardLabels(language), languages: enabledLanguages, currentLanguage: language)
+                }
             }
         }
+        keysView.isHidden = plane == .emoji
+        emojiView?.isHidden = plane != .emoji
         keysView.setShiftMode(plane == .letters ? shift.mode : .off)
         refreshReturnKey()
         updateGeometry(animated: false)
+    }
+
+    // MARK: Emoji page
+
+    /// The emoji page over the key area, in exactly its height: the same
+    /// page geometry as the other pages, so ABC and delete sit on the bottom
+    /// row and the keyboard does not move.
+    private func showEmojiPage(_ identity: PageIdentity, opening: Bool) {
+        let page = emojiView ?? makeEmojiView()
+        if opening { shownRecentEmoji = recentEmoji.items }
+        if emojiCatalog == nil { emojiCatalog = EmojiCatalog.bundled() }
+        let supported = EmojiVersion.supported(by: ProcessInfo.processInfo.operatingSystemVersion)
+        let sections = emojiCatalog?.page(recents: shownRecentEmoji, supporting: supported)
+            ?? (shownRecentEmoji.isEmpty ? [] : [EmojiSection(kind: .recents, emoji: shownRecentEmoji)])
+        let spec = KeyboardLayout.page(language: language, plane: .emoji, options: identity.options)
+        let keys = KeyboardGeometry.layout(page: spec, sizing: identity.sizing, areaHeight: identity.areaHeight)
+        UIView.performWithoutAnimation {
+            page.show(EmojiPageLayout(keys: keys, sizing: identity.sizing), labels: KeyboardLabels(language),
+                      sections: sections, resetsPosition: opening)
+        }
+    }
+
+    private func makeEmojiView() -> EmojiKeyboardView {
+        let page = EmojiKeyboardView()
+        page.translatesAutoresizingMaskIntoConstraints = false
+        page.delegate = self
+        page.barKeys.delegate = self
+        page.configure(theme: theme)
+        page.hapticsEnabled = keysView.hapticsEnabled
+        page.isInputDimmed = keysView.isInputDimmed
+        view.addSubview(page)
+        NSLayoutConstraint.activate([
+            page.topAnchor.constraint(equalTo: keysView.topAnchor),
+            page.leadingAnchor.constraint(equalTo: keysView.leadingAnchor),
+            page.trailingAnchor.constraint(equalTo: keysView.trailingAnchor),
+            page.heightAnchor.constraint(equalTo: keysView.heightAnchor)
+        ])
+        emojiView = page
+        return page
+    }
+
+    /// While nothing can be typed (a request runs, the report panel is
+    /// open) the keys of every page dim.
+    private func setInputDimmed(_ dimmed: Bool) {
+        keysView.isInputDimmed = dimmed
+        emojiView?.isInputDimmed = dimmed
+    }
+
+    /// The emoji page is the largest thing the keyboard holds; while it is
+    /// not on screen it goes, with the list, and comes back on the next tap
+    /// of the emoji key.
+    override func didReceiveMemoryWarning() {
+        super.didReceiveMemoryWarning()
+        guard plane != .emoji else { return }
+        emojiView?.removeFromSuperview()
+        emojiView = nil
+        emojiCatalog = nil
     }
 
     /// The tallest the AI area may become. The keys never give up height;
@@ -788,7 +875,7 @@ final class KeyboardViewController: UIInputViewController {
             offersTypedSource: flow.error == .pasteDenied || flow.error == .noSourceMessage,
             offersReport: offersReport
         ))
-        keysView.isInputDimmed = flow.isGenerating || actionBar.isReporting
+        setInputDimmed(flow.isGenerating || actionBar.isReporting)
         if flow.stage != .composing { polisher.stop() }
         refreshReturnKey()
         updateGeometry(animated: true)
@@ -820,7 +907,7 @@ final class KeyboardViewController: UIInputViewController {
             errorOffersRetry: notice?.offersRetry ?? true,
             offersReport: offersReport
         ))
-        keysView.isInputDimmed = flow.isGenerating || actionBar.isReporting
+        setInputDimmed(flow.isGenerating || actionBar.isReporting)
         if flow.stage != .composing { polisher.stop() }
         refreshReturnKey()
         updateGeometry(animated: true)
@@ -840,7 +927,7 @@ final class KeyboardViewController: UIInputViewController {
         replyCoordinator.clear()
         composeCoordinator.clear()
         actionBar.endComposing()
-        keysView.isInputDimmed = false
+        setInputDimmed(false)
         layoutKeyboard(force: false)
         updateGeometry(animated: true)
         refreshHostContext()
@@ -990,7 +1077,7 @@ final class KeyboardViewController: UIInputViewController {
     /// nothing while it is open.
     private func reportingDidChange() {
         let generating = activeFlow == .compose ? composeCoordinator.flow.isGenerating : replyCoordinator.flow.isGenerating
-        keysView.isInputDimmed = generating || actionBar.isReporting
+        setInputDimmed(generating || actionBar.isReporting)
         refreshReturnKey()
         refreshAutoShift()
         restartSuggestions()
@@ -1081,7 +1168,9 @@ extension KeyboardViewController: KeyboardKeysViewDelegate {
 
     func keysView(_ view: KeyboardKeysView, didSelectPlane selected: KeyboardPlane) {
         plane = selected
-        if selected != .letters { shift.reset() }
+        // The emoji page leaves shift as it was: ABC brings back the letters
+        // page exactly as it was left.
+        if selected == .numbers || selected == .symbols { shift.reset() }
         layoutKeyboard(force: false)
         refreshAutoShift()
     }
@@ -1243,7 +1332,7 @@ extension KeyboardViewController: KeyboardActionBarDelegate {
             polisher.stop()
             replyCoordinator.suspend()
             actionBar.endComposing()
-            keysView.isInputDimmed = false
+            setInputDimmed(false)
             applyChips(from: replyCoordinator.configuration)
             updateGeometry(animated: true)
             restartSuggestions()
@@ -1410,5 +1499,28 @@ extension KeyboardViewController: AutocorrectControllerDelegate {
 
     func autocorrect(_ controller: AutocorrectController, didUpdate suggestions: [AutocorrectSuggestion]) {
         actionBar.showSuggestions(suggestions)
+    }
+}
+
+// MARK: - Emoji page
+
+extension KeyboardViewController: EmojiKeyboardViewDelegate {
+
+    /// An emoji goes where a key would type: the host field, or the field of
+    /// the composer. It ends the word before it - no correction is made for
+    /// it and no suggestion stays for it - and it joins the recents, which
+    /// the page shows the next time it opens.
+    func emojiView(_ view: EmojiKeyboardView, didPick emoji: String) {
+        prepareComposerForTyping()
+        guard target != .nowhere else { return }
+        autocorrect.keepCorrection()
+        insert(emoji)
+        wordTyping.reset()
+        lastSpaceTap = 0
+        recentEmoji.record(emoji)
+        let items = recentEmoji.items
+        let store = recentEmojiStore
+        DispatchQueue.global(qos: .utility).async { store.save(items) }
+        refreshSuggestions()
     }
 }

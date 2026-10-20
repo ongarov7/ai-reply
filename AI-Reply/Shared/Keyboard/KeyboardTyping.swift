@@ -148,6 +148,16 @@ enum SpaceShortcut {
 /// Word-at-a-time deletion, used once delete has been held for a while.
 enum TextDeletion {
 
+    /// UTF-16 length of the last character of `context`: one backspace.
+    ///
+    /// A character is what the user sees as one - a letter with its accents,
+    /// a flag, a family emoji joined by ZWJs, a keycap - so a backspace never
+    /// leaves half an emoji behind.
+    static func lastCharacterLength(before context: String) -> Int {
+        guard let last = context.last else { return 0 }
+        return String(last).utf16.count
+    }
+
     /// How many characters one word-delete removes from the end of `context`:
     /// the whitespace before the caret plus the word (or the run of
     /// punctuation) before that. Always at least one while there is text.

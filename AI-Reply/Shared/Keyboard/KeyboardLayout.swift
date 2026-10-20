@@ -2,11 +2,13 @@ import UIKit
 
 // MARK: - Model
 
-/// The three planes a layout has, exactly as on the iOS keyboard.
+/// The planes a layout has: the three of the iOS keyboard, and the emoji
+/// page, which has its own grid and keeps only the bottom row's controls.
 enum KeyboardPlane: Hashable, Sendable {
     case letters
     case numbers
     case symbols
+    case emoji
 }
 
 /// What a key DOES. Pure data: the extension decides how it looks and where
@@ -18,7 +20,7 @@ enum KeyAction: Hashable, Sendable {
     case delete
     case space
     case returnKey
-    /// Letters / numbers / symbols.
+    /// Letters / numbers / symbols, and the emoji key (`.plane(.emoji)`).
     case plane(KeyboardPlane)
     /// This keyboard's own ҚАЗ / РУС / ENG switch.
     case nextLanguage
@@ -114,6 +116,19 @@ enum KeyboardFieldKind: Hashable, Sendable {
             return false
         }
     }
+
+    /// Fields the emoji key belongs in: plain text. Not addresses, links,
+    /// handles or passwords, not the digit pads, and not a field that asked
+    /// for ASCII - the iOS keyboard offers no emoji there either.
+    static func offersEmoji(_ type: UIKeyboardType, isSecure: Bool) -> Bool {
+        guard !isSecure, KeyboardFieldKind(type) == .text else { return false }
+        switch type {
+        case .asciiCapable, .numberPad, .decimalPad, .asciiCapableNumberPad, .phonePad, .namePhonePad:
+            return false
+        default:
+            return true
+        }
+    }
 }
 
 struct KeyboardPageOptions: Hashable, Sendable {
@@ -123,6 +138,11 @@ struct KeyboardPageOptions: Hashable, Sendable {
     /// The ҚАЗ / РУС / ENG key. Hidden when only one layout is switched on.
     var showsLanguageKey: Bool = true
     var field: KeyboardFieldKind = .text
+    /// The emoji key on the letters page, right after 123. The keyboard
+    /// decides it from the field and the width
+    /// (`KeyboardGeometry.fitsEmojiKey`); it is never drawn in an e-mail,
+    /// URL or handle field whatever this says.
+    var showsEmojiKey: Bool = false
 }
 
 // MARK: - Layouts
@@ -192,10 +212,11 @@ enum KeyboardLayout {
         ]
     }
 
-    /// Rows on the letters page, including the bottom row.
+    /// Rows on a page, including the bottom row. The emoji page has the
+    /// letters page's, so its controls sit where the bottom row was.
     static func rowCount(language: KeyboardLanguage, plane: KeyboardPlane) -> Int {
         switch plane {
-        case .letters: return letters(for: language).count + 1
+        case .letters, .emoji: return letters(for: language).count + 1
         case .numbers, .symbols: return 4
         }
     }
@@ -218,6 +239,8 @@ enum KeyboardLayout {
             return punctuationPage(language: language, plane: .numbers, rows: numbers(for: language), options: options)
         case .symbols:
             return punctuationPage(language: language, plane: .symbols, rows: symbols(for: language), options: options)
+        case .emoji:
+            return emojiPage(language: language, options: options)
         }
     }
 
@@ -255,8 +278,23 @@ enum KeyboardLayout {
             }
         }
 
-        result.append(bottomRow(planeKey: .numbers, options: options))
+        result.append(bottomRow(planeKey: .numbers, options: options,
+                                emojiKey: options.showsEmojiKey && options.field == .text))
         return KeyboardPageSpec(language: language, plane: .letters, columns: language == .english ? 10 : 11, rows: result)
+    }
+
+    /// The emoji page: the grid's rows hold no keys - the emoji view draws
+    /// them - and the bottom row is ABC, the globe when iOS asks for one, the
+    /// category bar's space and delete. As many rows as the letters page of
+    /// the same layout, so ABC lands exactly where 123 was.
+    private static func emojiPage(language: KeyboardLanguage, options: KeyboardPageOptions) -> KeyboardPageSpec {
+        let control = KeyWidth.units(latinModifierWidth)
+        var bar: [KeySlot] = [.key(.plane(.letters), control)]
+        if options.showsNextKeyboardKey { bar.append(.key(.nextKeyboard, control)) }
+        bar.append(.spacer(.flexible(1)))
+        bar.append(.key(.delete, control))
+        let grid = Array(repeating: KeyRow([.spacer(.flexible(1))]), count: letters(for: language).count)
+        return KeyboardPageSpec(language: language, plane: .emoji, columns: 10, rows: grid + [KeyRow(bar, unitColumns: 10)])
     }
 
     private static func punctuationPage(
@@ -288,12 +326,13 @@ enum KeyboardLayout {
         }
     }
 
-    /// 123 / ABC, the globe when iOS asks for one, the layout key, the field's
-    /// own extras, space and return. Sized on the Latin grid so it is identical
-    /// on every layout.
-    private static func bottomRow(planeKey: KeyboardPlane, options: KeyboardPageOptions) -> KeyRow {
+    /// 123 / ABC, the emoji key on the letters page, the globe when iOS asks
+    /// for one, the layout key, the field's own extras, space and return.
+    /// Sized on the Latin grid so it is identical on every layout.
+    private static func bottomRow(planeKey: KeyboardPlane, options: KeyboardPageOptions, emojiKey: Bool = false) -> KeyRow {
         let control = KeyWidth.units(latinModifierWidth)
         var slots: [KeySlot] = [.key(.plane(planeKey), control)]
+        if emojiKey { slots.append(.key(.plane(.emoji), control)) }
         if options.showsNextKeyboardKey { slots.append(.key(.nextKeyboard, control)) }
         if options.showsLanguageKey { slots.append(.key(.nextLanguage, control)) }
 
@@ -402,11 +441,14 @@ struct KeyboardLabels: Sendable {
     var numbers: String { "123" }
     var symbols: String { "#+=" }
 
+    /// What the plane key says - for the emoji key, which shows a face, what
+    /// VoiceOver says.
     func planeKey(_ plane: KeyboardPlane) -> String {
         switch plane {
         case .letters: return letters
         case .numbers: return numbers
         case .symbols: return symbols
+        case .emoji:   return emojiAccessibility
         }
     }
 
@@ -524,6 +566,63 @@ struct KeyboardLabels: Sendable {
         case .english: return "Switch layout"
         case .russian: return "Сменить раскладку"
         case .kazakh:  return "Тілді ауыстыру"
+        }
+    }
+
+    var emojiAccessibility: String {
+        switch language {
+        case .english: return "Emoji"
+        case .russian: return "Эмодзи"
+        case .kazakh:  return "Эмодзи"
+        }
+    }
+
+    // MARK: Emoji page
+
+    /// The emoji page's section titles and category buttons. Drafts for the
+    /// owner to review in Russian and Kazakh.
+    func emojiSectionTitle(_ kind: EmojiSection.Kind) -> String {
+        switch kind {
+        case .recents:
+            switch language {
+            case .english: return "Frequently Used"
+            case .russian: return "Часто используемые"
+            case .kazakh:  return "Жиі қолданылатындар"
+            }
+        case .category(let category):
+            return emojiCategoryTitle(category)
+        }
+    }
+
+    private func emojiCategoryTitle(_ category: EmojiCategory) -> String {
+        switch (category, language) {
+        case (.smileysEmotion, .english): return "Smileys & Emotion"
+        case (.smileysEmotion, .russian): return "Смайлики и эмоции"
+        case (.smileysEmotion, .kazakh):  return "Смайликтер мен эмоциялар"
+        case (.peopleBody, .english):     return "People & Body"
+        case (.peopleBody, .russian):     return "Люди и тело"
+        case (.peopleBody, .kazakh):      return "Адамдар мен дене"
+        case (.animalsNature, .english):  return "Animals & Nature"
+        case (.animalsNature, .russian):  return "Животные и природа"
+        case (.animalsNature, .kazakh):   return "Жануарлар мен табиғат"
+        case (.foodDrink, .english):      return "Food & Drink"
+        case (.foodDrink, .russian):      return "Еда и напитки"
+        case (.foodDrink, .kazakh):       return "Тағам мен сусын"
+        case (.travelPlaces, .english):   return "Travel & Places"
+        case (.travelPlaces, .russian):   return "Путешествия и места"
+        case (.travelPlaces, .kazakh):    return "Саяхат және орындар"
+        case (.activities, .english):     return "Activities"
+        case (.activities, .russian):     return "Занятия"
+        case (.activities, .kazakh):      return "Іс-әрекеттер"
+        case (.objects, .english):        return "Objects"
+        case (.objects, .russian):        return "Предметы"
+        case (.objects, .kazakh):         return "Заттар"
+        case (.symbols, .english):        return "Symbols"
+        case (.symbols, .russian):        return "Символы"
+        case (.symbols, .kazakh):         return "Таңбалар"
+        case (.flags, .english):          return "Flags"
+        case (.flags, .russian):          return "Флаги"
+        case (.flags, .kazakh):           return "Жалаулар"
         }
     }
 }
