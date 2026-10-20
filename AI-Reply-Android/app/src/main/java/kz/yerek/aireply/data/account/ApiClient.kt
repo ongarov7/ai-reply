@@ -58,15 +58,38 @@ sealed interface ApiError {
 
     data class RateLimited(val retryAfterSeconds: Int?) : ApiError
 
-    /** Daily quota is spent. [resetsAt] is ISO-8601 from the server. */
+    /**
+     * Every reply is spent: the plan's day and whatever the account had
+     * beyond it. [resetsAt] is ISO-8601 from the server. [canBuy]: more can
+     * be bought on this platform (`details.can_buy`).
+     */
     data class DailyLimitReached(
         val limit: Int,
         val usedToday: Int,
-        val resetsAt: String?
+        val resetsAt: String?,
+        val canBuy: Boolean = false
     ) : ApiError
 
     /** This month's quota is spent; it comes back with the next month, not tomorrow. */
-    data class MonthlyLimitReached(val resetsAt: String?) : ApiError
+    data class MonthlyLimitReached(val resetsAt: String?, val canBuy: Boolean = false) : ApiError
+
+    /**
+     * 409 for an `Idempotency-Key`: the same action is still being written
+     * ([inProgress]), or the key already paid for its replay.
+     */
+    data class GenerationConflict(val inProgress: Boolean) : ApiError
+
+    /** Purchases are not open on this platform (`IAP_UNAVAILABLE`). */
+    data object PurchasesUnavailable : ApiError
+
+    /** The store did not confirm the purchase; [reason] is the server's `details.reason`. */
+    data class PurchaseInvalid(val reason: String?) : ApiError
+
+    /** The purchase was already granted to another account. */
+    data object PurchaseOtherAccount : ApiError
+
+    /** Google's API did not answer the server; nothing was granted or consumed. */
+    data object StoreUnavailable : ApiError
 
     /**
      * Today's voice input is spent: a daily cap of its own, apart from the
@@ -305,9 +328,17 @@ class ApiClient(
                 "DAILY_LIMIT_REACHED" -> return ApiError.DailyLimitReached(
                     limit = details?.dailyLimit ?: 0,
                     usedToday = details?.usedToday ?: 0,
-                    resetsAt = details?.resetsAt
+                    resetsAt = details?.resetsAt,
+                    canBuy = details?.canBuy == true
                 )
-                "MONTHLY_LIMIT_REACHED" -> return ApiError.MonthlyLimitReached(details?.resetsAt)
+                "MONTHLY_LIMIT_REACHED" -> return ApiError.MonthlyLimitReached(
+                    resetsAt = details?.resetsAt,
+                    canBuy = details?.canBuy == true
+                )
+                "IAP_UNAVAILABLE" -> return ApiError.PurchasesUnavailable
+                "PURCHASE_INVALID" -> return ApiError.PurchaseInvalid(details?.reason)
+                "PURCHASE_BELONGS_TO_ANOTHER_ACCOUNT" -> return ApiError.PurchaseOtherAccount
+                "STORE_UNAVAILABLE" -> return ApiError.StoreUnavailable
                 "VOICE_LIMIT_REACHED" -> return ApiError.VoiceLimitReached
                 "CONSENT_REQUIRED" -> return ApiError.ConsentRequired
                 "SUBSCRIPTION_EXPIRED" -> return ApiError.SubscriptionExpired
@@ -325,7 +356,11 @@ class ApiClient(
                     }
                 }
                 "NOT_FOUND" -> return ApiError.NotFound
-                "CONFLICT" -> return ApiError.Conflict
+                "CONFLICT" -> return if (details?.field == "idempotency_key") {
+                    ApiError.GenerationConflict(inProgress = details.reason == "in_progress")
+                } else {
+                    ApiError.Conflict
+                }
             }
 
             // No envelope: a proxy error page, or the old /v1 shape.

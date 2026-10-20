@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Balance -->
+    <string name="balance_title">Ответы</string>
+    <string name="balance_welcome_title">Бесплатные ответы: %1$d из %2$d</string>
+    <string name="balance_today">Сегодня доступно</string>
+    <string name="balance_welcome">Приветственный бонус</string>
+    <string name="balance_welcome_value">%1$d из %2$d</string>
+    <string name="balance_purchased">Купленные ответы</string>
+    <string name="balance_pass">Пропуск до %1$s</string>
+    <string name="settings_account_plan_available">%1$s · доступно %2$d</string>
+
+</resources>

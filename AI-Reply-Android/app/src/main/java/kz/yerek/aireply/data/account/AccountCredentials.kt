@@ -85,16 +85,20 @@ class AccountUsageCache(private val settings: SettingsStore) {
         val dailyLimit: Int,
         val usedToday: Int,
         val remainingToday: Int,
-        val planCode: String
+        val planCode: String,
+        /** Everything usable, from a server that sends the balance; null otherwise. */
+        val remainingTotal: Int? = null
     ) {
-        val isKnown: Boolean get() = dailyLimit > 0
-        val isExhausted: Boolean get() = dailyLimit > 0 && remainingToday <= 0
+        val isKnown: Boolean get() = dailyLimit > 0 || remainingTotal != null
     }
 
+    /** An answer without usage (an older reply response) changes nothing. */
     fun store(usage: UsageDto) {
+        if (!usage.isKnown) return
         settings.cachedDailyLimit = usage.dailyLimit
         settings.cachedUsedToday = usage.usedToday
         settings.cachedRemainingToday = usage.remainingToday
+        settings.cachedRemainingTotal = usage.remainingTotal
     }
 
     fun storePlanCode(code: String) {
@@ -110,6 +114,7 @@ class AccountUsageCache(private val settings: SettingsStore) {
         dailyLimit = settings.cachedDailyLimit,
         usedToday = settings.cachedUsedToday,
         remainingToday = settings.cachedRemainingToday,
-        planCode = settings.cachedPlanCode.orEmpty()
+        planCode = settings.cachedPlanCode.orEmpty(),
+        remainingTotal = settings.cachedRemainingTotal
     )
 }

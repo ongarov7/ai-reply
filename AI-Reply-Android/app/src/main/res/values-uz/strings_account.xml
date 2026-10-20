@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Balance -->
+    <string name="balance_title">Javoblar</string>
+    <string name="balance_welcome_title">Bepul javoblar: %2$d tadan %1$d ta</string>
+    <string name="balance_today">Bugun mavjud</string>
+    <string name="balance_welcome">Xush kelibsiz bonusi</string>
+    <string name="balance_welcome_value">%2$d tadan %1$d ta</string>
+    <string name="balance_purchased">Sotib olingan javoblar</string>
+    <string name="balance_pass">Ruxsatnoma: %1$s gacha</string>
+    <string name="settings_account_plan_available">%1$s · %2$d ta mavjud</string>
+
+</resources>

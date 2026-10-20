@@ -117,6 +117,8 @@ class MainActivity : ComponentActivity() {
         services.configuration.reload()
         // A profile change that could not reach the server is retried on every return.
         lifecycleScope.launch { services.profileSync.pushPending() }
+        // A feature switched on meanwhile (purchases, the support chat) shows without a restart.
+        lifecycleScope.launch { services.account.reloadConfigIfStale() }
         // The notification permission may have changed in system settings.
         services.push.onResume()
     }

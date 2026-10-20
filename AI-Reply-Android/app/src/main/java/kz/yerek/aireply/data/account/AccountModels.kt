@@ -131,7 +131,14 @@ data class SubscriptionDto(
     val source: String? = null
 )
 
-/** The only counter the app trusts: the server's. */
+/**
+ * The only counter the app trusts: the server's.
+ *
+ * The first seven fields keep their old meaning: [remainingToday] is the
+ * plan's daily allowance alone. The balance beyond the plan (contract §3.2)
+ * comes from servers with `features.credits`; an older server sends none of
+ * it, and each missing part is simply null.
+ */
 @Serializable
 data class UsageDto(
     @SerialName("daily_limit") val dailyLimit: Int = 0,
@@ -140,12 +147,39 @@ data class UsageDto(
     @SerialName("monthly_limit") val monthlyLimit: Int = 0,
     @SerialName("used_month") val usedMonth: Int = 0,
     @SerialName("resets_at") val resetsAt: String = "",
-    val timezone: String = ""
+    val timezone: String = "",
+    /** The free replies of a new account; null when it never had any. */
+    val welcome: WelcomeDto? = null,
+    /** Administrator grants and purchased packs left. */
+    val credits: Int? = null,
+    /** The pass running now; null when there is none. */
+    val pass: PassDto? = null,
+    /** Plan + pass + welcome + credits: everything usable right now. */
+    @SerialName("remaining_total") val remainingTotal: Int? = null,
+    /** What paid for this generation (`daily | pass | welcome | admin | pack`); reply and compose answers only. */
+    val bucket: String? = null
 ) {
+    /** The server has answered: every real usage carries its reset time. */
+    val isKnown: Boolean get() = dailyLimit > 0 || resetsAt.isNotEmpty() || remainingTotal != null
+
     companion object {
         val UNKNOWN = UsageDto()
     }
 }
+
+/** `usage.welcome`: the free replies granted once to a new account. */
+@Serializable
+data class WelcomeDto(
+    val total: Int = 0,
+    val remaining: Int = 0
+)
+
+/** `usage.pass`: a pass running now. [expiresAt] is RFC 3339 in the server's time zone. */
+@Serializable
+data class PassDto(
+    @SerialName("expires_at") val expiresAt: String = "",
+    val remaining: Int = 0
+)
 
 /** Everything /api/v1/me returns in one call. */
 @Serializable
@@ -240,7 +274,21 @@ data class ServerFeaturesDto(
     /** `DELETE /api/v1/me` and its POST alias `/api/v1/me/delete`. */
     @SerialName("account_deletion") val accountDeletion: Boolean = false,
     /** `POST /api/v1/ai/transcribe` exists and is switched on: voice input goes through the server. */
-    @SerialName("voice_transcription") val voiceTranscription: Boolean = false
+    @SerialName("voice_transcription") val voiceTranscription: Boolean = false,
+    /** New accounts get free replies (`usage.welcome`). */
+    @SerialName("welcome_bonus") val welcomeBonus: Boolean = false,
+    /** `usage` carries `welcome`, `credits`, `pass`, `remaining_total`; limit errors carry `can_buy`. */
+    val credits: Boolean = false,
+    /** `/ai/reply` and `/ai/compose` take an `Idempotency-Key` header. */
+    @SerialName("idempotent_generation") val idempotentGeneration: Boolean = false,
+    /** `PUT /api/v1/installations/{id}/diagnostics` exists. */
+    @SerialName("permission_diagnostics") val permissionDiagnostics: Boolean = false,
+    /** The administrator switched reminders on. Informational for the app. */
+    @SerialName("push_reminders") val pushReminders: Boolean = false,
+    /** The support chat (`/api/v1/support/...`). */
+    @SerialName("support_chat") val supportChat: Boolean = false,
+    /** Replies can be bought through Google Play here (`/api/v1/iap/...`). */
+    @SerialName("iap_android") val iapAndroid: Boolean = false
 )
 
 /** Non-secret server configuration the client is allowed to know. */
@@ -365,6 +413,10 @@ data class ErrorDetailsDto(
     @SerialName("attempts_remaining") val attemptsRemaining: Int? = null,
     /** Which request field was refused, e.g. `source_text`. */
     val field: String? = null,
+    /** Why: `in_progress` / `used` for an idempotency key, the store's reason for a purchase. */
+    val reason: String? = null,
     /** The limit that field has, when it was refused for length. */
-    @SerialName("max_characters") val maxCharacters: Int? = null
+    @SerialName("max_characters") val maxCharacters: Int? = null,
+    /** A limit refusal: more replies can be bought on this platform (`features.iap_android`). */
+    @SerialName("can_buy") val canBuy: Boolean? = null
 )

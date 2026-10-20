@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Account features from the October 2026 contracts: the balance, the
+    exhausted sheet, purchases through Google Play and the support chat.
+    The same keys in the same order in every language.
+-->
+<resources>
+
+    <!-- Balance -->
+    <string name="balance_title">Replies</string>
+    <string name="balance_welcome_title">Free replies: %1$d of %2$d</string>
+    <string name="balance_today">Available today</string>
+    <string name="balance_welcome">Welcome bonus</string>
+    <string name="balance_welcome_value">%1$d of %2$d</string>
+    <string name="balance_purchased">Purchased replies</string>
+    <string name="balance_pass">Pass until %1$s</string>
+    <string name="settings_account_plan_available">%1$s · %2$d available</string>
+
+</resources>

@@ -162,6 +162,7 @@ class AccountController(
     /** Sign-in methods and current legal versions, needed before the first screen. */
     suspend fun loadServerConfig() {
         runCatching { service.serverConfig() }.getOrNull()?.let { config ->
+            configLoadedAt = clock()
             // The administrator's character limits, for the keyboard too.
             AILimits.apply(config)
             val legal = config.legal ?: LegalConfigDto.PRODUCTION
@@ -179,6 +180,20 @@ class AccountController(
             }
             observer?.onServerFeatures(config.features)
         }
+    }
+
+    @Volatile
+    private var configLoadedAt = 0L
+
+    /**
+     * Back in the app: a feature the administrator switched on (purchases,
+     * the support chat) appears without a restart. At most once every
+     * [CONFIG_REFRESH_MS], and only after the start-up load.
+     */
+    suspend fun reloadConfigIfStale() {
+        if (!_state.value.bootstrapComplete) return
+        if (clock() - configLoadedAt < CONFIG_REFRESH_MS) return
+        loadServerConfig()
     }
 
     suspend fun bootstrap() {
@@ -253,10 +268,14 @@ class AccountController(
 
     suspend fun refreshUsage() {
         if (!credentials.isSignedIn) return
-        runCatching { service.usage() }.getOrNull()?.let { usage ->
-            usageCache.store(usage)
-            _state.update { it.copy(usage = usage) }
-        }
+        runCatching { service.usage() }.getOrNull()?.let(::applyUsage)
+    }
+
+    /** A balance the server sent with another answer: a purchase, a reply. */
+    fun applyUsage(usage: UsageDto) {
+        if (!usage.isKnown) return
+        usageCache.store(usage)
+        _state.update { it.copy(usage = usage) }
     }
 
     // ------------------------------------------------------------- sign-in
@@ -725,6 +744,9 @@ class AccountController(
     companion object {
         /** The server's usual wait between codes, for an answer that did not say. */
         const val DEFAULT_RESEND_SECONDS = 32
+
+        /** How old the server's features may get before a return to the app reads them again. */
+        const val CONFIG_REFRESH_MS = 10L * 60 * 1000
 
         /**
          * Maps a failure onto a string resource. The server's English message is

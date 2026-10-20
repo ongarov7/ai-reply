@@ -213,6 +213,18 @@ class SettingsStore internal constructor(
         get() = account().getInt(KEY_USAGE_REMAINING, 0)
         set(value) = account().edit().putInt(KEY_USAGE_REMAINING, value).apply()
 
+    /**
+     * The server's `remaining_total` (plan, pass, free and purchased replies
+     * together), or null from a server that does not send the balance.
+     */
+    var cachedRemainingTotal: Int?
+        get() = account().getInt(KEY_USAGE_TOTAL, -1).takeIf { it >= 0 }
+        set(value) {
+            account().edit().apply {
+                if (value == null) remove(KEY_USAGE_TOTAL) else putInt(KEY_USAGE_TOTAL, value.coerceAtLeast(0))
+            }.apply()
+        }
+
     var cachedPlanCode: String?
         get() = account().getString(KEY_USAGE_PLAN, null)
         set(value) {
@@ -228,6 +240,7 @@ class SettingsStore internal constructor(
             .remove(KEY_USAGE_LIMIT)
             .remove(KEY_USAGE_USED)
             .remove(KEY_USAGE_REMAINING)
+            .remove(KEY_USAGE_TOTAL)
             .remove(KEY_USAGE_PLAN)
             .apply()
     }
@@ -238,6 +251,7 @@ class SettingsStore internal constructor(
             .remove(KEY_USAGE_LIMIT)
             .remove(KEY_USAGE_USED)
             .remove(KEY_USAGE_REMAINING)
+            .remove(KEY_USAGE_TOTAL)
             .remove(KEY_USAGE_PLAN)
             .apply()
     }
@@ -397,10 +411,11 @@ class SettingsStore internal constructor(
         const val KEY_USAGE_USED = "account.usage.usedToday"
         const val KEY_USAGE_REMAINING = "account.usage.remainingToday"
         const val KEY_USAGE_PLAN = "account.usage.planCode"
+        const val KEY_USAGE_TOTAL = "account.usage.remainingTotal"
 
         val ACCOUNT_KEYS = setOf(
             KEY_ACCESS_EXPIRY, KEY_ACCOUNT_IDENTIFIER, KEY_ACCOUNT_DEVICE,
-            KEY_USAGE_LIMIT, KEY_USAGE_USED, KEY_USAGE_REMAINING, KEY_USAGE_PLAN
+            KEY_USAGE_LIMIT, KEY_USAGE_USED, KEY_USAGE_REMAINING, KEY_USAGE_PLAN, KEY_USAGE_TOTAL
         )
     }
 }

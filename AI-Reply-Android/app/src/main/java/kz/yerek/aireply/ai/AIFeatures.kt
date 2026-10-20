@@ -23,7 +23,11 @@ data class AIFeatures(
     /** `POST /api/v1/ai/reports`: the Report control under a reply or a written message. */
     val aiReports: Boolean = false,
     /** `POST /api/v1/ai/transcribe`: the keyboard's microphone records and the server transcribes. */
-    val voiceTranscription: Boolean = false
+    val voiceTranscription: Boolean = false,
+    /** `Idempotency-Key` on `/ai/reply` and `/ai/compose`: a retried action is charged once. */
+    val idempotentGeneration: Boolean = false,
+    /** Replies can be bought in the app (Google Play): the keyboard's limit notice leads there. */
+    val iapAndroid: Boolean = false
 ) {
     companion object {
         val NONE = AIFeatures(replyPreferences = false, senderProfile = false, instructionPolish = false)

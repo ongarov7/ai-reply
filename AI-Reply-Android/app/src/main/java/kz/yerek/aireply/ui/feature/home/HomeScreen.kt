@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -44,6 +45,8 @@ import kz.yerek.aireply.ui.design.ReadableColumn
 import kz.yerek.aireply.ui.feature.setup.KeyboardSetupAction
 import kz.yerek.aireply.ui.design.Spacing
 import kz.yerek.aireply.ui.design.StepRow
+import kz.yerek.aireply.ui.feature.account.BalanceRows
+import kz.yerek.aireply.ui.feature.account.BalanceSummary
 import kz.yerek.aireply.ui.feature.account.UsageSummary
 import kz.yerek.aireply.ui.navigation.Routes
 import androidx.compose.runtime.LaunchedEffect
@@ -218,7 +221,15 @@ private fun UsageCard(onOpen: (String) -> Unit) {
 
     if (!state.isSignedIn) return
 
-    val summary = UsageSummary.of(state.usage, services.usageCache.current())
+    val cached = services.usageCache.current()
+    val balance = BalanceSummary.of(state.usage, cached)
+    if (balance.hasBalance) {
+        BalanceCard(balance, state.subscription?.plan?.localizedName(language).orEmpty()) { onOpen(Routes.Subscription) }
+        return
+    }
+
+    // A server without the balance: the plan's own count, as before.
+    val summary = UsageSummary.of(state.usage, cached)
 
     AppCard(modifier = Modifier.clickable { onOpen(Routes.Subscription) }) {
         Row(
@@ -266,5 +277,47 @@ private fun UsageCard(onOpen: (String) -> Unit) {
                 )
             }
         }
+    }
+}
+
+/**
+ * The balance from a server that sends it: «Бесплатные ответы: 35 из 50»
+ * while free replies are left, then what is available today and what it is
+ * made of. Plain numbers in the text colours: nothing here is an error.
+ */
+@Composable
+private fun BalanceCard(balance: BalanceSummary, planName: String, onOpen: () -> Unit) {
+    AppCard(modifier = Modifier.clickable(onClick = onOpen)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
+                val welcome = balance.welcomeHeadline
+                Text(
+                    if (welcome != null) {
+                        stringResource(R.string.balance_welcome_title, welcome.remaining, welcome.total)
+                    } else {
+                        stringResource(R.string.balance_title)
+                    },
+                    style = MaterialTheme.typography.titleSmall
+                )
+                if (planName.isNotEmpty()) {
+                    Text(
+                        planName,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = LocalExtraColors.current.textSecondary
+                    )
+                }
+            }
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = LocalExtraColors.current.textTertiary,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+        BalanceRows(balance, modifier = Modifier.padding(top = Spacing.xs))
     }
 }

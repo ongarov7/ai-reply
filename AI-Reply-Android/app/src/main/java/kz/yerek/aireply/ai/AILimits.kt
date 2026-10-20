@@ -88,7 +88,9 @@ data class AILimits(
                     productEvents = announced?.productEvents ?: false,
                     preferredLanguage = announced?.preferredLanguage ?: false,
                     aiReports = announced?.aiReports ?: false,
-                    voiceTranscription = announced?.voiceTranscription ?: false
+                    voiceTranscription = announced?.voiceTranscription ?: false,
+                    idempotentGeneration = announced?.idempotentGeneration ?: false,
+                    iapAndroid = announced?.iapAndroid ?: false
                 )
             )
         }
@@ -118,6 +120,8 @@ data class AILimits(
                 ?.putBoolean(KEY_PREFERRED_LANGUAGE, features.preferredLanguage)
                 ?.putBoolean(KEY_AI_REPORTS, features.aiReports)
                 ?.putBoolean(KEY_VOICE_TRANSCRIPTION, features.voiceTranscription)
+                ?.putBoolean(KEY_IDEMPOTENT_GENERATION, features.idempotentGeneration)
+                ?.putBoolean(KEY_IAP_ANDROID, features.iapAndroid)
                 ?.apply()
         }
 
@@ -130,7 +134,9 @@ data class AILimits(
                 productEvents = preferences.getBoolean(KEY_PRODUCT_EVENTS, false),
                 preferredLanguage = preferences.getBoolean(KEY_PREFERRED_LANGUAGE, false),
                 aiReports = preferences.getBoolean(KEY_AI_REPORTS, false),
-                voiceTranscription = preferences.getBoolean(KEY_VOICE_TRANSCRIPTION, false)
+                voiceTranscription = preferences.getBoolean(KEY_VOICE_TRANSCRIPTION, false),
+                idempotentGeneration = preferences.getBoolean(KEY_IDEMPOTENT_GENERATION, false),
+                iapAndroid = preferences.getBoolean(KEY_IAP_ANDROID, false)
             )
         }
 
@@ -151,5 +157,7 @@ data class AILimits(
         private const val KEY_PREFERRED_LANGUAGE = "ai.features.preferredLanguage"
         private const val KEY_AI_REPORTS = "ai.features.aiReports"
         private const val KEY_VOICE_TRANSCRIPTION = "ai.features.voiceTranscription"
+        private const val KEY_IDEMPOTENT_GENERATION = "ai.features.idempotentGeneration"
+        private const val KEY_IAP_ANDROID = "ai.features.iapAndroid"
     }
 }

@@ -2,6 +2,7 @@ package kz.yerek.aireply.ui.feature.account
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -63,6 +64,7 @@ fun SubscriptionScreen(onBack: () -> Unit) {
     val language = appLanguage.code
 
     val summary = UsageSummary.of(state.usage, services.usageCache.current())
+    val balance = BalanceSummary.of(state.usage)
 
     LaunchedEffect(Unit) {
         account.loadPlans()
@@ -133,6 +135,15 @@ fun SubscriptionScreen(onBack: () -> Unit) {
                 }
                 state.subscription?.expiresAt?.let { formatExpiry(it, appLanguage.locale) }?.let { expiry ->
                     Footnote(stringResource(R.string.subscription_renews, expiry))
+                }
+            }
+
+            // What the account has beyond the plan, from a server that sends it.
+            if (balance.hasBalance) {
+                AppSection(stringResource(R.string.balance_title)) {
+                    AppCard(contentPadding = PaddingValues(horizontal = Spacing.m, vertical = Spacing.xs)) {
+                        BalanceRows(balance)
+                    }
                 }
             }
 

@@ -205,10 +205,17 @@ internal fun DeleteAccountDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
     )
 }
 
-/** "Free · 7/10": the plan, and what is left of a counted allowance (never "0/0"). */
+/**
+ * "Free · 42 available" from a server that sends the balance; "Free · 7/10"
+ * (what is left of a counted plan, never "0/0") from one that does not. The
+ * plan's own day alone would read "0/5" while free replies are left.
+ */
+@Composable
 private fun planSummary(state: AccountController.State, language: String): String {
     val plan = state.subscription?.plan ?: return ""
     val name = plan.localizedName(language)
+    val balance = BalanceSummary.of(state.usage)
+    if (balance.hasBalance) return stringResource(R.string.settings_account_plan_available, name, balance.availableNow)
     val summary = UsageSummary.of(state.usage) ?: return name
     return "$name · ${summary.remaining}/${summary.limit}"
 }
