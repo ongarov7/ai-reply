@@ -222,6 +222,15 @@
     <string name="kb_limit_title">Жауаптар лимиті таусылды</string>
     <string name="kb_limit_body">Қосымша жауап сатып алу немесе тариф таңдау үшін AI\u00A0Reply қолданбасын ашыңыз.</string>
     <string name="kb_limit_open">AI\u00A0Reply-ды ашу</string>
+    <string name="kb_emoji_recent">Соңғылар</string>
+    <string name="kb_emoji_smileys">Смайликтер мен адамдар</string>
+    <string name="kb_emoji_animals">Жануарлар мен табиғат</string>
+    <string name="kb_emoji_food">Тағам мен сусын</string>
+    <string name="kb_emoji_travel">Саяхат пен орындар</string>
+    <string name="kb_emoji_activities">Әрекеттер</string>
+    <string name="kb_emoji_objects">Заттар</string>
+    <string name="kb_emoji_symbols">Таңбалар</string>
+    <string name="kb_emoji_flags">Жалаулар</string>
     <string name="kb_err_consent_required">AI жауаптары үшін AI Reply қолданбасын ашып, шарттарды қабылдаңыз.</string>
     <string name="settings_account_delete">Тіркелгіні жою</string>
     <string name="settings_account_delete_title">Тіркелгіні жоясыз ба?</string>

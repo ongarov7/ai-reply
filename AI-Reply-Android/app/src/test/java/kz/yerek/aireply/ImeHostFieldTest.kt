@@ -81,6 +81,26 @@ class ImeHostFieldTest {
         }
     }
 
+    /** The emoji page types whole sequences, and delete takes each back whole. */
+    @Test
+    fun `an emoji from the emoji page goes in whole and comes out whole`() {
+        listOf(
+            "🏴\uDB40\uDC67\uDB40\uDC62\uDB40\uDC73\uDB40\uDC63\uDB40\uDC74\uDB40\uDC7F",
+            "👩‍❤️‍💋‍👨",
+            "1️⃣",
+            "❤️",
+            "🧑‍🤝‍🧑",
+            "🇰🇿"
+        ).forEach { emoji ->
+            start(ImeFakeInputConnection("Сәлем "))
+            host.commitText(emoji)
+            assertEquals(emoji, "Сәлем $emoji", connection.toString())
+            deliverReports()
+            host.deleteBackward()
+            assertEquals(emoji, "Сәлем ", connection.toString())
+        }
+    }
+
     @Test
     fun `delete with a selection removes just the selection`() {
         start(ImeFakeInputConnection("Привет мир").apply { selectExternally(0, 7) })

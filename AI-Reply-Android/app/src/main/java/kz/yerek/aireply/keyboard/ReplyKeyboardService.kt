@@ -62,6 +62,11 @@ import kz.yerek.aireply.keyboard.autocorrect.AutocorrectDictionaries
 import kz.yerek.aireply.keyboard.autocorrect.AutocorrectEngine
 import kz.yerek.aireply.keyboard.autocorrect.PrefsLearnedWordsStore
 import kz.yerek.aireply.keyboard.autocorrect.Suggestion
+import kz.yerek.aireply.keyboard.emoji.AssetEmojiSource
+import kz.yerek.aireply.keyboard.emoji.EmojiCatalogCache
+import kz.yerek.aireply.keyboard.emoji.EmojiRecents
+import kz.yerek.aireply.keyboard.emoji.PaintEmojiSupport
+import kz.yerek.aireply.keyboard.emoji.PrefsEmojiRecentsStore
 import kz.yerek.aireply.keyboard.input.ClipboardMiss
 import kz.yerek.aireply.keyboard.input.ContextTextProvider
 import kz.yerek.aireply.keyboard.input.HostField
@@ -77,6 +82,7 @@ import kz.yerek.aireply.keyboard.layout.KeyboardLabels
 import kz.yerek.aireply.keyboard.layout.KeyboardLayout
 import kz.yerek.aireply.keyboard.layout.KeyboardSizing
 import kz.yerek.aireply.keyboard.layout.PageOptions
+import kz.yerek.aireply.keyboard.layout.PanelKind
 import kz.yerek.aireply.keyboard.layout.PanelFit
 import kz.yerek.aireply.keyboard.layout.ReturnFace
 import kz.yerek.aireply.keyboard.layout.ShiftState
@@ -92,6 +98,9 @@ import kz.yerek.aireply.keyboard.ui.ComposerPanel
 import kz.yerek.aireply.keyboard.ui.CreateActions
 import kz.yerek.aireply.keyboard.ui.CreateModel
 import kz.yerek.aireply.keyboard.ui.CreatePanel
+import kz.yerek.aireply.keyboard.ui.EmojiCategoryBar
+import kz.yerek.aireply.keyboard.ui.EmojiGrid
+import kz.yerek.aireply.keyboard.ui.EmojiPanelState
 import kz.yerek.aireply.keyboard.ui.KeySurfaceController
 import kz.yerek.aireply.keyboard.ui.KeySurfaceListener
 import kz.yerek.aireply.keyboard.ui.KeySurfaceState
@@ -132,7 +141,9 @@ import java.util.concurrent.Executors
  *    JSON parse happens on a key press; the key area is one canvas that a
  *    keystroke only redraws.
  *  * Native layouts (ҚАЗ / РУС / ENG), one keyboard height for all of them,
- *    and no dead zones between keys.
+ *    and no dead zones between keys. The emoji page is one more page of the
+ *    same height, reached from the key after ?123; the emoji typed last are
+ *    kept on this phone only.
  *  * A reply or a message is only ever requested by the user tapping Reply,
  *    Write, Regenerate or Try again. Appearing, copying and typing start
  *    nothing - with one opt-out exception: after a pause in an instruction
@@ -176,6 +187,11 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val contextProvider = ContextTextProvider()
+
+    /** The emoji page: its catalog, its scroll, and the emoji typed last. */
+    private val emojiPanel = EmojiPanelState()
+    private lateinit var emojiRecents: EmojiRecents
+    private var emojiLoading = false
 
     private var inputView: ComposeView? = null
 
@@ -250,6 +266,8 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         panels = KeyboardPanels(replies, compose, dictation, layout = { language }, layouts = { enabledLanguages })
         // Recordings a keyboard killed mid-way left behind.
         scope.launch(Dispatchers.IO) { VoiceFiles.sweep(voiceDirectory) }
+        emojiRecents = EmojiRecents(PrefsEmojiRecentsStore(this))
+        loadEmoji()
         reports = AIReportController(scope, services.aiReportSender, BuildConfig.VERSION_NAME)
         orientation = resources.configuration.orientation
         surface = KeySurfaceController(this)
@@ -336,6 +354,7 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         // after the panels, which type letters. A restart of the same field
         // keeps the page the user chose.
         val opening = fieldKeys.startPlane(plane, previousField, restarting, isComposing)
+            .let { if (it == KeyboardPlane.EMOJI && !takesEmoji()) KeyboardPlane.LETTERS else it }
         if (!restarting || opening != plane) {
             plane = opening
             shift.reset()
@@ -463,7 +482,9 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
             decimal = fieldKeys.decimal,
             // Gboard's digits over the letters in a password field, where the
             // keyboard's one height has room for them.
-            numberRow = !composing && fieldKeys.password && KeyboardLayout.numberRowFits(language, enabledLanguages)
+            numberRow = !composing && fieldKeys.password && KeyboardLayout.numberRowFits(language, enabledLanguages),
+            // Emoji where text goes: the panels' fields, or a plain text field.
+            showsEmojiKey = takesEmoji(composing)
         )
         val page = remember(language, plane, options, sizing, areaHeight) {
             KeyboardGeometry.layout(KeyboardLayout.page(language, plane, options), sizing, areaHeight)
@@ -500,6 +521,14 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
                 controller = surface,
                 onAccessibilityKey = { key ->
                     if (key == KeyboardKey.Backspace) onDelete(word = false) else onKeyCommit(key)
+                },
+                panel = { laid ->
+                    when (laid.kind) {
+                        PanelKind.EMOJI_GRID -> EmojiGrid(emojiPanel, laid, theme, strings, keys.dimmed, ::typeEmoji)
+                        PanelKind.EMOJI_CATEGORIES -> EmojiCategoryBar(emojiPanel, laid, theme, strings) {
+                            feedback.onKeyPress(inputView)
+                        }
+                    }
                 },
                 top = {
                     val session = replies.session
@@ -861,8 +890,11 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
             KeyboardKey.Space -> typeSpace()
             KeyboardKey.Return -> pressReturn()
             is KeyboardKey.Plane -> {
+                if (key.target == KeyboardPlane.EMOJI) openEmoji()
                 plane = key.target
-                if (key.target != KeyboardPlane.LETTERS) shift.reset()
+                // The emoji page is a detour from the letters: ABC brings them
+                // back as they were, caps lock included.
+                if (key.target != KeyboardPlane.LETTERS && key.target != KeyboardPlane.EMOJI) shift.reset()
                 refreshAutoShift()
             }
             KeyboardKey.Layout -> switchLanguage(language.next(enabledLanguages))
@@ -876,6 +908,65 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         insert(text)
         shift.characterTyped()
         refreshAutoShift()
+    }
+
+    /**
+     * An emoji tapped on the emoji page: typed like a key - into the app's
+     * field (the word being typed ends as typed first) or into the panel's
+     * field - and remembered as recent once it went in.
+     */
+    private fun typeEmoji(emoji: String) {
+        dictation.keyPressed()
+        feedback.onKeyPress(inputView)
+        prepareComposerForTyping()
+        val inserted = when (target) {
+            Target.HOST -> {
+                insert(emoji)
+                true
+            }
+            Target.COMPOSER -> activeField?.let { field ->
+                val before = field.text
+                insert(emoji)
+                field.text != before
+            } ?: false
+            Target.NOWHERE -> false
+        }
+        // An emoji between two spaces is not the double-space full stop.
+        lastSpaceTap = 0
+        if (inserted) emojiRecents.record(emoji)
+        refreshAutoShift()
+    }
+
+    /** The emoji page opens: the recent emoji as they are now, and the catalog if it is not read yet. */
+    private fun openEmoji() {
+        emojiPanel.opened(emojiRecents.items)
+        if (emojiPanel.catalog?.size?.let { it > 0 } != true) loadEmoji()
+    }
+
+    /**
+     * The catalog and the recent emoji, read and checked against the font
+     * off the main thread - once per process, on the keyboard's creation.
+     */
+    private fun loadEmoji() {
+        if (emojiLoading) return
+        emojiLoading = true
+        scope.launch {
+            withContext(Dispatchers.IO) { emojiRecents.load() }
+            val catalog = withContext(Dispatchers.Default) {
+                EmojiCatalogCache.load(AssetEmojiSource(assets), PaintEmojiSupport())
+            }
+            emojiLoading = false
+            emojiPanel.catalogLoaded(catalog)
+        }
+    }
+
+    /** The emoji key is offered, and the emoji page may stay up: never in a password, an address or a number. */
+    private fun takesEmoji(composing: Boolean = isComposing): Boolean =
+        !isSecureField && (composing || fieldKeys.takesEmoji)
+
+    /** Back to the letters from the emoji page where emoji no longer belong. */
+    private fun leaveEmojiIfRefused() {
+        if (plane == KeyboardPlane.EMOJI && !takesEmoji()) plane = KeyboardPlane.LETTERS
     }
 
     override fun onDelete(word: Boolean) {
@@ -1295,6 +1386,8 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         panels.closeAll()
         focus = PanelFocus.INSTRUCTION
         sourceExpanded = false
+        // Emoji typed into the panel; the app's field may take none.
+        leaveEmojiIfRefused()
         refreshAutoShift()
     }
 

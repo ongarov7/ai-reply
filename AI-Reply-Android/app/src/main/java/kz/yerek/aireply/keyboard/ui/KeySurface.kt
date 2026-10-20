@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SpaceBar
 import androidx.compose.material.icons.outlined.ArrowUpward
+import androidx.compose.material.icons.outlined.EmojiEmotions
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -61,6 +62,7 @@ import kz.yerek.aireply.keyboard.KeyboardTheme
 import kz.yerek.aireply.keyboard.layout.Box as KeyBox
 import kz.yerek.aireply.keyboard.layout.KeyboardLabels
 import kz.yerek.aireply.keyboard.layout.LaidOutKey
+import kz.yerek.aireply.keyboard.layout.LaidOutPanel
 import kz.yerek.aireply.keyboard.layout.PageLayout
 import kz.yerek.aireply.keyboard.layout.ReturnFace
 import kz.yerek.aireply.keyboard.layout.ShiftState
@@ -92,6 +94,10 @@ data class KeySurfaceState(
  *
  * Accessibility keeps one node per key, laid over the canvas: TalkBack users
  * explore and double-tap keys as usual.
+ *
+ * A page's panels (the emoji grid and its categories) are Compose content
+ * laid over the canvas by [panel], each in its whole touch area: a touch
+ * there is the panel's and never reaches the keys.
  */
 @Composable
 fun KeySurface(
@@ -99,7 +105,8 @@ fun KeySurface(
     theme: KeyboardTheme,
     controller: KeySurfaceController,
     onAccessibilityKey: (KeyboardKey) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    panel: @Composable (LaidOutPanel) -> Unit = {}
 ) {
     SideEffect {
         controller.layout = state.layout
@@ -125,7 +132,8 @@ fun KeySurface(
             go = rememberVectorPainter(Icons.AutoMirrored.Filled.ArrowForward),
             done = rememberVectorPainter(Icons.Filled.Check),
             previous = rememberVectorPainter(Icons.AutoMirrored.Filled.ArrowBack),
-            space = rememberVectorPainter(Icons.Filled.SpaceBar)
+            space = rememberVectorPainter(Icons.Filled.SpaceBar),
+            emoji = rememberVectorPainter(Icons.Outlined.EmojiEmotions)
         )
 
         Box(modifier.fillMaxWidth().height(state.layout.height.dp)) {
@@ -153,6 +161,23 @@ fun KeySurface(
                             }
                         }
                 )
+            }
+
+            // On top of everything, and owning every touch in its area -
+            // a tap between two emoji must not type the nearest key.
+            state.layout.panels.forEach { laid ->
+                Box(
+                    Modifier
+                        .offset(laid.hitFrame.left.dp, laid.hitFrame.top.dp)
+                        .size(laid.hitFrame.width.dp, laid.hitFrame.height.dp)
+                        .pointerInput(Unit) {
+                            awaitPointerEventScope {
+                                while (true) awaitPointerEvent()
+                            }
+                        }
+                ) {
+                    panel(laid)
+                }
             }
         }
     }
@@ -209,7 +234,9 @@ private class KeyIcons(
     val done: VectorPainter,
     val previous: VectorPainter,
     /** The pads' space key: a narrow side key, with no language to name. */
-    val space: VectorPainter
+    val space: VectorPainter,
+    /** The letters' emoji key. */
+    val emoji: VectorPainter
 )
 
 private enum class Face { LETTER, SPECIAL, ENGAGED, PROMINENT }
@@ -318,10 +345,15 @@ private fun DrawScope.drawPage(
                 measurer, state.labels.badge, center,
                 TextStyle(fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = content), keyAlpha
             )
-            is KeyboardKey.Plane -> drawCentered(
-                measurer, state.labels.planeKey(k.target), center,
-                TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Medium, color = content), keyAlpha
-            )
+            is KeyboardKey.Plane -> if (k.target == KeyboardPlane.EMOJI) {
+                // A face, drawn like the globe: an icon on a control key.
+                drawIcon(icons.emoji, center, 21f, content, keyAlpha)
+            } else {
+                drawCentered(
+                    measurer, state.labels.planeKey(k.target), center,
+                    TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Medium, color = content), keyAlpha
+                )
+            }
             KeyboardKey.Return -> {
                 val painter = when (state.returnFace) {
                     ReturnFace.NEWLINE -> icons.newline

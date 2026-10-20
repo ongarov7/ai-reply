@@ -222,6 +222,15 @@
     <string name="kb_limit_title">Лимит ответов исчерпан</string>
     <string name="kb_limit_body">Откройте AI\u00A0Reply, чтобы докупить ответы или выбрать тариф.</string>
     <string name="kb_limit_open">Открыть AI\u00A0Reply</string>
+    <string name="kb_emoji_recent">Недавние</string>
+    <string name="kb_emoji_smileys">Смайлы и люди</string>
+    <string name="kb_emoji_animals">Животные и природа</string>
+    <string name="kb_emoji_food">Еда и напитки</string>
+    <string name="kb_emoji_travel">Путешествия и места</string>
+    <string name="kb_emoji_activities">Занятия</string>
+    <string name="kb_emoji_objects">Предметы</string>
+    <string name="kb_emoji_symbols">Символы</string>
+    <string name="kb_emoji_flags">Флаги</string>
     <string name="kb_err_consent_required">Откройте AI Reply и примите условия, чтобы пользоваться AI-ответами.</string>
     <string name="settings_account_delete">Удалить аккаунт</string>
     <string name="settings_account_delete_title">Удалить аккаунт?</string>

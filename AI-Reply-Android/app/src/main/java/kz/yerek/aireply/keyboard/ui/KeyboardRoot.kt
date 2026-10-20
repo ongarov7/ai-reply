@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import kz.yerek.aireply.keyboard.KeyboardKey
 import kz.yerek.aireply.keyboard.KeyboardTheme
+import kz.yerek.aireply.keyboard.layout.LaidOutPanel
 
 /**
  * The whole keyboard: the persona row or the composer, then the keys.
@@ -24,7 +25,9 @@ fun KeyboardRoot(
     controller: KeySurfaceController,
     onAccessibilityKey: (KeyboardKey) -> Unit,
     top: @Composable () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** The page's panels over the keys: the emoji grid and its categories. */
+    panel: @Composable (LaidOutPanel) -> Unit = {}
 ) {
     Column(
         modifier = modifier
@@ -38,7 +41,8 @@ fun KeyboardRoot(
             state = keys,
             theme = theme,
             controller = controller,
-            onAccessibilityKey = onAccessibilityKey
+            onAccessibilityKey = onAccessibilityKey,
+            panel = panel
         )
     }
 }

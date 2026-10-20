@@ -110,6 +110,19 @@ class ImeComposingTest {
         assertEquals(8, connection.selectionEnd)
     }
 
+    /** An emoji ends the word being typed as it was typed: it is not a separator that corrects. */
+    @Test
+    fun `an emoji typed after a word leaves the word as typed`() {
+        start()
+        type("сегодян")
+        controller.typeInHost("😀")
+        deliverReports()
+        scope.runCurrent()
+        assertEquals("сегодян😀", connection.toString())
+        assertEquals("", connection.composing)
+        assertEquals(connection.text.length, connection.selectionEnd)
+    }
+
     @Test
     fun `punctuation applies the correction too, and keeps the case`() {
         start(ImeFakeInputConnection("Ну, "))

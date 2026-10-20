@@ -212,6 +212,15 @@
     <string name="kb_limit_title">Javoblar limiti tugadi</string>
     <string name="kb_limit_body">Qoʻshimcha javoblar sotib olish yoki tarif tanlash uchun AI\u00A0Reply ilovasini oching.</string>
     <string name="kb_limit_open">AI\u00A0Replyni ochish</string>
+    <string name="kb_emoji_recent">Soʻnggilar</string>
+    <string name="kb_emoji_smileys">Smayliklar va odamlar</string>
+    <string name="kb_emoji_animals">Hayvonlar va tabiat</string>
+    <string name="kb_emoji_food">Taom va ichimliklar</string>
+    <string name="kb_emoji_travel">Sayohat va joylar</string>
+    <string name="kb_emoji_activities">Faoliyat</string>
+    <string name="kb_emoji_objects">Buyumlar</string>
+    <string name="kb_emoji_symbols">Belgilar</string>
+    <string name="kb_emoji_flags">Bayroqlar</string>
     <string name="kb_err_consent_required">AI javoblar uchun AI Reply ilovasini ochib, shartlarni qabul qiling.</string>
     <string name="settings_account_delete">Hisobni oʻchirish</string>
     <string name="settings_account_delete_title">Hisob oʻchirilsinmi?</string>
