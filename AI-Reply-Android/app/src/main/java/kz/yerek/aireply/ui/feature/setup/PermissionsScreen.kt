@@ -15,7 +15,7 @@ import kz.yerek.aireply.ui.design.Spacing
  */
 @Composable
 fun PermissionsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
-    AppScreen(title = stringResource(R.string.permissions_title), onBack = onBack) {
+    AppScreen(title = stringResource(R.string.permissions_screen_title), onBack = onBack) {
         ReadableColumn(verticalArrangement = Arrangement.spacedBy(Spacing.m)) {
             Footnote(stringResource(R.string.permissions_intro))
             KeyboardPermissionsContent(onOpen)

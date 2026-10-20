@@ -12,6 +12,7 @@
 
     <!-- Keyboard and permissions -->
     <string name="permissions_title">Настройка клавиатуры и разрешений</string>
+    <string name="permissions_screen_title">Клавиатура и разрешения</string>
     <string name="permissions_intro">Что Android сообщает прямо сейчас — и что сделать, если что-то ещё не настроено.</string>
     <string name="permissions_keyboard_enabled">Клавиатура включена</string>
     <string name="permissions_keyboard_default">Выбрана по умолчанию</string>

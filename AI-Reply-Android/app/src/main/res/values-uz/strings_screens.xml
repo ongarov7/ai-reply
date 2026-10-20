@@ -12,6 +12,7 @@
 
     <!-- Keyboard and permissions -->
     <string name="permissions_title">Klaviatura va ruxsatlarni sozlash</string>
+    <string name="permissions_screen_title">Klaviatura va ruxsatlar</string>
     <string name="permissions_intro">Android hozir nimani bildiryapti va hali sozlanmagan narsa boʻlsa, nima qilish kerak.</string>
     <string name="permissions_keyboard_enabled">Klaviatura yoqilgan</string>
     <string name="permissions_keyboard_default">Standart sifatida tanlangan</string>

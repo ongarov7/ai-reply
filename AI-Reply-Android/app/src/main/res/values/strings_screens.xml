@@ -11,7 +11,8 @@
     <string name="evidence_today">today, %1$s</string>
 
     <!-- Keyboard and permissions -->
-    <string name="permissions_title">Keyboard and permissions</string>
+    <string name="permissions_title">Keyboard and permissions setup</string>
+    <string name="permissions_screen_title">Keyboard and permissions</string>
     <string name="permissions_intro">What Android reports right now, and what to do about anything that is not set up yet.</string>
     <string name="permissions_keyboard_enabled">Keyboard enabled</string>
     <string name="permissions_keyboard_default">Chosen as default</string>

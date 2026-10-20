@@ -12,6 +12,7 @@
 
     <!-- Keyboard and permissions -->
     <string name="permissions_title">Пернетақта мен рұқсаттарды баптау</string>
+    <string name="permissions_screen_title">Пернетақта және рұқсаттар</string>
     <string name="permissions_intro">Android қазір не хабарлайды және әлі бапталмаған нәрсе болса, не істеу керек.</string>
     <string name="permissions_keyboard_enabled">Пернетақта қосулы</string>
     <string name="permissions_keyboard_default">Әдепкі ретінде таңдалған</string>
