@@ -20,6 +20,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/productevents"
 	"github.com/aireply/ai-reply-back-end/internal/reports"
 	"github.com/aireply/ai-reply-back-end/internal/subscriptions"
+	"github.com/aireply/ai-reply-back-end/internal/support"
 	"github.com/aireply/ai-reply-back-end/internal/transport/httpx"
 	"github.com/aireply/ai-reply-back-end/internal/users"
 )
@@ -52,6 +53,7 @@ type Server struct {
 	reports       *reports.Service
 	credits       *credits.Service
 	purchases     PurchaseOptions
+	support       *support.Service
 	limiter       *middleware.Limiter
 	ping          Pinger
 	log           *slog.Logger
@@ -72,6 +74,8 @@ type Deps struct {
 	Notifications *notifications.Service
 	// Reports — AI жауабына шағымдар (POST /api/v1/ai/reports).
 	Reports *reports.Service
+	// Support — қолдау чаты (/api/v1/support/*, features.support_chat).
+	Support *support.Service
 	Limiter *middleware.Limiter
 	Ping    Pinger
 	Log     *slog.Logger
@@ -87,7 +91,7 @@ func New(d Deps) *Server {
 		cfg: d.Config, auth: d.Auth, users: d.Users, plans: d.Plans, subs: d.Subs,
 		ai: d.AI, limits: d.Limits, payments: d.Payments, events: d.Events,
 		installations: d.Installations, notifications: d.Notifications, reports: d.Reports,
-		credits: d.Credits, purchases: d.Purchases, limiter: d.Limiter, ping: d.Ping, log: d.Log,
+		credits: d.Credits, purchases: d.Purchases, support: d.Support, limiter: d.Limiter, ping: d.Ping, log: d.Log,
 	}
 }
 
@@ -198,6 +202,9 @@ func (s *Server) Register(mux *http.ServeMux) {
 
 	// --- өнім оқиғалары (тек қолданбадан; пернетақта ештеңе жібермейді)
 	mux.Handle("POST /api/v1/analytics/events", s.requireUser(eventsLimit(http.HandlerFunc(s.handleProductEvents))))
+
+	// --- қолдау чаты: оператормен хат алмасу (features.support_chat)
+	s.registerSupport(mux, perUser)
 
 	// --- төлемдер (демо адаптер)
 	mux.Handle("POST /api/v1/payments/checkout", s.requireUser(http.HandlerFunc(s.handleCheckout)))

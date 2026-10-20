@@ -314,6 +314,8 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 			"permission_diagnostics": s.installations != nil,
 			// Reminder pushes (onboarding, keyboard, paste help) are switched on in the admin panel.
 			"push_reminders": s.notifications != nil && s.notifications.RemindersEnabled(r.Context()),
+			// /api/v1/support/*: the chat with a support operator.
+			"support_chat": s.support != nil,
 		},
 		"demo_mode":    s.cfg.Auth.DemoMode,
 		"payment_mode": s.payments.Mode(),

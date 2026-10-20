@@ -253,6 +253,8 @@ type Limits struct {
 	GenericPerMinute  int
 	// TranscribePerMinute — дауыс жазбасының жеке шелегі: бір қолданушыға минутына.
 	TranscribePerMinute int
+	// SupportPerMinute — қолдау чатына жазу: бір қолданушыға минутына.
+	SupportPerMinute int
 }
 
 type Log struct {
@@ -411,6 +413,7 @@ func Load(envFile string) (Config, error) {
 			// Дауыс жазбасы: өз шелегі және тәуліктік шек (polish сияқты, квотадан бөлек).
 			TranscribePerMinute: num("RATE_TRANSCRIBE_PER_MINUTE", 10),
 			TranscribePerDay:    num("LIMIT_TRANSCRIBE_PER_DAY", 100),
+			SupportPerMinute:    num("RATE_SUPPORT_PER_MINUTE", 20),
 		},
 		Log:  Log{Level: str("LOG_LEVEL", "info"), Format: str("LOG_FORMAT", "json")},
 		Push: pushFromEnv(),

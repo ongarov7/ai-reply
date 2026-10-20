@@ -231,6 +231,7 @@ HMAC, лимиты). Новые сборки их не вызывают.
 - `features.permission_diagnostics` — приложение может слать
   `PUT /api/v1/installations/{installation_id}/diagnostics`.
 - `features.push_reminders` — админ включил напоминания (`reminders.enabled`).
+- `features.support_chat` — чат с поддержкой (`/api/v1/support/*`, см. «Чат поддержки»).
 - `payment_mode` — строка `off | demo | live` (по умолчанию `off`).
 - `legal.contact_email` — `CONTACT_EMAIL`, пустая строка, если не задан (тогда приложение
   ведёт на `support_url`). `legal.ai_provider` — кому уходят тексты (экран согласия).
@@ -865,6 +866,37 @@ languages, purpose, latency_ms, status, code, retried), `ai_voice_reused` (по�
   В админке `GET /api/v1/admin/dashboard` отдаёт `series.product_events` — число
   событий каждого имени за выбранный период.
 
+## Чат поддержки
+
+Переписка с оператором (только при `features.support_chat = true`). Токен и согласие с
+текущими условиями обязательны (как для AI), без согласия — `403 CONSENT_REQUIRED`. У
+аккаунта один чат; он появляется с первым сообщением.
+
+| Метод | Путь | Что делает |
+|---|---|---|
+| GET | `/api/v1/support/conversation` | `{ "conversation": { "id", "status": "open\|resolved", "unread_count", "created_at", "updated_at" } }`; до первого сообщения — `{ "conversation": null }` |
+| GET | `/api/v1/support/messages?before=<id>\|after=<id>&limit=30` | `{ "messages": [{ "id", "sender": "user\|operator", "text", "created_at", "read_at" }], "has_more" }` — всегда по возрастанию времени; без курсора — последняя страница; `limit` до 100 |
+| POST | `/api/v1/support/messages` | `{ "text", "client_message_id" }` → `201 { "message" }` |
+| POST | `/api/v1/support/read` | `{ "up_to_message_id" }` → `{ "unread_count" }` |
+
+- `text` обрезается по краям, 1–2000 символов, иначе `400 INVALID_REQUEST` (`details.field = text`).
+  `client_message_id` — UUID: повтор с тем же значением возвращает уже сохранённое сообщение
+  (тот же `201`), второго не будет. Сообщение в решённый чат снова открывает его.
+- `before` и `after` вместе или чужой/неизвестный id — `400 INVALID_REQUEST`. `has_more` —
+  есть ли ещё сообщения в ту же сторону. Порядок стабилен: внутри чата `created_at` строго растёт.
+- `read` отмечает прочитанными сообщения оператора до указанного (включительно);
+  `unread_count` — сколько ещё не прочитано.
+- Кто из операторов ответил, не сообщается: `sender` — только `user` или `operator`, приложение
+  показывает «Поддержка AI Reply».
+- Лимит отправки — `RATE_SUPPORT_PER_MINUTE` (20 в минуту на пользователя) → `429 RATE_LIMITED`;
+  чтение не ограничено: приложение опрашивает `after=` каждые 5 с, пока чат открыт.
+- Ответ оператора присылает push `support_reply` (категория `account`, ссылка
+  `aireply://support`, `data.conversation_id`) — один на «пачку» непрочитанного: ключ
+  `support_reply:<conversation_id>:<первое непрочитанное сообщение оператора>`. Следующие ответы до
+  прочтения нового push не дают; после `read` следующий ответ — снова push. Текст ответа в push не попадает.
+- Хранение: таблицы `support_conversations` и `support_messages` (миграция `0017`) живут, пока
+  существует аккаунт, и удаляются вместе с ним. Текст сообщений в лог не пишется — только id и длина.
+
 ## Платежи (demo)
 
 | Метод | Путь |
@@ -954,6 +986,20 @@ credits, admin, packs, pass { expires_at, remaining } | null, remaining_total }`
 | POST | `/reports/{id}/resolve` | отметить решённой (CSRF) → `{ "ok": true, "changed": true }`; повтор — `changed: false`; аудит `report.resolve` |
 
 Текст жалобы виден администратору — человек сам решил его отправить.
+
+### Поддержка (`/api/v1/admin/support…`)
+
+| Метод | Путь | Что делает |
+|---|---|---|
+| GET | `/support/summary` | `{ "open", "unread" }` — открытые чаты и чаты с непрочитанным для оператора (значок в меню, опрос раз в 30 с) |
+| GET | `/support/conversations?status=open\|resolved\|all&unread=1&q=&page=` | список, свежие первыми (25 на страницу): `id`, `user_id`, `identifier` (маска), `status`, `unread`, `user_unread`, `last_message_at`, `last_sender`, `preview` (120 символов); `q` — телефон, почта или id (`%` и `_` буквально) |
+| GET | `/support/conversations/{id}?before=\|after=&limit=` | `conversation`, `user` (маска, тариф, платформа/версия/ОС последней установки, `last_seen`), `diagnostics` (пока `null`), `messages`, `has_more` |
+| POST | `/support/conversations/{id}/messages` | `{ "text" }` → `201 { "message" }`: ответ оператора, сообщения пользователя считаются прочитанными, уходит push; 60 в минуту на админа; аудит `support.reply` (только `length`) |
+| POST | `/support/conversations/{id}/resolve` · `/reopen` | `{ "ok", "changed" }`; аудит `support.resolve` / `support.reopen` при изменении |
+| POST | `/support/conversations/{id}/read` | отметить сообщения пользователя прочитанными |
+
+Все POST — с `X-CSRF-Token`. Переписка доступна только здесь, в карточке пользователя
+(`/users/{id}`) её нет. Операторов о новых сообщениях оповещает только админ-панель.
 
 ### Уведомления (`/api/v1/admin/notifications…`)
 

@@ -86,12 +86,15 @@ const (
 	TypeKeyboardSetupIncomplete = "keyboard_setup_incomplete"
 	TypeClipboardHelp           = "clipboard_help"
 	TypeAccountInfo             = "account_info"
+	// TypeSupportReply — оператор қолдау чатында жауап берді.
+	TypeSupportReply = "support_reply"
 )
 
 // AutomaticNotificationTypes — сервер өзі жіберетін түрлер (әкімші сүзгісі үшін).
 var AutomaticNotificationTypes = []string{
 	TypeSubscriptionActivated, TypeSubscriptionExpiring, TypeSubscriptionExpired, TypeQuotaLow, TypeQuotaExhausted,
 	TypeOnboardingIncomplete, TypeKeyboardSetupIncomplete, TypeClipboardHelp, TypeAccountInfo,
+	TypeSupportReply,
 }
 
 // ReminderTypes — автоматты еске салу шолуы жіберетін түрлер.

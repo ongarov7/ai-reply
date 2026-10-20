@@ -38,6 +38,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/repository"
 	"github.com/aireply/ai-reply-back-end/internal/simulator"
 	"github.com/aireply/ai-reply-back-end/internal/subscriptions"
+	"github.com/aireply/ai-reply-back-end/internal/support"
 	"github.com/aireply/ai-reply-back-end/internal/traits"
 	"github.com/aireply/ai-reply-back-end/internal/transport/adminapi"
 	"github.com/aireply/ai-reply-back-end/internal/transport/api"
@@ -444,6 +445,7 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 		WithDemoCheckout(cfg.Payments.DemoCheckout).WithProduction(cfg.App.IsProduction())
 	eventSvc := productevents.New(store, log).WithClock(clock)
 	reportSvc := reports.New(store, log).WithClock(clock)
+	supportSvc := support.New(store, subSvc, log).WithClock(clock).WithNotifier(events)
 	adminSvc := admin.New(store, subSvc, planSvc, cfg, log).WithEvents(events)
 	simulatorSvc := simulator.New(simulator.Deps{
 		Repo: store, Users: userSvc, Subs: subSvc, Plans: planSvc, AI: aiSvc, Limits: limitSvc,
@@ -458,11 +460,11 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 	mux := http.NewServeMux()
 	api.New(api.Deps{Config: cfg, Auth: authSvc, Users: userSvc, Plans: planSvc, Subs: subSvc,
 		AI: aiSvc, Limits: limitSvc, Payments: paymentSvc, Events: eventSvc, Installations: installSvc,
-		Notifications: notifySvc, Reports: reportSvc, Limiter: limiter, Log: log,
+		Notifications: notifySvc, Reports: reportSvc, Support: supportSvc, Limiter: limiter, Log: log,
 		Ping:    func(ctx context.Context) error { return db.Reader().PingContext(ctx) },
 		Credits: creditSvc}).Register(mux)
 	adminapi.New(adminapi.Deps{Config: cfg, Admin: adminSvc, Limits: limitSvc, Notifications: notifySvc,
-		Payments: paymentSvc, Reports: reportSvc, Credits: creditSvc, Limiter: limiter, Log: log}).Register(mux)
+		Payments: paymentSvc, Reports: reportSvc, Credits: creditSvc, Support: supportSvc, Limiter: limiter, Log: log}).Register(mux)
 	simulatorapi.New(simulatorapi.Deps{Config: cfg, Admin: adminSvc, Simulator: simulatorSvc,
 		Limiter: limiter, Log: log}).Register(mux)
 	webServer, err := web.New(web.Deps{Config: cfg, Admin: adminSvc, Plans: planSvc, Payments: paymentSvc,

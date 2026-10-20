@@ -87,6 +87,8 @@ func adminKeyFamilies() map[string][]string {
 		"admin.credits.kind.":   domain.GrantKinds,
 		"admin.credits.entry.":  domain.LedgerEntries,
 		"admin.credits.status.": {domain.GrantActive, domain.GrantRevoked},
+		// Support chat.
+		"admin.support.status.": domain.SupportStatuses,
 		// Dashboard range buttons.
 		"common.": {"today", "7d", "30d", "month", "prev_month"},
 	}
@@ -178,6 +180,7 @@ func TestAdminScriptStatusListsMatchTheBackend(t *testing.T) {
 		"DIAGNOSTIC_STATUSES": domain.DiagnosticStatuses,
 		"DIAGNOSTIC_FILTERS":  domain.DiagnosticFilters,
 		"REMINDER_TYPES":      domain.AdminReminderTypes,
+		"SUPPORT_STATUSES":    domain.SupportStatuses,
 	} {
 		if got := list(name); !reflect.DeepEqual(got, want) {
 			t.Errorf("%s = %v, backend has %v", name, got, want)
