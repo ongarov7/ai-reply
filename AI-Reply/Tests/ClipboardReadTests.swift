@@ -30,7 +30,7 @@ final class ClipboardReadTests: XCTestCase {
 
     func testRetryIsNotOfferedWhereItCannotWork() {
         for error: AIReplyError in [.fullAccessRequired, .pasteDenied, .noSourceMessage, .messageTooLong(limit: 400),
-                                    .noInstruction, .instructionTooLong(limit: 600)] {
+                                    .noInstruction, .instructionTooLong(limit: 600), .quotaExhausted, .monthlyQuotaExhausted] {
             XCTAssertFalse(error.offersRetry, "\(error)")
         }
         for error: AIReplyError in [.offline, .timedOut, .rateLimited, .serviceUnavailable, .emptyResponse] {

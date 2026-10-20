@@ -186,6 +186,10 @@ final class ComposeFlowTests: XCTestCase {
         await waitUntil { self.scripted.pending == 1 }
         scripted.fail(.quotaExhausted)
         await waitUntil { self.coordinator.flow.error == .quotaExhausted }
+        // The keyboard sends the user to the app, and offers no Retry.
+        let russian = AIReplyStrings.forLanguage(.russian)
+        XCTAssertEqual(coordinator.session?.notice(russian),
+                       ComposeSession.Notice(text: russian.keyboardMessage(for: .quotaExhausted), offersRetry: false))
     }
 
     func testStopIgnoresTheLateAnswer() async {

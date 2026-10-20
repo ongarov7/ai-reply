@@ -50,7 +50,7 @@ struct ComposeSession: Equatable, Sendable {
         guard let error = flow.error else { return nil }
         // The reply sentence for Full Access talks about a copied message;
         // writing has none.
-        let text = error == .fullAccessRequired ? strings.compose.fullAccessRequired : strings.message(for: error)
+        let text = error == .fullAccessRequired ? strings.compose.fullAccessRequired : strings.keyboardMessage(for: error)
         return text.isEmpty ? nil : Notice(text: text, offersRetry: error.offersRetry)
     }
 }

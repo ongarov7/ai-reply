@@ -318,12 +318,12 @@ final class LocalizationTests: XCTestCase {
     /// language, and none of them is English left in another language.
     func testKeyboardReleaseStringsAreTranslated() {
         let english = AIReplyStrings.forLanguage(.english)
-        XCTAssertEqual(english.message(for: .quotaExhausted), "You have used today's replies. They come back tomorrow.")
+        XCTAssertEqual(english.message(for: .quotaExhausted), "You have used all available replies for today.")
         XCTAssertEqual(english.message(for: .monthlyQuotaExhausted),
-                       "You have used this month's replies. They come back next month.")
+                       "You have used all available replies for this month.")
         XCTAssertEqual(english.message(for: .consentRequired),
                        "Open AI Reply and accept the terms to use AI replies.")
-        XCTAssertEqual(AIReplyStrings.forLanguage(.uzbek).quotaExhausted, "Bugungi javoblar tugadi. Ular ertaga yangilanadi.")
+        XCTAssertEqual(AIReplyStrings.forLanguage(.uzbek).quotaExhausted, "Bugun uchun mavjud javoblar tugadi.")
 
         for language in AppLanguage.allCases where language != .english {
             let strings = AIReplyStrings.forLanguage(language)
@@ -424,5 +424,38 @@ final class LocalizationTests: XCTestCase {
                               "\(key) leaves out Reply to copied in \(language.rawValue)")
             }
         }
+    }
+
+    // MARK: Limits
+
+    /// A spent limit in the keyboard: «Лимит ответов исчерпан» and where to
+    /// go, since the keyboard can neither sell replies nor open the app. No
+    /// language promises a date any more: replies can be bought before it.
+    func testKeyboardLimitMessageSendsTheUserToTheApp() {
+        let russian = AIReplyStrings.forLanguage(.russian)
+        XCTAssertEqual(russian.keyboardMessage(for: .quotaExhausted),
+                       "Лимит ответов исчерпан\nОткройте AI Reply, чтобы докупить ответы или выбрать тариф.")
+        XCTAssertEqual(russian.keyboardMessage(for: .monthlyQuotaExhausted), russian.keyboardMessage(for: .quotaExhausted))
+        XCTAssertEqual(russian.keyboardMessage(for: .offline), russian.message(for: .offline))
+
+        let english = AIReplyStrings.forLanguage(.english)
+        let promises = ["tomorrow", "next month", "завтра", "следующем месяце", "ертең", "келесі ай", "ertaga", "keyingi oy"]
+        for language in AppLanguage.allCases {
+            let strings = AIReplyStrings.forLanguage(language)
+            let limit = strings.keyboardMessage(for: .quotaExhausted)
+            XCTAssertTrue(limit.hasPrefix(strings.limitReachedTitle + "\n"), language.rawValue)
+            XCTAssertTrue(limit.contains("AI Reply"), language.rawValue)
+            for text in [strings.quotaExhausted, strings.monthlyQuotaExhausted, limit] {
+                for promise in promises {
+                    XCTAssertFalse(text.lowercased().contains(promise), "\(language.rawValue): \(text)")
+                }
+            }
+            if language != .english {
+                XCTAssertNotEqual(strings.limitReachedTitle, english.limitReachedTitle, language.rawValue)
+                XCTAssertNotEqual(strings.limitReachedHint, english.limitReachedHint, language.rawValue)
+            }
+        }
+        XCTAssertFalse(AIReplyError.quotaExhausted.offersRetry)
+        XCTAssertFalse(AIReplyError.monthlyQuotaExhausted.offersRetry)
     }
 }

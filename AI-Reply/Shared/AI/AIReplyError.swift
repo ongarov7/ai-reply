@@ -49,14 +49,16 @@ enum AIReplyError: Error, Equatable, Sendable {
 
     /// Whether doing the same thing again can work, so the composer offers
     /// Retry. Not when the keyboard itself is in the way (no Full Access),
-    /// when iOS refused the paste or nothing was copied, or when a text is
-    /// too long: Retry would only bring the same sentence back.
+    /// when iOS refused the paste or nothing was copied, when the replies are
+    /// spent, or when a text is too long: Retry would only bring the same
+    /// sentence back.
     var offersRetry: Bool {
         switch self {
-        case .noSourceMessage, .pasteDenied, .fullAccessRequired, .messageTooLong, .noInstruction, .instructionTooLong:
+        case .noSourceMessage, .pasteDenied, .fullAccessRequired, .quotaExhausted, .monthlyQuotaExhausted,
+             .messageTooLong, .noInstruction, .instructionTooLong:
             return false
         case .notConfigured, .offline, .timedOut, .cancelled, .authenticationFailed, .rateLimited,
-             .quotaExhausted, .monthlyQuotaExhausted, .consentRequired, .emptyResponse, .serviceUnavailable:
+             .consentRequired, .emptyResponse, .serviceUnavailable:
             return true
         }
     }

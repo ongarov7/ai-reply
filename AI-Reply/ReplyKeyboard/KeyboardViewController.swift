@@ -772,7 +772,7 @@ final class KeyboardViewController: UIInputViewController {
         }
         guard let session = replyCoordinator.session, replyCoordinator.isComposing else { return }
         let flow = session.flow
-        let message = flow.error.map { aiStrings.message(for: $0) }
+        let message = flow.error.map { aiStrings.keyboardMessage(for: $0) }
         actionBar.render(ReplyComposerView.Content(
             personaName: session.template.displayName(appLanguage: uiLanguage),
             source: session.sourceMessage,
@@ -782,7 +782,8 @@ final class KeyboardViewController: UIInputViewController {
             sourceLimit: AILimits.current.sourceCharacters,
             instructionLimit: ReplyInstruction.maximumCharacters,
             // Retry only where trying again can work: never without Full
-            // Access, after a refused paste or with no message.
+            // Access, after a refused paste, with no message or with the
+            // replies spent.
             errorOffersRetry: flow.error?.offersRetry ?? true,
             offersTypedSource: flow.error == .pasteDenied || flow.error == .noSourceMessage,
             offersReport: offersReport
