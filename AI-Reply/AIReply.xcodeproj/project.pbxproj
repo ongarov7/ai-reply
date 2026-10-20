@@ -263,6 +263,11 @@
 		49735F832440D079095A5B97 /* IdempotentGeneration.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCD7EF8C6C739F02684EC025 /* IdempotentGeneration.swift */; };
 		BDB8A0F778B029EE9F70204E /* IdempotentGeneration.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCD7EF8C6C739F02684EC025 /* IdempotentGeneration.swift */; };
 		78E25949DDAB442F504D0836 /* IdempotentGenerationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 626C504F1201997F388B5000 /* IdempotentGenerationTests.swift */; };
+		09AC12915AFD0F7769B1D415 /* PurchaseAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 704D8A6BF81CBD5A814E2B9F /* PurchaseAPI.swift */; };
+		F85E9B7DFED6B46453D057DA /* StoreKitClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDF4053B99B2FD53E93B6A75 /* StoreKitClient.swift */; };
+		1C024BB7533067F19B2529CA /* PurchaseStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2782AB288AE617EDA7400F25 /* PurchaseStore.swift */; };
+		ED04328DDD15F0A22748F3B7 /* PurchaseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89BB4E548C5A1807961D48FF /* PurchaseView.swift */; };
+		C2F18E43516E28096F887E5E /* PurchaseStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47571D600E43E204FB203137 /* PurchaseStoreTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -493,6 +498,11 @@
 		63333DA3CF26D22FBD3FE8F0 /* BalanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalanceTests.swift; sourceTree = "<group>"; };
 		BCD7EF8C6C739F02684EC025 /* IdempotentGeneration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdempotentGeneration.swift; sourceTree = "<group>"; };
 		626C504F1201997F388B5000 /* IdempotentGenerationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdempotentGenerationTests.swift; sourceTree = "<group>"; };
+		704D8A6BF81CBD5A814E2B9F /* PurchaseAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurchaseAPI.swift; sourceTree = "<group>"; };
+		EDF4053B99B2FD53E93B6A75 /* StoreKitClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreKitClient.swift; sourceTree = "<group>"; };
+		2782AB288AE617EDA7400F25 /* PurchaseStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurchaseStore.swift; sourceTree = "<group>"; };
+		89BB4E548C5A1807961D48FF /* PurchaseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurchaseView.swift; sourceTree = "<group>"; };
+		47571D600E43E204FB203137 /* PurchaseStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurchaseStoreTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -509,6 +519,17 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		71B1AFC1C42C3FE2FF695623 /* Store */ = {
+			isa = PBXGroup;
+			children = (
+				704D8A6BF81CBD5A814E2B9F /* PurchaseAPI.swift */,
+				EDF4053B99B2FD53E93B6A75 /* StoreKitClient.swift */,
+				2782AB288AE617EDA7400F25 /* PurchaseStore.swift */,
+				89BB4E548C5A1807961D48FF /* PurchaseView.swift */,
+			);
+			path = Store;
+			sourceTree = "<group>";
+		};
 		E7268E2089BBB0BFAB40D3C0 /* Emoji */ = {
 			isa = PBXGroup;
 			children = (
@@ -719,6 +740,7 @@
 				D7B75D514737294D9F090817 /* ComposeRecipientTests.swift */,
 				63333DA3CF26D22FBD3FE8F0 /* BalanceTests.swift */,
 				626C504F1201997F388B5000 /* IdempotentGenerationTests.swift */,
+				47571D600E43E204FB203137 /* PurchaseStoreTests.swift */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -809,6 +831,7 @@
 				235E59D67BFAA230C7F55B58 /* Setup */,
 				173DAB703FD44FE7CB8718F8 /* Templates */,
 				284F811FB11CC12ACBBD066E /* Voice */,
+				71B1AFC1C42C3FE2FF695623 /* Store */,
 			);
 			path = Features;
 			sourceTree = "<group>";
@@ -1135,6 +1158,7 @@
 				AE273F46E8285DAB6423B51B /* ComposeRecipientTests.swift in Sources */,
 				107AD2C8CC69E8F96DFDB07A /* BalanceTests.swift in Sources */,
 				78E25949DDAB442F504D0836 /* IdempotentGenerationTests.swift in Sources */,
+				C2F18E43516E28096F887E5E /* PurchaseStoreTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1343,6 +1367,10 @@
 				84F80AD89B955ADE9E787B90 /* BalanceSummary.swift in Sources */,
 				F0B3F31ECC7FC25CF40A6730 /* DebugPreviews.swift in Sources */,
 				49735F832440D079095A5B97 /* IdempotentGeneration.swift in Sources */,
+				09AC12915AFD0F7769B1D415 /* PurchaseAPI.swift in Sources */,
+				F85E9B7DFED6B46453D057DA /* StoreKitClient.swift in Sources */,
+				1C024BB7533067F19B2529CA /* PurchaseStore.swift in Sources */,
+				ED04328DDD15F0A22748F3B7 /* PurchaseView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

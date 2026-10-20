@@ -208,10 +208,25 @@ final class DeepLinkTests: XCTestCase {
         XCTAssertEqual(AppRouter.path(for: .compose), [.compose])
         XCTAssertEqual(AppRouter.path(for: .onboarding), [])
         XCTAssertEqual(AppRouter.path(for: .support), [], "no screen yet: Home")
-        XCTAssertEqual(AppRouter.path(for: .purchase), [], "no screen yet: Home")
+        XCTAssertEqual(AppRouter.path(for: .purchase), [.subscription], "purchases closed: the plans")
+        XCTAssertEqual(AppRouter.path(for: .purchase, availability: .init(purchases: true)), [.purchase])
         for screen in AppScreen.allCases {
             XCTAssertEqual(AppRouter.presentsTutorial(screen), screen == .onboarding, screen.rawValue)
         }
+    }
+
+    /// `aireply://purchase` opens «Докупить ответы» only while the server
+    /// sells; the router learns that from the account's features.
+    @MainActor
+    func testPurchaseLinkFollowsTheServersSwitch() {
+        let router = AppRouter()
+        router.mainInterfaceDidAppear()
+        router.open(.screen(.purchase))
+        XCTAssertEqual(router.path, [.subscription])
+
+        router.availability = AppRouter.Availability(purchases: true)
+        router.open(.screen(.purchase))
+        XCTAssertEqual(router.path, [.purchase])
     }
 
     /// The app's screens are the server's `domain.LinkScreens`, spelled alike.

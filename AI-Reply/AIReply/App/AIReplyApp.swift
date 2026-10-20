@@ -46,6 +46,15 @@ struct AIReplyApp: App {
         AppServices.shared.onNotificationOpened = { [weak account] in
             Task { await account?.refresh() }
         }
+        // A purchase was granted: the new balance at once.
+        AppServices.shared.purchases.onGrant = { [weak account] usage in
+            guard let account else { return }
+            if let usage {
+                account.receiveUsage(usage)
+            } else {
+                Task { await account.refresh() }
+            }
+        }
         _settings = State(initialValue: settings)
         _configuration = State(initialValue: configuration)
         _account = State(initialValue: account)
@@ -78,6 +87,7 @@ struct AIReplyApp: App {
             .environment(keyboardStatus)
             .environment(services.router)
             .environment(services.notifications)
+            .environment(services.purchases)
             // A gender picked on another device arrives with /me; one picked
             // here and not yet confirmed is retried on every return.
             .onChange(of: account.profile) {
@@ -169,6 +179,8 @@ enum DebugScreen: String {
     case signIn, email, code
     /// Home with sample numbers: free, purchased and pass replies.
     case balance
+    /// «Докупить ответы» over a sample catalogue (no App Store, no server).
+    case purchase
 
     static var requested: DebugScreen? {
         let arguments = CommandLine.arguments
@@ -225,6 +237,7 @@ private struct DebugScreenHost: View {
             VerifyCodeView(challenge: .init(email: "aigerim@example.kz",
                                             resendAvailableAt: Date().addingTimeInterval(32))) { _ in }
         case .balance:   DebugBalanceHost()
+        case .purchase:  DebugPurchaseHost()
         }
     }
 }

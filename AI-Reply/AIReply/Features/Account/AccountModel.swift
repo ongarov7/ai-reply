@@ -259,6 +259,12 @@ final class AccountModel {
     }
     #endif
 
+    /// Numbers the server sent with another answer: a purchase it granted.
+    func receiveUsage(_ usage: AccountAPI.Usage) {
+        self.usage = usage
+        AccountUsageCache.store(usage)
+    }
+
     // MARK: Sign-in: e-mail
 
     func startEmailSignIn() {

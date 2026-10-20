@@ -62,6 +62,16 @@ enum APIError: Error, Equatable, Sendable {
     /// 409 on a generation: this Idempotency-Key was paid for and replayed
     /// already; only a new action (a new key) generates again.
     case generationKeyUsed
+    /// IAP_UNAVAILABLE: the store is not connected on the server, or sales
+    /// on this platform are closed.
+    case purchasesUnavailable
+    /// PURCHASE_INVALID: the store did not confirm the purchase. `reason` is
+    /// the server's word for why (`revoked`, `signature`, …).
+    case purchaseInvalid(reason: String?)
+    /// PURCHASE_BELONGS_TO_ANOTHER_ACCOUNT: granted to another account already.
+    case purchaseBelongsToAnotherAccount
+    /// STORE_UNAVAILABLE: the store's own API did not answer; later works.
+    case storeUnavailable
     case server
     /// The client could not make sense of the response at all.
     case malformedResponse
@@ -100,8 +110,8 @@ struct APIClient: Sendable {
 
     // MARK: Requests
 
-    func get<Response: Decodable>(_ path: String, token: String? = nil) async throws -> Response {
-        try await send(path: path, method: "GET", body: Optional<Empty>.none, token: token)
+    func get<Response: Decodable>(_ path: String, query: [URLQueryItem] = [], token: String? = nil) async throws -> Response {
+        try await send(path: path, method: "GET", body: Optional<Empty>.none, token: token, query: query)
     }
 
     @discardableResult
@@ -141,8 +151,16 @@ struct APIClient: Sendable {
     // MARK: Transport
 
     /// The request `send` puts on the wire; separate so its shape is testable.
-    func makeRequest<Body: Encodable>(path: String, method: String, body: Body?, token: String?) throws -> URLRequest {
-        var request = URLRequest(url: baseURL.appendingPathComponent(path))
+    func makeRequest<Body: Encodable>(path: String, method: String, body: Body?, token: String?,
+                                      query: [URLQueryItem] = []) throws -> URLRequest {
+        var url = baseURL.appendingPathComponent(path)
+        // A query is added as items, never as part of the path, where "?"
+        // would be escaped.
+        if !query.isEmpty, var components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+            components.queryItems = query
+            url = components.url ?? url
+        }
+        var request = URLRequest(url: url)
         request.httpMethod = method
         for (name, value) in headers {
             request.setValue(value, forHTTPHeaderField: name)
@@ -159,9 +177,9 @@ struct APIClient: Sendable {
     }
 
     private func send<Body: Encodable, Response: Decodable>(
-        path: String, method: String, body: Body?, token: String?
+        path: String, method: String, body: Body?, token: String?, query: [URLQueryItem] = []
     ) async throws -> Response {
-        let request = try makeRequest(path: path, method: method, body: body, token: token)
+        let request = try makeRequest(path: path, method: method, body: body, token: token, query: query)
 
         let data: Data
         let response: URLResponse
@@ -262,6 +280,10 @@ struct APIClient: Sendable {
                 return .instructionMissing
             }
             return .invalidRequest
+        case "IAP_UNAVAILABLE":                 return .purchasesUnavailable
+        case "PURCHASE_INVALID":                return .purchaseInvalid(reason: details?.reason)
+        case "PURCHASE_BELONGS_TO_ANOTHER_ACCOUNT": return .purchaseBelongsToAnotherAccount
+        case "STORE_UNAVAILABLE":               return .storeUnavailable
         case "NOT_FOUND":                       return .notFound
         case "CONFLICT":
             if details?.field == "idempotency_key" {

@@ -15,6 +15,8 @@ enum AppRoute: Hashable {
     case permissions
     case pasteHelp
     case compose
+    /// «Докупить ответы».
+    case purchase
 
     @MainActor @ViewBuilder
     var destination: some View {
@@ -28,6 +30,7 @@ enum AppRoute: Hashable {
         case .permissions:          PermissionsView()
         case .pasteHelp:            PasteHelpView()
         case .compose:              ComposeView()
+        case .purchase:             PurchaseView()
         }
     }
 }
@@ -51,6 +54,15 @@ final class AppRouter {
         var id: String { url.absoluteString }
     }
 
+    /// The screens behind a server feature that this server offers now.
+    /// A link to one it does not offer opens the nearest screen there is.
+    struct Availability: Equatable, Sendable {
+        /// `features.iap_ios`.
+        var purchases = false
+        /// `features.support_chat`.
+        var supportChat = false
+    }
+
     nonisolated static let pendingLifetime: TimeInterval = 15 * 60
 
     /// Home's navigation stack.
@@ -60,6 +72,8 @@ final class AppRouter {
     /// The guide («Как пользоваться AI Reply») over Home: from Settings or
     /// from `aireply://onboarding`.
     var isShowingTutorial = false
+    /// Set from the account's features (see `AppServices`).
+    var availability = Availability()
 
     private(set) var pending: DeepLinkDestination?
     @ObservationIgnored private var pendingSince: Date?
@@ -122,7 +136,7 @@ final class AppRouter {
             webPage = WebPage(url: url)
         case .screen(let screen):
             webPage = nil
-            path = Self.path(for: screen)
+            path = Self.path(for: screen, availability: availability)
             if Self.presentsTutorial(screen) { isShowingTutorial = true }
         }
     }
@@ -132,7 +146,7 @@ final class AppRouter {
         screen == .onboarding
     }
 
-    nonisolated static func path(for screen: AppScreen) -> [AppRoute] {
+    nonisolated static func path(for screen: AppScreen, availability: Availability = Availability()) -> [AppRoute] {
         switch screen {
         case .home:          return []
         case .subscription:  return [.subscription]
@@ -145,8 +159,10 @@ final class AppRouter {
         case .pasteHelp:     return [.pasteHelp]
         case .compose:       return [.compose]
         case .onboarding:    return []
+        // Purchases closed: the plans, where the other ways to more replies are.
+        case .purchase:      return availability.purchases ? [.purchase] : [.subscription]
         // No screen yet in this build: Home, as an older build does.
-        case .support, .purchase: return []
+        case .support:       return []
         }
     }
 }

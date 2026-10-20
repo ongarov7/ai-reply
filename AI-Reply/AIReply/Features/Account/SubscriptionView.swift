@@ -8,13 +8,16 @@ import SwiftUI
 /// keeps a cached copy only so the keyboard can render instantly; it is never
 /// the source of truth, and a stale cache can only ever be pessimistic.
 ///
-/// Nothing is sold here in a Release build (see
+/// No plan is sold here in a Release build (see
 /// `AccountModel.purchasesAvailableInThisBuild`): the other plans are listed
-/// with their limits, without a price or a button.
+/// with their limits, without a price or a button. Reply packs and the pass
+/// are sold on «Докупить ответы», through the App Store, while the server
+/// sells them (`features.iap_ios`).
 struct SubscriptionView: View {
 
     @Environment(AppSettings.self) private var settings
     @Environment(AccountModel.self) private var account
+    @Environment(PurchaseStore.self) private var purchases
 
     @State private var isChanging = false
     /// Why the last Choose failed; shown under the plans.
@@ -24,6 +27,8 @@ struct SubscriptionView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: DS.Spacing.xl) {
                 usageCard
+                // Packs and the pass, only while the server sells them.
+                if purchases.isEnabled { buyMoreCard }
                 if showsPlans { plansSection }
             }
             .padding(.horizontal, DS.Spacing.l)
@@ -82,6 +87,20 @@ struct SubscriptionView: View {
             }
         }
         .dsCard()
+    }
+
+    private var buyMoreCard: some View {
+        NavigationLink(value: AppRoute.purchase) {
+            HStack {
+                Label("purchase.title", systemImage: "plus.circle")
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(.primary)
+                Spacer()
+                Image(systemName: "chevron.right").font(.footnote).foregroundStyle(.secondary)
+            }
+            .dsCard()
+        }
+        .buttonStyle(.plain)
     }
 
     /// The server lists only the plans it shows; the section is worth a

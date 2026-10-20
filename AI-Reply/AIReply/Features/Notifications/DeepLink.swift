@@ -7,8 +7,9 @@ import Foundation
 /// The same list the server validates links against (`domain.LinkScreens`).
 /// "notifications" is the notifications part of Settings; "keyboard" and
 /// "permissions" both open «Настройка клавиатуры и разрешений»;
-/// "onboarding" shows the guide over Home. "support" and "purchase" have no
-/// screen in this build yet and open Home, as an unknown screen does.
+/// "onboarding" shows the guide over Home; "purchase" opens «Докупить
+/// ответы» while purchases are on, the plans otherwise. "support" has no
+/// screen in this build yet and opens Home, as an unknown screen does.
 enum AppScreen: String, CaseIterable, Sendable {
     case home, subscription, settings, notifications, templates, profile, keyboard, compose
     case onboarding, permissions

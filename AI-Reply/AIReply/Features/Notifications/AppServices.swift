@@ -44,6 +44,8 @@ final class AppServices {
 
     let router = AppRouter()
     let notifications: PushNotificationsModel
+    /// Reply packs and the pass; follows the App Store's transactions from launch.
+    let purchases = PurchaseStore()
 
     /// The app's interface language, from `AppSettings`.
     var appLanguage: () -> String = { SharedSettings.shared.effectiveAppLanguage.rawValue }
@@ -122,6 +124,9 @@ final class AppServices {
         applyDebugLaunchOptions()
         #endif
         Task { await notifications.refreshPermission() }
+        // Before anything else can buy: Ask to Buy approvals and purchases
+        // left unfinished arrive here, and wait for the account if need be.
+        purchases.start()
     }
 
     // MARK: Inputs from the app
@@ -131,6 +136,12 @@ final class AppServices {
         account = state
         notifications.setSignedIn(state.isSignedIn)
         notifications.setServerDeliversPush(state.features.map { $0.pushNotifications ?? false })
+        purchases.accountDidChange(isSignedIn: state.isSignedIn && state.isBootstrapComplete,
+                                   userID: state.userID, features: state.features)
+        router.availability = AppRouter.Availability(
+            purchases: state.isSignedIn && state.features?.iapIOS == true,
+            supportChat: false
+        )
 
         requestDeviceTokenIfPossible()
         reportOpenedNotifications()
@@ -146,6 +157,8 @@ final class AppServices {
         // A token FCM could not make earlier (offline at launch) is tried again.
         if hasAPNsToken, currentPushToken == nil { fetchPushToken() }
         requestInstallationSync(routine: true)
+        // A purchase the server had not confirmed yet is sent again.
+        Task { await purchases.processUnfinished() }
     }
 
     /// The installation to name on the logout request, so the server detaches
