@@ -18,7 +18,7 @@ final class TemplateSummaryTests: XCTestCase {
         XCTAssertEqual(summary.name(for: .kazakh), "Клиент")
 
         let work = TemplateSummary(template: .builtIn(.work, sortIndex: 1))
-        XCTAssertEqual(work.name(for: .kazakh), "Жұмыс")
+        XCTAssertEqual(work.name(for: .kazakh), "Әріптес")
     }
 
     func testCustomNamesAreCarriedVerbatim() {

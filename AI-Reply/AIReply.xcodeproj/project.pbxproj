@@ -243,6 +243,7 @@
 		F9C08C12FDB7B7ED2DEB3AA4 /* KeyboardActionBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50D232A0E7FFFC95C7AB549C /* KeyboardActionBar.swift */; };
 		FB68C3381390555C81D77917 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4871B7428808BDBAA314E78 /* DesignSystem.swift */; };
 		FEF45880C36B767675C5DCD3 /* CommunicationTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90E39000C4ED61ADBA6BA9DB /* CommunicationTypes.swift */; };
+		D619DEEFDE69A7C4F6141138 /* RecipientKindTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A02C735F304FB2B2AF2C2070 /* RecipientKindTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -457,6 +458,7 @@
 		FC4110DA74720440CE927976 /* EditDistance.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EditDistance.swift; sourceTree = "<group>"; };
 		FE58C34E468563CEF001E34F /* ProductEvents.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ProductEvents.swift; sourceTree = "<group>"; };
 		FF45F7430763064DEBE1991B /* OnboardingGenderStep.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OnboardingGenderStep.swift; sourceTree = "<group>"; };
+		A02C735F304FB2B2AF2C2070 /* RecipientKindTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipientKindTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -663,6 +665,7 @@
 				97982D7D99ECF45D72D7C39B /* PushEnvironmentTests.swift */,
 				00985BE1BD5750228F264479 /* PushNotificationsModelTests.swift */,
 				40C0C4C6C68D55BB47BC9602 /* PreferredLanguageSyncTests.swift */,
+				A02C735F304FB2B2AF2C2070 /* RecipientKindTests.swift */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -1067,6 +1070,7 @@
 				A05E0CA3981042BDAD6EE4E9 /* PushEnvironmentTests.swift in Sources */,
 				F89C7C6A308F40595E29AF7F /* PushNotificationsModelTests.swift in Sources */,
 				B8585584FDE8CD2FD6C6823B /* PreferredLanguageSyncTests.swift in Sources */,
+				D619DEEFDE69A7C4F6141138 /* RecipientKindTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

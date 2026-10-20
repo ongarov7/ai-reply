@@ -52,16 +52,22 @@ final class LocalizationTests: XCTestCase {
     func testTemplateNamesMatchTheBrief() {
         XCTAssertEqual(ReplyTemplate.builtIn(.friend, sortIndex: 0).displayName(appLanguage: .kazakh), "Дос")
         XCTAssertEqual(ReplyTemplate.builtIn(.client, sortIndex: 0).displayName(appLanguage: .kazakh), "Клиент")
-        XCTAssertEqual(ReplyTemplate.builtIn(.business, sortIndex: 0).displayName(appLanguage: .kazakh), "Бизнес")
-        XCTAssertEqual(ReplyTemplate.builtIn(.work, sortIndex: 0).displayName(appLanguage: .kazakh), "Жұмыс")
-        XCTAssertEqual(ReplyTemplate.builtInName(.custom, language: .kazakh), "Басқа")
+        XCTAssertEqual(ReplyTemplate.builtIn(.business, sortIndex: 0).displayName(appLanguage: .kazakh), "Серіктес")
+        XCTAssertEqual(ReplyTemplate.builtIn(.work, sortIndex: 0).displayName(appLanguage: .kazakh), "Әріптес")
+        XCTAssertEqual(ReplyTemplate.builtInName(.custom, language: .kazakh), "Өзімнің")
 
         XCTAssertEqual(ReplyTemplate.builtIn(.friend, sortIndex: 0).displayName(appLanguage: .russian), "Друг")
-        XCTAssertEqual(ReplyTemplate.builtIn(.work, sortIndex: 0).displayName(appLanguage: .russian), "Работа")
+        XCTAssertEqual(ReplyTemplate.builtIn(.work, sortIndex: 0).displayName(appLanguage: .russian), "Коллега")
+        XCTAssertEqual(ReplyTemplate.builtIn(.business, sortIndex: 0).displayName(appLanguage: .russian), "Партнёр")
         XCTAssertEqual(ReplyTemplate.builtInName(.custom, language: .russian), "Свой")
 
         XCTAssertEqual(ReplyTemplate.builtIn(.friend, sortIndex: 0).displayName(appLanguage: .english), "Friend")
-        XCTAssertEqual(ReplyTemplate.builtIn(.friend, sortIndex: 0).displayName(appLanguage: .uzbek), "Do‘st")
+        XCTAssertEqual(ReplyTemplate.builtIn(.work, sortIndex: 0).displayName(appLanguage: .english), "Colleague")
+        XCTAssertEqual(ReplyTemplate.builtIn(.business, sortIndex: 0).displayName(appLanguage: .english), "Partner")
+        // U+02BB, as the catalog's own `relationship.friend` spells it.
+        XCTAssertEqual(ReplyTemplate.builtIn(.friend, sortIndex: 0).displayName(appLanguage: .uzbek), "Do\u{02BB}st")
+        XCTAssertEqual(ReplyTemplate.builtIn(.work, sortIndex: 0).displayName(appLanguage: .uzbek), "Hamkasb")
+        XCTAssertEqual(ReplyTemplate.builtIn(.business, sortIndex: 0).displayName(appLanguage: .uzbek), "Hamkor")
     }
 
     /// No product string may be identical across all three languages unless it

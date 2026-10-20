@@ -70,16 +70,48 @@ extension ReplyTemplate {
     /// Both exist because both questions are asked: the keys follow the layout,
     /// the product UI follows the app.
     func displayName(appLanguage: AppLanguage) -> String {
-        if appLanguage == .uzbek,
-           customName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false {
+        if appLanguage == .uzbek, !hasCustomName {
+            // U+02BB in "Doʻst", as the app's own Uzbek strings spell it.
             switch relationship {
-            case .friend: return "Do‘st"
+            case .friend: return "Do\u{02BB}st"
             case .client: return "Mijoz"
-            case .business: return "Biznes"
-            case .work: return "Ish"
+            case .business: return "Hamkor"
+            case .work: return "Hamkasb"
             case .custom: return "Boshqa"
             }
         }
         return displayName(language: appLanguage.keyboardLanguage)
+    }
+
+    /// The name as the answer to «Кому отвечаем?» ("who are we replying
+    /// to?") in the app's recipient grid: Другу, Клиенту, Коллеге, Партнёру.
+    ///
+    /// Russian and Kazakh put the recipient in the dative; English and Uzbek
+    /// read right with the plain name. A name the user typed is theirs and is
+    /// never declined.
+    func recipientName(appLanguage: AppLanguage) -> String {
+        guard !hasCustomName else { return displayName(appLanguage: appLanguage) }
+        return Self.builtInRecipientName(relationship, appLanguage: appLanguage)
+            ?? displayName(appLanguage: appLanguage)
+    }
+
+    /// The dative of a built-in name, or nil where the language uses the
+    /// plain one (and for `custom`, which has no built-in name to decline).
+    static func builtInRecipientName(_ relationship: RelationshipKind, appLanguage: AppLanguage) -> String? {
+        switch (relationship, appLanguage) {
+        case (.friend, .russian):   return "Другу"
+        case (.client, .russian):   return "Клиенту"
+        case (.work, .russian):     return "Коллеге"
+        case (.business, .russian): return "Партнёру"
+        case (.friend, .kazakh):    return "Досқа"
+        case (.client, .kazakh):    return "Клиентке"
+        case (.work, .kazakh):      return "Әріптеске"
+        case (.business, .kazakh):  return "Серіктеске"
+        default:                    return nil
+        }
+    }
+
+    private var hasCustomName: Bool {
+        customName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
     }
 }

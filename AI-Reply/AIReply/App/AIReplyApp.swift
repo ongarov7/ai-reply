@@ -24,6 +24,10 @@ struct AIReplyApp: App {
 
         let settings = AppSettings()
         let configuration = ReplyConfigurationModel()
+        // The keyboard draws its first frame from a summary with the names
+        // resolved; one written before the built-ins were renamed is
+        // rewritten once, so the row does not show the old names.
+        SharedSettings.shared.refreshTemplateSummariesIfOutdated(from: configuration.configuration)
         let account = AccountModel()
         // A gender chosen on another device is taken the moment the profile
         // arrives, before the first-run onboarding decides its steps: a

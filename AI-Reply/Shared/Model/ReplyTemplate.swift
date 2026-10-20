@@ -64,8 +64,9 @@ struct ReplyTemplate: Codable, Hashable, Identifiable, Sendable {
         return Self.builtInName(relationship, language: language)
     }
 
-    /// Localized names for the built-in templates, exactly as the brief
-    /// specifies them.
+    /// Localized names for the built-in templates, as the owner set them
+    /// (20.10.2026): Friend, Client, Colleague, Partner. The raw values stay
+    /// `work` and `business`.
     static func builtInName(_ relationship: RelationshipKind, language: KeyboardLanguage) -> String {
         switch (relationship, language) {
         case (.friend, .english):   return "Friend"
@@ -74,15 +75,15 @@ struct ReplyTemplate: Codable, Hashable, Identifiable, Sendable {
         case (.client, .english):   return "Client"
         case (.client, .russian):   return "Клиент"
         case (.client, .kazakh):    return "Клиент"
-        case (.business, .english): return "Business"
-        case (.business, .russian): return "Бизнес"
-        case (.business, .kazakh):  return "Бизнес"
-        case (.work, .english):     return "Work"
-        case (.work, .russian):     return "Работа"
-        case (.work, .kazakh):      return "Жұмыс"
+        case (.business, .english): return "Partner"
+        case (.business, .russian): return "Партнёр"
+        case (.business, .kazakh):  return "Серіктес"
+        case (.work, .english):     return "Colleague"
+        case (.work, .russian):     return "Коллега"
+        case (.work, .kazakh):      return "Әріптес"
         case (.custom, .english):   return "Custom"
         case (.custom, .russian):   return "Свой"
-        case (.custom, .kazakh):    return "Басқа"
+        case (.custom, .kazakh):    return "Өзімнің"
         }
     }
 

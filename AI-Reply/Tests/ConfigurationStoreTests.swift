@@ -50,7 +50,7 @@ final class ConfigurationStoreTests: XCTestCase {
         XCTAssertEqual(friend.displayName(language: .kazakh), "Дос")
 
         let work = ReplyTemplate.builtIn(.work, sortIndex: 0)
-        XCTAssertEqual(work.displayName(language: .kazakh), "Жұмыс")
+        XCTAssertEqual(work.displayName(language: .kazakh), "Әріптес")
     }
 
     /// A user's own template name is their word, shown verbatim in every UI

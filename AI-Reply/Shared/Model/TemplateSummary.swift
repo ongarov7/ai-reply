@@ -25,6 +25,12 @@ struct TemplateSummary: Codable, Hashable, Sendable {
         names[language.rawValue] ?? names["en"] ?? id
     }
 
+    /// The kind the chip's icon is drawn for. A built-in's identifier is its
+    /// relationship; anything else is a template the user made.
+    var relationship: RelationshipKind {
+        RelationshipKind.builtIns.first { $0.rawValue == id } ?? .custom
+    }
+
     init(template: ReplyTemplate) {
         self.id = template.id
         self.names = Dictionary(
@@ -43,6 +49,13 @@ struct TemplateSummary: Codable, Hashable, Sendable {
 extension SharedSettings {
 
     private static let templateSummariesKey = "shared.templateSummaries"
+    private static let templateSummariesVersionKey = "shared.templateSummariesVersion"
+
+    /// Raised whenever what a summary holds changes without the user saving
+    /// anything: version 2 renamed Business and Work to Partner and
+    /// Colleague. The names are stored resolved, so an older summary would
+    /// show the old ones on the keyboard's first frame.
+    static let templateSummariesVersion = 2
 
     /// The visible templates, in bar order, as the app last saved them.
     ///
@@ -62,5 +75,19 @@ extension SharedSettings {
     func setTemplateSummaries(_ summaries: [TemplateSummary]) {
         guard let data = try? JSONEncoder().encode(summaries) else { return }
         defaults.set(data, forKey: Self.templateSummariesKey)
+        defaults.set(Self.templateSummariesVersion, forKey: Self.templateSummariesVersionKey)
+    }
+
+    /// Writes the summaries again, once, when the stored ones were made by an
+    /// older version - called by the app at launch, so the keyboard's first
+    /// frame after an update already shows the current names. Returns
+    /// whether it wrote.
+    @discardableResult
+    func refreshTemplateSummariesIfOutdated(from configuration: ReplyConfiguration) -> Bool {
+        guard defaults.integer(forKey: Self.templateSummariesVersionKey) < Self.templateSummariesVersion else {
+            return false
+        }
+        setTemplateSummaries(configuration.visibleTemplates.map(TemplateSummary.init(template:)))
+        return true
     }
 }

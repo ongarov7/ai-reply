@@ -47,18 +47,45 @@ enum WorkingHoursBehaviour: String, CaseIterable, Codable, Identifiable, Sendabl
 
 /// The relationship a template describes. Drives the built-in behaviour that
 /// the brief specifies for each one.
+///
+/// The raw values are stored (templates' `id` and `relationship`, the
+/// profile's active relationships, `shared.lastTemplateID`) and sent to the
+/// server, so they never change: `business` is the one the product calls
+/// Partner (Партнёр), `work` the one it calls Colleague (Коллега). An unknown
+/// value would fail the whole configuration's decode.
 enum RelationshipKind: String, CaseIterable, Codable, Identifiable, Sendable {
     case friend
     case client
+    /// Partner - Партнёр, Серіктес.
     case business
+    /// Colleague - Коллега, Әріптес.
     case work
     case custom
 
     var id: String { rawValue }
 
-    /// The four the app ships with, in bar order. `custom` is not one of them:
-    /// it is what a user-created template is.
-    static let builtIns: [RelationshipKind] = [.friend, .client, .business, .work]
+    /// The four the app ships with, in bar order: Друг, Клиент, Коллега,
+    /// Партнёр. `custom` is not one of them: it is what a user-created
+    /// template is. Only a new configuration takes this order; an existing
+    /// user keeps the one their templates' `sortIndex` already holds.
+    static let builtIns: [RelationshipKind] = [.friend, .client, .work, .business]
+
+    /// The SF Symbol drawn with the name, on the keyboard's persona row and in
+    /// the app.
+    ///
+    /// Every one exists on iOS 17.0, the deployment target (checked against
+    /// the SF Symbols availability table). SF Symbols has no `handshake`, so
+    /// Partner is two people with a line between them; it differs from
+    /// Colleague's briefcase and from Friend's two people side by side.
+    var symbolName: String {
+        switch self {
+        case .friend:   return "person.2"
+        case .client:   return "person"
+        case .work:     return "briefcase"
+        case .business: return "person.line.dotted.person"
+        case .custom:   return "person.crop.circle"
+        }
+    }
 
     /// Sensible starting point for a template of this kind.
     var defaultTone: ReplyTone {
