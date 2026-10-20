@@ -209,6 +209,9 @@
     <string name="legal_consent_ai_disclosure">«%1$s» yoki «%2$s» tugmasini bosganingizda AI Reply matn yozish uchun nusxalangan yoki belgilangan xabarni, koʻrsatmangizni va profil maʼlumotlaringizni serverimiz orqali OpenAI’ga yuboradi. Aqlli tuzatish yoqilgan boʻlsa, koʻrsatma yozish paytida ham yuboriladi. Serverimiz xabarlar, koʻrsatmalar va tayyor matnlarni saqlamaydi; profil hisobingizni oʻchirmaguningizcha unda saqlanadi.</string>
     <string name="legal_consent_ai_checkbox">Javob yozish uchun bu matnlar OpenAI’ga yuborilishiga roziman.</string>
     <string name="kb_err_quota_monthly">Bu oygi javoblar tugadi. Keyingi oyda yangilanadi.</string>
+    <string name="kb_limit_title">Javoblar limiti tugadi</string>
+    <string name="kb_limit_body">Qoʻshimcha javoblar sotib olish yoki tarif tanlash uchun AI\u00A0Reply ilovasini oching.</string>
+    <string name="kb_limit_open">AI\u00A0Replyni ochish</string>
     <string name="kb_err_consent_required">AI javoblar uchun AI Reply ilovasini ochib, shartlarni qabul qiling.</string>
     <string name="settings_account_delete">Hisobni oʻchirish</string>
     <string name="settings_account_delete_title">Hisob oʻchirilsinmi?</string>

@@ -328,7 +328,7 @@
     <string name="home_usage_title">Бүгінгі жауаптар</string>
     <string name="home_usage_left">%1$d-тен қалды</string>
     <string name="kb_err_sign_in_required">Жалғастыру үшін AI Reply қолданбасын ашып, кіріңіз.</string>
-    <string name="kb_err_quota_exhausted">Бүгінгі жауаптар бітті. Ертең жаңарады.</string>
+    <string name="kb_err_quota_exhausted">Қолжетімді жауаптар бітті.</string>
 
     <!-- Onboarding v2, the sender's grammatical gender, the tutorial row -->
     <string name="onboarding_skip_tutorial">Нұсқаулықты өткізу</string>

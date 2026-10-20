@@ -137,7 +137,9 @@ class ComposerActions(
     val assist: TypingAssistActions,
     val report: ReportActions = ReportActions.NONE,
     /** Pause, Resume, Done, Cancel, Try again and Undo of a recording. */
-    val voice: VoiceActions = VoiceActions.NONE
+    val voice: VoiceActions = VoiceActions.NONE,
+    /** The replies are spent: AI Reply opens on its purchase screen. */
+    val onOpenApp: () -> Unit = {}
 )
 
 // ----------------------------------------------------------------- persona row
@@ -423,7 +425,12 @@ fun ComposerPanel(
             }
         }
 
-        if (errorMessage != null && !flow.isConflict) NoticeLine(errorMessage, flow.error, theme)
+        if (!flow.isConflict) {
+            when {
+                flow.error?.isLimit == true -> LimitNotice(strings, theme, actions.onOpenApp)
+                errorMessage != null -> NoticeLine(errorMessage, flow.error, theme)
+            }
+        }
 
         if (composingLike && !flow.isConflict && voiceLineShows(model.voice, session.instruction.text, model.instructionLimit)) {
             VoiceLine(
@@ -455,7 +462,7 @@ fun ComposerPanel(
             // A recording's controls take the row: Reply waits for the words.
             model.voice.showsControls && stage == ReplyComposerFlow.Stage.Composing ->
                 PanelVoiceControls(model.voice, actions.voice, strings, theme)
-            // "Copy a message first" is not a failed request: Reply stays Reply.
+            // "Copy a message first" and spent replies are not a failed request: Reply stays Reply.
             else -> ComposingRow(model, actions, strings, theme, failed = errorMessage != null && flow.error?.offersRetry == true)
         }
     }

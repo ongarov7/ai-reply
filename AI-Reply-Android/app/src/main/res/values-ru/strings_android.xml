@@ -219,6 +219,9 @@
     <string name="legal_consent_ai_disclosure">Когда вы нажимаете «%1$s» или «%2$s», AI Reply отправляет скопированное или выделенное сообщение, вашу инструкцию и данные профиля через наш сервер в OpenAI, чтобы написать текст. Если включена умная коррекция, инструкция отправляется и во время набора. Наш сервер не сохраняет сообщения, инструкции и готовые тексты; профиль хранится в вашем аккаунте, пока вы его не удалите.</string>
     <string name="legal_consent_ai_checkbox">Я соглашаюсь на отправку этих текстов в OpenAI для написания ответов.</string>
     <string name="kb_err_quota_monthly">Ответы на этот месяц закончились. Они обновятся в следующем месяце.</string>
+    <string name="kb_limit_title">Лимит ответов исчерпан</string>
+    <string name="kb_limit_body">Откройте AI\u00A0Reply, чтобы докупить ответы или выбрать тариф.</string>
+    <string name="kb_limit_open">Открыть AI\u00A0Reply</string>
     <string name="kb_err_consent_required">Откройте AI Reply и примите условия, чтобы пользоваться AI-ответами.</string>
     <string name="settings_account_delete">Удалить аккаунт</string>
     <string name="settings_account_delete_title">Удалить аккаунт?</string>

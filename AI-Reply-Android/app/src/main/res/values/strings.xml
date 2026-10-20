@@ -329,7 +329,7 @@
     <string name="home_usage_title">Replies today</string>
     <string name="home_usage_left">of %1$d left</string>
     <string name="kb_err_sign_in_required">Open the AI Reply app and sign in to keep replying.</string>
-    <string name="kb_err_quota_exhausted">You have used today\'s replies. They come back tomorrow.</string>
+    <string name="kb_err_quota_exhausted">You have used your available replies.</string>
 
     <!-- Onboarding v2, the sender's grammatical gender, the tutorial row -->
     <string name="onboarding_skip_tutorial">Skip tutorial</string>

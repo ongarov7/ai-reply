@@ -328,7 +328,7 @@
     <string name="home_usage_title">Ответы сегодня</string>
     <string name="home_usage_left">осталось из %1$d</string>
     <string name="kb_err_sign_in_required">Откройте приложение AI Reply и войдите, чтобы продолжить.</string>
-    <string name="kb_err_quota_exhausted">Ответы на сегодня закончились. Они обновятся завтра.</string>
+    <string name="kb_err_quota_exhausted">Доступные ответы закончились.</string>
 
     <!-- Onboarding v2, the sender's grammatical gender, the tutorial row -->
     <string name="onboarding_skip_tutorial">Пропустить обучение</string>

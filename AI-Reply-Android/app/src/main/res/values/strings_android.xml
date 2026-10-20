@@ -248,6 +248,10 @@
     <string name="legal_consent_ai_disclosure">When you tap %1$s or %2$s, AI Reply sends the message you copied or selected, your instruction and your profile details through our server to OpenAI to write the text. With Smart correction on, your instruction is also sent while you type it. Our server does not save the messages, instructions or generated texts; your profile is kept in your account until you delete it.</string>
     <string name="legal_consent_ai_checkbox">I agree that these texts are sent to OpenAI to write replies.</string>
     <string name="kb_err_quota_monthly">You have used this month\'s replies. They come back next month.</string>
+    <!-- The keyboard when the replies are spent: it sells nothing, the app does. -->
+    <string name="kb_limit_title">Reply limit reached</string>
+    <string name="kb_limit_body">Open AI\u00A0Reply to buy more replies or choose a plan.</string>
+    <string name="kb_limit_open">Open AI\u00A0Reply</string>
     <string name="kb_err_consent_required">Open AI Reply and accept the terms to use AI replies.</string>
     <string name="settings_account_delete">Delete account</string>
     <string name="settings_account_delete_title">Delete your account?</string>

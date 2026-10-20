@@ -250,7 +250,7 @@
     <string name="settings_account_signed_out">Hisobga kirilmagan</string>
     <string name="settings_account_footer">Klaviatura ham shu hisobdan foydalanadi. Chiqsangiz, qayta kirguningizcha javoblar ishlamaydi.</string>
     <string name="kb_err_sign_in_required">Javob berishni davom ettirish uchun AI Reply ilovasini ochib, hisobga kiring.</string>
-    <string name="kb_err_quota_exhausted">Bugungi javoblaringiz tugadi. Ular ertaga yangilanadi.</string>
+    <string name="kb_err_quota_exhausted">Mavjud javoblar tugadi.</string>
 
     <!-- Onboarding v2, the sender's grammatical gender, the tutorial row -->
     <string name="onboarding_skip_tutorial">Qoʻllanmani oʻtkazib yuborish</string>

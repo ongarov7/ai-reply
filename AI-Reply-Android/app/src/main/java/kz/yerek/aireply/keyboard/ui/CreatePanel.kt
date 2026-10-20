@@ -95,7 +95,9 @@ class CreateActions(
     val onReplyToCopied: () -> Unit = {},
     val report: ReportActions = ReportActions.NONE,
     /** Pause, Resume, Done, Cancel, Try again and Undo of a recording. */
-    val voice: VoiceActions = VoiceActions.NONE
+    val voice: VoiceActions = VoiceActions.NONE,
+    /** The replies are spent: AI Reply opens on its purchase screen. */
+    val onOpenApp: () -> Unit = {}
 )
 
 /**
@@ -197,7 +199,12 @@ fun CreatePanel(
             }
         }
 
-        if (errorMessage != null && !flow.isConflict) NoticeLine(errorMessage, flow.error, theme)
+        if (!flow.isConflict) {
+            when {
+                flow.error?.isLimit == true -> LimitNotice(strings, theme, actions.onOpenApp)
+                errorMessage != null -> NoticeLine(errorMessage, flow.error, theme)
+            }
+        }
 
         if (!flow.showsReply && !flow.isConflict && !model.compact) CreateLine(model, actions, strings, theme)
 

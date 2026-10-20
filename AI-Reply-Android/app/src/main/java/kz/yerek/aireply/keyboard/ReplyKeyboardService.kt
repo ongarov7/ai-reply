@@ -644,7 +644,8 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
             onMic = ::startPanelDictation,
             assist = assistActions,
             report = reportActions,
-            voice = voiceActions
+            voice = voiceActions,
+            onOpenApp = ::openPurchase
         )
     }
 
@@ -689,8 +690,19 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
             onMic = ::startPanelDictation,
             onReplyToCopied = ::replyToCopied,
             report = reportActions,
-            voice = voiceActions
+            voice = voiceActions,
+            onOpenApp = ::openPurchase
         )
+    }
+
+    /**
+     * "Open AI Reply" under «Лимит ответов исчерпан»: the app's purchase
+     * screen. The panel is kept as it is, so after buying the same request is
+     * one tap away.
+     */
+    private fun openPurchase() {
+        leaveFields()
+        KeyboardAppLink.open(this, KeyboardAppLink.PURCHASE)
     }
 
     /** Pause, Resume, Done, Cancel, Try again, Insert and Undo - for the app's field and the panels alike. */

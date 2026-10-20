@@ -219,6 +219,9 @@
     <string name="legal_consent_ai_disclosure">«%1$s» немесе «%2$s» батырмасын басқанда AI Reply мәтін жазу үшін көшірілген не белгіленген хабарламаны, нұсқауыңызды және профиль деректерін біздің сервер арқылы OpenAI-ға жібереді. Ақылды түзету қосулы болса, нұсқау теру кезінде де жіберіледі. Біздің сервер хабарламаларды, нұсқауларды және дайын мәтіндерді сақтамайды; профиль тіркелгіңізді жойғанша сонда сақталады.</string>
     <string name="legal_consent_ai_checkbox">Жауап жазу үшін бұл мәтіндердің OpenAI-ға жіберілуіне келісемін.</string>
     <string name="kb_err_quota_monthly">Осы айдағы жауаптар бітті. Келесі айда жаңарады.</string>
+    <string name="kb_limit_title">Жауаптар лимиті таусылды</string>
+    <string name="kb_limit_body">Қосымша жауап сатып алу немесе тариф таңдау үшін AI\u00A0Reply қолданбасын ашыңыз.</string>
+    <string name="kb_limit_open">AI\u00A0Reply-ды ашу</string>
     <string name="kb_err_consent_required">AI жауаптары үшін AI Reply қолданбасын ашып, шарттарды қабылдаңыз.</string>
     <string name="settings_account_delete">Тіркелгіні жою</string>
     <string name="settings_account_delete_title">Тіркелгіні жоясыз ба?</string>
