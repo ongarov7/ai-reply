@@ -23,8 +23,8 @@
 
 | Код | HTTP | Когда | Что делает приложение |
 |---|---|---|---|
-| `DAILY_LIMIT_REACHED` | 429 | дневной лимит ответов исчерпан | «Ответы на сегодня закончились…» |
-| `MONTHLY_LIMIT_REACHED` | 429 | месячный лимит тарифа исчерпан (`monthly_message_limit > 0`) | своё сообщение «…на этот месяц» |
+| `DAILY_LIMIT_REACHED` | 429 | дневной лимит ответов исчерпан, и других источников (пропуск, бесплатные ответы, кредиты) не осталось | «Ответы на сегодня закончились…» |
+| `MONTHLY_LIMIT_REACHED` | 429 | месячный лимит тарифа исчерпан (`monthly_message_limit > 0`), других источников не осталось | своё сообщение «…на этот месяц» |
 | `CONSENT_REQUIRED` | 403 | нет согласия на **текущие** версии условий и политики (не давали, старая версия или отозвано) | возвращается на экран согласия; клавиатура просит открыть приложение |
 | `VOICE_LIMIT_REACHED` | 429 | дневной лимит голосового ввода исчерпан (`LIMIT_TRANSCRIBE_PER_DAY`, квота ответов ни при чём); `details { daily_limit, resets_at }` | клавиатура сообщает, что голосовой ввод на сегодня закончился; набор текстом и ответы работают |
 
@@ -181,7 +181,8 @@ HMAC, лимиты). Новые сборки их не вызывают.
 |---|---|---|
 | GET | `/api/v1/me` | профиль + тариф + квота одним запросом |
 | PATCH | `/api/v1/me` | частичное обновление профиля (все поля опциональны; `POST` — то же для Android) |
-| GET | `/api/v1/me/usage` | `daily_limit`, `used_today`, `remaining_today`, `resets_at` |
+| GET | `/api/v1/me/usage` | `daily_limit`, `used_today`, `remaining_today`, `resets_at`, баланс (см. «Баланс ответов») |
+| GET | `/api/v1/me/credits` | баланс сверх тарифа и последние 50 записей журнала (`features.credits`) |
 | GET | `/api/v1/me/subscription` | текущий тариф и статус |
 | GET | `/api/v1/me/devices` | список устройств |
 | POST | `/api/v1/devices` | регистрация устройства (для старых сборок; push — через `/installations`) |
@@ -201,7 +202,8 @@ HMAC, лимиты). Новые сборки их не вызывают.
                 "reply_preferences": true, "sender_profile": true, "instruction_polish": true,
                 "voice_transcription": true,
                 "product_events": true, "installations": true, "push_notifications": true,
-                "preferred_language": true, "purchases": false, "ai_reports": true, "account_deletion": true },
+                "preferred_language": true, "purchases": false, "ai_reports": true, "account_deletion": true,
+                "welcome_bonus": true, "credits": true, "idempotent_generation": true },
   "payment_mode": "off",
   "legal": { "terms_version": "2026-10-08", "privacy_version": "2026-10-08",
              "terms_url": "https://ai-reply.kz/offer", "privacy_url": "https://ai-reply.kz/privacy",
@@ -218,6 +220,13 @@ HMAC, лимиты). Новые сборки их не вызывают.
   не показывает микрофон (эндпоинт отвечает `404 NOT_FOUND`).
 - `features.ai_reports` — показывать кнопку «Пожаловаться» (`POST /api/v1/ai/reports`).
 - `features.account_deletion` — показывать «Удалить аккаунт».
+- `features.welcome_bonus` — новые аккаунты получают бесплатные ответы (настройка админки
+  `welcome_bonus_units` больше 0).
+- `features.credits` — в `usage` есть `welcome`, `credits`, `pass`, `remaining_total`, `bucket`,
+  работает `GET /api/v1/me/credits`, в лимитных ошибках — `welcome_remaining`,
+  `credits_remaining`, `pass_active`, `can_buy`.
+- `features.idempotent_generation` — `/ai/reply` и `/ai/compose` принимают заголовок
+  `Idempotency-Key` (см. ниже).
 - `payment_mode` — строка `off | demo | live` (по умолчанию `off`).
 - `legal.contact_email` — `CONTACT_EMAIL`, пустая строка, если не задан (тогда приложение
   ведёт на `support_url`). `legal.ai_provider` — кому уходят тексты (экран согласия).
@@ -319,6 +328,65 @@ HMAC, лимиты). Новые сборки их не вызывают.
 - Язык push и писем решает сервер: `preferred_language` → язык последнего устройства
   аккаунта (`locale` установки) → `users.locale` → `en`.
 
+### Баланс ответов
+
+`usage` (в `/me`, `/me/usage`, ответах входа и обновления сессии, ответах `/ai/reply` и
+`/ai/compose`) сохраняет все прежние поля с прежним смыслом — `remaining_today`,
+`used_today` и `used_month` относятся только к тарифу — и добавляет:
+
+```json
+"welcome": { "total": 50, "remaining": 35 },
+"credits": 0,
+"pass": { "expires_at": "2026-10-21T15:00:00+05:00", "remaining": 40 },
+"remaining_total": 42,
+"bucket": "welcome"
+```
+
+- `welcome` — бесплатные ответы нового аккаунта; поля нет, если их у аккаунта не было
+  (старые аккаунты, install-токены, симулятор). Отозванные администратором показываются с
+  `remaining: 0`.
+- `credits` — остаток начислений администратора и купленных пакетов.
+- `pass` — действующий пропуск (`expires_at` в часовом поясе приложения); поля нет, если
+  пропуска нет. Пропуск, у которого кончились ответы, остаётся до `expires_at` с `remaining: 0`.
+- `remaining_total` = `remaining_today` + пропуск + бесплатные ответы + `credits`.
+- `bucket` — только в ответах `/ai/reply` и `/ai/compose`: чем оплачен этот ответ —
+  `daily | pass | welcome | admin | pack`.
+
+Порядок списания: дневной лимит тарифа → действующий пропуск (раньше истекающий первым) →
+бесплатные ответы → начисления администратора → пакеты (старые первыми). Всё списание —
+одна транзакция с проверкой остатка в самом `UPDATE`: параллельные запросы не берут одну
+единицу дважды, баланс не уходит в минус. Месячный лимит тарифа закрывает только тариф и
+не мешает остальным источникам; ответы из них считаются в `usage_daily.extra_used` /
+`usage_monthly.extra_used`, а не в `used`. Ошибка провайдера или ушедший клиент возвращают
+единицу ровно в тот источник, из которого она взята. Резерв, который остался «в работе»
+после падения процесса, через 5 минут (`max(5 мин, 4 × OPENAI_TIMEOUT)`) возвращает
+фоновая задача раз в 15 минут.
+
+`429 DAILY_LIMIT_REACHED` / `MONTHLY_LIMIT_REACHED` приходит, только когда закончилось всё;
+коды прежние, в `details` добавлены `welcome_remaining`, `credits_remaining`,
+`pass_active` (идёт пропуск, у которого кончились ответы) и `can_buy` (можно предложить
+докупить ответы на этой платформе; пока покупок нет — всегда `false`).
+
+Бесплатные ответы: один раз на аккаунт (`kind = 'account'`), созданный после выхода этой
+версии (`system_settings.welcome_bonus_since` — момент миграции `0015_credits`), в
+количестве `welcome_bonus_units` (по умолчанию 50, `0` — выключено, меняется в админке и
+действует только на новые аккаунты). Выдаются при регистрации; если запись не удалась,
+вход всё равно проходит, а `/me` или следующий ответ сессии выдают их позже. Повторный вход,
+переустановка и другая платформа второй раз не выдают. Удалённый аккаунт не хранит ничего
+о человеке, поэтому новая регистрация после удаления получит бесплатные ответы снова —
+известное ограничение.
+
+`GET /api/v1/me/credits`:
+
+```json
+{ "balance": { "welcome": { "total": 50, "remaining": 35 }, "credits": 0 },
+  "entries": [ { "entry": "consume", "delta": -1, "kind": "welcome", "created_at": "2026-10-20T10:00:00Z" },
+               { "entry": "grant", "delta": 50, "kind": "welcome", "created_at": "2026-10-20T09:00:00Z" } ] }
+```
+
+`entries` — последние 50, новые первыми: `entry` — `grant | consume | refund | revoke`,
+`kind` — `welcome | admin | pack | pass`. Ответы из тарифа в журнал не пишутся.
+
 ## Установки и push-уведомления
 
 Схема, настройка Firebase, повторы и тестирование — [docs/notifications.md](../../docs/notifications.md).
@@ -416,6 +484,10 @@ FCM-токене, смене языка, разрешения или внутр�
 | `quota_low` | после ответа осталось `0 < остаток ≤ max(1, ⌈лимит × PUSH_QUOTA_LOW_PERCENT / 100⌉)` (7 → 1, 30 → 3, 50 → 5) | push |
 | `quota_exhausted` | после ответа остаток 0 или запрос упёрся в лимит | push |
 
+Пока остались пропуск, бесплатные ответы или кредиты, квотные уведомления не отправляются:
+`quota_exhausted` придёт, когда закончится всё. Фильтр аудитории `quota` в кампаниях тоже
+считает общий остаток (тариф + пропуск + бесплатные ответы + кредиты).
+
 Каждое событие создаёт не больше одного уведомления — ключ уникален в БД
 (`notifications.dedupe_key = user:<uid>:<ключ>`):
 
@@ -461,11 +533,29 @@ FCM-токене, смене языка, разрешения или внутр�
 { "reply": "…", "detected_language": "ru",
   "usage": { "daily_limit": 7, "used_today": 1, "remaining_today": 6,
              "monthly_limit": 0, "used_month": 1,
-             "resets_at": "2026-03-11T19:00:00Z", "timezone": "Asia/Almaty" } }
+             "resets_at": "2026-03-11T19:00:00Z", "timezone": "Asia/Almaty",
+             "welcome": { "total": 50, "remaining": 50 }, "credits": 0,
+             "remaining_total": 56, "bucket": "daily" } }
 ```
 
 Порядок на сервере: аутентификация → согласие (`CONSENT_REQUIRED`) → валидация
-размера → тариф и квота (атомарный резерв) → промпт → провайдер → учёт токенов → ответ.
+размера → тариф и баланс (атомарный резерв в одном из источников, см. «Баланс ответов») →
+промпт → провайдер → учёт токенов → ответ.
+
+Заголовок `Idempotency-Key` (`^[A-Za-z0-9-]{8,64}$`, `features.idempotent_generation`;
+у `/ai/compose` — то же самое). Приложение создаёт один ключ на действие пользователя
+(Reply, «Создать», «Другой вариант») и повторяет его только при автоматическом повторе того
+же действия:
+
+- тот же ключ после успеха — второго списания нет; в течение 10 минут сервер генерирует
+  ещё раз бесплатно (`usage.bucket` — источник первой оплаты), следующий повтор —
+  `409 CONFLICT`, `details { field: "idempotency_key", reason: "used" }`; так же и через 10 минут
+  или с тем же ключом на другом эндпоинте;
+- тот же ключ, пока первый запрос выполняется, — `409`, `reason: "in_progress"`;
+- неудачная генерация возвращается, и ключ можно использовать снова (одно списание);
+- текст ответа для повторов не хранится — повтор генерирует заново;
+- неверный формат — `400 INVALID_REQUEST`, `details { field: "idempotency_key", reason: "format" }`;
+- без заголовка всё как раньше: каждый запрос оплачивается.
 При ошибке провайдера резерв возвращается, счётчик не растёт — и тогда, когда клиент
 ушёл, не дождавшись ответа (клавиатуру закрыли): возврат квоты, токены и событие
 пишутся в отдельном контексте с коротким таймаутом.
@@ -473,7 +563,8 @@ FCM-токене, смене языка, разрешения или внутр�
 `usage.monthly_limit` (0 — без месячного лимита) и `used_month` — как в `GET /me/usage`.
 При месячном лимите `remaining_today` не больше того, что осталось на месяц. В
 `429 DAILY_LIMIT_REACHED` / `MONTHLY_LIMIT_REACHED` `details` — `daily_limit`, `used_today`,
-`resets_at` и, если у тарифа есть месячный лимит, `monthly_limit` и `used_month`.
+`resets_at`, `welcome_remaining`, `credits_remaining`, `pass_active`, `can_buy` и, если у
+тарифа есть месячный лимит, `monthly_limit` и `used_month`.
 
 Профиль берётся с сервера; блок `profile` в запросе допускается для клиентов,
 которые держат его локально, и имеет приоритет.
@@ -744,7 +835,9 @@ production с ней не стартуют). В `PAYMENT_MODE=demo` подтве
 один раз на платёж, даже если подтверждение повторили. Статус `succeeded` и новый тариф
 пишутся одной транзакцией и не зависят от обрыва запроса: если запись не удалась, платёж
 остаётся незавершённым, и повторный `confirm` выдаёт тариф; повтор после успеха возвращает
-текущую подписку без второго уведомления.
+текущую подписку без второго уведомления. Завершается только платёж в статусе `created` или
+`pending`: `confirm` неудавшегося или возвращённого платежа отвечает `409 CONFLICT`
+(`details { field: "payment", reason: "failed" | "refunded" }`) и тариф не выдаёт.
 
 ## Совместимость со старыми сборками
 
@@ -771,6 +864,26 @@ access-токен `/api/v1` там отвечает `401`, чтобы польз
 `reports`.
 `users/{id}` отдаёт `user.preferred_language`. Отключение пользователя и «отозвать сессии»
 отвязывают его установки (`devices_detached` в аудите).
+
+`users/{id}` также отдаёт `subscription` с реальным состоянием (`status` — статус
+действующей подписки; если её нет — последней записи, истёкшая — `expired`, записей нет —
+`none`; `usable` — даёт ли она лимиты сейчас), `balances { welcome { total, remaining } | null,
+credits, admin, packs, pass { expires_at, remaining } | null, remaining_total }`, `grants`
+(до 50: `id`, `kind`, `units_total`, `units_remaining`, `status` `active | revoked`,
+`created_at`, `expires_at`, `reason`, `by` `system | admin`, `revoked_at`, `revoke_reason`) и
+`ledger` (последние 50: `at`, `entry`, `kind`, `delta`, `by`, `reason`). Список `users`
+отдаёт `remaining_total` (дневной остаток тарифа + все остальные источники); поиск `q`
+ищет `%` и `_` как обычные символы.
+
+| Метод | Путь | Что делает |
+|---|---|---|
+| POST | `/settings/welcome-bonus` | `{ "units": 0…1000 }` — бесплатные ответы новых аккаунтов (`0` — выкл.); действует только на аккаунты, созданные после изменения; аудит `settings.welcome_bonus.update { before, after }`; `GET /settings` отдаёт `welcome_bonus { units, default, since, range }` |
+| POST | `/users/{id}/credits` | `{ "units": 1…10000, "reason": "…" }` (причина обязательна, до 200 символов) — начисление `admin` без срока; 60 в час на администратора; аудит `credits.grant { grant_id, kind, units, reason }` |
+| POST | `/users/{id}/credits/{grant_id}/revoke` | `{ "reason": "…" }` (необязательно) — остаток начисления любого вида обнуляется, потраченное остаётся; повтор — `409` (`details.field = grant_id`); аудит `credits.revoke { grant_id, kind, units_revoked, reason }` |
+
+Дашборд: «сегодня» везде — день часового пояса приложения; отказы по лимиту не считаются
+неудачными генерациями (`stats.refused` отдельно от `stats.failed`, в среднюю задержку не
+входят); `requests_today` включает ответы из всех источников.
 
 Вход (`POST /admin/login`, `/simulator/login`): `RATE_ADMIN_LOGIN_PER_HOUR` на IP, 5 попыток
 за 15 минут на пару адрес+IP (считаются до проверки пароля) и 20 неудач в час на адрес —

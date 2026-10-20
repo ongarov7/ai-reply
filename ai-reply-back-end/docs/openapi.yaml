@@ -313,9 +313,24 @@ paths:
         "409": { description: EMAIL_ALREADY_IN_USE }
   /api/v1/me/usage:
     get:
-      summary: Остаток генераций
+      summary: Остаток генераций (тариф, бесплатные ответы, кредиты, пропуск)
       security: [{ bearerAuth: [] }]
-      responses: { "200": { description: OK } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Usage" }
+  /api/v1/me/credits:
+    get:
+      summary: Баланс сверх тарифа и последние 50 записей журнала (features.credits)
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Credits" }
   /api/v1/me/subscription:
     get:
       summary: Текущая подписка
@@ -471,6 +486,8 @@ paths:
         язык сообщения → input_language → language. Другой язык даёт только явная
         просьба в instruction («ответь на русском»).
       security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         required: true
         content:
@@ -508,15 +525,18 @@ paths:
                   reply: { type: string }
                   detected_language: { type: string }
                   usage: { $ref: "#/components/schemas/Usage" }
-        "400": { description: "INVALID_REQUEST (details.field = source_text) или неизвестное поле" }
+        "400": { description: "INVALID_REQUEST (details.field = source_text | idempotency_key) или неизвестное поле" }
         "403": { description: CONSENT_REQUIRED — нет согласия на текущие версии условий и политики }
-        "429": { description: "DAILY_LIMIT_REACHED / MONTHLY_LIMIT_REACHED (details: daily_limit, used_today, resets_at; monthly_limit и used_month при месячном лимите) / RATE_LIMITED" }
+        "409": { description: "CONFLICT, details.field = idempotency_key: reason = in_progress (тот же ключ ещё выполняется) | used (ключ уже оплатил ответ и бесплатный повтор израсходован или прошло 10 минут)" }
+        "429": { description: "DAILY_LIMIT_REACHED / MONTHLY_LIMIT_REACHED — закончились все источники (details: daily_limit, used_today, resets_at; monthly_limit и used_month при месячном лимите; welcome_remaining, credits_remaining, pass_active, can_buy) / RATE_LIMITED" }
         "502": { description: AI_PROVIDER_UNAVAILABLE }
         "504": { description: AI_TIMEOUT }
   /api/v1/ai/compose:
     post:
       summary: Написать новое сообщение по инструкции (режим «Создать»)
       security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         required: true
         content:
@@ -547,10 +567,11 @@ paths:
                   text: { type: string }
                   detected_language: { type: string }
                   usage: { $ref: "#/components/schemas/Usage" }
-        "400": { description: "INVALID_REQUEST (details.field = instruction)" }
+        "400": { description: "INVALID_REQUEST (details.field = instruction | idempotency_key)" }
         "401": { description: UNAUTHORIZED }
         "403": { description: CONSENT_REQUIRED }
-        "429": { description: DAILY_LIMIT_REACHED / MONTHLY_LIMIT_REACHED / RATE_LIMITED }
+        "409": { description: "CONFLICT, details.field = idempotency_key, reason = in_progress | used (как у /ai/reply)" }
+        "429": { description: "DAILY_LIMIT_REACHED / MONTHLY_LIMIT_REACHED (details как у /ai/reply) / RATE_LIMITED" }
         "502": { description: AI_PROVIDER_UNAVAILABLE }
         "504": { description: AI_TIMEOUT }
   /api/v1/ai/polish:
@@ -821,6 +842,69 @@ paths:
       parameters:
         - { name: id, in: path, required: true, schema: { type: string } }
       responses: { "200": { description: "{ ok: true, changed: bool }" }, "404": { description: NOT_FOUND } }
+  /api/v1/admin/settings/welcome-bonus:
+    post:
+      tags: [admin]
+      summary: Бесплатные ответы новых аккаунтов (0 — выключено); аудит settings.welcome_bonus.update { before, after }
+      description: Действует только на аккаунты, созданные после изменения; выданные ответы не меняются.
+      security: [{ adminSession: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [units]
+              properties:
+                units: { type: integer, minimum: 0, maximum: 1000 }
+      responses:
+        "200": { description: "{ units, default: 50, since: \"2026-10-20 15:04\", range: { min, max } }" }
+        "400": { description: "INVALID_REQUEST, details.field = units, reason = range" }
+  /api/v1/admin/users/{id}/credits:
+    post:
+      tags: [admin]
+      summary: Начислить ответы вручную (kind admin, без срока); аудит credits.grant { grant_id, kind, units, reason }
+      security: [{ adminSession: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [units, reason]
+              properties:
+                units: { type: integer, minimum: 1, maximum: 10000 }
+                reason: { type: string, maxLength: 200, description: "обязательна; приводится к одной строке" }
+      responses:
+        "200": { description: "{ grant: { id, kind, units_total, units_remaining, status, created_at, expires_at, reason, by, revoked_at, revoke_reason } }" }
+        "400": { description: "INVALID_REQUEST, details.field = units (range) | reason (required, too_long)" }
+        "404": { description: NOT_FOUND }
+        "429": { description: "RATE_LIMITED — больше 60 начислений в час на администратора" }
+  /api/v1/admin/users/{id}/credits/{grant_id}/revoke:
+    post:
+      tags: [admin]
+      summary: Отозвать остаток начисления (любого вида); аудит credits.revoke { grant_id, kind, units_revoked, reason }
+      security: [{ adminSession: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: grant_id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                reason: { type: string, maxLength: 200 }
+      responses:
+        "200": { description: "{ grant, units_revoked }" }
+        "404": { description: NOT_FOUND }
+        "409": { description: "CONFLICT, details.field = grant_id, reason = revoked" }
   /v1/auth/register:
     post:
       summary: "Совместимость: install_id → токен (старые сборки; только при LEGACY_API_ENABLED=true, по умолчанию выключено)"
@@ -832,6 +916,20 @@ paths:
       deprecated: true
       responses: { "200": { description: OK } }
 components:
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema: { type: string, pattern: "^[A-Za-z0-9-]{8,64}$" }
+      description: >-
+        features.idempotent_generation. Один ключ на действие пользователя (Reply, Create,
+        Regenerate), повторяется только при автоматическом повторе того же действия. Ключ
+        оплачивает не больше одного ответа: повтор после успеха в течение 10 минут генерирует
+        ещё раз бесплатно (usage.bucket — источник первой оплаты), следующий — 409
+        reason = used; пока первый запрос выполняется — 409 reason = in_progress; после
+        неудачи (возврат) ключ можно использовать снова. Текст ответа не хранится. Без
+        заголовка каждый запрос оплачивается, как раньше.
   securitySchemes:
     bearerAuth:
       type: http
@@ -882,6 +980,9 @@ components:
             purchases: { type: boolean, description: "тариф можно купить прямо сейчас (переключатель админки + интеграция оплаты)" }
             ai_reports: { type: boolean, description: "POST /api/v1/ai/reports доступен — показывать «Пожаловаться»" }
             account_deletion: { type: boolean, description: "DELETE /api/v1/me и POST /api/v1/me/delete доступны" }
+            welcome_bonus: { type: boolean, description: "новые аккаунты получают бесплатные ответы (welcome_bonus_units > 0)" }
+            credits: { type: boolean, description: "usage.welcome/credits/pass/remaining_total/bucket, GET /me/credits, расширенные details лимитных ошибок" }
+            idempotent_generation: { type: boolean, description: "заголовок Idempotency-Key на /ai/reply и /ai/compose" }
         demo_mode: { type: boolean }
         payment_mode: { type: string, enum: [off, demo, live], description: "по умолчанию off" }
         legal: { $ref: "#/components/schemas/LegalConfig" }
@@ -1021,14 +1122,52 @@ components:
         send: { type: boolean }
     Usage:
       type: object
+      description: >-
+        Порядок списания: дневной лимит тарифа → действующий пропуск → бесплатные ответы →
+        начисления администратора → купленные пакеты (старые первыми). Месячный лимит тарифа
+        закрывает только тариф; ответы из других источников не входят в used_today/used_month.
       properties:
         daily_limit: { type: integer }
-        used_today: { type: integer }
-        remaining_today: { type: integer, description: "не больше остатка месяца, если monthly_limit > 0" }
+        used_today: { type: integer, description: "только тариф" }
+        remaining_today: { type: integer, description: "только тариф; не больше остатка месяца, если monthly_limit > 0" }
         monthly_limit: { type: integer, description: "0 — без месячного лимита" }
-        used_month: { type: integer }
+        used_month: { type: integer, description: "только тариф" }
         resets_at: { type: string, format: date-time }
         timezone: { type: string }
+        welcome:
+          type: object
+          description: "бесплатные ответы; поля нет, если у аккаунта их не было"
+          properties:
+            total: { type: integer, example: 50 }
+            remaining: { type: integer, example: 35 }
+        credits: { type: integer, description: "остаток начислений администратора и купленных пакетов" }
+        pass:
+          type: object
+          description: "действующий пропуск; поля нет, если его нет"
+          properties:
+            expires_at: { type: string, format: date-time, example: "2026-10-21T15:00:00+05:00" }
+            remaining: { type: integer }
+        remaining_total: { type: integer, description: "remaining_today + pass + welcome + credits" }
+        bucket: { type: string, enum: [daily, pass, welcome, admin, pack], description: "только в ответах /ai/reply и /ai/compose: чем оплачен этот ответ" }
+    Credits:
+      type: object
+      properties:
+        balance:
+          type: object
+          properties:
+            welcome: { type: object, properties: { total: { type: integer }, remaining: { type: integer } } }
+            credits: { type: integer }
+            pass: { type: object, properties: { expires_at: { type: string, format: date-time }, remaining: { type: integer } } }
+        entries:
+          type: array
+          description: "последние 50, новые первыми"
+          items:
+            type: object
+            properties:
+              entry: { type: string, enum: [grant, consume, refund, revoke] }
+              delta: { type: integer }
+              kind: { type: string, enum: [welcome, admin, pack, pass] }
+              created_at: { type: string, format: date-time }
     DeleteAccountRequest:
       type: object
       additionalProperties: false
