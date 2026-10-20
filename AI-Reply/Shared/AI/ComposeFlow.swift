@@ -16,13 +16,16 @@ import Foundation
 ///     New: everything above is discarded, back to an empty instruction.
 ///
 ///     composing ──Reply to copied──▶ the reply composer, with the copied
-///         message and this instruction (nothing generated); nothing copied
-///         or no Full Access: an error here, and Create stays.
+///         message and this instruction (nothing generated); paste refused
+///         by iOS: the reply composer with an empty card to type the message
+///         into; nothing copied or no Full Access: an error here, and Create
+///         stays.
 struct ComposeSession: Equatable, Sendable {
     var instruction: String = ""
     var flow = ReplyComposerFlow()
     /// "Reply to copied" could not start: nothing copied, no Full Access, or
-    /// an instruction too long for a reply. Kept apart from `flow.error`
+    /// an instruction too long for a reply. (A refused paste is not kept
+    /// here: the reply opens with a card to type the message into.) Kept apart from `flow.error`
     /// because it is not a failure of writing - Write stays Write, not Retry.
     var copiedMessageError: AIReplyError?
 
@@ -234,6 +237,18 @@ final class ComposeFlowCoordinator {
         }
 
         switch read() {
+        case .failure(.pasteDenied):
+            // The user did copy and iOS refused it. The way round it is
+            // typing the message, which only the reply composer's card
+            // takes - Create has no field for it. So the reply opens as a
+            // persona tap opens it after a refusal: an empty card to type
+            // into, the refusal said, and the instruction typed here.
+            var reply = ReplySession(sourceMessage: "", source: nil, template: persona)
+            reply.instruction = instruction
+            reply.flow.fail(.pasteDenied)
+            ReplyLog.event("ai_compose_reply_to_copied: paste denied, message to be typed")
+            clear()
+            return reply
         case .failure(let error):
             refuseReplyToCopied(error)
             return nil

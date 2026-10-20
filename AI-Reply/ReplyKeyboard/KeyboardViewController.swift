@@ -1446,8 +1446,9 @@ extension KeyboardViewController: KeyboardActionBarDelegate {
     /// tap is the user's gesture, as a persona tap is - and the panel
     /// becomes the reply composer with it, the persona used last and the
     /// instruction typed here. Nothing is generated: Reply is still the
-    /// user's tap. Nothing copied, or no Full Access: Create stays and
-    /// says so.
+    /// user's tap. A paste iOS refused opens it too, with an empty message
+    /// card to type into. Nothing copied, or no Full Access: Create stays
+    /// and says so.
     private func replyToCopiedFromCreate() {
         let lastUsed = SharedSettings.shared.lastTemplateID
         // A persona the configuration has not loaded yet is looked up

@@ -393,20 +393,31 @@ final class ComposeFlowTests: XCTestCase {
         XCTAssertTrue(scripted.requests.isEmpty)
     }
 
-    /// iOS refused the paste: Create says so - and where to allow it - and
-    /// stays, with the instruction, and without Retry.
-    func testRefusedPasteIsExplainedInCreate() async {
+    /// iOS refused the paste. Create has no field to type the message in,
+    /// so the reply composer opens as after a persona tap: an empty card to
+    /// type the message into, the refusal said (where to allow it, or type),
+    /// the instruction carried over - and nothing written, no Retry.
+    func testRefusedPasteOpensTheReplyWithAMessageToType() async throws {
         coordinator.open()
-        coordinator.updateInstruction("да")
+        coordinator.updateInstruction("  да\n")
         let reply = coordinator.replyToCopied(persona: friend, instructionLimit: 280) { .failure(.pasteDenied) }
 
-        XCTAssertNil(reply)
-        XCTAssertTrue(coordinator.isActive)
-        XCTAssertEqual(coordinator.session?.instruction, "да")
+        let opened = try XCTUnwrap(reply)
+        XCTAssertEqual(opened.sourceMessage, "")
+        XCTAssertNil(opened.source)
+        XCTAssertNil(opened.usableSource, "nothing to reply to until the user types it")
+        XCTAssertEqual(opened.instruction, "да")
+        XCTAssertEqual(opened.template, friend)
+        XCTAssertEqual(opened.flow.stage, .composing)
+        XCTAssertEqual(opened.flow.error, .pasteDenied, "the card offers typing for this error")
+        XCTAssertEqual(opened.flow.error?.offersRetry, false)
         for language in AppLanguage.allCases {
             let strings = AIReplyStrings.forLanguage(language)
-            XCTAssertEqual(coordinator.session?.notice(strings), ComposeSession.Notice(text: strings.pasteDenied, offersRetry: false))
+            XCTAssertEqual(strings.keyboardMessage(for: .pasteDenied), strings.pasteDenied, language.rawValue)
         }
+        XCTAssertFalse(coordinator.isActive, "Create closes: the panel is the reply now")
+        XCTAssertNil(ComposeSessionParking.take())
+
         try? await Task.sleep(for: .milliseconds(20))
         XCTAssertTrue(scripted.requests.isEmpty)
     }
