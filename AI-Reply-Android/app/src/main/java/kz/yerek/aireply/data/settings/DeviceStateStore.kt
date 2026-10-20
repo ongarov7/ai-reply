@@ -82,16 +82,55 @@ class DeviceStateStore internal constructor(private val prefs: SharedPreferences
         prefs.edit().remove(KEY_PENDING_SYNC).remove(KEY_LANGUAGE_PENDING_SYNC).apply()
     }
 
+    // ------------------------------------------------------------ evidence
+    // What this phone has SEEN work, for the setup screen and the permission
+    // diagnostics: times only, never what was pasted or typed.
+
+    /**
+     * When copied text last reached AI Reply on the user's own tap - a
+     * persona, Paste message, Reply to copied - in epoch milliseconds; null
+     * until it has happened on this phone. The proof that the clipboard works
+     * for the keyboard here.
+     */
+    val lastSuccessfulPasteAt: Long?
+        get() = prefs.getLong(KEY_LAST_PASTE, 0L).takeIf { it > 0L }
+
+    fun notePaste(at: Long) {
+        prefs.edit().putLong(KEY_LAST_PASTE, at).apply()
+    }
+
+    /**
+     * When the AI Reply keyboard was last on screen over a field - in use,
+     * not merely enabled - in epoch milliseconds; null until then. Kept to
+     * [KEYBOARD_SHOWN_RESOLUTION_MS]: a chat shows the keyboard many times a
+     * minute, and a write each time would be noise.
+     */
+    val keyboardLastShownAt: Long?
+        get() = prefs.getLong(KEY_KEYBOARD_SHOWN, 0L).takeIf { it > 0L }
+
+    /** Records [at] when the stored time is older than the resolution (or in the future); true when it wrote. */
+    fun noteKeyboardShown(at: Long): Boolean {
+        val stored = prefs.getLong(KEY_KEYBOARD_SHOWN, 0L)
+        if (stored in (at - KEYBOARD_SHOWN_RESOLUTION_MS + 1)..at) return false
+        prefs.edit().putLong(KEY_KEYBOARD_SHOWN, at).apply()
+        return true
+    }
+
     /** The backing file, for once-per-install flags such as [kz.yerek.aireply.analytics.ProductEvents]. */
     val sharedPreferences: SharedPreferences get() = prefs
 
-    private companion object {
-        const val NAME = "aireply_device"
+    companion object {
+        /** How fine [keyboardLastShownAt] is: ten minutes. */
+        const val KEYBOARD_SHOWN_RESOLUTION_MS = 10L * 60 * 1000
 
-        const val KEY_ONBOARDING_VERSION = "onboarding.completedVersion"
-        const val KEY_RESUME_STEP = "onboarding.resumeStep"
-        const val KEY_ASKS_GENDER = "onboarding.asksGender"
-        const val KEY_PENDING_SYNC = "profile.pendingSync"
-        const val KEY_LANGUAGE_PENDING_SYNC = "profile.languagePendingSync"
+        private const val NAME = "aireply_device"
+
+        private const val KEY_ONBOARDING_VERSION = "onboarding.completedVersion"
+        private const val KEY_RESUME_STEP = "onboarding.resumeStep"
+        private const val KEY_ASKS_GENDER = "onboarding.asksGender"
+        private const val KEY_PENDING_SYNC = "profile.pendingSync"
+        private const val KEY_LANGUAGE_PENDING_SYNC = "profile.languagePendingSync"
+        private const val KEY_LAST_PASTE = "diagnostics.lastSuccessfulPasteAt"
+        private const val KEY_KEYBOARD_SHOWN = "diagnostics.keyboardLastShownAt"
     }
 }

@@ -345,7 +345,7 @@ fun ComposerPanel(
     val generating = flow.isGenerating
     val composingLike = stage == ReplyComposerFlow.Stage.Composing ||
         flow.generationOrigin == ReplyComposerFlow.Origin.COMPOSING
-    val errorMessage = flow.error?.let { strings.message(it) }?.takeIf { it.isNotEmpty() }
+    val errorMessage = noticeText(strings, flow.error, session.clipboardMiss)
 
     Column(
         modifier = modifier
@@ -423,17 +423,7 @@ fun ComposerPanel(
             }
         }
 
-        if (errorMessage != null && !flow.isConflict) {
-            Text(
-                text = errorMessage,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                color = theme.destructive,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp)
-            )
-        }
+        if (errorMessage != null && !flow.isConflict) NoticeLine(errorMessage, flow.error, theme)
 
         if (composingLike && !flow.isConflict && voiceLineShows(model.voice, session.instruction.text, model.instructionLimit)) {
             VoiceLine(
@@ -465,7 +455,8 @@ fun ComposerPanel(
             // A recording's controls take the row: Reply waits for the words.
             model.voice.showsControls && stage == ReplyComposerFlow.Stage.Composing ->
                 PanelVoiceControls(model.voice, actions.voice, strings, theme)
-            else -> ComposingRow(model, actions, strings, theme, errorMessage != null)
+            // "Copy a message first" is not a failed request: Reply stays Reply.
+            else -> ComposingRow(model, actions, strings, theme, failed = errorMessage != null && flow.error?.offersRetry == true)
         }
     }
 }

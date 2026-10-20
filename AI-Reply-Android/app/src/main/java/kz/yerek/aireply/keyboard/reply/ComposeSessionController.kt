@@ -14,6 +14,7 @@ import kz.yerek.aireply.ai.ComposeService
 import kz.yerek.aireply.ai.ReplyDraftNormalizer
 import kz.yerek.aireply.core.lang.AppLanguage
 import kz.yerek.aireply.core.lang.KeyboardLanguage
+import kz.yerek.aireply.keyboard.input.ClipboardMiss
 import kz.yerek.aireply.keyboard.input.KeyboardTextFieldState
 import kz.yerek.aireply.platform.ReplyLog
 
@@ -39,6 +40,13 @@ class ComposeSession {
     val draft = KeyboardTextFieldState()
 
     var flow: ReplyComposerFlow by mutableStateOf(ReplyComposerFlow())
+        internal set
+
+    /**
+     * Why "Reply to copied" found nothing, while its notice is up: an empty
+     * clipboard and a clip marked private need different words.
+     */
+    var clipboardMiss: ClipboardMiss? by mutableStateOf(null)
         internal set
 
     /** Whether "New" has anything to clear. */
@@ -225,10 +233,11 @@ class ComposeSessionController(
     }
 
     /** A failure found before any request could start. */
-    fun showError(error: AIReplyError) {
+    fun showError(error: AIReplyError, miss: ClipboardMiss? = null) {
         val current = session ?: return
         if (current.flow.isGenerating) return
         current.flow = current.flow.failing(error)
+        current.clipboardMiss = miss
     }
 
     /** The keyboard went away: stop any request, keep the rest for a while. */

@@ -38,7 +38,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kz.yerek.aireply.R
-import kz.yerek.aireply.ai.AIReplyError
 import kz.yerek.aireply.ai.AIReportDraft
 import kz.yerek.aireply.ai.AppStrings
 import kz.yerek.aireply.core.text.codePointLength
@@ -124,11 +123,10 @@ fun CreatePanel(
     val flow = session.flow
     val stage = flow.stage
     val generating = flow.isGenerating
-    val errorMessage = flow.error?.let { strings.message(it) }?.takeIf { it.isNotEmpty() }
+    val errorMessage = noticeText(strings, flow.error, session.clipboardMiss)
     // "Copy a message first" is about Reply to copied, not a failed Write:
     // the button keeps saying Write.
-    val writeFailed = errorMessage != null &&
-        flow.error != AIReplyError.NoSourceMessage && flow.error != AIReplyError.ClipboardUnavailable
+    val writeFailed = errorMessage != null && flow.error?.offersRetry == true
 
     Column(
         modifier = modifier
@@ -199,17 +197,7 @@ fun CreatePanel(
             }
         }
 
-        if (errorMessage != null && !flow.isConflict) {
-            Text(
-                text = errorMessage,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                color = theme.destructive,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp)
-            )
-        }
+        if (errorMessage != null && !flow.isConflict) NoticeLine(errorMessage, flow.error, theme)
 
         if (!flow.showsReply && !flow.isConflict && !model.compact) CreateLine(model, actions, strings, theme)
 

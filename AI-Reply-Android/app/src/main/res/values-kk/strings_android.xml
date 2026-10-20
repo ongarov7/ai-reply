@@ -27,6 +27,7 @@
     <string name="kb_err_no_source">Алдымен хабарламаны көшіріңіз</string>
     <string name="kb_err_message_too_long">Хабарлама тым ұзын. %1$d таңбаға дейінгі мәтінді көшіріңіз.</string>
     <string name="kb_err_clipboard_unavailable">Көшірілген хабарламаны оқу мүмкін болмады.</string>
+    <string name="kb_paste_private">Бұл мәтін құпия деп белгіленген, AI Reply оны оқымайды. Хабарламаның өзін көшіріңіз.</string>
     <string name="kb_err_not_configured">AI Reply қолданбасын ашып, баптауды аяқтаңыз.</string>
     <string name="kb_err_offline">Интернет байланысы жоқ.</string>
     <string name="kb_err_timed_out">Тым ұзаққа созылды. Қайталап көріңіз.</string>

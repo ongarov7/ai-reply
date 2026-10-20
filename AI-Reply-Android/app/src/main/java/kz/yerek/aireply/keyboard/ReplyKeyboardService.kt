@@ -8,6 +8,7 @@ import android.text.InputType
 import android.view.View
 import android.view.accessibility.AccessibilityManager
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputMethodManager
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -51,7 +52,9 @@ import kz.yerek.aireply.core.lang.KeyboardPlane
 import kz.yerek.aireply.core.lang.TemplateNaming
 import kz.yerek.aireply.data.account.LegalConfigDto
 import kz.yerek.aireply.data.settings.AppearancePreference
+import kz.yerek.aireply.data.settings.DeviceStateStore
 import kz.yerek.aireply.domain.model.ReplyConfiguration
+import kz.yerek.aireply.domain.model.ReplyTemplate
 import kz.yerek.aireply.domain.model.TemplateSummary
 import kz.yerek.aireply.keyboard.autocorrect.AssetDictionarySource
 import kz.yerek.aireply.keyboard.autocorrect.AutocorrectController
@@ -59,10 +62,12 @@ import kz.yerek.aireply.keyboard.autocorrect.AutocorrectDictionaries
 import kz.yerek.aireply.keyboard.autocorrect.AutocorrectEngine
 import kz.yerek.aireply.keyboard.autocorrect.PrefsLearnedWordsStore
 import kz.yerek.aireply.keyboard.autocorrect.Suggestion
+import kz.yerek.aireply.keyboard.input.ClipboardMiss
 import kz.yerek.aireply.keyboard.input.ContextTextProvider
 import kz.yerek.aireply.keyboard.input.HostField
 import kz.yerek.aireply.keyboard.input.KeyboardStatus
 import kz.yerek.aireply.keyboard.input.KeyboardTextFieldState
+import kz.yerek.aireply.keyboard.input.ReplyContextSource
 import kz.yerek.aireply.keyboard.layout.AutoCapitalization
 import kz.yerek.aireply.keyboard.layout.Capitalization
 import kz.yerek.aireply.keyboard.layout.FieldKeys
@@ -214,6 +219,7 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
     private var smartCorrection = true
     private var configurationLoadedAt = 0L
     private var lastSpaceTap = 0L
+    private var lastShownNoted = 0L
     private var orientation = Configuration.ORIENTATION_UNDEFINED
     private var announcementStrings: Pair<AppLanguage, AppStrings>? = null
 
@@ -336,6 +342,19 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         }
         refreshAutoShift()
         viewHost.onShown()
+        noteKeyboardShown()
+    }
+
+    /**
+     * The keyboard is in use on this phone - the evidence the setup screen
+     * cannot get from Android, which only says it is enabled and selected.
+     * A time, kept to ten minutes, written off the main thread.
+     */
+    private fun noteKeyboardShown() {
+        val now = System.currentTimeMillis()
+        if (now - lastShownNoted in 0 until DeviceStateStore.KEYBOARD_SHOWN_RESOLUTION_MS) return
+        lastShownNoted = now
+        scope.launch(Dispatchers.IO) { services.deviceState.noteKeyboardShown(now) }
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
@@ -1103,7 +1122,11 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         val resuming = replies.session != null && replies.isSuspended
         // The message: a selection in the field, else what the user copied.
         // Opening never generates - it only shows the composer.
-        panels.openReply(template) { contextProvider.acquire(this, currentInputConnection, isSecureField) }
+        val pending = panels.openReply(template) { readCopied(currentInputConnection) }
+        val opened = replies.session
+        if (pending != null && opened != null) {
+            readLater(pending) { late -> panels.lateSource(opened, late, replacing = false) }
+        }
         if (resuming) {
             // Back to the instruction from a number field: letters, not its pad.
             if (plane.isPad) plane = KeyboardPlane.LETTERS
@@ -1143,13 +1166,53 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
 
     /** Explicit Paste inside the composer: the clipboard, never the selection. */
     private fun pasteSource() {
-        when (val result = contextProvider.acquire(this, null, isSecureField)) {
+        when (val result = readCopied(null)) {
             is ContextTextProvider.Result.Success -> {
                 replies.replaceSource(result.context.text)
                 sourceExpanded = false
             }
-            is ContextTextProvider.Result.Failure -> replies.showError(result.error)
+            is ContextTextProvider.Result.Failure -> replies.showError(result.error, result.miss)
+            is ContextTextProvider.Result.Deferred -> {
+                val session = replies.session ?: return
+                readLater(result) { late ->
+                    panels.lateSource(session, late, replacing = true)
+                    if (late is ContextTextProvider.Result.Success && replies.session === session) sourceExpanded = false
+                }
+            }
         }
+    }
+
+    /**
+     * The clipboard (or the field's selection, with [connection]) on the
+     * user's tap. A paste that worked is noted for the setup screen - the
+     * time, never the text.
+     */
+    private fun readCopied(connection: InputConnection?): ContextTextProvider.Result =
+        contextProvider.acquire(this, connection, isSecureField).also(::notePaste)
+
+    /**
+     * Copied text that lives behind another app's provider, read off the main
+     * thread; [then] gets the result on the main thread. The keys keep
+     * working meanwhile.
+     */
+    private fun readLater(pending: ContextTextProvider.Result.Deferred, then: (ContextTextProvider.Result) -> Unit) {
+        scope.launch {
+            val late = withContext(Dispatchers.IO) {
+                runCatching { pending.read() }.getOrElse {
+                    ContextTextProvider.Result.Failure(AIReplyError.ClipboardUnavailable, ClipboardMiss.UNREADABLE)
+                }
+            }
+            notePaste(late)
+            then(late)
+            refreshAutoShift()
+        }
+    }
+
+    private fun notePaste(result: ContextTextProvider.Result) {
+        val copied = result as? ContextTextProvider.Result.Success ?: return
+        if (copied.context.source != ReplyContextSource.CLIPBOARD) return
+        val now = System.currentTimeMillis()
+        scope.launch(Dispatchers.IO) { services.deviceState.notePaste(now) }
     }
 
     private fun tapField(field: PanelFocus, offset: Int) {
@@ -1234,7 +1297,20 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         val template = KeyboardPanels.personaForCopied(configuration, selectedTemplateId ?: services.settings.lastTemplateId)
         leaveFields()
         // The clipboard only - a selection in the chat's field is the user's own draft.
-        val outcome = panels.replyToCopied(template, isSecureField) { contextProvider.acquire(this, null, isSecureField) }
+        replyToCopied(template) { readCopied(null) }
+    }
+
+    private fun replyToCopied(template: ReplyTemplate?, acquire: () -> ContextTextProvider.Result) {
+        val outcome = panels.replyToCopied(template, isSecureField, acquire)
+        if (outcome is KeyboardPanels.CopiedReply.Reading) {
+            // Create stays as it is until the text is read; then the same
+            // step again, with the same request - if Create is still waiting.
+            val created = compose.session
+            readLater(outcome.read) { late ->
+                if (compose.session === created && created != null) replyToCopied(template) { late }
+            }
+            return
+        }
         if (outcome == KeyboardPanels.CopiedReply.Opened && template != null) {
             selectedTemplateId = template.id
             scope.launch(Dispatchers.IO) { services.settings.lastTemplateId = template.id }

@@ -18,6 +18,7 @@
     <string name="kb_err_no_source">Avval xabarni nusxalang</string>
     <string name="kb_err_message_too_long">Xabar juda uzun. %1$d belgigacha matnni nusxalang.</string>
     <string name="kb_err_clipboard_unavailable">Nusxalangan xabarni oʻqib boʻlmadi.</string>
+    <string name="kb_paste_private">Bu matn maxfiy deb belgilangan, AI Reply uni oʻqimaydi. Xabarning oʻzini nusxalang.</string>
     <string name="kb_err_not_configured">AI Reply ilovasini ochib, sozlashni yakunlang.</string>
     <string name="kb_err_offline">Internet aloqasi yoʻq.</string>
     <string name="kb_err_timed_out">Juda uzoq davom etdi. Qayta urinib koʻring.</string>

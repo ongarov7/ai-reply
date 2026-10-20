@@ -56,6 +56,12 @@ class KeyboardPanels(
         /** Nothing usable was copied: Create stays, saying so. */
         data class NothingCopied(val error: AIReplyError) : CopiedReply
 
+        /**
+         * The copied text is still being read, off the main thread: Create
+         * stays as it is, and [read]'s result goes to [replyToCopied] again.
+         */
+        class Reading(val read: ContextTextProvider.Result.Deferred) : CopiedReply
+
         /** Not now: a password field, no persona, or Create is not taking a request. */
         data object Refused : CopiedReply
     }
@@ -141,19 +147,47 @@ class KeyboardPanels(
     /**
      * A persona on the row: the composer for [template] on the message
      * [acquire] finds, or the reply put aside, resumed. Generates nothing.
+     *
+     * Returns the read still to be done when the copied text is behind
+     * another app's provider: the composer opens at once with no message, and
+     * the caller hands the result to [lateSource] when it comes.
      */
-    fun openReply(template: ReplyTemplate, acquire: () -> ContextTextProvider.Result) {
+    fun openReply(
+        template: ReplyTemplate,
+        acquire: () -> ContextTextProvider.Result
+    ): ContextTextProvider.Result.Deferred? {
         dictation.cancel()
         compose.clear()
         if (replies.session != null && replies.isSuspended) {
             replies.resume(template)
-            return
+            return null
         }
         when (val result = acquire()) {
             is ContextTextProvider.Result.Success ->
                 replies.open(template, result.context.text, result.context.source, null)
             is ContextTextProvider.Result.Failure ->
-                replies.open(template, "", null, result.error)
+                replies.open(template, "", null, result.error, result.miss)
+            is ContextTextProvider.Result.Deferred -> {
+                replies.open(template, "", null, null)
+                return result
+            }
+        }
+        return null
+    }
+
+    /**
+     * A clipboard read that finished off the main thread, for the reply
+     * [session] it was started for (by a persona or by Paste). It lands only
+     * while that session is the one on screen; text arriving for a message
+     * field the user has typed into meanwhile is dropped - their words win.
+     */
+    fun lateSource(session: ReplySession, result: ContextTextProvider.Result, replacing: Boolean) {
+        if (replies.session !== session || !replies.isComposing) return
+        if (!replacing && session.source.text.isNotBlank()) return
+        when (result) {
+            is ContextTextProvider.Result.Success -> replies.replaceSource(result.context.text)
+            is ContextTextProvider.Result.Failure -> replies.showError(result.error, result.miss)
+            is ContextTextProvider.Result.Deferred -> Unit
         }
     }
 
@@ -184,9 +218,10 @@ class KeyboardPanels(
 
         return when (val result = acquire()) {
             is ContextTextProvider.Result.Failure -> {
-                compose.showError(result.error)
+                compose.showError(result.error, result.miss)
                 CopiedReply.NothingCopied(result.error)
             }
+            is ContextTextProvider.Result.Deferred -> CopiedReply.Reading(result)
             is ContextTextProvider.Result.Success -> {
                 val request = created.instruction.text
                 dictation.cancel()

@@ -16,6 +16,7 @@ import kz.yerek.aireply.core.lang.AppLanguage
 import kz.yerek.aireply.core.lang.KeyboardLanguage
 import kz.yerek.aireply.domain.model.ReplyConfiguration
 import kz.yerek.aireply.domain.model.ReplyTemplate
+import kz.yerek.aireply.keyboard.input.ClipboardMiss
 import kz.yerek.aireply.keyboard.input.KeyboardTextFieldState
 import kz.yerek.aireply.keyboard.input.ReplyContextSource
 import kz.yerek.aireply.platform.ReplyLog
@@ -42,6 +43,13 @@ class ReplySession(template: ReplyTemplate, source: String, val acquiredFrom: Re
     val draft = KeyboardTextFieldState()
 
     var flow: ReplyComposerFlow by mutableStateOf(ReplyComposerFlow())
+        internal set
+
+    /**
+     * Why the last clipboard read found nothing, while its notice is up: an
+     * empty clipboard and a clip marked private need different words.
+     */
+    var clipboardMiss: ClipboardMiss? by mutableStateOf(null)
         internal set
 
     /** Puts the current version's text in the draft field, caret at the end. */
@@ -101,13 +109,21 @@ class ReplySessionController(
     // ---------------------------------------------------------------- entry
 
     /** The user picked a persona on the row. Opens the composer; generates nothing. */
-    fun open(template: ReplyTemplate, source: String, from: ReplyContextSource?, error: AIReplyError?) {
+    fun open(
+        template: ReplyTemplate,
+        source: String,
+        from: ReplyContextSource?,
+        error: AIReplyError?,
+        miss: ClipboardMiss? = null
+    ) {
         cancelJob()
         val opened = ReplySession(template, source, from)
         // An empty clipboard is not an error worth shouting about: the
-        // composer opens anyway and its placeholder says what to do.
+        // composer opens anyway and its placeholder says what to do. A clip
+        // marked private is said, quietly: the user did copy something.
         if (error != null && error != AIReplyError.NoSourceMessage) {
             opened.flow = opened.flow.failing(error)
+            opened.clipboardMiss = miss
         }
         session = opened
         isSuspended = false
@@ -136,11 +152,13 @@ class ReplySessionController(
         val current = session ?: return
         current.source.set(text)
         current.flow = current.flow.clearingError()
+        current.clipboardMiss = null
     }
 
-    fun showError(error: AIReplyError) {
+    fun showError(error: AIReplyError, miss: ClipboardMiss? = null) {
         val current = session ?: return
         current.flow = current.flow.copy(error = error.takeIf { it != AIReplyError.Cancelled })
+        current.clipboardMiss = miss
     }
 
     /** The source or the instruction was edited: an old error no longer describes it. */
