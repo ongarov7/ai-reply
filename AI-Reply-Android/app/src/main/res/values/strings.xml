@@ -342,32 +342,10 @@
     <string name="kb_err_quota_exhausted">You have used your available replies.</string>
 
     <!-- Onboarding v2, the sender's grammatical gender, the tutorial row -->
-    <string name="onboarding_skip_tutorial">Skip tutorial</string>
     <string name="onboarding_gender_title">How should replies speak for you?</string>
     <string name="onboarding_gender_prompt">In Russian, some words change with gender: «рад» or «рада». Choose the form Russian replies use for you.</string>
     <string name="onboarding_gender_skip_note">Skip it, and replies avoid these forms.</string>
     <string name="onboarding_gender_footer">You can change this in Settings ▸ Profile.</string>
-    <string name="onboarding_usage_step_instruction">If you like, say what to answer, then tap Reply</string>
-    <string name="onboarding_mock_field">Message</string>
-    <string name="onboarding_tutorial_incoming">Hi! How much does your service cost?</string>
-    <string name="onboarding_tutorial_instruction">Politely say I\'m busy today but can call tomorrow.</string>
-    <string name="onboarding_tutorial_instruction_male">@string/onboarding_tutorial_instruction</string>
-    <string name="onboarding_tutorial_instruction_female">@string/onboarding_tutorial_instruction</string>
-    <string name="onboarding_tutorial_reply">Hi! Sorry, I can\'t talk today, but I\'d be happy to call tomorrow and go over the details.</string>
-    <string name="onboarding_tutorial_reply_male">@string/onboarding_tutorial_reply</string>
-    <string name="onboarding_tutorial_reply_female">@string/onboarding_tutorial_reply</string>
-    <string name="onboarding_practice_title">Try it yourself</string>
-    <string name="onboarding_practice_prompt">A practice run on this screen: nothing is sent and no replies are used up.</string>
-    <string name="onboarding_practice_hint_copy">Tap %1$s under the message.</string>
-    <string name="onboarding_practice_hint_open">Copied. Now open the AI\u00A0Reply keyboard.</string>
-    <string name="onboarding_practice_open">Open AI\u00A0Reply</string>
-    <string name="onboarding_practice_hint_persona">This is the AI\u00A0Reply keyboard. You\'re replying to a friend, so tap %1$s.</string>
-    <string name="onboarding_practice_hint_reply">The copied message is already here. Tap %1$s.</string>
-    <string name="onboarding_practice_hint_insert">Like it? Tap %1$s.</string>
-    <string name="onboarding_practice_incoming">Hey! It\'s been ages. How are you?</string>
-    <string name="onboarding_practice_reply">Hey! It really has been a while. So good to hear from you! How are you doing?</string>
-    <string name="onboarding_practice_reply_male">@string/onboarding_practice_reply</string>
-    <string name="onboarding_practice_reply_female">@string/onboarding_practice_reply</string>
     <string name="profile_gender">Replies in Russian speak as</string>
     <string name="profile_gender_male">Male</string>
     <string name="profile_gender_female">Female</string>
@@ -375,7 +353,6 @@
     <string name="profile_gender_footer">Used only for Russian grammar: «рад/рада», «сделал/сделала». We never guess it from your name or account.</string>
     <string name="settings_tutorial">How to use AI\u00A0Reply</string>
     <string name="settings_tutorial_footer">A short walkthrough: copy a message, reply from the keyboard, practise. Nothing is reset.</string>
-    <string name="onboarding_keyboard_privacy">Android warns that a keyboard “may be able to collect all the text you type”. Every keyboard gets this standard notice. AI\u00A0Reply sends text through its server to OpenAI when you tap %1$s or %2$s and, with Smart correction on, the instruction you type in its own field, to suggest a correction. Nothing else you type is sent.</string>
     <string name="onboarding_gender_example_male" translatable="false">«Я рад помочь»</string>
     <string name="onboarding_gender_example_female" translatable="false">«Я рада помочь»</string>
 

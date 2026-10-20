@@ -168,17 +168,7 @@
     <string name="kb_polish_undo_description">Түзетуді болдырмау</string>
 
     <!-- Onboarding v2 on Android: keyboard status and setup, switching, clipboard; smart correction -->
-    <string name="android_status_keyboard">AI\u00A0Reply пернетақтасы</string>
-    <string name="android_status_enabled">Қосулы</string>
-    <string name="android_status_not_enabled">Қосылмаған</string>
-    <string name="android_status_current">Ағымдағы пернетақта</string>
-    <string name="android_status_other_keyboard">Басқасы</string>
-    <string name="onboarding_keyboard_step_enable">Пернетақталар тізімінде AI\u00A0Reply-ды қосыңыз</string>
-    <string name="onboarding_keyboard_step_confirm">Жүйелік ескертуді растаңыз</string>
-    <string name="onboarding_keyboard_step_choose">Осында оралып, AI\u00A0Reply-ды таңдаңыз</string>
     <string name="onboarding_switch_note">Пернетақтаны ауыстыру үшін навигация панеліндегі пернетақта белгішесін басыңыз немесе бос орын не тіл пернесін басып тұрыңыз — бұл телефонға байланысты.</string>
-    <string name="onboarding_clipboard_note">AI\u00A0Reply көшірілген хабарламаны тек үлгіні немесе «Хабарламаны қою» түймесін басқанда оқиды. Android-тың кейбір нұсқалары сол сәтте буфер оқылғаны туралы қысқа хабарлама көрсетеді — бұл қалыпты жағдай.</string>
-    <string name="cd_tutorial_next">Келесі қадамды көрсету</string>
     <string name="settings_smart_correction">Ақылды түзету</string>
     <string name="settings_smart_correction_footer">Қателер телефонның өзінде түзетіліп, сөздер сонда ұсынылады: бұл үшін басқа қолданбаларда терген ештеңеңіз жіберілмейді. AI\u00A0Reply өрісіне нұсқау жазғанда, тазарақ нұсқасын ұсыну үшін сол мәтін AI\u00A0Reply сервері арқылы OpenAI-ға жіберілуі мүмкін.</string>
     <string name="settings_smart_correction_attribution">Сөздіктер: Leipzig Corpora Collection (CC BY).</string>

@@ -96,8 +96,9 @@ class LocalizationParityTest {
         val required = setOf(
             "account_sign_in_title", "account_code_title", "legal_consent_title",
             "registration_title", "home_title", "settings_title", "profile_title",
-            "templates_title", "hours_title", "android_setup_title", "onboarding_welcome_title",
-            "onboarding_usage_title", "onboarding_done_title", "compose_title",
+            "templates_title", "hours_title", "android_setup_title", "onboarding_welcome_headline",
+            "onboarding_tutorial_title", "onboarding_connect_title", "permissions_title", "paste_help_title",
+            "compose_title",
             "subscription_title", "kb_generate", "kb_insert", "kb_err_sign_in_required",
             "settings_privacy_body", "legal_terms", "legal_privacy"
         )

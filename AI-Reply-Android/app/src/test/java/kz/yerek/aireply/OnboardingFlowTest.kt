@@ -3,6 +3,8 @@ package kz.yerek.aireply
 import kz.yerek.aireply.data.settings.DeviceStateStore
 import kz.yerek.aireply.ui.feature.onboarding.OnboardingFlow
 import kz.yerek.aireply.ui.feature.onboarding.OnboardingMode
+import kz.yerek.aireply.ui.feature.onboarding.OnboardingPath
+import kz.yerek.aireply.ui.feature.onboarding.OnboardingStatus
 import kz.yerek.aireply.ui.feature.onboarding.OnboardingStep
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -18,59 +20,98 @@ import org.junit.Test
 class OnboardingFlowTest {
 
     private val firstRun = OnboardingFlow(OnboardingMode.FIRST_RUN, asksGender = true)
+    private val setupFirst = OnboardingFlow(OnboardingMode.FIRST_RUN, asksGender = true, path = OnboardingPath.SETUP_FIRST)
 
     @Test
-    fun `step ids are the stable ones shared with iOS and analytics`() {
+    fun `step ids are the stable codes shared with iOS and the server`() {
         assertEquals(
-            listOf("welcome", "gender", "keyboard", "copyReply", "practice"),
+            listOf("welcome", "tutorial_copy", "tutorial_recipient", "tutorial_reply", "permissions", "gender"),
             OnboardingStep.entries.map { it.id }
         )
-        assertEquals(OnboardingStep.COPY_REPLY, OnboardingStep.fromId("copyReply"))
+        assertEquals(OnboardingStep.TUTORIAL_RECIPIENT, OnboardingStep.fromId("tutorial_recipient"))
         assertNull(OnboardingStep.fromId("fullAccess"))
+        assertNull(OnboardingStep.fromId(null))
+    }
+
+    @Test
+    fun `a run saved by the previous version comes back at the matching place`() {
+        assertEquals(OnboardingStep.PERMISSIONS, OnboardingStep.fromId("keyboard"))
+        assertEquals(OnboardingStep.TUTORIAL_COPY, OnboardingStep.fromId("copyReply"))
+        assertEquals(OnboardingStep.TUTORIAL_REPLY, OnboardingStep.fromId("practice"))
+        assertEquals(OnboardingStep.PERMISSIONS, firstRun.start("keyboard"))
+    }
+
+    @Test
+    fun `try first shows the tutorial, then the keyboard, then the gender`() {
+        assertEquals(
+            listOf(
+                OnboardingStep.WELCOME, OnboardingStep.TUTORIAL_COPY, OnboardingStep.TUTORIAL_RECIPIENT,
+                OnboardingStep.TUTORIAL_REPLY, OnboardingStep.PERMISSIONS, OnboardingStep.GENDER
+            ),
+            firstRun.steps
+        )
+        assertEquals("skipping the tutorial lands on the keyboard", OnboardingStep.PERMISSIONS, firstRun.afterTutorial)
+    }
+
+    @Test
+    fun `set up the keyboard first puts the tutorial after it`() {
+        assertEquals(
+            listOf(
+                OnboardingStep.WELCOME, OnboardingStep.PERMISSIONS, OnboardingStep.TUTORIAL_COPY,
+                OnboardingStep.TUTORIAL_RECIPIENT, OnboardingStep.TUTORIAL_REPLY, OnboardingStep.GENDER
+            ),
+            setupFirst.steps
+        )
+        assertEquals(OnboardingStep.PERMISSIONS, setupFirst.next(OnboardingStep.WELCOME))
+        assertEquals(OnboardingStep.GENDER, setupFirst.afterTutorial)
+        val answered = setupFirst.copy(asksGender = false)
+        assertNull("nothing after the tutorial: skipping it finishes", answered.afterTutorial)
+        assertEquals(OnboardingPath.SETUP_FIRST, OnboardingPath.fromId("setup_first"))
+        assertEquals("an unknown path is the default", OnboardingPath.TRY_FIRST, OnboardingPath.fromId(null))
     }
 
     @Test
     fun `a first run asks the gender only when it was never asked`() {
-        assertEquals(OnboardingStep.entries, firstRun.steps)
         val answered = OnboardingFlow(OnboardingMode.FIRST_RUN, asksGender = false)
         assertFalse(OnboardingStep.GENDER in answered.steps)
+        assertTrue(answered.isLast(OnboardingStep.PERMISSIONS))
     }
 
     @Test
     fun `the tutorial never asks the gender`() {
         val tutorial = OnboardingFlow(OnboardingMode.TUTORIAL, asksGender = true)
-        assertEquals(
-            listOf(OnboardingStep.WELCOME, OnboardingStep.KEYBOARD, OnboardingStep.COPY_REPLY, OnboardingStep.PRACTICE),
-            tutorial.steps
-        )
+        assertFalse(OnboardingStep.GENDER in tutorial.steps)
+        assertEquals(OnboardingStep.PERMISSIONS, tutorial.steps.last())
     }
 
     @Test
     fun `steps go forward and back and the last one finishes`() {
-        assertEquals(OnboardingStep.GENDER, firstRun.next(OnboardingStep.WELCOME))
-        assertEquals(OnboardingStep.PRACTICE, firstRun.next(OnboardingStep.COPY_REPLY))
-        assertNull("after the last step the run is finished", firstRun.next(OnboardingStep.PRACTICE))
-        assertTrue(firstRun.isLast(OnboardingStep.PRACTICE))
+        assertEquals(OnboardingStep.TUTORIAL_COPY, firstRun.next(OnboardingStep.WELCOME))
+        assertEquals(OnboardingStep.GENDER, firstRun.next(OnboardingStep.PERMISSIONS))
+        assertNull("after the last step the run is finished", firstRun.next(OnboardingStep.GENDER))
+        assertTrue(firstRun.isLast(OnboardingStep.GENDER))
 
         assertNull(firstRun.previous(OnboardingStep.WELCOME))
-        assertEquals(OnboardingStep.WELCOME, firstRun.previous(OnboardingStep.GENDER))
-
-        val answered = OnboardingFlow(OnboardingMode.FIRST_RUN, asksGender = false)
-        assertEquals("a skipped step is skipped both ways", OnboardingStep.WELCOME, answered.previous(OnboardingStep.KEYBOARD))
+        assertEquals(OnboardingStep.WELCOME, firstRun.previous(OnboardingStep.TUTORIAL_COPY))
+        assertEquals("back follows the chosen path", OnboardingStep.WELCOME, setupFirst.previous(OnboardingStep.PERMISSIONS))
+        assertEquals(OnboardingStep.PERMISSIONS, setupFirst.previous(OnboardingStep.TUTORIAL_COPY))
     }
 
     @Test
-    fun `the welcome screen is not numbered`() {
-        assertNull(firstRun.number(OnboardingStep.WELCOME))
-        assertEquals(1, firstRun.number(OnboardingStep.GENDER))
-        assertEquals(4, firstRun.number(OnboardingStep.PRACTICE))
-        assertEquals(4, firstRun.numberedCount)
+    fun `only the tutorial is numbered, one to three`() {
+        assertNull(firstRun.tutorialNumber(OnboardingStep.WELCOME))
+        assertNull(firstRun.tutorialNumber(OnboardingStep.PERMISSIONS))
+        assertEquals(1, firstRun.tutorialNumber(OnboardingStep.TUTORIAL_COPY))
+        assertEquals(3, setupFirst.tutorialNumber(OnboardingStep.TUTORIAL_REPLY))
+        assertEquals(3, firstRun.tutorialCount)
+        assertTrue(OnboardingStep.TUTORIAL_RECIPIENT.isTutorial)
+        assertFalse(OnboardingStep.GENDER.isTutorial)
     }
 
     @Test
     fun `a first run resumes where it stopped and the tutorial starts over`() {
         assertTrue(firstRun.resumes)
-        assertEquals(OnboardingStep.COPY_REPLY, firstRun.start("copyReply"))
+        assertEquals(OnboardingStep.TUTORIAL_RECIPIENT, firstRun.start("tutorial_recipient"))
         assertEquals(OnboardingStep.WELCOME, firstRun.start(null))
         assertEquals("an id from a newer build", OnboardingStep.WELCOME, firstRun.start("somethingNew"))
 
@@ -81,7 +122,7 @@ class OnboardingFlowTest {
     }
 
     @Test
-    fun `a run keeps its steps and its count from start to finish`() {
+    fun `a run keeps its steps from start to finish`() {
         assertTrue("never asked", OnboardingFlow.asksGender(OnboardingMode.FIRST_RUN, genderAnswered = false, startedAsking = null))
         assertFalse("answered before", OnboardingFlow.asksGender(OnboardingMode.FIRST_RUN, genderAnswered = true, startedAsking = null))
 
@@ -91,10 +132,7 @@ class OnboardingFlowTest {
             OnboardingFlow.asksGender(OnboardingMode.FIRST_RUN, genderAnswered = true, startedAsking = true)
         )
         assertEquals(firstRun.steps, resumed.steps)
-        assertEquals(OnboardingStep.COPY_REPLY, resumed.start("copyReply"))
-        assertEquals("still step 3 of 4", 3, resumed.number(OnboardingStep.COPY_REPLY))
-        assertEquals(4, resumed.numberedCount)
-        assertEquals("back still reaches the gender", OnboardingStep.GENDER, resumed.previous(OnboardingStep.KEYBOARD))
+        assertEquals(OnboardingStep.GENDER, resumed.start("gender"))
 
         assertFalse(
             "a run that started without it does not grow one",
@@ -114,12 +152,29 @@ class OnboardingFlowTest {
     }
 
     @Test
-    fun `everyone below the current version sees it once`() {
-        assertEquals(2, OnboardingFlow.CURRENT_VERSION)
+    fun `someone who finished any version never sees the new one by itself`() {
+        assertEquals(3, OnboardingFlow.CURRENT_VERSION)
         assertTrue("new users", OnboardingFlow.needsOnboarding(0))
-        assertTrue("users of the old onboarding", OnboardingFlow.needsOnboarding(1))
-        assertFalse(OnboardingFlow.needsOnboarding(2))
-        assertFalse("a newer build's version", OnboardingFlow.needsOnboarding(3))
+        assertFalse("users of the unversioned onboarding", OnboardingFlow.needsOnboarding(1))
+        assertFalse("users of version 2", OnboardingFlow.needsOnboarding(2))
+        assertFalse(OnboardingFlow.needsOnboarding(3))
+    }
+
+    @Test
+    fun `the status says where the device is`() {
+        assertEquals(OnboardingStatus.NOT_STARTED, OnboardingFlow.status(0, storedStatus = null, resumeStep = null))
+        assertEquals(OnboardingStatus.IN_PROGRESS, OnboardingFlow.status(0, null, resumeStep = "tutorial_copy"))
+        assertEquals(OnboardingStatus.COMPLETED, OnboardingFlow.status(3, "completed", null))
+        assertEquals(OnboardingStatus.SKIPPED, OnboardingFlow.status(3, "skipped", null))
+        assertEquals("finished before the status was kept", OnboardingStatus.COMPLETED, OnboardingFlow.status(2, null, null))
+        assertEquals(listOf("not_started", "in_progress", "completed", "skipped"), OnboardingStatus.entries.map { it.wire })
+    }
+
+    @Test
+    fun `opened again it is the tutorial once finished, the real run after later`() {
+        assertEquals(OnboardingMode.TUTORIAL, OnboardingFlow.reopenMode(OnboardingStatus.COMPLETED))
+        assertEquals(OnboardingMode.FIRST_RUN, OnboardingFlow.reopenMode(OnboardingStatus.SKIPPED))
+        assertEquals(OnboardingMode.FIRST_RUN, OnboardingFlow.reopenMode(OnboardingStatus.IN_PROGRESS))
     }
 
     // ------------------------------------------------------- device storage
@@ -177,6 +232,26 @@ class OnboardingFlowTest {
 
         DeviceStateStore(file).completeOnboarding(2)
         assertTrue("a finished run left nothing to resume", OnboardingFlow.startsRun(OnboardingMode.FIRST_RUN, DeviceStateStore(file).onboardingResumeStep))
+    }
+
+    @Test
+    fun `later is recorded as skipped, finishing it later as completed`() {
+        val file = InMemoryPreferences()
+        DeviceStateStore(file).apply {
+            onboardingResumeStep = "welcome"
+            onboardingPath = "setup_first"
+        }
+        assertEquals("setup_first", DeviceStateStore(file).onboardingPath)
+
+        DeviceStateStore(file).completeOnboarding(3, skipped = true)
+        val store = DeviceStateStore(file)
+        assertEquals("skipped", store.onboardingStatus)
+        assertEquals(3, store.completedOnboardingVersion)
+        assertNull("the path goes with the run", store.onboardingPath)
+        assertFalse("not shown again by itself", OnboardingFlow.needsOnboarding(store.completedOnboardingVersion ?: 0))
+
+        DeviceStateStore(file).completeOnboarding(3)
+        assertEquals("completed", DeviceStateStore(file).onboardingStatus)
     }
 
     @Test

@@ -66,4 +66,57 @@
     <string name="compose_paste_private">Скопированный текст помечен как личный (например, пароль), поэтому AI Reply его не вставляет. Скопируй само сообщение.</string>
     <string name="compose_paste_unreadable">Не удалось прочитать скопированный текст. Скопируй сообщение ещё раз.</string>
 
+    <!-- Onboarding: welcome -->
+    <string name="onboarding_later">Позже</string>
+    <string name="onboarding_welcome_headline">Твой личный ассистент в переписке</string>
+    <string name="onboarding_welcome_subtitle">Отвечай уверенно клиентам и легко общайся с близкими. Прямо с клавиатуры.</string>
+    <string name="onboarding_example">Например</string>
+    <string name="onboarding_welcome_incoming">Привет! Давно не общались. Как ты?</string>
+    <string name="onboarding_reply_variant">Вариант ответа</string>
+    <string name="onboarding_welcome_reply">Привет! Очень приятно тебя слышать. Расскажи, как твои дела?</string>
+    <string name="onboarding_welcome_reply_male">Привет! Рад тебя слышать. Расскажи, как твои дела?</string>
+    <string name="onboarding_welcome_reply_female">Привет! Рада тебя слышать. Расскажи, как твои дела?</string>
+    <string name="onboarding_flow_copy">Скопируй сообщение.</string>
+    <string name="onboarding_flow_choose">Выбери собеседника.</string>
+    <string name="onboarding_flow_reply">Получи ответ.</string>
+    <string name="onboarding_setup_keyboard">Настроить клавиатуру</string>
+    <string name="onboarding_try_first">Сначала попробовать</string>
+
+    <!-- Onboarding: the three-step tutorial (local examples only) -->
+    <string name="onboarding_tutorial_title">Как пользоваться · %1$d из %2$d</string>
+    <string name="onboarding_copy_title">Скопируй сообщение</string>
+    <string name="onboarding_copy_prompt">Сначала скопируй сообщение, на которое хочешь ответить. Попробуй здесь.</string>
+    <string name="onboarding_demo_message">Добрый день! Можно узнать подробнее?</string>
+    <string name="onboarding_copied_note">Сообщение скопировано.</string>
+    <string name="onboarding_copy_footnote">В любом мессенджере: нажми и удерживай сообщение, затем выбери «Копировать».</string>
+    <string name="onboarding_recipient_title">Выбери собеседника</string>
+    <string name="onboarding_recipient_prompt">Нажми, кому отвечаешь. В клавиатуре эти кнопки — над буквами.</string>
+    <string name="onboarding_recipient_note">От выбора зависят тон и формальность: другу — тепло и на «ты», клиенту и партнёру — вежливо и на «Вы», коллеге — спокойно и по делу.</string>
+    <string name="onboarding_try_title">Попробуй сам</string>
+    <string name="onboarding_try_prompt">Выбери собеседника и посмотри, как меняется ответ. Здесь ничего не отправляется и ответы не тратятся.</string>
+    <string name="onboarding_message_label">Сообщение</string>
+    <string name="onboarding_reply_ready">Ответ готов</string>
+    <string name="onboarding_demo_reply_friend">Привет! Конечно, расскажу. Что именно интересно?</string>
+    <string name="onboarding_demo_reply_client">Добрый день! Конечно. Подскажите, пожалуйста, что именно Вас интересует, — я всё подробно расскажу.</string>
+    <string name="onboarding_demo_reply_colleague">Добрый день! Да, конечно. Что именно уточнить?</string>
+    <string name="onboarding_demo_reply_partner">Добрый день! Безусловно. Предлагаю обсудить детали — когда Вам удобно созвониться?</string>
+    <string name="onboarding_success">Получилось!</string>
+    <string name="onboarding_success_body">Так AI Reply отвечает в любом мессенджере: ответ появляется в клавиатуре, а отправляешь его ты сам.</string>
+    <string name="onboarding_start_using">Начать пользоваться</string>
+
+    <!-- Onboarding: connect the keyboard -->
+    <string name="onboarding_connect_title">Подключи AI Reply</string>
+    <string name="onboarding_connect_prompt">Пара шагов в настройках Android — и AI Reply появится в любом мессенджере.</string>
+    <string name="onboarding_connect_step_open">Открой настройки клавиатур</string>
+    <string name="onboarding_connect_step_enable">Включи AI Reply</string>
+    <string name="onboarding_connect_step_default">Выбери AI Reply как клавиатуру по умолчанию</string>
+    <string name="onboarding_connect_ready">Клавиатура подключена</string>
+    <string name="onboarding_connect_why_title">Зачем нужен доступ?</string>
+    <string name="onboarding_connect_why_body">Android показывает одно и то же предупреждение для любой клавиатуры, которая не встроена в телефон: она «может собирать весь вводимый текст». AI Reply отправляет текст, только когда ты нажимаешь «%1$s» или «%2$s» (скопированное сообщение и твою просьбу), а с умной коррекцией — ещё и просьбу, пока ты пишешь её в поле AI Reply. Остальное, что ты печатаешь, никуда не уходит.</string>
+    <string name="onboarding_connect_privacy_link">Как обрабатываются данные</string>
+    <string name="onboarding_connect_later">Настроить позже</string>
+    <string name="onboarding_practice_field_prompt">Проверь: нажми на поле — должна появиться клавиатура AI Reply.</string>
+    <string name="onboarding_practice_field_placeholder">Напиши что-нибудь…</string>
+    <string name="onboarding_practice_confirmed">Клавиатура AI Reply на экране — всё работает.</string>
+
 </resources>

@@ -66,4 +66,57 @@
     <string name="compose_paste_private">Nusxalangan matn maxfiy deb belgilangan (masalan, parol), shuning uchun AI Reply uni joylamaydi. Xabarning oʻzini nusxalang.</string>
     <string name="compose_paste_unreadable">Nusxalangan matnni oʻqib boʻlmadi. Xabarni qaytadan nusxalang.</string>
 
+    <!-- Onboarding: welcome -->
+    <string name="onboarding_later">Keyinroq</string>
+    <string name="onboarding_welcome_headline">Yozishmalardagi shaxsiy yordamchingiz</string>
+    <string name="onboarding_welcome_subtitle">Mijozlarga ishonch bilan javob bering, yaqinlaringiz bilan oson muloqot qiling. Toʻgʻridan-toʻgʻri klaviaturadan.</string>
+    <string name="onboarding_example">Masalan</string>
+    <string name="onboarding_welcome_incoming">Salom! Ancha vaqt gaplashmadik. Qalaysan?</string>
+    <string name="onboarding_reply_variant">Javob varianti</string>
+    <string name="onboarding_welcome_reply">Salom! Seni eshitganimdan xursandman. Ishlaring qalay, aytib ber?</string>
+    <string name="onboarding_welcome_reply_male">@string/onboarding_welcome_reply</string>
+    <string name="onboarding_welcome_reply_female">@string/onboarding_welcome_reply</string>
+    <string name="onboarding_flow_copy">Xabarni nusxalang.</string>
+    <string name="onboarding_flow_choose">Suhbatdoshni tanlang.</string>
+    <string name="onboarding_flow_reply">Javob oling.</string>
+    <string name="onboarding_setup_keyboard">Klaviaturani sozlash</string>
+    <string name="onboarding_try_first">Avval sinab koʻrish</string>
+
+    <!-- Onboarding: the three-step tutorial (local examples only) -->
+    <string name="onboarding_tutorial_title">Qanday foydalanish · %1$d/%2$d</string>
+    <string name="onboarding_copy_title">Xabarni nusxalang</string>
+    <string name="onboarding_copy_prompt">Avval javob bermoqchi boʻlgan xabarni nusxalang. Shu yerda sinab koʻring.</string>
+    <string name="onboarding_demo_message">Assalomu alaykum! Batafsilroq bilsam boʻladimi?</string>
+    <string name="onboarding_copied_note">Xabar nusxalandi.</string>
+    <string name="onboarding_copy_footnote">Istalgan messenjerda: xabarni bosib turing, soʻng «Nusxalash»ni tanlang.</string>
+    <string name="onboarding_recipient_title">Suhbatdoshni tanlang</string>
+    <string name="onboarding_recipient_prompt">Kimga javob berayotganingizni bosing. Klaviaturada bu tugmalar harflar ustida.</string>
+    <string name="onboarding_recipient_note">Tanlov javob ohangi va rasmiyligini belgilaydi: doʻstga — samimiy, mijoz va hamkorga — xushmuomala, «Siz» bilan, hamkasbga — qisqa va aniq.</string>
+    <string name="onboarding_try_title">Oʻzingiz sinab koʻring</string>
+    <string name="onboarding_try_prompt">Suhbatdoshni tanlang va javob qanday oʻzgarishini koʻring. Bu yerda hech narsa yuborilmaydi, javoblar sarflanmaydi.</string>
+    <string name="onboarding_message_label">Xabar</string>
+    <string name="onboarding_reply_ready">Javob tayyor</string>
+    <string name="onboarding_demo_reply_friend">Salom! Albatta, aytib beraman. Aynan nima qiziq?</string>
+    <string name="onboarding_demo_reply_client">Assalomu alaykum! Albatta. Sizni aynan nima qiziqtirayotganini ayting, hammasini batafsil tushuntirib beraman.</string>
+    <string name="onboarding_demo_reply_colleague">Salom! Ha, albatta. Aynan nimani aniqlashtiray?</string>
+    <string name="onboarding_demo_reply_partner">Assalomu alaykum! Albatta. Tafsilotlarni muhokama qilaylik — sizga qachon qoʻngʻiroq qilish qulay?</string>
+    <string name="onboarding_success">Ajoyib, chiqdi!</string>
+    <string name="onboarding_success_body">AI Reply istalgan messenjerda shunday ishlaydi: javob klaviaturada chiqadi, uni esa oʻzingiz yuborasiz.</string>
+    <string name="onboarding_start_using">Foydalanishni boshlash</string>
+
+    <!-- Onboarding: connect the keyboard -->
+    <string name="onboarding_connect_title">AI Replyni ulang</string>
+    <string name="onboarding_connect_prompt">Android sozlamalarida bir necha qadam — va AI Reply istalgan messenjerda paydo boʻladi.</string>
+    <string name="onboarding_connect_step_open">Klaviatura sozlamalarini oching</string>
+    <string name="onboarding_connect_step_enable">AI Replyni yoqing</string>
+    <string name="onboarding_connect_step_default">AI Replyni standart klaviatura qilib tanlang</string>
+    <string name="onboarding_connect_ready">Klaviatura ulandi</string>
+    <string name="onboarding_connect_why_title">Ruxsat nima uchun kerak?</string>
+    <string name="onboarding_connect_why_body">Android telefonga oʻrnatilmagan har qanday klaviatura uchun bir xil ogohlantirish koʻrsatadi: u «yozgan barcha matningizni yigʻishi mumkin». AI Reply matnni faqat «%1$s» yoki «%2$s»ni bosganingizda yuboradi (nusxalangan xabar va soʻrovingizni), aqlli tuzatish yoqilgan boʻlsa — AI Reply maydonida yozayotgan soʻrovingizni ham. Yozgan boshqa matnlaringiz hech qayerga ketmaydi.</string>
+    <string name="onboarding_connect_privacy_link">Maʼlumotlar qanday qayta ishlanadi</string>
+    <string name="onboarding_connect_later">Keyinroq sozlash</string>
+    <string name="onboarding_practice_field_prompt">Tekshiring: maydonni bosing — AI Reply klaviaturasi chiqishi kerak.</string>
+    <string name="onboarding_practice_field_placeholder">Biror narsa yozing…</string>
+    <string name="onboarding_practice_confirmed">AI Reply klaviaturasi ekranda — hammasi ishlayapti.</string>
+
 </resources>

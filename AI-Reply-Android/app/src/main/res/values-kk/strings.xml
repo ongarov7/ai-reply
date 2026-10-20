@@ -341,32 +341,10 @@
     <string name="kb_err_quota_exhausted">Қолжетімді жауаптар бітті.</string>
 
     <!-- Onboarding v2, the sender's grammatical gender, the tutorial row -->
-    <string name="onboarding_skip_tutorial">Нұсқаулықты өткізу</string>
     <string name="onboarding_gender_title">Жауаптар сіздің атыңыздан қалай жазылсын?</string>
     <string name="onboarding_gender_prompt">Орыс тілінде кейбір сөздер жынысқа қарай өзгереді: «рад» не «рада», «сделал» не «сделала». Орысша жауаптарда қай тұлға қолданылатынын таңдаңыз.</string>
     <string name="onboarding_gender_skip_note">Өткізіп жіберсеңіз, жауаптарда мұндай тұлғалар қолданылмайды.</string>
     <string name="onboarding_gender_footer">Мұны Параметрлер ▸ Профиль бөлімінде өзгертуге болады.</string>
-    <string name="onboarding_usage_step_instruction">Қаласаңыз, не деп жауап беретініңізді жазып, «Жауап беру» түймесін басыңыз</string>
-    <string name="onboarding_mock_field">Хабарлама</string>
-    <string name="onboarding_tutorial_incoming">Қайырлы күн! Қызметіңіз қанша тұрады?</string>
-    <string name="onboarding_tutorial_instruction">Бүгін бос емес екенімді, бірақ ертең қоңырауласа алатынымды сыпайы айт.</string>
-    <string name="onboarding_tutorial_instruction_male">@string/onboarding_tutorial_instruction</string>
-    <string name="onboarding_tutorial_instruction_female">@string/onboarding_tutorial_instruction</string>
-    <string name="onboarding_tutorial_reply">Қайырлы күн! Өкінішке қарай, бүгін сөйлесе алмаймын. Ертең хабарласайық — бәрін толық талқылаймыз.</string>
-    <string name="onboarding_tutorial_reply_male">@string/onboarding_tutorial_reply</string>
-    <string name="onboarding_tutorial_reply_female">@string/onboarding_tutorial_reply</string>
-    <string name="onboarding_practice_title">Өзіңіз байқап көріңіз</string>
-    <string name="onboarding_practice_prompt">Бұл — осы экрандағы жаттығу: ештеңе жіберілмейді, жауаптар лимиті жұмсалмайды.</string>
-    <string name="onboarding_practice_hint_copy">Хабарламаның астындағы «%1$s» түймесін басыңыз.</string>
-    <string name="onboarding_practice_hint_open">Көшірілді. Енді AI\u00A0Reply пернетақтасын ашыңыз.</string>
-    <string name="onboarding_practice_open">AI\u00A0Reply-ды ашу</string>
-    <string name="onboarding_practice_hint_persona">Бұл — AI\u00A0Reply пернетақтасы. Сіз досыңызға жауап бересіз, сондықтан «%1$s» үлгісін басыңыз.</string>
-    <string name="onboarding_practice_hint_reply">Көшірілген хабарлама осында тұр. «%1$s» түймесін басыңыз.</string>
-    <string name="onboarding_practice_hint_insert">Ұнады ма? «%1$s» түймесін басыңыз.</string>
-    <string name="onboarding_practice_incoming">Сәлем! Көптен бері хабарласпадық. Қалайсың?</string>
-    <string name="onboarding_practice_reply">Сәлем! Иә, расында көп уақыт өтті. Хабарласқаныңа қуаныштымын! Өзің қалайсың?</string>
-    <string name="onboarding_practice_reply_male">@string/onboarding_practice_reply</string>
-    <string name="onboarding_practice_reply_female">@string/onboarding_practice_reply</string>
     <string name="profile_gender">Орысша жауаптардағы жыныс</string>
     <string name="profile_gender_male">Ер адам</string>
     <string name="profile_gender_female">Әйел адам</string>
@@ -374,6 +352,5 @@
     <string name="profile_gender_footer">Тек орыс тілінің грамматикасы үшін керек: «рад/рада», «сделал/сделала». Біз мұны атыңыздан не аккаунтыңыздан ешқашан болжамаймыз.</string>
     <string name="settings_tutorial">AI\u00A0Reply-ды қалай қолдануға болады</string>
     <string name="settings_tutorial_footer">Қысқа нұсқаулық: хабарламаны көшіру, пернетақтадан жауап беру, жаттығу. Ешқандай параметр өзгермейді.</string>
-    <string name="onboarding_keyboard_privacy">Android пернетақта «сіз терген мәтіннің барлығын жинауы мүмкін» деп ескертеді. Бұл — кез келген пернетақтаға көрсетілетін стандартты ескерту. AI\u00A0Reply мәтінді «%1$s» не «%2$s» түймесін басқанда өз сервері арқылы OpenAI-ға жібереді. Ақылды түзету қосулы болса, AI\u00A0Reply өрісіне жазған нұсқауыңыз түзету ұсыну үшін де жіберілуі мүмкін. Терген басқа мәтініңіз ешқайда жіберілмейді.</string>
 
 </resources>

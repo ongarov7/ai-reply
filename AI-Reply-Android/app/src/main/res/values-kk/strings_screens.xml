@@ -66,4 +66,57 @@
     <string name="compose_paste_private">Көшірілген мәтін құпия деп белгіленген (мысалы, құпиясөз), сондықтан AI Reply оны қоймайды. Хабарламаның өзін көшіріңіз.</string>
     <string name="compose_paste_unreadable">Көшірілген мәтінді оқу мүмкін болмады. Хабарламаны қайта көшіріңіз.</string>
 
+    <!-- Onboarding: welcome -->
+    <string name="onboarding_later">Кейінірек</string>
+    <string name="onboarding_welcome_headline">Хат алмасудағы жеке көмекшіңіз</string>
+    <string name="onboarding_welcome_subtitle">Клиенттерге сенімді жауап беріңіз, жақындарыңызбен оңай сөйлесіңіз. Тікелей пернетақтадан.</string>
+    <string name="onboarding_example">Мысалы</string>
+    <string name="onboarding_welcome_incoming">Сәлем! Көптен бері хабарласпадық. Қалайсың?</string>
+    <string name="onboarding_reply_variant">Жауап нұсқасы</string>
+    <string name="onboarding_welcome_reply">Сәлем! Сені естігеніме қуаныштымын. Жағдайың қалай, айтшы?</string>
+    <string name="onboarding_welcome_reply_male">@string/onboarding_welcome_reply</string>
+    <string name="onboarding_welcome_reply_female">@string/onboarding_welcome_reply</string>
+    <string name="onboarding_flow_copy">Хабарламаны көшіріңіз.</string>
+    <string name="onboarding_flow_choose">Әңгімелесушіні таңдаңыз.</string>
+    <string name="onboarding_flow_reply">Жауап алыңыз.</string>
+    <string name="onboarding_setup_keyboard">Пернетақтаны баптау</string>
+    <string name="onboarding_try_first">Алдымен байқап көру</string>
+
+    <!-- Onboarding: the three-step tutorial (local examples only) -->
+    <string name="onboarding_tutorial_title">Қалай пайдалану · %1$d/%2$d</string>
+    <string name="onboarding_copy_title">Хабарламаны көшіріңіз</string>
+    <string name="onboarding_copy_prompt">Алдымен жауап бергіңіз келетін хабарламаны көшіріңіз. Осы жерде байқап көріңіз.</string>
+    <string name="onboarding_demo_message">Қайырлы күн! Толығырақ білуге бола ма?</string>
+    <string name="onboarding_copied_note">Хабарлама көшірілді.</string>
+    <string name="onboarding_copy_footnote">Кез келген мессенджерде: хабарламаны басып тұрып, «Көшіру» таңдаңыз.</string>
+    <string name="onboarding_recipient_title">Әңгімелесушіні таңдаңыз</string>
+    <string name="onboarding_recipient_prompt">Кімге жауап беретініңізді басыңыз. Пернетақтада бұл түймелер әріптердің үстінде.</string>
+    <string name="onboarding_recipient_note">Таңдау жауаптың үні мен ресмилігін анықтайды: досқа — жылы, клиент пен серіктеске — сыпайы, «Сіз» деп, әріптеске — қысқа әрі нақты.</string>
+    <string name="onboarding_try_title">Өзіңіз байқап көріңіз</string>
+    <string name="onboarding_try_prompt">Алушыны таңдап, жауаптың қалай өзгеретінін көріңіз. Мұнда ештеңе жіберілмейді, жауаптар жұмсалмайды.</string>
+    <string name="onboarding_message_label">Хабарлама</string>
+    <string name="onboarding_reply_ready">Жауап дайын</string>
+    <string name="onboarding_demo_reply_friend">Сәлем! Әрине, айтып берейін. Нақты не қызықтырады?</string>
+    <string name="onboarding_demo_reply_client">Қайырлы күн! Әрине. Сізді нақты не қызықтыратынын айтыңызшы, бәрін толық түсіндіремін.</string>
+    <string name="onboarding_demo_reply_colleague">Сәлеметсіз бе! Иә, әрине. Нақты нені нақтылайын?</string>
+    <string name="onboarding_demo_reply_partner">Қайырлы күн! Әрине. Толығырақ талқылайық — сізге қашан қоңырау шалу ыңғайлы?</string>
+    <string name="onboarding_success">Тамаша, шықты!</string>
+    <string name="onboarding_success_body">AI Reply кез келген мессенджерде осылай жұмыс істейді: жауап пернетақтада шығады, ал оны өзіңіз жібересіз.</string>
+    <string name="onboarding_start_using">Қолдануды бастау</string>
+
+    <!-- Onboarding: connect the keyboard -->
+    <string name="onboarding_connect_title">AI Reply қосыңыз</string>
+    <string name="onboarding_connect_prompt">Android баптауларында бірнеше қадам — және AI Reply кез келген мессенджерде пайда болады.</string>
+    <string name="onboarding_connect_step_open">Пернетақта баптауларын ашыңыз</string>
+    <string name="onboarding_connect_step_enable">AI Reply қосыңыз</string>
+    <string name="onboarding_connect_step_default">AI Reply пернетақтасын әдепкі етіп таңдаңыз</string>
+    <string name="onboarding_connect_ready">Пернетақта қосылды</string>
+    <string name="onboarding_connect_why_title">Рұқсат не үшін керек?</string>
+    <string name="onboarding_connect_why_body">Android телефонға кірістірілмеген кез келген пернетақта үшін бірдей ескерту көрсетеді: ол «терілген барлық мәтінді жинауы мүмкін». AI Reply мәтінді тек «%1$s» не «%2$s» басқанда жібереді (көшірілген хабарлама мен өтінішіңізді), ал ақылды түзету қосулы болса — AI Reply өрісінде жазылып жатқан өтінішті де. Басқа терген мәтініңіз ешқайда кетпейді.</string>
+    <string name="onboarding_connect_privacy_link">Деректер қалай өңделеді</string>
+    <string name="onboarding_connect_later">Кейінірек баптау</string>
+    <string name="onboarding_practice_field_prompt">Тексеріңіз: өрісті басыңыз — AI Reply пернетақтасы шығуы керек.</string>
+    <string name="onboarding_practice_field_placeholder">Бірдеңе жазыңыз…</string>
+    <string name="onboarding_practice_confirmed">AI Reply пернетақтасы экранда — бәрі жұмыс істейді.</string>
+
 </resources>

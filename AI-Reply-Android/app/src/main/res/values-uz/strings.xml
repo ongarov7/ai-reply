@@ -264,32 +264,10 @@
     <string name="kb_err_quota_exhausted">Mavjud javoblar tugadi.</string>
 
     <!-- Onboarding v2, the sender's grammatical gender, the tutorial row -->
-    <string name="onboarding_skip_tutorial">Qoʻllanmani oʻtkazib yuborish</string>
     <string name="onboarding_gender_title">Javoblar siz nomingizdan qanday yozilsin?</string>
     <string name="onboarding_gender_prompt">Rus tilida baʼzi soʻzlar jinsga qarab oʻzgaradi: «рад» yoki «рада», «сделал» yoki «сделала». Ruscha javoblarda qaysi shakl ishlatilishini tanlang.</string>
     <string name="onboarding_gender_skip_note">Oʻtkazib yuborsangiz, javoblarda bunday shakllar ishlatilmaydi.</string>
     <string name="onboarding_gender_footer">Buni Sozlamalar ▸ Profil boʻlimida oʻzgartirish mumkin.</string>
-    <string name="onboarding_usage_step_instruction">Xohlasangiz, nima deb javob berishni yozing va «Javob berish»ni bosing</string>
-    <string name="onboarding_mock_field">Xabar</string>
-    <string name="onboarding_tutorial_incoming">Assalomu alaykum! Xizmatingiz qancha turadi?</string>
-    <string name="onboarding_tutorial_instruction">Bugun bandligimni, lekin ertaga qoʻngʻiroq qila olishimni xushmuomalalik bilan ayt.</string>
-    <string name="onboarding_tutorial_instruction_male">@string/onboarding_tutorial_instruction</string>
-    <string name="onboarding_tutorial_instruction_female">@string/onboarding_tutorial_instruction</string>
-    <string name="onboarding_tutorial_reply">Assalomu alaykum! Afsuski, bugun gaplasha olmayman. Ertaga bogʻlanaylik — hammasini batafsil muhokama qilamiz.</string>
-    <string name="onboarding_tutorial_reply_male">@string/onboarding_tutorial_reply</string>
-    <string name="onboarding_tutorial_reply_female">@string/onboarding_tutorial_reply</string>
-    <string name="onboarding_practice_title">Oʻzingiz sinab koʻring</string>
-    <string name="onboarding_practice_prompt">Bu shu ekrandagi mashq: hech narsa yuborilmaydi va javoblar sarflanmaydi.</string>
-    <string name="onboarding_practice_hint_copy">Xabar ostidagi «%1$s»ni bosing.</string>
-    <string name="onboarding_practice_hint_open">Nusxalandi. Endi AI\u00A0Reply klaviaturasini oching.</string>
-    <string name="onboarding_practice_open">AI\u00A0Replyni ochish</string>
-    <string name="onboarding_practice_hint_persona">Bu — AI\u00A0Reply klaviaturasi. Siz doʻstingizga javob beryapsiz, shuning uchun «%1$s»ni bosing.</string>
-    <string name="onboarding_practice_hint_reply">Nusxalangan xabar shu yerda. «%1$s»ni bosing.</string>
-    <string name="onboarding_practice_hint_insert">Yoqdimi? «%1$s»ni bosing.</string>
-    <string name="onboarding_practice_incoming">Salom! Ancha vaqtdan beri gaplashmadik. Qalaysan?</string>
-    <string name="onboarding_practice_reply">Salom! Ha, rostdan ham ancha boʻldi. Sendan xabar kelganidan xursandman! Oʻzing qalaysan?</string>
-    <string name="onboarding_practice_reply_male">@string/onboarding_practice_reply</string>
-    <string name="onboarding_practice_reply_female">@string/onboarding_practice_reply</string>
     <string name="profile_gender">Ruscha javoblarda jins</string>
     <string name="profile_gender_male">Erkak</string>
     <string name="profile_gender_female">Ayol</string>
@@ -297,6 +275,5 @@
     <string name="profile_gender_footer">Faqat rus tili grammatikasi uchun kerak: «рад/рада», «сделал/сделала». Biz buni hech qachon ismingiz yoki akkauntingizdan taxmin qilmaymiz.</string>
     <string name="settings_tutorial">AI\u00A0Replydan qanday foydalanish</string>
     <string name="settings_tutorial_footer">Qisqa qoʻllanma: xabarni nusxalash, klaviaturadan javob berish, mashq. Hech qanday sozlama oʻzgarmaydi.</string>
-    <string name="onboarding_keyboard_privacy">Android klaviatura «siz yozgan barcha matnni yigʻishi mumkin» deb ogohlantiradi. Bu har qanday klaviatura uchun odatiy ogohlantirish. AI\u00A0Reply matnni «%1$s» yoki «%2$s»ni bosganingizda oʻz serveri orqali OpenAI’ga yuboradi. Aqlli tuzatish yoqilgan boʻlsa, AI\u00A0Reply maydoniga yozgan koʻrsatmangiz tuzatish taklif qilish uchun ham yuborilishi mumkin. Yozgan boshqa matningiz hech qayerga yuborilmaydi.</string>
 
 </resources>

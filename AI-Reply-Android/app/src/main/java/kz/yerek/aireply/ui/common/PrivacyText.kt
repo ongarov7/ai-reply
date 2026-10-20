@@ -15,11 +15,3 @@ fun privacyStatement(): String = stringResource(
     stringResource(R.string.kb_generate),
     stringResource(R.string.kb_compose_write)
 )
-
-/** The note under Android's standard "may collect all the text you type" warning. */
-@Composable
-fun keyboardWarningNote(): String = stringResource(
-    R.string.onboarding_keyboard_privacy,
-    stringResource(R.string.kb_generate),
-    stringResource(R.string.kb_compose_write)
-)

@@ -66,4 +66,57 @@
     <string name="compose_paste_private">The copied text is marked private, such as a password, so AI Reply does not paste it. Copy the message itself.</string>
     <string name="compose_paste_unreadable">The copied text could not be read. Copy the message again.</string>
 
+    <!-- Onboarding: welcome -->
+    <string name="onboarding_later">Later</string>
+    <string name="onboarding_welcome_headline">Your personal assistant for messaging</string>
+    <string name="onboarding_welcome_subtitle">Reply to clients with confidence and chat easily with the people close to you. Right from the keyboard.</string>
+    <string name="onboarding_example">For example</string>
+    <string name="onboarding_welcome_incoming">Hi! It’s been a while. How are you?</string>
+    <string name="onboarding_reply_variant">Suggested reply</string>
+    <string name="onboarding_welcome_reply">Hi! So good to hear from you. Tell me, how have you been?</string>
+    <string name="onboarding_welcome_reply_male">@string/onboarding_welcome_reply</string>
+    <string name="onboarding_welcome_reply_female">@string/onboarding_welcome_reply</string>
+    <string name="onboarding_flow_copy">Copy the message.</string>
+    <string name="onboarding_flow_choose">Choose who it’s for.</string>
+    <string name="onboarding_flow_reply">Get the reply.</string>
+    <string name="onboarding_setup_keyboard">Set up the keyboard</string>
+    <string name="onboarding_try_first">Try it first</string>
+
+    <!-- Onboarding: the three-step tutorial (local examples only) -->
+    <string name="onboarding_tutorial_title">How to use · %1$d of %2$d</string>
+    <string name="onboarding_copy_title">Copy the message</string>
+    <string name="onboarding_copy_prompt">First copy the message you want to reply to. Try it here.</string>
+    <string name="onboarding_demo_message">Good afternoon! Could you tell me more?</string>
+    <string name="onboarding_copied_note">Message copied.</string>
+    <string name="onboarding_copy_footnote">In any messenger: press and hold the message, then tap Copy.</string>
+    <string name="onboarding_recipient_title">Choose who it’s for</string>
+    <string name="onboarding_recipient_prompt">Tap who you’re replying to. In the keyboard these buttons sit above the letters.</string>
+    <string name="onboarding_recipient_note">The choice sets the tone and how formal the reply is: warm for a friend, polite for a client or a partner, plain and to the point for a colleague.</string>
+    <string name="onboarding_try_title">Try it yourself</string>
+    <string name="onboarding_try_prompt">Pick who it’s for and see the reply change. Nothing is sent here and no replies are used.</string>
+    <string name="onboarding_message_label">Message</string>
+    <string name="onboarding_reply_ready">Reply ready</string>
+    <string name="onboarding_demo_reply_friend">Hi! Sure, happy to tell you. What would you like to know?</string>
+    <string name="onboarding_demo_reply_client">Good afternoon! Of course. Could you tell me what exactly you’re interested in? I’ll explain everything in detail.</string>
+    <string name="onboarding_demo_reply_colleague">Hi! Yes, of course. What exactly should I clarify?</string>
+    <string name="onboarding_demo_reply_partner">Good afternoon! Certainly. Let’s go over the details: when would be a good time for a call?</string>
+    <string name="onboarding_success">That’s it!</string>
+    <string name="onboarding_success_body">This is how AI Reply works in any messenger: the reply appears in the keyboard, and you send it yourself.</string>
+    <string name="onboarding_start_using">Start using</string>
+
+    <!-- Onboarding: connect the keyboard -->
+    <string name="onboarding_connect_title">Connect AI Reply</string>
+    <string name="onboarding_connect_prompt">A couple of steps in Android settings, and AI Reply is there in every messenger.</string>
+    <string name="onboarding_connect_step_open">Open keyboard settings</string>
+    <string name="onboarding_connect_step_enable">Turn on AI Reply</string>
+    <string name="onboarding_connect_step_default">Choose AI Reply as the default keyboard</string>
+    <string name="onboarding_connect_ready">The keyboard is connected</string>
+    <string name="onboarding_connect_why_title">Why does it need access?</string>
+    <string name="onboarding_connect_why_body">Android shows the same warning for every keyboard that did not come with the phone: it “may be able to collect all the text you type”. AI Reply sends text only when you tap %1$s or %2$s (the copied message and your request) and, with Smart correction on, the request while you type it in AI Reply’s own field. Nothing else you type leaves the phone.</string>
+    <string name="onboarding_connect_privacy_link">How data is handled</string>
+    <string name="onboarding_connect_later">Set up later</string>
+    <string name="onboarding_practice_field_prompt">Check it: tap the field, and the AI Reply keyboard should appear.</string>
+    <string name="onboarding_practice_field_placeholder">Type something…</string>
+    <string name="onboarding_practice_confirmed">The AI Reply keyboard is on screen: everything works.</string>
+
 </resources>

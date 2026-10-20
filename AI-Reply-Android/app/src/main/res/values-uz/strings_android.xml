@@ -158,17 +158,7 @@
     <string name="kb_polish_undo_description">Tuzatishni bekor qilish</string>
 
     <!-- Onboarding v2 on Android: keyboard status and setup, switching, clipboard; smart correction -->
-    <string name="android_status_keyboard">AI\u00A0Reply klaviaturasi</string>
-    <string name="android_status_enabled">Yoqilgan</string>
-    <string name="android_status_not_enabled">Yoqilmagan</string>
-    <string name="android_status_current">Joriy klaviatura</string>
-    <string name="android_status_other_keyboard">Boshqasi</string>
-    <string name="onboarding_keyboard_step_enable">Klaviaturalar roʻyxatida AI\u00A0Replyni yoqing</string>
-    <string name="onboarding_keyboard_step_confirm">Tizim ogohlantirishini tasdiqlang</string>
-    <string name="onboarding_keyboard_step_choose">Shu yerga qaytib, AI\u00A0Replyni tanlang</string>
     <string name="onboarding_switch_note">Klaviaturani almashtirish uchun navigatsiya panelidagi klaviatura belgisini bosing yoki boʻsh joy yoxud til tugmasini bosib turing — bu telefonga bogʻliq.</string>
-    <string name="onboarding_clipboard_note">AI\u00A0Reply nusxalangan xabarni faqat shablonni yoki «Xabarni joylash» tugmasini bosganingizda oʻqiydi. Androidning baʼzi versiyalari shu paytda bufer oʻqilgani haqida qisqa xabar koʻrsatadi — bu odatiy hol.</string>
-    <string name="cd_tutorial_next">Keyingi qadamni koʻrsatish</string>
     <string name="settings_smart_correction">Aqlli tuzatish</string>
     <string name="settings_smart_correction_footer">Xatolar tuzatiladi va soʻzlar toʻgʻridan-toʻgʻri telefonda taklif qilinadi: buning uchun boshqa ilovalarda yozganlaringiz yuborilmaydi. AI\u00A0Reply maydonida koʻrsatma yozayotganingizda, tozaroq variant taklif qilish uchun bu matn AI\u00A0Reply serveri orqali OpenAI’ga yuborilishi mumkin.</string>
     <string name="settings_smart_correction_attribution">Lugʻatlar: Leipzig Corpora Collection (CC BY).</string>

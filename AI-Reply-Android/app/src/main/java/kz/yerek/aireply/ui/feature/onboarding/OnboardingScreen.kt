@@ -1,19 +1,26 @@
 package kz.yerek.aireply.ui.feature.onboarding
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -21,81 +28,103 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.Layout
-import androidx.compose.ui.layout.Placeable
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kz.yerek.aireply.R
+import kz.yerek.aireply.ServiceLocator
 import kz.yerek.aireply.analytics.ProductEvent
 import kz.yerek.aireply.analytics.ProductEventValue
 import kz.yerek.aireply.analytics.ProductEvents
 import kz.yerek.aireply.domain.model.GrammaticalGender
+import kz.yerek.aireply.domain.model.RelationshipKind
+import kz.yerek.aireply.keyboard.input.KeyboardStatus
 import kz.yerek.aireply.ui.LocalServices
-import kz.yerek.aireply.ui.common.Footnote
-import kz.yerek.aireply.ui.design.LocalExtraColors
+import kz.yerek.aireply.ui.common.rememberKeyboardStatus
+import kz.yerek.aireply.ui.design.AppMark
+import kz.yerek.aireply.ui.design.Layout
 import kz.yerek.aireply.ui.design.PrimaryButton
 import kz.yerek.aireply.ui.design.ReadableColumn
-import kz.yerek.aireply.ui.design.SecondaryButton
 import kz.yerek.aireply.ui.design.Spacing
+import kz.yerek.aireply.ui.feature.setup.openKeyboardSettings
 
 /**
- * The first run, and the same screens again as "How to use AI Reply".
+ * The first run, and the same screens again from Settings.
  *
- * Онбординг: әр қадамды өткізіп жіберуге болады.
+ * Онбординг: сәлемдесу, үш қадамды оқыту, пернетақтаны қосу, жыныс.
  *
- * Every step can be skipped, and the whole run with "Skip tutorial". A first
- * run remembers its step, so a process killed halfway comes back to it, and
- * finishing records the version on this device. The tutorial changes nothing.
- * Which steps exist and in what order is [OnboardingFlow]'s decision.
+ * Welcome → (try first) the tutorial, then «Подключи AI Reply»; or (set up
+ * the keyboard) the other way round → the gender, when it was never
+ * answered. «Позже» leaves it for good (Settings and reminders offer it
+ * again); each part can be skipped. A first run remembers its step and its
+ * path, so a run that was closed halfway comes back there; finishing it
+ * records the version on this device and never touches the replies balance.
+ * Which steps exist and in what order is [OnboardingFlow]'s decision. No
+ * step moves by itself: the user turns every page.
+ *
+ * @param reopened opened from Settings or a link rather than at first launch,
+ *   for the `trigger` of `onboarding_started`.
  */
 @Composable
-fun OnboardingScreen(mode: OnboardingMode, onFinished: () -> Unit) {
+fun OnboardingScreen(mode: OnboardingMode, onFinished: () -> Unit, reopened: Boolean = false) {
     val services = LocalServices.current
+    val context = LocalContext.current
+    val device = services.deviceState
     val configuration by services.configuration.configuration.collectAsStateWithLifecycle()
     val profileGender = configuration.profile.grammaticalGender
 
+    // Read before the first step is saved: a run that comes back was started already.
+    val savedStep = remember { if (mode == OnboardingMode.FIRST_RUN) device.onboardingResumeStep else null }
     val asksGender = rememberSaveable {
         OnboardingFlow.asksGender(
             mode = mode,
             genderAnswered = services.configuration.profile.grammaticalGender != null,
-            startedAsking = services.deviceState.onboardingAsksGender
+            startedAsking = device.onboardingAsksGender
         )
     }
-    val flow = remember(asksGender) { OnboardingFlow(mode, asksGender) }
-    var step by rememberSaveable {
-        mutableStateOf(flow.start(if (flow.resumes) services.deviceState.onboardingResumeStep else null))
+    var path by rememberSaveable {
+        mutableStateOf(OnboardingPath.fromId(if (mode == OnboardingMode.FIRST_RUN) device.onboardingPath else null))
     }
+    val flow = remember(asksGender, path) { OnboardingFlow(mode, asksGender, path) }
+    var step by rememberSaveable { mutableStateOf(flow.start(savedStep)) }
     var gender by rememberSaveable { mutableStateOf(profileGender?.takeIf { it.isSpecified }) }
+    var recipient by rememberSaveable { mutableStateOf<RelationshipKind?>(null) }
+    var messageCopied by rememberSaveable { mutableStateOf(false) }
+    var replyCopied by rememberSaveable { mutableStateOf(false) }
+    val keyboard by rememberKeyboardStatus()
 
-    // Read before the first step is saved: a run that comes back after the
-    // process was killed was started already.
-    var started by rememberSaveable {
-        mutableStateOf(!OnboardingFlow.startsRun(mode, services.deviceState.onboardingResumeStep))
-    }
+    var announced by rememberSaveable { mutableStateOf(false) }
     var viewed by rememberSaveable { mutableStateOf<OnboardingStep?>(null) }
     LaunchedEffect(Unit) {
-        if (started) return@LaunchedEffect
-        started = true
-        ProductEvents.track(
-            ProductEvent.ONBOARDING_STARTED,
-            mapOf(
-                "version" to ProductEventValue.Number(OnboardingFlow.CURRENT_VERSION),
-                "trigger" to ProductEventValue.Code(if (mode == OnboardingMode.FIRST_RUN) "auto" else "settings")
+        if (announced) return@LaunchedEffect
+        announced = true
+        if (OnboardingFlow.startsRun(mode, savedStep)) {
+            ProductEvents.track(
+                ProductEvent.ONBOARDING_STARTED,
+                mapOf(
+                    "version" to ProductEventValue.Number(OnboardingFlow.CURRENT_VERSION),
+                    "trigger" to ProductEventValue.Code(if (mode == OnboardingMode.FIRST_RUN && !reopened) "auto" else "settings")
+                )
             )
-        )
+        } else {
+            ProductEvents.track(ProductEvent.ONBOARDING_RESUMED)
+        }
     }
-    LaunchedEffect(step) {
+    LaunchedEffect(step, path) {
         if (flow.resumes) {
-            services.deviceState.onboardingResumeStep = step.id
-            services.deviceState.onboardingAsksGender = flow.asksGender
+            device.onboardingResumeStep = step.id
+            device.onboardingAsksGender = flow.asksGender
+            device.onboardingPath = path.id
         }
         if (viewed == step) return@LaunchedEffect
         viewed = step
@@ -104,7 +133,7 @@ fun OnboardingScreen(mode: OnboardingMode, onFinished: () -> Unit) {
 
     fun finish(skipped: Boolean) {
         if (mode == OnboardingMode.FIRST_RUN) {
-            services.deviceState.completeOnboarding(OnboardingFlow.CURRENT_VERSION)
+            device.completeOnboarding(OnboardingFlow.CURRENT_VERSION, skipped = skipped)
             services.profileSync.reportOnboardingCompleted(OnboardingFlow.CURRENT_VERSION)
             ProductEvents.track(
                 ProductEvent.ONBOARDING_COMPLETED,
@@ -115,6 +144,14 @@ fun OnboardingScreen(mode: OnboardingMode, onFinished: () -> Unit) {
             )
         }
         onFinished()
+    }
+
+    fun go(next: OnboardingStep?) {
+        if (next != null) step = next else finish(skipped = false)
+    }
+
+    fun skipped(at: OnboardingStep) {
+        ProductEvents.track(ProductEvent.ONBOARDING_SKIPPED, mapOf("step" to ProductEventValue.Code(at.id)))
     }
 
     // Coming back to this step and continuing with the same answer is not a new choice.
@@ -130,86 +167,110 @@ fun OnboardingScreen(mode: OnboardingMode, onFinished: () -> Unit) {
         )
     }
 
-    fun advance() {
-        flow.next(step)?.let { step = it } ?: finish(skipped = false)
-    }
+    val actions = OnboardingActions(
+        later = {
+            skipped(OnboardingStep.WELCOME)
+            finish(skipped = true)
+        },
+        choosePath = { chosen ->
+            path = chosen
+            go(OnboardingFlow(mode, asksGender, chosen).next(OnboardingStep.WELCOME))
+        },
+        next = { go(flow.next(step)) },
+        skipTutorial = {
+            skipped(step)
+            go(flow.afterTutorial)
+        },
+        startUsing = {
+            ProductEvents.track(ProductEvent.ONBOARDING_PRACTICE_COMPLETED)
+            go(flow.next(step))
+        },
+        openKeyboardSettings = { openKeyboardSettings(context) },
+        chooseKeyboard = { KeyboardStatus.showKeyboardPicker(context) },
+        setUpLater = {
+            skipped(OnboardingStep.PERMISSIONS)
+            go(flow.next(step))
+        },
+        saveGender = {
+            gender?.let(::saveGender)
+            go(flow.next(step))
+        },
+        skipGender = {
+            saveGender(GrammaticalGender.UNSPECIFIED)
+            go(flow.next(step))
+        }
+    )
 
-    fun skip() {
-        if (step == OnboardingStep.GENDER) saveGender(GrammaticalGender.UNSPECIFIED)
-        advance()
-    }
-
-    fun proceed() {
-        if (step == OnboardingStep.GENDER) gender?.let(::saveGender)
-        advance()
-    }
+    val previous = flow.previous(step)
+    BackHandler(enabled = previous != null) { previous?.let { step = it } }
 
     // A Surface, not a bare background: it also sets the content colour, so
     // text follows the dark theme the way it does inside AppScreen's Scaffold.
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        OnboardingLayout(
-            flow = flow,
-            step = step,
-            gender = gender,
-            profileGender = profileGender,
-            onGender = { gender = it },
-            onStep = { step = it },
-            onSkip = ::skip,
-            onProceed = ::proceed,
-            onFinish = ::finish
-        )
-    }
-}
-
-@Composable
-private fun OnboardingLayout(
-    flow: OnboardingFlow,
-    step: OnboardingStep,
-    gender: GrammaticalGender?,
-    profileGender: GrammaticalGender?,
-    onGender: (GrammaticalGender) -> Unit,
-    onStep: (OnboardingStep) -> Unit,
-    onSkip: () -> Unit,
-    onProceed: () -> Unit,
-    onFinish: (skipped: Boolean) -> Unit
-) {
-    val previous = flow.previous(step)
-    BackHandler(enabled = previous != null) { previous?.let(onStep) }
-
-    Column(modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
-        flow.number(step)?.let { number -> Progress(number, flow.numberedCount) }
-
-        AnimatedContent(targetState = step, label = "onboarding", modifier = Modifier.weight(1f)) { current ->
-            Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-                ReadableColumn(verticalArrangement = Arrangement.spacedBy(Spacing.l)) {
-                    when (current) {
-                        OnboardingStep.WELCOME -> WelcomeStep(onSkipTutorial = { onFinish(true) })
-                        OnboardingStep.GENDER -> GenderStep(selected = gender, onSelect = onGender)
-                        OnboardingStep.KEYBOARD -> KeyboardStep(onSkipTutorial = { onFinish(true) })
-                        OnboardingStep.COPY_REPLY -> CopyReplyStep(profileGender)
-                        OnboardingStep.PRACTICE -> PracticeStep(profileGender)
+        Column(modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
+            TopBar(
+                step = step,
+                flow = flow,
+                onBack = previous?.let { { step = it } },
+                onLater = { if (mode == OnboardingMode.FIRST_RUN) actions.later() else onFinished() }
+            )
+            // Every page starts at its top.
+            key(step) {
+                Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                    ReadableColumn(verticalArrangement = Arrangement.spacedBy(Spacing.l)) {
+                        when (step) {
+                            OnboardingStep.WELCOME -> WelcomeStep(profileGender)
+                            OnboardingStep.TUTORIAL_COPY -> TutorialCopyStep(messageCopied) { messageCopied = true }
+                            OnboardingStep.TUTORIAL_RECIPIENT -> TutorialRecipientStep(recipient) { recipient = it }
+                            OnboardingStep.TUTORIAL_REPLY -> TutorialReplyStep(
+                                selected = recipient ?: OnboardingExamples.defaultRecipient,
+                                onSelect = {
+                                    recipient = it
+                                    replyCopied = false
+                                },
+                                copied = replyCopied,
+                                onCopied = { replyCopied = true }
+                            )
+                            OnboardingStep.PERMISSIONS -> ConnectStep(keyboard)
+                            OnboardingStep.GENDER -> GenderStep(selected = gender, onSelect = { gender = it })
+                        }
                     }
                 }
             }
+            BottomBar(step, flow, keyboard, gender, actions)
         }
-
-        StepBar(
-            showsBack = previous != null,
-            showsSkip = step != OnboardingStep.WELCOME && !flow.isLast(step),
-            primary = stringResource(
-                when {
-                    step == OnboardingStep.WELCOME -> R.string.onboarding_start
-                    flow.isLast(step) -> R.string.onboarding_finish
-                    else -> R.string.onboarding_next
-                }
-            ),
-            primaryEnabled = step != OnboardingStep.GENDER || gender != null,
-            onBack = { previous?.let(onStep) },
-            onSkip = onSkip,
-            onPrimary = onProceed
-        )
     }
 }
+
+/** One button of the bottom bar. */
+private class Action(val label: String, val onClick: () -> Unit, val enabled: Boolean = true)
+
+/**
+ * Where this device is with the onboarding: the stored version (or the old
+ * profile flag), how it ended, and a saved step.
+ */
+internal fun onboardingStatus(services: ServiceLocator): OnboardingStatus = OnboardingFlow.status(
+    completedVersion = OnboardingFlow.completedVersion(
+        stored = services.deviceState.completedOnboardingVersion,
+        legacyCompleted = services.configuration.profile.hasCompletedOnboarding
+    ),
+    storedStatus = services.deviceState.onboardingStatus,
+    resumeStep = services.deviceState.onboardingResumeStep
+)
+
+/** What the buttons of the bars do; the screen owns the state they change. */
+private class OnboardingActions(
+    val later: () -> Unit,
+    val choosePath: (OnboardingPath) -> Unit,
+    val next: () -> Unit,
+    val skipTutorial: () -> Unit,
+    val startUsing: () -> Unit,
+    val openKeyboardSettings: () -> Unit,
+    val chooseKeyboard: () -> Unit,
+    val setUpLater: () -> Unit,
+    val saveGender: () -> Unit,
+    val skipGender: () -> Unit
+)
 
 private fun trackViewed(step: OnboardingStep) {
     ProductEvents.track(
@@ -217,131 +278,110 @@ private fun trackViewed(step: OnboardingStep) {
         mapOf("step" to ProductEventValue.Code(step.id))
     )
     when (step) {
-        OnboardingStep.KEYBOARD -> ProductEvents.track(ProductEvent.ONBOARDING_KEYBOARD_STEP_VIEWED)
-        OnboardingStep.COPY_REPLY -> ProductEvents.track(ProductEvent.PASTE_TUTORIAL_VIEWED)
+        OnboardingStep.PERMISSIONS -> ProductEvents.track(ProductEvent.ONBOARDING_KEYBOARD_STEP_VIEWED)
+        OnboardingStep.TUTORIAL_COPY -> ProductEvents.track(ProductEvent.PASTE_TUTORIAL_VIEWED)
         else -> Unit
     }
 }
 
-@Composable
-private fun Progress(number: Int, count: Int) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = Spacing.l, top = Spacing.s, end = Spacing.l),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        LinearProgressIndicator(
-            progress = { number.toFloat() / count },
-            modifier = Modifier.fillMaxWidth()
-        )
-        Text(
-            stringResource(R.string.onboarding_step, number, count),
-            style = MaterialTheme.typography.labelSmall,
-            color = LocalExtraColors.current.textSecondary,
-            modifier = Modifier.padding(top = Spacing.xxs)
-        )
-    }
-}
-
-/** Back, Skip and the step's main action, laid out by [StepBarLayout]. */
-@Composable
-private fun StepBar(
-    showsBack: Boolean,
-    showsSkip: Boolean,
-    primary: String,
-    primaryEnabled: Boolean,
-    onBack: () -> Unit,
-    onSkip: () -> Unit,
-    onPrimary: () -> Unit
-) {
-    StepBarLayout(
-        spacing = Spacing.s,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(Spacing.l)
-    ) {
-        if (showsBack) SecondaryButton(stringResource(R.string.onboarding_back), onClick = onBack)
-        if (showsSkip) SecondaryButton(stringResource(R.string.onboarding_skip), onClick = onSkip)
-        PrimaryButton(text = primary, enabled = primaryEnabled, onClick = onPrimary)
-    }
-}
-
 /**
- * One line when every label fits on one line there, the main action (the
- * last child) taking the room that is left. Otherwise the quiet buttons share
- * a line above a full-width main action, and when even they do not fit side by
- * side, each button gets a line of its own. A label never breaks inside a
- * word, whatever the language and the text size.
+ * The welcome screen's mark and «Позже»; elsewhere Back and, in the
+ * tutorial, «Как пользоваться · 1 из 3».
  */
 @Composable
-private fun StepBarLayout(spacing: Dp, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    Layout(content = content, modifier = modifier) { measurables, constraints ->
-        val gap = spacing.roundToPx()
-        val natural = measurables.map { it.maxIntrinsicWidth(Constraints.Infinity) }
-        val main = measurables.lastIndex
-        val quiet = measurables.indices.filter { it != main }
-        val oneLine = natural.sum() + gap * main
-        val width = if (constraints.hasBoundedWidth) constraints.maxWidth else oneLine
-
-        // Each line is a list of (child, width) pairs.
-        val lines: List<List<Pair<Int, Int>>> = when {
-            oneLine <= width -> listOf(
-                quiet.map { it to natural[it] } + (main to width - quiet.sumOf { natural[it] } - gap * quiet.size)
+private fun TopBar(step: OnboardingStep, flow: OnboardingFlow, onBack: (() -> Unit)?, onLater: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 56.dp)
+            .padding(horizontal = Spacing.xxs),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (step == OnboardingStep.WELCOME) {
+            Spacer(Modifier.width(Spacing.m))
+            AppMark(size = 28.dp)
+            Text(
+                stringResource(R.string.app_name),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(start = Spacing.xs)
             )
-            quiet.isEmpty() -> listOf(listOf(main to width))
-            else -> {
-                val quietLine = quiet.sumOf { natural[it] } + gap * (quiet.size - 1)
-                if (quietLine <= width) {
-                    // The room left over is shared out, so the line is as wide as the main action.
-                    val extra = (width - quietLine) / quiet.size
-                    listOf(quiet.map { it to natural[it] + extra }, listOf(main to width))
-                } else {
-                    measurables.indices.map { listOf(it to width) }
+            Spacer(Modifier.weight(1f))
+            TextButton(onClick = onLater) { Text(stringResource(R.string.onboarding_later)) }
+        } else {
+            if (onBack != null) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.cd_back))
                 }
+            } else {
+                Spacer(Modifier.width(Spacing.m))
             }
-        }
-
-        val placeables = arrayOfNulls<Placeable>(measurables.size)
-        val lineHeights = lines.map { line ->
-            line.maxOf { (index, lineWidth) ->
-                val itemWidth = lineWidth.coerceAtLeast(0)
-                measurables[index]
-                    .measure(constraints.copy(minWidth = itemWidth, maxWidth = itemWidth, minHeight = 0))
-                    .also { placeables[index] = it }
-                    .height
-            }
-        }
-        val height = lineHeights.sum() + gap * (lines.size - 1)
-
-        layout(width, height) {
-            var y = 0
-            lines.forEachIndexed { row, line ->
-                var x = 0
-                line.forEach { (index, _) ->
-                    val placeable = requireNotNull(placeables[index])
-                    placeable.placeRelative(x, y + (lineHeights[row] - placeable.height) / 2)
-                    x += placeable.width + gap
-                }
-                y += lineHeights[row] + gap
+            flow.tutorialNumber(step)?.let { number ->
+                Text(
+                    stringResource(R.string.onboarding_tutorial_title, number, flow.tutorialCount),
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.semantics { heading() }
+                )
             }
         }
     }
 }
 
-/** A step's title and the sentence under it. */
+/** The page dots in the tutorial, the step's main action, and its quiet one under it. */
 @Composable
-internal fun StepHeader(heading: String, prompt: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-        Text(heading, style = MaterialTheme.typography.headlineMedium)
-        Footnote(prompt)
-    }
-}
+private fun BottomBar(
+    step: OnboardingStep,
+    flow: OnboardingFlow,
+    keyboard: KeyboardStatus.Snapshot,
+    gender: GrammaticalGender?,
+    actions: OnboardingActions
+) {
+    val last = flow.isLast(step)
+    val continueLabel = stringResource(if (last) R.string.onboarding_finish else R.string.onboarding_next)
 
-/** Ends the run from an early step, for someone who already knows the app. */
-@Composable
-internal fun ColumnScope.SkipTutorialButton(onClick: () -> Unit) {
-    TextButton(onClick = onClick, modifier = Modifier.align(Alignment.CenterHorizontally)) {
-        Text(stringResource(R.string.onboarding_skip_tutorial))
+    val (primary, secondary) = when (step) {
+        OnboardingStep.WELCOME ->
+            Action(stringResource(R.string.onboarding_setup_keyboard), { actions.choosePath(OnboardingPath.SETUP_FIRST) }) to
+                Action(stringResource(R.string.onboarding_try_first), { actions.choosePath(OnboardingPath.TRY_FIRST) })
+        OnboardingStep.TUTORIAL_COPY, OnboardingStep.TUTORIAL_RECIPIENT ->
+            Action(stringResource(R.string.onboarding_next), actions.next) to
+                Action(stringResource(R.string.onboarding_skip), actions.skipTutorial)
+        OnboardingStep.TUTORIAL_REPLY ->
+            Action(stringResource(R.string.onboarding_start_using), actions.startUsing) to null
+        OnboardingStep.PERMISSIONS -> when {
+            !keyboard.isEnabled ->
+                Action(stringResource(R.string.permissions_action_keyboard_settings), actions.openKeyboardSettings) to
+                    Action(stringResource(R.string.onboarding_connect_later), actions.setUpLater)
+            !keyboard.isSelected ->
+                Action(stringResource(R.string.permissions_action_choose), actions.chooseKeyboard) to
+                    Action(stringResource(R.string.onboarding_connect_later), actions.setUpLater)
+            else -> Action(continueLabel, actions.next) to null
+        }
+        OnboardingStep.GENDER ->
+            Action(continueLabel, actions.saveGender, enabled = gender != null) to
+                Action(stringResource(R.string.onboarding_skip), actions.skipGender)
+    }
+
+    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        Column(
+            modifier = Modifier
+                .widthIn(max = Layout.readableWidth)
+                .fillMaxWidth()
+                .padding(start = Spacing.l, end = Spacing.l, top = Spacing.s, bottom = Spacing.xs),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(Spacing.xs)
+        ) {
+            flow.tutorialNumber(step)?.let { number ->
+                ProgressDots(flow.tutorialCount, number, Modifier.padding(bottom = Spacing.xs))
+            }
+            PrimaryButton(text = primary.label, enabled = primary.enabled, onClick = primary.onClick)
+            if (secondary != null) {
+                TextButton(onClick = secondary.onClick, modifier = Modifier.heightIn(min = Layout.minimumTouchTarget)) {
+                    Text(secondary.label)
+                }
+            } else {
+                // The same height either way, so the main action never jumps between pages.
+                Spacer(Modifier.heightIn(min = Layout.minimumTouchTarget))
+            }
+        }
     }
 }

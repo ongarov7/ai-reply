@@ -53,13 +53,40 @@ class DeviceStateStore internal constructor(private val prefs: SharedPreferences
             }.apply()
         }
 
-    /** Records a finished onboarding. A version never goes down, and the run in progress is gone. */
-    fun completeOnboarding(version: Int) {
+    /**
+     * The welcome screen's choice for the unfinished run (`try_first` or
+     * `setup_first`), kept with [onboardingResumeStep] so a run that comes
+     * back has its steps in the same order. Null when no run is in progress.
+     */
+    var onboardingPath: String?
+        get() = prefs.getString(KEY_PATH, null)
+        set(value) {
+            prefs.edit().apply {
+                if (value == null) remove(KEY_PATH) else putString(KEY_PATH, value)
+            }.apply()
+        }
+
+    /**
+     * How the last finished run ended: `completed`, or `skipped` when it was
+     * left with «Позже». Null before any run finished, and for one finished
+     * by a build that did not record it.
+     */
+    val onboardingStatus: String?
+        get() = prefs.getString(KEY_STATUS, null)
+
+    /**
+     * Records a finished onboarding. A version never goes down, and the run in
+     * progress is gone. [skipped]: it was left with «Позже»; finishing it later
+     * makes it completed.
+     */
+    fun completeOnboarding(version: Int, skipped: Boolean = false) {
         val stored = completedOnboardingVersion ?: 0
         prefs.edit()
             .putInt(KEY_ONBOARDING_VERSION, maxOf(stored, version))
+            .putString(KEY_STATUS, if (skipped) STATUS_SKIPPED else STATUS_COMPLETED)
             .remove(KEY_RESUME_STEP)
             .remove(KEY_ASKS_GENDER)
+            .remove(KEY_PATH)
             .apply()
     }
 
@@ -128,6 +155,13 @@ class DeviceStateStore internal constructor(private val prefs: SharedPreferences
         prefs.edit().putLong(KEY_KEYBOARD_CHECK, at).apply()
     }
 
+    /** Calls [onChange] on the main thread whenever a value here changes; the returned function stops it. */
+    fun observe(onChange: () -> Unit): () -> Unit {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> onChange() }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        return { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+
     /** The backing file, for once-per-install flags such as [kz.yerek.aireply.analytics.ProductEvents]. */
     val sharedPreferences: SharedPreferences get() = prefs
 
@@ -140,6 +174,10 @@ class DeviceStateStore internal constructor(private val prefs: SharedPreferences
         private const val KEY_ONBOARDING_VERSION = "onboarding.completedVersion"
         private const val KEY_RESUME_STEP = "onboarding.resumeStep"
         private const val KEY_ASKS_GENDER = "onboarding.asksGender"
+        private const val KEY_PATH = "onboarding.path"
+        private const val KEY_STATUS = "onboarding.status"
+        private const val STATUS_COMPLETED = "completed"
+        private const val STATUS_SKIPPED = "skipped"
         private const val KEY_PENDING_SYNC = "profile.pendingSync"
         private const val KEY_LANGUAGE_PENDING_SYNC = "profile.languagePendingSync"
         private const val KEY_LAST_PASTE = "diagnostics.lastSuccessfulPasteAt"

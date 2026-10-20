@@ -35,6 +35,7 @@ import kz.yerek.aireply.ui.feature.hours.WorkingHoursScreen
 import kz.yerek.aireply.ui.feature.onboarding.OnboardingFlow
 import kz.yerek.aireply.ui.feature.onboarding.OnboardingMode
 import kz.yerek.aireply.ui.feature.onboarding.OnboardingScreen
+import kz.yerek.aireply.ui.feature.onboarding.onboardingStatus
 import kz.yerek.aireply.ui.feature.profile.ProfileScreen
 import kz.yerek.aireply.ui.feature.settings.SettingsScreen
 import kz.yerek.aireply.ui.feature.setup.KeyboardSetupScreen
@@ -134,8 +135,11 @@ fun AppNavHost(debugScreen: String? = null) {
             OnboardingScreen(mode = OnboardingMode.FIRST_RUN, onFinished = { needsOnboarding = false })
         }
 
+        // Settings and aireply://onboarding: the tutorial once it was finished,
+        // the real run for someone who left it with «Позже».
         composable(Routes.Tutorial) {
-            OnboardingScreen(mode = OnboardingMode.TUTORIAL, onFinished = navController::popBackStack)
+            val mode = remember { OnboardingFlow.reopenMode(onboardingStatus(services)) }
+            OnboardingScreen(mode = mode, onFinished = navController::popBackStack, reopened = true)
         }
 
         composable(Routes.Home) {
