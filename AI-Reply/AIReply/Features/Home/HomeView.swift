@@ -177,7 +177,7 @@ struct HomeView: View {
                 }
 
                 if keyboard.keyboardSighting == .unknown {
-                    KeyboardSetupSteps().padding(.top, DS.Spacing.xxs)
+                    KeyboardConnectSteps().padding(.top, DS.Spacing.xs)
                 }
 
                 // ONE action, and only while something is left to do. "Open

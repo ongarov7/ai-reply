@@ -5,35 +5,13 @@ import UIKit
 /// permissions section, Settings and «Подключи AI Reply» say the same thing
 /// the same way.
 
-/// The steps for adding the keyboard in iOS Settings.
-struct KeyboardSetupSteps: View {
-    /// The short path: iOS lists a keyboard app's own keyboards on the app's
-    /// page in Settings, which is the one page an app may open. The long
-    /// path through General ▸ Keyboard is offered separately as a fallback.
-    private let steps: [LocalizedStringKey] = [
-        "home.setup.step.openApp",
-        "home.setup.step.appKeyboards",
-        "home.setup.step.enable",
-        "home.setup.step.fullAccess"
-    ]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.s) {
-            ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
-                DSStepRow(index: index + 1, text: step)
-            }
-        }
-        .dsCard()
-    }
-}
-
 /// THE setup action: opens AI Reply's own page in iOS Settings, the one page
 /// an app may open - and for a keyboard app the page that lists its keyboard
 /// and the Full Access switch. Nothing can turn either on for the user.
 struct OpenKeyboardSettingsButton: View {
     var body: some View {
         Button(action: Self.openSystemSettings) {
-            Label("home.keyboard.openSettings", systemImage: "keyboard")
+            Label("permissions.openSettings", systemImage: "keyboard")
         }
         .buttonStyle(.dsPrimary)
     }
