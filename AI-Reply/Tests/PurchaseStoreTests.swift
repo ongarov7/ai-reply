@@ -37,6 +37,8 @@ final class PurchaseStoreTests: XCTestCase {
     private final class FakeBackend: PurchaseBackend, @unchecked Sendable {
         var catalogueResult: Result<PurchaseAPI.Catalogue, APIError>
         var verdicts: [Result<PurchaseAPI.Verdict, APIError>] = []
+        /// While true, every submit waits before it answers.
+        var holdsAnswers = false
         private(set) var submitted: [String] = []
         private(set) var catalogueCalls = 0
 
@@ -51,6 +53,7 @@ final class PurchaseStoreTests: XCTestCase {
 
         func submit(signedTransaction: String) async throws -> PurchaseAPI.Verdict {
             submitted.append(signedTransaction)
+            while holdsAnswers { try await Task.sleep(for: .milliseconds(5)) }
             guard !verdicts.isEmpty else { return PurchaseAPI.Verdict(status: "granted", usage: nil) }
             return try verdicts.removeFirst().get()
         }
@@ -200,11 +203,14 @@ final class PurchaseStoreTests: XCTestCase {
         XCTAssertEqual(log.finished, ["t2"])
     }
 
-    func testOnlyRefusalsThatNeverChangeAreFinished() async {
+    /// Finished only after a grant, or a refund the store made. A refusal
+    /// that only a misconfigured server gives (another bundle, a product
+    /// type it does not sell) stays, to be sent again once it is fixed.
+    func testOnlyARevokedRefusalIsFinished() async {
         let cases: [(APIError, PurchaseStore.Failure, Bool)] = [
             (.purchaseInvalid(reason: "revoked"), .notConfirmed, true),
-            (.purchaseInvalid(reason: "product_type"), .notConfirmed, true),
-            (.purchaseInvalid(reason: "bundle_mismatch"), .notConfirmed, true),
+            (.purchaseInvalid(reason: "product_type"), .notConfirmed, false),
+            (.purchaseInvalid(reason: "bundle_mismatch"), .notConfirmed, false),
             (.purchaseInvalid(reason: "signature"), .notConfirmed, false),
             (.purchaseInvalid(reason: nil), .notConfirmed, false),
             (.purchaseBelongsToAnotherAccount, .anotherAccount, false),
@@ -281,6 +287,90 @@ final class PurchaseStoreTests: XCTestCase {
         store.accountDidChange(isSignedIn: true, userID: "u2", features: features(#"{"iap_ios": true}"#))
         XCTAssertTrue(store.offers.isEmpty)
         XCTAssertEqual(store.catalogueState, .idle)
+    }
+
+    /// A refused transaction is not sent again on every return to the app;
+    /// the next launch sends it again.
+    func testARefusalIsSentAgainAtTheNextLaunch() async {
+        let log = FinishLog()
+        let paid = transaction("t6", log: log)
+        let (store, storeKit, backend) = makeStore()
+        storeKit.unfinished = [paid]
+        backend.verdicts = [.failure(.purchaseInvalid(reason: "bundle_mismatch"))]
+
+        await store.processUnfinished()
+        await store.processUnfinished()
+        XCTAssertEqual(backend.submitted, ["jws-t6"])
+
+        let (relaunched, relaunchedStoreKit, relaunchedBackend) = makeStore()
+        relaunchedStoreKit.unfinished = [paid]
+        await relaunched.processUnfinished()
+        XCTAssertEqual(relaunchedBackend.submitted, ["jws-t6"])
+        XCTAssertEqual(log.finished, ["t6"], "granted once the server is fixed")
+    }
+
+    // MARK: The same transaction twice at once
+
+    /// Back from the App Store sheet, the app sends what is unfinished - the
+    /// sheet's own transaction among them - while the sheet sends it too.
+    /// One request; when it fails, the sheet says so and can be closed.
+    func testTheSheetSharesARequestAlreadyRunning() async throws {
+        let log = FinishLog()
+        let (store, storeKit, backend) = makeStore()
+        await store.loadCatalogue()
+        let offer = try XCTUnwrap(store.offers.first)
+        let paid = transaction("t7", log: log)
+        storeKit.unfinished = [paid]
+        storeKit.result = .success(.purchased(paid))
+        backend.verdicts = [.failure(.offline)]
+        backend.holdsAnswers = true
+
+        let returning = Task { await store.processUnfinished() }
+        for _ in 0..<200 where backend.submitted.isEmpty { try await Task.sleep(for: .milliseconds(5)) }
+        let buying = Task { await store.purchase(offer) }
+        for _ in 0..<200 where store.status != .verifying(productID: "pack.50") {
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        XCTAssertEqual(store.status, .verifying(productID: "pack.50"))
+
+        backend.holdsAnswers = false
+        await returning.value
+        await buying.value
+
+        XCTAssertEqual(backend.submitted, ["jws-t7"], "one request for both")
+        XCTAssertEqual(store.status, .failed(.willRetry))
+        XCTAssertTrue(log.finished.isEmpty)
+        store.dismissStatus()
+        XCTAssertEqual(store.status, .idle)
+    }
+
+    func testASharedGrantIsToldOnce() async throws {
+        let log = FinishLog()
+        let (store, storeKit, backend) = makeStore()
+        var grants = 0
+        store.onGrant = { _ in grants += 1 }
+        await store.loadCatalogue()
+        let offer = try XCTUnwrap(store.offers.first)
+        let paid = transaction("t8", log: log)
+        storeKit.unfinished = [paid]
+        storeKit.result = .success(.purchased(paid))
+        backend.holdsAnswers = true
+
+        let returning = Task { await store.processUnfinished() }
+        for _ in 0..<200 where backend.submitted.isEmpty { try await Task.sleep(for: .milliseconds(5)) }
+        let buying = Task { await store.purchase(offer) }
+        for _ in 0..<200 where store.status != .verifying(productID: "pack.50") {
+            try await Task.sleep(for: .milliseconds(5))
+        }
+
+        backend.holdsAnswers = false
+        await buying.value
+        await returning.value
+
+        XCTAssertEqual(backend.submitted, ["jws-t8"])
+        XCTAssertEqual(store.status, .granted)
+        XCTAssertEqual(log.finished, ["t8"])
+        XCTAssertEqual(grants, 1)
     }
 
     // MARK: Transactions outside the sheet

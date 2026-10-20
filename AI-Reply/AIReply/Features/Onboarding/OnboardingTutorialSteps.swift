@@ -146,7 +146,9 @@ struct TutorialReplyStep: View {
     @State private var didCopy = false
 
     var body: some View {
-        OnboardingPage {
+        // Another recipient, or the copy done: the reply card under the
+        // grid scrolls into view, so the change is seen on a small screen.
+        OnboardingPage(reveal: ReplyReveal(kind: kind, didCopy: didCopy)) {
             VStack(alignment: .leading, spacing: DS.Spacing.l) {
                 OnboardingStepTitle("onboarding.tutorial.reply.title", "onboarding.tutorial.reply.body")
 
@@ -160,12 +162,17 @@ struct TutorialReplyStep: View {
                     TutorialRecipientGrid(selection: recipient)
                 }
 
-                replyCard
+                replyCard.onboardingRevealed()
             }
         } buttons: {
             TutorialButtons(position: 3, primary: "onboarding.tutorial.start", onPrimary: onDone, onSkip: nil)
         }
         .onboardingTutorialHeader(position: 3, count: OnboardingFlow.Step.tutorial.count)
+    }
+
+    private struct ReplyReveal: Hashable {
+        let kind: RelationshipKind
+        let didCopy: Bool
     }
 
     /// The choice made on step 2; Client until there is one, the example

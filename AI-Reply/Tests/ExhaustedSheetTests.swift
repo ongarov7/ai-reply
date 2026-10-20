@@ -31,6 +31,31 @@ final class ExhaustedSheetTests: XCTestCase {
         XCTAssertNil(ExhaustedOffer.decide(failure: nil, refusal: canBuy, purchasesEnabled: true))
     }
 
+    /// The sentence says only what the sheet offers, and in Russian agrees
+    /// with the gender the user chose - or says neither.
+    func testTheTextFitsTheOfferAndTheUser() {
+        let buy = ExhaustedOffer(offersPurchase: true)
+        let plans = ExhaustedOffer(offersPurchase: false)
+        XCTAssertEqual(buy.bodyKey(gender: nil), "exhausted.body")
+        XCTAssertEqual(buy.bodyKey(gender: .unspecified), "exhausted.body")
+        XCTAssertEqual(buy.bodyKey(gender: .male), "exhausted.body.male")
+        XCTAssertEqual(buy.bodyKey(gender: .female), "exhausted.body.female")
+        for gender: GrammaticalGender? in [nil, .male, .female, .unspecified] {
+            XCTAssertEqual(plans.bodyKey(gender: gender), "exhausted.body.plans")
+        }
+
+        func russian(_ key: String) -> String { AppSettings.localized(key, language: .russian) }
+        XCTAssertTrue(russian("exhausted.body.male").hasPrefix("Ты использовал "))
+        XCTAssertTrue(russian("exhausted.body.female").hasPrefix("Ты использовала "))
+        XCTAssertFalse(russian("exhausted.body").contains("использовал"))
+        XCTAssertFalse(russian("exhausted.body.plans").contains("дополнительные"))
+        for language in AppLanguage.allCases {
+            XCTAssertNotEqual(AppSettings.localized("exhausted.body.plans", language: language),
+                              AppSettings.localized("exhausted.body", language: language),
+                              "nothing to buy is offered in \(language.rawValue)")
+        }
+    }
+
     // MARK: The server's refusal
 
     private func refusal(_ code: String, details: String) -> APIError {

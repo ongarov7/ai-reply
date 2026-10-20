@@ -6,29 +6,56 @@ import SwiftUI
 /// Онбординг беттерінің ортақ бөліктері.
 
 /// A scrolling page on the grouped background, its buttons pinned under it.
+///
+/// Each time `reveal` changes, the view marked `.onboardingRevealed()`
+/// scrolls fully into view: a change below the fold of a small screen is
+/// seen where it happens.
 struct OnboardingPage<Content: View, Buttons: View>: View {
+    var reveal: AnyHashable? = nil
     @ViewBuilder var content: Content
     @ViewBuilder var buttons: Buttons
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
-        ScrollView {
-            content
-                .padding(.horizontal, DS.Spacing.l)
-                .padding(.vertical, DS.Spacing.m)
-                .frame(maxWidth: DS.Layout.readableWidth, alignment: .leading)
-                .frame(maxWidth: .infinity)
+        ScrollViewReader { proxy in
+            ScrollView {
+                content
+                    .padding(.horizontal, DS.Spacing.l)
+                    .padding(.vertical, DS.Spacing.m)
+                    .frame(maxWidth: DS.Layout.readableWidth, alignment: .leading)
+                    .frame(maxWidth: .infinity)
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .background(Color.dsBackground)
+            .safeAreaInset(edge: .bottom) {
+                VStack(spacing: DS.Spacing.xxs) { buttons }
+                    .padding(.horizontal, DS.Spacing.l)
+                    .padding(.top, DS.Spacing.s)
+                    .padding(.bottom, DS.Spacing.xs)
+                    .frame(maxWidth: DS.Layout.readableWidth)
+                    .frame(maxWidth: .infinity)
+                    .background(Color.dsBackground)
+            }
+            .onChange(of: reveal) {
+                withAnimation(reduceMotion ? nil : .easeOut(duration: 0.25)) {
+                    proxy.scrollTo(OnboardingReveal.id, anchor: .bottom)
+                }
+            }
         }
-        .scrollDismissesKeyboard(.interactively)
-        .background(Color.dsBackground)
-        .safeAreaInset(edge: .bottom) {
-            VStack(spacing: DS.Spacing.xxs) { buttons }
-                .padding(.horizontal, DS.Spacing.l)
-                .padding(.top, DS.Spacing.s)
-                .padding(.bottom, DS.Spacing.xs)
-                .frame(maxWidth: DS.Layout.readableWidth)
-                .frame(maxWidth: .infinity)
-                .background(Color.dsBackground)
-        }
+    }
+}
+
+/// The one view on an `OnboardingPage` that `reveal` scrolls to.
+private enum OnboardingReveal {
+    static let id = "onboarding.reveal"
+}
+
+extension View {
+    /// Marks the view an `OnboardingPage` scrolls into view when its
+    /// `reveal` changes.
+    func onboardingRevealed() -> some View {
+        id(OnboardingReveal.id)
     }
 }
 

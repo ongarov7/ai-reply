@@ -684,7 +684,9 @@ Behaviour:
   `subscription`, `settings`, `notifications`, `templates`, `profile`,
   `compose`, `keyboard` and `permissions` (both «Настройка клавиатуры и
   разрешений»), `paste_help`, `onboarding` (the guide over Home); `support`
-  and `purchase` open Home until those screens ship;
+  opens «Чат с оператором» when the server has `support_chat` (Home
+  otherwise), `purchase` opens «Докупить ответы» when it has `iap_ios` (the
+  plans otherwise);
   `https://ai-reply.kz/...` opens in an in-app browser; anything else just opens
   the app. A destination waits behind consent, sign-in and onboarding (15
   minutes at most). A tap with a delivery id is reported to
@@ -704,7 +706,9 @@ notifications section. `-AIReplyDebugScreen compose | permissions | paste_help`
 open those screens; `-AIReplyDebugScreen onboarding` opens the guide, with
 `-AIReplyDebugStep tutorial_copy | tutorial_recipient | tutorial_reply |
 permissions`, `-AIReplyDebugPath setup_first | try_first` and
-`-AIReplyDebugGender male | female | unspecified`.
+`-AIReplyDebugGender male | female | unspecified`; `-AIReplyDebugScreen
+exhausted` opens «Лимит ответов исчерпан» (`-AIReplyDebugOffer plans` without
+«Докупить ответы», `-AIReplyDebugGender` for the wording).
 
 ---
 

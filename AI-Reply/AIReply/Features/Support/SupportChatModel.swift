@@ -89,7 +89,10 @@ final class SupportChatModel {
         enum Delivery: Equatable {
             case sent
             case sending
+            /// Retry can send it.
             case failed
+            /// The server will not take it as it is; Retry would not help.
+            case refused
         }
 
         /// The server's id, or the client message id while unsent.
@@ -105,6 +108,7 @@ final class SupportChatModel {
     }
 
     nonisolated static let pageSize = 30
+    /// The server's limit, in Unicode code points (`draftLength`).
     nonisolated static let maximumLength = 2000
     nonisolated static let pollInterval: Duration = .seconds(5)
 
@@ -136,8 +140,12 @@ final class SupportChatModel {
 
     var trimmedDraft: String { draft.trimmingCharacters(in: .whitespacesAndNewlines) }
 
+    /// The draft's length as the server counts it: code points, not the
+    /// characters on screen (a family emoji is one character, and seven).
+    var draftLength: Int { trimmedDraft.unicodeScalars.count }
+
     var canSend: Bool {
-        let count = trimmedDraft.count
+        let count = draftLength
         return loadState == .loaded && count > 0 && count <= Self.maximumLength
     }
 
@@ -262,10 +270,17 @@ final class SupportChatModel {
         } catch {
             // Already arrived through a poll and taken off: nothing failed.
             guard let index = unsent.firstIndex(where: { $0.id == id }) else { return }
-            unsent[index].delivery = .failed
-            if case APIError.rateLimited = error {
+            switch error {
+            // The text is the one thing in this request a user can get
+            // wrong: longer than the server takes.
+            case APIError.invalidRequest:
+                unsent[index].delivery = .refused
+                sendErrorKey = "support.error.tooLong"
+            case APIError.rateLimited:
+                unsent[index].delivery = .failed
                 sendErrorKey = "support.error.rateLimited"
-            } else {
+            default:
+                unsent[index].delivery = .failed
                 sendErrorKey = "support.error.send"
             }
         }

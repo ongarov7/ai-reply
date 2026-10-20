@@ -221,7 +221,8 @@ enum DebugScreen: String {
     }
 
     /// `-AIReplyDebugGender male | female | unspecified`: the gender the
-    /// opened guide has already (no question then).
+    /// opened guide has already (no question then), or the exhausted
+    /// sheet speaks to.
     static var onboardingGender: GrammaticalGender? {
         value(after: "-AIReplyDebugGender").flatMap(GrammaticalGender.init(rawValue:))
     }

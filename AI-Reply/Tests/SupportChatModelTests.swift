@@ -151,6 +151,22 @@ final class SupportChatModelTests: XCTestCase {
         XCTAssertTrue(model.canSend)
     }
 
+    /// The limit is counted as the server counts it, in code points: a
+    /// family emoji is one character on screen and seven to the server.
+    func testTheLimitIsCountedAsTheServerCountsIt() async {
+        let model = SupportChatModel(transport: FakeSupport())
+        await model.load()
+        let family = "👨‍👩‍👧‍👦"
+        XCTAssertEqual(family.count, 1)
+        model.draft = String(repeating: family, count: 286)
+        XCTAssertEqual(model.trimmedDraft.count, 286)
+        XCTAssertEqual(model.draftLength, 2002)
+        XCTAssertFalse(model.canSend)
+        model.draft = String(repeating: family, count: 285) + "ok   "
+        XCTAssertEqual(model.draftLength, 1997)
+        XCTAssertTrue(model.canSend)
+    }
+
     // MARK: Sending
 
     func testAMessageIsSendingThenSent() async throws {
@@ -203,6 +219,26 @@ final class SupportChatModelTests: XCTestCase {
         model.draft = "Ещё вопрос"
         await model.send()
         XCTAssertEqual(model.sendErrorKey, "support.error.rateLimited")
+    }
+
+    /// The server would not take the text: said so, and no Retry that would
+    /// only be refused again.
+    func testARefusedMessageIsNotOfferedAgain() async throws {
+        let server = FakeSupport()
+        await server.setSendFailures([.invalidRequest])
+        let model = SupportChatModel(transport: server)
+        await model.load()
+        model.draft = "Вопрос"
+
+        await model.send()
+        let refused = try XCTUnwrap(model.items.last)
+        XCTAssertEqual(refused.delivery, .refused)
+        XCTAssertEqual(model.sendErrorKey, "support.error.tooLong")
+
+        await model.retry(refused.id)
+        let sent = await server.sent
+        XCTAssertEqual(sent.count, 1)
+        XCTAssertEqual(model.items.last?.delivery, .refused)
     }
 
     /// The server kept the message before its answer came back, and a poll

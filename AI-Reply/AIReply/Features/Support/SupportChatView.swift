@@ -209,10 +209,10 @@ private struct SupportChatContent: View {
                 .accessibilityLabel(Text("support.send"))
                 .frame(minWidth: DS.Layout.minimumTouchTarget, minHeight: DS.Layout.minimumTouchTarget)
             }
-            if model.trimmedDraft.count > SupportChatModel.maximumLength - 200 {
-                Text(verbatim: "\(model.trimmedDraft.count) / \(SupportChatModel.maximumLength)")
+            if model.draftLength > SupportChatModel.maximumLength - 200 {
+                Text(verbatim: "\(model.draftLength) / \(SupportChatModel.maximumLength)")
                     .font(.caption.monospacedDigit())
-                    .foregroundStyle(model.trimmedDraft.count > SupportChatModel.maximumLength ? Color.red : .secondary)
+                    .foregroundStyle(model.draftLength > SupportChatModel.maximumLength ? Color.red : .secondary)
             }
         }
         .padding(.horizontal, DS.Spacing.m)
@@ -273,6 +273,10 @@ private struct SupportBubble: View {
             }
             .buttonStyle(.borderless)
             .foregroundStyle(Color.red)
+        case .refused:
+            Label("support.refused", systemImage: "exclamationmark.circle")
+                .font(.caption)
+                .foregroundStyle(Color.red)
         }
     }
 }

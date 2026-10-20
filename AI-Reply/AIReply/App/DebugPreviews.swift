@@ -111,7 +111,8 @@ struct DebugPurchaseHost: View {
     }
 }
 
-/// The exhausted sheet over «Создать ответ», as after a refused Reply.
+/// The exhausted sheet over «Создать ответ», as after a refused Reply;
+/// `-AIReplyDebugGender` picks the user's gender.
 struct DebugExhaustedHost: View {
     let offersPurchase: Bool
     @State private var isShowing = true
@@ -119,7 +120,8 @@ struct DebugExhaustedHost: View {
     var body: some View {
         NavigationStack { ComposeView() }
             .sheet(isPresented: $isShowing) {
-                ExhaustedSheetView(offer: ExhaustedOffer(offersPurchase: offersPurchase), onBuy: {}, onPlans: {})
+                ExhaustedSheetView(offer: ExhaustedOffer(offersPurchase: offersPurchase),
+                                   gender: DebugScreen.onboardingGender, onBuy: {}, onPlans: {})
             }
     }
 }

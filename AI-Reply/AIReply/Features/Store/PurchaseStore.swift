@@ -51,10 +51,14 @@ struct PurchaseOffer: Identifiable, Equatable, Sendable {
 ///   price.
 /// - A purchase carries the account's `appAccountToken`; the verified
 ///   transaction goes to the server, and `finish()` is called only after
-///   the server granted it (200), or refused it for a reason that never
-///   changes. Anything else leaves it unfinished: it comes back at the next
-///   launch (`Transaction.unfinished`) and is sent again, which the server
-///   answers `already_granted` at worst.
+///   the server granted it (200), or said the store revoked it. Anything
+///   else leaves it unfinished: it comes back (`Transaction.unfinished`) and
+///   is sent again, which the server answers `already_granted` at worst. A
+///   refusal is sent again at the next launch, not on every return to the
+///   app.
+/// - The same transaction is never sent twice at once: the sheet, the
+///   update listener and a return to the app share one request and its
+///   answer.
 /// - `Transaction.updates` is followed from launch: Ask to Buy approvals
 ///   and purchases made elsewhere arrive there. Transactions that arrive
 ///   before an account can receive them wait.
@@ -106,8 +110,6 @@ final class PurchaseStore {
     enum Delivery: Equatable {
         case granted
         case failed(Failure)
-        /// The same transaction is being sent already.
-        case alreadySending
     }
 
     private(set) var offers: [PurchaseOffer] = []
@@ -130,7 +132,12 @@ final class PurchaseStore {
     /// sales were on is still granted after they close.
     @ObservationIgnored private var canDeliver = false
     @ObservationIgnored private var waiting: [StoreTransaction] = []
-    @ObservationIgnored private var sending: Set<String> = []
+    /// The request for each transaction being sent; a second send of the
+    /// same one waits for it.
+    @ObservationIgnored private var sending: [String: Task<Delivery, Never>] = [:]
+    /// Refused by the server this launch: not sent again on each return to
+    /// the app, only at the next launch (or for another account).
+    @ObservationIgnored private var refused: Set<String> = []
     @ObservationIgnored private var updatesTask: Task<Void, Never>?
 
     init(storeKit: StoreKitClient = AppStoreClient(), backend: PurchaseBackend = BackendPurchaseService()) {
@@ -147,6 +154,7 @@ final class PurchaseStore {
             // Another account: its token and its products are not this one's.
             self.userID = userID
             accountToken = nil
+            refused = []
             offers = []
             catalogueState = .idle
             status = .idle
@@ -181,22 +189,24 @@ final class PurchaseStore {
     }
 
     /// Every transaction the App Store still holds undelivered: at launch
-    /// and on each return to the app.
+    /// and on each return to the app. One the server refused this launch
+    /// waits for the next.
     func processUnfinished() async {
-        for transaction in await storeKit.unfinishedTransactions() {
+        for transaction in await storeKit.unfinishedTransactions() where !refused.contains(transaction.id) {
             await received(transaction)
         }
     }
 
-    /// A transaction that arrived outside a purchase sheet.
+    /// A transaction that arrived outside a purchase sheet. The sheet's own,
+    /// if it comes here too, is told by the sheet: both share one request.
     func received(_ transaction: StoreTransaction) async {
         guard canDeliver else {
             if !waiting.contains(where: { $0.id == transaction.id }) { waiting.append(transaction) }
             return
         }
         let delivery = await deliver(transaction)
-        // An Ask to Buy approval, or the sheet's own transaction sent here first.
-        if delivery == .granted, status == .pending || status == .verifying(productID: transaction.productID) {
+        // An Ask to Buy approval.
+        if delivery == .granted, status == .pending {
             status = .granted
         }
     }
@@ -209,23 +219,38 @@ final class PurchaseStore {
         }
     }
 
-    /// Sends one transaction and finishes it when the server says so.
+    /// Sends one transaction and finishes it when the server says so. Sent
+    /// again while the first request runs, it waits for that request's answer.
     func deliver(_ transaction: StoreTransaction) async -> Delivery {
-        guard !sending.contains(transaction.id) else { return .alreadySending }
-        sending.insert(transaction.id)
-        defer { sending.remove(transaction.id) }
+        if let inFlight = sending[transaction.id] { return await inFlight.value }
+        let request = Task { () -> Delivery in
+            let delivery = await submit(transaction)
+            // Still on the main actor: gone before anyone reads the answer.
+            sending[transaction.id] = nil
+            return delivery
+        }
+        sending[transaction.id] = request
+        return await request.value
+    }
+
+    private func submit(_ transaction: StoreTransaction) async -> Delivery {
         do {
             let verdict = try await backend.submit(signedTransaction: transaction.signedTransaction)
             guard verdict.isGranted else { return .failed(.willRetry) }
+            refused.remove(transaction.id)
             await transaction.finish()
             onGrant?(verdict.usage)
             return .granted
         } catch APIError.purchaseInvalid(let reason) {
-            // Some refusals never change; the server will not grant it, so
-            // the App Store may stop offering it back.
-            if Self.isFinalRefusal(reason) { await transaction.finish() }
+            ReplyLog.event("store: transaction refused: \(reason ?? "no reason")")
+            if Self.finishesAfterRefusal(reason) {
+                await transaction.finish()
+            } else {
+                refused.insert(transaction.id)
+            }
             return .failed(.notConfirmed)
         } catch APIError.purchaseBelongsToAnotherAccount {
+            refused.insert(transaction.id)
             return .failed(.anotherAccount)
         } catch {
             ReplyLog.event("store: transaction not confirmed yet: \(error)")
@@ -233,9 +258,15 @@ final class PurchaseStore {
         }
     }
 
-    /// `PURCHASE_INVALID` reasons after which a transaction may be finished.
-    nonisolated static func isFinalRefusal(_ reason: String?) -> Bool {
-        ["revoked", "product_type", "bundle_mismatch"].contains(reason ?? "")
+    /// The one `PURCHASE_INVALID` reason after which a transaction is
+    /// finished: the store refunded or revoked it, so there is nothing to
+    /// grant, ever. Every other refusal can change. StoreKit hands the app
+    /// only its own transactions, so `bundle_mismatch` means the server's
+    /// bundle id is wrong, and `product_type` a product set up as another
+    /// type: the paid transaction stays, and is sent again once that is
+    /// fixed.
+    nonisolated static func finishesAfterRefusal(_ reason: String?) -> Bool {
+        reason == "revoked"
     }
 
     // MARK: Catalogue
@@ -286,8 +317,6 @@ final class PurchaseStore {
             switch await deliver(transaction) {
             case .granted:              status = .granted
             case .failed(let failure):  status = .failed(failure)
-            // The update listener has it; it sets the outcome.
-            case .alreadySending:       break
             }
         case .pending:
             status = .pending

@@ -248,7 +248,7 @@ final class LocalizationTests: XCTestCase {
                     "permissions.fullAccess.on %@", "permissions.fullAccess.outdated %@",
                     "permissions.fullAccess.off %@", "permissions.paste.on %@",
                     "permissions.paste.outdated %@", "permissions.paste.off %@",
-                    "home.keyboard.lastSeen %@", "home.keyboard.fullAccessOn %@",
+                    "home.keyboard.ready %@", "home.keyboard.lastSeen %@", "home.keyboard.fullAccessOn %@",
                     "home.keyboard.fullAccessOutdated %@"]
         for language in ["en", "ru", "kk", "uz"] {
             let path = try XCTUnwrap(
@@ -259,6 +259,25 @@ final class LocalizationTests: XCTestCase {
                 let value = try XCTUnwrap(table[key], "\(key) missing in \(language)")
                 XCTAssertEqual(value.components(separatedBy: "%@").count, 2, "\(key) in \(language)")
             }
+        }
+    }
+
+    /// The purchase screen and the support errors are reached from flows
+    /// that say «ты» in Russian, and say it too, as on Android. The
+    /// operator's greeting (`support.empty`) stays formal.
+    func testRussianPurchaseAndSupportCopySaysTy() throws {
+        let path = try XCTUnwrap(Bundle.main.path(forResource: "Localizable", ofType: "strings", inDirectory: "ru.lproj"))
+        let table = try XCTUnwrap(NSDictionary(contentsOfFile: path) as? [String: String])
+        let formal = try NSRegularExpression(pattern: #"\b(вы|вас|вам|ваш\w*)\b|\w+(йте|ите)\b"#,
+                                             options: [.caseInsensitive])
+        let keys = table.keys.filter {
+            $0.hasPrefix("purchase.") || $0.hasPrefix("support.error.") || $0.hasPrefix("exhausted.")
+        }
+        XCTAssertGreaterThan(keys.count, 20)
+        for key in keys {
+            let value = try XCTUnwrap(table[key])
+            let range = NSRange(value.startIndex..., in: value)
+            XCTAssertNil(formal.firstMatch(in: value, range: range), "\(key): \(value)")
         }
     }
 
@@ -278,9 +297,11 @@ final class LocalizationTests: XCTestCase {
             "voice.suggestions.title", "voice.suggestions.rules.footer", "voice.status.failed",
             "permissions.section.footer",
             "balance.today", "balance.welcome", "balance.purchased", "exhausted.title", "exhausted.body",
+            "exhausted.body.male", "exhausted.body.female", "exhausted.body.plans",
             "exhausted.plans", "purchase.title", "purchase.packs.footer", "purchase.pass.footer",
             "purchase.status.pending", "purchase.status.willRetry", "purchase.status.notConfirmed",
-            "support.title", "support.empty", "support.operator", "support.failed", "support.error.send"
+            "support.title", "support.empty", "support.operator", "support.failed", "support.error.send",
+            "support.error.tooLong", "support.refused", "home.keyboard.notSeen"
         ]
 
         func value(_ key: String, _ language: String) throws -> String {

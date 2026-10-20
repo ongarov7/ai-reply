@@ -238,11 +238,14 @@ struct HomeView: View {
     /// Explicitly typed. `Text(condition ? "a" : "b")` can resolve the ternary
     /// as `String` rather than `LocalizedStringKey`, which compiles happily and
     /// then ships the raw key to the user instead of the translation.
+    ///
+    /// Said as «Настройка клавиатуры и разрешений» says it: what was seen,
+    /// and when. Not seen is not "not set up" - it may be added, not opened.
     private var keyboardStateKey: LocalizedStringKey {
         switch keyboard.keyboardSighting {
-        case .confirmed:          return "home.keyboard.ready"
-        case .outdated(let date): return "home.keyboard.lastSeen \(date, format: sightingFormat)"
-        case .denied, .unknown:   return "home.keyboard.notReady"
+        case .confirmed(let date): return "home.keyboard.ready \(date, format: sightingFormat)"
+        case .outdated(let date):  return "home.keyboard.lastSeen \(date, format: sightingFormat)"
+        case .denied, .unknown:    return "home.keyboard.notSeen"
         }
     }
 

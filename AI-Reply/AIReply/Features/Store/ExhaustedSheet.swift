@@ -19,6 +19,18 @@ struct ExhaustedOffer: Identifiable, Equatable {
         guard failure == .quotaExhausted || failure == .monthlyQuotaExhausted, let refusal else { return nil }
         return ExhaustedOffer(offersPurchase: purchasesEnabled && refusal.canBuy)
     }
+
+    /// The sentence under the title, as a catalog key. It names only what
+    /// the sheet offers, and in Russian agrees with the gender the user
+    /// chose; with none chosen it says neither.
+    func bodyKey(gender: GrammaticalGender?) -> String {
+        guard offersPurchase else { return "exhausted.body.plans" }
+        switch gender {
+        case .male:              return "exhausted.body.male"
+        case .female:            return "exhausted.body.female"
+        case .unspecified, nil:  return "exhausted.body"
+        }
+    }
 }
 
 /// «Лимит ответов исчерпан»: a half-height sheet over the screen that asked,
@@ -26,6 +38,8 @@ struct ExhaustedOffer: Identifiable, Equatable {
 struct ExhaustedSheetView: View {
 
     let offer: ExhaustedOffer
+    /// `UserProfile.grammaticalGender`.
+    let gender: GrammaticalGender?
     var onBuy: () -> Void
     var onPlans: () -> Void
 
@@ -43,7 +57,7 @@ struct ExhaustedSheetView: View {
                         .font(.title3.weight(.semibold))
                         .multilineTextAlignment(.center)
                         .accessibilityAddTraits(.isHeader)
-                    Text("exhausted.body")
+                    Text(LocalizedStringKey(offer.bodyKey(gender: gender)))
                         .font(.body)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)

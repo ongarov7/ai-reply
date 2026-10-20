@@ -2194,6 +2194,64 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
+            "value" : "Доступные ответы закончились. Можешь получить дополнительные ответы или выбрать другой тариф."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mavjud javoblardan foydalanib boʻldingiz. Qoʻshimcha javob olishingiz yoki boshqa tarif tanlashingiz mumkin."
+          }
+        }
+      }
+    },
+    "exhausted.body.female" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You have used the replies available to you. You can get more replies or choose another plan."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Қолжетімді жауаптарды пайдаланып болдыңыз. Қосымша жауап алуға немесе басқа тариф таңдауға болады."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ты использовала доступные ответы. Можешь получить дополнительные ответы или выбрать другой тариф."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mavjud javoblardan foydalanib boʻldingiz. Qoʻshimcha javob olishingiz yoki boshqa tarif tanlashingiz mumkin."
+          }
+        }
+      }
+    },
+    "exhausted.body.male" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You have used the replies available to you. You can get more replies or choose another plan."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Қолжетімді жауаптарды пайдаланып болдыңыз. Қосымша жауап алуға немесе басқа тариф таңдауға болады."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "Ты использовал доступные ответы. Можешь получить дополнительные ответы или выбрать другой тариф."
           }
         },
@@ -2201,6 +2259,35 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mavjud javoblardan foydalanib boʻldingiz. Qoʻshimcha javob olishingiz yoki boshqa tarif tanlashingiz mumkin."
+          }
+        }
+      }
+    },
+    "exhausted.body.plans" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You have used the replies available to you. You can choose another plan."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Қолжетімді жауаптар бітті. Басқа тариф таңдауға болады."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Доступные ответы закончились. Можешь выбрать другой тариф."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mavjud javoblar tugadi. Boshqa tarif tanlashingiz mumkin."
           }
         }
       }
@@ -2524,60 +2611,60 @@
         }
       }
     },
-    "home.keyboard.notReady" : {
+    "home.keyboard.notSeen" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Reply keyboard is not set up yet"
+            "value" : "AI Reply keyboard not seen yet"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Reply пернетақтасы әлі қосылмаған"
+            "value" : "AI Reply пернетақтасы әзірге анықталмады"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Клавиатура AI Reply ещё не подключена"
+            "value" : "Клавиатура AI Reply пока не обнаружена"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Reply klaviaturasi hali sozlanmagan"
+            "value" : "AI Reply klaviaturasi hali aniqlanmagan"
           }
         }
       }
     },
-    "home.keyboard.ready" : {
+    "home.keyboard.ready %@" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Reply keyboard is set up"
+            "value" : "AI Reply keyboard added · checked %@"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Reply пернетақтасы қосулы"
+            "value" : "AI Reply пернетақтасы қосылған · %@ тексерілді"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Клавиатура AI Reply подключена"
+            "value" : "Клавиатура AI Reply подключена · проверено %@"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Reply klaviaturasi sozlangan"
+            "value" : "AI Reply klaviaturasi qoʻshilgan · %@ tekshirildi"
           }
         }
       }
@@ -7740,7 +7827,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Эта покупка уже начислена другому аккаунту AI Reply. Войдите в тот аккаунт, чтобы пользоваться ответами."
+            "value" : "Эта покупка уже начислена другому аккаунту AI Reply. Войди в тот аккаунт, чтобы пользоваться ответами."
           }
         },
         "uz" : {
@@ -7798,7 +7885,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Покупка не прошла. Попробуйте ещё раз."
+            "value" : "Покупка не прошла. Попробуй ещё раз."
           }
         },
         "uz" : {
@@ -7856,7 +7943,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "App Store не подтвердил покупку, ответы не начислены. Если деньги списаны, напишите в поддержку."
+            "value" : "App Store не подтвердил покупку, ответы не начислены. Если деньги списаны, напиши в поддержку."
           }
         },
         "uz" : {
@@ -8030,7 +8117,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Сейчас купить ответы нельзя. Попробуйте позже."
+            "value" : "Сейчас купить ответы нельзя. Попробуй позже."
           }
         },
         "uz" : {
@@ -10712,7 +10799,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Слишком много сообщений подряд. Подождите минуту."
+            "value" : "Слишком много сообщений подряд. Подожди минуту."
           }
         },
         "uz" : {
@@ -10741,13 +10828,42 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Сообщение не отправлено. Проверьте подключение и повторите."
+            "value" : "Сообщение не отправлено. Проверь подключение и повтори."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Xabar yuborilmadi. Aloqani tekshirib, qayta urinib koʻring."
+          }
+        }
+      }
+    },
+    "support.error.tooLong" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The message is too long. Shorten it and send it again."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Хабарлама тым ұзын. Қысқартып, қайта жіберіңіз."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сообщение слишком длинное. Сократи его и отправь снова."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xabar juda uzun. Uni qisqartirib, qayta yuboring."
           }
         }
       }
@@ -10835,6 +10951,35 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Xabar"
+          }
+        }
+      }
+    },
+    "support.refused" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not sent"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Жіберілмеді"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не отправлено"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yuborilmadi"
           }
         }
       }

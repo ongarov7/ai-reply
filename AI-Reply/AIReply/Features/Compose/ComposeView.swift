@@ -78,7 +78,7 @@ struct ComposeView: View {
                 router.path.append(route)
             }
         }) { offer in
-            ExhaustedSheetView(offer: offer,
+            ExhaustedSheetView(offer: offer, gender: model.profile.grammaticalGender,
                                onBuy: { leaveSheet(for: .purchase) },
                                onPlans: { leaveSheet(for: .subscription) })
         }
