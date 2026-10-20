@@ -155,6 +155,20 @@ class DeviceStateStore internal constructor(private val prefs: SharedPreferences
         prefs.edit().putLong(KEY_KEYBOARD_CHECK, at).apply()
     }
 
+    /** What the last permission diagnostics report said (statuses only), and when it reached the server. */
+    val diagnosticsFingerprint: String?
+        get() = prefs.getString(KEY_DIAGNOSTICS_FINGERPRINT, null)
+
+    val diagnosticsReportedAt: Long
+        get() = prefs.getLong(KEY_DIAGNOSTICS_REPORTED_AT, 0L)
+
+    fun noteDiagnosticsReported(fingerprint: String, at: Long) {
+        prefs.edit()
+            .putString(KEY_DIAGNOSTICS_FINGERPRINT, fingerprint)
+            .putLong(KEY_DIAGNOSTICS_REPORTED_AT, at)
+            .apply()
+    }
+
     /** Calls [onChange] on the main thread whenever a value here changes; the returned function stops it. */
     fun observe(onChange: () -> Unit): () -> Unit {
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> onChange() }
@@ -183,5 +197,7 @@ class DeviceStateStore internal constructor(private val prefs: SharedPreferences
         private const val KEY_LAST_PASTE = "diagnostics.lastSuccessfulPasteAt"
         private const val KEY_KEYBOARD_SHOWN = "diagnostics.keyboardLastShownAt"
         private const val KEY_KEYBOARD_CHECK = "diagnostics.lastKeyboardCheckAt"
+        private const val KEY_DIAGNOSTICS_FINGERPRINT = "diagnostics.reportFingerprint"
+        private const val KEY_DIAGNOSTICS_REPORTED_AT = "diagnostics.reportedAt"
     }
 }

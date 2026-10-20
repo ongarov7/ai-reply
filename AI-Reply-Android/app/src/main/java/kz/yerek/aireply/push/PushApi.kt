@@ -124,6 +124,12 @@ class HttpPushApi(
         }
     }
 
+    /** `PUT /api/v1/installations/{id}/diagnostics`; the answer echoes the report and is not needed. */
+    suspend fun putDiagnostics(installationId: String, report: DiagnosticsReport, token: String?) {
+        val body = json.encodeToString(DiagnosticsReport.serializer(), report)
+        client().request("PUT", "$INSTALLATIONS/$installationId/diagnostics", body, token)
+    }
+
     /**
      * Sent without a token: the server matches the delivery to the
      * installation, and a tap must not wait for, or fail on, a token refresh.

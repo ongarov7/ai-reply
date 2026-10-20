@@ -49,12 +49,16 @@ import kz.yerek.aireply.data.settings.DeviceStateStore
 import kz.yerek.aireply.data.settings.SettingsStore
 import kz.yerek.aireply.data.support.SupportApi
 import kz.yerek.aireply.keyboard.autocorrect.PrefsLearnedWordsStore
+import kz.yerek.aireply.keyboard.input.KeyboardStatus
 import kz.yerek.aireply.push.ClientContext
+import kz.yerek.aireply.push.DiagnosticsReporter
 import kz.yerek.aireply.push.HttpPushApi
 import kz.yerek.aireply.push.InstallationIdStore
+import kz.yerek.aireply.push.PermissionDiagnostics
 import kz.yerek.aireply.push.PushCoordinator
 import kz.yerek.aireply.push.PushStateStore
 import kz.yerek.aireply.ui.feature.account.AccountController
+import kz.yerek.aireply.ui.feature.onboarding.onboardingStatus
 import kz.yerek.aireply.ui.feature.support.SupportChatController
 import kz.yerek.aireply.ui.navigation.PendingNavigation
 import kz.yerek.aireply.voice.VoiceTranscriber
@@ -173,6 +177,7 @@ class ServiceLocator(context: Context) {
             // and the chat's badge is read.
             resumePurchases()
             if (features?.supportChat == true) support.refreshUnread()
+            diagnostics.onResume()
         }
         override fun onLegalAccepted() = push.onLegalAccepted()
         override fun onSignedIn(userId: String) = push.onSignedIn(userId)
@@ -270,6 +275,35 @@ class ServiceLocator(context: Context) {
             localized = { LocalizedContext.wrap(appContext, settings.effectiveAppLanguage) },
             // An operator's reply: read in the chat when it is on screen, else the badge and the notification.
             onSupportReply = { support.onReplyPush() },
+            scope = scope
+        )
+    }
+
+    /**
+     * The permission diagnostics: what this phone has seen of the keyboard,
+     * paste and onboarding, reported on every return to the app when it
+     * changed or a day passed. Statuses and times only.
+     */
+    val diagnostics: DiagnosticsReporter by lazy {
+        DiagnosticsReporter(
+            api = { id, report, token ->
+                HttpPushApi(client = { ApiClient(aiConfiguration.backendBaseUrl) }, session = accountSession)
+                    .putDiagnostics(id, report, token)
+            },
+            session = accountSession,
+            store = deviceState,
+            installationId = { clientContext.installationId },
+            // After the terms, on a server that takes it, for an installation the server knows.
+            isEnabled = {
+                val state = account.state.value
+                state.hasAcceptedLegal && state.features?.permissionDiagnostics == true && pushState.lastSyncAt > 0L
+            },
+            snapshot = {
+                val now = System.currentTimeMillis()
+                val keyboard = KeyboardStatus.current(appContext)
+                deviceState.noteKeyboardCheck(now)
+                PermissionDiagnostics.report(keyboard, deviceState.lastSuccessfulPasteAt, onboardingStatus(this), now)
+            },
             scope = scope
         )
     }

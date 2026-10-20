@@ -125,6 +125,8 @@ class MainActivity : ComponentActivity() {
         services.resumePurchases()
         // An operator may have answered meanwhile: the chat's badge.
         if (services.account.state.value.features?.supportChat == true) services.support.refreshUnread()
+        // The keyboard may have been switched on or off in system settings.
+        services.diagnostics.onResume()
     }
 
     override fun onStop() {
