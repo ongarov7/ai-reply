@@ -18,6 +18,7 @@
 
     aireply_autocorrect.xml holds the words the user taught the keyboard -
     words they typed - and stays on this phone: never synced, never sent.
+    aireply_emoji.xml, the emoji typed last, is the same kind of thing.
 
     aireply_push.xml (the FCM token and the installation's sync marks)
     describes this device only. The installation id itself lives in
@@ -33,6 +34,7 @@
         <exclude domain="sharedpref" path="aireply_secure.xml" />
         <exclude domain="sharedpref" path="aireply_device.xml" />
         <exclude domain="sharedpref" path="aireply_autocorrect.xml" />
+        <exclude domain="sharedpref" path="aireply_emoji.xml" />
         <exclude domain="sharedpref" path="aireply_push.xml" />
         <exclude domain="sharedpref" path="aireply_account.xml" />
     </cloud-backup>
@@ -40,6 +42,7 @@
         <exclude domain="sharedpref" path="aireply_secure.xml" />
         <exclude domain="sharedpref" path="aireply_device.xml" />
         <exclude domain="sharedpref" path="aireply_autocorrect.xml" />
+        <exclude domain="sharedpref" path="aireply_emoji.xml" />
         <exclude domain="sharedpref" path="aireply_push.xml" />
         <exclude domain="sharedpref" path="aireply_account.xml" />
     </device-transfer>
