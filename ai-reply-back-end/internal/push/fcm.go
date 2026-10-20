@@ -3,10 +3,6 @@ package push
 import (
 	"bytes"
 	"context"
-	"crypto"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,13 +11,14 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
+
+	"github.com/aireply/ai-reply-back-end/internal/googleauth"
 )
 
 // FCM әдепкі мекенжайлары.
 const (
-	GoogleTokenURL = "https://oauth2.googleapis.com/token"
+	GoogleTokenURL = googleauth.TokenURL
 	FCMEndpoint    = "https://fcm.googleapis.com"
 	fcmScope       = "https://www.googleapis.com/auth/firebase.messaging"
 )
@@ -50,13 +47,9 @@ type FCMConfig struct {
 // FCM — Firebase Cloud Messaging HTTP v1 провайдері (Android және iOS).
 type FCM struct {
 	cfg    FCMConfig
-	key    *rsa.PrivateKey
+	tokens *googleauth.TokenSource
 	client *http.Client
 	now    func() time.Time
-
-	mu          sync.Mutex
-	accessToken string
-	expiresAt   time.Time
 }
 
 // NewFCM — кілтті тексеріп, провайдер жасайды. Қате мәтінінде кілт мазмұны болмайды.
@@ -67,7 +60,7 @@ func NewFCM(cfg FCMConfig) (*FCM, error) {
 	if !strings.Contains(cfg.ClientEmail, "@") {
 		return nil, errors.New("fcm: the client e-mail must be the service account e-mail")
 	}
-	key, err := parseRSAKey(cfg.PrivateKey)
+	key, err := googleauth.ParseRSAKey(cfg.PrivateKey)
 	if err != nil {
 		return nil, errors.New("fcm: the private key is not a valid service-account private key")
 	}
@@ -94,7 +87,13 @@ func NewFCM(cfg FCMConfig) (*FCM, error) {
 	if now == nil {
 		now = time.Now
 	}
-	return &FCM{cfg: cfg, key: key, client: client, now: now}, nil
+	tokens, err := googleauth.New(googleauth.Config{
+		ClientEmail: cfg.ClientEmail, Key: key, Scope: fcmScope, TokenURL: cfg.TokenURL, HTTPClient: client, Now: now,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("fcm: %w", err)
+	}
+	return &FCM{cfg: cfg, tokens: tokens, client: client, now: now}, nil
 }
 
 // Name — провайдер аты.
@@ -197,7 +196,7 @@ func collapseID(id string) string {
 
 // Send — бір құрылғыға бір хабарлама.
 func (f *FCM) Send(ctx context.Context, target Target, msg Message) Result {
-	access, err := f.token(ctx)
+	access, err := f.tokens.Token(ctx)
 	if err != nil {
 		return Result{Outcome: Retry, Code: "OAUTH_TOKEN_UNAVAILABLE", Detail: safeDetail(err.Error())}
 	}
@@ -229,7 +228,7 @@ func (f *FCM) Send(ctx context.Context, target Target, msg Message) Result {
 	}
 	result := ClassifyFCM(res.StatusCode, raw, res.Header.Get("Retry-After"), f.now())
 	if res.StatusCode == http.StatusUnauthorized {
-		f.forgetToken() // the cached OAuth token was refused: fetch a new one next time
+		f.tokens.Forget() // the cached OAuth token was refused: fetch a new one next time
 	}
 	return result
 }
@@ -299,85 +298,4 @@ func ClassifyFCM(status int, body []byte, retryAfterHeader string, now time.Time
 		result.Code = fmt.Sprintf("HTTP_%d", status)
 	}
 	return result
-}
-
-// token — OAuth access token (кэштеледі, мерзімі бітуге 5 минут қалғанда жаңарады).
-func (f *FCM) token(ctx context.Context) (string, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	now := f.now()
-	if f.accessToken != "" && now.Before(f.expiresAt.Add(-5*time.Minute)) {
-		return f.accessToken, nil
-	}
-
-	assertion, err := f.assertion(now)
-	if err != nil {
-		return "", err
-	}
-	form := url.Values{}
-	form.Set("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer")
-	form.Set("assertion", assertion)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, f.cfg.TokenURL, strings.NewReader(form.Encode()))
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	res, err := f.client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("oauth token request failed: %s", safeDetail(err.Error()))
-	}
-	defer res.Body.Close()
-	raw, _ := io.ReadAll(io.LimitReader(res.Body, 64*1024))
-	if res.StatusCode != http.StatusOK {
-		var e struct {
-			Error string `json:"error"`
-		}
-		_ = json.Unmarshal(raw, &e)
-		return "", fmt.Errorf("oauth token refused: HTTP %d %s", res.StatusCode, safeDetail(e.Error))
-	}
-	var tok struct {
-		AccessToken string `json:"access_token"`
-		ExpiresIn   int    `json:"expires_in"`
-	}
-	if err := json.Unmarshal(raw, &tok); err != nil || tok.AccessToken == "" {
-		return "", errors.New("oauth token response has no access_token")
-	}
-	if tok.ExpiresIn <= 0 {
-		tok.ExpiresIn = 3600
-	}
-	f.accessToken = tok.AccessToken
-	f.expiresAt = now.Add(time.Duration(tok.ExpiresIn) * time.Second)
-	return f.accessToken, nil
-}
-
-func (f *FCM) forgetToken() {
-	f.mu.Lock()
-	f.accessToken = ""
-	f.mu.Unlock()
-}
-
-// assertion — RS256 JWT, Google оны access token-ге айырбастайды.
-func (f *FCM) assertion(now time.Time) (string, error) {
-	header, err := jwtSegment(map[string]string{"alg": "RS256", "typ": "JWT"})
-	if err != nil {
-		return "", err
-	}
-	claims, err := jwtSegment(map[string]any{
-		"iss":   f.cfg.ClientEmail,
-		"sub":   f.cfg.ClientEmail,
-		"scope": fcmScope,
-		"aud":   f.cfg.TokenURL,
-		"iat":   now.Unix(),
-		"exp":   now.Add(time.Hour).Unix(),
-	})
-	if err != nil {
-		return "", err
-	}
-	signing := header + "." + claims
-	digest := sha256.Sum256([]byte(signing))
-	sig, err := rsa.SignPKCS1v15(rand.Reader, f.key, crypto.SHA256, digest[:])
-	if err != nil {
-		return "", errors.New("oauth assertion could not be signed")
-	}
-	return signing + "." + b64url(sig), nil
 }

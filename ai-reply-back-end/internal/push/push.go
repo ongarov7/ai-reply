@@ -14,19 +14,17 @@ package push
 
 import (
 	"context"
-	"crypto/rsa"
 	"crypto/sha256"
-	"crypto/x509"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	"encoding/pem"
 	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/aireply/ai-reply-back-end/internal/googleauth"
 )
 
 // Message — провайдерге тәуелсіз хабарлама.
@@ -139,36 +137,6 @@ func TokenHash(token string) string {
 
 // ---------------------------------------------------------------- helpers
 
-var errKey = errors.New("push: private key is not a valid PEM key of the expected type")
-
-// parseRSAKey — Google қызметтік тіркелгісінің кілті (PKCS#8, кейде PKCS#1).
-func parseRSAKey(raw string) (*rsa.PrivateKey, error) {
-	block, _ := pem.Decode([]byte(strings.TrimSpace(raw)))
-	if block == nil {
-		return nil, errKey
-	}
-	if key, err := x509.ParsePKCS8PrivateKey(block.Bytes); err == nil {
-		if rsaKey, ok := key.(*rsa.PrivateKey); ok {
-			return rsaKey, nil
-		}
-		return nil, errKey
-	}
-	if key, err := x509.ParsePKCS1PrivateKey(block.Bytes); err == nil {
-		return key, nil
-	}
-	return nil, errKey
-}
-
-func b64url(b []byte) string { return base64.RawURLEncoding.EncodeToString(b) }
-
-func jwtSegment(v any) (string, error) {
-	raw, err := json.Marshal(v)
-	if err != nil {
-		return "", err
-	}
-	return b64url(raw), nil
-}
-
 // retryAfter — "Retry-After" тақырыбы (секунд не HTTP күні).
 func retryAfter(header string, now time.Time) time.Duration {
 	header = strings.TrimSpace(header)
@@ -194,13 +162,7 @@ func transportFailure(ctx context.Context, err error) Result {
 }
 
 // safeDetail — қысқа, бір жолды мәтін. FCM мекенжайында токен жоқ, токен тек денеде.
-func safeDetail(s string) string {
-	s = strings.Join(strings.Fields(s), " ")
-	if r := []rune(s); len(r) > 160 {
-		s = string(r[:160])
-	}
-	return s
-}
+func safeDetail(s string) string { return googleauth.SafeDetail(s) }
 
 func statusDetail(status int, code string) string {
 	if code == "" {
