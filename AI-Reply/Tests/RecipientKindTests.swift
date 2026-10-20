@@ -116,4 +116,47 @@ final class RecipientKindTests: XCTestCase {
         XCTAssertFalse(current.refreshTemplateSummariesIfOutdated(from: .initial))
         XCTAssertEqual(current.templateSummaries?.map(\.id).count, 1, "a save by this build is the truth")
     }
+
+    /// A user who updates and only ever uses the keyboard: the app has not
+    /// run to rewrite the summary, so the keyboard reads the old one with
+    /// today's names - order, hidden templates and the user's own names
+    /// kept - and writes it back itself, once.
+    func testTheKeyboardShowsAnOldSummaryWithTheNewNamesAndRewritesIt() throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "RecipientKindTests.\(UUID().uuidString)"))
+        let settings = SharedSettings(defaults: defaults)
+        let renamed = Dictionary(uniqueKeysWithValues: AppLanguage.allCases.map { ($0.rawValue, "Покупатели") })
+        let version1 = [
+            TemplateSummary(id: "friend", names: TemplateSummary.version1BuiltInNames[.friend]!),
+            TemplateSummary(id: "client", names: renamed),
+            TemplateSummary(id: "business", names: TemplateSummary.version1BuiltInNames[.business]!),
+            // Written before Uzbek existed: only three names.
+            TemplateSummary(id: "work", names: ["en": "Work", "ru": "Работа", "kk": "Жұмыс"]),
+            TemplateSummary(id: "custom-1", names: ["en": "Ish", "ru": "Ish", "kk": "Ish", "uz": "Ish"])
+        ]
+        defaults.set(try JSONEncoder().encode(version1), forKey: "shared.templateSummaries")
+
+        let firstFrame = try XCTUnwrap(settings.templateSummaries)
+        XCTAssertEqual(firstFrame.map(\.id), ["friend", "client", "business", "work", "custom-1"])
+        XCTAssertEqual(firstFrame.map { $0.name(for: .russian) }, ["Друг", "Покупатели", "Партнёр", "Коллега", "Ish"])
+        XCTAssertEqual(firstFrame.map { $0.name(for: .uzbek) }, ["Do\u{02BB}st", "Покупатели", "Hamkor", "Hamkasb", "Ish"])
+        XCTAssertEqual(firstFrame.map { $0.name(for: .kazakh) }, ["Дос", "Покупатели", "Серіктес", "Әріптес", "Ish"])
+
+        XCTAssertTrue(settings.refreshOutdatedTemplateSummaries())
+        XCTAssertFalse(settings.refreshOutdatedTemplateSummaries(), "only once")
+        XCTAssertFalse(settings.refreshTemplateSummariesIfOutdated(from: .initial), "the app finds it current")
+        let stored = try JSONDecoder().decode([TemplateSummary].self,
+                                              from: try XCTUnwrap(defaults.data(forKey: "shared.templateSummaries")))
+        XCTAssertEqual(stored, firstFrame)
+    }
+
+    /// A summary the current build wrote is drawn as it is, even where a
+    /// name the user typed happens to be an old built-in name.
+    func testACurrentSummaryIsNeverRenamed() throws {
+        let settings = SharedSettings(defaults: try XCTUnwrap(UserDefaults(suiteName: "RecipientKindTests.\(UUID().uuidString)")))
+        var business = ReplyTemplate.builtIn(.business, sortIndex: 0)
+        business.setName("Business")
+        settings.setTemplateSummaries([TemplateSummary(template: business)])
+        XCTAssertEqual(settings.templateSummaries?.first?.name(for: .english), "Business")
+        XCTAssertFalse(settings.refreshOutdatedTemplateSummaries())
+    }
 }

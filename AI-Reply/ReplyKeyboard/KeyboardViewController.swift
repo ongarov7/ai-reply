@@ -328,6 +328,9 @@ final class KeyboardViewController: UIInputViewController {
         guard now - configurationLoadedAt > 1.0 else { return }
         configurationLoadedAt = now
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            // A summary an older app version wrote is put right here too:
+            // the app does it at launch, but this user may never open it.
+            SharedSettings.shared.refreshOutdatedTemplateSummaries()
             let configuration = ProfileStore.shared.load()
             DispatchQueue.main.async {
                 guard let self else { return }

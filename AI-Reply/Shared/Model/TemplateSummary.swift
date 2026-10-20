@@ -44,6 +44,28 @@ struct TemplateSummary: Codable, Hashable, Sendable {
         self.id = id
         self.names = names
     }
+
+    /// The names a version 1 summary stored for the built-ins, per app
+    /// language: Business and Work before they became Partner and
+    /// Colleague, and Uzbek "Do‘st" with U+2018.
+    static let version1BuiltInNames: [RelationshipKind: [String: String]] = [
+        .friend:   ["en": "Friend", "ru": "Друг", "kk": "Дос", "uz": "Do\u{2018}st"],
+        .client:   ["en": "Client", "ru": "Клиент", "kk": "Клиент", "uz": "Mijoz"],
+        .business: ["en": "Business", "ru": "Бизнес", "kk": "Бизнес", "uz": "Biznes"],
+        .work:     ["en": "Work", "ru": "Работа", "kk": "Жұмыс", "uz": "Ish"]
+    ]
+
+    /// This summary as the current build would write it, for one written
+    /// by version 1: a built-in still under every name version 1 gave it
+    /// gets today's names. A name the user typed is the same in every
+    /// language and matches none of those, so it stays - as do the order
+    /// and which templates are shown, which version 2 did not change.
+    func withCurrentBuiltInNames() -> TemplateSummary {
+        let kind = relationship
+        guard kind != .custom, let old = Self.version1BuiltInNames[kind], !names.isEmpty,
+              names.allSatisfy({ old[$0.key] == $0.value }) else { return self }
+        return TemplateSummary(template: .builtIn(kind, sortIndex: 0))
+    }
 }
 
 extension SharedSettings {
@@ -62,11 +84,19 @@ extension SharedSettings {
     /// Returns nil when nothing has been written yet, which is the honest
     /// answer for a fresh install: the caller then falls back to the defaults
     /// rather than showing an empty row.
+    ///
+    /// One written by an older version is read with today's built-in names
+    /// (`withCurrentBuiltInNames`), so the keyboard's first frame never shows
+    /// the old ones - also for a user who updated and has not opened the app.
     var templateSummaries: [TemplateSummary]? {
         guard let data = defaults.data(forKey: Self.templateSummariesKey),
               let decoded = try? JSONDecoder().decode([TemplateSummary].self, from: data),
               !decoded.isEmpty else { return nil }
-        return decoded
+        return areTemplateSummariesOutdated ? decoded.map { $0.withCurrentBuiltInNames() } : decoded
+    }
+
+    private var areTemplateSummariesOutdated: Bool {
+        defaults.integer(forKey: Self.templateSummariesVersionKey) < Self.templateSummariesVersion
     }
 
     /// Written by the app whenever the configuration is saved. A few hundred
@@ -84,10 +114,22 @@ extension SharedSettings {
     /// whether it wrote.
     @discardableResult
     func refreshTemplateSummariesIfOutdated(from configuration: ReplyConfiguration) -> Bool {
-        guard defaults.integer(forKey: Self.templateSummariesVersionKey) < Self.templateSummariesVersion else {
-            return false
-        }
+        guard areTemplateSummariesOutdated else { return false }
         setTemplateSummaries(configuration.visibleTemplates.map(TemplateSummary.init(template:)))
+        return true
+    }
+
+    /// The keyboard's side of the same refresh, for a user who updated and
+    /// uses only the keyboard: an outdated summary is written back with
+    /// today's built-in names, from the summary itself. Not from the
+    /// configuration file, which would turn a failed read into the
+    /// defaults. Lands only with Full Access (the App Group is read-only to
+    /// the keyboard without it); the read above covers the rest. Returns
+    /// whether it wrote.
+    @discardableResult
+    func refreshOutdatedTemplateSummaries() -> Bool {
+        guard areTemplateSummariesOutdated, let current = templateSummaries else { return false }
+        setTemplateSummaries(current)
         return true
     }
 }
