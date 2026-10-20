@@ -1,5 +1,6 @@
 package kz.yerek.aireply.keyboard.input
 
+import android.content.ClipData
 import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
@@ -68,8 +69,15 @@ enum class ClipboardMiss {
  *
  * TYPING NEVER WAITS. The text a clip carries is read at once; text only behind
  * another app's provider is read off the main thread, capped.
+ *
+ * The decisions themselves ([read]) see the clipboard only through
+ * [CopiedClip], so every case - empty, private, inline, HTML, a provider's -
+ * is tested on the JVM; [acquire] hands them the system's clip.
  */
-class ContextTextProvider {
+class ContextTextProvider(
+    /** The text of an HTML-only clip's markup: Android's own parser, unless a test brings one. */
+    private val htmlText: (String) -> String? = { html -> Html.fromHtml(html, Html.FROM_HTML_MODE_COMPACT).toString() }
+) {
 
     sealed interface Result {
         data class Success(val context: ReplyContext) : Result
@@ -91,10 +99,58 @@ class ContextTextProvider {
         class Deferred(val read: () -> Result) : Result
     }
 
+    /**
+     * One clip, as [read] looks at it - in that order: what the description
+     * says, the private flag, and only then the item, so a clip marked
+     * private is never opened. Anything that throws counts as absent.
+     */
+    internal interface CopiedClip {
+        /** Whether the clip's description lists [mimeType]; false with nothing copied. */
+        fun hasMimeType(mimeType: String): Boolean
+
+        /** The copying app flagged the clip as sensitive ([EXTRA_IS_SENSITIVE]). */
+        fun isMarkedSensitive(): Boolean
+
+        /** The clip's first item; null when it has none. */
+        fun firstItem(): Item?
+
+        interface Item {
+            /** The text the copying app put in the clip, already in memory. */
+            fun text(): CharSequence?
+
+            fun htmlText(): String?
+
+            /** The text is behind a content URI, another app's provider. */
+            fun hasUri(): Boolean
+
+            /**
+             * At most [limit] characters behind the URI, or null when it is not
+             * readable text. Slow and possibly huge: off the main thread only.
+             */
+            fun readUri(limit: Int): String?
+        }
+    }
+
     fun acquire(
         context: Context,
         connection: InputConnection?,
         isSecureField: Boolean
+    ): Result = read(
+        isSecureField = isSecureField,
+        selection = { connection?.getSelectedText(0) },
+        clip = { SystemClip.of(context) }
+    )
+
+    /**
+     * What a tap finds, in the order it looks: a password field refuses, a
+     * selection in the field wins, then the copied clip ([clip] is null
+     * without a clipboard). Only the tap's own reads run here; text behind a
+     * provider comes back as [Result.Deferred].
+     */
+    internal fun read(
+        isSecureField: Boolean,
+        selection: () -> CharSequence?,
+        clip: () -> CopiedClip?
     ): Result {
         // A password field is never a conversation. Refusing here means the
         // clipboard is not even consulted while one is focused.
@@ -104,19 +160,17 @@ class ContextTextProvider {
         }
 
         // STEP 1 — a selection inside the active editable input.
-        normalised(connection?.getSelectedText(0)?.toString())?.let {
+        normalised(selection()?.toString())?.let {
             ReplyLog.event { "source: selection" }
             return Result.Success(ReplyContext(it, ReplyContextSource.EDITABLE_SELECTION))
         }
 
         // STEP 2 — explicitly copied text.
-        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-            ?: return Result.Failure(AIReplyError.ClipboardUnavailable)
+        val copied = clip() ?: return Result.Failure(AIReplyError.ClipboardUnavailable)
 
         // Browsers and some messengers copy rich text as HTML only; its text
         // is the message just the same.
-        val description = clipboard.primaryClipDescription
-        if (description == null || TEXT_TYPES.none(description::hasMimeType)) {
+        if (TEXT_TYPES.none { type -> runCatching { copied.hasMimeType(type) }.getOrDefault(false) }) {
             ReplyLog.event { "clipboard: no text" }
             return Result.Failure(AIReplyError.NoSourceMessage, ClipboardMiss.NOTHING_COPIED)
         }
@@ -128,29 +182,33 @@ class ContextTextProvider {
         // constant is API 33, but Android's copy-and-paste guidance has apps
         // set the same key on older versions too, so it is read on all of them.
         // The user did copy something, so this is not "copy a message first".
-        if (isMarkedSensitive { key -> description.extras?.getBoolean(key, false) }) {
+        if (runCatching { copied.isMarkedSensitive() }.getOrDefault(false)) {
             ReplyLog.event { "clipboard: refused, marked sensitive" }
             return Result.Failure(AIReplyError.ClipboardUnavailable, ClipboardMiss.MARKED_PRIVATE)
         }
 
-        val item = runCatching { clipboard.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0) }.getOrNull()
+        val item = runCatching { copied.firstItem() }.getOrNull()
             ?: return Result.Failure(AIReplyError.NoSourceMessage, ClipboardMiss.NOTHING_COPIED)
 
         // The text the copying app put in the clip: already in memory, so it
         // is read right here. Only when there is none does anything else run -
         // and that runs later, off the main thread (see [Result.Deferred]).
-        val inline = runCatching { item.text?.toString() }.getOrNull()
+        val inline = runCatching { item.text()?.toString() }.getOrNull()
         if (inline != null) return copiedText(normalised(inline))
 
-        val html = runCatching { item.htmlText }.getOrNull()
-        val uri = runCatching { item.uri }.getOrNull()
-        if (html == null && uri == null) {
+        val html = runCatching { item.htmlText() }.getOrNull()
+        val behindUri = runCatching { item.hasUri() }.getOrDefault(false)
+        if (html == null && !behindUri) {
             ReplyLog.event { "clipboard: no usable text" }
             return Result.Failure(AIReplyError.NoSourceMessage, ClipboardMiss.NOTHING_COPIED)
         }
         ReplyLog.event { "clipboard: text to be read later" }
         return Result.Deferred {
-            val text = if (html != null) fromHtml(html) else readText(context, uri!!)
+            val text = if (html != null) {
+                fromHtml(html)
+            } else {
+                runCatching { item.readUri(MAX_DEFERRED_CHARACTERS) }.getOrNull()?.take(MAX_DEFERRED_CHARACTERS)
+            }
             if (text == null) {
                 ReplyLog.event { "clipboard: copied text unreadable" }
                 Result.Failure(AIReplyError.ClipboardUnavailable, ClipboardMiss.UNREADABLE)
@@ -171,30 +229,36 @@ class ContextTextProvider {
 
     /** HTML-only clips: the text of the markup, capped like any other late read. */
     private fun fromHtml(html: String): String? = runCatching {
-        Html.fromHtml(html.take(MAX_DEFERRED_CHARACTERS * 4), Html.FROM_HTML_MODE_COMPACT).toString()
-            .take(MAX_DEFERRED_CHARACTERS)
+        htmlText(html.take(MAX_DEFERRED_CHARACTERS * 4))?.take(MAX_DEFERRED_CHARACTERS)
     }.getOrNull()
 
-    /**
-     * What `ClipData.Item.coerceToText` does for a content URI - open it as
-     * any text type and read it - but with a cap, and with null rather than
-     * the URI itself when it is not readable text: "content://…" is not a
-     * message.
-     */
-    private fun readText(context: Context, uri: Uri): String? = runCatching {
-        context.contentResolver.openTypedAssetFileDescriptor(uri, "text/*", null)?.use { descriptor ->
-            InputStreamReader(descriptor.createInputStream(), Charsets.UTF_8).use { reader ->
-                val buffer = CharArray(MAX_DEFERRED_CHARACTERS)
-                var filled = 0
-                while (filled < buffer.size) {
-                    val count = reader.read(buffer, filled, buffer.size - filled)
-                    if (count < 0) break
-                    filled += count
-                }
-                String(buffer, 0, filled)
-            }
+    /** The system clipboard's primary clip, as [read] looks at it. */
+    private class SystemClip(private val clipboard: ClipboardManager, private val context: Context) : CopiedClip {
+        private val description: ClipDescription? by lazy { runCatching { clipboard.primaryClipDescription }.getOrNull() }
+
+        override fun hasMimeType(mimeType: String): Boolean = description?.hasMimeType(mimeType) == true
+
+        override fun isMarkedSensitive(): Boolean =
+            isMarkedSensitive { key -> description?.extras?.getBoolean(key, false) }
+
+        override fun firstItem(): CopiedClip.Item? =
+            clipboard.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.let { SystemItem(it, context) }
+
+        companion object {
+            fun of(context: Context): SystemClip? =
+                (context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager)?.let { SystemClip(it, context) }
         }
-    }.getOrNull()
+    }
+
+    private class SystemItem(private val item: ClipData.Item, private val context: Context) : CopiedClip.Item {
+        // Taken on the tap, like the clip itself.
+        private val uri: Uri? = runCatching { item.uri }.getOrNull()
+
+        override fun text(): CharSequence? = item.text
+        override fun htmlText(): String? = item.htmlText
+        override fun hasUri(): Boolean = uri != null
+        override fun readUri(limit: Int): String? = uri?.let { readText(context, it, limit) }
+    }
 
     private fun normalised(value: String?): String? = value?.trim()?.takeIf { it.isNotEmpty() }
 
@@ -211,6 +275,27 @@ class ContextTextProvider {
         /** The miss an error stands for when a caller names only the error. */
         fun missFor(error: AIReplyError): ClipboardMiss =
             if (error == AIReplyError.ClipboardUnavailable) ClipboardMiss.UNREADABLE else ClipboardMiss.NOTHING_COPIED
+
+        /**
+         * What `ClipData.Item.coerceToText` does for a content URI - open it
+         * as any text type and read it - but with a cap, and with null rather
+         * than the URI itself when it is not readable text: "content://…" is
+         * not a message.
+         */
+        fun readText(context: Context, uri: Uri, limit: Int): String? = runCatching {
+            context.contentResolver.openTypedAssetFileDescriptor(uri, "text/*", null)?.use { descriptor ->
+                InputStreamReader(descriptor.createInputStream(), Charsets.UTF_8).use { reader ->
+                    val buffer = CharArray(limit)
+                    var filled = 0
+                    while (filled < buffer.size) {
+                        val count = reader.read(buffer, filled, buffer.size - filled)
+                        if (count < 0) break
+                        filled += count
+                    }
+                    String(buffer, 0, filled)
+                }
+            }
+        }.getOrNull()
 
         /** `ClipDescription.EXTRA_IS_SENSITIVE`, spelled out so it is usable below API 33. */
         const val EXTRA_IS_SENSITIVE = "android.content.extra.IS_SENSITIVE"
