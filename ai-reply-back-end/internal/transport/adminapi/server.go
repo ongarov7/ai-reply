@@ -90,6 +90,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /api/v1/admin/reports", s.guard(s.handleReports))
 	mux.Handle("POST /api/v1/admin/reports/{id}/resolve", s.guard(s.handleResolveReport))
 	s.registerNotifications(mux)
+	s.registerDiagnostics(mux)
 }
 
 // guard — cookie сессиясы + күй өзгертетін сұраныстарда CSRF тақырыбы.

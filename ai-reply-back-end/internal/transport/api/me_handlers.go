@@ -247,6 +247,10 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 			"ai_reports": true,
 			// DELETE /api/v1/me and POST /api/v1/me/delete.
 			"account_deletion": true,
+			// PUT /api/v1/installations/{id}/diagnostics — keyboard and permission state.
+			"permission_diagnostics": s.installations != nil,
+			// Reminder pushes (onboarding, keyboard, paste help) are switched on in the admin panel.
+			"push_reminders": s.notifications != nil && s.notifications.RemindersEnabled(r.Context()),
 		},
 		"demo_mode":    s.cfg.Auth.DemoMode,
 		"payment_mode": s.payments.Mode(),

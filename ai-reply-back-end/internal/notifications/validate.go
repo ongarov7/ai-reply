@@ -326,6 +326,10 @@ func ValidateAudience(f domain.AudienceFilter) (domain.AudienceFilter, error) {
 	}
 	sort.Strings(emails)
 	f.Emails = emails
+	f.Diagnostics = strings.ToLower(strings.TrimSpace(f.Diagnostics))
+	if f.Diagnostics != "" && !oneOf(f.Diagnostics, domain.DiagnosticFilters) {
+		return f, domain.InvalidField("audience.diagnostics", "unknown")
+	}
 	return f, nil
 }
 

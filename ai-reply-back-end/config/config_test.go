@@ -258,7 +258,8 @@ func TestPushRejectsHalfConfiguredFirebaseAndBadLimits(t *testing.T) {
 		t.Fatalf("complete FCM config: %v", err)
 	}
 
-	for key, value := range map[string]string{"PUSH_QUOTA_LOW_PERCENT": "101", "PUSH_MAX_ATTEMPTS": "11"} {
+	for key, value := range map[string]string{"PUSH_QUOTA_LOW_PERCENT": "101", "PUSH_MAX_ATTEMPTS": "11",
+		"PUSH_BATCH_SIZE": "501", "PUSH_WORKER_CONCURRENCY": "65"} {
 		setValidEnv(t)
 		t.Setenv(key, value)
 		if _, err := Load(""); err == nil || !strings.Contains(err.Error(), key) {
