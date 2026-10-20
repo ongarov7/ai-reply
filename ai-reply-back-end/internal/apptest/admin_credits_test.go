@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/aireply/ai-reply-back-end/internal/domain"
 	"github.com/aireply/ai-reply-back-end/internal/traits"
@@ -37,6 +38,10 @@ func TestWelcomeBonusSettingAppliesToLaterAccountsOnly(t *testing.T) {
 	admin := h.signInAdmin()
 	headers := admin.headers(h.cfg.Admin.CookieName)
 	early := h.signIn("welcome-early@example.com")
+	cutoff := func() int {
+		return h.scalar(`SELECT CAST(value AS INTEGER) FROM system_settings WHERE key = 'welcome_bonus_since'`)
+	}
+	released := cutoff()
 
 	settings := h.do(http.MethodGet, "/api/v1/admin/settings", nil, headers)
 	if settings.num("welcome_bonus", "units") != 50 || settings.num("welcome_bonus", "default") != 50 ||
@@ -57,7 +62,8 @@ func TestWelcomeBonusSettingAppliesToLaterAccountsOnly(t *testing.T) {
 	if saved.status != http.StatusOK || saved.num("units") != 20 {
 		t.Fatalf("save: %d %s", saved.status, saved.raw)
 	}
-	if meta := h.auditMeta("settings.welcome_bonus.update"); meta == nil || meta["before"] != float64(50) || meta["after"] != float64(20) {
+	if meta := h.auditMeta("settings.welcome_bonus.update"); meta == nil || meta["before"] != float64(50) || meta["after"] != float64(20) ||
+		meta["since_before"] == nil || meta["since_after"] != meta["since_before"] {
 		t.Fatalf("audit = %v", meta)
 	}
 
@@ -67,8 +73,44 @@ func TestWelcomeBonusSettingAppliesToLaterAccountsOnly(t *testing.T) {
 	}
 	mustStatus(t, h.do(http.MethodPost, "/api/v1/admin/settings/welcome-bonus", map[string]any{"units": 0}, headers),
 		http.StatusOK, "")
-	if h.welcomeLeft(h.signIn("welcome-none@example.com").userID) != -1 || h.welcomeLeft(early.userID) != 50 {
+	none := h.signIn("welcome-none@example.com")
+	if h.welcomeLeft(none.userID) != -1 || h.welcomeLeft(early.userID) != 50 {
 		t.Fatal("switching the bonus off touched what was given or still gave one")
+	}
+	if cutoff() != released {
+		t.Fatal("changing or switching off the bonus moved the cutoff")
+	}
+
+	// Switched on again: the cutoff moves to that moment, so an account that
+	// signed up while it was off never gets it, not even through /me.
+	time.Sleep(2 * time.Millisecond) // created_at and the cutoff are milliseconds
+	on := h.do(http.MethodPost, "/api/v1/admin/settings/welcome-bonus", map[string]any{"units": 30}, headers)
+	if on.status != http.StatusOK || on.num("units") != 30 {
+		t.Fatalf("switch on: %d %s", on.status, on.raw)
+	}
+	moved := cutoff()
+	if created := h.scalar(`SELECT created_at FROM users WHERE id = ?`, none.userID); moved <= released || created >= moved {
+		t.Fatalf("cutoff %d (was %d), account created %d", moved, released, created)
+	}
+	if meta := h.auditMeta("settings.welcome_bonus.update"); meta == nil || meta["before"] != float64(0) || meta["after"] != float64(30) ||
+		meta["since_after"] != traits.FromMillis(int64(moved)).Format(time.RFC3339Nano) || meta["since_before"] == meta["since_after"] {
+		t.Fatalf("switch-on audit = %v", meta)
+	}
+	me := h.do(http.MethodGet, "/api/v1/me", nil, h.auth(none.access))
+	if usage, _ := me.body["usage"].(map[string]any); me.status != http.StatusOK || usage["welcome"] != nil {
+		t.Fatalf("/me of an account from the off period: %s", me.raw)
+	}
+	h.refresh(none)
+	if h.welcomeLeft(none.userID) != -1 {
+		t.Fatal("switching the bonus back on gave it to an account from the off period")
+	}
+	if again := h.signIn("welcome-again@example.com"); h.welcomeLeft(again.userID) != 30 || h.welcomeLeft(early.userID) != 50 {
+		t.Fatalf("after switching on: new %d, early %d", h.welcomeLeft(again.userID), h.welcomeLeft(early.userID))
+	}
+	mustStatus(t, h.do(http.MethodPost, "/api/v1/admin/settings/welcome-bonus", map[string]any{"units": 40}, headers),
+		http.StatusOK, "")
+	if cutoff() != moved {
+		t.Fatal("a change between two positive values moved the cutoff")
 	}
 }
 
@@ -187,5 +229,50 @@ func TestAdminUserListShowsTheTotalRemaining(t *testing.T) {
 	rows, _ := res.body["users"].([]any)
 	if res.status != http.StatusOK || len(rows) != 1 || rows[0].(map[string]any)["remaining_total"] != float64(19) {
 		t.Fatalf("list = %s", res.raw)
+	}
+}
+
+// Тізім мен карта бір санайды: мерзімі өткен тариф — тегін тариф, айлық шек күнді қысқартады.
+func TestAdminUserListCountsWhatTheUserGetsNow(t *testing.T) {
+	h := newHarness(t)
+	admin := h.signInAdmin()
+	headers := admin.headers(h.cfg.Admin.CookieName)
+	_, month := h.todayKeys()
+
+	lapsed := h.signIn("list-lapsed@example.com")
+	h.assignPlan(admin, lapsed.userID, "standard", "")
+	h.exec(`UPDATE subscriptions SET expires_at = ? WHERE user_id = ? AND status = 'active'`,
+		traits.Millis(h.clock.Now().Add(-time.Hour)), lapsed.userID)
+	h.useQuota(lapsed.userID, 3)
+
+	capped := h.signIn("list-capped@example.com")
+	h.assignPlan(admin, capped.userID, "standard", "")
+	h.exec(`UPDATE plans SET monthly_message_limit = 40 WHERE code = 'standard'`)
+	h.useQuota(capped.userID, 2)
+	h.exec(`INSERT INTO usage_monthly (user_id, usage_month, used, updated_at) VALUES (?,?,38,0)`, capped.userID, month)
+
+	list := h.do(http.MethodGet, "/api/v1/admin/users?q=list-", nil, headers)
+	rows, _ := list.body["users"].([]any)
+	if list.status != http.StatusOK || len(rows) != 2 {
+		t.Fatalf("list = %s", list.raw)
+	}
+	want := map[string][2]float64{lapsed.userID: {7, 4}, capped.userID: {30, 2}}
+	for _, raw := range rows {
+		row := raw.(map[string]any)
+		id, _ := row["id"].(string)
+		detail := h.do(http.MethodGet, "/api/v1/admin/users/"+id, nil, headers)
+		if row["daily_limit"] != want[id][0] || row["remaining_total"] != want[id][1] ||
+			detail.num("entitlement", "daily_limit") != want[id][0] || detail.num("balances", "remaining_total") != want[id][1] {
+			t.Fatalf("row %v, want daily %v and total %v; detail %s", row, want[id][0], want[id][1], detail.raw)
+		}
+	}
+
+	// Sorting by today's use is accepted (it used to fail on a missing column).
+	for dir, first := range map[string]string{"desc": lapsed.userID, "asc": capped.userID} {
+		sorted := h.do(http.MethodGet, "/api/v1/admin/users?q=list-&sort=used_today&dir="+dir, nil, headers)
+		rows, _ := sorted.body["users"].([]any)
+		if sorted.status != http.StatusOK || len(rows) != 2 || rows[0].(map[string]any)["id"] != first {
+			t.Fatalf("sort=used_today dir=%s: %d %s", dir, sorted.status, sorted.raw)
+		}
 	}
 }

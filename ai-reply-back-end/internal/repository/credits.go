@@ -246,8 +246,8 @@ func counters(ctx context.Context, tx *sql.Tx, userID, date, month string) (day,
 // CommitGeneration — жауап жетті: брон «committed» болады. false — брон бұдан былай күтілмеген.
 func (s *Store) CommitGeneration(ctx context.Context, id string, now time.Time) (bool, error) {
 	res, err := s.db.Writer().ExecContext(ctx, `
-		UPDATE usage_reservations SET status = 'committed', updated_at = ? WHERE id = ? AND status = 'reserved'`,
-		ms(now), id)
+		UPDATE usage_reservations SET status = ?, updated_at = ? WHERE id = ? AND status = ?`,
+		domain.ReservationCommitted, ms(now), id, domain.ReservationReserved)
 	if err != nil {
 		return false, err
 	}
@@ -270,9 +270,10 @@ func (s *Store) RefundGeneration(ctx context.Context, id string, now time.Time) 
 			grant                       sql.NullString
 		)
 		err := tx.QueryRowContext(ctx, `
-			UPDATE usage_reservations SET status = 'refunded', updated_at = ?
-			WHERE id = ? AND status = 'reserved'
-			RETURNING user_id, bucket, grant_id, usage_date, usage_month`, at, id).
+			UPDATE usage_reservations SET status = ?, updated_at = ?
+			WHERE id = ? AND status = ?
+			RETURNING user_id, bucket, grant_id, usage_date, usage_month`,
+			domain.ReservationRefunded, at, id, domain.ReservationReserved).
 			Scan(&userID, &bucket, &grant, &date, &month)
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil

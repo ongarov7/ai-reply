@@ -258,9 +258,9 @@ func (s *Server) handleUsers(w http.ResponseWriter, r *http.Request) {
 			"created_at":   row.User.CreatedAt.In(loc).Format("2006-01-02 15:04"),
 			"last_active":  optionalTime(row.User.LastActiveAt, loc),
 			"status":       row.User.Status,
+			// The plan's day (monthly cap included) plus pass, welcome bonus and credits.
+			"remaining_total": row.RemainingTotal,
 		}
-		// The plan's day (without the monthly cap) plus pass, welcome bonus and credits.
-		item["remaining_total"] = max(row.DailyLimit-row.UsedToday, 0) + row.ExtraRemaining
 		out = append(out, item)
 	}
 	httpx.JSON(w, http.StatusOK, map[string]any{

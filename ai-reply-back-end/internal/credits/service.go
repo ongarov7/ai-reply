@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"strconv"
 	"strings"
 	"sync"
@@ -68,7 +69,8 @@ func StaleAfter(providerTimeout time.Duration) time.Duration {
 // Welcome — бонус баптауы: қанша және қай сәттен бастап ашылған тіркелгілерге.
 type Welcome struct {
 	Units int
-	// Since — осы сәттен бұрын ашылған тіркелгілер бонус алмайды (0015 жазған уақыт).
+	// Since — осы сәттен бұрын ашылған тіркелгілер бонус алмайды: 0015 жазған уақыт,
+	// бонус өшірулі күйден қосылса — қосылған сәт.
 	Since time.Time
 }
 
@@ -78,7 +80,7 @@ type Service struct {
 	log        *slog.Logger
 	clock      traits.Clock
 	ttl        time.Duration
-	now        func() time.Time // кэш уақыты: сынақ сағатына тәуелсіз
+	now        func() time.Time // қабырға сағаты (сынақ сағатына тәуелсіз): кэш және welcome_bonus_since
 	staleAfter time.Duration
 
 	mu       sync.RWMutex
@@ -131,47 +133,74 @@ func (s *Service) WelcomeSettings(ctx context.Context) Welcome {
 	return fresh
 }
 
+// welcomeKeys — бонус баптауының кілттері.
+var welcomeKeys = []string{SettingWelcomeUnits, SettingWelcomeSince}
+
 func (s *Service) readWelcome(ctx context.Context) (Welcome, error) {
+	stored := make(map[string]string, len(welcomeKeys))
+	for _, key := range welcomeKeys {
+		raw, err := s.repo.Setting(ctx, key)
+		switch {
+		case err == nil:
+			stored[key] = raw
+		case !errors.Is(err, domain.ErrNotFound):
+			return Welcome{}, err
+		}
+	}
+	return parseWelcome(stored), nil
+}
+
+// parseWelcome — сақталған мәндерден баптау (жоқ кілт картада болмайды).
+func parseWelcome(stored map[string]string) Welcome {
 	w := Welcome{Units: DefaultWelcomeUnits}
-	raw, err := s.repo.Setting(ctx, SettingWelcomeUnits)
-	switch {
-	case err == nil:
+	if raw, ok := stored[SettingWelcomeUnits]; ok {
 		// A row that does not parse or is out of range can only come from a
 		// hand edit; the default applies, as with the AI limits.
-		if v, convErr := strconv.Atoi(strings.TrimSpace(raw)); convErr == nil && v >= WelcomeRange.Min && v <= WelcomeRange.Max {
+		if v, err := strconv.Atoi(strings.TrimSpace(raw)); err == nil && v >= WelcomeRange.Min && v <= WelcomeRange.Max {
 			w.Units = v
 		}
-	case !errors.Is(err, domain.ErrNotFound):
-		return Welcome{}, err
 	}
-	raw, err = s.repo.Setting(ctx, SettingWelcomeSince)
-	switch {
-	case err == nil:
-		if v, convErr := strconv.ParseInt(strings.TrimSpace(raw), 10, 64); convErr == nil && v > 0 {
-			w.Since = traits.FromMillis(v)
-		}
-	case !errors.Is(err, domain.ErrNotFound):
-		return Welcome{}, err
+	if v, err := strconv.ParseInt(strings.TrimSpace(stored[SettingWelcomeSince]), 10, 64); err == nil && v > 0 {
+		w.Since = traits.FromMillis(v)
 	}
 	// Without a cutoff every existing account would qualify: the bonus stays off.
 	if w.Since.IsZero() {
 		w.Units = 0
 	}
-	return w, nil
+	return w
 }
 
 // SetWelcomeUnits — жаңа тіркелгілердің бонусы (0 — өшірулі). Берілген бонустар өзгермейді.
-func (s *Service) SetWelcomeUnits(ctx context.Context, units int) (Welcome, error) {
+//
+// Switching the bonus on from off also moves welcome_bonus_since to now, in
+// the same transaction: an account that signed up while it was off never gets
+// it later through the repair on /me. A change between two positive values
+// keeps the cutoff. before and after are the stored settings around the
+// write, for the audit.
+func (s *Service) SetWelcomeUnits(ctx context.Context, units int) (before, after Welcome, err error) {
 	if units < WelcomeRange.Min || units > WelcomeRange.Max {
-		return Welcome{}, domain.InvalidField("units", "range")
+		return Welcome{}, Welcome{}, domain.InvalidField("units", "range")
 	}
-	if err := s.repo.SetSetting(ctx, SettingWelcomeUnits, strconv.Itoa(units)); err != nil {
-		return Welcome{}, err
+	err = s.repo.UpdateSettings(ctx, welcomeKeys, func(stored map[string]string) (map[string]string, error) {
+		before = parseWelcome(stored)
+		write := map[string]string{SettingWelcomeUnits: strconv.Itoa(units)}
+		if units > 0 && before.Units == 0 {
+			// The wall clock, not the test clock: users.created_at is stamped with it.
+			write[SettingWelcomeSince] = strconv.FormatInt(traits.Millis(s.now()), 10)
+		}
+		merged := make(map[string]string, len(welcomeKeys))
+		maps.Copy(merged, stored)
+		maps.Copy(merged, write)
+		after = parseWelcome(merged)
+		return write, nil
+	})
+	if err != nil {
+		return Welcome{}, Welcome{}, err
 	}
 	s.mu.Lock()
-	s.loaded = false
+	s.welcome, s.loadedAt, s.loaded = after, s.now(), true
 	s.mu.Unlock()
-	return s.WelcomeSettings(ctx), nil
+	return before, after, nil
 }
 
 // eligible — бонус осы тіркелгіге тиесілі ме (тек жаңа, кәдімгі тіркелгі).
@@ -237,11 +266,6 @@ func (s *Service) Balance(ctx context.Context, userID string) (domain.CreditBala
 // Ledger — соңғы журнал жазбалары, жаңасы бірінші.
 func (s *Service) Ledger(ctx context.Context, userID string, limit int) ([]domain.LedgerEntry, error) {
 	return s.repo.CreditLedger(ctx, userID, limit)
-}
-
-// Grants — қолданушының кредиттері, жаңасы бірінші.
-func (s *Service) Grants(ctx context.Context, userID string, limit int) ([]domain.CreditGrant, error) {
-	return s.repo.CreditGrants(ctx, userID, limit)
 }
 
 // ---------------------------------------------------------------- admin

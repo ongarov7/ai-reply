@@ -155,12 +155,14 @@ func (s *Store) Setting(ctx context.Context, key string) (string, error) {
 	return v, err
 }
 
+// upsertSetting — бір параметрді жазу (key, value, updated_at).
+const upsertSetting = `
+	INSERT INTO system_settings (key, value, updated_at) VALUES (?,?,?)
+	ON CONFLICT (key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`
+
 // SetSetting — параметрді жазу.
 func (s *Store) SetSetting(ctx context.Context, key, value string) error {
-	_, err := s.db.Writer().ExecContext(ctx, `
-		INSERT INTO system_settings (key, value, updated_at) VALUES (?,?,?)
-		ON CONFLICT (key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
-		key, value, ms(time.Now()))
+	_, err := s.db.Writer().ExecContext(ctx, upsertSetting, key, value, ms(time.Now()))
 	return err
 }
 
@@ -173,14 +175,44 @@ func (s *Store) SetSettings(ctx context.Context, values map[string]string) error
 	defer func() { _ = tx.Rollback() }()
 	now := ms(time.Now())
 	for key, value := range values {
-		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO system_settings (key, value, updated_at) VALUES (?,?,?)
-			ON CONFLICT (key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
-			key, value, now); err != nil {
+		if _, err := tx.ExecContext(ctx, upsertSetting, key, value, now); err != nil {
 			return err
 		}
 	}
 	return tx.Commit()
+}
+
+// UpdateSettings — параметрлерді оқып, жаңасын сол транзакцияда жазады.
+//
+// fn gets the stored values of keys (a missing key is absent from the map)
+// and returns the values to write. The read and the write share one
+// transaction on the single writer, so no other write lands between them;
+// nothing is written when fn returns an error.
+func (s *Store) UpdateSettings(ctx context.Context, keys []string, fn func(stored map[string]string) (map[string]string, error)) error {
+	return s.db.Tx(ctx, func(tx *sql.Tx) error {
+		stored := make(map[string]string, len(keys))
+		for _, key := range keys {
+			var v string
+			err := tx.QueryRowContext(ctx, `SELECT value FROM system_settings WHERE key = ?`, key).Scan(&v)
+			switch {
+			case err == nil:
+				stored[key] = v
+			case !errors.Is(err, sql.ErrNoRows):
+				return err
+			}
+		}
+		values, err := fn(stored)
+		if err != nil {
+			return err
+		}
+		now := ms(time.Now())
+		for key, value := range values {
+			if _, err := tx.ExecContext(ctx, upsertSetting, key, value, now); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 // RecordAppVersion — қолданба нұсқасын белгілеу (аналитика үшін).

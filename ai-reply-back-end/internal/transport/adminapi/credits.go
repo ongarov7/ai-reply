@@ -48,15 +48,26 @@ func (s *Server) handleSaveWelcomeBonus(w http.ResponseWriter, r *http.Request) 
 		httpx.Fail(w, domain.ErrNotFound)
 		return
 	}
-	before := s.credits.WelcomeSettings(r.Context()).Units
-	saved, err := s.credits.SetWelcomeUnits(r.Context(), body.Units)
+	before, after, err := s.credits.SetWelcomeUnits(r.Context(), body.Units)
 	if err != nil {
 		httpx.Fail(w, err)
 		return
 	}
+	// since_after differs from since_before only when the bonus was switched on from off.
 	s.admin.Audit(r.Context(), adminFrom(r.Context()), s.ip(r), "settings.welcome_bonus.update", "system_settings",
-		credits.SettingWelcomeUnits, map[string]any{"before": before, "after": saved.Units})
+		credits.SettingWelcomeUnits, map[string]any{
+			"before": before.Units, "after": after.Units,
+			"since_before": auditTime(before.Since), "since_after": auditTime(after.Since),
+		})
 	httpx.JSON(w, http.StatusOK, s.welcomeBonusPayload(r))
+}
+
+// auditTime — аудиттегі уақыт (RFC 3339, UTC, миллисекундпен); нөлдік уақыт — nil.
+func auditTime(t time.Time) any {
+	if t.IsZero() {
+		return nil
+	}
+	return t.UTC().Format(time.RFC3339Nano)
 }
 
 // handleGrantCredits — әкімші қолмен береді: units 1…10000, түсініктеме міндетті (≤ 200 таңба).

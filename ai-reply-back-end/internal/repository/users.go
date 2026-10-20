@@ -250,16 +250,22 @@ type UserFilter struct {
 
 // UserRow — тізім жолы (қолдану метадерегімен бірге).
 type UserRow struct {
-	User         domain.User
-	PlanCode     string
-	PlanName     string
-	SubStatus    string
+	User      domain.User
+	PlanCode  string
+	PlanName  string
+	SubStatus string
+	// DailyLimit, MonthlyLimit — жолдағы жазылымның тарифі (мерзімі өтсе де).
+	// admin.Users replaces them with what the person gets now, as Entitlement does.
 	DailyLimit   int
+	MonthlyLimit int
 	UsedToday    int
+	UsedMonth    int
 	TokensMonth  int
 	SubExpiresAt *time.Time
 	// ExtraRemaining — тарифтен тыс қалдық: pass, бонус, кредиттер (now сәтінде).
 	ExtraRemaining int
+	// RemainingTotal — тарифтің бүгінгі қалдығы (айлық шекпен) + ExtraRemaining; admin.Users толтырады.
+	RemainingTotal int
 }
 
 // ListUsers — сүзгі, іздеу, беттеу.
@@ -320,13 +326,13 @@ func (s *Store) ListUsers(ctx context.Context, f UserFilter, today, month string
 
 	query := `SELECT ` + userColumns + `,
 		COALESCE(p.code, ''), COALESCE(p.name_en, ''), COALESCE(sub.status, ''),
-		COALESCE(p.daily_message_limit, 0), COALESCE(ud.used, 0),
+		COALESCE(p.daily_message_limit, 0), COALESCE(p.monthly_message_limit, 0),
+		COALESCE(ud.used, 0) AS used_today, COALESCE(um.used, 0),
 		COALESCE(um.input_tokens, 0) + COALESCE(um.output_tokens, 0), sub.expires_at,
 		COALESCE((SELECT SUM(g.units_remaining) FROM credit_grants g
 		          WHERE g.user_id = u.id AND g.status = 'active' AND g.units_remaining > 0
 		            AND g.starts_at <= ? AND (g.expires_at IS NULL OR g.expires_at > ?)), 0) ` +
-		strings.ReplaceAll(base, "FROM users u", "FROM users u") +
-		fmt.Sprintf(" ORDER BY %s %s LIMIT ? OFFSET ?", sortColumn, direction)
+		base + fmt.Sprintf(" ORDER BY %s %s LIMIT ? OFFSET ?", sortColumn, direction)
 	// userColumns u. префиксімен жазылуы керек
 	query = strings.Replace(query, "SELECT "+userColumns, "SELECT "+prefixColumns(userColumns, "u."), 1)
 
@@ -352,8 +358,8 @@ func (s *Store) ListUsers(ctx context.Context, f UserFilter, today, month string
 		if err := rows.Scan(&r.User.ID, &phone, &email, &r.User.Status, &r.User.Locale, &r.User.Timezone,
 			&r.User.Platform, &r.User.AppVersion, &r.User.OSVersion, &r.User.Kind, &legacy,
 			&created, &updated, &lastActive, &r.User.PreferredLanguage,
-			&r.PlanCode, &r.PlanName, &r.SubStatus, &r.DailyLimit, &r.UsedToday, &r.TokensMonth, &expires,
-			&r.ExtraRemaining); err != nil {
+			&r.PlanCode, &r.PlanName, &r.SubStatus, &r.DailyLimit, &r.MonthlyLimit, &r.UsedToday, &r.UsedMonth,
+			&r.TokensMonth, &expires, &r.ExtraRemaining); err != nil {
 			return nil, 0, err
 		}
 		r.User.Phone, r.User.Email, r.User.LegacyClient = text(phone), text(email), text(legacy)

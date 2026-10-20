@@ -845,8 +845,8 @@ paths:
   /api/v1/admin/settings/welcome-bonus:
     post:
       tags: [admin]
-      summary: Бесплатные ответы новых аккаунтов (0 — выключено); аудит settings.welcome_bonus.update { before, after }
-      description: Действует только на аккаунты, созданные после изменения; выданные ответы не меняются.
+      summary: Бесплатные ответы новых аккаунтов (0 — выключено); аудит settings.welcome_bonus.update { before, after, since_before, since_after }
+      description: Действует только на аккаунты, созданные после изменения; выданные ответы не меняются. Включение из 0 в той же записи переносит welcome_bonus_since (since) на момент включения, так что аккаунты, созданные при выключенном бонусе, его не получают.
       security: [{ adminSession: [] }]
       requestBody:
         required: true

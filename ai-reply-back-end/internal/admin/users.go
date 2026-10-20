@@ -28,9 +28,37 @@ type UserDetail struct {
 const creditRows = 50
 
 // Users — сүзгіленген тізім.
+//
+// A row's limits and remaining_total are what the person gets now, counted
+// as subscriptions.Entitlement counts them for the user card: a subscription
+// that lapsed (or whose plan is gone) gives the default plan, and a monthly
+// cap shortens the day.
 func (s *Service) Users(ctx context.Context, f repository.UserFilter) ([]repository.UserRow, int, error) {
-	date, month := s.subs.TodayKeys()
-	return s.repo.ListUsers(ctx, f, date, month, s.subs.Now())
+	now := s.subs.Now()
+	date, month := s.subs.Keys(now)
+	rows, total, err := s.repo.ListUsers(ctx, f, date, month, now)
+	if err != nil {
+		return nil, 0, err
+	}
+	var fallback *domain.Plan
+	for i := range rows {
+		row := &rows[i]
+		sub := domain.Subscription{Status: row.SubStatus, ExpiresAt: row.SubExpiresAt}
+		if row.PlanCode == "" || !sub.IsUsable(now) {
+			if fallback == nil {
+				plan, err := s.plans.Default(ctx)
+				if err != nil {
+					return nil, 0, err
+				}
+				fallback = &plan
+			}
+			row.DailyLimit, row.MonthlyLimit = fallback.DailyLimit, fallback.MonthlyLimit
+		}
+		allowance := domain.Entitlement{DailyLimit: row.DailyLimit, MonthlyLimit: row.MonthlyLimit,
+			UsedToday: row.UsedToday, UsedMonth: row.UsedMonth}
+		row.RemainingTotal = allowance.Remaining() + row.ExtraRemaining
+	}
+	return rows, total, nil
 }
 
 // UserDetail — бір қолданушының метадерегі.

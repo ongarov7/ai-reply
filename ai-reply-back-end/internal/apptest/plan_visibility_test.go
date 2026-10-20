@@ -2,6 +2,7 @@ package apptest
 
 import (
 	"context"
+	"errors"
 	"io/fs"
 	"net/http"
 	"path/filepath"
@@ -11,7 +12,10 @@ import (
 	"time"
 
 	"github.com/aireply/ai-reply-back-end/internal/database"
+	"github.com/aireply/ai-reply-back-end/internal/domain"
 	"github.com/aireply/ai-reply-back-end/internal/payments"
+	"github.com/aireply/ai-reply-back-end/internal/plans"
+	"github.com/aireply/ai-reply-back-end/internal/subscriptions"
 	"github.com/aireply/ai-reply-back-end/internal/traits"
 	"github.com/aireply/ai-reply-back-end/migrations"
 )
@@ -518,5 +522,62 @@ func TestAFailedOrRefundedPaymentIsNeverCompleted(t *testing.T) {
 		if plan := h.do(http.MethodGet, "/api/v1/me/subscription", nil, h.auth(s.access)).str("plan", "code"); plan != "free" {
 			t.Fatalf("%s payment gave plan %q", status, plan)
 		}
+	}
+}
+
+// flippingProvider — провайдер «төленді» дейді, ал төлем дәл сол сәтте басқа күйге өтеді
+// (webhook не әкімші): тексеру мен жазудың арасындағы жарыс.
+type flippingProvider struct {
+	payments.DemoProvider
+	h      *harness
+	status string
+}
+
+func (p flippingProvider) VerifyPayment(_ context.Context, payment domain.Payment) (string, error) {
+	p.h.exec(`UPDATE payments SET status = ? WHERE id = ?`, p.status, payment.ID)
+	return "succeeded", nil
+}
+
+// CompletePayment сәтсіз не қайтарылған төлемді аяқтамайды, оқу мен жазудың арасында өзгерсе де.
+func TestCompletePaymentNeverFinishesAFailedOrRefundedPayment(t *testing.T) {
+	h := newHarness(t)
+	s := h.signIn("payment-race@example.com")
+	h.openStore("standard")
+	ctx := context.Background()
+	subs := subscriptions.New(h.store, plans.New(h.store), h.cfg.App.Location()).WithClock(h.clock)
+	before := h.scalar(`SELECT COUNT(*) FROM subscriptions WHERE user_id = ?`, s.userID)
+	for _, status := range []string{"failed", "refunded"} {
+		// The store on its own: only a created or pending payment is completed.
+		id := h.checkout(s, "standard").str("payment_id")
+		h.exec(`UPDATE payments SET status = ? WHERE id = ?`, status, id)
+		row := `SELECT status || ':' || provider_ref || ':' || updated_at FROM payments WHERE id = ?`
+		stored := h.text(row, id)
+		applied, _, err := h.store.CompletePayment(ctx, id, "ref-"+status, domain.Subscription{
+			UserID: s.userID, PlanID: h.planID("standard"), Status: domain.SubActive, Source: "payment",
+		})
+		if err != nil || applied {
+			t.Fatalf("%s: CompletePayment applied=%v err=%v", status, applied, err)
+		}
+		if got := h.text(row, id); got != stored {
+			t.Fatalf("%s payment changed: %q, was %q", status, got, stored)
+		}
+
+		// Through confirm: the status changes after the read, so only the SQL guard stops it.
+		id = h.checkout(s, "standard").str("payment_id")
+		svc := payments.New(h.store, subs, flippingProvider{h: h, status: status}, "demo").WithDemoCheckout(true)
+		_, err = svc.Confirm(ctx, s.userID, id)
+		var conflict *domain.ConflictError
+		if !errors.As(err, &conflict) || conflict.Field != "payment" || conflict.Reason != status {
+			t.Fatalf("%s while confirming: %v", status, err)
+		}
+		if got := h.text(`SELECT status FROM payments WHERE id = ?`, id); got != status {
+			t.Fatalf("%s payment became %q while confirming", status, got)
+		}
+	}
+	if n := h.scalar(`SELECT COUNT(*) FROM subscriptions WHERE user_id = ?`, s.userID); n != before {
+		t.Fatalf("%d subscriptions, want %d", n, before)
+	}
+	if plan := h.do(http.MethodGet, "/api/v1/me/subscription", nil, h.auth(s.access)).str("plan", "code"); plan != "free" {
+		t.Fatalf("a failed or refunded payment gave plan %q", plan)
 	}
 }
