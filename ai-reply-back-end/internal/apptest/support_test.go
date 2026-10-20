@@ -13,6 +13,7 @@ import (
 
 	"github.com/aireply/ai-reply-back-end/internal/database"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
+	"github.com/aireply/ai-reply-back-end/internal/notifications"
 	"github.com/aireply/ai-reply-back-end/migrations"
 )
 
@@ -309,6 +310,48 @@ func TestSupportReplyNotifiesOncePerUnreadBurst(t *testing.T) {
 	}
 	if n := h.scalar(`SELECT COUNT(*) FROM notifications WHERE type = ? AND user_id = ?`, domain.TypeSupportReply, s.userID); n != 2 {
 		t.Fatalf("support notifications = %d", n)
+	}
+}
+
+// Оператор жауабы — шолу хабары емес: тыныш сағатта да бірден кетеді, кезекте бір тәулік жарамды.
+func TestSupportReplyPushIgnoresQuietHoursAndExpiresAfterADay(t *testing.T) {
+	h := newHarness(t)
+	h.pushClock.T = time.Date(2026, 3, 11, 18, 0, 0, 0, time.UTC) // 23:00 in Almaty, inside the 22–9 quiet hours
+	s := h.signIn("support.night@example.com")
+	h.mustRegister(installation(installID(407), domain.PlatformIOS, fcmToken(407)), s.access)
+	h.mustSupportSend(s.access, "Түнгі сұрақ")
+	conversation := h.supportConversationID(s.access)
+	admin := h.signInAdmin()
+	reply := func(text string) string {
+		t.Helper()
+		res := h.supportAdmin(admin, http.MethodPost, "/conversations/"+conversation+"/messages", map[string]any{"text": text})
+		mustStatus(t, res, http.StatusCreated, "")
+		return res.str("message", "id")
+	}
+
+	first := reply("Түнгі жауап")
+	h.tick()
+	pushes := h.pushesOf(domain.TypeSupportReply)
+	if len(pushes) != 1 || pushes[0].TTL != notifications.SupportReplyTTL {
+		t.Fatalf("support reply in quiet hours: %+v", pushes)
+	}
+	if n := h.scalar(`SELECT COUNT(*) FROM notifications WHERE type = ? AND not_before IS NOT NULL`, domain.TypeSupportReply); n != 0 {
+		t.Fatalf("the support reply was deferred (%d)", n)
+	}
+
+	// A new burst whose push waited in the queue for more than a day is not sent.
+	mustStatus(t, h.do(http.MethodPost, "/api/v1/support/read", map[string]any{"up_to_message_id": first}, h.auth(s.access)),
+		http.StatusOK, "")
+	reply("Кейінгі жауап")
+	h.pushClock.Advance(notifications.SupportReplyTTL + time.Hour)
+	h.tick()
+	if n := len(h.pushesOf(domain.TypeSupportReply)); n != 1 {
+		t.Fatalf("an expired support reply was sent (%d sends)", n)
+	}
+	if got := h.text(`SELECT GROUP_CONCAT(d.status || ':' || COALESCE(d.error_code, ''), ',') FROM notification_deliveries d
+		JOIN notifications n ON n.id = d.notification_id WHERE n.type = ? AND n.user_id = ? AND d.status = 'skipped'`,
+		domain.TypeSupportReply, s.userID); got != "skipped:expired" {
+		t.Fatalf("late delivery = %s", got)
 	}
 }
 

@@ -143,9 +143,9 @@ func QuietUntil(now time.Time, loc *time.Location, start, end int) time.Time {
 // pushDeadline — осы сәттен кейін push жіберілмейді (expired).
 //
 // A quota notice is true only until its day (or month) ends in the app
-// timezone; a reminder is worth 12 hours; anything else a day. The window
-// counts from the time the push was first allowed to go out (after quiet
-// hours), not from when it was written.
+// timezone; a reminder is worth 12 hours; a support reply and anything else
+// a day. The window counts from the time the push was first allowed to go out
+// (after quiet hours), not from when it was written.
 func (s *Service) pushDeadline(n domain.Notification) time.Time {
 	start := n.CreatedAt
 	if n.NotBefore != nil && n.NotBefore.After(start) {
@@ -160,6 +160,8 @@ func (s *Service) pushDeadline(n domain.Notification) time.Time {
 		return time.Date(local.Year(), local.Month(), local.Day()+1, 0, 0, 0, 0, s.loc)
 	case domain.IsReminderType(n.Type):
 		return start.Add(ReminderTTL)
+	case n.Type == domain.TypeSupportReply:
+		return start.Add(SupportReplyTTL)
 	default:
 		return start.Add(DefaultTTL)
 	}

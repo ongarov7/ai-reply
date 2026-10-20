@@ -182,7 +182,7 @@ no_verified_email`. `Idempotency-Key` в Resend — `notification-<delivery_id>`
 `expired`, `email_disabled`, `no_verified_email`, `email_template_missing`.
 
 Срок жизни push: квотное уведомление действует до конца своего дня (месяца) в
-`DEFAULT_TIMEZONE`, напоминание — 12 ч, остальные — 24 ч. Доставка, пролежавшая в очереди
+`DEFAULT_TIMEZONE`, напоминание — 12 ч, ответ поддержки и остальные — 24 ч. Доставка, пролежавшая в очереди
 дольше (повторы, остановленный воркер), не отправляется (`skipped expired`); FCM получает
 оставшийся TTL. Тихие часы: напоминания о сроке тарифа и напоминания из обхода ставятся с
 `next_attempt_at` на конец тихих часов получателя (`notifications.not_before`, срок жизни
