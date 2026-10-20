@@ -8455,7 +8455,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Оны тек өзіңіз қоса аласыз: «Параметрлер» ▸ AI Reply ▸ «Пернетақталар» ▸ «Толық рұқсат». Мұны ешбір қолданба сіздің орныңызға жасай алмайды."
+            "value" : "Оны тек өзіңіз қоса аласыз: «Реттеулер» ▸ AI Reply ▸ «Пернетақталар» ▸ «Толық рұқсат». Мұны ешбір қолданба сіздің орныңызға жасай алмайды."
           }
         },
         "ru" : {
@@ -8571,7 +8571,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Бұл сұрақты iOS өзі қояды, тек сіз басқаннан кейін. Мұндай баптауы бар iOS нұсқаларында жауабыңызды кейін өзгертуге болады: «Параметрлер» ▸ AI Reply ▸ «Басқа қолданбалардан қою»."
+            "value" : "Бұл сұрақты iOS өзі қояды, тек сіз басқаннан кейін. Мұндай баптауы бар iOS нұсқаларында жауабыңызды кейін өзгертуге болады: «Реттеулер» ▸ AI Reply ▸ «Басқа қолданбалардан көшіріп қою»."
           }
         },
         "ru" : {
@@ -8583,7 +8583,7 @@
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bu savolni iOS oʻzi beradi, faqat siz bosganingizdan keyin. Bunday sozlamasi bor iOS versiyalarida javobingizni keyinroq oʻzgartirish mumkin: Sozlamalar ▸ AI Reply ▸ Boshqa ilovalardan joylash."
+            "value" : "Bu savolni iOS oʻzi beradi, faqat siz bosganingizdan keyin. Bunday sozlamasi bor iOS versiyalarida javobingizni keyinroq oʻzgartirish mumkin: Settings ▸ AI Reply ▸ Paste from Other Apps."
           }
         }
       }
@@ -9035,7 +9035,7 @@
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "«Пернетақталар» жолы жоқ па? Онда: «Параметрлер» ▸ «Негізгі» ▸ «Пернетақта» ▸ «Пернетақталар» ▸ «Жаңа пернетақта қосу» ▸ AI Reply."
+            "value" : "«Пернетақталар» жолы жоқ па? Онда: «Реттеулер» ▸ «Негізгі» ▸ «Пернетақта» ▸ «Пернетақталар» ▸ «Жаңа пернетақта қосу» ▸ AI Reply."
           }
         },
         "ru" : {

@@ -43,11 +43,13 @@ final class ClipboardReadTests: XCTestCase {
     /// Every language says iOS refused it, names the setting the way iOS
     /// names it there, and offers typing instead.
     func testRefusedPasteSaysWhereToAllowIt() {
+        // The option labels are iOS's own (PSSystemPolicy PASTE_BETWEEN_APPS_ALLOW):
+        // «Разрешать», «Рұқсат бар».
         let expected: [AppLanguage: [String]] = [
-            .english: ["Settings › AI Reply › Paste from Other Apps", "Allow", "type"],
-            .russian: ["Настройки › AI Reply", "«Вставка из других приложений»", "«Разрешить»", "вручную"],
-            .kazakh: ["Реттеулер › AI Reply", "«Басқа қолданбалардан көшіріп қою»", "«Рұқсат беру»", "қолмен"],
-            .uzbek: ["Settings › AI Reply › Paste from Other Apps", "Allow", "qo\u{02BB}lda"]
+            .english: [Self.pasteSettingPath[.english]!, "Allow", "type"],
+            .russian: [Self.pasteSettingPath[.russian]!, "«Разрешать»", "вручную"],
+            .kazakh: [Self.pasteSettingPath[.kazakh]!, "«Рұқсат бар»", "қолмен"],
+            .uzbek: [Self.pasteSettingPath[.uzbek]!, "Allow", "qo\u{02BB}lda"]
         ]
         let english = AIReplyStrings.forLanguage(.english)
         for language in AppLanguage.allCases {
@@ -64,6 +66,30 @@ final class ClipboardReadTests: XCTestCase {
                 XCTAssertNotEqual(message, english.pasteDenied, language.rawValue)
                 XCTAssertNotEqual(strings.typeSourceMessage, english.typeSourceMessage, language.rawValue)
             }
+        }
+    }
+
+    /// Where iOS keeps the setting, as Settings names it in each language
+    /// (Preferences.app CFBundleDisplayName and PSSystemPolicy
+    /// PASTE_BETWEEN_APPS). iOS has no Uzbek, so Uzbek uses the English labels.
+    private static let pasteSettingPath: [AppLanguage: String] = [
+        .english: "Settings ▸ AI Reply ▸ Paste from Other Apps",
+        .russian: "«Настройки» ▸ AI Reply ▸ «Вставка из других приложений»",
+        .kazakh: "«Реттеулер» ▸ AI Reply ▸ «Басқа қолданбалардан көшіріп қою»",
+        .uzbek: "Settings ▸ AI Reply ▸ Paste from Other Apps"
+    ]
+
+    /// The keyboard's refusal and the app's paste help send the user to the
+    /// same place, spelled the same way, in every language.
+    func testAppAndKeyboardNameThePasteSettingAlike() {
+        let settings = AppSettings(store: SharedSettings(defaults: UserDefaults(suiteName: "ClipboardReadTests.\(UUID())")!))
+        for language in AppLanguage.allCases {
+            settings.setLanguage(language)
+            let path = Self.pasteSettingPath[language]!
+            // The app keeps "AI Reply" on one line with a no-break space.
+            let help = settings.localized("setup.paste.footer").replacingOccurrences(of: "\u{00A0}", with: " ")
+            XCTAssertTrue(help.contains(path), "app, \(language.rawValue): \(help)")
+            XCTAssertTrue(AIReplyStrings.forLanguage(language).pasteDenied.contains(path), "keyboard, \(language.rawValue)")
         }
     }
 }

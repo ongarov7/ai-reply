@@ -94,7 +94,9 @@ struct AIReplyStrings: Sendable {
     let noSourceMessage: String
     /// iOS refused the paste. Names the setting with the words iOS itself
     /// uses in that language - the keyboard cannot open Settings - and the
-    /// way round it: typing the message.
+    /// way round it: typing the message. The path is the one the app's own
+    /// paste help (`setup.paste.footer`) names; iOS has no Uzbek, so Uzbek
+    /// names the English labels.
     let pasteDenied: String
     /// Takes the limit, which the server publishes and an administrator can
     /// change: the sentence must never name a number the server no longer uses.
@@ -229,7 +231,7 @@ struct AIReplyStrings: Sendable {
         instructionPlaceholder: "How should I reply?",
         typeSourceMessage: "Type or paste the message you are replying to",
         noSourceMessage: "Copy a message first",
-        pasteDenied: "iOS blocked the paste. Allow it in Settings › AI Reply › Paste from Other Apps › Allow, or type the message yourself.",
+        pasteDenied: "iOS blocked the paste. Allow it in Settings ▸ AI Reply ▸ Paste from Other Apps ▸ Allow, or type the message yourself.",
         messageTooLongFormat: "Message is too long. Copy up to %d characters.",
         fullAccessRequired: "Turn on Full Access for AI Reply in iOS Settings to read copied text and get replies.",
         notConfigured: "Open the AI Reply app and finish setup first.",
@@ -289,7 +291,7 @@ struct AIReplyStrings: Sendable {
         instructionPlaceholder: "Как ответить?",
         typeSourceMessage: "Введите или вставьте сообщение, на которое отвечаете",
         noSourceMessage: "Сначала скопируйте сообщение",
-        pasteDenied: "iOS запретила вставку. Откройте Настройки › AI Reply › «Вставка из других приложений» и выберите «Разрешить» или введите сообщение вручную.",
+        pasteDenied: "iOS запретила вставку. Откройте «Настройки» ▸ AI Reply ▸ «Вставка из других приложений» и выберите «Разрешать» или введите сообщение вручную.",
         messageTooLongFormat: "Сообщение слишком длинное. Скопируйте не более %d символов.",
         fullAccessRequired: "Включите полный доступ для AI Reply в настройках iOS, чтобы читать скопированный текст и получать ответы.",
         notConfigured: "Откройте приложение AI Reply и завершите настройку.",
@@ -349,7 +351,7 @@ struct AIReplyStrings: Sendable {
         instructionPlaceholder: "Қалай жауап беру керек?",
         typeSourceMessage: "Жауап беретін хабарламаны теріңіз не қойыңыз",
         noSourceMessage: "Алдымен хабарламаны көшіріңіз",
-        pasteDenied: "iOS қоюға рұқсат бермеді. Реттеулер › AI Reply › «Басқа қолданбалардан көшіріп қою» ішінде «Рұқсат беру» таңдаңыз немесе хабарламаны қолмен теріңіз.",
+        pasteDenied: "iOS қоюға рұқсат бермеді. «Реттеулер» ▸ AI Reply ▸ «Басқа қолданбалардан көшіріп қою» ішінде «Рұқсат бар» таңдаңыз немесе хабарламаны қолмен теріңіз.",
         messageTooLongFormat: "Хабарлама тым ұзын. %d таңбаға дейінгі мәтінді көшіріңіз.",
         fullAccessRequired: "Көшірілген мәтінді оқып, жауап алу үшін iOS баптауларында AI Reply пернетақтасына толық рұқсат беріңіз.",
         notConfigured: "AI Reply қолданбасын ашып, баптауды аяқтаңыз.",
@@ -409,7 +411,7 @@ struct AIReplyStrings: Sendable {
         instructionPlaceholder: "Qanday javob beraman?",
         typeSourceMessage: "Javob beradigan xabarni yozing yoki joylang",
         noSourceMessage: "Avval xabarni nusxalang",
-        pasteDenied: "iOS joylashga ruxsat bermadi. Settings › AI Reply › Paste from Other Apps boʻlimida Allow ni tanlang yoki xabarni qoʻlda yozing.",
+        pasteDenied: "iOS joylashga ruxsat bermadi. Settings ▸ AI Reply ▸ Paste from Other Apps boʻlimida Allow ni tanlang yoki xabarni qoʻlda yozing.",
         messageTooLongFormat: "Xabar juda uzun. %d belgigacha matnni nusxalang.",
         fullAccessRequired: "Nusxalangan matnni o‘qish va javob olish uchun iOS sozlamalarida AI Reply klaviaturasiga to‘liq ruxsat bering.",
         notConfigured: "AI Reply ilovasini ochib, sozlashni yakunlang.",
