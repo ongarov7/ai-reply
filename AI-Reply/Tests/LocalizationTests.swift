@@ -276,7 +276,11 @@ final class LocalizationTests: XCTestCase {
             "settings.privacy.body", "home.privacy.body", "onboarding.connect.why.body",
             "profile.replyLanguage.auto", "profile.replyLanguage.footer",
             "voice.suggestions.title", "voice.suggestions.rules.footer", "voice.status.failed",
-            "permissions.section.footer"
+            "permissions.section.footer",
+            "balance.today", "balance.welcome", "balance.purchased", "exhausted.title", "exhausted.body",
+            "exhausted.plans", "purchase.title", "purchase.packs.footer", "purchase.pass.footer",
+            "purchase.status.pending", "purchase.status.willRetry", "purchase.status.notConfirmed",
+            "support.title", "support.empty", "support.operator", "support.failed", "support.error.send"
         ]
 
         func value(_ key: String, _ language: String) throws -> String {
