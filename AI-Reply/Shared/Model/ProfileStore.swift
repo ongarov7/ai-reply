@@ -16,6 +16,19 @@ struct ReplyConfiguration: Codable, Hashable, Sendable {
         templates.first { $0.id == id }
     }
 
+    /// The four built-ins in this user's bar order: a new install's
+    /// (`RelationshipKind.builtIns`), or the one an existing user kept. A
+    /// hidden one keeps its place; one missing from the file goes last.
+    var builtInOrder: [RelationshipKind] {
+        let stored = templates
+            .filter { $0.isBuiltIn && RelationshipKind.builtIns.contains($0.relationship) }
+            .sorted { $0.sortIndex < $1.sortIndex }
+            .map(\.relationship)
+        var seen = Set<RelationshipKind>()
+        let known = stored.filter { seen.insert($0).inserted }
+        return known + RelationshipKind.builtIns.filter { !seen.contains($0) }
+    }
+
     /// Repairs anything that would leave the user stuck: missing built-ins
     /// after a decode, every template hidden, duplicate sort indices.
     func normalized() -> ReplyConfiguration {

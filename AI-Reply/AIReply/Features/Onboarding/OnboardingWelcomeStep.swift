@@ -5,6 +5,7 @@ import SwiftUI
 struct OnboardingWelcomeStep: View {
 
     @Environment(AppSettings.self) private var settings
+    @Environment(ReplyConfigurationModel.self) private var model
     let samples: OnboardingSamples
 
     var body: some View {
@@ -31,7 +32,7 @@ struct OnboardingWelcomeStep: View {
                 }
             }
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("onboarding.welcome.mock")
+            .accessibilityLabel(Text("onboarding.welcome.mock \(mockNames)"))
 
             VStack(alignment: .leading, spacing: DS.Spacing.s) {
                 FeatureRow(symbol: "doc.on.clipboard", text: "onboarding.welcome.point.copy")
@@ -40,6 +41,14 @@ struct OnboardingWelcomeStep: View {
             }
             .dsCard()
         }
+    }
+
+    /// The names on the mock row, in its order, as one list in the app's
+    /// language: "Друг, Клиент, Коллега и Партнёр".
+    private var mockNames: String {
+        model.configuration.builtInOrder
+            .map { ReplyTemplate.builtIn($0, sortIndex: 0).displayName(appLanguage: settings.effectiveLanguage) }
+            .formatted(.list(type: .and).locale(settings.locale))
     }
 }
 

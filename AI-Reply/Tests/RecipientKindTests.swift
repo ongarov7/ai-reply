@@ -42,6 +42,28 @@ final class RecipientKindTests: XCTestCase {
         XCTAssertEqual(loaded.profile.activeRelationships, stored.profile.activeRelationships)
     }
 
+    /// The onboarding mock of the persona row (reopenable from Settings)
+    /// shows the built-ins in the order this user's keyboard has them.
+    func testTheOnboardingMockFollowsTheUsersOrder() {
+        XCTAssertEqual(ReplyConfiguration.initial.builtInOrder, [.friend, .client, .work, .business])
+
+        // An older build's order, Partner before Colleague, with Colleague
+        // hidden and a template of the user's in between.
+        var hidden = ReplyTemplate.builtIn(.work, sortIndex: 4)
+        hidden.isVisible = false
+        let existing = ReplyConfiguration(profile: .empty, templates: [
+            .builtIn(.friend, sortIndex: 0),
+            .builtIn(.client, sortIndex: 1),
+            .custom(name: "Supplier", sortIndex: 2),
+            .builtIn(.business, sortIndex: 3),
+            hidden
+        ])
+        XCTAssertEqual(existing.builtInOrder, [.friend, .client, .business, .work])
+        XCTAssertEqual(ReplyConfiguration(profile: .empty, templates: [
+            .builtIn(.business, sortIndex: 0), .builtIn(.friend, sortIndex: 1)
+        ]).builtInOrder, [.business, .friend, .client, .work], "one missing from the file goes last")
+    }
+
     // MARK: Icons
 
     /// Run on a newer simulator, so this proves only that the names are

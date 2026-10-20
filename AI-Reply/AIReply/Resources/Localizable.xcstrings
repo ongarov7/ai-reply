@@ -5514,31 +5514,31 @@
         }
       }
     },
-    "onboarding.welcome.mock" : {
+    "onboarding.welcome.mock %@" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A chat with the AI Reply keyboard. Above the keys: the Write with AI button on the left, then Friend, Client, Colleague and Partner."
+            "value" : "A chat with the AI Reply keyboard. Above the keys: the Write with AI button on the left, then %@."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Reply пернетақтасы ашық тұрған чат. Пернелердің үстінде: сол жақта «AI-мен жазу» түймесі, одан кейін «Дос», «Клиент», «Әріптес», «Серіктес»."
+            "value" : "AI Reply пернетақтасы ашық тұрған чат. Пернелердің үстінде: сол жақта «AI-мен жазу» түймесі, одан кейін %@."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Чат с клавиатурой AI Reply. Над клавишами: слева кнопка «Написать с AI», за ней «Друг», «Клиент», «Коллега» и «Партнёр»."
+            "value" : "Чат с клавиатурой AI Reply. Над клавишами: слева кнопка «Написать с AI», за ней %@."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Reply klaviaturasi ochiq chat. Tugmalar ustida: chapda «AI bilan yozish» tugmasi, keyin «Doʻst», «Mijoz», «Hamkasb» va «Hamkor»."
+            "value" : "AI Reply klaviaturasi ochiq chat. Tugmalar ustida: chapda «AI bilan yozish» tugmasi, keyin %@."
           }
         }
       }
