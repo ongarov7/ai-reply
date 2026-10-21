@@ -323,8 +323,8 @@ func TestCreditsMigrationKeepsExistingAccounts(t *testing.T) {
 		scalar(`SELECT COUNT(*) FROM usage_reservations`) != 0 {
 		t.Fatal("the migration wrote grants, ledger rows or reservations")
 	}
-	if scalar(`SELECT CAST(value AS INTEGER) FROM system_settings WHERE key = 'welcome_bonus_units'`) != 50 {
-		t.Fatal("welcome_bonus_units is not 50")
+	if scalar(`SELECT CAST(value AS INTEGER) FROM system_settings WHERE key = 'welcome_bonus_units'`) != credits.DefaultWelcomeUnits {
+		t.Fatalf("welcome_bonus_units is not %d", credits.DefaultWelcomeUnits)
 	}
 	since := scalar(`SELECT CAST(value AS INTEGER) FROM system_settings WHERE key = 'welcome_bonus_since'`)
 	if since < 1_700_000_000_000 {

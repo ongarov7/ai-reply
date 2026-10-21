@@ -44,7 +44,7 @@ func TestWelcomeBonusSettingAppliesToLaterAccountsOnly(t *testing.T) {
 	released := cutoff()
 
 	settings := h.do(http.MethodGet, "/api/v1/admin/settings", nil, headers)
-	if settings.num("welcome_bonus", "units") != 50 || settings.num("welcome_bonus", "default") != 50 ||
+	if settings.num("welcome_bonus", "units") != 50 || settings.num("welcome_bonus", "default") != 20 ||
 		settings.num("welcome_bonus", "range", "max") != 1000 || settings.str("welcome_bonus", "since") == "" {
 		t.Fatalf("settings = %s", settings.raw)
 	}

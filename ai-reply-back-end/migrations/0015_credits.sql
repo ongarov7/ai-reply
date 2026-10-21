@@ -93,6 +93,6 @@ CREATE UNIQUE INDEX idx_usage_reservations_key ON usage_reservations (user_id, i
 CREATE INDEX idx_usage_reservations_status ON usage_reservations (status, created_at);
 CREATE INDEX idx_usage_reservations_user ON usage_reservations (user_id);
 
-INSERT OR IGNORE INTO system_settings (key, value, updated_at) VALUES ('welcome_bonus_units', '50', 0);
+INSERT OR IGNORE INTO system_settings (key, value, updated_at) VALUES ('welcome_bonus_units', '20', 0);
 INSERT OR IGNORE INTO system_settings (key, value, updated_at)
 VALUES ('welcome_bonus_since', CAST(CAST(strftime('%s', 'now') AS INTEGER) * 1000 AS TEXT), 0);

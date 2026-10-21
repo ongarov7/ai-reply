@@ -127,7 +127,7 @@ Limit errors keep codes `DAILY_LIMIT_REACHED` / `MONTHLY_LIMIT_REACHED` and add
 
 Welcome grant: once per account (`kind='account'` users created after the release cutoff), at
 provisioning with a lazy repair on `/me` and session responses. Default units come from the admin
-setting `welcome_bonus_units` (initial 50, 0 = off). Reinstall, re-login and platform switch never
+setting `welcome_bonus_units` (initial 20, set in the admin panel, 0 = off). Reinstall, re-login and platform switch never
 grant again. Deleting the account and signing up again creates a new account; no identity hash is
 kept after deletion (privacy), which is a known limitation.
 
