@@ -359,3 +359,51 @@ func TestCreditsMigrationKeepsExistingAccounts(t *testing.T) {
 		t.Fatal("the settings rows were duplicated")
 	}
 }
+
+// 0019 ескі 50-ді бір рет 20-ға ауыстырады, әкімші таңдаған мән өзгермейді.
+func TestWelcomeBonusMigrationLowersOnlyTheOldValue(t *testing.T) {
+	ctx := context.Background()
+	entries, err := fs.ReadDir(migrations.FS, ".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := fstest.MapFS{}
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".sql") && e.Name() < "0019" {
+			body, _ := fs.ReadFile(migrations.FS, e.Name())
+			before[e.Name()] = &fstest.MapFile{Data: body}
+		}
+	}
+	for name, tc := range map[string]struct{ before, want string }{
+		"deployed with 50": {"50", "20"},
+		"admin choice":     {"35", "35"},
+		"switched off":     {"0", "0"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			db, err := database.Open(database.Options{Path: filepath.Join(t.TempDir(), "w.db"), MaxReadConns: 2})
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = db.Close() })
+			if _, err := database.Migrate(ctx, db, before); err != nil {
+				t.Fatalf("migrations before 0019: %v", err)
+			}
+			if _, err := db.Writer().ExecContext(ctx,
+				`UPDATE system_settings SET value = ? WHERE key = 'welcome_bonus_units'`, tc.before); err != nil {
+				t.Fatal(err)
+			}
+			applied, err := database.Migrate(ctx, db, migrations.FS)
+			if err != nil || len(applied) == 0 || applied[0] != "0019_welcome_bonus_20.sql" {
+				t.Fatalf("applied = %v, err = %v", applied, err)
+			}
+			var got string
+			if err := db.Reader().QueryRowContext(ctx,
+				`SELECT value FROM system_settings WHERE key = 'welcome_bonus_units'`).Scan(&got); err != nil {
+				t.Fatal(err)
+			}
+			if got != tc.want {
+				t.Fatalf("welcome_bonus_units = %s, want %s", got, tc.want)
+			}
+		})
+	}
+}
