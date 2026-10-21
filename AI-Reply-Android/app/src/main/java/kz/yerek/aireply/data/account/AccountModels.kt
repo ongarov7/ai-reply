@@ -287,8 +287,12 @@ data class ServerFeaturesDto(
     @SerialName("push_reminders") val pushReminders: Boolean = false,
     /** The support chat (`/api/v1/support/...`). */
     @SerialName("support_chat") val supportChat: Boolean = false,
-    /** Replies can be bought through Google Play here (`/api/v1/iap/...`). */
-    @SerialName("iap_android") val iapAndroid: Boolean = false
+    /**
+     * Replies can be bought through Google Play here (`/api/v1/iap/...`) when
+     * true. False while sales are closed: nothing is offered, but a purchase
+     * already paid is still handed over. Null on a server without purchases.
+     */
+    @SerialName("iap_android") val iapAndroid: Boolean? = null
 )
 
 /** Non-secret server configuration the client is allowed to know. */

@@ -80,14 +80,18 @@ class BalanceTest {
     fun `the new features default to off`() {
         val old = json.decodeFromString(ServerConfigDto.serializer(), """{"features":{"compose":true}}""").features!!
         assertFalse(old.welcomeBonus || old.credits || old.idempotentGeneration || old.permissionDiagnostics)
-        assertFalse(old.supportChat || old.iapAndroid || old.pushReminders)
+        assertFalse(old.supportChat || old.pushReminders)
+        assertNull("a server without purchases does not say iap_android", old.iapAndroid)
         val current = json.decodeFromString(
             ServerConfigDto.serializer(),
             """{"features":{"welcome_bonus":true,"credits":true,"idempotent_generation":true,
                "permission_diagnostics":true,"push_reminders":false,"support_chat":true,"iap_ios":true,"iap_android":true}}"""
         ).features!!
         assertTrue(current.welcomeBonus && current.credits && current.idempotentGeneration)
-        assertTrue(current.permissionDiagnostics && current.supportChat && current.iapAndroid)
+        assertTrue(current.permissionDiagnostics && current.supportChat && current.iapAndroid == true)
+
+        val closed = json.decodeFromString(ServerConfigDto.serializer(), """{"features":{"iap_android":false}}""").features!!
+        assertEquals("sales closed is false, not absent", false, closed.iapAndroid)
     }
 
     @Test

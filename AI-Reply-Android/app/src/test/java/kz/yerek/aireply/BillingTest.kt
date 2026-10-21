@@ -83,11 +83,13 @@ class BillingTest {
     /** The server's purchase endpoints as scripted answers. */
     private class FakeApi : PurchaseApi {
         var catalogError: ApiError? = null
+        var catalogs = 0
         val verified = mutableListOf<Pair<String, String>>()
         var answer: (String) -> PurchaseResultDto = { PurchaseResultDto(PurchaseResultDto.STATUS_GRANTED, USAGE) }
         var gate: CompletableDeferred<Unit>? = null
 
         override suspend fun catalog(): IapCatalogDto {
+            catalogs++
             catalogError?.let { throw ApiException(it, 403) }
             return CATALOG
         }
@@ -101,7 +103,10 @@ class BillingTest {
 
     private val store = FakeStore()
     private val api = FakeApi()
-    private var enabled = true
+    /** `features.iap_android` true: on sale. */
+    private var offered = true
+    /** `features.iap_android` sent at all: what was paid is handed over. */
+    private var deliverable = true
     private val usages = mutableListOf<UsageDto>()
     private var refreshes = 0
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
@@ -110,7 +115,8 @@ class BillingTest {
     private val billing = BillingRepository(
         store = store,
         api = api,
-        isEnabled = { enabled },
+        isOffered = { offered },
+        canDeliver = { deliverable },
         onUsage = { usages += it },
         refreshUsage = { refreshes++ },
         scope = scope
@@ -137,12 +143,59 @@ class BillingTest {
     }
 
     @Test
-    fun `with purchases off nothing is loaded and Play is never bound`() = runBlocking {
-        enabled = false
+    fun `on a server without purchases nothing is loaded and Play is never bound`() = runBlocking {
+        offered = false
+        deliverable = false
+        store.held += purchase("token-1")
         billing.load()
         billing.resume()
+        billing.reconcile()
         assertEquals(BillingState.Phase.OFF, state.phase)
         assertEquals(0, store.connects)
+        assertEquals(0, api.catalogs)
+        assertTrue(api.verified.isEmpty())
+    }
+
+    @Test
+    fun `with sales closed nothing is offered, but a purchase already paid is still handed over`() = runBlocking {
+        offered = false
+        // A pending payment that cleared after the admin closed sales.
+        store.held += purchase("cleared-late")
+        billing.load()
+        assertEquals(BillingState.Phase.OFF, state.phase)
+        assertTrue(state.products.isEmpty())
+        assertEquals("the catalogue is refused while closed: not asked", 0, api.catalogs)
+        assertEquals(listOf("play.pack_20" to "cleared-late"), api.verified)
+        assertEquals(listOf(USAGE), usages)
+
+        store.held += purchase("on-return")
+        billing.resume()
+        assertEquals(listOf("cleared-late", "on-return"), api.verified.map { it.second })
+    }
+
+    @Test
+    fun `with the token unknown every purchase goes, and another account's refusal is not reported`() = runBlocking {
+        // The flag still says on sale, but the server closed sales meanwhile.
+        api.catalogError = ApiError.PurchasesUnavailable
+        store.held += purchase("mine")
+        store.held += purchase("theirs", account = "11111111-1111-4111-8111-111111111111")
+        api.answer = { token ->
+            if (token == "theirs") throw ApiException(ApiError.PurchaseInvalid("account_mismatch"), 400)
+            PurchaseResultDto(PurchaseResultDto.STATUS_ALREADY_GRANTED, USAGE)
+        }
+        billing.reconcile()
+        assertEquals(listOf("mine", "theirs"), api.verified.map { it.second })
+        assertNull("someone else's purchase is not this account's news", state.notice)
+
+        billing.reconcile()
+        assertEquals("both finished, not sent again", 2, api.verified.size)
+    }
+
+    @Test
+    fun `nothing held, nothing asked of the server`() = runBlocking {
+        billing.resume()
+        billing.reconcile()
+        assertEquals(0, api.catalogs)
         assertTrue(api.verified.isEmpty())
     }
 

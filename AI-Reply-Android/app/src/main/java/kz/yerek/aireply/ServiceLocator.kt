@@ -353,8 +353,15 @@ class ServiceLocator(context: Context) {
         get() = sampleData || account.state.value.features?.iapAndroid == true
 
     /**
+     * Whether purchases Play still holds go to the server: it knows Play
+     * purchases (`features.iap_android` sent), even with sales closed.
+     */
+    private val purchasesDeliverable: Boolean
+        get() = sampleData || (account.state.value.isSignedIn && account.state.value.features?.iapAndroid != null)
+
+    /**
      * Buying replies through Google Play. The app only, never the keyboard;
-     * Play is not bound until purchases are offered and a screen asks.
+     * Play is not bound on a server that knows no Play purchases.
      */
     val billing: BillingRepository by lazy {
         billingCreated = true
@@ -365,7 +372,8 @@ class ServiceLocator(context: Context) {
                 override suspend fun verify(productId: String, purchaseToken: String) =
                     accountService.verifyGooglePurchase(productId, purchaseToken)
             },
-            isEnabled = { sampleData || (account.state.value.isSignedIn && purchasesOffered) },
+            isOffered = { sampleData || (account.state.value.isSignedIn && purchasesOffered) },
+            canDeliver = { purchasesDeliverable },
             onUsage = { usage -> account.applyUsage(usage) },
             refreshUsage = { account.refreshUsage() },
             scope = scope
@@ -375,9 +383,9 @@ class ServiceLocator(context: Context) {
     @Volatile
     private var billingCreated = false
 
-    /** Back in the app: purchases Play still holds go to the server, once billing exists or is offered. */
+    /** Back in the app: purchases Play still holds go to the server, once billing exists or can deliver. */
     fun resumePurchases() {
-        if (billingCreated || (account.state.value.isSignedIn && purchasesOffered)) billing.resume()
+        if (billingCreated || purchasesDeliverable) billing.resume()
     }
 
     /** Platform, version, locale and time zone — nothing that identifies a person. */

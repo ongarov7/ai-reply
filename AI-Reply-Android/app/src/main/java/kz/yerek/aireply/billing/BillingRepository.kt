@@ -87,13 +87,18 @@ data class BillingState(
  * has seen.
  *
  * Shown only where both sides agree: a product the server lists and Play
- * prices. Nothing here runs while purchases are off ([isEnabled]).
+ * prices, and only while purchases are on sale ([isOffered]). Handing over
+ * what was already paid ([canDeliver]) goes on after sales close: a payment
+ * Play held as pending may clear days later, and a purchase left unconsumed
+ * is refunded by Play after 3 days.
  */
 class BillingRepository(
     private val store: StoreClient,
     private val api: PurchaseApi,
-    /** Signed in, and `features.iap_android` (or the debug catalogue). */
-    private val isEnabled: () -> Boolean,
+    /** Signed in, and `features.iap_android` is true (or the debug catalogue): products and «Купить». */
+    private val isOffered: () -> Boolean,
+    /** Signed in, and the server knows Play purchases (`features.iap_android` sent, even false). */
+    private val canDeliver: () -> Boolean,
     /** The balance the server sent with a grant. */
     private val onUsage: (UsageDto) -> Unit,
     /** A grant without a balance in the answer: read it again. */
@@ -119,8 +124,10 @@ class BillingRepository(
 
     /** The purchase screen opened: the catalogue, then anything Play still holds. */
     suspend fun load() {
-        if (!isEnabled()) {
+        if (!isOffered()) {
             _state.value = BillingState(phase = BillingState.Phase.OFF)
+            // Nothing on sale, but what was paid meanwhile is still handed over.
+            reconcile()
             return
         }
         _state.update { it.copy(phase = BillingState.Phase.LOADING, notice = null) }
@@ -173,7 +180,7 @@ class BillingRepository(
 
     /** Back in the app: a purchase paid meanwhile, or never handed over, goes to the server now. */
     fun resume() {
-        if (!isEnabled()) return
+        if (!canDeliver()) return
         scope.launch { reconcile() }
     }
 
@@ -188,21 +195,28 @@ class BillingRepository(
         _state.value = BillingState()
     }
 
-    /** Every unconsumed purchase Play holds for this account goes to the server; pending ones are shown. */
+    /**
+     * Every unconsumed purchase Play holds for this account goes to the server;
+     * pending ones are shown. Runs with sales closed too ([canDeliver]).
+     */
     suspend fun reconcile() {
-        if (!isEnabled()) return
-        if (accountToken == null) {
-            accountToken = runCatching { api.catalog().accountToken.ifBlank { null } }
-                .onFailure { if (it is CancellationException) throw it }
-                .getOrNull()
-        }
+        if (!canDeliver()) return
         if (!store.connect()) return
         val held = store.purchases() ?: return
         _state.update { state ->
             state.copy(pendingProductIds = held.filter { it.state == StorePurchaseState.PENDING }.flatMap { it.productIds }.toSet())
         }
+        val paid = held.filter { it.state == StorePurchaseState.PURCHASED }
+        if (paid.isEmpty()) return
+        // With sales closed the catalogue is refused, so the token stays unknown and
+        // every purchase goes: the server refuses another account's and keeps nothing.
+        if (accountToken == null && isOffered()) {
+            accountToken = runCatching { api.catalog().accountToken.ifBlank { null } }
+                .onFailure { if (it is CancellationException) throw it }
+                .getOrNull()
+        }
         val mine = accountToken
-        held.filter { it.state == StorePurchaseState.PURCHASED }
+        paid
             // Bought by another AI Reply account on this phone: that account hands it over.
             .filter { mine == null || it.accountToken == null || it.accountToken == mine }
             .forEach { verify(it, fromSheet = false) }
@@ -277,10 +291,11 @@ class BillingRepository(
             throw cancelled
         } catch (failure: ApiException) {
             ReplyLog.warn(failure) { "purchase not granted (HTTP ${failure.httpStatus ?: "none"})" }
-            notice = when (failure.error) {
+            notice = when (val error = failure.error) {
                 is ApiError.PurchaseInvalid -> {
                     synchronized(lock) { finished += token }
-                    PurchaseNotice.NOT_CONFIRMED
+                    // Found on return, bound to another account: not this one's to report.
+                    if (!fromSheet && error.reason == REASON_ACCOUNT) null else PurchaseNotice.NOT_CONFIRMED
                 }
                 ApiError.PurchaseOtherAccount -> {
                     synchronized(lock) { finished += token }
@@ -308,5 +323,10 @@ class BillingRepository(
         "pack" -> OfferedProduct.Kind.PACK
         "pass" -> OfferedProduct.Kind.PASS
         else -> null
+    }
+
+    private companion object {
+        /** `PURCHASE_INVALID` `details.reason`: Play's obfuscated account id is not this account's token. */
+        const val REASON_ACCOUNT = "account_mismatch"
     }
 }
