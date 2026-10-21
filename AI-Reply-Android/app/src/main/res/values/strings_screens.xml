@@ -52,7 +52,7 @@
     <string name="paste_help_step_recipient">Tap who you are replying to: AI Reply reads the copied text at that moment.</string>
     <string name="paste_help_rules_title">How Android protects the clipboard</string>
     <string name="paste_help_rule_focus">Android lets only the app on screen, or the keyboard in use, read the clipboard. So AI Reply reads it as your keyboard and only when you tap: never in the background.</string>
-    <string name="paste_help_rule_private">Text another app marks private, like a password or a bank code, is hidden from other apps. AI Reply does not read it either: copy the message itself.</string>
+    <string name="paste_help_rule_private">From Android 13 the system leaves text another app marks private, like a password or a bank code, out of the preview it shows after you copy. AI Reply never reads such text: copy the message itself.</string>
     <string name="paste_help_rule_notice">From Android 12 the phone may briefly say that AI Reply pasted from the clipboard. That is the system confirming your tap.</string>
     <string name="paste_help_rule_no_switch">There is no separate “allow paste” switch on Android: nothing needs to be turned on.</string>
     <string name="paste_help_last">Last successful paste: %1$s</string>

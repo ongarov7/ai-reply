@@ -83,9 +83,10 @@ fun NavigationRow(
             )
         }
         if (badgeCount > 0) {
-            Badge(modifier = Modifier.semantics { badgeDescription?.let { contentDescription = it } }) {
-                Text(if (badgeCount > 99) "99+" else badgeCount.toString())
-            }
+            UnreadBadge(
+                count = badgeCount,
+                modifier = Modifier.semantics { badgeDescription?.let { contentDescription = it } }
+            )
         }
         if (busy) {
             CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = accent)
@@ -96,6 +97,25 @@ fun NavigationRow(
                 tint = LocalExtraColors.current.textTertiary,
                 modifier = Modifier.size(20.dp)
             )
+        }
+    }
+}
+
+/**
+ * Something new waits, like an operator's unread reply: in the accent
+ * colour, because nothing is wrong. Material's Badge defaults to the error
+ * red, which this app keeps for real errors. With [count], the number;
+ * without it, a dot.
+ */
+@Composable
+fun UnreadBadge(modifier: Modifier = Modifier, count: Int? = null) {
+    val container = MaterialTheme.colorScheme.primary
+    val content = MaterialTheme.colorScheme.onPrimary
+    if (count == null) {
+        Badge(modifier = modifier, containerColor = container, contentColor = content)
+    } else {
+        Badge(modifier = modifier, containerColor = container, contentColor = content) {
+            Text(if (count > 99) "99+" else count.toString())
         }
     }
 }

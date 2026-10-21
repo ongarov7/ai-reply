@@ -17,7 +17,6 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.PersonOutline
-import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -39,6 +38,7 @@ import kz.yerek.aireply.ui.common.Footnote
 import kz.yerek.aireply.ui.common.NavigationRow
 import kz.yerek.aireply.ui.common.RowDividerIndented
 import kz.yerek.aireply.ui.common.RowGroup
+import kz.yerek.aireply.ui.common.UnreadBadge
 import kz.yerek.aireply.ui.common.privacyStatement
 import kz.yerek.aireply.ui.common.rememberKeyboardStatus
 import kz.yerek.aireply.ui.design.AppCard
@@ -75,7 +75,7 @@ fun HomeScreen(onOpen: (String) -> Unit) {
         actions = {
             IconButton(onClick = { onOpen(Routes.Settings) }) {
                 // An operator's unread reply waits in Settings ▸ Chat with support.
-                BadgedBox(badge = { if (unread > 0) Badge() }) {
+                BadgedBox(badge = { if (unread > 0) UnreadBadge() }) {
                     Icon(
                         Icons.Filled.Settings,
                         contentDescription = if (unread > 0) {

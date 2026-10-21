@@ -214,6 +214,38 @@ class LocalizationParityTest {
         }
     }
 
+    /** The support chat greets with «Здравствуйте … Напишите»: every line of it says Вы, as iOS does. */
+    @Test
+    fun `russian support chat keeps to one form of address`() {
+        val informal = Regex(
+            """(?iU)(?<!\p{L})(ты|тебя|тебе|тобой|твой|твоя|твоё|твое|твои|подожди|проверь|напиши|попробуй|повтори)(?!\p{L})"""
+        )
+        val chat = russian.filterKeys { it.startsWith("support_") }
+        assertTrue("expected the chat strings", chat.size > 10)
+        chat.forEach { (key, value) -> assertTrue("$key: $value", informal.find(value) == null) }
+        assertTrue(russian.getValue("support_rate_limited").contains("Подождите"))
+        assertTrue(russian.getValue("support_load_failed").contains("Проверьте"))
+        assertEquals("Ваше сообщение", russian.getValue("support_your_message"))
+    }
+
+    /**
+     * EXTRA_IS_SENSITIVE keeps a clip out of the system's copy preview; it
+     * does not hide it from the apps that may read the clipboard. The paste
+     * help says only that.
+     */
+    @Test
+    fun `the paste help does not overstate the private mark`() {
+        val overstated = mapOf(
+            "en" to "from other apps", "ru" to "от других приложений",
+            "kk" to "басқа қолданбалардан", "uz" to "boshqa ilovalardan"
+        )
+        mapOf("en" to english, "ru" to russian, "kk" to kazakh, "uz" to uzbek).forEach { (language, table) ->
+            val text = table.getValue("paste_help_rule_private")
+            assertTrue("$language: $text", !text.contains(overstated.getValue(language)))
+            assertTrue("$language: $text", text.contains("Android 13"))
+        }
+    }
+
     @Test
     fun `no translation is left as the untranslated english text`() {
         // Sanity check on the mechanical conversion: a handful of identical

@@ -36,7 +36,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -120,7 +119,7 @@ fun SupportChatScreen(onBack: () -> Unit) {
                     else -> Messages(state, onRetry = chat::retry, onTop = chat::loadOlder)
                 }
             }
-            if (enabled) InputBar(onSend = chat::send)
+            if (enabled) InputBar(draft = chat.draft, onDraftChange = { chat.draft = it }, onSend = chat::send)
         }
     }
 }
@@ -244,9 +243,18 @@ private fun Bubble(message: ChatMessage, showsName: Boolean, locale: Locale, onR
     }
 }
 
+/**
+ * The field and Send. What is typed lives on the controller, in memory: it is
+ * there again after leaving the screen, but never goes into saved state, which
+ * Android keeps outside the app.
+ */
 @Composable
-private fun InputBar(onSend: (String) -> Boolean) {
-    var text by rememberSaveable { mutableStateOf("") }
+private fun InputBar(draft: String, onDraftChange: (String) -> Unit, onSend: (String) -> Boolean) {
+    var text by remember { mutableStateOf(draft) }
+    fun edit(value: String) {
+        text = value
+        onDraftChange(value)
+    }
     val tooLong = SupportChatController.isTooLong(text)
     val canSend = SupportChatController.isSendable(text)
     Column(
@@ -266,7 +274,7 @@ private fun InputBar(onSend: (String) -> Boolean) {
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
             OutlinedTextField(
                 value = text,
-                onValueChange = { text = it },
+                onValueChange = ::edit,
                 placeholder = { Text(stringResource(R.string.support_input_hint)) },
                 maxLines = 5,
                 isError = tooLong,
@@ -278,7 +286,7 @@ private fun InputBar(onSend: (String) -> Boolean) {
                 modifier = Modifier.weight(1f)
             )
             FilledIconButton(
-                onClick = { if (onSend(text)) text = "" },
+                onClick = { if (onSend(text)) edit("") },
                 enabled = canSend,
                 colors = IconButtonDefaults.filledIconButtonColors(),
                 modifier = Modifier.padding(bottom = 4.dp).size(48.dp)

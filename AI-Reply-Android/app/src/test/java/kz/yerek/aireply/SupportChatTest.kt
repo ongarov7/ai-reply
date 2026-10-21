@@ -4,6 +4,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -33,6 +34,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.Locale
@@ -50,8 +52,12 @@ class SupportChatTest {
         val messages = mutableListOf<SupportMessageDto>()
         val calls = mutableListOf<String>()
         val sent = mutableListOf<Pair<String, String>>()
+        /** Thrown before the message is stored. */
         var sendError: ApiError? = null
+        /** Thrown after it is stored: the answer is lost on the way, as on a timeout. */
+        var answerLost: ApiError? = null
         var sendGate: CompletableDeferred<Unit>? = null
+        private val byClientId = mutableMapOf<String, SupportMessageDto>()
         var unread = 0
         var conversationExists = true
         var pageSize = 3
@@ -86,7 +92,11 @@ class SupportChatTest {
             sendGate?.await()
             sendError?.let { throw ApiException(it, 429) }
             // A retry with the same client id returns the stored message.
-            return SupportMessageDto("m${messages.size + 1}", "user", text, "2026-10-20T11:00:00+05:00").also { messages += it }
+            val stored = byClientId.getOrPut(clientMessageId) {
+                SupportMessageDto("m${messages.size + 1}", "user", text, "2026-10-20T11:0${messages.size}:00+05:00").also { messages += it }
+            }
+            answerLost?.let { throw ApiException(it) }
+            return stored
         }
 
         override suspend fun markRead(upToMessageId: String): Int {
@@ -158,13 +168,15 @@ class SupportChatTest {
         assertEquals(listOf("client-1" to "Не приходит ответ"), server.sent)
 
         val asked = server.calls.size
-        chat.poll()
-        assertEquals("no poll while ours is on its way", asked, server.calls.size)
+        val polling = launch(Dispatchers.Unconfined) { chat.poll() }
+        assertEquals("no page is read while ours is on its way", asked, server.calls.size)
 
         server.sendGate!!.complete(Unit)
+        polling.join()
         val stored = chat.state.value.messages.single()
         assertEquals(ChatMessage.Status.SENT, stored.status)
         assertEquals("m1", stored.id)
+        assertEquals("the poll waited and ran after it", "messages before=null after=null", server.calls.last())
 
         chat.poll()
         assertEquals("the poll after it does not repeat it", listOf("Не приходит ответ"), texts)
@@ -189,6 +201,150 @@ class SupportChatTest {
         assertEquals(listOf("Первое", "Второе"), texts)
         assertEquals(ChatMessage.Status.SENT, chat.state.value.messages.first().status)
         assertEquals("ours not sent yet stay after the server's", ChatMessage.Status.FAILED, chat.state.value.messages.last().status)
+    }
+
+    @Test
+    fun `an operator reply written just before ours is not skipped`() = runBlocking {
+        server.userWrote("hello")
+        chat.open()
+        server.operatorWrites("operator answer")
+        chat.send("follow up")
+        assertEquals("ours waits after what the pages brought", listOf("hello", "follow up"), texts)
+        assertEquals("the cursor stays on the last paged message", "m1", chat.state.value.afterId)
+
+        chat.poll()
+        assertEquals(listOf("hello", "operator answer", "follow up"), texts)
+        assertTrue(server.calls.contains("messages before=null after=m1"))
+        assertEquals("each message once", 3, chat.state.value.messages.map { it.key }.toSet().size)
+        assertTrue("read up to the reply", server.calls.contains("read m2"))
+        assertEquals(0, chat.unread.value)
+
+        chat.poll()
+        assertEquals(listOf("hello", "operator answer", "follow up"), texts)
+        assertEquals("messages before=null after=m3", server.calls.last { it.startsWith("messages") })
+    }
+
+    @Test
+    fun `a reply push while ours is on its way is polled after it`() = runBlocking {
+        server.userWrote("hello")
+        chat.open()
+        server.sendGate = CompletableDeferred()
+        chat.send("follow up")
+        server.operatorWrites("operator answer")
+        assertTrue("on screen: no notification", chat.onReplyPush())
+
+        server.sendGate!!.complete(Unit)
+        assertEquals("in the server's order", listOf("hello", "operator answer", "follow up"), texts)
+        assertEquals(0, chat.unread.value)
+    }
+
+    @Test
+    fun `a poll reads every page the server has after the cursor`() = runBlocking {
+        server.userWrote("Здравствуйте")
+        chat.open()
+        (1..5).forEach { server.operatorWrites("Ответ $it") }
+        chat.poll()
+        assertEquals(listOf("Здравствуйте") + (1..5).map { "Ответ $it" }, texts)
+        assertEquals(
+            listOf("messages before=null after=m1", "messages before=null after=m4"),
+            server.calls.filter { "after=m" in it }
+        )
+        assertTrue(server.calls.contains("read m6"))
+    }
+
+    @Test
+    fun `a send stored without an answer shows once`() = runBlocking {
+        chat.open()
+        server.answerLost = ApiError.TimedOut
+        chat.send("Не приходит ответ")
+        assertEquals(SendFailure.NETWORK, chat.state.value.messages.single().failure)
+
+        server.answerLost = null
+        chat.poll()
+        val shown = chat.state.value.messages.single()
+        assertEquals("Не приходит ответ", shown.text)
+        assertEquals(ChatMessage.Status.SENT, shown.status)
+        assertEquals("m1", shown.id)
+        assertEquals("asked again with the same client id", listOf("client-1", "client-1"), server.sent.map { it.first })
+        assertEquals("stored once", 1, server.messages.size)
+
+        chat.poll()
+        assertEquals(listOf("Не приходит ответ"), texts)
+    }
+
+    @Test
+    fun `a send stored without an answer shows once when the chat is opened again`() = runBlocking {
+        server.userWrote("Здравствуйте")
+        chat.open()
+        chat.close()
+        server.answerLost = ApiError.TimedOut
+        chat.send("Ещё вопрос")
+        server.answerLost = null
+        server.operatorWrites("Слушаю")
+
+        chat.open()
+        assertEquals(listOf("Здравствуйте", "Ещё вопрос", "Слушаю"), texts)
+        assertTrue(chat.state.value.messages.all { it.status == ChatMessage.Status.SENT })
+        assertEquals(2, server.sent.size)
+    }
+
+    @Test
+    fun `a failed send is not taken for an older message with the same text`() = runBlocking {
+        server.userWrote("Спасибо")
+        chat.open()
+        server.sendError = ApiError.Offline
+        chat.send("Спасибо")
+        server.sendError = null
+        server.operatorWrites("Пожалуйста")
+        chat.poll()
+
+        assertEquals(listOf("Спасибо", "Пожалуйста", "Спасибо"), texts)
+        assertEquals(ChatMessage.Status.FAILED, chat.state.value.messages.last().status)
+        assertEquals("nothing sent without Retry", 1, server.sent.size)
+
+        chat.retry("client-1")
+        chat.poll()
+        assertEquals(listOf("Спасибо", "Пожалуйста", "Спасибо"), texts)
+        assertTrue(chat.state.value.messages.all { it.status == ChatMessage.Status.SENT })
+    }
+
+    @Test
+    fun `a rate limited send is not sent again on its own`() = runBlocking {
+        chat.open()
+        server.sendError = ApiError.RateLimited(60)
+        chat.send("Первое")
+        server.sendError = null
+        server.userWrote("Первое")
+        chat.poll()
+        assertEquals(1, server.sent.size)
+        assertEquals(SendFailure.RATE_LIMITED, chat.state.value.messages.last().failure)
+    }
+
+    @Test
+    fun `the draft stays in memory and goes with the account`() {
+        chat.draft = "Не приходит ответ"
+        assertEquals("Не приходит ответ", chat.draft)
+        chat.reset()
+        assertEquals("", chat.draft)
+
+        val screen = File("src/main/java/kz/yerek/aireply/ui/feature/support/SupportChatScreen.kt").readText()
+        assertFalse("never in saved instance state", "rememberSaveable" in screen)
+    }
+
+    /** Material's Badge defaults to the error red; an unread reply is not an error. */
+    @Test
+    fun `unread badges are drawn in the accent colour`() {
+        val call = Regex("""(?<![A-Za-z])Badge\(""")
+        val drawing = File("src/main/java").walkTopDown()
+            .filter { it.isFile && it.extension == "kt" && call.containsMatchIn(it.readText()) }
+            .map { it.name }
+            .toList()
+        assertEquals("one badge for the app", listOf("Rows.kt"), drawing)
+        val rows = File("src/main/java/kz/yerek/aireply/ui/common/Rows.kt")
+        val badges = rows.readLines().filter { call.containsMatchIn(it) }
+        assertEquals(2, badges.size)
+        badges.forEach { assertTrue(it, "containerColor = container" in it) }
+        assertTrue(rows.readText().contains("val container = MaterialTheme.colorScheme.primary"))
     }
 
     @Test

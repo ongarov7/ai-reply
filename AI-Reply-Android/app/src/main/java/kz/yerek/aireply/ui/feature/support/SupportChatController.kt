@@ -12,6 +12,8 @@ import kotlinx.coroutines.sync.withLock
 import kz.yerek.aireply.data.account.ApiError
 import kz.yerek.aireply.data.account.ApiException
 import kz.yerek.aireply.data.support.SupportApi
+import kz.yerek.aireply.data.support.SupportMessageDto
+import kz.yerek.aireply.data.support.SupportMessagesPage
 import kz.yerek.aireply.platform.ReplyLog
 import java.util.UUID
 
@@ -30,6 +32,8 @@ import java.util.UUID
  * `GET /support/conversation` for the badge. While the chat is on screen, an
  * `after=` poll every [POLL_INTERVAL_MS], driven by the screen's lifecycle;
  * a `support_reply` push polls at once instead of showing a notification.
+ * Pages and sends take turns: a poll asked for while one of ours is on its
+ * way runs right after it, so nothing it would have brought is skipped.
  */
 class SupportChatController(
     private val api: SupportApi,
@@ -52,11 +56,18 @@ class SupportChatController(
     var isVisible: Boolean = false
         private set
 
-    /** One load or poll at a time, so pages never interleave. */
+    /** One load, poll or send at a time, so pages never interleave and none is read while ours is on its way. */
     private val loading = Mutex()
 
     @Volatile
     private var markedReadUpTo: String? = null
+
+    /**
+     * What is typed and not sent yet. In memory only: it outlives leaving the
+     * screen, never the process, and is never put in saved state or on disk.
+     */
+    @Volatile
+    var draft: String = ""
 
     /** Back in the app: the badge. */
     fun refreshUnread() {
@@ -74,9 +85,8 @@ class SupportChatController(
         if (!isEnabled()) return
         loading.withLock {
             _state.update { it.copy(loading = true, loadFailed = false) }
-            try {
-                val page = api.messages()
-                _state.update { it.withLatest(page) }
+            val page = try {
+                api.messages()
             } catch (cancelled: CancellationException) {
                 _state.update { it.copy(loading = false) }
                 throw cancelled
@@ -84,6 +94,8 @@ class SupportChatController(
                 _state.update { it.copy(loading = false, loadFailed = !it.loaded) }
                 return
             }
+            confirmUnanswered(page)
+            _state.update { it.withLatest(page) }
         }
         markRead()
     }
@@ -93,23 +105,63 @@ class SupportChatController(
         isVisible = false
     }
 
-    /** What arrived since the newest message shown. Skipped while one of ours is on its way. */
+    /**
+     * What arrived after the newest message a page brought, page by page as
+     * the server has them. While one of ours is on its way, it waits for it.
+     */
     suspend fun poll() {
-        if (!isEnabled() || _state.value.isSending) return
+        if (!isEnabled()) return
         if (!_state.value.loaded) return open()
         loading.withLock {
-            val after = _state.value.newestId
+            val after = _state.value.afterId
             val page = try {
-                api.messages(after = after)
+                if (after == null) api.messages() else newerThan(after)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: ApiException) {
-                // A missed poll is caught up by the next one.
+                // A missed poll is caught up by the next one: the cursor has not moved.
                 return
             }
+            confirmUnanswered(page)
             _state.update { if (after == null) it.withLatest(page) else it.withNewer(page) }
         }
         markRead()
+    }
+
+    /** Every page after [after], up to [MAX_PAGES_PER_POLL]; the next poll goes on from the last. */
+    private suspend fun newerThan(after: String): SupportMessagesPage {
+        val messages = mutableListOf<SupportMessageDto>()
+        var cursor = after
+        repeat(MAX_PAGES_PER_POLL) {
+            val page = api.messages(after = cursor)
+            messages += page.messages
+            cursor = page.messages.lastOrNull()?.id ?: return SupportMessagesPage(messages)
+            if (!page.hasMore) return SupportMessagesPage(messages)
+        }
+        return SupportMessagesPage(messages, hasMore = true)
+    }
+
+    /**
+     * A send that got no answer may still have been stored: when a page has
+     * the user's message with its text, the server is asked again with the
+     * same client id. It answers the message it has, so the page's copy and
+     * the bubble become one; one it never had is stored once, as was asked.
+     */
+    private suspend fun confirmUnanswered(page: SupportMessagesPage) {
+        for (message in _state.value.unconfirmed(page)) {
+            val clientId = message.clientMessageId ?: continue
+            _state.update { it.retrying(clientId) }
+            try {
+                val stored = api.send(message.text, clientId)
+                _state.update { it.sent(clientId, stored) }
+            } catch (cancelled: CancellationException) {
+                _state.update { it.failed(clientId, SendFailure.NETWORK) }
+                throw cancelled
+            } catch (failure: ApiException) {
+                // Still unanswered: Retry under the bubble asks the same way.
+                _state.update { it.failed(clientId, failureOf(failure)) }
+            }
+        }
     }
 
     /** The top of the list came into view: the page before. */
@@ -169,24 +221,29 @@ class SupportChatController(
         _state.value = SupportChatState()
         _unread.value = 0
         markedReadUpTo = null
+        draft = ""
     }
 
+    /** One at a time, in the order they were written, and never while a page loads. */
     private suspend fun deliver(clientId: String, text: String) {
         try {
-            val stored = api.send(text, clientId)
-            _state.update { it.sent(clientId, stored) }
+            loading.withLock {
+                val stored = api.send(text, clientId)
+                _state.update { it.sent(clientId, stored) }
+            }
         } catch (cancelled: CancellationException) {
             _state.update { it.failed(clientId, SendFailure.NETWORK) }
             throw cancelled
         } catch (failure: ApiException) {
             ReplyLog.warn(failure) { "support message not sent (HTTP ${failure.httpStatus ?: "none"})" }
-            val reason = when (failure.error) {
-                is ApiError.RateLimited -> SendFailure.RATE_LIMITED
-                ApiError.InvalidRequest -> SendFailure.REFUSED
-                else -> SendFailure.NETWORK
-            }
-            _state.update { it.failed(clientId, reason) }
+            _state.update { it.failed(clientId, failureOf(failure)) }
         }
+    }
+
+    private fun failureOf(failure: ApiException): SendFailure = when (failure.error) {
+        is ApiError.RateLimited -> SendFailure.RATE_LIMITED
+        ApiError.InvalidRequest -> SendFailure.REFUSED
+        else -> SendFailure.NETWORK
     }
 
     /** Read up to the operator's newest message, once per message, while the chat is on screen. */
@@ -207,6 +264,9 @@ class SupportChatController(
     companion object {
         /** While the chat is on screen. */
         const val POLL_INTERVAL_MS = 5_000L
+
+        /** `after=` pages one poll reads when more keep coming. */
+        const val MAX_PAGES_PER_POLL = 5
 
         /** The server's limit, in characters. */
         const val MAX_LENGTH = 2000

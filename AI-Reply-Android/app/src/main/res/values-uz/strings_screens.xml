@@ -52,7 +52,7 @@
     <string name="paste_help_step_recipient">Kimga javob berayotganingizni bosing: aynan shu paytda AI Reply nusxalangan matnni oʻqiydi.</string>
     <string name="paste_help_rules_title">Android almashish buferini qanday himoya qiladi</string>
     <string name="paste_help_rule_focus">Android almashish buferini faqat ekrandagi ilovaga yoki hozir ishlatilayotgan klaviaturaga oʻqishga ruxsat beradi. Shuning uchun AI Reply uni klaviatura sifatida va faqat siz bosganingizda oʻqiydi — hech qachon fonda emas.</string>
-    <string name="paste_help_rule_private">Boshqa ilova maxfiy deb belgilagan matn (parol, bank kodi) boshqa ilovalardan yashiriladi. AI Reply ham uni oʻqimaydi — xabarning oʻzini nusxalang.</string>
+    <string name="paste_help_rule_private">Android 13 dan boshlab tizim boshqa ilova maxfiy deb belgilagan matnni (parol, bank kodi) nusxalashdan keyin chiqadigan oldindan koʻrish oynasida koʻrsatmaydi. AI Reply bunday matnni hech qachon oʻqimaydi — xabarning oʻzini nusxalang.</string>
     <string name="paste_help_rule_notice">Android 12 dan boshlab telefon AI Reply almashish buferidan matn joylaganini qisqa koʻrsatishi mumkin. Shu tarzda tizim bosganingizni tasdiqlaydi.</string>
     <string name="paste_help_rule_no_switch">Android’da alohida «Joylashga ruxsat berish» tugmasi yoʻq — hech narsani yoqish shart emas.</string>
     <string name="paste_help_last">Oxirgi muvaffaqiyatli joylash: %1$s</string>
