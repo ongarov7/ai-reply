@@ -262,6 +262,55 @@ final class SupportChatModelTests: XCTestCase {
         XCTAssertEqual(model.items.map(\.id), ["o1", "s1"])
     }
 
+    /// The operator wrote, then the user sent before the next poll. The
+    /// server pages `after=` by time, so a cursor on our newer message would
+    /// skip the reply for good: the poll goes on from the newest message a
+    /// page brought, shows the reply above ours and reads it.
+    func testAReplyWrittenJustBeforeOurMessageIsNotSkipped() async {
+        let server = FakeSupport()
+        await server.setPage(.latest, [message("o1", user: false, read: true)])
+        await server.setPage(.after("o1"), [message("o2", user: false), message("s1", user: true, text: "Вопрос")])
+        let inbox = SupportInbox(transport: server)
+        inbox.didRead(unreadCount: 1)
+        let model = SupportChatModel(transport: server, inbox: inbox)
+        await model.load()
+
+        model.draft = "Вопрос"
+        await model.send()
+        XCTAssertEqual(model.items.map(\.id), ["o1", "s1"])
+
+        await model.poll()
+        XCTAssertEqual(model.items.map(\.id), ["o1", "o2", "s1"], "the reply above our newer message, ours once")
+        XCTAssertEqual(model.items.map(\.delivery), [.sent, .sent, .sent])
+        let read = await server.readUpTo
+        XCTAssertEqual(read, ["o2"])
+        XCTAssertEqual(inbox.unreadCount, 0)
+
+        await model.poll()
+        let cursors = await server.cursors
+        XCTAssertEqual(cursors, [.latest, .after("o1"), .after("s1")], "on from ours once a page brought it")
+    }
+
+    /// A page that has the reply and not yet ours: ours keeps waiting after
+    /// it, and the cursor moves only as far as the page went.
+    func testOurSavedMessageWaitsForItsPage() async {
+        let server = FakeSupport()
+        await server.setPage(.latest, [message("o1", user: false, read: true)])
+        await server.setPage(.after("o1"), [message("o2", user: false)])
+        await server.setPage(.after("o2"), [message("s1", user: true, text: "Вопрос")])
+        let model = SupportChatModel(transport: server)
+        await model.load()
+        model.draft = "Вопрос"
+        await model.send()
+
+        await model.poll()
+        XCTAssertEqual(model.items.map(\.id), ["o1", "o2", "s1"])
+        await model.poll()
+        XCTAssertEqual(model.items.map(\.id), ["o1", "o2", "s1"])
+        let cursors = await server.cursors
+        XCTAssertEqual(cursors, [.latest, .after("o1"), .after("o2")])
+    }
+
     // MARK: Badge
 
     func testTheBadgeFollowsTheServer() async throws {

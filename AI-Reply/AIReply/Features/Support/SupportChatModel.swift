@@ -81,6 +81,11 @@ final class SupportInbox {
 /// messages being sent, or that failed, follow them. A message is sent with
 /// a `client_message_id` made once, so Retry can never post it twice. The
 /// text of a message is never logged or stored on the device.
+///
+/// The `after=` cursor is the newest message a page brought, never one a
+/// send answered: the server pages `after=` by time, then id, so an operator
+/// reply written just before our message would be skipped for good. Until a
+/// page brings it, our saved message waits after the paged ones.
 @MainActor
 @Observable
 final class SupportChatModel {
@@ -124,7 +129,11 @@ final class SupportChatModel {
     /// marking read happen only then.
     @ObservationIgnored var isActive = true
 
+    /// What pages brought, one unbroken run in the server's order.
     @ObservationIgnored private var server: [SupportAPI.Message] = []
+    /// Ours the server saved that no page has brought yet: newer than
+    /// everything in `server`, so shown after it.
+    @ObservationIgnored private var saved: [SupportAPI.Message] = []
     @ObservationIgnored private var unsent: [Item] = []
     @ObservationIgnored private let transport: SupportTransport
     @ObservationIgnored private weak var inbox: SupportInbox?
@@ -165,6 +174,7 @@ final class SupportChatModel {
         do {
             let page = try await transport.messages(.latest, limit: Self.pageSize)
             server = page.messages
+            pageBrought(page.messages)
             hasOlder = page.hasMore
             loadState = .loaded
             rebuild()
@@ -186,14 +196,14 @@ final class SupportChatModel {
         rebuild()
     }
 
-    /// What arrived since the newest message: every few seconds while the
-    /// chat is on screen, and at once for a reply push.
+    /// What arrived since the newest message a page brought: every few
+    /// seconds while the chat is on screen, and at once for a reply push.
     func poll() async {
         guard loadState == .loaded, !isPolling else { return }
         isPolling = true
         defer { isPolling = false }
         do {
-            guard let newest = server.last else {
+            guard let newest = afterCursor else {
                 // Nothing yet: the conversation may have started elsewhere.
                 let page = try await transport.messages(.latest, limit: Self.pageSize)
                 merge(newer: page.messages)
@@ -202,7 +212,7 @@ final class SupportChatModel {
                 await markReadIfNeeded()
                 return
             }
-            var cursor = newest.id
+            var cursor = newest
             for _ in 0..<5 {
                 let page = try await transport.messages(.after(cursor), limit: Self.pageSize)
                 merge(newer: page.messages)
@@ -226,10 +236,17 @@ final class SupportChatModel {
         }
     }
 
+    /// The `after=` cursor. Only pages move it: a message our send saved may
+    /// be newer than a reply no page has brought yet.
+    private var afterCursor: String? { server.last?.id }
+
+    /// A page `after=` the cursor: each message follows the paged ones in the
+    /// server's order, ahead of ours that still wait for a page.
     private func merge(newer messages: [SupportAPI.Message]) {
         let known = Set(server.map(\.id))
         let fresh = messages.filter { !known.contains($0.id) }
         server += fresh
+        pageBrought(fresh)
         // Our own message saved before its answer came back: it is here now,
         // so the copy still marked "sending" goes.
         for message in fresh where message.isFromUser {
@@ -237,6 +254,13 @@ final class SupportChatModel {
                 unsent.remove(at: index)
             }
         }
+    }
+
+    /// Ours a send saved, now in their place among the paged ones.
+    private func pageBrought(_ messages: [SupportAPI.Message]) {
+        guard !saved.isEmpty else { return }
+        let arrived = Set(messages.map(\.id))
+        saved.removeAll { arrived.contains($0.id) }
     }
 
     // MARK: Sending
@@ -264,9 +288,12 @@ final class SupportChatModel {
     private func deliver(_ id: String) async {
         guard let item = unsent.first(where: { $0.id == id }) else { return }
         do {
-            let saved = try await transport.send(text: item.text, clientMessageID: item.id)
+            let stored = try await transport.send(text: item.text, clientMessageID: item.id)
             unsent.removeAll { $0.id == id }
-            if !server.contains(where: { $0.id == saved.id }) { server.append(saved) }
+            // Not into `server`: the cursor stays on what the pages brought.
+            if !server.contains(where: { $0.id == stored.id }), !saved.contains(where: { $0.id == stored.id }) {
+                saved.append(stored)
+            }
         } catch {
             // Already arrived through a poll and taken off: nothing failed.
             guard let index = unsent.firstIndex(where: { $0.id == id }) else { return }
@@ -304,7 +331,7 @@ final class SupportChatModel {
     }
 
     private func rebuild() {
-        items = server.map { message in
+        items = (server + saved).map { message in
             Item(id: message.id, isFromUser: message.isFromUser, text: message.text,
                  date: ServerTime.date(message.createdAt) ?? now(), delivery: .sent)
         } + unsent
