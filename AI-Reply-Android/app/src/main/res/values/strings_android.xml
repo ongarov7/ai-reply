@@ -243,16 +243,6 @@
     <string name="kb_limit_body">Open AI\u00A0Reply to buy more replies or choose a plan.</string>
     <string name="kb_limit_open">Open AI\u00A0Reply</string>
 
-    <!-- The emoji page: its categories, in the app's language. -->
-    <string name="kb_emoji_recent">Recent</string>
-    <string name="kb_emoji_smileys">Smileys &amp; people</string>
-    <string name="kb_emoji_animals">Animals &amp; nature</string>
-    <string name="kb_emoji_food">Food &amp; drink</string>
-    <string name="kb_emoji_travel">Travel &amp; places</string>
-    <string name="kb_emoji_activities">Activities</string>
-    <string name="kb_emoji_objects">Objects</string>
-    <string name="kb_emoji_symbols">Symbols</string>
-    <string name="kb_emoji_flags">Flags</string>
     <string name="kb_err_consent_required">Open AI Reply and accept the terms to use AI replies.</string>
     <string name="settings_account_delete">Delete account</string>
     <string name="settings_account_delete_title">Delete your account?</string>

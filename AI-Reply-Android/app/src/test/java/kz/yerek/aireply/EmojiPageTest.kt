@@ -4,6 +4,7 @@ import android.text.InputType
 import kz.yerek.aireply.core.lang.KeyboardLanguage
 import kz.yerek.aireply.core.lang.KeyboardPlane
 import kz.yerek.aireply.keyboard.KeyboardKey
+import kz.yerek.aireply.keyboard.emoji.EmojiTab
 import kz.yerek.aireply.keyboard.layout.FieldKeys
 import kz.yerek.aireply.keyboard.layout.FieldKind
 import kz.yerek.aireply.keyboard.layout.KeyWidth
@@ -86,6 +87,21 @@ class EmojiPageTest {
         assertEquals("Emoji", KeyboardLabels(KeyboardLanguage.ENGLISH).planeKey(KeyboardPlane.EMOJI))
         assertEquals("Эмодзи", KeyboardLabels(KeyboardLanguage.RUSSIAN).planeKey(KeyboardPlane.EMOJI))
         assertEquals("Эмодзи", KeyboardLabels(KeyboardLanguage.KAZAKH).planeKey(KeyboardPlane.EMOJI))
+    }
+
+    @Test
+    fun `the headers and tabs follow the layout, like the ABC key beside them`() {
+        // Whatever language the app is in: a Kazakh layout shows «АӘБ» and Kazakh headers.
+        assertEquals("Smileys & people", KeyboardLabels(KeyboardLanguage.ENGLISH).emojiTab(EmojiTab.SMILEYS_PEOPLE))
+        assertEquals("Смайлы и люди", KeyboardLabels(KeyboardLanguage.RUSSIAN).emojiTab(EmojiTab.SMILEYS_PEOPLE))
+        assertEquals("Смайликтер мен адамдар", KeyboardLabels(KeyboardLanguage.KAZAKH).emojiTab(EmojiTab.SMILEYS_PEOPLE))
+        assertEquals("Соңғылар", KeyboardLabels(KeyboardLanguage.KAZAKH).emojiTab(EmojiTab.RECENT))
+        assertEquals("Флаги", KeyboardLabels(KeyboardLanguage.RUSSIAN).emojiTab(EmojiTab.FLAGS))
+        for (tab in EmojiTab.entries) {
+            val names = KeyboardLanguage.entries.map { KeyboardLabels(it).emojiTab(tab) }
+            assertTrue("$tab", names.none(String::isBlank))
+            assertEquals("$tab translated for every layout", names.size, names.toSet().size)
+        }
     }
 
     // -------------------------------------------------------------- fields

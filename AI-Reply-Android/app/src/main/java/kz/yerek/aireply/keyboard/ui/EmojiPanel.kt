@@ -54,13 +54,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
-import kz.yerek.aireply.R
-import kz.yerek.aireply.ai.AppStrings
 import kz.yerek.aireply.keyboard.KeyboardTheme
 import kz.yerek.aireply.keyboard.emoji.EmojiCatalog
 import kz.yerek.aireply.keyboard.emoji.EmojiGridLayout
 import kz.yerek.aireply.keyboard.emoji.EmojiPageModel
 import kz.yerek.aireply.keyboard.emoji.EmojiTab
+import kz.yerek.aireply.keyboard.layout.KeyboardLabels
 import kz.yerek.aireply.keyboard.layout.LaidOutPanel
 
 /**
@@ -111,7 +110,8 @@ class EmojiPanelState {
 /**
  * The emoji grid: every category in one vertical scroll, a header over each,
  * the tabs below following along. Its box is the panel's whole touch area,
- * so a tap between two emoji never reaches the keys underneath.
+ * so a tap between two emoji never reaches the keys underneath. The headers
+ * are in the layout's language ([KeyboardLabels]), like the ABC key below.
  *
  * The emoji are drawn by the system font, exactly as the app they go into
  * will draw them - never swapped for EmojiCompat's - and only the ones that
@@ -122,7 +122,7 @@ internal fun EmojiGrid(
     state: EmojiPanelState,
     panel: LaidOutPanel,
     theme: KeyboardTheme,
-    strings: AppStrings,
+    labels: KeyboardLabels,
     dimmed: Boolean,
     onEmoji: (String) -> Unit
 ) {
@@ -159,7 +159,7 @@ internal fun EmojiGrid(
                 contentType = { index -> if (page.items[index] is EmojiPageModel.Header) 0 else 1 }
             ) { index ->
                 when (val item = page.items[index]) {
-                    is EmojiPageModel.Header -> EmojiHeader(tabName(strings, item.tab), theme)
+                    is EmojiPageModel.Header -> EmojiHeader(labels.emojiTab(item.tab), theme)
                     is EmojiPageModel.Cell -> EmojiCell(item.emoji, enabled = !dimmed, onEmoji = onEmoji)
                 }
             }
@@ -207,7 +207,7 @@ internal fun EmojiCategoryBar(
     state: EmojiPanelState,
     panel: LaidOutPanel,
     theme: KeyboardTheme,
-    strings: AppStrings,
+    labels: KeyboardLabels,
     onTab: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
@@ -222,7 +222,7 @@ internal fun EmojiCategoryBar(
     ) {
         page.tabs.forEach { tab ->
             val isSelected = tab == selected
-            val name = tabName(strings, tab)
+            val name = labels.emojiTab(tab)
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -258,20 +258,6 @@ private fun LaidOutPanel.innerPadding() = Insets(
     end = (hitFrame.right - frame.right).coerceAtLeast(0f),
     bottom = (hitFrame.bottom - frame.bottom).coerceAtLeast(0f)
 )
-
-private fun tabName(strings: AppStrings, tab: EmojiTab): String = strings[
-    when (tab) {
-        EmojiTab.RECENT -> R.string.kb_emoji_recent
-        EmojiTab.SMILEYS_PEOPLE -> R.string.kb_emoji_smileys
-        EmojiTab.ANIMALS_NATURE -> R.string.kb_emoji_animals
-        EmojiTab.FOOD_DRINK -> R.string.kb_emoji_food
-        EmojiTab.TRAVEL_PLACES -> R.string.kb_emoji_travel
-        EmojiTab.ACTIVITIES -> R.string.kb_emoji_activities
-        EmojiTab.OBJECTS -> R.string.kb_emoji_objects
-        EmojiTab.SYMBOLS -> R.string.kb_emoji_symbols
-        EmojiTab.FLAGS -> R.string.kb_emoji_flags
-    }
-]
 
 private fun tabIcon(tab: EmojiTab): ImageVector = when (tab) {
     EmojiTab.RECENT -> Icons.Outlined.Schedule

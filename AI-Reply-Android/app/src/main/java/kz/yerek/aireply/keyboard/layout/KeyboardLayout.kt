@@ -4,6 +4,7 @@ import kz.yerek.aireply.core.lang.KeyboardLanguage
 import kz.yerek.aireply.core.lang.KeyboardPlane
 import kz.yerek.aireply.keyboard.KeyVisualStyle
 import kz.yerek.aireply.keyboard.KeyboardKey
+import kz.yerek.aireply.keyboard.emoji.EmojiTab
 
 // ------------------------------------------------------------------- model
 
@@ -613,6 +614,43 @@ data class KeyboardLabels(val language: KeyboardLanguage) {
             KeyboardLanguage.ENGLISH -> "Emoji"
             KeyboardLanguage.RUSSIAN, KeyboardLanguage.KAZAKH -> "Эмодзи"
         }
+
+    /** The emoji page's header over a category and its tab's name, like the ABC key beside them. */
+    fun emojiTab(tab: EmojiTab): String = when (language) {
+        KeyboardLanguage.ENGLISH -> when (tab) {
+            EmojiTab.RECENT -> "Recent"
+            EmojiTab.SMILEYS_PEOPLE -> "Smileys & people"
+            EmojiTab.ANIMALS_NATURE -> "Animals & nature"
+            EmojiTab.FOOD_DRINK -> "Food & drink"
+            EmojiTab.TRAVEL_PLACES -> "Travel & places"
+            EmojiTab.ACTIVITIES -> "Activities"
+            EmojiTab.OBJECTS -> "Objects"
+            EmojiTab.SYMBOLS -> "Symbols"
+            EmojiTab.FLAGS -> "Flags"
+        }
+        KeyboardLanguage.RUSSIAN -> when (tab) {
+            EmojiTab.RECENT -> "Недавние"
+            EmojiTab.SMILEYS_PEOPLE -> "Смайлы и люди"
+            EmojiTab.ANIMALS_NATURE -> "Животные и природа"
+            EmojiTab.FOOD_DRINK -> "Еда и напитки"
+            EmojiTab.TRAVEL_PLACES -> "Путешествия и места"
+            EmojiTab.ACTIVITIES -> "Занятия"
+            EmojiTab.OBJECTS -> "Предметы"
+            EmojiTab.SYMBOLS -> "Символы"
+            EmojiTab.FLAGS -> "Флаги"
+        }
+        KeyboardLanguage.KAZAKH -> when (tab) {
+            EmojiTab.RECENT -> "Соңғылар"
+            EmojiTab.SMILEYS_PEOPLE -> "Смайликтер мен адамдар"
+            EmojiTab.ANIMALS_NATURE -> "Жануарлар мен табиғат"
+            EmojiTab.FOOD_DRINK -> "Тағам мен сусын"
+            EmojiTab.TRAVEL_PLACES -> "Саяхат пен орындар"
+            EmojiTab.ACTIVITIES -> "Әрекеттер"
+            EmojiTab.OBJECTS -> "Заттар"
+            EmojiTab.SYMBOLS -> "Таңбалар"
+            EmojiTab.FLAGS -> "Жалаулар"
+        }
+    }
 
     val badge: String get() = language.badge
 

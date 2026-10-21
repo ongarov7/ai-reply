@@ -560,8 +560,8 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
                 },
                 panel = { laid ->
                     when (laid.kind) {
-                        PanelKind.EMOJI_GRID -> EmojiGrid(emojiPanel, laid, theme, strings, keys.dimmed, ::typeEmoji)
-                        PanelKind.EMOJI_CATEGORIES -> EmojiCategoryBar(emojiPanel, laid, theme, strings) {
+                        PanelKind.EMOJI_GRID -> EmojiGrid(emojiPanel, laid, theme, keys.labels, keys.dimmed, ::typeEmoji)
+                        PanelKind.EMOJI_CATEGORIES -> EmojiCategoryBar(emojiPanel, laid, theme, keys.labels) {
                             feedback.onKeyPress(inputView)
                         }
                     }
