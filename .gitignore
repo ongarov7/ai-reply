@@ -7,6 +7,8 @@
 .env.*
 !.env.example
 *.pem
+# Apple's public root certificate, embedded to verify App Store purchases.
+!ai-reply-back-end/internal/iap/appstore/apple_root_ca_g3.pem
 *.p8
 # Local Apple keys and their private backups; never bundled or committed.
 AI-Reply/Config/Secrets/
