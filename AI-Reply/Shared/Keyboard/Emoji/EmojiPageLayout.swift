@@ -73,10 +73,13 @@ struct EmojiPageLayout: Equatable, Sendable {
             rowMetrics: keys.rowMetrics
         )
 
-        let gap = sizing.columnGap(columns: 10)
         let leftEdge = bar.keys.filter { $0.action != .delete }.map(\.frame.maxX).max() ?? sizing.sideInset
         let delete = bar.keys.first { $0.action == .delete }
         let rightEdge = delete?.frame.minX ?? size.width - sizing.sideInset
+        // Keep all category buttons usable beside the native globe on a
+        // compact keyboard. Give up padding before category target width.
+        let categoryCount = CGFloat(EmojiCategory.allCases.count + 1) // including recents
+        let gap = min(sizing.columnGap(columns: 10), max(0, (rightEdge - leftEdge - categoryCount * 19) / 2))
         categoryFrame = CGRect(x: leftEdge + gap, y: 0, width: max(0, rightEdge - gap - (leftEdge + gap)),
                                height: barFrame.height)
         categoryKeyMinY = delete?.frame.minY ?? 0

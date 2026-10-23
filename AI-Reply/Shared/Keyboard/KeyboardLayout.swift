@@ -37,6 +37,8 @@ enum KeyAction: Hashable, Sendable {
 enum KeyWidth: Hashable, Sendable {
     /// Multiples of the row's key unit.
     case units(CGFloat)
+    /// Grid-relative controls keep a usable touch width on compact devices.
+    case atLeast(CGFloat, units: CGFloat)
     /// A share of whatever width is left once the fixed slots are placed.
     case flexible(CGFloat)
 }
@@ -288,7 +290,7 @@ enum KeyboardLayout {
     /// category bar's space and delete. As many rows as the letters page of
     /// the same layout, so ABC lands exactly where 123 was.
     private static func emojiPage(language: KeyboardLanguage, options: KeyboardPageOptions) -> KeyboardPageSpec {
-        let control = KeyWidth.units(latinModifierWidth)
+        let control = bottomControlWidth
         var bar: [KeySlot] = [.key(.plane(.letters), control)]
         if options.showsNextKeyboardKey { bar.append(.key(.nextKeyboard, control)) }
         bar.append(.spacer(.flexible(1)))
@@ -330,7 +332,7 @@ enum KeyboardLayout {
     /// for one, the layout key, the field's own extras, space and return.
     /// Sized on the Latin grid so it is identical on every layout.
     private static func bottomRow(planeKey: KeyboardPlane, options: KeyboardPageOptions, emojiKey: Bool = false) -> KeyRow {
-        let control = KeyWidth.units(latinModifierWidth)
+        let control = bottomControlWidth
         var slots: [KeySlot] = [.key(.plane(planeKey), control)]
         if emojiKey { slots.append(.key(.plane(.emoji), control)) }
         if options.showsNextKeyboardKey { slots.append(.key(.nextKeyboard, control)) }
@@ -353,9 +355,13 @@ enum KeyboardLayout {
             slots.append(.key(.character("#")))
         }
 
-        slots.append(.key(.returnKey, .units(2.75)))
+        slots.append(.key(.returnKey, .atLeast(66, units: 2.25)))
         return KeyRow(slots, unitColumns: 10)
     }
+
+    /// Secondary controls give their excess width to Space. The half-gaps
+    /// either side bring a 39pt cap close to a 44pt exclusive touch target.
+    private static let bottomControlWidth = KeyWidth.atLeast(39, units: 1.15)
 
     // MARK: Long press
 

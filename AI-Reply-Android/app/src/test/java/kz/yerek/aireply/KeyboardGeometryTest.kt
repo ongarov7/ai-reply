@@ -7,6 +7,7 @@ import kz.yerek.aireply.keyboard.layout.KeyboardGeometry
 import kz.yerek.aireply.keyboard.layout.KeyboardLayout
 import kz.yerek.aireply.keyboard.layout.KeyboardPage
 import kz.yerek.aireply.keyboard.layout.KeyboardSizing
+import kz.yerek.aireply.keyboard.layout.KeyWidth
 import kz.yerek.aireply.keyboard.layout.PageLayout
 import kz.yerek.aireply.keyboard.layout.PageOptions
 import kz.yerek.aireply.keyboard.layout.PanelKind
@@ -326,7 +327,7 @@ class KeyboardGeometryTest {
             val layout = KeyboardGeometry.layout(KeyboardLayout.page(KeyboardLanguage.KAZAKH, KeyboardPlane.LETTERS, crowded), sizing, height)
             val space = layout.keys.first { it.key == KeyboardKey.Space }
             val numbers = layout.keys.first { it.key == KeyboardKey.Plane(KeyboardPlane.NUMBERS) }
-            val unit = numbers.frame.width / KeyboardLayout.MODIFIER_UNITS
+            val unit = numbers.frame.width / KeyboardLayout.BOTTOM_PLANE_UNITS
             assertTrue("w=$width space=${space.frame.width}", space.frame.width >= 85f)
             assertTrue("w=$width space=${space.frame.width} unit=$unit", space.frame.width >= unit * 3f)
             // The emoji key is a whole key, the size of the comma's.
@@ -334,4 +335,43 @@ class KeyboardGeometryTest {
             assertTrue("w=$width", emoji.frame.width >= unit - 0.5f)
         }
     }
+    @Test
+    fun `space gains a quarter to a third while system controls keep their widths`() {
+        for (width in widths) for (density in listOf(1f, 2.625f, 3.5f)) {
+            for (language in KeyboardLanguage.entries) for (globe in listOf(false, true)) {
+                val sizing = KeyboardSizing(width, false, density)
+                val options = PageOptions(showsGlobeKey = globe, showsLanguageKey = true, showsEmojiKey = true)
+                val page = KeyboardLayout.page(language, KeyboardPlane.LETTERS, options)
+                val oldBottom = page.rows.last().copy(keyGap = null, slots = page.rows.last().slots.map { slot ->
+                    slot.copy(width = when (slot.key) {
+                        is KeyboardKey.Plane -> KeyWidth.Units(if ((slot.key as KeyboardKey.Plane).target == KeyboardPlane.NUMBERS) 1.5f else 1f)
+                        KeyboardKey.Layout -> KeyWidth.Units(1.25f)
+                        KeyboardKey.Character(".") -> KeyWidth.Units(1f)
+                        else -> slot.width
+                    })
+                })
+                val height = sizing.keyAreaHeight(KeyboardLayout.maximumRowCount(KeyboardLanguage.CYCLE_ORDER))
+                val previous = KeyboardGeometry.layout(page.copy(rows = page.rows.dropLast(1) + oldBottom), sizing, height)
+                val current = KeyboardGeometry.layout(page, sizing, height)
+                val space = current.keys.first { it.key == KeyboardKey.Space }
+                val oldSpace = previous.keys.first { it.key == KeyboardKey.Space }
+                val gain = space.frame.width / oldSpace.frame.width
+                val label = "$language width=$width density=$density globe=$globe gain=$gain"
+                assertTrue(label, gain in 1.25f..1.35f)
+                for (key in listOf(KeyboardKey.Return, KeyboardKey.Globe, KeyboardKey.Plane(KeyboardPlane.EMOJI))) {
+                    val before = previous.keys.firstOrNull { it.key == key } ?: continue
+                    assertEquals(label, before.frame.width, current.keys.first { it.key == key }.frame.width, 1f / density)
+                }
+                // Every sampled point of the visible Space key resolves exclusively to Space.
+                for (x in listOf(space.frame.left + 0.01f, space.frame.centerX, space.frame.right - 0.01f)) {
+                    for (y in listOf(space.frame.top + 0.01f, space.frame.centerY, space.frame.bottom - 0.01f)) {
+                        assertEquals(label, KeyboardKey.Space, current.keys[current.keyIndex(x, y)!!].key)
+                        assertEquals(label, 1, current.owners(x, y))
+                    }
+                }
+                assertNoOverlaps(current, label)
+            }
+        }
+    }
+
 }

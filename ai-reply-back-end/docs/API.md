@@ -1155,7 +1155,7 @@ credits, admin, packs, pass { expires_at, remaining } | null, remaining_total }`
 | Метод | Путь | Что делает |
 |---|---|---|
 | GET | `/notifications` | состояние (`status: { enabled, worker, fcm, email, link_hosts }`) и справочники формы: категории кампаний (`subscription`, `system`, `marketing`), экраны, языки (`content_locales`, `required_locales`, `fallback_locale: "ru"`), сегменты, фильтры, платформы, каналы, типы, лимиты |
-| POST | `/notifications/audience/preview` | `{ audience, category }` → `{ preview: { users, devices, android, ios, by_language, unresolved }, audience }`; только считает, 30 в минуту на админа |
+| POST | `/notifications/audience/preview` | `{ audience, category }` → `{ preview: { matched_users, matched_devices, users, devices, android, ios, by_language, exclusions, empty_reason, records, unresolved }, audience }`; только считает, 30 в минуту на админа |
 | GET | `/notifications/campaigns?status=&page=&limit=` | список с live-статистикой |
 | POST | `/notifications/campaigns` | создать (и при `send: true` — отправить); заголовок `Idempotency-Key` обязателен |
 | GET | `/notifications/campaigns/{id}` | кампания + `stats` (в т.ч. `by_language`) + `errors: [{ code, count }]` |
@@ -1166,6 +1166,24 @@ credits, admin, packs, pass { expires_at, remaining } | null, remaining_total }`
 | GET | `/diagnostics?filter=&platform=&q=&page=&limit=` | отчёты диагностики: строки как в реестре устройств (замаскированный пользователь) + `diagnostics`; `counts` по фильтрам; `filter`: `setup_incomplete`, `keyboard_not_verified`, `paste_problems`, `full_access_disabled`, `notifications_disabled`, `unknown` (пусто или `all` — все) |
 | GET | `/users/{id}/diagnostics` | `{ devices: [… + diagnostics], reminders: [{ type, send_count, last_sent_at, last_source, resolved_at }] }` |
 | GET · POST | `/settings/reminders` | `{ current, defaults, ranges, types }`; тело POST — `{ enabled, types: { <type>: { cooldown_hours, max_sends } }, min_account_age_hours, quiet_start_hour, quiet_end_hour }` (все три типа); аудит `settings.reminders.update` |
+
+Предпросмотр читает один снимок БД. `matched_users` включает активные аккаунты без
+установок, если они подходят под фильтры; `users` и `devices` — только доступные для push.
+`exclusions` — причина → `{ users, devices }`: `no_devices`, `token_inactive`,
+`missing_token`, `disabled_in_app`, `permission_denied`, `provider_unavailable`,
+`stale_device`, `category_not_opted_in`, `category_disabled`. У устройства одна основная
+причина; уникальных людей нельзя суммировать между причинами. `empty_reason`:
+`no_matching_users`, `no_devices` или `no_eligible_devices`. `records` — до 20 подходящих
+устройств: внутренние `user_id`/`device_id`, замаскированный `user`, `platform`, `locale`,
+отпечаток `push`; полного токена и клиентского installation ID нет. Анонимные установки
+видны в реестре устройств, но не входят в кампании. Маркетинг требует opt-in.
+
+При отправке `recipient_count`, `device_count`, `recipient_snapshot_at` и строки outbox
+фиксируются одной транзакцией; провайдер вызывается только рабочим процессом. Устройства,
+добавленные позже, не попадут в эту отправку. Перед попыткой ещё раз проверяются аккаунт,
+разрешение и категория. `status.fcm` означает настройку провайдера, а не проверку ключа
+у Firebase и не подтверждённую доставку. Неизменённые API-клиенты могут отправить пустую
+аудиторию (снимок 0, без push); админка блокирует подтверждение и объясняет причины.
 
 Кампания:
 

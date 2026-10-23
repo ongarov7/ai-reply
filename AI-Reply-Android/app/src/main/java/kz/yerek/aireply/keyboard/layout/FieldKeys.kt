@@ -48,6 +48,9 @@ data class FieldKeys(
      */
     val takesEmoji: Boolean get() = kind == FieldKind.TEXT && !password && !isNumeric
 
+    /** Sentence shortcuts must not rewrite addresses, numbers or passwords. */
+    val takesSentenceShortcuts: Boolean get() = kind == FieldKind.TEXT && !password && !isNumeric
+
     /**
      * The page to show as this field starts, [current] being the page up now
      * and [previous] the field before this one.

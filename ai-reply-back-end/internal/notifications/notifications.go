@@ -159,7 +159,7 @@ func (s *Service) email() (Mailer, EmailRenderer) {
 type Status struct {
 	Enabled   bool     `json:"enabled"` // PUSH_NOTIFICATIONS_ENABLED
 	Worker    bool     `json:"worker"`  // the dispatcher runs in this process
-	FCM       bool     `json:"fcm"`     // Firebase credentials work (Android and iOS)
+	FCM       bool     `json:"fcm"`     // Firebase provider configured; does not prove credential validity or delivery
 	Email     bool     `json:"email"`   // notification e-mails go out (Resend)
 	LinkHosts []string `json:"link_hosts"`
 }
@@ -618,7 +618,15 @@ func (s *Service) SendCampaign(ctx context.Context, id string) (CampaignResult, 
 		if !s.Ready() {
 			return CampaignResult{}, domain.ErrPushDisabled
 		}
-		queued, err := s.repo.QueueCampaign(ctx, id, s.clock.Now())
+		q, _, err := s.audienceQuery(ctx, campaign.Audience, campaign.Category)
+		if err != nil {
+			return CampaignResult{}, err
+		}
+		texts := make(map[string]domain.LocalizedText, len(domain.Locales))
+		for _, l := range domain.Locales {
+			texts[l], _ = campaign.TextFor(l)
+		}
+		queued, err := s.repo.QueueCampaign(ctx, campaign, q, texts)
 		if err != nil {
 			return CampaignResult{}, err
 		}

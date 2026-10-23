@@ -145,6 +145,30 @@ enum SpaceShortcut {
     }
 }
 
+/// A punctuation key on 123 or #+= arms a return to letters on the next
+/// Space. It follows keystrokes rather than inspecting host text: old text,
+/// cursor moves and dedicated numeric fields cannot trigger the transition.
+struct PunctuationPlaneReturn: Equatable, Sendable {
+    private(set) var isArmed = false
+
+    mutating func typed(_ text: String, on plane: KeyboardPlane) {
+        isArmed = (plane == .numbers || plane == .symbols)
+            && !text.isEmpty && text.allSatisfy { ".,!?;:…。！？،؛".contains($0) }
+    }
+
+    mutating func consumeSpace(on plane: KeyboardPlane, keyboardType: UIKeyboardType, isSecure: Bool) -> Bool {
+        defer { reset() }
+        return isArmed && (plane == .numbers || plane == .symbols)
+            && Self.allowsAutomaticReturn(keyboardType: keyboardType, isSecure: isSecure)
+    }
+
+    static func allowsAutomaticReturn(keyboardType: UIKeyboardType, isSecure: Bool) -> Bool {
+        !isSecure && KeyboardFieldKind(keyboardType) == .text && !KeyboardFieldKind.startsOnNumbers(keyboardType)
+    }
+
+    mutating func reset() { isArmed = false }
+}
+
 /// Word-at-a-time deletion, used once delete has been held for a while.
 enum TextDeletion {
 

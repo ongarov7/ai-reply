@@ -62,8 +62,10 @@ func adminKeyFamilies() map[string][]string {
 		"admin.push.campaign_status.": domain.CampaignStatuses,
 		"admin.push.delivery_status.": domain.DeliveryStatuses,
 		"admin.push.category.":        domain.NotificationCategories,
-		"admin.push.screen.":          domain.LinkScreens,
-		"admin.push.push_status.":     {domain.PushNone, domain.PushActive, domain.PushInvalid, domain.PushReplaced},
+		"admin.push.exclusion.": {"no_matching_users", "no_devices", "no_eligible_devices", "token_inactive", "missing_token",
+			"disabled_in_app", "permission_denied", "provider_unavailable", "stale_device", "category_not_opted_in", "category_disabled"},
+		"admin.push.screen.":      domain.LinkScreens,
+		"admin.push.push_status.": {domain.PushNone, domain.PushActive, domain.PushInvalid, domain.PushReplaced},
 		"admin.push.permission.": {domain.PermissionAuthorized, domain.PermissionDenied, domain.PermissionNotDetermined,
 			domain.PermissionProvisional, domain.PermissionEphemeral, domain.PermissionUnknown},
 		// The audience enums notifications.ValidateAudience accepts (GET /notifications lists them).

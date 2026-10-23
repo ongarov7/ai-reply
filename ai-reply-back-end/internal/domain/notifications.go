@@ -413,29 +413,30 @@ func (t LocalizedText) Filled() bool { return t.Title != "" && t.Body != "" }
 // Content holds the text per language; Title and Body repeat the fallback
 // language's text (the table's original columns).
 type Campaign struct {
-	ID             string
-	Name           string
-	Title          string
-	Body           string
-	Content        map[string]LocalizedText
-	FallbackLocale string
-	Category       string
-	Link           string
-	Data           map[string]string
-	Audience       AudienceFilter
-	Status         string
-	CreatedBy      string
-	CreatedByEmail string // resolved from admin_users when read
-	IdempotencyKey string
-	RecipientCount int
-	DeviceCount    int
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	QueuedAt       *time.Time
-	StartedAt      *time.Time
-	CompletedAt    *time.Time
-	CancelledAt    *time.Time
-	FinalStats     *DeliveryStats
+	ID                  string
+	Name                string
+	Title               string
+	Body                string
+	Content             map[string]LocalizedText
+	FallbackLocale      string
+	Category            string
+	Link                string
+	Data                map[string]string
+	Audience            AudienceFilter
+	Status              string
+	CreatedBy           string
+	CreatedByEmail      string // resolved from admin_users when read
+	IdempotencyKey      string
+	RecipientCount      int
+	DeviceCount         int
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+	QueuedAt            *time.Time
+	RecipientSnapshotAt *time.Time
+	StartedAt           *time.Time
+	CompletedAt         *time.Time
+	CancelledAt         *time.Time
+	FinalStats          *DeliveryStats
 
 	// NotificationType — notifications.type of the fan-out: "campaign", or a reminder type.
 	NotificationType string

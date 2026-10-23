@@ -203,7 +203,7 @@ struct AIReplyStrings: Sendable {
 
     private static let english = AIReplyStrings(
         generate: "Reply",
-        regenerate: "Regenerate",
+        regenerate: "Another reply",
         insert: "Insert",
         cancel: "Cancel",
         replaceExisting: "Replace",
@@ -263,7 +263,7 @@ struct AIReplyStrings: Sendable {
 
     private static let russian = AIReplyStrings(
         generate: "Ответить",
-        regenerate: "Сгенерировать заново",
+        regenerate: "Другой вариант",
         insert: "Вставить",
         cancel: "Отмена",
         replaceExisting: "Заменить",
@@ -323,7 +323,7 @@ struct AIReplyStrings: Sendable {
 
     private static let kazakh = AIReplyStrings(
         generate: "Жауап беру",
-        regenerate: "Қайта жасау",
+        regenerate: "Басқа нұсқа",
         insert: "Кірістіру",
         cancel: "Бас тарту",
         replaceExisting: "Ауыстыру",
@@ -383,7 +383,7 @@ struct AIReplyStrings: Sendable {
 
     private static let uzbek = AIReplyStrings(
         generate: "Javob berish",
-        regenerate: "Qayta yaratish",
+        regenerate: "Boshqa variant",
         insert: "Kiritish",
         cancel: "Bekor qilish",
         replaceExisting: "Almashtirish",

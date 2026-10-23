@@ -134,10 +134,10 @@ struct KeyboardPageLayout: Equatable, Sendable {
 /// everything.
 struct PersonaRowLayout: Equatable, Sendable {
 
-    static let height: CGFloat = 36
-    static let pillHeight: CGFloat = 30
-    /// The ✨ disc.
-    static let actionWidth: CGFloat = 38
+    static let height: CGFloat = 44
+    static let pillHeight: CGFloat = 44
+    /// The pinned ✨ AI action, including its visible label.
+    static let actionWidth: CGFloat = 64
     static let spacing: CGFloat = 6
     static let edgeInset: CGFloat = 8
     /// Text padding per side: roomy when everything fits, tighter on a narrow
@@ -187,16 +187,17 @@ struct PersonaRowLayout: Equatable, Sendable {
         let texts = textWidths.map { max(0, ceil($0)) }
         let icons = iconWidths.count == texts.count ? iconWidths.map { max(0, ceil($0)) } : texts.map { _ in 0 }
         let gaps = Self.spacing * CGFloat(texts.count - 1)
-        let textTotal = texts.reduce(0, +)
         let iconTotal = icons.reduce(0, +)
         func fits(padding: CGFloat, withIcons: Bool) -> Bool {
-            textTotal + (withIcons ? iconTotal : 0) + padding * 2 * CGFloat(texts.count) + gaps <= available
+            zip(texts, icons).reduce(CGFloat(0)) { total, item in
+                total + max(44, item.0 + (withIcons ? item.1 : 0) + padding * 2)
+            } + gaps <= available
         }
         let withIcons = iconTotal > 0 ? Self.paddings.first { fits(padding: $0, withIcons: true) } : nil
         let withoutIcons = Self.paddings.first { fits(padding: $0, withIcons: false) }
         let padding = withIcons ?? withoutIcons ?? Self.paddings.last ?? 8
         showsIcons = withIcons != nil
-        var widths = zip(texts, icons).map { text, icon in text + (withIcons != nil ? icon : 0) + padding * 2 }
+        var widths = zip(texts, icons).map { text, icon in max(44, text + (withIcons != nil ? icon : 0) + padding * 2) }
         let used = widths.reduce(0, +) + gaps
         if used <= available {
             let extra = min(Self.maximumStretch, ((available - used) / CGFloat(widths.count)).rounded(.down))
@@ -210,6 +211,46 @@ struct PersonaRowLayout: Equatable, Sendable {
         }
         pillFrames = frames
         contentWidth = max(personasFrame.width, x - Self.spacing + Self.edgeInset)
+    }
+}
+
+/// The reply controls keep their position beneath the reply. On narrow
+/// keyboards the pager and Insert use a second row instead of overlapping.
+/// Pager space is reserved even for the first variant, so regeneration does
+/// not change the panel's height when another variant arrives.
+struct ReplyResultActionsLayout: Equatable, Sendable {
+    static let target: CGFloat = 44
+    static let gap: CGFloat = 6
+    let back: CGRect
+    let regenerate: CGRect
+    let edit: CGRect
+    let previous: CGRect
+    let version: CGRect
+    let next: CGRect
+    let insert: CGRect
+    let height: CGFloat
+
+    init(width: CGFloat, regenerateWidth: CGFloat, insertWidth: CGFloat) {
+        let width = max(0, width)
+        let target = Self.target
+        let gap = Self.gap
+        let pagerWidth = target * 2 + 34
+        let regenerateWidth = min(max(112, regenerateWidth), max(target, width - target * 2 - gap * 2))
+        let insertWidth = min(width, max(96, insertWidth))
+        let firstRowWidth = target * 2 + regenerateWidth + gap * 2
+        let fitsOneRow = firstRowWidth + gap + pagerWidth + gap + insertWidth <= width
+        back = CGRect(x: 0, y: 0, width: target, height: target)
+        regenerate = CGRect(x: back.maxX + gap, y: 0, width: regenerateWidth, height: target)
+        edit = CGRect(x: regenerate.maxX + gap, y: 0, width: target, height: target)
+        let secondY = fitsOneRow ? 0 : target + gap
+        insert = CGRect(x: width - insertWidth, y: secondY, width: insertWidth, height: target)
+        let pagerX = fitsOneRow
+            ? edit.maxX + gap + max(0, (insert.minX - gap - edit.maxX - gap - pagerWidth) / 2)
+            : CGFloat(0)
+        previous = CGRect(x: pagerX, y: secondY, width: target, height: target)
+        version = CGRect(x: previous.maxX, y: secondY, width: 34, height: target)
+        next = CGRect(x: version.maxX, y: secondY, width: target, height: target)
+        height = secondY + target
     }
 }
 
@@ -281,6 +322,7 @@ enum KeyboardGeometry {
 
         var keys: [LaidOutKey] = []
         var rowTop = sizing.topInset
+        var previousHitBottom: CGFloat = 0
 
         for (rowIndex, row) in page.rows.enumerated() {
             // A row on its own grid (the bottom row) also takes that grid's
@@ -297,6 +339,7 @@ enum KeyboardGeometry {
             for (index, slot) in row.slots.enumerated() {
                 switch slot.width {
                 case .units(let units): fixedWidth += units * unit
+                case .atLeast(let minimum, let units): fixedWidth += max(minimum, units * unit)
                 case .flexible(let weight): flexibleWeight += max(weight, 0)
                 }
                 if index > 0, slot.action != nil, row.slots[index - 1].action != nil { gapCount += 1 }
@@ -313,6 +356,7 @@ enum KeyboardGeometry {
                 let slotWidth: CGFloat
                 switch slot.width {
                 case .units(let units): slotWidth = units * unit
+                case .atLeast(let minimum, let units): slotWidth = max(minimum, units * unit)
                 case .flexible(let weight):
                     slotWidth = flexibleWeight > 0 ? flexibleWidth * max(weight, 0) / flexibleWeight : 0
                 }
@@ -324,22 +368,30 @@ enum KeyboardGeometry {
 
             // Vertical band: half the row gap either side, and the outer rows
             // reach the very top and bottom of the page.
-            let bandTop: CGFloat = rowIndex == 0 ? 0 : sizing.pixel(rowTop - metrics.gap / 2)
+            let bandTop = previousHitBottom
             let bandBottom: CGFloat = rowIndex == page.rows.count - 1
                 ? areaHeight
                 : sizing.pixel(rowTop + metrics.key + metrics.gap / 2)
+            let band = CGRect(x: 0, y: bandTop, width: width, height: bandBottom - bandTop)
+            previousHitBottom = band.maxY
 
+            var previousHitRight: CGFloat = 0
             for (index, key) in rowKeys.enumerated() {
                 // Horizontal: the midpoint to each neighbour, and the screen
-                // edge for the first and last key of the row.
-                let left: CGFloat = index == 0 ? 0 : sizing.pixel((rowKeys[index - 1].maxX + key.minX) / 2)
+                // edge for the first and last key of the row. Carry the
+                // CGRect's actual edge to its neighbour: on a 3x screen,
+                // origin + (right - origin) can round one ULP past right.
+                // Recomputing the next origin from right would overlap it.
+                let left = previousHitRight
                 let right: CGFloat = index == rowKeys.count - 1
                     ? width
                     : sizing.pixel((key.maxX + rowKeys[index + 1].minX) / 2)
+                let hitFrame = CGRect(x: left, y: band.minY, width: right - left, height: band.height)
+                previousHitRight = hitFrame.maxX
                 keys.append(LaidOutKey(
                     action: key.action,
                     frame: CGRect(x: key.minX, y: top, width: key.maxX - key.minX, height: bottom - top),
-                    hitFrame: CGRect(x: left, y: bandTop, width: right - left, height: bandBottom - bandTop),
+                    hitFrame: hitFrame,
                     row: rowIndex,
                     alternates: key.alternates
                 ))

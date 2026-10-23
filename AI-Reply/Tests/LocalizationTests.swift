@@ -13,7 +13,7 @@ final class LocalizationTests: XCTestCase {
     func testKeyboardVocabularyMatchesTheBrief() {
         let english = AIReplyStrings.forLanguage(.english)
         XCTAssertEqual(english.insert, "Insert")
-        XCTAssertEqual(english.regenerate, "Regenerate")
+        XCTAssertEqual(english.regenerate, "Another reply")
         XCTAssertEqual(english.cancel, "Cancel")
         XCTAssertEqual(english.replaceExisting, "Replace")
         XCTAssertEqual(english.appendToExisting, "Add")
@@ -22,7 +22,7 @@ final class LocalizationTests: XCTestCase {
 
         let russian = AIReplyStrings.forLanguage(.russian)
         XCTAssertEqual(russian.insert, "Вставить")
-        XCTAssertEqual(russian.regenerate, "Сгенерировать заново")
+        XCTAssertEqual(russian.regenerate, "Другой вариант")
         XCTAssertEqual(russian.cancel, "Отмена")
         XCTAssertEqual(russian.replaceExisting, "Заменить")
         XCTAssertEqual(russian.appendToExisting, "Добавить")
@@ -31,7 +31,7 @@ final class LocalizationTests: XCTestCase {
 
         let kazakh = AIReplyStrings.forLanguage(.kazakh)
         XCTAssertEqual(kazakh.insert, "Кірістіру")
-        XCTAssertEqual(kazakh.regenerate, "Қайта жасау")
+        XCTAssertEqual(kazakh.regenerate, "Басқа нұсқа")
         XCTAssertEqual(kazakh.cancel, "Бас тарту")
         XCTAssertEqual(kazakh.replaceExisting, "Ауыстыру")
         XCTAssertEqual(kazakh.appendToExisting, "Қосу")

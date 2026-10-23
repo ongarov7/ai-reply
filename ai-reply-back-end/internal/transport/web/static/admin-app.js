@@ -1697,7 +1697,12 @@
     props: { preview: { type: Object, required: true }, content: { type: Object, required: true }, meta: { type: Object, default: null } },
     computed: {
       m: function () { return pushMeta(this.meta); },
-      unresolved: function () { return this.preview.unresolved || []; }
+      unresolved: function () { return this.preview.unresolved || []; },
+      exclusions: function () {
+        var reasons = this.preview.exclusions || {};
+        return Object.keys(reasons).sort().map(function (code) { return { code: code, users: reasons[code].users, devices: reasons[code].devices }; });
+      },
+      records: function () { return this.preview.records || []; }
     },
     methods: Object.assign({}, helpers, {
       reach: function (l) { return (this.preview.by_language || {})[l] || { users: 0, devices: 0 }; },
@@ -1711,7 +1716,24 @@
           <div class="stat"><div class="label">Android</div><div class="value">{{ nf(preview.android) }}</div></div>
           <div class="stat"><div class="label">iOS</div><div class="value">{{ nf(preview.ios) }}</div></div>
         </div>
-        <p class="hint">{{ tf('admin.push.preview.matched', { n: nf(preview.matched_devices) }) }}</p>
+        <p class="hint">{{ tf('admin.push.preview.matched', { n: nf(preview.matched_devices) }) }}
+          {{ tf('admin.push.preview.matched_users', { n: nf(preview.matched_users) }) }}</p>
+        <div v-if="preview.empty_reason" class="notice notice-warn" role="status">{{ t('admin.push.exclusion.' + preview.empty_reason) }}</div>
+        <div v-if="exclusions.length" class="notice notice-info" role="status">
+          <b>{{ t('admin.push.preview.exclusions') }}</b>
+          <ul class="plain-list"><li v-for="r in exclusions" :key="r.code">
+            {{ t('admin.push.exclusion.' + r.code) }} — {{ tf('admin.push.preview.excluded_counts', { users: nf(r.users), devices: nf(r.devices) }) }}
+          </li></ul>
+          <p class="hint">{{ t('admin.push.preview.exclusion_hint') }}</p>
+        </div>
+        <p class="hint">{{ t('admin.push.preview.eligibility_hint') }}</p>
+        <div v-if="records.length" class="table-wrap">
+          <h3 class="subhead">{{ t('admin.push.preview.sample') }}</h3>
+          <table class="mini-table"><thead><tr><th>{{ t('admin.push.preview.users') }}</th><th>{{ t('admin.push.preview.devices') }}</th><th>Push</th></tr></thead>
+            <tbody><tr v-for="r in records" :key="r.device_id"><td><a :href="'/admin/users/' + r.user_id" @click.prevent="go('/admin/users/' + r.user_id)">{{ r.user || r.user_id }}</a></td>
+              <td>{{ r.platform }} · {{ langName(r.locale) }}</td><td class="mono">{{ r.push }}</td></tr></tbody>
+          </table>
+        </div>
         <h3 class="subhead">{{ t('admin.push.preview.by_language') }}</h3>
         <div class="table-wrap">
           <table class="mini-table">
@@ -1750,6 +1772,7 @@
     computed: {
       m: function () { return pushMeta(this.meta); },
       summary: function () { return audienceSummary(this.audience, this.plans); },
+      canSend: function () { return !this.busy && !this.loading && !this.blocked && !this.error && !!this.preview && this.preview.devices > 0; },
       dataPairs: function () { return flatten(this.content.data || {}, ""); }
     },
     mounted: function () {
@@ -1770,7 +1793,7 @@
       },
       source: function (l) { return textSource(this.content, l, this.m.content_locales); },
       close: function () { if (!this.busy) this.$emit("close"); },
-      confirm: function () { if (!this.busy && !this.loading) this.$emit("confirm"); }
+      confirm: function () { if (this.canSend) this.$emit("confirm"); }
     }),
     template: `
       <div class="modal-backdrop" @click.self="close" @keydown.esc="close">
@@ -1808,7 +1831,7 @@
           </div>
           <div class="modal-foot">
             <button type="button" class="btn" :disabled="busy" @click="close">{{ t('common.cancel') }}</button>
-            <button type="button" class="btn btn-primary" :disabled="busy || loading" @click="confirm">
+            <button type="button" class="btn btn-primary" :disabled="!canSend" @click="confirm">
               {{ busy ? t('admin.push.sending') : (preview ? tf('admin.push.confirm.send_n', { n: nf(preview.devices) }) : t('admin.push.send')) }}</button>
           </div>
         </div>
@@ -1855,7 +1878,7 @@
                 <td><span :class="'badge ' + campaignBadge(c.status)">{{ t('admin.push.campaign_status.' + c.status) }}</span></td>
                 <td class="nowrap"><span class="mono">{{ c.created_at }}</span><div class="muted small">{{ adminName(c.created_by, c.created_by_email) }}</div></td>
                 <td class="nowrap">
-                  <template v-if="c.started_at">{{ nf(c.recipient_count) }} / {{ nf(c.device_count) }}</template>
+                  <template v-if="c.recipient_snapshot_at || c.started_at">{{ nf(c.recipient_count) }} / {{ nf(c.device_count) }}</template>
                   <span v-else class="muted">—</span></td>
                 <td>{{ nf(c.stats.provider_accepted) }}</td>
                 <td>{{ nf(c.stats.provider_failed + c.stats.invalid_token) }}</td>
@@ -2539,11 +2562,12 @@
                   <dl class="kv kv-tight">
                     <dt>{{ t('admin.push.col.created') }}</dt><dd><span class="mono">{{ data.created_at }}</span><div class="muted small">{{ adminName(data.created_by, data.created_by_email) }}</div></dd>
                     <dt>{{ t('admin.push.time.queued') }}</dt><dd class="mono">{{ data.queued_at || '—' }}</dd>
+                    <dt>{{ t('admin.push.time.snapshot') }}</dt><dd class="mono">{{ data.recipient_snapshot_at || '—' }}</dd>
                     <dt>{{ t('admin.push.time.started') }}</dt><dd class="mono">{{ data.started_at || '—' }}</dd>
                     <dt>{{ t('admin.push.time.completed') }}</dt><dd class="mono">{{ data.completed_at || '—' }}</dd>
                     <dt>{{ t('admin.push.time.cancelled') }}</dt><dd class="mono">{{ data.cancelled_at || '—' }}</dd>
                     <dt>{{ t('admin.push.col.recipients') }}</dt>
-                    <dd><template v-if="data.started_at">{{ nf(data.recipient_count) }} / {{ nf(data.device_count) }}</template><span v-else>—</span></dd>
+                    <dd><template v-if="data.recipient_snapshot_at || data.started_at">{{ nf(data.recipient_count) }} / {{ nf(data.device_count) }}</template><span v-else>—</span></dd>
                   </dl>
                   <p class="hint">{{ t('admin.push.col.recipients_hint') }}</p>
                 </div>
@@ -2792,7 +2816,7 @@
           </nav>
           <div v-if="status" class="push-status" :aria-label="t('admin.push.status.title')">
             <span :class="'badge ' + (status.enabled && status.fcm ? 'badge-ok' : 'badge-muted')">
-              {{ t('admin.push.status.push') }}: {{ status.enabled && status.fcm ? t('admin.push.status.ready') : t('admin.push.status.off') }}</span>
+              {{ t('admin.push.status.push') }}: {{ status.enabled && status.fcm ? t('admin.push.status.configured') : t('admin.push.status.off') }}</span>
             <span :class="'badge ' + (status.email ? 'badge-ok' : 'badge-muted')">
               {{ t('admin.push.status.email') }}: {{ status.email ? t('admin.push.status.on') : t('admin.push.status.off') }}</span>
           </div>
@@ -2803,7 +2827,7 @@
             <span :class="'badge ' + (status.enabled ? 'badge-ok' : 'badge-muted')">{{ t('admin.push.status.sending') }}:
               {{ status.enabled ? t('admin.push.status.on') : t('admin.push.status.off') }}</span>
             <span :class="'badge ' + (status.fcm ? 'badge-ok' : 'badge-muted')">FCM (Android + iOS):
-              {{ status.fcm ? t('admin.push.status.ready') : t('admin.push.status.not_configured') }}</span>
+              {{ status.fcm ? t('admin.push.status.configured') : t('admin.push.status.not_configured') }}</span>
           </div>
         </div>
         <div v-for="note in notes" :key="note" class="notice notice-info" role="status">{{ note }}</div>

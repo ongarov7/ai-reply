@@ -25,6 +25,7 @@ struct OnboardingConnectStep: View {
 
     @FocusState private var isChecking: Bool
     @State private var isShowingHelp = false
+    @State private var isShowingVideo = false
     @State private var privacyPage: AppRouter.WebPage?
 
     var body: some View {
@@ -42,6 +43,11 @@ struct OnboardingConnectStep: View {
                         .multilineTextAlignment(.center)
                 }
                 .frame(maxWidth: .infinity)
+
+                Button { isShowingVideo = true } label: {
+                    Label("tutorial.paste.title", systemImage: "play.rectangle")
+                        .frame(maxWidth: .infinity, minHeight: DS.Layout.minimumTouchTarget)
+                }
 
                 KeyboardConnectSteps(showsProgress: true)
                     .dsCard()
@@ -94,6 +100,16 @@ struct OnboardingConnectStep: View {
                     .toolbar {
                         ToolbarItem(placement: .confirmationAction) {
                             Button("common.done") { isShowingHelp = false }
+                        }
+                    }
+            }
+        }
+        .sheet(isPresented: $isShowingVideo) {
+            NavigationStack {
+                PasteTutorialView()
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("common.done") { isShowingVideo = false }
                         }
                     }
             }

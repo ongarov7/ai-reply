@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tutorial_videos_title">Видеоинструкции</string>
+    <string name="tutorial_keyboard_title">Настройка клавиатуры и скопированный текст</string>
+    <string name="tutorial_watch">Смотреть видео</string>
+    <string name="tutorial_play_pause">Воспроизвести / пауза</string>
+    <string name="tutorial_replay">Сначала</string>
+    <string name="tutorial_offline_body">Видео хранится на телефоне и работает без интернета. К инструкции можно вернуться в любой момент. Просмотр не выдаёт разрешений Android.</string>
+    <string name="tutorial_video_error">Не удалось открыть видео. Текстовая инструкция по-прежнему доступна.</string>
+    <string name="tutorial_caption_setup">Откройте настройку клавиатуры в AI Reply.</string>
+    <string name="tutorial_caption_settings">В настройках Android найдите AI Reply в списке экранных клавиатур.</string>
+    <string name="tutorial_caption_allow">Включите AI Reply и выберите её клавиатурой. Для буфера обмена отдельное разрешение не требуется.</string>
+    <string name="tutorial_caption_try">Скопируйте сообщение, переключитесь на AI Reply и нажмите получателя или «Вставить». Текст читается только после нажатия.</string>
+</resources>

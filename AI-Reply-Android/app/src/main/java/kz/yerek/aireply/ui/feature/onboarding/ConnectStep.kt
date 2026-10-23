@@ -49,6 +49,7 @@ import kz.yerek.aireply.ui.design.AppMark
 import kz.yerek.aireply.ui.design.LocalExtraColors
 import kz.yerek.aireply.ui.design.Spacing
 import kz.yerek.aireply.ui.feature.setup.KeyboardHelpSheet
+import kz.yerek.aireply.ui.feature.setup.KeyboardTutorialEntry
 
 /**
  * «Подключи AI Reply»: the three things Android asks, each ticked as the
@@ -81,6 +82,8 @@ internal fun ColumnScope.ConnectStep(status: KeyboardStatus.Snapshot) {
             ConnectLine(3, stringResource(R.string.onboarding_connect_step_default), done = status.isSelected)
         }
     }
+
+    KeyboardTutorialEntry()
 
     if (status.isReady) PracticeField()
 

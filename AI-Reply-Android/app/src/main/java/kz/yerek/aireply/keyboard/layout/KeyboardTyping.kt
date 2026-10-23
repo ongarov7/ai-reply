@@ -1,5 +1,7 @@
 package kz.yerek.aireply.keyboard.layout
 
+import kz.yerek.aireply.core.lang.KeyboardPlane
+
 /**
  * Shift, the way Gboard and the iOS keyboard behave:
  *
@@ -171,4 +173,11 @@ object TextDeletion {
         }
         return context.length - index
     }
+}
+
+/** Only sentence punctuation followed by Space leaves the punctuation pages. */
+object PunctuationSpaceShortcut {
+    fun returnsToLetters(plane: KeyboardPlane, before: String?, sentenceField: Boolean): Boolean =
+        sentenceField && (plane == KeyboardPlane.NUMBERS || plane == KeyboardPlane.SYMBOLS) &&
+            before?.lastOrNull()?.let { it in ".,!?:;…" } == true
 }

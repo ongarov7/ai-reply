@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tutorial_videos_title">Videoqoʻllanmalar</string>
+    <string name="tutorial_keyboard_title">Klaviaturani sozlash va nusxalangan matn</string>
+    <string name="tutorial_watch">Videoni koʻrish</string>
+    <string name="tutorial_play_pause">Ijro / pauza</string>
+    <string name="tutorial_replay">Qayta koʻrish</string>
+    <string name="tutorial_offline_body">Video telefonda saqlanadi va internetsiz ishlaydi. Yoʻriqnomani istalgan payt qayta ochishingiz mumkin. Videoni koʻrish Android ruxsatlarini bermaydi.</string>
+    <string name="tutorial_video_error">Video ochilmadi. Matnli yoʻriqnoma hali ham mavjud.</string>
+    <string name="tutorial_caption_setup">AI Reply ichida klaviatura sozlamalarini oching.</string>
+    <string name="tutorial_caption_settings">Android sozlamalaridagi ekran klaviaturalari roʻyxatidan AI Reply ni toping.</string>
+    <string name="tutorial_caption_allow">AI Reply klaviaturasini yoqing va uni tanlang. Bufer uchun alohida ruxsat kerak emas.</string>
+    <string name="tutorial_caption_try">Xabarni nusxalang, AI Reply klaviaturasiga oʻting va qabul qiluvchi yoki «Qoʻyish» tugmasini bosing. Matn faqat bosganingizdan keyin oʻqiladi.</string>
+</resources>

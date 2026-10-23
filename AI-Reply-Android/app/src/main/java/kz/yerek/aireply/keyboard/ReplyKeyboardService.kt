@@ -92,6 +92,7 @@ import kz.yerek.aireply.keyboard.layout.PanelKind
 import kz.yerek.aireply.keyboard.layout.PanelFit
 import kz.yerek.aireply.keyboard.layout.ReturnFace
 import kz.yerek.aireply.keyboard.layout.ShiftState
+import kz.yerek.aireply.keyboard.layout.PunctuationSpaceShortcut
 import kz.yerek.aireply.keyboard.layout.SpaceShortcut
 import kz.yerek.aireply.keyboard.reply.ComposeSessionController
 import kz.yerek.aireply.keyboard.reply.InstructionPolish
@@ -483,6 +484,13 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
 
     @Composable
     private fun KeyboardContent() {
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            KeyboardContentAtWidth(maxWidth.value)
+        }
+    }
+
+    @Composable
+    private fun KeyboardContentAtWidth(width: Float) {
         val configuration = LocalConfiguration.current
         val density = LocalDensity.current.density
         val fontScale = LocalDensity.current.fontScale
@@ -497,7 +505,6 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
             }
         )
 
-        val width = configuration.screenWidthDp.toFloat()
         val screenHeight = configuration.screenHeightDp.toFloat()
         // The tallest the window can be and what lies under the keys: what
         // the panels plan with ([PanelFit.roomAbove]), once per window.
@@ -1085,8 +1092,10 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         prepareComposerForTyping()
         val now = SystemClock.uptimeMillis()
         // No ". " in a number, phone or date field: digits are not a sentence.
-        val sentences = target != Target.HOST || !fieldKeys.isNumeric
-        if (sentences && SpaceShortcut.shouldInsertPeriod(textBeforeCursor(), now - lastSpaceTap)) {
+        val sentences = target != Target.HOST || (!isSecureField && fieldKeys.takesSentenceShortcuts)
+        val before = textBeforeCursor()
+        val returnsToLetters = PunctuationSpaceShortcut.returnsToLetters(plane, before, sentences)
+        if (sentences && SpaceShortcut.shouldInsertPeriod(before, now - lastSpaceTap)) {
             // ". " - the system keyboards' behaviour.
             when (target) {
                 Target.HOST -> hostField.batch {
@@ -1104,8 +1113,9 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
             insert(" ")
             lastSpaceTap = now
         }
-        // Back to letters after a space on ?123, as Gboard does; a pad stays.
-        if (plane == KeyboardPlane.NUMBERS || plane == KeyboardPlane.SYMBOLS) plane = KeyboardPlane.LETTERS
+        // A sentence ends its punctuation detour; numeric runs and specialized
+        // fields keep the page the user chose. This changes state only, not the view.
+        if (returnsToLetters) plane = KeyboardPlane.LETTERS
         refreshAutoShift()
     }
 

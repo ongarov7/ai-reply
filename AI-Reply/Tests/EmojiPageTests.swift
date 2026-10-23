@@ -62,21 +62,22 @@ final class EmojiPageTests: XCTestCase {
     }
 
     /// With the keyboard's own globe the space bar must keep 2.5 units, or
-    /// the key goes; in portrait it keeps about 2.7 even at 320pt, in
-    /// landscape it would not, so there the key is dropped. Without the
-    /// globe there is always room.
+    /// the optional emoji key goes. The minimum control widths reserve the
+    /// space on 320pt screens; wider portrait and landscape layouts fit it.
     func testGlobeKeepsTheEmojiKeyOnlyWhileTheSpaceBarHasRoom() {
         var globe = KeyboardPageOptions(showsNextKeyboardKey: true, showsLanguageKey: true)
         for width in portraitWidths {
             let sizing = KeyboardSizing(width: width, isLandscape: false)
-            XCTAssertTrue(KeyboardGeometry.fitsEmojiKey(options: globe, sizing: sizing), "w=\(width)")
+            XCTAssertEqual(KeyboardGeometry.fitsEmojiKey(options: globe, sizing: sizing), width >= 375, "w=\(width)")
             var withEmoji = globe
             withEmoji.showsEmojiKey = true
-            XCTAssertGreaterThanOrEqual(KeyboardGeometry.spaceBarUnits(options: withEmoji, sizing: sizing), 2.5, "w=\(width)")
+            if width >= 375 {
+                XCTAssertGreaterThanOrEqual(KeyboardGeometry.spaceBarUnits(options: withEmoji, sizing: sizing), 2.5, "w=\(width)")
+            }
         }
         for width: CGFloat in [568, 667, 736] {
             let sizing = KeyboardSizing(width: width, isLandscape: true)
-            XCTAssertFalse(KeyboardGeometry.fitsEmojiKey(options: globe, sizing: sizing), "landscape w=\(width)")
+            XCTAssertTrue(KeyboardGeometry.fitsEmojiKey(options: globe, sizing: sizing), "landscape w=\(width)")
             XCTAssertTrue(KeyboardGeometry.fitsEmojiKey(options: KeyboardPageOptions(), sizing: sizing), "no globe w=\(width)")
         }
         // One layout only: no language key, room again.

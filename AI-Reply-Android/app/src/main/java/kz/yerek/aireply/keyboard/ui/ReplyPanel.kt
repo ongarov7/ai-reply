@@ -208,16 +208,21 @@ fun PersonaRow(
                 if (index > 0) Spacer(Modifier.width(PersonaRowLayout.SLOT_GAP.dp))
                 when (slot) {
                     PersonaRowLayout.Slot.MIC -> if (onMic != null) HostMicButton(strings, theme, onMic)
-                    // A plain disc; only the glyph carries the accent.
-                    PersonaRowLayout.Slot.CREATE -> CircleIcon(
-                        icon = Icons.Filled.AutoAwesome,
-                        description = strings[R.string.kb_compose_open],
-                        theme = theme,
-                        size = PersonaRowLayout.CREATE_SIZE.dp,
-                        iconSize = 17.dp,
-                        tint = theme.accent,
-                        onClick = onCreate
-                    )
+                    PersonaRowLayout.Slot.CREATE -> Row(
+                        modifier = Modifier
+                            .width(PersonaRowLayout.CREATE_WIDTH.dp)
+                            .height(PERSONA_ROW_HEIGHT)
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(theme.fieldBackground)
+                            .clickable(role = Role.Button, onClick = onCreate)
+                            .semantics { contentDescription = strings[R.string.kb_compose_open] },
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = theme.accent, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(strings[R.string.kb_ai_label], fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = theme.accent)
+                    }
                     // Fades only when the strip comes or goes, never between keystrokes.
                     PersonaRowLayout.Slot.CHIPS -> Crossfade(
                         targetState = suggestions.isNotEmpty(),
@@ -739,62 +744,92 @@ internal fun ResultRow(
     val drafts = flow.drafts
     val canInsert = (stage == ReplyComposerFlow.Stage.Result || editing) && draftText.isNotBlank()
 
-    Row(
-        modifier = Modifier.fillMaxWidth().height(ROW_HEIGHT),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        CircleIcon(Icons.AutoMirrored.Filled.ArrowBack, backDescription, theme, onClick = onBack)
-        Spacer(Modifier.width(6.dp))
-        CircleIcon(
-            icon = Icons.Filled.Refresh,
-            description = if (regenerating) strings[R.string.kb_stop] else strings[R.string.kb_regenerate],
-            theme = theme,
-            busy = regenerating,
-            enabled = stage == ReplyComposerFlow.Stage.Result || editing || regenerating,
-            onClick = onRegenerate
-        )
-        Spacer(Modifier.width(6.dp))
-        CircleIcon(
-            icon = if (editing) Icons.Filled.Check else Icons.Filled.Edit,
-            description = if (editing) strings[R.string.kb_done_editing] else strings[R.string.kb_edit_reply],
-            theme = theme,
-            selected = editing,
-            enabled = stage == ReplyComposerFlow.Stage.Result || editing,
-            onClick = onEdit
-        )
-
-        Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-            if (drafts.count > 1) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    CircleIcon(
-                        Icons.Filled.ChevronLeft, strings[R.string.kb_previous_version], theme, 28.dp, 20.dp,
-                        filled = false, enabled = drafts.canSelectPrevious && !flow.isGenerating,
-                        onClick = onPreviousVersion
-                    )
-                    Text(
-                        text = "${drafts.position}/${drafts.count}",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = theme.secondaryText,
-                        modifier = Modifier.semantics {
-                            contentDescription = strings.get(R.string.kb_version_position, drafts.position, drafts.count)
-                        }
-                    )
-                    CircleIcon(
-                        Icons.Filled.ChevronRight, strings[R.string.kb_next_version], theme, 28.dp, 20.dp,
-                        filled = false, enabled = drafts.canSelectNext && !flow.isGenerating,
-                        onClick = onNextVersion
-                    )
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val compact = maxWidth < 360.dp || LocalDensity.current.fontScale > 1.2f
+        val inlineVersions = maxWidth >= 540.dp && !compact
+        val versions: @Composable () -> Unit = {
+            VersionNavigation(flow, strings, theme, onPreviousVersion, onNextVersion)
+        }
+        val editButton: @Composable () -> Unit = {
+            CircleIcon(
+                icon = if (editing) Icons.Filled.Check else Icons.Filled.Edit,
+                description = if (editing) strings[R.string.kb_done_editing] else strings[R.string.kb_edit_reply],
+                theme = theme, size = 48.dp, selected = editing,
+                enabled = stage == ReplyComposerFlow.Stage.Result || editing, onClick = onEdit
+            )
+        }
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                CircleIcon(Icons.AutoMirrored.Filled.ArrowBack, backDescription, theme, size = 48.dp, onClick = onBack)
+                ActionPill(
+                    label = when {
+                        regenerating -> strings[R.string.kb_stop]
+                        compact -> strings[R.string.kb_another_reply_compact]
+                        else -> strings[R.string.kb_another_reply]
+                    },
+                    enabled = stage == ReplyComposerFlow.Stage.Result || editing || regenerating,
+                    theme = theme,
+                    modifier = Modifier.weight(1f).semantics { contentDescription = strings[if (regenerating) R.string.kb_stop else R.string.kb_another_reply] },
+                    quiet = true,
+                    busy = regenerating,
+                    icon = if (regenerating) null else Icons.Filled.Refresh,
+                    height = 48.dp,
+                    onClick = onRegenerate
+                )
+                if (!compact) editButton()
+                if (inlineVersions && drafts.count > 1) versions()
+                ActionPill(
+                    label = strings[R.string.kb_insert],
+                    enabled = canInsert,
+                    theme = theme,
+                    modifier = Modifier.widthIn(min = if (compact) 80.dp else 96.dp),
+                    height = 48.dp,
+                    onClick = onInsert
+                )
+            }
+            // Versions get their own space rather than squeezing the labeled
+            // action or Insert off a compact screen. Selection behavior is unchanged.
+            if ((drafts.count > 1 && !inlineVersions) || compact) {
+                Row(Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (compact) editButton()
+                    Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        if (drafts.count > 1) versions()
+                    }
+                    if (compact) Spacer(Modifier.width(48.dp))
                 }
             }
         }
+    }
+}
 
-        ActionPill(
-            label = strings[R.string.kb_insert],
-            enabled = canInsert,
-            theme = theme,
-            modifier = Modifier.widthIn(min = 96.dp),
-            onClick = onInsert
+@Composable
+private fun VersionNavigation(
+    flow: ReplyComposerFlow,
+    strings: AppStrings,
+    theme: KeyboardTheme,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit
+) {
+    val drafts = flow.drafts
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        CircleIcon(
+            Icons.Filled.ChevronLeft, strings[R.string.kb_previous_version], theme, 48.dp, 20.dp,
+            filled = false, enabled = drafts.canSelectPrevious && !flow.isGenerating, onClick = onPrevious
+        )
+        Text(
+            text = "${drafts.position}/${drafts.count}", fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+            color = theme.secondaryText,
+            modifier = Modifier.semantics {
+                contentDescription = strings.get(R.string.kb_version_position, drafts.position, drafts.count)
+            }
+        )
+        CircleIcon(
+            Icons.Filled.ChevronRight, strings[R.string.kb_next_version], theme, 48.dp, 20.dp,
+            filled = false, enabled = drafts.canSelectNext && !flow.isGenerating, onClick = onNext
         )
     }
 }
@@ -916,6 +951,7 @@ internal fun ActionPill(
     quiet: Boolean = false,
     busy: Boolean = false,
     icon: ImageVector? = null,
+    height: Dp = 32.dp,
     onClick: () -> Unit
 ) {
     val background = when {
@@ -925,8 +961,8 @@ internal fun ActionPill(
     }
     Row(
         modifier = modifier
-            .height(32.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .height(height)
+            .clip(RoundedCornerShape(height / 2))
             .background(background)
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
             .padding(horizontal = 14.dp),
@@ -937,7 +973,7 @@ internal fun ActionPill(
             CircularProgressIndicator(
                 modifier = Modifier.size(14.dp),
                 strokeWidth = 2.dp,
-                color = Color.White
+                color = if (quiet) theme.primaryText else Color.White
             )
             Spacer(Modifier.width(6.dp))
         } else if (icon != null) {

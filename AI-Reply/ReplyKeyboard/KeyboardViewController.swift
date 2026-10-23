@@ -20,6 +20,7 @@ final class KeyboardViewController: UIInputViewController {
 
     private var plane: KeyboardPlane = .letters
     private var shift = ShiftState()
+    private var punctuationReturn = PunctuationPlaneReturn()
     private var theme = KeyboardTheme(isDark: false)
 
     /// Read after the keyboard is connected to its host; iOS logs a warning
@@ -179,6 +180,7 @@ final class KeyboardViewController: UIInputViewController {
         refreshThemeIfNeeded()
         showsGlobe = needsInputModeSwitchKey
         plane = KeyboardFieldKind.startsOnNumbers(textDocumentProxy.keyboardType ?? .default) ? .numbers : .letters
+        punctuationReturn.reset()
         hostField.reset(to: currentHostField)
         refreshHostContext()
         layoutKeyboard(force: true)
@@ -253,6 +255,7 @@ final class KeyboardViewController: UIInputViewController {
                                                         fieldChanged: fieldChanged)
         if fieldChanged { hostFieldDidChange() }
         if !ownMutation {
+            punctuationReturn.reset()
             refreshHostContext()
             // The text moved under the correction: Undo no longer applies,
             // and no word is being typed at the new caret yet.
@@ -692,6 +695,7 @@ final class KeyboardViewController: UIInputViewController {
     private func hostFieldDidChange() {
         autocorrect.restart()
         lastSpaceTap = 0
+        punctuationReturn.reset()
         guard !actionBar.isComposing else { return }
         let startsOnNumbers = KeyboardFieldKind.startsOnNumbers(textDocumentProxy.keyboardType ?? .default)
         plane = startsOnNumbers ? .numbers : .letters
@@ -834,6 +838,7 @@ final class KeyboardViewController: UIInputViewController {
         language = next
         KeyboardLanguageStore.saveAsync(next)
         plane = .letters
+        punctuationReturn.reset()
         shift.reset()
         autocorrect.switchLanguage(to: next)
         layoutKeyboard(force: true)
@@ -919,6 +924,7 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func showComposePanel() {
+        punctuationReturn.reset()
         actionBar.beginComposing()
         shift.reset()
         layoutKeyboard(force: false)
@@ -927,6 +933,7 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func closeComposer() {
+        punctuationReturn.reset()
         polisher.stop()
         replyCoordinator.clear()
         composeCoordinator.clear()
@@ -1098,11 +1105,15 @@ extension KeyboardViewController: KeyboardKeysViewDelegate {
         let isLetter = plane == .letters && text.count == 1 && (text.first?.isLetter ?? false)
         let corrected = Self.wordSeparators.contains(text) ? correctWordBeforeSeparator() : nil
         insert(isLetter ? shift.apply(to: text) : text)
+        if target != .nowhere { punctuationReturn.typed(text, on: plane) }
         if target != .nowhere { wordTyping.typed(text) }
         if let corrected { autocorrect.didApply(corrected, separator: text) }
         if plane == .letters {
             shift.characterTyped()
-        } else if text == "'" {
+        } else if text == "'", PunctuationPlaneReturn.allowsAutomaticReturn(
+            keyboardType: actionBar.isComposing ? .default : textDocumentProxy.keyboardType ?? .default,
+            isSecure: !actionBar.isComposing && (textDocumentProxy.isSecureTextEntry ?? false)
+        ) {
             // As on iOS: an apostrophe from 123 goes back to letters, so
             // "don't" does not need a second switch.
             plane = .letters
@@ -1120,6 +1131,7 @@ extension KeyboardViewController: KeyboardKeysViewDelegate {
 
     func keysView(_ view: KeyboardKeysView, didDelete unit: KeyboardKeysView.DeleteUnit) {
         prepareComposerForTyping()
+        punctuationReturn.reset()
         // Backspace right after a correction takes it back: the word returns
         // as typed, without the separator, and is not corrected again. When
         // the live text no longer ends with the correction - a single-line
@@ -1145,6 +1157,11 @@ extension KeyboardViewController: KeyboardKeysViewDelegate {
     func keysViewDidTapSpace(_ view: KeyboardKeysView) {
         prepareComposerForTyping()
         autocorrect.keepCorrection()
+        let returnsToLetters = target != .nowhere && punctuationReturn.consumeSpace(
+            on: plane,
+            keyboardType: actionBar.isComposing ? .default : textDocumentProxy.keyboardType ?? .default,
+            isSecure: !actionBar.isComposing && (textDocumentProxy.isSecureTextEntry ?? false)
+        )
         let now = Date.timeIntervalSinceReferenceDate
         if SpaceShortcut.shouldInsertPeriod(before: textBeforeCursor, secondsSinceLastSpace: now - lastSpaceTap) {
             deleteCharacter()
@@ -1156,12 +1173,17 @@ extension KeyboardViewController: KeyboardKeysViewDelegate {
             if let corrected { autocorrect.didApply(corrected, separator: " ") }
             lastSpaceTap = now
         }
+        if returnsToLetters {
+            plane = .letters
+            layoutKeyboard(force: false)
+        }
         refreshAutoShift()
         refreshSuggestions()
     }
 
     func keysViewDidTapReturn(_ view: KeyboardKeysView) {
         prepareComposerForTyping()
+        punctuationReturn.reset()
         autocorrect.keepCorrection()
         let corrected = correctWordBeforeSeparator()
         insert("\n")
@@ -1171,6 +1193,7 @@ extension KeyboardViewController: KeyboardKeysViewDelegate {
     }
 
     func keysView(_ view: KeyboardKeysView, didSelectPlane selected: KeyboardPlane) {
+        punctuationReturn.reset()
         plane = selected
         // The emoji page leaves shift as it was: ABC brings back the letters
         // page exactly as it was left.
@@ -1198,6 +1221,7 @@ extension KeyboardViewController: KeyboardKeysViewDelegate {
     }
 
     func keysView(_ view: KeyboardKeysView, moveCursorBy offset: Int) {
+        punctuationReturn.reset()
         autocorrect.keepCorrection()
         wordTyping.reset()
         switch target {
@@ -1316,6 +1340,7 @@ extension KeyboardViewController: KeyboardActionBarDelegate {
     /// the strip was for the word at the old caret, and Undo for a correction
     /// there no longer applies.
     func actionBarDidMoveComposerCaret(_ bar: KeyboardActionBar) {
+        punctuationReturn.reset()
         autocorrect.keepCorrection()
         wordTyping.reset()
         autocorrect.restart()
@@ -1475,6 +1500,7 @@ extension KeyboardViewController: KeyboardActionBarDelegate {
 extension KeyboardViewController: ReplyFlowCoordinatorDelegate {
 
     func coordinator(_ coordinator: ReplyFlowCoordinator, didOpen session: ReplySession) {
+        punctuationReturn.reset()
         actionBar.beginComposing()
         shift.reset()
         layoutKeyboard(force: false)

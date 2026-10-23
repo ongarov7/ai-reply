@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tutorial_videos_title">Бейненұсқаулықтар</string>
+    <string name="tutorial_keyboard_title">Пернетақтаны баптау және көшірілген мәтін</string>
+    <string name="tutorial_watch">Бейнені көру</string>
+    <string name="tutorial_play_pause">Ойнату / кідірту</string>
+    <string name="tutorial_replay">Қайта ойнату</string>
+    <string name="tutorial_offline_body">Бейне телефонда сақталады және интернетсіз жұмыс істейді. Нұсқаулықты кез келген уақытта қайта аша аласыз. Бейнені көру Android рұқсаттарын бермейді.</string>
+    <string name="tutorial_video_error">Бейне ашылмады. Мәтіндік нұсқаулық қолжетімді.</string>
+    <string name="tutorial_caption_setup">AI Reply ішінен пернетақтаны баптауды ашыңыз.</string>
+    <string name="tutorial_caption_settings">Android баптауларынан экрандық пернетақталар тізімінде AI Reply табыңыз.</string>
+    <string name="tutorial_caption_allow">AI Reply пернетақтасын қосып, оны таңдаңыз. Алмасу буферіне бөлек рұқсат қажет емес.</string>
+    <string name="tutorial_caption_try">Хабарламаны көшіріп, AI Reply пернетақтасына ауысыңыз да, алушыны немесе «Қою» түймесін түртіңіз. Мәтін тек сіз түрткеннен кейін оқылады.</string>
+</resources>

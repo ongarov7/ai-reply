@@ -1,9 +1,54 @@
+import UIKit
 import XCTest
 @testable import AIReply
 
 /// Shift, auto-capitalisation, the double-space full stop and word delete:
 /// the typing rules users feel on every sentence.
 final class KeyboardTypingTests: XCTestCase {
+
+    func testPunctuationThenSpaceReturnsOnceForEveryLanguageAndPunctuationPlane() {
+        for language in KeyboardLanguage.allCases {
+            for plane: KeyboardPlane in [.numbers, .symbols] {
+                for punctuation in [".", ",", "!", "?", ":", ";", "?!", "…"] {
+                    var state = PunctuationPlaneReturn()
+                    state.typed(punctuation, on: plane)
+                    XCTAssertTrue(state.consumeSpace(on: plane, keyboardType: .default, isSecure: false), "\(language) \(plane) \(punctuation)")
+                    XCTAssertFalse(state.consumeSpace(on: plane, keyboardType: .default, isSecure: false), "consumed exactly once")
+                }
+            }
+        }
+    }
+
+    func testPunctuationReturnKeepsSpecializedAndSecureFieldsOnTheirPlane() {
+        for type: UIKeyboardType in [.numberPad, .decimalPad, .asciiCapableNumberPad, .phonePad,
+                                     .namePhonePad, .numbersAndPunctuation, .emailAddress, .URL, .twitter] {
+            var state = PunctuationPlaneReturn()
+            state.typed(".", on: .numbers)
+            XCTAssertFalse(state.consumeSpace(on: .numbers, keyboardType: type, isSecure: false), "\(type.rawValue)")
+        }
+        var secure = PunctuationPlaneReturn()
+        secure.typed("!", on: .symbols)
+        XCTAssertFalse(secure.consumeSpace(on: .symbols, keyboardType: .default, isSecure: true))
+    }
+
+    func testOnlyConsecutivePunctuationArmsReturnAndResetCancelsIt() {
+        var state = PunctuationPlaneReturn()
+        state.typed("!", on: .symbols)
+        state.typed("?", on: .symbols)
+        XCTAssertTrue(state.isArmed)
+        state.typed("2", on: .numbers)
+        XCTAssertFalse(state.consumeSpace(on: .numbers, keyboardType: .default, isSecure: false))
+        for text in ["1", "@", "/", "#", "+", "", ".com"] {
+            state.typed("!", on: .numbers)
+            state.typed(text, on: .numbers)
+            XCTAssertFalse(state.isArmed, text)
+        }
+        state.typed("!", on: .letters)
+        XCTAssertFalse(state.isArmed)
+        state.typed("!", on: .symbols)
+        state.reset()
+        XCTAssertFalse(state.consumeSpace(on: .symbols, keyboardType: .default, isSecure: false))
+    }
 
     // MARK: Shift
 

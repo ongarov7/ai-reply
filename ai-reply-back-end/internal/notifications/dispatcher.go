@@ -213,7 +213,14 @@ func (s *Service) keepCancelledStats(ctx context.Context) {
 // under way finish and save their result, so a push the provider accepted is
 // not sent again after the restart.
 func (s *Service) ProcessBatch(ctx context.Context) (int, error) {
-	claimed, err := s.repo.ClaimDeliveries(ctx, s.owner, s.clock.Now(), leaseDuration, s.cfg.BatchSize)
+	var channels []string
+	if s.Ready() {
+		channels = append(channels, domain.ChannelPush)
+	}
+	if mailer, _ := s.email(); mailer != nil {
+		channels = append(channels, domain.ChannelEmail)
+	}
+	claimed, err := s.repo.ClaimDeliveries(ctx, s.owner, s.clock.Now(), leaseDuration, s.cfg.BatchSize, channels)
 	if err != nil || len(claimed) == 0 {
 		return 0, err
 	}
@@ -360,8 +367,8 @@ func (s *Service) sendPush(ctx context.Context, d repository.ClaimedDelivery, n 
 	case !s.Ready() || s.sealer == nil:
 		return skip("provider_unavailable")
 	}
-	if n.NotBefore != nil && domain.CategoryOptional(n.Category) {
-		// Deferred out of quiet hours: the person may have switched the category off meanwhile.
+	if domain.CategoryOptional(n.Category) {
+		// A stable recipient snapshot must still honor a category switched off before dispatch.
 		prefs, err := s.repo.NotificationPreferences(ctx, d.UserID)
 		if err != nil {
 			status, next := s.retry(d, 0)

@@ -1,0 +1,71 @@
+{
+  "language": "kk",
+  "output": "/Users/yerekyerkinbekuly/progo/ai-reply/AI-Reply-Android/app/src/main/res/raw/keyboard_setup_kk.mp4",
+  "contact": "/Users/yerekyerkinbekuly/progo/ai-reply/docs/audits/evidence/android-tutorial-kk-frames.png",
+  "bytes": 346441,
+  "capture_wall_seconds": null,
+  "held_static_final_frame": false,
+  "seconds": 23.97,
+  "width": 720,
+  "height": 1816,
+  "video": "Stream #0:0[0x1](und): Video: h264 (High) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 720x1816 [SAR 1:1 DAR 90:227], 112 kb/s, 30 fps, 30 tbr, 15360 tbn (default)",
+  "audio_streams": 0,
+  "subtitle_streams": 0,
+  "source_coded_metadata": {
+    "seconds": 5.83,
+    "width": 720,
+    "height": 1616,
+    "video": "Stream #0:0[0x1](eng): Video: h264 (Constrained Baseline) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 720x1616, 242 kb/s, 2.40 fps, 90k tbr, 90k tbn (default)",
+    "audio_streams": 0,
+    "subtitle_streams": 0
+  },
+  "guide_coded_metadata": {
+    "seconds": null,
+    "width": 720,
+    "height": 1616,
+    "note": "Static VFR recording has one genuine frame and no coded duration; capture wall time independently verified."
+  },
+  "source_whole": "/tmp/ai-reply-keyboard-kk-raw.mp4",
+  "source_guide": "/tmp/ai-reply-android-guide-kk.mp4",
+  "normalized_source": "/tmp/ai-reply-android-kk-normalized.mp4",
+  "source_capture_wall_seconds": 25,
+  "source_settings_capture_wall_interval": [
+    4,
+    14
+  ],
+  "source_segments": [
+    {
+      "file": "/tmp/ai-reply-keyboard-kk-raw.mp4",
+      "start": 0,
+      "end": 4,
+      "output_seconds": 4
+    },
+    {
+      "file": "/tmp/ai-reply-keyboard-kk-raw.mp4",
+      "start": 5.5,
+      "end": 14,
+      "output_seconds": 10,
+      "hold": "genuine stable Settings frame retained for 10-second reading interval; native Settings verified visible during capture wall seconds4–14"
+    },
+    {
+      "file": "/tmp/ai-reply-android-guide-kk.mp4",
+      "start": 0,
+      "end": 10,
+      "output_seconds": 10,
+      "capture_wall_seconds": 11.56,
+      "hold": "genuine first decoded guide frame retained for 10-second reading interval; static guide wall time independently verified"
+    }
+  ],
+  "visual_qa": {
+    "contact_sheet_reviewed": true,
+    "checks": [
+      "localized app screens",
+      "full-width native Settings screen",
+      "localized readable captions",
+      "no Simulator/Emulator or recording caveats in burned captions",
+      "no personal information visible"
+    ],
+    "real_frame_reading_holds_documented": true
+  },
+  "sha256": "00859718e5ad138f5e6ebfb731e838b785c06bc34d6390f0dd3ae00672338f60"
+}

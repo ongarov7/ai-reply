@@ -60,7 +60,7 @@
     <string name="android_keyboard_ready">AI Reply klaviaturasi tayyor</string>
     <string name="android_keyboard_enabled_not_selected">AI Reply yoqilgan, ammo tanlanmagan</string>
     <string name="android_keyboard_not_enabled">AI Reply klaviaturasi hali yoqilmagan</string>
-    <string name="android_howitworks_clipboard">Android faol klaviaturaga nusxalangan matnni oʻqishga ruxsat beradi. AI Reply uni faqat shablonni bosganingizda oʻqiydi, fonda hech qachon emas.</string>
+    <string name="android_howitworks_clipboard">Chatdagi xabarni nusxalang, AI Reply klaviaturasiga oʻting va qabul qiluvchi yoki «Qoʻyish» tugmasini bosing. Android faol klaviaturaga nusxalangan matnni oʻqishga ruxsat beradi; alohida bufer ruxsatini yoqish shart emas. AI Reply matnni faqat bosganingizdan keyin oʻqiydi, fonda hech qachon oʻqimaydi.</string>
     <string name="android_privacy_sensitive">Boshqa ilova maxfiy deb belgilagan matn, masalan parol menejeridagi yozuv, hech qachon oʻqilmaydi.</string>
 
     <string name="compose_instruction">Koʻrsatma</string>
@@ -256,4 +256,8 @@
     <string name="voice_rec_undo_description">Ovoz bilan qoʻshilgan matnni olib tashlash</string>
     <string name="kb_err_voice_limit">Bugungi ovozli kiritish tugadi. Ertaga yana mavjud boʻladi.</string>
 
+    <string name="kb_ai_label">AI</string>
+    <string name="kb_another_reply">Boshqa javob</string>
+    <string name="kb_another_reply_compact">Yana</string>
+    <string name="android_clipboard_title">Nusxalangan matn</string>
 </resources>

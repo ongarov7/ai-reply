@@ -1,4 +1,5 @@
 import XCTest
+import AVFoundation
 @testable import AIReply
 
 /// The permission diagnostics (contract §3.4): what the statuses say, the
@@ -10,6 +11,93 @@ final class PermissionDiagnosticsTests: XCTestCase {
 
     private let installation = "0b7c9a52-4f5e-4d0a-9c1e-1d2f3a4b5c6d"
     private let noon = Date(timeIntervalSince1970: 1_792_497_600) // 2026-10-20 12:00 UTC
+
+    func testTutorialResumeDoesNotReplayCompletedOrInvalidPosition() {
+        XCTAssertEqual(PasteTutorialPlayback.resumePosition(8.5), 8.5)
+        for value in [-1.0, 23.5, 24, .infinity, .nan] {
+            XCTAssertEqual(PasteTutorialPlayback.resumePosition(value), 0)
+        }
+        XCTAssertEqual(PasteTutorialPlayback.resumePosition(16, duration: 16), 0)
+        XCTAssertEqual(PasteTutorialPlayback.resumePosition(16, duration: 20), 16)
+        XCTAssertEqual(PasteTutorialPlayback.resumePosition(8, duration: .nan), 0)
+    }
+
+    func testTutorialProgressBelongsToEachRecording() throws {
+        let suite = "PasteTutorialPlaybackTests.\(UUID())"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(12, forKey: "tutorial.paste.position")
+        for (index, language) in AppLanguage.allCases.enumerated() {
+            XCTAssertEqual(PasteTutorialPlayback.savedPosition(for: language, defaults: defaults), 0,
+                           "a shared legacy position cannot jump into another recording")
+            PasteTutorialPlayback.savePosition(Double(index + 1), for: language, defaults: defaults)
+        }
+        for (index, language) in AppLanguage.allCases.enumerated() {
+            XCTAssertEqual(PasteTutorialPlayback.savedPosition(for: language, defaults: defaults), Double(index + 1))
+        }
+        PasteTutorialPlayback.savePosition(0, for: .russian, defaults: defaults)
+        XCTAssertEqual(PasteTutorialPlayback.savedPosition(for: .russian, defaults: defaults), 0)
+        XCTAssertEqual(PasteTutorialPlayback.savedPosition(for: .kazakh, defaults: defaults), 3)
+        PasteTutorialPlayback.savePosition(.nan, for: .english, defaults: defaults)
+        XCTAssertEqual(PasteTutorialPlayback.savedPosition(for: .english, defaults: defaults), 0)
+    }
+
+    @MainActor
+    func testTutorialSelectionFollowsTheEffectiveAppLanguageAndChangesWithIt() throws {
+        let suite = "PasteTutorialSelectionTests.\(UUID())"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = AppSettings(store: SharedSettings(defaults: defaults))
+        XCTAssertNil(settings.language)
+        XCTAssertEqual(settings.effectiveLanguage, .systemDefault)
+        for language in AppLanguage.allCases {
+            settings.setLanguage(language)
+            let resource = try XCTUnwrap(PasteTutorialResource.resolve(for: settings.effectiveLanguage) {
+                URL(fileURLWithPath: "/tutorial-tests/\($0).mp4")
+            })
+            XCTAssertEqual(resource.language, language)
+            XCTAssertEqual(resource.url.lastPathComponent, "paste-permission-\(language.rawValue).mp4")
+        }
+        settings.setLanguage(nil)
+        XCTAssertEqual(PasteTutorialResource.name(for: settings.effectiveLanguage),
+                       "paste-permission-\(AppLanguage.systemDefault.rawValue)")
+    }
+
+    func testMissingLocalizedTutorialUsesOnlyAnExplicitEnglishFallback() throws {
+        let englishURL = URL(fileURLWithPath: "/tutorial-tests/paste-permission-en.mp4")
+        for language in AppLanguage.allCases where language != .english {
+            var lookedUp: [String] = []
+            let resource = try XCTUnwrap(PasteTutorialResource.resolve(for: language) { name in
+                lookedUp.append(name)
+                return name == "paste-permission-en" ? englishURL : nil
+            })
+            XCTAssertEqual(lookedUp, ["paste-permission-\(language.rawValue)", "paste-permission-en"])
+            XCTAssertEqual(resource.language, .english)
+            XCTAssertEqual(resource.url, englishURL)
+        }
+        XCTAssertNil(PasteTutorialResource.resolve(for: .uzbek, lookup: { _ in nil }))
+    }
+
+    @MainActor
+    func testEveryLocalizedTutorialIsBundledOfflineSilentH264() async throws {
+        for language in AppLanguage.allCases {
+            let resource = try XCTUnwrap(PasteTutorialResource.resolve(for: language), language.rawValue)
+            XCTAssertEqual(resource.language, language, "every production locale requires its own recording")
+            XCTAssertEqual(resource.url.lastPathComponent, "paste-permission-\(language.rawValue).mp4")
+            XCTAssertTrue(resource.url.isFileURL)
+            XCTAssertTrue(FileManager.default.fileExists(atPath: resource.url.path))
+            let asset = AVURLAsset(url: resource.url)
+            let duration = try await asset.load(.duration).seconds
+            XCTAssertGreaterThanOrEqual(duration, 15, language.rawValue)
+            XCTAssertLessThanOrEqual(duration, 25, language.rawValue)
+            let audio = try await asset.loadTracks(withMediaType: .audio)
+            XCTAssertTrue(audio.isEmpty, language.rawValue)
+            let tracks = try await asset.loadTracks(withMediaType: .video)
+            let track = try XCTUnwrap(tracks.first)
+            let formats = try await track.load(.formatDescriptions)
+            XCTAssertEqual(formats.map { CMFormatDescriptionGetMediaSubType($0) }, [kCMVideoCodecType_H264], language.rawValue)
+        }
+    }
 
     // MARK: Statuses
 

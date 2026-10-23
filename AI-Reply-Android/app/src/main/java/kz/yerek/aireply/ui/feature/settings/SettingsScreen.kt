@@ -68,6 +68,7 @@ import kz.yerek.aireply.ui.design.AppSection
 import kz.yerek.aireply.ui.design.ReadableColumn
 import kz.yerek.aireply.ui.design.Spacing
 import kz.yerek.aireply.ui.feature.setup.KeyboardPermissionsContent
+import kz.yerek.aireply.ui.feature.setup.KeyboardTutorialEntry
 import kz.yerek.aireply.ui.navigation.Routes
 
 /**
@@ -268,6 +269,10 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit, focusSection: S
                         color = MaterialTheme.colorScheme.error
                     )
                 }
+            }
+
+            AppSection(stringResource(R.string.tutorial_videos_title)) {
+                KeyboardTutorialEntry()
             }
 
             AppSection(stringResource(R.string.settings_tutorial)) {

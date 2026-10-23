@@ -41,6 +41,7 @@ import kz.yerek.aireply.ui.feature.profile.ProfileScreen
 import kz.yerek.aireply.ui.feature.settings.SettingsScreen
 import kz.yerek.aireply.ui.feature.setup.KeyboardSetupScreen
 import kz.yerek.aireply.ui.feature.setup.PasteHelpScreen
+import kz.yerek.aireply.ui.feature.setup.KeyboardTutorialScreen
 import kz.yerek.aireply.ui.feature.setup.PermissionsScreen
 import kz.yerek.aireply.ui.feature.support.SupportChatScreen
 import kz.yerek.aireply.ui.feature.templates.TemplateEditorScreen
@@ -177,6 +178,7 @@ fun AppNavHost(debugScreen: String? = null) {
             )
         }
         composable(Routes.PasteHelp) { PasteHelpScreen(onBack = navController::popBackStack) }
+        composable(Routes.VideoTutorial) { KeyboardTutorialScreen(onBack = navController::popBackStack) }
         composable(Routes.Support) { SupportChatScreen(onBack = navController::popBackStack) }
 
         composable(Routes.Templates) {

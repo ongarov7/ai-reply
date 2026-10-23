@@ -21,7 +21,7 @@ struct TemplateChip: Equatable {
 
 /// The persona row above the keys:  ✨ | Дос | Клиент | Әріптес | Серіктес
 ///
-/// * 36pt tall, and ADAPTIVE to the width: personas that fit share the row
+/// * 44pt tall, and ADAPTIVE to the width: personas that fit share the row
 ///   evenly; when space is short their padding tightens first; only when they
 ///   still do not fit does the row scroll (with a fade at the trailing edge,
 ///   never a cut label). The keys below never shrink. `PersonaRowLayout`
@@ -34,8 +34,8 @@ struct TemplateChip: Equatable {
 /// * "✨" (Create) is pinned at the LEADING edge, outside the personas, so it
 ///   is never cut off, faded or scrolled away. It opens the second AI mode -
 ///   writing a message from a description - and has nothing to do with the
-///   copied message. Icon only: a label next to the personas read as one
-///   more persona. It is also the row's first element for VoiceOver.
+///   copied message. Its short AI label stays visible beside the icon. It is
+///   also the row's first element for VoiceOver.
 /// * Personas are made, hidden and ordered in the app; the row shows the
 ///   visible ones, in that order.
 ///
@@ -81,8 +81,12 @@ final class TemplateBarView: UIView {
         // ✨ first: the leading element on screen and for VoiceOver.
         var create = UIButton.Configuration.plain()
         create.contentInsets = .zero
-        create.background.cornerRadius = 15
-        create.image = UIImage(systemName: "sparkles", withConfiguration: UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold))
+        create.background.cornerRadius = 16
+        create.image = UIImage(systemName: "sparkles", withConfiguration: UIImage.SymbolConfiguration(pointSize: 17, weight: .semibold))
+        create.imagePadding = 4
+        var titleAttributes = AttributeContainer()
+        titleAttributes.font = .systemFont(ofSize: 14, weight: .semibold)
+        create.attributedTitle = AttributedString("AI", attributes: titleAttributes)
         createButton.configuration = create
         // A key-coloured disc; only the glyph carries the accent, so it reads
         // as an action rather than one more persona.

@@ -247,7 +247,7 @@ final class ReplyComposerView: UIView {
 
     // Result row
     private let backButton = CircleIconButton(symbol: "chevron.left", pointSize: 14)
-    private let regenerateButton = CircleIconButton(symbol: "arrow.clockwise", pointSize: 13)
+    private let regenerateButton = UIButton(type: .system)
     private let editButton = CircleIconButton(symbol: "pencil", pointSize: 13)
     private let previousButton = CircleIconButton(symbol: "chevron.left", pointSize: 12, filled: false)
     private let versionLabel = UILabel()
@@ -255,7 +255,7 @@ final class ReplyComposerView: UIView {
     private let insertButton = UIButton(type: .system)
 
     private var iconButtons: [CircleIconButton] {
-        [closeButton, collapseButton, pasteButton, clearButton, backButton, regenerateButton,
+        [closeButton, collapseButton, pasteButton, clearButton, backButton,
          editButton, previousButton, nextButton, reportButton]
     }
 
@@ -291,7 +291,6 @@ final class ReplyComposerView: UIView {
     /// The message preview's height in the header, and "Reply to copied"'s.
     private var previewHeight: CGFloat { headerHeight - 4 }
     private let rowHeight: CGFloat = 32
-    private let iconSize: CGFloat = 32
     private let reasonHeight: CGFloat = 28
     /// A switch at its natural size, and its label beside it.
     private let includeTextHeight: CGFloat = 31
@@ -381,10 +380,18 @@ final class ReplyComposerView: UIView {
         primaryButton.addTarget(self, action: #selector(primaryTapped), for: .touchUpInside)
 
         backButton.addTarget(self, action: #selector(backTapped), for: .touchUpInside)
+        configurePill(regenerateButton, symbol: "arrow.clockwise", trailingImage: false)
+        regenerateButton.configuration?.image = UIImage(systemName: "arrow.clockwise",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold))
+        regenerateButton.titleLabel?.adjustsFontSizeToFitWidth = true
+        regenerateButton.titleLabel?.minimumScaleFactor = 0.75
         regenerateButton.addTarget(self, action: #selector(regenerateTapped), for: .touchUpInside)
         editButton.addTarget(self, action: #selector(editTapped), for: .touchUpInside)
         previousButton.addTarget(self, action: #selector(previousTapped), for: .touchUpInside)
         nextButton.addTarget(self, action: #selector(nextTapped), for: .touchUpInside)
+        for button in [backButton, editButton, previousButton, nextButton] {
+            button.extendsTouchTarget = false
+        }
         versionLabel.font = .monospacedDigitSystemFont(ofSize: 12, weight: .semibold)
         versionLabel.textAlignment = .center
 
@@ -472,6 +479,15 @@ final class ReplyComposerView: UIView {
         polishChip.configure(theme: theme, uiLanguage: uiLanguage)
         applyTheme()
         refresh()
+        remeasure()
+    }
+
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        if previousTraitCollection?.preferredContentSizeCategory != traitCollection.preferredContentSizeCategory {
+            refresh()
+            remeasure()
+        }
     }
 
     private var currentIntents: [QuickIntent] {
@@ -620,6 +636,8 @@ final class ReplyComposerView: UIView {
         errorLabel.textColor = theme.destructive
         conflictLabel.textColor = theme.primaryText
         versionLabel.textColor = theme.secondaryText
+        regenerateButton.configuration?.background.backgroundColor = theme.fieldBackground
+        regenerateButton.configuration?.baseForegroundColor = theme.primaryText
 
         for button in iconButtons {
             button.fillColor = theme.fieldBackground
@@ -644,7 +662,7 @@ final class ReplyComposerView: UIView {
 
     private func applyText(_ title: String, to button: UIButton, size: CGFloat, weight: UIFont.Weight) {
         var attributes = AttributeContainer()
-        attributes.font = .systemFont(ofSize: size, weight: weight)
+        attributes.font = button === regenerateButton ? regenerationFont : .systemFont(ofSize: size, weight: weight)
         button.configuration?.attributedTitle = AttributedString(title, attributes: attributes)
         button.accessibilityLabel = title
     }
@@ -796,8 +814,8 @@ final class ReplyComposerView: UIView {
         // While a new version is being made the same button stops it: a
         // spinner in place of the arrow, and a tap cancels.
         let regenerating = flow.generationOrigin == .result
-        regenerateButton.isBusy = regenerating
-        regenerateButton.accessibilityLabel = regenerating ? strings.stop : strings.regenerate
+        applyText(regenerating ? strings.stop : strings.regenerate, to: regenerateButton, size: 14, weight: .medium)
+        regenerateButton.configuration?.showsActivityIndicator = regenerating
         regenerateButton.isEnabled = stage == .result || stage == .editing || regenerating
 
         let editing = stage == .editing
@@ -919,6 +937,20 @@ final class ReplyComposerView: UIView {
 
     private var contentWidth: CGFloat { max(0, layoutWidth - outerInset * 2 - innerInset * 2) }
 
+    private var regenerationFont: UIFont {
+        UIFontMetrics(forTextStyle: .subheadline).scaledFont(
+            for: .systemFont(ofSize: 14, weight: .medium), maximumPointSize: 20, compatibleWith: traitCollection)
+    }
+
+    private var resultActionsLayout: ReplyResultActionsLayout {
+        // Measure the normal title even while Stop is shown, so starting or
+        // completing regeneration never moves the reply controls.
+        let font = regenerationFont
+        let titleWidth = ceil((strings.regenerate as NSString).size(withAttributes: [.font: font]).width)
+        return ReplyResultActionsLayout(width: contentWidth, regenerateWidth: titleWidth + 44,
+                                        insertWidth: ceil(insertButton.intrinsicContentSize.width))
+    }
+
     /// Create shows "Reply to copied" while the instruction is on screen -
     /// also while it is being written from, so the row does not jump away
     /// under a running request.
@@ -932,7 +964,8 @@ final class ReplyComposerView: UIView {
     private func solveHeights() -> Plan {
         var plan = Plan()
         let width = contentWidth
-        let chrome = 2 + innerInset / 2 + headerHeight + gap + gap + rowHeight + innerInset / 2 + 2 + 4
+        let actionsHeight = flow.showsReply && !isConflict && reportPanel == nil ? resultActionsLayout.height : rowHeight
+        let chrome = 2 + innerInset / 2 + headerHeight + gap + gap + actionsHeight + innerInset / 2 + 2 + 4
 
         if isConflict {
             // The question takes the place of the reply, at the reply's
@@ -1110,20 +1143,14 @@ final class ReplyComposerView: UIView {
 
         // Bottom row.
         if flow.showsReply {
-            var x = left
-            for button in [backButton, regenerateButton, editButton] {
-                place(button, CGRect(x: x, y: y, width: iconSize, height: iconSize))
-                x += iconSize + 6
-            }
-            let insertWidth = max(96, ceil(insertButton.intrinsicContentSize.width))
-            place(insertButton, CGRect(x: left + width - insertWidth, y: y, width: insertWidth, height: rowHeight))
-            if !versionLabel.isHidden {
-                let pagerWidth: CGFloat = 28 + 34 + 28
-                let available = insertButton.frame.minX - x
-                let pagerX = x + max(0, (available - pagerWidth) / 2)
-                place(previousButton, CGRect(x: pagerX, y: y + 2, width: 28, height: 28))
-                place(versionLabel, CGRect(x: pagerX + 28, y: y, width: 34, height: rowHeight))
-                place(nextButton, CGRect(x: pagerX + 62, y: y + 2, width: 28, height: 28))
+            let actions = resultActionsLayout
+            for (button, frame) in [
+                (backButton as UIView, actions.back), (regenerateButton as UIView, actions.regenerate),
+                (editButton as UIView, actions.edit), (previousButton as UIView, actions.previous),
+                (versionLabel as UIView, actions.version), (nextButton as UIView, actions.next),
+                (insertButton as UIView, actions.insert)
+            ] {
+                place(button, frame.offsetBy(dx: left, dy: y))
             }
         } else {
             let primaryWidth = min(max(104, ceil(primaryButton.intrinsicContentSize.width)), width * 0.5)
@@ -1609,6 +1636,8 @@ final class CircleIconButton: UIControl {
 
     /// Filled buttons sit on a disc; the others are just the glyph.
     let isFilled: Bool
+    /// Result controls already have real 44pt frames, with exclusive bounds.
+    var extendsTouchTarget = true
 
     var fillColor: UIColor = .white { didSet { refreshAppearance() } }
     var glyphColor: UIColor = .label { didSet { refreshAppearance() } }
@@ -1674,7 +1703,7 @@ final class CircleIconButton: UIControl {
     /// A little more than the drawn disc answers a touch. Neighbours are 6pt
     /// apart, so 3pt to each side never reaches the next button.
     override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
-        bounds.insetBy(dx: -3, dy: -5).contains(point)
+        (extendsTouchTarget ? bounds.insetBy(dx: -3, dy: -5) : bounds).contains(point)
     }
 
     private func refreshAppearance() {

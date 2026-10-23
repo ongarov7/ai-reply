@@ -5,6 +5,10 @@ import kz.yerek.aireply.keyboard.layout.AutoCapitalization
 import kz.yerek.aireply.keyboard.layout.Capitalization
 import kz.yerek.aireply.keyboard.layout.ShiftState
 import kz.yerek.aireply.keyboard.layout.SpaceShortcut
+import kz.yerek.aireply.keyboard.layout.PunctuationSpaceShortcut
+import kz.yerek.aireply.keyboard.layout.FieldKeys
+import kz.yerek.aireply.keyboard.layout.FieldKind
+import kz.yerek.aireply.core.lang.KeyboardPlane
 import kz.yerek.aireply.keyboard.layout.TextDeletion
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -129,4 +133,39 @@ class KeyboardTypingTest {
         assertEquals("12345", field.text)
         assertTrue(field.insert("6", limit = 6))
     }
+    @Test
+    fun `punctuation and one space return both punctuation pages to letters in every language`() {
+        for (plane in listOf(KeyboardPlane.NUMBERS, KeyboardPlane.SYMBOLS)) {
+            for (text in listOf("Привет", "Сәлем", "Hello")) {
+                for (punctuation in listOf(".", ",", "!", "?", ":", ";", "?!", "...", "…")) {
+                    assertTrue("$plane $text$punctuation", PunctuationSpaceShortcut.returnsToLetters(plane, text + punctuation, true))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `spaces after digits symbols or an existing space preserve the selected page`() {
+        for (plane in KeyboardPlane.entries) for (text in listOf("123", "12.5", "$", "_", "! ", "", " ")) {
+            assertFalse("$plane $text", PunctuationSpaceShortcut.returnsToLetters(plane, text, true))
+        }
+        for (plane in KeyboardPlane.entries.filter { it != KeyboardPlane.NUMBERS && it != KeyboardPlane.SYMBOLS }) {
+            assertFalse("$plane", PunctuationSpaceShortcut.returnsToLetters(plane, "!", true))
+        }
+    }
+
+    @Test
+    fun `password address and numeric fields never apply sentence shortcuts`() {
+        val specialized = listOf(
+            FieldKeys(kind = FieldKind.EMAIL), FieldKeys(kind = FieldKind.URL), FieldKeys(password = true),
+            FieldKeys(plane = KeyboardPlane.NUMBER_PAD), FieldKeys(plane = KeyboardPlane.PHONE_PAD),
+            FieldKeys(plane = KeyboardPlane.DATE_PAD)
+        )
+        for (field in specialized) {
+            assertFalse("$field", field.takesSentenceShortcuts)
+            assertFalse("$field", PunctuationSpaceShortcut.returnsToLetters(KeyboardPlane.NUMBERS, "!", field.takesSentenceShortcuts))
+        }
+        assertTrue(FieldKeys().takesSentenceShortcuts)
+    }
+
 }

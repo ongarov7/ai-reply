@@ -2,10 +2,12 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 	"strings"
 	"time"
 
 	"github.com/aireply/ai-reply-back-end/internal/domain"
+	"github.com/aireply/ai-reply-back-end/internal/traits"
 )
 
 // AudienceQuery — push алушыларын таңдау шарттары.
@@ -93,7 +95,7 @@ func matchClause(q AudienceQuery) (string, []any) {
 	args := []any{}
 
 	if q.UserID != "" {
-		where = append(where, "i.user_id = ?")
+		where = append(where, "u.id = ?")
 		args = append(args, q.UserID)
 	}
 	if len(f.Platforms) > 0 {
@@ -152,7 +154,7 @@ func matchClause(q AudienceQuery) (string, []any) {
 		if len(q.Recipients) == 0 {
 			where = append(where, "0 = 1")
 		} else {
-			where = append(where, "i.user_id IN ("+placeholders(len(q.Recipients))+")")
+			where = append(where, "u.id IN ("+placeholders(len(q.Recipients))+")")
 			for _, id := range q.Recipients {
 				args = append(args, id)
 			}
@@ -197,35 +199,49 @@ func quotaClause(q AudienceQuery) (string, []any) {
 // configured provider, seen recently enough, and — unless the category is
 // security — the account has not switched this category off. Marketing is
 // opt-in: only accounts that switched it on are reached.
-func reachableClause(q AudienceQuery) (string, []any) {
-	where := []string{
-		"i.push_status = 'active'",
-		"i.push_token_sealed IS NOT NULL",
-		"i.notifications_enabled = 1",
-		"i.push_permission IN ('authorized','provisional','ephemeral','unknown')",
+// reachCheck is shared by dispatch eligibility and the explanation of exclusions.
+type reachCheck struct {
+	clause string
+	args   []any
+	reason string
+}
+
+func reachChecks(q AudienceQuery) []reachCheck {
+	checks := []reachCheck{
+		{"i.push_status = 'active'", nil, "token_inactive"},
+		{"i.push_token_sealed IS NOT NULL AND i.push_token_sealed <> ''", nil, "missing_token"},
+		{"i.notifications_enabled = 1", nil, "disabled_in_app"},
+		{"i.push_permission IN ('authorized','provisional','ephemeral','unknown')", nil, "permission_denied"},
 	}
-	var args []any
 	if len(q.Platforms) == 0 {
-		where = append(where, "0 = 1")
+		checks = append(checks, reachCheck{"0 = 1", nil, "provider_unavailable"})
 	} else {
-		where = append(where, "i.platform IN ("+placeholders(len(q.Platforms))+")")
-		for _, p := range q.Platforms {
-			args = append(args, p)
+		args := make([]any, len(q.Platforms))
+		for i, p := range q.Platforms {
+			args[i] = p
 		}
+		checks = append(checks, reachCheck{"i.platform IN (" + placeholders(len(q.Platforms)) + ")", args, "provider_unavailable"})
 	}
 	if q.StaleAfter > 0 {
-		where = append(where, "i.last_seen_at >= ?")
-		args = append(args, ms(q.Now.Add(-q.StaleAfter)))
+		checks = append(checks, reachCheck{"i.last_seen_at >= ?", []any{ms(q.Now.Add(-q.StaleAfter))}, "stale_device"})
 	}
 	switch {
 	case domain.CategoryOptIn(q.Category):
-		where = append(where, `EXISTS (SELECT 1 FROM notification_preferences np
-			WHERE np.user_id = i.user_id AND np.category = ? AND np.enabled = 1)`)
-		args = append(args, q.Category)
+		checks = append(checks, reachCheck{`EXISTS (SELECT 1 FROM notification_preferences np
+   WHERE np.user_id = i.user_id AND np.category = ? AND np.enabled = 1)`, []any{q.Category}, "category_not_opted_in"})
 	case domain.CategoryOptional(q.Category):
-		where = append(where, `NOT EXISTS (SELECT 1 FROM notification_preferences np
-			WHERE np.user_id = i.user_id AND np.category = ? AND np.enabled = 0)`)
-		args = append(args, q.Category)
+		checks = append(checks, reachCheck{`NOT EXISTS (SELECT 1 FROM notification_preferences np
+   WHERE np.user_id = i.user_id AND np.category = ? AND np.enabled = 0)`, []any{q.Category}, "category_disabled"})
+	}
+	return checks
+}
+
+func reachableClause(q AudienceQuery) (string, []any) {
+	var where []string
+	var args []any
+	for _, c := range reachChecks(q) {
+		where = append(where, c.clause)
+		args = append(args, c.args...)
 	}
 	return strings.Join(where, " AND "), args
 }
@@ -247,51 +263,137 @@ type LanguageReach struct {
 
 // AudiencePreview — алушылар саны (ешнәрсе жіберілмейді).
 type AudiencePreview struct {
+	MatchedUsers   int                      `json:"matched_users"`   // matching accounts, including those with no installation
 	MatchedDevices int                      `json:"matched_devices"` // match the filters, reachable or not
 	Devices        int                      `json:"devices"`         // will receive the push
 	Users          int                      `json:"users"`           // distinct accounts among Devices
 	Android        int                      `json:"android"`
 	IOS            int                      `json:"ios"`
 	ByLanguage     map[string]LanguageReach `json:"by_language"`
+	Exclusions     map[string]LanguageReach `json:"exclusions"`
+	Records        []AudienceRecipient      `json:"records"`
+	EmptyReason    string                   `json:"empty_reason,omitempty"`
 	// Unresolved — e-mails from the filter that belong to no account.
 	Unresolved []string `json:"unresolved"`
 }
 
-// PreviewAudience — агрегат сұраныстар; жолдар жадқа жүктелмейді.
+// AudienceRecipient exposes internal references and a masked fingerprint, never a client installation ID or token.
+type AudienceRecipient struct {
+	UserID   string `json:"user_id"`
+	User     string `json:"user"`
+	DeviceID string `json:"device_id"`
+	Platform string `json:"platform"`
+	Locale   string `json:"locale"`
+	Push     string `json:"push"`
+}
+
+// PreviewAudience uses one read transaction so totals and the limited sample see the same database snapshot.
 func (s *Store) PreviewAudience(ctx context.Context, q AudienceQuery) (AudiencePreview, error) {
-	out := AudiencePreview{ByLanguage: map[string]LanguageReach{}, Unresolved: []string{}}
+	out := AudiencePreview{ByLanguage: map[string]LanguageReach{}, Exclusions: map[string]LanguageReach{},
+		Records: []AudienceRecipient{}, Unresolved: []string{}}
 	for _, l := range domain.Locales {
 		out.ByLanguage[l] = LanguageReach{}
 	}
-	match, matchArgs := matchClause(q)
-	if err := s.db.Reader().QueryRowContext(ctx,
-		`SELECT COUNT(*)`+audienceFrom+match, matchArgs...).Scan(&out.MatchedDevices); err != nil {
-		return out, err
-	}
-	where, args := eligible(q)
-	if err := s.db.Reader().QueryRowContext(ctx, `
-		SELECT COUNT(*), COUNT(DISTINCT i.user_id),
-		       COALESCE(SUM(CASE WHEN i.platform = 'android' THEN 1 ELSE 0 END), 0),
-		       COALESCE(SUM(CASE WHEN i.platform = 'ios' THEN 1 ELSE 0 END), 0)`+audienceFrom+where, args...).
-		Scan(&out.Devices, &out.Users, &out.Android, &out.IOS); err != nil {
-		return out, err
-	}
-	rows, err := s.db.Reader().QueryContext(ctx, `
-		SELECT `+resolvedLanguage+` AS language, COUNT(*), COUNT(DISTINCT i.user_id)`+audienceFrom+where+`
-		GROUP BY language`, args...)
+	tx, err := s.db.Reader().BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 	if err != nil {
 		return out, err
 	}
-	defer rows.Close()
+	defer tx.Rollback()
+	// LEFT JOIN counts matching accounts which have not registered any device yet.
+	matchFrom := ` FROM users u LEFT JOIN app_installations i ON i.user_id = u.id WHERE `
+	match, matchArgs := matchClause(q)
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(i.id), COUNT(DISTINCT u.id)`+matchFrom+match, matchArgs...).
+		Scan(&out.MatchedDevices, &out.MatchedUsers); err != nil {
+		return out, err
+	}
+	where, args := eligible(q)
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*), COUNT(DISTINCT i.user_id),
+  COALESCE(SUM(CASE WHEN i.platform = 'android' THEN 1 ELSE 0 END), 0),
+  COALESCE(SUM(CASE WHEN i.platform = 'ios' THEN 1 ELSE 0 END), 0)`+audienceFrom+where, args...).
+		Scan(&out.Devices, &out.Users, &out.Android, &out.IOS); err != nil {
+		return out, err
+	}
+	rows, err := tx.QueryContext(ctx, `SELECT `+resolvedLanguage+` AS language, COUNT(*), COUNT(DISTINCT i.user_id)`+
+		audienceFrom+where+` GROUP BY language`, args...)
+	if err != nil {
+		return out, err
+	}
 	for rows.Next() {
 		var language string
 		var reach LanguageReach
 		if err := rows.Scan(&language, &reach.Devices, &reach.Users); err != nil {
+			rows.Close()
 			return out, err
 		}
 		out.ByLanguage[language] = reach
 	}
-	return out, rows.Err()
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return out, err
+	}
+	// Each matched device gets its first failed eligibility check. A user with multiple
+	// devices may occur in several reason groups; reason counts must not be added as unique users.
+	reason := `CASE WHEN i.id IS NULL THEN 'no_devices'`
+	var reasonArgs []any
+	for _, check := range reachChecks(q) {
+		reason += ` WHEN NOT (` + check.clause + `) THEN '` + check.reason + `'`
+		reasonArgs = append(reasonArgs, check.args...)
+	}
+	reason += ` ELSE '' END`
+	rows, err = tx.QueryContext(ctx, `SELECT reason, COUNT(device_id), COUNT(DISTINCT user_id) FROM (
+  SELECT `+reason+` AS reason, i.id AS device_id, u.id AS user_id`+matchFrom+match+`) WHERE reason <> '' GROUP BY reason`,
+		append(reasonArgs, matchArgs...)...)
+	if err != nil {
+		return out, err
+	}
+	for rows.Next() {
+		var code string
+		var reach LanguageReach
+		if err := rows.Scan(&code, &reach.Devices, &reach.Users); err != nil {
+			rows.Close()
+			return out, err
+		}
+		out.Exclusions[code] = reach
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return out, err
+	}
+	rows, err = tx.QueryContext(ctx, `SELECT u.id, COALESCE(NULLIF(u.email, ''), u.phone, ''), i.id,
+  i.platform, `+resolvedLanguage+`, i.push_provider, COALESCE(i.push_token_hash, '')`+
+		audienceFrom+where+` ORDER BY i.last_seen_at DESC, i.id LIMIT 20`, args...)
+	if err != nil {
+		return out, err
+	}
+	for rows.Next() {
+		var rec AudienceRecipient
+		var provider, hash, identifier string
+		if err := rows.Scan(&rec.UserID, &identifier, &rec.DeviceID, &rec.Platform, &rec.Locale, &provider, &hash); err != nil {
+			rows.Close()
+			return out, err
+		}
+		rec.User = traits.MaskIdentifier(identifier)
+		rec.Push = domain.TokenFingerprint(provider, hash)
+		out.Records = append(out.Records, rec)
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return out, err
+	}
+	if out.Devices == 0 {
+		switch {
+		case out.MatchedUsers == 0:
+			out.EmptyReason = "no_matching_users"
+		case out.MatchedDevices == 0:
+			out.EmptyReason = "no_devices"
+		default:
+			out.EmptyReason = "no_eligible_devices"
+		}
+	}
+	return out, tx.Commit()
 }
 
 // ResolveAccountEmails — поштадан тіркелгіге (тек кәдімгі тіркелгілер). Табылмағаны бөлек.

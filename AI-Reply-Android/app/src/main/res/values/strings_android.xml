@@ -96,7 +96,7 @@
     <string name="android_keyboard_ready">AI Reply keyboard is ready</string>
     <string name="android_keyboard_enabled_not_selected">AI Reply is enabled but not selected</string>
     <string name="android_keyboard_not_enabled">AI Reply keyboard is not enabled yet</string>
-    <string name="android_howitworks_clipboard">Android lets the active keyboard read what you copied. AI Reply reads it only when you tap a template — never in the background.</string>
+    <string name="android_howitworks_clipboard">Copy a message in your chat, switch to AI Reply, then tap a recipient or Paste. Android lets the active keyboard read copied text; there is no separate clipboard permission to enable. AI Reply reads it only after your tap, never in the background.</string>
     <string name="android_privacy_sensitive">Text another app marked as sensitive, such as a password manager entry, is never read.</string>
     <string name="android_open_settings">Open app settings</string>
 
@@ -297,4 +297,8 @@
     <string name="voice_rec_undo_description">Remove the text added from voice</string>
     <string name="kb_err_voice_limit">You\'ve used today\'s voice input. It comes back tomorrow.</string>
 
+    <string name="kb_ai_label">AI</string>
+    <string name="kb_another_reply">Another reply</string>
+    <string name="kb_another_reply_compact">Again</string>
+    <string name="android_clipboard_title">Copied text</string>
 </resources>

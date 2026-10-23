@@ -178,21 +178,22 @@ func insertOwnDelivery(ctx context.Context, tx *sql.Tx, notificationID, userID, 
 const campaignColumns = `id, name, title, body, content, fallback_locale, category, link, data, audience_filter,
 	status, created_by, COALESCE((SELECT a.email FROM admin_users a WHERE a.id = created_by), ''),
 	COALESCE(idempotency_key, ''), recipient_count, device_count, created_at, updated_at, queued_at,
-	started_at, completed_at, cancelled_at, final_stats, notification_type`
+	started_at, completed_at, cancelled_at, final_stats, notification_type, recipient_snapshot_at`
 
 func scanCampaign(row interface{ Scan(...any) error }) (domain.Campaign, error) {
 	var (
-		c                                       domain.Campaign
-		content, data, audience, final          string
-		created, updated                        int64
-		queued, started, completed, cancelledAt sql.NullInt64
+		c                                                   domain.Campaign
+		content, data, audience, final                      string
+		created, updated                                    int64
+		queued, started, completed, cancelledAt, snapshotAt sql.NullInt64
 	)
 	err := row.Scan(&c.ID, &c.Name, &c.Title, &c.Body, &content, &c.FallbackLocale, &c.Category, &c.Link, &data,
 		&audience, &c.Status, &c.CreatedBy, &c.CreatedByEmail, &c.IdempotencyKey, &c.RecipientCount, &c.DeviceCount,
-		&created, &updated, &queued, &started, &completed, &cancelledAt, &final, &c.NotificationType)
+		&created, &updated, &queued, &started, &completed, &cancelledAt, &final, &c.NotificationType, &snapshotAt)
 	if err != nil {
 		return domain.Campaign{}, err
 	}
+	c.RecipientSnapshotAt = timePtr(snapshotAt)
 	c.Content = map[string]domain.LocalizedText{}
 	_ = json.Unmarshal([]byte(content), &c.Content)
 	c.Data = decodeData(data)
@@ -295,16 +296,27 @@ func (s *Store) ListCampaigns(ctx context.Context, status string, page traits.Pa
 	return out, total, rows.Err()
 }
 
-// QueueCampaign — draft → queued. Басқа күйдегі науқан өзгермейді (қайта басу зиянсыз).
-func (s *Store) QueueCampaign(ctx context.Context, id string, now time.Time) (bool, error) {
-	res, err := s.db.Writer().ExecContext(ctx, `
-		UPDATE notification_campaigns SET status = 'queued', queued_at = ?, updated_at = ?
-		WHERE id = ? AND status = 'draft'`, ms(now), ms(now), id)
-	if err != nil {
-		return false, err
-	}
-	n, err := res.RowsAffected()
-	return n > 0, err
+// QueueCampaign freezes recipients and queues the campaign in the same transaction.
+// It creates outbox rows only; provider calls remain exclusively in the worker.
+func (s *Store) QueueCampaign(ctx context.Context, c domain.Campaign, q AudienceQuery, texts map[string]domain.LocalizedText) (bool, error) {
+	var queued bool
+	err := s.db.Tx(ctx, func(tx *sql.Tx) error {
+		queued = false
+		res, err := tx.ExecContext(ctx, `UPDATE notification_campaigns SET status = 'queued', queued_at = ?, updated_at = ?
+   WHERE id = ? AND status = 'draft'`, ms(q.Now), ms(q.Now), c.ID)
+		if err != nil {
+			return err
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			return nil
+		}
+		if _, _, err := snapshotCampaign(ctx, tx, c, q, texts); err != nil {
+			return err
+		}
+		queued = true
+		return nil
+	})
+	return queued, err
 }
 
 // CancelCampaign — әлі жіберілмеген жеткізулерді тоқтатады.
@@ -358,21 +370,14 @@ func (s *Store) ids(ctx context.Context, query string, args ...any) ([]string, e
 	return out, rows.Err()
 }
 
-// FanOutCampaign — queued → processing және алушыларды тіл бойынша кезекке қою, бір транзакцияда.
-//
-// The status change is the claim: of two workers that see the same queued
-// campaign, one UPDATE changes a row and fans out, the other changes nothing
-// and returns claimed=false. Each language gets its own notification row
-// (dedupe "campaign:<id>:<lang>") with the text from texts, and the devices
-// whose notification language is that one. A crash in the middle rolls
-// everything back and the campaign stays queued for the next attempt.
+// FanOutCampaign starts the stable recipient snapshot prepared at send time.
+// Legacy queued campaigns without a snapshot are expanded once in this transaction.
 func (s *Store) FanOutCampaign(ctx context.Context, c domain.Campaign, q AudienceQuery, texts map[string]domain.LocalizedText) (claimed bool, devices, users int, err error) {
 	now := ms(q.Now)
 	err = s.db.Tx(ctx, func(tx *sql.Tx) error {
 		claimed, devices, users = false, 0, 0
-		res, err := tx.ExecContext(ctx, `
-			UPDATE notification_campaigns SET status = 'processing', started_at = ?, updated_at = ?
-			WHERE id = ? AND status = 'queued'`, now, now, c.ID)
+		res, err := tx.ExecContext(ctx, `UPDATE notification_campaigns SET status = 'processing', started_at = ?, updated_at = ?
+   WHERE id = ? AND status = 'queued'`, now, now, c.ID)
 		if err != nil {
 			return err
 		}
@@ -380,68 +385,79 @@ func (s *Store) FanOutCampaign(ctx context.Context, c domain.Campaign, q Audienc
 			return nil
 		}
 		claimed = true
-
-		for _, lang := range domain.Locales {
-			text, ok := texts[lang]
-			if !ok {
-				continue
-			}
-			dedupe := "campaign:" + c.ID + ":" + lang
-			if _, err := tx.ExecContext(ctx, insertNotification,
-				traits.NewID(), dedupe, dedupe, c.ID, nil, c.Category, campaignType(c), lang,
-				text.Title, text.Body, c.Link, encodeData(c.Data), "{}", now); err != nil {
-				return err
-			}
-			var notificationID string
-			if err := tx.QueryRowContext(ctx, `SELECT id FROM notifications WHERE dedupe_key = ?`, dedupe).
-				Scan(&notificationID); err != nil {
-				return err
-			}
-			q.Language = lang
-			where, args := eligible(q)
-			res, err := tx.ExecContext(ctx, deliveryInsert+where,
-				append([]any{notificationID, c.ID, now, now, now}, args...)...)
+		var snapshot sql.NullInt64
+		if err := tx.QueryRowContext(ctx, `SELECT recipient_snapshot_at, device_count, recipient_count
+   FROM notification_campaigns WHERE id = ?`, c.ID).Scan(&snapshot, &devices, &users); err != nil {
+			return err
+		}
+		if !snapshot.Valid {
+			devices, users, err = snapshotCampaign(ctx, tx, c, q, texts)
 			if err != nil {
 				return err
 			}
-			if n, _ := res.RowsAffected(); n == 0 {
-				// Nobody reads this language: no empty notification is kept.
-				if _, err := tx.ExecContext(ctx, `DELETE FROM notifications WHERE id = ?
-					AND NOT EXISTS (SELECT 1 FROM notification_deliveries d WHERE d.notification_id = notifications.id)`,
-					notificationID); err != nil {
-					return err
-				}
-			}
-		}
-		if err := tx.QueryRowContext(ctx, `
-			SELECT COUNT(*), COUNT(DISTINCT user_id) FROM notification_deliveries WHERE campaign_id = ?`, c.ID).
-			Scan(&devices, &users); err != nil {
-			return err
 		}
 		if devices == 0 {
-			_, err = tx.ExecContext(ctx, `
-				UPDATE notification_campaigns SET status = 'completed', completed_at = ?, updated_at = ?,
-					recipient_count = 0, device_count = 0, final_stats = '{"total":0}'
-				WHERE id = ?`, now, now, c.ID)
-			return err
+			_, err = tx.ExecContext(ctx, `UPDATE notification_campaigns SET status = 'completed', completed_at = ?, updated_at = ?,
+    final_stats = '{"total":0}' WHERE id = ?`, now, now, c.ID)
 		}
-		_, err = tx.ExecContext(ctx, `
-			UPDATE notification_campaigns SET recipient_count = ?, device_count = ?, updated_at = ? WHERE id = ?`,
-			users, devices, now, c.ID)
-		if err != nil || !domain.IsReminderType(c.NotificationType) {
-			return err
-		}
-		// An admin reminder counts in the ledger, so the automatic sweep keeps its cooldown.
-		_, err = tx.ExecContext(ctx, `
-			INSERT INTO notification_reminders (user_id, type, send_count, last_sent_at, last_source, updated_at)
-			SELECT DISTINCT user_id, ?, 1, ?, 'admin', ? FROM notification_deliveries
-			WHERE campaign_id = ? AND user_id IS NOT NULL
-			ON CONFLICT (user_id, type) DO UPDATE SET send_count = notification_reminders.send_count + 1,
-				last_sent_at = excluded.last_sent_at, last_source = excluded.last_source, updated_at = excluded.updated_at`,
-			c.NotificationType, now, now, c.ID)
 		return err
 	})
 	return claimed, devices, users, err
+}
+
+func snapshotCampaign(ctx context.Context, tx *sql.Tx, c domain.Campaign, q AudienceQuery, texts map[string]domain.LocalizedText) (devices, users int, err error) {
+	now := ms(q.Now)
+	for _, lang := range domain.Locales {
+		text, ok := texts[lang]
+		if !ok {
+			continue
+		}
+		dedupe := "campaign:" + c.ID + ":" + lang
+		if _, err := tx.ExecContext(ctx, insertNotification,
+			traits.NewID(), dedupe, dedupe, c.ID, nil, c.Category, campaignType(c), lang,
+			text.Title, text.Body, c.Link, encodeData(c.Data), "{}", now); err != nil {
+			return 0, 0, err
+		}
+		var notificationID string
+		if err := tx.QueryRowContext(ctx, `SELECT id FROM notifications WHERE dedupe_key = ?`, dedupe).
+			Scan(&notificationID); err != nil {
+			return 0, 0, err
+		}
+		q.Language = lang
+		where, args := eligible(q)
+		res, err := tx.ExecContext(ctx, deliveryInsert+where,
+			append([]any{notificationID, c.ID, now, now, now}, args...)...)
+		if err != nil {
+			return 0, 0, err
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			// Nobody reads this language: no empty notification is kept.
+			if _, err := tx.ExecContext(ctx, `DELETE FROM notifications WHERE id = ?
+			AND NOT EXISTS (SELECT 1 FROM notification_deliveries d WHERE d.notification_id = notifications.id)`,
+				notificationID); err != nil {
+				return 0, 0, err
+			}
+		}
+	}
+	if err := tx.QueryRowContext(ctx, `
+		SELECT COUNT(*), COUNT(DISTINCT user_id) FROM notification_deliveries WHERE campaign_id = ?`, c.ID).
+		Scan(&devices, &users); err != nil {
+		return 0, 0, err
+	}
+
+	if _, err = tx.ExecContext(ctx, `UPDATE notification_campaigns SET recipient_count = ?, device_count = ?,
+  recipient_snapshot_at = ?, updated_at = ? WHERE id = ?`, users, devices, now, now, c.ID); err != nil {
+		return 0, 0, err
+	}
+	if devices > 0 && domain.IsReminderType(c.NotificationType) {
+		_, err = tx.ExecContext(ctx, `INSERT INTO notification_reminders (user_id, type, send_count, last_sent_at, last_source, updated_at)
+   SELECT DISTINCT user_id, ?, 1, ?, 'admin', ? FROM notification_deliveries
+   WHERE campaign_id = ? AND user_id IS NOT NULL
+   ON CONFLICT (user_id, type) DO UPDATE SET send_count = notification_reminders.send_count + 1,
+    last_sent_at = excluded.last_sent_at, last_source = excluded.last_source, updated_at = excluded.updated_at`,
+			c.NotificationType, now, now, c.ID)
+	}
+	return devices, users, err
 }
 
 // campaignType — науқан хабарламаларының түрі (бос болса "campaign").
@@ -594,8 +610,17 @@ const inCancelledCampaign = `campaign_id IN (SELECT id FROM notification_campaig
 // claimable again; that retry counts as an attempt, unless its campaign was
 // cancelled meanwhile: then it ends as cancelled. Automatic notifications
 // (a purchase confirmation) are claimed before campaign rows, so a large
-// campaign never delays them.
-func (s *Store) ClaimDeliveries(ctx context.Context, owner string, now time.Time, lease time.Duration, limit int) ([]ClaimedDelivery, error) {
+// campaign never delays them. Campaign deliveries wait for their parent to enter
+// processing, and each worker claims only channels it can currently send.
+func (s *Store) ClaimDeliveries(ctx context.Context, owner string, now time.Time, lease time.Duration, limit int, channels []string) ([]ClaimedDelivery, error) {
+	if len(channels) == 0 {
+		return nil, nil
+	}
+	args := []any{owner, ms(now.Add(lease)), ms(now), ms(now), ms(now)}
+	for _, channel := range channels {
+		args = append(args, channel)
+	}
+	args = append(args, limit)
 	var out []ClaimedDelivery
 	err := s.db.Tx(ctx, func(tx *sql.Tx) error {
 		out = nil
@@ -610,12 +635,15 @@ func (s *Store) ClaimDeliveries(ctx context.Context, owner string, now time.Time
 			SET status = 'sending', lease_owner = ?, lease_until = ?, attempt_count = attempt_count + 1, updated_at = ?
 			WHERE id IN (
 				SELECT id FROM notification_deliveries
-				WHERE (status IN ('queued','retrying') AND next_attempt_at <= ?)
-				   OR (status = 'sending' AND lease_until < ?)
+				WHERE ((status IN ('queued','retrying') AND next_attempt_at <= ?)
+				   OR (status = 'sending' AND lease_until < ?))
+    AND (campaign_id IS NULL OR EXISTS (SELECT 1 FROM notification_campaigns c
+     WHERE c.id = notification_deliveries.campaign_id AND c.status = 'processing'))
+    AND channel IN (`+placeholders(len(channels))+`)
 				ORDER BY campaign_id IS NOT NULL, next_attempt_at LIMIT ?)
 			RETURNING id, notification_id, COALESCE(campaign_id, ''), channel, COALESCE(installation_id, ''),
 			          COALESCE(user_id, ''), platform, provider, attempt_count`,
-			owner, ms(now.Add(lease)), ms(now), ms(now), ms(now), limit)
+			args...)
 		if err != nil {
 			return err
 		}

@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		BA2026102300000000000012 /* paste-permission-en.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = BA2026102300000000000011 /* paste-permission-en.mp4 */; };
+		BA2026102300000000000022 /* paste-permission-ru.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = BA2026102300000000000021 /* paste-permission-ru.mp4 */; };
+		BA2026102300000000000032 /* paste-permission-kk.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = BA2026102300000000000031 /* paste-permission-kk.mp4 */; };
+		BA2026102300000000000042 /* paste-permission-uz.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = BA2026102300000000000041 /* paste-permission-uz.mp4 */; };
 		A1B2C3D4E5F6071829304A02 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071829304A01 /* PrivacyInfo.xcprivacy */; };
 		A1B2C3D4E5F6071829304A04 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071829304A03 /* PrivacyInfo.xcprivacy */; };
 		01B9F4CDCCDDFD2D4BD97650 /* KeyboardTyping.swift in Sources */ = {isa = PBXBuildFile; fileRef = C09C0AE3852C149085890DC1 /* KeyboardTyping.swift */; };
@@ -310,6 +314,10 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		BA2026102300000000000011 /* paste-permission-en.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = Tutorials/paste-permission-en.mp4; sourceTree = "<group>"; };
+		BA2026102300000000000021 /* paste-permission-ru.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = Tutorials/paste-permission-ru.mp4; sourceTree = "<group>"; };
+		BA2026102300000000000031 /* paste-permission-kk.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = Tutorials/paste-permission-kk.mp4; sourceTree = "<group>"; };
+		BA2026102300000000000041 /* paste-permission-uz.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = Tutorials/paste-permission-uz.mp4; sourceTree = "<group>"; };
 		A1B2C3D4E5F6071829304A01 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		A1B2C3D4E5F6071829304A03 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		007CAE30B84E19B48967E9DA /* TemplateListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateListView.swift; sourceTree = "<group>"; };
@@ -781,6 +789,10 @@
 				A301AD572AE5FB646DD9F3DD /* Assets.xcassets */,
 				A1B2C3D4E5F6071829304A05 /* InfoPlist.xcstrings */,
 				2E52AC5449FEDDEE2B8129A8 /* Localizable.xcstrings */,
+				BA2026102300000000000011 /* paste-permission-en.mp4 */,
+				BA2026102300000000000021 /* paste-permission-ru.mp4 */,
+				BA2026102300000000000031 /* paste-permission-kk.mp4 */,
+				BA2026102300000000000041 /* paste-permission-uz.mp4 */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -1094,6 +1106,10 @@
 			files = (
 				84FB3DEC26F06F5650AC3549 /* Assets.xcassets in Resources */,
 				39325F9CAB90B0BDF6FBAE0A /* Localizable.xcstrings in Resources */,
+				BA2026102300000000000012 /* paste-permission-en.mp4 in Resources */,
+				BA2026102300000000000022 /* paste-permission-ru.mp4 in Resources */,
+				BA2026102300000000000032 /* paste-permission-kk.mp4 in Resources */,
+				BA2026102300000000000042 /* paste-permission-uz.mp4 in Resources */,
 				A1B2C3D4E5F6071829304A06 /* InfoPlist.xcstrings in Resources */,
 				A1B2C3D4E5F6071829304A02 /* PrivacyInfo.xcprivacy in Resources */,
 			);

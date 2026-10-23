@@ -217,8 +217,9 @@ object KeyboardGeometry {
             // A row on its own grid (the bottom row) also takes that grid's
             // gap, so it is identical on every layout.
             val columns = max(row.unitColumns ?: page.columns, 1)
-            val gap = sizing.columnGap(columns)
-            val unit = (innerWidth - (columns - 1) * gap) / columns
+            val gridGap = sizing.columnGap(columns)
+            val gap = row.keyGap ?: gridGap
+            val unit = (innerWidth - (columns - 1) * gridGap) / columns
 
             // Gaps sit only between two KEYS. A spacer is itself the space
             // between its neighbours, so it never gets a gap of its own. A

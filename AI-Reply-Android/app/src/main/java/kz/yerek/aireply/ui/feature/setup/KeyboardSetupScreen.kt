@@ -70,6 +70,10 @@ fun KeyboardSetupScreen(onBack: (() -> Unit)? = null, showsTitle: Boolean = true
         ReadableColumn {
             Footnote(stringResource(R.string.android_setup_subtitle))
 
+            AppSection(stringResource(R.string.tutorial_videos_title)) {
+                KeyboardTutorialEntry()
+            }
+
             AppSection(stringResource(R.string.setup_checklist_title)) {
                 AppCard {
                     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s)) {
@@ -130,7 +134,7 @@ fun KeyboardSetupScreen(onBack: (() -> Unit)? = null, showsTitle: Boolean = true
                 KeyboardSetupAction(status, context)
             }
 
-            AppSection(stringResource(R.string.setup_paste_title)) {
+            AppSection(stringResource(R.string.android_clipboard_title)) {
                 AppCard {
                     Text(
                         stringResource(R.string.android_howitworks_clipboard),

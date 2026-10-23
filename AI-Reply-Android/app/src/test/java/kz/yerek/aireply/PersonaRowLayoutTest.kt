@@ -38,12 +38,12 @@ class PersonaRowLayoutTest {
 
     @Test
     fun `the row keeps its height`() {
-        assertEquals(44f, PersonaRowLayout.HEIGHT)
+        assertEquals(48f, PersonaRowLayout.HEIGHT)
     }
 
     @Test
     fun `the chips start right of create and run to the trailing edge`() {
-        val createEnd = PersonaRowLayout.SIDE_PADDING + PersonaRowLayout.CREATE_SIZE
+        val createEnd = PersonaRowLayout.SIDE_PADDING + PersonaRowLayout.CREATE_WIDTH
         assertTrue(PersonaRowLayout.CHIPS_START > createEnd)
         for (width in widths) {
             val end = PersonaRowLayout.CHIPS_START + PersonaRowLayout.chipsWidth(width)
@@ -53,7 +53,7 @@ class PersonaRowLayoutTest {
 
     @Test
     fun `the four built-ins fill the chips area without scrolling`() {
-        for (width in widths) {
+        for (width in widths.filter { it >= 393f }) {
             val available = PersonaRowLayout.chipsWidth(width)
             val chips = PersonaRowLayout.chipWidths(builtIns, available)
             val used = chips.sum() + PersonaRowLayout.CHIP_GAP * (chips.size - 1)
@@ -108,8 +108,8 @@ class PersonaRowLayoutTest {
 
     @Test
     fun `icons go before the chips would scroll`() {
-        // 411 dp, no 🎙: the Russian set fits with its icons.
-        val roomy = PersonaRowLayout.chipFit(builtIns, allIcons, PersonaRowLayout.chipsWidth(411f))
+        // 480 dp, no 🎙: the Russian set fits with its icons.
+        val roomy = PersonaRowLayout.chipFit(builtIns, allIcons, PersonaRowLayout.chipsWidth(480f))
         assertTrue(roomy.showsIcons)
         // 393 dp: not with the icons, but every label fits at a comfortable padding.
         val phone = PersonaRowLayout.chipFit(builtIns, allIcons, PersonaRowLayout.chipsWidth(393f))
@@ -122,12 +122,12 @@ class PersonaRowLayoutTest {
     }
 
     @Test
-    fun `at 360 dp with the mic the four labels still fit, without icons`() {
+    fun `compact rows preserve chip widths and scrolling with the wider AI button`() {
         for (labels in listOf(builtIns, kazakh, english)) {
             val available = PersonaRowLayout.chipsWidth(360f, hasMic = true)
             val fit = PersonaRowLayout.chipFit(labels, allIcons, available)
             assertFalse("$labels", fit.showsIcons)
-            assertTrue("$labels used=${used(fit.widths)} of $available", used(fit.widths) <= available)
+            assertTrue("$labels remain reachable by scrolling", used(fit.widths) > available)
             fit.widths.zip(labels).forEach { (chip, text) ->
                 assertTrue("$labels", chip >= text + PersonaRowLayout.TIGHT_PADDING * 2 - 0.001f)
             }
@@ -155,7 +155,7 @@ class PersonaRowLayoutTest {
 
     @Test
     fun `icons never change the row`() {
-        assertEquals(44f, PersonaRowLayout.HEIGHT)
+        assertEquals(48f, PersonaRowLayout.HEIGHT)
         assertTrue(PersonaRowLayout.ICON_SIZE < 30f)
         for (width in widths) {
             // ✨ and 🎙 keep their places whatever the chips show.
@@ -166,10 +166,11 @@ class PersonaRowLayoutTest {
     }
 
     @Test
-    fun `the mic mirrors create at the trailing edge and the chips keep the space between`() {
+    fun `the mic keeps its native target and the chips retain all remaining space`() {
         assertEquals(listOf(Slot.CREATE, Slot.CHIPS, Slot.MIC), PersonaRowLayout.order(hasMic = true))
         assertEquals(listOf(Slot.CREATE, Slot.CHIPS), PersonaRowLayout.order(hasMic = false))
-        assertEquals(PersonaRowLayout.CREATE_SIZE, PersonaRowLayout.MIC_SIZE)
+        assertTrue(PersonaRowLayout.CREATE_WIDTH > PersonaRowLayout.MIC_SIZE)
+        assertTrue(PersonaRowLayout.MIC_SIZE >= 48f)
         for (width in listOf(320f, 360f, 411f, 600f)) {
             val withMic = PersonaRowLayout.chipsWidth(width, hasMic = true)
             val end = PersonaRowLayout.CHIPS_START + withMic + PersonaRowLayout.SLOT_GAP + PersonaRowLayout.MIC_SIZE

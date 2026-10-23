@@ -56,6 +56,12 @@ struct PermissionsView: View {
                 Text("permissions.fullAccess")
             }
 
+            Section("tutorial.videos") {
+                NavigationLink { PasteTutorialView() } label: {
+                    Label("tutorial.paste.title", systemImage: "play.rectangle")
+                }
+            }
+
             Section {
                 PrivacyPoint("setup.privacy.clipboard")
                 PrivacyPoint("setup.privacy.explicit")

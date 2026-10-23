@@ -69,7 +69,7 @@
     <string name="android_keyboard_ready">AI Reply пернетақтасы дайын</string>
     <string name="android_keyboard_enabled_not_selected">AI Reply қосулы, бірақ таңдалмаған</string>
     <string name="android_keyboard_not_enabled">AI Reply пернетақтасы әлі қосылмаған</string>
-    <string name="android_howitworks_clipboard">Android белсенді пернетақтаға көшірілген мәтінді оқуға рұқсат береді. AI Reply оны тек сіз үлгіні түрткенде оқиды — фонда ешқашан.</string>
+    <string name="android_howitworks_clipboard">Чаттағы хабарламаны көшіріп, AI Reply пернетақтасына ауысыңыз да, алушыны немесе «Қою» түймесін түртіңіз. Android белсенді пернетақтаға көшірілген мәтінді оқуға рұқсат береді — алмасу буферіне бөлек рұқсат қосудың қажеті жоқ. AI Reply мәтінді тек сіз түрткеннен кейін оқиды, фонда ешқашан оқымайды.</string>
     <string name="android_privacy_sensitive">Басқа қолданба құпия деп белгілеген мәтін, мысалы құпия сөз менеджеріндегі жазба, ешқашан оқылмайды.</string>
     <string name="android_open_settings">Қолданба параметрлерін ашу</string>
 
@@ -266,4 +266,8 @@
     <string name="voice_rec_undo_description">Дауыспен қосылған мәтінді алып тастау</string>
     <string name="kb_err_voice_limit">Бүгінгі дауыспен енгізу таусылды. Ертең қайта қолжетімді болады.</string>
 
+    <string name="kb_ai_label">AI</string>
+    <string name="kb_another_reply">Басқа нұсқа</string>
+    <string name="kb_another_reply_compact">Тағы</string>
+    <string name="android_clipboard_title">Көшірілген мәтін</string>
 </resources>

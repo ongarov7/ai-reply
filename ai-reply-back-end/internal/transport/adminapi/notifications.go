@@ -296,12 +296,13 @@ func (s *Server) campaignDTO(v notifications.CampaignView) map[string]any {
 		"category": c.Category, "link": c.Link, "data": data, "audience": c.Audience, "status": c.Status,
 		"created_by": c.CreatedBy, "created_by_email": c.CreatedByEmail,
 		"recipient_count": c.RecipientCount, "device_count": c.DeviceCount,
-		"created_at":   c.CreatedAt.In(loc).Format("2006-01-02 15:04"),
-		"queued_at":    optionalTime(c.QueuedAt, loc),
-		"started_at":   optionalTime(c.StartedAt, loc),
-		"completed_at": optionalTime(c.CompletedAt, loc),
-		"cancelled_at": optionalTime(c.CancelledAt, loc),
-		"stats":        stats,
+		"created_at":            c.CreatedAt.In(loc).Format("2006-01-02 15:04"),
+		"queued_at":             optionalTime(c.QueuedAt, loc),
+		"recipient_snapshot_at": optionalTime(c.RecipientSnapshotAt, loc),
+		"started_at":            optionalTime(c.StartedAt, loc),
+		"completed_at":          optionalTime(c.CompletedAt, loc),
+		"cancelled_at":          optionalTime(c.CancelledAt, loc),
+		"stats":                 stats,
 	}
 }
 

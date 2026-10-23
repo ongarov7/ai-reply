@@ -32,16 +32,16 @@ object PersonaRowLayout {
 
     fun order(hasMic: Boolean): List<Slot> = if (hasMic) order + Slot.MIC else order
 
-    const val HEIGHT = 44f
+    const val HEIGHT = 48f
 
     /** Between the row's content and the keyboard's edges. */
     const val SIDE_PADDING = 6f
 
-    /** The ✨ disc. */
-    const val CREATE_SIZE = 30f
+    /** A recognizable ✨ AI pill, with a native-size interactive height. */
+    const val CREATE_WIDTH = 64f
 
-    /** The 🎙 disc: ✨'s size, so the row stays balanced. */
-    const val MIC_SIZE = CREATE_SIZE
+    /** The microphone keeps a separate, square touch target. */
+    const val MIC_SIZE = 48f
 
     /** Between ✨ and the chips (or the suggestions), and between them and 🎙. */
     const val SLOT_GAP = 6f
@@ -52,10 +52,8 @@ object PersonaRowLayout {
     val CHIP_PADDINGS = listOf(14f, 11f, 8f)
 
     /**
-     * The last padding before the chips scroll, for labels only: the four
-     * built-ins in Russian or Kazakh just miss the row at 8 dp on a 360 dp
-     * phone with 🎙, and a row of four that scrolls by a few dp hides the
-     * last one for nothing. Icons never get this little room.
+     * The last padding before labels scroll. Icons keep their roomier
+     * padding; adding the wider AI action never squeezes either below it.
      */
     const val TIGHT_PADDING = 6f
 
@@ -70,7 +68,7 @@ object PersonaRowLayout {
     const val ICON_WIDTH = ICON_SIZE + ICON_GAP
 
     /** Where the chips (and the suggestions) start, from the row's leading edge. */
-    const val CHIPS_START = SIDE_PADDING + CREATE_SIZE + SLOT_GAP
+    const val CHIPS_START = SIDE_PADDING + CREATE_WIDTH + SLOT_GAP
 
     /** The width the chips - or the suggestions - get in a row [rowWidth] wide, with or without 🎙. */
     fun chipsWidth(rowWidth: Float, hasMic: Boolean = false): Float =

@@ -22,6 +22,131 @@ final class KeyboardGeometryTests: XCTestCase {
         }
     }
 
+    private func overlaps(_ a: CGRect, _ b: CGRect) -> Bool {
+        let intersection = a.intersection(b)
+        return !intersection.isNull && intersection.width > 0 && intersection.height > 0
+    }
+
+    /// Exact boundary coordinates matter on 3x displays: decimal thirds
+    /// must remain half-open after CGRect reconstructs origin + width.
+    func testHitPartitionsShareExactEdgesAtEveryDisplayScale() {
+        for scale: CGFloat in [2, 3] {
+            for width: CGFloat in [320, 375, 390, 430] {
+                let sizing = KeyboardSizing(width: width, isLandscape: false, scale: scale)
+                let options = KeyboardPageOptions(showsNextKeyboardKey: true, showsLanguageKey: true, field: .email)
+                for page in allPages(options) {
+                    let layout = KeyboardGeometry.layout(page: page, sizing: sizing, areaHeight: sizing.keyAreaHeight(maximumRows: 5))
+                    var previousRowBottom: CGFloat = 0
+                    for rowIndex in page.rows.indices {
+                        let row = layout.keys.filter { $0.row == rowIndex }
+                        XCTAssertEqual(row.first!.hitFrame.minY, previousRowBottom)
+                        previousRowBottom = row.first!.hitFrame.maxY
+                        for (left, right) in zip(row, row.dropFirst()) {
+                            XCTAssertEqual(left.hitFrame.maxX, right.hitFrame.minX)
+                            let boundary = CGPoint(x: right.hitFrame.minX, y: right.hitFrame.midY)
+                            XCTAssertEqual(layout.keys.filter { $0.hitFrame.contains(boundary) }.count, 1)
+                            XCTAssertEqual(layout.key(at: boundary)?.action, right.action)
+                            let before = CGPoint(x: boundary.x.nextDown, y: boundary.y)
+                            XCTAssertEqual(layout.key(at: before)?.action, left.action)
+                        }
+                    }
+                    XCTAssertEqual(previousRowBottom, layout.size.height)
+                }
+            }
+        }
+    }
+
+    func testBottomRowRemainsExclusiveInEveryFieldAndControlCombination() {
+        for sizing in sizings() {
+            for field: KeyboardFieldKind in [.text, .email, .url, .social] {
+                for globe in [false, true] {
+                    for languageKey in [false, true] {
+                        var options = KeyboardPageOptions(showsNextKeyboardKey: globe, showsLanguageKey: languageKey, field: field)
+                        options.showsEmojiKey = KeyboardGeometry.fitsEmojiKey(options: options, sizing: sizing)
+                        for page in allPages(options) {
+                            let layout = KeyboardGeometry.layout(page: page, sizing: sizing, areaHeight: sizing.keyAreaHeight(maximumRows: 5))
+                            let row = layout.keys.filter { $0.row == page.rows.count - 1 }
+                            for key in row {
+                                XCTAssertGreaterThan(key.frame.width, 0)
+                                XCTAssertGreaterThanOrEqual(key.frame.minX, 0)
+                                XCTAssertLessThanOrEqual(key.frame.maxX, sizing.width)
+                                for other in row where other.action != key.action {
+                                    XCTAssertFalse(overlaps(key.hitFrame, other.hitFrame), "\(field) \(key.action) \(other.action)")
+                                }
+                            }
+                            let space = row.first { $0.action == .space }!
+                            for x in stride(from: space.frame.minX + 0.25, to: space.frame.maxX, by: 1) {
+                                XCTAssertEqual(layout.key(at: CGPoint(x: x, y: space.frame.midY))?.action, .space)
+                            }
+                            if globe { XCTAssertTrue(row.contains { $0.action == .nextKeyboard }) }
+                            if languageKey { XCTAssertTrue(row.contains { $0.action == .nextLanguage }) }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    func testSpaceGainsWidthWithoutBorrowingItsNeighboursHitAreas() {
+        for width: CGFloat in [375, 390, 393, 430, 440] {
+            let sizing = KeyboardSizing(width: width, isLandscape: false)
+            let options = KeyboardPageOptions(showsEmojiKey: true)
+            let page = KeyboardLayout.page(language: .russian, plane: .letters, options: options)
+            var legacyRows = page.rows
+            legacyRows[legacyRows.count - 1].slots = legacyRows.last!.slots.map { slot in
+                switch slot.action {
+                case .some(.plane(_)), .some(.nextLanguage), .some(.nextKeyboard):
+                    return .key(slot.action!, .units(KeyboardLayout.latinModifierWidth))
+                case .returnKey?: return .key(.returnKey, .units(2.75))
+                default: return slot
+                }
+            }
+            let legacy = KeyboardPageSpec(language: page.language, plane: page.plane, columns: page.columns, rows: legacyRows)
+            let area = sizing.keyAreaHeight(maximumRows: 5)
+            let currentLayout = KeyboardGeometry.layout(page: page, sizing: sizing, areaHeight: area)
+            let oldLayout = KeyboardGeometry.layout(page: legacy, sizing: sizing, areaHeight: area)
+            let currentSpace = currentLayout.keys.first { $0.action == .space }!
+            let oldSpace = oldLayout.keys.first { $0.action == .space }!
+            XCTAssertGreaterThanOrEqual(currentSpace.frame.width / oldSpace.frame.width, width >= 430 ? 1.25 : 1.15)
+            for key in currentLayout.keys where key.row == page.rows.count - 1 && key.action != .space {
+                XCTAssertFalse(overlaps(currentSpace.hitFrame, key.hitFrame))
+            }
+        }
+    }
+
+    func testResultActionsFitAllWidthsLanguagesAndLargerTextWithoutOverlap() {
+        for width in portraitWidths + [568, 844] {
+            for language in AppLanguage.allCases {
+                for fontSize: CGFloat in [14, 20] {
+                    let strings = AIReplyStrings.forLanguage(language)
+                    let font = UIFont.systemFont(ofSize: fontSize, weight: .medium)
+                    let measured = ceil((strings.regenerate as NSString).size(withAttributes: [.font: font]).width) + 44
+                    let layout = ReplyResultActionsLayout(width: width - 26, regenerateWidth: measured, insertWidth: 108)
+                    let frames = [layout.back, layout.regenerate, layout.edit, layout.previous, layout.version, layout.next, layout.insert]
+                    for (index, frame) in frames.enumerated() {
+                        XCTAssertGreaterThanOrEqual(frame.minX, 0)
+                        XCTAssertLessThanOrEqual(frame.maxX, width - 26)
+                        XCTAssertLessThanOrEqual(frame.maxY, layout.height)
+                        XCTAssertGreaterThanOrEqual(frame.height, 44)
+                        if index != 4 { XCTAssertGreaterThanOrEqual(frame.width, 44) }
+                        for other in frames.dropFirst(index + 1) { XCTAssertFalse(overlaps(frame, other)) }
+                    }
+                    XCTAssertEqual(layout.regenerate.minY, layout.back.minY)
+                    XCTAssertGreaterThan(layout.regenerate.width, layout.back.width * 2)
+                }
+            }
+        }
+    }
+
+    func testResultControlsUseASecondRowOnlyWhenNeeded() {
+        let compact = ReplyResultActionsLayout(width: 294, regenerateWidth: 150, insertWidth: 108)
+        let landscape = ReplyResultActionsLayout(width: 818, regenerateWidth: 150, insertWidth: 108)
+        XCTAssertEqual(compact.height, 94)
+        XCTAssertEqual(compact.insert.minY, 50)
+        XCTAssertEqual(landscape.height, 44)
+        XCTAssertEqual(landscape.insert.minY, 0)
+    }
+
     /// Every point of the key area belongs to exactly one key. This is the
     /// test that fails if a gap, a margin or a spacer swallows a touch.
     func testHitFramesTileTheWholeKeyArea() {
@@ -137,7 +262,7 @@ final class KeyboardGeometryTests: XCTestCase {
         for width in portraitWidths + [844] where width >= 375 {
             let row = PersonaRowLayout(width: width, textWidths: fourPersonas)
             let create = row.createFrame
-            XCTAssertEqual(create, CGRect(x: 8, y: 3, width: 38, height: 30), "w=\(width)")
+            XCTAssertEqual(create, CGRect(x: 8, y: 0, width: 64, height: 44), "w=\(width)")
 
             XCTAssertEqual(row.pillFrames.count, 4)
             let pills = row.pillFrames.map { $0.offsetBy(dx: row.personasFrame.minX, dy: 0) }
@@ -212,23 +337,23 @@ final class KeyboardGeometryTests: XCTestCase {
     // MARK: Persona icons
 
     /// Icons first, then every padding without them, then scrolling: on a Max
-    /// phone the four fit with icons; on the 393 and 375 phones they keep
+    /// row the four fit with icons; on the 393 and 375 phones they keep
     /// their names and lose the icons; at 320 they scroll, without icons.
     func testIconsAreTheFirstThingTheRowGivesUp() {
-        let wide = PersonaRowLayout(width: 430, textWidths: fourPersonas, iconWidths: fourIcons)
+        let wide = PersonaRowLayout(width: 500, textWidths: fourPersonas, iconWidths: fourIcons)
         XCTAssertTrue(wide.showsIcons)
         XCTAssertFalse(wide.scrolls)
-        XCTAssertEqual(wide.pillFrames[0].width, fourPersonas[0] + fourIcons[0] + 8 * 2 + stretch(of: wide, padding: 8, icons: true), accuracy: 0.01)
+        XCTAssertEqual(wide.pillFrames[0].width, fourPersonas[0] + fourIcons[0] + 14 * 2 + stretch(of: wide, padding: 14, icons: true), accuracy: 0.01)
 
         let regular = PersonaRowLayout(width: 393, textWidths: fourPersonas, iconWidths: fourIcons)
         XCTAssertFalse(regular.showsIcons, "no padding has room for the icons at 393")
         XCTAssertFalse(regular.scrolls)
-        XCTAssertEqual(regular.pillFrames[0].width, fourPersonas[0] + 14 * 2 + stretch(of: regular, padding: 14, icons: false), accuracy: 0.01)
+        XCTAssertEqual(regular.pillFrames[0].width, fourPersonas[0] + 11 * 2 + stretch(of: regular, padding: 11, icons: false), accuracy: 0.01)
 
         let compact = PersonaRowLayout(width: 375, textWidths: fourPersonas, iconWidths: fourIcons)
         XCTAssertFalse(compact.showsIcons)
         XCTAssertFalse(compact.scrolls)
-        XCTAssertEqual(compact.pillFrames[0].width, fourPersonas[0] + 11 * 2 + stretch(of: compact, padding: 11, icons: false), accuracy: 0.01)
+        XCTAssertEqual(compact.pillFrames[0].width, fourPersonas[0] + 8 * 2 + stretch(of: compact, padding: 8, icons: false), accuracy: 0.01)
 
         let narrow = PersonaRowLayout(width: 320, textWidths: fourPersonas, iconWidths: fourIcons)
         XCTAssertFalse(narrow.showsIcons, "a row that scrolls never shows icons")

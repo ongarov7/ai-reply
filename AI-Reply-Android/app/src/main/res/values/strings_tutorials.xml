@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tutorial_videos_title">Video tutorials</string>
+    <string name="tutorial_keyboard_title">Keyboard setup and copied text</string>
+    <string name="tutorial_watch">Watch video</string>
+    <string name="tutorial_play_pause">Play / pause</string>
+    <string name="tutorial_replay">Replay</string>
+    <string name="tutorial_offline_body">The video is stored on your phone and works offline. You can return to these instructions at any time. Watching does not grant Android permissions.</string>
+    <string name="tutorial_video_error">The video could not be opened. The written instructions are still available.</string>
+    <string name="tutorial_caption_setup">Open Keyboard setup in AI Reply.</string>
+    <string name="tutorial_caption_settings">In Android settings, find AI Reply in the on-screen keyboard list.</string>
+    <string name="tutorial_caption_allow">Enable AI Reply, then select it as your keyboard. A separate clipboard permission is not required.</string>
+    <string name="tutorial_caption_try">Copy a message, switch to AI Reply, then tap a recipient or Paste. Text is read only after your tap.</string>
+</resources>

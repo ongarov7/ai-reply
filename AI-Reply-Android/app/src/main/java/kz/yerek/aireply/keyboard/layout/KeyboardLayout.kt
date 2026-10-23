@@ -74,7 +74,9 @@ data class KeyRow(
      * grid. The bottom row uses the 10-column grid on every layout, so ?123,
      * space and return keep one size whatever language is up.
      */
-    val unitColumns: Int? = null
+    val unitColumns: Int? = null,
+    /** Spacing between controls; their unit size stays on the page grid. */
+    val keyGap: Float? = null
 )
 
 /** A complete page: every row, the bottom one included. */
@@ -176,8 +178,10 @@ object KeyboardLayout {
 
     val KAZAKH_LETTERS: List<List<String>> = listOf(KAZAKH_TOP_ROW) + RUSSIAN_LETTERS
 
-    /** Shift and delete on the Latin rows, and the plane / return keys. */
+    /** Shift and delete on the Latin rows, and the Return key. */
     const val MODIFIER_UNITS = 1.5f
+    const val BOTTOM_PLANE_UNITS = 1.35f
+    private const val BOTTOM_ROW_GAP = 3f
 
     private const val DIGITS = "1234567890"
 
@@ -362,11 +366,12 @@ object KeyboardLayout {
         val modifier = KeyWidth.Units(MODIFIER_UNITS)
         val bar = KeyRow(
             listOf(
-                KeySlot(KeyboardKey.Plane(KeyboardPlane.LETTERS), modifier),
+                KeySlot(KeyboardKey.Plane(KeyboardPlane.LETTERS), KeyWidth.Units(BOTTOM_PLANE_UNITS)),
                 KeySlot.panel(PanelKind.EMOJI_CATEGORIES, KeyWidth.Flexible(1f)),
                 KeySlot(KeyboardKey.Backspace, modifier)
             ),
-            unitColumns = 10
+            unitColumns = 10,
+            keyGap = BOTTOM_ROW_GAP
         )
         return KeyboardPage(
             language = language,
@@ -484,7 +489,7 @@ object KeyboardLayout {
      * sized on the 10-column grid so the row is identical on every layout.
      */
     private fun bottomRow(language: KeyboardLanguage, planeKey: KeyboardPlane, options: PageOptions): KeyRow {
-        val slots = mutableListOf(KeySlot(KeyboardKey.Plane(planeKey), KeyWidth.Units(MODIFIER_UNITS)))
+        val slots = mutableListOf(KeySlot(KeyboardKey.Plane(planeKey), KeyWidth.Units(BOTTOM_PLANE_UNITS)))
 
         // The letters' row only: ?123 and =\< stay exactly as they were.
         if (options.showsEmojiKey && planeKey == KeyboardPlane.NUMBERS) slots += KeySlot(KeyboardKey.Plane(KeyboardPlane.EMOJI))
@@ -501,7 +506,7 @@ object KeyboardLayout {
             }
             slots += KeySlot(KeyboardKey.Character(extra), alternates = alternates(extra, language))
         }
-        if (options.showsLanguageKey) slots += KeySlot(KeyboardKey.Layout, KeyWidth.Units(1.25f))
+        if (options.showsLanguageKey) slots += KeySlot(KeyboardKey.Layout, KeyWidth.Units(1f))
 
         slots += KeySlot(KeyboardKey.Space, KeyWidth.Flexible(1f))
 
@@ -509,9 +514,11 @@ object KeyboardLayout {
             FieldKind.TEXT -> listOf(",", "?", "!", "…", ":", ";", "'", "\"", "-")
             FieldKind.EMAIL, FieldKind.URL -> listOf(".com", ".kz", ".ru")
         }
-        slots += KeySlot(KeyboardKey.Character("."), alternates = stopAlternates)
+        slots += KeySlot(KeyboardKey.Character("."), KeyWidth.Units(0.9f), alternates = stopAlternates)
         slots += KeySlot(KeyboardKey.Return, KeyWidth.Units(MODIFIER_UNITS))
-        return KeyRow(slots, unitColumns = 10)
+        // Reclaim secondary-key width and spare spacing for Space, retaining
+        // the full system-switch and Return widths on the shared grid.
+        return KeyRow(slots, unitColumns = 10, keyGap = BOTTOM_ROW_GAP)
     }
 
     // ---------------------------------------------------------- long press

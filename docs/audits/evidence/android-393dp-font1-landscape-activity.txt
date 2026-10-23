@@ -1,0 +1,2 @@
+Android emulator activity configuration (read-only dumpsys)
+mOverrideConfig={1.0 310mcc260mnc [en_US] ldltr sw393dp w881dp h393dp 440dpi nrml long land finger -keyb/v/h -nav/h winConfig={ mBounds=Rect(0, 0 - 2424, 1080) mAppBounds=Rect(0, 0 - 2424, 1080) mMaxBounds=Rect(0, 0 - 2424, 1080) mDisplayRotation=ROTATION_90 mWindowingMode=fullscreen mActivityType=standard mAlwaysOnTop=undefined mRotation=ROTATION_90} as.4 s.2 fontWeightAdjustment=0}

@@ -69,7 +69,7 @@
     <string name="android_keyboard_ready">Клавиатура AI Reply готова</string>
     <string name="android_keyboard_enabled_not_selected">AI Reply включена, но не выбрана</string>
     <string name="android_keyboard_not_enabled">Клавиатура AI Reply ещё не включена</string>
-    <string name="android_howitworks_clipboard">Android разрешает активной клавиатуре читать скопированный текст. AI Reply читает его только когда вы нажимаете шаблон — никогда в фоне.</string>
+    <string name="android_howitworks_clipboard">Скопируйте сообщение в чате, переключитесь на AI Reply и нажмите получателя или «Вставить». Android разрешает активной клавиатуре читать скопированный текст — отдельное разрешение для буфера обмена включать не нужно. AI Reply читает текст только после вашего нажатия, никогда в фоне.</string>
     <string name="android_privacy_sensitive">Текст, помеченный другим приложением как конфиденциальный (например, запись из менеджера паролей), не читается никогда.</string>
     <string name="android_open_settings">Открыть настройки приложения</string>
 
@@ -266,4 +266,8 @@
     <string name="voice_rec_undo_description">Убрать текст, добавленный голосом</string>
     <string name="kb_err_voice_limit">Голосовой ввод на сегодня исчерпан. Завтра он снова будет доступен.</string>
 
+    <string name="kb_ai_label">AI</string>
+    <string name="kb_another_reply">Другой вариант</string>
+    <string name="kb_another_reply_compact">Ещё</string>
+    <string name="android_clipboard_title">Скопированный текст</string>
 </resources>

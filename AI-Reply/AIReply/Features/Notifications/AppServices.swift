@@ -161,7 +161,11 @@ final class AppServices {
         guard isStarted, phase == .active else { return }
         // The user may have changed the permission in iOS Settings; a change
         // registers again on its own.
-        Task { await notifications.refreshPermission() }
+        Task {
+            await notifications.refreshPermission()
+            // APNs may have failed while offline on the previous attempt.
+            requestDeviceTokenIfPossible()
+        }
         // A token FCM could not make earlier (offline at launch) is tried again.
         if hasAPNsToken, currentPushToken == nil { fetchPushToken() }
         requestInstallationSync(routine: true)
@@ -196,6 +200,7 @@ final class AppServices {
     }
 
     func didFailToRegisterForRemoteNotifications(error: Error) {
+        hasRequestedDeviceToken = false
         ReplyLog.event("push: APNs registration failed: \(error)")
     }
 
