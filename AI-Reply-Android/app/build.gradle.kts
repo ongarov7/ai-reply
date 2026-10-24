@@ -46,7 +46,7 @@ val googleWebClientId: String = run {
 }
 
 /**
- * versionCode 1 / versionName "1.0" unless overridden for a store upload, so
+ * versionCode 2 / versionName "1.0.1" unless overridden for a store upload, so
  * every Play upload gets a higher number without editing this file:
  *   ./gradlew bundleRelease -Paireply.versionCode=7 -Paireply.versionName=1.0.6
  * A value that is not a positive whole number (Play's ceiling is 2100000000),
@@ -56,11 +56,11 @@ val appVersionCode: Int = (findProperty("aireply.versionCode") as String?)?.trim
     requireNotNull(raw.toIntOrNull()?.takeIf { it in 1..2_100_000_000 }) {
         "aireply.versionCode must be a whole number from 1 to 2100000000, got \"$raw\""
     }
-} ?: 1
+} ?: 2
 
 val appVersionName: String = (findProperty("aireply.versionName") as String?)?.trim()?.also { name ->
     require(name.isNotEmpty()) { "aireply.versionName must not be empty" }
-} ?: "1.0"
+} ?: "1.0.1"
 
 android {
     namespace = "kz.yerek.aireply"
