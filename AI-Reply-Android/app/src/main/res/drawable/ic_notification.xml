@@ -1,28 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-    Status-bar icon for notifications: the app mark (reply arrow and spark, the
-    geometry of ic_launcher_foreground) as a single white shape. The system
-    tints it; colour here would be ignored, and shading would turn into a blob.
--->
+<!-- Monochrome speech bubbles for the system-tinted notification status icon. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="24dp"
-    android:height="24dp"
-    android:viewportWidth="24"
-    android:viewportHeight="24">
-
-    <group
-        android:scaleX="0.3667"
-        android:scaleY="0.3667"
-        android:translateX="-9.27"
-        android:translateY="-6.15">
-
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
         <path
             android:fillColor="#FFFFFF"
-            android:pathData="M28,52 L48,34 L48,44 C66,45.5 78,56.5 80.5,77 C72,62.5 62,57.5 48,57.5 L48,68 Z" />
-
+            android:pathData="M18,8 H18.5 C20.4,8 22,9.6 22,11.5 V17.5 C22,19.4 20.4,21 18.5,21 H18 V23 L14,21 H10.5 C9.5,21 8.6,20.6 8,20 H14.5 L16,20.8 V19 H18.5 C19.3,19 20,18.3 20,17.5 V11.5 C20,10.7 19.3,10 18.5,10 H18 Z" />
         <path
             android:fillColor="#FFFFFF"
-            android:pathData="M78,22 L80.6,29.4 L88,32 L80.6,34.6 L78,42 L75.4,34.6 L68,32 L75.4,29.4 Z" />
-    </group>
-
+            android:fillType="evenOdd"
+            android:pathData="M5.5,2 H15.5 C18,2 20,4 20,6.5 V12.5 C20,15 18,17 15.5,17 H10 L5,21 V17 C2.8,16.8 1,14.9 1,12.5 V6.5 C1,4 3,2 5.5,2 Z M5.5,4 C4.1,4 3,5.1 3,6.5 V12.5 C3,13.9 4.1,15 5.5,15 H7 V16.8 L9.3,15 H15.5 C16.9,15 18,13.9 18,12.5 V6.5 C18,5.1 16.9,4 15.5,4 Z" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M7.5,9.5 A1,1 0,1 1,5.5,9.5 A1,1 0,1 1,7.5,9.5 Z M11.5,9.5 A1,1 0,1 1,9.5,9.5 A1,1 0,1 1,11.5,9.5 Z M15.5,9.5 A1,1 0,1 1,13.5,9.5 A1,1 0,1 1,15.5,9.5 Z" />
 </vector>

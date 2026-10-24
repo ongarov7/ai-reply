@@ -87,7 +87,7 @@ as long as the Compose BOM and the Compose compiler plugin move with Kotlin.
 ./gradlew assembleRelease         # needs a signing config; none is checked in
 ```
 
-Each Play upload needs a higher `versionCode`. The defaults (2 / "1.0.1") stay
+Each Play upload needs a higher `versionCode`. The defaults (3 / "1.0.2") stay
 in `app/build.gradle.kts`; an upload overrides them instead of editing it:
 
 ```bash
@@ -105,6 +105,11 @@ echo "sdk.dir=$HOME/Library/Android/sdk" > local.properties
 ```
 
 `build-and-log.command` does all of the above and writes `build.log`.
+
+The launcher and in-app mark share the owner's approved artwork in
+`app/src/main/res/drawable-nodpi/app_mark.png`. Adaptive icons retain the full
+image; density PNGs cover legacy launchers. Themed icons and notification icons
+use a monochrome speech-bubble motif so system tinting stays legible.
 
 ### Sign-in (Google, e-mail)
 

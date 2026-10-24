@@ -1,22 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-    The app mark: a reply arrow with a spark, the same geometry the iOS
-    AppMarkView draws. Vector rather than a PNG set, for the same reason it is
-    drawn on iOS: one source that is crisp at every density.
--->
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M28,52 L48,34 L48,44 C66,45.5 78,56.5 80.5,77 C72,62.5 62,57.5 48,57.5 L48,68 Z" />
-
-    <path
-        android:fillColor="#FFFFFF"
-        android:fillAlpha="0.95"
-        android:pathData="M78,22 L80.6,29.4 L88,32 L80.6,34.6 L78,42 L75.4,34.6 L68,32 L75.4,29.4 Z" />
-
-</vector>
+<!-- Preserve the complete owner-supplied icon inside the adaptive icon's 72dp viewport. -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/app_mark"
+    android:insetLeft="16.6667%"
+    android:insetTop="16.6667%"
+    android:insetRight="16.6667%"
+    android:insetBottom="16.6667%" />
