@@ -7,6 +7,7 @@ struct HomeView: View {
     @Environment(AccountModel.self) private var account
     @Environment(PushNotificationsModel.self) private var notifications
     @Environment(SupportInbox.self) private var support
+    @Environment(AppUpdateModel.self) private var updates
 
     /// Re-read on appearance and on every return to the foreground -
     /// typically from iOS Settings, or from another app where the keyboard
@@ -19,6 +20,10 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: DS.Spacing.xl) {
                 header
                 if account.isSignedIn { usageCard }
+                if updates.showsUpdateCard {
+                    AppUpdateCard()
+                        .transition(.opacity)
+                }
                 if notifications.showsPermissionCard {
                     PushPermissionCard()
                         .transition(.opacity)
@@ -61,11 +66,15 @@ struct HomeView: View {
             keyboard.refresh()
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { keyboard.refresh() }
+            if phase == .active {
+                keyboard.refresh()
+                Task { await updates.checkForUpdates() }
+            }
         }
         .task {
             await account.refresh()
         }
+        .task { await updates.checkForUpdates() }
     }
 
     // MARK: Sections

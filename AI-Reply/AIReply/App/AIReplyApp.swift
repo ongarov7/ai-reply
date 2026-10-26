@@ -11,6 +11,7 @@ struct AIReplyApp: App {
     @State private var configuration: ReplyConfigurationModel
     @State private var account: AccountModel
     @State private var keyboardStatus: KeyboardStatusMonitor
+    @State private var updates: AppUpdateModel
     @Environment(\.scenePhase) private var scenePhase
 
     private let services = AppServices.shared
@@ -70,6 +71,11 @@ struct AIReplyApp: App {
         _configuration = State(initialValue: configuration)
         _account = State(initialValue: account)
         _keyboardStatus = State(initialValue: keyboardStatus)
+        #if DEBUG
+        _updates = State(initialValue: AppUpdateModel.debugPreviewIfRequested() ?? AppUpdateModel())
+        #else
+        _updates = State(initialValue: AppUpdateModel())
+        #endif
     }
 
     var body: some Scene {
@@ -101,6 +107,7 @@ struct AIReplyApp: App {
             .environment(services.notifications)
             .environment(services.purchases)
             .environment(services.support)
+            .environment(updates)
             // A gender picked on another device arrives with /me; one picked
             // here and not yet confirmed is retried on every return.
             .onChange(of: account.profile) {

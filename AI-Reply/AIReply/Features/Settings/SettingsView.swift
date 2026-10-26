@@ -180,6 +180,8 @@ struct SettingsView: View {
             }
             .task { await support.refresh() }
 
+            AppUpdateSettingsSection()
+
             if !AppGroup.isAvailable || !model.isPersistent {
                 Section {
                     Label("settings.storage.unavailable", systemImage: "exclamationmark.triangle")

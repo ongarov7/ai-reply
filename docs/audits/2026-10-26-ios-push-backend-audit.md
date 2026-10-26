@@ -52,3 +52,23 @@ The full suite passed (integration package 52.152 s); the focused race suite pas
 (27.917 s). The bundled Node runtime also passed `--check` for `admin-app.js` and
 `tools/tests/admin-push-ui.test.cjs`, including both Vue template compilations.
 `git diff --check` passed. No provider delivery or production state is inferred from these local results.
+
+## Production verification — 26 October 2026
+
+Production was inspected with owner-authorized access. Neither `.env` nor private-key contents were read. The server checkout was clean on `main` at `2ee6f98`. The owner had rebuilt the container before inspection: its creation time was 16:42:51 UTC (21:42:51 Asia/Almaty), health was good, and `/app/server -check` passed with `APP_ENV=production`.
+
+Read-only SQLite aggregates showed seven iOS installations with an active token, authorized OS permission and notifications enabled in the app. Other iOS groups included `none / authorized` (4) and `none / not_determined` (24); one record had reason `account_deleted`. Android groups included `active / authorized` (16) and `active / not_determined` (2). These registry counts do not imply eligibility for every notification category.
+
+Only one Android account had explicitly enabled marketing notifications. Fresh audience previews confirmed:
+
+- Marketing, all platforms: Android 3, iOS 0; nine accounts were excluded for missing marketing opt-in.
+- System, iOS only: seven eligible devices.
+- System, the designated developer test account only: exactly one eligible iOS device.
+
+Campaign `3a3f3484-33d8-4fd7-87f1-40b64b78a66c` was sent to that test account at 21:52 Asia/Almaty. It completed for one user and one iOS device. Its delivery recorded `provider_accepted` on attempt 1, an empty error code and a provider message ID. The opened flag remained false at verification. On 27 October 2026 (Asia/Almaty), the owner explicitly confirmed that the test notification appeared on the physical iPhone. Visible receipt is therefore confirmed; a notification tap and an opened event remain unverified.
+
+No preferences, tokens, encryption secrets or provider keys were changed. No backend code correction was warranted: the zero iOS marketing audience was explained by missing category opt-in. Preserve that choice; do not enable consent on users' behalf or relabel marketing as system notifications to bypass it.
+
+TestFlight 1.1.1 (10) was available to the three testers in the existing `AI-Reply Internal` group. Release verification passed: 631 iOS tests with no failures or skips; all 23 backend test-bearing packages; and eight focused push/audience race tests plus three subtests, with no failures, skips or race warnings. The App Store submission draft contained build 10 and passed the readiness check. After the requested physical-notification confirmation, version 1.1.1 (10) was submitted to Apple Review on 27 October 2026 at 00:09 Asia/Almaty. App Store Connect confirmed “Ожидание проверки” (Waiting for Review). [Submission `6ccfc053-ff63-445a-976a-89f00c98b6e5`](https://appstoreconnect.apple.com/apps/6818570150/distribution/reviewsubmissions/details/6ccfc053-ff63-445a-976a-89f00c98b6e5) is awaiting review; approval and public release have not been confirmed.
+
+At the owner's request, repeat test campaign `7a84b83d-a124-4459-991f-866972d4bb01` was sent to the same single test iPhone on 27 October at 00:11 Asia/Almaty. It completed for one user and one iOS device running 1.1.1, with `provider_accepted` on attempt 1 and no errors. The delivery also recorded one opened event at 00:11, confirming that the app reported opening this repeat notification.
