@@ -38,6 +38,17 @@ assert.equal(reasons[0].code, 'permission_denied');
 assert.equal(reasons[0].users, 2);
 assert.equal(reasons[0].devices, 3);
 assert.equal(preview.computed.records.call({ preview: {} }).length, 0, 'older preview responses remain supported');
+const platformState = { preview: { by_platform: {
+  android: { matched_devices: 3, devices: 3, exclusions: {} },
+  ios: { matched_devices: 1, devices: 0, exclusions: { permission_denied: { users: 1, devices: 1 } } },
+} } };
+assert.equal(preview.methods.platformReach.call(platformState, 'ios').matched_devices, 1);
+const platformReasons = preview.methods.exclusionPlatforms.call(platformState, 'permission_denied');
+assert.equal(platformReasons.length, 1);
+assert.equal(platformReasons[0].name, 'iOS');
+assert.equal(platformReasons[0].devices, 1);
+assert.equal(preview.methods.platformReach.call({ preview: {} }, 'ios'), null, 'older API has no platform diagnostics');
+assert.equal(preview.methods.exclusionPlatforms.call({ preview: {} }, 'permission_denied').length, 0);
 console.log('Admin push UI: 8 confirmation scenarios and recipient diagnostics passed');
 // Compile the actual templates with the repository's shipped Vue compiler.
 const vue = fs.readFileSync(path.resolve(path.dirname(file), 'vendor/vue.global.prod.js'), 'utf8');

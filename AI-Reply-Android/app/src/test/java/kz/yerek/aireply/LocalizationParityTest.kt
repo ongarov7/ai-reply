@@ -123,6 +123,20 @@ class LocalizationParityTest {
         }
     }
 
+    @Test
+    fun `immediate copied message guidance is translated and follows the published limit`() {
+        val key = "kb_copied_message_too_long"
+        val translations = listOf(english, russian, kazakh, uzbek).map { it.getValue(key) }
+        assertEquals("each language has its own guidance", 4, translations.toSet().size)
+        translations.forEach { format ->
+            listOf(50, 400, 2000).forEach { limit ->
+                val text = String.format(format, limit)
+                assertTrue("the note must name the active limit: $text", text.contains(limit.toString()))
+                assertTrue("the note must remain compact: $text", text.length <= 56)
+            }
+        }
+    }
+
     /**
      * Plurals: Russian and Kazakh have every one, each language has the
      * quantities its grammar asks for (Russian one / few / many), and every

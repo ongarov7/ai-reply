@@ -101,6 +101,9 @@ struct AIReplyStrings: Sendable {
     /// Takes the limit, which the server publishes and an administrator can
     /// change: the sentence must never name a number the server no longer uses.
     let messageTooLongFormat: String
+    /// Immediate, compact guidance beside the disabled Reply button. The
+    /// copied message stays intact so the user can shorten it in place.
+    let copiedMessageTooLongFormat: String
     /// Without Full Access a keyboard can neither read the clipboard nor reach
     /// the network, so this covers both - and is said before any request.
     let fullAccessRequired: String
@@ -193,6 +196,10 @@ struct AIReplyStrings: Sendable {
         String(format: messageTooLongFormat, limit)
     }
 
+    func copiedMessageTooLong(limit: Int) -> String {
+        String(format: copiedMessageTooLongFormat, limit)
+    }
+
     func versionPosition(_ position: Int, of count: Int) -> String {
         String(format: versionPositionFormat, position, count)
     }
@@ -233,6 +240,7 @@ struct AIReplyStrings: Sendable {
         noSourceMessage: "Copy a message first",
         pasteDenied: "iOS blocked the paste. Allow it in Settings ▸ AI Reply ▸ Paste from Other Apps ▸ Allow, or type the message yourself.",
         messageTooLongFormat: "Message is too long. Copy up to %d characters.",
+        copiedMessageTooLongFormat: "Copied text exceeds %d characters.",
         fullAccessRequired: "Turn on Full Access for AI Reply in iOS Settings to read copied text and get replies.",
         notConfigured: "Open the AI Reply app and finish setup first.",
         offline: "No internet connection.",
@@ -293,6 +301,7 @@ struct AIReplyStrings: Sendable {
         noSourceMessage: "Сначала скопируйте сообщение",
         pasteDenied: "iOS запретила вставку. Откройте «Настройки» ▸ AI Reply ▸ «Вставка из других приложений» и выберите «Разрешать» или введите сообщение вручную.",
         messageTooLongFormat: "Сообщение слишком длинное. Скопируйте не более %d символов.",
+        copiedMessageTooLongFormat: "Скопировано больше %d символов.",
         fullAccessRequired: "Включите полный доступ для AI Reply в настройках iOS, чтобы читать скопированный текст и получать ответы.",
         notConfigured: "Откройте приложение AI Reply и завершите настройку.",
         offline: "Нет подключения к интернету.",
@@ -353,6 +362,7 @@ struct AIReplyStrings: Sendable {
         noSourceMessage: "Алдымен хабарламаны көшіріңіз",
         pasteDenied: "iOS қоюға рұқсат бермеді. «Реттеулер» ▸ AI Reply ▸ «Басқа қолданбалардан көшіріп қою» ішінде «Рұқсат бар» таңдаңыз немесе хабарламаны қолмен теріңіз.",
         messageTooLongFormat: "Хабарлама тым ұзын. %d таңбаға дейінгі мәтінді көшіріңіз.",
+        copiedMessageTooLongFormat: "Көшірілген мәтін %d таңбадан ұзын.",
         fullAccessRequired: "Көшірілген мәтінді оқып, жауап алу үшін iOS баптауларында AI Reply пернетақтасына толық рұқсат беріңіз.",
         notConfigured: "AI Reply қолданбасын ашып, баптауды аяқтаңыз.",
         offline: "Интернет байланысы жоқ.",
@@ -413,6 +423,7 @@ struct AIReplyStrings: Sendable {
         noSourceMessage: "Avval xabarni nusxalang",
         pasteDenied: "iOS joylashga ruxsat bermadi. Settings ▸ AI Reply ▸ Paste from Other Apps boʻlimida Allow ni tanlang yoki xabarni qoʻlda yozing.",
         messageTooLongFormat: "Xabar juda uzun. %d belgigacha matnni nusxalang.",
+        copiedMessageTooLongFormat: "Nusxalangan xabar %d belgidan uzun.",
         fullAccessRequired: "Nusxalangan matnni o‘qish va javob olish uchun iOS sozlamalarida AI Reply klaviaturasiga to‘liq ruxsat bering.",
         notConfigured: "AI Reply ilovasini ochib, sozlashni yakunlang.",
         offline: "Internet aloqasi yo‘q.",

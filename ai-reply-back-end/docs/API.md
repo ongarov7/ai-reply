@@ -1155,7 +1155,7 @@ credits, admin, packs, pass { expires_at, remaining } | null, remaining_total }`
 | Метод | Путь | Что делает |
 |---|---|---|
 | GET | `/notifications` | состояние (`status: { enabled, worker, fcm, email, link_hosts }`) и справочники формы: категории кампаний (`subscription`, `system`, `marketing`), экраны, языки (`content_locales`, `required_locales`, `fallback_locale: "ru"`), сегменты, фильтры, платформы, каналы, типы, лимиты |
-| POST | `/notifications/audience/preview` | `{ audience, category }` → `{ preview: { matched_users, matched_devices, users, devices, android, ios, by_language, exclusions, empty_reason, records, unresolved }, audience }`; только считает, 30 в минуту на админа |
+| POST | `/notifications/audience/preview` | `{ audience, category }` → `{ preview: { matched_users, matched_devices, users, devices, android, ios, by_language, by_platform, exclusions, empty_reason, records, unresolved }, audience }`; только считает, 30 в минуту на админа |
 | GET | `/notifications/campaigns?status=&page=&limit=` | список с live-статистикой |
 | POST | `/notifications/campaigns` | создать (и при `send: true` — отправить); заголовок `Idempotency-Key` обязателен |
 | GET | `/notifications/campaigns/{id}` | кампания + `stats` (в т.ч. `by_language`) + `errors: [{ code, count }]` |
@@ -1177,6 +1177,13 @@ credits, admin, packs, pass { expires_at, remaining } | null, remaining_total }`
 устройств: внутренние `user_id`/`device_id`, замаскированный `user`, `platform`, `locale`,
 отпечаток `push`; полного токена и клиентского installation ID нет. Анонимные установки
 видны в реестре устройств, но не входят в кампании. Маркетинг требует opt-in.
+
+`by_platform.ios` и `by_platform.android` содержат `matched_users`, `matched_devices`,
+`users`, `devices` и `exclusions` в том же формате. Это объясняет ноль на одной платформе,
+даже когда на другой есть получатели. Все счётчики учитывают текущие фильтры кампании;
+аккаунты без установок и анонимные установки в разбиение по платформам не входят.
+Один аккаунт с устройствами обеих платформ учитывается по одному разу на каждой из них,
+но только один раз в общем `users` и в общем счётчике пользователей одной причины.
 
 При отправке `recipient_count`, `device_count`, `recipient_snapshot_at` и строки outbox
 фиксируются одной транзакцией; провайдер вызывается только рабочим процессом. Устройства,

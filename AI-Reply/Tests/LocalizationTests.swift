@@ -1,4 +1,5 @@
 import XCTest
+import UIKit
 @testable import AIReply
 
 /// Localization is a product requirement here, not a nicety: the bug this
@@ -116,6 +117,30 @@ final class LocalizationTests: XCTestCase {
                 XCTAssertNotEqual(own, en, "\(label) is untranslated in \(language.rawValue)")
             }
         }
+    }
+
+    /// The over-limit note appears before a request, in the same 30pt slot
+    /// as the quick intents. It must name the published limit in all four
+    /// languages and remain readable on the smallest supported phone width.
+    func testCopiedMessageLengthGuidanceIsLocalizedAndFitsTheExistingRow() {
+        var translations = Set<String>()
+        for language in AppLanguage.allCases {
+            let strings = AIReplyStrings.forLanguage(language)
+            for limit in [50, 400, 2000] {
+                let text = strings.copiedMessageTooLong(limit: limit)
+                XCTAssertTrue(text.contains(String(limit)), language.rawValue)
+                XCTAssertFalse(text.contains("%d"), language.rawValue)
+                if limit == 400 { translations.insert(text) }
+                // At 320pt the row has at least 139pt beside its Reply
+                // button; require the full 11pt font to fit without shrinking.
+                let bounds = (text as NSString).boundingRect(
+                    with: CGSize(width: 139, height: CGFloat.greatestFiniteMagnitude),
+                    options: [.usesLineFragmentOrigin, .usesFontLeading],
+                    attributes: [.font: UIFont.systemFont(ofSize: 11, weight: .medium)], context: nil)
+                XCTAssertLessThanOrEqual(ceil(bounds.height), 30, "\(language.rawValue): \(text)")
+            }
+        }
+        XCTAssertEqual(translations.count, 4, "every language needs its own copied-message guidance")
     }
 
     /// Quick intents are presets for the INSTRUCTION, so every language needs

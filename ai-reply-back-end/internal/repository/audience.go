@@ -263,18 +263,30 @@ type LanguageReach struct {
 
 // AudiencePreview — алушылар саны (ешнәрсе жіберілмейді).
 type AudiencePreview struct {
-	MatchedUsers   int                      `json:"matched_users"`   // matching accounts, including those with no installation
-	MatchedDevices int                      `json:"matched_devices"` // match the filters, reachable or not
-	Devices        int                      `json:"devices"`         // will receive the push
-	Users          int                      `json:"users"`           // distinct accounts among Devices
-	Android        int                      `json:"android"`
-	IOS            int                      `json:"ios"`
-	ByLanguage     map[string]LanguageReach `json:"by_language"`
-	Exclusions     map[string]LanguageReach `json:"exclusions"`
-	Records        []AudienceRecipient      `json:"records"`
-	EmptyReason    string                   `json:"empty_reason,omitempty"`
+	MatchedUsers   int                       `json:"matched_users"`   // matching accounts, including those with no installation
+	MatchedDevices int                       `json:"matched_devices"` // match the filters, reachable or not
+	Devices        int                       `json:"devices"`         // will receive the push
+	Users          int                       `json:"users"`           // distinct accounts among Devices
+	Android        int                       `json:"android"`
+	IOS            int                       `json:"ios"`
+	ByLanguage     map[string]LanguageReach  `json:"by_language"`
+	ByPlatform     map[string]*PlatformReach `json:"by_platform"`
+	Exclusions     map[string]LanguageReach  `json:"exclusions"`
+	Records        []AudienceRecipient       `json:"records"`
+	EmptyReason    string                    `json:"empty_reason,omitempty"`
 	// Unresolved — e-mails from the filter that belong to no account.
 	Unresolved []string `json:"unresolved"`
+}
+
+// PlatformReach explains a platform's count without changing audience eligibility.
+// Matching counts include only accounts/devices selected by the campaign filters,
+// just like the overall preview; anonymous installations remain excluded.
+type PlatformReach struct {
+	MatchedUsers   int                      `json:"matched_users"`
+	MatchedDevices int                      `json:"matched_devices"`
+	Users          int                      `json:"users"`
+	Devices        int                      `json:"devices"`
+	Exclusions     map[string]LanguageReach `json:"exclusions"`
 }
 
 // AudienceRecipient exposes internal references and a masked fingerprint, never a client installation ID or token.
@@ -290,7 +302,12 @@ type AudienceRecipient struct {
 // PreviewAudience uses one read transaction so totals and the limited sample see the same database snapshot.
 func (s *Store) PreviewAudience(ctx context.Context, q AudienceQuery) (AudiencePreview, error) {
 	out := AudiencePreview{ByLanguage: map[string]LanguageReach{}, Exclusions: map[string]LanguageReach{},
+		ByPlatform: map[string]*PlatformReach{
+			domain.PlatformAndroid: {Exclusions: map[string]LanguageReach{}},
+			domain.PlatformIOS:     {Exclusions: map[string]LanguageReach{}},
+		},
 		Records: []AudienceRecipient{}, Unresolved: []string{}}
+	android, ios := out.ByPlatform[domain.PlatformAndroid], out.ByPlatform[domain.PlatformIOS]
 	for _, l := range domain.Locales {
 		out.ByLanguage[l] = LanguageReach{}
 	}
@@ -302,17 +319,25 @@ func (s *Store) PreviewAudience(ctx context.Context, q AudienceQuery) (AudienceP
 	// LEFT JOIN counts matching accounts which have not registered any device yet.
 	matchFrom := ` FROM users u LEFT JOIN app_installations i ON i.user_id = u.id WHERE `
 	match, matchArgs := matchClause(q)
-	if err := tx.QueryRowContext(ctx, `SELECT COUNT(i.id), COUNT(DISTINCT u.id)`+matchFrom+match, matchArgs...).
-		Scan(&out.MatchedDevices, &out.MatchedUsers); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(i.id), COUNT(DISTINCT u.id),
+  COUNT(CASE WHEN i.platform = 'android' THEN i.id END),
+  COUNT(DISTINCT CASE WHEN i.platform = 'android' THEN u.id END),
+  COUNT(CASE WHEN i.platform = 'ios' THEN i.id END),
+  COUNT(DISTINCT CASE WHEN i.platform = 'ios' THEN u.id END)`+matchFrom+match, matchArgs...).
+		Scan(&out.MatchedDevices, &out.MatchedUsers, &android.MatchedDevices, &android.MatchedUsers,
+			&ios.MatchedDevices, &ios.MatchedUsers); err != nil {
 		return out, err
 	}
 	where, args := eligible(q)
 	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*), COUNT(DISTINCT i.user_id),
   COALESCE(SUM(CASE WHEN i.platform = 'android' THEN 1 ELSE 0 END), 0),
-  COALESCE(SUM(CASE WHEN i.platform = 'ios' THEN 1 ELSE 0 END), 0)`+audienceFrom+where, args...).
-		Scan(&out.Devices, &out.Users, &out.Android, &out.IOS); err != nil {
+  COALESCE(SUM(CASE WHEN i.platform = 'ios' THEN 1 ELSE 0 END), 0),
+  COUNT(DISTINCT CASE WHEN i.platform = 'android' THEN i.user_id END),
+  COUNT(DISTINCT CASE WHEN i.platform = 'ios' THEN i.user_id END)`+audienceFrom+where, args...).
+		Scan(&out.Devices, &out.Users, &out.Android, &out.IOS, &android.Users, &ios.Users); err != nil {
 		return out, err
 	}
+	android.Devices, ios.Devices = out.Android, out.IOS
 	rows, err := tx.QueryContext(ctx, `SELECT `+resolvedLanguage+` AS language, COUNT(*), COUNT(DISTINCT i.user_id)`+
 		audienceFrom+where+` GROUP BY language`, args...)
 	if err != nil {
@@ -341,20 +366,31 @@ func (s *Store) PreviewAudience(ctx context.Context, q AudienceQuery) (AudienceP
 		reasonArgs = append(reasonArgs, check.args...)
 	}
 	reason += ` ELSE '' END`
-	rows, err = tx.QueryContext(ctx, `SELECT reason, COUNT(device_id), COUNT(DISTINCT user_id) FROM (
-  SELECT `+reason+` AS reason, i.id AS device_id, u.id AS user_id`+matchFrom+match+`) WHERE reason <> '' GROUP BY reason`,
+	// Keep the overall distinct-user count separate from the per-platform counts:
+	// an account with both iOS and Android must not be counted twice in a reason.
+	rows, err = tx.QueryContext(ctx, `WITH excluded AS (
+  SELECT `+reason+` AS reason, i.id AS device_id, u.id AS user_id, i.platform`+matchFrom+match+`)
+  SELECT reason, '' AS platform, COUNT(device_id), COUNT(DISTINCT user_id)
+  FROM excluded WHERE reason <> '' GROUP BY reason
+  UNION ALL
+  SELECT reason, platform, COUNT(device_id), COUNT(DISTINCT user_id)
+  FROM excluded WHERE reason <> '' AND platform IN ('android', 'ios') GROUP BY reason, platform`,
 		append(reasonArgs, matchArgs...)...)
 	if err != nil {
 		return out, err
 	}
 	for rows.Next() {
-		var code string
+		var code, platform string
 		var reach LanguageReach
-		if err := rows.Scan(&code, &reach.Devices, &reach.Users); err != nil {
+		if err := rows.Scan(&code, &platform, &reach.Devices, &reach.Users); err != nil {
 			rows.Close()
 			return out, err
 		}
-		out.Exclusions[code] = reach
+		if platform == "" {
+			out.Exclusions[code] = reach
+		} else {
+			out.ByPlatform[platform].Exclusions[code] = reach
+		}
 	}
 	err = rows.Err()
 	rows.Close()

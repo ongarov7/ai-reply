@@ -205,7 +205,14 @@ actor InstallationRegistrar {
         do {
             let response = try await send(snapshot)
             rejectedFingerprint = nil
-            store.setLastSync(InstallationSyncRecord(fingerprint: fingerprint, syncedAt: now()))
+            // A dead token is not a completed registration. If its replacement
+            // fails offline and the app closes, the next launch must hear the
+            // invalid status again instead of suppressing repair for 24 hours.
+            if response.pushStatus == "invalid", snapshot.payload.push != nil {
+                store.setLastSync(nil)
+            } else {
+                store.setLastSync(InstallationSyncRecord(fingerprint: fingerprint, syncedAt: now()))
+            }
             return .registered(response)
         } catch {
             let failure = error as? APIError ?? .server

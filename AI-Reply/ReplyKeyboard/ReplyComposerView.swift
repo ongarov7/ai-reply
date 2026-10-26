@@ -168,6 +168,7 @@ final class ReplyComposerView: UIView {
         case intents
         case suggestions
         case polish
+        case sourceLimit
     }
 
     private var suggestions: [AutocorrectSuggestion] = []
@@ -244,6 +245,9 @@ final class ReplyComposerView: UIView {
     /// typed, or when a cleaner version of it is on offer.
     private let suggestionStrip = SuggestionStripView()
     private let polishChip = PolishChipView()
+    /// Shares the quick-action slot: an invalid copied message explains why
+    /// Reply is disabled without adding a row or moving the keyboard keys.
+    private let sourceLimitLabel = UILabel()
 
     // Result row
     private let backButton = CircleIconButton(symbol: "chevron.left", pointSize: 14)
@@ -375,6 +379,10 @@ final class ReplyComposerView: UIView {
             self.delegate?.composer(self, didPick: suggestion)
         }
         polishChip.addTarget(self, action: #selector(polishTapped), for: .touchUpInside)
+        sourceLimitLabel.font = .systemFont(ofSize: 11, weight: .medium)
+        sourceLimitLabel.numberOfLines = 2
+        sourceLimitLabel.adjustsFontSizeToFitWidth = true
+        sourceLimitLabel.minimumScaleFactor = 0.8
 
         configurePill(primaryButton, symbol: nil, trailingImage: false)
         primaryButton.addTarget(self, action: #selector(primaryTapped), for: .touchUpInside)
@@ -430,7 +438,7 @@ final class ReplyComposerView: UIView {
 
         [personaChip, previewButton, counterLabel, closeButton, titleIcon, titleLabel, newButton,
          copiedButton, sourceCard, instructionView, draftView,
-         errorLabel, conflictLabel, quickActions, suggestionStrip, polishChip, primaryButton, backButton,
+         errorLabel, conflictLabel, quickActions, suggestionStrip, polishChip, sourceLimitLabel, primaryButton, backButton,
          regenerateButton, editButton,
          previousButton, versionLabel, nextButton, insertButton, replaceButton, appendButton,
          conflictCancelButton, reportButton].forEach(panel.addSubview)
@@ -634,6 +642,7 @@ final class ReplyComposerView: UIView {
         draftView.backgroundColor = theme.fieldBackground
 
         errorLabel.textColor = theme.destructive
+        sourceLimitLabel.textColor = theme.destructive
         conflictLabel.textColor = theme.primaryText
         versionLabel.textColor = theme.secondaryText
         regenerateButton.configuration?.background.backgroundColor = theme.fieldBackground
@@ -692,10 +701,13 @@ final class ReplyComposerView: UIView {
         previewButton.isEnabled = !flow.isGenerating && !isConflict
 
         let count = AIReplyService.characterCount(sourceText)
+        let overLimit = count > sourceLimit
         counterLabel.text = "\(count) / \(sourceLimit)"
-        counterLabel.textColor = count > sourceLimit ? theme.destructive : theme.secondaryText
+        counterLabel.textColor = overLimit ? theme.destructive : theme.secondaryText
         counterLabel.accessibilityLabel = strings.characterCount(count, limit: sourceLimit)
+        counterLabel.accessibilityHint = overLimit ? strings.copiedMessageTooLong(limit: sourceLimit) : nil
         counterLabel.isHidden = !hasSource
+        sourceLimitLabel.text = overLimit && !isCompose ? strings.copiedMessageTooLong(limit: sourceLimit) : nil
 
         closeButton.accessibilityLabel = strings.cancel
         // The report panel hides it while open; every way it closes ends here.
@@ -763,13 +775,12 @@ final class ReplyComposerView: UIView {
 
         // Composing row
         let showsComposingRow = composingLike && !isConflict
-        for view in [quickActions, suggestionStrip, polishChip] as [UIView] {
+        for view in [quickActions, suggestionStrip, polishChip, sourceLimitLabel] as [UIView] {
             view.isHidden = !showsComposingRow
         }
         quickActions.setEnabled(stage == .composing)
         updateAccessory(animated: false)
         primaryButton.isHidden = !composingLike || isConflict
-        let overLimit = count > sourceLimit
         let canGenerate = isCompose
             ? stage == .composing && hasInstruction
             : stage == .composing && hasSource && !overLimit
@@ -1159,6 +1170,7 @@ final class ReplyComposerView: UIView {
             place(quickActions, slot)
             place(suggestionStrip, slot)
             place(polishChip, slot.insetBy(dx: 0, dy: 1))
+            place(sourceLimitLabel, slot)
         }
 
         for view in [sourceView, instructionView, draftView] where view.showsCaret {
@@ -1347,12 +1359,13 @@ final class ReplyComposerView: UIView {
 
     private var wantedAccessory: Accessory {
         guard flow.stage == .composing else { return .intents }
+        if sourceLimitLabel.text != nil { return .sourceLimit }
         if polish != .none { return .polish }
         if !suggestions.isEmpty, focus == .instruction { return .suggestions }
         return .intents
     }
 
-    /// Crossfades the slot's three occupants. Their frames never change, so
+    /// Crossfades the slot's occupants. Their frames never change, so
     /// neither does the panel's height.
     private func updateAccessory(animated: Bool) {
         let wanted = wantedAccessory
@@ -1360,6 +1373,7 @@ final class ReplyComposerView: UIView {
             self.quickActions.alpha = wanted == .intents ? 1 : 0
             self.suggestionStrip.alpha = wanted == .suggestions ? 1 : 0
             self.polishChip.alpha = wanted == .polish ? 1 : 0
+            self.sourceLimitLabel.alpha = wanted == .sourceLimit ? 1 : 0
         }
         quickActions.isUserInteractionEnabled = wanted == .intents
         suggestionStrip.isUserInteractionEnabled = wanted == .suggestions
@@ -1367,6 +1381,7 @@ final class ReplyComposerView: UIView {
         quickActions.accessibilityElementsHidden = wanted != .intents
         suggestionStrip.accessibilityElementsHidden = wanted != .suggestions
         polishChip.accessibilityElementsHidden = wanted != .polish
+        sourceLimitLabel.accessibilityElementsHidden = wanted != .sourceLimit
         let changed = wanted != shownAccessory
         shownAccessory = wanted
         if animated, changed, window != nil {

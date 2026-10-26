@@ -857,7 +857,7 @@ paths:
                 audience: { $ref: "#/components/schemas/AudienceFilter" }
                 category: { type: string, enum: [subscription, system, marketing], default: marketing, description: "security и account — только события сервера (400)" }
       responses:
-        "200": { description: "preview { matched_users, users, devices, matched_devices, android, ios, by_language { kk|ru|en|uz: { users, devices } }, exclusions { reason: { users, devices } }, empty_reason, records [masked eligible device sample, max 20], unresolved [emails] }, audience (нормализованный)" }
+        "200": { description: "preview { matched_users, users, devices, matched_devices, android, ios, by_language { kk|ru|en|uz: { users, devices } }, by_platform { ios|android: { matched_users, matched_devices, users, devices, exclusions { reason: { users, devices } } } }, exclusions { reason: { users, devices } }, empty_reason, records [masked eligible device sample, max 20], unresolved [emails] }, audience (нормализованный)" }
         "400": { description: "INVALID_REQUEST (details.field = audience.segment, audience.plan_ids, …)" }
         "429": { description: RATE_LIMITED (details.retry_after_seconds) }
   /api/v1/admin/notifications/campaigns:

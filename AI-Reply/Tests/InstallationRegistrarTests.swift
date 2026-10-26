@@ -21,9 +21,11 @@ final class InstallationRegistrarTests: XCTestCase {
         /// Tokens the server rejects with 401.
         var rejectedTokens: Set<String> = []
         var failure: APIError?
+        var pushStatus: String?
 
         func reject(_ tokens: Set<String>) { rejectedTokens = tokens }
         func fail(with failure: APIError?) { self.failure = failure }
+        func respondWithPushStatus(_ status: String) { pushStatus = status }
 
         func register(_ payload: InstallationPayload, accessToken: String?) async throws -> InstallationResponse {
             calls.append(Call(payload: payload, token: accessToken))
@@ -32,7 +34,7 @@ final class InstallationRegistrarTests: XCTestCase {
                 throw APIError.unauthorized
             }
             return InstallationResponse(installationID: payload.installation_id, attached: accessToken != nil,
-                                        pushStatus: payload.push == nil ? "none" : "active",
+                                        pushStatus: pushStatus ?? (payload.push == nil ? "none" : "active"),
                                         pushAvailable: true, notificationsEnabled: payload.notifications_enabled,
                                         preferences: accessToken == nil ? nil : ["marketing": true])
         }
@@ -237,6 +239,28 @@ final class InstallationRegistrarTests: XCTestCase {
         guard case .registered = retried else { return XCTFail("expected the retry to register, got \(retried)") }
         let calls = await server.calls
         XCTAssertEqual(calls.count, 2)
+    }
+
+    func testAnInvalidPushTokenCanBeRepairedAfterRelaunchWithoutWaitingADay() async {
+        let snapshot = signedIn(payload(permission: .authorized, token: Self.fcmToken))
+        await server.respondWithPushStatus("invalid")
+        let first = await registrar.sync(snapshot)
+        guard case .registered(let response) = first else { return XCTFail("expected server response") }
+        XCTAssertEqual(response.pushStatus, "invalid")
+        XCTAssertNil(store.lastSync(), "an invalid token must not suppress repair across launches")
+
+        let clock = self.clock!
+        let relaunched = InstallationRegistrar(transport: server, tokens: tokens, store: store, now: { clock.now })
+        let afterRelaunch = await relaunched.sync(snapshot)
+        guard case .registered = afterRelaunch else { return XCTFail("repair must not wait 24 hours") }
+
+        await server.respondWithPushStatus("active")
+        let replacement = signedIn(payload(permission: .authorized, token: Self.otherFCMToken))
+        _ = await relaunched.sync(replacement)
+        let unchanged = await relaunched.sync(replacement)
+        XCTAssertEqual(unchanged, .unchanged, "healthy registrations still deduplicate")
+        let calls = await server.calls
+        XCTAssertEqual(calls.count, 3)
     }
 
     func testAnInvalidPayloadIsNotResentUntilItChanges() async {

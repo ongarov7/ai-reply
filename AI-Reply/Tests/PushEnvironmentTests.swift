@@ -8,6 +8,47 @@ import XCTest
 /// Push баптауы, Firebase параметрлері және орнату идентификаторы.
 final class PushEnvironmentTests: XCTestCase {
 
+    func testFailedReplacementStaysPendingEvenWithACachedToken() {
+        var state = PushTokenFetchState()
+        state.requestReplacement()
+        XCTAssertEqual(state.begin(hasAPNsToken: true), .replace)
+        state.failed()
+        XCTAssertTrue(state.needsRetry)
+        XCTAssertTrue(state.pendingReplacement)
+        XCTAssertEqual(state.retryDelay, 30)
+        XCTAssertEqual(state.begin(hasAPNsToken: true), .replace)
+        state.succeeded()
+        XCTAssertFalse(state.needsRetry)
+        XCTAssertFalse(state.pendingReplacement)
+    }
+
+    func testReplacementRequestedDuringFetchRunsAfterItWithoutOverlapping() {
+        var state = PushTokenFetchState()
+        XCTAssertNil(state.begin(hasAPNsToken: false))
+        XCTAssertEqual(state.begin(hasAPNsToken: true), .fetch)
+        state.requestReplacement()
+        XCTAssertNil(state.begin(hasAPNsToken: true))
+        state.succeeded()
+        XCTAssertTrue(state.pendingReplacement)
+        XCTAssertEqual(state.begin(hasAPNsToken: true), .replace)
+        state.succeeded()
+        XCTAssertFalse(state.needsRetry)
+    }
+
+    func testInitialTokenFailureRetriesWithBoundedBackoff() {
+        var state = PushTokenFetchState()
+        for attempt in 0..<12 {
+            XCTAssertEqual(state.begin(hasAPNsToken: true), .fetch)
+            state.failed()
+            XCTAssertTrue(state.needsRetry)
+            XCTAssertEqual(state.retryDelay, min(30 * pow(2, Double(attempt)), 1800))
+        }
+        XCTAssertEqual(state.begin(hasAPNsToken: true), .fetch)
+        state.succeeded()
+        XCTAssertFalse(state.needsRetry)
+        XCTAssertEqual(state.failures, 0)
+    }
+
     // MARK: Build flag
 
     func testOnlyABuildWithTheFlagAsksForATokenAtAll() {

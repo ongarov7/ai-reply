@@ -159,6 +159,43 @@ enum FirebasePushError: Error, Equatable {
     case noToken
 }
 
+/// Keeps token repair pending until Firebase actually returns a replacement.
+/// A failed delete/fetch must not leave a cached, invalid token blocking retries.
+struct PushTokenFetchState {
+    enum Action: Equatable {
+        case fetch, replace
+    }
+
+    private(set) var pendingReplacement = false
+    private(set) var inFlight: Action?
+    private(set) var failures = 0
+
+    var needsRetry: Bool { pendingReplacement || failures > 0 }
+    var retryDelay: TimeInterval { min(30 * pow(2, Double(min(max(failures - 1, 0), 6))), 30 * 60) }
+
+    mutating func requestReplacement() {
+        pendingReplacement = true
+    }
+
+    mutating func begin(hasAPNsToken: Bool) -> Action? {
+        guard hasAPNsToken, inFlight == nil else { return nil }
+        let action: Action = pendingReplacement ? .replace : .fetch
+        inFlight = action
+        return action
+    }
+
+    mutating func succeeded() {
+        if inFlight == .replace { pendingReplacement = false }
+        inFlight = nil
+        failures = 0
+    }
+
+    mutating func failed() {
+        inFlight = nil
+        failures = min(failures + 1, 7)
+    }
+}
+
 /// FCM registration tokens: what the server sends to (`message.token`), the
 /// same kind the Android app registers.
 ///

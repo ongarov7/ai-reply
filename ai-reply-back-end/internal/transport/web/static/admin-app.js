@@ -1706,6 +1706,16 @@
     },
     methods: Object.assign({}, helpers, {
       reach: function (l) { return (this.preview.by_language || {})[l] || { users: 0, devices: 0 }; },
+      platformReach: function (platform) { return (this.preview.by_platform || {})[platform] || null; },
+      exclusionPlatforms: function (code) {
+        var platforms = this.preview.by_platform || {};
+        return ["android", "ios"].filter(function (platform) {
+          return platforms[platform] && platforms[platform].exclusions && platforms[platform].exclusions[code];
+        }).map(function (platform) {
+          var reach = platforms[platform].exclusions[code];
+          return { platform: platform, name: platform === "ios" ? "iOS" : "Android", users: reach.users, devices: reach.devices };
+        });
+      },
       source: function (l) { return textSource(this.content, l, this.m.content_locales); }
     }),
     template: `
@@ -1713,8 +1723,10 @@
         <div class="stat-grid" aria-live="polite">
           <div class="stat stat-brand"><div class="label">{{ t('admin.push.preview.users') }}</div><div class="value">{{ nf(preview.users) }}</div></div>
           <div class="stat stat-brand"><div class="label">{{ t('admin.push.preview.devices') }}</div><div class="value">{{ nf(preview.devices) }}</div></div>
-          <div class="stat"><div class="label">Android</div><div class="value">{{ nf(preview.android) }}</div></div>
-          <div class="stat"><div class="label">iOS</div><div class="value">{{ nf(preview.ios) }}</div></div>
+          <div class="stat"><div class="label">Android</div><div class="value">{{ nf(preview.android) }}</div>
+            <div v-if="platformReach('android')" class="hint">{{ tf('admin.push.preview.matched', { n: nf(platformReach('android').matched_devices) }) }}</div></div>
+          <div class="stat"><div class="label">iOS</div><div class="value">{{ nf(preview.ios) }}</div>
+            <div v-if="platformReach('ios')" class="hint">{{ tf('admin.push.preview.matched', { n: nf(platformReach('ios').matched_devices) }) }}</div></div>
         </div>
         <p class="hint">{{ tf('admin.push.preview.matched', { n: nf(preview.matched_devices) }) }}
           {{ tf('admin.push.preview.matched_users', { n: nf(preview.matched_users) }) }}</p>
@@ -1723,6 +1735,7 @@
           <b>{{ t('admin.push.preview.exclusions') }}</b>
           <ul class="plain-list"><li v-for="r in exclusions" :key="r.code">
             {{ t('admin.push.exclusion.' + r.code) }} — {{ tf('admin.push.preview.excluded_counts', { users: nf(r.users), devices: nf(r.devices) }) }}
+            <span v-for="p in exclusionPlatforms(r.code)" :key="p.platform" class="hint"> · {{ p.name }}: {{ tf('admin.push.preview.excluded_counts', { users: nf(p.users), devices: nf(p.devices) }) }}</span>
           </li></ul>
           <p class="hint">{{ t('admin.push.preview.exclusion_hint') }}</p>
         </div>

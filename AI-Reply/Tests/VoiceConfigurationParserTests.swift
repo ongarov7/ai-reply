@@ -1,4 +1,7 @@
 import XCTest
+import AVFoundation
+import Speech
+import UIKit
 @testable import AIReply
 
 /// The dictation examples from the brief, in all three languages.
@@ -86,5 +89,184 @@ final class VoiceConfigurationParserTests: XCTestCase {
         let result = VoiceConfigurationParser.parse("с 18:00 до 18:00", language: .russian)
         XCTAssertNil(result.start)
         XCTAssertNil(result.end)
+    }
+}
+
+/// Session ownership and cancelled system prompts must be verifiable without
+/// opening a real microphone or changing the test runner's audio session.
+@MainActor
+final class DictationAudioLifecycleTests: XCTestCase {
+    private enum Failure: Error { case unavailable }
+
+    @MainActor
+    private final class SessionProbe {
+        var current = DictationAudioSession.Configuration(category: .ambient, mode: .default, options: [.mixWithOthers])
+        var events: [String] = []
+        var activationOptions: AVAudioSession.SetActiveOptions?
+        var deactivationOptions: AVAudioSession.SetActiveOptions?
+        var failActivation = false
+        var failDeactivation = false
+
+        lazy var session = DictationAudioSession(configuration: { self.current }, setCategory: {
+            self.current = $0
+            self.events.append($0.category == .record ? "record" : "restore")
+        }, setActive: { active, options in
+            self.events.append(active ? "activate" : "deactivate")
+            if active {
+                self.activationOptions = options
+                if self.failActivation { throw Failure.unavailable }
+            } else {
+                self.deactivationOptions = options
+                if self.failDeactivation { throw Failure.unavailable }
+            }
+        })
+    }
+
+    func testRecordingUsesSupportedOptionsThenReleasesAndRestoresPreviousSession() throws {
+        let probe = SessionProbe()
+        try probe.session.begin()
+        XCTAssertEqual(probe.current.category, .record)
+        XCTAssertEqual(probe.current.mode, .measurement)
+        XCTAssertEqual(probe.current.options, [])
+        XCTAssertEqual(probe.activationOptions, [])
+
+        try probe.session.end()
+        XCTAssertEqual(probe.events, ["record", "activate", "deactivate", "restore"])
+        XCTAssertEqual(probe.deactivationOptions, .notifyOthersOnDeactivation)
+        XCTAssertEqual(probe.current.category, .ambient)
+        XCTAssertEqual(probe.current.mode, .default)
+        XCTAssertEqual(probe.current.options, [.mixWithOthers])
+
+        try probe.session.end()
+        XCTAssertEqual(probe.events.count, 4, "Repeated stop must not deactivate another player's session")
+    }
+
+    func testFailedActivationRestoresTheConfiguration() {
+        let probe = SessionProbe()
+        probe.failActivation = true
+        XCTAssertThrowsError(try probe.session.begin())
+        XCTAssertEqual(probe.events, ["record", "activate", "deactivate", "restore"])
+        XCTAssertEqual(probe.current.category, .ambient)
+    }
+
+    func testFailedDeactivationKeepsOwnershipForRetry() throws {
+        let probe = SessionProbe()
+        try probe.session.begin()
+        probe.failDeactivation = true
+        XCTAssertThrowsError(try probe.session.end())
+        XCTAssertEqual(probe.current.category, .record)
+        probe.failDeactivation = false
+        try probe.session.end()
+        XCTAssertEqual(probe.events, ["record", "activate", "deactivate", "deactivate", "restore"])
+        XCTAssertEqual(probe.current.category, .ambient)
+    }
+
+    func testStoppingIdleModelDoesNotTouchAnotherAudioSession() {
+        let probe = SessionProbe()
+        let model = VoiceReplyViewModel(recordingSession: probe.session, notificationCenter: NotificationCenter())
+        model.stopRecording()
+        model.stopRecording()
+        XCTAssertTrue(probe.events.isEmpty)
+    }
+
+    func testImmediateDismissalBeforeStartupTaskRunsDoesNotRequestPermissions() async {
+        let probe = SessionProbe()
+        var microphoneRequests = 0
+        let model = VoiceReplyViewModel(recordingSession: probe.session, microphonePermission: {
+            microphoneRequests += 1
+            return false
+        }, notificationCenter: NotificationCenter())
+        model.startRecording()
+        model.stopRecording()
+        for _ in 0..<10 { await Task.yield() }
+        XCTAssertEqual(microphoneRequests, 0)
+        XCTAssertEqual(model.status, .stoppedNoSpeech)
+        XCTAssertTrue(probe.events.isEmpty)
+    }
+
+    func testStopWhileMicrophonePromptIsPendingCannotStartCaptureAfterDismissal() async throws {
+        let probe = SessionProbe()
+        var pending: CheckedContinuation<Bool, Never>?
+        var speechRequests = 0
+        let model = VoiceReplyViewModel(recordingSession: probe.session, microphonePermission: {
+            await withCheckedContinuation { pending = $0 }
+        }, speechPermission: {
+            speechRequests += 1
+            return .denied
+        }, notificationCenter: NotificationCenter())
+        model.startRecording()
+        for _ in 0..<100 where pending == nil { await Task.yield() }
+        let prompt = try XCTUnwrap(pending)
+        model.stopRecording()
+        prompt.resume(returning: true)
+        for _ in 0..<10 { await Task.yield() }
+        XCTAssertEqual(speechRequests, 0)
+        XCTAssertEqual(model.status, .stoppedNoSpeech)
+        XCTAssertFalse(model.isRecording)
+        XCTAssertTrue(probe.events.isEmpty)
+    }
+
+    func testStopWhileSpeechPromptIsPendingIgnoresItsLateResult() async throws {
+        let probe = SessionProbe()
+        var pending: CheckedContinuation<SFSpeechRecognizerAuthorizationStatus, Never>?
+        let model = VoiceReplyViewModel(recordingSession: probe.session, microphonePermission: { true }, speechPermission: {
+            await withCheckedContinuation { pending = $0 }
+        }, notificationCenter: NotificationCenter())
+        model.startRecording()
+        for _ in 0..<100 where pending == nil { await Task.yield() }
+        let prompt = try XCTUnwrap(pending)
+        model.stopRecording()
+        prompt.resume(returning: .denied)
+        for _ in 0..<10 { await Task.yield() }
+        XCTAssertEqual(model.status, .stoppedNoSpeech)
+        XCTAssertFalse(model.isRecording)
+        XCTAssertTrue(probe.events.isEmpty)
+    }
+
+    func testRepeatedStartDuringPermissionPromptCreatesOnlyOneRequest() async throws {
+        var requests = 0
+        var pending: CheckedContinuation<Bool, Never>?
+        let model = VoiceReplyViewModel(microphonePermission: {
+            requests += 1
+            return await withCheckedContinuation { pending = $0 }
+        }, notificationCenter: NotificationCenter())
+        model.startRecording()
+        model.startRecording()
+        for _ in 0..<100 where pending == nil { await Task.yield() }
+        let prompt = try XCTUnwrap(pending)
+        XCTAssertEqual(requests, 1)
+        model.stopRecording()
+        prompt.resume(returning: false)
+        for _ in 0..<10 { await Task.yield() }
+        XCTAssertEqual(model.status, .stoppedNoSpeech)
+    }
+
+    func testBackgroundAndInterruptionCancelPendingCapture() async throws {
+        for notification in [
+            Notification(name: UIApplication.didEnterBackgroundNotification),
+            Notification(name: AVAudioSession.interruptionNotification,
+                         userInfo: [AVAudioSessionInterruptionTypeKey: AVAudioSession.InterruptionType.began.rawValue])
+        ] {
+            let center = NotificationCenter()
+            let probe = SessionProbe()
+            var pending: CheckedContinuation<Bool, Never>?
+            var speechRequests = 0
+            let model = VoiceReplyViewModel(recordingSession: probe.session, microphonePermission: {
+                await withCheckedContinuation { pending = $0 }
+            }, speechPermission: {
+                speechRequests += 1
+                return .denied
+            }, notificationCenter: center)
+            model.startRecording()
+            for _ in 0..<100 where pending == nil { await Task.yield() }
+            let prompt = try XCTUnwrap(pending)
+            center.post(notification)
+            for _ in 0..<100 where model.status != .stoppedNoSpeech { await Task.yield() }
+            XCTAssertEqual(model.status, .stoppedNoSpeech)
+            prompt.resume(returning: true)
+            for _ in 0..<10 { await Task.yield() }
+            XCTAssertEqual(speechRequests, 0)
+            XCTAssertTrue(probe.events.isEmpty)
+        }
     }
 }

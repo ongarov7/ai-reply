@@ -50,6 +50,7 @@
     <!-- Reply panel errors. Plain, actionable, never a status code. -->
     <string name="kb_err_no_source">Copy a message first</string>
     <string name="kb_err_message_too_long">Message is too long. Please select or copy up to %1$d characters.</string>
+    <string name="kb_copied_message_too_long">Copied text exceeds %1$d characters.</string>
     <string name="kb_err_clipboard_unavailable">The copied message could not be read.</string>
     <string name="kb_paste_private">This text is marked private, so AI Reply does not read it. Copy the message itself.</string>
     <string name="kb_err_not_configured">Open the AI Reply app and finish setup first.</string>

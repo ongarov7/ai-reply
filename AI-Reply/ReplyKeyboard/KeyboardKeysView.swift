@@ -138,6 +138,17 @@ final class KeyboardKeysView: UIView {
         for track in tracks.values { track.stopTimer() }
     }
 
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        if window == nil { cancelPendingTouches() }
+    }
+
+    /// UIKit can hide an extension during a globe gesture before delivering
+    /// its final touch event. No repeat or delayed feedback may outlive it.
+    func cancelPendingTouches() {
+        cancelAllTracks()
+    }
+
     // MARK: Configuration
 
     func configure(theme: KeyboardTheme) {

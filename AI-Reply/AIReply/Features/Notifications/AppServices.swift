@@ -77,8 +77,8 @@ final class AppServices {
     /// APNs handed over its token this launch: FCM can make one now.
     private var hasAPNsToken = false
     private var tokenTask: Task<Void, Never>?
-    /// The server said FCM no longer takes the current token.
-    private var replacesTokenOnNextFetch = false
+    private var tokenRetryTask: Task<Void, Never>?
+    private var tokenFetchState = PushTokenFetchState()
     private var hasReplacedInvalidToken = false
     /// Delivery ids of tapped notifications, until the server can be told.
     private var openedDeliveries: [String] = []
@@ -166,8 +166,6 @@ final class AppServices {
             // APNs may have failed while offline on the previous attempt.
             requestDeviceTokenIfPossible()
         }
-        // A token FCM could not make earlier (offline at launch) is tried again.
-        if hasAPNsToken, currentPushToken == nil { fetchPushToken() }
         requestInstallationSync(routine: true)
         // A purchase the server had not confirmed yet is sent again.
         Task { await purchases.processUnfinished() }
@@ -222,8 +220,14 @@ final class AppServices {
     private func requestDeviceTokenIfPossible() {
         guard isStarted, account.hasAcceptedLegal, notifications.buildSupportsPush,
               account.features?.pushNotifications == true,
-              notifications.permission.allowsDelivery,
-              !hasRequestedDeviceToken else { return }
+              notifications.permission.allowsDelivery else { return }
+        // Permission or server support may have been restored since a failed
+        // fetch. Resume FCM after reading those gates, even with cached APNs.
+        if hasAPNsToken {
+            if currentPushToken == nil || tokenFetchState.needsRetry { fetchPushToken() }
+            return
+        }
+        guard !hasRequestedDeviceToken else { return }
         hasRequestedDeviceToken = true
         UIApplication.shared.registerForRemoteNotifications()
     }
@@ -231,18 +235,44 @@ final class AppServices {
     /// Asks FCM for its token, which needs the APNs token first. `replacing`
     /// drops the current one and makes a new one.
     private func fetchPushToken(replacing: Bool = false) {
-        if replacing { replacesTokenOnNextFetch = true }
-        guard hasAPNsToken, tokenTask == nil else { return }
-        let replace = replacesTokenOnNextFetch
-        replacesTokenOnNextFetch = false
+        if replacing { tokenFetchState.requestReplacement() }
+        guard isStarted, account.hasAcceptedLegal, notifications.buildSupportsPush,
+              account.features?.pushNotifications == true,
+              notifications.permission.allowsDelivery,
+              tokenTask == nil,
+              let action = tokenFetchState.begin(hasAPNsToken: hasAPNsToken) else { return }
+        tokenRetryTask?.cancel()
+        tokenRetryTask = nil
         tokenTask = Task { [weak self] in
+            guard let self else { return }
             do {
-                let token = replace ? try await FirebasePush.replaceToken() : try await FirebasePush.token()
-                self?.didReceivePushToken(token)
+                let token = action == .replace ? try await FirebasePush.replaceToken() : try await FirebasePush.token()
+                tokenFetchState.succeeded()
+                didReceivePushToken(token)
             } catch {
+                tokenFetchState.failed()
                 ReplyLog.event("push: no FCM token: \(error)")
             }
-            self?.tokenTask = nil
+            tokenTask = nil
+            // A replacement requested during a normal fetch still has to run.
+            if tokenFetchState.pendingReplacement, tokenFetchState.failures == 0 {
+                fetchPushToken()
+            } else if tokenFetchState.needsRetry {
+                scheduleTokenRetry()
+            }
+        }
+    }
+
+    private func scheduleTokenRetry() {
+        tokenRetryTask?.cancel()
+        let delay = tokenFetchState.retryDelay
+        tokenRetryTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(delay))
+            guard !Task.isCancelled, let self else { return }
+            self.tokenRetryTask = nil
+            // Foregrounding also resumes a pending repair, even with a cached token.
+            guard UIApplication.shared.applicationState == .active else { return }
+            self.fetchPushToken()
         }
     }
 

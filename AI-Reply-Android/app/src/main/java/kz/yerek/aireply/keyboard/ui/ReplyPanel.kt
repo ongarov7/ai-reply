@@ -697,16 +697,31 @@ private fun ComposingRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        IntentSlot(
-            intents = model.intents,
-            enabled = flow.stage == ReplyComposerFlow.Stage.Composing,
-            assist = model.assist,
-            assistActions = actions.assist,
-            strings = strings,
-            theme = theme,
-            onIntent = actions.onIntent,
-            modifier = Modifier.weight(1f)
-        )
+        if (overLimit && !generating) {
+            // Use the existing intent slot: the pasted text stays intact and
+            // the keyboard's height does not change at the length boundary.
+            Text(
+                text = strings.get(R.string.kb_copied_message_too_long, model.sourceLimit),
+                fontSize = 10.5.sp,
+                lineHeight = 13.sp,
+                fontWeight = FontWeight.Medium,
+                color = theme.destructive,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+        } else {
+            IntentSlot(
+                intents = model.intents,
+                enabled = flow.stage == ReplyComposerFlow.Stage.Composing,
+                assist = model.assist,
+                assistActions = actions.assist,
+                strings = strings,
+                theme = theme,
+                onIntent = actions.onIntent,
+                modifier = Modifier.weight(1f)
+            )
+        }
         if (model.voice.offered) MicButton(strings, theme, enabled = !generating, onClick = actions.onMic)
         ActionPill(
             label = when {

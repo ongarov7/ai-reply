@@ -3,7 +3,8 @@ import UIKit
 /// Opting the input view into system key-click feedback. This is the only
 /// reason `loadView()` is overridden.
 final class ReplyInputView: UIInputView, UIInputViewAudioFeedback {
-    var enableInputClicksWhenVisible: Bool { true }
+    var inputClicksEnabled = false
+    var enableInputClicksWhenVisible: Bool { inputClicksEnabled && window != nil }
 }
 
 final class KeyboardViewController: UIInputViewController {
@@ -166,6 +167,7 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        (view as? ReplyInputView)?.inputClicksEnabled = true
         lastAppearanceProbe = Date.timeIntervalSinceReferenceDate
         refreshScreenHeight()
         reloadSettings()
@@ -215,6 +217,11 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
+        (view as? ReplyInputView)?.inputClicksEnabled = false
+        keysView.cancelPendingTouches()
+        emojiView?.barKeys.cancelPendingTouches()
+        keysView.hapticsEnabled = false
+        emojiView?.hapticsEnabled = false
         polisher.stop()
         autocorrect.keepCorrection()
         // An unfinished reply or Create is kept in memory for a few minutes,

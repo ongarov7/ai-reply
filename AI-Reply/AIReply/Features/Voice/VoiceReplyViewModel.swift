@@ -56,6 +56,58 @@ enum VoiceStatus: Equatable {
     }
 }
 
+/// Only dictation owns the recording session. Restore the previous configuration
+/// after releasing the microphone, so later playback never inherits record mode.
+@MainActor
+final class DictationAudioSession {
+    struct Configuration {
+        let category: AVAudioSession.Category
+        let mode: AVAudioSession.Mode
+        let options: AVAudioSession.CategoryOptions
+    }
+
+    private let configuration: () -> Configuration
+    private let setCategory: (Configuration) throws -> Void
+    private let setActive: (Bool, AVAudioSession.SetActiveOptions) throws -> Void
+    private var previous: Configuration?
+
+    init(session: AVAudioSession = .sharedInstance()) {
+        configuration = { Configuration(category: session.category, mode: session.mode, options: session.categoryOptions) }
+        setCategory = { try session.setCategory($0.category, mode: $0.mode, options: $0.options) }
+        setActive = { try session.setActive($0, options: $1) }
+    }
+
+    init(configuration: @escaping () -> Configuration,
+         setCategory: @escaping (Configuration) throws -> Void,
+         setActive: @escaping (Bool, AVAudioSession.SetActiveOptions) throws -> Void) {
+        self.configuration = configuration
+        self.setCategory = setCategory
+        self.setActive = setActive
+    }
+
+    func begin() throws {
+        // A failed teardown must succeed before a new recording can take over.
+        try end()
+        previous = configuration()
+        do {
+            // duckOthers is unsupported for .record, and dictation plays no audio.
+            try setCategory(Configuration(category: .record, mode: .measurement, options: []))
+            try setActive(true, [])
+        } catch {
+            try? end()
+            throw error
+        }
+    }
+
+    func end() throws {
+        guard let previous else { return }
+        // The engine and its tap must already be stopped by the caller.
+        try setActive(false, .notifyOthersOnDeactivation)
+        try setCategory(previous)
+        self.previous = nil
+    }
+}
+
 @MainActor
 @Observable
 final class VoiceReplyViewModel {
@@ -81,6 +133,37 @@ final class VoiceReplyViewModel {
     @ObservationIgnored private var startedAt: Date?
     @ObservationIgnored private var hasRecognitionResult = false
     @ObservationIgnored private var isInputTapInstalled = false
+    @ObservationIgnored private let recordingSession: DictationAudioSession
+    @ObservationIgnored private let microphonePermission: () async -> Bool
+    @ObservationIgnored private let speechPermission: () async -> SFSpeechRecognizerAuthorizationStatus
+    @ObservationIgnored private var startTask: Task<Void, Never>?
+    @ObservationIgnored private var startID: UUID?
+    @ObservationIgnored private var recognitionID: UUID?
+    @ObservationIgnored private let notificationCenter: NotificationCenter
+    @ObservationIgnored private var observers: [NSObjectProtocol] = []
+
+    init(recordingSession: DictationAudioSession? = nil,
+         microphonePermission: (() async -> Bool)? = nil,
+         speechPermission: (() async -> SFSpeechRecognizerAuthorizationStatus)? = nil,
+         notificationCenter: NotificationCenter = .default) {
+        self.recordingSession = recordingSession ?? DictationAudioSession()
+        self.microphonePermission = microphonePermission ?? Self.requestMicrophonePermission
+        self.speechPermission = speechPermission ?? Self.requestSpeechPermission
+        self.notificationCenter = notificationCenter
+        observers.append(notificationCenter.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.stopRecording() }
+        })
+        observers.append(notificationCenter.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self] notification in
+            guard let type = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+                  type == AVAudioSession.InterruptionType.began.rawValue else { return }
+            Task { @MainActor in self?.stopRecording() }
+        })
+    }
+
+    deinit {
+        startTask?.cancel()
+        for observer in observers { notificationCenter.removeObserver(observer) }
+    }
 
     private var locale: Locale { Locale(identifier: language.localeIdentifier) }
 
@@ -118,8 +201,18 @@ final class VoiceReplyViewModel {
     }
 
     func startRecording() {
-        guard !isRecording else { return }
-        Task { await requestPermissionsAndStart() }
+        guard !isRecording, startTask == nil else { return }
+        let id = UUID()
+        startID = id
+        startTask = Task { [weak self] in
+            guard let self else { return }
+            await requestPermissionsAndStart()
+            // A cancelled permission prompt may complete after a newer start.
+            if startID == id {
+                startTask = nil
+                startID = nil
+            }
+        }
     }
 
     func stopRecording() {
@@ -142,14 +235,18 @@ final class VoiceReplyViewModel {
     // MARK: Capture
 
     private func requestPermissionsAndStart() async {
+        guard !Task.isCancelled else { return }
         status = .requestingPermission
 
-        guard await requestMicrophonePermission() else {
+        let microphoneAllowed = await microphonePermission()
+        guard !Task.isCancelled else { return }
+        guard microphoneAllowed else {
             status = .microphoneDenied
             return
         }
 
-        let speechStatus = await requestSpeechPermission()
+        let speechStatus = await speechPermission()
+        guard !Task.isCancelled else { return }
         guard speechStatus == .authorized else {
             status = Self.status(forSpeechAuthorization: speechStatus)
             return
@@ -182,6 +279,8 @@ final class VoiceReplyViewModel {
     private func startAudioRecognition(with recognizer: SFSpeechRecognizer) throws {
         recognitionTask?.cancel()
         recognitionTask = nil
+        let id = UUID()
+        recognitionID = id
         hasRecognitionResult = false
 
         let request = SFSpeechAudioBufferRecognitionRequest()
@@ -198,9 +297,7 @@ final class VoiceReplyViewModel {
 
         recognitionRequest = request
 
-        let audioSession = AVAudioSession.sharedInstance()
-        try audioSession.setCategory(.record, mode: .measurement, options: [.duckOthers])
-        try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+        try recordingSession.begin()
 
         let inputNode = audioEngine.inputNode
         let recordingFormat = inputNode.outputFormat(forBus: 0)
@@ -215,7 +312,8 @@ final class VoiceReplyViewModel {
 
         recognitionTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
             Task { @MainActor in
-                self?.handleRecognition(result: result, error: error)
+                guard let self, self.recognitionID == id else { return }
+                self.handleRecognition(result: result, error: error)
             }
         }
 
@@ -233,8 +331,12 @@ final class VoiceReplyViewModel {
         if let result {
             hasRecognitionResult = true
             transcript = result.bestTranscription.formattedString
-            if result.isFinal, !isRecording {
-                finalizeStoppedRecognition()
+            if result.isFinal {
+                if isRecording {
+                    stopCapture(reason: .user)
+                } else {
+                    finalizeStoppedRecognition()
+                }
             }
         }
 
@@ -273,6 +375,9 @@ final class VoiceReplyViewModel {
     }
 
     private func stopCapture(reason: StopReason) {
+        startTask?.cancel()
+        startTask = nil
+        startID = nil
         updateElapsed()
 
         timer?.invalidate()
@@ -292,7 +397,12 @@ final class VoiceReplyViewModel {
         recognitionRequest = nil
         isRecording = false
 
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        do {
+            try recordingSession.end()
+        } catch {
+            // Keep ownership for a later retry rather than pretending cleanup succeeded.
+            NSLog("AI Reply: dictation audio session could not be released: %@", error.localizedDescription)
+        }
 
         switch reason {
         case .user:
@@ -323,7 +433,7 @@ final class VoiceReplyViewModel {
 
     // MARK: Permissions
 
-    private func requestMicrophonePermission() async -> Bool {
+    private static func requestMicrophonePermission() async -> Bool {
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .authorized:
             return true
@@ -340,7 +450,7 @@ final class VoiceReplyViewModel {
         }
     }
 
-    private func requestSpeechPermission() async -> SFSpeechRecognizerAuthorizationStatus {
+    private static func requestSpeechPermission() async -> SFSpeechRecognizerAuthorizationStatus {
         let current = SFSpeechRecognizer.authorizationStatus()
         guard current == .notDetermined else { return current }
 

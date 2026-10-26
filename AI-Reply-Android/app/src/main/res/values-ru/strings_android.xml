@@ -26,6 +26,7 @@
 
     <string name="kb_err_no_source">Сначала скопируйте сообщение</string>
     <string name="kb_err_message_too_long">Сообщение слишком длинное. Скопируйте не более %1$d символов.</string>
+    <string name="kb_copied_message_too_long">Скопировано больше %1$d символов.</string>
     <string name="kb_err_clipboard_unavailable">Не удалось прочитать скопированное сообщение.</string>
     <string name="kb_paste_private">Этот текст отмечен как конфиденциальный, AI Reply его не читает. Скопируйте само сообщение.</string>
     <string name="kb_err_not_configured">Откройте приложение AI Reply и завершите настройку.</string>

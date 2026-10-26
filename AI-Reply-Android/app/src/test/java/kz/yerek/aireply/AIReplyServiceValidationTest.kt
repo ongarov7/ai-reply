@@ -60,4 +60,19 @@ class AIReplyServiceValidationTest {
         val message = "Сәлеметсіз бе"
         assertEquals(13, AIReplyService.characterCount(message))
     }
+
+    @Test
+    fun `displayed source count matches validation at unicode boundaries`() {
+        listOf(50, 400, 2000).forEach { limit ->
+            val family = "👨‍👩‍👧‍👦"
+            val exact = "ә".repeat(limit - 7) + family
+            val atBoundary = " \n$exact\t "
+            assertEquals(limit, AIReplyService.characterCount(atBoundary))
+            assertTrue(AIReplyService.validate(atBoundary, limit) is AIReplyService.ValidationResult.Valid)
+            val over = exact + "🙂"
+            assertEquals(limit + 1, AIReplyService.characterCount(over))
+            assertEquals(AIReplyError.MessageTooLong(limit),
+                (AIReplyService.validate(over, limit) as AIReplyService.ValidationResult.Invalid).error)
+        }
+    }
 }

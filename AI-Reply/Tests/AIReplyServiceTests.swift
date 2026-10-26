@@ -48,6 +48,23 @@ final class AIReplyServiceTests: XCTestCase {
         XCTAssertNotNil(AIReplyService.validate(message: String(repeating: "ә", count: limit + 1), limit: limit).failureValue)
     }
 
+    /// The counter and the immediate guidance must flip at the same server
+    /// boundary, including emoji sequences with several Unicode scalars.
+    func testDisplayedSourceCountMatchesValidationAtUnicodeBoundaries() {
+        for currentLimit in [50, 400, 2000] {
+            let family = "👨‍👩‍👧‍👦"
+            XCTAssertEqual(family.unicodeScalars.count, 7)
+            let exact = String(repeating: "ә", count: currentLimit - 7) + family
+            for (message, expectedCount) in [(" \n" + exact + "\t ", currentLimit),
+                                             (exact + "🙂", currentLimit + 1)] {
+                let count = AIReplyService.characterCount(message)
+                XCTAssertEqual(count, expectedCount)
+                XCTAssertEqual(AIReplyService.validate(message: message, limit: currentLimit).failureValue,
+                               count > currentLimit ? .messageTooLong(limit: currentLimit) : nil)
+            }
+        }
+    }
+
     /// The limit applies to the INCOMING MESSAGE only. A long profile and long
     /// template instructions must not make a legal message illegal.
     func testProfileLengthDoesNotAffectTheMessageLimit() {
