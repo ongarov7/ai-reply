@@ -47,7 +47,7 @@ targets:
       properties:
         CFBundleDisplayName: AI Reply
         CFBundleShortVersionString: "1.1.1"
-        CFBundleVersion: "10"
+        CFBundleVersion: "11"
         AIReplySignInWithApple: $(AIREPLY_SIGN_IN_WITH_APPLE)
         AIReplyPushNotifications: $(AIREPLY_PUSH_NOTIFICATIONS)
         # "<team id>.", for the installation id's app-only keychain group.
@@ -181,7 +181,7 @@ targets:
       properties:
         CFBundleDisplayName: AI Reply
         CFBundleShortVersionString: "1.1.1"
-        CFBundleVersion: "10"
+        CFBundleVersion: "11"
         NSExtension:
           NSExtensionAttributes:
             IsASCIICapable: true
