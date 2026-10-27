@@ -15,6 +15,10 @@ transport (HTTP)  →  services (auth, ai, plans, subscriptions, payments)  → 
 - `transport` не знает SQL, `repository` не знает HTTP, `domain` не знает ни того ни другого.
 - DTO описаны отдельно от таблиц: схему БД можно менять, не ломая мобильные клиенты.
 
+Проект расширения платежей BCC, включая банковские ответы, сверку и выдачу покупок:
+[BCC_PAYMENTS_ARCHITECTURE.md](BCC_PAYMENTS_ARCHITECTURE.md). Новые части описаны как
+план реализации и пока не подключены к работающему приложению.
+
 ## База данных
 
 SQLite в режиме WAL. Один пул на запись (ровно одно соединение, `BEGIN IMMEDIATE`)
