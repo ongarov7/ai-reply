@@ -17,22 +17,23 @@ import (
 
 // Config — қолданбаның толық баптауы.
 type Config struct {
-	App       App
-	Database  Database
-	Auth      Auth
-	Email     Email
-	OAuth     OAuth
-	OpenAI    OpenAI
-	AI        AI
-	Analytics Analytics
-	Admin     Admin
-	Payments  Payments
-	Limits    Limits
-	Log       Log
-	Push      Push
-	Legal     Legal
-	Retention Retention
-	IAP       IAP
+	App              App
+	Database         Database
+	Auth             Auth
+	Email            Email
+	OAuth            OAuth
+	OpenAI           OpenAI
+	AI               AI
+	Analytics        Analytics
+	Admin            Admin
+	Payments         Payments
+	BCCSandboxNotify BCCSandboxNotify
+	Limits           Limits
+	Log              Log
+	Push             Push
+	Legal            Legal
+	Retention        Retention
+	IAP              IAP
 }
 
 type App struct {
@@ -438,6 +439,13 @@ func Load(envFile string) (Config, error) {
 			Mode:         strings.ToLower(str("PAYMENT_MODE", "off")),
 			DemoCheckout: boolean("PAYMENT_DEMO_CHECKOUT", false),
 		},
+		BCCSandboxNotify: BCCSandboxNotify{
+			Enabled:         boolean("BCC_SANDBOX_NOTIFY_ENABLED", false),
+			PublicURL:       str("BCC_TEST_NOTIFY_URL", ""),
+			ManagementToken: str("BCC_SANDBOX_NOTIFY_MANAGEMENT_TOKEN", ""),
+			BasicUsername:   str("BCC_SANDBOX_NOTIFY_BASIC_USERNAME", ""),
+			BasicPassword:   str("BCC_SANDBOX_NOTIFY_BASIC_PASSWORD", ""),
+		},
 		Limits: Limits{
 			SourceTextChars:   num("LIMIT_SOURCE_TEXT_CHARS", 400),
 			InstructionChars:  num("LIMIT_INSTRUCTION_CHARS", 400),
@@ -603,6 +611,15 @@ func (c Config) Validate() []string {
 	}
 	problems = append(problems, c.Push.validate()...)
 	problems = append(problems, c.IAP.validate()...)
+	problems = append(problems, c.BCCSandboxNotify.Validate(c.App.PublicBaseURL)...)
+	if c.BCCSandboxNotify.Enabled && c.BCCSandboxNotify.ManagementToken != "" {
+		for _, other := range []string{c.Auth.AccessSecret, c.Auth.RefreshSecret, c.Auth.LegacySecret, c.Admin.BootstrapPassword} {
+			if c.BCCSandboxNotify.ManagementToken == other {
+				problems = append(problems, "BCC_SANDBOX_NOTIFY_MANAGEMENT_TOKEN must be separate from application credentials")
+				break
+			}
+		}
+	}
 	return problems
 }
 

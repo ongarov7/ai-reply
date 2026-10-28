@@ -212,6 +212,13 @@ func run(envFile string) error {
 	limiter := middleware.NewLimiter()
 
 	mux := http.NewServeMux()
+	bccNotify, err := registerBCCSandboxNotify(mux, cfg)
+	if err != nil {
+		return err
+	}
+	if bccNotify != nil {
+		defer bccNotify.Close()
+	}
 	api.New(api.Deps{
 		Config: cfg, Auth: authSvc, Users: userSvc, Plans: planSvc, Subs: subSvc,
 		AI: aiSvc, Limits: limitSvc, Payments: paymentSvc, Events: eventSvc,
@@ -255,6 +262,9 @@ func run(envFile string) error {
 		WriteTimeout:      60 * time.Second,
 		IdleTimeout:       90 * time.Second,
 	}
+	// Shutdown normally drains handlers below. Close also cancels connections
+	// on a listener error or shutdown deadline before the notification DB closes.
+	defer server.Close()
 
 	for _, worker := range []func(context.Context){
 		func(ctx context.Context) { expireSubscriptions(ctx, subSvc, notifyEvents, creditSvc, log) },

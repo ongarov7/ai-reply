@@ -30,6 +30,9 @@ type Options struct {
 	Path         string
 	BusyTimeout  time.Duration
 	MaxReadConns int
+	// FullSync requests crash-durable commits on every new connection. The
+	// application's existing NORMAL mode remains the default.
+	FullSync bool
 }
 
 // Open дерекқорды ашады, PRAGMA-ларды орнатады.
@@ -85,7 +88,11 @@ func open(opts Options, writer bool) (*sql.DB, error) {
 		q.Set("_journal_mode", "WAL")
 		q.Set("_busy_timeout", fmt.Sprintf("%d", opts.BusyTimeout.Milliseconds()))
 		q.Set("_foreign_keys", "on")
-		q.Set("_synchronous", "NORMAL")
+		if opts.FullSync {
+			q.Set("_synchronous", "FULL")
+		} else {
+			q.Set("_synchronous", "NORMAL")
+		}
 		if writer {
 			q.Set("_txlock", "immediate")
 		}

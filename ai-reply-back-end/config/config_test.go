@@ -18,7 +18,12 @@ func setValidEnv(t *testing.T) {
 		"JWT_REFRESH_SECRET":  "test-refresh-secret-that-is-long-enough-0",
 		"AUTH_SIGNING_SECRET": "test-legacy-secret-that-is-long-enough-00",
 		"AUTH_DEMO_MODE":      "true", "AUTH_DEMO_OTP": "1111", "ADMIN_EMAIL": "",
-		"CONTACT_EMAIL": "support@ai-reply.kz",
+		"CONTACT_EMAIL":                       "support@ai-reply.kz",
+		"BCC_SANDBOX_NOTIFY_ENABLED":          "false",
+		"BCC_TEST_NOTIFY_URL":                 "",
+		"BCC_SANDBOX_NOTIFY_MANAGEMENT_TOKEN": "",
+		"BCC_SANDBOX_NOTIFY_BASIC_USERNAME":   "",
+		"BCC_SANDBOX_NOTIFY_BASIC_PASSWORD":   "",
 	}
 	for key, value := range env {
 		t.Setenv(key, value)
