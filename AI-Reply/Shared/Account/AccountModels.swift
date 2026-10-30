@@ -159,10 +159,12 @@ extension AccountAPI {
         let status: String
         let plan: Plan
         let expiresAt: String?
+        var autoRenews: Bool? = nil
 
         enum CodingKeys: String, CodingKey {
             case id, status, plan
             case expiresAt = "expires_at"
+            case autoRenews = "auto_renews"
         }
     }
 

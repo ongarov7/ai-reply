@@ -1,13 +1,11 @@
 import Foundation
 import Observation
 
-/// This iOS product shows account access and balances without selling access.
-/// Server feature flags cannot enable a storefront in this app.
+/// Purchases in this iOS product use StoreKit. The website link is information
+/// only; it never opens an external checkout or a website login handoff.
 enum IOSProductPolicy {
-    static let allowsNewPurchases = false
-    /// Explicit product choice for the internal prototype. It is not changed
-    /// by remote flags, receipts, reviewer accounts or browser state.
-    static let showsWebsiteAccountLink = true
+    static let allowsNewPurchases = true
+    static let showsServiceInformationLink = true
 }
 
 /// A product the screen may offer: what the server sells, at the price the

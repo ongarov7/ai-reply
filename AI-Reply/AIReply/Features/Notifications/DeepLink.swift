@@ -7,8 +7,8 @@ import Foundation
 /// The same list the server validates links against (`domain.LinkScreens`).
 /// "notifications" is the notifications part of Settings; "keyboard" and
 /// "permissions" both open «Настройка клавиатуры и разрешений»;
-/// "onboarding" shows the guide over Home; "purchase" is a compatibility
-/// route to the balance; "support" opens
+/// "onboarding" shows the guide over Home; "purchase" opens native StoreKit
+/// purchases when available; "support" opens
 /// «Чат с оператором» on a server with the chat, Home otherwise.
 enum AppScreen: String, CaseIterable, Sendable {
     case home, subscription, settings, notifications, templates, profile, keyboard, compose
@@ -17,14 +17,10 @@ enum AppScreen: String, CaseIterable, Sendable {
     case support, purchase
 }
 
-/// A checked notification destination. Payment offers use the external browser;
-/// the in-app browser is reserved for legal and support pages.
+/// A checked destination. Website links are information, legal or support only.
 enum DeepLinkDestination: Equatable, Sendable {
     case screen(AppScreen)
     case web(URL)
-    case externalWeb(URL)
-    /// An explicit local user action. Network links never produce this case.
-    case websiteAccount
     case none
 }
 
@@ -36,10 +32,9 @@ enum DeepLink {
     static let maximumLength = 512
 
     private static let informationPaths: Set<String> = [
-        "/offer", "/terms", "/privacy", "/support", "/account/delete",
-        "/sandbox/offer", "/sandbox/terms", "/sandbox/privacy", "/sandbox/support", "/sandbox/account/delete"
+        "/app", "/offer", "/terms", "/privacy", "/support", "/account/delete",
+        "/sandbox/app", "/sandbox/offer", "/sandbox/terms", "/sandbox/privacy", "/sandbox/support", "/sandbox/account/delete"
     ]
-    private static let offerPaths: Set<String> = ["/payment", "/sandbox/payment"]
 
     static func destination(for raw: String?) -> DeepLinkDestination {
         guard let components = components(for: raw), let scheme = components.scheme?.lowercased() else { return .none }
@@ -54,42 +49,24 @@ enum DeepLink {
         }
     }
 
-    /// Only the dedicated, opted-in offer notification can request this route.
-    /// It is consumed on a tap, never on notification arrival.
-    static func topupOfferDestination(for raw: String?) -> DeepLinkDestination {
-        guard let components = components(for: raw),
-              let url = validatedURL(components, paths: offerPaths) else { return .none }
-        return .externalWeb(url)
-    }
-
-    /// Handoff links are accepted only from the authenticated endpoint, never
-    /// from a push payload. They must stay in this build's backend environment.
-    static func handoffURL(_ raw: String, backendBaseURL: URL) -> URL? {
-        guard let base = URLComponents(url: backendBaseURL, resolvingAgainstBaseURL: false),
-              base.scheme == "https", base.host == webHost, base.port == nil,
-              base.user == nil, base.password == nil, base.query == nil, base.fragment == nil,
-              ["", "/", "/sandbox", "/sandbox/"].contains(base.percentEncodedPath),
-              var target = components(for: raw),
-              let fragment = target.percentEncodedFragment,
-              fragment.hasPrefix("handoff=") else { return nil }
-        let token = String(fragment.dropFirst("handoff=".count))
-        guard token.utf8.count == 43,
-              token.utf8.allSatisfy({ (65...90).contains($0) || (97...122).contains($0)
-                  || (48...57).contains($0) || $0 == 45 || $0 == 95 }) else { return nil }
-        let expectedPath = base.percentEncodedPath.hasPrefix("/sandbox") ? "/sandbox/payment" : "/payment"
-        let originalURL = target.url
-        target.fragment = nil
-        guard validatedURL(target, paths: [expectedPath]) != nil else { return nil }
-        return originalURL
+    /// Information-only page for this build's canonical backend environment.
+    static func serviceInformationDestination(backendBaseURL: URL, locale: String) -> DeepLinkDestination {
+        guard var components = URLComponents(url: backendBaseURL, resolvingAgainstBaseURL: false),
+              components.scheme == "https", components.host == webHost,
+              components.port == nil, components.user == nil, components.password == nil,
+              components.query == nil, components.fragment == nil,
+              ["", "/", "/sandbox", "/sandbox/"].contains(components.percentEncodedPath),
+              ["ru", "kk", "en", "uz"].contains(locale) else { return .none }
+        components.path = components.path.hasPrefix("/sandbox") ? "/sandbox/app" : "/app"
+        components.queryItems = [URLQueryItem(name: "lang", value: locale)]
+        return destination(for: components.url?.absoluteString)
     }
 
     static func isAllowed(_ destination: DeepLinkDestination) -> Bool {
         switch destination {
         case .none: return false
         case .screen: return true
-        case .websiteAccount: return true
         case .web(let url): return Self.destination(for: url.absoluteString) == destination
-        case .externalWeb(let url): return topupOfferDestination(for: url.absoluteString) == destination
         }
     }
 
@@ -166,11 +143,9 @@ struct NotificationPayload: Equatable, Sendable {
     var isWebTopupOffer: Bool { type == Self.webTopupOfferType }
 
     var destination: DeepLinkDestination {
+        // Previously delivered website-payment offers stay inert too.
+        if isWebTopupOffer { return .none }
         if isSupportReply { return .screen(.support) }
-        if isWebTopupOffer {
-            guard category == "marketing" else { return .none }
-            return DeepLink.topupOfferDestination(for: link)
-        }
         return DeepLink.destination(for: link)
     }
 }

@@ -8,35 +8,6 @@ import XCTest
 /// Хабарлама сілтемелері: тек рұқсат етілген экрандар мен ai-reply.kz беттері.
 final class DeepLinkTests: XCTestCase {
 
-    private static let handoffToken = String(repeating: "a", count: 43)
-
-    private final class FakeWebHandoff: WebPaymentHandoffProviding, @unchecked Sendable {
-        var result: Result<WebPaymentHandoff, APIError>
-        var holdsAnswers = false
-        private(set) var users: [String] = []
-        private(set) var locales: [String] = []
-
-        init(url: String = "https://ai-reply.kz/sandbox/payment#handoff=" + DeepLinkTests.handoffToken) {
-            result = .success(WebPaymentHandoff(url: url, expiresIn: 60))
-        }
-
-        func create(expectedUserID: String, locale: String) async throws -> WebPaymentHandoff {
-            users.append(expectedUserID)
-            locales.append(locale)
-            // Deliberately ignore cancellation: the router must reject a late
-            // response even when an underlying transport has already sent it.
-            while holdsAnswers { await Task.yield() }
-            return try result.get()
-        }
-    }
-
-    @MainActor
-    private func waitForHandoff(_ router: AppRouter) async throws {
-        for _ in 0..<200 where router.isOpeningWebOffer { try await Task.sleep(for: .milliseconds(5)) }
-        XCTAssertFalse(router.isOpeningWebOffer)
-    }
-
-
     // MARK: aireply://
 
     func testEveryKnownScreenOpensItself() {
@@ -61,8 +32,8 @@ final class DeepLinkTests: XCTestCase {
     func testOurSiteOpensInTheApp() throws {
         XCTAssertEqual(DeepLink.destination(for: "https://ai-reply.kz/offer"),
                        .web(try XCTUnwrap(URL(string: "https://ai-reply.kz/offer"))))
-        XCTAssertEqual(DeepLink.destination(for: "https://ai-reply.kz/sandbox/privacy?lang=kk"),
-                       .web(try XCTUnwrap(URL(string: "https://ai-reply.kz/sandbox/privacy?lang=kk"))))
+        XCTAssertEqual(DeepLink.destination(for: "https://ai-reply.kz/sandbox/app?lang=kk"),
+                       .web(try XCTUnwrap(URL(string: "https://ai-reply.kz/sandbox/app?lang=kk"))))
     }
 
     func testEverythingElseOnlyOpensTheApp() {
@@ -88,33 +59,38 @@ final class DeepLinkTests: XCTestCase {
         XCTAssertEqual(DeepLink.destination(for: nil), .none)
     }
 
-    func testOrdinaryWebLinksCannotOpenCheckoutOrUnlistedPages() {
-        for link in [
-            "https://ai-reply.kz/", "https://help.ai-reply.kz/privacy",
-            "https://ai-reply.kz/account", "https://ai-reply.kz/sandbox/account",
-            "https://ai-reply.kz/payment", "https://ai-reply.kz/sandbox/payment",
-            "https://ai-reply.kz/checkout", "https://ai-reply.kz/privacy/../payment",
-            "https://ai-reply.kz/%70rivacy", "https://ai-reply.kz/privacy?redirect=/payment",
-            "https://ai-reply.kz/privacy?lang=ru&lang=en", "https://ai-reply.kz/privacy#payment"
-        ] {
-            XCTAssertEqual(DeepLink.destination(for: link), .none, link)
+    func testWebsitePaymentLinksAndHandoffsAreNeverAccepted() {
+        for raw in ["https://ai-reply.kz/", "https://ai-reply.kz/account", "https://ai-reply.kz/sandbox/account",
+                    "https://ai-reply.kz/payment", "https://ai-reply.kz/sandbox/payment",
+                    "https://ai-reply.kz/checkout", "https://ai-reply.kz/app?redirect=/payment",
+                    "https://help.ai-reply.kz/app", "https://ai-reply.kz/%61pp",
+                    "https://ai-reply.kz/app#handoff=" + String(repeating: "a", count: 43),
+                    "https://ai-reply.kz/sandbox/payment#handoff=" + String(repeating: "a", count: 43)] {
+            XCTAssertEqual(DeepLink.destination(for: raw), .none, raw)
         }
     }
 
-    func testOnlyDedicatedMarketingOfferCanOpenExactPaymentURL() throws {
-        for path in ["/payment", "/sandbox/payment?lang=ru"] {
-            let url = try XCTUnwrap(URL(string: "https://ai-reply.kz" + path))
-            let payload = NotificationPayload(type: "web_topup_offer", category: "marketing", link: url.absoluteString)
-            XCTAssertEqual(payload.destination, .externalWeb(url))
-            XCTAssertTrue(payload.isWebTopupOffer)
-            XCTAssertEqual(NotificationPayload(type: "news", category: "marketing", link: url.absoluteString).destination, .none)
+    func testPreviouslyDeliveredWebsitePaymentOffersAreInert() {
+        for link in ["https://ai-reply.kz/payment", "https://ai-reply.kz/sandbox/payment", "aireply://purchase",
+                     "https://ai-reply.kz/app", ""] {
+            XCTAssertEqual(NotificationPayload(type: "web_topup_offer", category: "marketing", link: link).destination,
+                           .none, link)
         }
-        for link in ["https://ai-reply.kz/account", "https://ai-reply.kz/payment/", "https://ai-reply.kz/payment?next=bank",
-                     "https://ai-reply.kz/payment#x", "https://ai-reply.kz:443/payment", "http://ai-reply.kz/payment",
-                     "https://help.ai-reply.kz/payment", "https://example.com/payment", "aireply://purchase"] {
-            XCTAssertEqual(NotificationPayload(type: "web_topup_offer", category: "marketing", link: link).destination, .none, link)
+        XCTAssertEqual(NotificationPayload(type: "web_topup_offer", category: "marketing", link: "aireply://support",
+                                           conversationID: "old-data").destination, .none)
+        XCTAssertEqual(NotificationPayload(type: "campaign", category: "marketing", link: "aireply://purchase").destination,
+                       .screen(.purchase), "native purchase links remain distinct from the removed website offer")
+    }
+
+    func testInformationPageIsBuiltFromExactCanonicalEnvironment() throws {
+        for (base, path) in [("https://ai-reply.kz", "/app"), ("https://ai-reply.kz/sandbox", "/sandbox/app")] {
+            let destination = DeepLink.serviceInformationDestination(backendBaseURL: try XCTUnwrap(URL(string: base)), locale: "uz")
+            XCTAssertEqual(destination, .web(try XCTUnwrap(URL(string: "https://ai-reply.kz" + path + "?lang=uz"))))
         }
-        XCTAssertEqual(NotificationPayload(type: "web_topup_offer", category: "account", link: "https://ai-reply.kz/payment").destination, .none)
+        for base in ["http://ai-reply.kz", "https://example.com", "https://ai-reply.kz:443", "https://user@ai-reply.kz",
+                     "https://ai-reply.kz/payment", "https://ai-reply.kz/sandbox?redirect=/payment"] {
+            XCTAssertEqual(DeepLink.serviceInformationDestination(backendBaseURL: try XCTUnwrap(URL(string: base)), locale: "ru"), .none)
+        }
     }
 
     // MARK: userInfo
@@ -159,215 +135,12 @@ final class DeepLinkTests: XCTestCase {
     // MARK: Router
 
     @MainActor
-    func testWebsiteAccountCardUsesCurrentEnvironmentWithoutMarketingOptIn() async throws {
-        XCTAssertTrue(IOSProductPolicy.showsWebsiteAccountLink)
-        XCTAssertFalse(NotificationPreferences.defaults.isOn("marketing"))
-        for (base, payment) in [("https://ai-reply.kz", "https://ai-reply.kz/payment"),
-                                ("https://ai-reply.kz/sandbox", "https://ai-reply.kz/sandbox/payment")] {
-            var opened: [URL] = []
-            let provider = FakeWebHandoff(url: payment + "#handoff=" + Self.handoffToken)
-            let router = AppRouter(openExternal: { opened.append($0); return true }, handoffProvider: provider,
-                                   backendBaseURL: { URL(string: base) }, locale: { "uz" })
-            router.accountDidChange(userID: "account-A", isReady: true)
-            router.scenePhaseDidChange(.active)
-            router.mainInterfaceDidAppear()
-            router.openWebsiteAccount()
-            try await waitForHandoff(router)
-            XCTAssertEqual(provider.users, ["account-A"])
-            XCTAssertEqual(provider.locales, ["uz"])
-            XCTAssertEqual(opened.map(\.absoluteString), [payment + "#handoff=" + Self.handoffToken])
-            XCTAssertNil(router.webPage, "the account never opens in the embedded legal browser")
-        }
-    }
-
-    @MainActor
-    func testWebsiteAccountActionRequiresReadyAccountAndMainInterface() async throws {
-        var opened: [URL] = []
-        let provider = FakeWebHandoff()
-        let router = AppRouter(openExternal: { opened.append($0); return true }, handoffProvider: provider,
-                               backendBaseURL: { URL(string: "https://ai-reply.kz/sandbox") })
-        router.openWebsiteAccount()
-        XCTAssertNil(router.pending, "a local tap must not survive into a different login")
-        XCTAssertTrue(provider.users.isEmpty)
-        router.accountDidChange(userID: "account-A", isReady: true)
-        router.openWebsiteAccount()
-        XCTAssertTrue(provider.users.isEmpty, "sign-in alone must not bypass onboarding")
-        router.scenePhaseDidChange(.active)
-        router.mainInterfaceDidAppear()
-        router.openWebsiteAccount()
-        try await waitForHandoff(router)
-        XCTAssertEqual(opened.count, 1)
-        XCTAssertEqual(provider.users, ["account-A"])
-        XCTAssertEqual(DeepLink.destination(for: "aireply://websiteAccount"), .screen(.home),
-                       "the local action adds no incoming link screen")
-    }
-
-    @MainActor
-    func testWebsiteAccountRepeatedTapDoesNotCreateAnotherHandoff() async throws {
-        var opened: [URL] = []
-        let provider = FakeWebHandoff()
-        provider.holdsAnswers = true
-        let router = AppRouter(openExternal: { opened.append($0); return true }, handoffProvider: provider,
-                               backendBaseURL: { URL(string: "https://ai-reply.kz/sandbox") })
-        router.accountDidChange(userID: "account-A", isReady: true)
-        router.scenePhaseDidChange(.active)
-        router.mainInterfaceDidAppear()
-        router.openWebsiteAccount()
-        for _ in 0..<200 where provider.users.isEmpty { try await Task.sleep(for: .milliseconds(5)) }
-        router.openWebsiteAccount()
-        XCTAssertEqual(provider.users, ["account-A"])
-        provider.holdsAnswers = false
-        try await waitForHandoff(router)
-        XCTAssertEqual(opened.count, 1)
-    }
-
-    @MainActor
-    func testSignOutStartInvalidatesHandoffWhileVisibleAccountIsStillCached() async throws {
-        var opened: [URL] = []
-        let provider = FakeWebHandoff()
-        provider.holdsAnswers = true
-        let router = AppRouter(openExternal: { opened.append($0); return true }, handoffProvider: provider,
-                               backendBaseURL: { URL(string: "https://ai-reply.kz/sandbox") })
-        router.accountDidChange(userID: "account-A", isReady: true)
-        router.scenePhaseDidChange(.active)
-        router.mainInterfaceDidAppear()
-        router.openWebsiteAccount()
-        for _ in 0..<200 where provider.users.isEmpty { try await Task.sleep(for: .milliseconds(5)) }
-        XCTAssertEqual(provider.users, ["account-A"])
-
-        // Logout has begun and credentials can already be cleared, but its
-        // network call has not returned and the visible phase still says A.
-        router.accountWillSignOut()
-        router.accountDidChange(userID: "account-A", isReady: true)
-        XCTAssertFalse(router.canOpenWebsiteAccount)
-        provider.holdsAnswers = false
-        try await Task.sleep(for: .milliseconds(30))
-        router.openWebsiteAccount()
-        router.retryWebOffer()
-        XCTAssertTrue(opened.isEmpty)
-        XCTAssertFalse(router.webOfferOpeningFailed)
-        XCTAssertEqual(provider.users, ["account-A"])
-
-        router.accountDidChange(userID: nil, isReady: false)
-        router.accountDidChange(userID: "account-B", isReady: true)
-        XCTAssertTrue(router.canOpenWebsiteAccount)
-    }
-
-    @MainActor
-    func testWebsiteAccountFailureKeepsAccountBoundRetryWithoutPlainURLFallback() async throws {
-        var opened: [URL] = []
-        let provider = FakeWebHandoff()
-        provider.result = .failure(.offline)
-        let router = AppRouter(openExternal: { opened.append($0); return true }, handoffProvider: provider,
-                               backendBaseURL: { URL(string: "https://ai-reply.kz/sandbox") })
-        router.accountDidChange(userID: "account-A", isReady: true)
-        router.scenePhaseDidChange(.active)
-        router.mainInterfaceDidAppear()
-        router.openWebsiteAccount()
-        try await waitForHandoff(router)
-        XCTAssertTrue(opened.isEmpty)
-        XCTAssertTrue(router.webOfferOpeningFailed)
-        router.accountDidChange(userID: "account-B", isReady: true)
-        router.retryWebOffer()
-        XCTAssertFalse(router.webOfferOpeningFailed)
-        XCTAssertEqual(provider.users, ["account-A"], "B cannot retry the earlier account's local action")
-        XCTAssertTrue(opened.isEmpty)
-    }
-
-    @MainActor
-    func testOfferTappedDuringInactiveTransitionWaitsForActiveScene() async throws {
-        var opened: [URL] = []
-        let provider = FakeWebHandoff()
-        let router = AppRouter(openExternal: { opened.append($0); return true }, handoffProvider: provider,
-                               backendBaseURL: { URL(string: "https://ai-reply.kz/sandbox") })
-        router.accountDidChange(userID: "account-A", isReady: true)
-        router.mainInterfaceDidAppear()
-        router.scenePhaseDidChange(.inactive)
-        let destination = DeepLink.topupOfferDestination(for: "https://ai-reply.kz/sandbox/payment")
-        router.open(destination)
-        XCTAssertEqual(router.pending, destination)
-        XCTAssertTrue(provider.users.isEmpty)
-        XCTAssertFalse(router.canOpenWebsiteAccount)
-        router.scenePhaseDidChange(.active)
-        try await waitForHandoff(router)
-        XCTAssertEqual(provider.users, ["account-A"])
-        XCTAssertEqual(opened.count, 1)
-        XCTAssertNil(router.pending)
-    }
-
-    @MainActor
-    func testBackgroundDiscardsLateHandoffWithoutAutomaticallyReopening() async throws {
-        var opened: [URL] = []
-        let provider = FakeWebHandoff()
-        provider.holdsAnswers = true
-        let router = AppRouter(openExternal: { opened.append($0); return true }, handoffProvider: provider,
-                               backendBaseURL: { URL(string: "https://ai-reply.kz/sandbox") })
-        router.accountDidChange(userID: "account-A", isReady: true)
-        router.scenePhaseDidChange(.active)
-        router.mainInterfaceDidAppear()
-        router.openWebsiteAccount()
-        for _ in 0..<200 where provider.users.isEmpty { try await Task.sleep(for: .milliseconds(5)) }
-        router.scenePhaseDidChange(.background)
-        provider.holdsAnswers = false
-        try await Task.sleep(for: .milliseconds(30))
-        router.scenePhaseDidChange(.active)
-        XCTAssertTrue(opened.isEmpty)
-        XCTAssertFalse(router.webOfferOpeningFailed)
-        XCTAssertEqual(provider.users, ["account-A"])
-        XCTAssertTrue(router.canOpenWebsiteAccount)
-    }
-
-    @MainActor
-    func testNormalBrowserOpeningCanMakeSceneInactiveWithoutErrorOrRepeat() async throws {
-        var opened: [URL] = []
-        weak var routerReference: AppRouter?
-        let provider = FakeWebHandoff()
-        let router = AppRouter(openExternal: { url in
-            opened.append(url)
-            routerReference?.scenePhaseDidChange(.inactive)
-            return true
-        }, handoffProvider: provider, backendBaseURL: { URL(string: "https://ai-reply.kz/sandbox") })
-        routerReference = router
-        router.accountDidChange(userID: "account-A", isReady: true)
-        router.scenePhaseDidChange(.active)
-        router.mainInterfaceDidAppear()
-        router.openWebsiteAccount()
-        try await waitForHandoff(router)
-        router.scenePhaseDidChange(.active)
-        XCTAssertEqual(opened.count, 1)
-        XCTAssertEqual(provider.users.count, 1)
-        XCTAssertFalse(router.webOfferOpeningFailed)
-        XCTAssertFalse(router.isOpeningWebOffer)
-    }
-
-    @MainActor
-    func testBackendEnvironmentChangedDuringHandoffCannotOpenOldSession() async throws {
-        var opened: [URL] = []
-        var base = URL(string: "https://ai-reply.kz/sandbox")
-        let provider = FakeWebHandoff()
-        provider.holdsAnswers = true
-        let router = AppRouter(openExternal: { opened.append($0); return true }, handoffProvider: provider,
-                               backendBaseURL: { base })
-        router.accountDidChange(userID: "account-A", isReady: true)
-        router.scenePhaseDidChange(.active)
-        router.mainInterfaceDidAppear()
-        router.openWebsiteAccount()
-        for _ in 0..<200 where provider.users.isEmpty { try await Task.sleep(for: .milliseconds(5)) }
-        base = URL(string: "https://ai-reply.kz")
-        provider.holdsAnswers = false
-        try await waitForHandoff(router)
-        XCTAssertTrue(opened.isEmpty)
-        XCTAssertTrue(router.webOfferOpeningFailed)
-    }
-
-    @MainActor
     func testDestinationWaitsForTheGates() {
         let router = AppRouter()
         router.open(.screen(.subscription))
         XCTAssertEqual(router.path, [], "a gate is showing: nothing is pushed around it")
         XCTAssertEqual(router.pending, .screen(.subscription))
 
-        router.scenePhaseDidChange(.active)
         router.mainInterfaceDidAppear()
         XCTAssertEqual(router.path, [.subscription])
         XCTAssertNil(router.pending)
@@ -376,7 +149,6 @@ final class DeepLinkTests: XCTestCase {
     @MainActor
     func testDestinationAppliesAtOnceWhenHomeIsShowing() {
         let router = AppRouter()
-        router.scenePhaseDidChange(.active)
         router.mainInterfaceDidAppear()
         router.open(.screen(.templates))
         XCTAssertEqual(router.path, [.templates])
@@ -387,7 +159,6 @@ final class DeepLinkTests: XCTestCase {
     @MainActor
     func testSigningOutPutsTheGateBack() {
         let router = AppRouter()
-        router.scenePhaseDidChange(.active)
         router.mainInterfaceDidAppear()
         router.mainInterfaceDidDisappear()
         router.open(.screen(.settings))
@@ -400,7 +171,6 @@ final class DeepLinkTests: XCTestCase {
     @MainActor
     func testAGateComingBackStartsHomeFromItsRootNextTime() throws {
         let router = AppRouter()
-        router.scenePhaseDidChange(.active)
         router.mainInterfaceDidAppear()
         router.path = [.settings]
         router.webPage = AppRouter.WebPage(url: try XCTUnwrap(URL(string: "https://ai-reply.kz/offer")))
@@ -409,7 +179,6 @@ final class DeepLinkTests: XCTestCase {
         XCTAssertEqual(router.path, [], "the next account must not land on the last one's screen")
         XCTAssertNil(router.webPage)
 
-        router.scenePhaseDidChange(.active)
         router.mainInterfaceDidAppear()
         XCTAssertEqual(router.path, [])
     }
@@ -419,7 +188,6 @@ final class DeepLinkTests: XCTestCase {
     @MainActor
     func testADestinationWaitingBehindTheGateSurvivesIt() {
         let router = AppRouter()
-        router.scenePhaseDidChange(.active)
         router.mainInterfaceDidAppear()
         router.path = [.settings]
         router.mainInterfaceDidDisappear()
@@ -427,7 +195,6 @@ final class DeepLinkTests: XCTestCase {
         router.mainInterfaceDidDisappear()
         XCTAssertEqual(router.pending, .screen(.subscription))
 
-        router.scenePhaseDidChange(.active)
         router.mainInterfaceDidAppear()
         XCTAssertEqual(router.path, [.subscription])
     }
@@ -438,7 +205,6 @@ final class DeepLinkTests: XCTestCase {
         let router = AppRouter(now: { now })
         router.open(.screen(.compose))
         now = now.addingTimeInterval(AppRouter.pendingLifetime + 1)
-        router.scenePhaseDidChange(.active)
         router.mainInterfaceDidAppear()
         XCTAssertEqual(router.path, [], "signing in much later must not jump to an old screen")
     }
@@ -446,7 +212,6 @@ final class DeepLinkTests: XCTestCase {
     @MainActor
     func testWebLinksOpenTheInAppBrowser() throws {
         let router = AppRouter()
-        router.scenePhaseDidChange(.active)
         router.mainInterfaceDidAppear()
         let url = try XCTUnwrap(URL(string: "https://ai-reply.kz/offer"))
         router.open(.web(url))
@@ -455,196 +220,29 @@ final class DeepLinkTests: XCTestCase {
     }
 
     @MainActor
-    func testExternalOfferWaitsForAllGatesAndNeverUsesEmbeddedBrowser() async throws {
-        var opened: [URL] = []
-        let provider = FakeWebHandoff()
-        let router = AppRouter(openExternal: { opened.append($0); return true }, handoffProvider: provider,
-                               backendBaseURL: { URL(string: "https://ai-reply.kz/sandbox") }, locale: { "kk" })
-        let url = try XCTUnwrap(URL(string: "https://ai-reply.kz/sandbox/payment"))
-        let payload = NotificationPayload(type: "web_topup_offer", category: "marketing", link: url.absoluteString)
-        router.open(payload.destination)
-        XCTAssertTrue(opened.isEmpty)
-        XCTAssertTrue(provider.users.isEmpty, "no handoff is requested before the gates")
-        router.scenePhaseDidChange(.active)
+    func testHomeInformationPageUsesNoAccountAndNoWebsiteLogin() throws {
+        let router = AppRouter(backendBaseURL: { URL(string: "https://ai-reply.kz/sandbox") }, locale: { "kk" })
+        router.openServiceInformation()
+        XCTAssertNil(router.webPage, "a direct action needs the main interface")
         router.mainInterfaceDidAppear()
-        XCTAssertTrue(provider.users.isEmpty, "Home alone cannot replace an authenticated account")
-        router.accountDidChange(userID: "account-A", isReady: true)
-        try await waitForHandoff(router)
-        XCTAssertEqual(provider.users, ["account-A"])
-        XCTAssertEqual(provider.locales, ["kk"])
-        XCTAssertEqual(opened.map(\.absoluteString), ["https://ai-reply.kz/sandbox/payment#handoff=" + Self.handoffToken])
-        XCTAssertNil(router.webPage)
+        router.openServiceInformation()
+        XCTAssertNil(router.webPage, "inactive scenes do not present a browser")
+        router.scenePhaseDidChange(.active)
+        router.openServiceInformation()
+        XCTAssertEqual(router.webPage?.url.absoluteString, "https://ai-reply.kz/sandbox/app?lang=kk")
         XCTAssertTrue(router.path.isEmpty)
-        router.scenePhaseDidChange(.active)
-        router.mainInterfaceDidAppear()
-        XCTAssertEqual(opened.count, 1, "the tap is consumed once")
+        router.accountWillSignOut()
+        XCTAssertNil(router.webPage)
     }
 
     @MainActor
-    func testRouterRejectsPaymentInEmbeddedBrowserAndArbitraryExternalURL() throws {
-        var opened: [URL] = []
-        let router = AppRouter(openExternal: { opened.append($0); return true })
-        router.scenePhaseDidChange(.active)
+    func testRouterRevalidatesDirectWebDestinations() throws {
+        let router = AppRouter()
         router.mainInterfaceDidAppear()
         router.open(.web(try XCTUnwrap(URL(string: "https://ai-reply.kz/payment"))))
-        router.open(.externalWeb(try XCTUnwrap(URL(string: "https://ai-reply.kz/account"))))
-        router.open(.externalWeb(try XCTUnwrap(URL(string: "https://example.com/payment"))))
-        XCTAssertTrue(opened.isEmpty)
         XCTAssertNil(router.webPage)
-        XCTAssertNil(router.pending)
-    }
-
-    @MainActor
-    func testStaleExternalOfferDoesNotOpenAfterSignIn() throws {
-        var opened: [URL] = []
-        var now = Date(timeIntervalSince1970: 1_800_000_000)
-        let router = AppRouter(now: { now }, openExternal: { opened.append($0); return true })
-        router.open(.externalWeb(try XCTUnwrap(URL(string: "https://ai-reply.kz/payment"))))
-        now = now.addingTimeInterval(AppRouter.pendingLifetime + 1)
-        router.scenePhaseDidChange(.active)
-        router.mainInterfaceDidAppear()
-        XCTAssertTrue(opened.isEmpty)
-        XCTAssertNil(router.pending)
-    }
-
-    @MainActor
-    func testAccountSwitchRejectsLateHandoffResponse() async throws {
-        var opened: [URL] = []
-        let provider = FakeWebHandoff()
-        provider.holdsAnswers = true
-        let router = AppRouter(openExternal: { opened.append($0); return true }, handoffProvider: provider,
-                               backendBaseURL: { URL(string: "https://ai-reply.kz/sandbox") })
-        router.accountDidChange(userID: "account-A", isReady: true)
-        router.scenePhaseDidChange(.active)
-        router.mainInterfaceDidAppear()
-        router.open(.externalWeb(try XCTUnwrap(URL(string: "https://ai-reply.kz/sandbox/payment"))))
-        for _ in 0..<200 where provider.users.isEmpty { try await Task.sleep(for: .milliseconds(5)) }
-        XCTAssertEqual(provider.users, ["account-A"])
-        router.accountDidChange(userID: "account-B", isReady: true)
-        provider.holdsAnswers = false
-        try await Task.sleep(for: .milliseconds(30))
-        XCTAssertTrue(opened.isEmpty)
-        XCTAssertFalse(router.webOfferOpeningFailed)
-        router.retryWebOffer()
-        XCTAssertEqual(provider.users, ["account-A"], "B cannot retry A's request")
-    }
-
-    @MainActor
-    func testGateReturningCancelsHandoffWithoutOpeningTheBrowser() async throws {
-        var opened: [URL] = []
-        let provider = FakeWebHandoff()
-        provider.holdsAnswers = true
-        let router = AppRouter(openExternal: { opened.append($0); return true }, handoffProvider: provider,
-                               backendBaseURL: { URL(string: "https://ai-reply.kz/sandbox") })
-        router.accountDidChange(userID: "account-A", isReady: true)
-        router.scenePhaseDidChange(.active)
-        router.mainInterfaceDidAppear()
-        router.open(.externalWeb(try XCTUnwrap(URL(string: "https://ai-reply.kz/sandbox/payment"))))
-        for _ in 0..<200 where provider.users.isEmpty { try await Task.sleep(for: .milliseconds(5)) }
-        router.mainInterfaceDidDisappear()
-        provider.holdsAnswers = false
-        try await Task.sleep(for: .milliseconds(30))
-        XCTAssertTrue(opened.isEmpty)
-        XCTAssertFalse(router.webOfferOpeningFailed)
-    }
-
-    @MainActor
-    func testHandoffFailureHasNoPlainURLFallbackAndCanBeRetriedExplicitly() async throws {
-        var opened: [URL] = []
-        let provider = FakeWebHandoff()
-        provider.result = .failure(.offline)
-        let router = AppRouter(openExternal: { opened.append($0); return true }, handoffProvider: provider,
-                               backendBaseURL: { URL(string: "https://ai-reply.kz/sandbox") })
-        router.accountDidChange(userID: "account-A", isReady: true)
-        router.scenePhaseDidChange(.active)
-        router.mainInterfaceDidAppear()
-        router.open(.externalWeb(try XCTUnwrap(URL(string: "https://ai-reply.kz/sandbox/payment"))))
-        try await waitForHandoff(router)
-        XCTAssertTrue(opened.isEmpty)
-        XCTAssertTrue(router.webOfferOpeningFailed)
-        XCTAssertEqual(provider.users.count, 1)
-        provider.result = .success(WebPaymentHandoff(url: "https://ai-reply.kz/sandbox/payment#handoff=" + Self.handoffToken,
-                                                    expiresIn: 60))
-        router.retryWebOffer()
-        try await waitForHandoff(router)
-        XCTAssertEqual(opened.count, 1)
-        XCTAssertEqual(provider.users, ["account-A", "account-A"])
-        XCTAssertFalse(router.webOfferOpeningFailed)
-    }
-
-    @MainActor
-    func testTamperedOrExpiredHandoffNeverOpens() async throws {
-        for response in [
-            WebPaymentHandoff(url: "https://example.com/sandbox/payment#handoff=" + Self.handoffToken, expiresIn: 60),
-            WebPaymentHandoff(url: "https://ai-reply.kz/payment#handoff=" + Self.handoffToken, expiresIn: 60),
-            WebPaymentHandoff(url: "https://ai-reply.kz/sandbox/payment", expiresIn: 60),
-            WebPaymentHandoff(url: "https://ai-reply.kz/sandbox/payment#handoff=" + Self.handoffToken, expiresIn: 0)
-        ] {
-            var opened: [URL] = []
-            let provider = FakeWebHandoff()
-            provider.result = .success(response)
-            let router = AppRouter(openExternal: { opened.append($0); return true }, handoffProvider: provider,
-                                   backendBaseURL: { URL(string: "https://ai-reply.kz/sandbox") })
-            router.accountDidChange(userID: "account-A", isReady: true)
-            router.scenePhaseDidChange(.active)
-            router.mainInterfaceDidAppear()
-            router.open(.externalWeb(try XCTUnwrap(URL(string: "https://ai-reply.kz/sandbox/payment"))))
-            try await waitForHandoff(router)
-            XCTAssertTrue(opened.isEmpty)
-            XCTAssertTrue(router.webOfferOpeningFailed)
-        }
-    }
-
-    @MainActor
-    func testHandoffThatSpentItsLifetimeInFlightIsRejected() async throws {
-        var opened: [URL] = []
-        var now = Date(timeIntervalSince1970: 1_800_000_000)
-        let provider = FakeWebHandoff()
-        provider.holdsAnswers = true
-        let router = AppRouter(now: { now }, openExternal: { opened.append($0); return true }, handoffProvider: provider,
-                               backendBaseURL: { URL(string: "https://ai-reply.kz/sandbox") })
-        router.accountDidChange(userID: "account-A", isReady: true)
-        router.scenePhaseDidChange(.active)
-        router.mainInterfaceDidAppear()
-        router.open(.externalWeb(try XCTUnwrap(URL(string: "https://ai-reply.kz/sandbox/payment"))))
-        for _ in 0..<200 where provider.users.isEmpty { try await Task.sleep(for: .milliseconds(5)) }
-        now = now.addingTimeInterval(61)
-        provider.holdsAnswers = false
-        try await waitForHandoff(router)
-        XCTAssertTrue(opened.isEmpty)
-        XCTAssertTrue(router.webOfferOpeningFailed)
-    }
-
-    func testHandoffBodyAndResponseContract() throws {
-        let request = BackendWebPaymentHandoffProvider.Request(expectedUserID: "account-A", locale: "ru")
-        let body = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(request)) as? [String: String])
-        XCTAssertEqual(body, ["expected_user_id": "account-A", "locale": "ru"])
-        let response = try JSONDecoder().decode(WebPaymentHandoff.self,
-            from: Data(#"{"url":"https://ai-reply.kz/payment#handoff=opaque","expires_in":60}"#.utf8))
-        XCTAssertEqual(response.expiresIn, 60)
-    }
-
-    func testHandoffURLValidationHasExactEnvironmentAndTokenShape() throws {
-        let prod = try XCTUnwrap(URL(string: "https://ai-reply.kz"))
-        let sandbox = try XCTUnwrap(URL(string: "https://ai-reply.kz/sandbox"))
-        let suffix = "#handoff=" + Self.handoffToken
-        XCTAssertNotNil(DeepLink.handoffURL("https://ai-reply.kz/payment" + suffix, backendBaseURL: prod))
-        XCTAssertNotNil(DeepLink.handoffURL("https://ai-reply.kz/sandbox/payment?lang=uz" + suffix, backendBaseURL: sandbox))
-        for raw in ["https://ai-reply.kz/payment" + suffix,
-                    "https://ai-reply.kz/sandbox/payment#handoff=short",
-                    "https://ai-reply.kz/sandbox/payment" + suffix + "&next=x",
-                    "https://ai-reply.kz/sandbox/payment" + suffix + "=",
-                    "https://ai-reply.kz/sandbox/payment?next=bank" + suffix,
-                    "https://ai-reply.kz/sandbox/payment?lang=ru&lang=en" + suffix,
-                    "https://ai-reply.kz/sandbox/%70ayment" + suffix,
-                    "https://ai-reply.kz:443/sandbox/payment" + suffix,
-                    "https://user@ai-reply.kz/sandbox/payment" + suffix,
-                    "https://help.ai-reply.kz/sandbox/payment" + suffix,
-                    "http://ai-reply.kz/sandbox/payment" + suffix] {
-            XCTAssertNil(DeepLink.handoffURL(raw, backendBaseURL: sandbox), raw)
-            XCTAssertEqual(NotificationPayload(type: "web_topup_offer", category: "marketing", link: raw).destination, .none)
-        }
-        XCTAssertNil(DeepLink.handoffURL("https://ai-reply.kz/sandbox/payment" + suffix, backendBaseURL: prod))
+        router.open(.web(try XCTUnwrap(URL(string: "https://example.com/app"))))
+        XCTAssertNil(router.webPage)
     }
 
     @MainActor
@@ -652,7 +250,6 @@ final class DeepLinkTests: XCTestCase {
         let router = AppRouter()
         router.open(.none)
         XCTAssertNil(router.pending)
-        router.scenePhaseDidChange(.active)
         router.mainInterfaceDidAppear()
         XCTAssertEqual(router.path, [])
         XCTAssertNil(router.webPage)
@@ -673,7 +270,7 @@ final class DeepLinkTests: XCTestCase {
         XCTAssertEqual(AppRouter.path(for: .support), [], "no chat on this server: Home")
         XCTAssertEqual(AppRouter.path(for: .support, availability: .init(supportChat: true)), [.support])
         XCTAssertEqual(AppRouter.path(for: .purchase), [.subscription], "purchases closed: the plans")
-        XCTAssertEqual(AppRouter.path(for: .purchase, availability: .init(purchases: true)), [.subscription])
+        XCTAssertEqual(AppRouter.path(for: .purchase, availability: .init(purchases: true)), [.purchase])
         for screen in AppScreen.allCases {
             XCTAssertEqual(AppRouter.presentsTutorial(screen), screen == .onboarding, screen.rawValue)
         }
@@ -697,24 +294,23 @@ final class DeepLinkTests: XCTestCase {
 
         let router = AppRouter()
         router.availability = AppRouter.Availability(supportChat: true)
-        router.scenePhaseDidChange(.active)
         router.mainInterfaceDidAppear()
         router.open(payload.destination)
         XCTAssertEqual(router.path, [.support])
     }
 
-    /// Older purchase links always open the neutral balance screen.
+    /// `aireply://purchase` opens «Докупить ответы» only while the server
+    /// sells; the router learns that from the account's features.
     @MainActor
-    func testPurchaseLinkCannotEnableCommerceWithAServerSwitch() {
+    func testPurchaseLinkFollowsTheServersSwitch() {
         let router = AppRouter()
-        router.scenePhaseDidChange(.active)
         router.mainInterfaceDidAppear()
         router.open(.screen(.purchase))
         XCTAssertEqual(router.path, [.subscription])
 
         router.availability = AppRouter.Availability(purchases: true)
         router.open(.screen(.purchase))
-        XCTAssertEqual(router.path, [.subscription])
+        XCTAssertEqual(router.path, [.purchase])
     }
 
     /// The app's screens are the server's `domain.LinkScreens`, spelled alike.
@@ -733,7 +329,6 @@ final class DeepLinkTests: XCTestCase {
         router.open(.screen(.onboarding))
         XCTAssertFalse(router.isShowingTutorial, "not around the gates")
 
-        router.scenePhaseDidChange(.active)
         router.mainInterfaceDidAppear()
         XCTAssertTrue(router.isShowingTutorial)
         XCTAssertEqual(router.path, [])
@@ -749,14 +344,12 @@ final class DeepLinkTests: XCTestCase {
         let router = AppRouter()
         router.open(.screen(.onboarding))
         router.firstRunOnboardingDidFinish()
-        router.scenePhaseDidChange(.active)
         router.mainInterfaceDidAppear()
         XCTAssertFalse(router.isShowingTutorial)
 
         router.mainInterfaceDidDisappear()
         router.open(.screen(.subscription))
         router.firstRunOnboardingDidFinish()
-        router.scenePhaseDidChange(.active)
         router.mainInterfaceDidAppear()
         XCTAssertEqual(router.path, [.subscription], "other links still open")
     }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"html/template"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -161,6 +162,26 @@ type legalView struct {
 	Updated string
 	Body    template.HTML
 	Boot    template.JS
+}
+
+type appInfoView struct {
+	baseView
+	AppStoreURL string
+	Boot        template.JS
+}
+
+func (s *Server) handleAppInfo(w http.ResponseWriter, r *http.Request) {
+	locale := s.locale(w, r)
+	base := s.base(locale)
+	base.AppInfoPage = true
+	storeURL := s.cfg.App.AppStoreURL
+	parsed, err := url.Parse(storeURL)
+	if err != nil || parsed.Scheme != "https" || parsed.User != nil || (parsed.Host != "apps.apple.com" && parsed.Host != "itunes.apple.com") {
+		storeURL = ""
+	}
+	s.render(w, "app_info", "public_layout", appInfoView{
+		baseView: base, AppStoreURL: storeURL, Boot: template.JS("{}"),
+	})
 }
 
 // handleTerms — пайдалану шарттары.

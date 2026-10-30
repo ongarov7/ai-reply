@@ -140,11 +140,9 @@ final class AppServices {
     func accountDidChange(_ state: AccountState) {
         let previous = account
         account = state
-        router.accountDidChange(userID: state.userID,
-                                isReady: state.isSignedIn && state.isBootstrapComplete && state.hasAcceptedLegal)
         notifications.setSignedIn(state.isSignedIn, accountID: state.userID)
         notifications.setServerDeliversPush(state.features.map { $0.pushNotifications ?? false })
-        purchases.accountDidChange(isSignedIn: state.isSignedIn && state.isBootstrapComplete,
+        purchases.accountDidChange(isSignedIn: state.isSignedIn && state.isBootstrapComplete && AccountCredentials.isSignedIn,
                                    userID: state.userID, features: state.features)
         support.accountDidChange(isSignedIn: state.isSignedIn, hasAcceptedLegal: state.hasAcceptedLegal,
                                  features: state.features)
@@ -157,6 +155,12 @@ final class AppServices {
         reportOpenedNotifications()
         // Covers the consent too: the registration right after it is accepted.
         if state != previous { requestInstallationSync() }
+    }
+
+    /// Logout clears purchase eligibility before its server request can wait.
+    func accountWillSignOut() {
+        purchases.accountDidChange(isSignedIn: false, userID: nil, features: account.features)
+        router.accountWillSignOut()
     }
 
     func scenePhaseDidChange(_ phase: ScenePhase) {

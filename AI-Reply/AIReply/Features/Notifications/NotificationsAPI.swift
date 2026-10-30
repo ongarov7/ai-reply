@@ -65,45 +65,6 @@ struct BackendNotificationPreferencesService: NotificationPreferencesService {
     }
 }
 
-/// A short-lived, single-use website login issued for the tapped offer.
-/// The opaque URL is never logged or persisted by the app.
-struct WebPaymentHandoff: Decodable, Equatable, Sendable {
-    let url: String
-    let expiresIn: Int
-
-    enum CodingKeys: String, CodingKey {
-        case url
-        case expiresIn = "expires_in"
-    }
-}
-
-protocol WebPaymentHandoffProviding: Sendable {
-    func create(expectedUserID: String, locale: String) async throws -> WebPaymentHandoff
-}
-
-struct BackendWebPaymentHandoffProvider: WebPaymentHandoffProviding {
-    struct Request: Encodable, Sendable {
-        let expectedUserID: String
-        let locale: String
-
-        enum CodingKeys: String, CodingKey {
-            case expectedUserID = "expected_user_id"
-            case locale
-        }
-    }
-
-    private let session: AccountSession
-
-    init(session: AccountSession = .shared) { self.session = session }
-
-    func create(expectedUserID: String, locale: String) async throws -> WebPaymentHandoff {
-        let request = Request(expectedUserID: expectedUserID, locale: locale)
-        return try await session.authenticated { token in
-            try await NotificationsAPI.client().post("api/v1/web/payment-handoff", body: request, token: token)
-        }
-    }
-}
-
 /// Tells the server a notification was opened.
 protocol NotificationOpenedReporting: Sendable {
     func reportOpened(installationID: String, deliveryID: String) async throws

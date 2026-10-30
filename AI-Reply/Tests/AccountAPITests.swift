@@ -269,17 +269,32 @@ final class AccountReleaseTests: XCTestCase {
 
     // MARK: Plans
 
+    func testSubscriptionRenewalFlagIsOptionalAndKeepsCancelledAccess() throws {
+        let base = #"{"id":"s","status":"active","expires_at":"2026-11-30T00:00:00Z","plan":{"id":"p","code":"base_monthly","name":{"en":"Base"},"description":{},"price":59900,"price_text":"599","currency":"KZT","daily_message_limit":30,"monthly_message_limit":0,"period_days":30,"is_free":false}"#
+        func subscription(_ extra: String) throws -> AccountAPI.Subscription {
+            try JSONDecoder().decode(AccountAPI.Subscription.self, from: Data((base + extra + "}").utf8))
+        }
+        XCTAssertNil(try subscription("").autoRenews)
+        XCTAssertNil(try subscription(#", "auto_renews": null"#).autoRenews)
+        XCTAssertEqual(try subscription(#", "auto_renews": true"#).autoRenews, true)
+        let cancelled = try subscription(#", "auto_renews": false"#)
+        XCTAssertEqual(cancelled.autoRenews, false)
+        XCTAssertEqual(cancelled.status, "active")
+        XCTAssertEqual(cancelled.expiresAt, "2026-11-30T00:00:00Z")
+    }
+
     func testPlanIsPurchasableOnlyWhenTheServerSaysSo() throws {
         XCTAssertTrue(try plan(#", "purchasable": true"#).purchasable)
         XCTAssertFalse(try plan(#", "purchasable": false"#).purchasable)
         XCTAssertFalse(try plan("").purchasable, "an older server does not send it, and nothing is sold then")
     }
 
-    /// Server flags and a purchasable plan cannot enable sales in this product.
+    /// Legacy create/confirm checkout stays disabled while native StoreKit is enabled.
     @MainActor
-    func testNewPurchasesStayOffEvenWhenTheServerAllowsThem() throws {
+    func testLegacyCheckoutStaysDisabledWhenNativeStoreKitIsEnabled() throws {
         let model = AccountModel()
-        XCTAssertFalse(AccountModel.purchasesAvailableInThisBuild)
+        XCTAssertTrue(IOSProductPolicy.allowsNewPurchases)
+        XCTAssertFalse(AccountModel.legacyCheckoutAvailableInThisBuild)
         XCTAssertFalse(model.canPurchase(try plan(#", "purchasable": true"#)))
         XCTAssertFalse(model.canPurchase(try plan("")))
         let free = try JSONDecoder().decode(AccountAPI.Plan.self, from: Data("""

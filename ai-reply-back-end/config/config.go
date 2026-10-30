@@ -334,8 +334,8 @@ type IAP struct {
 	AppleEnabled  bool
 	AppleBundleID string
 	// AppleAcceptSandbox — Sandbox транзакциялары (TestFlight, App Review) қабылдана ма.
-	// Әдепкі: production-да false, басқа ортада true. App Review production серверге
-	// Sandbox-тан сатып алады, сондықтан шолуға жібергенде true қою керек.
+	// Әр сервер тек бір ортаны қабылдайды: production-да false, тест ортасында true.
+	// TestFlight / App Review Sandbox бөлек API мен дерекқорға бағытталуы керек.
 	AppleAcceptSandbox bool
 	GooglePackageName  string
 	GoogleClientEmail  string

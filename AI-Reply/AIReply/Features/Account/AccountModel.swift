@@ -176,13 +176,13 @@ final class AccountModel {
         return offersApple || !isRelease
     }
 
-    /// Account access is readable; this iOS product does not sell access.
-    static var purchasesAvailableInThisBuild: Bool { IOSProductPolicy.allowsNewPurchases }
+    /// The legacy create/confirm checkout is not StoreKit and stays disabled.
+    static let legacyCheckoutAvailableInThisBuild = false
 
     /// A Choose button (and a price) for this plan: the build can buy, and
     /// the server says the plan can be bought right now.
     func canPurchase(_ plan: AccountAPI.Plan) -> Bool {
-        Self.purchasesAvailableInThisBuild && plan.purchasable && !plan.isFree
+        Self.legacyCheckoutAvailableInThisBuild && plan.purchasable && !plan.isFree
     }
 
     /// The account signs in with Apple, so deleting it revokes Apple's token.

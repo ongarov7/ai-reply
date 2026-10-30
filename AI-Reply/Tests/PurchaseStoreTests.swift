@@ -1,6 +1,67 @@
 import XCTest
 @testable import AIReply
 
+final class SubscriptionDisplayTests: XCTestCase {
+    private func plan(_ code: String, days: Int, kind: String, limit: Int = 0, free: Bool = false) -> AccountAPI.Plan {
+        AccountAPI.Plan(id: code, code: code, name: ["en": code.hasPrefix("base") ? "Base" : "Pro"],
+                        description: [:], price: 0, priceText: "", currency: "KZT",
+                        dailyLimit: limit, monthlyLimit: 0, periodDays: days, isFree: free,
+                        entitlementKind: kind)
+    }
+
+    private var plans: [AccountAPI.Plan] {
+        [plan("free", days: 0, kind: "welcome", free: true),
+         plan("base_monthly", days: 30, kind: "daily", limit: 30),
+         plan("base_yearly", days: 365, kind: "daily", limit: 30),
+         plan("pro_monthly", days: 30, kind: "unlimited"),
+         plan("pro_yearly", days: 365, kind: "unlimited")]
+    }
+
+    func testUnmappedPlansRemainReadableWithoutDuplicatePeriods() {
+        let catalogue = SubscriptionPlanCatalogue(plans: plans, offers: [])
+        XCTAssertEqual(catalogue.freePlan?.code, "free")
+        XCTAssertEqual(catalogue.periods, ["month", "year"])
+        XCTAssertEqual(catalogue.visible(period: "month").map(\.planID), ["base_monthly", "pro_monthly"])
+        XCTAssertEqual(catalogue.visible(period: "year").map(\.planID), ["base_yearly", "pro_yearly"])
+        XCTAssertEqual(catalogue.visible(period: "month").map(\.allowance), [.daily(30), .unlimited])
+        XCTAssertTrue(catalogue.options.allSatisfy { $0.offer == nil }, "information alone cannot open checkout")
+    }
+
+    func testMissingSelectedPeriodFallsBackToOnePeriod() {
+        let yearly = plans.filter { $0.periodDays == 365 }
+        let catalogue = SubscriptionPlanCatalogue(plans: yearly, offers: [])
+        XCTAssertEqual(catalogue.visible(period: "month").map(\.planID), ["base_yearly", "pro_yearly"])
+        XCTAssertTrue(catalogue.visible(period: "month").allSatisfy { $0.billingPeriod == "year" })
+    }
+
+    func testMatchedStoreOfferReplacesInformationWithoutLegacyCheckoutFlag() throws {
+        let offer = PurchaseOffer(code: "base_monthly", kind: .subscription, units: 0, durationHours: 0,
+                                  storeProductID: "base.monthly", name: "Base", displayPrice: "599 ₸",
+                                  planID: "base_monthly", billingPeriod: "month", entitlementKind: "daily", dailyLimit: 30)
+        XCTAssertFalse(plans[1].purchasable, "the legacy checkout flag does not govern StoreKit")
+        let catalogue = SubscriptionPlanCatalogue(plans: plans, offers: [offer])
+        XCTAssertEqual(catalogue.options.count, 4)
+        let monthlyBase = try XCTUnwrap(catalogue.visible(period: "month").first)
+        XCTAssertEqual(monthlyBase.id, offer.id)
+        XCTAssertEqual(monthlyBase.offer?.displayPrice, "599 ₸")
+    }
+
+    func testZeroDailyLimitNeverBecomesZeroRepliesPerDay() {
+        let invalid = plan("unknown_monthly", days: 30, kind: "daily")
+        let catalogue = SubscriptionPlanCatalogue(plans: [invalid], offers: [])
+        XCTAssertEqual(catalogue.options.first?.allowance, .unspecified)
+    }
+
+    func testStoreOnlySubscriptionsRemainAvailableWhilePlansAreLoading() {
+        let offer = PurchaseOffer(code: "pro_yearly", kind: .subscription, units: 0, durationHours: 0,
+                                  storeProductID: "pro.yearly", name: "Pro", displayPrice: "29 990 ₸",
+                                  planID: "pro_yearly", billingPeriod: "year", entitlementKind: "unlimited")
+        let catalogue = SubscriptionPlanCatalogue(plans: [], offers: [offer])
+        XCTAssertEqual(catalogue.visible(period: "month").first?.offer, offer)
+        XCTAssertEqual(catalogue.options.first?.allowance, .unlimited)
+    }
+}
+
 /// Packs and the pass through StoreKit 2, with the App Store and the server
 /// both imitated: what is offered, when a transaction is finished, and how
 /// every outcome is told (contract §3.8).
@@ -108,21 +169,23 @@ final class PurchaseStoreTests: XCTestCase {
             StoreProduct(id: "gift.10", displayName: "Gift", displayPrice: "1 ₸"),
             StoreProduct(id: "unknown", displayName: "Unknown", displayPrice: "5 ₸")
         ]
-        let store = PurchaseStore(storeKit: storeKit, backend: backend, preferences: preferences, allowsNewPurchases: true)
+        let store = PurchaseStore(storeKit: storeKit, backend: backend, preferences: preferences)
         store.accountDidChange(isSignedIn: true, userID: "u1", features: features(iap))
         return (store, storeKit, backend)
     }
 
     // MARK: Catalogue
 
-    func testProductPolicyBlocksNewSalesDespiteBackendAndStoreAvailability() async {
+    func testNativeSalesUseBuildPolicyAndStillRequireBackendAvailability() async {
         let apple = FakeStoreKit()
         let backend = FakeBackend(catalogue: .success(PurchaseAPI.Catalogue(products: serverProducts, accountToken: token)))
         let store = PurchaseStore(storeKit: apple, backend: backend)
         store.accountDidChange(isSignedIn: true, userID: "u1", features: features(#"{"iap_ios": true}"#))
-        XCTAssertFalse(IOSProductPolicy.allowsNewPurchases)
+        XCTAssertTrue(IOSProductPolicy.allowsNewPurchases)
+        XCTAssertTrue(store.isEnabled)
+        XCTAssertTrue(store.canMakePayments)
+        store.accountDidChange(isSignedIn: true, userID: "u1", features: features(#"{"iap_ios": false}"#))
         XCTAssertFalse(store.isEnabled)
-        XCTAssertFalse(store.canMakePayments)
         await store.loadCatalogue()
         let offer = PurchaseOffer(code: "pack30", kind: .pack, units: 30, durationHours: 0,
                                   storeProductID: "kz.aireply.pack30", name: "30 replies", displayPrice: "100 ₸")
@@ -140,7 +203,7 @@ final class PurchaseStoreTests: XCTestCase {
         let log = FinishLog()
         apple.unfinished = [transaction("previous-purchase", log: log)]
         let backend = FakeBackend(catalogue: .failure(.purchasesUnavailable))
-        let store = PurchaseStore(storeKit: apple, backend: backend)
+        let store = PurchaseStore(storeKit: apple, backend: backend, allowsNewPurchases: false)
         store.accountDidChange(isSignedIn: true, userID: "u1", features: features(#"{"iap_ios": true}"#))
         await store.processUnfinished()
         XCTAssertFalse(store.isEnabled)
@@ -148,6 +211,47 @@ final class PurchaseStoreTests: XCTestCase {
         XCTAssertEqual(log.finished, ["previous-purchase"])
         XCTAssertEqual(backend.catalogueCalls, 0)
         XCTAssertTrue(apple.tokens.isEmpty)
+    }
+
+    func testSignOutInvalidatesLoadedOffersBeforeAnotherPurchaseCanStart() async throws {
+        let (store, apple, backend) = makeStore()
+        await store.loadCatalogue()
+        let oldOffer = try XCTUnwrap(store.offers.first)
+        store.accountDidChange(isSignedIn: false, userID: nil, features: features(#"{"iap_ios": true}"#))
+        await store.purchase(oldOffer)
+        XCTAssertFalse(store.isEnabled)
+        XCTAssertTrue(store.offers.isEmpty)
+        XCTAssertTrue(apple.tokens.isEmpty, "the cached signed-in screen cannot start a purchase after logout begins")
+        XCTAssertTrue(backend.submitted.isEmpty)
+    }
+
+    func testTransactionArrivingDuringLogoutWaitsForTheAccountToReturn() async throws {
+        let (store, _, backend) = makeStore()
+        let log = FinishLog()
+        store.accountDidChange(isSignedIn: false, userID: nil, features: features(#"{"iap_ios": true}"#))
+        await store.received(transaction("logout-waiting", log: log))
+        XCTAssertTrue(backend.submitted.isEmpty)
+        XCTAssertTrue(log.finished.isEmpty)
+        store.accountDidChange(isSignedIn: true, userID: "u1", features: features(#"{"iap_ios": true}"#))
+        for _ in 0..<100 where log.finished.isEmpty { try await Task.sleep(for: .milliseconds(5)) }
+        XCTAssertEqual(backend.submitted, ["jws-logout-waiting"])
+        XCTAssertEqual(log.finished, ["logout-waiting"])
+    }
+
+    func testServerGrantForABeforeLogoutFinishesWithoutUpdatingLoggedOutUI() async throws {
+        let (store, _, backend) = makeStore()
+        let log = FinishLog()
+        var grants = 0
+        store.onGrant = { _ in grants += 1 }
+        backend.holdsAnswers = true
+        let delivery = Task { await store.received(transaction("logout-granted", log: log)) }
+        for _ in 0..<100 where backend.submitted.isEmpty { try await Task.sleep(for: .milliseconds(5)) }
+        XCTAssertEqual(backend.submitted, ["jws-logout-granted"])
+        store.accountDidChange(isSignedIn: false, userID: nil, features: features(#"{"iap_ios": true}"#))
+        backend.holdsAnswers = false
+        await delivery.value
+        XCTAssertEqual(log.finished, ["logout-granted"], "the server already credited A before StoreKit finish")
+        XCTAssertEqual(grants, 0, "the old grant must not populate a logged-out or different account UI")
     }
 
     func testNothingIsShownOrAskedWhilePurchasesAreOff() async {

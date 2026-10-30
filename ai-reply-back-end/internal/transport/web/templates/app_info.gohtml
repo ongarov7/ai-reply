@@ -1,0 +1,31 @@
+{{define "title"}}{{call .T "app_info.title"}}{{end}}
+{{define "content"}}
+<main class="wrap">
+  <article class="legal">
+    <h1>{{call .T "app_info.title"}}</h1>
+    <p>{{call .T "app_info.intro"}}</p>
+
+    <h2>{{call .T "app_info.keyboard_title"}}</h2>
+    <ol>
+      <li>{{call .T "app_info.keyboard_step1"}}</li>
+      <li>{{call .T "app_info.keyboard_step2"}}</li>
+      <li>{{call .T "app_info.keyboard_step3"}}</li>
+    </ol>
+    <p>{{call .T "app_info.full_access"}} <a href="{{.BasePath}}/privacy?lang={{.Locale}}">{{call .T "footer.privacy"}}</a>.</p>
+
+    <h2>{{call .T "app_info.use_title"}}</h2>
+    <ol>
+      <li>{{call .T "app_info.use_step1"}}</li>
+      <li>{{call .T "app_info.use_step2"}}</li>
+      <li>{{call .T "app_info.use_step3"}}</li>
+    </ol>
+
+    <h2>{{call .T "app_info.help_title"}}</h2>
+    <p>{{call .T "app_info.help_body"}} <a href="{{.BasePath}}/support?lang={{.Locale}}">{{call .T "footer.support"}}</a>.</p>
+    {{if .ContactEmail}}<p>{{call .T "support.contact_body"}} <a href="mailto:{{.ContactEmail}}">{{.ContactEmail}}</a></p>{{end}}
+    <p><a href="{{.BasePath}}/offer?lang={{.Locale}}">{{call .T "footer.terms"}}</a> · <a href="{{.BasePath}}/privacy?lang={{.Locale}}">{{call .T "footer.privacy"}}</a></p>
+
+    {{if .AppStoreURL}}<p><a class="btn btn-primary" href="{{.AppStoreURL}}" rel="noopener noreferrer">{{call .T "app_info.download"}}</a></p>{{end}}
+  </article>
+</main>
+{{end}}

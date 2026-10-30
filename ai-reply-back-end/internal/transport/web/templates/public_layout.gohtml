@@ -53,7 +53,7 @@
       <a href="{{.BasePath}}/offer?lang={{.Locale}}">{{call .T "footer.terms"}}</a>
       <a href="{{.BasePath}}/privacy?lang={{.Locale}}">{{call .T "footer.privacy"}}</a>
       <a href="{{.BasePath}}/support?lang={{.Locale}}">{{call .T "footer.support"}}</a>
-      <a href="{{.BasePath}}/account/delete?lang={{.Locale}}">{{call .T "footer.delete_account"}}</a>
+      {{if not .AppInfoPage}}<a href="{{.BasePath}}/account/delete?lang={{.Locale}}">{{call .T "footer.delete_account"}}</a>{{end}}
       {{if .ContactEmail}}<a href="mailto:{{.ContactEmail}}">{{call .T "footer.contact"}}</a>{{end}}
     </nav>
   </div>

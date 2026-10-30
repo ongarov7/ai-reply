@@ -38,7 +38,7 @@ struct AIReplyApp: App {
             ProfileSync(configuration: configuration, account: account).adoptServerChoice(profile?.gender)
         }
         account.installationIDForSignOut = { AppServices.shared.installationIDForSignOut }
-        account.willEndSession = { AppServices.shared.router.accountWillSignOut() }
+        account.willEndSession = { AppServices.shared.accountWillSignOut() }
         account.didDeleteAccount = { [weak configuration] in
             configuration?.forgetAccountProfile()
             ProductEventReporter.shared.discardWaiting()

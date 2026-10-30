@@ -23,12 +23,8 @@ struct HomeView: View {
                 Text("home.description")
                     .font(.body)
                     .foregroundStyle(.secondary)
-                if account.isSignedIn {
-                    VStack(spacing: DS.Spacing.s) {
-                        usageCard
-                        if IOSProductPolicy.showsWebsiteAccountLink { websiteAccountCard }
-                    }
-                }
+                if account.isSignedIn { usageCard }
+                if IOSProductPolicy.showsServiceInformationLink { serviceInformationCard }
                 if updates.showsUpdateCard {
                     AppUpdateCard()
                         .transition(.opacity)
@@ -137,9 +133,9 @@ struct HomeView: View {
 
     private var balance: BalanceSummary { BalanceSummary.make(account.usage) }
 
-    private var websiteAccountCard: some View {
+    private var serviceInformationCard: some View {
         Button {
-            router.openWebsiteAccount()
+            router.openServiceInformation()
         } label: {
             HStack(spacing: DS.Spacing.s) {
                 Image(systemName: "globe")
@@ -147,10 +143,10 @@ struct HomeView: View {
                     .foregroundStyle(Color.accentColor)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: DS.Spacing.xxs) {
-                    Text("home.websiteAccount.title")
+                    Text("home.serviceInformation.title")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.primary)
-                    Text("home.websiteAccount.subtitle")
+                    Text("home.serviceInformation.subtitle")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -165,10 +161,10 @@ struct HomeView: View {
             .dsCard()
         }
         .buttonStyle(.plain)
-        .disabled(!router.canOpenWebsiteAccount)
+        .disabled(!router.canOpenServiceInformation)
         .accessibilityElement(children: .combine)
-        .accessibilityHint(Text("home.websiteAccount.externalHint"))
-        .accessibilityIdentifier("home.websiteAccount")
+        .accessibilityHint(Text("home.serviceInformation.hint"))
+        .accessibilityIdentifier("home.serviceInformation")
     }
 
     /// «Бесплатные ответы: 35 из 50» while a new account has free replies

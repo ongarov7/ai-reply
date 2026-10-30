@@ -121,8 +121,8 @@ final class ComposeViewModel {
     /// - Parameter language: drives which localized error sentence is shown, and
     ///   which name a template is referred to by. It does NOT decide the reply's
     ///   language: that follows the incoming message.
-    ///   - purchasesEnabled: legacy input retained for callers; this product
-    ///     never turns a spent limit into a purchase offer.
+    ///   - purchasesEnabled: native StoreKit purchases are available, so a
+    ///     spent limit can offer the purchase screen.
     func generate(configuration: ReplyConfiguration, language: AppLanguage, purchasesEnabled: Bool = false) {
         guard let templateID = selectedTemplateID,
               let template = configuration.template(id: templateID) else { return }

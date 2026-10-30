@@ -14903,64 +14903,6 @@
         }
       }
     },
-    "exhausted.balance" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Посмотреть баланс"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Балансты қарау"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "View balance"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Balansni ko‘rish"
-          }
-        }
-      }
-    },
-    "exhausted.body.balance" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Доступные ответы закончились. Посмотри баланс и действующие условия доступа в своём аккаунте."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Қолжетімді жауаптар таусылды. Аккаунтыңдағы баланс пен қолданыстағы қолжетімділік шарттарын қара."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You have used your available replies. Check your account balance and current access details."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mavjud javoblaringiz tugadi. Hisobingizdagi balans va joriy foydalanish shartlarini ko‘ring."
-          }
-        }
-      }
-    },
     "notifications.card.offersOptional" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -15019,176 +14961,147 @@
         }
       }
     },
-    "notifications.website.opening" : {
+    "home.serviceInformation.title" : {
       "extractionState" : "manual",
       "localizations" : {
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Открываю сайт…"
+            "value" : "О сервисе AI Reply"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Сайт ашылуда…"
+            "value" : "AI Reply сервисі туралы"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Opening website…"
+            "value" : "About AI Reply"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sayt ochilmoqda…"
+            "value" : "AI Reply xizmati haqida"
           }
         }
       }
     },
-    "notifications.website.openFailed" : {
+    "home.serviceInformation.subtitle" : {
       "extractionState" : "manual",
       "localizations" : {
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Не удалось открыть сайт"
+            "value" : "Как работает сервис и поддержка"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Сайтты ашу мүмкін болмады"
+            "value" : "Сервис қалай жұмыс істейді және қолдау"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Couldn’t open website"
+            "value" : "How the service works and support"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Saytni ochib bo‘lmadi"
+            "value" : "Xizmat qanday ishlaydi va yordam"
           }
         }
       }
     },
-    "notifications.website.retryBody" : {
+    "home.serviceInformation.hint" : {
       "extractionState" : "manual",
       "localizations" : {
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Не удалось подготовить вход на сайт. Попробуй ещё раз."
+            "value" : "Откроется информационная страница сайта."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Сайтқа кіруді дайындау мүмкін болмады. Қайта көр."
+            "value" : "Сайттың ақпараттық беті ашылады."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "We couldn’t prepare your website sign-in. Please try again."
+            "value" : "Opens the website’s information page."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Saytga kirishni tayyorlab bo‘lmadi. Qayta urinib ko‘ring."
+            "value" : "Saytning ma’lumot sahifasi ochiladi."
           }
         }
       }
     },
-    "home.websiteAccount.title" : {
+    "subscription.renewsOn %@" : {
       "extractionState" : "manual",
       "localizations" : {
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Личный кабинет на сайте"
+            "value" : "Продление %@"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Сайттағы жеке кабинет"
+            "value" : "Ұзарту күні: %@"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Website account"
+            "value" : "Renews on %@"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Saytdagi shaxsiy kabinet"
+            "value" : "Yangilanish sanasi: %@"
           }
         }
       }
     },
-    "home.websiteAccount.subtitle" : {
+    "subscription.renewalOff" : {
       "extractionState" : "manual",
       "localizations" : {
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Тарифы и баланс AI Reply"
+            "value" : "Автопродление отключено. Доступ сохранится до конца оплаченного периода."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Reply тарифтері мен балансы"
+            "value" : "Автоматты ұзарту өшірулі. Қолжетімділік төленген кезеңнің соңына дейін сақталады."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Reply plans and balance"
+            "value" : "Automatic renewal is off. Access continues until the end of the paid period."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Reply tariflari va balansi"
-          }
-        }
-      }
-    },
-    "home.websiteAccount.externalHint" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Откроется внешний браузер."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Сыртқы браузер ашылады."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Opens in your external browser."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tashqi brauzerda ochiladi."
+            "value" : "Avtomatik yangilanish o‘chirilgan. Foydalanish huquqi to‘langan muddat oxirigacha saqlanadi."
           }
         }
       }

@@ -235,6 +235,15 @@ func (s *Store) GrantPurchase(ctx context.Context, in PurchaseGrant) (GrantResul
 	p := in.Purchase
 	now := ms(in.Now)
 	err := s.db.Tx(ctx, func(tx *sql.Tx) error {
+		if p.Provider == domain.ProviderAppStore {
+			var blocked bool
+			if err := tx.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM apple_purchase_lifecycle WHERE transaction_id=? AND state<>'restored')`, p.TransactionID).Scan(&blocked); err != nil {
+				return err
+			}
+			if blocked {
+				return domain.PurchaseInvalid(domain.PurchaseReasonRevoked)
+			}
+		}
 		id := traits.NewID()
 		res, err := tx.ExecContext(ctx, `
 			INSERT INTO iap_purchases (id, user_id, provider, environment, store_product_id, product_code, transaction_id,
@@ -373,12 +382,16 @@ type PurchaseRevocation struct {
 	// At — дүкен қашан қайтарды (revocationDate, voidedTimeMillis).
 	At  time.Time
 	Now time.Time
+	// SignedAt — verified Apple event/snapshot time; zero leaves other providers unchanged.
+	SignedAt time.Time
 	// Tombstone — бізде жоқ транзакция: осы жол Status-пен, иесіз жазылады, кейін берілмейді.
 	Tombstone *domain.IAPPurchase
 }
 
 // RevocationResult — не болды.
 type RevocationResult struct {
+	// Ignored — an older or duplicate signed Apple event changed nothing.
+	Ignored bool
 	// Found — транзакция бізде бар еді.
 	Found bool
 	// Revoked — осы шақыру күйін ауыстырды (қайталанған хабарлама — false).
@@ -403,6 +416,16 @@ func (s *Store) RevokePurchase(ctx context.Context, in PurchaseRevocation) (Revo
 	}
 	now := ms(in.Now)
 	err := s.db.Tx(ctx, func(tx *sql.Tx) error {
+		if in.Provider == domain.ProviderAppStore && !in.SignedAt.IsZero() {
+			advanced, err := advanceApplePurchaseLifecycle(ctx, tx, in.TransactionID, in.Status, in.SignedAt, in.Now)
+			if err != nil {
+				return err
+			}
+			if !advanced {
+				out.Ignored = true
+				return nil
+			}
+		}
 		existing, err := purchaseInTx(ctx, tx, in.Provider, in.TransactionID)
 		if errors.Is(err, sql.ErrNoRows) {
 			if in.Tombstone == nil {
@@ -490,9 +513,28 @@ type RestoreResult struct {
 // the app's post grants the transaction normally, still only to the account
 // its appAccountToken names. A deleted account's purchase stays as it is.
 func (s *Store) RestorePurchase(ctx context.Context, provider, transactionID string, now time.Time) (RestoreResult, error) {
+	return s.restorePurchase(ctx, provider, transactionID, time.Time{}, now)
+}
+
+// RestoreApplePurchase keeps a reversal's signed state even if there is no
+// purchase yet, so a delayed earlier refund cannot block the eventual grant.
+func (s *Store) RestoreApplePurchase(ctx context.Context, transactionID string, signedAt, now time.Time) (RestoreResult, error) {
+	return s.restorePurchase(ctx, domain.ProviderAppStore, transactionID, signedAt, now)
+}
+
+func (s *Store) restorePurchase(ctx context.Context, provider, transactionID string, signedAt, now time.Time) (RestoreResult, error) {
 	var out RestoreResult
 	at := ms(now)
 	err := s.db.Tx(ctx, func(tx *sql.Tx) error {
+		if provider == domain.ProviderAppStore && !signedAt.IsZero() {
+			advanced, err := advanceApplePurchaseLifecycle(ctx, tx, transactionID, "restored", signedAt, now)
+			if err != nil {
+				return err
+			}
+			if !advanced {
+				return nil
+			}
+		}
 		existing, err := purchaseInTx(ctx, tx, provider, transactionID)
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil

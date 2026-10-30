@@ -24,20 +24,6 @@ struct RootNavigationView: View {
         .sheet(item: $router.webPage) { page in
             SafariView(url: page.url).ignoresSafeArea()
         }
-        .overlay {
-            if router.isOpeningWebOffer {
-                ProgressView("notifications.website.opening")
-                    .padding(DS.Spacing.l)
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
-                    .allowsHitTesting(false)
-            }
-        }
-        .alert("notifications.website.openFailed", isPresented: $router.webOfferOpeningFailed) {
-            Button("common.retry") { router.retryWebOffer() }
-            Button("common.cancel", role: .cancel) { router.dismissWebOfferFailure() }
-        } message: {
-            Text("notifications.website.retryBody")
-        }
         // The guide again, over everything: nothing is reset, and the screen
         // underneath is still there when it closes.
         .fullScreenCover(isPresented: $router.isShowingTutorial) {

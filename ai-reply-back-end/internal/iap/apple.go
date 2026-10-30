@@ -72,6 +72,7 @@ func (s *Service) VerifyApple(ctx context.Context, user domain.User, signed stri
 		if _, err := s.repo.RevokePurchase(ctx, repository.PurchaseRevocation{
 			Provider: domain.ProviderAppStore, TransactionID: tx.TransactionID, Status: domain.PurchaseRefunded,
 			Reason: appleRevokeReason("refund", tx), At: time.UnixMilli(tx.RevocationDate), Now: s.clock.Now(),
+			SignedAt: time.UnixMilli(tx.SignedDate),
 		}); err != nil {
 			return Result{}, err
 		}
@@ -205,7 +206,7 @@ func (s *Service) appleNotification(ctx context.Context, n appstore.Notification
 	}
 	now := s.clock.Now()
 	if n.NotificationType == appstore.NotificationRefundReversed {
-		res, err := s.repo.RestorePurchase(ctx, domain.ProviderAppStore, tx.TransactionID, now)
+		res, err := s.repo.RestoreApplePurchase(ctx, tx.TransactionID, time.UnixMilli(n.SignedDate), now)
 		if err != nil {
 			return "", "", err
 		}
@@ -242,11 +243,14 @@ func (s *Service) appleNotification(ctx context.Context, n appstore.Notification
 	res, err := s.repo.RevokePurchase(ctx, repository.PurchaseRevocation{
 		Provider: domain.ProviderAppStore, TransactionID: tx.TransactionID, Status: status,
 		Reason: appleRevokeReason(kind, tx), At: at, Now: now, Tombstone: tombstone,
+		SignedAt: time.UnixMilli(n.SignedDate),
 	})
 	if err != nil {
 		return "", "", err
 	}
 	switch {
+	case res.Ignored:
+		return OutcomeUnchanged, tx.TransactionID, nil
 	case !res.Found:
 		return OutcomeUnknown, tx.TransactionID, nil
 	case !res.Revoked:

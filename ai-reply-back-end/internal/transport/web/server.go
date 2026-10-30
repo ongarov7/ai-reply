@@ -64,8 +64,9 @@ func New(d Deps) (*Server, error) {
 		templates: map[string]*template.Template{},
 	}
 	pages := map[string][]string{
-		"landing": {"templates/public_layout.gohtml", "templates/landing.gohtml"},
-		"legal":   {"templates/public_layout.gohtml", "templates/legal.gohtml"},
+		"landing":  {"templates/public_layout.gohtml", "templates/landing.gohtml"},
+		"app_info": {"templates/public_layout.gohtml", "templates/app_info.gohtml"},
+		"legal":    {"templates/public_layout.gohtml", "templates/legal.gohtml"},
 		// Қолдау және тіркелгіні жою — дүкендер сұрайтын көпшілік беттер.
 		"support":        {"templates/public_layout.gohtml", "templates/support.gohtml"},
 		"account_delete": {"templates/public_layout.gohtml", "templates/account_delete.gohtml"},
@@ -110,6 +111,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /static/", http.StripPrefix("/static/", cacheStatic(http.FileServer(http.FS(static)))))
 
 	mux.HandleFunc("GET /{$}", s.handleLanding)
+	mux.HandleFunc("GET /app", s.handleAppInfo)
 	mux.HandleFunc("GET /offer", s.handleTerms)
 	mux.HandleFunc("GET /terms", s.handleTerms)
 	mux.HandleFunc("GET /privacy", s.handlePrivacy)
@@ -158,6 +160,7 @@ type baseView struct {
 	ContactEmail   string
 	BasePath       string
 	AccountPage    bool
+	AppInfoPage    bool
 	CommercialPage bool
 	AccountVersion string
 }

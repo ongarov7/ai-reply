@@ -358,7 +358,10 @@ func TestAppleTransactionsThatDoNotVerifyGrantNothing(t *testing.T) {
 		{"xcode", base(func(tx *appstoretest.Transaction) { tx.Environment = "Xcode" }), "environment"},
 		{"another account", base(func(tx *appstoretest.Transaction) { tx.AppAccountToken = h.iap.AccountToken(other.userID) }), "account_mismatch"},
 		{"no account token", base(func(tx *appstoretest.Transaction) { tx.AppAccountToken = "" }), "account_mismatch"},
-		{"revoked", base(func(tx *appstoretest.Transaction) { tx.RevocationDate = h.clock.Now().UnixMilli() }), "revoked"},
+		{"revoked", base(func(tx *appstoretest.Transaction) {
+			tx.TransactionID = "2000000000000101"
+			tx.RevocationDate = h.clock.Now().UnixMilli()
+		}), "revoked"},
 		{"subscription", base(func(tx *appstoretest.Transaction) { tx.Type = "Auto-Renewable Subscription" }), "product_type"},
 		{"non-consumable", base(func(tx *appstoretest.Transaction) { tx.Type = "Non-Consumable" }), "product_type"},
 		{"unknown product", base(func(tx *appstoretest.Transaction) { tx.ProductID = "kz.aireply.pack999" }), "product_unknown"},
@@ -465,6 +468,7 @@ func TestRefundNotificationRevokesWhatIsLeft(t *testing.T) {
 	}
 
 	// Apple reverses the refund: what the refund took comes back.
+	h.clock.Advance(time.Millisecond)
 	mustStatus(t, h.appleNotification("REFUND_REVERSED", "6b8f2d3e-0000-4000-8000-000000000003", signed), http.StatusOK, "")
 	if h.creditsLeft(s.access) != 47 || h.scalar(`SELECT COUNT(*) FROM credit_ledger WHERE user_id = ? AND entry = 'grant'
 		AND delta = 47 AND reason = 'refund_reversed'`, s.userID) != 1 {
@@ -517,6 +521,7 @@ func TestReversedEarlyRefundLetsThePurchaseThrough(t *testing.T) {
 		AND status = 'refunded'`) != 1 {
 		t.Fatal("no placeholder for the early refund")
 	}
+	h.clock.Advance(time.Millisecond)
 	mustStatus(t, h.appleNotification("REFUND_REVERSED", "6b8f2d3e-0000-4000-8000-000000000701", signed), http.StatusOK, "")
 	if h.scalar(`SELECT COUNT(*) FROM iap_purchases WHERE transaction_id = '2000000000000700'`) != 0 ||
 		h.text(`SELECT outcome FROM iap_notifications WHERE notification_id = '6b8f2d3e-0000-4000-8000-000000000701'`) != "cleared" {
@@ -536,7 +541,7 @@ func TestReversedEarlyRefundLetsThePurchaseThrough(t *testing.T) {
 		t.Fatal("credits moved to another account")
 	}
 
-	// A reversal for a transaction nobody has seen at all changes nothing.
+	// An unknown reversal grants nothing; its signed lifecycle is retained separately.
 	mustStatus(t, h.appleNotification("REFUND_REVERSED", "6b8f2d3e-0000-4000-8000-000000000702",
 		h.appleTx(s.userID, "2000000000000701", packApple, nil)), http.StatusOK, "")
 	if h.text(`SELECT outcome FROM iap_notifications WHERE notification_id = '6b8f2d3e-0000-4000-8000-000000000702'`) != "unchanged" ||
@@ -553,6 +558,7 @@ func TestReversedEarlyRefundLetsThePurchaseThrough(t *testing.T) {
 		h.appleTx(gone.userID, "2000000000000702", packApple, func(tx *appstoretest.Transaction) {
 			tx.RevocationDate = h.clock.Now().UnixMilli()
 		})), http.StatusOK, "")
+	h.clock.Advance(time.Millisecond)
 	mustStatus(t, h.appleNotification("REFUND_REVERSED", "6b8f2d3e-0000-4000-8000-000000000704", goneTx), http.StatusOK, "")
 	if h.scalar(`SELECT COUNT(*) FROM iap_purchases WHERE transaction_id = '2000000000000702' AND user_id IS NULL
 		AND units = 50`) != 1 {
