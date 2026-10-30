@@ -789,3 +789,52 @@ The reported duplicate Base/Pro cards and “0 replies per day” screenshot cam
 - Source **`0386421`** is pushed to `origin/Payment`. Both archived targets are **1.2.0 (13)** and use `https://ai-reply.kz/sandbox`; internal-only upload options were verified. Archive: `outputs/payment-testflight-2026-10-30/AIReply-1.2.0-13.xcarchive`.
 - Apple accepted build 13 at **2026-10-30 16:32:14 +05:00**, returning `Upload succeeded`, `Uploaded package is processing`, and `EXPORT SUCCEEDED`. Log: `/tmp/ai-reply-payment-upload-1.2.0-13.log`. After refreshing TestFlight, the owner explicitly confirmed that **1.2.0 (13) is available on the device**. The build UUID and exact App Store Connect row status were not independently read because native browser interaction was interrupted by concurrent user input; no such status or UUID is inferred.
 - A fresh Business-page check after the owner’s “done” response still showed the Paid Apps Agreement as **New** and the legal-entity-update banner. Its verified screenshot is `outputs/payment-testflight-2026-10-30/paid-apps-agreement-still-new.png`. Actual sandbox payment remains blocked until that agreement is active.
+
+## Internal website-payment prototype — build 14, 30 October 2026
+
+The owner selected an internal test with website purchases and an optional offer
+push. The new app keeps the redesigned interface, account and credit balance but
+removes the storefront, prices and new IAP purchase actions. Existing unfinished
+store transactions still have their confirmation path. New purchases cannot be
+re-enabled by a backend feature flag. There was no Android or audio-code change.
+
+- Backend source **`20433bb`** and iOS source **`a0eedb7`** are pushed to
+  `origin/Payment`. The owner reported a successful rebuild/configuration check
+  and restart. Independent checks confirmed both health endpoints return 200,
+  `/sandbox/payment?lang=ru` renders the new page with sandbox assets, and the
+  account/handoff endpoints reject unauthenticated requests with 401.
+- The separate website shows the canonical **30 replies / 100 KZT** permanent
+  pack before login. A purchase requires explicit website terms and an exact
+  account/price/catalog snapshot. Existing-order replay precedes quote checking;
+  only a verified final BCC callback grants credits, once. A bank return and
+  link expiry are not proof of payment failure or success.
+- The offer is `marketing`, off until explicit consent, and sends only to
+  compatible iOS installations (build 14+). An account marker preserves
+  once-only queuing after notification-history retention. Sandbox push and the
+  offer require independent, default-off configuration. At the live check,
+  `/sandbox/api/v1/config` still returned `push_notifications=false`.
+- On a tapped offer, the app requests a one-use account-bound website sign-in
+  code with a 60-second lifetime. The website removes it from the address and
+  confirms switching if another browser account exists. Long-lived app tokens
+  are not placed in URLs; expired links do not silently adopt an old browser
+  session. The app refreshes its balance after returning from the browser.
+- Verification: full iOS suite **684 passed** before the final hardening;
+  subsequent focused suites **23**, **79** and **25 passed** for the changed
+  notification, handoff and account logic. Final full backend `go test ./...`
+  passed, as did **25 JavaScript tests**. Targeted BCC and handoff race tests
+  passed. `git diff --check` and archive signature verification passed.
+- Final archive: `outputs/payment-testflight-2026-10-30/AIReply-1.2.0-14-final.xcarchive`.
+  Both bundles are **1.2.0 (14)**, retain their bundle IDs and use
+  `https://ai-reply.kz/sandbox`. Upload options explicitly retain
+  `testFlightInternalTestingOnly=true` and preserve the build number.
+- Apple accepted the upload at **20:27:22 +05:00**, reporting `Upload succeeded`,
+  `Uploaded package is processing`, and `EXPORT SUCCEEDED`. Log:
+  `/tmp/ai-reply-web-payment-14-upload.log`. Processing/group availability still
+  needs independent confirmation; no build-14 UUID or completed status is
+  inferred from upload success.
+
+The live page was inspected in the browser; the full physical-device path
+through a real test push and BCC confirmation has not yet been executed. Bank
+notification setup and explicit sandbox flags are prerequisites. Follow
+`docs/WEB_PAYMENT_SANDBOX.md`. This internal upload is not a public App Store
+submission or approval of website-only digital sales or payment-link pushes.
