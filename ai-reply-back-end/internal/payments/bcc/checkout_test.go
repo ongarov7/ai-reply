@@ -36,7 +36,7 @@ func testCheckout(t *testing.T) (*CheckoutService, *catalog.Service) {
 	if _, err = db.Writer().Exec(`INSERT INTO users(id,email,status,created_at,updated_at)VALUES('bank-user','bank@example.test','active',1,1)`); err != nil {
 		t.Fatal(err)
 	}
-	cfg := CheckoutConfig{Enabled: true, AppEnv: "test", PublicBaseURL: "https://sandbox.example.test", Merchant: "00000001", MerchantName: "TEST MERCHANT", Terminal: "88888881", MACKeyHex: publicTestKey, NotifyUsername: "bank-sandbox", NotifyPassword: strings.Repeat("a", 40), StateSecret: strings.Repeat("b", 40)}
+	cfg := CheckoutConfig{Enabled: true, Environment: Sandbox, AppEnv: "test", PublicBaseURL: "https://sandbox.example.test", Merchant: "00000001", MerchantName: "TEST MERCHANT", Terminal: "88888881", MACKeyHex: publicTestKey, NotifyUsername: "bank-sandbox", NotifyPassword: strings.Repeat("a", 40), StateSecret: strings.Repeat("b", 40)}
 	s, err := NewCheckout(cfg, db, prices)
 	if err != nil {
 		t.Fatal(err)
@@ -186,7 +186,7 @@ func TestBrowserReturnAndQueryDoNotProvePayment(t *testing.T) {
 	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	w := httptest.NewRecorder()
 	s.Return(w, r)
-	if w.Code != 200 || bankBalance(t, s) != 0 {
+	if w.Code != http.StatusSeeOther || w.Header().Get("Location") != "https://sandbox.example.test:443/payment?order="+o.ID || bankBalance(t, s) != 0 {
 		t.Fatal("browser return confirmed payment")
 	}
 	// A successful query envelope has no original status contract.

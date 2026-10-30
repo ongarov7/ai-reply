@@ -1,5 +1,14 @@
 # Backend deployment environment — 9 October 2026
 
+## Current internal test: website checkout — 30 October 2026
+
+For TestFlight **1.2.0 (14)** use [WEB_PAYMENT_SANDBOX.md](WEB_PAYMENT_SANDBOX.md).
+It documents `/sandbox/payment`, one-use account handoff, the separately opted-in
+offer push and the three new migrations. New purchases are absent from the iOS
+interface. The primary bank checkout and promotion stay off. Sandbox push is
+also off by default and requires its own explicit switch; the earlier baseline
+below described the sandbox before this optional path existed.
+
 ## Payment update — 30 October 2026
 
 Work is on `Payment`. Android sources are unchanged. Before restarting, take a consistent backup of the current SQLite database, including committed WAL data, using the server's existing backup procedure. Keep the current Compose project and persistent volume.

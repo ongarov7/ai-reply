@@ -140,6 +140,7 @@ func (s *Server) handleRegisterInstallation(w http.ResponseWriter, r *http.Reque
 			return
 		}
 		res.Preferences = prefs
+		s.notifications.MaybeQueueWebTopupOffer(r.Context(), userID)
 	}
 	httpx.JSON(w, http.StatusOK, res)
 }
@@ -192,7 +193,8 @@ func (s *Server) detachOnLogout(r *http.Request, userID string) {
 }
 
 type preferencesRequest struct {
-	Preferences map[string]bool `json:"preferences"`
+	Preferences    map[string]bool `json:"preferences"`
+	ExpectedUserID string          `json:"expected_user_id,omitempty"`
 }
 
 // handleNotificationPreferences — санаттар бойынша баптау.
@@ -212,6 +214,10 @@ func (s *Server) handleUpdateNotificationPreferences(w http.ResponseWriter, r *h
 	var body preferencesRequest
 	if err := httpx.Decode(w, r, 4096, &body); err != nil {
 		httpx.Fail(w, err)
+		return
+	}
+	if body.ExpectedUserID != "" && body.ExpectedUserID != user.ID {
+		httpx.Fail(w, domain.ConflictField("expected_user_id", "account_changed"))
 		return
 	}
 	if len(body.Preferences) == 0 {

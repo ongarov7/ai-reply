@@ -100,6 +100,7 @@ type Service struct {
 	renderer EmailRenderer
 
 	reminders *reminderSettings
+	webTopup  *webTopupOffers
 }
 
 // New — қызмет.
@@ -243,6 +244,10 @@ type UserNotification struct {
 	Category       string // domain.Category*
 	Link           string // aireply://<screen> or an allowed https URL
 	Data           map[string]string
+	// Platforms limits this event to clients that support its action.
+	Platforms []string
+	// RequirePushTarget keeps a once-only event pending until registration is ready.
+	RequirePushTarget bool
 	// Text — the push title and body for the resolved language.
 	Text func(locale string) (title, body string)
 	// TitleKey, BodyKey — translation keys used when Text is nil.
@@ -364,15 +369,17 @@ func (s *Service) NotifyUser(ctx context.Context, n UserNotification) (NotifyRes
 	}
 
 	channels.Reminder = n.Reminder
+	channels.RequirePushTarget = n.RequirePushTarget
 	if n.Defer && channels.PushSkip == "" {
 		channels.NotBefore = s.quietUntil(ctx, user.ID, s.clock.Now(), s.ReminderSettings(ctx))
 	}
 
-	q, _, err := s.audienceQuery(ctx, domain.AudienceFilter{}, content.Category)
+	q, _, err := s.audienceQuery(ctx, domain.AudienceFilter{Platforms: n.Platforms}, content.Category)
 	if err != nil {
 		return NotifyResult{}, err
 	}
 	q.UserID = user.ID
+	q.RequireExternalWebTopup = n.Type == domain.TypeWebTopupOffer
 	res, err := s.repo.CreateUserNotification(ctx, domain.Notification{
 		DedupeKey:      repository.UserNotificationKey(user.ID, n.IdempotencyKey),
 		IdempotencyKey: n.IdempotencyKey,
@@ -477,6 +484,9 @@ func (s *Service) SetPreferences(ctx context.Context, userID string, prefs map[s
 	}
 	if err := s.repo.SetNotificationPreferences(ctx, userID, clean, s.clock.Now()); err != nil {
 		return nil, err
+	}
+	if clean[domain.CategoryMarketing] {
+		s.MaybeQueueWebTopupOffer(ctx, userID)
 	}
 	return s.Preferences(ctx, userID)
 }

@@ -1,0 +1,42 @@
+.account-page { max-width: 1000px; padding-top: 52px; padding-bottom: 72px; min-height: 70vh; }
+.account-page [hidden] { display: none !important; }
+.account-heading { margin-bottom: 30px; }
+.account-heading h1 { font-size: clamp(32px, 5vw, 46px); margin: 16px 0 12px; }
+.account-heading .lede { font-size: 18px; max-width: 42em; margin-bottom: 0; }
+.account-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; align-items: start; }
+.account-public-offers { padding: 0; margin-bottom: 28px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 20px; }
+.account-public-offer .account-public-price { font-size: 34px; font-weight: 700; margin: 16px 0 0; }
+.account-public-offer .btn { white-space: normal; }
+.account-card { border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 26px; background: #fff; }
+.account-card h2 { font-size: 22px; line-height: 1.3; margin: 0; }
+.account-card p { margin: 16px 0; }
+.account-card-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.account-login { max-width: 620px; }
+.account-login .account-form { margin: 22px 0; }
+.account-page input, .account-page button { font: inherit; }
+.account-page input { min-width: 0; width: 100%; }
+.account-check { display: flex; align-items: flex-start; gap: 10px; margin-top: 20px; font-size: 14px; }
+.account-check input { flex: 0 0 auto; width: 20px; height: 20px; margin: 3px 0 0; accent-color: var(--brand); }
+.account-check a { text-decoration: underline; text-underline-offset: 3px; }
+.account-muted { color: var(--muted); font-size: 14px; }
+.account-email { font-size: 20px; font-weight: 600; overflow-wrap: anywhere; }
+.account-id { font-size: 12px; overflow-wrap: anywhere; }
+.account-card .account-id { margin-top: -8px; }
+.account-link { color: var(--brand-ink); text-decoration: underline; text-underline-offset: 3px; border: 0; background: transparent; padding: 0; cursor: pointer; font-size: 14px; }
+.account-balances { display: grid; gap: 0; margin: 22px 0; }
+.account-balances div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line-2); }
+.account-balances dt { color: var(--muted); font-size: 15px; }
+.account-balances dd { margin: 0; font-size: 24px; font-weight: 650; line-height: 1.3; }
+.account-product { padding: 18px; margin: 18px 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-soft); }
+.account-product h3 { margin: 0; font-size: 18px; }
+.account-product .account-product-price { font-size: 30px; font-weight: 700; margin: 12px 0 2px; }
+.account-product .account-product-units { margin: 0 0 18px; color: var(--muted); font-size: 15px; }
+.account-product .btn { width: 100%; white-space: normal; }
+.account-order { margin-top: 22px; border-left: 3px solid var(--brand); }
+.account-order.is-success { border-left-color: var(--ok); }
+.account-order-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+.account-error { padding: 14px 18px; border: 1px solid #f4c9b3; border-radius: var(--radius); color: #8b3510; background: #fff8f4; }
+.account-page button:disabled { cursor: wait; opacity: .55; }
+.account-page button:focus-visible, .account-page a:focus-visible { outline: 3px solid var(--brand); outline-offset: 4px; }
+.account-terms a { text-decoration: underline; text-underline-offset: 3px; }
+@media (max-width: 700px) { .account-grid { grid-template-columns: 1fr; } .account-page { padding-top: 32px; } .account-card { padding: 22px; } .account-order-actions .btn { flex: 1 1 180px; } }

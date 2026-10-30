@@ -2,11 +2,11 @@
 <html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>AI Reply - BCC sandbox</title>
+<title>AI Reply - BCC</title>
 <body><main>
-<h1>Test payment</h1>
+<h1>{{if .Sandbox}}Test payment{{else}}Payment{{end}}</h1>
 <p>{{.Amount}} &#8376; - {{.Units}} replies</p>
-<p>BCC sandbox. Replies are added only after the bank confirms payment.</p>
+<p>{{if .Sandbox}}BCC sandbox. {{end}}Replies are added only after the bank confirms payment.</p>
 <form id="bank-checkout" method="post" action="{{.Endpoint}}">
 {{range $name,$values := .Fields}}{{range $values}}<input type="hidden" name="{{$name}}" value="{{.}}">{{end}}{{end}}
 <input type="hidden" name="CLIENT_IP" value="{{.ClientIP}}">

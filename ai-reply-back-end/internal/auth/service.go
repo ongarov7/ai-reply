@@ -340,7 +340,7 @@ func (s *Service) issueSession(ctx context.Context, user domain.User, info Devic
 		return Session{}, err
 	}
 
-	access, expiresIn, err := s.accessToken(user, device.ID)
+	access, expiresIn, err := s.accessToken(user, device.ID, device.Platform)
 	if err != nil {
 		return Session{}, err
 	}
@@ -370,7 +370,7 @@ func (s *Service) issueSession(ctx context.Context, user domain.User, info Devic
 	}, nil
 }
 
-func (s *Service) accessToken(user domain.User, deviceID string) (string, int, error) {
+func (s *Service) accessToken(user domain.User, deviceID, platform string) (string, int, error) {
 	now := s.clock.Now()
 	claims := Claims{
 		Subject:   user.ID,
@@ -380,7 +380,7 @@ func (s *Service) accessToken(user domain.User, deviceID string) (string, int, e
 		TokenID:   traits.NewID(),
 		Type:      "access",
 		DeviceID:  deviceID,
-		Platform:  user.Platform,
+		Platform:  platform,
 	}
 	token, err := SignJWT(s.cfg.AccessSecret, claims)
 	return token, int(s.cfg.AccessTTL.Seconds()), err
@@ -419,6 +419,13 @@ func (s *Service) Refresh(ctx context.Context, rawToken string, info DeviceInfo)
 		return Session{}, domain.ErrAccountDisabled
 	}
 
+	// A website login updates the account's last platform. A native session
+	// keeps the platform of its own device when its access token is refreshed.
+	device, err := s.repo.Device(ctx, stored.DeviceID)
+	if err != nil || device.UserID != user.ID || device.RevokedAt != nil {
+		return Session{}, domain.ErrUnauthorized
+	}
+
 	raw := traits.RandomToken(32)
 	next := repository.RefreshToken{
 		UserID:    user.ID,
@@ -432,7 +439,7 @@ func (s *Service) Refresh(ctx context.Context, rawToken string, info DeviceInfo)
 		return Session{}, domain.ErrUnauthorized
 	}
 
-	access, expiresIn, err := s.accessToken(user, stored.DeviceID)
+	access, expiresIn, err := s.accessToken(user, stored.DeviceID, device.Platform)
 	if err != nil {
 		return Session{}, err
 	}

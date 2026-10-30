@@ -17,9 +17,10 @@ import (
 // retention windows the server actually applies (RETENTION_*) and whether
 // deleting an account revokes Sign in with Apple (APPLE_TEAM_ID / _KEY_ID /
 // _PRIVATE_KEY; without the key the texts promise only what the person can do
-// in their Apple ID settings). Bump legal.PrivacyVersion /
-// legal.TermsVersion when the meaning of a text changes: the apps then ask
-// every account to accept again before AI replies work.
+// in their Apple ID settings). Consent versioning is reviewed separately:
+// changing legal.PrivacyVersion or legal.TermsVersion makes every account
+// accept again before AI replies work. Website purchase conditions must be
+// presented at checkout without silently invalidating mobile AI consent.
 
 // legalInfo — заң мәтіндеріне баптаудан келетін мәндер.
 type legalInfo struct {
@@ -214,7 +215,14 @@ func termsBody(locale string, info legalInfo) string {
 				{"1. Жалпы ережелер", "Бұл құжат AI Reply цифрлық қызметін — мобильді қосымшаны, оның пернетақтасын және осы сайтты — пайдалану туралы жария оферта болып табылады. «Қабылдаймын» түймесін басу, тіркелу немесе қызметті пайдалану осы офертаның толық акцепті болып саналады." + by},
 				{"2. Қызмет", "AI Reply — мессенджерлерге арналған жауап пен хабарлама жобаларын жасауға көмектесетін мобильді қосымша мен пернетақта. Мәтінді Құпиялық саясатында сипатталғандай OpenAI-дың AI моделі автоматты түрде жазады; қызмет мәтінді пайдаланушы әрекетінсіз алушыға жібермейді."},
 				{"3. Есептік жазба", "Кіру Apple, Google арқылы немесе поштаға келетін бір реттік код арқылы орындалады. Пайдаланушы өз құрылғысы мен есептік жазбасына қолжетімділіктің қауіпсіздігіне жауап береді. Есептік жазбаны кез келген уақытта қосымшада немесе аккаунтты жою бетінде (" + info.DeletionURL + ") жоюға болады."},
-				{"4. Тарифтер мен төлем", "Қазір қызмет тегін, күндік жауап лимитін оператор белгілейді; қанша жауап қалғанын қосымша мен пернетақта көрсетеді. Ақылы тарифтер енгізілсе, олардың бағасы, мерзімі мен лимиті сатып алу алдында көрсетіледі, ал оларды App Store не Google Play арқылы сол дүкеннің ережелері бойынша, соның ішінде төлем мен қайтару ережелері бойынша сатып алуға болады."},
+				{"4. Тарифтер мен төлем", strings.Join([]string{
+					"Жаңа аккаунтқа 10 тегін жауап бір рет беріледі. Олардың жарамдылық мерзімі шектелмеген және бұл күн сайын жаңаратын лимит емес. Нақты қалдық аккаунтта, қосымшада және пернетақтада көрсетіледі.",
+					"Қолжетімді ақылы ұсыныстың бағасы, валютасы, жауап саны, мерзімі мен лимиттері сатып алуды растағанға дейін көрсетіледі. App Store не Google Play арқылы сатып алуларға тиісті дүкеннің төлем, жазылымды ұзарту және қайтару ережелері қолданылады.",
+					"Сайттағы төлем қолжетімді болса, Банк ЦентрКредит (BCC) арқылы бір реттік жауап пакетін сатып алуға болады. Бұл жазылым емес, автоматты түрде қайта төлем алынбайды. Жауаптардың пайдалану мерзімі шектелмейді, сатып алынған пакеттердің қалдығы қосылады. Баланс сайтта, қосымшада және пернетақтада бір аккаунтпен кіргенде ғана ортақ болады.",
+					"Жауаптар сервер банктен сәтті төлемнің түпкілікті растауын алғаннан кейін ғана қосылады. Банктің бетінен сайтқа қайту өздігінен төлемді растамайды.",
+					"Карта деректері банктің қорғалған төлем бетінде енгізіледі және AI Reply серверіне түспейді.",
+					"Сайттағы сатып алудың төлемі немесе қайтарымы туралы сұрақтар: " + contact + ". Дүкен арқылы сатып алудың қайтарымы сол дүкеннің ережелерімен қаралады.",
+				}, "\n")},
 				{"5. Пайдалану шарттары", "Қызметті заңсыз, зиянды, алдамшы контент жасауға немесе басқа тұлғалардың құқықтарын бұзуға пайдалануға болмайды. Елеулі бұзушылық кезінде қолжетімділік шектелуі мүмкін."},
 				{"6. Жауапкершілік", "Жасалған мәтін — тек жоба. AI қателесуі мүмкін: деректерді, аттарды, бағалар мен күндерді тексеріңіз. Пайдаланушы мәтінді жіберер алдында тексереді және жіберілген мазмұнға өзі жауап береді. Қызмет үздіксіз немесе қатесіз жұмыс істейтініне кепілдік берілмейді."},
 				{"7. Деректер мен зияткерлік құқықтар", "Дербес деректер бөлек Құпиялық саясатына сәйкес өңделеді. Қосымшаға, дизайнға және бағдарламалық кодқа құқықтар AI Reply құқық иесіне тиесілі; пайдаланушыға жеке пайдалану үшін шектеулі құқық беріледі."},
@@ -226,7 +234,14 @@ func termsBody(locale string, info legalInfo) string {
 				{"1. Общие положения", "Настоящий документ является публичной офертой на использование цифрового сервиса AI Reply: мобильного приложения, его клавиатуры и этого сайта. Нажатие кнопки согласия, регистрация или использование сервиса означают полный и безоговорочный акцепт оферты." + by},
 				{"2. Предмет оферты", "AI Reply предоставляет мобильное приложение и клавиатуру для подготовки черновиков ответов и сообщений в мессенджерах. Тексты автоматически пишет AI-модель OpenAI, как описано в Политике конфиденциальности; сервис не отправляет их получателю без действия пользователя."},
 				{"3. Аккаунт", "Вход выполняется через Apple, Google или по одноразовому коду, который приходит на почту. Пользователь отвечает за сохранность доступа к своему устройству и аккаунту. Удалить аккаунт можно в любой момент в приложении или на странице удаления аккаунта (" + info.DeletionURL + ")."},
-				{"4. Тарифы и оплата", "Сейчас сервис бесплатный, с дневным лимитом ответов, который устанавливает оператор; приложение и клавиатура показывают, сколько ответов осталось. Если появятся платные тарифы, их цена, срок и лимиты будут показаны до покупки, а купить их можно будет через App Store или Google Play по правилам этого магазина, включая правила оплаты и возврата."},
+				{"4. Тарифы и оплата", strings.Join([]string{
+					"Новому аккаунту один раз предоставляются 10 бесплатных ответов без срока действия. Это не ежедневный лимит и он не обновляется каждый день. Фактический остаток показан в аккаунте, приложении и клавиатуре.",
+					"Цена, валюта, количество ответов, срок и лимиты доступного платного предложения показаны до подтверждения покупки. Для покупок через App Store или Google Play действуют правила соответствующего магазина, включая оплату, продление подписок и возврат.",
+					"Когда оплата на сайте доступна, через Банк ЦентрКредит (BCC) можно купить разовый пакет ответов. Это не подписка: автоматических повторных списаний нет. Ответы не имеют срока действия, остатки купленных пакетов складываются. Общий баланс сайта, приложения и клавиатуры доступен только при входе в один и тот же аккаунт.",
+					"Ответы зачисляются только после получения сервером окончательного подтверждения успешной оплаты от банка. Возвращение с банковской страницы на сайт само по себе не подтверждает оплату.",
+					"Реквизиты карты вводятся на защищённой платёжной странице банка и не поступают на сервер AI Reply.",
+					"По вопросам оплаты и возврата покупок на сайте обращайтесь в поддержку: " + contact + ". Возврат покупок через магазин рассматривается по правилам этого магазина.",
+				}, "\n")},
 				{"5. Правила использования", "Запрещено использовать сервис для незаконного, вредоносного или вводящего в заблуждение контента и нарушения прав третьих лиц. При существенном нарушении доступ может быть ограничен."},
 				{"6. Ответственность", "Сгенерированный текст является черновиком. AI может ошибаться: проверяйте факты, имена, цены и даты. Пользователь проверяет текст до отправки и самостоятельно отвечает за отправленное содержание. Бесперебойная и безошибочная работа сервиса не гарантируется."},
 				{"7. Данные и интеллектуальные права", "Персональные данные обрабатываются по отдельной Политике конфиденциальности. Права на приложение, дизайн и программный код принадлежат правообладателю AI Reply; пользователю предоставляется ограниченное право личного использования."},
@@ -238,7 +253,14 @@ func termsBody(locale string, info legalInfo) string {
 				{"1. General", "This document is a public offer governing use of the AI Reply digital service: the mobile app, its keyboard and this website. Selecting the consent control, registering, or using the service constitutes full acceptance of this offer." + by},
 				{"2. Service", "AI Reply provides a mobile app and keyboard that prepare draft replies and messages for messengers. The texts are written automatically by an AI model of OpenAI, as described in the Privacy Policy, and are never sent to a recipient without a user action."},
 				{"3. Account", "You sign in with Apple, Google or a one-time code sent to your e-mail. You are responsible for keeping access to your device and account secure. You can delete the account at any time in the app or on the account deletion page (" + info.DeletionURL + ")."},
-				{"4. Plans and payment", "The service is currently free, with a daily reply limit set by the operator; the app and the keyboard show how many replies are left. If paid plans are introduced, their price, term and limits are shown before purchase, and they are bought through the App Store or Google Play under the rules of that store, including its payment and refund rules."},
+				{"4. Plans and payment", strings.Join([]string{
+					"A new account receives 10 free replies once, with no expiry. This is not a daily allowance and does not reset each day. Your actual balance is shown in your account, the app and the keyboard.",
+					"The price, currency, reply quantity, term and limits of an available paid offer are shown before you confirm a purchase. Purchases through the App Store or Google Play follow the respective store's rules, including payment, subscription renewal and refunds.",
+					"When website payments are available, you can buy a one-time reply pack through Bank CenterCredit (BCC). This is not a subscription and has no automatic recurring charges. The replies do not expire, and the balances of purchased packs accumulate. The website, app and keyboard share a balance only when you sign in to the same account.",
+					"Replies are added only after the server receives final confirmation of successful payment from the bank. Returning from the bank's page to the website does not by itself confirm payment.",
+					"Card details are entered on the bank's secure payment page and do not reach the AI Reply server.",
+					"For questions about website payments or refunds, contact support: " + contact + ". Refunds for store purchases follow that store's rules.",
+				}, "\n")},
 				{"5. Acceptable use", "The service must not be used for illegal, harmful, or deceptive content or to violate third-party rights. Access may be restricted for a material violation."},
 				{"6. Responsibility", "Generated text is a draft. AI can be wrong: check facts, names, prices and dates. You review the text before sending it and remain responsible for what you send. Uninterrupted or error-free operation is not guaranteed."},
 				{"7. Data and intellectual property", "Personal data is handled under the separate Privacy Policy. Rights in the app, design, and software belong to the AI Reply rights holder; users receive a limited right of personal use."},
@@ -250,7 +272,14 @@ func termsBody(locale string, info legalInfo) string {
 				{"1. Umumiy qoidalar", "Ushbu hujjat AI Reply raqamli xizmatidan — mobil ilova, uning klaviaturasi va ushbu saytdan — foydalanish boʻyicha ommaviy ofertadir. Rozilik tugmasini bosish, roʻyxatdan oʻtish yoki xizmatdan foydalanish ofertani toʻliq qabul qilishni anglatadi." + by},
 				{"2. Xizmat", "AI Reply messenjerlar uchun javob va xabar qoralamalarini tayyorlaydigan mobil ilova va klaviaturani taqdim etadi. Matnlarni Maxfiylik siyosatida tavsiflanganidek OpenAI’ning AI modeli avtomatik yozadi; xizmat ularni foydalanuvchi harakatisiz oluvchiga yubormaydi."},
 				{"3. Hisob", "Kirish Apple, Google orqali yoki pochtaga keladigan bir martalik kod orqali amalga oshiriladi. Foydalanuvchi qurilmasi va hisobiga kirish xavfsizligi uchun javob beradi. Hisobni istalgan vaqtda ilovada yoki hisobni oʻchirish sahifasida (" + info.DeletionURL + ") oʻchirish mumkin."},
-				{"4. Tarif va toʻlov", "Hozir xizmat bepul, kunlik javoblar limitini operator belgilaydi; qancha javob qolganini ilova va klaviatura koʻrsatadi. Agar pullik tariflar joriy etilsa, ularning narxi, muddati va limitlari xariddan oldin koʻrsatiladi, ularni esa App Store yoki Google Play orqali shu doʻkon qoidalariga, jumladan toʻlov va qaytarish qoidalariga muvofiq sotib olish mumkin boʻladi."},
+				{"4. Tarif va toʻlov", strings.Join([]string{
+					"Yangi hisobga bir marta 10 ta bepul javob beriladi, ularning amal qilish muddati cheklanmagan. Bu kunlik limit emas va har kuni yangilanmaydi. Haqiqiy qoldiq hisobda, ilovada va klaviaturada koʻrsatiladi.",
+					"Mavjud pullik taklifning narxi, valyutasi, javoblar soni, muddati va limitlari xaridni tasdiqlashdan oldin koʻrsatiladi. App Store yoki Google Play orqali xaridlarga tegishli doʻkonning toʻlov, obunani uzaytirish va pulni qaytarish qoidalari qoʻllanadi.",
+					"Saytda toʻlov mavjud boʻlsa, Bank CenterCredit (BCC) orqali bir martalik javoblar paketini sotib olish mumkin. Bu obuna emas, avtomatik takroriy toʻlovlar yoʻq. Javoblarning amal qilish muddati cheklanmagan, sotib olingan paketlar qoldigʻi qoʻshiladi. Sayt, ilova va klaviatura balansi faqat bir xil hisobga kirilganda umumiy boʻladi.",
+					"Javoblar faqat server bankdan muvaffaqiyatli toʻlovning yakuniy tasdigʻini olganidan keyin qoʻshiladi. Bank sahifasidan saytga qaytishning oʻzi toʻlovni tasdiqlamaydi.",
+					"Karta rekvizitlari bankning himoyalangan toʻlov sahifasida kiritiladi va AI Reply serveriga kelib tushmaydi.",
+					"Saytdagi toʻlov yoki xarid pulini qaytarish boʻyicha yordam xizmatiga murojaat qiling: " + contact + ". Doʻkon orqali xarid pulini qaytarish tegishli doʻkon qoidalari asosida koʻrib chiqiladi.",
+				}, "\n")},
 				{"5. Foydalanish qoidalari", "Xizmatdan noqonuniy, zararli yoki chalgʻituvchi kontent yaratish va uchinchi shaxslar huquqlarini buzish uchun foydalanish mumkin emas. Jiddiy buzilishda kirish cheklanishi mumkin."},
 				{"6. Javobgarlik", "Yaratilgan matn qoralamadir. AI xato qilishi mumkin: faktlar, ismlar, narxlar va sanalarni tekshiring. Foydalanuvchi matnni yuborishdan oldin tekshiradi va yuborilgan mazmun uchun oʻzi javob beradi. Xizmat uzluksiz yoki xatosiz ishlashi kafolatlanmaydi."},
 				{"7. Maʼlumotlar va intellektual huquqlar", "Shaxsiy maʼlumotlar alohida Maxfiylik siyosatiga muvofiq qayta ishlanadi. Ilova, dizayn va dasturiy kod huquqlari AI Reply huquq egasiga tegishli; foydalanuvchiga shaxsiy foydalanish uchun cheklangan huquq beriladi."},
@@ -295,7 +324,7 @@ func privacyBody(locale string, info legalInfo) string {
 					"Қосымша оқиғалары: онбординг пен баптау қадамдары, мысалы «пернетақта қосылды», — мәтінсіз.",
 					"Келісім жазбалары: шарттар мен осы саясаттың қай нұсқасын, қашан, қай платформа мен қосымша нұсқасынан қабылдағаныңыз, сондай-ақ AI өңдеуге келісімді қашан кері қайтарғаныңыз.",
 					"Шағымдар: жауапқа шағымдансаңыз — себеп, пікіріңіз және «Жауап мәтінін шағыммен бірге жіберу» қосулы қалса ғана, жасалған мәтін.",
-					"Төлемдер: сатып алу жазбалары — ақылы тарифтер сатылса ғана; сатып алу App Store не Google Play арқылы өтеді.",
+					"Төлемдер: сатып алынған ұсыныс, сома, валюта, төлем мен қайтарым күйі және транзакция нөмірлері. Қолжетімді сатып алу App Store, Google Play немесе сайтта BCC арқылы өтеді. Карта деректері банктің бетінде енгізіледі және AI Reply серверінде сақталмайды. Төлем мен қайтарым жазбалары салыстырып тексеру үшін сақталады және автоматты түрде жойылмайды; аккаунт жойылғанда оған байланысы жойылады.",
 				}, "\n")},
 				{"AI жауаптары қалай жазылады", strings.Join([]string{
 					"«Жауап беру» батырмасын басқанда көшірілген хабарлама не ағымдағы өрісте өзіңіз белгілеген мәтін (пернетақта оны тек осы сәтте оқиды), нұсқауыңыз, профиль деректері және таңдалған үлгі біздің сервер арқылы OpenAI-ға (АҚШ) жіберіледі, мәтінді соның моделі жазады. «Жазу» батырмасын басқанда тек нұсқауыңыз бен грамматикалық тегіңіз жіберіледі; көшірілген хабарлама «Көшірілгенге жауап беру» таңдасаңыз ғана, жауап ретінде жіберіледі. Ақылды түзету қосулы болса, AI Reply-дың өз өрісінде терген нұсқауыңыз түзету ұсыну үшін теру кезінде де жіберіледі.",
@@ -334,7 +363,7 @@ func privacyBody(locale string, info legalInfo) string {
 					"События приложения: шаги онбординга и настроек, например «клавиатура включена», — без текста.",
 					"Записи о согласии: какие версии условий и этой политики вы приняли, когда, с какой платформы и версии приложения, а также когда вы отозвали согласие на AI-обработку.",
 					"Жалобы: если вы пожалуетесь на ответ — причина, ваш комментарий и, только если вы оставили включённым «Отправить текст ответа вместе с жалобой», сгенерированный текст.",
-					"Платежи: записи о покупках — только если платные тарифы когда-либо будут продаваться; покупка будет проходить через App Store или Google Play.",
+					"Платежи: купленное предложение, сумма, валюта, статус оплаты и возврата, номера транзакций. Доступные покупки проходят через App Store, Google Play или BCC на сайте. Реквизиты карты вводятся на странице банка и не хранятся на сервере AI Reply. Записи о платеже и возврате сохраняются для сверки и не удаляются автоматически; при удалении аккаунта их привязка к нему удаляется.",
 				}, "\n")},
 				{"Как пишутся AI-ответы", strings.Join([]string{
 					"Когда вы нажимаете «Ответить», скопированное сообщение или текст, который вы выделили в текущем поле (клавиатура читает его только в этот момент), ваша инструкция, данные профиля и выбранный шаблон передаются через наш сервер в OpenAI (США), модель которой пишет текст. Когда вы нажимаете «Написать», отправляются только ваша инструкция и грамматический род; скопированное сообщение отправляется, только если вы выберете «Ответить на скопированное», — тогда это обычный ответ. Если включена умная коррекция, инструкция, которую вы набираете в собственном поле AI Reply, отправляется и во время набора, чтобы предложить исправление.",
@@ -373,7 +402,7 @@ func privacyBody(locale string, info legalInfo) string {
 					"App events: onboarding and settings steps such as “keyboard enabled” — never text.",
 					"Consent records: which versions of the terms and of this policy you accepted, when, from which platform and app version, and when you withdrew consent to AI processing.",
 					"Reports: when you report a reply — the reason, your comment and, only if you leave “Send the reply text with the report” on, the generated text.",
-					"Payments: purchase records — only if paid plans are ever sold; they would be bought through the App Store or Google Play.",
+					"Payments: the purchased offer, amount, currency, payment and refund status, and transaction references. Available purchases use the App Store, Google Play or BCC on the website. Card details are entered on the bank's page and are not stored on the AI Reply server. Payment and refund records are kept for reconciliation and are not removed automatically; deleting the account removes their link to it.",
 				}, "\n")},
 				{"How AI replies are written", strings.Join([]string{
 					"When you tap Reply, the message you copied or the text you selected in the current field (the keyboard reads it only at that moment), your instruction, your profile details and the template you chose go through our server to OpenAI (USA), whose model writes the text. When you tap Write, only your instruction and your grammatical gender are sent; the copied message goes only if you choose Reply to copied, and then as a reply. With Smart correction on, the instruction you type in AI Reply's own field is also sent while you type it, to suggest a correction.",
@@ -412,7 +441,7 @@ func privacyBody(locale string, info legalInfo) string {
 					"Ilova hodisalari: onboarding va sozlash qadamlari, masalan «klaviatura yoqildi», — matnsiz.",
 					"Rozilik yozuvlari: shartlar va ushbu siyosatning qaysi versiyalarini, qachon, qaysi platforma va ilova versiyasidan qabul qilganingiz, shuningdek AI ishlov berishga rozilikni qachon qaytarib olganingiz.",
 					"Shikoyatlar: javob ustidan shikoyat qilsangiz — sabab, izohingiz va faqat «Javob matnini shikoyat bilan birga yuborish» yoqilgan qolsa, yaratilgan matn.",
-					"Toʻlovlar: xaridlar yozuvlari — faqat pullik tariflar sotilsa; xarid App Store yoki Google Play orqali amalga oshiriladi.",
+					"Toʻlovlar: sotib olingan taklif, summa, valyuta, toʻlov va qaytarish holati hamda tranzaksiya raqamlari. Mavjud xaridlar App Store, Google Play yoki saytda BCC orqali amalga oshiriladi. Karta rekvizitlari bank sahifasida kiritiladi va AI Reply serverida saqlanmaydi. Toʻlov va qaytarish yozuvlari solishtirib tekshirish uchun saqlanadi va avtomatik oʻchirilmaydi; hisob oʻchirilganda unga bogʻlanish olib tashlanadi.",
 				}, "\n")},
 				{"AI javoblari qanday yoziladi", strings.Join([]string{
 					"«Javob berish» tugmasini bosganingizda nusxalangan xabar yoki joriy maydonda oʻzingiz belgilagan matn (klaviatura uni faqat shu paytda oʻqiydi), koʻrsatmangiz, profil maʼlumotlaringiz va tanlangan shablon serverimiz orqali OpenAI’ga (AQSH) yuboriladi va matnni uning modeli yozadi. «Yozish» tugmasini bosganingizda faqat koʻrsatmangiz va grammatik jinsingiz yuboriladi; nusxalangan xabar faqat «Nusxalanganga javob berish»ni tanlasangiz, javob sifatida yuboriladi. Aqlli tuzatish yoqilgan boʻlsa, AI Reply’ning oʻz maydonida yozayotgan koʻrsatmangiz tuzatish taklif qilish uchun yozish paytida ham yuboriladi.",

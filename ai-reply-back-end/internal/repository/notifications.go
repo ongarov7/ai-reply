@@ -51,6 +51,7 @@ const insertNotification = `
 
 // UserChannels — бір қолданушының хабарламасы қай арнамен кетеді.
 type UserChannels struct {
+	RequirePushTarget bool
 	// PushSkip — "" queues the push to every eligible device (none at all is
 	// recorded as one skipped row, "no_devices"); a code records one skipped
 	// row with that code instead (e.g. "push_disabled").
@@ -76,6 +77,8 @@ type UserNotificationResult struct {
 
 // CreateUserNotification — бір қолданушыға бір логикалық хабарлама және оның
 // жеткізулері (push, қажет болса пошта), бір транзакцияда.
+var errUserNotificationNoTargets = errors.New("user notification has no push targets")
+
 func (s *Store) CreateUserNotification(ctx context.Context, n domain.Notification, q AudienceQuery, ch UserChannels) (UserNotificationResult, error) {
 	var out UserNotificationResult
 	now := ms(q.Now)
@@ -125,6 +128,21 @@ func (s *Store) CreateUserNotification(ctx context.Context, n domain.Notificatio
 				}
 			}
 		}
+		if ch.RequirePushTarget && out.Devices == 0 {
+			return errUserNotificationNoTargets
+		}
+		if q.RequireExternalWebTopup {
+			res, err := tx.ExecContext(ctx, `UPDATE notification_preferences SET web_topup_offer_queued_at=? WHERE user_id=? AND category='marketing' AND enabled=1 AND web_topup_offer_queued_at IS NULL`, now, n.UserID)
+			if err != nil {
+				return err
+			}
+			if changed, err := res.RowsAffected(); err != nil {
+				return err
+			} else if changed != 1 {
+				out.Skipped = "web_offer_already_queued"
+				return errUserNotificationNoTargets
+			}
+		}
 		if ch.Reminder != nil {
 			if out.Devices == 0 {
 				return errReminderNotSent
@@ -151,7 +169,7 @@ func (s *Store) CreateUserNotification(ctx context.Context, n domain.Notificatio
 		}
 		return nil
 	})
-	if errors.Is(err, errReminderNotSent) {
+	if errors.Is(err, errReminderNotSent) || errors.Is(err, errUserNotificationNoTargets) {
 		return UserNotificationResult{Skipped: out.Skipped}, nil
 	}
 	return out, err

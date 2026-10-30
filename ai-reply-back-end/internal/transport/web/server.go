@@ -38,7 +38,8 @@ type Server struct {
 	log       *slog.Logger
 	templates map[string]*template.Template
 	// adminVersion — әкімші скрипті мен стилінің хэші (?v=…): жаңа нұсқа кэштен алынбайды.
-	adminVersion string
+	adminVersion   string
+	accountVersion string
 }
 
 // Deps — тәуелділіктер.
@@ -68,6 +69,7 @@ func New(d Deps) (*Server, error) {
 		// Қолдау және тіркелгіні жою — дүкендер сұрайтын көпшілік беттер.
 		"support":        {"templates/public_layout.gohtml", "templates/support.gohtml"},
 		"account_delete": {"templates/public_layout.gohtml", "templates/account_delete.gohtml"},
+		"account":        {"templates/public_layout.gohtml", "templates/account.gohtml"},
 		"admin_login":    {"templates/admin_login.gohtml"},
 		"admin_app":      {"templates/admin_app.gohtml"},
 		// Интерактивті өнім симуляторы — бөлек қабық, әкімші панелін қозғамайды.
@@ -86,6 +88,10 @@ func New(d Deps) (*Server, error) {
 		return nil, err
 	}
 	s.adminVersion = version
+	s.accountVersion, err = assetVersion("static/account.js", "static/account.css")
+	if err != nil {
+		return nil, err
+	}
 	return s, nil
 }
 
@@ -109,6 +115,8 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /privacy", s.handlePrivacy)
 	mux.HandleFunc("GET /support", s.handleSupport)
 	mux.HandleFunc("GET /account/delete", s.handleAccountDelete)
+	mux.HandleFunc("GET /account", s.handleAccount)
+	mux.HandleFunc("GET /payment", s.handlePayment)
 	mux.HandleFunc("GET /delete-account", s.handleDeleteAccountRedirect)
 
 	ipKey := func(r *http.Request) string { return clientIP(r, s.cfg.App.TrustProxy) }
@@ -143,22 +151,26 @@ func cacheStatic(next http.Handler) http.Handler {
 
 // baseView — барлық беттің ортақ деректері.
 type baseView struct {
-	T            func(string) string
-	Locale       string
-	Locales      []string
-	Year         int
-	ContactEmail string
-	BasePath     string
+	T              func(string) string
+	Locale         string
+	Locales        []string
+	Year           int
+	ContactEmail   string
+	BasePath       string
+	AccountPage    bool
+	CommercialPage bool
+	AccountVersion string
 }
 
 func (s *Server) base(locale string) baseView {
 	return baseView{
-		T:            s.bundle.Translator(locale),
-		Locale:       locale,
-		Locales:      domain.Locales,
-		Year:         time.Now().Year(),
-		ContactEmail: s.cfg.App.ContactEmail(),
-		BasePath:     s.basePath(),
+		T:              s.bundle.Translator(locale),
+		Locale:         locale,
+		Locales:        domain.Locales,
+		Year:           time.Now().Year(),
+		ContactEmail:   s.cfg.App.ContactEmail(),
+		BasePath:       s.basePath(),
+		AccountVersion: s.accountVersion,
 	}
 }
 

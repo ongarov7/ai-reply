@@ -20,11 +20,10 @@
 
     <h2>{{call .T "support.documents_title"}}</h2>
     <ul>
-      <li><a href="/privacy?lang={{.Locale}}">{{call .T "footer.privacy"}}</a></li>
-      <li><a href="/offer?lang={{.Locale}}">{{call .T "footer.terms"}}</a></li>
-      <li><a href="/account/delete?lang={{.Locale}}">{{call .T "footer.delete_account"}}</a></li>
+      <li><a href="{{.BasePath}}/privacy?lang={{.Locale}}">{{call .T "footer.privacy"}}</a></li>
+      <li><a href="{{.BasePath}}/offer?lang={{.Locale}}">{{call .T "footer.terms"}}</a></li>
+      <li><a href="{{.BasePath}}/account/delete?lang={{.Locale}}">{{call .T "footer.delete_account"}}</a></li>
     </ul>
-    <p style="margin-top:36px"><a class="btn btn-ghost" href="/?lang={{.Locale}}">{{call .T "legal.back"}}</a></p>
   </article>
 </div>
 {{end}}

@@ -87,14 +87,15 @@ const (
 	TypeClipboardHelp           = "clipboard_help"
 	TypeAccountInfo             = "account_info"
 	// TypeSupportReply — оператор қолдау чатында жауап берді.
-	TypeSupportReply = "support_reply"
+	TypeSupportReply  = "support_reply"
+	TypeWebTopupOffer = "web_topup_offer"
 )
 
 // AutomaticNotificationTypes — сервер өзі жіберетін түрлер (әкімші сүзгісі үшін).
 var AutomaticNotificationTypes = []string{
 	TypeSubscriptionActivated, TypeSubscriptionExpiring, TypeSubscriptionExpired, TypeQuotaLow, TypeQuotaExhausted,
 	TypeOnboardingIncomplete, TypeKeyboardSetupIncomplete, TypeClipboardHelp, TypeAccountInfo,
-	TypeSupportReply,
+	TypeSupportReply, TypeWebTopupOffer,
 }
 
 // ReminderTypes — автоматты еске салу шолуы жіберетін түрлер.
@@ -199,6 +200,21 @@ type Installation struct {
 // TokenFingerprint — журнал мен әкімші панеліне жарамды қысқа белгі (токеннің өзі емес).
 func (i Installation) TokenFingerprint() string {
 	return TokenFingerprint(i.PushProvider, i.PushTokenHash)
+}
+
+// SupportsExternalWebTopup excludes clients whose website link opens inside
+// the app. Build numbers are decimal integers, never a permissive prefix parse.
+func (i Installation) SupportsExternalWebTopup() bool {
+	if i.Platform != PlatformIOS || VersionNumber(i.AppVersion) < 1002000 || len(i.AppBuild) == 0 || len(i.AppBuild) > 9 {
+		return false
+	}
+	for _, c := range i.AppBuild {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	build, err := strconv.ParseInt(i.AppBuild, 10, 64)
+	return err == nil && build >= 14
 }
 
 // TokenFingerprint — провайдер + хэштің алғашқы 8 таңбасы, мысалы "fcm:1a2b3c4d".

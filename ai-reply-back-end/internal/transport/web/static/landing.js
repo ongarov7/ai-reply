@@ -15,6 +15,7 @@
   document.documentElement.classList.add("js");
 
   var data = readJSON("landing-data");
+  var basePath = data && data.base_path === "/sandbox" ? "/sandbox" : "";
 
   function readJSON(id) {
     var node = document.getElementById(id);
@@ -220,7 +221,7 @@
     }
 
     function post(path, body) {
-      return fetch(path, {
+      return fetch(basePath + path, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Accept": "application/json" },
         credentials: "same-origin",

@@ -39,7 +39,7 @@
     </div>
 
     {{if .ContactEmail}}<p>{{call .T "delete.contact"}} <a href="mailto:{{.ContactEmail}}">{{.ContactEmail}}</a></p>{{end}}
-    <p style="margin-top:36px"><a class="btn btn-ghost" href="/support?lang={{.Locale}}">{{call .T "support.title"}}</a></p>
+    <p style="margin-top:36px"><a class="btn btn-ghost" href="{{.BasePath}}/support?lang={{.Locale}}">{{call .T "support.title"}}</a></p>
   </article>
 </div>
 {{end}}

@@ -124,14 +124,14 @@ func TestPrivacyPolicyDescribesTheRealProcessing(t *testing.T) {
 	}
 }
 
-// Оферта: қазіргі кіру тәсілдері, тегін қызмет, ақылы тариф тек дүкендер арқылы.
+// Offer describes the welcome grant, store purchases and one-time bank packs.
 func TestTermsDescribeTheCurrentService(t *testing.T) {
 	h := newHarness(t)
 	for locale, needles := range map[string][]string{
-		"en": {"Apple, Google or a one-time code", "currently free", "App Store or Google Play", "9. Contact"},
-		"ru": {"через Apple, Google или по одноразовому коду", "Сейчас сервис бесплатный", "App Store или Google Play", "9. Контакты"},
-		"kk": {"Apple, Google арқылы", "Қазір қызмет тегін", "App Store не Google Play", "9. Байланыс"},
-		"uz": {"Apple, Google orqali", "Hozir xizmat bepul", "App Store yoki Google Play", "9. Aloqa"},
+		"en": {"Apple, Google or a one-time code", "10 free replies", "App Store or Google Play", "one-time reply pack", "do not expire", "final confirmation", "9. Contact"},
+		"ru": {"через Apple, Google или по одноразовому коду", "10 бесплатных ответов", "App Store или Google Play", "разовый пакет", "не имеют срока действия", "окончательного подтверждения", "9. Контакты"},
+		"kk": {"Apple, Google арқылы", "10 тегін жауап", "App Store не Google Play", "бір реттік жауап пакетін", "мерзімі шектелмейді", "түпкілікті растауын", "9. Байланыс"},
+		"uz": {"Apple, Google orqali", "10 ta bepul javob", "App Store yoki Google Play", "bir martalik javoblar", "muddati cheklanmagan", "yakuniy tasdigʻini", "9. Aloqa"},
 	} {
 		_, page := fetch(t, h, "/offer?lang="+locale)
 		page = html.UnescapeString(page)
@@ -140,7 +140,7 @@ func TestTermsDescribeTheCurrentService(t *testing.T) {
 				t.Errorf("%s offer is missing %q", locale, needle)
 			}
 		}
-		for _, stale := range []string{"phone number", "номеру телефона", "телефон нөмірі", "telefon raqami"} {
+		for _, stale := range []string{"phone number", "номеру телефона", "телефон нөмірі", "telefon raqami", "currently free", "Сейчас сервис бесплатный", "Қазір қызмет тегін", "Hozir xizmat bepul"} {
 			if strings.Contains(page, stale) {
 				t.Errorf("%s offer still offers phone sign-in", locale)
 			}
@@ -163,13 +163,14 @@ func TestPrivacyPolicyMatchesWhatTheAppsSend(t *testing.T) {
 		"A log of administrator actions on an account", "is not removed automatically, including after the account is deleted",
 		"finished notification deliveries — after 7 days", "the notifications themselves — after 40 days",
 		"If you signed in with Apple, you can remove AI Reply in your Apple ID settings",
+		"payment and refund status", "BCC on the website", "Card details are entered on the bank",
 	} {
 		if !strings.Contains(page, needle) {
 			t.Errorf("en privacy policy is missing %q", needle)
 		}
 	}
 	for _, stale := range []string{"only the text of AI Reply's own instruction field", "When you tap Reply or Write",
-		"Everything else is removed", "disconnect Sign in with Apple"} {
+		"Everything else is removed", "disconnect Sign in with Apple", "only if paid plans are ever sold"} {
 		if strings.Contains(page, stale) {
 			t.Errorf("en privacy policy still says %q", stale)
 		}

@@ -138,7 +138,7 @@
         {{if .PeriodText}}<div class="plan-period">{{.PeriodText}}</div>{{else if not .IsFree}}<div class="plan-period">{{call $.T "pricing.per_month"}}</div>{{end}}
         <p class="plan-desc">{{.Description}}</p>
         {{if .AllowanceText}}<div class="plan-limit"><b>{{.AllowanceText}}</b></div>{{else}}<div class="plan-limit"><b>{{.DailyLimit}}</b><span>{{call $.T "pricing.per_day"}}</span></div>{{end}}
-        <a class="btn {{if .Featured}}btn-primary{{else}}btn-ghost{{end}}" href="#download">{{$.PricingCTA}}</a>
+        {{if .AccountPurchase}}<a class="btn btn-ghost" href="{{$.BasePath}}/payment?lang={{$.Locale}}">{{call $.T "account.choose_pack"}}</a>{{else}}<a class="btn {{if .Featured}}btn-primary{{else}}btn-ghost{{end}}" href="#download">{{$.PricingCTA}}</a>{{end}}
       </div>
       {{end}}
     </div>

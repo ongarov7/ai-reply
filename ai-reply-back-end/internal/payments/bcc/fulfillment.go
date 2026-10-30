@@ -12,11 +12,11 @@ import (
 
 // fulfillAuthenticatedPack is reachable only after Basic Auth and the complete
 // original-operation binding have verified. Query wrappers and browser returns
-// have no access to this path. The sandbox service cannot run on production.
+// have no access to this path. Every lookup stays in the configured bank environment.
 func (s *CheckoutService) fulfillAuthenticatedPack(ctx context.Context, order BankOrder, safe map[string]string) error {
 	return s.db.Tx(ctx, func(tx *sql.Tx) error {
 		var user, status, raw string
-		if err := tx.QueryRowContext(ctx, `SELECT coalesce(user_id,''),status,snapshot_json FROM billing_orders WHERE id=? AND environment='sandbox'`, order.ID).Scan(&user, &status, &raw); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT coalesce(user_id,''),status,snapshot_json FROM billing_orders WHERE id=? AND environment=?`, order.ID, s.Environment()).Scan(&user, &status, &raw); err != nil {
 			return err
 		}
 		if status == "succeeded" || status == "refunded" {
@@ -43,10 +43,11 @@ func (s *CheckoutService) fulfillAuthenticatedPack(ctx context.Context, order Ba
 			return err
 		}
 		grantID := traits.NewID()
-		if _, err := tx.ExecContext(ctx, `INSERT INTO credit_grants(id,user_id,kind,units_total,units_remaining,starts_at,status,product_code,granted_by,reason,created_at,updated_at,billing_order_id) VALUES(?,?,'pack',?,?,?,'active',?,'system','Verified BCC sandbox purchase',?,?,?)`, grantID, user, product.Units, product.Units, now, product.Code, now, now, order.ID); err != nil {
+		reason := "Verified BCC " + string(s.Environment()) + " purchase"
+		if _, err := tx.ExecContext(ctx, `INSERT INTO credit_grants(id,user_id,kind,units_total,units_remaining,starts_at,status,product_code,granted_by,reason,created_at,updated_at,billing_order_id) VALUES(?,?,'pack',?,?,?,'active',?,'system',?,?,?,?)`, grantID, user, product.Units, product.Units, now, product.Code, reason, now, now, order.ID); err != nil {
 			return err
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO credit_ledger(id,user_id,grant_id,entry,kind,delta,actor,reason,created_at) VALUES(?,?,?,'grant','pack',?,'system','Verified BCC sandbox purchase',?)`, traits.NewID(), user, grantID, product.Units, now); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO credit_ledger(id,user_id,grant_id,entry,kind,delta,actor,reason,created_at) VALUES(?,?,?,'grant','pack',?,'system',?,?)`, traits.NewID(), user, grantID, product.Units, reason, now); err != nil {
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, `UPDATE billing_orders SET status='succeeded',updated_at=? WHERE id=?`, now, order.ID); err != nil {

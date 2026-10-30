@@ -15,6 +15,12 @@ import (
 
 // The test API shares the HTTPS listener, not the database or account sessions.
 func billingSandboxConfig(primary config.Config) (config.Config, error) {
+	if primary.BillingSandboxPushEnabled && !primary.Push.FCM.Configured() {
+		return config.Config{}, fmt.Errorf("billing sandbox push requires configured Firebase credentials")
+	}
+	if primary.BillingSandboxWebTopupOfferEnabled && !primary.BillingSandboxPushEnabled {
+		return config.Config{}, fmt.Errorf("billing sandbox web offer requires explicitly enabled sandbox push")
+	}
 	base, err := url.Parse(primary.App.PublicBaseURL)
 	if err != nil || base.Host == "" || base.User != nil || base.RawQuery != "" || base.Fragment != "" ||
 		(base.Path != "" && base.Path != "/") || (base.Scheme != "https" && base.Scheme != "http") ||
@@ -44,7 +50,13 @@ func billingSandboxConfig(primary config.Config) (config.Config, error) {
 	sandbox.Admin.CookieName += "_sandbox"
 	sandbox.Payments.Mode, sandbox.Payments.DemoCheckout = "off", false
 	sandbox.Push.Enabled, sandbox.Push.WorkerEnabled, sandbox.Push.EmailsEnabled = false, false, false
+	sandbox.Push.WebTopupOfferEnabled = false
 	sandbox.Push.FCM = config.FCM{}
+	if primary.BillingSandboxPushEnabled {
+		sandbox.Push.Enabled, sandbox.Push.WorkerEnabled = true, true
+		sandbox.Push.FCM = primary.Push.FCM
+		sandbox.Push.WebTopupOfferEnabled = primary.BillingSandboxWebTopupOfferEnabled
+	}
 	// Apple sign-in uses the real authorization for this bundle, even in
 	// TestFlight. Keep public client IDs for verification, but never revoke it
 	// when deleting an account from the isolated billing database.
@@ -53,10 +65,15 @@ func billingSandboxConfig(primary config.Config) (config.Config, error) {
 	sandbox.IAP.GoogleClientEmail, sandbox.IAP.GooglePrivateKey, sandbox.IAP.GoogleServiceAccountFile = "", "", ""
 	sandbox.IAP.GoogleVoidedPoll = 0
 	sandbox.BCCSandboxNotify.Enabled = false
+	// Never inherit primary production merchant, signing or notification secrets.
+	sandbox.BCCCheckout = primary.BCCSandboxCheckout
 	sandbox.BCCCheckout.Enabled = primary.BillingSandboxBCCEnabled
+	sandbox.BCCCheckout.Environment = "sandbox"
+	sandbox.BCCCheckout.ProductionApproved = false
 	sandbox.BCCCheckout.AppEnv = "staging"
 	sandbox.BCCCheckout.PublicBaseURL = sandbox.App.PublicBaseURL
 	sandbox.BillingSandboxEnabled, sandbox.BillingSandboxBCCEnabled = false, false
+	sandbox.BillingSandboxPushEnabled, sandbox.BillingSandboxWebTopupOfferEnabled = false, false
 	if problems := sandbox.Validate(); len(problems) > 0 {
 		return config.Config{}, fmt.Errorf("billing sandbox configuration: %s", strings.Join(problems, "; "))
 	}

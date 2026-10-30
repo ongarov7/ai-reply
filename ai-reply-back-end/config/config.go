@@ -17,26 +17,29 @@ import (
 
 // Config — қолданбаның толық баптауы.
 type Config struct {
-	App                      App
-	Database                 Database
-	Auth                     Auth
-	Email                    Email
-	OAuth                    OAuth
-	OpenAI                   OpenAI
-	AI                       AI
-	Analytics                Analytics
-	Admin                    Admin
-	Payments                 Payments
-	BCCSandboxNotify         BCCSandboxNotify
-	BCCCheckout              BCCCheckout
-	BillingSandboxEnabled    bool
-	BillingSandboxBCCEnabled bool
-	Limits                   Limits
-	Log                      Log
-	Push                     Push
-	Legal                    Legal
-	Retention                Retention
-	IAP                      IAP
+	App                                App
+	Database                           Database
+	Auth                               Auth
+	Email                              Email
+	OAuth                              OAuth
+	OpenAI                             OpenAI
+	AI                                 AI
+	Analytics                          Analytics
+	Admin                              Admin
+	Payments                           Payments
+	BCCSandboxNotify                   BCCSandboxNotify
+	BCCCheckout                        BCCCheckout
+	BCCSandboxCheckout                 BCCCheckout
+	BillingSandboxEnabled              bool
+	BillingSandboxBCCEnabled           bool
+	BillingSandboxPushEnabled          bool
+	BillingSandboxWebTopupOfferEnabled bool
+	Limits                             Limits
+	Log                                Log
+	Push                               Push
+	Legal                              Legal
+	Retention                          Retention
+	IAP                                IAP
 }
 
 type App struct {
@@ -276,13 +279,14 @@ type Log struct {
 // server fully working without Firebase: installations are still registered,
 // automatic events are recorded as skipped, nothing is sent.
 type Push struct {
-	Enabled          bool
-	WorkerEnabled    bool
-	MaxAttempts      int
-	BatchSize        int
-	Concurrency      int
-	CampaignsPerHour int
-	LinkHosts        []string
+	Enabled              bool
+	WebTopupOfferEnabled bool
+	WorkerEnabled        bool
+	MaxAttempts          int
+	BatchSize            int
+	Concurrency          int
+	CampaignsPerHour     int
+	LinkHosts            []string
 	// QuotaLowPercent — «квота аяқталуға жақын» шегі, лимиттің пайызы (күндік және айлық).
 	QuotaLowPercent int
 	// RetentionDays — аяқталған жеткізулер мен хабарламалар қанша күн сақталады (0 — өшірілмейді).
@@ -449,9 +453,12 @@ func Load(envFile string) (Config, error) {
 			BasicUsername:   str("BCC_SANDBOX_NOTIFY_BASIC_USERNAME", ""),
 			BasicPassword:   str("BCC_SANDBOX_NOTIFY_BASIC_PASSWORD", ""),
 		},
-		BCCCheckout:              bccCheckoutFromEnv(appEnv, publicBaseURL),
-		BillingSandboxEnabled:    boolean("BILLING_SANDBOX_ENABLED", false),
-		BillingSandboxBCCEnabled: boolean("BILLING_SANDBOX_BCC_ENABLED", false),
+		BCCCheckout:                        bccCheckoutFromEnv(appEnv, publicBaseURL),
+		BCCSandboxCheckout:                 bccSandboxCheckoutFromEnv(appEnv, publicBaseURL),
+		BillingSandboxEnabled:              boolean("BILLING_SANDBOX_ENABLED", false),
+		BillingSandboxBCCEnabled:           boolean("BILLING_SANDBOX_BCC_ENABLED", false),
+		BillingSandboxPushEnabled:          boolean("BILLING_SANDBOX_PUSH_ENABLED", false),
+		BillingSandboxWebTopupOfferEnabled: boolean("BILLING_SANDBOX_WEB_TOPUP_OFFER_ENABLED", false),
 		Limits: Limits{
 			SourceTextChars:   num("LIMIT_SOURCE_TEXT_CHARS", 400),
 			InstructionChars:  num("LIMIT_INSTRUCTION_CHARS", 400),
@@ -622,16 +629,34 @@ func (c Config) Validate() []string {
 	}
 	problems = append(problems, c.BCCSandboxNotify.Validate(c.App.PublicBaseURL)...)
 	if err := c.BCCCheckout.Validate(); err != nil {
-		problems = append(problems, "BCC_CHECKOUT_ENABLED requires staging/test, HTTPS PUBLIC_BASE_URL, verified sandbox merchant/terminal/MAC settings and separate notification/state secrets")
+		problems = append(problems, "BCC_CHECKOUT_ENABLED requires an explicit bank environment, HTTPS PUBLIC_BASE_URL, verified merchant/terminal/MAC settings and separate notification/state secrets; production also requires APP_ENV=production and BCC_CHECKOUT_PRODUCTION_APPROVED=true")
 	}
 	if c.BillingSandboxBCCEnabled && !c.BillingSandboxEnabled {
 		problems = append(problems, "BILLING_SANDBOX_BCC_ENABLED requires BILLING_SANDBOX_ENABLED=true")
+	}
+	if c.BillingSandboxPushEnabled && (!c.BillingSandboxEnabled || !c.Push.FCM.Configured()) {
+		problems = append(problems, "BILLING_SANDBOX_PUSH_ENABLED requires BILLING_SANDBOX_ENABLED=true and configured Firebase credentials")
+	}
+	if c.BillingSandboxWebTopupOfferEnabled && !c.BillingSandboxPushEnabled {
+		problems = append(problems, "BILLING_SANDBOX_WEB_TOPUP_OFFER_ENABLED requires BILLING_SANDBOX_PUSH_ENABLED=true")
 	}
 	if c.BCCCheckout.Enabled {
 		for _, paymentSecret := range []string{c.BCCCheckout.NotifyPassword, c.BCCCheckout.StateSecret} {
 			for _, applicationSecret := range []string{c.Auth.AccessSecret, c.Auth.RefreshSecret, c.Admin.BootstrapPassword} {
 				if paymentSecret != "" && paymentSecret == applicationSecret {
 					problems = append(problems, "BCC checkout secrets must be separate from application credentials")
+				}
+			}
+		}
+		if c.BCCCheckout.Environment == "production" {
+			if c.BCCSandboxCheckout.Terminal != "" && c.BCCCheckout.Terminal == c.BCCSandboxCheckout.Terminal {
+				problems = append(problems, "BCC production terminal must differ from the configured sandbox terminal")
+			}
+			for _, productionSecret := range []string{c.BCCCheckout.MACKeyHex, c.BCCCheckout.NotifyPassword, c.BCCCheckout.StateSecret} {
+				for _, sandboxSecret := range []string{c.BCCSandboxCheckout.MACKeyHex, c.BCCSandboxCheckout.NotifyPassword, c.BCCSandboxCheckout.StateSecret} {
+					if productionSecret != "" && sandboxSecret != "" && strings.EqualFold(productionSecret, sandboxSecret) {
+						problems = append(problems, "BCC production credentials must differ from sandbox credentials")
+					}
 				}
 			}
 		}
@@ -759,16 +784,17 @@ func (a Auth) validateReviewLogin() []string {
 
 func pushFromEnv() Push {
 	p := Push{
-		Enabled:          boolean("PUSH_NOTIFICATIONS_ENABLED", false),
-		WorkerEnabled:    boolean("PUSH_WORKER_ENABLED", true),
-		MaxAttempts:      num("PUSH_MAX_ATTEMPTS", 5),
-		BatchSize:        num("PUSH_BATCH_SIZE", 50),
-		Concurrency:      num("PUSH_WORKER_CONCURRENCY", 8),
-		CampaignsPerHour: num("RATE_PUSH_CAMPAIGNS_PER_HOUR", 10),
-		LinkHosts:        list("PUSH_LINK_HOSTS", hostOf(str("PUBLIC_BASE_URL", "https://ai-reply.kz"))),
-		QuotaLowPercent:  num("PUSH_QUOTA_LOW_PERCENT", 10),
-		RetentionDays:    days("RETENTION_NOTIFICATIONS_DAYS", 180),
-		EmailsEnabled:    boolean("NOTIFICATION_EMAILS_ENABLED", true),
+		Enabled:              boolean("PUSH_NOTIFICATIONS_ENABLED", false),
+		WebTopupOfferEnabled: boolean("WEB_TOPUP_OFFER_PUSH_ENABLED", false),
+		WorkerEnabled:        boolean("PUSH_WORKER_ENABLED", true),
+		MaxAttempts:          num("PUSH_MAX_ATTEMPTS", 5),
+		BatchSize:            num("PUSH_BATCH_SIZE", 50),
+		Concurrency:          num("PUSH_WORKER_CONCURRENCY", 8),
+		CampaignsPerHour:     num("RATE_PUSH_CAMPAIGNS_PER_HOUR", 10),
+		LinkHosts:            list("PUSH_LINK_HOSTS", hostOf(str("PUBLIC_BASE_URL", "https://ai-reply.kz"))),
+		QuotaLowPercent:      num("PUSH_QUOTA_LOW_PERCENT", 10),
+		RetentionDays:        days("RETENTION_NOTIFICATIONS_DAYS", 180),
+		EmailsEnabled:        boolean("NOTIFICATION_EMAILS_ENABLED", true),
 		FCM: FCM{
 			ProjectID:   str("FIREBASE_PROJECT_ID", ""),
 			ClientEmail: str("FIREBASE_CLIENT_EMAIL", ""),

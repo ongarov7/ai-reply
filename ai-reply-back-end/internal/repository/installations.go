@@ -345,6 +345,8 @@ func (s *Store) ListInstallations(ctx context.Context, f InstallationFilter) ([]
 
 // SendTarget — жіберу сәтіндегі орнату күйі (шифрланған токенмен, тек жұмысшыға).
 type SendTarget struct {
+	AppVersion           string
+	AppBuild             string
 	InstallationID       string
 	UserID               string
 	Platform             string
@@ -365,10 +367,10 @@ func (s *Store) InstallationSendTarget(ctx context.Context, id string) (SendTarg
 		enabled        int
 	)
 	err := s.db.Reader().QueryRowContext(ctx, `
-		SELECT id, user_id, platform, push_provider, push_token_sealed, push_token_hash,
+		SELECT id, user_id, platform, app_version, app_build, push_provider, push_token_sealed, push_token_hash,
 		       push_status, push_permission, notifications_enabled
 		FROM app_installations WHERE id = ?`, id).
-		Scan(&t.InstallationID, &userID, &t.Platform, &t.Provider, &sealed, &hash,
+		Scan(&t.InstallationID, &userID, &t.Platform, &t.AppVersion, &t.AppBuild, &t.Provider, &sealed, &hash,
 			&t.PushStatus, &t.Permission, &enabled)
 	if errors.Is(err, sql.ErrNoRows) {
 		return SendTarget{}, domain.ErrNotFound

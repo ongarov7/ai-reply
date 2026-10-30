@@ -27,36 +27,51 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/catalog"
 	"github.com/aireply/ai-reply-back-end/internal/database"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
+	"github.com/aireply/ai-reply-back-end/internal/legal"
 	"github.com/aireply/ai-reply-back-end/internal/traits"
 )
 
-// CheckoutConfig deliberately enables only BCC sandbox hosted checkout.
-// Final original notifications require separately configured bank Basic Auth.
+// CheckoutConfig binds hosted checkout to one bank environment. Production also
+// requires an explicit operator opt-in and separately configured credentials.
 type CheckoutConfig struct {
-	Enabled        bool
-	AppEnv         string
-	PublicBaseURL  string
-	Merchant       string
-	MerchantName   string
-	Terminal       string
-	MACKeyHex      string
-	NotifyUsername string
-	NotifyPassword string
-	StateSecret    string
+	Enabled            bool
+	Environment        Environment
+	ProductionApproved bool
+	AppEnv             string
+	PublicBaseURL      string
+	Merchant           string
+	MerchantName       string
+	Terminal           string
+	MACKeyHex          string
+	NotifyUsername     string
+	NotifyPassword     string
+	StateSecret        string
 }
 
-func (CheckoutConfig) String() string               { return "bcc sandbox checkout configuration (redacted)" }
+func (CheckoutConfig) String() string               { return "bcc checkout configuration (redacted)" }
 func (CheckoutConfig) GoString() string             { return "bcc.CheckoutConfig{redacted}" }
 func (CheckoutConfig) MarshalJSON() ([]byte, error) { return []byte(`{"redacted":true}`), nil }
 func (c CheckoutConfig) Validate() error {
 	if !c.Enabled {
 		return nil
 	}
-	if c.AppEnv != "test" && c.AppEnv != "development" && c.AppEnv != "staging" {
+	switch c.Environment {
+	case Sandbox:
+		if c.AppEnv != "test" && c.AppEnv != "development" && c.AppEnv != "staging" {
+			return ErrInvalidConfig
+		}
+	case Production:
+		if c.AppEnv != "production" || !c.ProductionApproved {
+			return ErrInvalidConfig
+		}
+	default:
 		return ErrInvalidConfig
 	}
 	u, err := url.Parse(c.PublicBaseURL)
-	if err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.Path != "" && u.Path != "/" && u.Path != "/sandbox" || net.ParseIP(u.Hostname()) != nil || !strings.Contains(u.Hostname(), ".") || u.Port() != "" && u.Port() != "443" {
+	if err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || u.Path != "" && u.Path != "/" && u.Path != "/sandbox" || net.ParseIP(u.Hostname()) != nil || !strings.Contains(u.Hostname(), ".") || u.Port() != "" && u.Port() != "443" {
+		return ErrInvalidConfig
+	}
+	if c.Environment == Production && u.Path == "/sandbox" {
 		return ErrInvalidConfig
 	}
 	if !digits(c.Merchant) || c.Terminal == "" || len(c.Merchant) > 32 || len(c.Terminal) > 32 || !printableASCII(c.Merchant) || !printableASCII(c.Terminal) || strings.ContainsAny(c.Merchant+c.Terminal, " \t\n\r") {
@@ -67,6 +82,9 @@ func (c CheckoutConfig) Validate() error {
 	}
 	if _, err = decodeMACKey(c.MACKeyHex); err != nil {
 		return err
+	}
+	if c.Environment == Production && (c.Terminal == "88888881" || c.Terminal == "88888888" || strings.EqualFold(c.MACKeyHex, publicTestKey)) {
+		return ErrInvalidConfig
 	}
 	if c.NotifyUsername == "" || len(c.NotifyUsername) > 128 || strings.ContainsAny(c.NotifyUsername, ":\r\n\x00") || len(c.NotifyPassword) < 32 || len(c.NotifyPassword) > 256 || strings.ContainsAny(c.NotifyPassword, "\r\n\x00") || len(c.StateSecret) < 32 || c.StateSecret == c.NotifyPassword {
 		return ErrInvalidConfig
@@ -93,7 +111,7 @@ func NewCheckout(cfg CheckoutConfig, db *database.DB, prices *catalog.Service) (
 	if db == nil || prices == nil {
 		return nil, ErrInvalidConfig
 	}
-	client, err := New(Config{Environment: Sandbox, Terminal: cfg.Terminal, MACKeyHex: cfg.MACKeyHex})
+	client, err := New(Config{Environment: cfg.Environment, Terminal: cfg.Terminal, MACKeyHex: cfg.MACKeyHex})
 	if err != nil {
 		return nil, err
 	}
@@ -101,6 +119,12 @@ func NewCheckout(cfg CheckoutConfig, db *database.DB, prices *catalog.Service) (
 	return s, nil
 }
 func (s *CheckoutService) Enabled() bool { return s != nil && s.cfg.Enabled }
+func (s *CheckoutService) Environment() Environment {
+	if s == nil {
+		return ""
+	}
+	return s.cfg.Environment
+}
 
 type BankOrder struct {
 	ID                 string `json:"payment_id"`
@@ -140,7 +164,7 @@ func readOrder(row interface{ Scan(...any) error }) (BankOrder, error) {
 }
 func (s *CheckoutService) token(id string) string {
 	mac := hmac.New(sha256.New, []byte(s.cfg.StateSecret))
-	_, _ = mac.Write([]byte("bcc-sandbox-checkout-v1:" + id))
+	_, _ = mac.Write([]byte("bcc-" + string(s.cfg.Environment) + "-checkout-v1:" + id))
 	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 }
 func hashToken(t string) string { h := sha256.Sum256([]byte(t)); return hex.EncodeToString(h[:]) }
@@ -151,6 +175,9 @@ func (s *CheckoutService) baseURL() string {
 	return strings.TrimRight(u.String(), "/")
 }
 func (s *CheckoutService) redirect(o BankOrder) BankOrder {
+	if o.Status != "created" || s.now().Sub(time.UnixMilli(o.createdAt)) > 15*time.Minute {
+		return o
+	}
 	o.RedirectURL = s.baseURL() + "/api/v1/payments/bcc/orders/" + o.ID + "/checkout?state=" + url.QueryEscape(s.token(o.ID))
 	return o
 }
@@ -158,6 +185,24 @@ func (s *CheckoutService) redirect(o BankOrder) BankOrder {
 // Start fixes both price and entitlements before the browser visits the bank.
 // It never accepts an amount, merchant, endpoint or recipient from the caller.
 func (s *CheckoutService) Start(ctx context.Context, userID, code, idempotency string) (BankOrder, error) {
+	return s.start(ctx, userID, code, idempotency, nil)
+}
+
+// ExpectedQuote is the exact offer accepted in the authenticated website flow.
+// Replaying the same order never replaces its original offer or consent.
+type ExpectedQuote struct {
+	CatalogVersion int64
+	PriceMinor     int64
+	Units          int
+	Currency       string
+	TermsVersion   string
+}
+
+func (s *CheckoutService) StartExpected(ctx context.Context, userID, code, idempotency string, expected ExpectedQuote) (BankOrder, error) {
+	return s.start(ctx, userID, code, idempotency, &expected)
+}
+
+func (s *CheckoutService) start(ctx context.Context, userID, code, idempotency string, expected *ExpectedQuote) (BankOrder, error) {
 	if !s.Enabled() {
 		return BankOrder{}, domain.ErrPurchasesDisabled
 	}
@@ -169,6 +214,9 @@ func (s *CheckoutService) Start(ctx context.Context, userID, code, idempotency s
 	}
 	previous, lookupErr := readOrder(s.db.Reader().QueryRowContext(ctx, `SELECT `+orderColumns+` FROM billing_orders WHERE user_id=? AND idempotency_key=?`, userID, idempotency))
 	if lookupErr == nil {
+		if previous.Environment != string(s.Environment()) {
+			return BankOrder{}, domain.ConflictField("Idempotency-Key", "different_environment")
+		}
 		if previous.ProductCode != code {
 			return BankOrder{}, domain.ConflictField("Idempotency-Key", "different_product")
 		}
@@ -177,45 +225,13 @@ func (s *CheckoutService) Start(ctx context.Context, userID, code, idempotency s
 	if !errors.Is(lookupErr, domain.ErrNotFound) {
 		return BankOrder{}, lookupErr
 	}
-	p, version, err := s.catalog.ProductForWeb(ctx, code)
-	if err != nil {
-		return BankOrder{}, err
-	}
-	// Recurring contracts are not simulated as a one-off payment. Sandbox only
-	// offers a permanent message pack until recurring billing is fully verified.
-	if p.Kind != "pack" {
-		return BankOrder{}, domain.ErrPlanUnavailable
-	}
-	now := s.now().UTC()
-	o := BankOrder{ID: traits.NewID(), userID: userID, ProductCode: p.Code, Units: p.Units, CatalogVersion: version, AmountMinor: p.PriceMinor, Currency: p.Currency, Status: "created", Environment: "sandbox", createdAt: now.UnixMilli()}
-	suffix, err := rand.Int(rand.Reader, big.NewInt(1000000))
-	if err != nil {
-		return BankOrder{}, ErrUnavailable
-	}
-	o.bankOrder = fmt.Sprintf("%d%06d", now.UnixMilli(), suffix.Int64())
-	state := s.token(o.ID)
-	o.tokenHash = hashToken(state)
-	var nonce [16]byte
-	if _, err = rand.Read(nonce[:]); err != nil {
-		return BankOrder{}, ErrUnavailable
-	}
-	amount, _ := FormatKZT(p.PriceMinor)
-	var rnID [8]byte
-	if _, err = rand.Read(rnID[:]); err != nil {
-		return BankOrder{}, ErrUnavailable
-	}
-	fields := url.Values{"AMOUNT": {amount}, "CURRENCY": {CurrencyKZT}, "ORDER": {o.bankOrder}, "MERCH_RN_ID": {strings.ToUpper(hex.EncodeToString(rnID[:]))}, "DESC": {"AI Reply " + p.Code}, "MERCHANT": {s.cfg.Merchant}, "MERCH_NAME": {s.cfg.MerchantName}, "TERMINAL": {s.cfg.Terminal}, "MERCH_GMT": {"0"}, "TIMESTAMP": {now.Format("20060102150405")}, "TRTYPE": {"1"}, "NONCE": {strings.ToUpper(hex.EncodeToString(nonce[:]))}, "LANG": {"ru"}, "BACKREF": {s.baseURL() + "/api/v1/payments/bcc/orders/" + o.ID + "/return?state=" + url.QueryEscape(state)}, "NOTIFY_URL": {s.baseURL() + "/api/v1/payments/bcc/notify"}}
-	signature, err := SignRequest(Purchase, fields, s.cfg.MACKeyHex)
-	if err != nil {
-		return BankOrder{}, err
-	}
-	fields.Set("P_SIGN", signature)
-	raw, _ := json.Marshal(fields)
-	snapshot, _ := json.Marshal(p)
-	o.request = string(raw)
-	err = s.db.Tx(ctx, func(tx *sql.Tx) error {
+	var o BankOrder
+	err := s.db.Tx(ctx, func(tx *sql.Tx) error {
 		previous, err := readOrder(tx.QueryRowContext(ctx, `SELECT `+orderColumns+` FROM billing_orders WHERE user_id=? AND idempotency_key=?`, userID, idempotency))
 		if err == nil {
+			if previous.Environment != string(s.Environment()) {
+				return domain.ConflictField("Idempotency-Key", "different_environment")
+			}
 			if previous.ProductCode != code {
 				return domain.ConflictField("Idempotency-Key", "different_product")
 			}
@@ -225,7 +241,54 @@ func (s *CheckoutService) Start(ctx context.Context, userID, code, idempotency s
 		if !errors.Is(err, domain.ErrNotFound) {
 			return err
 		}
-		_, err = tx.ExecContext(ctx, `INSERT INTO billing_orders(id,user_id,idempotency_key,catalog_version,product_code,snapshot_json,amount_minor,currency,provider,environment,bank_order,status,checkout_token_hash,request_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?, 'bcc','sandbox',?,'created',?,?,?,?)`, o.ID, userID, idempotency, version, p.Code, string(snapshot), p.PriceMinor, p.Currency, o.bankOrder, o.tokenHash, o.request, o.createdAt, o.createdAt)
+		// The catalog read shares the BEGIN IMMEDIATE writer transaction with
+		// order creation, so a concurrent publication cannot change an accepted offer.
+		p, version, err := s.catalog.ProductForWebInTx(ctx, tx, code)
+		if err != nil {
+			return err
+		}
+		if p.Kind != "pack" {
+			return domain.ErrPlanUnavailable
+		}
+		if expected != nil {
+			if expected.TermsVersion != legal.WebPurchaseTermsVersion {
+				return domain.ConflictField("terms_version", "changed")
+			}
+			if expected.CatalogVersion != version || expected.PriceMinor != p.PriceMinor || expected.Units != p.Units || expected.Currency != p.Currency {
+				return domain.ConflictField("quote", "changed")
+			}
+		}
+		now := s.now().UTC()
+		o = BankOrder{ID: traits.NewID(), userID: userID, ProductCode: p.Code, Units: p.Units, CatalogVersion: version, AmountMinor: p.PriceMinor, Currency: p.Currency, Status: "created", Environment: string(s.Environment()), createdAt: now.UnixMilli()}
+		suffix, err := rand.Int(rand.Reader, big.NewInt(1000000))
+		if err != nil {
+			return ErrUnavailable
+		}
+		o.bankOrder = fmt.Sprintf("%d%06d", now.UnixMilli(), suffix.Int64())
+		state := s.token(o.ID)
+		o.tokenHash = hashToken(state)
+		var nonce [16]byte
+		if _, err = rand.Read(nonce[:]); err != nil {
+			return ErrUnavailable
+		}
+		amount, _ := FormatKZT(p.PriceMinor)
+		var rnID [8]byte
+		if _, err = rand.Read(rnID[:]); err != nil {
+			return ErrUnavailable
+		}
+		fields := url.Values{"AMOUNT": {amount}, "CURRENCY": {CurrencyKZT}, "ORDER": {o.bankOrder}, "MERCH_RN_ID": {strings.ToUpper(hex.EncodeToString(rnID[:]))}, "DESC": {"AI Reply " + p.Code}, "MERCHANT": {s.cfg.Merchant}, "MERCH_NAME": {s.cfg.MerchantName}, "TERMINAL": {s.cfg.Terminal}, "MERCH_GMT": {"0"}, "TIMESTAMP": {now.Format("20060102150405")}, "TRTYPE": {"1"}, "NONCE": {strings.ToUpper(hex.EncodeToString(nonce[:]))}, "LANG": {"ru"}, "BACKREF": {s.baseURL() + "/api/v1/payments/bcc/orders/" + o.ID + "/return?state=" + url.QueryEscape(state)}, "NOTIFY_URL": {s.baseURL() + "/api/v1/payments/bcc/notify"}}
+		signature, err := SignRequest(Purchase, fields, s.cfg.MACKeyHex)
+		if err != nil {
+			return err
+		}
+		fields.Set("P_SIGN", signature)
+		raw, _ := json.Marshal(fields)
+		snapshot, _ := json.Marshal(p)
+		o.request = string(raw)
+		_, err = tx.ExecContext(ctx, `INSERT INTO billing_orders(id,user_id,idempotency_key,catalog_version,product_code,snapshot_json,amount_minor,currency,provider,environment,bank_order,status,checkout_token_hash,request_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?, 'bcc',?,?,'created',?,?,?,?)`, o.ID, userID, idempotency, version, p.Code, string(snapshot), p.PriceMinor, p.Currency, o.Environment, o.bankOrder, o.tokenHash, o.request, o.createdAt, o.createdAt)
+		if err == nil && expected != nil {
+			_, err = tx.ExecContext(ctx, `INSERT INTO billing_web_purchase_consents(order_id,user_id,product_code,catalog_version,price_minor,units,terms_version,source,accepted_at) VALUES(?,?,?,?,?,?,?,'website',?)`, o.ID, userID, p.Code, version, p.PriceMinor, p.Units, expected.TermsVersion, o.createdAt)
+		}
 		return err
 	})
 	if err != nil {
@@ -237,7 +300,7 @@ func (s *CheckoutService) owned(ctx context.Context, user, id string) (BankOrder
 	if !s.Enabled() {
 		return BankOrder{}, domain.ErrPurchasesDisabled
 	}
-	o, err := readOrder(s.db.Reader().QueryRowContext(ctx, `SELECT `+orderColumns+` FROM billing_orders WHERE id=? AND environment='sandbox'`, id))
+	o, err := readOrder(s.db.Reader().QueryRowContext(ctx, `SELECT `+orderColumns+` FROM billing_orders WHERE id=? AND environment=?`, id, s.Environment()))
 	if err != nil {
 		return o, err
 	}
@@ -253,6 +316,13 @@ func (s *CheckoutService) Status(ctx context.Context, user, id string) (BankOrde
 	}
 	if o.Status == "created" || o.Status == "pending" || o.Status == "verification_pending" {
 		o.VerificationReason = "authenticated_bank_confirmation_pending"
+	}
+	if o.Status == "created" {
+		if s.now().Sub(time.UnixMilli(o.createdAt)) > 15*time.Minute {
+			o.VerificationReason = "checkout_expired_bank_confirmation_pending"
+		} else {
+			o = s.redirect(o)
+		}
 	}
 	return o, nil
 }
@@ -307,7 +377,7 @@ func (s *CheckoutService) withState(r *http.Request) (BankOrder, error) {
 	if !s.Enabled() {
 		return BankOrder{}, domain.ErrNotFound
 	}
-	o, err := readOrder(s.db.Reader().QueryRowContext(r.Context(), `SELECT `+orderColumns+` FROM billing_orders WHERE id=? AND environment='sandbox'`, r.PathValue("id")))
+	o, err := readOrder(s.db.Reader().QueryRowContext(r.Context(), `SELECT `+orderColumns+` FROM billing_orders WHERE id=? AND environment=?`, r.PathValue("id"), s.Environment()))
 	if err != nil {
 		return o, err
 	}
@@ -362,17 +432,19 @@ func (s *CheckoutService) CheckoutPageWithClientIP(w http.ResponseWriter, r *htt
 		return
 	}
 	cspNonce := base64.StdEncoding.EncodeToString(nonce[:])
-	w.Header().Set("Content-Security-Policy", "default-src 'none'; script-src 'nonce-"+cspNonce+"'; form-action https://test3ds.bcc.kz:5445; frame-ancestors 'none'; base-uri 'none'")
+	endpoint, _ := s.Environment().Endpoint()
+	bankURL, _ := url.Parse(endpoint)
+	w.Header().Set("Content-Security-Policy", "default-src 'none'; script-src 'nonce-"+cspNonce+"'; form-action "+bankURL.Scheme+"://"+bankURL.Host+"; frame-ancestors 'none'; base-uri 'none'")
 	amount, _ := FormatKZT(o.AmountMinor)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = bankForm.Execute(w, map[string]any{"Amount": amount, "Units": o.Units, "Endpoint": template.URL(SandboxEndpoint), "Fields": fields, "ClientIP": ip.String(), "CSPNonce": cspNonce})
+	_ = bankForm.Execute(w, map[string]any{"Amount": amount, "Units": o.Units, "Sandbox": s.Environment() == Sandbox, "Endpoint": template.URL(endpoint), "Fields": fields, "ClientIP": ip.String(), "CSPNonce": cspNonce})
 }
 
 func secureHeaders(w http.ResponseWriter) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Referrer-Policy", "no-referrer")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.Header().Set("Content-Security-Policy", "default-src 'none'; form-action https://test3ds.bcc.kz:5445; frame-ancestors 'none'; base-uri 'none'")
+	w.Header().Set("Content-Security-Policy", "default-src 'none'; form-action 'none'; frame-ancestors 'none'; base-uri 'none'")
 }
 func (s *CheckoutService) Return(w http.ResponseWriter, r *http.Request) {
 	secureHeaders(w)
@@ -389,8 +461,9 @@ func (s *CheckoutService) Return(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unavailable", http.StatusServiceUnavailable)
 		return
 	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_, _ = io.WriteString(w, `<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AI Reply</title><body><h1>Платёж проверяется</h1><p>Вернитесь в приложение. Ответы появятся только после серверного подтверждения оплаты.</p></body></html>`)
+	// A bank browser return is only a navigation signal. The account page reads
+	// the user-owned server order; no bank-supplied status reaches its URL.
+	http.Redirect(w, r, s.baseURL()+"/payment?"+url.Values{"order": {o.ID}}.Encode(), http.StatusSeeOther)
 }
 func parseNotification(w http.ResponseWriter, r *http.Request) (url.Values, error) {
 	media, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
@@ -439,7 +512,7 @@ func (s *CheckoutService) Notify(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid notification", http.StatusBadRequest)
 		return
 	}
-	o, err := readOrder(s.db.Reader().QueryRowContext(r.Context(), `SELECT `+orderColumns+` FROM billing_orders WHERE bank_order=? AND environment='sandbox'`, fields.Get("ORDER")))
+	o, err := readOrder(s.db.Reader().QueryRowContext(r.Context(), `SELECT `+orderColumns+` FROM billing_orders WHERE bank_order=? AND environment=?`, fields.Get("ORDER"), s.Environment()))
 	if err != nil {
 		http.Error(w, "Unknown order", http.StatusNotFound)
 		return

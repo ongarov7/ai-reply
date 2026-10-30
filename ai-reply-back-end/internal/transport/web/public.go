@@ -18,14 +18,15 @@ import (
 func clientIP(r *http.Request, trustProxy bool) string { return httpx.ClientIP(r, trustProxy) }
 
 type planView struct {
-	Name          string
-	Description   string
-	PriceText     string
-	DailyLimit    int
-	IsFree        bool
-	Featured      bool
-	PeriodText    string
-	AllowanceText string
+	Name            string
+	Description     string
+	PriceText       string
+	DailyLimit      int
+	IsFree          bool
+	Featured        bool
+	PeriodText      string
+	AllowanceText   string
+	AccountPurchase bool
 }
 
 type landingView struct {
@@ -80,12 +81,13 @@ func (s *Server) handleLanding(w http.ResponseWriter, r *http.Request) {
 		s.log.Error("landing plans failed", "error", err.Error())
 	}
 
-	boot, err := json.Marshal(map[string]any{"scenes": s.demoScenes(locale), "locale": locale})
+	boot, err := json.Marshal(map[string]any{"scenes": s.demoScenes(locale), "locale": locale, "base_path": s.basePath()})
 	if err != nil {
 		boot = []byte("{}")
 	}
 	view := landingView{baseView: s.base(locale), Boot: template.JS(boot),
 		AppStoreURL: s.cfg.App.AppStoreURL, PlayStoreURL: s.cfg.App.PlayStoreURL}
+	view.CommercialPage = true
 	purchasable := false
 	for _, p := range list {
 		if p.IsFree && view.FreeLimit == 0 {
@@ -145,7 +147,7 @@ func (s *Server) handleLanding(w http.ResponseWriter, r *http.Request) {
 				} else if product.BillingPeriod == "year" {
 					period = s.bundle.T(locale, "admin.billing.year")
 				}
-				view.Plans = append(view.Plans, planView{Name: name, PriceText: traits.FormatMoney(product.PriceMinor, product.Currency), IsFree: product.Kind == "welcome", Description: description, AllowanceText: allowance, PeriodText: period, Featured: product.Code == "base_monthly"})
+				view.Plans = append(view.Plans, planView{Name: name, PriceText: traits.FormatMoney(product.PriceMinor, product.Currency), IsFree: product.Kind == "welcome", Description: description, AllowanceText: allowance, PeriodText: period, Featured: product.Code == "base_monthly", AccountPurchase: product.Kind == "pack"})
 			}
 			view.PricingNote = s.bundle.T(locale, "pricing.catalog_note")
 		}
@@ -222,7 +224,7 @@ func (s *Server) handleAccountDelete(w http.ResponseWriter, r *http.Request) {
 	} {
 		messages[code] = s.bundle.T(locale, key)
 	}
-	boot, err := json.Marshal(map[string]any{"errors": messages})
+	boot, err := json.Marshal(map[string]any{"errors": messages, "base_path": s.basePath()})
 	if err != nil {
 		boot = []byte("{}")
 	}

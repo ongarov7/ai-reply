@@ -1,5 +1,5 @@
-// Package bcc implements the documented BCC request primitives. It does not
-// implement payments.Provider, accept callbacks, send money or grant purchases.
+// Package bcc implements documented BCC primitives and an explicitly enabled
+// hosted pack checkout with authenticated, order-bound bank notifications.
 //
 // In particular, a successful TRTYPE=90 response is not proof that the original
 // payment succeeded. The bank's original-operation response contract still needs

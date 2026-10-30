@@ -20,6 +20,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/auth"
 	"github.com/aireply/ai-reply-back-end/internal/database"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
+	"github.com/aireply/ai-reply-back-end/internal/payments/bcc"
 	"github.com/aireply/ai-reply-back-end/internal/repository"
 )
 
@@ -118,6 +119,68 @@ func TestBillingSandboxCannotRevokePrimaryAppleCredentials(t *testing.T) {
 	}
 	if !reflect.DeepEqual(primary.OAuth, original) {
 		t.Fatal("sandbox derivation changed the primary Apple configuration")
+	}
+}
+
+func TestBillingSandboxNeverInheritsProductionBankCredentials(t *testing.T) {
+	primary := billingPrimaryFixture(t)
+	primary.BillingSandboxBCCEnabled = true
+	primary.BCCCheckout = config.BCCCheckout{
+		Enabled: true, Environment: bcc.Production, ProductionApproved: true, AppEnv: "production",
+		PublicBaseURL: primary.App.PublicBaseURL, Merchant: "12345678", MerchantName: "LIVE MERCHANT", Terminal: "12345678",
+		MACKeyHex: "00112233445566778899AABBCCDDEEFF", NotifyUsername: "live-bank", NotifyPassword: strings.Repeat("p", 40), StateSecret: strings.Repeat("q", 40),
+	}
+	primary.BCCSandboxCheckout = config.BCCCheckout{
+		Environment: bcc.Sandbox, Merchant: "00000001", MerchantName: "TEST MERCHANT", Terminal: "88888881",
+		MACKeyHex: "11223344556677889900AABBCCDDEEFF", NotifyUsername: "sandbox-bank", NotifyPassword: strings.Repeat("s", 40), StateSecret: strings.Repeat("t", 40),
+	}
+	before := primary.BCCCheckout
+	sandbox, err := billingSandboxConfig(primary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !sandbox.BCCCheckout.Enabled || sandbox.BCCCheckout.Environment != bcc.Sandbox || sandbox.BCCCheckout.ProductionApproved || sandbox.BCCCheckout.Terminal != "88888881" || sandbox.BCCCheckout.NotifyUsername != "sandbox-bank" {
+		t.Fatal("sandbox selected production bank configuration")
+	}
+	if sandbox.BCCCheckout.MACKeyHex == primary.BCCCheckout.MACKeyHex || sandbox.BCCCheckout.NotifyPassword == primary.BCCCheckout.NotifyPassword || sandbox.BCCCheckout.StateSecret == primary.BCCCheckout.StateSecret {
+		t.Fatal("sandbox inherited a production bank secret")
+	}
+	if !reflect.DeepEqual(primary.BCCCheckout, before) {
+		t.Fatal("sandbox derivation changed primary bank configuration")
+	}
+}
+
+func TestBillingSandboxPushRequiresIndependentExplicitOptIn(t *testing.T) {
+	primary := billingPrimaryFixture(t)
+	primary.Push.Enabled, primary.Push.WorkerEnabled, primary.Push.EmailsEnabled, primary.Push.WebTopupOfferEnabled = true, true, true, true
+	primary.Push.FCM = config.FCM{ProjectID: "dummy-project", ClientEmail: "dummy@example.invalid", PrivateKey: "dummy-not-a-real-key"}
+	original := primary.Push
+	sandbox, err := billingSandboxConfig(primary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sandbox.Push.Enabled || sandbox.Push.WorkerEnabled || sandbox.Push.WebTopupOfferEnabled || sandbox.Push.FCM.Configured() || sandbox.Push.EmailsEnabled {
+		t.Fatal("primary push settings silently enabled sandbox")
+	}
+	primary.BillingSandboxPushEnabled = true
+	sandbox, err = billingSandboxConfig(primary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !sandbox.Push.Enabled || !sandbox.Push.WorkerEnabled || !sandbox.Push.FCM.Configured() || sandbox.Push.WebTopupOfferEnabled || sandbox.Push.EmailsEnabled || sandbox.OAuth.AppleRevocation() {
+		t.Fatal("explicit sandbox push was not isolated")
+	}
+	primary.BillingSandboxWebTopupOfferEnabled = true
+	sandbox, err = billingSandboxConfig(primary)
+	if err != nil || !sandbox.Push.WebTopupOfferEnabled {
+		t.Fatal("independent sandbox offer switch not applied")
+	}
+	if !reflect.DeepEqual(original, primary.Push) {
+		t.Fatal("sandbox configuration changed primary push settings")
+	}
+	primary.Push.FCM = config.FCM{}
+	if _, err = billingSandboxConfig(primary); err == nil {
+		t.Fatal("enabled sandbox push accepted missing credentials")
 	}
 }
 

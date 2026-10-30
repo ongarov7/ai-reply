@@ -210,7 +210,7 @@ func buildApplication(ctx context.Context, cfg config.Config, log *slog.Logger, 
 	}
 	bccCheckout, err := bcc.NewCheckout(cfg.BCCCheckout, db, catalogSvc)
 	if err != nil {
-		return nil, fmt.Errorf("initialize BCC sandbox checkout: %w", err)
+		return nil, fmt.Errorf("initialize BCC checkout: %w", err)
 	}
 	planSvc := plans.New(store)
 	subSvc := subscriptions.New(store, planSvc, cfg.App.Location())
@@ -245,6 +245,7 @@ func buildApplication(ctx context.Context, cfg config.Config, log *slog.Logger, 
 		Repo: store, Installations: installSvc, Provider: pushProvider, Plans: planSvc,
 		Config: cfg.Push, Location: cfg.App.Location(), Translate: bundle.T, Log: log,
 	})
+	notifySvc.WithWebTopupOffers(bccCheckout.Enabled, catalogSvc, cfg.App.PublicBaseURL)
 	if mailer != nil {
 		notifySvc.WithEmail(mailer, email.NotificationTemplates{Translate: bundle.T, Brand: cfg.Email.FromName})
 	}
@@ -309,6 +310,7 @@ func buildApplication(ctx context.Context, cfg config.Config, log *slog.Logger, 
 	})
 	apiServer.Register(mux)
 	apiServer.RegisterBCC(mux, bccCheckout)
+	apiServer.RegisterWebAccount(mux, bccCheckout, catalogSvc)
 
 	adminapi.New(adminapi.Deps{
 		Catalog: catalogSvc,

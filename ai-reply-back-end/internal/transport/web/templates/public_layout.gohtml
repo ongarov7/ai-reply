@@ -8,21 +8,28 @@
 <meta property="og:title" content="AI Reply — {{call .T "app.tagline"}}">
 <meta property="og:description" content="{{call .T "hero.subtitle"}}">
 <meta property="og:type" content="website">
-<link rel="stylesheet" href="/static/landing.css">
-<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="{{.BasePath}}/static/landing.css">
+<link rel="icon" href="{{.BasePath}}/static/favicon.svg" type="image/svg+xml">
 <script id="landing-data" type="application/json">{{.Boot}}</script>
-<script src="/static/landing.js" defer></script>
+<script src="{{.BasePath}}/static/landing.js" defer></script>
+{{if .AccountPage}}<link rel="stylesheet" href="{{.BasePath}}/static/account.css?v={{.AccountVersion}}"><script src="{{.BasePath}}/static/account.js?v={{.AccountVersion}}" defer></script>{{end}}
 </head>
 <body>
 <header class="site-header">
   <div class="wrap">
-    <a class="logo" href="/"><span class="logo-mark">AI</span><span class="logo-name">AI&nbsp;Reply</span></a>
+    {{if .CommercialPage}}<a class="logo" href="{{.BasePath}}/"><span class="logo-mark">AI</span><span class="logo-name">AI&nbsp;Reply</span></a>{{else}}<span class="logo"><span class="logo-mark">AI</span><span class="logo-name">AI&nbsp;Reply</span></span>{{end}}
     <nav class="nav">
-      <a href="/#how">{{call .T "nav.how"}}</a>
-      <a href="/#features">{{call .T "nav.features"}}</a>
-      <a href="/#privacy">{{call .T "nav.privacy"}}</a>
-      <a href="/#pricing">{{call .T "nav.pricing"}}</a>
-      <a href="/#faq">{{call .T "nav.faq"}}</a>
+      {{if .CommercialPage}}
+      <a href="{{.BasePath}}/#how">{{call .T "nav.how"}}</a>
+      <a href="{{.BasePath}}/#features">{{call .T "nav.features"}}</a>
+      <a href="{{.BasePath}}/#privacy">{{call .T "nav.privacy"}}</a>
+      <a href="{{.BasePath}}/#pricing">{{call .T "nav.pricing"}}</a>
+      <a href="{{.BasePath}}/account?lang={{.Locale}}">{{call .T "account.open"}}</a>
+      {{else}}
+      <a href="{{.BasePath}}/offer?lang={{.Locale}}">{{call .T "footer.terms"}}</a>
+      <a href="{{.BasePath}}/privacy?lang={{.Locale}}">{{call .T "footer.privacy"}}</a>
+      <a href="{{.BasePath}}/support?lang={{.Locale}}">{{call .T "footer.support"}}</a>
+      {{end}}
     </nav>
     <div class="header-right">
       <div class="lang lang-links">
@@ -31,7 +38,7 @@
       <select class="lang-select" aria-label="Language">
         {{range .Locales}}<option value="{{.}}" {{if eq . $.Locale}}selected{{end}}>{{.}}</option>{{end}}
       </select>
-      <a class="btn btn-primary btn-sm" href="/#download">{{call .T "nav.download"}}</a>
+      {{if .CommercialPage}}<a class="btn btn-primary btn-sm" href="{{.BasePath}}/#download">{{call .T "nav.download"}}</a>{{end}}
       <button class="nav-toggle" type="button" aria-label="menu" aria-expanded="false"><span></span><span></span><span></span></button>
     </div>
   </div>
@@ -43,10 +50,10 @@
   <div class="wrap">
     <span>© {{.Year}} AI Reply. {{call .T "footer.rights"}}.</span>
     <nav>
-      <a href="/offer?lang={{.Locale}}">{{call .T "footer.terms"}}</a>
-      <a href="/privacy?lang={{.Locale}}">{{call .T "footer.privacy"}}</a>
-      <a href="/support?lang={{.Locale}}">{{call .T "footer.support"}}</a>
-      <a href="/account/delete?lang={{.Locale}}">{{call .T "footer.delete_account"}}</a>
+      <a href="{{.BasePath}}/offer?lang={{.Locale}}">{{call .T "footer.terms"}}</a>
+      <a href="{{.BasePath}}/privacy?lang={{.Locale}}">{{call .T "footer.privacy"}}</a>
+      <a href="{{.BasePath}}/support?lang={{.Locale}}">{{call .T "footer.support"}}</a>
+      <a href="{{.BasePath}}/account/delete?lang={{.Locale}}">{{call .T "footer.delete_account"}}</a>
       {{if .ContactEmail}}<a href="mailto:{{.ContactEmail}}">{{call .T "footer.contact"}}</a>{{end}}
     </nav>
   </div>

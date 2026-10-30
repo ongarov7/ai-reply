@@ -14,7 +14,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/traits"
 )
 
-// Refund requests one full sandbox refund. An uncertain transport result is
+// Refund requests one full refund in the configured bank environment. An uncertain transport result is
 // recorded for reconciliation and is never retried as another money operation.
 func (s *CheckoutService) Refund(ctx context.Context, adminID, id string) (BankOrder, error) {
 	if !s.Enabled() {
@@ -28,7 +28,7 @@ func (s *CheckoutService) Refund(ctx context.Context, adminID, id string) (BankO
 	var send bool
 	err := s.db.Tx(ctx, func(tx *sql.Tx) error {
 		var err error
-		order, err = readOrder(tx.QueryRowContext(ctx, `SELECT `+orderColumns+` FROM billing_orders WHERE id=? AND environment='sandbox'`, id))
+		order, err = readOrder(tx.QueryRowContext(ctx, `SELECT `+orderColumns+` FROM billing_orders WHERE id=? AND environment=?`, id, s.Environment()))
 		if err != nil {
 			return err
 		}
@@ -122,7 +122,7 @@ func (s *CheckoutService) refundRequest(ctx context.Context, id string) (url.Val
 func (s *CheckoutService) refundAuthenticatedPack(ctx context.Context, order BankOrder, safe map[string]string) error {
 	return s.db.Tx(ctx, func(tx *sql.Tx) error {
 		var status string
-		if err := tx.QueryRowContext(ctx, `SELECT status FROM billing_orders WHERE id=? AND environment='sandbox'`, order.ID).Scan(&status); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT status FROM billing_orders WHERE id=? AND environment=?`, order.ID, s.Environment()).Scan(&status); err != nil {
 			return err
 		}
 		if status == "refunded" {
@@ -167,7 +167,7 @@ func (s *CheckoutService) Orders(ctx context.Context) ([]BankOrder, error) {
 	if !s.Enabled() {
 		return []BankOrder{}, nil
 	}
-	rows, err := s.db.Reader().QueryContext(ctx, `SELECT `+orderColumns+` FROM billing_orders WHERE environment='sandbox' ORDER BY created_at DESC LIMIT 100`)
+	rows, err := s.db.Reader().QueryContext(ctx, `SELECT `+orderColumns+` FROM billing_orders WHERE environment=? ORDER BY created_at DESC LIMIT 100`, s.Environment())
 	if err != nil {
 		return nil, err
 	}

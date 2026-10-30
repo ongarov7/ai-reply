@@ -1,0 +1,64 @@
+{{define "title"}}{{if .PaymentPage}}{{call .T "account.payment_title"}}{{else}}{{call .T "account.title"}}{{end}} — AI Reply{{end}}
+{{define "content"}}
+<main class="account-page wrap" id="account-app" aria-busy="true">
+  <script id="account-data" type="application/json">{{.AccountBoot}}</script>
+  <div class="account-heading"><span class="badge">AI Reply</span><h1>{{if .PaymentPage}}{{call .T "account.payment_title"}}{{else}}{{call .T "account.title"}}{{end}}</h1><p class="lede">{{if .PaymentPage}}{{call .T "account.payment_intro"}}{{else}}{{call .T "account.intro"}}{{end}}</p></div>
+  {{if .PaymentPage}}<section class="account-public-offers" aria-label="{{call .T "account.top_up"}}">{{range .Offers}}<article class="account-card account-public-offer" data-public-product="{{.Code}}"><h2 data-offer-name>{{.Name}}</h2><p class="account-public-price" data-offer-price>{{.PriceText}}</p><p><strong data-offer-units>{{.Units}}</strong> {{call $.T "account.public_units"}}</p><p class="account-muted">{{call $.T "account.pack_hint"}}</p><a class="btn btn-primary" data-public-offer="{{.Code}}" href="#account-login">{{call $.T "account.choose_pack"}}</a></article>{{else}}<p class="account-muted">{{call .T "account.bank_unavailable"}}</p>{{end}}</section>{{end}}
+  <p id="account-loading" role="status">{{call .T "account.loading"}}</p>
+  <p id="account-error" class="account-error" role="alert" hidden></p>
+  <button id="account-reload" class="btn btn-ghost" type="button" hidden>{{call .T "account.retry"}}</button>
+  <section id="account-switch" class="account-card account-login" hidden aria-labelledby="account-switch-title">
+    <h2 id="account-switch-title">{{call .T "account.switch_title"}}</h2>
+    <p id="account-switch-message"></p>
+    <p class="account-muted">{{call .T "account.switch_hint"}}</p>
+    <div class="account-order-actions"><button id="account-switch-confirm" class="btn btn-primary" type="button">{{call .T "account.switch_confirm"}}</button><button id="account-switch-cancel" class="btn btn-ghost" type="button">{{call .T "account.switch_cancel"}}</button></div>
+  </section>
+  <section id="account-login" class="account-card account-login" hidden aria-labelledby="account-login-title">
+    <h2 id="account-login-title">{{call .T "account.sign_in"}}</h2>
+    <p>{{call .T "account.email_hint"}}</p>
+    <p class="account-muted">{{call .T "account.apple_hint"}}</p>
+    <div class="account-form">
+      <form id="account-email-form">
+        <label for="account-email">{{call .T "account.email"}}</label>
+        <input id="account-email" name="email" type="email" autocomplete="email" inputmode="email" maxlength="254" required>
+        <button class="btn btn-primary" type="submit">{{call .T "account.send_code"}}</button>
+      </form>
+      <form id="account-code-form" hidden>
+        <p id="account-code-hint" class="form-status" role="status"></p>
+        <label for="account-code">{{call .T "account.code"}}</label>
+        <input id="account-code" name="code" type="text" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required>
+        <div class="form-actions"><button class="btn btn-primary" type="submit">{{call .T "account.sign_in"}}</button><button id="account-change-email" class="btn btn-ghost" type="button">{{call .T "account.change_email"}}</button><button id="account-resend" class="btn btn-ghost" type="button" disabled>{{call .T "account.resend"}}</button></div>
+        <p id="account-resend-hint" class="form-hint" role="status"></p>
+      </form>
+    </div>
+    <p class="account-muted account-terms">{{call .T "account.terms_hint"}} <a href="{{.BasePath}}/offer?lang={{.Locale}}">{{call .T "footer.terms"}}</a> · <a href="{{.BasePath}}/privacy?lang={{.Locale}}">{{call .T "footer.privacy"}}</a></p>
+  </section>
+  <div id="account-content" hidden>
+    <div class="account-grid">
+      <section class="account-card" aria-labelledby="account-identity-title">
+        <div class="account-card-heading"><h2 id="account-identity-title">{{call .T "account.your_account"}}</h2><button id="account-logout" class="account-link" type="button">{{call .T "account.logout"}}</button></div>
+        <p id="account-confirmed-email" class="account-email"></p>
+        <p class="account-muted account-id">{{call .T "account.account_id"}} <span id="account-user-id"></span></p>
+        <p class="account-muted">{{call .T "account.recipient_hint"}}</p>
+        <dl class="account-balances"><div><dt>{{call .T "account.available"}}</dt><dd id="account-remaining"></dd></div><div><dt>{{call .T "account.purchased"}}</dt><dd id="account-purchased"></dd></div><div id="account-welcome-row" hidden><dt>{{call .T "account.welcome"}}</dt><dd id="account-welcome"></dd></div></dl>
+        <p class="account-muted" id="account-current-plan"></p>
+        <button id="account-refresh" class="account-link" type="button">{{call .T "account.refresh"}}</button>
+      </section>
+      <section class="account-card" aria-labelledby="account-pack-title">
+        <div class="account-card-heading"><h2 id="account-pack-title">{{call .T "account.top_up"}}</h2><span id="account-sandbox" class="badge" hidden>{{call .T "account.test_payment"}}</span></div>
+        <p>{{call .T "account.pack_hint"}}</p>
+        <p id="account-bank-unavailable" class="account-muted" hidden>{{call .T "account.bank_unavailable"}}</p>
+        <div id="account-terms-box" class="account-check" hidden><input id="account-purchase-terms" type="checkbox"><label for="account-purchase-terms">{{call .T "account.purchase_terms"}} <a href="{{.BasePath}}/offer?lang={{.Locale}}#web-purchases" target="_blank" rel="noopener">{{call .T "footer.terms"}}</a></label></div>
+        <div id="account-products"></div>
+        <p class="account-muted">{{call .T "account.card_hint"}}</p>
+        <a class="account-link" href="{{.BasePath}}/?lang={{.Locale}}#pricing">{{call .T "account.all_plans"}}</a>
+      </section>
+    </div>
+    <section id="account-order" class="account-card account-order" hidden aria-labelledby="account-order-title" aria-live="polite">
+      <h2 id="account-order-title">{{call .T "account.order_title"}}</h2><p class="account-muted account-id">{{call .T "account.order_number"}} <span id="account-order-id"></span></p><p id="account-order-status"></p><p id="account-order-hint" class="account-muted"></p>
+      <div class="account-order-actions"><button id="account-check-order" class="btn btn-ghost" type="button">{{call .T "account.check_status"}}</button><button id="account-retry-checkout" class="btn btn-ghost" type="button" hidden>{{call .T "account.retry_checkout"}}</button><a id="account-continue-order" class="btn btn-primary" hidden>{{call .T "account.continue_payment"}}</a></div>
+    </section>
+  </div>
+  <noscript><p class="account-error">{{call .T "account.javascript"}}</p></noscript>
+</main>
+{{end}}

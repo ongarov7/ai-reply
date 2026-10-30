@@ -378,6 +378,20 @@ func (s *Service) sendPush(ctx context.Context, d repository.ClaimedDelivery, n 
 			return skip(SkipDisabledByUser)
 		}
 	}
+	if n.Type == domain.TypeWebTopupOffer {
+		client := domain.Installation{Platform: target.Platform, AppVersion: target.AppVersion, AppBuild: target.AppBuild}
+		if !client.SupportsExternalWebTopup() {
+			return skip("web_offer_client_unsupported")
+		}
+		allowed, err := s.webTopupDispatchAllowed(ctx, n)
+		if err != nil {
+			status, next := s.retry(d, 0)
+			return outcome{status: status, next: next, code: "web_offer_lookup_failed", fingerprint: fingerprint}
+		}
+		if !allowed || d.Platform != domain.PlatformIOS {
+			return skip("web_offer_unavailable")
+		}
+	}
 	token, err := s.sealer.Open(target.TokenSealed)
 	if err != nil {
 		// The sealing key changed (JWT_ACCESS_SECRET rotated): the app sends
@@ -430,6 +444,9 @@ func (s *Service) sendPush(ctx context.Context, d repository.ClaimedDelivery, n 
 
 // sendEmail — тіркелгінің расталған поштасына бір хат (мекенжай жіберу сәтінде оқылады).
 func (s *Service) sendEmail(ctx context.Context, d repository.ClaimedDelivery, n domain.Notification, started time.Time) outcome {
+	if n.Type == domain.TypeWebTopupOffer {
+		return outcome{status: domain.DeliverySkipped, code: "push_only_offer"}
+	}
 	mailer, renderer := s.email()
 	if mailer == nil {
 		return outcome{status: domain.DeliverySkipped, code: SkipEmailDisabled}

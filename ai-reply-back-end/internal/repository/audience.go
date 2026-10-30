@@ -18,7 +18,8 @@ import (
 // file's own fixed fragments, chosen by validated enum values — never a field
 // name or an expression from a request.
 type AudienceQuery struct {
-	Filter domain.AudienceFilter
+	RequireExternalWebTopup bool
+	Filter                  domain.AudienceFilter
 	// Recipients — Filter.UserIDs plus the accounts Filter.Emails resolved to.
 	// Used only when the filter names people: an empty list then matches nobody.
 	Recipients []string
@@ -93,6 +94,11 @@ func matchClause(q AudienceQuery) (string, []any) {
 	now := ms(q.Now)
 	where := []string{"u.status = 'active'", "u.deleted_at IS NULL", "u.kind = 'account'"}
 	args := []any{}
+	if q.RequireExternalWebTopup {
+		// Keep this in the creation transaction, so an unsupported token cannot
+		// consume a once-only event before a compatible installation registers.
+		where = append(where, "i.platform = 'ios'", "i.app_version_num >= 1002000", "length(i.app_build) BETWEEN 1 AND 9", "i.app_build NOT GLOB '*[^0-9]*'", "CAST(i.app_build AS INTEGER) >= 14")
+	}
 
 	if q.UserID != "" {
 		where = append(where, "u.id = ?")
