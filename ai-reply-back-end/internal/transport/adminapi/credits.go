@@ -31,12 +31,17 @@ func (s *Server) welcomeBonusPayload(r *http.Request) map[string]any {
 	}
 	return map[string]any{
 		"units": w.Units, "default": credits.DefaultWelcomeUnits, "since": since,
-		"range": credits.WelcomeRange,
+		"range":           credits.WelcomeRange,
+		"catalog_managed": s.catalog != nil,
 	}
 }
 
 // handleSaveWelcomeBonus — жаңа тіркелгілердің бонусы (0 — өшірулі). Берілген бонустар өзгермейді.
 func (s *Server) handleSaveWelcomeBonus(w http.ResponseWriter, r *http.Request) {
+	if s.catalog != nil {
+		httpx.Fail(w, domain.ConflictField("catalog", "use_billing_catalog"))
+		return
+	}
 	var body struct {
 		Units int `json:"units"`
 	}
@@ -151,7 +156,7 @@ func (s *Server) balancesPayload(e domain.Entitlement) map[string]any {
 	b := e.Balance
 	out := map[string]any{
 		"welcome": nil, "credits": b.Credits(), "admin": b.Admin, "packs": b.Packs, "pass": nil,
-		"remaining_total": e.RemainingTotal(),
+		"remaining_total": e.RemainingTotal(), "unlimited": e.Unlimited, "purchased_credits": b.Packs, "admin_credits": b.Admin,
 	}
 	if b.HasWelcome {
 		out["welcome"] = map[string]any{"total": b.WelcomeTotal, "remaining": b.WelcomeRemaining}

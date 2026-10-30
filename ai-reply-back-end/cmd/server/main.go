@@ -20,6 +20,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/auth"
 	"github.com/aireply/ai-reply-back-end/internal/auth/appleid"
 	"github.com/aireply/ai-reply-back-end/internal/auth/idtoken"
+	"github.com/aireply/ai-reply-back-end/internal/catalog"
 	"github.com/aireply/ai-reply-back-end/internal/credits"
 	"github.com/aireply/ai-reply-back-end/internal/database"
 	"github.com/aireply/ai-reply-back-end/internal/email"
@@ -31,6 +32,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/middleware"
 	"github.com/aireply/ai-reply-back-end/internal/notifications"
 	"github.com/aireply/ai-reply-back-end/internal/payments"
+	"github.com/aireply/ai-reply-back-end/internal/payments/bcc"
 	"github.com/aireply/ai-reply-back-end/internal/plans"
 	"github.com/aireply/ai-reply-back-end/internal/productevents"
 	"github.com/aireply/ai-reply-back-end/internal/push"
@@ -76,6 +78,13 @@ func checkConfig(envFile string) int {
 	for _, warning := range cfg.Warnings() {
 		fmt.Fprintf(os.Stderr, "warning: %s\n", warning)
 	}
+	if cfg.BillingSandboxEnabled {
+		if _, err := billingSandboxConfig(cfg); err != nil {
+			fmt.Fprintf(os.Stderr, "configuration check failed: %v\n", err)
+			return 1
+		}
+		fmt.Println("isolated billing sandbox: /sandbox (separate database and sessions)")
+	}
 	fmt.Printf("configuration OK (APP_ENV=%s)\nsign-in client ids: google=%v apple=%v\n",
 		cfg.App.Env, cfg.OAuth.GoogleClientIDs, cfg.OAuth.AppleClientIDs)
 	fmt.Printf("in-app purchases: app_store=%v (bundle %s, sandbox %v) google_play=%v (package %s, test %v)\n",
@@ -90,36 +99,98 @@ func run(envFile string) error {
 		return err
 	}
 	log := logging.New(cfg.Log.Level, cfg.Log.Format)
-	// Іске қосылуды тоқтатпайтын олқылықтар: оператор аты, Apple токенін кері қайтару, APPLE_CLIENT_ID пішіні.
 	for _, warning := range cfg.Warnings() {
 		log.Warn("configuration warning: " + warning)
 	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	var workers sync.WaitGroup
+	var applications []*application
+	defer func() {
+		stop()
+		workers.Wait()
+		for i := len(applications) - 1; i >= 0; i-- {
+			applications[i].close()
+		}
+	}()
+	primary, err := buildApplication(ctx, cfg, log, &workers)
+	if err != nil {
+		return err
+	}
+	applications = append(applications, primary)
+	if cfg.BillingSandboxEnabled {
+		sandboxConfig, err := billingSandboxConfig(cfg)
+		if err != nil {
+			return err
+		}
+		sandbox, err := buildApplication(ctx, sandboxConfig, log, &workers)
+		if err != nil {
+			return fmt.Errorf("initialize isolated billing sandbox: %w", err)
+		}
+		applications = append(applications, sandbox)
+		primary.mux.Handle("/sandbox/", http.StripPrefix("/sandbox", sandbox.handler))
+		primary.mux.HandleFunc("GET /sandbox", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/sandbox/", http.StatusTemporaryRedirect)
+		})
+		log.Info("isolated billing sandbox available", "path", "/sandbox", "database_separate", true)
+	}
+	server := &http.Server{
+		Addr: fmt.Sprintf("%s:%d", cfg.App.Host, cfg.App.Port), Handler: primary.handler,
+		ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 30 * time.Second,
+		WriteTimeout: 60 * time.Second, IdleTimeout: 90 * time.Second,
+	}
+	defer server.Close()
+	errCh := make(chan error, 1)
+	go func() {
+		log.Info("server listening", "addr", server.Addr, "env", cfg.App.Env, "timezone", cfg.App.Timezone)
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			errCh <- err
+		}
+	}()
+	select {
+	case err := <-errCh:
+		return err
+	case <-ctx.Done():
+		log.Info("shutting down")
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		return server.Shutdown(shutdownCtx)
+	}
+}
 
+type application struct {
+	mux     *http.ServeMux
+	handler http.Handler
+	closers []func()
+}
+
+func (a *application) close() {
+	for i := len(a.closers) - 1; i >= 0; i-- {
+		a.closers[i]()
+	}
+}
+
+// Each application owns its database, authentication keys, billing state and workers.
+func buildApplication(ctx context.Context, cfg config.Config, log *slog.Logger, workers *sync.WaitGroup) (_ *application, err error) {
+	instance := &application{}
+	defer func() {
+		if err != nil {
+			instance.close()
+		}
+	}()
 	db, err := database.Open(database.Options{
 		Path:         cfg.Database.Path,
 		BusyTimeout:  cfg.Database.BusyTimeout,
 		MaxReadConns: cfg.Database.MaxReadConns,
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
-	defer db.Close()
-
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
-	// Background workers use the database: they are stopped through ctx and
-	// awaited before the deferred db.Close runs.
-	var workers sync.WaitGroup
-	defer func() {
-		stop()
-		workers.Wait()
-	}()
+	instance.closers = append(instance.closers, func() { _ = db.Close() })
 
 	if cfg.Database.MigrateOnStart {
 		applied, err := database.Migrate(ctx, db, migrations.FS)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if len(applied) > 0 {
 			log.Info("migrations applied", "count", len(applied), "names", applied)
@@ -128,16 +199,24 @@ func run(envFile string) error {
 
 	bundle, err := localization.Load()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// ---------------------------------------------------------------- wiring
 	store := repository.New(db)
+	catalogSvc := catalog.New(db)
+	if err := catalogSvc.EnsureInitial(ctx); err != nil {
+		return nil, fmt.Errorf("initialize billing catalog: %w", err)
+	}
+	bccCheckout, err := bcc.NewCheckout(cfg.BCCCheckout, db, catalogSvc)
+	if err != nil {
+		return nil, fmt.Errorf("initialize BCC sandbox checkout: %w", err)
+	}
 	planSvc := plans.New(store)
 	subSvc := subscriptions.New(store, planSvc, cfg.App.Location())
 	userSvc := users.New(store).WithLogger(log)
 	if err := configureAppleRevocation(userSvc, cfg.OAuth); err != nil {
-		return err
+		return nil, err
 	}
 	sender := auth.NewSender(cfg.Auth.OTPChannel, log)
 	// Welcome bonus, admin credits and the ledger; a reservation still open
@@ -146,13 +225,13 @@ func run(envFile string) error {
 	authSvc := auth.New(store, cfg.Auth, sender, subSvc, log).WithWelcome(creditSvc)
 	// Account-deletion codes are issued in the background; let them finish
 	// before the database closes.
-	defer authSvc.Wait()
+	instance.closers = append(instance.closers, authSvc.Wait)
 	mailer, err := newMailer(cfg, bundle)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if err := configureSignIn(authSvc, cfg, mailer); err != nil {
-		return err
+		return nil, err
 	}
 	// Client id-лер — ашық мәндер: токеннің aud-ы сәйкес келмесе, журналда екеуі де көрінеді.
 	log.Info("sign-in client ids", "google", cfg.OAuth.GoogleClientIDs, "apple", cfg.OAuth.AppleClientIDs,
@@ -160,7 +239,7 @@ func run(envFile string) error {
 	installSvc := installations.New(store, cfg.Auth.AccessSecret, log)
 	pushProvider, err := configurePush(cfg.Push, log)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	notifySvc := notifications.New(notifications.Deps{
 		Repo: store, Installations: installSvc, Provider: pushProvider, Plans: planSvc,
@@ -198,7 +277,7 @@ func run(envFile string) error {
 	// configured, an admin creates products and switches iap_enabled on.
 	iapSvc, err := iap.New(iap.Deps{Repo: store, Config: cfg.IAP, Secret: cfg.Auth.AccessSecret, Log: log})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	simulatorSvc := simulator.New(simulator.Deps{
 		Repo: store, Users: userSvc, Subs: subSvc, Plans: planSvc, AI: aiSvc, Limits: limitSvc,
@@ -206,30 +285,35 @@ func run(envFile string) error {
 	})
 
 	if err := adminSvc.Bootstrap(ctx); err != nil {
-		return fmt.Errorf("admin bootstrap: %w", err)
+		return nil, fmt.Errorf("admin bootstrap: %w", err)
 	}
 
 	limiter := middleware.NewLimiter()
 
 	mux := http.NewServeMux()
+	catalogSvc.RegisterPublic(mux)
 	bccNotify, err := registerBCCSandboxNotify(mux, cfg)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if bccNotify != nil {
-		defer bccNotify.Close()
+		instance.closers = append(instance.closers, func() { _ = bccNotify.Close() })
 	}
-	api.New(api.Deps{
+	apiServer := api.New(api.Deps{
 		Config: cfg, Auth: authSvc, Users: userSvc, Plans: planSvc, Subs: subSvc,
 		AI: aiSvc, Limits: limitSvc, Payments: paymentSvc, Events: eventSvc,
 		Installations: installSvc, Notifications: notifySvc, Reports: reportSvc, Support: supportSvc,
 		Limiter: limiter, Log: log,
 		Ping:    func(ctx context.Context) error { return db.Reader().PingContext(ctx) },
 		Credits: creditSvc, IAP: iapSvc,
-	}).Register(mux)
+	})
+	apiServer.Register(mux)
+	apiServer.RegisterBCC(mux, bccCheckout)
 
 	adminapi.New(adminapi.Deps{
-		Config: cfg, Admin: adminSvc, Limits: limitSvc, Notifications: notifySvc, Payments: paymentSvc,
+		Catalog: catalogSvc,
+		Bank:    bccCheckout,
+		Config:  cfg, Admin: adminSvc, Limits: limitSvc, Notifications: notifySvc, Payments: paymentSvc,
 		Reports: reportSvc, Credits: creditSvc, Support: supportSvc, IAP: iapSvc, Limiter: limiter, Log: log,
 	}).Register(mux)
 
@@ -238,11 +322,12 @@ func run(envFile string) error {
 	}).Register(mux)
 
 	webServer, err := web.New(web.Deps{
-		Config: cfg, Admin: adminSvc, Plans: planSvc, Payments: paymentSvc, Notifications: notifySvc,
+		Catalog: catalogSvc,
+		Config:  cfg, Admin: adminSvc, Plans: planSvc, Payments: paymentSvc, Notifications: notifySvc,
 		Bundle: bundle, Limiter: limiter, Log: log,
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	webServer.Register(mux)
 
@@ -253,18 +338,6 @@ func run(envFile string) error {
 		middleware.SecurityHeaders(cfg.App.HSTS()),
 		middleware.CORS(cfg.App.CORSOrigins),
 	)
-
-	server := &http.Server{
-		Addr:              fmt.Sprintf("%s:%d", cfg.App.Host, cfg.App.Port),
-		Handler:           handler,
-		ReadHeaderTimeout: 10 * time.Second,
-		ReadTimeout:       30 * time.Second,
-		WriteTimeout:      60 * time.Second,
-		IdleTimeout:       90 * time.Second,
-	}
-	// Shutdown normally drains handlers below. Close also cancels connections
-	// on a listener error or shutdown deadline before the notification DB closes.
-	defer server.Close()
 
 	for _, worker := range []func(context.Context){
 		func(ctx context.Context) { expireSubscriptions(ctx, subSvc, notifyEvents, creditSvc, log) },
@@ -283,31 +356,8 @@ func run(envFile string) error {
 		}(worker)
 	}
 
-	errCh := make(chan error, 1)
-	go func() {
-		log.Info("server listening",
-			"addr", server.Addr, "env", cfg.App.Env, "timezone", cfg.App.Timezone,
-			"demo_mode", cfg.Auth.DemoMode, "payment_mode", cfg.Payments.Mode,
-			"demo_checkout", cfg.Payments.DemoCheckout,
-			"legacy_api", cfg.Auth.LegacyEnabled, "model", cfg.OpenAI.Model,
-			"email_otp", authSvc.EmailDelivery(), "google_sign_in", authSvc.GoogleEnabled(),
-			"apple_sign_in", authSvc.AppleEnabled(), "push", notifySvc.Ready(),
-			"notification_email", notifySvc.Status().Email,
-			"iap_app_store", cfg.IAP.Apple(), "iap_google_play", cfg.IAP.Google())
-		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			errCh <- err
-		}
-	}()
-
-	select {
-	case err := <-errCh:
-		return err
-	case <-ctx.Done():
-		log.Info("shutting down")
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-		defer cancel()
-		return server.Shutdown(shutdownCtx)
-	}
+	instance.mux, instance.handler = mux, handler
+	return instance, nil
 }
 
 // newMailer — Resend жіберушісі (бапталмаса nil): кіру кодтары да, хабарлама хаттары да осы арқылы.

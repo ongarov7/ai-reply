@@ -218,17 +218,18 @@ type Device struct {
 
 // Plan — тариф. Лимиттер кодта емес, дерекқорда.
 type Plan struct {
-	ID           string
-	Code         string
-	Name         map[string]string
-	Description  map[string]string
-	Price        int64
-	Currency     string
-	DailyLimit   int
-	MonthlyLimit int
-	PeriodDays   int
-	IsFree       bool
-	IsActive     bool
+	ID              string
+	Code            string
+	Name            map[string]string
+	Description     map[string]string
+	Price           int64
+	Currency        string
+	DailyLimit      int
+	MonthlyLimit    int
+	EntitlementKind string
+	PeriodDays      int
+	IsFree          bool
+	IsActive        bool
 	// IsVisible — customers see the plan (apps, landing, /api/v1/plans).
 	IsVisible  bool
 	SortOrder  int
@@ -236,6 +237,14 @@ type Plan struct {
 	UpdatedAt  time.Time
 	ArchivedAt *time.Time
 }
+
+const (
+	EntitlementDaily     = "daily"
+	EntitlementWelcome   = "welcome"
+	EntitlementUnlimited = "unlimited"
+)
+
+func (p Plan) Unlimited() bool { return p.EntitlementKind == EntitlementUnlimited && !p.IsFree }
 
 // Listed — тариф клиентке көрсетіледі: қосулы, көрінеді, мұрағатта емес.
 func (p Plan) Listed() bool { return p.IsActive && p.IsVisible && p.ArchivedAt == nil }
@@ -273,6 +282,7 @@ type Subscription struct {
 	Source      string
 	StartedAt   time.Time
 	ExpiresAt   *time.Time
+	AutoRenews  *bool
 	CancelledAt *time.Time
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
@@ -295,6 +305,7 @@ type Entitlement struct {
 	Subscription *Subscription
 	DailyLimit   int
 	MonthlyLimit int
+	Unlimited    bool
 	UsedToday    int
 	UsedMonth    int
 	ResetsAt     time.Time

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI Reply - BCC sandbox</title>
+<body><main>
+<h1>Test payment</h1>
+<p>{{.Amount}} &#8376; - {{.Units}} replies</p>
+<p>BCC sandbox. Replies are added only after the bank confirms payment.</p>
+<form id="bank-checkout" method="post" action="{{.Endpoint}}">
+{{range $name,$values := .Fields}}{{range $values}}<input type="hidden" name="{{$name}}" value="{{.}}">{{end}}{{end}}
+<input type="hidden" name="CLIENT_IP" value="{{.ClientIP}}">
+<input type="hidden" name="M_INFO" id="m-info" value="">
+<p>3-D Secure requires the cardholder's phone number and billing address. These details are sent directly to the bank.</p>
+<label for="phone-cc">Phone country calling code</label>
+<input id="phone-cc" type="tel" inputmode="numeric" pattern="[1-9][0-9]{0,2}" maxlength="3" autocomplete="tel-country-code" placeholder="7" required>
+<label for="phone-subscriber">Phone number without country code</label>
+<input id="phone-subscriber" type="tel" inputmode="numeric" pattern="[0-9]{1,15}" maxlength="15" autocomplete="tel-national" required>
+<label for="billing-address">Cardholder billing address</label>
+<input id="billing-address" type="text" maxlength="50" autocomplete="billing address-line1" required>
+<p id="checkout-error" role="alert"></p>
+<noscript>JavaScript is required for 3-D Secure. Payment cannot be submitted without the required browser details.</noscript>
+<button id="bank-submit" type="submit" disabled>Continue to bank</button>
+</form></main>
+<script nonce="{{.CSPNonce}}">
+(function () {
+  'use strict';
+  var form = document.getElementById('bank-checkout');
+  var button = document.getElementById('bank-submit');
+  var error = document.getElementById('checkout-error');
+  button.disabled = false;
+  form.addEventListener('submit', function (event) {
+    var cc = document.getElementById('phone-cc').value.trim();
+    var subscriber = document.getElementById('phone-subscriber').value.trim();
+    var address = document.getElementById('billing-address').value.trim();
+    var height = String(window.screen.height);
+    var width = String(window.screen.width);
+    if (!/^[1-9][0-9]{0,2}$/.test(cc) || !/^[0-9]{1,15}$/.test(subscriber) || cc.length + subscriber.length > 15 ||
+        !address || Array.from(address).length > 50 || !/^[1-9][0-9]{0,5}$/.test(height) || !/^[1-9][0-9]{0,5}$/.test(width)) {
+      event.preventDefault();
+      error.textContent = 'Check your phone number, billing address and browser screen details.';
+      return;
+    }
+    var info = {
+      browserScreenHeight: height,
+      browserScreenWidth: width,
+      mobilePhone: { cc: cc, subscriber: subscriber },
+      billAddrLine1: address
+    };
+    try {
+      var bytes = new TextEncoder().encode(JSON.stringify(info));
+      var binary = '';
+      bytes.forEach(function (value) { binary += String.fromCharCode(value); });
+      document.getElementById('m-info').value = btoa(binary);
+      button.disabled = true;
+    } catch (e) {
+      event.preventDefault();
+      error.textContent = 'Could not prepare 3-D Secure details.';
+    }
+  });
+})();
+</script>
+</body></html>

@@ -64,13 +64,13 @@ func (s *Server) guard(next http.HandlerFunc) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie(s.cfg.Admin.CookieName)
 		if err != nil {
-			http.Redirect(w, r, "/admin/login", http.StatusSeeOther)
+			http.Redirect(w, r, s.appPath("/admin/login"), http.StatusSeeOther)
 			return
 		}
 		adminUser, session, err := s.admin.Authenticate(r.Context(), cookie.Value)
 		if err != nil {
 			s.clearCookie(w)
-			http.Redirect(w, r, "/admin/login", http.StatusSeeOther)
+			http.Redirect(w, r, s.appPath("/admin/login"), http.StatusSeeOther)
 			return
 		}
 		// Күй өзгертетін сұраныстарда CSRF токені міндетті.
@@ -210,18 +210,19 @@ func (s *Server) endSession(w http.ResponseWriter, r *http.Request) bool {
 }
 
 type loginView struct {
-	T       func(string) string
-	Locale  string
-	Locales []string
-	CSRF    string
-	Error   string
+	BasePath string
+	T        func(string) string
+	Locale   string
+	Locales  []string
+	CSRF     string
+	Error    string
 }
 
 func (s *Server) handleLoginForm(w http.ResponseWriter, r *http.Request) {
 	locale := s.locale(w, r)
 	token := traits.RandomToken(16)
 	http.SetCookie(w, &http.Cookie{
-		Name: csrfCookie, Value: token, Path: "/admin", HttpOnly: true,
+		Name: csrfCookie, Value: token, Path: s.appPath("/admin"), HttpOnly: true,
 		Secure: s.cfg.Admin.SecureCookies, SameSite: http.SameSiteLaxMode, MaxAge: 3600,
 	})
 	message := ""
@@ -230,7 +231,7 @@ func (s *Server) handleLoginForm(w http.ResponseWriter, r *http.Request) {
 	}
 	s.render(w, "admin_login", "admin_login", loginView{
 		T: s.bundle.Translator(locale), Locale: locale, Locales: domain.Locales,
-		CSRF: token, Error: message,
+		CSRF: token, Error: message, BasePath: s.basePath(),
 	})
 }
 
@@ -255,16 +256,16 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 			s.loginFailed(r, r.FormValue("email"))
 		}
 		s.log.Warn("admin login failed", "ip", clientIP(r, s.cfg.App.TrustProxy))
-		http.Redirect(w, r, "/admin/login?error=1", http.StatusSeeOther)
+		http.Redirect(w, r, s.appPath("/admin/login?error=1"), http.StatusSeeOther)
 		return
 	}
 
 	http.SetCookie(w, &http.Cookie{
-		Name: s.cfg.Admin.CookieName, Value: session.Token, Path: "/", HttpOnly: true,
+		Name: s.cfg.Admin.CookieName, Value: session.Token, Path: s.cookiePath(), HttpOnly: true,
 		Secure: s.cfg.Admin.SecureCookies, SameSite: http.SameSiteLaxMode,
 		Expires: session.ExpiresAt,
 	})
-	http.Redirect(w, r, "/admin", http.StatusSeeOther)
+	http.Redirect(w, r, s.appPath("/admin"), http.StatusSeeOther)
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
@@ -272,12 +273,12 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.clearCookie(w)
-	http.Redirect(w, r, "/admin/login", http.StatusSeeOther)
+	http.Redirect(w, r, s.appPath("/admin/login"), http.StatusSeeOther)
 }
 
 func (s *Server) clearCookie(w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{
-		Name: s.cfg.Admin.CookieName, Value: "", Path: "/", HttpOnly: true,
+		Name: s.cfg.Admin.CookieName, Value: "", Path: s.cookiePath(), HttpOnly: true,
 		Secure: s.cfg.Admin.SecureCookies, SameSite: http.SameSiteLaxMode, MaxAge: -1,
 	})
 }

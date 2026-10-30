@@ -17,23 +17,26 @@ import (
 
 // Config — қолданбаның толық баптауы.
 type Config struct {
-	App              App
-	Database         Database
-	Auth             Auth
-	Email            Email
-	OAuth            OAuth
-	OpenAI           OpenAI
-	AI               AI
-	Analytics        Analytics
-	Admin            Admin
-	Payments         Payments
-	BCCSandboxNotify BCCSandboxNotify
-	Limits           Limits
-	Log              Log
-	Push             Push
-	Legal            Legal
-	Retention        Retention
-	IAP              IAP
+	App                      App
+	Database                 Database
+	Auth                     Auth
+	Email                    Email
+	OAuth                    OAuth
+	OpenAI                   OpenAI
+	AI                       AI
+	Analytics                Analytics
+	Admin                    Admin
+	Payments                 Payments
+	BCCSandboxNotify         BCCSandboxNotify
+	BCCCheckout              BCCCheckout
+	BillingSandboxEnabled    bool
+	BillingSandboxBCCEnabled bool
+	Limits                   Limits
+	Log                      Log
+	Push                     Push
+	Legal                    Legal
+	Retention                Retention
+	IAP                      IAP
 }
 
 type App struct {
@@ -446,6 +449,9 @@ func Load(envFile string) (Config, error) {
 			BasicUsername:   str("BCC_SANDBOX_NOTIFY_BASIC_USERNAME", ""),
 			BasicPassword:   str("BCC_SANDBOX_NOTIFY_BASIC_PASSWORD", ""),
 		},
+		BCCCheckout:              bccCheckoutFromEnv(appEnv, publicBaseURL),
+		BillingSandboxEnabled:    boolean("BILLING_SANDBOX_ENABLED", false),
+		BillingSandboxBCCEnabled: boolean("BILLING_SANDBOX_BCC_ENABLED", false),
 		Limits: Limits{
 			SourceTextChars:   num("LIMIT_SOURCE_TEXT_CHARS", 400),
 			InstructionChars:  num("LIMIT_INSTRUCTION_CHARS", 400),
@@ -611,7 +617,25 @@ func (c Config) Validate() []string {
 	}
 	problems = append(problems, c.Push.validate()...)
 	problems = append(problems, c.IAP.validate()...)
+	if c.App.IsProduction() && c.IAP.AppleEnabled && c.IAP.AppleAcceptSandbox {
+		problems = append(problems, "APPLE_IAP_ACCEPT_SANDBOX=true requires a separate staging/test backend and database; sandbox purchases cannot grant production entitlements")
+	}
 	problems = append(problems, c.BCCSandboxNotify.Validate(c.App.PublicBaseURL)...)
+	if err := c.BCCCheckout.Validate(); err != nil {
+		problems = append(problems, "BCC_CHECKOUT_ENABLED requires staging/test, HTTPS PUBLIC_BASE_URL, verified sandbox merchant/terminal/MAC settings and separate notification/state secrets")
+	}
+	if c.BillingSandboxBCCEnabled && !c.BillingSandboxEnabled {
+		problems = append(problems, "BILLING_SANDBOX_BCC_ENABLED requires BILLING_SANDBOX_ENABLED=true")
+	}
+	if c.BCCCheckout.Enabled {
+		for _, paymentSecret := range []string{c.BCCCheckout.NotifyPassword, c.BCCCheckout.StateSecret} {
+			for _, applicationSecret := range []string{c.Auth.AccessSecret, c.Auth.RefreshSecret, c.Admin.BootstrapPassword} {
+				if paymentSecret != "" && paymentSecret == applicationSecret {
+					problems = append(problems, "BCC checkout secrets must be separate from application credentials")
+				}
+			}
+		}
+	}
 	if c.BCCSandboxNotify.Enabled && c.BCCSandboxNotify.ManagementToken != "" {
 		for _, other := range []string{c.Auth.AccessSecret, c.Auth.RefreshSecret, c.Auth.LegacySecret, c.Admin.BootstrapPassword} {
 			if c.BCCSandboxNotify.ManagementToken == other {
@@ -641,11 +665,6 @@ func (c Config) Warnings() []string {
 			warning += " (App Store guideline 5.1.1(v) expects the token to be revoked)"
 		}
 		warnings = append(warnings, warning)
-	}
-	if c.App.IsProduction() && c.IAP.Apple() && !c.IAP.AppleAcceptSandbox {
-		warnings = append(warnings, "APPLE_IAP_ENABLED=true but APPLE_IAP_ACCEPT_SANDBOX is not true: App Review and "+
-			"TestFlight buy in the Sandbox environment against this server and their purchases are refused "+
-			"(PURCHASE_INVALID environment); set it to true while a build with purchases is in review")
 	}
 	for _, id := range c.OAuth.AppleClientIDs {
 		if !looksLikeBundleID(id) {
@@ -819,7 +838,7 @@ func iapFromEnv(appEnv string) IAP {
 	i := IAP{
 		AppleEnabled:  boolean("APPLE_IAP_ENABLED", false),
 		AppleBundleID: str("APPLE_IAP_BUNDLE_ID", "kz.ai-reply.reply.keyboard.keyboard"),
-		// Production refuses Sandbox unless the owner says so (App Review buys in Sandbox).
+		// Each backend accepts exactly one Apple environment; sandbox uses its own database.
 		AppleAcceptSandbox: boolean("APPLE_IAP_ACCEPT_SANDBOX", appEnv != "production"),
 		GooglePackageName:  str("GOOGLE_PLAY_PACKAGE_NAME", "kz.yerek.aireply"),
 		GoogleClientEmail:  str("GOOGLE_PLAY_CLIENT_EMAIL", ""),

@@ -29,7 +29,7 @@ func (s *Service) appleRejected(err error, userID string) error {
 func (s *Service) appleEnvironment(env string) bool {
 	switch env {
 	case appstore.EnvironmentProduction:
-		return true
+		return !s.cfg.AppleAcceptSandbox
 	case appstore.EnvironmentSandbox:
 		return s.cfg.AppleAcceptSandbox
 	}
@@ -60,14 +60,14 @@ func (s *Service) VerifyApple(ctx context.Context, user domain.User, signed stri
 		return refuse(domain.PurchaseReasonBundle)
 	case !s.appleEnvironment(tx.Environment):
 		return refuse(domain.PurchaseReasonEnvironment)
-	case tx.Type != appstore.TypeConsumable && tx.Type != appstore.TypeNonRenewing:
+	case tx.Type != appstore.TypeConsumable && tx.Type != appstore.TypeNonRenewing && tx.Type != appstore.TypeAutoRenewable:
 		return refuse(domain.PurchaseReasonType)
 	case tx.Quantity < 0:
 		return refuse(domain.PurchaseReasonQuantity)
 	case tx.AppAccountToken == "" || !strings.EqualFold(tx.AppAccountToken, s.AccountToken(user.ID)):
 		return refuse(domain.PurchaseReasonAccount)
 	}
-	if tx.RevocationDate != 0 {
+	if tx.RevocationDate != 0 && tx.Type != appstore.TypeAutoRenewable {
 		// The store already took it back: whatever this account still holds of it goes too.
 		if _, err := s.repo.RevokePurchase(ctx, repository.PurchaseRevocation{
 			Provider: domain.ProviderAppStore, TransactionID: tx.TransactionID, Status: domain.PurchaseRefunded,
@@ -84,6 +84,19 @@ func (s *Service) VerifyApple(ctx context.Context, user domain.User, signed stri
 	if err != nil {
 		return Result{}, err
 	}
+	if tx.Type == appstore.TypeAutoRenewable {
+		if product.Kind != domain.ProductSubscription {
+			return refuse(domain.PurchaseReasonType)
+		}
+		result, err := s.applyAppleSubscription(ctx, user, product, tx, nil, 0, false, tx.IsUpgraded)
+		if err == nil && tx.RevocationDate > 0 {
+			return refuse(domain.PurchaseReasonRevoked)
+		}
+		return result, err
+	}
+	if product.Kind == domain.ProductSubscription {
+		return refuse(domain.PurchaseReasonType)
+	}
 	var purchased *time.Time
 	if tx.PurchaseDate > 0 {
 		t := time.UnixMilli(tx.PurchaseDate).UTC()
@@ -92,7 +105,8 @@ func (s *Service) VerifyApple(ctx context.Context, user domain.User, signed stri
 	return s.grant(ctx, user, product, domain.IAPPurchase{
 		Provider: domain.ProviderAppStore, Environment: tx.Environment, StoreProductID: tx.ProductID,
 		TransactionID: tx.TransactionID, OriginalTransactionID: tx.OriginalTransactionID, Quantity: tx.Quantity,
-		PurchasedAt: purchased,
+		PurchasedAt:     purchased,
+		PriceMilliunits: tx.Price, Currency: tx.Currency,
 	}, "")
 }
 
@@ -167,6 +181,8 @@ func (s *Service) appleNotification(ctx context.Context, n appstore.Notification
 	case appstore.NotificationRefund, appstore.NotificationRevoke, appstore.NotificationRefundReversed:
 	case appstore.NotificationTest, appstore.NotificationConsumption, appstore.NotificationRefundDeclined:
 		return OutcomeLogged, "", nil
+	case appstore.NotificationSubscribed, appstore.NotificationRenewed, appstore.NotificationFailedRenewal,
+		appstore.NotificationExpired, appstore.NotificationGraceExpired, appstore.NotificationRenewalStatus, appstore.NotificationRenewalPreference:
 	default:
 		return OutcomeIgnored, "", nil
 	}
@@ -176,6 +192,15 @@ func (s *Service) appleNotification(ctx context.Context, n appstore.Notification
 		return outcomeInvalidTxn, "", nil
 	}
 	if tx.BundleID != s.cfg.AppleBundleID {
+		return OutcomeIgnored, tx.TransactionID, nil
+	}
+	if !s.appleEnvironment(tx.Environment) {
+		return OutcomeIgnored, tx.TransactionID, nil
+	}
+	if tx.Type == appstore.TypeAutoRenewable {
+		return s.appleSubscriptionNotification(ctx, n, tx)
+	}
+	if n.NotificationType != appstore.NotificationRefund && n.NotificationType != appstore.NotificationRevoke && n.NotificationType != appstore.NotificationRefundReversed {
 		return OutcomeIgnored, tx.TransactionID, nil
 	}
 	now := s.clock.Now()
@@ -230,4 +255,96 @@ func (s *Service) appleNotification(ctx context.Context, n appstore.Notification
 	s.log.Info("iap purchase revoked", "provider", domain.ProviderAppStore, "user_id", res.UserID,
 		"transaction_id", tx.TransactionID, "status", status, "units_removed", res.UnitsRemoved)
 	return OutcomeRevoked, tx.TransactionID, nil
+}
+
+func (s *Service) applyAppleSubscription(ctx context.Context, user domain.User, product domain.IAPProduct, tx appstore.Transaction, autoRenew *bool, grace int64, restore bool, mayShorten bool) (Result, error) {
+	if tx.OriginalTransactionID == "" || tx.ExpiresDate <= 0 || tx.PurchaseDate <= 0 || tx.ExpiresDate < tx.PurchaseDate {
+		return Result{}, domain.PurchaseInvalid(domain.PurchaseReasonMalformed)
+	}
+	plan, err := s.repo.Plan(ctx, product.PlanID)
+	if err != nil {
+		return Result{}, err
+	}
+	if plan.IsFree {
+		return Result{}, domain.PurchaseInvalid(domain.PurchaseReasonProduct)
+	}
+	expires := time.UnixMilli(tx.ExpiresDate)
+	if tx.IsUpgraded {
+		expires = time.UnixMilli(tx.PurchaseDate)
+	}
+	if grace > tx.ExpiresDate {
+		expires = time.UnixMilli(grace)
+	}
+	var revoked *time.Time
+	if tx.RevocationDate > 0 {
+		t := time.UnixMilli(tx.RevocationDate)
+		revoked = &t
+	}
+	res, err := s.repo.ApplyAppleSubscription(ctx, repository.AppleSubscription{
+		UserID: user.ID, OriginalTransactionID: tx.OriginalTransactionID, TransactionID: tx.TransactionID, ProductID: tx.ProductID,
+		PlanID: product.PlanID, Environment: tx.Environment, PurchasedAt: time.UnixMilli(tx.PurchaseDate), ExpiresAt: expires,
+		SignedAt: time.UnixMilli(tx.SignedDate), RevokedAt: revoked, AutoRenew: autoRenew, PriceMilliunits: tx.Price, Currency: tx.Currency, Restore: restore, MayShorten: mayShorten,
+	}, s.clock.Now())
+	if err != nil {
+		return Result{}, err
+	}
+	status := StatusAlreadyGranted
+	if res.Granted {
+		status = StatusGranted
+	}
+	return Result{Status: status, Purchase: res.Purchase}, nil
+}
+
+func (s *Service) appleSubscriptionNotification(ctx context.Context, n appstore.Notification, tx appstore.Transaction) (string, string, error) {
+	user, err := s.repo.UserByIAPAccountToken(ctx, tx.AppAccountToken)
+	if errors.Is(err, domain.ErrNotFound) {
+		return OutcomeUnknown, tx.TransactionID, nil
+	}
+	if err != nil {
+		return "", "", err
+	}
+	product, err := s.repo.IAPProductByStoreID(ctx, domain.ProviderAppStore, tx.ProductID)
+	if err != nil {
+		return "", "", err
+	}
+	if product.Kind != domain.ProductSubscription {
+		return OutcomeIgnored, tx.TransactionID, nil
+	}
+	var autoRenew *bool
+	var grace int64
+	if n.Data.SignedRenewalInfo != "" {
+		renewal, err := s.apple.Renewal(n.Data.SignedRenewalInfo)
+		if err != nil {
+			return "", "", s.appleRejected(err, user.ID)
+		}
+		if renewal.OriginalTransactionID != tx.OriginalTransactionID || !s.appleEnvironment(renewal.Environment) {
+			return OutcomeIgnored, tx.TransactionID, nil
+		}
+		auto := renewal.AutoRenewStatus == 1
+		autoRenew = &auto
+		if n.NotificationType == appstore.NotificationFailedRenewal && n.Subtype == "GRACE_PERIOD" {
+			grace = renewal.GracePeriodExpiresDate
+		}
+		// Renewal notifications may have a fresher signedDate than their transaction.
+		if renewal.SignedDate > tx.SignedDate {
+			tx.SignedDate = renewal.SignedDate
+		}
+	}
+	if n.SignedDate > tx.SignedDate {
+		tx.SignedDate = n.SignedDate
+	}
+	if n.NotificationType == appstore.NotificationRefund || n.NotificationType == appstore.NotificationRevoke {
+		if tx.RevocationDate == 0 {
+			return OutcomeIgnored, tx.TransactionID, nil
+		}
+	}
+	restore := n.NotificationType == appstore.NotificationRefundReversed
+	if restore {
+		tx.RevocationDate = 0
+	}
+	_, err = s.applyAppleSubscription(ctx, user, product, tx, autoRenew, grace, restore, tx.IsUpgraded || n.NotificationType == appstore.NotificationGraceExpired || n.NotificationType == appstore.NotificationExpired)
+	if err != nil {
+		return "", "", err
+	}
+	return "subscription_updated", tx.TransactionID, nil
 }

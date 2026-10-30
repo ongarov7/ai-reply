@@ -1,5 +1,34 @@
 # Backend deployment environment — 9 October 2026
 
+## Payment update — 30 October 2026
+
+Work is on `Payment`. Android sources are unchanged. Before restarting, take a consistent backup of the current SQLite database, including committed WAL data, using the server's existing backup procedure. Keep the current Compose project and persistent volume.
+
+From the existing checkout on the server:
+
+```sh
+git switch Payment
+git pull --ff-only origin Payment
+cd ai-reply-back-end
+python3 scripts/configure-billing-sandbox-env.py
+docker compose config --quiet
+docker compose build backend
+docker compose run --rm --no-deps backend -check
+docker compose up -d --no-deps backend
+```
+
+If already inside `ai-reply-back-end`, omit the `cd` line. The helper preserves existing JWT/database settings, makes a private `.env` backup, generates separate notification/state secrets and enables an isolated `/sandbox` on the same HTTPS listener. It does not print credentials. Bank checkout stays off until BCC configures the same notification Basic Auth. Do not use `--enable-bcc` before that setup.
+
+- Production remains on the current database; sandbox uses `aireply-sandbox.db` in the same persistent volume, with separate users, JWT keys, admin cookies and balances. Push and notification email delivery are disabled in sandbox.
+- Main admin: `/admin/billing`. Test admin: `/sandbox/admin/billing`. Log in separately. Save a draft, review it and publish; changes do not activate before publication.
+- Configure the five real Apple product IDs in App Store Connect and the matching catalog. Base/Pro share one subscription group; `pack30` is consumable. Actual checkout prices come from StoreKit. A price mismatch blocks the native purchase until the catalog/store price is approved and aligned.
+- Enable IAP separately in the test admin after mapping products. Configure Apple's sandbox notification URL as `https://ai-reply.kz/sandbox/api/v1/iap/apple/notifications`. The primary backend accepts only production Apple transactions; the sandbox backend accepts only sandbox transactions.
+- TestFlight sandbox builds use `AIREPLY_BACKEND_BASE_URL=https://ai-reply.kz/sandbox` for both app and extension. They must not be submitted as the public production build.
+- BCC sandbox notification URL: `https://ai-reply.kz:443/sandbox/api/v1/payments/bcc/notify`. Configure its generated `BCC_CHECKOUT_NOTIFY_USERNAME/PASSWORD` at the bank, then rerun the helper with `--enable-bcc`, validate and restart. The public test merchant/terminal/MAC values are in the helper and the BCC setup document. Native digital checkout continues through StoreKit.
+- Migrations `0022` and `0023` keep prior purchased credits and existing welcome grants, retire old offers from new sales, and preserve legacy paid subscriptions. New eligible accounts receive 10 welcome replies once. Existing accounts do not receive a second welcome grant. Base resets in `Asia/Almaty`; Pro is explicitly unlimited. Enable Pro sales only after clients supporting `usage.unlimited` are distributed.
+
+Verify `/healthz`, `/api/v1/config`, `/sandbox/healthz` and `/sandbox/api/v1/config` after restart. A migration rollback requires restoring the consistent backup; do not delete the live volume or reset balances. No production deployment or real payment has been performed as part of local verification.
+
 This checklist compares the current `notification` branch with the server environment pasted by the owner on 9 October. Codex has not inspected private live server files or performed a live deployment. The owner has now deployed the updated backend through Docker. The local backend `.env` is different from the pasted server environment: it has no Resend, Google, Apple or Firebase settings. Do not copy the local `.env` to production.
 
 Earlier read-only live check on 9 October: public `/healthz` and `/api/v1/config` returned HTTP 200 with staging/demo settings and without the new notification flags. After the owner's Docker deployment, Codex repeated only those public GET requests: both returned HTTP 200; `/api/v1/config` now reports `demo_mode=false`, `payment_mode=off`, `purchases=false`, and enabled `installations`, `push_notifications`, `account_deletion` and `ai_reports`. The owner supplied successful production configuration validation and logs reporting migrations 0011–0014 applied. An initial owner request returned 502 immediately after container startup, but the later public checks passed; the exact cause of that temporary 502 was not established. No live server shell, private file or production data was accessed by Codex. Physical-device authentication, deletion and notification delivery still need testing.

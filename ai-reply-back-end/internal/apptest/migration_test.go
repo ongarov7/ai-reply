@@ -392,7 +392,7 @@ func TestWelcomeBonusMigrationLowersOnlyTheOldValue(t *testing.T) {
 				`UPDATE system_settings SET value = ? WHERE key = 'welcome_bonus_units'`, tc.before); err != nil {
 				t.Fatal(err)
 			}
-			applied, err := database.Migrate(ctx, db, migrations.FS)
+			applied, err := database.Migrate(ctx, db, migrationsBefore(t, "0020"))
 			if err != nil || len(applied) == 0 || applied[0] != "0019_welcome_bonus_20.sql" {
 				t.Fatalf("applied = %v, err = %v", applied, err)
 			}

@@ -125,6 +125,10 @@ type Transaction struct {
 	BundleID              string `json:"bundleId"`
 	ProductID             string `json:"productId"`
 	PurchaseDate          int64  `json:"purchaseDate"`
+	ExpiresDate           int64  `json:"expiresDate"`
+	Price                 int64  `json:"price"`
+	Currency              string `json:"currency"`
+	IsUpgraded            bool   `json:"isUpgraded"`
 	Quantity              int    `json:"quantity"`
 	// Type — Consumable | Non-Consumable | Auto-Renewable Subscription | Non-Renewing Subscription.
 	Type string `json:"type"`
@@ -155,12 +159,19 @@ const (
 
 // Сервер хабарламаларының түрлері (Notification.NotificationType), сервер өңдейтіндері.
 const (
-	NotificationRefund         = "REFUND"
-	NotificationRevoke         = "REVOKE"
-	NotificationRefundReversed = "REFUND_REVERSED"
-	NotificationRefundDeclined = "REFUND_DECLINED"
-	NotificationConsumption    = "CONSUMPTION_REQUEST"
-	NotificationTest           = "TEST"
+	NotificationRefund            = "REFUND"
+	NotificationRevoke            = "REVOKE"
+	NotificationRefundReversed    = "REFUND_REVERSED"
+	NotificationRefundDeclined    = "REFUND_DECLINED"
+	NotificationConsumption       = "CONSUMPTION_REQUEST"
+	NotificationTest              = "TEST"
+	NotificationSubscribed        = "SUBSCRIBED"
+	NotificationRenewed           = "DID_RENEW"
+	NotificationFailedRenewal     = "DID_FAIL_TO_RENEW"
+	NotificationExpired           = "EXPIRED"
+	NotificationGraceExpired      = "GRACE_PERIOD_EXPIRED"
+	NotificationRenewalStatus     = "DID_CHANGE_RENEWAL_STATUS"
+	NotificationRenewalPreference = "DID_CHANGE_RENEWAL_PREF"
 )
 
 // Notification — ResponseBodyV2DecodedPayload (App Store Server Notifications V2).
@@ -180,6 +191,26 @@ type NotificationData struct {
 	BundleVersion         string `json:"bundleVersion"`
 	Environment           string `json:"environment"`
 	SignedTransactionInfo string `json:"signedTransactionInfo"`
+	SignedRenewalInfo     string `json:"signedRenewalInfo"`
+}
+
+type Renewal struct {
+	OriginalTransactionID  string `json:"originalTransactionId"`
+	AutoRenewStatus        int    `json:"autoRenewStatus"`
+	GracePeriodExpiresDate int64  `json:"gracePeriodExpiresDate"`
+	Environment            string `json:"environment"`
+	SignedDate             int64  `json:"signedDate"`
+}
+
+func (v *Verifier) Renewal(jws string) (Renewal, error) {
+	var r Renewal
+	if err := v.Verify(jws, &r); err != nil {
+		return r, err
+	}
+	if r.OriginalTransactionID == "" {
+		return r, reject(ReasonMalformed, "renewal without original transaction")
+	}
+	return r, nil
 }
 
 // Transaction — signedTransaction (jwsRepresentation) тексеріп, ашады.

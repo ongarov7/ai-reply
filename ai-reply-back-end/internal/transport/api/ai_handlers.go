@@ -256,6 +256,7 @@ func (s *Server) handleCompose(w http.ResponseWriter, r *http.Request) {
 func (s *Server) resultUsage(result ai.Result) usageDTO {
 	dto := usageDTO{
 		DailyLimit:     result.DailyLimit,
+		Unlimited:      result.Unlimited,
 		UsedToday:      result.UsedToday,
 		RemainingToday: result.Remaining,
 		MonthlyLimit:   result.MonthlyLimit,

@@ -370,7 +370,8 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 		// purpose: demo sign-in, demo checkout and the old install-token API.
 		"AUTH_DEMO_MODE": "true", "AUTH_DEMO_OTP": "1111", "LEGACY_API_ENABLED": "true",
 		"PAYMENT_MODE": "demo", "PAYMENT_DEMO_CHECKOUT": "true",
-		"ADMIN_EMAIL": adminEmail, "ADMIN_PASSWORD": adminPassword,
+		"APPLE_IAP_ACCEPT_SANDBOX": "false",
+		"ADMIN_EMAIL":              adminEmail, "ADMIN_PASSWORD": adminPassword,
 		"LOG_LEVEL": "info", "LOG_FORMAT": "json", "RATE_AI_PER_MINUTE": "1000",
 		"RATE_OTP_REQUEST_PER_HOUR": "100", "RATE_OTP_VERIFY_PER_HOUR": "200",
 		"RATE_GENERIC_PER_MINUTE": "1000", "OTP_MAX_ATTEMPTS": "5", "PUSH_NOTIFICATIONS_ENABLED": "true",
@@ -379,6 +380,7 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 		"AI_REPAIR_ENABLED":          "false",
 		"RATE_TRANSCRIBE_PER_MINUTE": "1000",
 		welcomeBonusEnv:              "0",
+		"TEST_APPROVED_ENTITLEMENTS": "false",
 	}
 	for _, opt := range opts {
 		opt(env)
@@ -400,6 +402,13 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 		t.Fatalf("migrate: %v", err)
 	}
 
+	// Legacy feature tests deliberately retain their original tariff fixture. New billing
+	// tests opt into the current migrated defaults with TEST_APPROVED_ENTITLEMENTS=true.
+	if env["TEST_APPROVED_ENTITLEMENTS"] != "true" {
+		if _, err := db.Writer().Exec(`UPDATE plans SET daily_message_limit=7, entitlement_kind='daily' WHERE code='free'; DELETE FROM iap_products WHERE code IN ('pack30','base_monthly','base_yearly','pro_monthly','pro_yearly'); DELETE FROM plans WHERE code IN ('base_monthly','base_yearly','pro_monthly','pro_yearly')`); err != nil {
+			t.Fatal(err)
+		}
+	}
 	// The migration writes the production default (50); a test opts in with withWelcomeBonus.
 	if _, err := db.Writer().Exec(`UPDATE system_settings SET value = ? WHERE key = ?`,
 		env[welcomeBonusEnv], credits.SettingWelcomeUnits); err != nil {

@@ -188,6 +188,7 @@ func (s *Server) subscriptionDTO(e domain.Entitlement) subscriptionDTO {
 		dto.ID = e.Subscription.ID
 		dto.Status = e.Subscription.Status
 		dto.Source = e.Subscription.Source
+		dto.AutoRenews = e.Subscription.AutoRenews
 		dto.StartedAt = e.Subscription.StartedAt.Format(time.RFC3339)
 		if e.Subscription.ExpiresAt != nil {
 			dto.ExpiresAt = e.Subscription.ExpiresAt.Format(time.RFC3339)

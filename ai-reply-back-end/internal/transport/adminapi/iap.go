@@ -51,6 +51,10 @@ type productPayload struct {
 	Kind            string            `json:"kind"`
 	Units           int               `json:"units"`
 	DurationHours   int               `json:"duration_hours"`
+	PlanID          string            `json:"plan_id"`
+	BillingPeriod   string            `json:"billing_period"`
+	PriceMinor      int64             `json:"price_minor"`
+	Currency        string            `json:"currency"`
 	AppleProductID  string            `json:"apple_product_id"`
 	GoogleProductID string            `json:"google_product_id"`
 	Name            map[string]string `json:"name"`
@@ -69,7 +73,7 @@ type productPayload struct {
 
 func (p productPayload) input() iap.ProductInput {
 	return iap.ProductInput{
-		Code: p.Code, Kind: p.Kind, Units: p.Units, DurationHours: p.DurationHours,
+		Code: p.Code, Kind: p.Kind, Units: p.Units, DurationHours: p.DurationHours, PlanID: p.PlanID, BillingPeriod: p.BillingPeriod, PriceMinor: p.PriceMinor, Currency: p.Currency,
 		AppleProductID: p.AppleProductID, GoogleProductID: p.GoogleProductID, Name: p.Name,
 		IsActive: p.IsActive, SortOrder: p.SortOrder,
 	}
@@ -82,7 +86,7 @@ func (s *Server) productDTO(p domain.IAPProduct, sales int) map[string]any {
 		name[l] = p.Name[l]
 	}
 	return map[string]any{
-		"id": p.ID, "code": p.Code, "kind": p.Kind, "units": p.Units, "duration_hours": p.DurationHours,
+		"id": p.ID, "code": p.Code, "kind": p.Kind, "units": p.Units, "duration_hours": p.DurationHours, "plan_id": p.PlanID, "billing_period": p.BillingPeriod, "price_minor": p.PriceMinor, "currency": p.Currency,
 		"apple_product_id": p.AppleProductID, "google_product_id": p.GoogleProductID, "name": name,
 		"is_active": p.IsActive, "sort_order": p.SortOrder, "archived": p.ArchivedAt != nil,
 		"archived_at": optionalTime(p.ArchivedAt, loc), "sales": sales,
@@ -95,7 +99,7 @@ func (s *Server) productDTO(p domain.IAPProduct, sales int) map[string]any {
 // productAudit — аудиттегі өнім (атаулар мен уақытсыз).
 func productAudit(p domain.IAPProduct) map[string]any {
 	return map[string]any{
-		"code": p.Code, "kind": p.Kind, "units": p.Units, "duration_hours": p.DurationHours,
+		"code": p.Code, "kind": p.Kind, "units": p.Units, "duration_hours": p.DurationHours, "plan_id": p.PlanID, "billing_period": p.BillingPeriod, "price_minor": p.PriceMinor, "currency": p.Currency,
 		"apple_product_id": p.AppleProductID, "google_product_id": p.GoogleProductID,
 		"is_active": p.IsActive, "sort_order": p.SortOrder,
 	}
@@ -147,6 +151,10 @@ func (s *Server) handleIAPProductUpdate(w http.ResponseWriter, r *http.Request) 
 		httpx.Fail(w, domain.ErrNotFound)
 		return
 	}
+	if s.catalogManaged(body.Code) || s.catalogManagedIAP(r, r.PathValue("id")) {
+		httpx.Fail(w, domain.ConflictField("catalog", "use_billing_catalog"))
+		return
+	}
 	before, after, err := s.iap.UpdateProduct(r.Context(), r.PathValue("id"), body.input())
 	if err != nil {
 		httpx.Fail(w, err)
@@ -160,6 +168,10 @@ func (s *Server) handleIAPProductUpdate(w http.ResponseWriter, r *http.Request) 
 func (s *Server) handleIAPProductArchive(w http.ResponseWriter, r *http.Request) {
 	if s.iap == nil {
 		httpx.Fail(w, domain.ErrNotFound)
+		return
+	}
+	if s.catalogManagedIAP(r, r.PathValue("id")) {
+		httpx.Fail(w, domain.ConflictField("catalog", "use_billing_catalog"))
 		return
 	}
 	p, err := s.iap.ArchiveProduct(r.Context(), r.PathValue("id"))
@@ -282,4 +294,20 @@ func (s *Server) handleSaveIAP(w http.ResponseWriter, r *http.Request) {
 	s.admin.Audit(r.Context(), adminFrom(r.Context()), s.ip(r), "settings.iap.update", "system_settings",
 		iap.SettingEnabled, map[string]any{"before": before, "after": body.Enabled})
 	httpx.JSON(w, http.StatusOK, s.iapPayload(r))
+}
+
+func (s *Server) catalogManagedIAP(r *http.Request, id string) bool {
+	if s.catalog == nil || s.iap == nil {
+		return false
+	}
+	products, _, err := s.iap.AdminProducts(r.Context())
+	if err != nil {
+		return true
+	}
+	for _, p := range products {
+		if p.ID == id {
+			return s.catalogManaged(p.Code)
+		}
+	}
+	return false
 }

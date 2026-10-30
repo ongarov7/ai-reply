@@ -391,30 +391,24 @@ func TestAppleTransactionsThatDoNotVerifyGrantNothing(t *testing.T) {
 }
 
 // Sandbox (TestFlight, App Review) қабылданатын серверде — ортасымен жазылады, нақты сатылымнан бөлек.
-func TestSandboxPurchasesAreRecordedApart(t *testing.T) {
-	h := newHarness(t, withIAP(t))
-	admin := h.openIAP()
-	s := h.signIn("iap-sandbox@example.com")
-	res := h.postApple(s.access, h.appleTx(s.userID, "2000000000000200", packApple,
-		func(tx *appstoretest.Transaction) { tx.Environment = "Sandbox" }))
-	if res.status != http.StatusOK || res.str("status") != "granted" {
-		t.Fatalf("sandbox: %s", res.raw)
-	}
-	mustStatus(t, h.postApple(s.access, h.appleTx(s.userID, "2000000000000201", packApple, nil)), http.StatusOK, "")
-
-	sandbox := h.adminCall(admin, http.MethodGet, "/iap/purchases?environment=Sandbox", nil)
-	production := h.adminCall(admin, http.MethodGet, "/iap/purchases?environment=Production", nil)
-	if sandbox.num("total") != 1 || production.num("total") != 1 {
-		t.Fatalf("sandbox %s production %s", sandbox.raw, production.raw)
-	}
-	stats, _ := sandbox.body["stats"].([]any)
-	seen := map[string]float64{}
-	for _, g := range stats {
-		row := g.(map[string]any)
-		seen[row["environment"].(string)+"/"+row["status"].(string)] = row["count"].(float64)
-	}
-	if seen["Sandbox/granted"] != 1 || seen["Production/granted"] != 1 {
-		t.Fatalf("stats %v", seen)
+func TestSandboxPurchasesAreIsolatedFromProduction(t *testing.T) {
+	for _, sandbox := range []bool{false, true} {
+		t.Run(fmt.Sprintf("sandbox=%v", sandbox), func(t *testing.T) {
+			h := newHarness(t, withIAP(t), withEnv("APPLE_IAP_ACCEPT_SANDBOX", strconv.FormatBool(sandbox)))
+			h.openIAP()
+			s := h.signIn("iap-environment@example.com")
+			production := h.appleTx(s.userID, "production-tx", packApple, nil)
+			test := h.appleTx(s.userID, "sandbox-tx", packApple, func(tx *appstoretest.Transaction) { tx.Environment = "Sandbox" })
+			accepted, refused := production, test
+			if sandbox {
+				accepted, refused = test, production
+			}
+			mustStatus(t, h.postApple(s.access, accepted), http.StatusOK, "")
+			mustStatus(t, h.postApple(s.access, refused), http.StatusBadRequest, "PURCHASE_INVALID")
+			if h.creditsLeft(s.access) != 50 || h.scalar(`SELECT COUNT(*) FROM iap_purchases WHERE user_id=?`, s.userID) != 1 {
+				t.Fatal("environments were mixed")
+			}
+		})
 	}
 }
 
@@ -963,7 +957,7 @@ func TestGoogleTestPurchasesNeedTheSwitch(t *testing.T) {
 		t.Fatalf("a promo code purchase: %d %s", res.status, res.raw)
 	}
 	status := h.adminCall(admin, http.MethodGet, "/iap/products", nil)
-	if iap, _ := status.body["iap"].(map[string]any); iap["google_test"] != false || iap["apple_sandbox"] != true {
+	if iap, _ := status.body["iap"].(map[string]any); iap["google_test"] != false || iap["apple_sandbox"] != false {
 		t.Fatalf("iap status %v", status.body["iap"])
 	}
 }
@@ -1039,7 +1033,7 @@ func TestAdminManagesIAPProductsWithAudit(t *testing.T) {
 		{"pass without hours", with(passBody(), map[string]any{"duration_hours": 0}), "duration_hours"},
 		{"pass over 30 days", with(passBody(), map[string]any{"duration_hours": 721}), "duration_hours"},
 		{"pack with hours", with(packBody(), map[string]any{"duration_hours": 24}), "duration_hours"},
-		{"kind", with(packBody(), map[string]any{"kind": "subscription"}), "kind"},
+		{"kind", with(packBody(), map[string]any{"kind": "subscription"}), "plan_id"},
 		{"code", with(packBody(), map[string]any{"code": "Pack 50"}), "code"},
 		{"apple id", with(packBody(), map[string]any{"apple_product_id": "bad id!"}), "apple_product_id"},
 		{"google id", with(packBody(), map[string]any{"google_product_id": "Pack50"}), "google_product_id"},
@@ -1085,18 +1079,21 @@ func TestAdminManagesIAPProductsWithAudit(t *testing.T) {
 		t.Fatalf("row %v", row)
 	}
 	if iap, _ := list.body["iap"].(map[string]any); iap["apple"] != true || iap["google"] != true ||
-		iap["apple_sandbox"] != true || iap["google_test"] != true ||
+		iap["apple_sandbox"] != false || iap["google_test"] != true ||
 		iap["notification_url"] != h.cfg.App.PublicBaseURL+"/api/v1/iap/apple/notifications" {
 		t.Fatalf("iap status %v", list.body["iap"])
 	}
 
-	// The row as the page got it goes straight back, with one change.
+	// A mapped product keeps the entitlement shown when a pending purchase began.
 	row["units"] = 60
+	mustStatus(t, h.adminCall(admin, http.MethodPatch, "/iap/products/"+id, row), http.StatusConflict, "CONFLICT")
+	row["units"] = 50
+	row["name"].(map[string]any)["ru"] = "Пакет ответов"
 	mustStatus(t, h.adminCall(admin, http.MethodPatch, "/iap/products/"+id, row), http.StatusOK, "")
 	meta := h.auditMeta("iap_product.update")
 	before, _ := meta["before"].(map[string]any)
 	after, _ := meta["after"].(map[string]any)
-	if before["units"] != float64(50) || after["units"] != float64(60) {
+	if before["units"] != float64(50) || after["units"] != float64(50) {
 		t.Fatalf("update audit %v", meta)
 	}
 	for field, value := range map[string]any{"code": "pack_60", "kind": "pass"} {
@@ -1141,8 +1138,8 @@ func TestAdminSeesPurchasesWithoutContent(t *testing.T) {
 	token := playToken(40)
 	h.playPurchase(s.userID, packGoogle, token, nil)
 	mustStatus(t, h.postGoogle(s.access, packGoogle, token), http.StatusOK, "")
-	mustStatus(t, h.postApple(other.access, h.appleTx(other.userID, "2000000000000501", passApple,
-		func(tx *appstoretest.Transaction) { tx.Environment = "Sandbox" })), http.StatusOK, "")
+	mustStatus(t, h.postApple(other.access, h.appleTx(other.userID, "2000000000000501", passApple, nil)), http.StatusOK, "")
+	h.exec(`UPDATE iap_purchases SET environment='Sandbox' WHERE transaction_id='2000000000000501'`)
 
 	count := func(query string) float64 {
 		res := h.adminCall(admin, http.MethodGet, "/iap/purchases"+query, nil)

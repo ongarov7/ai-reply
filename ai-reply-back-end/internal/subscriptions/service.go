@@ -196,6 +196,19 @@ func (s *Service) Entitlement(ctx context.Context, userID string) (domain.Entitl
 		}
 		plan = free
 	}
+	apple, err := s.repo.ActiveAppleSubscription(ctx, userID, now)
+	if err != nil && !errors.Is(err, domain.ErrNotFound) {
+		return domain.Entitlement{}, err
+	}
+	if err == nil {
+		applePlan, err := s.repo.Plan(ctx, apple.PlanID)
+		if err != nil {
+			return domain.Entitlement{}, err
+		}
+		if plan.IsFree || applePlan.Unlimited() || (!plan.Unlimited() && applePlan.DailyLimit >= plan.DailyLimit) {
+			plan, sub = applePlan, &apple
+		}
+	}
 
 	date, month := s.Keys(now)
 	usedDay, usedMonth, err := s.repo.Counters(ctx, userID, date, month)
@@ -213,6 +226,7 @@ func (s *Service) Entitlement(ctx context.Context, userID string) (domain.Entitl
 		Subscription: sub,
 		DailyLimit:   plan.DailyLimit,
 		MonthlyLimit: plan.MonthlyLimit,
+		Unlimited:    plan.Unlimited(),
 		UsedToday:    usedDay,
 		UsedMonth:    usedMonth,
 		ResetsAt:     s.NextReset(now),

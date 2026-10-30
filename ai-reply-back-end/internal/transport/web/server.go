@@ -7,10 +7,13 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/aireply/ai-reply-back-end/config"
 	"github.com/aireply/ai-reply-back-end/internal/admin"
+	"github.com/aireply/ai-reply-back-end/internal/catalog"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
 	"github.com/aireply/ai-reply-back-end/internal/localization"
 	"github.com/aireply/ai-reply-back-end/internal/middleware"
@@ -28,6 +31,7 @@ type Server struct {
 	admin     *admin.Service
 	plans     *plans.Service
 	payments  *payments.Service
+	catalog   *catalog.Service
 	notify    *notifications.Service
 	bundle    *localization.Bundle
 	limiter   *middleware.Limiter
@@ -44,6 +48,7 @@ type Deps struct {
 	Plans  *plans.Service
 	// Payments — лендинг тариф сатылатын-сатылмайтынын осыдан біледі (nil — ештеңе сатылмайды).
 	Payments      *payments.Service
+	Catalog       *catalog.Service
 	Notifications *notifications.Service
 	Bundle        *localization.Bundle
 	Limiter       *middleware.Limiter
@@ -53,7 +58,7 @@ type Deps struct {
 // New — шаблондарды жинап, серверді құрады.
 func New(d Deps) (*Server, error) {
 	s := &Server{
-		cfg: d.Config, admin: d.Admin, plans: d.Plans, payments: d.Payments, notify: d.Notifications,
+		cfg: d.Config, admin: d.Admin, plans: d.Plans, payments: d.Payments, catalog: d.Catalog, notify: d.Notifications,
 		bundle: d.Bundle, limiter: d.Limiter, log: d.Log,
 		templates: map[string]*template.Template{},
 	}
@@ -143,6 +148,7 @@ type baseView struct {
 	Locales      []string
 	Year         int
 	ContactEmail string
+	BasePath     string
 }
 
 func (s *Server) base(locale string) baseView {
@@ -152,6 +158,7 @@ func (s *Server) base(locale string) baseView {
 		Locales:      domain.Locales,
 		Year:         time.Now().Year(),
 		ContactEmail: s.cfg.App.ContactEmail(),
+		BasePath:     s.basePath(),
 	}
 }
 
@@ -165,4 +172,22 @@ func (s *Server) render(w http.ResponseWriter, name, entry string, data any) {
 	if err := tpl.ExecuteTemplate(w, entry, data); err != nil {
 		s.log.Error("template render failed", "template", name, "error", err.Error())
 	}
+}
+
+func (s *Server) basePath() string {
+	u, err := url.Parse(s.cfg.App.PublicBaseURL)
+	if err != nil {
+		return ""
+	}
+	if strings.TrimRight(u.Path, "/") == "/sandbox" {
+		return "/sandbox"
+	}
+	return ""
+}
+func (s *Server) appPath(path string) string { return s.basePath() + path }
+func (s *Server) cookiePath() string {
+	if s.basePath() == "" {
+		return "/"
+	}
+	return s.basePath() + "/"
 }

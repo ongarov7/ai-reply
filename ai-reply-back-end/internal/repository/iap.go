@@ -15,7 +15,7 @@ import (
 
 const iapProductColumns = `id, code, kind, units, duration_hours, COALESCE(apple_product_id, ''),
 	COALESCE(google_product_id, ''), name_kk, name_ru, name_en, name_uz, is_active, sort_order,
-	created_at, updated_at, archived_at`
+	created_at, updated_at, archived_at, plan_id, billing_period, price_minor, currency`
 
 // IAPProducts — әкімші баптаған өнімдер (sort_order, code бойынша). archived — мұрағаттағылар да.
 func (s *Store) IAPProducts(ctx context.Context, archived bool) ([]domain.IAPProduct, error) {
@@ -62,10 +62,10 @@ func (s *Store) CreateIAPProduct(ctx context.Context, p domain.IAPProduct, now t
 	p.CreatedAt, p.UpdatedAt = now, now
 	_, err := s.db.Writer().ExecContext(ctx, `
 		INSERT INTO iap_products (id, code, kind, units, duration_hours, apple_product_id, google_product_id,
-		                          name_kk, name_ru, name_en, name_uz, is_active, sort_order, created_at, updated_at)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		                          name_kk, name_ru, name_en, name_uz, is_active, sort_order, created_at, updated_at, plan_id, billing_period, price_minor, currency)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		p.ID, p.Code, p.Kind, p.Units, p.DurationHours, nullText(p.AppleProductID), nullText(p.GoogleProductID),
-		p.Name["kk"], p.Name["ru"], p.Name["en"], p.Name["uz"], p.IsActive, p.SortOrder, ms(now), ms(now))
+		p.Name["kk"], p.Name["ru"], p.Name["en"], p.Name["uz"], p.IsActive, p.SortOrder, ms(now), ms(now), p.PlanID, p.BillingPeriod, p.PriceMinor, p.Currency)
 	if err != nil {
 		return domain.IAPProduct{}, productConflict(err)
 	}
@@ -76,10 +76,10 @@ func (s *Store) CreateIAPProduct(ctx context.Context, p domain.IAPProduct, now t
 func (s *Store) UpdateIAPProduct(ctx context.Context, p domain.IAPProduct, now time.Time) error {
 	res, err := s.db.Writer().ExecContext(ctx, `
 		UPDATE iap_products SET units = ?, duration_hours = ?, apple_product_id = ?, google_product_id = ?,
-		       name_kk = ?, name_ru = ?, name_en = ?, name_uz = ?, is_active = ?, sort_order = ?, updated_at = ?
+		       name_kk = ?, name_ru = ?, name_en = ?, name_uz = ?, is_active = ?, sort_order = ?, updated_at = ?, plan_id = ?, billing_period = ?, price_minor = ?, currency = ?
 		WHERE id = ? AND archived_at IS NULL`,
 		p.Units, p.DurationHours, nullText(p.AppleProductID), nullText(p.GoogleProductID),
-		p.Name["kk"], p.Name["ru"], p.Name["en"], p.Name["uz"], p.IsActive, p.SortOrder, ms(now), p.ID)
+		p.Name["kk"], p.Name["ru"], p.Name["en"], p.Name["uz"], p.IsActive, p.SortOrder, ms(now), p.PlanID, p.BillingPeriod, p.PriceMinor, p.Currency, p.ID)
 	if err != nil {
 		return productConflict(err)
 	}
@@ -131,7 +131,7 @@ func scanIAPProducts(rows *sql.Rows) ([]domain.IAPProduct, error) {
 			archived         sql.NullInt64
 		)
 		if err := rows.Scan(&p.ID, &p.Code, &p.Kind, &p.Units, &p.DurationHours, &p.AppleProductID,
-			&p.GoogleProductID, &kk, &ru, &en, &uz, &active, &p.SortOrder, &created, &updated, &archived); err != nil {
+			&p.GoogleProductID, &kk, &ru, &en, &uz, &active, &p.SortOrder, &created, &updated, &archived, &p.PlanID, &p.BillingPeriod, &p.PriceMinor, &p.Currency); err != nil {
 			return nil, err
 		}
 		p.Name = map[string]string{"kk": kk, "ru": ru, "en": en, "uz": uz}
@@ -168,7 +168,7 @@ func (s *Store) IAPProductSales(ctx context.Context) (map[string]int, error) {
 
 const iapPurchaseColumns = `p.id, COALESCE(p.user_id, ''), p.provider, p.environment, p.store_product_id, p.product_code,
 	p.transaction_id, p.original_transaction_id, p.order_id, p.quantity, p.units, p.status, p.consumed_at,
-	p.purchased_at, p.revoked_at, p.revoke_reason, p.created_at, p.updated_at`
+	p.purchased_at, p.revoked_at, p.revoke_reason, p.created_at, p.updated_at, p.price_milliunits, p.currency`
 
 func scanIAPPurchase(scan func(...any) error, extra ...any) (domain.IAPPurchase, error) {
 	var (
@@ -178,7 +178,7 @@ func scanIAPPurchase(scan func(...any) error, extra ...any) (domain.IAPPurchase,
 	)
 	dest := []any{&p.ID, &p.UserID, &p.Provider, &p.Environment, &p.StoreProductID, &p.ProductCode,
 		&p.TransactionID, &p.OriginalTransactionID, &p.OrderID, &p.Quantity, &p.Units, &p.Status, &consumed,
-		&purchased, &revoke, &p.RevokeReason, &created, &updated}
+		&purchased, &revoke, &p.RevokeReason, &created, &updated, &p.PriceMilliunits, &p.Currency}
 	if err := scan(append(dest, extra...)...); err != nil {
 		return domain.IAPPurchase{}, err
 	}
@@ -239,12 +239,12 @@ func (s *Store) GrantPurchase(ctx context.Context, in PurchaseGrant) (GrantResul
 		res, err := tx.ExecContext(ctx, `
 			INSERT INTO iap_purchases (id, user_id, provider, environment, store_product_id, product_code, transaction_id,
 			                           original_transaction_id, order_id, quantity, units, status, purchase_token_sealed,
-			                           purchased_at, created_at, updated_at)
-			VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+			                           purchased_at, created_at, updated_at, price_milliunits, currency)
+			VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 			ON CONFLICT (provider, transaction_id) DO NOTHING`,
 			id, p.UserID, p.Provider, p.Environment, p.StoreProductID, p.ProductCode, p.TransactionID,
 			p.OriginalTransactionID, p.OrderID, p.Quantity, p.Units, domain.PurchaseGranted, nullText(in.SealedToken),
-			msPtr(p.PurchasedAt), now, now)
+			msPtr(p.PurchasedAt), now, now, p.PriceMilliunits, p.Currency)
 		if err != nil {
 			return err
 		}

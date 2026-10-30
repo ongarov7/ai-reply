@@ -43,12 +43,18 @@ func (s *Server) registerIAP(mux *http.ServeMux, perUser middleware.KeyFunc) {
 
 // iapProductDTO — қолданбаға көрінетін өнім (бағасы дүкенде: StoreKit / Play Billing).
 type iapProductDTO struct {
-	Code           string `json:"code"`
-	Kind           string `json:"kind"`
-	Units          int    `json:"units"`
-	DurationHours  int    `json:"duration_hours"`
-	StoreProductID string `json:"store_product_id"`
-	Name           string `json:"name"`
+	Code            string `json:"code"`
+	Kind            string `json:"kind"`
+	Units           int    `json:"units"`
+	DurationHours   int    `json:"duration_hours"`
+	StoreProductID  string `json:"store_product_id"`
+	Name            string `json:"name"`
+	PlanID          string `json:"plan_id,omitempty"`
+	BillingPeriod   string `json:"billing_period,omitempty"`
+	EntitlementKind string `json:"entitlement_kind,omitempty"`
+	DailyLimit      int    `json:"daily_limit"`
+	Price           int64  `json:"price"`
+	Currency        string `json:"currency"`
 }
 
 // handleIAPProducts — GET /api/v1/iap/products?platform=ios|android.
@@ -74,10 +80,35 @@ func (s *Server) handleIAPProducts(w http.ResponseWriter, r *http.Request) {
 	locale := domain.ResolveLanguage(user.PreferredLanguage, user.Locale)
 	out := make([]iapProductDTO, 0, len(products))
 	for _, p := range products {
-		out = append(out, iapProductDTO{Code: p.Code, Kind: p.Kind, Units: p.Units, DurationHours: p.DurationHours,
-			StoreProductID: p.StoreID(platform), Name: p.LocalizedName(locale)})
+		product := iapProductDTO{Code: p.Code, Kind: p.Kind, Units: p.Units, DurationHours: p.DurationHours, StoreProductID: p.StoreID(platform), Name: p.LocalizedName(locale), PlanID: p.PlanID, BillingPeriod: p.BillingPeriod, Price: p.PriceMinor, Currency: p.Currency}
+		if p.Kind == domain.ProductSubscription {
+			plan, err := s.plans.Get(r.Context(), p.PlanID)
+			if err != nil {
+				httpx.Fail(w, err)
+				return
+			}
+			product.EntitlementKind, product.DailyLimit = plan.EntitlementKind, plan.DailyLimit
+			if product.Currency == "" {
+				product.Price, product.Currency = plan.Price, plan.Currency
+			}
+		}
+		out = append(out, product)
 	}
-	httpx.JSON(w, http.StatusOK, map[string]any{"products": out, "account_token": s.iap.AccountToken(user.ID)})
+	token := s.iap.AccountToken(user.ID)
+	if token == "" {
+		httpx.Fail(w, domain.ErrStoreUnavailable)
+		return
+	}
+	response := map[string]any{"products": out, "account_token": token}
+	if platform == domain.PlatformIOS {
+		entitlement, err := s.subs.Entitlement(r.Context(), user.ID)
+		if err == nil && entitlement.Plan.IsFree {
+			if rec := s.iap.PackageRecommendation(r.Context(), user.ID, products); rec != nil {
+				response["recommendation"] = rec
+			}
+		}
+	}
+	httpx.JSON(w, http.StatusOK, response)
 }
 
 type appleTransactionRequest struct {

@@ -5,12 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>{{call .T "admin.login.title"}} — AI Reply</title>
-<link rel="stylesheet" href="/static/admin.css">
-<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="{{.BasePath}}/static/admin.css">
+<link rel="icon" href="{{.BasePath}}/static/favicon.svg" type="image/svg+xml">
 </head>
 <body>
 <div class="login-wrap">
-  <form class="login-card" method="post" action="/admin/login">
+  <form class="login-card" method="post" action="{{.BasePath}}/admin/login">
     <div class="mark">AI</div>
     <h1>{{call .T "admin.login.title"}}</h1>
     <p class="sub">{{call .T "admin.login.subtitle"}}</p>

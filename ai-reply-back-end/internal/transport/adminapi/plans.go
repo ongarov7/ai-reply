@@ -122,6 +122,10 @@ func (s *Server) handlePlanUpdate(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, err)
 		return
 	}
+	if s.catalogManaged(current.Code) {
+		httpx.Fail(w, domain.ConflictField("catalog", "use_billing_catalog"))
+		return
+	}
 	if err := s.admin.UpdatePlan(r.Context(), adminFrom(r.Context()), s.ip(r),
 		body.toDomain(current.ID, current.IsVisible)); err != nil {
 		s.planFail(w, err)
@@ -131,6 +135,11 @@ func (s *Server) handlePlanUpdate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handlePlanArchive(w http.ResponseWriter, r *http.Request) {
+	if p, err := s.admin.Plan(r.Context(), r.PathValue("id")); err == nil && s.catalogManaged(p.Code) {
+		httpx.Fail(w, domain.ConflictField("catalog", "use_billing_catalog"))
+		return
+	}
+
 	if err := s.admin.ArchivePlan(r.Context(), adminFrom(r.Context()), s.ip(r), r.PathValue("id")); err != nil {
 		s.planFail(w, err)
 		return

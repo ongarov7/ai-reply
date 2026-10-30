@@ -18,12 +18,14 @@ import (
 func clientIP(r *http.Request, trustProxy bool) string { return httpx.ClientIP(r, trustProxy) }
 
 type planView struct {
-	Name        string
-	Description string
-	PriceText   string
-	DailyLimit  int
-	IsFree      bool
-	Featured    bool
+	Name          string
+	Description   string
+	PriceText     string
+	DailyLimit    int
+	IsFree        bool
+	Featured      bool
+	PeriodText    string
+	AllowanceText string
 }
 
 type landingView struct {
@@ -37,6 +39,7 @@ type landingView struct {
 	// не қосымшада таңдау туралы уәде бермейді (*_free нұсқалары).
 	PricingSubtitle string
 	PricingCTA      string
+	PricingNote     string
 	// AppStoreURL, PlayStoreURL — дүкендегі бет (APP_STORE_URL, PLAY_STORE_URL); бос — «жақында».
 	AppStoreURL  string
 	PlayStoreURL string
@@ -110,6 +113,42 @@ func (s *Server) handleLanding(w http.ResponseWriter, r *http.Request) {
 			IsFree:      p.IsFree,
 			Featured:    i == 1,
 		})
+	}
+	view.PricingNote = s.bundle.T(locale, "pricing.note")
+	if s.catalog != nil {
+		published, catalogErr := s.catalog.Published(r.Context())
+		if catalogErr == nil {
+			view.Plans = nil
+			for _, product := range published.Products {
+				if !product.Active || !product.AvailableWeb {
+					continue
+				}
+				name := product.Name[locale]
+				if name == "" {
+					name = product.Name["en"]
+				}
+				allowance, description := "", ""
+				switch {
+				case product.Unlimited:
+					allowance = s.bundle.T(locale, "admin.billing.unlimited")
+				case product.Kind == "welcome":
+					allowance = strconv.Itoa(product.Units) + " · " + s.bundle.T(locale, "admin.billing.lifetime")
+				case product.Kind == "pack":
+					allowance = strconv.Itoa(product.Units) + " · " + s.bundle.T(locale, "admin.billing.permanent")
+					description = s.bundle.T(locale, "pricing.pack_description")
+				default:
+					allowance = strconv.Itoa(product.DailyLimit) + " / " + s.bundle.T(locale, "pricing.per_day")
+				}
+				period := s.bundle.T(locale, "admin.billing.once")
+				if product.BillingPeriod == "month" {
+					period = s.bundle.T(locale, "admin.billing.month")
+				} else if product.BillingPeriod == "year" {
+					period = s.bundle.T(locale, "admin.billing.year")
+				}
+				view.Plans = append(view.Plans, planView{Name: name, PriceText: traits.FormatMoney(product.PriceMinor, product.Currency), IsFree: product.Kind == "welcome", Description: description, AllowanceText: allowance, PeriodText: period, Featured: product.Code == "base_monthly"})
+			}
+			view.PricingNote = s.bundle.T(locale, "pricing.catalog_note")
+		}
 	}
 	s.render(w, "landing", "public_layout", view)
 }

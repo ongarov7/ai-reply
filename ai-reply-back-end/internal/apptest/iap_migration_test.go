@@ -53,7 +53,7 @@ func TestIAPMigrationKeepsExistingAccounts(t *testing.T) {
 	exec(`INSERT INTO credit_grants (id, user_id, kind, units_total, units_remaining, starts_at, status, created_at, updated_at)
 		VALUES ('g-1', 'u-1', 'admin', 5, 5, 1000, 'active', 1000, 1000)`)
 
-	applied, err := database.Migrate(ctx, db, migrations.FS)
+	applied, err := database.Migrate(ctx, db, migrationsBefore(t, "0019"))
 	if err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
@@ -103,7 +103,7 @@ func TestIAPMigrationKeepsExistingAccounts(t *testing.T) {
 	if scalar(`SELECT COUNT(*) FROM iap_purchases WHERE user_id IS NULL`) != 2 || scalar(`SELECT COUNT(*) FROM credit_grants`) != 0 {
 		t.Fatal("purchases must stay with user_id NULL, grants go with the account")
 	}
-	if again, err := database.Migrate(ctx, db, migrations.FS); err != nil || len(again) != 0 {
+	if again, err := database.Migrate(ctx, db, migrationsBefore(t, "0019")); err != nil || len(again) != 0 {
 		t.Fatalf("rerun: %v %v", again, err)
 	}
 }

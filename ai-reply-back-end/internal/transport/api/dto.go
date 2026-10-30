@@ -96,18 +96,19 @@ func toProfileDTO(p domain.Profile) profileDTO {
 }
 
 type planDTO struct {
-	ID           string            `json:"id"`
-	Code         string            `json:"code"`
-	Name         map[string]string `json:"name"`
-	Description  map[string]string `json:"description"`
-	Price        int64             `json:"price"`
-	PriceText    string            `json:"price_text"`
-	Currency     string            `json:"currency"`
-	DailyLimit   int               `json:"daily_message_limit"`
-	MonthlyLimit int               `json:"monthly_message_limit"`
-	PeriodDays   int               `json:"period_days"`
-	IsFree       bool              `json:"is_free"`
-	SortOrder    int               `json:"sort_order"`
+	ID              string            `json:"id"`
+	Code            string            `json:"code"`
+	Name            map[string]string `json:"name"`
+	Description     map[string]string `json:"description"`
+	Price           int64             `json:"price"`
+	PriceText       string            `json:"price_text"`
+	Currency        string            `json:"currency"`
+	DailyLimit      int               `json:"daily_message_limit"`
+	MonthlyLimit    int               `json:"monthly_message_limit"`
+	PeriodDays      int               `json:"period_days"`
+	IsFree          bool              `json:"is_free"`
+	SortOrder       int               `json:"sort_order"`
+	EntitlementKind string            `json:"entitlement_kind"`
 	// Purchasable — the plan can be bought right now. False for the current
 	// plan inside a subscription and whenever buying is switched off.
 	Purchasable bool `json:"purchasable"`
@@ -115,40 +116,45 @@ type planDTO struct {
 
 func toPlanDTO(p domain.Plan) planDTO {
 	return planDTO{
-		ID:           p.ID,
-		Code:         p.Code,
-		Name:         p.Name,
-		Description:  p.Description,
-		Price:        p.Price,
-		PriceText:    traits.FormatMoney(p.Price, p.Currency),
-		Currency:     p.Currency,
-		DailyLimit:   p.DailyLimit,
-		MonthlyLimit: p.MonthlyLimit,
-		PeriodDays:   p.PeriodDays,
-		IsFree:       p.IsFree,
-		SortOrder:    p.SortOrder,
+		ID:              p.ID,
+		Code:            p.Code,
+		Name:            p.Name,
+		Description:     p.Description,
+		Price:           p.Price,
+		PriceText:       traits.FormatMoney(p.Price, p.Currency),
+		Currency:        p.Currency,
+		DailyLimit:      p.DailyLimit,
+		MonthlyLimit:    p.MonthlyLimit,
+		PeriodDays:      p.PeriodDays,
+		IsFree:          p.IsFree,
+		SortOrder:       p.SortOrder,
+		EntitlementKind: p.EntitlementKind,
 	}
 }
 
 type subscriptionDTO struct {
-	ID        string  `json:"id,omitempty"`
-	Status    string  `json:"status"`
-	Plan      planDTO `json:"plan"`
-	StartedAt string  `json:"started_at,omitempty"`
-	ExpiresAt string  `json:"expires_at,omitempty"`
-	Source    string  `json:"source,omitempty"`
+	ID         string  `json:"id,omitempty"`
+	Status     string  `json:"status"`
+	Plan       planDTO `json:"plan"`
+	StartedAt  string  `json:"started_at,omitempty"`
+	ExpiresAt  string  `json:"expires_at,omitempty"`
+	Source     string  `json:"source,omitempty"`
+	AutoRenews *bool   `json:"auto_renews,omitempty"`
 }
 
 // usageDTO — квота және баланс. Ескі өрістердің мағынасы өзгермейді:
 // remaining_today — тек тарифтің бүгінгі қалдығы.
 type usageDTO struct {
-	DailyLimit     int    `json:"daily_limit"`
-	UsedToday      int    `json:"used_today"`
-	RemainingToday int    `json:"remaining_today"`
-	MonthlyLimit   int    `json:"monthly_limit"`
-	UsedMonth      int    `json:"used_month"`
-	ResetsAt       string `json:"resets_at"`
-	Timezone       string `json:"timezone"`
+	DailyLimit       int    `json:"daily_limit"`
+	Unlimited        bool   `json:"unlimited"`
+	PurchasedCredits int    `json:"purchased_credits"`
+	AdminCredits     int    `json:"admin_credits"`
+	UsedToday        int    `json:"used_today"`
+	RemainingToday   int    `json:"remaining_today"`
+	MonthlyLimit     int    `json:"monthly_limit"`
+	UsedMonth        int    `json:"used_month"`
+	ResetsAt         string `json:"resets_at"`
+	Timezone         string `json:"timezone"`
 	// Welcome — сәлемдесу бонусы; тіркелгіде жоқ болса өріс жоқ.
 	Welcome *welcomeDTO `json:"welcome,omitempty"`
 	// Credits — әкімші кредиттері мен сатып алынған пакеттердің қалдығы.
@@ -174,6 +180,7 @@ type passDTO struct {
 func toUsageDTO(e domain.Entitlement, tz string, loc *time.Location) usageDTO {
 	dto := usageDTO{
 		DailyLimit:     e.DailyLimit,
+		Unlimited:      e.Unlimited,
 		UsedToday:      e.UsedToday,
 		RemainingToday: e.Remaining(),
 		MonthlyLimit:   e.MonthlyLimit,
@@ -191,6 +198,7 @@ func (u *usageDTO) withBalance(b domain.CreditBalance, loc *time.Location) {
 		u.Welcome = &welcomeDTO{Total: b.WelcomeTotal, Remaining: b.WelcomeRemaining}
 	}
 	u.Credits = b.Credits()
+	u.PurchasedCredits, u.AdminCredits = b.Packs, b.Admin
 	if b.PassActive && b.PassExpiresAt != nil {
 		u.Pass = &passDTO{ExpiresAt: b.PassExpiresAt.In(loc).Format(time.RFC3339), Remaining: b.PassRemaining}
 	}

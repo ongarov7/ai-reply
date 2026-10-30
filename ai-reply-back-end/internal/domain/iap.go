@@ -16,12 +16,13 @@ var IAPProviders = []string{ProviderAppStore, ProviderGooglePlay}
 
 // Өнім түрлері (iap_products.kind): пакет мерзімсіз, pass — мерзімді.
 const (
-	ProductPack = GrantPack
-	ProductPass = GrantPass
+	ProductPack         = GrantPack
+	ProductPass         = GrantPass
+	ProductSubscription = "subscription"
 )
 
 // IAPProductKinds — рұқсат етілген түрлер.
-var IAPProductKinds = []string{ProductPack, ProductPass}
+var IAPProductKinds = []string{ProductPack, ProductPass, ProductSubscription}
 
 // Сатып алу күйлері (iap_purchases.status).
 //
@@ -108,6 +109,10 @@ type IAPProduct struct {
 	Kind            string
 	Units           int
 	DurationHours   int
+	PlanID          string
+	BillingPeriod   string
+	PriceMinor      int64
+	Currency        string
 	AppleProductID  string
 	GoogleProductID string
 	Name            map[string]string
@@ -131,7 +136,11 @@ func (p IAPProduct) StoreID(platform string) string {
 
 // Offered — бұл платформада сатылады ма.
 func (p IAPProduct) Offered(platform string) bool {
-	return p.IsActive && p.ArchivedAt == nil && p.Units > 0 && p.StoreID(platform) != ""
+	valid := p.Units > 0
+	if p.Kind == ProductSubscription {
+		valid = p.PlanID != "" && (p.BillingPeriod == "month" || p.BillingPeriod == "year") && platform == PlatformIOS
+	}
+	return p.IsActive && p.ArchivedAt == nil && valid && p.StoreID(platform) != ""
 }
 
 // LocalizedName — тілдегі атау, болмаса ru → en → код.
@@ -161,6 +170,8 @@ type IAPPurchase struct {
 	OrderID               string
 	Quantity              int
 	Units                 int
+	PriceMilliunits       int64
+	Currency              string
 	Status                string
 	ConsumedAt            *time.Time
 	PurchasedAt           *time.Time

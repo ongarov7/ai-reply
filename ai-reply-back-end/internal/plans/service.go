@@ -80,6 +80,13 @@ func (s *Service) Create(ctx context.Context, p domain.Plan) (domain.Plan, error
 
 // Update — өзгерту; лимит өзгерісі бірден бүкіл клиентке тарайды.
 func (s *Service) Update(ctx context.Context, p domain.Plan) error {
+	if p.EntitlementKind == "" {
+		current, err := s.repo.Plan(ctx, p.ID)
+		if err != nil {
+			return err
+		}
+		p.EntitlementKind = current.EntitlementKind
+	}
 	if err := validate(&p); err != nil {
 		return err
 	}
@@ -123,6 +130,22 @@ func (s *Service) UsageCount(ctx context.Context, id string) (int, error) {
 }
 
 func validate(p *domain.Plan) error {
+	if p.EntitlementKind == "" {
+		p.EntitlementKind = domain.EntitlementDaily
+	}
+	switch p.EntitlementKind {
+	case domain.EntitlementDaily:
+	case domain.EntitlementWelcome:
+		if !p.IsFree || p.DailyLimit != 0 || p.MonthlyLimit != 0 {
+			return domain.ErrInvalidRequest
+		}
+	case domain.EntitlementUnlimited:
+		if p.IsFree || p.DailyLimit != 0 || p.MonthlyLimit != 0 {
+			return domain.ErrInvalidRequest
+		}
+	default:
+		return domain.ErrInvalidRequest
+	}
 	p.Code = strings.ToLower(strings.TrimSpace(p.Code))
 	if p.Code == "" || len(p.Code) > 40 {
 		return domain.ErrInvalidRequest

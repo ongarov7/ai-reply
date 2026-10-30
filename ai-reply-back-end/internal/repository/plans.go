@@ -13,7 +13,7 @@ import (
 const planColumns = `id, code, name_kk, name_ru, name_en, name_uz,
 	description_kk, description_ru, description_en, description_uz,
 	price, currency, daily_message_limit, monthly_message_limit, period_days,
-	is_free, is_active, sort_order, created_at, updated_at, archived_at, is_visible`
+	is_free, is_active, sort_order, created_at, updated_at, archived_at, is_visible, entitlement_kind`
 
 func scanPlan(row interface{ Scan(...any) error }) (domain.Plan, error) {
 	var (
@@ -26,7 +26,7 @@ func scanPlan(row interface{ Scan(...any) error }) (domain.Plan, error) {
 	)
 	if err := row.Scan(&p.ID, &p.Code, &nkk, &nru, &nen, &nuz, &dkk, &dru, &den, &duz,
 		&p.Price, &p.Currency, &p.DailyLimit, &p.MonthlyLimit, &p.PeriodDays,
-		&free, &active, &p.SortOrder, &created, &updated, &archived, &seen); err != nil {
+		&free, &active, &p.SortOrder, &created, &updated, &archived, &seen, &p.EntitlementKind); err != nil {
 		return domain.Plan{}, err
 	}
 	p.Name = map[string]string{"kk": nkk, "ru": nru, "en": nen, "uz": nuz}
@@ -95,11 +95,11 @@ func (s *Store) CreatePlan(ctx context.Context, p domain.Plan) (domain.Plan, err
 	p.CreatedAt, p.UpdatedAt = now, now
 	_, err := s.db.Writer().ExecContext(ctx, `
 		INSERT INTO plans (`+planColumns+`)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		p.ID, p.Code, p.Name["kk"], p.Name["ru"], p.Name["en"], p.Name["uz"],
 		p.Description["kk"], p.Description["ru"], p.Description["en"], p.Description["uz"],
 		p.Price, p.Currency, p.DailyLimit, p.MonthlyLimit, p.PeriodDays,
-		boolInt(p.IsFree), boolInt(p.IsActive), p.SortOrder, ms(now), ms(now), nil, boolInt(p.IsVisible))
+		boolInt(p.IsFree), boolInt(p.IsActive), p.SortOrder, ms(now), ms(now), nil, boolInt(p.IsVisible), planEntitlement(p))
 	if isUnique(err) {
 		return domain.Plan{}, domain.ErrConflict
 	}
@@ -112,12 +112,12 @@ func (s *Store) UpdatePlan(ctx context.Context, p domain.Plan) error {
 		UPDATE plans SET code = ?, name_kk = ?, name_ru = ?, name_en = ?, name_uz = ?,
 			description_kk = ?, description_ru = ?, description_en = ?, description_uz = ?,
 			price = ?, currency = ?, daily_message_limit = ?, monthly_message_limit = ?,
-			period_days = ?, is_free = ?, is_active = ?, is_visible = ?, sort_order = ?, updated_at = ?
+			period_days = ?, is_free = ?, is_active = ?, is_visible = ?, sort_order = ?, updated_at = ?, entitlement_kind = ?
 		WHERE id = ?`,
 		p.Code, p.Name["kk"], p.Name["ru"], p.Name["en"], p.Name["uz"],
 		p.Description["kk"], p.Description["ru"], p.Description["en"], p.Description["uz"],
 		p.Price, p.Currency, p.DailyLimit, p.MonthlyLimit, p.PeriodDays,
-		boolInt(p.IsFree), boolInt(p.IsActive), boolInt(p.IsVisible), p.SortOrder, ms(time.Now()), p.ID)
+		boolInt(p.IsFree), boolInt(p.IsActive), boolInt(p.IsVisible), p.SortOrder, ms(time.Now()), planEntitlement(p), p.ID)
 	if isUnique(err) {
 		return domain.ErrConflict
 	}
@@ -145,4 +145,11 @@ func boolInt(v bool) int {
 		return 1
 	}
 	return 0
+}
+
+func planEntitlement(p domain.Plan) string {
+	if p.EntitlementKind == "" {
+		return domain.EntitlementDaily
+	}
+	return p.EntitlementKind
 }

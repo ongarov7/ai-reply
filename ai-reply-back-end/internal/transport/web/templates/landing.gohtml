@@ -135,14 +135,14 @@
       <div class="plan{{if .Featured}} is-featured{{end}}">
         <div class="plan-name">{{.Name}}</div>
         <div class="plan-price">{{if .IsFree}}{{call $.T "pricing.free"}}{{else}}{{.PriceText}}{{end}}</div>
-        {{if not .IsFree}}<div class="plan-period">{{call $.T "pricing.per_month"}}</div>{{end}}
+        {{if .PeriodText}}<div class="plan-period">{{.PeriodText}}</div>{{else if not .IsFree}}<div class="plan-period">{{call $.T "pricing.per_month"}}</div>{{end}}
         <p class="plan-desc">{{.Description}}</p>
-        <div class="plan-limit"><b>{{.DailyLimit}}</b><span>{{call $.T "pricing.per_day"}}</span></div>
+        {{if .AllowanceText}}<div class="plan-limit"><b>{{.AllowanceText}}</b></div>{{else}}<div class="plan-limit"><b>{{.DailyLimit}}</b><span>{{call $.T "pricing.per_day"}}</span></div>{{end}}
         <a class="btn {{if .Featured}}btn-primary{{else}}btn-ghost{{end}}" href="#download">{{$.PricingCTA}}</a>
       </div>
       {{end}}
     </div>
-    <p class="note">{{call .T "pricing.note"}}</p>
+    <p class="note">{{.PricingNote}}</p>
   </div>
 </section>
 

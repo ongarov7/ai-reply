@@ -12,6 +12,7 @@ import (
 
 	"github.com/aireply/ai-reply-back-end/config"
 	"github.com/aireply/ai-reply-back-end/internal/admin"
+	"github.com/aireply/ai-reply-back-end/internal/catalog"
 	"github.com/aireply/ai-reply-back-end/internal/credits"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
 	"github.com/aireply/ai-reply-back-end/internal/iap"
@@ -19,6 +20,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/middleware"
 	"github.com/aireply/ai-reply-back-end/internal/notifications"
 	"github.com/aireply/ai-reply-back-end/internal/payments"
+	"github.com/aireply/ai-reply-back-end/internal/payments/bcc"
 	"github.com/aireply/ai-reply-back-end/internal/reports"
 	"github.com/aireply/ai-reply-back-end/internal/repository"
 	"github.com/aireply/ai-reply-back-end/internal/support"
@@ -44,6 +46,8 @@ type Server struct {
 	credits  *credits.Service
 	support  *support.Service
 	iap      *iap.Service
+	catalog  *catalog.Service
+	bank     *bcc.CheckoutService
 	limiter  *middleware.Limiter
 	log      *slog.Logger
 }
@@ -63,7 +67,9 @@ type Deps struct {
 	// Support — қолдау чаты (Қолдау беті).
 	Support *support.Service
 	// IAP — App Store / Google Play өнімдері мен сатып алулары («Покупки» беті).
-	IAP *iap.Service
+	IAP     *iap.Service
+	Catalog *catalog.Service
+	Bank    *bcc.CheckoutService
 	// Limiter — науқан жіберу мен алдын ала санаудың әкімші шелектері (nil — өз шектегіші).
 	Limiter *middleware.Limiter
 	Log     *slog.Logger
@@ -76,7 +82,7 @@ func New(d Deps) *Server {
 		limiter = middleware.NewLimiter()
 	}
 	return &Server{cfg: d.Config, admin: d.Admin, limits: d.Limits, notify: d.Notifications, payments: d.Payments,
-		reports: d.Reports, credits: d.Credits, support: d.Support, iap: d.IAP, limiter: limiter, log: d.Log}
+		reports: d.Reports, credits: d.Credits, support: d.Support, iap: d.IAP, catalog: d.Catalog, bank: d.Bank, limiter: limiter, log: d.Log}
 }
 
 // Register — маршруттар.
@@ -106,6 +112,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	s.registerDiagnostics(mux)
 	s.registerSupport(mux)
 	s.registerIAP(mux)
+	s.registerCatalog(mux)
 }
 
 // guard — cookie сессиясы + күй өзгертетін сұраныстарда CSRF тақырыбы.

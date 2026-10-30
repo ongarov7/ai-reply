@@ -472,7 +472,7 @@ func TestPlanVisibilityMigrationKeepsSubscriptions(t *testing.T) {
 		}
 	}
 
-	applied, err := database.Migrate(ctx, db, migrations.FS)
+	applied, err := database.Migrate(ctx, db, migrationsBefore(t, "0013"))
 	if err != nil {
 		t.Fatalf("migrate: %v", err)
 	}

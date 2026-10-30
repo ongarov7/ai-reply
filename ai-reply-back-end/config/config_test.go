@@ -867,7 +867,7 @@ func TestIAPIsOffUntilConfigured(t *testing.T) {
 	}
 }
 
-// Production-да Sandbox тек APPLE_IAP_ACCEPT_SANDBOX=true болса қабылданады (App Review туралы ескерту бар).
+// Sandbox purchases require a backend and database separate from production.
 func TestProductionRefusesSandboxPurchasesByDefault(t *testing.T) {
 	if got := iapFromEnv("production"); got.AppleAcceptSandbox {
 		t.Fatal("production accepts Sandbox by default")
@@ -880,19 +880,13 @@ func TestProductionRefusesSandboxPurchasesByDefault(t *testing.T) {
 		t.Fatal("an explicit true is ignored")
 	}
 
-	cfg := Config{App: App{Env: "production"}, IAP: IAP{AppleEnabled: true, AppleBundleID: "kz.ai-reply.reply.keyboard.keyboard"}}
-	found := false
-	for _, w := range cfg.Warnings() {
-		found = found || strings.Contains(w, "APPLE_IAP_ACCEPT_SANDBOX")
+	cfg := Config{App: App{Env: "production"}, IAP: IAP{AppleEnabled: true, AppleAcceptSandbox: true, AppleBundleID: "kz.ai-reply.reply.keyboard.keyboard"}}
+	if problems := strings.Join(cfg.Validate(), "\n"); !strings.Contains(problems, "sandbox purchases cannot grant production entitlements") {
+		t.Fatal("production allowed sandbox entitlements")
 	}
-	if !found {
-		t.Fatal("no warning about App Review purchases being refused")
-	}
-	cfg.IAP.AppleAcceptSandbox = true
-	for _, w := range cfg.Warnings() {
-		if strings.Contains(w, "APPLE_IAP_ACCEPT_SANDBOX") {
-			t.Fatal("warning with sandbox accepted")
-		}
+	cfg.App.Env = "staging"
+	if problems := strings.Join(cfg.Validate(), "\n"); strings.Contains(problems, "APPLE_IAP_ACCEPT_SANDBOX") {
+		t.Fatal("staging sandbox configuration rejected")
 	}
 }
 

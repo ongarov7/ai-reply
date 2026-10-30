@@ -258,10 +258,42 @@ func (s *Service) Products(ctx context.Context, platform string) ([]domain.IAPPr
 	out := make([]domain.IAPProduct, 0, len(all))
 	for _, p := range all {
 		if p.Offered(platform) {
+			if p.Kind == domain.ProductSubscription {
+				plan, err := s.repo.Plan(ctx, p.PlanID)
+				if err != nil || plan.IsFree || !plan.IsActive || plan.ArchivedAt != nil {
+					continue
+				}
+			}
 			out = append(out, p)
 		}
 	}
 	return out, nil
+}
+
+type Recommendation struct {
+	ID                 string `json:"id"`
+	PurchaseCount      int    `json:"purchase_count"`
+	SpentMinor         int64  `json:"spent_minor"`
+	Currency           string `json:"currency"`
+	BasePriceMinor     int64  `json:"base_price_minor"`
+	BaseStoreProductID string `json:"base_store_product_id"`
+}
+
+func (s *Service) PackageRecommendation(ctx context.Context, userID string, products []domain.IAPProduct) *Recommendation {
+	spend, err := s.repo.PackageSpending(ctx, userID)
+	if err != nil || !spend.AllPricesKnown || (spend.Count != 4 && spend.Count != 5) {
+		return nil
+	}
+	for _, product := range products {
+		if product.Kind != domain.ProductSubscription || product.Currency != "KZT" || product.PriceMinor <= 0 {
+			continue
+		}
+		plan, err := s.repo.Plan(ctx, product.PlanID)
+		if err == nil && plan.Code == "base_monthly" {
+			return &Recommendation{ID: fmt.Sprintf("base_after_pack_%d", spend.Count), PurchaseCount: spend.Count, SpentMinor: spend.SpentMinor, Currency: "KZT", BasePriceMinor: product.PriceMinor, BaseStoreProductID: product.AppleProductID}
+		}
+	}
+	return nil
 }
 
 // SetEnabled — әкімшінің ауыстырғышы. Ешбір дүкен бапталмаса қосуға болмайды (ErrIAPUnavailable).
@@ -286,18 +318,29 @@ func (s *Service) SetEnabled(ctx context.Context, enabled bool) (before bool, er
 
 // AccountToken — тіркелгінің тұрақты UUID-і: дүкенге беріледі (appAccountToken, obfuscatedAccountId).
 //
-// HMAC of the user id under a key derived from the server secret, formatted
-// as a version 4 UUID: stable across devices and reinstalls, says nothing
-// about the account, and cannot be computed by anyone else. Rotating
-// JWT_ACCESS_SECRET changes every token: purchases made before and posted
-// after the rotation are then refused (account_mismatch).
+// The initial value matches the pre-migration HMAC UUID, preserving pending
+// purchases. Once persisted it is independent of signing-key rotations.
+// Deploy this version before rotating the legacy signing key.
 func (s *Service) AccountToken(userID string) string {
 	mac := hmac.New(sha256.New, s.accountKey)
 	mac.Write([]byte("account|" + userID))
 	b := mac.Sum(nil)[:16]
 	b[6] = (b[6] & 0x0f) | 0x40
 	b[8] = (b[8] & 0x3f) | 0x80
-	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
+	initial := fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
+	if s.repo == nil {
+		return initial
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	token, err := s.repo.EnsureIAPAccountToken(ctx, userID, initial)
+	if err != nil {
+		if s.log != nil {
+			s.log.Error("iap account token unavailable", "user_id", userID, "error", err.Error())
+		}
+		return ""
+	}
+	return token
 }
 
 func deriveKey(secret, label string) []byte {
@@ -367,6 +410,10 @@ type ProductInput struct {
 	Kind            string
 	Units           int
 	DurationHours   int
+	PlanID          string
+	BillingPeriod   string
+	PriceMinor      int64
+	Currency        string
 	AppleProductID  string
 	GoogleProductID string
 	Name            map[string]string
@@ -389,6 +436,8 @@ func validate(in ProductInput) (domain.IAPProduct, error) {
 	p := domain.IAPProduct{
 		Code: strings.TrimSpace(in.Code), Kind: strings.TrimSpace(in.Kind), Units: in.Units,
 		DurationHours: in.DurationHours, AppleProductID: strings.TrimSpace(in.AppleProductID),
+		PlanID: strings.TrimSpace(in.PlanID), BillingPeriod: in.BillingPeriod,
+		PriceMinor: in.PriceMinor, Currency: strings.ToUpper(strings.TrimSpace(in.Currency)),
 		GoogleProductID: strings.TrimSpace(in.GoogleProductID), Name: map[string]string{},
 		IsActive: in.IsActive, SortOrder: in.SortOrder,
 	}
@@ -397,8 +446,10 @@ func validate(in ProductInput) (domain.IAPProduct, error) {
 		return p, domain.InvalidField("code", "format")
 	case !traits.OneOf(p.Kind, domain.IAPProductKinds...):
 		return p, domain.InvalidField("kind", "value")
-	case !UnitsRange.has(p.Units):
+	case p.Kind != domain.ProductSubscription && !UnitsRange.has(p.Units):
 		return p, domain.InvalidField("units", "range")
+	case p.Kind == domain.ProductSubscription && (p.PlanID == "" || (p.BillingPeriod != "month" && p.BillingPeriod != "year") || p.Units != 0 || p.DurationHours != 0 || p.GoogleProductID != ""):
+		return p, domain.InvalidField("plan_id", "subscription_configuration")
 	case p.Kind == domain.ProductPass && !DurationRange.has(p.DurationHours):
 		return p, domain.InvalidField("duration_hours", "range")
 	case p.Kind == domain.ProductPack && p.DurationHours != 0:
@@ -407,6 +458,8 @@ func validate(in ProductInput) (domain.IAPProduct, error) {
 		return p, domain.InvalidField("apple_product_id", "format")
 	case p.GoogleProductID != "" && !googlePattern.MatchString(p.GoogleProductID):
 		return p, domain.InvalidField("google_product_id", "format")
+	case p.PriceMinor < 0:
+		return p, domain.InvalidField("price_minor", "range")
 	case !SortRange.has(p.SortOrder):
 		return p, domain.InvalidField("sort_order", "range")
 	case p.IsActive && p.AppleProductID == "" && p.GoogleProductID == "":
@@ -431,6 +484,9 @@ func validate(in ProductInput) (domain.IAPProduct, error) {
 func (s *Service) CreateProduct(ctx context.Context, in ProductInput) (domain.IAPProduct, error) {
 	p, err := validate(in)
 	if err != nil {
+		return domain.IAPProduct{}, err
+	}
+	if err := s.validateProductPlan(ctx, p); err != nil {
 		return domain.IAPProduct{}, err
 	}
 	created, err := s.repo.CreateIAPProduct(ctx, p, s.clock.Now())
@@ -459,6 +515,16 @@ func (s *Service) UpdateProduct(ctx context.Context, id string, in ProductInput)
 	if in.Kind == "" {
 		in.Kind = before.Kind
 	}
+	if in.PlanID == "" {
+		in.PlanID = before.PlanID
+	}
+	if in.BillingPeriod == "" {
+		in.BillingPeriod = before.BillingPeriod
+	}
+	if in.Currency == "" {
+		in.Currency = before.Currency
+		in.PriceMinor = before.PriceMinor
+	}
 	if strings.TrimSpace(in.Code) != before.Code {
 		return before, after, domain.InvalidField("code", "immutable")
 	}
@@ -469,6 +535,13 @@ func (s *Service) UpdateProduct(ctx context.Context, id string, in ProductInput)
 	if err != nil {
 		return before, after, err
 	}
+	if err := s.validateProductPlan(ctx, after); err != nil {
+		return before, after, err
+	}
+	// A mapped store ID is a durable contract. Change its entitlement through a new product ID.
+	if before.AppleProductID != "" && (after.Units != before.Units || after.DurationHours != before.DurationHours || after.PlanID != before.PlanID || after.AppleProductID != before.AppleProductID) {
+		return before, after, domain.ConflictField("product", "new_store_product_required")
+	}
 	after.ID, after.CreatedAt = before.ID, before.CreatedAt
 	now := s.clock.Now()
 	if err := s.repo.UpdateIAPProduct(ctx, after, now); err != nil {
@@ -477,6 +550,20 @@ func (s *Service) UpdateProduct(ctx context.Context, id string, in ProductInput)
 	after.UpdatedAt = now
 	s.forget()
 	return before, after, nil
+}
+
+func (s *Service) validateProductPlan(ctx context.Context, p domain.IAPProduct) error {
+	if p.Kind != domain.ProductSubscription {
+		return nil
+	}
+	plan, err := s.repo.Plan(ctx, p.PlanID)
+	if err != nil {
+		return err
+	}
+	if plan.IsFree || plan.EntitlementKind == domain.EntitlementWelcome {
+		return domain.InvalidField("plan_id", "paid_plan_required")
+	}
+	return nil
 }
 
 // ArchiveProduct — өнімді мұрағаттау (сатылмайды, бұрынғы сатып алулар өз өнімін табады).

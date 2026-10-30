@@ -7,6 +7,8 @@
 
   var Vue = window.Vue;
   var boot = JSON.parse(document.getElementById("boot").textContent);
+  var basePath = boot.base_path === "/sandbox" ? "/sandbox" : "";
+  function appPath(path) { return basePath && path !== basePath && path.indexOf(basePath + "/") !== 0 ? basePath + path : path; }
 
   /* ------------------------------------------------------------------ state */
   var state = Vue.reactive({
@@ -40,10 +42,12 @@
   }
 
   function parseRoute(path) {
+    if (basePath && path.indexOf(basePath + "/") === 0) path = path.slice(basePath.length);
     var clean = path.split("?")[0].split("#")[0].replace(/\/+$/, "") || "/admin";
     var parts = clean.split("/").filter(Boolean); // ["admin", ...]
     if (parts.length <= 1) return { name: "dashboard" };
     if (parts[1] === "users") return parts[2] ? { name: "user", id: parts[2] } : { name: "users" };
+    if (parts[1] === "billing") return { name: "billing" };
     if (parts[1] === "plans") return { name: "plans" };
     if (parts[1] === "purchases") return { name: "purchases", tab: parts[2] === "transactions" ? "transactions" : "products" };
     if (parts[1] === "audit") return { name: "audit" };
@@ -61,6 +65,7 @@
   }
 
   function navigate(path) {
+    path = appPath(path);
     history.pushState({}, "", path);
     state.route = parseRoute(path);
     state.routeSeq++;
@@ -96,8 +101,8 @@
     if (options.headers) {
       for (var name in options.headers) init.headers[name] = options.headers[name];
     }
-    var response = await fetch("/api/v1/admin" + path, init);
-    if (response.status === 401) { location.href = "/admin/login"; throw new Error("unauthorized"); }
+    var response = await fetch(appPath("/api/v1/admin") + path, init);
+    if (response.status === 401) { location.href = appPath("/admin/login"); throw new Error("unauthorized"); }
     var payload = null;
     try { payload = await response.json(); } catch (e) { payload = null; }
     if (!response.ok) {
@@ -655,7 +660,7 @@
   };
 
   // Сатып алулар (domain.IAPProductKinds, IAPPurchaseStatuses, IAPProviders, IAPEnvironments).
-  var IAP_KINDS = ["pack", "pass"];
+  var IAP_KINDS = ["pack", "pass", "subscription"];
   var IAP_STATUSES = ["pending", "granted", "refunded", "revoked", "rejected"];
   var IAP_PROVIDERS = ["app_store", "google_play"];
   var IAP_ENVIRONMENTS = ["Production", "Sandbox", "Test", "Promo"];
@@ -794,7 +799,7 @@
             <div class="card">
               <div class="card-head"><h2>{{ t('admin.credits.title') }}</h2>
                 <div class="right"><span class="badge badge-brand">{{ t('admin.credits.remaining_total') }}:
-                  {{ nf(data.balances.remaining_total) }}</span></div></div>
+                  {{ data.balances.unlimited ? '∞' : nf(data.balances.remaining_total) }}</span></div></div>
               <div class="card-body">
                 <dl class="kv">
                   <dt>{{ t('admin.credits.welcome') }}</dt>
@@ -1066,8 +1071,8 @@
                     {{ p.listed ? t('admin.plans.shown') : t('admin.plans.hidden') }}</span>
                     <span v-if="p.purchasable" class="badge badge-brand">{{ t('admin.plans.for_sale') }}</span></td>
                   <td style="text-align:right; white-space:nowrap">
-                    <button class="btn btn-sm" @click="edit(p)">{{ t('common.edit') }}</button>
-                    <button class="btn btn-sm btn-danger" @click="archive(p)">{{ t('common.archive') }}</button>
+                    <button class="btn btn-sm" v-if="!['free','base_monthly','base_yearly','pro_monthly','pro_yearly','pack30'].includes(p.code)" @click="edit(p)">{{ t('common.edit') }}</button><a v-else class="btn btn-sm" :href="appPath('/admin/billing')">{{ t('admin.billing.title') }}</a>
+                    <button class="btn btn-sm btn-danger" v-if="!['free','base_monthly','base_yearly','pro_monthly','pro_yearly','pack30'].includes(p.code)" @click="archive(p)">{{ t('common.archive') }}</button>
                   </td>
                 </tr>
                 <tr v-if="!plans.length && !loading"><td colspan="9" class="empty">{{ t('common.empty') }}</td></tr>
@@ -1410,7 +1415,7 @@
             <button v-if="!data.iap.enabled" class="btn btn-primary" :disabled="!data.iap.configured"
               @click="setIAP(true)">{{ t('admin.settings.iap_on') }}</button>
             <button v-else class="btn btn-danger" @click="setIAP(false)">{{ t('admin.settings.iap_off') }}</button>
-            <a class="btn" href="/admin/purchases" @click.prevent="$root.go('/admin/purchases')">{{ t('admin.iap.open_products') }}</a>
+            <a class="btn" :href="appPath('/admin/purchases')" @click.prevent="$root.go('/admin/purchases')">{{ t('admin.iap.open_products') }}</a>
             <p class="muted" v-if="!data.iap.configured">{{ t('admin.settings.iap_unavailable') }}</p>
             <p class="muted" v-else-if="data.iap.enabled && !data.iap.available_ios && !data.iap.available_android">
               {{ t('admin.settings.iap_no_products') }}</p>
@@ -1426,13 +1431,14 @@
                   <span :class="'badge ' + (welcomeUnits > 0 ? 'badge-ok' : 'badge-muted')">
                     {{ welcomeUnits > 0 ? 'on' : 'off' }}</span></span>
                 <input type="number" step="1" :min="data.welcome_bonus.range.min" :max="data.welcome_bonus.range.max"
-                  v-model.number="welcomeUnits" :aria-invalid="welcomeInvalid()">
+                  v-model.number="welcomeUnits" :aria-invalid="welcomeInvalid()" :disabled="data.welcome_bonus.catalog_managed">
                 <small class="muted">{{ t('admin.settings.limit_default') }}: {{ data.welcome_bonus.default }} ·
                   {{ t('admin.settings.limit_range') }}: {{ data.welcome_bonus.range.min }}–{{ data.welcome_bonus.range.max }}</small>
               </label>
             </div>
             <p class="muted" v-if="data.welcome_bonus.since">{{ tf('admin.settings.welcome_bonus_since', { date: data.welcome_bonus.since }) }}</p>
-            <button class="btn btn-primary" :disabled="savingWelcome" @click="saveWelcome">{{ t('common.save') }}</button>
+            <button v-if="!data.welcome_bonus.catalog_managed" class="btn btn-primary" :disabled="savingWelcome" @click="saveWelcome">{{ t('common.save') }}</button>
+            <a v-else class="btn btn-primary" :href="appPath('/admin/billing')" @click.prevent="$root.go('/admin/billing')">{{ t('admin.billing.title') }}</a>
           </div>
         </div>
         <div class="card" v-if="data.ai_limits">
@@ -1625,7 +1631,7 @@
     campaignBadge: campaignBadge, deliveryBadge: deliveryBadge, pushBadge: pushBadge,
     permissionBadge: permissionBadge, pendingOf: pendingOf, adminName: adminName,
     pairs: function (value) { return flatten(value, ""); },
-    userLink: function (id) { return "/admin/users/" + encodeURIComponent(id); },
+    userLink: function (id) { return appPath("/admin/users/" + encodeURIComponent(id)); },
     // target — жеткізу қайда кетті: пошта не құрылғы.
     target: function (d) {
       if (d.channel === "email") return t("admin.push.channel.email");
@@ -1873,7 +1879,7 @@
               <option value="">{{ t('common.all') }}</option>
               <option v-for="s in statuses" :key="s" :value="s">{{ t('admin.push.campaign_status.' + s) }}</option>
             </select>
-            <a class="btn btn-sm btn-primary" href="/admin/notifications/new"
+            <a class="btn btn-sm btn-primary" :href="appPath('/admin/notifications/new')"
                @click.prevent="go('/admin/notifications/new')">+ {{ t('admin.push.new') }}</a>
           </div>
         </div>
@@ -2432,7 +2438,7 @@
     template: `
       <div>
         <div class="toolbar">
-          <a class="btn btn-sm" href="/admin/notifications" @click.prevent="go('/admin/notifications')">← {{ t('common.back') }}</a>
+          <a class="btn btn-sm" :href="appPath('/admin/notifications')" @click.prevent="go('/admin/notifications')">← {{ t('common.back') }}</a>
           <span v-if="live" class="badge badge-brand" role="status"><span class="pulse"></span>{{ t('admin.push.auto_refresh') }}</span>
         </div>
         <div v-if="missing" class="card"><div class="empty">{{ t('admin.error.not_found') }}</div></div>
@@ -2824,7 +2830,7 @@
       <div>
         <div class="subnav-bar">
           <nav class="subnav" :aria-label="t('admin.nav.notifications')">
-            <a v-for="item in tabs" :key="item.key" :href="item.path" :class="{ 'is-active': activeTab === item.key }"
+            <a v-for="item in tabs" :key="item.key" :href="appPath(item.path)" :class="{ 'is-active': activeTab === item.key }"
                :aria-current="activeTab === item.key ? 'page' : null" @click.prevent="go(item.path)">{{ item.label }}</a>
           </nav>
           <div v-if="status" class="push-status" :aria-label="t('admin.push.status.title')">
@@ -3344,7 +3350,7 @@
   // IAPProducts — әкімші баптайтын тауарлар: дүкендегі Product ID және не береді (бағасы дүкенде).
   var IAPProducts = {
     data: function () {
-      return { loading: true, products: [], iap: null, editing: null, tab: "ru", saving: false, kinds: IAP_KINDS };
+      return { loading: true, products: [], iap: null, editing: null, tab: "ru", saving: false, kinds: IAP_KINDS.filter(function(k) { return k !== "subscription"; }) };
     },
     mounted: function () { this.load(); },
     methods: Object.assign({}, helpers, iapHelpers, {
@@ -3448,8 +3454,8 @@
                     <span v-if="p.offered_android" class="badge badge-brand">Android</span></td>
                   <td>{{ nf(p.sales) }}</td>
                   <td style="text-align:right; white-space:nowrap"><template v-if="!p.archived">
-                    <button class="btn btn-sm" @click="edit(p)">{{ t('common.edit') }}</button>
-                    <button class="btn btn-sm btn-danger" @click="archive(p)">{{ t('common.archive') }}</button></template></td>
+                    <button class="btn btn-sm" v-if="!['free','base_monthly','base_yearly','pro_monthly','pro_yearly','pack30'].includes(p.code)" @click="edit(p)">{{ t('common.edit') }}</button><a v-else class="btn btn-sm" :href="appPath('/admin/billing')">{{ t('admin.billing.title') }}</a>
+                    <button class="btn btn-sm btn-danger" v-if="!['free','base_monthly','base_yearly','pro_monthly','pro_yearly','pack30'].includes(p.code)" @click="archive(p)">{{ t('common.archive') }}</button></template></td>
                 </tr>
                 <tr v-if="!loading && !products.length"><td colspan="9" class="empty">{{ t('admin.iap.no_products') }}</td></tr>
               </tbody>
@@ -3624,7 +3630,7 @@
       <div>
         <div class="subnav-bar">
           <nav class="subnav" :aria-label="t('admin.nav.purchases')">
-            <a v-for="item in tabs" :key="item.key" :href="item.path" :class="{ 'is-active': route.tab === item.key }"
+            <a v-for="item in tabs" :key="item.key" :href="appPath(item.path)" :class="{ 'is-active': route.tab === item.key }"
                :aria-current="route.tab === item.key ? 'page' : null" @click.prevent="go(item.path)">{{ item.label }}</a>
           </nav>
         </div>
@@ -3634,15 +3640,77 @@
   };
 
   /* --------------------------------------------------------------- shell */
+  var BillingCatalog = {
+    data: function () { return { loading: true, saving: false, published: null, draft: null, products: [], history: [], audit: [], dirty: false, reviewing: false, bankEnabled: false, orders: [] }; },
+    mounted: function () { this.load(); },
+    methods: {
+      t: t,
+      money: function (p) { return new Intl.NumberFormat(state.locale === 'kk' ? 'kk-KZ' : state.locale, { style: 'currency', currency: p.currency }).format(p.price_minor / 100); },
+      kind: function (p) { return p.unlimited ? t('admin.billing.unlimited') : p.kind === 'welcome' ? p.units + ' · ' + t('admin.billing.lifetime') : p.kind === 'pack' ? p.units + ' · ' + t('admin.billing.permanent') : p.daily_limit + ' / ' + t('pricing.per_day'); },
+      modified: function () { this.dirty = true; this.reviewing = false; },
+      price: function (p, event) { p.price_minor = Math.round(Number(event.target.value) * 100); this.modified(); },
+      async load() {
+        this.loading = true;
+        try { var d = await api('/billing/catalog'); this.published = d.published; this.draft = d.draft; this.products = JSON.parse(JSON.stringify((d.draft || d.published).products)); this.history = d.history || []; this.audit = d.audit || []; this.bankEnabled = d.bank_enabled; if(this.bankEnabled) this.orders = (await api("/billing/orders")).orders || []; this.dirty = false; this.reviewing = false; }
+        catch (e) { toast('danger', t('common.error')); }
+        this.loading = false;
+      },
+      async save() {
+        this.saving = true;
+        try { var d = await api('/billing/catalog/draft', { method: 'PUT', body: { revision: this.draft ? this.draft.revision : 0, products: this.products } }); this.draft = d.draft; this.dirty = false; this.reviewing = true; toast('ok', t('admin.billing.draft_saved')); }
+        catch (e) { toast('danger', e.code === 'CONFLICT' ? t('admin.billing.reload_conflict') : t('common.error')); }
+        this.saving = false;
+      },
+
+      async refund(order) {
+        if (!window.confirm(t('admin.billing.refund_confirm'))) return;
+        this.saving = true;
+        try { await api('/billing/orders/' + encodeURIComponent(order.payment_id) + '/refund', {method: 'POST', body: {}}); await this.load(); }
+        catch(e) { toast('danger',t('common.error')); }
+        this.saving = false;
+      },
+      async publish() {
+        if (!this.draft || this.dirty || !this.reviewing) return;
+        this.saving = true;
+        try { await api('/billing/catalog/publish', { method: 'POST', body: { id: this.draft.id, revision: this.draft.revision } }); toast('ok', t('admin.billing.published')); await this.load(); }
+        catch (e) { toast('danger', t('admin.billing.publish_error')); }
+        this.saving = false;
+      },
+      old: function (code) { return this.published.products.find(function (p) { return p.code === code; }); },
+      date: function (value) { return value ? new Date(value).toLocaleString() : '—'; }
+    },
+    template: `
+      <div v-if="!loading && published">
+        <div class="card"><div class="card-head"><h2>{{ t('admin.billing.title') }}</h2><span class="badge badge-ok">{{ t('admin.billing.live_version') }} {{ published.id }}</span></div>
+          <div class="card-body"><p>{{ t('admin.billing.workflow') }}</p><p class="muted">{{ t('admin.billing.store_hint') }}</p>
+            <div class="right"><button class="btn" @click="load" :disabled="saving">{{ t('admin.billing.reload') }}</button><button class="btn btn-primary" @click="save" :disabled="saving">{{ t('admin.billing.save_draft') }}</button><button class="btn" v-if="draft && !dirty" @click="reviewing = !reviewing">{{ t('admin.billing.review') }}</button></div>
+          </div>
+          <div class="table-wrap"><table><thead><tr><th>{{ t('admin.iap.product') }}</th><th>{{ t('admin.plans.price') }} · ₸</th><th>{{ t('admin.billing.allowance') }}</th><th>App Store Product ID</th><th>{{ t('admin.billing.availability') }}</th></tr></thead>
+            <tbody><tr v-for="p in products" :key="p.code"><td><b>{{ p.name[$root.state.locale] || p.name.en }}</b><div class="mono muted">{{ p.code }}</div><input :aria-label="t('admin.plans.name')" v-model="p.name[$root.state.locale]" @input="modified"></td>
+              <td><input type="number" min="0" max="1000000" step="0.01" :disabled="p.kind === 'welcome'" :value="p.price_minor / 100" @input="price(p, $event)" :aria-label="t('admin.plans.price')"><div class="muted">{{ p.billing_period === 'month' ? t('admin.billing.month') : p.billing_period === 'year' ? t('admin.billing.year') : t('admin.billing.once') }}</div></td>
+              <td><span v-if="p.unlimited">{{ t('admin.billing.unlimited') }}</span><input v-else-if="p.kind === 'subscription'" type="number" min="1" max="1000000" v-model.number="p.daily_limit" @input="modified" :aria-label="t('admin.plans.daily')"><input v-else type="number" min="1" max="1000000" v-model.number="p.units" @input="modified" :aria-label="t('admin.credits.units')"><div class="muted">{{ kind(p) }}</div></td>
+              <td><input v-if="p.kind !== 'welcome'" v-model.trim="p.apple_product_id" @input="modified" aria-label="App Store Product ID"><span class="badge badge-warn" v-if="p.kind !== 'welcome'">{{ p.apple_product_id ? t('admin.billing.store_unverified') : t('admin.billing.store_missing') }}</span></td>
+              <td><label><input type="checkbox" v-model="p.active" :disabled="p.kind === 'welcome'" @change="modified"> {{ t('common.active') }}</label><label><input type="checkbox" v-model="p.available_ios" @change="modified"> iOS</label><label><input type="checkbox" v-model="p.available_web" @change="modified"> Web</label></td>
+            </tr></tbody></table></div>
+        </div>
+        <div class="card" v-if="reviewing && draft && !dirty"><div class="card-head"><h2>{{ t('admin.billing.review') }} · {{ draft.id }} / {{ draft.revision }}</h2></div><div class="card-body"><p>{{ t('admin.billing.publish_hint') }}</p>
+          <div class="table-wrap"><table><thead><tr><th>{{ t('admin.iap.product') }}</th><th>{{ t('admin.billing.before') }}</th><th>{{ t('admin.billing.after') }}</th></tr></thead><tbody><tr v-for="p in products" :key="p.code"><td>{{ p.code }}</td><td>{{ money(old(p.code)) }} · {{ kind(old(p.code)) }} · {{ old(p.code).active ? t('common.active') : t('common.disabled') }}<div class="mono">{{ old(p.code).apple_product_id || '—' }}</div></td><td>{{ money(p) }} · {{ kind(p) }} · {{ p.active ? t('common.active') : t('common.disabled') }}<div class="mono">{{ p.apple_product_id || '—' }}</div></td></tr></tbody></table></div>
+          <button class="btn btn-primary" @click="publish" :disabled="saving">{{ t('admin.billing.publish') }}</button></div></div>
+        <div class="card" v-if="bankEnabled"><div class="card-head"><h2>BCC · sandbox</h2></div><div class="card-body"><p>{{ t('admin.billing.refund_policy') }}</p></div><div class="table-wrap"><table><thead><tr><th>{{ t('admin.iap.product') }}</th><th>{{ t('admin.plans.price') }}</th><th>{{ t('admin.users.col_status') }}</th><th></th></tr></thead><tbody><tr v-for="o in orders" :key="o.payment_id"><td>{{ o.product_code }}<div class="mono">{{ o.payment_id }}</div></td><td>{{ money({price_minor:o.amount_minor,currency:o.currency}) }}</td><td>{{ o.status }}<div v-if="o.refund_status">{{ t('admin.billing.refund') }}: {{ o.refund_status }}</div></td><td><button v-if="o.status === 'succeeded' && !o.refund_status" class="btn btn-sm btn-danger" :disabled="saving" @click="refund(o)">{{ t('admin.billing.refund') }}</button></td></tr></tbody></table></div></div>
+        <div class="card"><div class="card-head"><h2>{{ t('admin.billing.history') }}</h2></div><div class="table-wrap"><table><thead><tr><th>{{ t('admin.billing.version') }}</th><th>{{ t('admin.users.col_status') }}</th><th>{{ t('admin.audit.admin') }}</th><th>{{ t('admin.audit.when') }}</th></tr></thead><tbody><tr v-for="v in history" :key="v.id"><td>{{ v.id }} / {{ v.revision }}</td><td>{{ v.state }}</td><td>{{ v.published_by || v.updated_by }}</td><td>{{ date(v.published_at || v.updated_at) }}</td></tr></tbody></table></div></div>
+        <div class="card"><div class="card-head"><h2>{{ t('admin.billing.audit') }}</h2></div><div class="table-wrap"><table><tbody><tr v-for="a in audit" :key="a.id"><td>{{ a.version_id }}</td><td>{{ a.action }}</td><td>{{ a.actor }}</td><td>{{ date(a.created_at) }}</td><td><details><summary>{{ t('admin.billing.review') }}</summary><pre>{{ JSON.stringify({ before: a.before, after: a.after }, null, 2) }}</pre></details></td></tr></tbody></table></div></div>
+      </div>`
+  };
+
   var App = {
-    components: { Dashboard: Dashboard, Users: Users, UserDetail: UserDetail, Plans: Plans,
+    components: { BillingCatalog: BillingCatalog, Dashboard: Dashboard, Users: Users, UserDetail: UserDetail, Plans: Plans,
                   Audit: Audit, Reports: Reports, Settings: Settings, Notifications: Notifications,
                   Support: Support, Purchases: Purchases },
     data: function () { return { state: state }; },
     computed: {
       title: function () {
         return {
-          dashboard: t("admin.nav.dashboard"), users: t("admin.users.title"), user: t("admin.user.detail"),
+          billing: t("admin.billing.title"), dashboard: t("admin.nav.dashboard"), users: t("admin.users.title"), user: t("admin.user.detail"),
           plans: t("admin.plans.title"), audit: t("admin.audit.title"), reports: t("admin.reports.title"),
           settings: t("admin.settings.title"), notifications: t("admin.notifications.title"),
           diagnostics: t("admin.diag.title"),
@@ -3672,43 +3740,44 @@
       <div class="shell">
         <aside class="sidebar" :class="{ 'is-open': state.sidebarOpen }">
           <div class="brand"><span class="mark">AI</span> AI&nbsp;Reply</div>
-          <a class="item" href="/admin" :class="{ 'is-active': isActive('dashboard') }"
+          <a class="item" :href="appPath('/admin')" :class="{ 'is-active': isActive('dashboard') }"
              :aria-current="isActive('dashboard') ? 'page' : null" @click.prevent="go('/admin')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>
             {{ t('admin.nav.dashboard') }}</a>
-          <a class="item" href="/admin/users" :class="{ 'is-active': isActive('users') }"
+          <a class="item" :href="appPath('/admin/users')" :class="{ 'is-active': isActive('users') }"
              :aria-current="isActive('users') ? 'page' : null" @click.prevent="go('/admin/users')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0M16 11a3 3 0 1 0 0-6M17.5 20a5.5 5.5 0 0 0-2.2-4.4"/></svg>
             {{ t('admin.nav.users') }}</a>
-          <a class="item" href="/admin/plans" :class="{ 'is-active': isActive('plans') }"
+          <a class="item" :href="appPath('/admin/billing')" :class="{ 'is-active': isActive('billing') }" :aria-current="isActive('billing') ? 'page' : null" @click.prevent="go('/admin/billing')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4"/></svg>{{ t('admin.billing.title') }}</a>
+          <a class="item" :href="appPath('/admin/plans')" :class="{ 'is-active': isActive('plans') }"
              :aria-current="isActive('plans') ? 'page' : null" @click.prevent="go('/admin/plans')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 12V5a2 2 0 0 1 2-2h7l9 9-9 9z"/><circle cx="7.5" cy="7.5" r="1.4"/></svg>
             {{ t('admin.nav.plans') }}</a>
-          <a class="item" href="/admin/purchases" :class="{ 'is-active': isActive('purchases') }"
+          <a class="item" :href="appPath('/admin/purchases')" :class="{ 'is-active': isActive('purchases') }"
              :aria-current="isActive('purchases') ? 'page' : null" @click.prevent="go('/admin/purchases')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 7h14l-1.2 11.1a2 2 0 0 1-2 1.9H8.2a2 2 0 0 1-2-1.9z"/><path d="M9 7a3 3 0 0 1 6 0"/></svg>
             {{ t('admin.nav.purchases') }}</a>
-          <a class="item" href="/admin/notifications" :class="{ 'is-active': isActive('notifications') }"
+          <a class="item" :href="appPath('/admin/notifications')" :class="{ 'is-active': isActive('notifications') }"
              :aria-current="isActive('notifications') ? 'page' : null" @click.prevent="go('/admin/notifications')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9a6 6 0 1 1 12 0c0 5 2 6 2 6H4s2-1 2-6M10 20a2 2 0 0 0 4 0"/></svg>
             {{ t('admin.nav.notifications') }}</a>
-          <a class="item" href="/admin/diagnostics" :class="{ 'is-active': isActive('diagnostics') }"
+          <a class="item" :href="appPath('/admin/diagnostics')" :class="{ 'is-active': isActive('diagnostics') }"
              :aria-current="isActive('diagnostics') ? 'page' : null" @click.prevent="go('/admin/diagnostics')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"/></svg>
             {{ t('admin.nav.diagnostics') }}</a>
-          <a class="item" href="/admin/reports" :class="{ 'is-active': isActive('reports') }"
+          <a class="item" :href="appPath('/admin/reports')" :class="{ 'is-active': isActive('reports') }"
              :aria-current="isActive('reports') ? 'page' : null" @click.prevent="go('/admin/reports')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg>
             {{ t('admin.nav.reports') }}</a>
-          <a class="item" href="/admin/support" :class="{ 'is-active': isActive('support') }"
+          <a class="item" :href="appPath('/admin/support')" :class="{ 'is-active': isActive('support') }"
              :aria-current="isActive('support') ? 'page' : null" @click.prevent="go('/admin/support')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>
             {{ t('admin.nav.support') }}<span v-if="state.supportUnread" class="nav-badge">{{ state.supportUnread }}</span></a>
-          <a class="item" href="/admin/audit" :class="{ 'is-active': isActive('audit') }"
+          <a class="item" :href="appPath('/admin/audit')" :class="{ 'is-active': isActive('audit') }"
              :aria-current="isActive('audit') ? 'page' : null" @click.prevent="go('/admin/audit')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg>
             {{ t('admin.nav.audit') }}</a>
-          <a class="item" href="/admin/settings" :class="{ 'is-active': isActive('settings') }"
+          <a class="item" :href="appPath('/admin/settings')" :class="{ 'is-active': isActive('settings') }"
              :aria-current="isActive('settings') ? 'page' : null" @click.prevent="go('/admin/settings')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>
             {{ t('admin.nav.settings') }}</a>
@@ -3728,7 +3797,7 @@
                    @click="setLocale(l)">{{ l }}</a>
               </div>
               <span class="who">{{ state.admin.email }}</span>
-              <form id="logout-form" method="post" action="/admin/logout">
+              <form id="logout-form" method="post" :action="appPath('/admin/logout')">
                 <input type="hidden" name="csrf" :value="state.csrf">
                 <button class="btn btn-sm" type="submit">{{ t('admin.nav.logout') }}</button>
               </form>
@@ -3738,6 +3807,7 @@
             <dashboard v-if="state.route.name === 'dashboard'"/>
             <users v-else-if="state.route.name === 'users'"/>
             <user-detail v-else-if="state.route.name === 'user'" :id="state.route.id" :key="state.route.id"/>
+            <billing-catalog v-else-if="state.route.name === 'billing'"/>
             <plans v-else-if="state.route.name === 'plans'"/>
             <purchases v-else-if="state.route.name === 'purchases'" :route="state.route" :key="'purchases' + state.routeSeq"/>
             <audit v-else-if="state.route.name === 'audit'"/>
@@ -3761,6 +3831,7 @@
   app.component("user-diagnostics", UserDiagnostics);
   app.component("reminder-settings", ReminderSettings);
   app.config.globalProperties.t = t;
+  app.config.globalProperties.appPath = appPath;
   app.config.globalProperties.tf = tf;
   app.mount("#app");
   document.getElementById("app").classList.remove("app-loading");

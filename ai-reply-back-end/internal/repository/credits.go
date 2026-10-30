@@ -27,6 +27,7 @@ type ReserveInput struct {
 	// DailyLimit, MonthlyLimit — тариф шектері (MonthlyLimit 0 — айлық шек жоқ).
 	DailyLimit   int
 	MonthlyLimit int
+	Unlimited    bool
 	Now          time.Time
 }
 
@@ -96,9 +97,9 @@ func (s *Store) ReserveGeneration(ctx context.Context, in ReserveInput) (Reserva
 
 		var closed error
 		switch {
-		case in.DailyLimit <= 0 || day >= in.DailyLimit:
+		case !in.Unlimited && (in.DailyLimit <= 0 || day >= in.DailyLimit):
 			closed = domain.ErrDailyLimit
-		case in.MonthlyLimit > 0 && mon >= in.MonthlyLimit:
+		case !in.Unlimited && in.MonthlyLimit > 0 && mon >= in.MonthlyLimit:
 			closed = domain.ErrMonthlyLimit
 		}
 
@@ -106,15 +107,15 @@ func (s *Store) ReserveGeneration(ctx context.Context, in ReserveInput) (Reserva
 		if closed == nil {
 			if err := tx.QueryRowContext(ctx, `
 				UPDATE usage_daily SET used = used + 1, updated_at = ?
-				WHERE user_id = ? AND usage_date = ? AND used < ? RETURNING used`,
-				now, in.UserID, in.Date, in.DailyLimit).Scan(&day); err != nil {
+				WHERE user_id = ? AND usage_date = ? AND (? OR used < ?) RETURNING used`,
+				now, in.UserID, in.Date, in.Unlimited, in.DailyLimit).Scan(&day); err != nil {
 				if errors.Is(err, sql.ErrNoRows) {
 					return domain.ErrDailyLimit
 				}
 				return err
 			}
 			guard, args := "", []any{now, in.UserID, in.Month}
-			if in.MonthlyLimit > 0 {
+			if in.MonthlyLimit > 0 && !in.Unlimited {
 				guard, args = " AND used < ?", append(args, in.MonthlyLimit)
 			}
 			if err := tx.QueryRowContext(ctx, `
@@ -126,6 +127,9 @@ func (s *Store) ReserveGeneration(ctx context.Context, in ReserveInput) (Reserva
 				return err
 			}
 			out.Bucket = domain.BucketDaily
+			if in.Unlimited {
+				out.Bucket = domain.BucketUnlimited
+			}
 		} else {
 			var (
 				kind string
@@ -293,7 +297,7 @@ func (s *Store) RefundGeneration(ctx context.Context, id string, now time.Time) 
 		}
 		refunded = true
 		column := "extra_used"
-		if bucket == domain.BucketDaily {
+		if bucket == domain.BucketDaily || bucket == domain.BucketUnlimited {
 			column = "used"
 		}
 		if _, err := tx.ExecContext(ctx, `
@@ -306,7 +310,7 @@ func (s *Store) RefundGeneration(ctx context.Context, id string, now time.Time) 
 			WHERE user_id = ? AND usage_month = ? AND `+column+` > 0`, at, userID, month); err != nil {
 			return err
 		}
-		if bucket == domain.BucketDaily || !grant.Valid {
+		if bucket == domain.BucketDaily || bucket == domain.BucketUnlimited || !grant.Valid {
 			return nil
 		}
 		var kind string

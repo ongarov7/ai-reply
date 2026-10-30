@@ -159,6 +159,8 @@ type Transaction struct {
 	BundleID              string `json:"bundleId"`
 	ProductID             string `json:"productId"`
 	PurchaseDate          int64  `json:"purchaseDate"`
+	ExpiresDate           int64  `json:"expiresDate,omitempty"`
+	IsUpgraded            bool   `json:"isUpgraded,omitempty"`
 	Quantity              int    `json:"quantity"`
 	Type                  string `json:"type"`
 	AppAccountToken       string `json:"appAccountToken,omitempty"`
@@ -189,4 +191,5 @@ type NotificationData struct {
 	BundleVersion         string `json:"bundleVersion"`
 	Environment           string `json:"environment"`
 	SignedTransactionInfo string `json:"signedTransactionInfo,omitempty"`
+	SignedRenewalInfo     string `json:"signedRenewalInfo,omitempty"`
 }

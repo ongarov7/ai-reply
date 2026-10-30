@@ -4,127 +4,109 @@ import (
 	"context"
 	"io/fs"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/aireply/ai-reply-back-end/internal/database"
+	"github.com/aireply/ai-reply-back-end/internal/domain"
 	"github.com/aireply/ai-reply-back-end/internal/repository"
 	"github.com/aireply/ai-reply-back-end/migrations"
 )
 
-func TestFreeDailyLimitUpgradeRepairsExistingDataAndKeepsAdminEdits(t *testing.T) {
-	ctx := context.Background()
-	before := fstest.MapFS{}
+// Historical migration tests pin their target version; later business-model migrations
+// intentionally supersede defaults and must be verified independently.
+func migrationsBefore(t *testing.T, before string) fstest.MapFS {
+	t.Helper()
+	out := fstest.MapFS{}
 	entries, err := fs.ReadDir(migrations.FS, ".")
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, entry := range entries {
-		if strings.HasSuffix(entry.Name(), ".sql") && entry.Name() < "0021" {
+		if strings.HasSuffix(entry.Name(), ".sql") && entry.Name() < before {
 			body, err := fs.ReadFile(migrations.FS, entry.Name())
 			if err != nil {
 				t.Fatal(err)
 			}
-			before[entry.Name()] = &fstest.MapFile{Data: body}
+			out[entry.Name()] = &fstest.MapFile{Data: body}
 		}
 	}
-	for _, custom := range []bool{false, true} {
-		name := "known multilingual boilerplate"
-		if custom {
-			name = "custom admin copy"
+	return out
+}
+
+func TestApprovedEntitlementMigrationPreservesExistingBalancesAndPaidContract(t *testing.T) {
+	ctx := context.Background()
+	db, err := database.Open(database.Options{Path: filepath.Join(t.TempDir(), "existing.db"), MaxReadConns: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	if _, err := database.Migrate(ctx, db, migrationsBefore(t, "0022")); err != nil {
+		t.Fatal(err)
+	}
+	for _, stmt := range []string{
+		`INSERT INTO users(id,email,status,kind,created_at,updated_at) VALUES ('existing','existing@example.com','active','account',1000,1000)`,
+		`INSERT INTO credit_grants(id,user_id,kind,units_total,units_remaining,starts_at,status,created_at,updated_at) VALUES ('welcome','existing','welcome',20,7,1000,'active',1000,1000)`,
+		`INSERT INTO credit_grants(id,user_id,kind,units_total,units_remaining,starts_at,status,created_at,updated_at) VALUES ('purchased','existing','pack',60,49,1000,'active',1000,1000)`,
+		`INSERT INTO usage_daily(user_id,usage_date,used,updated_at) VALUES ('existing','2026-10-23',7,1000)`,
+		`INSERT INTO subscriptions(id,user_id,plan_id,status,source,started_at,expires_at,created_at,updated_at) SELECT 'legacy-pro','existing',id,'active','payment',1000,9999999999999,1000,1000 FROM plans WHERE code='pro'`,
+	} {
+		if _, err := db.Writer().ExecContext(ctx, stmt); err != nil {
+			t.Fatal(err)
 		}
-		t.Run(name, func(t *testing.T) {
-			db, err := database.Open(database.Options{Path: filepath.Join(t.TempDir(), "existing.db"), MaxReadConns: 2})
-			if err != nil {
-				t.Fatal(err)
-			}
-			t.Cleanup(func() { _ = db.Close() })
-			if _, err := database.Migrate(ctx, db, before); err != nil {
-				t.Fatal(err)
-			}
-			old := map[string]string{"kk": "Күніне 20 жауап. Картасыз бастаңыз.", "ru": "20 ответов в день. Начните без карты.", "en": "20 replies per day. Start without a card.", "uz": "Kuniga 20 ta javob. Kartasiz boshlang."}
-			want := map[string]string{"kk": "Күніне 7 жауап. Картасыз бастаңыз.", "ru": "7 ответов в день. Начните без карты.", "en": "7 replies per day. Start without a card.", "uz": "Kuniga 7 ta javob. Kartasiz boshlang."}
-			if custom {
-				old = map[string]string{"kk": "Арнайы 20 бөлім", "ru": "Особые условия 20", "en": "20 custom benefits, edited by admin", "uz": "20 maxsus shart"}
-				want = old
-			}
-			if _, err := db.Writer().ExecContext(ctx, `UPDATE plans SET daily_message_limit=20, name_ru='Мой бесплатный 20',
-    description_kk=?, description_ru=?, description_en=?, description_uz=?, monthly_message_limit=100,updated_at=1234 WHERE code='free'`, old["kk"], old["ru"], old["en"], old["uz"]); err != nil {
-				t.Fatal(err)
-			}
-			// A paid plan can independently have the same limit and copy; do not change it.
-			if _, err := db.Writer().ExecContext(ctx, `UPDATE plans SET daily_message_limit=20,description_ru='20 ответов в день. Начните без карты.',updated_at=4321 WHERE code='standard'`); err != nil {
-				t.Fatal(err)
-			}
-			if _, err := db.Writer().ExecContext(ctx, `UPDATE system_settings SET value='20' WHERE key='welcome_bonus_units'`); err != nil {
-				t.Fatal(err)
-			}
-			if _, err := db.Writer().ExecContext(ctx, `INSERT INTO users(id,email,status,kind,created_at,updated_at) VALUES('migration-free-user','migration-free@example.com','active','account',1000,1000)`); err != nil {
-				t.Fatal(err)
-			}
-			if _, err := db.Writer().ExecContext(ctx, `INSERT INTO usage_daily(user_id,usage_date,used,updated_at) VALUES('migration-free-user','2026-10-23',9,1000)`); err != nil {
-				t.Fatal(err)
-			}
-			store := repository.New(db)
-			freeBefore, err := store.PlanByCode(ctx, "free")
-			if err != nil {
-				t.Fatal(err)
-			}
-			paidBefore, err := store.PlanByCode(ctx, "standard")
-			if err != nil {
-				t.Fatal(err)
-			}
-			applied, err := database.Migrate(ctx, db, migrations.FS)
-			if err != nil || len(applied) != 1 || applied[0] != "0021_free_daily_limit_7.sql" {
-				t.Fatalf("upgrade applied=%v err=%v", applied, err)
-			}
-			freeAfter, err := store.PlanByCode(ctx, "free")
-			if err != nil {
-				t.Fatal(err)
-			}
-			if freeAfter.DailyLimit != 7 || !reflect.DeepEqual(freeAfter.Description, want) {
-				t.Fatalf("free plan: limit=%d description=%v", freeAfter.DailyLimit, freeAfter.Description)
-			}
-			if !reflect.DeepEqual(freeAfter.Name, freeBefore.Name) || freeAfter.MonthlyLimit != 100 || freeAfter.IsActive != freeBefore.IsActive || freeAfter.IsVisible != freeBefore.IsVisible {
-				t.Fatal("unrelated free plan fields changed")
-			}
-			paidAfter, err := store.PlanByCode(ctx, "standard")
-			if err != nil || !reflect.DeepEqual(paidAfter, paidBefore) {
-				t.Fatal("paid plan changed")
-			}
-			var bonus string
-			if err := db.Reader().QueryRowContext(ctx, `SELECT value FROM system_settings WHERE key='welcome_bonus_units'`).Scan(&bonus); err != nil || bonus != "20" {
-				t.Fatalf("welcome bonus changed: %q err=%v", bonus, err)
-			}
-			var used int
-			if err := db.Reader().QueryRowContext(ctx, `SELECT used FROM usage_daily WHERE user_id='migration-free-user'`).Scan(&used); err != nil || used != 9 {
-				t.Fatalf("usage reset: %d err=%v", used, err)
-			}
-			// Reapplying the SQL itself is a no-op once the desired state is reached.
-			body, err := fs.ReadFile(migrations.FS, "0021_free_daily_limit_7.sql")
-			if err != nil {
-				t.Fatal(err)
-			}
-			result, err := db.Writer().ExecContext(ctx, string(body))
-			if err != nil {
-				t.Fatal(err)
-			}
-			if affected, _ := result.RowsAffected(); affected != 0 {
-				t.Fatalf("SQL is not idempotent: affected=%d", affected)
-			}
-			// A later admin edit must remain authoritative on every subsequent startup.
-			if _, err := db.Writer().ExecContext(ctx, `UPDATE plans SET daily_message_limit=12,description_en='My updated plan' WHERE code='free'`); err != nil {
-				t.Fatal(err)
-			}
-			if again, err := database.Migrate(ctx, db, migrations.FS); err != nil || len(again) != 0 {
-				t.Fatalf("second startup=%v err=%v", again, err)
-			}
-			final, err := store.PlanByCode(ctx, "free")
-			if err != nil || final.DailyLimit != 12 || final.Description["en"] != "My updated plan" {
-				t.Fatal("later admin edit was reset")
-			}
-		})
+	}
+	recentAccountAt := time.Now().UnixMilli()
+	if _, err := db.Writer().ExecContext(ctx, `INSERT INTO users(id,email,status,kind,created_at,updated_at) VALUES ('recent','recent@example.com','active','account',?,?)`, recentAccountAt, recentAccountAt); err != nil {
+		t.Fatal(err)
+	}
+	applied, err := database.Migrate(ctx, db, migrations.FS)
+	if err != nil || len(applied) < 1 || applied[0] != "0022_ios_entitlements.sql" {
+		t.Fatalf("migration: %v %v", applied, err)
+	}
+	repo := repository.New(db)
+	free, err := repo.PlanByCode(ctx, "free")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if free.DailyLimit != 0 || free.EntitlementKind != domain.EntitlementWelcome {
+		t.Fatalf("free: %+v", free)
+	}
+	balance, err := repo.CreditBalance(ctx, "existing", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if balance.WelcomeTotal != 20 || balance.WelcomeRemaining != 7 || balance.Packs != 49 {
+		t.Fatalf("existing credits changed: %+v", balance)
+	}
+	legacy, err := repo.CurrentSubscription(ctx, "existing")
+	if err != nil || legacy.ID != "legacy-pro" || !legacy.IsUsable(time.Now()) {
+		t.Fatalf("legacy contract changed: %+v %v", legacy, err)
+	}
+	legacyPlan, err := repo.PlanByCode(ctx, "pro")
+	if err != nil || legacyPlan.DailyLimit != 50 || legacyPlan.Price != 349000 {
+		t.Fatalf("legacy paid plan changed: %+v %v", legacyPlan, err)
+	}
+	var units string
+	if err := db.Reader().QueryRow(`SELECT value FROM system_settings WHERE key='welcome_bonus_units'`).Scan(&units); err != nil || units != "10" {
+		t.Fatalf("new allowance %q %v", units, err)
+	}
+	var cutoff int64
+	if err := db.Reader().QueryRow(`SELECT CAST(value AS INTEGER) FROM system_settings WHERE key='welcome_bonus_since'`).Scan(&cutoff); err != nil || cutoff <= recentAccountAt {
+		t.Fatal("missing release cutoff")
+	}
+	if again, err := database.Migrate(ctx, db, migrations.FS); err != nil || len(again) != 0 {
+		t.Fatalf("rerun: %v %v", again, err)
+	}
+	var count int
+	if err := db.Reader().QueryRow(`SELECT COUNT(*) FROM credit_grants WHERE user_id='existing'`).Scan(&count); err != nil || count != 2 {
+		t.Fatal("migration regranted credits")
+	}
+	for code, price := range map[string]int64{"base_monthly": 59900, "base_yearly": 599900, "pro_monthly": 299900, "pro_yearly": 2999000} {
+		p, err := repo.PlanByCode(ctx, code)
+		if err != nil || p.Price != price {
+			t.Fatalf("approved plan %s: %+v %v", code, p, err)
+		}
 	}
 }

@@ -97,6 +97,7 @@ type Result struct {
 	InputTokens      int
 	OutputTokens     int
 	DailyLimit       int
+	Unlimited        bool
 	UsedToday        int
 	Remaining        int
 	// MonthlyLimit — 0 болса айлық шек жоқ; UsedMonth — осы айда жұмсалғаны.
@@ -217,7 +218,7 @@ func (s *Service) generate(ctx context.Context, c call, prompt Prompt, started t
 
 	res, err := s.repo.ReserveGeneration(ctx, repository.ReserveInput{
 		UserID: c.User.ID, Key: c.Key, Mode: c.Mode, Date: date, Month: month,
-		DailyLimit: entitlement.DailyLimit, MonthlyLimit: entitlement.MonthlyLimit, Now: started,
+		DailyLimit: entitlement.DailyLimit, MonthlyLimit: entitlement.MonthlyLimit, Unlimited: entitlement.Unlimited, Now: started,
 	})
 	if err != nil {
 		if !isQuotaRefusal(err) {
@@ -283,7 +284,7 @@ func (s *Service) generate(ctx context.Context, c call, prompt Prompt, started t
 
 	usage := entitlement
 	usage.UsedToday, usage.UsedMonth, usage.Balance = res.UsedToday, res.UsedMonth, res.Balance
-	if s.quota != nil && !res.Replay {
+	if s.quota != nil && !res.Replay && !entitlement.Unlimited {
 		s.quota.QuotaUsed(ctx, c.User, usage, date, month)
 	}
 
@@ -294,6 +295,7 @@ func (s *Service) generate(ctx context.Context, c call, prompt Prompt, started t
 		InputTokens:      outcome.InputTokens,
 		OutputTokens:     outcome.OutputTokens,
 		DailyLimit:       entitlement.DailyLimit,
+		Unlimited:        entitlement.Unlimited,
 		UsedToday:        usage.UsedToday,
 		Remaining:        usage.Remaining(),
 		MonthlyLimit:     entitlement.MonthlyLimit,

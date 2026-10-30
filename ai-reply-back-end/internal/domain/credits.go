@@ -8,11 +8,12 @@ import "time"
 // an active pass, the welcome bonus, admin grants and purchased packs
 // (oldest first). A monthly plan cap only closes the daily bucket.
 const (
-	BucketDaily   = "daily"
-	BucketPass    = "pass"
-	BucketWelcome = "welcome"
-	BucketAdmin   = "admin"
-	BucketPack    = "pack"
+	BucketDaily     = "daily"
+	BucketUnlimited = "unlimited"
+	BucketPass      = "pass"
+	BucketWelcome   = "welcome"
+	BucketAdmin     = "admin"
+	BucketPack      = "pack"
 )
 
 // Кредит түрлері (credit_grants.kind). Атаулары бөліктердің атауымен бірдей.

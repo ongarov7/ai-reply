@@ -14,10 +14,11 @@ import (
 
 // appView — Vue қосымшасының қабығы.
 type appView struct {
-	T       func(string) string
-	Locale  string
-	Boot    template.JS
-	Version string
+	T        func(string) string
+	Locale   string
+	Boot     template.JS
+	Version  string
+	BasePath string
 }
 
 // handleAdminApp — SPA қабығын береді; аудармалар мен CSRF бірден кіріктіріледі.
@@ -31,7 +32,8 @@ func (s *Server) handleAdminApp(w http.ResponseWriter, r *http.Request) {
 	}
 
 	boot := map[string]any{
-		"csrf": sessionFrom(r.Context()).CSRFToken,
+		"csrf":      sessionFrom(r.Context()).CSRFToken,
+		"base_path": s.basePath(),
 		"admin": map[string]any{
 			"id": adminUser.ID, "email": adminUser.Email, "name": adminUser.Name, "role": adminUser.Role,
 		},
@@ -49,7 +51,7 @@ func (s *Server) handleAdminApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.render(w, "admin_app", "admin_app", appView{
-		T: s.bundle.Translator(locale), Locale: locale, Boot: template.JS(raw), Version: s.adminVersion,
+		T: s.bundle.Translator(locale), Locale: locale, Boot: template.JS(raw), Version: s.adminVersion, BasePath: s.basePath(),
 	})
 }
 
