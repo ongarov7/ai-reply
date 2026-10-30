@@ -1,10 +1,22 @@
 import Foundation
 
-/// Fixed production configuration shared by the app and keyboard extension.
+/// Backend configuration shared by the app and keyboard extension.
 struct AIConfiguration: Sendable {
 
     static let productionBaseURL = URL(string: "https://ai-reply.kz")!
     static let requestTimeout: TimeInterval = 25
+
+    /// A sandbox distribution can select its own backend at build time.
+    /// The containing app and extension receive the same build setting.
+    static var distributionBaseURL: URL {
+        guard let value = Bundle.main.object(forInfoDictionaryKey: "AIReplyBackendBaseURL") as? String,
+              let url = URL(string: value), url.scheme == "https",
+              let host = url.host, !host.isEmpty,
+              url.user == nil, url.password == nil, url.query == nil, url.fragment == nil else {
+            return productionBaseURL
+        }
+        return url
+    }
 
     /// Longest incoming message, as the server last published it (see
     /// `AILimits`). Not a constant: the administrator owns this number.
@@ -57,7 +69,7 @@ struct AIConfiguration: Sendable {
            let url = URL(string: raw), url.scheme != nil {
             return url
         }
-        return productionBaseURL
+        return distributionBaseURL
     }
 
     /// Points this install at a test backend, or back at production when
@@ -93,7 +105,7 @@ struct AIConfiguration: Sendable {
 
 #else
 
-    static var resolvedBaseURL: URL { productionBaseURL }
+    static var resolvedBaseURL: URL { distributionBaseURL }
 
 #endif
 }

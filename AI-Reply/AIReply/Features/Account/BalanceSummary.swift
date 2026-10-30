@@ -15,18 +15,22 @@ struct BalanceSummary: Equatable {
         /// What can be generated now: plan, pass, free and purchased
         /// replies together (the plan's day alone on an older server).
         case today(Int)
+        case unlimited
         /// The free replies of a new account.
         case welcome(remaining: Int, total: Int)
         /// Administrator grants and purchased packs.
         case purchased(Int)
+        case admin(Int)
         /// A running pass, until when and what is left of it.
         case pass(until: Date, remaining: Int)
 
         var id: String {
             switch self {
             case .today:     return "today"
+            case .unlimited: return "unlimited"
             case .welcome:   return "welcome"
             case .purchased: return "purchased"
+            case .admin:     return "admin"
             case .pass:      return "pass"
             }
         }
@@ -42,16 +46,18 @@ struct BalanceSummary: Equatable {
 
     static func make(_ usage: AccountAPI.Usage, now: Date = Date()) -> BalanceSummary {
         guard usage.isKnown else { return .unknown }
-        var rows: [Row] = [.today(usage.availableNow)]
+        var rows: [Row] = [usage.unlimited ? .unlimited : .today(usage.availableNow)]
         var headline: AccountAPI.Usage.Welcome?
         if let welcome = usage.welcome, welcome.total > 0 {
             let remaining = min(max(0, welcome.remaining), welcome.total)
             rows.append(.welcome(remaining: remaining, total: welcome.total))
             if remaining > 0 { headline = AccountAPI.Usage.Welcome(total: welcome.total, remaining: remaining) }
         }
-        if let credits = usage.credits, credits > 0 {
+        let purchased = usage.purchasedCredits ?? usage.credits.map { max(0, $0 - (usage.adminCredits ?? 0)) }
+        if let credits = purchased, credits > 0 {
             rows.append(.purchased(credits))
         }
+        if let credits = usage.adminCredits, credits > 0 { rows.append(.admin(credits)) }
         if let pass = usage.pass, let until = date(pass.expiresAt), until > now {
             rows.append(.pass(until: until, remaining: max(0, pass.remaining)))
         }
@@ -61,7 +67,9 @@ struct BalanceSummary: Equatable {
     /// The rows beyond today's total: what the plan screen lists under its
     /// own number.
     var extraRows: [Row] {
-        rows.filter { if case .today = $0 { return false } else { return true } }
+        rows.filter {
+            switch $0 { case .today, .unlimited: return false; default: return true }
+        }
     }
 
     static func date(_ iso: String) -> Date? { ServerTime.date(iso) }
@@ -106,10 +114,14 @@ struct BalanceRows: View {
         switch item {
         case .today(let count):
             row(Text("balance.today"), value: Text(verbatim: "\(count)"), isTotal: true)
+        case .unlimited:
+            row(Text("purchase.unlimited"), value: Text(verbatim: "∞"), isTotal: true)
         case .welcome(let remaining, let total):
             row(Text("balance.welcome"), value: Text("balance.welcome.value \(remaining) \(total)"))
         case .purchased(let count):
             row(Text("balance.purchased"), value: Text(verbatim: "\(count)"))
+        case .admin(let count):
+            row(Text("balance.admin"), value: Text(verbatim: "\(count)"))
         case .pass(let until, let remaining):
             row(Text("balance.pass \(until, format: passFormat)"), value: Text(verbatim: "\(remaining)"))
         }

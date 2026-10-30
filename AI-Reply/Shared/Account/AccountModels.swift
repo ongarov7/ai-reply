@@ -125,6 +125,9 @@ extension AccountAPI {
         /// verified billing integration and the administrator's switch).
         /// Absent on older servers, which counts as no.
         var purchasable = false
+        var entitlementKind = "daily"
+
+        var isUnlimited: Bool { entitlementKind == "unlimited" }
 
         enum CodingKeys: String, CodingKey {
             case id, code, name, description, price, currency, purchasable
@@ -133,6 +136,7 @@ extension AccountAPI {
             case monthlyLimit = "monthly_message_limit"
             case periodDays = "period_days"
             case isFree = "is_free"
+            case entitlementKind = "entitlement_kind"
         }
 
         /// Localized name with an English fallback, mirroring the server.
@@ -188,6 +192,9 @@ extension AccountAPI {
         /// What paid for this generation: daily | pass | welcome | admin |
         /// pack. Only in reply and compose answers.
         var bucket: String? = nil
+        var unlimited = false
+        var purchasedCredits: Int? = nil
+        var adminCredits: Int? = nil
 
         struct Welcome: Decodable, Sendable, Equatable {
             let total: Int
@@ -215,13 +222,16 @@ extension AccountAPI {
             case timezone
             case welcome, credits, pass, bucket
             case remainingTotal = "remaining_total"
+            case unlimited
+            case purchasedCredits = "purchased_credits"
+            case adminCredits = "admin_credits"
         }
 
         static let unknown = Usage(dailyLimit: 0, usedToday: 0, remainingToday: 0,
                                    monthlyLimit: 0, usedMonth: 0, resetsAt: "", timezone: "")
 
         /// The server has answered: every real usage carries its reset time.
-        var isKnown: Bool { dailyLimit > 0 || !resetsAt.isEmpty }
+        var isKnown: Bool { unlimited || remainingTotal != nil || dailyLimit > 0 || !resetsAt.isEmpty }
 
         /// What can be generated right now: the whole balance where the
         /// server sends it, the plan's day otherwise.
@@ -472,6 +482,9 @@ extension AccountAPI.Usage {
         pass = (try? container.decodeIfPresent(Pass.self, forKey: .pass)) ?? nil
         remainingTotal = (try? container.decodeIfPresent(Int.self, forKey: .remainingTotal)) ?? nil
         bucket = (try? container.decodeIfPresent(String.self, forKey: .bucket)) ?? nil
+        unlimited = (try? container.decodeIfPresent(Bool.self, forKey: .unlimited)) ?? false
+        purchasedCredits = (try? container.decodeIfPresent(Int.self, forKey: .purchasedCredits)) ?? nil
+        adminCredits = (try? container.decodeIfPresent(Int.self, forKey: .adminCredits)) ?? nil
     }
 }
 
@@ -493,5 +506,6 @@ extension AccountAPI.Plan {
         periodDays = try container.decode(Int.self, forKey: .periodDays)
         isFree = try container.decode(Bool.self, forKey: .isFree)
         purchasable = try container.decodeIfPresent(Bool.self, forKey: .purchasable) ?? false
+        entitlementKind = (try? container.decodeIfPresent(String.self, forKey: .entitlementKind)) ?? (isFree ? "welcome" : "daily")
     }
 }

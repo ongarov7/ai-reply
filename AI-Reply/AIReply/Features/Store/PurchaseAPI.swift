@@ -20,20 +20,39 @@ enum PurchaseAPI {
         let storeProductID: String
         /// In the account's language.
         let name: String
+        var planID: String? = nil
+        var billingPeriod: String? = nil
+        var entitlementKind: String? = nil
+        var dailyLimit = 0
+        var price: Int? = nil
+        var currency: String? = nil
 
         enum CodingKeys: String, CodingKey {
             case code, kind, units, name
             case durationHours = "duration_hours"
             case storeProductID = "store_product_id"
+            case planID = "plan_id"
+            case billingPeriod = "billing_period"
+            case entitlementKind = "entitlement_kind"
+            case dailyLimit = "daily_limit"
+            case price, currency
         }
 
-        init(code: String, kind: String, units: Int, durationHours: Int, storeProductID: String, name: String) {
+        init(code: String, kind: String, units: Int, durationHours: Int, storeProductID: String, name: String,
+             planID: String? = nil, billingPeriod: String? = nil, entitlementKind: String? = nil,
+             dailyLimit: Int = 0, price: Int? = nil, currency: String? = nil) {
             self.code = code
             self.kind = kind
             self.units = units
             self.durationHours = durationHours
             self.storeProductID = storeProductID
             self.name = name
+            self.planID = planID
+            self.billingPeriod = billingPeriod
+            self.entitlementKind = entitlementKind
+            self.dailyLimit = dailyLimit
+            self.price = price
+            self.currency = currency
         }
 
         init(from decoder: Decoder) throws {
@@ -44,6 +63,12 @@ enum PurchaseAPI {
             durationHours = (try? container.decodeIfPresent(Int.self, forKey: .durationHours)) ?? 0
             storeProductID = try container.decodeIfPresent(String.self, forKey: .storeProductID) ?? ""
             name = (try? container.decodeIfPresent(String.self, forKey: .name)) ?? ""
+            planID = try? container.decodeIfPresent(String.self, forKey: .planID)
+            billingPeriod = try? container.decodeIfPresent(String.self, forKey: .billingPeriod)
+            entitlementKind = try? container.decodeIfPresent(String.self, forKey: .entitlementKind)
+            dailyLimit = (try? container.decodeIfPresent(Int.self, forKey: .dailyLimit)) ?? 0
+            price = try? container.decodeIfPresent(Int.self, forKey: .price)
+            currency = try? container.decodeIfPresent(String.self, forKey: .currency)
         }
     }
 
@@ -53,10 +78,29 @@ enum PurchaseAPI {
         /// The account's stable UUID, given to StoreKit as `appAccountToken`
         /// so the server can tell whose purchase it is.
         let accountToken: String
+        var recommendation: Recommendation? = nil
 
         enum CodingKeys: String, CodingKey {
             case products
             case accountToken = "account_token"
+            case recommendation
+        }
+    }
+
+    struct Recommendation: Decodable, Equatable, Sendable {
+        let id: String
+        let purchaseCount: Int
+        let spentMinor: Int
+        let currency: String
+        let basePriceMinor: Int
+        let baseStoreProductID: String
+
+        enum CodingKeys: String, CodingKey {
+            case id, currency
+            case purchaseCount = "purchase_count"
+            case spentMinor = "spent_minor"
+            case basePriceMinor = "base_price_minor"
+            case baseStoreProductID = "base_store_product_id"
         }
     }
 
@@ -68,6 +112,15 @@ enum PurchaseAPI {
         let usage: AccountAPI.Usage?
 
         var isGranted: Bool { status == "granted" || status == "already_granted" }
+    }
+}
+
+extension PurchaseAPI.Catalogue {
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        products = try container.decode([PurchaseAPI.Product].self, forKey: .products)
+        accountToken = try container.decode(String.self, forKey: .accountToken)
+        recommendation = try? container.decodeIfPresent(PurchaseAPI.Recommendation.self, forKey: .recommendation)
     }
 }
 

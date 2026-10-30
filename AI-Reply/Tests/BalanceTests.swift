@@ -73,6 +73,32 @@ final class BalanceTests: XCTestCase {
 
     // MARK: Summary
 
+    func testProRemainsUnlimitedWithZeroNumericBalance() throws {
+        let pro = try usage("""
+        {"daily_limit": 0, "used_today": 40, "remaining_today": 0,
+         "unlimited": true, "remaining_total": 0, "purchased_credits": 60, "admin_credits": 5, "credits": 65}
+        """)
+        XCTAssertTrue(pro.isKnown)
+        XCTAssertEqual(BalanceSummary.make(pro).rows, [.unlimited, .purchased(60), .admin(5)])
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "ProBalanceTests.\(UUID())"))
+        defer { AccountUsageCache.clear(defaults: defaults) }
+        AccountUsageCache.store(pro, defaults: defaults)
+        XCTAssertTrue(AccountUsageCache.snapshot(defaults: defaults).unlimited)
+        XCTAssertFalse(AccountUsageCache.snapshot(defaults: defaults).isExhausted)
+        AccountUsageCache.store(try usage(planOnly), defaults: defaults)
+        XCTAssertFalse(AccountUsageCache.snapshot(defaults: defaults).unlimited)
+        XCTAssertTrue(AccountUsageCache.snapshot(defaults: defaults).isExhausted)
+    }
+
+    func testOneTimeWelcomeIsKnownWithoutADailyReset() throws {
+        let free = try usage("""
+        {"daily_limit": 0, "used_today": 0, "remaining_today": 0,
+         "welcome": {"total": 10, "remaining": 7}, "remaining_total": 7}
+        """)
+        XCTAssertTrue(free.isKnown)
+        XCTAssertEqual(BalanceSummary.make(free).rows, [.today(7), .welcome(remaining: 7, total: 10)])
+    }
+
     func testNothingIsANumberBeforeTheServerAnswers() {
         XCTAssertFalse(AccountAPI.Usage.unknown.isKnown)
         XCTAssertEqual(BalanceSummary.make(.unknown), .unknown)

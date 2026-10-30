@@ -2878,25 +2878,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Better replies, straight from your keyboard."
+            "value" : "Your personal messaging assistant."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Дайын жауаптар — тікелей пернетақтадан."
+            "value" : "Хат алмасудағы жеке көмекшің."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Готовые ответы прямо с клавиатуры."
+            "value" : "Твой личный ассистент в переписке."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Yaxshi javoblar bevosita klaviaturangizda."
+            "value" : "Yozishmalardagi shaxsiy yordamchingiz."
           }
         }
       }
@@ -2994,25 +2994,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Replies today"
+            "value" : "Available replies"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Бүгінгі жауаптар"
+            "value" : "Қолжетімді жауаптар"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ответы сегодня"
+            "value" : "Доступные ответы"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bugungi javoblar"
+            "value" : "Mavjud javoblar"
           }
         }
       }
@@ -7634,25 +7634,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Reply packs"
+            "value" : "Without a subscription"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Жауап пакеттері"
+            "value" : "Жазылымсыз"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Пакеты ответов"
+            "value" : "Без подписки"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Javob paketlari"
+            "value" : "Obunasiz"
           }
         }
       }
@@ -7663,25 +7663,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pack replies never expire and are used last: after the day's replies, the pass and the free ones."
+            "value" : "A one-time purchase. Replies never expire and stay with your account. They are used after your included allowance."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Пакеттегі жауаптардың мерзімі бітпейді, олар ең соңында жұмсалады: бүгінгі, рұқсаттама және тегін жауаптардан кейін."
+            "value" : "Бір реттік сатып алу. Жауаптардың мерзімі бітпейді, олар тіркелгіде сақталады. Алдымен тарифке кіретін жауаптар жұмсалады."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ответы из пакета не сгорают и расходуются последними: после ответов на сегодня, пропуска и бесплатных."
+            "value" : "Разовая покупка. Ответы не сгорают и сохраняются в аккаунте. Расходуются после включённых ответов."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Paketdagi javoblarning muddati tugamaydi va ular eng oxirida ishlatiladi: bugungi, ruxsatnoma va bepul javoblardan keyin."
+            "value" : "Bir martalik xarid. Javoblar muddatsiz va hisobingizda saqlanadi. Avval tarifga kiritilgan javoblar sarflanadi."
           }
         }
       }
@@ -7902,25 +7902,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Replies added"
+            "value" : "Purchase confirmed. Your access is up to date."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Жауаптар қосылды"
+            "value" : "Сатып алу расталды. Қолжетімділік жаңартылды."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ответы начислены"
+            "value" : "Покупка подтверждена. Доступ обновлён."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Javoblar qoʻshildi"
+            "value" : "Xarid tasdiqlandi. Foydalanish huquqi yangilandi."
           }
         }
       }
@@ -7931,25 +7931,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The App Store did not confirm the purchase, so no replies were added. If you were charged, write to support."
+            "value" : "The purchase could not be confirmed. If you were charged, contact support."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "App Store сатып алуды растамады, жауаптар қосылмады. Ақша алынса, қолдау қызметіне жазыңыз."
+            "value" : "Сатып алуды растау мүмкін болмады. Ақша алынса, қолдау қызметіне жаз."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "App Store не подтвердил покупку, ответы не начислены. Если деньги списаны, напиши в поддержку."
+            "value" : "Не удалось подтвердить покупку. Если деньги списаны, напиши в поддержку."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "App Store xaridni tasdiqlamadi, javoblar qoʻshilmadi. Pul yechilgan boʻlsa, qoʻllab-quvvatlashga yozing."
+            "value" : "Xaridni tasdiqlab bo‘lmadi. Pul yechilgan bo‘lsa, yordam xizmatiga yozing."
           }
         }
       }
@@ -7960,25 +7960,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The purchase is waiting for approval. The replies appear as soon as it is approved."
+            "value" : "Your purchase is waiting for approval. Access updates after confirmation."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Сатып алу мақұлдауды күтуде. Мақұлданған бойда жауаптар қосылады."
+            "value" : "Сатып алу мақұлдауды күтіп тұр. Расталғаннан кейін қолжетімділік жаңартылады."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Покупка ожидает подтверждения. Ответы появятся, как только её одобрят."
+            "value" : "Покупка ожидает одобрения. Доступ обновится после подтверждения."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Xarid tasdiqlanishini kutmoqda. Tasdiqlangan zahoti javoblar qoʻshiladi."
+            "value" : "Xarid tasdiqlanishi kutilmoqda. Tasdiqdan keyin foydalanish huquqi yangilanadi."
           }
         }
       }
@@ -8047,25 +8047,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The payment went through, but the confirmation has not reached our server yet. We will send it again by ourselves, and the replies will appear."
+            "value" : "Your purchase is still being confirmed. We will retry automatically."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Төлем өтті, бірақ растау серверге әлі жетпеді. Біз оны өзіміз қайта жібереміз, жауаптар қосылады."
+            "value" : "Сатып алу әлі расталып жатыр. Тексеру автоматты түрде қайталанады."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Оплата прошла, но подтверждение ещё не дошло до сервера. Мы отправим его ещё раз сами, и ответы появятся."
+            "value" : "Покупка ещё подтверждается. Мы повторим проверку автоматически."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Toʻlov oʻtdi, lekin tasdiq hali serverga yetmadi. Uni oʻzimiz qayta yuboramiz va javoblar qoʻshiladi."
+            "value" : "Xarid hali tasdiqlanmoqda. Tekshiruv avtomatik takrorlanadi."
           }
         }
       }
@@ -8076,25 +8076,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Buy more replies"
+            "value" : "Plans and replies"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Жауап сатып алу"
+            "value" : "Тарифтер мен жауаптар"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Докупить ответы"
+            "value" : "Тарифы и ответы"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Javob sotib olish"
+            "value" : "Tariflar va javoblar"
           }
         }
       }
@@ -13259,16 +13259,16 @@
             "value" : "Video Tutorials"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Видеоинструкции"
-          }
-        },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Бейненұсқаулықтар"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Видеоинструкции"
           }
         },
         "uz" : {
@@ -13288,16 +13288,16 @@
             "value" : "How to Enable Automatic Paste"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Как разрешить автоматическую вставку"
-          }
-        },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Автоматты қоюға рұқсат беру"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Как разрешить автоматическую вставку"
           }
         },
         "uz" : {
@@ -13317,16 +13317,16 @@
             "value" : "Silent iOS setup video. Use Play to begin."
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Видео настройки iOS без звука. Нажмите воспроизведение."
-          }
-        },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "iOS баптауының дыбыссыз бейнесі. Ойнатуды басыңыз."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Видео настройки iOS без звука. Нажмите воспроизведение."
           }
         },
         "uz" : {
@@ -13346,16 +13346,16 @@
             "value" : "Watch again"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Смотреть ещё раз"
-          }
-        },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Қайта көру"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Смотреть ещё раз"
           }
         },
         "uz" : {
@@ -13375,16 +13375,16 @@
             "value" : "The video is unavailable in this build. Follow the written steps in Keyboard Setup."
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Видео недоступно в этой сборке. Следуйте шагам в настройке клавиатуры."
-          }
-        },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Бұл нұсқада бейне қолжетімсіз. Пернетақтаны баптау қадамдарын орындаңыз."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Видео недоступно в этой сборке. Следуйте шагам в настройке клавиатуры."
           }
         },
         "uz" : {
@@ -13404,16 +13404,16 @@
             "value" : "Open Settings → Apps → AI Reply → Paste from Other Apps and choose Allow."
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Откройте Настройки → Приложения → AI Reply → Вставка из других приложений и выберите «Разрешить»."
-          }
-        },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Реттеулер → Қолданбалар → AI Reply → Басқа қолданбалардан қою бөлімін ашып, рұқсат беріңіз."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Откройте Настройки → Приложения → AI Reply → Вставка из других приложений и выберите «Разрешить»."
           }
         },
         "uz" : {
@@ -13433,16 +13433,16 @@
             "value" : "Paste permission and keyboard Full Access are separate settings. Only you can grant them in iOS. This video works offline and does not change permissions."
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Вставка и «Полный доступ» клавиатуры — разные настройки. Только вы можете разрешить их в iOS. Видео работает без интернета и не меняет разрешения."
-          }
-        },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Қою рұқсаты мен пернетақтаның толық рұқсаты — бөлек баптаулар. Оларды iOS жүйесінде тек өзіңіз бересіз. Бейне интернетсіз жұмыс істейді және рұқсаттарды өзгертпейді."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вставка и «Полный доступ» клавиатуры — разные настройки. Только вы можете разрешить их в iOS. Видео работает без интернета и не меняет разрешения."
           }
         },
         "uz" : {
@@ -13462,16 +13462,16 @@
             "value" : "Try manual paste"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Проверьте ручную вставку"
-          }
-        },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Қолмен қойып көріңіз"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Проверьте ручную вставку"
           }
         },
         "uz" : {
@@ -13491,16 +13491,16 @@
             "value" : "Copy a short test message, then tap Paste here. This manual action does not verify or grant automatic paste permission for the keyboard. Nothing is sent or generated."
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Скопируйте короткий тестовый текст и нажмите «Вставить» здесь. Ручная вставка не проверяет и не выдаёт разрешение автоматической вставки для клавиатуры. Текст никуда не отправляется, генерация не запускается."
-          }
-        },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Қысқа сынақ мәтінін көшіріп, мұнда «Қою» басыңыз. Қолмен қою пернетақтаның автоматты қою рұқсатын тексермейді және бермейді. Мәтін жіберілмейді, жауап жасалмайды."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скопируйте короткий тестовый текст и нажмите «Вставить» здесь. Ручная вставка не проверяет и не выдаёт разрешение автоматической вставки для клавиатуры. Текст никуда не отправляется, генерация не запускается."
           }
         },
         "uz" : {
@@ -13520,16 +13520,16 @@
             "value" : "Open Keyboard & Permissions in AI Reply."
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Откройте настройку клавиатуры в AI Reply."
-          }
-        },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "AI Reply ішінен пернетақтаны баптауды ашыңыз."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Откройте настройку клавиатуры в AI Reply."
           }
         },
         "uz" : {
@@ -13549,16 +13549,16 @@
             "value" : "Tap Open Settings to open AI Reply’s page in iOS Settings."
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Нажмите «Открыть настройки»: откроется страница AI Reply в iOS."
-          }
-        },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "«Реттеулерді ашу» басыңыз: iOS ішінде AI Reply беті ашылады."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нажмите «Открыть настройки»: откроется страница AI Reply в iOS."
           }
         },
         "uz" : {
@@ -13578,16 +13578,16 @@
             "value" : "Allow pasting from other apps in AI Reply’s settings."
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Разрешите вставку из других приложений в настройках AI Reply."
-          }
-        },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "AI Reply реттеулерінде басқа қолданбалардан қоюға рұқсат беріңіз."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Разрешите вставку из других приложений в настройках AI Reply."
           }
         },
         "uz" : {
@@ -13607,16 +13607,16 @@
             "value" : "Paste your copied test message with the Paste button."
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Вставьте скопированный тестовый текст кнопкой «Вставить»."
-          }
-        },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Көшірілген сынақ мәтінін «Қою» түймесімен қойыңыз."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вставьте скопированный тестовый текст кнопкой «Вставить»."
           }
         },
         "uz" : {
@@ -13636,16 +13636,16 @@
             "value" : "Watch video"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Смотреть видео"
-          }
-        },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Бейнені көру"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Смотреть видео"
           }
         },
         "uz" : {
@@ -13665,16 +13665,16 @@
             "value" : "The tutorial in this language is unavailable. The English video is shown."
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Видео на этом языке недоступно. Показана английская версия."
-          }
-        },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Бұл тілдегі бейненұсқаулық қолжетімсіз. Ағылшынша нұсқа көрсетіледі."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Видео на этом языке недоступно. Показана английская версия."
           }
         },
         "uz" : {
@@ -14058,6 +14058,789 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "App Store’ni ochib boʻlmadi. Keyinroq qayta urinib koʻring."
+          }
+        }
+      }
+    },
+    "balance.admin" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bonus replies"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Бонустық жауаптар"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Бонусные ответы"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bonus javoblar"
+          }
+        }
+      }
+    },
+    "home.description" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Find the right words when you’re not sure what to say. For work and personal conversations. Right from your keyboard."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не деп жауап береріңді білмегенде, сөз табуға көмектеседі. Жұмысқа да, жеке әңгімеге де. Тікелей пернетақтадан."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Поможет подобрать слова, когда не знаешь, что ответить. Для рабочих вопросов и личных разговоров. Прямо с клавиатуры."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nima deb javob berishni bilmaganingizda kerakli so‘zlarni topishga yordam beradi. Ish va shaxsiy suhbatlar uchun. Bevosita klaviaturadan."
+          }
+        }
+      }
+    },
+    "purchase.billed.month" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Charged monthly. Renews automatically."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Төлем ай сайын алынады. Автоматты түрде ұзартылады."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оплата за месяц. Продлевается автоматически."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To‘lov har oy olinadi. Avtomatik uzaytiriladi."
+          }
+        }
+      }
+    },
+    "purchase.billed.year" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Charged yearly. Renews automatically."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Төлем жыл сайын алынады. Автоматты түрде ұзартылады."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оплата за год. Продлевается автоматически."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To‘lov har yili olinadi. Avtomatik uzaytiriladi."
+          }
+        }
+      }
+    },
+    "purchase.buyPack" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buy once"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Бір рет сатып алу"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Купить разово"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bir marta sotib olish"
+          }
+        }
+      }
+    },
+    "purchase.heading" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "More room for every conversation"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Әр әңгімеге көбірек жауап"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Больше ответов для твоих разговоров"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Har bir suhbat uchun ko‘proq javob"
+          }
+        }
+      }
+    },
+    "purchase.intro" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose a subscription or buy extra replies once. A subscription is optional."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Жазылымды немесе бір реттік жауап пакетін таңда. Жазылым міндетті емес."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Выбери подписку или разовый пакет ответов. Подписываться необязательно."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Obuna yoki bir martalik javoblar paketini tanlang. Obuna majburiy emas."
+          }
+        }
+      }
+    },
+    "purchase.manage" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Manage subscription"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Жазылымды басқару"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Управлять подпиской"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Obunani boshqarish"
+          }
+        }
+      }
+    },
+    "purchase.month" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Monthly"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ай"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Месяц"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oy"
+          }
+        }
+      }
+    },
+    "purchase.pack30" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "30 extra replies"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "30 қосымша жауап"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "30 дополнительных ответов"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "30 ta qo‘shimcha javob"
+          }
+        }
+      }
+    },
+    "purchase.period" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Billing period"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Төлем кезеңі"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Период оплаты"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To‘lov davri"
+          }
+        }
+      }
+    },
+    "purchase.priceMismatch" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This purchase is temporarily unavailable while its price is updated. Please try again later."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Баға жаңартылып жатыр. Сатып алу уақытша қолжетімсіз. Кейінірек қайталап көр."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Покупка временно недоступна: цена обновляется. Попробуй позже."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Narx yangilanayotgani uchun xarid vaqtincha mavjud emas. Keyinroq qayta urinib ko‘ring."
+          }
+        }
+      }
+    },
+    "purchase.renewal" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Payment is charged to your Apple Account. Subscriptions renew automatically until cancelled in App Store settings. Cancellation keeps access until the end of the paid period. Extra reply packs are a one-time purchase."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Төлем Apple Account есебінен алынады. Жазылым App Store баптауларында тоқтатылғанша автоматты түрде ұзартылады. Тоқтатқаннан кейін қолжетімділік төленген кезеңнің соңына дейін сақталады. Жауап пакеті үшін бір рет төленеді."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оплата списывается с Apple Account. Подписка продлевается автоматически до отмены в настройках App Store. После отмены доступ сохраняется до конца оплаченного периода. Пакеты ответов оплачиваются один раз."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To‘lov Apple Account hisobidan olinadi. Obuna App Store sozlamalarida bekor qilinmaguncha avtomatik uzaytiriladi. Bekor qilingandan keyin foydalanish to‘langan davr oxirigacha davom etadi. Javoblar paketi uchun bir marta to‘lanadi."
+          }
+        }
+      }
+    },
+    "purchase.restore" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restore purchases"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сатып алуларды қалпына келтіру"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Восстановить покупки"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xaridlarni tiklash"
+          }
+        }
+      }
+    },
+    "purchase.restore.detail" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Subscriptions are restored through Apple. Purchased reply balances are synced with your AI Reply account."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Жазылымдар Apple арқылы қалпына келтіріледі. Сатып алынған жауаптар балансы AI Reply тіркелгісімен синхрондалады."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Подписки восстанавливаются через Apple. Баланс купленных ответов синхронизируется с аккаунтом AI Reply."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Obunalar Apple orqali tiklanadi. Sotib olingan javoblar balansi AI Reply hisobingiz bilan sinxronlanadi."
+          }
+        }
+      }
+    },
+    "purchase.status.noRestore" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No active Apple subscriptions to restore. Purchased replies stay with your AI Reply account."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Қалпына келтірілетін белсенді Apple жазылымы жоқ. Сатып алынған жауаптар AI Reply тіркелгісінде сақталады."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Активных подписок Apple для восстановления нет. Купленные ответы сохраняются в аккаунте AI Reply."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tiklash uchun faol Apple obunasi topilmadi. Sotib olingan javoblar AI Reply hisobingizda saqlanadi."
+          }
+        }
+      }
+    },
+    "purchase.status.restored" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Purchases confirmed. Your access is up to date."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сатып алулар расталды. Қолжетімділік жаңартылды."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Покупки подтверждены. Доступ обновлён."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xaridlar tasdiqlandi. Foydalanish huquqi yangilandi."
+          }
+        }
+      }
+    },
+    "purchase.status.restoring" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restoring and confirming purchases…"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сатып алулар қалпына келтіріліп, расталып жатыр…"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Восстанавливаем и подтверждаем покупки…"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xaridlar tiklanmoqda va tasdiqlanmoqda…"
+          }
+        }
+      }
+    },
+    "purchase.subscribe" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Subscribe"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Жазылу"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Подписаться"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Obuna bo‘lish"
+          }
+        }
+      }
+    },
+    "purchase.subscriptions" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Subscriptions"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Жазылымдар"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Подписки"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Obunalar"
+          }
+        }
+      }
+    },
+    "purchase.unlimited" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unlimited replies"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Шектеусіз жауаптар"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Безлимитные ответы"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cheksiz javoblar"
+          }
+        }
+      }
+    },
+    "purchase.year" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yearly"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Жыл"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Год"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yil"
+          }
+        }
+      }
+    },
+    "subscription.validUntil %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Access until %@"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ дейін қолжетімді"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Доступ до %@"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ gacha foydalanish mumkin"
+          }
+        }
+      }
+    },
+    "purchase.recommendation.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A plan for everyday replies"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Күн сайынғы жауаптар"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ответы на каждый день"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Har kunlik javoblar"
+          }
+        }
+      }
+    },
+    "purchase.recommendation.body %@ %@ %lld" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You’ve spent %@ on extra reply packs. With Base at %@ per month, you get %lld replies every day."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Қосымша жауаптарға %@ жұмсадың. Айына %@ тұратын Base арқылы күн сайын %lld жауап ал."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "На дополнительные ответы уже ушло %@. Base за %@ в месяц даёт %lld ответов каждый день."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qo‘shimcha javoblar uchun %@ sarfladingiz. Oyiga %@ evaziga Base bilan har kuni %lld ta javob oling."
+          }
+        }
+      }
+    },
+    "purchase.recommendation.choose" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View Base"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Base тарифін көру"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Посмотреть Base"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Base tarifini ko‘rish"
+          }
+        }
+      }
+    },
+    "purchase.recommendation.dismiss" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continue without a subscription"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Жазылымсыз жалғастыру"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Продолжить без подписки"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Obunasiz davom etish"
           }
         }
       }

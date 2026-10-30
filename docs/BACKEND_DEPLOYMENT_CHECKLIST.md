@@ -7,13 +7,13 @@ Work is on `Payment`. Android sources are unchanged. Before restarting, take a c
 From the existing checkout on the server:
 
 ```sh
-git switch Payment
-git pull --ff-only origin Payment
+git switch Payment &&
+git pull --ff-only origin Payment &&
 cd ai-reply-back-end
-python3 scripts/configure-billing-sandbox-env.py
-docker compose config --quiet
-docker compose build backend
-docker compose run --rm --no-deps backend -check
+python3 scripts/configure-billing-sandbox-env.py &&
+docker compose config --quiet &&
+docker compose build backend &&
+docker compose run --rm --no-deps backend -check &&
 docker compose up -d --no-deps backend
 ```
 

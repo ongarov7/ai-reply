@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>AIReplyBackendBaseURL</key>
+	<string>$(AIREPLY_BACKEND_BASE_URL)</string>
 	<key>AIReplyAppIdentifierPrefix</key>
 	<string>$(AppIdentifierPrefix)</string>
 	<key>AIReplyFirebaseAPIKey</key>
@@ -46,7 +48,7 @@
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>
-	<string>11</string>
+	<string>12</string>
 	<key>FirebaseAppDelegateProxyEnabled</key>
 	<false/>
 	<key>FirebaseMessagingAutoInitEnabled</key>

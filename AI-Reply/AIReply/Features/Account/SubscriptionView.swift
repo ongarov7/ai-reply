@@ -8,40 +8,34 @@ import SwiftUI
 /// keeps a cached copy only so the keyboard can render instantly; it is never
 /// the source of truth, and a stale cache can only ever be pessimistic.
 ///
-/// No plan is sold here in a Release build (see
-/// `AccountModel.purchasesAvailableInThisBuild`): the other plans are listed
-/// with their limits, without a price or a button. Reply packs and the pass
-/// are sold on «Докупить ответы», through the App Store, while the server
-/// sells them (`features.iap_ios`).
+/// The published catalog is matched with App Store products before a price
+/// or purchase action appears. Subscriptions and one-time packs stay separate.
 struct SubscriptionView: View {
 
     @Environment(AppSettings.self) private var settings
     @Environment(AccountModel.self) private var account
     @Environment(PurchaseStore.self) private var purchases
 
-    @State private var isChanging = false
-    /// Why the last Choose failed; shown under the plans.
-    @State private var purchaseErrorKey: String?
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: DS.Spacing.xl) {
-                usageCard
-                // Packs and the pass, only while the server sells them.
-                if purchases.isEnabled { buyMoreCard }
-                if showsPlans { plansSection }
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: DS.Spacing.xl) {
+                    usageCard
+                    PurchaseOptionsView(onSelectOffer: { proxy.scrollTo($0, anchor: .top) })
+                }
+                .padding(.horizontal, DS.Spacing.l)
+                .padding(.vertical, DS.Spacing.l)
+                .frame(maxWidth: DS.Layout.readableWidth, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .center)
             }
-            .padding(.horizontal, DS.Spacing.l)
-            .padding(.vertical, DS.Spacing.l)
-            .frame(maxWidth: DS.Layout.readableWidth, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .center)
         }
         .background(Color.dsBackground)
         .navigationTitle("subscription.title")
         .navigationBarTitleDisplayMode(.inline)
         .task {
-            await account.loadPlans()
             await account.refresh()
+            await purchases.loadCatalogue()
         }
     }
 
@@ -59,7 +53,7 @@ struct SubscriptionView: View {
                 VStack(alignment: .trailing, spacing: DS.Spacing.xxs) {
                     // Everything usable today, free and purchased replies
                     // included. A dash until the server has answered.
-                    Text(verbatim: usageIsKnown ? "\(account.usage.availableNow)" : "—")
+                    Text(verbatim: usageIsKnown ? (account.usage.unlimited ? "∞" : "\(account.usage.availableNow)") : "—")
                         .font(.largeTitle.weight(.semibold).monospacedDigit())
                         .foregroundStyle(usageIsKnown ? Color.primary : Color.secondary)
                     Text("subscription.remaining").font(.caption).foregroundStyle(.secondary)
@@ -67,7 +61,7 @@ struct SubscriptionView: View {
             }
 
             // The plan's own day: its allowance and what was used of it.
-            if account.usage.dailyLimit > 0 {
+            if !account.usage.unlimited && account.usage.dailyLimit > 0 {
                 ProgressView(value: progress)
                     .tint(Color.accentColor)
                 Text("subscription.usedToday \(account.usage.usedToday) \(account.usage.dailyLimit)")
@@ -81,103 +75,9 @@ struct SubscriptionView: View {
             }
 
             if let expiry = account.subscription?.expiresAt, !expiry.isEmpty {
-                Label(LocalizedStringKey("subscription.renews \(formatted(expiry))"), systemImage: "calendar")
+                Label(LocalizedStringKey("subscription.validUntil \(formatted(expiry))"), systemImage: "calendar")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
-            }
-        }
-        .dsCard()
-    }
-
-    private var buyMoreCard: some View {
-        NavigationLink(value: AppRoute.purchase) {
-            HStack {
-                Label("purchase.title", systemImage: "plus.circle")
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(.primary)
-                Spacer()
-                Image(systemName: "chevron.right").font(.footnote).foregroundStyle(.secondary)
-            }
-            .dsCard()
-        }
-        .buttonStyle(.plain)
-    }
-
-    /// The server lists only the plans it shows; the section is worth a
-    /// place only when one of them is not the current plan.
-    private var showsPlans: Bool {
-        account.plans.contains { $0.id != account.subscription?.plan.id }
-    }
-
-    private var plansSection: some View {
-        DSSection(title: "subscription.available") {
-            VStack(alignment: .leading, spacing: DS.Spacing.s) {
-                ForEach(account.plans) { plan in
-                    planRow(plan)
-                }
-                if let purchaseErrorKey {
-                    AuthErrorLabel(key: purchaseErrorKey)
-                }
-            }
-        }
-    }
-
-    private func planRow(_ plan: AccountAPI.Plan) -> some View {
-        let language = settings.effectiveLanguage.rawValue
-        let isCurrent = account.subscription?.plan.id == plan.id
-        // A price only next to a button that can take it.
-        let isPurchasable = account.canPurchase(plan)
-
-        return VStack(alignment: .leading, spacing: DS.Spacing.xs) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(verbatim: plan.localizedName(language))
-                    .font(.body.weight(.semibold))
-                Spacer()
-                if isPurchasable {
-                    Text(verbatim: plan.priceText)
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            Text(verbatim: plan.localizedDescription(language))
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-
-            HStack {
-                Label {
-                    Text("subscription.perDay \(plan.dailyLimit)")
-                } icon: {
-                    Image(systemName: "bolt.fill")
-                }
-                .font(.footnote)
-                .foregroundStyle(Color.accentColor)
-
-                Spacer()
-
-                if isCurrent {
-                    Text("subscription.currentBadge")
-                        .font(.caption.weight(.semibold))
-                        .padding(.horizontal, DS.Spacing.xs)
-                        .padding(.vertical, 4)
-                        .background(
-                            Capsule().fill(Color.accentColor.opacity(0.15))
-                        )
-                        .foregroundStyle(Color.accentColor)
-                } else if isPurchasable {
-                    Button("subscription.choose") {
-                        Task {
-                            isChanging = true
-                            purchaseErrorKey = nil
-                            if !(await account.choosePlan(plan)) {
-                                purchaseErrorKey = account.errorKey ?? "account.error.generic"
-                            }
-                            isChanging = false
-                        }
-                    }
-                    .font(.subheadline.weight(.semibold))
-                    .disabled(isChanging || account.isBusy)
-                }
             }
         }
         .dsCard()

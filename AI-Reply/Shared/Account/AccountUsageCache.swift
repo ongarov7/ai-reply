@@ -23,12 +23,13 @@ enum AccountUsageCache {
         static let welcomeRemaining = "account.usage.welcomeRemaining"
         static let welcomeTotal = "account.usage.welcomeTotal"
         static let credits = "account.usage.credits"
+        static let unlimited = "account.usage.unlimited"
         /// The last limit refusal and when it came.
         static let limitRefusal = "account.limit.refusal"
         static let limitRefusedAt = "account.limit.refusedAt"
 
         static let all = [dailyLimit, usedToday, remaining, resetsAt, planName, updatedAt,
-                          remainingTotal, welcomeRemaining, welcomeTotal, credits, limitRefusal, limitRefusedAt]
+                          remainingTotal, welcomeRemaining, welcomeTotal, credits, unlimited, limitRefusal, limitRefusedAt]
     }
 
     /// A snapshot as the UI wants it.
@@ -44,11 +45,13 @@ enum AccountUsageCache {
         var welcomeRemaining: Int? = nil
         var welcomeTotal: Int? = nil
         var credits: Int? = nil
+        var unlimited = false
 
-        var isKnown: Bool { dailyLimit > 0 || remainingTotal != nil }
+        var isKnown: Bool { unlimited || dailyLimit > 0 || remainingTotal != nil }
         /// Nothing at all is left: the plan's day, and - where the server
         /// sends them - the free, purchased and pass replies too.
         var isExhausted: Bool {
+            if unlimited { return false }
             if let remainingTotal { return remainingTotal <= 0 }
             return dailyLimit > 0 && remainingToday <= 0
         }
@@ -64,6 +67,7 @@ enum AccountUsageCache {
         store(usage.welcome?.remaining, forKey: Key.welcomeRemaining, defaults: defaults)
         store(usage.welcome?.total, forKey: Key.welcomeTotal, defaults: defaults)
         store(usage.credits, forKey: Key.credits, defaults: defaults)
+        defaults.set(usage.unlimited, forKey: Key.unlimited)
     }
 
     /// A value the server did not send is removed, not left from before.
@@ -115,7 +119,8 @@ enum AccountUsageCache {
             remainingTotal: integer(Key.remainingTotal, defaults),
             welcomeRemaining: integer(Key.welcomeRemaining, defaults),
             welcomeTotal: integer(Key.welcomeTotal, defaults),
-            credits: integer(Key.credits, defaults)
+            credits: integer(Key.credits, defaults),
+            unlimited: defaults.bool(forKey: Key.unlimited)
         )
     }
 

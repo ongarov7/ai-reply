@@ -16,6 +16,9 @@ final class PurchaseStoreTests: XCTestCase {
         var products: [StoreProduct] = []
         var result: Result<StorePurchaseResult, Error> = .success(.cancelled)
         var unfinished: [StoreTransaction] = []
+        var entitlements: [StoreTransaction] = []
+        var syncError: Error?
+        private(set) var syncCount = 0
         private(set) var tokens: [UUID] = []
         private(set) var requestedProducts: [[String]] = []
 
@@ -29,6 +32,11 @@ final class PurchaseStoreTests: XCTestCase {
             return try result.get()
         }
 
+        func sync() async throws {
+            syncCount += 1
+            if let syncError { throw syncError }
+        }
+        func currentEntitlements() async -> [StoreTransaction] { entitlements }
         func unfinishedTransactions() async -> [StoreTransaction] { unfinished }
 
         func transactionUpdates() -> AsyncStream<StoreTransaction> { AsyncStream { $0.finish() } }
@@ -53,9 +61,9 @@ final class PurchaseStoreTests: XCTestCase {
 
         func submit(signedTransaction: String) async throws -> PurchaseAPI.Verdict {
             submitted.append(signedTransaction)
+            let answer = verdicts.isEmpty ? .success(PurchaseAPI.Verdict(status: "granted", usage: nil)) : verdicts.removeFirst()
             while holdsAnswers { try await Task.sleep(for: .milliseconds(5)) }
-            guard !verdicts.isEmpty else { return PurchaseAPI.Verdict(status: "granted", usage: nil) }
-            return try verdicts.removeFirst().get()
+            return try answer.get()
         }
     }
 
@@ -90,7 +98,8 @@ final class PurchaseStoreTests: XCTestCase {
 
     private func makeStore(storeKit: FakeStoreKit = FakeStoreKit(),
                            backend: FakeBackend? = nil,
-                           iap: String = #"{"iap_ios": true}"#) -> (PurchaseStore, FakeStoreKit, FakeBackend) {
+                           iap: String = #"{"iap_ios": true}"#,
+                           preferences: UserDefaults = .standard) -> (PurchaseStore, FakeStoreKit, FakeBackend) {
         let backend = backend ?? FakeBackend(catalogue: .success(PurchaseAPI.Catalogue(products: serverProducts,
                                                                                          accountToken: token)))
         storeKit.products = [
@@ -99,7 +108,7 @@ final class PurchaseStoreTests: XCTestCase {
             StoreProduct(id: "gift.10", displayName: "Gift", displayPrice: "1 ₸"),
             StoreProduct(id: "unknown", displayName: "Unknown", displayPrice: "5 ₸")
         ]
-        let store = PurchaseStore(storeKit: storeKit, backend: backend)
+        let store = PurchaseStore(storeKit: storeKit, backend: backend, preferences: preferences)
         store.accountDidChange(isSignedIn: true, userID: "u1", features: features(iap))
         return (store, storeKit, backend)
     }
@@ -270,6 +279,21 @@ final class PurchaseStoreTests: XCTestCase {
         XCTAssertEqual(log.finished, ["t3"])
     }
 
+    func testUnrelatedGrantDoesNotConfirmAPendingPurchase() async throws {
+        let log = FinishLog()
+        let (store, apple, _) = makeStore()
+        await store.loadCatalogue()
+        apple.result = .success(.pending)
+        await store.purchase(try XCTUnwrap(store.offers.first))
+        let unrelated = StoreTransaction(id: "older", productID: "another-product", signedTransaction: "older-jws",
+                                         finish: { log.finish("older") })
+        await store.received(unrelated)
+        XCTAssertEqual(store.status, .pending)
+        await store.received(transaction("approved", log: log))
+        XCTAssertEqual(store.status, .granted)
+        XCTAssertEqual(log.finished, ["older", "approved"])
+    }
+
     func testNoTokenNoPurchase() async {
         let (store, storeKit, _) = makeStore()
         let offer = PurchaseOffer(code: "pack_50", kind: .pack, units: 50, durationHours: 0,
@@ -397,6 +421,134 @@ final class PurchaseStoreTests: XCTestCase {
         }
         XCTAssertEqual(backend.submitted, ["jws-t4"])
         XCTAssertEqual(log.finished, ["t4"])
+    }
+
+    func testRestoreConfirmsSignedSubscriptionsAndDeduplicatesUnfinished() async {
+        let log = FinishLog()
+        let (store, apple, backend) = makeStore()
+        let subscription = transaction("restored", log: log)
+        apple.entitlements = [subscription]
+        apple.unfinished = [subscription]
+        backend.verdicts = [.success(PurchaseAPI.Verdict(status: "already_granted", usage: nil))]
+        await store.restore()
+        XCTAssertEqual(apple.syncCount, 1)
+        XCTAssertEqual(backend.submitted, ["jws-restored"])
+        XCTAssertEqual(log.finished, ["restored"])
+        XCTAssertEqual(store.status, .restored)
+    }
+
+    func testRestoreDoesNotReportSuccessBeforeTheServerConfirms() async {
+        let log = FinishLog()
+        let (store, apple, backend) = makeStore()
+        apple.entitlements = [transaction("restore-pending", log: log)]
+        backend.verdicts = [.failure(.offline)]
+        await store.restore()
+        XCTAssertEqual(store.status, .failed(.willRetry))
+        XCTAssertTrue(log.finished.isEmpty)
+    }
+
+    func testRestoreWithoutTransactionsRefreshesAccountWithoutGrantingCredits() async {
+        let (store, apple, backend) = makeStore()
+        var refreshes = 0
+        store.onGrant = { _ in refreshes += 1 }
+        await store.restore()
+        XCTAssertEqual(apple.syncCount, 1)
+        XCTAssertTrue(backend.submitted.isEmpty)
+        XCTAssertEqual(refreshes, 1)
+        XCTAssertEqual(store.status, .nothingToRestore)
+    }
+
+    func testSubscriptionsRequireMatchingStoreTypeAndPeriod() {
+        let product = PurchaseAPI.Product(code: "pro_monthly", kind: "subscription", units: 0, durationHours: 0,
+                                          storeProductID: "pro.month", name: "Pro", planID: "pro",
+                                          billingPeriod: "month", entitlementKind: "unlimited")
+        let subscription = StoreProduct(id: "pro.month", displayName: "Pro", displayPrice: "2 999 ₸",
+                                        kind: .subscription, billingPeriod: "month")
+        XCTAssertEqual(PurchaseOffer.match(server: [product], store: [subscription]).count, 1)
+        var wrong = subscription
+        wrong.kind = .consumable
+        XCTAssertTrue(PurchaseOffer.match(server: [product], store: [wrong]).isEmpty)
+        wrong = subscription
+        wrong.billingPeriod = "year"
+        XCTAssertTrue(PurchaseOffer.match(server: [product], store: [wrong]).isEmpty)
+    }
+
+    func testStorePriceIsPreservedAndMismatchDetected() throws {
+        let product = PurchaseAPI.Product(code: "pack30", kind: "pack", units: 30, durationHours: 0,
+                                          storeProductID: "pack30", name: "30", price: 10000, currency: "KZT")
+        let apple = StoreProduct(id: "pack30", displayName: "30", displayPrice: "199 ₸", price: 199, currency: "KZT")
+        let offer = try XCTUnwrap(PurchaseOffer.match(server: [product], store: [apple]).first)
+        XCTAssertEqual(offer.displayPrice, "199 ₸")
+        XCTAssertTrue(offer.hasPriceMismatch)
+    }
+
+    func testUnapprovedPriceCannotOpenCheckout() async throws {
+        let (store, apple, backend) = makeStore()
+        await store.loadCatalogue()
+        var offer = try XCTUnwrap(store.offers.first)
+        offer.hasPriceMismatch = true
+        await store.purchase(offer)
+        XCTAssertEqual(store.status, .failed(.unavailable))
+        XCTAssertTrue(apple.tokens.isEmpty)
+        XCTAssertTrue(backend.submitted.isEmpty)
+    }
+
+    func testRestoreRemainsAvailableAfterSalesClose() async {
+        let (store, apple, _) = makeStore(iap: #"{"iap_ios": false}"#)
+        XCTAssertTrue(store.canRestore)
+        await store.restore()
+        XCTAssertEqual(apple.syncCount, 1)
+        XCTAssertEqual(store.status, .nothingToRestore)
+    }
+
+    func testRecommendationDismissalIsPerAccountAndThreshold() async throws {
+        let preferences = try XCTUnwrap(UserDefaults(suiteName: "RecommendationTests.\(UUID())"))
+        let recommendation = PurchaseAPI.Recommendation(id: "base_after_pack_4", purchaseCount: 4, spentMinor: 40000,
+                                                       currency: "KZT", basePriceMinor: 59900, baseStoreProductID: "base.month")
+        let catalogue = PurchaseAPI.Catalogue(products: serverProducts, accountToken: token, recommendation: recommendation)
+        let backend = FakeBackend(catalogue: .success(catalogue))
+        let (store, _, _) = makeStore(backend: backend, preferences: preferences)
+        await store.loadCatalogue()
+        XCTAssertEqual(store.recommendation, recommendation)
+        store.dismissRecommendation()
+        await store.loadCatalogue()
+        XCTAssertNil(store.recommendation)
+        let (relaunched, _, _) = makeStore(backend: backend, preferences: preferences)
+        await relaunched.loadCatalogue()
+        XCTAssertNil(relaunched.recommendation)
+        relaunched.accountDidChange(isSignedIn: true, userID: "another-user", features: features(#"{"iap_ios": true}"#))
+        await relaunched.loadCatalogue()
+        XCTAssertEqual(relaunched.recommendation, recommendation)
+    }
+
+    func testRestoreDoesNotReuseAnotherAccountsInFlightGrant() async throws {
+        let log = FinishLog()
+        let (store, apple, backend) = makeStore()
+        let paid = transaction("switched", log: log)
+        backend.holdsAnswers = true
+        backend.verdicts = [.success(PurchaseAPI.Verdict(status: "granted", usage: nil)),
+                            .failure(.purchaseBelongsToAnotherAccount)]
+        let firstAccount = Task { await store.deliver(paid) }
+        for _ in 0..<200 where backend.submitted.isEmpty { try await Task.sleep(for: .milliseconds(5)) }
+        store.accountDidChange(isSignedIn: true, userID: "another-user", features: features(#"{"iap_ios": true}"#))
+        apple.entitlements = [paid]
+        let restoring = Task { await store.restore() }
+        for _ in 0..<200 where backend.submitted.count < 2 { try await Task.sleep(for: .milliseconds(5)) }
+        XCTAssertEqual(backend.submitted.count, 2, "each account requires its own server verdict")
+        backend.holdsAnswers = false
+        _ = await firstAccount.value
+        await restoring.value
+        XCTAssertEqual(store.status, .failed(.anotherAccount))
+        XCTAssertEqual(log.finished, ["switched"], "only the first account was granted")
+    }
+
+    func testMalformedOptionalRecommendationDoesNotHideLegacyProducts() throws {
+        let catalogue = try JSONDecoder().decode(PurchaseAPI.Catalogue.self, from: Data("""
+        {"products": [{"code": "pack", "kind": "pack", "units": 30, "store_product_id": "pack30"}],
+         "account_token": "\(token)", "recommendation": {"purchase_count": "four"}}
+        """.utf8))
+        XCTAssertEqual(catalogue.products.first?.units, 30)
+        XCTAssertNil(catalogue.recommendation)
     }
 
     // MARK: Wire format

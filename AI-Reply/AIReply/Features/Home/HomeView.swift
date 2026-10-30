@@ -19,6 +19,9 @@ struct HomeView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: DS.Spacing.xl) {
                 header
+                Text("home.description")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
                 if account.isSignedIn { usageCard }
                 if updates.showsUpdateCard {
                     AppUpdateCard()
@@ -81,9 +84,9 @@ struct HomeView: View {
 
     private var header: some View {
         HStack(alignment: .top, spacing: DS.Spacing.m) {
-            AppMarkView(size: 56)
+            AppMarkView(size: 64)
             VStack(alignment: .leading, spacing: DS.Spacing.xxs) {
-                Text("home.title").font(.title.weight(.semibold))
+                Text("home.title").font(.largeTitle.weight(.bold))
                 Text("home.subtitle").font(.subheadline).foregroundStyle(.secondary)
             }
         }
@@ -104,9 +107,22 @@ struct HomeView: View {
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
+                    VStack(alignment: .trailing, spacing: DS.Spacing.xxs) {
+                        Text(verbatim: balance.isKnown ? (account.usage.unlimited ? "∞" : "\(account.usage.availableNow)") : "—")
+                            .font(.largeTitle.weight(.semibold).monospacedDigit())
+                            .foregroundStyle(Color.accentColor)
+                        if balance.isKnown && !account.usage.unlimited {
+                            Text("home.usage.left")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                     Image(systemName: "chevron.right").font(.footnote).foregroundStyle(.secondary)
                 }
-                BalanceRows(rows: balance.rows, isKnown: balance.isKnown)
+                if !balance.extraRows.isEmpty {
+                    Divider()
+                    BalanceRows(rows: balance.extraRows)
+                }
             }
             .dsCard()
         }
@@ -118,7 +134,7 @@ struct HomeView: View {
     /// «Бесплатные ответы: 35 из 50» while a new account has free replies
     /// left, otherwise the usual title.
     private var usageTitle: LocalizedStringKey {
-        if let welcome = balance.welcomeHeadline {
+        if account.subscription?.plan.isFree == true, let welcome = balance.welcomeHeadline {
             return "balance.welcomeTitle \(welcome.remaining) \(welcome.total)"
         }
         return "home.usage.title"
@@ -132,14 +148,12 @@ struct HomeView: View {
         NavigationLink(value: AppRoute.compose) {
             HStack {
                 Label("home.tryIt", systemImage: "sparkles")
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(.primary)
+                    .font(.body.weight(.semibold))
                 Spacer()
-                Image(systemName: "chevron.right").font(.footnote).foregroundStyle(.secondary)
+                Image(systemName: "chevron.right").font(.footnote.weight(.semibold))
             }
-            .dsCard()
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.dsPrimary)
     }
 
     private var setupCard: some View {

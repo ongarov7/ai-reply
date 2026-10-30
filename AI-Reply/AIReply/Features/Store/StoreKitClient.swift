@@ -4,9 +4,14 @@ import StoreKit
 /// A product as the App Store describes it: its name and its price, in the
 /// storefront's currency and format.
 struct StoreProduct: Equatable, Sendable {
+    enum Kind: Equatable, Sendable { case consumable, subscription, nonRenewing, other }
     let id: String
     let displayName: String
     let displayPrice: String
+    var kind: Kind = .consumable
+    var billingPeriod: String? = nil
+    var price: Decimal? = nil
+    var currency: String? = nil
 }
 
 /// A verified App Store transaction, ready to be sent to the server.
@@ -45,6 +50,8 @@ protocol StoreKitClient: Sendable {
     func purchase(productID: String, appAccountToken: UUID) async throws -> StorePurchaseResult
     func unfinishedTransactions() async -> [StoreTransaction]
     func transactionUpdates() -> AsyncStream<StoreTransaction>
+    func sync() async throws
+    func currentEntitlements() async -> [StoreTransaction]
 }
 
 enum StoreKitClientError: Error, Equatable {
@@ -58,8 +65,34 @@ struct AppStoreClient: StoreKitClient {
 
     func products(for ids: [String]) async throws -> [StoreProduct] {
         try await Product.products(for: ids).map {
-            StoreProduct(id: $0.id, displayName: $0.displayName, displayPrice: $0.displayPrice)
+            StoreProduct(id: $0.id, displayName: $0.displayName, displayPrice: $0.displayPrice,
+                         kind: Self.kind($0),
+                         billingPeriod: Self.period($0), price: $0.price, currency: $0.priceFormatStyle.currencyCode)
         }
+    }
+
+    private static func kind(_ product: Product) -> StoreProduct.Kind {
+        switch product.type {
+        case .autoRenewable: return .subscription
+        case .consumable: return .consumable
+        case .nonRenewable: return .nonRenewing
+        default: return .other
+        }
+    }
+
+    private static func period(_ product: Product) -> String? {
+        guard let period = product.subscription?.subscriptionPeriod, period.value == 1 else { return nil }
+        switch period.unit { case .month: return "month"; case .year: return "year"; default: return nil }
+    }
+
+    func sync() async throws { try await AppStore.sync() }
+
+    func currentEntitlements() async -> [StoreTransaction] {
+        var transactions: [StoreTransaction] = []
+        for await verification in Transaction.currentEntitlements {
+            if let transaction = Self.transaction(from: verification) { transactions.append(transaction) }
+        }
+        return transactions
     }
 
     func purchase(productID: String, appAccountToken: UUID) async throws -> StorePurchaseResult {

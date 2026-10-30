@@ -52,9 +52,8 @@ struct AIReplyApp: App {
             guard let account else { return }
             if let usage {
                 account.receiveUsage(usage)
-            } else {
-                Task { await account.refresh() }
             }
+            Task { await account.refresh() }
         }
         let keyboardStatus = KeyboardStatusMonitor()
         // What the server's reminders may rely on: what the keyboard was

@@ -94,51 +94,57 @@ struct ComposeView: View {
 
     private var messageCard: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.s) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("compose.message")
-                    .font(.headline)
-                    .accessibilityAddTraits(.isHeader)
-                Spacer(minLength: DS.Spacing.s)
-                counter
-            }
+            Text("compose.message")
+                .font(.title2.weight(.bold))
+                .accessibilityAddTraits(.isHeader)
 
-            TextEditor(text: $viewModel.message)
-                .font(.body)
-                .scrollContentBackground(.hidden)
-                .frame(minHeight: 120)
-                .focused($isFocused)
-                .overlay(alignment: .topLeading) {
-                    if viewModel.message.isEmpty {
-                        Text("compose.message.placeholder")
-                            .foregroundStyle(.tertiary)
-                            .padding(.top, 8)
-                            .padding(.leading, 5)
-                            .allowsHitTesting(false)
+            VStack(alignment: .leading, spacing: DS.Spacing.s) {
+                TextEditor(text: $viewModel.message)
+                    .font(.body)
+                    .scrollContentBackground(.hidden)
+                    .frame(minHeight: 160)
+                    .focused($isFocused)
+                    .accessibilityLabel(Text("compose.message"))
+                    .overlay(alignment: .topLeading) {
+                        if viewModel.message.isEmpty {
+                            Text("compose.message.placeholder")
+                                .foregroundStyle(.tertiary)
+                                .padding(.top, 8)
+                                .padding(.leading, 5)
+                                .allowsHitTesting(false)
+                        }
+                    }
+
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: DS.Spacing.s) {
+                        counter
+                        Spacer(minLength: DS.Spacing.xs)
+                        inputButtons
+                    }
+                    VStack(alignment: .leading, spacing: DS.Spacing.s) {
+                        counter
+                        HStack(spacing: DS.Spacing.s) { inputButtons }
+                    }
+                    VStack(alignment: .leading, spacing: DS.Spacing.s) {
+                        counter
+                        inputButtons
                     }
                 }
 
-            // The system's own Paste button, labelled by iOS: it pastes on
-            // the user's tap and never shows the "Allow Paste" question.
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: DS.Spacing.s) { inputButtons }
-                VStack(alignment: .leading, spacing: DS.Spacing.s) { inputButtons }
-            }
+                if let key = viewModel.pasteNoticeKey {
+                    Text(LocalizedStringKey(key))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
 
-            if let key = viewModel.pasteNoticeKey {
-                Text(LocalizedStringKey(key))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                if viewModel.isOverLimit {
+                    Text(AIReplyStrings.forLanguage(settings.effectiveLanguage).messageTooLong(limit: viewModel.characterLimit))
+                        .font(.footnote)
+                        .foregroundStyle(Color.red)
+                }
             }
-
-            if viewModel.isOverLimit {
-                // The exact wording the keyboard shows, so the rule reads the
-                // same wherever the user meets it.
-                Text(AIReplyStrings.forLanguage(settings.effectiveLanguage).messageTooLong(limit: viewModel.characterLimit))
-                    .font(.footnote)
-                    .foregroundStyle(Color.red)
-            }
+            .dsCard()
         }
-        .dsCard()
     }
 
     @ViewBuilder
@@ -171,7 +177,7 @@ struct ComposeView: View {
     private var recipients: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.s) {
             Text("compose.recipients")
-                .font(.headline)
+                .font(.title2.weight(.bold))
                 .accessibilityAddTraits(.isHeader)
 
             RecipientGrid(

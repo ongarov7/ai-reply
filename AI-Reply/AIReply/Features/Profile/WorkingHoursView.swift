@@ -8,6 +8,7 @@ import SwiftUI
 struct WorkingHoursView: View {
 
     @Environment(ReplyConfigurationModel.self) private var model
+    @Environment(AppSettings.self) private var settings
 
     @State private var hours: WorkingHours = .default
 
@@ -81,7 +82,7 @@ struct WorkingHoursView: View {
             // minutes. The conversion is anchored to today and only the hour
             // and minute are read back, so no date or timezone is ever stored.
             DatePicker(
-                "",
+                titleKey,
                 selection: Binding(
                     get: { Self.date(from: selection.wrappedValue) },
                     set: { selection.wrappedValue = Self.time(from: $0) }
@@ -93,7 +94,9 @@ struct WorkingHoursView: View {
     }
 
     private func weekdayName(_ weekday: Int) -> String {
-        Calendar.current.standaloneWeekdaySymbols[weekday - 1].capitalized
+        var calendar = Calendar.current
+        calendar.locale = settings.locale
+        return calendar.standaloneWeekdaySymbols[weekday - 1].capitalized(with: settings.locale)
     }
 
     private static func date(from time: TimeOfDay) -> Date {
@@ -115,6 +118,7 @@ struct WorkingHoursView: View {
 struct QuickHoursEditor: View {
 
     @Binding var hours: WorkingHours
+    @Environment(AppSettings.self) private var settings
 
     private let weekdayOrder = [2, 3, 4, 5, 6, 7, 1]
 
@@ -124,8 +128,10 @@ struct QuickHoursEditor: View {
                 Text("hours.from").foregroundStyle(.secondary)
                 Spacer()
                 TimeOfDayPicker(time: startBinding)
+                    .accessibilityLabel(Text("hours.from"))
                 Text("hours.to").foregroundStyle(.secondary)
                 TimeOfDayPicker(time: endBinding)
+                    .accessibilityLabel(Text("hours.to"))
             }
 
             HStack(spacing: DS.Spacing.xxs) {
@@ -150,7 +156,9 @@ struct QuickHoursEditor: View {
     }
 
     private func symbol(_ weekday: Int) -> String {
-        String(Calendar.current.shortStandaloneWeekdaySymbols[weekday - 1].prefix(2))
+        var calendar = Calendar.current
+        calendar.locale = settings.locale
+        return String(calendar.shortStandaloneWeekdaySymbols[weekday - 1].prefix(2))
     }
 
     private func isEnabled(_ weekday: Int) -> Bool {

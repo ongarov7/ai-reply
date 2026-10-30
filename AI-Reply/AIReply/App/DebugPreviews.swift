@@ -12,22 +12,20 @@ enum DebugSamples {
         id: "free", code: "free",
         name: ["en": "Free", "ru": "Бесплатный", "kk": "Тегін", "uz": "Bepul"],
         description: [:], price: 0, priceText: "", currency: "KZT",
-        dailyLimit: 7, monthlyLimit: 0, periodDays: 0, isFree: true
+        dailyLimit: 0, monthlyLimit: 0, periodDays: 0, isFree: true, entitlementKind: "welcome"
     )
 
     static let subscription = AccountAPI.Subscription(id: nil, status: "active", plan: plan, expiresAt: nil)
 
-    /// Five of the plan's seven left, 35 of 50 free replies, 20 purchased
-    /// and a pass until tomorrow afternoon.
+    /// The approved free allowance and two permanent reply packs.
     static var usage: AccountAPI.Usage {
-        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
-        let passEnd = Calendar.current.date(bySettingHour: 15, minute: 0, second: 0, of: tomorrow) ?? tomorrow
-        var usage = AccountAPI.Usage(dailyLimit: 7, usedToday: 2, remainingToday: 5, monthlyLimit: 0, usedMonth: 2,
-                                     resetsAt: ISO8601DateFormatter().string(from: tomorrow), timezone: "Asia/Almaty")
-        usage.welcome = AccountAPI.Usage.Welcome(total: 50, remaining: 35)
-        usage.credits = 20
-        usage.pass = AccountAPI.Usage.Pass(expiresAt: ISO8601DateFormatter().string(from: passEnd), remaining: 40)
-        usage.remainingTotal = 100
+        var usage = AccountAPI.Usage(dailyLimit: 0, usedToday: 0, remainingToday: 0, monthlyLimit: 0, usedMonth: 3,
+                                     resetsAt: "", timezone: "Asia/Almaty")
+        usage.welcome = AccountAPI.Usage.Welcome(total: 10, remaining: 7)
+        usage.credits = 60
+        usage.purchasedCredits = 60
+        usage.adminCredits = 0
+        usage.remainingTotal = 67
         return usage
     }
 }
@@ -42,39 +40,41 @@ extension DebugSamples {
         """.utf8))
     }
 
-    /// Two packs and the pass, as an administrator could set them up.
+    // Local preview identifiers; App Store Connect mappings are supplied by the published catalog.
     static let products = [
-        PurchaseAPI.Product(code: "pack_50", kind: "pack", units: 50, durationHours: 0,
-                            storeProductID: "kz.aireply.pack.50", name: localizedName(units: 50)),
-        PurchaseAPI.Product(code: "pack_200", kind: "pack", units: 200, durationHours: 0,
-                            storeProductID: "kz.aireply.pack.200", name: localizedName(units: 200)),
-        PurchaseAPI.Product(code: "pass_24h", kind: "pass", units: 100, durationHours: 24,
-                            storeProductID: "kz.aireply.pass.24h", name: localizedName(units: 0))
+        PurchaseAPI.Product(code: "base_monthly", kind: "subscription", units: 0, durationHours: 0,
+                            storeProductID: "preview.base.monthly", name: "Base", planID: "base_monthly",
+                            billingPeriod: "month", entitlementKind: "daily", dailyLimit: 30),
+        PurchaseAPI.Product(code: "base_yearly", kind: "subscription", units: 0, durationHours: 0,
+                            storeProductID: "preview.base.yearly", name: "Base", planID: "base_yearly",
+                            billingPeriod: "year", entitlementKind: "daily", dailyLimit: 30),
+        PurchaseAPI.Product(code: "pro_monthly", kind: "subscription", units: 0, durationHours: 0,
+                            storeProductID: "preview.pro.monthly", name: "Pro", planID: "pro_monthly",
+                            billingPeriod: "month", entitlementKind: "unlimited"),
+        PurchaseAPI.Product(code: "pro_yearly", kind: "subscription", units: 0, durationHours: 0,
+                            storeProductID: "preview.pro.yearly", name: "Pro", planID: "pro_yearly",
+                            billingPeriod: "year", entitlementKind: "unlimited"),
+        PurchaseAPI.Product(code: "pack30", kind: "pack", units: 30, durationHours: 0,
+                            storeProductID: "preview.pack30", name: localizedPackName)
     ]
 
-    private static func localizedName(units: Int) -> String {
-        let language = SharedSettings.shared.effectiveAppLanguage
-        switch (language, units) {
-        case (.russian, 0): return "Пропуск на 24 часа"
-        case (.russian, _): return "\(units) ответов"
-        case (.kazakh, 0):  return "24 сағаттық рұқсаттама"
-        case (.kazakh, _):  return "\(units) жауап"
-        case (.uzbek, 0):   return "24 soatlik ruxsatnoma"
-        case (.uzbek, _):   return "\(units) ta javob"
-        case (_, 0):        return "24-hour pass"
-        case (_, _):        return "\(units) replies"
-        }
+    private static var localizedPackName: String {
+        AppSettings.localized("purchase.pack30", language: SharedSettings.shared.effectiveAppLanguage)
     }
 }
 
-/// The App Store, imitated. The prices are sample strings for the DEBUG
-/// screen only: a real build shows `Product.displayPrice`.
+/// Preview prices are excluded from Release. Checkout always uses StoreKit.
 struct DebugStoreKitClient: StoreKitClient {
     var canMakePayments: Bool { true }
 
     func products(for ids: [String]) async throws -> [StoreProduct] {
-        let prices = ["kz.aireply.pack.50": "990 ₸", "kz.aireply.pack.200": "2 990 ₸", "kz.aireply.pass.24h": "590 ₸"]
-        return ids.compactMap { id in prices[id].map { StoreProduct(id: id, displayName: id, displayPrice: $0) } }
+        let prices = ["preview.base.monthly": "599 ₸", "preview.base.yearly": "5 999 ₸",
+                      "preview.pro.monthly": "2 999 ₸", "preview.pro.yearly": "29 990 ₸", "preview.pack30": "100 ₸"]
+        return ids.compactMap { id in
+            prices[id].map { StoreProduct(id: id, displayName: id, displayPrice: $0,
+                                         kind: id == "preview.pack30" ? .consumable : .subscription,
+                                         billingPeriod: id.hasSuffix("monthly") ? "month" : (id.hasSuffix("yearly") ? "year" : nil)) }
+        }
     }
 
     func purchase(productID: String, appAccountToken: UUID) async throws -> StorePurchaseResult {
@@ -82,8 +82,9 @@ struct DebugStoreKitClient: StoreKitClient {
         return .pending
     }
 
+    func sync() async throws {}
+    func currentEntitlements() async -> [StoreTransaction] { [] }
     func unfinishedTransactions() async -> [StoreTransaction] { [] }
-
     func transactionUpdates() -> AsyncStream<StoreTransaction> { AsyncStream { $0.finish() } }
 }
 
