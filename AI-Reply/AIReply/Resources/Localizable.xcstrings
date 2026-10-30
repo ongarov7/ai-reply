@@ -10613,25 +10613,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "left today"
+            "value" : "available"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "бүгін қалды"
+            "value" : "қолжетімді"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "осталось сегодня"
+            "value" : "доступно"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "bugun qoldi"
+            "value" : "mavjud"
           }
         }
       }
@@ -14841,6 +14841,64 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Obunasiz davom etish"
+          }
+        }
+      }
+    },
+    "purchase.catalogueOnly" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This plan is not available to buy in the App Store yet."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Бұл тарифті App Store дүкенінен сатып алу әзірге қолжетімсіз."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Покупка этого тарифа в App Store пока недоступна."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu tarifni App Store orqali xarid qilish hozircha mavjud emas."
+          }
+        }
+      }
+    },
+    "purchase.welcome.once %lld" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld free replies once. They never expire."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld тегін жауап бір рет беріледі. Мерзімі шектелмеген."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld бесплатных ответов один раз. Без срока действия."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld ta bepul javob bir marta beriladi. Amal qilish muddati cheklanmagan."
           }
         }
       }

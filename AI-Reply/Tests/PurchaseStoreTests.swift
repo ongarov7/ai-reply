@@ -1,6 +1,67 @@
 import XCTest
 @testable import AIReply
 
+final class SubscriptionDisplayTests: XCTestCase {
+    private func plan(_ code: String, days: Int, kind: String, limit: Int = 0, free: Bool = false) -> AccountAPI.Plan {
+        AccountAPI.Plan(id: code, code: code, name: ["en": code.hasPrefix("base") ? "Base" : "Pro"],
+                        description: [:], price: 0, priceText: "", currency: "KZT",
+                        dailyLimit: limit, monthlyLimit: 0, periodDays: days, isFree: free,
+                        entitlementKind: kind)
+    }
+
+    private var plans: [AccountAPI.Plan] {
+        [plan("free", days: 0, kind: "welcome", free: true),
+         plan("base_monthly", days: 30, kind: "daily", limit: 30),
+         plan("base_yearly", days: 365, kind: "daily", limit: 30),
+         plan("pro_monthly", days: 30, kind: "unlimited"),
+         plan("pro_yearly", days: 365, kind: "unlimited")]
+    }
+
+    func testUnmappedPlansRemainReadableWithoutDuplicatePeriods() {
+        let catalogue = SubscriptionPlanCatalogue(plans: plans, offers: [])
+        XCTAssertEqual(catalogue.freePlan?.code, "free")
+        XCTAssertEqual(catalogue.periods, ["month", "year"])
+        XCTAssertEqual(catalogue.visible(period: "month").map(\.planID), ["base_monthly", "pro_monthly"])
+        XCTAssertEqual(catalogue.visible(period: "year").map(\.planID), ["base_yearly", "pro_yearly"])
+        XCTAssertEqual(catalogue.visible(period: "month").map(\.allowance), [.daily(30), .unlimited])
+        XCTAssertTrue(catalogue.options.allSatisfy { $0.offer == nil }, "information alone cannot open checkout")
+    }
+
+    func testMissingSelectedPeriodFallsBackToOnePeriod() {
+        let yearly = plans.filter { $0.periodDays == 365 }
+        let catalogue = SubscriptionPlanCatalogue(plans: yearly, offers: [])
+        XCTAssertEqual(catalogue.visible(period: "month").map(\.planID), ["base_yearly", "pro_yearly"])
+        XCTAssertTrue(catalogue.visible(period: "month").allSatisfy { $0.billingPeriod == "year" })
+    }
+
+    func testMatchedStoreOfferReplacesInformationWithoutLegacyCheckoutFlag() throws {
+        let offer = PurchaseOffer(code: "base_monthly", kind: .subscription, units: 0, durationHours: 0,
+                                  storeProductID: "base.monthly", name: "Base", displayPrice: "599 ₸",
+                                  planID: "base_monthly", billingPeriod: "month", entitlementKind: "daily", dailyLimit: 30)
+        XCTAssertFalse(plans[1].purchasable, "the legacy checkout flag does not govern StoreKit")
+        let catalogue = SubscriptionPlanCatalogue(plans: plans, offers: [offer])
+        XCTAssertEqual(catalogue.options.count, 4)
+        let monthlyBase = try XCTUnwrap(catalogue.visible(period: "month").first)
+        XCTAssertEqual(monthlyBase.id, offer.id)
+        XCTAssertEqual(monthlyBase.offer?.displayPrice, "599 ₸")
+    }
+
+    func testZeroDailyLimitNeverBecomesZeroRepliesPerDay() {
+        let invalid = plan("unknown_monthly", days: 30, kind: "daily")
+        let catalogue = SubscriptionPlanCatalogue(plans: [invalid], offers: [])
+        XCTAssertEqual(catalogue.options.first?.allowance, .unspecified)
+    }
+
+    func testStoreOnlySubscriptionsRemainAvailableWhilePlansAreLoading() {
+        let offer = PurchaseOffer(code: "pro_yearly", kind: .subscription, units: 0, durationHours: 0,
+                                  storeProductID: "pro.yearly", name: "Pro", displayPrice: "29 990 ₸",
+                                  planID: "pro_yearly", billingPeriod: "year", entitlementKind: "unlimited")
+        let catalogue = SubscriptionPlanCatalogue(plans: [], offers: [offer])
+        XCTAssertEqual(catalogue.visible(period: "month").first?.offer, offer)
+        XCTAssertEqual(catalogue.options.first?.allowance, .unlimited)
+    }
+}
+
 /// Packs and the pass through StoreKit 2, with the App Store and the server
 /// both imitated: what is offered, when a transaction is finished, and how
 /// every outcome is told (contract §3.8).

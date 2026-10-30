@@ -99,6 +99,16 @@ final class BalanceTests: XCTestCase {
         XCTAssertEqual(BalanceSummary.make(free).rows, [.today(7), .welcome(remaining: 7, total: 10)])
     }
 
+    func testExhaustedWelcomeDoesNotBecomeTenRepliesAgain() throws {
+        let free = try usage("""
+        {"daily_limit": 0, "used_today": 0, "remaining_today": 0,
+         "welcome": {"total": 10, "remaining": 0}, "remaining_total": 0}
+        """)
+        XCTAssertTrue(free.isKnown)
+        XCTAssertEqual(free.availableNow, 0)
+        XCTAssertEqual(BalanceSummary.make(free).rows, [.today(0), .welcome(remaining: 0, total: 10)])
+    }
+
     func testNothingIsANumberBeforeTheServerAnswers() {
         XCTAssertFalse(AccountAPI.Usage.unknown.isKnown)
         XCTAssertEqual(BalanceSummary.make(.unknown), .unknown)

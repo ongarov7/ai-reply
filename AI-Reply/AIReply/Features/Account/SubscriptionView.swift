@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Current plan, what is left today, and the plans that can replace it.
+/// Current plan, the full reply balance, and the shared plan catalogue.
 ///
 /// Тариф пен күндік квота: шешімді әрқашан сервер қабылдайды.
 ///
@@ -35,6 +35,7 @@ struct SubscriptionView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task {
             await account.refresh()
+            await account.loadPlans()
             await purchases.loadCatalogue()
         }
     }
@@ -56,7 +57,8 @@ struct SubscriptionView: View {
                     Text(verbatim: usageIsKnown ? (account.usage.unlimited ? "∞" : "\(account.usage.availableNow)") : "—")
                         .font(.largeTitle.weight(.semibold).monospacedDigit())
                         .foregroundStyle(usageIsKnown ? Color.primary : Color.secondary)
-                    Text("subscription.remaining").font(.caption).foregroundStyle(.secondary)
+                    Text(account.usage.unlimited ? LocalizedStringKey("purchase.unlimited") : LocalizedStringKey("subscription.remaining"))
+                        .font(.caption).foregroundStyle(.secondary)
                 }
             }
 
@@ -86,7 +88,7 @@ struct SubscriptionView: View {
     // MARK: Values
 
     private var planName: String {
-        account.subscription?.plan.localizedName(settings.effectiveLanguage.rawValue) ?? ""
+        account.subscription?.plan.localizedName(settings.effectiveLanguage.rawValue) ?? "—"
     }
 
     /// The server's numbers have arrived.

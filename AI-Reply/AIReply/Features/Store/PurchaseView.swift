@@ -3,6 +3,7 @@ import StoreKit
 
 struct PurchaseView: View {
     @Environment(PurchaseStore.self) private var store
+    @Environment(AccountModel.self) private var account
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -16,13 +17,82 @@ struct PurchaseView: View {
         .background(Color.dsBackground)
         .navigationTitle("purchase.title")
         .navigationBarTitleDisplayMode(.inline)
-        .task { await store.loadCatalogue() }
+        .task {
+            await account.refresh()
+            await account.loadPlans()
+            await store.loadCatalogue()
+        }
         .onDisappear { store.dismissStatus() }
     }
 }
 
-/// Products are shown only after both the server and the App Store return
-/// them. The server determines access; Apple supplies the checkout price.
+/// One catalogue for the plan and purchase routes. Server plans remain
+/// readable before their App Store mappings are ready; checkout requires a
+/// matched StoreKit offer. A missing selected period falls back to one period,
+/// never to both monthly and yearly cards together.
+struct SubscriptionPlanCatalogue {
+    struct Option: Identifiable {
+        enum Allowance: Equatable {
+            case daily(Int), unlimited, unspecified
+        }
+
+        let plan: AccountAPI.Plan?
+        let offer: PurchaseOffer?
+        let billingPeriod: String
+        let id: String
+
+        var planID: String? { offer?.planID ?? plan?.id }
+        var allowance: Allowance {
+            let kind = offer?.entitlementKind ?? plan?.entitlementKind
+            let limit = offer?.dailyLimit ?? plan?.dailyLimit ?? 0
+            if kind == "unlimited" { return .unlimited }
+            if kind == "daily", limit > 0 { return .daily(limit) }
+            return .unspecified
+        }
+
+        func name(_ language: String) -> String {
+            offer?.name ?? plan?.localizedName(language) ?? ""
+        }
+    }
+
+    let freePlan: AccountAPI.Plan?
+    let options: [Option]
+
+    init(plans: [AccountAPI.Plan], offers: [PurchaseOffer]) {
+        freePlan = plans.first(where: \.isFree)
+        let subscriptions = offers.filter { $0.kind == .subscription }
+        var included = Set<String>()
+        var result: [Option] = []
+        for plan in plans where !plan.isFree {
+            let period: String
+            switch plan.periodDays {
+            case 30: period = "month"
+            case 365: period = "year"
+            default: continue
+            }
+            let offer = subscriptions.first { $0.planID == plan.id && $0.billingPeriod == period }
+            if let offer { included.insert(offer.id) }
+            result.append(Option(plan: plan, offer: offer, billingPeriod: period, id: offer?.id ?? plan.id))
+        }
+        for offer in subscriptions where !included.contains(offer.id) {
+            guard let period = offer.billingPeriod, period == "month" || period == "year" else { continue }
+            result.append(Option(plan: nil, offer: offer, billingPeriod: period, id: offer.id))
+        }
+        options = result
+    }
+
+    var periods: [String] {
+        ["month", "year"].filter { period in options.contains { $0.billingPeriod == period } }
+    }
+
+    func visible(period: String) -> [Option] {
+        let selected = periods.contains(period) ? period : periods.first
+        return options.filter { $0.billingPeriod == selected }
+    }
+}
+
+/// Plans can be read before Store setup is complete. Purchases and prices
+/// appear only after both the server and the App Store return the product.
 struct PurchaseOptionsView: View {
     var onSelectOffer: (String) -> Void = { _ in }
     @Environment(PurchaseStore.self) private var store
@@ -48,6 +118,9 @@ struct PurchaseOptionsView: View {
                let offer = recommendedOffer(recommendation) {
                 recommendationCard(recommendation, offer: offer)
             }
+
+            if let free = planCatalogue.freePlan { freeCard(free) }
+            subscriptionPlans
 
             if store.isEnabled {
                 catalogue
@@ -113,18 +186,6 @@ struct PurchaseOptionsView: View {
 
     @ViewBuilder
     private var products: some View {
-        if !subscriptions.isEmpty {
-            VStack(alignment: .leading, spacing: DS.Spacing.m) {
-                Text("purchase.subscriptions").font(.headline).accessibilityAddTraits(.isHeader)
-                if Set(subscriptions.compactMap(\.billingPeriod)).count > 1 {
-                    Picker("purchase.period", selection: $period) {
-                        Text("purchase.month").tag("month")
-                        Text("purchase.year").tag("year")
-                    }.pickerStyle(.segmented)
-                }
-                ForEach(visibleSubscriptions) { offer in subscriptionCard(offer).id(offer.id) }
-            }
-        }
         if !packs.isEmpty {
             VStack(alignment: .leading, spacing: DS.Spacing.s) {
                 Text("purchase.packs").font(.headline).accessibilityAddTraits(.isHeader)
@@ -140,25 +201,55 @@ struct PurchaseOptionsView: View {
         }
     }
 
+    @ViewBuilder
+    private var subscriptionPlans: some View {
+        if !planCatalogue.options.isEmpty {
+            VStack(alignment: .leading, spacing: DS.Spacing.m) {
+                Text("purchase.subscriptions").font(.headline).accessibilityAddTraits(.isHeader)
+                if planCatalogue.periods.count > 1 {
+                    Picker("purchase.period", selection: $period) {
+                        Text("purchase.month").tag("month")
+                        Text("purchase.year").tag("year")
+                    }.pickerStyle(.segmented)
+                }
+                ForEach(planCatalogue.visible(period: period)) { option in
+                    subscriptionCard(option).id(option.id)
+                }
+            }
+        }
+    }
+
     private var subscriptions: [PurchaseOffer] { store.offers.filter { $0.kind == .subscription } }
     private var packs: [PurchaseOffer] { store.offers.filter { $0.kind == .pack } }
     private var passes: [PurchaseOffer] { store.offers.filter { $0.kind == .pass } }
-    private var visibleSubscriptions: [PurchaseOffer] {
-        let matches = subscriptions.filter { $0.billingPeriod == period }
-        return matches.isEmpty ? subscriptions : matches
+    private var planCatalogue: SubscriptionPlanCatalogue {
+        SubscriptionPlanCatalogue(plans: account.plans, offers: subscriptions)
     }
 
-    private func subscriptionCard(_ offer: PurchaseOffer) -> some View {
-        let current = account.subscription?.status == "active" && account.subscription?.plan.id == offer.planID
+    private func freeCard(_ plan: AccountAPI.Plan) -> some View {
+        VStack(alignment: .leading, spacing: DS.Spacing.s) {
+            Text(verbatim: plan.localizedName(settings.effectiveLanguage.rawValue)).font(.title3.bold())
+            if let welcome = account.usage.welcome, welcome.total > 0 {
+                Text("purchase.welcome.once \(welcome.total)")
+                    .font(.subheadline).foregroundStyle(.secondary)
+            } else {
+                Text(verbatim: plan.localizedDescription(settings.effectiveLanguage.rawValue))
+                    .font(.subheadline).foregroundStyle(.secondary)
+            }
+        }.dsCard()
+    }
+
+    private func subscriptionCard(_ option: SubscriptionPlanCatalogue.Option) -> some View {
+        let current = account.subscription?.status == "active" && account.subscription?.plan.id == option.planID
         return VStack(alignment: .leading, spacing: DS.Spacing.s) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: DS.Spacing.xxs) {
-                    Text(verbatim: offer.name).font(.title3.bold())
-                    if offer.entitlementKind == "unlimited" {
+                    Text(verbatim: option.name(settings.effectiveLanguage.rawValue)).font(.title3.bold())
+                    if option.allowance == .unlimited {
                         Label("purchase.unlimited", systemImage: "infinity")
                             .foregroundStyle(Color.accentColor).font(.subheadline)
-                    } else {
-                        Text("subscription.perDay \(offer.dailyLimit)").font(.subheadline).foregroundStyle(.secondary)
+                    } else if case .daily(let limit) = option.allowance {
+                        Text("subscription.perDay \(limit)").font(.subheadline).foregroundStyle(.secondary)
                     }
                 }
                 Spacer(minLength: DS.Spacing.s)
@@ -167,14 +258,20 @@ struct PurchaseOptionsView: View {
                         .accessibilityLabel("subscription.currentBadge")
                 }
             }
-            Text(verbatim: offer.displayPrice).font(.title2.weight(.semibold))
-            Text(offer.billingPeriod == "year" ? LocalizedStringKey("purchase.billed.year") : LocalizedStringKey("purchase.billed.month"))
-                .font(.footnote).foregroundStyle(.secondary)
-            buyButton(offer, current: current)
-            if offer.hasPriceMismatch { mismatchNotice }
+            Text(option.billingPeriod == "year" ? LocalizedStringKey("purchase.year") : LocalizedStringKey("purchase.month"))
+                .font(.subheadline).foregroundStyle(.secondary)
+            if let offer = option.offer {
+                Text(verbatim: offer.displayPrice).font(.title2.weight(.semibold))
+                Text(offer.billingPeriod == "year" ? LocalizedStringKey("purchase.billed.year") : LocalizedStringKey("purchase.billed.month"))
+                    .font(.footnote).foregroundStyle(.secondary)
+                buyButton(offer, current: current)
+                if offer.hasPriceMismatch { mismatchNotice }
+            } else {
+                Text("purchase.catalogueOnly").font(.footnote).foregroundStyle(.secondary)
+            }
         }
         .dsCard()
-        .overlay(RoundedRectangle(cornerRadius: DS.Radius.large).strokeBorder(current || selectedOfferID == offer.id ? Color.accentColor : Color.clear, lineWidth: 1.5))
+        .overlay(RoundedRectangle(cornerRadius: DS.Radius.large).strokeBorder(current || selectedOfferID == option.id ? Color.accentColor : Color.clear, lineWidth: 1.5))
     }
 
     private func packCard(_ offer: PurchaseOffer) -> some View {

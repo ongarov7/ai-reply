@@ -48,7 +48,7 @@ targets:
       properties:
         CFBundleDisplayName: AI Reply
         CFBundleShortVersionString: "1.2.0"
-        CFBundleVersion: "12"
+        CFBundleVersion: "13"
         AIReplySignInWithApple: $(AIREPLY_SIGN_IN_WITH_APPLE)
         AIReplyBackendBaseURL: $(AIREPLY_BACKEND_BASE_URL)
         AIReplyPushNotifications: $(AIREPLY_PUSH_NOTIFICATIONS)
@@ -184,7 +184,7 @@ targets:
         AIReplyBackendBaseURL: $(AIREPLY_BACKEND_BASE_URL)
         CFBundleDisplayName: AI Reply
         CFBundleShortVersionString: "1.2.0"
-        CFBundleVersion: "12"
+        CFBundleVersion: "13"
         NSExtension:
           NSExtensionAttributes:
             IsASCIICapable: true
