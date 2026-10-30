@@ -829,9 +829,11 @@ re-enabled by a backend feature flag. There was no Android or audio-code change.
   `testFlightInternalTestingOnly=true` and preserve the build number.
 - Apple accepted the upload at **20:27:22 +05:00**, reporting `Upload succeeded`,
   `Uploaded package is processing`, and `EXPORT SUCCEEDED`. Log:
-  `/tmp/ai-reply-web-payment-14-upload.log`. Processing/group availability still
-  needs independent confirmation; no build-14 UUID or completed status is
-  inferred from upload success.
+  `/tmp/ai-reply-web-payment-14-upload.log`. A subsequent native-browser check
+  independently showed build **1.2.0 (14)** in the build-upload list with status
+  **Processing**. Completed processing and internal-group availability remain
+  unconfirmed; no build-14 UUID is inferred. The observed accessibility text is
+  saved as `outputs/payment-testflight-2026-10-30/testflight-14-processing.txt`.
 
 The live page was inspected in the browser; the full physical-device path
 through a real test push and BCC confirmation has not yet been executed. Bank
