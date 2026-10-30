@@ -1,0 +1,38 @@
+{
+  "sourceLanguage" : "ru",
+  "strings" : {
+    "CFBundleDisplayName" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "AI Reply" } },
+        "kk" : { "stringUnit" : { "state" : "translated", "value" : "AI Reply" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "AI Reply" } }
+      }
+    },
+    "CFBundleName" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "AI Reply" } },
+        "kk" : { "stringUnit" : { "state" : "translated", "value" : "AI Reply" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "AI Reply" } }
+      }
+    },
+    "NSHumanReadableCopyright" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "© 2026 AI Reply" } },
+        "kk" : { "stringUnit" : { "state" : "translated", "value" : "© 2026 AI Reply" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "© 2026 AI Reply" } }
+      }
+    },
+    "NSMicrophoneUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "AI Reply records your voice only while recording is on, to turn it into text." } },
+        "kk" : { "stringUnit" : { "state" : "translated", "value" : "AI Reply дауысыңызды тек жазу қосулы кезде ғана жазады — оны мәтінге айналдыру үшін." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "AI Reply записывает голос только пока идёт запись, чтобы превратить его в текст." } }
+      }
+    }
+  },
+  "version" : "1.0"
+}
