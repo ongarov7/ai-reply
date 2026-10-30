@@ -45,6 +45,10 @@ func billingSandboxConfig(primary config.Config) (config.Config, error) {
 	sandbox.Payments.Mode, sandbox.Payments.DemoCheckout = "off", false
 	sandbox.Push.Enabled, sandbox.Push.WorkerEnabled, sandbox.Push.EmailsEnabled = false, false, false
 	sandbox.Push.FCM = config.FCM{}
+	// Apple sign-in uses the real authorization for this bundle, even in
+	// TestFlight. Keep public client IDs for verification, but never revoke it
+	// when deleting an account from the isolated billing database.
+	sandbox.OAuth.AppleTeamID, sandbox.OAuth.AppleKeyID, sandbox.OAuth.ApplePrivateKey = "", "", ""
 	sandbox.IAP.AppleEnabled, sandbox.IAP.AppleAcceptSandbox = true, true
 	sandbox.IAP.GoogleClientEmail, sandbox.IAP.GooglePrivateKey, sandbox.IAP.GoogleServiceAccountFile = "", "", ""
 	sandbox.IAP.GoogleVoidedPoll = 0

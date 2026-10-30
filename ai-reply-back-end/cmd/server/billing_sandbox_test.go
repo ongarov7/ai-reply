@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -91,6 +92,32 @@ func TestBillingSandboxDerivesIsolatedValidatedConfiguration(t *testing.T) {
 		if _, err = auth.ParseJWT(secret.sandbox, token, time.Now()); err == nil {
 			t.Fatal("cross-environment signature accepted")
 		}
+	}
+}
+
+func TestBillingSandboxCannotRevokePrimaryAppleCredentials(t *testing.T) {
+	primary := billingPrimaryFixture(t)
+	primary.OAuth = config.OAuth{
+		AppleClientIDs: []string{"kz.example.reply", "kz.example.reply.web"},
+		AppleTeamID:    "DUMMYTEAMID", AppleKeyID: "DUMMYKEYID", ApplePrivateKey: "dummy-not-a-real-private-key",
+	}
+	original := primary.OAuth
+	original.AppleClientIDs = append([]string(nil), original.AppleClientIDs...)
+	if !primary.OAuth.AppleRevocation() {
+		t.Fatal("fixture must represent a configured primary revoker")
+	}
+	sandbox, err := billingSandboxConfig(primary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sandbox.OAuth.AppleTeamID != "" || sandbox.OAuth.AppleKeyID != "" || sandbox.OAuth.ApplePrivateKey != "" || sandbox.OAuth.AppleRevocation() {
+		t.Fatal("sandbox inherited credentials capable of revoking the primary Apple authorization")
+	}
+	if !reflect.DeepEqual(sandbox.OAuth.AppleClientIDs, original.AppleClientIDs) {
+		t.Fatal("sandbox lost the client IDs needed for read-only Apple ID-token verification")
+	}
+	if !reflect.DeepEqual(primary.OAuth, original) {
+		t.Fatal("sandbox derivation changed the primary Apple configuration")
 	}
 }
 
