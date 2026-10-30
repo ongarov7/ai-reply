@@ -31,6 +31,40 @@ struct VisualEffectBackground: NSViewRepresentable {
     }
 }
 
+/// The app logo (a bubble with three dots in front of a second bubble) as a vector
+/// template: tinted by macOS in the menu bar, in the accent colour in the quick bar.
+enum BrandGlyph {
+    static let image: NSImage = {
+        let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { _ in
+            let back = NSBezierPath(roundedRect: NSRect(x: 6.5, y: 5.5, width: 10.5, height: 9.5), xRadius: 3.6, yRadius: 3.6)
+            back.lineWidth = 1.5
+            back.stroke()
+
+            let front = NSBezierPath(roundedRect: NSRect(x: 1, y: 3.5, width: 12, height: 10.5), xRadius: 4, yRadius: 4)
+            front.move(to: NSPoint(x: 3, y: 4.5))
+            front.line(to: NSPoint(x: 2, y: 1))
+            front.line(to: NSPoint(x: 6.5, y: 3.6))
+            front.close()
+            // Clear what lies under the front bubble, so the back outline never shows through the dots.
+            NSGraphicsContext.current?.compositingOperation = .clear
+            front.fill()
+            NSGraphicsContext.current?.compositingOperation = .sourceOver
+
+            let dots = NSBezierPath()
+            for x in [4.2, 7, 9.8] {
+                dots.appendOval(in: NSRect(x: x - 1.1, y: 7.6, width: 2.2, height: 2.2))
+            }
+            front.append(dots)
+            front.windingRule = .evenOdd
+            front.fill()
+            return true
+        }
+        image.isTemplate = true
+        image.accessibilityDescription = "AI Reply"
+        return image
+    }()
+}
+
 /// A card of the quick bar: material, rounded corners and a hairline border.
 struct BarCard<Content: View>: View {
     @ViewBuilder var content: Content

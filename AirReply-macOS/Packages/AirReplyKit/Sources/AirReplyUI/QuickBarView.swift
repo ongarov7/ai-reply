@@ -90,10 +90,11 @@ private struct HeightKey: PreferenceKey {
 
 private struct BrandIcon: View {
     var body: some View {
-        Image(nsImage: NSApp.applicationIconImage)
+        Image(nsImage: BrandGlyph.image)
+            .renderingMode(.template)
             .resizable()
-            .interpolation(.high)
-            .frame(width: 24, height: 24)
+            .foregroundStyle(Color.accentColor)
+            .frame(width: 22, height: 22)
             .accessibilityHidden(true)
     }
 }
