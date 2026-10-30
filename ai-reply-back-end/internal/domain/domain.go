@@ -53,6 +53,8 @@ const (
 	PlatformIOS     = "ios"
 	PlatformAndroid = "android"
 	PlatformWeb     = "web"
+	PlatformMacOS   = "macos"
+	PlatformWindows = "windows"
 	PlatformLegacy  = "legacy"
 )
 

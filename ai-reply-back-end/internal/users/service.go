@@ -170,7 +170,7 @@ func (s *Service) UpdateProfile(ctx context.Context, userID string, in ProfileUp
 // RegisterDevice — құрылғыны тіркеу (push негізі).
 func (s *Service) RegisterDevice(ctx context.Context, d domain.Device) (domain.Device, error) {
 	d.Platform = strings.ToLower(strings.TrimSpace(d.Platform))
-	if d.Platform != "" && !traits.OneOf(d.Platform, domain.PlatformIOS, domain.PlatformAndroid, domain.PlatformWeb) {
+	if d.Platform != "" && !clientPlatform(d.Platform) {
 		return domain.Device{}, domain.ErrInvalidRequest
 	}
 	d.AppVersion = traits.Clamp(d.AppVersion, 32)
@@ -190,6 +190,13 @@ func (s *Service) RemoveDevice(ctx context.Context, userID, deviceID string) err
 	return s.repo.RevokeDevice(ctx, userID, deviceID)
 }
 
+// clientPlatform — the apps that register devices and accept the documents:
+// the mobile apps, the website and the desktop apps.
+func clientPlatform(p string) bool {
+	return traits.OneOf(p, domain.PlatformIOS, domain.PlatformAndroid, domain.PlatformWeb,
+		domain.PlatformMacOS, domain.PlatformWindows)
+}
+
 // LegalConsentInput identifies the public documents accepted in a client.
 type LegalConsentInput struct {
 	TermsVersion   string
@@ -206,7 +213,7 @@ func (s *Service) SaveLegalConsent(ctx context.Context, userID string, in LegalC
 		return domain.LegalConsent{}, domain.ErrInvalidRequest
 	}
 	platform := strings.ToLower(strings.TrimSpace(in.Platform))
-	if !traits.OneOf(platform, domain.PlatformIOS, domain.PlatformAndroid, domain.PlatformWeb) {
+	if !clientPlatform(platform) {
 		return domain.LegalConsent{}, domain.ErrInvalidRequest
 	}
 	now := time.Now().UTC()

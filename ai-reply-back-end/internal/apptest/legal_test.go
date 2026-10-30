@@ -2,6 +2,7 @@ package apptest
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/aireply/ai-reply-back-end/internal/legal"
@@ -56,6 +57,34 @@ func TestLegalConfigAndConsentPersistence(t *testing.T) {
 	}
 	if got := me.str("legal_consent", "platform"); got != "ios" {
 		t.Fatalf("platform from /me = %q", got)
+	}
+}
+
+// The desktop apps accept the documents themselves; an unknown client still cannot.
+func TestLegalConsentFromDesktopApps(t *testing.T) {
+	h := newHarness(t)
+	for i, platform := range []string{"macos", "Windows"} {
+		session := h.signIn([]string{"+7 701 636 37 38", "+7 701 646 47 48"}[i])
+		res := h.do(http.MethodPost, "/api/v1/me/consents", map[string]any{
+			"terms_version": legal.TermsVersion, "privacy_version": legal.PrivacyVersion,
+			"locale": "ru", "platform": platform, "app_version": "1.0.0",
+		}, h.auth(session.access))
+		if res.status != http.StatusOK {
+			t.Fatalf("%s consent: %d %s", platform, res.status, res.raw)
+		}
+		me := h.do(http.MethodGet, "/api/v1/me", nil, h.auth(session.access))
+		if got, want := me.str("legal_consent", "platform"), strings.ToLower(platform); got != want {
+			t.Fatalf("platform from /me = %q, want %q", got, want)
+		}
+	}
+
+	session := h.signIn("+7 701 656 57 58")
+	res := h.do(http.MethodPost, "/api/v1/me/consents", map[string]any{
+		"terms_version": legal.TermsVersion, "privacy_version": legal.PrivacyVersion,
+		"locale": "ru", "platform": "linux",
+	}, h.auth(session.access))
+	if res.status != http.StatusBadRequest {
+		t.Fatalf("unknown platform accepted: %d %s", res.status, res.raw)
 	}
 }
 
