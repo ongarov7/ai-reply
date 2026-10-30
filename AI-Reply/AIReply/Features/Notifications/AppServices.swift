@@ -160,6 +160,7 @@ final class AppServices {
     }
 
     func scenePhaseDidChange(_ phase: ScenePhase) {
+        router.scenePhaseDidChange(phase)
         guard isStarted, phase == .active else { return }
         // The user may have changed the permission in iOS Settings; a change
         // registers again on its own.

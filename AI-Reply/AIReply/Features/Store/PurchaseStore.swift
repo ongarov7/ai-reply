@@ -5,6 +5,9 @@ import Observation
 /// Server feature flags cannot enable a storefront in this app.
 enum IOSProductPolicy {
     static let allowsNewPurchases = false
+    /// Explicit product choice for the internal prototype. It is not changed
+    /// by remote flags, receipts, reviewer accounts or browser state.
+    static let showsWebsiteAccountLink = true
 }
 
 /// A product the screen may offer: what the server sells, at the price the

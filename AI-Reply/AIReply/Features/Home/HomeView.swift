@@ -8,6 +8,7 @@ struct HomeView: View {
     @Environment(PushNotificationsModel.self) private var notifications
     @Environment(SupportInbox.self) private var support
     @Environment(AppUpdateModel.self) private var updates
+    @Environment(AppRouter.self) private var router
 
     /// Re-read on appearance and on every return to the foreground -
     /// typically from iOS Settings, or from another app where the keyboard
@@ -22,7 +23,12 @@ struct HomeView: View {
                 Text("home.description")
                     .font(.body)
                     .foregroundStyle(.secondary)
-                if account.isSignedIn { usageCard }
+                if account.isSignedIn {
+                    VStack(spacing: DS.Spacing.s) {
+                        usageCard
+                        if IOSProductPolicy.showsWebsiteAccountLink { websiteAccountCard }
+                    }
+                }
                 if updates.showsUpdateCard {
                     AppUpdateCard()
                         .transition(.opacity)
@@ -130,6 +136,40 @@ struct HomeView: View {
     }
 
     private var balance: BalanceSummary { BalanceSummary.make(account.usage) }
+
+    private var websiteAccountCard: some View {
+        Button {
+            router.openWebsiteAccount()
+        } label: {
+            HStack(spacing: DS.Spacing.s) {
+                Image(systemName: "globe")
+                    .font(.title3)
+                    .foregroundStyle(Color.accentColor)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: DS.Spacing.xxs) {
+                    Text("home.websiteAccount.title")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                    Text("home.websiteAccount.subtitle")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: DS.Spacing.xs)
+                Image(systemName: "arrow.up.right.square")
+                    .font(.body)
+                    .foregroundStyle(Color.accentColor)
+                    .accessibilityHidden(true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .dsCard()
+        }
+        .buttonStyle(.plain)
+        .disabled(!router.canOpenWebsiteAccount)
+        .accessibilityElement(children: .combine)
+        .accessibilityHint(Text("home.websiteAccount.externalHint"))
+        .accessibilityIdentifier("home.websiteAccount")
+    }
 
     /// «Бесплатные ответы: 35 из 50» while a new account has free replies
     /// left, otherwise the usual title.

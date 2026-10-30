@@ -120,6 +120,9 @@ final class AccountModel {
     /// there is none to name.
     @ObservationIgnored var installationIDForSignOut: (@MainActor () -> String?)?
 
+    /// Invalidates account-bound external work before logout can suspend.
+    @ObservationIgnored var willEndSession: (@MainActor () -> Void)?
+
     /// The account was deleted: the app drops what it keeps for it beyond
     /// the session (the synced profile, the events waiting to be sent).
     @ObservationIgnored var didDeleteAccount: (@MainActor () -> Void)?
@@ -533,6 +536,7 @@ final class AccountModel {
     }
 
     func signOut() async {
+        willEndSession?()
         isBusy = true
         await service.signOut(installationID: installationIDForSignOut?())
         await signOutLocally()
@@ -640,6 +644,7 @@ final class AccountModel {
     }
 
     private func signOutLocally() async {
+        willEndSession?()
         // A gender or language change this account never received stays
         // with it: it must not be sent to whoever signs in next on this phone.
         ProfileSync.discardPendingChange()

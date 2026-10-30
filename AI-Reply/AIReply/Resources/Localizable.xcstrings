@@ -15105,6 +15105,93 @@
           }
         }
       }
+    },
+    "home.websiteAccount.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Личный кабинет на сайте"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сайттағы жеке кабинет"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Website account"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saytdagi shaxsiy kabinet"
+          }
+        }
+      }
+    },
+    "home.websiteAccount.subtitle" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тарифы и баланс AI Reply"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply тарифтері мен балансы"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply plans and balance"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply tariflari va balansi"
+          }
+        }
+      }
+    },
+    "home.websiteAccount.externalHint" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Откроется внешний браузер."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сыртқы браузер ашылады."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens in your external browser."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tashqi brauzerda ochiladi."
+          }
+        }
+      }
     }
   },
   "version" : "1.1"

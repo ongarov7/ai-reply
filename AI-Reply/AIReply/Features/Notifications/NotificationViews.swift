@@ -16,7 +16,10 @@ struct RootNavigationView: View {
         NavigationStack(path: $router.path) {
             HomeView()
         }
-        .onAppear { router.mainInterfaceDidAppear() }
+        .onAppear {
+            router.scenePhaseDidChange(UIApplication.shared.applicationState == .active ? .active : .inactive)
+            router.mainInterfaceDidAppear()
+        }
         .onDisappear { router.mainInterfaceDidDisappear() }
         .sheet(item: $router.webPage) { page in
             SafariView(url: page.url).ignoresSafeArea()

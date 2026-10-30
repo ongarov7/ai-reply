@@ -325,6 +325,7 @@ final class LocalizationTests: XCTestCase {
             "subscription.title", "exhausted.balance", "exhausted.body.balance",
             "settings.notifications.category.marketing", "notifications.card.offersOptional", "notifications.card.save",
             "notifications.website.opening", "notifications.website.openFailed", "notifications.website.retryBody",
+            "home.websiteAccount.title", "home.websiteAccount.subtitle", "home.websiteAccount.externalHint",
             "exhausted.body.male", "exhausted.body.female", "exhausted.body.plans",
             "exhausted.plans", "purchase.title", "purchase.packs.footer", "purchase.pass.footer",
             "purchase.status.pending", "purchase.status.willRetry", "purchase.status.notConfirmed",

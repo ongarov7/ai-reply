@@ -23,6 +23,8 @@ enum DeepLinkDestination: Equatable, Sendable {
     case screen(AppScreen)
     case web(URL)
     case externalWeb(URL)
+    /// An explicit local user action. Network links never produce this case.
+    case websiteAccount
     case none
 }
 
@@ -85,6 +87,7 @@ enum DeepLink {
         switch destination {
         case .none: return false
         case .screen: return true
+        case .websiteAccount: return true
         case .web(let url): return Self.destination(for: url.absoluteString) == destination
         case .externalWeb(let url): return topupOfferDestination(for: url.absoluteString) == destination
         }

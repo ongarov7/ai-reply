@@ -83,14 +83,16 @@ final class AppRouter {
 
     private(set) var pending: DeepLinkDestination?
     @ObservationIgnored private var pendingSince: Date?
-    @ObservationIgnored private var isMainInterfaceVisible = false
+    private var isMainInterfaceVisible = false
+    private var isSceneActive = false
     @ObservationIgnored private let now: () -> Date
     @ObservationIgnored private let openExternal: @MainActor (URL) async -> Bool
     @ObservationIgnored private let handoffProvider: WebPaymentHandoffProviding
     @ObservationIgnored private let backendBaseURL: () -> URL?
     @ObservationIgnored private let locale: () -> String
-    @ObservationIgnored private var accountID: String?
-    @ObservationIgnored private var accountIsReady = false
+    private var accountID: String?
+    private var accountIsReady = false
+    @ObservationIgnored private var endingSessionUserID: String?
     @ObservationIgnored private var handoffTask: Task<Void, Never>?
     @ObservationIgnored private var handoffID: UUID?
     @ObservationIgnored private var retryOffer: (destination: DeepLinkDestination, accountID: String)?
@@ -114,11 +116,29 @@ final class AppRouter {
     /// Called independently of view appearance: a response for an earlier
     /// account must never open a website session after a sign-out or switch.
     func accountDidChange(userID: String?, isReady: Bool) {
+        // /me or config can publish the old visible phase while logout is
+        // still awaiting the server. They cannot reactivate that session.
+        if let endingSessionUserID, userID == endingSessionUserID, isReady { return }
+        if userID != endingSessionUserID { endingSessionUserID = nil }
         guard userID != accountID || isReady != accountIsReady else { return }
         accountID = userID
         accountIsReady = isReady
         cancelWebOffer()
         applyPendingIfReady()
+    }
+
+    func accountWillSignOut() {
+        endingSessionUserID = accountID
+        accountIsReady = false
+        cancelWebOffer()
+        if let pending {
+            switch pending {
+            case .externalWeb, .websiteAccount:
+                self.pending = nil
+                pendingSince = nil
+            default: break
+            }
+        }
     }
 
     /// Opens a destination now, or as soon as the gates in front of Home are passed.
@@ -133,6 +153,26 @@ final class AppRouter {
             pending = destination
             pendingSince = now()
         }
+    }
+
+    /// The visible account card is independent of push permission and
+    /// marketing consent. It still uses the same account-bound website login.
+    var canOpenWebsiteAccount: Bool {
+        IOSProductPolicy.showsWebsiteAccountLink && isMainInterfaceVisible && isSceneActive
+            && accountIsReady && accountID != nil && !isOpeningWebOffer
+    }
+
+    func openWebsiteAccount() {
+        guard canOpenWebsiteAccount else { return }
+        open(.websiteAccount)
+    }
+
+    /// Inactive/background is not necessarily a view disappearance. A link
+    /// tapped during activation waits; an in-flight response is discarded.
+    func scenePhaseDidChange(_ phase: ScenePhase) {
+        isSceneActive = phase == .active
+        if isSceneActive { applyPendingIfReady() }
+        else { cancelWebOffer() }
     }
 
     /// Home's navigation stack is on screen: every gate has been passed.
@@ -156,8 +196,10 @@ final class AppRouter {
     }
 
     private func canApply(_ destination: DeepLinkDestination) -> Bool {
-        if case .externalWeb = destination { return accountIsReady && accountID != nil }
-        return true
+        switch destination {
+        case .externalWeb, .websiteAccount: return isSceneActive && accountIsReady && accountID != nil
+        default: return true
+        }
     }
 
     /// A gate is back in front of Home: signed out, onboarding restarted.
@@ -191,9 +233,9 @@ final class AppRouter {
             return
         case .web(let url):
             webPage = WebPage(url: url)
-        case .externalWeb(let url):
+        case .externalWeb, .websiteAccount:
             webPage = nil
-            beginWebOffer(.externalWeb(url))
+            beginWebOffer(destination)
         case .screen(let screen):
             webPage = nil
             path = Self.path(for: screen, availability: availability)
@@ -217,7 +259,7 @@ final class AppRouter {
 
     func retryWebOffer() {
         guard let retryOffer, retryOffer.accountID == accountID,
-              isMainInterfaceVisible, accountIsReady else {
+              isSceneActive, isMainInterfaceVisible, accountIsReady else {
             dismissWebOfferFailure()
             return
         }
@@ -227,7 +269,7 @@ final class AppRouter {
     }
 
     private func beginWebOffer(_ destination: DeepLinkDestination) {
-        guard isMainInterfaceVisible, accountIsReady, let userID = accountID else { return }
+        guard isSceneActive, isMainInterfaceVisible, accountIsReady, let userID = accountID else { return }
         let requestID = UUID()
         handoffID = requestID
         isOpeningWebOffer = true
@@ -249,7 +291,8 @@ final class AppRouter {
                 let response = try await handoffProvider.create(expectedUserID: userID, locale: requestLocale)
                 guard mayOpenWebOffer(requestID: requestID, userID: userID), !Task.isCancelled else { return }
                 let elapsed = now().timeIntervalSince(started)
-                guard (1...60).contains(response.expiresIn), elapsed >= 0, elapsed < Double(response.expiresIn),
+                guard backendBaseURL() == baseURL,
+                      (1...60).contains(response.expiresIn), elapsed >= 0, elapsed < Double(response.expiresIn),
                       let url = DeepLink.handoffURL(response.url, backendBaseURL: baseURL) else { throw APIError.invalidRequest }
                 // No plain-link fallback: a browser may still hold another
                 // person's session. Only this account-bound handoff is opened.
@@ -264,7 +307,7 @@ final class AppRouter {
     }
 
     private func mayOpenWebOffer(requestID: UUID, userID: String) -> Bool {
-        handoffID == requestID && accountID == userID && accountIsReady && isMainInterfaceVisible
+        handoffID == requestID && accountID == userID && accountIsReady && isMainInterfaceVisible && isSceneActive
     }
 
     /// `aireply://onboarding` opens the guide over Home.
