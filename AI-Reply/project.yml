@@ -47,7 +47,7 @@ targets:
       path: AIReply/Info.plist
       properties:
         CFBundleDisplayName: AI Reply
-        CFBundleShortVersionString: "1.1.1"
+        CFBundleShortVersionString: "1.2.0"
         CFBundleVersion: "12"
         AIReplySignInWithApple: $(AIREPLY_SIGN_IN_WITH_APPLE)
         AIReplyBackendBaseURL: $(AIREPLY_BACKEND_BASE_URL)
@@ -183,7 +183,7 @@ targets:
       properties:
         AIReplyBackendBaseURL: $(AIREPLY_BACKEND_BASE_URL)
         CFBundleDisplayName: AI Reply
-        CFBundleShortVersionString: "1.1.1"
+        CFBundleShortVersionString: "1.2.0"
         CFBundleVersion: "12"
         NSExtension:
           NSExtensionAttributes:
