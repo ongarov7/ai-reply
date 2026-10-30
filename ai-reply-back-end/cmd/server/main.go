@@ -53,7 +53,21 @@ import (
 func main() {
 	envFile := flag.String("env", ".env", "path to the env file")
 	check := flag.Bool("check", false, "validate the configuration, print its warnings and exit (opens nothing)")
+	queueOffer := flag.String("queue-sandbox-web-offer", "", "queue the standard website offer for one eligible existing sandbox user and exit")
 	flag.Parse()
+	queueRequested := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == "queue-sandbox-web-offer" {
+			queueRequested = true
+		}
+	})
+	if flag.NArg() != 0 || *check && queueRequested {
+		fmt.Fprintln(os.Stderr, "choose either -check or -queue-sandbox-web-offer USER_ID, without positional arguments")
+		os.Exit(2)
+	}
+	if queueRequested {
+		os.Exit(queueSandboxWebOfferCommand(*envFile, *queueOffer))
+	}
 
 	if *check {
 		os.Exit(checkConfig(*envFile))

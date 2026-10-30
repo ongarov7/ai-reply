@@ -33,6 +33,8 @@ type Options struct {
 	// FullSync requests crash-durable commits on every new connection. The
 	// application's existing NORMAL mode remains the default.
 	FullSync bool
+	// MustExist opens an existing persistent database without creating files or directories.
+	MustExist bool
 }
 
 // Open дерекқорды ашады, PRAGMA-ларды орнатады.
@@ -40,8 +42,14 @@ func Open(opts Options) (*DB, error) {
 	if opts.Path == "" {
 		return nil, fmt.Errorf("database: path is required")
 	}
+	if opts.MustExist {
+		info, err := os.Stat(opts.Path)
+		if err != nil || !info.Mode().IsRegular() || opts.Path == ":memory:" {
+			return nil, fmt.Errorf("database: an existing regular file is required")
+		}
+	}
 	if opts.Path != ":memory:" {
-		if dir := filepath.Dir(opts.Path); dir != "" && dir != "." {
+		if dir := filepath.Dir(opts.Path); !opts.MustExist && dir != "" && dir != "." {
 			if err := os.MkdirAll(dir, 0o750); err != nil {
 				return nil, fmt.Errorf("database: create dir: %w", err)
 			}
@@ -85,6 +93,9 @@ func open(opts Options, writer bool) (*sql.DB, error) {
 		dsn = "file::memory:?cache=shared"
 	} else {
 		q := url.Values{}
+		if opts.MustExist {
+			q.Set("mode", "rw")
+		}
 		q.Set("_journal_mode", "WAL")
 		q.Set("_busy_timeout", fmt.Sprintf("%d", opts.BusyTimeout.Milliseconds()))
 		q.Set("_foreign_keys", "on")
