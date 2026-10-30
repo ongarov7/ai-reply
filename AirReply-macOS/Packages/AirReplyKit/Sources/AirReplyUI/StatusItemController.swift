@@ -32,9 +32,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         self.actions = actions
         super.init()
         if let button = item.button {
-            let image = NSImage(systemSymbolName: "ellipsis.bubble", accessibilityDescription: "AI Reply")
-            image?.isTemplate = true
-            button.image = image
+            button.image = Self.logoGlyph
             button.toolTip = "AI Reply"
         }
         let menu = NSMenu()
@@ -74,6 +72,38 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         quit.keyEquivalent = "q"
         menu.addItem(quit)
     }
+
+    /// The app logo (a bubble with three dots in front of a second bubble) as a
+    /// monochrome template, so macOS tints it like every other menu bar icon.
+    static let logoGlyph: NSImage = {
+        let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { _ in
+            let back = NSBezierPath(roundedRect: NSRect(x: 6.5, y: 5.5, width: 10.5, height: 9.5), xRadius: 3.6, yRadius: 3.6)
+            back.lineWidth = 1.5
+            back.stroke()
+
+            let front = NSBezierPath(roundedRect: NSRect(x: 1, y: 3.5, width: 12, height: 10.5), xRadius: 4, yRadius: 4)
+            front.move(to: NSPoint(x: 3, y: 4.5))
+            front.line(to: NSPoint(x: 2, y: 1))
+            front.line(to: NSPoint(x: 6.5, y: 3.6))
+            front.close()
+            // Clear what lies under the front bubble, so the back outline never shows through the dots.
+            NSGraphicsContext.current?.compositingOperation = .clear
+            front.fill()
+            NSGraphicsContext.current?.compositingOperation = .sourceOver
+
+            let dots = NSBezierPath()
+            for x in [4.2, 7, 9.8] {
+                dots.appendOval(in: NSRect(x: x - 1.1, y: 7.6, width: 2.2, height: 2.2))
+            }
+            front.append(dots)
+            front.windingRule = .evenOdd
+            front.fill()
+            return true
+        }
+        image.isTemplate = true
+        image.accessibilityDescription = "AI Reply"
+        return image
+    }()
 
     static func balanceLine(_ balance: BalanceSummary) -> String {
         let plan = balance.planName.isEmpty ? "" : balance.planName + " · "
