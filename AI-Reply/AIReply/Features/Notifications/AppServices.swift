@@ -140,7 +140,9 @@ final class AppServices {
     func accountDidChange(_ state: AccountState) {
         let previous = account
         account = state
-        notifications.setSignedIn(state.isSignedIn)
+        router.accountDidChange(userID: state.userID,
+                                isReady: state.isSignedIn && state.isBootstrapComplete && state.hasAcceptedLegal)
+        notifications.setSignedIn(state.isSignedIn, accountID: state.userID)
         notifications.setServerDeliversPush(state.features.map { $0.pushNotifications ?? false })
         purchases.accountDidChange(isSignedIn: state.isSignedIn && state.isBootstrapComplete,
                                    userID: state.userID, features: state.features)
@@ -443,7 +445,7 @@ final class NotificationCenterDelegate: NSObject, UNUserNotificationCenterDelega
                                 withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
         let payload = NotificationPayload(userInfo: notification.request.content.userInfo)
         #if DEBUG
-        if DebugLaunchOptions.autoOpensPushes {
+        if DebugLaunchOptions.autoOpensPushes && !payload.isWebTopupOffer {
             Task { @MainActor in AppServices.shared.notificationOpened(payload) }
         }
         #endif

@@ -121,8 +121,8 @@ struct DebugExhaustedHost: View {
     var body: some View {
         NavigationStack { ComposeView() }
             .sheet(isPresented: $isShowing) {
-                ExhaustedSheetView(offer: ExhaustedOffer(offersPurchase: offersPurchase),
-                                   gender: DebugScreen.onboardingGender, onBuy: {}, onPlans: {})
+                ExhaustedSheetView(offer: ExhaustedOffer(),
+                                   gender: DebugScreen.onboardingGender, onBalance: {})
             }
     }
 }

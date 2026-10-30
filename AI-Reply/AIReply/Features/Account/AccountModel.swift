@@ -44,6 +44,40 @@ final class AccountModel {
         case cancelled
     }
 
+    /// A /me response belongs to the account and native device session that
+    /// started it, including when authentication had to wait or retry.
+    struct RefreshIdentity: Equatable, Sendable {
+        let userID: String?
+        let deviceID: String
+
+        func accepts(_ current: Self, isSignedIn: Bool, responseUserID: String? = nil) -> Bool {
+            guard isSignedIn, deviceID == current.deviceID else { return false }
+            if let userID {
+                guard current.userID == userID else { return false }
+                return responseUserID == nil || responseUserID == userID
+            }
+            // Bootstrap has no user yet. If another request populated it
+            // meanwhile, only a matching success can still be applied.
+            if let currentUserID = current.userID { return responseUserID == currentUserID }
+            return true
+        }
+
+        // Authentication may clear the Keychain before returning its error.
+        // The same displayed account must still leave the signed-in screen;
+        // a different account or an explicit sign-in flow must not be reset.
+        func acceptsAuthenticationFailure(_ current: Self, credentialsPresent: Bool,
+                                          isDisplayingAccount: Bool) -> Bool {
+            guard deviceID == current.deviceID,
+                  credentialsPresent || isDisplayingAccount else { return false }
+            if userID == nil && !credentialsPresent { return true }
+            return accepts(current, isSignedIn: true)
+        }
+    }
+
+    private var refreshIdentity: RefreshIdentity {
+        RefreshIdentity(userID: user?.id, deviceID: AccountCredentials.deviceID)
+    }
+
     private(set) var phase: Phase
     private(set) var user: AccountAPI.User?
     /// The server's copy of the profile, as of the last answer that carried it.
@@ -139,17 +173,8 @@ final class AccountModel {
         return offersApple || !isRelease
     }
 
-    /// Whether this build can take a payment at all. Release builds cannot:
-    /// there is no StoreKit purchase flow yet, and a plan sold outside it
-    /// would not pass App Review. DEBUG builds may, against a development
-    /// server with the demo checkout.
-    static var purchasesAvailableInThisBuild: Bool {
-        #if DEBUG
-        return true
-        #else
-        return false
-        #endif
-    }
+    /// Account access is readable; this iOS product does not sell access.
+    static var purchasesAvailableInThisBuild: Bool { IOSProductPolicy.allowsNewPurchases }
 
     /// A Choose button (and a price) for this plan: the build can buy, and
     /// the server says the plan can be bought right now.
@@ -208,11 +233,14 @@ final class AccountModel {
             phase = .signedOut
             return
         }
+        let identity = refreshIdentity
         // An acceptance confirmed while this request was out is newer than
         // its answer, which must not undo it.
         let consentBefore = LegalConsentStore.load()
         do {
             let account = try await service.account()
+            guard identity.accepts(refreshIdentity, isSignedIn: AccountCredentials.isSignedIn,
+                                   responseUserID: account.user.id) else { return }
             apply(user: account.user, subscription: account.subscription, usage: account.usage)
             receive(account.profile)
             applyLegalConsent(account.legalConsent, recordBefore: consentBefore)
@@ -220,6 +248,9 @@ final class AccountModel {
             // The account is there: no earlier deletion went through.
             hasUnansweredDeletion = false
         } catch APIError.unauthorized {
+            guard identity.acceptsAuthenticationFailure(refreshIdentity,
+                    credentialsPresent: AccountCredentials.isSignedIn,
+                    isDisplayingAccount: phase == .signedIn) else { return }
             // A deletion whose answer was lost (the app closed since) did delete it.
             if hasUnansweredDeletion {
                 await forgetDeletedAccount()
@@ -227,9 +258,13 @@ final class AccountModel {
                 await signOutLocally()
             }
         } catch APIError.accountDisabled {
+            guard identity.acceptsAuthenticationFailure(refreshIdentity,
+                    credentialsPresent: AccountCredentials.isSignedIn,
+                    isDisplayingAccount: phase == .signedIn) else { return }
             errorKey = "account.error.disabled"
             await signOutLocally()
         } catch {
+            guard identity.accepts(refreshIdentity, isSignedIn: AccountCredentials.isSignedIn) else { return }
             // A refresh failing offline is not a reason to sign anyone out.
             errorKey = nil
         }
@@ -694,6 +729,7 @@ final class AccountModel {
     /// acquirer this becomes create → redirect → webhook, and only this method
     /// changes.
     func choosePlan(_ plan: AccountAPI.Plan) async -> Bool {
+        guard canPurchase(plan) else { return false }
         isBusy = true
         errorKey = nil
         defer { isBusy = false }

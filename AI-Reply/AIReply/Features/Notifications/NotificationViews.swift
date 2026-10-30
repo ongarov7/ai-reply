@@ -21,6 +21,20 @@ struct RootNavigationView: View {
         .sheet(item: $router.webPage) { page in
             SafariView(url: page.url).ignoresSafeArea()
         }
+        .overlay {
+            if router.isOpeningWebOffer {
+                ProgressView("notifications.website.opening")
+                    .padding(DS.Spacing.l)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+                    .allowsHitTesting(false)
+            }
+        }
+        .alert("notifications.website.openFailed", isPresented: $router.webOfferOpeningFailed) {
+            Button("common.retry") { router.retryWebOffer() }
+            Button("common.cancel", role: .cancel) { router.dismissWebOfferFailure() }
+        } message: {
+            Text("notifications.website.retryBody")
+        }
         // The guide again, over everything: nothing is reset, and the screen
         // underneath is still there when it closes.
         .fullScreenCover(isPresented: $router.isShowingTutorial) {
@@ -47,6 +61,7 @@ struct SafariView: UIViewControllerRepresentable {
 struct PushPermissionCard: View {
 
     @Environment(PushNotificationsModel.self) private var notifications
+    @State private var receivePackOffers = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.s) {
@@ -65,14 +80,29 @@ struct PushPermissionCard: View {
                 }
             }
 
+            if !notifications.displayedPreferences.isOn("marketing") {
+                Toggle("settings.notifications.category.marketing", isOn: $receivePackOffers)
+                    .font(.subheadline)
+                    .accessibilityIdentifier("notifications.card.packOffers")
+                Text("notifications.card.offersOptional")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if notifications.failedCategory == "marketing" {
+                Text("settings.notifications.saveFailed")
+                    .font(.footnote)
+                    .foregroundStyle(Color.orange)
+            }
             HStack(spacing: DS.Spacing.s) {
                 Button {
-                    Task { await notifications.requestPermission() }
+                    Task { await notifications.completePermissionCard(receivePackOffers: receivePackOffers) }
                 } label: {
-                    Text("notifications.card.enable")
+                    Text(LocalizedStringKey(notifications.permission.allowsDelivery ? "notifications.card.save" : "notifications.card.enable"))
                 }
                 .buttonStyle(.dsPrimary)
-                .disabled(notifications.isRequestingPermission)
+                .disabled(notifications.isRequestingPermission || notifications.isCompletingPermissionCard
+                          || notifications.preferencesState == .loading)
                 .accessibilityIdentifier("notifications.card.enable")
 
                 Button {
@@ -81,10 +111,12 @@ struct PushPermissionCard: View {
                     Text("notifications.card.notNow")
                 }
                 .buttonStyle(.dsSecondary)
+                .disabled(notifications.isCompletingPermissionCard)
                 .accessibilityIdentifier("notifications.card.notNow")
             }
         }
         .dsCard()
+        .task { await notifications.loadPreferences() }
     }
 }
 

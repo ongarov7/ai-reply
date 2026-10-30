@@ -18,7 +18,6 @@ struct ComposeView: View {
     @Environment(ReplyConfigurationModel.self) private var model
     @Environment(AppSettings.self) private var settings
     @Environment(AccountModel.self) private var account
-    @Environment(PurchaseStore.self) private var purchases
     @Environment(AppRouter.self) private var router
 
     @State private var viewModel = ComposeViewModel()
@@ -79,8 +78,7 @@ struct ComposeView: View {
             }
         }) { offer in
             ExhaustedSheetView(offer: offer, gender: model.profile.grammaticalGender,
-                               onBuy: { leaveSheet(for: .purchase) },
-                               onPlans: { leaveSheet(for: .subscription) })
+                               onBalance: { leaveSheet(for: .subscription) })
         }
         // The terms were not accepted on the server: back to the consent screen.
         .onChange(of: viewModel.failure) { _, failure in
@@ -312,8 +310,7 @@ struct ComposeView: View {
 
     private func generate() {
         isFocused = false
-        viewModel.generate(configuration: model.configuration, language: settings.effectiveLanguage,
-                           purchasesEnabled: purchases.isEnabled)
+        viewModel.generate(configuration: model.configuration, language: settings.effectiveLanguage)
     }
 
     private var exhaustedBinding: Binding<ExhaustedOffer?> {

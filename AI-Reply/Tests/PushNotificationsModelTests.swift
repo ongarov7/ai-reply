@@ -27,15 +27,23 @@ final class PushNotificationsModelTests: XCTestCase {
     private final class FakePreferences: NotificationPreferencesService, @unchecked Sendable {
         var stored = NotificationPreferences.defaults
         var failSaves = false
+        var holdsSaves = false
         private(set) var saves: [[String: Bool]] = []
+        private(set) var expectedUserIDs: [String?] = []
 
         func load() async throws -> NotificationPreferences { stored }
 
         func save(_ changes: [String: Bool]) async throws -> NotificationPreferences {
             saves.append(changes)
+            while holdsSaves { try await Task.sleep(for: .milliseconds(5)) }
             if failSaves { throw APIError.offline }
             for (key, value) in changes { stored.values[key] = value }
             return stored
+        }
+
+        func save(_ changes: [String: Bool], expectedUserID: String?) async throws -> NotificationPreferences {
+            expectedUserIDs.append(expectedUserID)
+            return try await save(changes)
         }
     }
 
@@ -172,6 +180,93 @@ final class PushNotificationsModelTests: XCTestCase {
     // MARK: Asking
 
     @MainActor
+    func testNormalPermissionDoesNotGrantMarketingConsent() async {
+        let preferences = FakePreferences()
+        let model = model(preferences: preferences)
+        model.setSignedIn(true)
+        model.setServerDeliversPush(true)
+        await model.refreshPermission()
+        await model.completePermissionCard(receivePackOffers: false)
+        XCTAssertTrue(model.permission.allowsDelivery)
+        XCTAssertFalse(model.displayedPreferences.isOn("marketing"))
+        XCTAssertTrue(preferences.saves.isEmpty)
+        XCTAssertFalse(model.showsPermissionCard)
+    }
+
+    @MainActor
+    func testExplicitOptionalChoiceSavesMarketingAndCanBeRevoked() async {
+        let preferences = FakePreferences()
+        let model = model(preferences: preferences)
+        model.setSignedIn(true)
+        model.setServerDeliversPush(true)
+        await model.refreshPermission()
+        await model.completePermissionCard(receivePackOffers: true)
+        XCTAssertEqual(preferences.saves, [["marketing": true]])
+        XCTAssertTrue(model.displayedPreferences.isOn("marketing"))
+        XCTAssertFalse(model.showsPermissionCard)
+        await model.setCategory("marketing", enabled: false)
+        XCTAssertFalse(model.displayedPreferences.isOn("marketing"))
+        XCTAssertEqual(preferences.saves, [["marketing": true], ["marketing": false]])
+    }
+
+    @MainActor
+    func testFailedConsentSaveDoesNotPretendSuccessOrAskForPermission() async {
+        let authorizer = FakeAuthorizer()
+        let preferences = FakePreferences()
+        preferences.failSaves = true
+        let model = model(authorizer: authorizer, preferences: preferences)
+        model.setSignedIn(true)
+        model.setServerDeliversPush(true)
+        await model.refreshPermission()
+        await model.completePermissionCard(receivePackOffers: true)
+        XCTAssertEqual(authorizer.requests, 0)
+        XCTAssertFalse(model.displayedPreferences.isOn("marketing"))
+        XCTAssertEqual(model.failedCategory, "marketing")
+        XCTAssertTrue(model.showsPermissionCard)
+    }
+
+    @MainActor
+    func testEarlierIOSPermissionStillNeedsSeparateAccountOptIn() async {
+        let authorizer = FakeAuthorizer()
+        authorizer.permission = .authorized
+        let preferences = FakePreferences()
+        let model = model(authorizer: authorizer, preferences: preferences)
+        model.setSignedIn(true, accountID: "new-account")
+        model.setServerDeliversPush(true)
+        await model.refreshPermission()
+        XCTAssertTrue(model.showsPermissionCard)
+        XCTAssertFalse(model.displayedPreferences.isOn("marketing"))
+        await model.completePermissionCard(receivePackOffers: true)
+        XCTAssertEqual(authorizer.requests, 0)
+        XCTAssertEqual(preferences.saves, [["marketing": true]])
+    }
+
+    @MainActor
+    func testAccountChangeCannotAdoptPreviousConsentOrDismissTheNewAccountsCard() async throws {
+        let preferences = FakePreferences()
+        preferences.holdsSaves = true
+        let model = model(preferences: preferences)
+        model.setSignedIn(true, accountID: "first")
+        model.setServerDeliversPush(true)
+        await model.refreshPermission()
+        let saving = Task { await model.completePermissionCard(receivePackOffers: true) }
+        for _ in 0..<100 where preferences.saves.isEmpty { try await Task.sleep(for: .milliseconds(5)) }
+        XCTAssertEqual(preferences.saves, [["marketing": true]])
+        XCTAssertEqual(preferences.expectedUserIDs, ["first"], "the request stays bound to the account that opted in")
+        model.setSignedIn(true, accountID: "second")
+        preferences.holdsSaves = false
+        await saving.value
+        XCTAssertEqual(preferences.expectedUserIDs, ["first"], "a new account cannot inherit or replace the saved request owner")
+        XCTAssertFalse(model.displayedPreferences.isOn("marketing"))
+        XCTAssertTrue(model.showsPermissionCard)
+        model.dismissCard()
+        model.setSignedIn(true, accountID: "third")
+        XCTAssertTrue(model.showsPermissionCard, "another account has not dismissed this optional choice")
+        model.setSignedIn(true, accountID: "second")
+        XCTAssertFalse(model.showsPermissionCard)
+    }
+
+    @MainActor
     func testAllowingAsksForATokenAndRegistersAgain() async {
         let authorizer = FakeAuthorizer()
         let model = model(authorizer: authorizer)
@@ -227,6 +322,21 @@ final class PushNotificationsModelTests: XCTestCase {
     }
 
     // MARK: Categories
+
+    func testBackendPreferenceBodyBindsChangesToExpectedAccount() throws {
+        let request = BackendNotificationPreferencesService.SaveRequest(preferences: ["marketing": true],
+                                                                         expectedUserID: "account-A")
+        let encoded = try JSONEncoder().encode(request)
+        let body = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        XCTAssertEqual(body["expected_user_id"] as? String, "account-A")
+        XCTAssertEqual(body["preferences"] as? [String: Bool], ["marketing": true])
+        XCTAssertNil(body["expectedUserID"], "the server expects snake_case")
+
+        let legacy = BackendNotificationPreferencesService.SaveRequest(preferences: ["marketing": false],
+                                                                        expectedUserID: nil)
+        let legacyBody = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(legacy)) as? [String: Any])
+        XCTAssertNil(legacyBody["expected_user_id"], "old unbound callers keep their compatible body")
+    }
 
     @MainActor
     func testACategorySwitchIsImmediateAndSaved() async {

@@ -44,7 +44,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "1F6D393FF0A4AA2046A9D3DF"
-               BuildableName = "ReplyKeyboardExtension.appex"
+               BuildableName = "ReplyKeyboard.appex"
                BlueprintName = "ReplyKeyboard"
                ReferencedContainer = "container:AIReply.xcodeproj">
             </BuildableReference>

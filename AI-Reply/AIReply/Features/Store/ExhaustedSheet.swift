@@ -1,35 +1,21 @@
 import SwiftUI
 
-/// The exhausted sheet's decision (contract §3.9): shown when a generation
-/// in the app failed because the replies are spent, and what it offers.
-///
-/// Лимит біткенде: қосымша жауап сатып алу (болса), тарифтер, «Позже».
+/// A spent reply balance can open its details, without offering a purchase.
 struct ExhaustedOffer: Identifiable, Equatable {
-
-    /// «Докупить ответы»: purchases are on for iOS (`features.iap_ios`) and
-    /// the server said more can be bought (`details.can_buy`).
-    let offersPurchase: Bool
-
-    var id: Bool { offersPurchase }
+    var offersPurchase: Bool { false }
+    var id: String { "balance-exhausted" }
 
     /// Only a refusal the server made for a spent limit (DAILY_LIMIT_REACHED
     /// or MONTHLY_LIMIT_REACHED, which leave `refusal`) opens the sheet: an
     /// expired subscription reads the same to the keyboard, but is not this.
     static func decide(failure: AIReplyError?, refusal: LimitRefusal?, purchasesEnabled: Bool) -> ExhaustedOffer? {
-        guard failure == .quotaExhausted || failure == .monthlyQuotaExhausted, let refusal else { return nil }
-        return ExhaustedOffer(offersPurchase: purchasesEnabled && refusal.canBuy)
+        guard failure == .quotaExhausted || failure == .monthlyQuotaExhausted, refusal != nil else { return nil }
+        return ExhaustedOffer()
     }
 
-    /// The sentence under the title, as a catalog key. It names only what
-    /// the sheet offers, and in Russian agrees with the gender the user
-    /// chose; with none chosen it says neither.
+    /// Neutral copy about the balance, independent of server sales flags.
     func bodyKey(gender: GrammaticalGender?) -> String {
-        guard offersPurchase else { return "exhausted.body.plans" }
-        switch gender {
-        case .male:              return "exhausted.body.male"
-        case .female:            return "exhausted.body.female"
-        case .unspecified, nil:  return "exhausted.body"
-        }
+        "exhausted.body.balance"
     }
 }
 
@@ -40,8 +26,7 @@ struct ExhaustedSheetView: View {
     let offer: ExhaustedOffer
     /// `UserProfile.grammaticalGender`.
     let gender: GrammaticalGender?
-    var onBuy: () -> Void
-    var onPlans: () -> Void
+    var onBalance: () -> Void
 
     @Environment(\.dismiss) private var dismiss
 
@@ -64,15 +49,8 @@ struct ExhaustedSheetView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 VStack(spacing: DS.Spacing.xs) {
-                    if offer.offersPurchase {
-                        Button("exhausted.buy", action: onBuy)
-                            .buttonStyle(.dsPrimary)
-                        Button("exhausted.plans", action: onPlans)
-                            .buttonStyle(.dsText)
-                    } else {
-                        Button("exhausted.plans", action: onPlans)
-                            .buttonStyle(.dsPrimary)
-                    }
+                    Button("exhausted.balance", action: onBalance)
+                        .buttonStyle(.dsPrimary)
                     Button("exhausted.later") { dismiss() }
                         .buttonStyle(.dsText)
                 }

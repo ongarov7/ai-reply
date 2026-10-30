@@ -12,13 +12,14 @@ final class ExhaustedSheetTests: XCTestCase {
 
     // MARK: Decision
 
-    func testBuyingIsOfferedOnlyWhenTheAppAndTheServerBothAllowIt() {
-        XCTAssertEqual(ExhaustedOffer.decide(failure: .quotaExhausted, refusal: canBuy, purchasesEnabled: true),
-                       ExhaustedOffer(offersPurchase: true))
-        XCTAssertEqual(ExhaustedOffer.decide(failure: .quotaExhausted, refusal: canBuy, purchasesEnabled: false),
-                       ExhaustedOffer(offersPurchase: false), "purchases off in the app: the plans only")
+    func testServerPurchaseFlagsCannotOfferCommerce() {
+        for enabled in [true, false] {
+            let offer = ExhaustedOffer.decide(failure: .quotaExhausted, refusal: canBuy, purchasesEnabled: enabled)
+            XCTAssertEqual(offer, ExhaustedOffer())
+            XCTAssertEqual(offer?.offersPurchase, false)
+        }
         XCTAssertEqual(ExhaustedOffer.decide(failure: .monthlyQuotaExhausted, refusal: .unknown, purchasesEnabled: true),
-                       ExhaustedOffer(offersPurchase: false), "the server cannot sell: the plans only")
+                       ExhaustedOffer())
     }
 
     /// No sheet for anything but a spent limit - and not for a refusal that
@@ -31,28 +32,15 @@ final class ExhaustedSheetTests: XCTestCase {
         XCTAssertNil(ExhaustedOffer.decide(failure: nil, refusal: canBuy, purchasesEnabled: true))
     }
 
-    /// The sentence says only what the sheet offers, and in Russian agrees
-    /// with the gender the user chose - or says neither.
-    func testTheTextFitsTheOfferAndTheUser() {
-        let buy = ExhaustedOffer(offersPurchase: true)
-        let plans = ExhaustedOffer(offersPurchase: false)
-        XCTAssertEqual(buy.bodyKey(gender: nil), "exhausted.body")
-        XCTAssertEqual(buy.bodyKey(gender: .unspecified), "exhausted.body")
-        XCTAssertEqual(buy.bodyKey(gender: .male), "exhausted.body.male")
-        XCTAssertEqual(buy.bodyKey(gender: .female), "exhausted.body.female")
+    func testExhaustionHasOnlyNeutralBalanceCopy() {
+        let offer = ExhaustedOffer()
         for gender: GrammaticalGender? in [nil, .male, .female, .unspecified] {
-            XCTAssertEqual(plans.bodyKey(gender: gender), "exhausted.body.plans")
+            XCTAssertEqual(offer.bodyKey(gender: gender), "exhausted.body.balance")
         }
-
-        func russian(_ key: String) -> String { AppSettings.localized(key, language: .russian) }
-        XCTAssertTrue(russian("exhausted.body.male").hasPrefix("Ты использовал "))
-        XCTAssertTrue(russian("exhausted.body.female").hasPrefix("Ты использовала "))
-        XCTAssertFalse(russian("exhausted.body").contains("использовал"))
-        XCTAssertFalse(russian("exhausted.body.plans").contains("дополнительные"))
         for language in AppLanguage.allCases {
-            XCTAssertNotEqual(AppSettings.localized("exhausted.body.plans", language: language),
-                              AppSettings.localized("exhausted.body", language: language),
-                              "nothing to buy is offered in \(language.rawValue)")
+            for key in ["exhausted.body.balance", "exhausted.balance"] {
+                XCTAssertNotEqual(AppSettings.localized(key, language: language), key)
+            }
         }
     }
 
@@ -118,7 +106,7 @@ final class ExhaustedSheetTests: XCTestCase {
         }
         XCTAssertEqual(model.failure, .quotaExhausted)
         XCTAssertNotNil(model.errorMessage)
-        XCTAssertEqual(model.exhausted, ExhaustedOffer(offersPurchase: true))
+        XCTAssertEqual(model.exhausted, ExhaustedOffer())
 
         model.dismissExhausted()
         XCTAssertNil(model.exhausted)

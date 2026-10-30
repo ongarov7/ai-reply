@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import SwiftUI
+import UIKit
 
 /// A screen pushed onto Home's navigation stack.
 enum AppRoute: Hashable {
@@ -15,7 +16,7 @@ enum AppRoute: Hashable {
     case permissions
     case pasteHelp
     case compose
-    /// «Докупить ответы».
+    /// Compatibility route for older links; opens account access only.
     case purchase
     /// «Чат с оператором».
     case support
@@ -32,7 +33,7 @@ enum AppRoute: Hashable {
         case .permissions:          PermissionsView()
         case .pasteHelp:            PasteHelpView()
         case .compose:              ComposeView()
-        case .purchase:             PurchaseView()
+        case .purchase:             SubscriptionView()
         case .support:              SupportChatView()
         }
     }
@@ -77,20 +78,56 @@ final class AppRouter {
     var isShowingTutorial = false
     /// Set from the account's features (see `AppServices`).
     var availability = Availability()
+    private(set) var isOpeningWebOffer = false
+    var webOfferOpeningFailed = false
 
     private(set) var pending: DeepLinkDestination?
     @ObservationIgnored private var pendingSince: Date?
     @ObservationIgnored private var isMainInterfaceVisible = false
     @ObservationIgnored private let now: () -> Date
+    @ObservationIgnored private let openExternal: @MainActor (URL) async -> Bool
+    @ObservationIgnored private let handoffProvider: WebPaymentHandoffProviding
+    @ObservationIgnored private let backendBaseURL: () -> URL?
+    @ObservationIgnored private let locale: () -> String
+    @ObservationIgnored private var accountID: String?
+    @ObservationIgnored private var accountIsReady = false
+    @ObservationIgnored private var handoffTask: Task<Void, Never>?
+    @ObservationIgnored private var handoffID: UUID?
+    @ObservationIgnored private var retryOffer: (destination: DeepLinkDestination, accountID: String)?
 
-    init(now: @escaping () -> Date = Date.init) {
+    init(now: @escaping () -> Date = Date.init,
+         openExternal: (@MainActor (URL) async -> Bool)? = nil,
+         handoffProvider: WebPaymentHandoffProviding = BackendWebPaymentHandoffProvider(),
+         backendBaseURL: @escaping () -> URL? = { AIConfiguration.shared.backendBaseURL },
+         locale: @escaping () -> String = { SharedSettings.shared.effectiveAppLanguage.rawValue }) {
         self.now = now
+        self.openExternal = openExternal ?? { url in
+            await withCheckedContinuation { continuation in
+                UIApplication.shared.open(url, options: [:]) { continuation.resume(returning: $0) }
+            }
+        }
+        self.handoffProvider = handoffProvider
+        self.backendBaseURL = backendBaseURL
+        self.locale = locale
+    }
+
+    /// Called independently of view appearance: a response for an earlier
+    /// account must never open a website session after a sign-out or switch.
+    func accountDidChange(userID: String?, isReady: Bool) {
+        guard userID != accountID || isReady != accountIsReady else { return }
+        accountID = userID
+        accountIsReady = isReady
+        cancelWebOffer()
+        applyPendingIfReady()
     }
 
     /// Opens a destination now, or as soon as the gates in front of Home are passed.
     func open(_ destination: DeepLinkDestination) {
-        guard destination != .none else { return }
-        if isMainInterfaceVisible {
+        guard DeepLink.isAllowed(destination) else { return }
+        cancelWebOffer()
+        pending = nil
+        pendingSince = nil
+        if isMainInterfaceVisible && canApply(destination) {
             apply(destination)
         } else {
             pending = destination
@@ -101,11 +138,26 @@ final class AppRouter {
     /// Home's navigation stack is on screen: every gate has been passed.
     func mainInterfaceDidAppear() {
         isMainInterfaceVisible = true
+        applyPendingIfReady()
+    }
+
+    private func applyPendingIfReady() {
+        guard isMainInterfaceVisible else { return }
         guard let destination = pending, let since = pendingSince else { return }
+        guard now().timeIntervalSince(since) <= Self.pendingLifetime else {
+            pending = nil
+            pendingSince = nil
+            return
+        }
+        guard canApply(destination) else { return }
         pending = nil
         pendingSince = nil
-        guard now().timeIntervalSince(since) <= Self.pendingLifetime else { return }
         apply(destination)
+    }
+
+    private func canApply(_ destination: DeepLinkDestination) -> Bool {
+        if case .externalWeb = destination { return accountIsReady && accountID != nil }
+        return true
     }
 
     /// A gate is back in front of Home: signed out, onboarding restarted.
@@ -113,6 +165,7 @@ final class AppRouter {
     /// still waiting behind the gate stays.
     func mainInterfaceDidDisappear() {
         isMainInterfaceVisible = false
+        cancelWebOffer()
         path = []
         webPage = nil
         isShowingTutorial = false
@@ -132,16 +185,86 @@ final class AppRouter {
     }
 
     private func apply(_ destination: DeepLinkDestination) {
+        guard DeepLink.isAllowed(destination) else { return }
         switch destination {
         case .none:
             return
         case .web(let url):
             webPage = WebPage(url: url)
+        case .externalWeb(let url):
+            webPage = nil
+            beginWebOffer(.externalWeb(url))
         case .screen(let screen):
             webPage = nil
             path = Self.path(for: screen, availability: availability)
             if Self.presentsTutorial(screen) { isShowingTutorial = true }
         }
+    }
+
+    private func cancelWebOffer() {
+        handoffTask?.cancel()
+        handoffTask = nil
+        handoffID = nil
+        isOpeningWebOffer = false
+        webOfferOpeningFailed = false
+        retryOffer = nil
+    }
+
+    func dismissWebOfferFailure() {
+        webOfferOpeningFailed = false
+        retryOffer = nil
+    }
+
+    func retryWebOffer() {
+        guard let retryOffer, retryOffer.accountID == accountID,
+              isMainInterfaceVisible, accountIsReady else {
+            dismissWebOfferFailure()
+            return
+        }
+        let destination = retryOffer.destination
+        cancelWebOffer()
+        beginWebOffer(destination)
+    }
+
+    private func beginWebOffer(_ destination: DeepLinkDestination) {
+        guard isMainInterfaceVisible, accountIsReady, let userID = accountID else { return }
+        let requestID = UUID()
+        handoffID = requestID
+        isOpeningWebOffer = true
+        webOfferOpeningFailed = false
+        let requestLocale = locale()
+        let baseURL = backendBaseURL()
+        let started = now()
+        handoffTask = Task { [weak self] in
+            guard let self else { return }
+            defer {
+                if handoffID == requestID {
+                    handoffTask = nil
+                    handoffID = nil
+                    isOpeningWebOffer = false
+                }
+            }
+            do {
+                guard let baseURL, ["ru", "kk", "en", "uz"].contains(requestLocale) else { throw APIError.invalidRequest }
+                let response = try await handoffProvider.create(expectedUserID: userID, locale: requestLocale)
+                guard mayOpenWebOffer(requestID: requestID, userID: userID), !Task.isCancelled else { return }
+                let elapsed = now().timeIntervalSince(started)
+                guard (1...60).contains(response.expiresIn), elapsed >= 0, elapsed < Double(response.expiresIn),
+                      let url = DeepLink.handoffURL(response.url, backendBaseURL: baseURL) else { throw APIError.invalidRequest }
+                // No plain-link fallback: a browser may still hold another
+                // person's session. Only this account-bound handoff is opened.
+                let opened = await openExternal(url)
+                if !opened { throw APIError.invalidRequest }
+            } catch {
+                guard mayOpenWebOffer(requestID: requestID, userID: userID), !Task.isCancelled else { return }
+                retryOffer = (destination, userID)
+                webOfferOpeningFailed = true
+            }
+        }
+    }
+
+    private func mayOpenWebOffer(requestID: UUID, userID: String) -> Bool {
+        handoffID == requestID && accountID == userID && accountIsReady && isMainInterfaceVisible
     }
 
     /// `aireply://onboarding` opens the guide over Home.
@@ -162,8 +285,8 @@ final class AppRouter {
         case .pasteHelp:     return [.pasteHelp]
         case .compose:       return [.compose]
         case .onboarding:    return []
-        // Purchases closed: the plans, where the other ways to more replies are.
-        case .purchase:      return availability.purchases ? [.purchase] : [.subscription]
+        // A remote feature flag never turns an old link into a storefront.
+        case .purchase:      return [.subscription]
         // No chat on this server: Home, as an older build does.
         case .support:       return availability.supportChat ? [.support] : []
         }

@@ -1,6 +1,12 @@
 import Foundation
 import Observation
 
+/// This iOS product shows account access and balances without selling access.
+/// Server feature flags cannot enable a storefront in this app.
+enum IOSProductPolicy {
+    static let allowsNewPurchases = false
+}
+
 /// A product the screen may offer: what the server sells, at the price the
 /// App Store shows. Only products both know become one.
 struct PurchaseOffer: Identifiable, Equatable, Sendable {
@@ -154,6 +160,7 @@ final class PurchaseStore {
     @ObservationIgnored private let storeKit: StoreKitClient
     @ObservationIgnored private let backend: PurchaseBackend
     @ObservationIgnored private let preferences: UserDefaults
+    @ObservationIgnored private let allowsNewPurchases: Bool
     @ObservationIgnored private var accountToken: UUID?
     @ObservationIgnored private var userID: String?
     /// Signed in, against a server that has purchases at all (the flag is
@@ -171,13 +178,19 @@ final class PurchaseStore {
     @ObservationIgnored private var pendingProductID: String?
 
     init(storeKit: StoreKitClient = AppStoreClient(), backend: PurchaseBackend = BackendPurchaseService(),
-         preferences: UserDefaults = .standard) {
+         preferences: UserDefaults = .standard, allowsNewPurchases: Bool = IOSProductPolicy.allowsNewPurchases) {
         self.storeKit = storeKit
         self.backend = backend
         self.preferences = preferences
+        #if DEBUG
+        // Exercise legacy transaction outcomes in tests without enabling a UI.
+        self.allowsNewPurchases = allowsNewPurchases
+        #else
+        self.allowsNewPurchases = IOSProductPolicy.allowsNewPurchases
+        #endif
     }
 
-    var canMakePayments: Bool { storeKit.canMakePayments }
+    var canMakePayments: Bool { allowsNewPurchases && storeKit.canMakePayments }
     var canRestore: Bool { canDeliver && !status.isBusy }
 
     // MARK: Account
@@ -194,7 +207,7 @@ final class PurchaseStore {
             pendingProductID = nil
             recommendation = nil
         }
-        let enabled = isSignedIn && features?.iapIOS == true
+        let enabled = allowsNewPurchases && isSignedIn && features?.iapIOS == true
         if enabled != isEnabled {
             isEnabled = enabled
             if !enabled {
@@ -363,7 +376,7 @@ final class PurchaseStore {
     // MARK: Purchase
 
     func purchase(_ offer: PurchaseOffer) async {
-        guard isEnabled, !status.isBusy else { return }
+        guard allowsNewPurchases, isEnabled, !status.isBusy else { return }
         guard let accountToken, canMakePayments, !offer.hasPriceMismatch else {
             status = .failed(.unavailable)
             return

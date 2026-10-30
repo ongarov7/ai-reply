@@ -275,13 +275,12 @@ final class AccountReleaseTests: XCTestCase {
         XCTAssertFalse(try plan("").purchasable, "an older server does not send it, and nothing is sold then")
     }
 
-    /// A price and Choose only next to a plan that can be bought, and only in
-    /// a build that can buy at all (DEBUG here; Release has no StoreKit flow).
+    /// Server flags and a purchasable plan cannot enable sales in this product.
     @MainActor
-    func testChooseNeedsABuildThatCanBuyAndAPurchasablePlan() throws {
+    func testNewPurchasesStayOffEvenWhenTheServerAllowsThem() throws {
         let model = AccountModel()
-        XCTAssertTrue(AccountModel.purchasesAvailableInThisBuild, "tests run the DEBUG build")
-        XCTAssertTrue(model.canPurchase(try plan(#", "purchasable": true"#)))
+        XCTAssertFalse(AccountModel.purchasesAvailableInThisBuild)
+        XCTAssertFalse(model.canPurchase(try plan(#", "purchasable": true"#)))
         XCTAssertFalse(model.canPurchase(try plan("")))
         let free = try JSONDecoder().decode(AccountAPI.Plan.self, from: Data("""
         {"id": "p1", "code": "free", "name": {"en": "Free"}, "description": {"en": ""}, "price": 0,
@@ -569,5 +568,63 @@ final class AccountReleaseTests: XCTestCase {
 
         let noContainer = await CrossProcessLock(fileURL: nil).acquire()
         XCTAssertFalse(noContainer.isLocked, "no App Group: unlocked, the actor still serialises")
+    }
+}
+
+/// Late /me answers must not replace or sign out a different native account.
+@MainActor
+final class AccountRefreshIdentityTests: XCTestCase {
+    private typealias Identity = AccountModel.RefreshIdentity
+
+    func testAuthenticationFailureCanLeaveExpiredAccountWithoutResettingAnotherLogin() {
+        let started = Identity(userID: "account-A", deviceID: "device")
+        XCTAssertTrue(started.acceptsAuthenticationFailure(started, credentialsPresent: false, isDisplayingAccount: true))
+        XCTAssertFalse(started.acceptsAuthenticationFailure(started, credentialsPresent: false, isDisplayingAccount: false))
+        let different = Identity(userID: "account-B", deviceID: "device")
+        XCTAssertFalse(started.acceptsAuthenticationFailure(different, credentialsPresent: false, isDisplayingAccount: true))
+        let bootstrap = Identity(userID: nil, deviceID: "device")
+        XCTAssertTrue(bootstrap.acceptsAuthenticationFailure(started, credentialsPresent: false, isDisplayingAccount: true))
+        XCTAssertFalse(bootstrap.acceptsAuthenticationFailure(started, credentialsPresent: false, isDisplayingAccount: false))
+    }
+
+    func testLateSuccessForACannotReplaceBOnTheSameDevice() {
+        let started = Identity(userID: "account-A", deviceID: "device")
+        let current = Identity(userID: "account-B", deviceID: "device")
+        XCTAssertFalse(started.accepts(current, isSignedIn: true, responseUserID: "account-A"))
+        XCTAssertFalse(started.accepts(current, isSignedIn: true, responseUserID: "account-B"),
+                       "a token retry for B is not a response owned by A's request")
+    }
+
+    func testLateUnauthorizedOrDisabledForACannotSignOutB() {
+        let started = Identity(userID: "account-A", deviceID: "device")
+        let current = Identity(userID: "account-B", deviceID: "device")
+        XCTAssertFalse(started.accepts(current, isSignedIn: true),
+                       "both authentication error branches use this guard before side effects")
+    }
+
+    func testChangedDeviceSessionOrSignOutRejectsTheOldAnswer() {
+        let started = Identity(userID: "account-A", deviceID: "old-device-session")
+        let replaced = Identity(userID: "account-A", deviceID: "new-device-session")
+        XCTAssertFalse(started.accepts(replaced, isSignedIn: true, responseUserID: "account-A"))
+        XCTAssertFalse(started.accepts(replaced, isSignedIn: true))
+        XCTAssertFalse(started.accepts(started, isSignedIn: false, responseUserID: "account-A"))
+        XCTAssertFalse(started.accepts(started, isSignedIn: false))
+    }
+
+    func testCurrentAccountResponseStillAppliesAndMismatchedResponseDoesNot() {
+        let identity = Identity(userID: "account-A", deviceID: "device")
+        XCTAssertTrue(identity.accepts(identity, isSignedIn: true, responseUserID: "account-A"))
+        XCTAssertTrue(identity.accepts(identity, isSignedIn: true))
+        XCTAssertFalse(identity.accepts(identity, isSignedIn: true, responseUserID: "account-B"))
+    }
+
+    func testBootstrapWithNoUserCanPopulateOnlyTheCurrentAccount() {
+        let bootstrap = Identity(userID: nil, deviceID: "device")
+        XCTAssertTrue(bootstrap.accepts(bootstrap, isSignedIn: true, responseUserID: "account-A"))
+        let alreadyLoaded = Identity(userID: "account-A", deviceID: "device")
+        XCTAssertTrue(bootstrap.accepts(alreadyLoaded, isSignedIn: true, responseUserID: "account-A"))
+        XCTAssertFalse(bootstrap.accepts(alreadyLoaded, isSignedIn: true, responseUserID: "account-B"))
+        XCTAssertFalse(bootstrap.accepts(alreadyLoaded, isSignedIn: true),
+                       "an unidentified bootstrap error cannot sign out a user loaded meanwhile")
     }
 }

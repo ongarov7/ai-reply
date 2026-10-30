@@ -8750,25 +8750,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Plan and limit"
+            "value" : "Balance and access"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Тариф және лимит"
+            "value" : "Баланс және қолжетімділік"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Тариф и лимит"
+            "value" : "Баланс и доступ"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tarif va limit"
+            "value" : "Balans va foydalanish"
           }
         }
       }
@@ -9330,25 +9330,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "News and offers"
+            "value" : "Receive offers for reply packs"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Жаңалықтар мен ұсыныстар"
+            "value" : "Жауап пакеттері туралы ұсыныстар алу"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Новости и предложения"
+            "value" : "Получать предложения о пакетах ответов"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Yangiliklar va takliflar"
+            "value" : "Javob paketlari haqida takliflar olish"
           }
         }
       }
@@ -10490,25 +10490,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Current plan"
+            "value" : "Current access"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ағымдағы тариф"
+            "value" : "Қазіргі қолжетімділік"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Текущий тариф"
+            "value" : "Текущий доступ"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Joriy tarif"
+            "value" : "Joriy foydalanish"
           }
         }
       }
@@ -10671,25 +10671,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Plan"
+            "value" : "Balance and access"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Тариф"
+            "value" : "Баланс және қолжетімділік"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Тариф"
+            "value" : "Баланс и доступ"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tarif"
+            "value" : "Balans va foydalanish"
           }
         }
       }
@@ -14899,6 +14899,209 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld ta bepul javob bir marta beriladi. Amal qilish muddati cheklanmagan."
+          }
+        }
+      }
+    },
+    "exhausted.balance" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Посмотреть баланс"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Балансты қарау"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View balance"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Balansni ko‘rish"
+          }
+        }
+      }
+    },
+    "exhausted.body.balance" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Доступные ответы закончились. Посмотри баланс и действующие условия доступа в своём аккаунте."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Қолжетімді жауаптар таусылды. Аккаунтыңдағы баланс пен қолданыстағы қолжетімділік шарттарын қара."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You have used your available replies. Check your account balance and current access details."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mavjud javoblaringiz tugadi. Hisobingizdagi balans va joriy foydalanish shartlarini ko‘ring."
+          }
+        }
+      }
+    },
+    "notifications.card.offersOptional" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Необязательно. Выбор можно изменить в настройках уведомлений."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Міндетті емес. Таңдауыңды хабарлама баптауларында өзгерте аласың."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Optional. You can change this in notification settings."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ixtiyoriy. Buni bildirishnoma sozlamalarida o‘zgartirish mumkin."
+          }
+        }
+      }
+    },
+    "notifications.card.save" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Готово"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Дайын"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tayyor"
+          }
+        }
+      }
+    },
+    "notifications.website.opening" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Открываю сайт…"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сайт ашылуда…"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opening website…"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sayt ochilmoqda…"
+          }
+        }
+      }
+    },
+    "notifications.website.openFailed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось открыть сайт"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сайтты ашу мүмкін болмады"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t open website"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saytni ochib bo‘lmadi"
+          }
+        }
+      }
+    },
+    "notifications.website.retryBody" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось подготовить вход на сайт. Попробуй ещё раз."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сайтқа кіруді дайындау мүмкін болмады. Қайта көр."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "We couldn’t prepare your website sign-in. Please try again."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saytga kirishni tayyorlab bo‘lmadi. Qayta urinib ko‘ring."
           }
         }
       }

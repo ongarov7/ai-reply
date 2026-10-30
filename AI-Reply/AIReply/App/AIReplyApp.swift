@@ -130,6 +130,11 @@ struct AIReplyApp: App {
                 switch phase {
                 case .active:
                     keyboardStatus.refresh()
+                    // A website payment can change the shared balance while
+                    // the app is away. Read /me when the user returns.
+                    if account.isSignedIn {
+                        Task { await account.refresh() }
+                    }
                     // The keyboard may have dropped a consent the server no longer has.
                     account.revalidateLegalConsent()
                     Task { await profileSync.reconcile() }

@@ -49,6 +49,17 @@ struct NotificationSettingsStore: @unchecked Sendable {
         defaults.set(value, forKey: Key.cardDismissed)
     }
 
+    /// A different account on this phone gets its own optional choice.
+    func isPermissionCardDismissed(for accountID: String?) -> Bool {
+        guard let accountID else { return isPermissionCardDismissed }
+        return defaults.bool(forKey: Key.cardDismissed + "." + accountID)
+    }
+
+    func setPermissionCardDismissed(_ value: Bool, for accountID: String?) {
+        guard let accountID else { setPermissionCardDismissed(value); return }
+        defaults.set(value, forKey: Key.cardDismissed + "." + accountID)
+    }
+
     /// The FCM token Firebase last handed to this installation.
     func pushToken(for installationID: String) -> String? {
         guard let data = defaults.data(forKey: Key.pushToken),

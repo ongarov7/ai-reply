@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Current plan, the full reply balance, and the shared plan catalogue.
+/// Current access and the full reply balance, as confirmed by the server.
 ///
 /// Тариф пен күндік квота: шешімді әрқашан сервер қабылдайды.
 ///
@@ -8,35 +8,24 @@ import SwiftUI
 /// keeps a cached copy only so the keyboard can render instantly; it is never
 /// the source of truth, and a stale cache can only ever be pessimistic.
 ///
-/// The published catalog is matched with App Store products before a price
-/// or purchase action appears. Subscriptions and one-time packs stay separate.
 struct SubscriptionView: View {
 
     @Environment(AppSettings.self) private var settings
     @Environment(AccountModel.self) private var account
-    @Environment(PurchaseStore.self) private var purchases
-
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: DS.Spacing.xl) {
-                    usageCard
-                    PurchaseOptionsView(onSelectOffer: { proxy.scrollTo($0, anchor: .top) })
-                }
+        ScrollView {
+            usageCard
                 .padding(.horizontal, DS.Spacing.l)
                 .padding(.vertical, DS.Spacing.l)
                 .frame(maxWidth: DS.Layout.readableWidth, alignment: .leading)
                 .frame(maxWidth: .infinity, alignment: .center)
-            }
         }
         .background(Color.dsBackground)
         .navigationTitle("subscription.title")
         .navigationBarTitleDisplayMode(.inline)
         .task {
             await account.refresh()
-            await account.loadPlans()
-            await purchases.loadCatalogue()
         }
     }
 

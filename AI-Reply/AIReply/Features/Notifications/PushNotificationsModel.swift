@@ -101,6 +101,15 @@ struct NotificationPreferences: Decodable, Equatable, Sendable {
 protocol NotificationPreferencesService: Sendable {
     func load() async throws -> NotificationPreferences
     func save(_ changes: [String: Bool]) async throws -> NotificationPreferences
+    func save(_ changes: [String: Bool], expectedUserID: String?) async throws -> NotificationPreferences
+}
+
+extension NotificationPreferencesService {
+    /// Compatibility for local transports. The backend implementation sends
+    /// the account binding so an authentication retry cannot change its owner.
+    func save(_ changes: [String: Bool], expectedUserID: String?) async throws -> NotificationPreferences {
+        try await save(changes)
+    }
 }
 
 /// What the notification UI shows, and what the user can change.
@@ -130,6 +139,7 @@ final class PushNotificationsModel {
     private(set) var failedCategory: String?
     private(set) var savingCategories: Set<String> = []
     private(set) var isRequestingPermission = false
+    private(set) var isCompletingPermissionCard = false
     private(set) var isSignedIn = false
     /// `features.push_notifications` from the server; nil until it answered.
     private(set) var serverDeliversPush: Bool?
@@ -147,6 +157,8 @@ final class PushNotificationsModel {
     @ObservationIgnored private let authorizer: NotificationAuthorizing
     @ObservationIgnored private let preferencesService: NotificationPreferencesService
     @ObservationIgnored private let store: NotificationSettingsStore
+    @ObservationIgnored private var accountID: String?
+    @ObservationIgnored private var accountGeneration = 0
 
     /// The installation's state changed: the server should hear about it.
     @ObservationIgnored var onStateChange: (() -> Void)?
@@ -176,10 +188,13 @@ final class PushNotificationsModel {
         buildSupportsPush && serverDeliversPush == true
     }
 
-    /// Home's soft card: signed in, pushes possible, never asked, not dismissed.
+    /// The optional soft ask can also offer a separate choice when iOS
+    /// permission was granted for an earlier account on this phone.
     var showsPermissionCard: Bool {
         if forcesPushUI { return !isCardHiddenThisLaunch }
-        return isSignedIn && isPushAvailable && permission == .notDetermined && !isCardDismissed
+        guard isSignedIn, isPushAvailable, !isCardDismissed else { return false }
+        return permission == .notDetermined
+            || (permission.allowsDelivery && !displayedPreferences.isOn("marketing"))
     }
 
     /// Settings ▸ Notifications.
@@ -199,12 +214,16 @@ final class PushNotificationsModel {
 
     // MARK: State from outside
 
-    func setSignedIn(_ signedIn: Bool) {
-        guard signedIn != isSignedIn else { return }
+    func setSignedIn(_ signedIn: Bool, accountID: String? = nil) {
+        guard signedIn != isSignedIn || accountID != self.accountID else { return }
+        self.accountID = accountID
+        accountGeneration += 1
         isSignedIn = signedIn
+        isCardDismissed = store.isPermissionCardDismissed(for: accountID)
         preferences = nil
         preferencesState = .idle
         failedCategory = nil
+        savingCategories = []
     }
 
     func setServerDeliversPush(_ value: Bool?) {
@@ -240,6 +259,25 @@ final class PushNotificationsModel {
 
     // MARK: Actions
 
+    /// The checkbox is an account preference, independent of iOS permission.
+    /// Leaving it off never grants marketing consent. A failed save keeps the
+    /// card open rather than pretending that consent was recorded.
+    func completePermissionCard(receivePackOffers: Bool) async {
+        guard isSignedIn, isPushAvailable, !isCompletingPermissionCard else { return }
+        let generation = accountGeneration
+        isCompletingPermissionCard = true
+        defer { isCompletingPermissionCard = false }
+        if receivePackOffers {
+            await setCategory("marketing", enabled: true)
+            guard generation == accountGeneration, displayedPreferences.isOn("marketing"),
+                  failedCategory != "marketing" else { return }
+        }
+        guard generation == accountGeneration else { return }
+        if permission == .notDetermined { await requestPermission() }
+        guard generation == accountGeneration else { return }
+        dismissCard()
+    }
+
     /// "Turn on notifications": the system prompt, then a token. What iOS
     /// reports afterwards decides, not the prompt's answer: a user may have
     /// changed it in Settings meanwhile.
@@ -265,7 +303,7 @@ final class PushNotificationsModel {
             return
         }
         isCardDismissed = true
-        store.setPermissionCardDismissed(true)
+        store.setPermissionCardDismissed(true, for: accountID)
     }
 
     func setEnabledInApp(_ enabled: Bool) {
@@ -281,12 +319,14 @@ final class PushNotificationsModel {
         guard isSignedIn, isPushAvailable || forcesPushUI, preferencesState != .loading,
               savingCategories.isEmpty else { return }
         preferencesState = .loading
+        let generation = accountGeneration
         do {
             let loaded = try await preferencesService.load()
-            guard isSignedIn else { return }
+            guard isSignedIn, generation == accountGeneration else { return }
             preferences = loaded
             preferencesState = .loaded
         } catch {
+            guard generation == accountGeneration else { return }
             preferencesState = .failed
         }
     }
@@ -297,18 +337,23 @@ final class PushNotificationsModel {
     /// server refuses or cannot be reached, the switch goes back.
     func setCategory(_ category: String, enabled: Bool) async {
         var current = displayedPreferences
-        guard current.isOptional(category), current.isOn(category) != enabled,
+        guard isSignedIn, isPushAvailable || forcesPushUI,
+              current.isOptional(category), current.isOn(category) != enabled,
               !savingCategories.contains(category) else { return }
+
+        let generation = accountGeneration
+        let savingAccountID = accountID
 
         let previous = current.values[category]
         current.values[category] = enabled
         preferences = current
         failedCategory = nil
         savingCategories.insert(category)
-        defer { savingCategories.remove(category) }
+        defer { if generation == accountGeneration { savingCategories.remove(category) } }
 
         do {
-            var saved = try await preferencesService.save([category: enabled])
+            var saved = try await preferencesService.save([category: enabled], expectedUserID: savingAccountID)
+            guard isSignedIn, generation == accountGeneration else { return }
             // Another switch may have changed while this one was saving: keep
             // what the user sees for those until their own answer arrives.
             if let shown = preferences {
@@ -319,6 +364,7 @@ final class PushNotificationsModel {
             preferences = saved
             preferencesState = .loaded
         } catch {
+            guard generation == accountGeneration else { return }
             if var rolledBack = preferences {
                 rolledBack.values[category] = previous
                 preferences = rolledBack
