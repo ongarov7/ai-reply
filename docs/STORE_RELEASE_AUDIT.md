@@ -840,3 +840,68 @@ through a real test push and BCC confirmation has not yet been executed. Bank
 notification setup and explicit sandbox flags are prerequisites. Follow
 `docs/WEB_PAYMENT_SANDBOX.md`. This internal upload is not a public App Store
 submission or approval of website-only digital sales or payment-link pushes.
+
+## Website account entry and live sandbox checks — build 15
+
+The owner resumed work and requested an explicit website-account entry on Home,
+with the optional offer push retained. Purchases remain on the website; the app
+reads the same server balance. A normal browser visit uses its own session or
+email sign-in; an app-initiated visit uses the existing account-bound handoff.
+
+- Backend source **`18bfac5`** separates the catalog offer from bank checkout
+  readiness and fixes four admin links that lost `/sandbox`. Its full Go suite,
+  current web/localization checks and **24 Node tests** passed.
+- iOS source **`04e3bde`** adds the explicit Home card in four languages and a
+  separate local router action. It uses the existing SSO flow, without requiring
+  marketing consent for a direct tap. Scene inactivity, backend changes and
+  logout cancel pending handoffs; the logout invalidation runs before network
+  suspension and rejects stale account-state updates. **707 iOS tests passed**,
+  with zero failures. The visual fixture was inspected in Simulator; its sample
+  balance is not the owner's live balance.
+- Archive `outputs/payment-testflight-2026-10-30/AIReply-1.2.0-15.xcarchive`
+  contains app and extension **1.2.0 (15)** with their existing bundle IDs and
+  `https://ai-reply.kz/sandbox`. Signature verification passed. Apple accepted
+  the internal-only upload at **21:33:59 +05:00**. Log:
+  `/tmp/ai-reply-web-account-15-upload.log`. A refreshed App Store Connect page
+  subsequently confirmed **Testing**, **Internal**, group **AI-Reply Internal**
+  and three existing invitations. Build UUID:
+  **`24da9fa4-01db-4651-a934-a5861b67f27a`**. Proofs:
+  `outputs/payment-testflight-2026-10-30/testflight-15-ready.png` and
+  `testflight-15-ready.txt`. No new tester or group was created.
+- Source **`d5cb674`** adds the operator-only `-queue-sandbox-web-offer USER_UUID`
+  command. It opens only an existing child database, starts no workers and
+  uses the same consent, installation and once-only checks. Full Go tests and
+  an independent review passed. No public impersonation or send endpoint was
+  added.
+- The owner explicitly authorized server configuration and restart. Settings
+  and consistent snapshots of both existing databases were backed up under
+  a private root-owned server directory. Public BCC sandbox fixtures and the
+  two sandbox push flags were configured; existing authentication secrets and
+  production credentials were preserved. Source `d5cb674` was rebuilt, checked
+  and deployed successfully. Both health endpoints returned 200.
+- The owner's existing sandbox account had explicit marketing consent and an
+  authorized, active iOS build-14 installation. Exactly one standard
+  `web_topup_offer` was queued for that account. The existing worker recorded
+  **`provider_accepted`**, attempt **1**, with a provider receipt and no error.
+  Actual lock-screen display and tap were not observed. No broadcast was sent.
+- For the authorized official-card check, only sandbox bank checkout was
+  temporarily enabled. The configured demo review login was used in the child
+  environment, with no real card or funds. The website created a **30 replies /
+  100 KZT** order and opened the official `test3ds.bcc.kz:5445` form. The public
+  Challenge+Fingerprint card ending **7828** passed 3-D Secure; BCC displayed
+  **Transaction successful**, bank operation **630323135128**, order
+  **1793378469427942289**, at **21:41:09 +05:00**. Screenshot:
+  `outputs/payment-testflight-2026-10-30/bcc-test-payment-success-15.png`.
+- The return reached the website's correct order. Independent database checks
+  found **`verification_pending`**, one `browser_return` event and **zero**
+  purchased-credit grants. No authenticated final BCC notification was recorded.
+  This verifies the form/3DS/return path, not end-to-end fulfillment. The test
+  order remains in the audit trail; its result was not manually promoted to paid.
+  The demo web session was logged out. Sandbox bank checkout was then returned
+  to **disabled** pending BCC notification setup; sandbox push remains enabled.
+
+Bank notification authentication is the remaining external prerequisite for a
+server-confirmed credit grant. Official test data and the exact callback setup
+are in `docs/BCC_SANDBOX_TEST_DATA.md`. There was no Android or audio-code change,
+real bank charge, public App Store submission, or claim that the proposed website
+sales model has public App Store approval.
