@@ -12,14 +12,13 @@ import (
 )
 
 type webTopupOffers struct {
-	bankEnabled func() bool
-	prices      *catalog.Service
-	paymentURL  string
+	prices     *catalog.Service
+	paymentURL string
 }
 
-// WithWebTopupOffers supplies the bank and catalog from this application's own
+// WithWebTopupOffers supplies the catalog from this application's own
 // database/environment. It never enables the separately gated feature.
-func (s *Service) WithWebTopupOffers(bankEnabled func() bool, prices *catalog.Service, publicBaseURL string) *Service {
+func (s *Service) WithWebTopupOffers(prices *catalog.Service, publicBaseURL string) *Service {
 	u, err := url.Parse(publicBaseURL)
 	if err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || u.Port() != "" && u.Port() != "443" || u.Path != "" && u.Path != "/" && u.Path != "/sandbox" {
 		return s
@@ -27,12 +26,12 @@ func (s *Service) WithWebTopupOffers(bankEnabled func() bool, prices *catalog.Se
 	u.Host = strings.ToLower(u.Hostname())
 	u.Path = strings.TrimRight(u.Path, "/") + "/payment"
 	u.RawPath = ""
-	s.webTopup = &webTopupOffers{bankEnabled: bankEnabled, prices: prices, paymentURL: u.String()}
+	s.webTopup = &webTopupOffers{prices: prices, paymentURL: u.String()}
 	return s
 }
 
 func (s *Service) currentWebTopupOffer(ctx context.Context) (catalog.Product, int64, bool, error) {
-	if !s.cfg.WebTopupOfferEnabled || !s.Ready() || s.webTopup == nil || s.webTopup.bankEnabled == nil || !s.webTopup.bankEnabled() || s.webTopup.prices == nil {
+	if !s.cfg.WebTopupOfferEnabled || !s.Ready() || s.webTopup == nil || s.webTopup.prices == nil {
 		return catalog.Product{}, 0, false, nil
 	}
 	p, version, err := s.webTopup.prices.ProductForWeb(ctx, "pack30")

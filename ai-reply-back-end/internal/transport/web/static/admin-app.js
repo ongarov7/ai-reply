@@ -857,7 +857,7 @@
 
             <div class="card">
               <div class="card-head"><h2>{{ t('admin.iap.user_title') }}</h2>
-                <div class="right"><a class="btn btn-sm" :href="'/admin/purchases/transactions?user_id=' + encodeURIComponent(data.user.id)"
+                <div class="right"><a class="btn btn-sm" :href="appPath('/admin/purchases/transactions?user_id=' + encodeURIComponent(data.user.id))"
                   @click.prevent="$root.go('/admin/purchases/transactions?user_id=' + encodeURIComponent(data.user.id))">
                   {{ t('admin.iap.all') }}</a></div></div>
               <div class="table-wrap">
@@ -963,14 +963,14 @@
               <div class="card-head"><h2>{{ t('admin.nav.notifications') }}</h2></div>
               <div class="card-body">
                 <a v-if="data.user.status === 'active'" class="btn btn-primary btn-block" style="margin-bottom:10px"
-                   :href="'/admin/notifications/new?user_ids=' + encodeURIComponent(data.user.id)"
+                   :href="appPath('/admin/notifications/new?user_ids=' + encodeURIComponent(data.user.id))"
                    @click.prevent="$root.go('/admin/notifications/new?user_ids=' + encodeURIComponent(data.user.id))">
                   {{ t('admin.user.send_push') }}</a>
                 <a class="btn btn-block" style="margin-bottom:10px"
-                   :href="'/admin/notifications/deliveries?user_id=' + encodeURIComponent(data.user.id)"
+                   :href="appPath('/admin/notifications/deliveries?user_id=' + encodeURIComponent(data.user.id))"
                    @click.prevent="$root.go('/admin/notifications/deliveries?user_id=' + encodeURIComponent(data.user.id))">
                   {{ t('admin.user.push_history') }}</a>
-                <a class="btn btn-block" :href="'/admin/notifications/devices?user_id=' + encodeURIComponent(data.user.id)"
+                <a class="btn btn-block" :href="appPath('/admin/notifications/devices?user_id=' + encodeURIComponent(data.user.id))"
                    @click.prevent="$root.go('/admin/notifications/devices?user_id=' + encodeURIComponent(data.user.id))">
                   {{ t('admin.user.push_devices') }}</a>
               </div>

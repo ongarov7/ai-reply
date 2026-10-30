@@ -3,11 +3,18 @@ package apptest
 import (
 	"context"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/aireply/ai-reply-back-end/internal/auth"
 	"github.com/aireply/ai-reply-back-end/internal/catalog"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
+	"github.com/aireply/ai-reply-back-end/internal/middleware"
+	"github.com/aireply/ai-reply-back-end/internal/payments/bcc"
+	"github.com/aireply/ai-reply-back-end/internal/plans"
+	"github.com/aireply/ai-reply-back-end/internal/subscriptions"
+	"github.com/aireply/ai-reply-back-end/internal/transport/api"
 )
 
 func webOfferHarness(t *testing.T, enabled bool) (*harness, *catalog.Service) {
@@ -16,12 +23,12 @@ func webOfferHarness(t *testing.T, enabled bool) (*harness, *catalog.Service) {
 	if enabled {
 		flag = "true"
 	}
-	h := newHarness(t, approvedEntitlements(), withEnv("WEB_TOPUP_OFFER_PUSH_ENABLED", flag), withEnv("PUBLIC_BASE_URL", "https://ai-reply.kz"))
+	h := newHarness(t, approvedEntitlements(), withEnv("WEB_TOPUP_OFFER_PUSH_ENABLED", flag), withEnv("PUBLIC_BASE_URL", "https://ai-reply.kz"), withEnv("BCC_CHECKOUT_ENABLED", "false"))
 	prices := catalog.New(h.db)
 	if err := prices.EnsureInitial(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	h.notify.WithWebTopupOffers(func() bool { return true }, prices, "https://ai-reply.kz/sandbox")
+	h.notify.WithWebTopupOffers(prices, "https://ai-reply.kz/sandbox")
 	return h, prices
 }
 
@@ -80,12 +87,10 @@ func TestWebsiteOfferWaitsForExplicitConsentAndReadyRegistration(t *testing.T) {
 	}
 }
 
-func TestWebsiteOfferHonorsFeatureBankConsentAndPublishedOffer(t *testing.T) {
-	for _, name := range []string{"feature_off", "bank_off", "no_consent", "opted_out", "catalog_changed"} {
+func TestWebsiteOfferHonorsFeatureConsentAndPublishedOffer(t *testing.T) {
+	for _, name := range []string{"feature_off", "no_consent", "opted_out", "catalog_changed"} {
 		t.Run(name, func(t *testing.T) {
 			h, prices := webOfferHarness(t, name != "feature_off")
-			bank := name != "bank_off"
-			h.notify.WithWebTopupOffers(func() bool { return bank }, prices, "https://ai-reply.kz/sandbox")
 			s := h.signIn("web-offer-gates@example.com")
 			h.mustRegister(installation(installID(652), "ios", fcmToken(652)), s.access)
 			if name != "no_consent" {
@@ -147,5 +152,72 @@ func TestWebsiteOfferRequiresCompatibleBuildBeforeQueueAndDispatch(t *testing.T)
 				t.Fatal("downgraded client received external payment offer")
 			}
 		})
+	}
+}
+
+func TestWebsiteCatalogOfferWithBankOffStillKeepsCheckoutAndCreditsDisabled(t *testing.T) {
+	h, prices := webOfferHarness(t, true)
+	ctx := context.Background()
+	bank, err := bcc.NewCheckout(h.cfg.BCCCheckout, h.db, prices)
+	if err != nil || bank.Enabled() {
+		t.Fatalf("fixture must have disabled bank checkout: %v", err)
+	}
+	s := h.signIn("catalog-offer-bank-off@example.com")
+	body := installation(installID(654), "ios", fcmToken(654))
+	body["app_version"], body["app_build"] = "1.2.0", "14"
+	h.mustRegister(body, s.access)
+	if response := h.do(http.MethodPut, "/api/v1/me/notification-preferences", map[string]any{
+		"expected_user_id": s.userID, "preferences": map[string]bool{"marketing": true},
+	}, h.auth(s.access)); response.status != http.StatusOK {
+		t.Fatal("explicit marketing opt-in failed")
+	}
+	h.tick()
+	messages := h.push.messages()
+	if len(messages) != 1 || messages[0].msg.Category != domain.CategoryMarketing || messages[0].msg.Data["type"] != domain.TypeWebTopupOffer || messages[0].msg.Data["link"] != "https://ai-reply.kz/sandbox/payment" || !strings.Contains(messages[0].msg.Body, "30") || !strings.Contains(messages[0].msg.Body, "100") {
+		t.Fatal("bank readiness blocked or changed the ordinary catalog offer")
+	}
+
+	// Use the same authenticated account/database for the website. Advertising
+	// the catalog must not enable the independently gated payment handler.
+	cfg := h.cfg
+	cfg.App.PublicBaseURL = "https://ai-reply.kz/sandbox"
+	planSvc := plans.New(h.store)
+	server := api.New(api.Deps{Config: cfg, Auth: h.authSvc, Users: h.users, Plans: planSvc,
+		Subs: subscriptions.New(h.store, planSvc, cfg.App.Location()), Credits: h.credits,
+		Notifications: h.notify, Installations: h.installations, Limiter: middleware.NewLimiter(), Log: discardLog()})
+	mux := http.NewServeMux()
+	server.RegisterWebAccount(mux, bank, prices)
+	handoff, err := h.authSvc.CreateWebPaymentHandoff(ctx, s.userID, "en")
+	if err != nil {
+		t.Fatal(err)
+	}
+	web, err := h.authSvc.ConsumeWebPaymentHandoff(ctx, handoff.Code, auth.DeviceInfo{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := httptest.NewRequest(http.MethodPost, "https://ai-reply.kz/sandbox/account/api/checkout", strings.NewReader(`{"product_code":"pack30","accept_terms":true}`))
+	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("Origin", "https://ai-reply.kz")
+	r.Header.Set("X-Requested-With", "AIReplyAccount")
+	r.AddCookie(&http.Cookie{Name: "aireply_web_sandbox_session", Value: web.RefreshToken})
+	w := httptest.NewRecorder()
+	http.StripPrefix("/sandbox", mux).ServeHTTP(w, r)
+	if w.Code != http.StatusServiceUnavailable || !strings.Contains(w.Body.String(), "WEB_PAYMENTS_UNAVAILABLE") {
+		t.Fatal("catalog offer enabled checkout with the bank switched off")
+	}
+	if h.scalar(`SELECT count(*) FROM billing_orders`) != 0 || h.scalar(`SELECT count(*) FROM credit_grants WHERE kind='pack'`) != 0 {
+		t.Fatal("catalog offer created a payment or granted purchased replies")
+	}
+
+	other := h.signIn("catalog-offer-opted-out@example.com")
+	body = installation(installID(655), "ios", fcmToken(655))
+	body["app_version"], body["app_build"] = "1.2.0", "14"
+	h.mustRegister(body, other.access)
+	if _, err = h.notify.SetPreferences(ctx, other.userID, map[string]bool{"marketing": false}); err != nil {
+		t.Fatal(err)
+	}
+	h.tick()
+	if len(h.push.messages()) != 1 || h.scalar(`SELECT count(*) FROM notifications WHERE user_id=? AND type='web_topup_offer'`, other.userID) != 0 {
+		t.Fatal("catalog offer ignored marketing opt-out")
 	}
 }

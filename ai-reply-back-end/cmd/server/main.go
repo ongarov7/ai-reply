@@ -245,7 +245,7 @@ func buildApplication(ctx context.Context, cfg config.Config, log *slog.Logger, 
 		Repo: store, Installations: installSvc, Provider: pushProvider, Plans: planSvc,
 		Config: cfg.Push, Location: cfg.App.Location(), Translate: bundle.T, Log: log,
 	})
-	notifySvc.WithWebTopupOffers(bccCheckout.Enabled, catalogSvc, cfg.App.PublicBaseURL)
+	notifySvc.WithWebTopupOffers(catalogSvc, cfg.App.PublicBaseURL)
 	if mailer != nil {
 		notifySvc.WithEmail(mailer, email.NotificationTemplates{Translate: bundle.T, Brand: cfg.Email.FromName})
 	}
