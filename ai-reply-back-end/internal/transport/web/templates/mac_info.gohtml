@@ -1,0 +1,26 @@
+{{define "title"}}{{call .T "mac.title"}}{{end}}
+{{define "content"}}
+<main class="wrap">
+  <article class="legal">
+    <h1>{{call .T "mac.title"}}</h1>
+    <p>{{call .T "mac.intro"}}</p>
+    <p>{{call .T "mac.requirements"}}</p>
+    {{if .MacOSDownloadURL}}
+    <p><a class="btn btn-primary" href="{{.MacOSDownloadURL}}">{{call .T "mac.download"}}</a></p>
+    {{else}}
+    <p>{{call .T "mac.soon"}}</p>
+    {{end}}
+    <h2>{{call .T "mac.install_title"}}</h2>
+    <ol>
+      <li>{{call .T "mac.install_step1"}}</li>
+      <li>{{call .T "mac.install_step2"}}</li>
+      <li>{{call .T "mac.install_step3"}}</li>
+    </ol>
+    <h2>{{call .T "mac.account_title"}}</h2>
+    <p>{{call .T "mac.account_body"}}</p>
+    <p><a class="btn btn-ghost" href="{{.BasePath}}/payment?lang={{.Locale}}">{{call .T "account.open"}}</a></p>
+    <p>{{call .T "mac.microphone"}}</p>
+    <p><a href="{{.BasePath}}/support?lang={{.Locale}}">{{call .T "footer.support"}}</a> · <a href="{{.BasePath}}/privacy?lang={{.Locale}}">{{call .T "footer.privacy"}}</a></p>
+  </article>
+</main>
+{{end}}

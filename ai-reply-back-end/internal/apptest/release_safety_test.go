@@ -44,8 +44,9 @@ func TestLandingClaimsMatchTheRelease(t *testing.T) {
 				t.Errorf("%s landing still says %q", locale, stale)
 			}
 		}
-		if strings.Count(page, `class="store"`) != 2 || strings.Contains(page, `<a class="store"`) {
-			t.Errorf("%s: without store links both badges say coming soon", locale)
+		if strings.Count(page, `class="store"`) != 3 || strings.Count(page, `<a class="store"`) != 1 ||
+			!strings.Contains(page, `<a class="store" href="/mac?lang=`+locale+`"><small>`) {
+			t.Errorf("%s: without release URLs store downloads stay unavailable and Mac links to its information page", locale)
 		}
 	}
 

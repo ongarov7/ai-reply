@@ -212,6 +212,20 @@ func TestWebCheckoutBindsAccountAndTermsAndGrantsOnlyAfterBankNotify(t *testing.
 	cfg := webTestConfig(t)
 	app := webTestApplication(t, cfg)
 	cookie, first := webTestSignIn(t, app.handler, "", "first@example.invalid")
+	// The desktop signs in independently, before any website purchase.
+	webTestRequest(app.handler, http.MethodPost, "/api/v1/auth/email/otp/request", map[string]string{"email": first.User.Email, "locale": "ru"}, nil, "https://billing.example.invalid", "")
+	macSignIn := webTestRequest(app.handler, http.MethodPost, "/api/v1/auth/email/otp/verify", map[string]any{
+		"email": first.User.Email, "code": "1111", "device": map[string]string{"platform": "macos", "device_id": "purchase-test-mac"},
+	}, nil, "https://billing.example.invalid", "")
+	var macSession struct {
+		AccessToken string `json:"access_token"`
+		User        struct {
+			ID string `json:"id"`
+		} `json:"user"`
+	}
+	if macSignIn.Code != http.StatusOK || json.Unmarshal(macSignIn.Body.Bytes(), &macSession) != nil || macSession.AccessToken == "" || macSession.User.ID != first.User.ID {
+		t.Fatal("desktop and website did not sign in to the same account")
+	}
 	other, second := webTestSignIn(t, app.handler, "", "second@example.invalid")
 	body := webTestQuote(first)
 	wrong := webTestRequest(app.handler, http.MethodPost, "/account/api/checkout", body, other, "https://billing.example.invalid", "cross-tab-attempt")
@@ -297,6 +311,15 @@ func TestWebCheckoutBindsAccountAndTermsAndGrantsOnlyAfterBankNotify(t *testing.
 	_ = json.Unmarshal(after.Body.Bytes(), &current)
 	if current.Usage.Purchased != 30 {
 		t.Fatalf("verified purchase should grant exactly 30, got %d", current.Usage.Purchased)
+	}
+	macRequest := httptest.NewRequest(http.MethodGet, "https://billing.example.invalid/api/v1/me", nil)
+	macRequest.Header.Set("Authorization", "Bearer "+macSession.AccessToken)
+	macResponse := httptest.NewRecorder()
+	app.handler.ServeHTTP(macResponse, macRequest)
+	var macBalance webTestSnapshot
+	if macResponse.Code != http.StatusOK || json.Unmarshal(macResponse.Body.Bytes(), &macBalance) != nil ||
+		macBalance.User.ID != first.User.ID || macBalance.Usage.Purchased != 30 || macBalance.Usage.Remaining != current.Usage.Remaining {
+		t.Fatal("the desktop session did not receive the bank-confirmed website purchase")
 	}
 	otherBalance := webTestRequest(app.handler, http.MethodGet, "/account/api/session", nil, other, "", "")
 	_ = json.Unmarshal(otherBalance.Body.Bytes(), &current)

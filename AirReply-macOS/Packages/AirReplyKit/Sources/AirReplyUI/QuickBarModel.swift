@@ -97,7 +97,8 @@ public final class QuickBarModel {
         focusRequest += 1
         Task {
             await account.refreshConfig()
-            if auth.isSignedIn { try? await account.refreshMe(maxAge: 30) }
+            // A website purchase can complete seconds after the last read.
+            if auth.isSignedIn { try? await account.refreshMe() }
         }
     }
 

@@ -24,6 +24,7 @@ public final class AppCoordinator {
     private var statusItem: StatusItemController?
     private var settingsWindow: SettingsWindowController?
     private var observers: [NSObjectProtocol] = []
+    private var activationObserver: NSObjectProtocol?
     /// Shown in Settings when the chosen shortcut could not be registered.
     private(set) var shortcutNote: String?
 
@@ -57,7 +58,7 @@ public final class AppCoordinator {
             signIn: { [unowned self] in showPanel() },
             plans: { [unowned self] in openPlans() },
             settings: { [unowned self] in openSettings() },
-            checkForUpdates: { [unowned self] in openURL(configuration.websiteURL("app")) },
+            checkForUpdates: { [unowned self] in openURL(configuration.websiteURL("mac")) },
             quit: { NSApp.terminate(nil) }))
         hotKeys.onPress = { [unowned self] in togglePanel() }
         registerShortcut(settings.shortcut)
@@ -66,6 +67,10 @@ public final class AppCoordinator {
             forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
                 Task { @MainActor in await self?.refreshAccount() }
             })
+        activationObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+                Task { @MainActor in await self?.refreshAccount(force: true) }
+            }
         Task {
             await account.refreshConfig()
             if auth.isSignedIn { try? await account.refreshMe() }
@@ -78,6 +83,8 @@ public final class AppCoordinator {
         voice.cancel()
         observers.forEach { NSWorkspace.shared.notificationCenter.removeObserver($0) }
         observers.removeAll()
+        if let activationObserver { NotificationCenter.default.removeObserver(activationObserver) }
+        activationObserver = nil
     }
 
     // MARK: Panel
@@ -153,9 +160,9 @@ public final class AppCoordinator {
         return account.me?.user.email
     }
 
-    func refreshAccount() async {
+    func refreshAccount(force: Bool = false) async {
         guard auth.isSignedIn else { return }
-        try? await account.refreshMe(maxAge: 10)
+        try? await account.refreshMe(maxAge: force ? 0 : 10)
     }
 
     func signOut() {

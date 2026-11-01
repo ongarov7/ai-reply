@@ -40,7 +40,7 @@ Release — `https://ai-reply.kz`. В Debug можно указать локал
 
 ## Сборка и тесты
 
-Нужны Xcode 26.6 и macOS 14+.
+Нужны Xcode 26.4.1 или новее и macOS 14+.
 
 ```bash
 xcodebuild -project AirReply.xcodeproj -scheme AirReply -configuration Debug build
@@ -50,7 +50,7 @@ xcodebuild -project AirReply.xcodeproj -scheme AirReply -configuration Debug bui
 swift test --package-path Packages/AirReplyKit
 ```
 
-132 теста: API и обновление токена, вход, согласие, баланс, генерация и ошибки, буфер обмена, горячая клавиша,
+134 теста: API и обновление токена, вход, согласие, баланс, генерация и ошибки, буфер обмена, горячая клавиша,
 вставка, запись голоса, логика строки, полнота переводов.
 
 Сквозной тест с настоящим сервером и OpenAI (только локальный backend, `APP_ENV=development`, тестовый код входа):

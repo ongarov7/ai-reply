@@ -55,8 +55,9 @@ type App struct {
 	// SimulatorEnabled — /simulator өнім демонстрациясы (SIMULATOR_ENABLED; әдепкі тек development/test).
 	SimulatorEnabled bool
 	// AppStoreURL, PlayStoreURL — лендингтегі дүкен сілтемелері; бос болса «жақында» белгісі қалады.
-	AppStoreURL  string
-	PlayStoreURL string
+	AppStoreURL      string
+	PlayStoreURL     string
+	MacOSDownloadURL string
 }
 
 // ContactEmail — қолдау мен заң беттеріндегі байланыс мекенжайы (CONTACT_EMAIL).
@@ -386,6 +387,7 @@ func Load(envFile string) (Config, error) {
 			SimulatorEnabled: boolean("SIMULATOR_ENABLED", appEnv == "development" || appEnv == "test"),
 			AppStoreURL:      str("APP_STORE_URL", ""),
 			PlayStoreURL:     str("PLAY_STORE_URL", ""),
+			MacOSDownloadURL: str("MACOS_DOWNLOAD_URL", ""),
 		},
 		Database: Database{
 			Path:           str("SQLITE_PATH", "data/aireply.db"),
@@ -623,6 +625,9 @@ func (c Config) Validate() []string {
 		}
 	}
 	problems = append(problems, c.Push.validate()...)
+	if c.App.MacOSDownloadURL != "" && c.App.MacOSInstallerURL() == "" {
+		problems = append(problems, "MACOS_DOWNLOAD_URL must be an HTTPS .dmg URL under /downloads/macos/ on the PUBLIC_BASE_URL host, without credentials, query or fragment")
+	}
 	problems = append(problems, c.IAP.validate()...)
 	if c.App.IsProduction() && c.IAP.AppleEnabled && c.IAP.AppleAcceptSandbox {
 		problems = append(problems, "APPLE_IAP_ACCEPT_SANDBOX=true requires a separate staging/test backend and database; sandbox purchases cannot grant production entitlements")

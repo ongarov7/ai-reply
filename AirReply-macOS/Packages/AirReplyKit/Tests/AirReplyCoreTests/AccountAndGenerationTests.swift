@@ -237,6 +237,25 @@ struct AuthAndAccountTests {
         #expect(account.balance?.remainingTotal == 37)
     }
 
+    @Test func websitePackAppearsInTheDesktopBalanceWithoutSigningInAgain() async throws {
+        let transport = FakeTransport { _ in
+            (200, #"{"user":{"id":"u-1"},"usage":{"daily_limit":0,"remaining_today":0,"purchased_credits":30,"remaining_total":30}}"#, [:])
+        }
+        let sessions = SessionStore(store: InMemorySecureStore())
+        try sessions.save(Fixtures.tokens(expiresAt: Date().addingTimeInterval(3600)))
+        let client = APIClient(configuration: Fixtures.configuration, transport: transport, sessions: sessions)
+        let account = AccountStore(client: client, configuration: Fixtures.configuration)
+        account.apply(try JSONDecoder.api.decode(MeResponse.self, from: Data(
+            #"{"user":{"id":"u-1"},"usage":{"daily_limit":0,"remaining_total":0}}"#.utf8)))
+        #expect(account.balance?.isExhausted == true)
+        try await account.refreshMe()
+        #expect(account.me?.user.id == "u-1")
+        #expect(account.balance?.credits == 30)
+        #expect(account.balance?.remainingTotal == 30)
+        #expect(account.balance?.isExhausted == false)
+        #expect(transport.requests(to: "/api/v1/me").count == 1)
+    }
+
     @Test func balanceSummary() throws {
         let (_, _, _, account) = environment(FakeTransport { _ in (200, "{}", [:]) })
         #expect(account.balance == nil)

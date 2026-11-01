@@ -1496,6 +1496,29 @@
         }
       }
     },
+    "settings.account.refresh": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refresh balance"
+          }
+        },
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Теңгерімді жаңарту"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Обновить баланс"
+          }
+        }
+      }
+    },
     "settings.account.sign_out": {
       "extractionState": "manual",
       "localizations": {

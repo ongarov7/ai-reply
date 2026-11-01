@@ -157,6 +157,7 @@ private struct AccountPane: View {
                     }
                 }
                 Section {
+                    Button("settings.account.refresh") { Task { await coordinator.refreshAccount(force: true) } }
                     Button("settings.account.plans") { coordinator.openPlans() }
                     Button("settings.account.sign_out", role: .destructive) { coordinator.signOut() }
                     Button("settings.account.delete") { coordinator.openAccountDeletion() }

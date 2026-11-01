@@ -10,12 +10,18 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 PROFILE="${NOTARY_PROFILE:-airreply-notary}"
-IDENTITY="Developer ID Application"
+TEAM_ID=2PK6339Q47
+IDENTITY=$(security find-identity -v -p codesigning | \
+    awk -v team="$TEAM_ID" '/"Developer ID Application: / && $0 ~ ("\\(" team "\\)\"$") {print $2; exit}')
 WORK=build/release
 OUT=dist
 
-if ! security find-identity -v -p codesigning | grep -q "$IDENTITY"; then
-    echo "error: no \"$IDENTITY\" certificate in the keychain" >&2
+if [ -z "$IDENTITY" ]; then
+    echo "error: no Developer ID Application certificate with a private key for team $TEAM_ID in the keychain" >&2
+    exit 1
+fi
+if ! xcrun notarytool history --keychain-profile "$PROFILE" >/dev/null; then
+    echo "error: configure the notarytool keychain profile '$PROFILE' before building (see README)" >&2
     exit 1
 fi
 
@@ -28,33 +34,52 @@ rm -rf "$WORK"
 mkdir -p "$WORK" "$OUT"
 
 xcodebuild -project AirReply.xcodeproj -scheme AirReply -configuration Release \
-    -destination 'generic/platform=macOS' -archivePath "$WORK/AirReply.xcarchive" archive
+    -destination 'generic/platform=macOS' -archivePath "$WORK/AirReply.xcarchive" \
+    CODE_SIGN_IDENTITY="$IDENTITY" archive
 xcodebuild -exportArchive -archivePath "$WORK/AirReply.xcarchive" \
     -exportOptionsPlist scripts/ExportOptions.plist -exportPath "$WORK/export"
 
 APP="$WORK/export/AI Reply.app"
 codesign --verify --deep --strict --verbose=2 "$APP"
-lipo -archs "$APP/Contents/MacOS/AI Reply"
+lipo -verify_arch arm64 x86_64 "$APP/Contents/MacOS/AI Reply"
+codesign -d --verbose=4 "$APP" 2>&1 | grep -qx "TeamIdentifier=$TEAM_ID"
+/usr/libexec/PlistBuddy -c 'Print :AIReplyBackendBaseURL' "$APP/Contents/Info.plist" | grep -qx 'https://ai-reply.kz'
+
+notarize() {
+    local file="$1" result="$2"
+    xcrun notarytool submit "$file" --keychain-profile "$PROFILE" --wait --output-format json > "$result"
+    python3 - "$result" <<'PY'
+import json, sys
+result = json.load(open(sys.argv[1]))
+print('Notarization:', result.get('id'), result.get('status'))
+if result.get('status') != 'Accepted':
+    sys.exit('error: Apple did not accept this submission; inspect the notarytool log before publishing')
+PY
+}
 
 # The app itself is notarized and stapled first, so it stays valid when copied out of the DMG.
 ditto -c -k --keepParent "$APP" "$WORK/AI-Reply.zip"
-xcrun notarytool submit "$WORK/AI-Reply.zip" --keychain-profile "$PROFILE" --wait
+notarize "$WORK/AI-Reply.zip" "$WORK/app-notarization.json"
 xcrun stapler staple "$APP"
+xcrun stapler validate "$APP"
+spctl --assess --type execute --verbose=2 "$APP"
 
 STAGE="$WORK/dmg"
 mkdir -p "$STAGE"
-cp -R "$APP" "$STAGE/"
+ditto "$APP" "$STAGE/AI Reply.app"
 ln -s /Applications "$STAGE/Applications"
 DMG="$OUT/AI-Reply-$VERSION.dmg"
 rm -f "$DMG"
 hdiutil create -volname "AI Reply" -srcfolder "$STAGE" -fs HFS+ -format UDZO -ov "$DMG"
 codesign --sign "$IDENTITY" --timestamp "$DMG"
-xcrun notarytool submit "$DMG" --keychain-profile "$PROFILE" --wait
+notarize "$DMG" "$WORK/dmg-notarization.json"
 xcrun stapler staple "$DMG"
+xcrun stapler validate "$DMG"
 spctl --assess --type open --context context:primary-signature --verbose=2 "$DMG"
 
 SHA=$(shasum -a 256 "$DMG" | awk '{print $1}')
 SIZE=$(stat -f %z "$DMG")
+(cd "$OUT" && shasum -a 256 "$(basename "$DMG")" > "$(basename "$DMG").sha256")
 cat > "$OUT/macos-$VERSION.json" <<JSON
 {
   "platform": "macos",
