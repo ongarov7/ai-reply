@@ -136,6 +136,14 @@ func (s *CheckoutService) refundAuthenticatedPack(ctx context.Context, order Ban
 			return err
 		}
 		now := s.now().UnixMilli()
+		// Revoke only the paid period purchased by this order. Later valid
+		// periods and unrelated stores retain their independently paid access.
+		if _, err := tx.ExecContext(ctx, `UPDATE bcc_subscription_periods SET revoked_at=? WHERE order_id=? AND revoked_at IS NULL`, now, order.ID); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE bcc_subscriptions SET status='canceled',next_due_at=NULL,updated_at=? WHERE id=(SELECT bcc_subscription_id FROM billing_orders WHERE id=?)`, now, order.ID); err != nil {
+			return err
+		}
 		var grant, user string
 		var remaining int
 		err := tx.QueryRowContext(ctx, `SELECT id,user_id,units_remaining FROM credit_grants WHERE billing_order_id=?`, order.ID).Scan(&grant, &user, &remaining)

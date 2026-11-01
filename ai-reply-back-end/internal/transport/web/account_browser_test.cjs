@@ -73,7 +73,7 @@ test('purchase requires separate unchecked terms and sends the exact account and
   assert.equal(request.opts.credentials, 'same-origin');
   assert.equal(request.opts.headers['X-Requested-With'], 'AIReplyAccount');
   assert.deepEqual(JSON.parse(request.opts.body), { product_code: 'pack30', expected_user_id: 'fixture-user-A',
-    expected_catalog_version: 1, expected_price_minor: 10000, expected_units: 30, terms_version: '2026-10-30-web-purchase-v1', accept_terms: true });
+    expected_catalog_version: 1, expected_price_minor: 10000, expected_units: 30, terms_version: '2026-10-30-web-purchase-v1', accept_terms: true, locale: 'en' });
   assert.equal(f.redirects.length, 1);
   assert.match(f.nodes.get('account-products').children[0].children[1].textContent, /100/);
   assert.match(f.nodes.get('account-products').children[0].children[2].textContent, /30/);
@@ -92,6 +92,44 @@ test('lost checkout response has a working manual recovery with the same body an
   assert.equal(posts[0].opts.headers['Idempotency-Key'], posts[1].opts.headers['Idempotency-Key']);
   assert.equal(f.redirects.length, 1);
   assert.doesNotMatch([...f.stored.values()].join(''), /access_token|refresh_token|@example/);
+});
+
+test('a subscription requires separate renewal consent and preserves its exact mandate', async () => {
+  const payload = session();
+  payload.bank.recurring_enabled = true;
+  payload.bank.recurring_terms_version = '2026-11-01';
+  payload.bank.products = [{ code: 'base_monthly', kind: 'subscription', units: 0, price_minor: 59900,
+    currency: 'KZT', billing_period: 'month', daily_limit: 30, active: true, available_web: true, name: { en: 'Base' } }];
+  const f = fixture(url => url.endsWith('/checkout') ? response(created()) : response(payload));
+  await f.app.init();
+  assert.equal(f.nodes.get('account-renewal-box').hidden, false);
+  f.accept();
+  await f.app.checkout('base_monthly');
+  assert.equal(f.requests.some(x => x.url.endsWith('/checkout')), false);
+  const expiry = f.nodes.get('account-card-expiry');
+  expiry.value = '2028-02'; expiry.listeners.change();
+  const consent = f.nodes.get('account-recurring-terms');
+  consent.checked = true; consent.listeners.change();
+  await f.app.checkout('base_monthly');
+  const request = f.requests.find(x => x.url.endsWith('/checkout'));
+  assert.ok(request);
+  const quote = JSON.parse(request.opts.body);
+  assert.equal(quote.recurring_until, '20280229');
+  assert.equal(quote.recurring_terms_version, '2026-11-01');
+  assert.equal(quote.accept_recurring, true);
+  assert.equal(quote.expected_units, 0);
+  assert.equal(quote.expected_price_minor, 59900);
+});
+
+test('changing card expiry clears renewal consent without starting payment', async () => {
+  const f = fixture(() => response(session()));
+  await f.app.init();
+  const consent = f.nodes.get('account-recurring-terms');
+  consent.checked = true;
+  const expiry = f.nodes.get('account-card-expiry');
+  expiry.value = '2028-03'; expiry.listeners.change();
+  assert.equal(consent.checked, false);
+  assert.equal(f.requests.some(x => x.url.endsWith('/checkout')), false);
 });
 
 test('an unresolved request survives reload and preserves its original approved quote', async () => {

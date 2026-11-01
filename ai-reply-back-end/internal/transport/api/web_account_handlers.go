@@ -61,6 +61,7 @@ func (s *Server) RegisterWebAccount(mux *http.ServeMux, bank *bcc.CheckoutServic
 	mux.Handle("GET /account/api/session", a.headers(a.requireSession(http.HandlerFunc(a.session))))
 	mux.Handle("POST /account/api/checkout", post(a.requireSession(checkoutLimit(http.HandlerFunc(a.checkout)))))
 	mux.Handle("GET /account/api/orders/{id}", a.headers(a.requireSession(statusLimit(http.HandlerFunc(a.order)))))
+	mux.Handle("POST /account/api/subscriptions/{id}/cancel", post(a.requireSession(checkoutLimit(http.HandlerFunc(a.cancelSubscription)))))
 }
 
 func (a *webAccount) createHandoff(w http.ResponseWriter, r *http.Request) {
@@ -232,11 +233,14 @@ func (a *webAccount) logout(w http.ResponseWriter, r *http.Request) {
 }
 
 type webBankView struct {
-	Enabled        bool              `json:"enabled"`
-	Environment    bcc.Environment   `json:"environment"`
-	CatalogVersion int64             `json:"catalog_version"`
-	TermsVersion   string            `json:"terms_version"`
-	Products       []catalog.Product `json:"products"`
+	Enabled               bool                   `json:"enabled"`
+	Environment           bcc.Environment        `json:"environment"`
+	CatalogVersion        int64                  `json:"catalog_version"`
+	TermsVersion          string                 `json:"terms_version"`
+	Products              []catalog.Product      `json:"products"`
+	RecurringEnabled      bool                   `json:"recurring_enabled"`
+	RecurringTermsVersion string                 `json:"recurring_terms_version"`
+	Subscriptions         []bcc.SubscriptionView `json:"subscriptions"`
 }
 
 type webSessionView struct {
@@ -257,7 +261,12 @@ func (a *webAccount) session(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, err)
 		return
 	}
-	bank := webBankView{Enabled: a.bank.Enabled(), Environment: a.bank.Environment(), TermsVersion: legal.WebPurchaseTermsVersion, Products: []catalog.Product{}}
+	bank := webBankView{Enabled: a.bank.Enabled(), Environment: a.bank.Environment(), TermsVersion: legal.WebPurchaseTermsVersion, Products: []catalog.Product{}, RecurringEnabled: a.bank.RecurringEnabled(), RecurringTermsVersion: bcc.RecurringTermsVersion}
+	bank.Subscriptions, err = a.bank.Subscriptions(r.Context(), user.ID)
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
 	if a.catalog != nil {
 		published, err := a.catalog.Published(r.Context())
 		if err != nil {
@@ -266,7 +275,7 @@ func (a *webAccount) session(w http.ResponseWriter, r *http.Request) {
 		}
 		bank.CatalogVersion = published.ID
 		for _, p := range published.Products {
-			if p.Active && p.AvailableWeb && p.Kind == "pack" && p.Units > 0 && p.PriceMinor > 0 && p.Currency == "KZT" {
+			if p.Active && p.AvailableWeb && (p.Kind == "pack" && p.Units > 0 || p.Kind == "subscription" && bank.RecurringEnabled) && p.PriceMinor > 0 && p.Currency == "KZT" {
 				bank.Products = append(bank.Products, p)
 			}
 		}
@@ -289,6 +298,10 @@ func (a *webAccount) checkout(w http.ResponseWriter, r *http.Request) {
 		ExpectedUnits          int    `json:"expected_units"`
 		TermsVersion           string `json:"terms_version"`
 		AcceptTerms            bool   `json:"accept_terms"`
+		Locale                 string `json:"locale"`
+		AcceptRecurring        bool   `json:"accept_recurring"`
+		RecurringTermsVersion  string `json:"recurring_terms_version"`
+		RecurringUntil         string `json:"recurring_until"`
 	}
 	if err := httpx.Decode(w, r, 2048, &body); err != nil {
 		httpx.Fail(w, err)
@@ -306,6 +319,7 @@ func (a *webAccount) checkout(w http.ResponseWriter, r *http.Request) {
 	o, err := a.bank.StartExpected(r.Context(), u.ID, body.ProductCode, r.Header.Get("Idempotency-Key"), bcc.ExpectedQuote{
 		CatalogVersion: body.ExpectedCatalogVersion, PriceMinor: body.ExpectedPriceMinor,
 		Units: body.ExpectedUnits, Currency: "KZT", TermsVersion: body.TermsVersion,
+		Locale: body.Locale, RecurringConsent: body.AcceptRecurring, RecurringTermsVersion: body.RecurringTermsVersion, RecurringUntil: body.RecurringUntil,
 	})
 	if err != nil {
 		var conflict *domain.ConflictError
@@ -321,6 +335,26 @@ func (a *webAccount) checkout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, http.StatusCreated, o)
+}
+
+func (a *webAccount) cancelSubscription(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		ExpectedUserID string `json:"expected_user_id"`
+	}
+	if err := httpx.Decode(w, r, 2048, &body); err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	user, _ := UserFrom(r.Context())
+	if body.ExpectedUserID != user.ID {
+		httpx.Error(w, http.StatusConflict, "WEB_ACCOUNT_CHANGED", "The account changed. Refresh before continuing.", nil)
+		return
+	}
+	if err := a.bank.CancelSubscription(r.Context(), user.ID, r.PathValue("id")); err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	a.session(w, r)
 }
 
 func (a *webAccount) order(w http.ResponseWriter, r *http.Request) {

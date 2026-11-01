@@ -46,6 +46,7 @@ PAYMENT_MODE=off
 BCC_CHECKOUT_ENVIRONMENT=production
 BCC_CHECKOUT_ENABLED=false
 BCC_CHECKOUT_PRODUCTION_APPROVED=false
+BCC_RECURRING_ENABLED=false
 BCC_PRODUCTION_MERCHANT_ID=
 BCC_PRODUCTION_MERCHANT_NAME=
 BCC_PRODUCTION_TERMINAL_ID=
@@ -56,17 +57,46 @@ BCC_PRODUCTION_STATE_SECRET=
 ```
 
 `PAYMENT_MODE=off` относится к старому платёжному провайдеру; BCC имеет отдельные
-переключатели. Боевой MAC — XOR компонент банка: вычислять локально, не передавая
-компоненты сторонним сайтам. Notification password и state secret — разные
-случайные секреты не короче 32 символов.
+переключатели. Соответствие реквизитов банка настройкам сервера:
+
+| Что нужно | Переменная |
+| --- | --- |
+| Боевой merchantID от BCC | `BCC_PRODUCTION_MERCHANT_ID` |
+| Название мерчанта от BCC | `BCC_PRODUCTION_MERCHANT_NAME` |
+| Боевой terminalID от BCC | `BCC_PRODUCTION_TERMINAL_ID` |
+| Результат побайтового XOR hex-компонент key1 и key2 | `BCC_PRODUCTION_MAC_KEY` |
+| Отдельный согласованный с банком логин callback | `BCC_PRODUCTION_NOTIFY_USERNAME` |
+| Новый случайный пароль callback, от 32 символов | `BCC_PRODUCTION_NOTIFY_PASSWORD` |
+| Другой случайный серверный секрет, от 32 символов | `BCC_PRODUCTION_STATE_SECRET` |
+
+`key1` и `key2` по отдельности backend не читает. Вычислять итоговый MAC локально,
+не передавая компоненты сторонним сайтам. Пароль callback и state secret можно
+создать двумя отдельными запусками `openssl rand -hex 32`. Значения production
+должны отличаться от sandbox; state secret банку не передаётся.
 
 На стороне банка настроить POST form-urlencoded, TLS 1.2 и тот же Basic Auth:
 `https://ai-reply.kz:443/api/v1/payments/bcc/notify`.
 Сначала проверить sandbox: оплату, итоговый notify, одно начисление при повторной
 доставке и возврат. Затем можно включить оба переключателя основного checkout,
 пройти `-check` и обновить контейнер. BACKREF не является подтверждением оплаты.
-Исходная Payment реализует BCC-пакет; MIT-автопродление Base/Pro требует отдельной
-реализации и проверки, наличие подписи `TRTYPE=171` само его не включает.
+Base/Pro доступны отдельно через `BCC_RECURRING_ENABLED=true`, для изолированного
+тестового контура — `BILLING_SANDBOX_BCC_RECURRING_ENABLED=true`. Пока банк не
+подтвердил рекуррентные операции и их итоговый callback, оба оставить `false`.
+Первый платёж требует отдельного согласия на продление. Каждый повторный платёж
+фиксируется до отправки банку; неопределённый результат не запускает повторное
+списание. Период доступа продлевает только подтверждённый callback. Отключение
+продления в кабинете сохраняет уже оплаченный доступ.
+
+`BCC_TEST_NOTIFY_URL` в `.env` должен быть обычным URL без Markdown-скобок.
+Приёмник `/api/v1/payments/bcc/sandbox/notify` служит для диагностики банка;
+начисление в изолированном контуре использует другой URL:
+`https://ai-reply.kz:443/sandbox/api/v1/payments/bcc/notify`.
+
+Для production-покупок App Store используются `APPLE_IAP_ENABLED=true`,
+`APPLE_IAP_BUNDLE_ID=kz.ai-reply.reply.keyboard.keyboard`,
+`APPLE_IAP_ACCEPT_SANDBOX=false`. До согласования цены продажи в админке остаются
+выключенными. Сервер проверяет подписанные StoreKit-транзакции встроенным
+сертификатом Apple; банковские key1/key2 к ним не относятся.
 
 ## Выпуск Mac
 
@@ -124,8 +154,10 @@ MACOS_DOWNLOAD_URL=https://ai-reply.kz/downloads/macos/AI-Reply-1.0.0.dmg
 
 ## Общий баланс
 
-Mac и сайт используют один серверный user ID. Проверенный банковский платёж
-появляется в `/api/v1/me` уже открытой Mac-сессии без повторного входа. Баланс
+Mac, iOS и сайт используют один серверный user ID. Проверенный банковский платёж
+появляется в `/api/v1/me` уже открытой сессии без повторного входа. iOS обновляет
+тариф и баланс при возвращении приложения на экран и при открытии тарифов.
+Пакет пополняет ответы, а Base/Pro меняет тариф. В Mac баланс
 обновляется при открытии строки ввода, активации приложения и кнопкой «Обновить
 баланс» в настройках. Другой email может означать другой аккаунт, особенно при
 Apple Hide My Email. Тариф и остаток общие; фактические цены зависят от канала.

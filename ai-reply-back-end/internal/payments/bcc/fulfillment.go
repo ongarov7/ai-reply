@@ -29,7 +29,7 @@ func (s *CheckoutService) fulfillAuthenticatedPack(ctx context.Context, order Ba
 		if err := json.Unmarshal([]byte(raw), &product); err != nil {
 			return err
 		}
-		if product.Kind != "pack" || product.Units <= 0 || product.Code != order.ProductCode || product.PriceMinor != order.AmountMinor || product.Currency != order.Currency {
+		if (product.Kind != "pack" || product.Units <= 0) && (product.Kind != "subscription" || periodDays(product) == 0) || product.Code != order.ProductCode || product.PriceMinor != order.AmountMinor || product.Currency != order.Currency {
 			return ErrInvalidRequest
 		}
 		now := s.now().UnixMilli()
@@ -42,12 +42,21 @@ func (s *CheckoutService) fulfillAuthenticatedPack(ctx context.Context, order Ba
 			_, err = tx.ExecContext(ctx, `INSERT OR IGNORE INTO billing_order_events(id,order_id,source,state,fields_json,created_at) VALUES(?,?,'authenticated_notify','account_deleted',?,?)`, "deleted-"+order.ID, order.ID, string(safeRaw), now)
 			return err
 		}
-		grantID := traits.NewID()
-		reason := "Verified BCC " + string(s.Environment()) + " purchase"
-		if _, err := tx.ExecContext(ctx, `INSERT INTO credit_grants(id,user_id,kind,units_total,units_remaining,starts_at,status,product_code,granted_by,reason,created_at,updated_at,billing_order_id) VALUES(?,?,'pack',?,?,?,'active',?,'system',?,?,?,?)`, grantID, user, product.Units, product.Units, now, product.Code, reason, now, now, order.ID); err != nil {
-			return err
+		if product.Kind == "subscription" {
+			if err := s.fulfillSubscriptionTx(ctx, tx, order, safe, s.now()); err != nil {
+				return err
+			}
+		} else {
+			grantID := traits.NewID()
+			reason := "Verified BCC " + string(s.Environment()) + " purchase"
+			if _, err := tx.ExecContext(ctx, `INSERT INTO credit_grants(id,user_id,kind,units_total,units_remaining,starts_at,status,product_code,granted_by,reason,created_at,updated_at,billing_order_id) VALUES(?,?,'pack',?,?,?,'active',?,'system',?,?,?,?)`, grantID, user, product.Units, product.Units, now, product.Code, reason, now, now, order.ID); err != nil {
+				return err
+			}
+			if _, err := tx.ExecContext(ctx, `INSERT INTO credit_ledger(id,user_id,grant_id,entry,kind,delta,actor,reason,created_at) VALUES(?,?,?,'grant','pack',?,'system',?,?)`, traits.NewID(), user, grantID, product.Units, reason, now); err != nil {
+				return err
+			}
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO credit_ledger(id,user_id,grant_id,entry,kind,delta,actor,reason,created_at) VALUES(?,?,?,'grant','pack',?,'system',?,?)`, traits.NewID(), user, grantID, product.Units, reason, now); err != nil {
+		if err := s.enqueueReceiptTx(ctx, tx, order, product, user, now); err != nil {
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, `UPDATE billing_orders SET status='succeeded',updated_at=? WHERE id=?`, now, order.ID); err != nil {

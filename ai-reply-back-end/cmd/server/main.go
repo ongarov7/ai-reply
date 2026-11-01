@@ -262,6 +262,7 @@ func buildApplication(ctx context.Context, cfg config.Config, log *slog.Logger, 
 	notifySvc.WithWebTopupOffers(catalogSvc, cfg.App.PublicBaseURL)
 	if mailer != nil {
 		notifySvc.WithEmail(mailer, email.NotificationTemplates{Translate: bundle.T, Brand: cfg.Email.FromName})
+		bccCheckout.WithReceiptEmail(mailer, email.NotificationTemplates{Translate: bundle.T, Brand: cfg.Email.FromName})
 	}
 	// Automatic notifications: plan activated (payment, admin), plan expiring
 	// or expired (the expiry sweep below), quota low or exhausted (AI gateway).
@@ -356,6 +357,7 @@ func buildApplication(ctx context.Context, cfg config.Config, log *slog.Logger, 
 	)
 
 	for _, worker := range []func(context.Context){
+		func(ctx context.Context) { bccCheckout.Run(ctx, log) },
 		func(ctx context.Context) { expireSubscriptions(ctx, subSvc, notifyEvents, creditSvc, log) },
 		func(ctx context.Context) { sweepReminders(ctx, notifyEvents) },
 		notifySvc.Run,

@@ -210,6 +210,19 @@ func (s *Service) Entitlement(ctx context.Context, userID string) (domain.Entitl
 		}
 	}
 
+	bank, bankErr := s.repo.ActiveBankSubscription(ctx, userID, now)
+	if bankErr != nil && !errors.Is(bankErr, domain.ErrNotFound) {
+		return domain.Entitlement{}, bankErr
+	}
+	if bankErr == nil {
+		bankPlan, err := s.repo.Plan(ctx, bank.PlanID)
+		if err != nil {
+			return domain.Entitlement{}, err
+		}
+		if plan.IsFree || bankPlan.Unlimited() || (!plan.Unlimited() && bankPlan.DailyLimit >= plan.DailyLimit) {
+			plan, sub = bankPlan, &bank
+		}
+	}
 	date, month := s.Keys(now)
 	usedDay, usedMonth, err := s.repo.Counters(ctx, userID, date, month)
 	if err != nil {

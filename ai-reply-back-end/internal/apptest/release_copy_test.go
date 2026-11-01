@@ -163,7 +163,8 @@ func TestPrivacyPolicyMatchesWhatTheAppsSend(t *testing.T) {
 		"A log of administrator actions on an account", "is not removed automatically, including after the account is deleted",
 		"finished notification deliveries — after 7 days", "the notifications themselves — after 40 days",
 		"If you signed in with Apple, you can remove AI Reply in your Apple ID settings",
-		"payment and refund status", "BCC on the website", "Card details are entered on the bank",
+		"payment and refund status", "BCC on the website", "The card number and CVC are entered on the bank",
+		"The renewal consent version and end date are stored",
 	} {
 		if !strings.Contains(page, needle) {
 			t.Errorf("en privacy policy is missing %q", needle)

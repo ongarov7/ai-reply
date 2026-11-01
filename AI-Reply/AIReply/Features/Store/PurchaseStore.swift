@@ -1,11 +1,11 @@
 import Foundation
 import Observation
 
-/// Purchases in this iOS product use StoreKit. The website link is information
-/// only; it never opens an external checkout or a website login handoff.
+/// Purchases in this iOS product use StoreKit. Home does not link to the
+/// service website; legal and support pages remain available in Settings.
 enum IOSProductPolicy {
     static let allowsNewPurchases = true
-    static let showsServiceInformationLink = true
+    static let showsServiceInformationLink = false
 }
 
 /// A product the screen may offer: what the server sells, at the price the

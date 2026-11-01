@@ -220,19 +220,16 @@ final class DeepLinkTests: XCTestCase {
     }
 
     @MainActor
-    func testHomeInformationPageUsesNoAccountAndNoWebsiteLogin() throws {
-        let router = AppRouter(backendBaseURL: { URL(string: "https://ai-reply.kz/sandbox") }, locale: { "kk" })
-        router.openServiceInformation()
-        XCTAssertNil(router.webPage, "a direct action needs the main interface")
-        router.mainInterfaceDidAppear()
-        router.openServiceInformation()
-        XCTAssertNil(router.webPage, "inactive scenes do not present a browser")
-        router.scenePhaseDidChange(.active)
-        router.openServiceInformation()
-        XCTAssertEqual(router.webPage?.url.absoluteString, "https://ai-reply.kz/sandbox/app?lang=kk")
-        XCTAssertTrue(router.path.isEmpty)
-        router.accountWillSignOut()
-        XCTAssertNil(router.webPage)
+    func testRemovedHomeWebsiteActionCannotPresentABrowser() {
+        for base in ["https://ai-reply.kz", "https://ai-reply.kz/sandbox"] {
+            let router = AppRouter(backendBaseURL: { URL(string: base) }, locale: { "kk" })
+            router.mainInterfaceDidAppear()
+            router.scenePhaseDidChange(.active)
+            XCTAssertFalse(router.canOpenServiceInformation)
+            router.openServiceInformation()
+            XCTAssertNil(router.webPage, "the removed Home action must stay disabled in every environment")
+            XCTAssertTrue(router.path.isEmpty)
+        }
     }
 
     @MainActor

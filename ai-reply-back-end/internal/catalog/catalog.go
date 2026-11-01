@@ -285,7 +285,7 @@ func synchronize(ctx context.Context, tx *sql.Tx, p Product, now int64) error {
 				target = "unlimited"
 			}
 			var subscribers int
-			if err = tx.QueryRowContext(ctx, `SELECT count(*) FROM subscriptions WHERE plan_id=(SELECT id FROM plans WHERE code=?)`, p.Code).Scan(&subscribers); err != nil {
+			if err = tx.QueryRowContext(ctx, `SELECT (SELECT count(*) FROM subscriptions WHERE plan_id=(SELECT id FROM plans WHERE code=?))+(SELECT count(*) FROM bcc_subscriptions WHERE plan_id=(SELECT id FROM plans WHERE code=?))`, p.Code, p.Code).Scan(&subscribers); err != nil {
 				return err
 			}
 			if (sold > 0 || subscribers > 0 || apple != "") && (daily != p.DailyLimit || kind != target) {

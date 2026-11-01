@@ -8,6 +8,7 @@ func bccCheckoutFromEnv(appEnv, publicBaseURL string) BCCCheckout {
 	cfg := bccSandboxCheckoutFromEnv(appEnv, publicBaseURL)
 	cfg.Enabled = boolean("BCC_CHECKOUT_ENABLED", false)
 	cfg.Environment = bcc.Environment(str("BCC_CHECKOUT_ENVIRONMENT", "sandbox"))
+	cfg.RecurringEnabled = boolean("BCC_RECURRING_ENABLED", false)
 	if cfg.Environment == bcc.Production {
 		cfg.ProductionApproved = boolean("BCC_CHECKOUT_PRODUCTION_APPROVED", false)
 		cfg.Merchant = str("BCC_PRODUCTION_MERCHANT_ID", "")
@@ -25,15 +26,16 @@ func bccCheckoutFromEnv(appEnv, publicBaseURL string) BCCCheckout {
 // Only billingSandboxConfig enables it and fixes its URL and app environment.
 func bccSandboxCheckoutFromEnv(appEnv, publicBaseURL string) BCCCheckout {
 	return BCCCheckout{
-		Environment:    bcc.Sandbox,
-		AppEnv:         appEnv,
-		PublicBaseURL:  publicBaseURL,
-		Merchant:       str("BCC_SANDBOX_MERCHANT_ID", ""),
-		MerchantName:   str("BCC_SANDBOX_MERCHANT_NAME", ""),
-		Terminal:       str("BCC_SANDBOX_TERMINAL_ID", ""),
-		MACKeyHex:      str("BCC_SANDBOX_MAC_KEY", ""),
-		NotifyUsername: str("BCC_CHECKOUT_NOTIFY_USERNAME", ""),
-		NotifyPassword: str("BCC_CHECKOUT_NOTIFY_PASSWORD", ""),
-		StateSecret:    str("BCC_CHECKOUT_STATE_SECRET", ""),
+		Environment:      bcc.Sandbox,
+		AppEnv:           appEnv,
+		PublicBaseURL:    publicBaseURL,
+		Merchant:         str("BCC_SANDBOX_MERCHANT_ID", ""),
+		MerchantName:     str("BCC_SANDBOX_MERCHANT_NAME", ""),
+		Terminal:         str("BCC_SANDBOX_TERMINAL_ID", ""),
+		MACKeyHex:        str("BCC_SANDBOX_MAC_KEY", ""),
+		NotifyUsername:   str("BCC_CHECKOUT_NOTIFY_USERNAME", ""),
+		NotifyPassword:   str("BCC_CHECKOUT_NOTIFY_PASSWORD", ""),
+		StateSecret:      str("BCC_CHECKOUT_STATE_SECRET", ""),
+		RecurringEnabled: boolean("BILLING_SANDBOX_BCC_RECURRING_ENABLED", false),
 	}
 }

@@ -53,7 +53,7 @@
     var resendAt = 0;
     var resendTimer = null;
     var nodes = {};
-    ['loading', 'error', 'reload', 'login', 'content', 'switch', 'switch-message', 'switch-confirm', 'switch-cancel', 'email-form', 'email', 'code-form', 'code', 'code-hint', 'change-email', 'resend', 'resend-hint', 'confirmed-email', 'user-id', 'remaining', 'purchased', 'welcome-row', 'welcome', 'current-plan', 'logout', 'refresh', 'sandbox', 'bank-unavailable', 'products', 'terms-box', 'purchase-terms', 'order', 'order-id', 'order-status', 'order-hint', 'check-order', 'retry-checkout', 'continue-order'].forEach(function (id) {
+    ['loading', 'error', 'reload', 'login', 'content', 'switch', 'switch-message', 'switch-confirm', 'switch-cancel', 'email-form', 'email', 'code-form', 'code', 'code-hint', 'change-email', 'resend', 'resend-hint', 'confirmed-email', 'user-id', 'remaining', 'purchased', 'welcome-row', 'welcome', 'current-plan', 'logout', 'refresh', 'sandbox', 'bank-unavailable', 'products', 'terms-box', 'purchase-terms', 'order', 'order-id', 'order-status', 'order-hint', 'check-order', 'retry-checkout', 'continue-order', 'renewal-box', 'card-expiry', 'recurring-terms', 'subscriptions'].forEach(function (id) {
       nodes[id] = document.getElementById('account-' + id);
     });
     var app = document.getElementById('account-app');
@@ -76,6 +76,9 @@
       nodes['switch-confirm'].disabled = value;
       nodes['switch-cancel'].disabled = value;
       nodes['purchase-terms'].disabled = value || !!state.pending;
+      nodes['recurring-terms'].disabled = value || !!state.pending;
+      nodes['card-expiry'].disabled = value || !!state.pending;
+      nodes.subscriptions.querySelectorAll('button').forEach(function (node) { node.disabled = value; });
       if (!value) updateResend();
       updateOrderButtons();
     }
@@ -83,7 +86,7 @@
       nodes['check-order'].disabled = state.busy || state.checking || browser.now() < state.nextCheckAt;
       nodes['retry-checkout'].disabled = state.busy;
       nodes.products.querySelectorAll('button').forEach(function (node) {
-        node.disabled = state.busy || !!state.pending || !nodes['purchase-terms'].checked || state.acceptedQuote !== quoteFingerprint(state.session);
+        node.disabled = state.busy || !!state.pending || !nodes['purchase-terms'].checked || state.acceptedQuote !== quoteFingerprint(state.session) || node.recurring && !recurringConsent();
       });
       if (state.cooldownTimer) browser.clearTimeout(state.cooldownTimer);
       var wait = state.nextCheckAt - browser.now();
@@ -136,6 +139,8 @@
       state.terminalOrder = null;
       state.acceptedQuote = '';
       nodes['purchase-terms'].checked = false;
+      nodes['recurring-terms'].checked = false;
+      nodes['card-expiry'].value = '';
       state.checking = false;
       hidden('content', true);
       hidden('login', false);
@@ -240,16 +245,21 @@
       if (!payload || !payload.bank || !payload.user) return null;
       var bank = payload.bank;
       var product = (Array.isArray(bank.products) ? bank.products : []).find(function (p) { return p.code === productCode; });
-      if (!bank.enabled || !product || product.kind !== 'pack' || product.active === false || product.available_web === false || product.currency !== 'KZT') return null;
+      if (!bank.enabled || !product || (product.kind !== 'pack' && (product.kind !== 'subscription' || !bank.recurring_enabled)) || product.active === false || product.available_web === false || product.currency !== 'KZT') return null;
       var quote = { product_code: productCode, expected_user_id: payload.user.id, expected_catalog_version: bank.catalog_version,
         expected_price_minor: product.price_minor, expected_units: product.units, terms_version: payload.terms_version || bank.terms_version || '', accept_terms: true };
+      if (product.kind === 'subscription') {
+        quote.accept_recurring = true;
+        quote.recurring_terms_version = bank.recurring_terms_version;
+        quote.recurring_until = recurringUntil();
+      }
       return validQuote(quote) ? quote : null;
     }
     function validQuote(quote) {
       return !!quote && ID.test(quote.expected_user_id || '') && typeof quote.product_code === 'string' &&
         Number.isSafeInteger(quote.expected_catalog_version) && quote.expected_catalog_version > 0 &&
         Number.isSafeInteger(quote.expected_price_minor) && quote.expected_price_minor > 0 &&
-        Number.isSafeInteger(quote.expected_units) && quote.expected_units > 0 &&
+        Number.isSafeInteger(quote.expected_units) && (quote.expected_units > 0 || quote.expected_units === 0 && quote.accept_recurring === true && /^\d{8}$/.test(quote.recurring_until || '') && typeof quote.recurring_terms_version === 'string' && quote.recurring_terms_version.length > 0) &&
         quote.accept_terms === true &&
         typeof quote.terms_version === 'string' && quote.terms_version.length > 0 && quote.terms_version.length <= 128;
     }
@@ -257,8 +267,18 @@
       if (!payload || !payload.bank) return '';
       return JSON.stringify([payload.user && payload.user.id, payload.bank.environment, payload.bank.catalog_version,
         payload.terms_version || payload.bank.terms_version,
-        (payload.bank.products || []).map(function (p) { return [p.code, p.price_minor, p.currency, p.units, p.active, p.available_web]; })]);
+        payload.bank.recurring_enabled, payload.bank.recurring_terms_version,
+        (payload.bank.products || []).map(function (p) { return [p.code, p.price_minor, p.currency, p.units, p.daily_limit, p.unlimited, p.billing_period, p.active, p.available_web]; })]);
     }
+    function recurringUntil() {
+      var value = nodes['card-expiry'].value;
+      if (!/^\d{4}-\d{2}$/.test(value)) return '';
+      var parts = value.split('-').map(Number);
+      if (parts[1] < 1 || parts[1] > 12) return '';
+      var end = new Date(Date.UTC(parts[0], parts[1], 0));
+      return end.toISOString().slice(0, 10).replace(/-/g, '');
+    }
+    function recurringConsent() { return nodes['recurring-terms'].checked && !!recurringUntil(); }
     function renderProducts() {
       nodes.products.replaceChildren();
       var bank = state.session.bank;
@@ -271,12 +291,13 @@
         card.querySelector('[data-offer-name]').textContent = product.name && (product.name[locale] || product.name.en) || t('top_up');
       });
       var products = bank.enabled && Array.isArray(bank.products) ? bank.products.filter(function (p) {
-        return !!purchaseQuote(state.session, p.code) && p.kind === 'pack' && p.active !== false && p.available_web !== false &&
-          typeof p.code === 'string' && Number.isInteger(p.units) && p.units > 0 &&
+        return (p.kind === 'pack' || p.kind === 'subscription' && bank.recurring_enabled) && p.active !== false && p.available_web !== false &&
+          typeof p.code === 'string' && Number.isInteger(p.units) && (p.units > 0 || p.kind === 'subscription') &&
           Number.isSafeInteger(p.price_minor) && p.price_minor > 0 && /^[A-Z]{3}$/.test(p.currency);
       }) : [];
       hidden('bank-unavailable', products.length > 0);
       hidden('terms-box', products.length === 0);
+      hidden('renewal-box', !products.some(function (p) { return p.kind === 'subscription'; }));
       hidden('sandbox', !bank.enabled || bank.environment !== 'sandbox');
       products.forEach(function (product) {
         var card = document.createElement('div');
@@ -285,12 +306,14 @@
         name.textContent = (product.name && (product.name[locale] || product.name.en)) || t('top_up');
         var price = document.createElement('p');
         price.className = 'account-product-price';
-        price.textContent = money(product.price_minor, product.currency);
+        var days = product.billing_period === 'year' ? 365 : 30;
+        price.textContent = money(product.price_minor, product.currency) + (product.kind === 'subscription' ? ' / ' + t('period_days', { days: days }) : '');
         var units = document.createElement('p');
         units.className = 'account-product-units';
-        units.textContent = t('pack_units', { count: product.units });
+        units.textContent = product.kind === 'subscription' ? (product.unlimited ? t('unlimited') : t('daily_units', { count: product.daily_limit })) : t('pack_units', { count: product.units });
         var button = document.createElement('button');
         button.type = 'button'; button.className = 'btn btn-primary'; button.textContent = t('buy');
+        button.recurring = product.kind === 'subscription';
         button.addEventListener('click', function () { checkout(product.code); });
         card.append(name, price, units, button);
         nodes.products.append(card);
@@ -312,6 +335,7 @@
       if (previousQuote !== quoteFingerprint(payload)) {
         state.acceptedQuote = '';
         nodes['purchase-terms'].checked = false;
+        nodes['recurring-terms'].checked = false;
       }
       var usage = payload.usage || {};
       text('confirmed-email', payload.user.email || t('email_unavailable'));
@@ -326,8 +350,38 @@
       hidden('loading', true); hidden('reload', true); hidden('login', true); hidden('content', false);
       if (restore) restorePending();
       renderProducts();
+      renderSubscriptions();
       renderPending();
       return payload;
+    }
+    function renderSubscriptions() {
+      nodes.subscriptions.replaceChildren();
+      (state.session.bank.subscriptions || []).forEach(function (sub) {
+        var row = document.createElement('div');
+        var summary = document.createElement('p');
+        var name = sub.name && (sub.name[locale] || sub.name.en) || sub.product_code;
+        summary.textContent = name + ': ' + t('subscription_status.' + sub.status) + (sub.paid_until ? '. ' + t('paid_until', { date: new Date(sub.paid_until).toLocaleString(locale) }) : '');
+        row.append(summary);
+        if (sub.next_charge_at && sub.auto_renew) {
+          var next = document.createElement('p');
+          next.textContent = t('next_charge', { amount: money(sub.amount_minor, sub.currency), date: new Date(sub.next_charge_at).toLocaleString(locale) });
+          row.append(next);
+        }
+        if (sub.status === 'active' || sub.status === 'pending' || sub.status === 'needs_review') {
+          var cancel = document.createElement('button');
+          cancel.type = 'button'; cancel.className = 'account-link'; cancel.textContent = t('cancel_renewal');
+          cancel.addEventListener('click', function () {
+            if (state.busy) return;
+            setBusy(true); notice('');
+            var owner = state.session.user.id;
+            api('/subscriptions/' + encodeURIComponent(sub.id) + '/cancel', { expected_user_id: owner }).then(function (payload) {
+              if (state.session && state.session.user.id === owner) { renderSession(payload, false); notice(t('renewal_cancelled')); }
+            }).catch(fail).then(function () { setBusy(false); });
+          });
+          row.append(cancel);
+        }
+        nodes.subscriptions.append(row);
+      });
     }
     function renderPending() {
       if (!state.pending) {
@@ -475,7 +529,7 @@
     function checkout(productCode) {
       if (state.busy || !state.session || state.pending) return Promise.resolve();
       var displayed = purchaseQuote(state.session, productCode);
-      if (!displayed || !nodes['purchase-terms'].checked || state.acceptedQuote !== quoteFingerprint(state.session)) {
+      if (!displayed || displayed.accept_recurring && !recurringConsent() || !nodes['purchase-terms'].checked || state.acceptedQuote !== quoteFingerprint(state.session)) {
         notice(t('error.TERMS_REQUIRED')); return Promise.resolve();
       }
       var owner = state.session.user.id;
@@ -508,7 +562,8 @@
       var intent = state.pending;
       // The backend checks the expected account and the exact approved quote.
       // Retrying a lost response reuses this same body and idempotency key.
-      return api('/checkout', intent.quote, { 'Idempotency-Key': intent.idempotency }).then(function (order) {
+      var requestQuote = Object.assign({}, intent.quote, { locale: locale });
+      return api('/checkout', requestQuote, { 'Idempotency-Key': intent.idempotency }).then(function (order) {
         if (epoch !== state.epoch || !state.session || state.session.user.id !== owner || state.pending !== intent) return;
         var id = orderID(order);
         if (!ID.test(id)) throw new Error('INVALID_ORDER');
@@ -567,6 +622,8 @@
       state.acceptedQuote = nodes['purchase-terms'].checked ? quoteFingerprint(state.session) : '';
       updateOrderButtons();
     });
+    nodes['recurring-terms'].addEventListener('change', updateOrderButtons);
+    nodes['card-expiry'].addEventListener('change', function () { nodes['recurring-terms'].checked = false; updateOrderButtons(); });
     nodes['retry-checkout'].addEventListener('click', retryCheckout);
     nodes['switch-confirm'].addEventListener('click', function () { if (!state.busy) return redeemHandoff(true); });
     nodes['switch-cancel'].addEventListener('click', function () { if (!state.busy) handoffFallback(t('handoff_cancelled')); });

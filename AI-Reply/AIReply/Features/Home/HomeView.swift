@@ -24,7 +24,6 @@ struct HomeView: View {
                     .font(.body)
                     .foregroundStyle(.secondary)
                 if account.isSignedIn { usageCard }
-                if IOSProductPolicy.showsServiceInformationLink { serviceInformationCard }
                 if updates.showsUpdateCard {
                     AppUpdateCard()
                         .transition(.opacity)
@@ -132,40 +131,6 @@ struct HomeView: View {
     }
 
     private var balance: BalanceSummary { BalanceSummary.make(account.usage) }
-
-    private var serviceInformationCard: some View {
-        Button {
-            router.openServiceInformation()
-        } label: {
-            HStack(spacing: DS.Spacing.s) {
-                Image(systemName: "globe")
-                    .font(.title3)
-                    .foregroundStyle(Color.accentColor)
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: DS.Spacing.xxs) {
-                    Text("home.serviceInformation.title")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
-                    Text("home.serviceInformation.subtitle")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-                .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: DS.Spacing.xs)
-                Image(systemName: "arrow.up.right.square")
-                    .font(.body)
-                    .foregroundStyle(Color.accentColor)
-                    .accessibilityHidden(true)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .dsCard()
-        }
-        .buttonStyle(.plain)
-        .disabled(!router.canOpenServiceInformation)
-        .accessibilityElement(children: .combine)
-        .accessibilityHint(Text("home.serviceInformation.hint"))
-        .accessibilityIdentifier("home.serviceInformation")
-    }
 
     /// «Бесплатные ответы: 35 из 50» while a new account has free replies
     /// left, otherwise the usual title.

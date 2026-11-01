@@ -42,6 +42,7 @@
         <p class="account-muted">{{call .T "account.recipient_hint"}}</p>
         <dl class="account-balances"><div><dt>{{call .T "account.available"}}</dt><dd id="account-remaining"></dd></div><div><dt>{{call .T "account.purchased"}}</dt><dd id="account-purchased"></dd></div><div id="account-welcome-row" hidden><dt>{{call .T "account.welcome"}}</dt><dd id="account-welcome"></dd></div></dl>
         <p class="account-muted" id="account-current-plan"></p>
+        <div id="account-subscriptions"></div>
         <button id="account-refresh" class="account-link" type="button">{{call .T "account.refresh"}}</button>
       </section>
       <section class="account-card" aria-labelledby="account-pack-title">
@@ -49,6 +50,12 @@
         <p>{{call .T "account.pack_hint"}}</p>
         <p id="account-bank-unavailable" class="account-muted" hidden>{{call .T "account.bank_unavailable"}}</p>
         <div id="account-terms-box" class="account-check" hidden><input id="account-purchase-terms" type="checkbox"><label for="account-purchase-terms">{{call .T "account.purchase_terms"}} <a href="{{.BasePath}}/offer?lang={{.Locale}}#web-purchases" target="_blank" rel="noopener">{{call .T "footer.terms"}}</a></label></div>
+        <div id="account-renewal-box" hidden>
+          <label for="account-card-expiry">{{call .T "account.card_expiry"}}</label>
+          <input id="account-card-expiry" type="month" autocomplete="off">
+          <p class="account-muted">{{call .T "account.card_expiry_hint"}}</p>
+          <div class="account-check"><input id="account-recurring-terms" type="checkbox"><label for="account-recurring-terms">{{call .T "account.recurring_terms"}}</label></div>
+        </div>
         <div id="account-products"></div>
         <p class="account-muted">{{call .T "account.card_hint"}}</p>
         <a class="account-link" href="{{.BasePath}}/?lang={{.Locale}}#pricing">{{call .T "account.all_plans"}}</a>

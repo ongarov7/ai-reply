@@ -27,6 +27,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/catalog"
 	"github.com/aireply/ai-reply-back-end/internal/database"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
+	"github.com/aireply/ai-reply-back-end/internal/email"
 	"github.com/aireply/ai-reply-back-end/internal/legal"
 	"github.com/aireply/ai-reply-back-end/internal/traits"
 )
@@ -46,6 +47,7 @@ type CheckoutConfig struct {
 	NotifyUsername     string
 	NotifyPassword     string
 	StateSecret        string
+	RecurringEnabled   bool
 }
 
 func (CheckoutConfig) String() string               { return "bcc checkout configuration (redacted)" }
@@ -53,6 +55,9 @@ func (CheckoutConfig) GoString() string             { return "bcc.CheckoutConfig
 func (CheckoutConfig) MarshalJSON() ([]byte, error) { return []byte(`{"redacted":true}`), nil }
 func (c CheckoutConfig) Validate() error {
 	if !c.Enabled {
+		if c.RecurringEnabled {
+			return ErrInvalidConfig
+		}
 		return nil
 	}
 	switch c.Environment {
@@ -93,11 +98,13 @@ func (c CheckoutConfig) Validate() error {
 }
 
 type CheckoutService struct {
-	cfg     CheckoutConfig
-	db      *database.DB
-	catalog *catalog.Service
-	client  *Client
-	now     func() time.Time
+	cfg              CheckoutConfig
+	db               *database.DB
+	catalog          *catalog.Service
+	client           *Client
+	now              func() time.Time
+	receiptSender    ReceiptSender
+	receiptTemplates email.NotificationTemplates
 }
 
 func NewCheckout(cfg CheckoutConfig, db *database.DB, prices *catalog.Service) (*CheckoutService, error) {
@@ -138,6 +145,8 @@ type BankOrder struct {
 	Environment        string `json:"environment"`
 	RedirectURL        string `json:"redirect_url,omitempty"`
 	VerificationReason string `json:"verification_reason,omitempty"`
+	Kind               string `json:"kind"`
+	BillingPeriod      string `json:"billing_period,omitempty"`
 	userID             string
 	bankOrder          string
 	tokenHash          string
@@ -158,6 +167,7 @@ func readOrder(row interface{ Scan(...any) error }) (BankOrder, error) {
 		var product catalog.Product
 		if err = json.Unmarshal([]byte(o.snapshot), &product); err == nil {
 			o.Units = product.Units
+			o.Kind, o.BillingPeriod = product.Kind, product.BillingPeriod
 		}
 	}
 	return o, err
@@ -191,11 +201,15 @@ func (s *CheckoutService) Start(ctx context.Context, userID, code, idempotency s
 // ExpectedQuote is the exact offer accepted in the authenticated website flow.
 // Replaying the same order never replaces its original offer or consent.
 type ExpectedQuote struct {
-	CatalogVersion int64
-	PriceMinor     int64
-	Units          int
-	Currency       string
-	TermsVersion   string
+	CatalogVersion        int64
+	PriceMinor            int64
+	Units                 int
+	Currency              string
+	TermsVersion          string
+	Locale                string
+	RecurringConsent      bool
+	RecurringTermsVersion string
+	RecurringUntil        string
 }
 
 func (s *CheckoutService) StartExpected(ctx context.Context, userID, code, idempotency string, expected ExpectedQuote) (BankOrder, error) {
@@ -247,8 +261,13 @@ func (s *CheckoutService) start(ctx context.Context, userID, code, idempotency s
 		if err != nil {
 			return err
 		}
-		if p.Kind != "pack" {
+		if p.Kind != "pack" && p.Kind != "subscription" {
 			return domain.ErrPlanUnavailable
+		}
+		if p.Kind == "subscription" {
+			if err := s.validateMandate(ctx, tx, userID, p, expected); err != nil {
+				return err
+			}
 		}
 		if expected != nil {
 			if expected.TermsVersion != legal.WebPurchaseTermsVersion {
@@ -277,6 +296,11 @@ func (s *CheckoutService) start(ctx context.Context, userID, code, idempotency s
 			return ErrUnavailable
 		}
 		fields := url.Values{"AMOUNT": {amount}, "CURRENCY": {CurrencyKZT}, "ORDER": {o.bankOrder}, "MERCH_RN_ID": {strings.ToUpper(hex.EncodeToString(rnID[:]))}, "DESC": {"AI Reply " + p.Code}, "MERCHANT": {s.cfg.Merchant}, "MERCH_NAME": {s.cfg.MerchantName}, "TERMINAL": {s.cfg.Terminal}, "MERCH_GMT": {"0"}, "TIMESTAMP": {now.Format("20060102150405")}, "TRTYPE": {"1"}, "NONCE": {strings.ToUpper(hex.EncodeToString(nonce[:]))}, "LANG": {"ru"}, "BACKREF": {s.baseURL() + "/api/v1/payments/bcc/orders/" + o.ID + "/return?state=" + url.QueryEscape(state)}, "NOTIFY_URL": {s.baseURL() + "/api/v1/payments/bcc/notify"}}
+		if p.Kind == "subscription" {
+			fields.Set("MERCH_TRAN_STATE", "S")
+			fields.Set("RECUR_FREQ", fmt.Sprint(periodDays(p)))
+			fields.Set("RECUR_EXP", expected.RecurringUntil)
+		}
 		signature, err := SignRequest(Purchase, fields, s.cfg.MACKeyHex)
 		if err != nil {
 			return err
@@ -284,10 +308,21 @@ func (s *CheckoutService) start(ctx context.Context, userID, code, idempotency s
 		fields.Set("P_SIGN", signature)
 		raw, _ := json.Marshal(fields)
 		snapshot, _ := json.Marshal(p)
+		o.snapshot, o.Kind, o.BillingPeriod = string(snapshot), p.Kind, p.BillingPeriod
 		o.request = string(raw)
 		_, err = tx.ExecContext(ctx, `INSERT INTO billing_orders(id,user_id,idempotency_key,catalog_version,product_code,snapshot_json,amount_minor,currency,provider,environment,bank_order,status,checkout_token_hash,request_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?, 'bcc',?,?,'created',?,?,?,?)`, o.ID, userID, idempotency, version, p.Code, string(snapshot), p.PriceMinor, p.Currency, o.Environment, o.bankOrder, o.tokenHash, o.request, o.createdAt, o.createdAt)
 		if err == nil && expected != nil {
 			_, err = tx.ExecContext(ctx, `INSERT INTO billing_web_purchase_consents(order_id,user_id,product_code,catalog_version,price_minor,units,terms_version,source,accepted_at) VALUES(?,?,?,?,?,?,?,'website',?)`, o.ID, userID, p.Code, version, p.PriceMinor, p.Units, expected.TermsVersion, o.createdAt)
+		}
+		if err == nil {
+			locale := "en"
+			if expected != nil {
+				locale = domain.NormalizeLocale(expected.Locale)
+			}
+			_, err = tx.ExecContext(ctx, `INSERT INTO billing_order_context(order_id,locale) VALUES(?,?)`, o.ID, locale)
+		}
+		if err == nil && p.Kind == "subscription" {
+			err = s.createMandate(ctx, tx, o, p, expected, fields.Get("MERCH_RN_ID"))
 		}
 		return err
 	})
@@ -345,7 +380,11 @@ func (s *CheckoutService) Reconcile(ctx context.Context, user, id string) (BankO
 		o.VerificationReason = "status_query_window_expired"
 		return o, nil
 	}
-	response, err := s.client.Query(ctx, QueryRequest{Order: o.bankOrder, OriginalType: Purchase, StartedAt: time.UnixMilli(o.createdAt)})
+	var request url.Values
+	if err := json.Unmarshal([]byte(o.request), &request); err != nil {
+		return BankOrder{}, err
+	}
+	response, err := s.client.Query(ctx, QueryRequest{Order: o.bankOrder, OriginalType: TransactionType(request.Get("TRTYPE")), StartedAt: time.UnixMilli(o.createdAt)})
 	if err != nil {
 		return BankOrder{}, domain.ErrStoreUnavailable
 	}
@@ -436,8 +475,13 @@ func (s *CheckoutService) CheckoutPageWithClientIP(w http.ResponseWriter, r *htt
 	bankURL, _ := url.Parse(endpoint)
 	w.Header().Set("Content-Security-Policy", "default-src 'none'; script-src 'nonce-"+cspNonce+"'; form-action "+bankURL.Scheme+"://"+bankURL.Host+"; frame-ancestors 'none'; base-uri 'none'")
 	amount, _ := FormatKZT(o.AmountMinor)
+	var product catalog.Product
+	if err := json.Unmarshal([]byte(o.snapshot), &product); err != nil {
+		http.Error(w, "Unavailable", http.StatusServiceUnavailable)
+		return
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = bankForm.Execute(w, map[string]any{"Amount": amount, "Units": o.Units, "Sandbox": s.Environment() == Sandbox, "Endpoint": template.URL(endpoint), "Fields": fields, "ClientIP": ip.String(), "CSPNonce": cspNonce})
+	_ = bankForm.Execute(w, map[string]any{"Amount": amount, "Units": o.Units, "Kind": product.Kind, "ProductName": product.Name["en"], "PeriodDays": periodDays(product), "Sandbox": s.Environment() == Sandbox, "Endpoint": template.URL(endpoint), "Fields": fields, "ClientIP": ip.String(), "CSPNonce": cspNonce})
 }
 
 func secureHeaders(w http.ResponseWriter) {
@@ -522,7 +566,7 @@ func (s *CheckoutService) Notify(w http.ResponseWriter, r *http.Request) {
 		kind = fields.Get("TRAN_TRTYPE")
 	}
 	amount, _ := FormatKZT(o.AmountMinor)
-	if fields.Get("TERMINAL") != s.cfg.Terminal || fields.Get("CURRENCY") != CurrencyKZT || fields.Get("AMOUNT") != amount || (kind == "1" && fields.Get("MERCHANT") != s.cfg.Merchant || kind == "14" && fields.Get("MERCHANT") != "" && fields.Get("MERCHANT") != s.cfg.Merchant) || fields.Get("TRTYPE") == "" && fields.Get("TRAN_TRTYPE") == "" || fields.Get("TRTYPE") != "" && fields.Get("TRTYPE") != "1" && fields.Get("TRTYPE") != "14" || fields.Get("TRAN_TRTYPE") != "" && fields.Get("TRAN_TRTYPE") != "1" && fields.Get("TRAN_TRTYPE") != "14" {
+	if fields.Get("TERMINAL") != s.cfg.Terminal || fields.Get("CURRENCY") != CurrencyKZT || fields.Get("AMOUNT") != amount || (kind == "1" && fields.Get("MERCHANT") != s.cfg.Merchant || kind != "1" && fields.Get("MERCHANT") != "" && fields.Get("MERCHANT") != s.cfg.Merchant) || (kind != "1" && kind != "14" && kind != "171") {
 		http.Error(w, "Notification mismatch", http.StatusBadRequest)
 		return
 	}
@@ -541,9 +585,17 @@ func (s *CheckoutService) Notify(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unavailable", http.StatusServiceUnavailable)
 		return
 	}
-	if fields.Get("MERCH_RN_ID") != original.Get("MERCH_RN_ID") || fields.Get("MERCH_RN_ID") == "" {
+	if original.Get("TRTYPE") != kind || fields.Get("MERCH_RN_ID") != original.Get("MERCH_RN_ID") || fields.Get("MERCH_RN_ID") == "" {
 		http.Error(w, "Notification mismatch", http.StatusBadRequest)
 		return
+	}
+	// A recurring callback must describe the exact registered operation. A
+	// different chain or a first-payment echo cannot fulfill a renewal order.
+	for _, key := range []string{"MERCH_TRAN_STATE", "RECUR_FREQ", "RECUR_EXP", "RECUR_REF"} {
+		if fields.Get(key) != original.Get(key) {
+			http.Error(w, "Notification mandate mismatch", http.StatusBadRequest)
+			return
+		}
 	}
 	expectedNonce, receivedNonce := sha256.Sum256([]byte(original.Get("NONCE"))), sha256.Sum256([]byte(fields.Get("NONCE")))
 	if fields.Get("NONCE") == "" || subtle.ConstantTimeCompare(expectedNonce[:], receivedNonce[:]) != 1 {
@@ -569,8 +621,8 @@ func (s *CheckoutService) Notify(w http.ResponseWriter, r *http.Request) {
 		} else {
 			err = s.fulfillAuthenticatedPack(r.Context(), o, safe)
 		}
-	} else if kind == "1" && fields.Get("ACTION") == "2" && fields.Get("RC") != "" && fields.Get("RC") != "00" {
-		err = s.recordEvent(r.Context(), o.ID, "authenticated_notify", "failed", safe)
+	} else if kind != "14" && fields.Get("ACTION") == "2" && fields.Get("RC") != "" && fields.Get("RC") != "00" {
+		err = s.recordDecline(r.Context(), o, safe)
 	} else {
 		err = s.recordEvent(r.Context(), o.ID, "authenticated_notify", "verification_pending", safe)
 	}
