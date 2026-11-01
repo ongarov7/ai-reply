@@ -69,10 +69,10 @@ func (s *CheckoutService) Run(ctx context.Context, log *slog.Logger) {
 	defer tick.Stop()
 	for {
 		if err := s.RunDue(ctx); err != nil && ctx.Err() == nil {
-			log.Error("BCC renewal scheduler failed")
+			log.Error("BCC renewal scheduler failed", "error", err.Error())
 		}
 		if err := s.SendReceipts(ctx); err != nil && ctx.Err() == nil {
-			log.Error("BCC receipt queue failed")
+			log.Error("BCC receipt queue failed", "error", err.Error())
 		}
 		select {
 		case <-ctx.Done():

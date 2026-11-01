@@ -3,6 +3,7 @@ package ai
 import (
 	"context"
 	"errors"
+	"github.com/aireply/ai-reply-back-end/internal/logging"
 	"log/slog"
 	"strings"
 	"time"
@@ -345,7 +346,17 @@ func (s *Service) quotaRefused(ctx context.Context, user domain.User, ent domain
 // logFailure — сәтсіз генерация: тек режим, нұсқа, код және кідіріс.
 func (s *Service) logFailure(c call, version, code string, latency int) {
 	s.log.Warn("ai_reply_failed", "user_id", c.User.ID, "mode", c.Mode, "prompt_version", version,
-		"code", code, "latency_ms", latency)
+		"code", code, "latency_ms", latency, providerAlert(code))
+}
+
+// providerAlert — провайдер жағындағы сәтсіздік (таймаут, 429, 5xx, бос жауап) операторға
+// WARNING ретінде жетеді; квота мен пайдаланушы қателері жетпейді.
+func providerAlert(code string) slog.Attr {
+	switch code {
+	case "AI_TIMEOUT", "RATE_LIMITED", "AI_PROVIDER_UNAVAILABLE", "AI_EMPTY_RESPONSE", "INTERNAL_ERROR":
+		return logging.Alert()
+	}
+	return slog.Attr{}
 }
 
 // record — оқиға метадерегі. Пайдаланушы мәтіні де, жауап та жазылмайды: тек ұзындығы.

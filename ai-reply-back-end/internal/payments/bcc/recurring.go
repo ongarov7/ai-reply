@@ -231,7 +231,10 @@ func (s *CheckoutService) RunDue(ctx context.Context) error {
 		// The final authenticated notification, not this wrapper response, grants access.
 		_, sendErr := s.client.post(ctx, RecurringCharge, fields)
 		if sendErr != nil {
+			// The charge may or may not have reached the bank: no blind retry, an
+			// operator reconciles it (TRTYPE 90 within 24 h) — hence the alert.
 			_, _ = s.db.Writer().ExecContext(context.WithoutCancel(ctx), `UPDATE bcc_recurring_attempts SET state='uncertain' WHERE order_id=? AND state='submitted'`, orderID)
+			s.log.Error("BCC renewal charge unconfirmed", "order_id", orderID, "environment", string(s.Environment()), "error", sendErr.Error())
 		}
 		if ctx.Err() != nil {
 			return ctx.Err()

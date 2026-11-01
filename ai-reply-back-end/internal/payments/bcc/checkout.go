@@ -13,8 +13,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/aireply/ai-reply-back-end/internal/logging"
 	"html/template"
 	"io"
+	"log/slog"
 	"math/big"
 	"mime"
 	"net"
@@ -105,13 +107,32 @@ type CheckoutService struct {
 	now              func() time.Time
 	receiptSender    ReceiptSender
 	receiptTemplates email.NotificationTemplates
+	log              *slog.Logger
+}
+
+// WithLogger — operator visibility for payment paths that used to fail silently
+// (rejected bank notifications, declines, an unconfirmed renewal charge). Only
+// order ids, transaction types and response codes are logged, never card data.
+func (s *CheckoutService) WithLogger(log *slog.Logger) *CheckoutService {
+	if log != nil {
+		s.log = log
+	}
+	return s
+}
+
+// reject — аутентификациядан өткен, бірақ қабылданбаған банк уведомлениесі: ақша
+// алынған болуы мүмкін, сондықтан әр жағдай ERROR деңгейінде журналға жазылады.
+func (s *CheckoutService) reject(w http.ResponseWriter, r *http.Request, status int, reason string, kv ...any) {
+	attrs := append([]any{"reason", reason, "status", status, "environment", string(s.Environment())}, kv...)
+	s.log.ErrorContext(r.Context(), "BCC notification rejected", attrs...)
+	http.Error(w, reason, status)
 }
 
 func NewCheckout(cfg CheckoutConfig, db *database.DB, prices *catalog.Service) (*CheckoutService, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
-	s := &CheckoutService{cfg: cfg, db: db, catalog: prices, now: time.Now}
+	s := &CheckoutService{cfg: cfg, db: db, catalog: prices, now: time.Now, log: slog.New(slog.NewTextHandler(io.Discard, nil))}
 	if !cfg.Enabled {
 		return s, nil
 	}
@@ -553,12 +574,12 @@ func (s *CheckoutService) Notify(w http.ResponseWriter, r *http.Request) {
 	}
 	fields, err := parseNotification(w, r)
 	if err != nil {
-		http.Error(w, "Invalid notification", http.StatusBadRequest)
+		s.reject(w, r, http.StatusBadRequest, "Invalid notification")
 		return
 	}
 	o, err := readOrder(s.db.Reader().QueryRowContext(r.Context(), `SELECT `+orderColumns+` FROM billing_orders WHERE bank_order=? AND environment=?`, fields.Get("ORDER"), s.Environment()))
 	if err != nil {
-		http.Error(w, "Unknown order", http.StatusNotFound)
+		s.reject(w, r, http.StatusNotFound, "Unknown order", "trtype", fields.Get("TRTYPE"))
 		return
 	}
 	kind := fields.Get("TRTYPE")
@@ -567,39 +588,39 @@ func (s *CheckoutService) Notify(w http.ResponseWriter, r *http.Request) {
 	}
 	amount, _ := FormatKZT(o.AmountMinor)
 	if fields.Get("TERMINAL") != s.cfg.Terminal || fields.Get("CURRENCY") != CurrencyKZT || fields.Get("AMOUNT") != amount || (kind == "1" && fields.Get("MERCHANT") != s.cfg.Merchant || kind != "1" && fields.Get("MERCHANT") != "" && fields.Get("MERCHANT") != s.cfg.Merchant) || (kind != "1" && kind != "14" && kind != "171") {
-		http.Error(w, "Notification mismatch", http.StatusBadRequest)
+		s.reject(w, r, http.StatusBadRequest, "Notification mismatch", "order_id", o.ID, "trtype", kind, "order_status", o.Status)
 		return
 	}
 	if fields.Get("TRTYPE") != "" && fields.Get("TRAN_TRTYPE") != "" && fields.Get("TRTYPE") != fields.Get("TRAN_TRTYPE") {
-		http.Error(w, "Notification type mismatch", http.StatusBadRequest)
+		s.reject(w, r, http.StatusBadRequest, "Notification type mismatch", "order_id", o.ID, "trtype", kind)
 		return
 	}
 	var original url.Values
 	if kind == "14" {
 		original, err = s.refundRequest(r.Context(), o.ID)
 		if err != nil {
-			http.Error(w, "Unregistered refund", http.StatusBadRequest)
+			s.reject(w, r, http.StatusBadRequest, "Unregistered refund", "order_id", o.ID)
 			return
 		}
 	} else if json.Unmarshal([]byte(o.request), &original) != nil {
-		http.Error(w, "Unavailable", http.StatusServiceUnavailable)
+		s.reject(w, r, http.StatusServiceUnavailable, "Unavailable", "order_id", o.ID, "trtype", kind)
 		return
 	}
 	if original.Get("TRTYPE") != kind || fields.Get("MERCH_RN_ID") != original.Get("MERCH_RN_ID") || fields.Get("MERCH_RN_ID") == "" {
-		http.Error(w, "Notification mismatch", http.StatusBadRequest)
+		s.reject(w, r, http.StatusBadRequest, "Notification mismatch", "order_id", o.ID, "trtype", kind, "order_status", o.Status)
 		return
 	}
 	// A recurring callback must describe the exact registered operation. A
 	// different chain or a first-payment echo cannot fulfill a renewal order.
 	for _, key := range []string{"MERCH_TRAN_STATE", "RECUR_FREQ", "RECUR_EXP", "RECUR_REF"} {
 		if fields.Get(key) != original.Get(key) {
-			http.Error(w, "Notification mandate mismatch", http.StatusBadRequest)
+			s.reject(w, r, http.StatusBadRequest, "Notification mandate mismatch", "order_id", o.ID, "trtype", kind)
 			return
 		}
 	}
 	expectedNonce, receivedNonce := sha256.Sum256([]byte(original.Get("NONCE"))), sha256.Sum256([]byte(fields.Get("NONCE")))
 	if fields.Get("NONCE") == "" || subtle.ConstantTimeCompare(expectedNonce[:], receivedNonce[:]) != 1 {
-		http.Error(w, "Notification mismatch", http.StatusBadRequest)
+		s.reject(w, r, http.StatusBadRequest, "Notification mismatch", "order_id", o.ID, "trtype", kind, "order_status", o.Status)
 		return
 	}
 	safe := map[string]string{}
@@ -613,7 +634,7 @@ func (s *CheckoutService) Notify(w http.ResponseWriter, r *http.Request) {
 	// must include both bank references; an intermediate event grants nothing.
 	if fields.Get("ACTION") == "0" && fields.Get("RC") == "00" {
 		if !bankReference(fields.Get("RRN")) || !bankReference(fields.Get("INT_REF")) {
-			http.Error(w, "Missing bank references", http.StatusBadRequest)
+			s.reject(w, r, http.StatusBadRequest, "Missing bank references", "order_id", o.ID, "trtype", kind)
 			return
 		}
 		if kind == "14" {
@@ -622,12 +643,18 @@ func (s *CheckoutService) Notify(w http.ResponseWriter, r *http.Request) {
 			err = s.fulfillAuthenticatedPack(r.Context(), o, safe)
 		}
 	} else if kind != "14" && fields.Get("ACTION") == "2" && fields.Get("RC") != "" && fields.Get("RC") != "00" {
+		// A decline is normal for the person but worth a WARNING for the operator:
+		// a run of them means a terminal, 3-D Secure or mandate problem at the bank.
+		s.log.WarnContext(r.Context(), "BCC payment declined", logging.Alert(), "order_id", o.ID, "trtype", kind,
+			"rc", fields.Get("RC"), "environment", string(s.Environment()))
 		err = s.recordDecline(r.Context(), o, safe)
 	} else {
 		err = s.recordEvent(r.Context(), o.ID, "authenticated_notify", "verification_pending", safe)
 	}
 	if err != nil {
-		http.Error(w, "Unavailable", http.StatusServiceUnavailable)
+		// A paid order that could not be fulfilled: the bank retries, but an operator must know.
+		s.reject(w, r, http.StatusServiceUnavailable, "Unavailable", "order_id", o.ID, "trtype", kind, "order_status", o.Status,
+			"action", fields.Get("ACTION"), "rc", fields.Get("RC"), "error", err.Error())
 		return
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")

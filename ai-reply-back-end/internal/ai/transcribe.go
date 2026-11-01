@@ -213,7 +213,7 @@ func (s *Service) transcribe(ctx context.Context, req TranscribeRequest, info au
 		code := errorCode(err)
 		s.record(ctx, c, entitlement, "error", code, PromptVersionTranscribe,
 			Completion{Model: s.transcriber.TranscribeModel()}, latency)
-		s.log.Warn("ai_voice_failed", append(logged, "status", "error", "code", code)...)
+		s.log.Warn("ai_voice_failed", append(logged, "status", "error", "code", code, providerAlert(code))...)
 		return TranscribeResult{}, err
 	}
 
