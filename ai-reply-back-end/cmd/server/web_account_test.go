@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/aireply/ai-reply-back-end/config"
+	"github.com/aireply/ai-reply-back-end/internal/alerts"
 	"github.com/aireply/ai-reply-back-end/internal/auth"
 	"github.com/aireply/ai-reply-back-end/internal/catalog"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
@@ -53,7 +54,7 @@ func webTestApplication(t *testing.T, cfg config.Config) *application {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	var workers sync.WaitGroup
-	app, err := buildApplication(ctx, cfg, slog.New(slog.NewTextHandler(io.Discard, nil)), &workers)
+	app, err := buildApplication(ctx, cfg, slog.New(slog.NewTextHandler(io.Discard, nil)), alerts.New(alerts.Config{}, nil), &workers)
 	if err != nil {
 		cancel()
 		t.Fatal(err)

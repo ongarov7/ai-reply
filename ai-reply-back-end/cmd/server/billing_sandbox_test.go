@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/aireply/ai-reply-back-end/config"
+	"github.com/aireply/ai-reply-back-end/internal/alerts"
 	"github.com/aireply/ai-reply-back-end/internal/auth"
 	"github.com/aireply/ai-reply-back-end/internal/database"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
@@ -313,7 +314,7 @@ func TestBillingSandboxBootSeparatesDataSessionsAndPrefixedAdmin(t *testing.T) {
 		}
 	})
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	primary, err := buildApplication(ctx, cfg, log, &workers)
+	primary, err := buildApplication(ctx, cfg, log, alerts.New(alerts.Config{}, nil), &workers)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -328,7 +329,7 @@ func TestBillingSandboxBootSeparatesDataSessionsAndPrefixedAdmin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sandbox, err := buildApplication(ctx, sandboxCfg, log, &workers)
+	sandbox, err := buildApplication(ctx, sandboxCfg, log, alerts.New(alerts.Config{}, nil), &workers)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -443,11 +444,11 @@ func TestBuildApplicationFailureCanBeRetriedAndWorkersStop(t *testing.T) {
 	var workers sync.WaitGroup
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	// Missing schema fails before any background worker starts; the owned DB must close.
-	if app, err := buildApplication(ctx, cfg, log, &workers); err == nil || app != nil {
+	if app, err := buildApplication(ctx, cfg, log, alerts.New(alerts.Config{}, nil), &workers); err == nil || app != nil {
 		t.Fatal("startup accepted missing schema")
 	}
 	cfg.Database.MigrateOnStart = true
-	app, err := buildApplication(ctx, cfg, log, &workers)
+	app, err := buildApplication(ctx, cfg, log, alerts.New(alerts.Config{}, nil), &workers)
 	if err != nil {
 		t.Fatalf("startup retry: %v", err)
 	}

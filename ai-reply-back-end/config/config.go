@@ -10,6 +10,7 @@ import (
 	"net/mail"
 	"net/url"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -36,6 +37,7 @@ type Config struct {
 	BillingSandboxWebTopupOfferEnabled bool
 	Limits                             Limits
 	Log                                Log
+	Telegram                           Telegram
 	Push                               Push
 	Legal                              Legal
 	Retention                          Retention
@@ -273,6 +275,33 @@ type Log struct {
 	Format string // json | text
 }
 
+// Telegram — өндірістік ескертулер (internal/alerts): панинка, төлем, дерекқор,
+// провайдер қателері бір чатқа. Токен тек осы жерде; журналға да, ескертуге де шықпайды.
+type Telegram struct {
+	Enabled  bool
+	BotToken string
+	ChatID   string
+}
+
+var (
+	telegramTokenPattern = regexp.MustCompile(`^\d{6,}:[A-Za-z0-9_-]{30,}$`)
+	telegramChatPattern  = regexp.MustCompile(`^(-?\d{1,20}|@[A-Za-z0-9_]{5,32})$`)
+)
+
+func (t Telegram) validate() []string {
+	if !t.Enabled {
+		return nil
+	}
+	var problems []string
+	if !telegramTokenPattern.MatchString(t.BotToken) {
+		problems = append(problems, "TELEGRAM_BOT_TOKEN must be the token issued by @BotFather (digits, a colon, then the secret) while TELEGRAM_ALERTS_ENABLED=true")
+	}
+	if !telegramChatPattern.MatchString(t.ChatID) {
+		problems = append(problems, "TELEGRAM_CHAT_ID must be a numeric chat id (groups are negative, channels start with -100) or a public @channel while TELEGRAM_ALERTS_ENABLED=true")
+	}
+	return problems
+}
+
 // Push — FCM арқылы хабарлама жіберу (Android те, iOS та) және хабарлама хаттары.
 //
 // Provider credentials exist only here, read from the environment; the apps
@@ -481,6 +510,11 @@ func Load(envFile string) (Config, error) {
 			IAPPerMinute:        num("RATE_IAP_PER_MINUTE", 20),
 		},
 		Log:  Log{Level: str("LOG_LEVEL", "info"), Format: str("LOG_FORMAT", "json")},
+		Telegram: Telegram{
+			Enabled:  boolean("TELEGRAM_ALERTS_ENABLED", false),
+			BotToken: str("TELEGRAM_BOT_TOKEN", ""),
+			ChatID:   str("TELEGRAM_CHAT_ID", ""),
+		},
 		Push: pushFromEnv(),
 		Legal: Legal{
 			OperatorName:    str("LEGAL_OPERATOR_NAME", ""),
@@ -551,6 +585,7 @@ func (c Config) Validate() []string {
 		problems = append(problems, "AUTH_SIGNING_SECRET must differ from JWT_ACCESS_SECRET and JWT_REFRESH_SECRET")
 	}
 	problems = append(problems, c.placeholders()...)
+	problems = append(problems, c.Telegram.validate()...)
 	// Демо OTP (тұрақты код, жалған SMS) тек жергілікті әзірлеу мен тестте:
 	// staging те нақты адамдар кіретін сервер.
 	if c.Auth.DemoMode && !c.App.AllowsDemo() {
@@ -703,6 +738,9 @@ func (c Config) Warnings() []string {
 				"so Sign in with Apple from the app will be refused", id))
 		}
 	}
+	if !c.Telegram.Enabled && (c.Telegram.BotToken != "" || c.Telegram.ChatID != "") {
+		warnings = append(warnings, "TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is set but TELEGRAM_ALERTS_ENABLED=false: no alerts are sent")
+	}
 	return warnings
 }
 
@@ -759,6 +797,7 @@ func (c Config) placeholders() []string {
 		{"AUTH_SIGNING_SECRET", c.Auth.LegacySecret, c.Auth.LegacyEnabled},
 		{"ADMIN_PASSWORD", c.Admin.BootstrapPassword, c.Admin.BootstrapEmail != ""},
 		{"RESEND_API_KEY", c.Email.ResendAPIKey, true},
+		{"TELEGRAM_BOT_TOKEN", c.Telegram.BotToken, c.Telegram.Enabled},
 	} {
 		upper := strings.ToUpper(s.value)
 		if s.used && (strings.Contains(upper, "REPLACE") || strings.Contains(upper, "CHANGE_ME")) {

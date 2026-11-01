@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"sync"
 	"syscall"
 	"time"
@@ -17,6 +18,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/config"
 	"github.com/aireply/ai-reply-back-end/internal/admin"
 	"github.com/aireply/ai-reply-back-end/internal/ai"
+	"github.com/aireply/ai-reply-back-end/internal/alerts"
 	"github.com/aireply/ai-reply-back-end/internal/auth"
 	"github.com/aireply/ai-reply-back-end/internal/auth/appleid"
 	"github.com/aireply/ai-reply-back-end/internal/auth/idtoken"
@@ -54,6 +56,7 @@ func main() {
 	envFile := flag.String("env", ".env", "path to the env file")
 	check := flag.Bool("check", false, "validate the configuration, print its warnings and exit (opens nothing)")
 	queueOffer := flag.String("queue-sandbox-web-offer", "", "queue the standard website offer for one eligible existing sandbox user and exit")
+	alertTest := flag.Bool("alert-test", false, "send one test alert to the configured Telegram chat and exit")
 	flag.Parse()
 	queueRequested := false
 	flag.Visit(func(f *flag.Flag) {
@@ -61,20 +64,56 @@ func main() {
 			queueRequested = true
 		}
 	})
-	if flag.NArg() != 0 || *check && queueRequested {
-		fmt.Fprintln(os.Stderr, "choose either -check or -queue-sandbox-web-offer USER_ID, without positional arguments")
+	modes := 0
+	for _, on := range []bool{*check, queueRequested, *alertTest} {
+		if on {
+			modes++
+		}
+	}
+	if flag.NArg() != 0 || modes > 1 {
+		fmt.Fprintln(os.Stderr, "choose one of -check, -alert-test or -queue-sandbox-web-offer USER_ID, without positional arguments")
 		os.Exit(2)
 	}
 	if queueRequested {
 		os.Exit(queueSandboxWebOfferCommand(*envFile, *queueOffer))
+	}
+	if *alertTest {
+		os.Exit(alertTestCommand(*envFile))
 	}
 
 	if *check {
 		os.Exit(checkConfig(*envFile))
 	}
 	if err := run(*envFile); err != nil {
+		// The process is about to exit: one synchronous CRITICAL message, if Telegram is configured.
+		alerts.Emergency("server exited with an error", err, os.Getenv("APP_ENV"))
 		fmt.Fprintf(os.Stderr, "\nstartup failed:\n%v\n\nSee .env.example for the required configuration.\n", err)
 		os.Exit(1)
+	}
+}
+
+// alertTestCommand — Telegram баптауын тексеру: бір WARNING хабарлама синхронды жіберіледі.
+func alertTestCommand(envFile string) int {
+	cfg, err := config.Load(envFile)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "configuration check failed:\n%v\n", err)
+		return 1
+	}
+	notifier := alerts.New(telegramConfig(cfg), logging.New(cfg.Log.Level, "text"))
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	if err := notifier.SendNow(ctx, alerts.Warning, "test alert", "source", "server -alert-test", "env", cfg.App.Env); err != nil {
+		fmt.Fprintf(os.Stderr, "test alert failed: %v\n", err)
+		return 1
+	}
+	fmt.Println("test alert delivered to Telegram")
+	return 0
+}
+
+func telegramConfig(cfg config.Config) alerts.Config {
+	return alerts.Config{
+		Enabled: cfg.Telegram.Enabled, BotToken: cfg.Telegram.BotToken, ChatID: cfg.Telegram.ChatID,
+		Service: "ai-reply", Environment: cfg.App.Env,
 	}
 }
 
@@ -104,6 +143,7 @@ func checkConfig(envFile string) int {
 	fmt.Printf("in-app purchases: app_store=%v (bundle %s, sandbox %v) google_play=%v (package %s, test %v)\n",
 		cfg.IAP.Apple(), cfg.IAP.AppleBundleID, cfg.IAP.AppleAcceptSandbox, cfg.IAP.Google(), cfg.IAP.GooglePackageName,
 		cfg.IAP.GoogleAcceptTest)
+	fmt.Printf("telegram alerts: %v\n", cfg.Telegram.Enabled)
 	return 0
 }
 
@@ -112,21 +152,35 @@ func run(envFile string) error {
 	if err != nil {
 		return err
 	}
-	log := logging.New(cfg.Log.Level, cfg.Log.Format)
+	// Telegram alerts: every ERROR-level record and every panic of the wrapped
+	// logger becomes a message; the notifier itself logs through the plain one.
+	base := logging.New(cfg.Log.Level, cfg.Log.Format)
+	notifier := alerts.New(telegramConfig(cfg), base)
+	log := slog.New(notifier.Handler(base.Handler()))
 	for _, warning := range cfg.Warnings() {
 		log.Warn("configuration warning: " + warning)
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	var workers sync.WaitGroup
 	var applications []*application
+	// The notifier outlives the workers so that errors raised while they stop are still delivered.
+	alertCtx, stopAlerts := context.WithCancel(context.Background())
+	var alertWorker sync.WaitGroup
+	alertWorker.Add(1)
+	go func() {
+		defer alertWorker.Done()
+		notifier.Run(alertCtx)
+	}()
 	defer func() {
 		stop()
 		workers.Wait()
 		for i := len(applications) - 1; i >= 0; i-- {
 			applications[i].close()
 		}
+		stopAlerts()
+		alertWorker.Wait()
 	}()
-	primary, err := buildApplication(ctx, cfg, log, &workers)
+	primary, err := buildApplication(ctx, cfg, log, notifier, &workers)
 	if err != nil {
 		return err
 	}
@@ -136,7 +190,8 @@ func run(envFile string) error {
 		if err != nil {
 			return err
 		}
-		sandbox, err := buildApplication(ctx, sandboxConfig, log, &workers)
+		// The sandbox shares the process and the alert channel; its records carry app=sandbox.
+		sandbox, err := buildApplication(ctx, sandboxConfig, log.With("app", "sandbox"), alerts.New(alerts.Config{}, base), &workers)
 		if err != nil {
 			return fmt.Errorf("initialize isolated billing sandbox: %w", err)
 		}
@@ -156,6 +211,7 @@ func run(envFile string) error {
 	errCh := make(chan error, 1)
 	go func() {
 		log.Info("server listening", "addr", server.Addr, "env", cfg.App.Env, "timezone", cfg.App.Timezone)
+		notifier.Notify(alerts.Recovered, "server started", "env", cfg.App.Env, "addr", server.Addr)
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}
@@ -165,6 +221,7 @@ func run(envFile string) error {
 		return err
 	case <-ctx.Done():
 		log.Info("shutting down")
+		notifier.Notify(alerts.Warning, "server shutting down", "env", cfg.App.Env, "reason", "signal")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 		return server.Shutdown(shutdownCtx)
@@ -184,7 +241,8 @@ func (a *application) close() {
 }
 
 // Each application owns its database, authentication keys, billing state and workers.
-func buildApplication(ctx context.Context, cfg config.Config, log *slog.Logger, workers *sync.WaitGroup) (_ *application, err error) {
+// notifier drives the periodic health checks (database, disk); a disabled one adds none.
+func buildApplication(ctx context.Context, cfg config.Config, log *slog.Logger, notifier *alerts.Notifier, workers *sync.WaitGroup) (_ *application, err error) {
 	instance := &application{}
 	defer func() {
 		if err != nil {
@@ -226,6 +284,7 @@ func buildApplication(ctx context.Context, cfg config.Config, log *slog.Logger, 
 	if err != nil {
 		return nil, fmt.Errorf("initialize BCC checkout: %w", err)
 	}
+	bccCheckout.WithLogger(log)
 	planSvc := plans.New(store)
 	subSvc := subscriptions.New(store, planSvc, cfg.App.Location())
 	userSvc := users.New(store).WithLogger(log)
@@ -356,7 +415,7 @@ func buildApplication(ctx context.Context, cfg config.Config, log *slog.Logger, 
 		middleware.CORS(cfg.App.CORSOrigins),
 	)
 
-	for _, worker := range []func(context.Context){
+	backgroundWorkers := []func(context.Context){
 		func(ctx context.Context) { bccCheckout.Run(ctx, log) },
 		func(ctx context.Context) { expireSubscriptions(ctx, subSvc, notifyEvents, creditSvc, log) },
 		func(ctx context.Context) { sweepReminders(ctx, notifyEvents) },
@@ -366,16 +425,56 @@ func buildApplication(ctx context.Context, cfg config.Config, log *slog.Logger, 
 		iapSvc.Run,
 		// Spent codes, dead sessions, abandoned installations, old metadata (RETENTION_*).
 		retention.New(store, cfg.Retention, log).Run,
-	} {
+	}
+	if notifier.Enabled() {
+		// Downtime and recovery, where the process itself can see it: the database
+		// stops answering, or the disk under it runs out (SQLite then fails every write).
+		backgroundWorkers = append(backgroundWorkers, func(ctx context.Context) {
+			notifier.Watch(ctx, time.Minute,
+				alerts.Check{Name: "database", Severity: alerts.Critical, Run: func(ctx context.Context) error {
+					return db.Reader().PingContext(ctx)
+				}},
+				alerts.Check{Name: "disk space below 2 GiB", Severity: alerts.Warning, Run: alerts.DiskSpace(cfg.Database.Path, 2<<30)},
+				alerts.Check{Name: "disk space below 500 MiB", Severity: alerts.Critical, Run: alerts.DiskSpace(cfg.Database.Path, 500<<20)},
+			)
+		})
+	}
+	for _, worker := range backgroundWorkers {
 		workers.Add(1)
 		go func(run func(context.Context)) {
 			defer workers.Done()
-			run(ctx)
+			runWorker(ctx, log, run)
 		}(worker)
 	}
 
 	instance.mux, instance.handler = mux, handler
 	return instance, nil
+}
+
+// runWorker — фон тапсырмасы панинкадан бүкіл процесті құлатпайды: CRITICAL журнал мен
+// ескерту (стек тек журналда), 10 секундтан кейін сол тапсырма қайта іске қосылады.
+//
+// Every worker loops until ctx is done, so a normal return means shutdown.
+func runWorker(ctx context.Context, log *slog.Logger, run func(context.Context)) {
+	for ctx.Err() == nil {
+		func() {
+			defer func() {
+				if rec := recover(); rec != nil {
+					log.LogAttrs(ctx, logging.LevelCritical, "background worker panicked",
+						slog.String("panic", fmt.Sprint(rec)), slog.String("stack", string(debug.Stack())))
+				}
+			}()
+			run(ctx)
+		}()
+		if ctx.Err() != nil {
+			return
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(10 * time.Second):
+		}
+	}
 }
 
 // newMailer — Resend жіберушісі (бапталмаса nil): кіру кодтары да, хабарлама хаттары да осы арқылы.

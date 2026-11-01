@@ -2,9 +2,12 @@
 package middleware
 
 import (
+	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"regexp"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -87,8 +90,13 @@ func Recover(log *slog.Logger) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			defer func() {
 				if rec := recover(); rec != nil {
-					logging.FromContext(r.Context(), log).Error("panic recovered",
-						"path", r.URL.Path, "panic", rec)
+					if err, ok := rec.(error); ok && errors.Is(err, http.ErrAbortHandler) {
+						panic(rec) // the client went away mid-response: net/http handles this one quietly
+					}
+					// CRITICAL in the log and in Telegram; the stack stays in the log only.
+					logging.FromContext(r.Context(), log).LogAttrs(r.Context(), logging.LevelCritical, "panic recovered",
+						slog.String("method", r.Method), slog.String("path", r.URL.Path),
+						slog.String("panic", fmt.Sprint(rec)), slog.String("stack", string(debug.Stack())))
 					httpx.Error(w, http.StatusInternalServerError, httpx.CodeInternal, "Something went wrong.", nil)
 				}
 			}()
