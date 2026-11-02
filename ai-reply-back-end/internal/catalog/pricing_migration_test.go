@@ -16,9 +16,9 @@ import (
 	"github.com/aireply/ai-reply-back-end/migrations"
 )
 
-func assertUnifiedProducts(t *testing.T, products []Product) {
+func assertUnifiedProducts(t *testing.T, products []Product, annualProPrice int64) {
 	t.Helper()
-	prices := map[string]int64{"free": 0, "base_monthly": 79000, "base_yearly": 790000, "pro_monthly": 345000, "pro_yearly": 3450000, "pack30": 13000}
+	prices := map[string]int64{"free": 0, "base_monthly": 79000, "base_yearly": 790000, "pro_monthly": 345000, "pro_yearly": annualProPrice, "pack30": 13000}
 	if len(products) != len(prices) {
 		t.Fatalf("products: %+v", products)
 	}
@@ -52,7 +52,7 @@ func TestUnifiedPricesOnFreshInstall(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertUnifiedProducts(t, version.Products)
+	assertUnifiedProducts(t, version.Products, 3490000)
 	for _, product := range version.Products {
 		if product.Kind == "welcome" {
 			continue
@@ -124,7 +124,7 @@ func TestUnifiedPricesUpgradePreservesHistoryAndSoldPurchases(t *testing.T) {
 	orderSnapshot, _ := json.Marshal(oldProducts[1])
 	exec(`INSERT INTO billing_orders(id,user_id,idempotency_key,catalog_version,product_code,snapshot_json,amount_minor,currency,provider,environment,bank_order,status,checkout_token_hash,request_json,created_at,updated_at) VALUES('pending','existing','original',1,'base_monthly',?,59900,'KZT','bcc','sandbox','original-bank-order','pending','token-hash','{}',1000,1000)`, string(orderSnapshot))
 	exec(`INSERT INTO bcc_subscriptions(id,user_id,environment,root_order_id,plan_id,snapshot_json,amount_minor,period_days,status,mandate_expires_at,merch_rn_id,created_at,updated_at) SELECT 'old-contract','existing','sandbox','pending',id,?,59900,30,'active',9999999999999,'original-mandate',1000,1000 FROM plans WHERE code='base_monthly'`, string(orderSnapshot))
-	if applied, err := database.Migrate(ctx, db, migrations.FS); err != nil || len(applied) != 1 || applied[0] != "0029_unified_pricing.sql" {
+	if applied, err := database.Migrate(ctx, db, catalogMigrationsBefore(t, "0030")); err != nil || len(applied) != 1 || applied[0] != "0029_unified_pricing.sql" {
 		t.Fatalf("upgrade: %v %v", applied, err)
 	}
 	s := New(db)
@@ -132,7 +132,7 @@ func TestUnifiedPricesUpgradePreservesHistoryAndSoldPurchases(t *testing.T) {
 	if err != nil || current.BaseVersion != 1 || current.ID == 1 {
 		t.Fatalf("new version: %+v %v", current, err)
 	}
-	assertUnifiedProducts(t, current.Products)
+	assertUnifiedProducts(t, current.Products, 3450000)
 	if current.Products[2].AvailableWeb || current.Products[1].AppleProductID != "test.base_monthly" {
 		t.Fatal("store mapping or availability changed")
 	}
@@ -173,7 +173,7 @@ func TestUnifiedPricesUpgradePreservesHistoryAndSoldPurchases(t *testing.T) {
 	if _, err := s.SaveDraft(ctx, "owner", 0, current.Products); err != nil {
 		t.Fatalf("new draft blocked after migration: %v", err)
 	}
-	if applied, err := database.Migrate(ctx, db, migrations.FS); err != nil || len(applied) != 0 {
+	if applied, err := database.Migrate(ctx, db, catalogMigrationsBefore(t, "0030")); err != nil || len(applied) != 0 {
 		t.Fatalf("rerun: %v %v", applied, err)
 	}
 }
@@ -222,7 +222,7 @@ func TestUnifiedPricesCustomizedPackKeepsDelayedStoreFulfillment(t *testing.T) {
 				exec(`INSERT INTO users(id,email,status,kind,created_at,updated_at) VALUES('buyer','buyer@example.test','active','account',1000,1000)`)
 				exec(`INSERT INTO iap_purchases(id,user_id,provider,environment,store_product_id,product_code,transaction_id,units,status,created_at,updated_at) VALUES('delayed','buyer',?,'Production','test.legacy60','pack30','legacy-tx',60,'pending',1000,1000)`, provider)
 			}
-			if _, err := database.Migrate(ctx, db, migrations.FS); err != nil {
+			if _, err := database.Migrate(ctx, db, catalogMigrationsBefore(t, "0030")); err != nil {
 				t.Fatal(err)
 			}
 			var units, active int
@@ -235,7 +235,7 @@ func TestUnifiedPricesCustomizedPackKeepsDelayedStoreFulfillment(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			assertUnifiedProducts(t, current.Products)
+			assertUnifiedProducts(t, current.Products, 3450000)
 			if provider == "unmapped" {
 				return
 			}
