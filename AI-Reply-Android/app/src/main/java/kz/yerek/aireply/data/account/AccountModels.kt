@@ -142,6 +142,8 @@ data class SubscriptionDto(
 @Serializable
 data class UsageDto(
     @SerialName("daily_limit") val dailyLimit: Int = 0,
+    /** Pro: no daily count at all (daily_limit and remaining_today are 0 then). */
+    val unlimited: Boolean = false,
     @SerialName("used_today") val usedToday: Int = 0,
     @SerialName("remaining_today") val remainingToday: Int = 0,
     @SerialName("monthly_limit") val monthlyLimit: Int = 0,

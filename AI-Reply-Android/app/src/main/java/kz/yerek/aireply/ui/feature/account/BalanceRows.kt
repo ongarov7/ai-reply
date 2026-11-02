@@ -34,7 +34,11 @@ import java.time.format.DateTimeFormatter
 fun BalanceRows(summary: BalanceSummary, modifier: Modifier = Modifier) {
     val locale = LocalServices.current.settings.effectiveAppLanguage.locale
     Column(modifier = modifier.fillMaxWidth()) {
-        BalanceRow(stringResource(R.string.balance_today), summary.availableNow.toString(), isTotal = true)
+        BalanceRow(
+            stringResource(R.string.balance_today),
+            if (summary.unlimited) stringResource(R.string.balance_unlimited) else summary.availableNow.toString(),
+            isTotal = true
+        )
         summary.welcome?.let { welcome ->
             RowDivider()
             BalanceRow(

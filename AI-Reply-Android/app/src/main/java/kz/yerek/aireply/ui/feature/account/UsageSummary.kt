@@ -33,7 +33,8 @@ data class UsageSummary(val remaining: Int, val limit: Int, val period: Period) 
                 Period.MONTH
             )
             // The server has not answered yet: the last known daily numbers.
-            usage == UsageDto.UNKNOWN && cached != null && cached.isKnown ->
+            // A cached limit of 0 would draw a 0/0 progress bar (NaN), which crashes with TalkBack on.
+            usage == UsageDto.UNKNOWN && cached != null && cached.isKnown && cached.dailyLimit > 0 ->
                 UsageSummary(cached.remainingToday.coerceAtLeast(0), cached.dailyLimit, Period.DAY)
             else -> null
         }

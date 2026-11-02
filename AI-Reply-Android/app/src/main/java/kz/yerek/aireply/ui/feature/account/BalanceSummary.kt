@@ -27,7 +27,9 @@ data class BalanceSummary(
     /** Administrator grants and purchased packs; a row while some are left. */
     val purchased: Int?,
     /** A running pass; a row until it ends. */
-    val pass: Pass?
+    val pass: Pass?,
+    /** An unlimited plan (Pro): no count to show, whatever availableNow says. */
+    val unlimited: Boolean = false
 ) {
     data class Part(val remaining: Int, val total: Int)
 
@@ -58,7 +60,8 @@ data class BalanceSummary(
                 availableNow = total.coerceAtLeast(0),
                 welcome = welcome,
                 purchased = usage.credits?.takeIf { it > 0 },
-                pass = pass
+                pass = pass,
+                unlimited = usage.unlimited
             )
         }
 

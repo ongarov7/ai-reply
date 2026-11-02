@@ -116,7 +116,7 @@ fun SubscriptionScreen(onBack: () -> Unit, onBuy: () -> Unit = {}) {
                     }
                 }
 
-                if (summary != null) {
+                if (summary != null && summary.limit > 0) {
                     LinearProgressIndicator(
                         progress = { summary.used.toFloat() / summary.limit },
                         modifier = Modifier

@@ -10,6 +10,7 @@
     <string name="balance_title">Replies</string>
     <string name="balance_welcome_title">Free replies: %1$d of %2$d</string>
     <string name="balance_today">Available today</string>
+    <string name="balance_unlimited">Unlimited</string>
     <string name="balance_welcome">Welcome bonus</string>
     <string name="balance_welcome_value">%1$d of %2$d</string>
     <string name="balance_purchased">Purchased replies</string>

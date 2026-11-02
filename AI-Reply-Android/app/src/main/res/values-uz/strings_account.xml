@@ -5,6 +5,7 @@
     <string name="balance_title">Javoblar</string>
     <string name="balance_welcome_title">Bepul javoblar: %2$d tadan %1$d ta</string>
     <string name="balance_today">Bugun mavjud</string>
+    <string name="balance_unlimited">Cheksiz</string>
     <string name="balance_welcome">Xush kelibsiz bonusi</string>
     <string name="balance_welcome_value">%2$d tadan %1$d ta</string>
     <string name="balance_purchased">Sotib olingan javoblar</string>

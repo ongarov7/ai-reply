@@ -187,4 +187,19 @@ class BalanceTest {
         assertNull("an older server's answer has no total", cache.current().remainingTotal)
         assertFalse(BalanceSummary.of(UsageDto.UNKNOWN, cache.current(), now).hasBalance)
     }
+
+    @Test
+    fun `an unlimited plan is shown as unlimited, never as 0 available`() {
+        val usage = kz.yerek.aireply.data.account.UsageDto(dailyLimit = 0, unlimited = true, remainingToday = 0,
+            resetsAt = "2026-11-02T19:00:00Z", remainingTotal = 0)
+        val summary = kz.yerek.aireply.ui.feature.account.BalanceSummary.of(usage)
+        org.junit.Assert.assertTrue(summary.unlimited)
+        org.junit.Assert.assertTrue(summary.hasBalance)
+    }
+
+    @Test
+    fun `a cached zero daily limit gives no plan count, so no 0 of 0 progress bar`() {
+        val cached = kz.yerek.aireply.data.account.AccountUsageCache.Snapshot(dailyLimit = 0, usedToday = 0, remainingToday = 0, planCode = "free", remainingTotal = 5)
+        org.junit.Assert.assertNull(kz.yerek.aireply.ui.feature.account.UsageSummary.of(kz.yerek.aireply.data.account.UsageDto.UNKNOWN, cached))
+    }
 }
