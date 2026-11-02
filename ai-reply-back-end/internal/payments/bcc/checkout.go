@@ -380,6 +380,13 @@ func (s *CheckoutService) Status(ctx context.Context, user, id string) (BankOrde
 			o = s.redirect(o)
 		}
 	}
+	// A checkout the person walked away from is shown as expired, so the page
+	// lets them buy again. The row keeps its status: a late authenticated
+	// success still grants what was paid for.
+	if (o.Status == "created" || o.Status == "pending" || o.Status == "verification_pending") &&
+		s.now().Sub(time.UnixMilli(o.createdAt)) > abandonedFirstPayment && isFirstPayment(o) {
+		o.Status, o.VerificationReason, o.RedirectURL = "expired", "checkout_abandoned", ""
+	}
 	return o, nil
 }
 
@@ -616,6 +623,10 @@ func (s *CheckoutService) Notify(w http.ResponseWriter, r *http.Request) {
 	// A recurring callback must describe the exact registered operation. A
 	// different chain or a first-payment echo cannot fulfill a renewal order.
 	for _, key := range []string{"MERCH_TRAN_STATE", "RECUR_FREQ", "RECUR_EXP", "RECUR_REF"} {
+		// A refund callback may leave out the chain fields we sent; when present they must match.
+		if kind == "14" && fields.Get(key) == "" {
+			continue
+		}
 		if fields.Get(key) != original.Get(key) {
 			s.reject(w, r, http.StatusBadRequest, "Notification mandate mismatch", "order_id", o.ID, "trtype", kind)
 			return
@@ -666,6 +677,12 @@ func (s *CheckoutService) Notify(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	_, _ = io.WriteString(w, "OK\n")
+}
+
+// isFirstPayment — a checkout the person started (TRTYPE=1), not a renewal charge.
+func isFirstPayment(o BankOrder) bool {
+	var request url.Values
+	return json.Unmarshal([]byte(o.request), &request) == nil && request.Get("TRTYPE") == "1"
 }
 
 func bankReference(value string) bool {

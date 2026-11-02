@@ -118,7 +118,14 @@ func (s *CheckoutService) Refund(ctx context.Context, adminID, id string) (BankO
 		s.log.Error("BCC refund outcome unknown", "order_id", order.ID, "environment", string(s.Environment()), "error", requestErr.Error())
 		return order, nil
 	}
-	if (response.Action == "2" || response.Action == "3") && response.RC != "" && response.RC != "00" && response.Order == order.bankOrder {
+	if response.Action == "3" {
+		// A processing fault or "in progress": the refund may still complete, so
+		// it stays pending and is never sent again; the bank cabinet decides.
+		s.log.Error("BCC refund outcome unknown", "order_id", order.ID, "action", response.Action, "rc", response.RC,
+			"environment", string(s.Environment()))
+		return order, nil
+	}
+	if response.Action == "2" && response.RC != "" && response.RC != "00" && response.Order == order.bankOrder && response.Terminal == s.cfg.Terminal {
 		// An explicit refusal: no money moved, the admin may send the refund again.
 		now := s.now().UnixMilli()
 		if _, err = s.db.Writer().ExecContext(context.WithoutCancel(ctx), `UPDATE billing_bank_operations SET status='needs_review',updated_at=? WHERE order_id=? AND kind='refund' AND status='pending'`, now, order.ID); err != nil {

@@ -236,7 +236,7 @@ func TestSubscriptionRefundCarriesRecurRefAndCanBeSentAgainAfterARefusal(t *test
 	root := paidSubscription(t, s, &now)
 	ctx := context.Background()
 	var sent []url.Values
-	bankAnswer(t, s, "3", "-1", &sent)
+	bankAnswer(t, s, "2", "05", &sent)
 	refused, err := s.Refund(ctx, "fixture-admin", root.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -332,5 +332,99 @@ func TestBrowserReturnByGetIsNavigationOnly(t *testing.T) {
 	s.Return(w, bad)
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("forged GET return: %d", w.Code)
+	}
+}
+
+func TestRefundInProgressOrFaultIsNeverResent(t *testing.T) {
+	s, _ := testCheckout(t)
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	root := paidSubscription(t, s, &now)
+	var sent []url.Values
+	bankAnswer(t, s, "3", "-31", &sent)
+	for i := 0; i < 2; i++ {
+		order, err := s.Refund(context.Background(), "fixture-admin", root.ID)
+		if err != nil || order.RefundStatus != "pending" {
+			t.Fatalf("ACTION=3 refund: %+v %v", order, err)
+		}
+	}
+	if len(sent) != 1 {
+		t.Fatalf("a refund that may still complete was sent %d times", len(sent))
+	}
+}
+
+func TestRefundCallbackWithoutTheChainFieldsIsRecorded(t *testing.T) {
+	s, _ := testCheckout(t)
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	root := paidSubscription(t, s, &now)
+	s.client.http = &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		return nil, errors.New("timeout")
+	})}
+	if _, err := s.Refund(context.Background(), "fixture-admin", root.ID); err != nil {
+		t.Fatal(err)
+	}
+	request, err := s.refundRequest(context.Background(), root.ID)
+	if err != nil || request.Get("RECUR_REF") == "" {
+		t.Fatalf("refund request: %v %v", request, err)
+	}
+	callback := url.Values{}
+	for key, values := range request {
+		if key != "RECUR_REF" && key != "P_SIGN" {
+			callback[key] = values
+		}
+	}
+	callback.Set("ACTION", "0")
+	callback.Set("RC", "00")
+	callback.Set("RRN", "323456789012")
+	callback.Set("INT_REF", "ABCDEF0123456780")
+	if w := notifyRequest(s, callback, true); w.Code != http.StatusOK {
+		t.Fatalf("refund callback without RECUR_REF: %d %s", w.Code, w.Body.String())
+	}
+	if orderStatus(t, s, root.ID) != "refunded" {
+		t.Fatal("the refund callback was not recorded")
+	}
+}
+
+func TestApprovedFirstPaymentAfterADeclineRenewsAgain(t *testing.T) {
+	s, _ := testCheckout(t)
+	s.cfg.RecurringEnabled = true
+	first, err := s.StartExpected(context.Background(), "bank-user", "base_monthly", "decline-then-approve-sub", subscriptionQuote(t, s, "base_monthly"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	declined := originalFields(t, s, first.ID)
+	declined.Set("ACTION", "2")
+	declined.Set("RC", "51")
+	if w := notifyRequest(s, declined, true); w.Code != http.StatusOK {
+		t.Fatal(w.Body.String())
+	}
+	if w := notifyRequest(s, originalFields(t, s, first.ID), true); w.Code != http.StatusOK {
+		t.Fatal(w.Body.String())
+	}
+	if got := mandateStatus(t, s, first.ID); got != "active" {
+		t.Fatalf("a paid subscription with recurring consent does not renew: %s", got)
+	}
+}
+
+func TestAnAbandonedCheckoutReadsAsExpiredSoThePageLetsThePersonBuyAgain(t *testing.T) {
+	s, _ := testCheckout(t)
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	s.now = func() time.Time { return now }
+	o, err := s.Start(context.Background(), "bank-user", "pack30", "walked-away")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status, _ := s.Status(context.Background(), "bank-user", o.ID); status.Status != "created" {
+		t.Fatalf("fresh checkout: %s", status.Status)
+	}
+	now = now.Add(abandonedFirstPayment + time.Minute)
+	status, err := s.Status(context.Background(), "bank-user", o.ID)
+	if err != nil || status.Status != "expired" || status.VerificationReason != "checkout_abandoned" || status.RedirectURL != "" {
+		t.Fatalf("abandoned checkout: %+v %v", status, err)
+	}
+	if orderStatus(t, s, o.ID) != "created" {
+		t.Fatal("the stored order must keep its status for a late confirmation")
+	}
+	if w := notifyRequest(s, originalFields(t, s, o.ID), true); w.Code != http.StatusOK || bankBalance(t, s) != 30 {
+		t.Fatal("a late confirmation of an abandoned checkout did not grant")
 	}
 }

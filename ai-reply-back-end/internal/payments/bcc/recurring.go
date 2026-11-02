@@ -333,6 +333,19 @@ func (s *CheckoutService) fulfillSubscriptionTx(ctx context.Context, tx *sql.Tx,
 	if status == "pending" {
 		status = "active"
 	}
+	// A first payment approved after it was recorded as declined or abandoned:
+	// the mandate was closed only for that reason, so it renews again, unless
+	// the person has meanwhile started another renewing subscription.
+	if status == "expired" && root == order.ID && !paid.Valid {
+		var others int
+		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM bcc_subscriptions o JOIN bcc_subscriptions cur ON cur.id=?
+ WHERE o.user_id=cur.user_id AND o.environment=cur.environment AND o.id<>cur.id AND o.status IN ('pending','active','needs_review')`, id).Scan(&others); err != nil {
+			return err
+		}
+		if others == 0 {
+			status = "active"
+		}
+	}
 	var next any
 	if status == "active" {
 		next = end.UnixMilli()
