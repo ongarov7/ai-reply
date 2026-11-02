@@ -518,9 +518,12 @@ func (s *CheckoutService) Return(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Not found", http.StatusNotFound)
 		return
 	}
-	if _, err = parseNotification(w, r); err != nil {
-		http.Error(w, "Invalid return", http.StatusBadRequest)
-		return
+	// The bank may send the browser back with GET or POST; either is only navigation.
+	if r.Method == http.MethodPost {
+		if _, err = parseNotification(w, r); err != nil {
+			http.Error(w, "Invalid return", http.StatusBadRequest)
+			return
+		}
 	}
 	if err = s.recordEvent(r.Context(), o.ID, "browser_return", "verification_pending", map[string]string{"reason": "browser_return_is_not_payment_proof"}); err != nil {
 		http.Error(w, "Unavailable", http.StatusServiceUnavailable)

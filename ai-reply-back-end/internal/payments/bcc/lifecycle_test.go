@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
@@ -309,5 +310,27 @@ func TestResubscribingContinuesAfterTheCanceledPaidPeriod(t *testing.T) {
 	}
 	if start != paidUntil.UnixMilli() || end != paidUntil.Add(30*24*time.Hour).UnixMilli() {
 		t.Fatalf("new period %d..%d overlaps the paid one ending %d", start, end, paidUntil.UnixMilli())
+	}
+}
+
+func TestBrowserReturnByGetIsNavigationOnly(t *testing.T) {
+	s, _ := testCheckout(t)
+	o, err := s.Start(context.Background(), "bank-user", "pack30", "get-return")
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := httptest.NewRequest(http.MethodGet, "https://sandbox.example.test/api/v1/payments/bcc/orders/"+o.ID+"/return?state="+s.token(o.ID), nil)
+	r.SetPathValue("id", o.ID)
+	w := httptest.NewRecorder()
+	s.Return(w, r)
+	if w.Code != http.StatusSeeOther || w.Header().Get("Location") != "https://sandbox.example.test:443/payment?order="+o.ID || bankBalance(t, s) != 0 {
+		t.Fatalf("GET return: %d %q", w.Code, w.Header().Get("Location"))
+	}
+	bad := httptest.NewRequest(http.MethodGet, "https://sandbox.example.test/api/v1/payments/bcc/orders/"+o.ID+"/return?state=forged", nil)
+	bad.SetPathValue("id", o.ID)
+	w = httptest.NewRecorder()
+	s.Return(w, bad)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("forged GET return: %d", w.Code)
 	}
 }

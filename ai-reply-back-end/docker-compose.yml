@@ -33,6 +33,16 @@ services:
         bind:
           create_host_path: false
     restart: unless-stopped
+    # The server drains requests for up to 15 s and then stops its workers;
+    # Docker's default 10 s would kill it mid-reply on every deploy.
+    stop_grace_period: 30s
+    # One JSON line per request: without rotation the log fills the VPS disk
+    # and SQLite then fails every write.
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
 
 volumes:
   aireply-data:

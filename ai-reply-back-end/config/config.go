@@ -742,6 +742,11 @@ func (c Config) Warnings() []string {
 				"so Sign in with Apple from the app will be refused", id))
 		}
 	}
+	if c.App.IsProduction() && c.App.HTTPS() && !c.App.TrustProxy {
+		warnings = append(warnings, "TRUST_PROXY=false while PUBLIC_BASE_URL is https: behind the reverse proxy every "+
+			"client shares one address, so per-address limits (admin login, sign-in codes, token refresh) apply to "+
+			"everyone at once; set TRUST_PROXY=true when the backend is reachable only through the proxy")
+	}
 	if !c.Telegram.Enabled && (c.Telegram.BotToken != "" || c.Telegram.ChatID != "") {
 		warnings = append(warnings, "TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is set but TELEGRAM_ALERTS_ENABLED=false: no alerts are sent")
 	}

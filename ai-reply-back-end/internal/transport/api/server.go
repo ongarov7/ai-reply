@@ -133,6 +133,12 @@ func (s *Server) Register(mux *http.ServeMux) {
 		}
 		return httpx.ClientIP(r, s.cfg.App.TrustProxy)
 	}
+	// Every active app refreshes its token at least every 15 minutes and reads
+	// /config on launch, and carrier NAT puts thousands of phones behind one
+	// address: these get wide per-address buckets of their own. The refresh token
+	// itself gates /auth/refresh (reuse revokes the whole family).
+	refreshLimit := middleware.RateLimit(s.limiter, "auth_refresh", limits.GenericPerMinute*sharedAddressFactor, time.Minute, ip)
+	sharedAddress := middleware.RateLimit(s.limiter, "app_start", limits.GenericPerMinute*sharedAddressFactor, time.Minute, ip)
 	aiLimit := middleware.RateLimit(s.limiter, "ai", limits.AIPerMinute, time.Minute, perUser)
 	// Polish үзіліс сайын шақырылады: жеке шелек, генерация лимитін жемейді.
 	polishLimit := middleware.RateLimit(s.limiter, "polish", limits.PolishPerMinute, time.Minute, perUser)
@@ -152,7 +158,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	// Бұрынғы идентификатор ағыны: шыққан build-тер (телефон және пошта) үшін сақталған.
 	mux.Handle("POST /api/v1/auth/request-otp", otpRequest(http.HandlerFunc(s.handleRequestOTP)))
 	mux.Handle("POST /api/v1/auth/verify-otp", otpVerify(http.HandlerFunc(s.handleVerifyOTP)))
-	mux.Handle("POST /api/v1/auth/refresh", generic(http.HandlerFunc(s.handleRefresh)))
+	mux.Handle("POST /api/v1/auth/refresh", refreshLimit(http.HandlerFunc(s.handleRefresh)))
 	mux.Handle("POST /api/v1/auth/logout", generic(http.HandlerFunc(s.handleLogout)))
 
 	// --- профиль және қолданыс
@@ -180,8 +186,8 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /api/v1/me/email/otp/verify", s.requireUser(otpVerify(http.HandlerFunc(s.handleLinkEmailVerify))))
 
 	// --- каталог
-	mux.Handle("GET /api/v1/plans", generic(http.HandlerFunc(s.handlePlans)))
-	mux.Handle("GET /api/v1/config", generic(http.HandlerFunc(s.handleConfig)))
+	mux.Handle("GET /api/v1/plans", sharedAddress(http.HandlerFunc(s.handlePlans)))
+	mux.Handle("GET /api/v1/config", sharedAddress(http.HandlerFunc(s.handleConfig)))
 
 	// --- құрылғылар (ескі build-тер) және орнатулар (push, метадерек)
 	mux.Handle("POST /api/v1/devices", s.requireUser(http.HandlerFunc(s.handleRegisterDevice)))

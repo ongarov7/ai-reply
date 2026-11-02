@@ -801,6 +801,10 @@ func TestStartupWarnings(t *testing.T) {
 		t.Fatalf("apple without revocation: %q", w)
 	}
 
+	if w := strings.Join(cfg.Warnings(), "\n"); !strings.Contains(w, "TRUST_PROXY=false while PUBLIC_BASE_URL is https") {
+		t.Fatalf("production behind https without TRUST_PROXY: %q", w)
+	}
+	t.Setenv("TRUST_PROXY", "true")
 	t.Setenv("APPLE_TEAM_ID", "TEAM123")
 	t.Setenv("APPLE_KEY_ID", "KEY123")
 	t.Setenv("APPLE_PRIVATE_KEY", `-----BEGIN PRIVATE KEY-----\nc2VjcmV0\n-----END PRIVATE KEY-----`)

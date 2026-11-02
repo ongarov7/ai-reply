@@ -54,5 +54,6 @@ func (s *Server) RegisterBCC(mux *http.ServeMux, bank *bcc.CheckoutService) {
 		bank.CheckoutPageWithClientIP(w, r, httpx.ClientIP(r, s.cfg.App.TrustProxy))
 	})
 	mux.HandleFunc("POST /api/v1/payments/bcc/orders/{id}/return", bank.Return)
+	mux.HandleFunc("GET /api/v1/payments/bcc/orders/{id}/return", bank.Return)
 	mux.HandleFunc("POST /api/v1/payments/bcc/notify", bank.Notify)
 }
