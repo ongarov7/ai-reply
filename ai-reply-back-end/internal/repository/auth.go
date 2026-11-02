@@ -190,6 +190,46 @@ func (s *Store) RotateRefreshToken(ctx context.Context, oldID string, next Refre
 	return next, err
 }
 
+// RotateUnusedSuccessor — the answer to a refresh was lost and the client retried with the
+// token rotated moments ago (at or after since): if nobody has used that rotation's
+// successor yet, the successor is rotated in its place, all in one transaction.
+// ErrUnauthorized when the successor is gone or already used: that is real reuse.
+func (s *Store) RotateUnusedSuccessor(ctx context.Context, rotatedID string, since time.Time, next RefreshToken) (RefreshToken, error) {
+	if next.ID == "" {
+		next.ID = traits.NewID()
+	}
+	next.IssuedAt = time.Now().UTC()
+	err := s.db.Tx(ctx, func(tx *sql.Tx) error {
+		var successor string
+		err := tx.QueryRowContext(ctx, `
+			SELECT coalesce(replaced_by,'') FROM refresh_tokens
+			WHERE id = ? AND revoked_reason = 'rotated' AND revoked_at >= ?`, rotatedID, ms(since)).Scan(&successor)
+		if errors.Is(err, sql.ErrNoRows) || err == nil && successor == "" {
+			return domain.ErrUnauthorized
+		}
+		if err != nil {
+			return err
+		}
+		res, err := tx.ExecContext(ctx, `
+			UPDATE refresh_tokens SET revoked_at = ?, revoked_reason = 'rotated', replaced_by = ?
+			WHERE id = ? AND revoked_at IS NULL`, ms(next.IssuedAt), next.ID, successor)
+		if err != nil {
+			return err
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			return domain.ErrUnauthorized
+		}
+		_, err = tx.ExecContext(ctx, `
+			INSERT INTO refresh_tokens (id, user_id, device_id, family_id, token_hash, issued_at,
+			                            expires_at, user_agent)
+			VALUES (?,?,?,?,?,?,?,?)`,
+			next.ID, next.UserID, nullText(next.DeviceID), next.FamilyID, next.TokenHash,
+			ms(next.IssuedAt), ms(next.ExpiresAt), next.UserAgent)
+		return err
+	})
+	return next, err
+}
+
 // RevokeFamily — бүкіл тізбекті жабады: қайта пайдалану анықталғанда және шығуда.
 func (s *Store) RevokeFamily(ctx context.Context, familyID, reason string) error {
 	_, err := s.db.Writer().ExecContext(ctx,

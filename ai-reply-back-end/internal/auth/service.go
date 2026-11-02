@@ -387,6 +387,10 @@ func (s *Service) accessToken(user domain.User, deviceID, platform string) (stri
 }
 
 // Refresh — токенді ротациялау. Қайта пайдалану анықталса, бүкіл тізбек жабылады.
+// refreshRetryGrace — how long a just-rotated refresh token may come back once,
+// when its successor is still unused (the client never received the answer).
+const refreshRetryGrace = time.Minute
+
 func (s *Service) Refresh(ctx context.Context, rawToken string, info DeviceInfo) (Session, error) {
 	if strings.TrimSpace(rawToken) == "" {
 		return Session{}, domain.ErrUnauthorized
@@ -401,7 +405,11 @@ func (s *Service) Refresh(ctx context.Context, rawToken string, info DeviceInfo)
 	}
 
 	now := s.clock.Now()
-	if stored.RevokedAt != nil {
+	// A token rotated moments ago may come back once: the answer to that
+	// rotation was lost (a dropped connection, a timeout, a suspended keyboard)
+	// and the client retried. Rotation timestamps are wall-clock times.
+	lostAnswer := stored.RevokedAt != nil && stored.Reason == "rotated" && time.Since(*stored.RevokedAt) <= refreshRetryGrace
+	if stored.RevokedAt != nil && !lostAnswer {
 		// Жабылған токенді қайта қолдану — ұрлану белгісі: тізбекті толық жабамыз.
 		_ = s.repo.RevokeFamily(ctx, stored.FamilyID, "reuse_detected")
 		s.log.Warn("refresh token reuse detected", "user_id", stored.UserID, "family", stored.FamilyID)
@@ -435,7 +443,18 @@ func (s *Service) Refresh(ctx context.Context, rawToken string, info DeviceInfo)
 		ExpiresAt: now.Add(s.cfg.RefreshTTL),
 		UserAgent: traits.Clamp(info.UserAgent, 200),
 	}
-	if _, err := s.repo.RotateRefreshToken(ctx, stored.ID, next); err != nil {
+	if lostAnswer {
+		// Only while the successor is still unused; otherwise someone else holds
+		// the chain, which is exactly what reuse detection is for.
+		if _, err := s.repo.RotateUnusedSuccessor(ctx, stored.ID, time.Now().Add(-refreshRetryGrace), next); err != nil {
+			if errors.Is(err, domain.ErrUnauthorized) {
+				_ = s.repo.RevokeFamily(ctx, stored.FamilyID, "reuse_detected")
+				s.log.Warn("refresh token reuse detected", "user_id", stored.UserID, "family", stored.FamilyID)
+			}
+			return Session{}, domain.ErrUnauthorized
+		}
+		s.log.Info("refresh retried after a lost answer", "user_id", stored.UserID, "family", stored.FamilyID)
+	} else if _, err := s.repo.RotateRefreshToken(ctx, stored.ID, next); err != nil {
 		return Session{}, domain.ErrUnauthorized
 	}
 

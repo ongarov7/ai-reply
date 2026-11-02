@@ -106,7 +106,8 @@ func TestAccessTokenExpiryAndRefreshRotation(t *testing.T) {
 		t.Fatalf("new access token rejected: %d", ok.status)
 	}
 
-	// Ескі токенді қайта пайдалану — бүкіл тізбек жабылады.
+	// Ескі токенді қайта пайдалану — бүкіл тізбек жабылады (after the lost-answer window).
+	h.exec(`UPDATE refresh_tokens SET revoked_at = revoked_at - 120000 WHERE revoked_reason = 'rotated'`)
 	reused := h.do(http.MethodPost, "/api/v1/auth/refresh",
 		map[string]any{"refresh_token": session.refresh}, nil)
 	if reused.status != http.StatusUnauthorized {
@@ -230,5 +231,57 @@ func TestAFailedProfileWriteLeavesNoHalfAccount(t *testing.T) {
 	h.exec(`DROP TRIGGER fail_profile`)
 	if s := h.signIn("+7 701 444 00 11"); !s.isNew {
 		t.Fatal("the retried sign-in did not create the account")
+	}
+}
+
+// A refresh whose answer was lost may be retried once with the same token while
+// its successor is unused; once the successor was used, the old token is reuse.
+func TestRefreshRetryAfterALostAnswerKeepsTheSession(t *testing.T) {
+	h := newHarness(t)
+	session := h.signIn("lost-refresh@example.com")
+	refresh := func(token string) response {
+		return h.do(http.MethodPost, "/api/v1/auth/refresh", map[string]any{"refresh_token": token}, nil)
+	}
+	lost := refresh(session.refresh)
+	if lost.status != http.StatusOK {
+		t.Fatalf("first refresh: %d %s", lost.status, lost.raw)
+	}
+	retried := refresh(session.refresh)
+	if retried.status != http.StatusOK {
+		t.Fatalf("a retry after a lost answer signed the user out: %d %s", retried.status, retried.raw)
+	}
+	if ok := h.do(http.MethodGet, "/api/v1/me", nil, h.auth(retried.str("access_token"))); ok.status != http.StatusOK {
+		t.Fatalf("access after the retry: %d", ok.status)
+	}
+	next := refresh(retried.str("refresh_token"))
+	if next.status != http.StatusOK {
+		t.Fatalf("the retried chain does not continue: %d %s", next.status, next.raw)
+	}
+	// The lost token's successor has now been used: presenting the lost one is reuse.
+	if stolen := refresh(lost.str("refresh_token")); stolen.status != http.StatusUnauthorized {
+		t.Fatalf("a token whose successor was used was accepted: %d", stolen.status)
+	}
+	if after := refresh(next.str("refresh_token")); after.status != http.StatusUnauthorized {
+		t.Fatalf("family not revoked after reuse: %d", after.status)
+	}
+}
+
+// A stolen token presented after the owner already refreshed is still reuse.
+func TestRefreshReuseAfterTheOwnerMovedOnRevokesTheFamily(t *testing.T) {
+	h := newHarness(t)
+	session := h.signIn("stolen-refresh@example.com")
+	refresh := func(token string) response {
+		return h.do(http.MethodPost, "/api/v1/auth/refresh", map[string]any{"refresh_token": token}, nil)
+	}
+	second := refresh(session.refresh)
+	third := refresh(second.str("refresh_token"))
+	if second.status != http.StatusOK || third.status != http.StatusOK {
+		t.Fatal("owner refreshes failed")
+	}
+	if stolen := refresh(session.refresh); stolen.status != http.StatusUnauthorized {
+		t.Fatalf("stolen token accepted: %d", stolen.status)
+	}
+	if after := refresh(third.str("refresh_token")); after.status != http.StatusUnauthorized {
+		t.Fatalf("family not revoked: %d", after.status)
 	}
 }
