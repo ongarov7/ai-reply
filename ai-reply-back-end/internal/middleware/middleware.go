@@ -80,8 +80,22 @@ func Logging(log *slog.Logger) func(http.Handler) http.Handler {
 				"bytes", sw.bytes,
 				"duration_ms", time.Since(started).Milliseconds(),
 			)
+			// An unexpected server error reaches the operator; known outages
+			// (502/503/504 from OpenAI, the stores, e-mail) have their own alerts.
+			if sw.status == http.StatusInternalServerError {
+				logging.FromContext(r.Context(), log).Error("api request failed",
+					"method", r.Method, "path", routeOf(r), "status", sw.status)
+			}
 		})
 	}
+}
+
+// routeOf — the matched route pattern (ids collapse into one alert), else the path.
+func routeOf(r *http.Request) string {
+	if r.Pattern != "" {
+		return r.Pattern
+	}
+	return r.URL.Path
 }
 
 // Recover — панинканы 500-ге айналдырады, стек журналда қалады, клиентке кетпейді.

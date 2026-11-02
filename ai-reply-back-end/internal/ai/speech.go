@@ -152,6 +152,9 @@ func transportError(ctx context.Context, err error) error {
 	if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		return domain.ErrProviderTimeout
 	}
+	if errors.Is(err, context.Canceled) || errors.Is(ctx.Err(), context.Canceled) {
+		return fmt.Errorf("%w: %w", domain.ErrProviderDown, context.Canceled)
+	}
 	return domain.ErrProviderDown
 }
 

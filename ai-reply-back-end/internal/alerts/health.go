@@ -55,12 +55,12 @@ func (n *Notifier) Watch(ctx context.Context, interval time.Duration, checks ...
 				st.failures++
 				if !st.failing && st.failures >= 2 {
 					st.failing, st.since = true, n.now()
-					n.Notify(c.Severity, c.Name+" check failing", "check", c.Name, "error", err.Error())
+					n.NotifyTransition(c.Severity, c.Name+" check failing", "check", c.Name, "error", err.Error())
 				}
 				continue
 			}
 			if st.failing {
-				n.Notify(Recovered, c.Name+" check recovered", "check", c.Name,
+				n.NotifyTransition(Recovered, c.Name+" check recovered", "check", c.Name,
 					"downtime", n.now().Sub(st.since).Round(time.Second).String())
 			}
 			st.failing, st.failures = false, 0

@@ -96,6 +96,7 @@ type message struct {
 type occurrence struct {
 	first time.Time
 	count int
+	last  message // the latest repeat, reported once the window ends
 }
 
 // Notifier — кезек, қайталануды басу және шектеу. Nil не өшірілген Notifier — бос операция.
@@ -198,6 +199,7 @@ func (n *Notifier) admit(m *message) bool {
 	if occ := n.seen[key]; occ != nil {
 		if now.Sub(occ.first) < n.cfg.DedupWindow {
 			occ.count++
+			occ.last = *m
 			return false
 		}
 		m.repeats = occ.count
@@ -234,6 +236,7 @@ func (n *Notifier) admit(m *message) bool {
 var identityKeys = map[string]bool{
 	"error": true, "path": true, "kind": true, "code": true, "source": true, "provider": true,
 	"state": true, "platform": true, "status": true, "reason": true, "check": true, "name": true,
+	"app": true, "panic": true, "environment": true,
 }
 
 func (m message) identity() string {
@@ -293,20 +296,54 @@ func (n *Notifier) drain() {
 // flushSummary — шектеу не толы кезек арқылы жоғалған ескертулер туралы бір хабарлама.
 func (n *Notifier) flushSummary() {
 	n.mu.Lock()
+	now := n.now()
 	count := n.suppressed
 	n.suppressed = 0
 	if count > 0 {
 		n.tokens-- // the summary itself spends a token; it may go negative briefly
 	}
+	// An alert that kept repeating inside its window is reported once the
+	// window ends, with the count, so a burst never looks like one event.
+	var repeats []message
+	for _, occ := range n.seen {
+		if occ.count > 0 && now.Sub(occ.first) >= n.cfg.DedupWindow {
+			m := occ.last
+			m.repeats, m.at = occ.count, now
+			repeats = append(repeats, m)
+			occ.first, occ.count = now, 0
+		}
+	}
 	n.mu.Unlock()
+	for _, m := range repeats {
+		n.enqueueDirect(m)
+	}
 	if count == 0 {
 		return
 	}
-	select {
-	case n.queue <- message{severity: Warning, title: "alerts suppressed by rate limit", at: n.now(),
-		fields: []field{{"dropped", strconv.Itoa(count)}, {"window", "1m"}}}:
-	default:
+	n.enqueueDirect(message{severity: Warning, title: "alerts suppressed by rate limit", at: now,
+		fields: []field{{"dropped", strconv.Itoa(count)}, {"window", "1m"}}})
+}
+
+// enqueueDirect — без дедупликации и шектеусіз (күй өзгерісі, жиынтық); толы кезекте тасталады.
+func (n *Notifier) enqueueDirect(m message) {
+	if !n.Enabled() {
+		return
 	}
+	if m.at.IsZero() {
+		m.at = n.now()
+	}
+	select {
+	case n.queue <- m:
+	default:
+		n.mu.Lock()
+		n.suppressed++
+		n.mu.Unlock()
+	}
+}
+
+// NotifyTransition — күй ауысуы (сәтсіз → қалпына келді): дедупликация мен шектеу оны жасырмайды.
+func (n *Notifier) NotifyTransition(severity Severity, title string, kv ...any) {
+	n.enqueueDirect(message{severity: severity, title: title, fields: fieldsFromKV(kv)})
 }
 
 // deliver — sendMessage; 429 мен 5xx-те қайталау, 400-де HTML-сіз нұсқа.

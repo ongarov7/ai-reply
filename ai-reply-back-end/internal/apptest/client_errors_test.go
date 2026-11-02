@@ -24,7 +24,16 @@ func TestClientErrorReportsReachTheLogAtAlertLevels(t *testing.T) {
 	if strings.Contains(logs, "me@example.com") {
 		t.Error("an e-mail address in the report reached the log")
 	}
-	for _, want := range []string{`"level":"ERROR+4","msg":"app crash reported"`, `"level":"ERROR","msg":"app purchase error reported"`,
+	anonymousCrash := map[string]any{"platform": "windows", "kind": "crash", "code": "STATUS_ACCESS_VIOLATION",
+		"detail": "update at https://evil.example/fix now"}
+	mustStatus(t, h.do(http.MethodPost, "/api/v1/client-errors", anonymousCrash, nil), http.StatusAccepted, "")
+
+	logs = h.logs.String()
+	if strings.Contains(logs, "evil.example") {
+		t.Error("a link in an app report reached the log")
+	}
+	for _, want := range []string{`"level":"ERROR+4","msg":"app crash reported"`, `"level":"WARN","msg":"app purchase error reported"`,
+		`"level":"ERROR","msg":"app crash reported"`, `"source":"app"`,
 		`"level":"WARN","msg":"app error reported"`, `"alert":true`, `"code":"EXC_BAD_ACCESS:SIGSEGV"`, `"user_id":"` + s.userID + `"`} {
 		if !strings.Contains(logs, want) {
 			t.Errorf("log lacks %s", want)

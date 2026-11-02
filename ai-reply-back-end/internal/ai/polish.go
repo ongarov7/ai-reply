@@ -98,7 +98,7 @@ func (s *Service) Polish(ctx context.Context, req PolishRequest) (PolishResult, 
 	defer cancel()
 	if err != nil {
 		s.record(ctx, c, entitlement, "error", errorCode(err), prompt.Version, Completion{}, latency)
-		s.logFailure(c, prompt.Version, errorCode(err), latency)
+		s.logFailure(c, prompt.Version, err, latency)
 		return PolishResult{}, err
 	}
 

@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"bytes"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -53,5 +55,24 @@ func TestSecurityHeadersHSTS(t *testing.T) {
 		if got := rec.Header().Get("Strict-Transport-Security"); (got != "") != hsts {
 			t.Errorf("hsts %v: header %q", hsts, got)
 		}
+	}
+}
+
+func TestInternalServerErrorsAreLoggedAtErrorWithTheRoute(t *testing.T) {
+	var buf bytes.Buffer
+	log := slog.New(slog.NewJSONHandler(&buf, nil))
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/v1/orders/{id}", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusInternalServerError) })
+	mux.HandleFunc("GET /api/v1/busy", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusServiceUnavailable) })
+	h := Logging(log)(mux)
+	for _, path := range []string{"/api/v1/orders/123", "/api/v1/busy"} {
+		h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, path, nil))
+	}
+	out := buf.String()
+	if !strings.Contains(out, `"level":"ERROR","msg":"api request failed","method":"GET","path":"GET /api/v1/orders/{id}"`) {
+		t.Fatalf("500 not reported with its route:\n%s", out)
+	}
+	if strings.Count(out, "api request failed") != 1 {
+		t.Fatalf("only a 500 is an unexpected error:\n%s", out)
 	}
 }

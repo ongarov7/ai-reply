@@ -364,3 +364,43 @@ func TestDiskSpaceCheck(t *testing.T) {
 		t.Fatal("expected a low-space error")
 	}
 }
+
+func TestRepeatsInsideTheWindowAreReportedWhenItEnds(t *testing.T) {
+	n := newTestNotifier(t, httptest.NewUnstartedServer(nil), nil)
+	now := time.Date(2026, 11, 2, 12, 0, 0, 0, time.UTC)
+	n.now = func() time.Time { return now }
+	for i := 0; i < 5; i++ {
+		n.Notify(Error, "BCC renewal charge unconfirmed", "error", "timeout")
+	}
+	<-n.queue // the first one goes at once
+	n.flushSummary()
+	if len(n.queue) != 0 {
+		t.Fatal("repeats must wait for the end of the window")
+	}
+	now = now.Add(6 * time.Minute)
+	n.flushSummary()
+	if len(n.queue) != 1 {
+		t.Fatalf("expected one repeat report, got %d", len(n.queue))
+	}
+	m := <-n.queue
+	if m.repeats != 4 || m.title != "BCC renewal charge unconfirmed" {
+		t.Fatalf("repeat report: %+v", m)
+	}
+	now = now.Add(6 * time.Minute)
+	n.flushSummary()
+	if len(n.queue) != 0 {
+		t.Fatal("a reported burst must not be reported again")
+	}
+}
+
+func TestHealthTransitionsAreNeverDeduplicated(t *testing.T) {
+	n := newTestNotifier(t, httptest.NewUnstartedServer(nil), func(c *Config) { c.RatePerMinute = 1 })
+	n.Notify(Warning, "filler", "kind", "uses the only token")
+	for i := 0; i < 2; i++ {
+		n.NotifyTransition(Critical, "database check failing", "check", "database", "error", "disk I/O error")
+		n.NotifyTransition(Recovered, "database check recovered", "check", "database")
+	}
+	if got := len(n.queue); got != 5 {
+		t.Fatalf("every transition must be queued, got %d", got)
+	}
+}

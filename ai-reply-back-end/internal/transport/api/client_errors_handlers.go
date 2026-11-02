@@ -34,6 +34,7 @@ var (
 	clientCodePattern    = regexp.MustCompile(`^[A-Za-z0-9_.:/-]{1,80}$`)
 	clientPlatforms      = map[string]bool{"ios": true, "android": true, "macos": true, "windows": true}
 	clientKinds          = map[string]bool{"crash": true, "purchase": true, "api": true, "keyboard": true, "other": true}
+	clientLinkPattern    = regexp.MustCompile(`(?i)\b(?:https?://|www\.)\S+|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:com|net|org|kz|ru|io|me|app|xyz|top|link|info)\b\S*`)
 )
 
 // handleClientError — қосымшаның маңызды қатесі: журналға және Telegram ескертуіне.
@@ -67,8 +68,8 @@ func (s *Server) handleClientError(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, domain.InvalidField("count", "range"))
 		return
 	}
-	// Whatever the app put there, no address, token or long number reaches the log.
-	detail := alerts.Scrub(body.Detail)
+	// Whatever the app put there, no address, token, link or long number reaches the log.
+	detail := clientLinkPattern.ReplaceAllString(alerts.Scrub(body.Detail), "[link]")
 	if body.Count == 0 {
 		body.Count = 1
 	}
@@ -77,17 +78,27 @@ func (s *Server) handleClientError(w http.ResponseWriter, r *http.Request) {
 	if detail != "" {
 		attrs = append(attrs, "detail", detail)
 	}
-	if user, ok := UserFrom(r.Context()); ok {
+	user, signedIn := UserFrom(r.Context())
+	if signedIn {
 		attrs = append(attrs, "user_id", user.ID)
 	}
-	log := logging.FromContext(r.Context(), s.log)
+	attrs = append(attrs, "source", "app")
+	// Anyone can post here: an anonymous report is one level lower, so it can
+	// never page as CRITICAL, and every report is marked as coming from an app.
+	level := slog.LevelWarn
+	title := "app error reported"
 	switch body.Kind {
 	case "crash":
-		log.Log(r.Context(), logging.LevelCritical, "app crash reported", attrs...)
+		level, title = logging.LevelCritical, "app crash reported"
 	case "purchase":
-		log.Log(r.Context(), slog.LevelError, "app purchase error reported", attrs...)
-	default:
-		log.Log(r.Context(), slog.LevelWarn, "app error reported", append(attrs, logging.Alert())...)
+		level, title = slog.LevelError, "app purchase error reported"
 	}
+	if !signedIn && level > slog.LevelWarn {
+		level = map[slog.Level]slog.Level{logging.LevelCritical: slog.LevelError, slog.LevelError: slog.LevelWarn}[level]
+	}
+	if level == slog.LevelWarn {
+		attrs = append(attrs, logging.Alert())
+	}
+	logging.FromContext(r.Context(), s.log).Log(r.Context(), level, title, attrs...)
 	httpx.JSON(w, http.StatusAccepted, map[string]any{"ok": true})
 }

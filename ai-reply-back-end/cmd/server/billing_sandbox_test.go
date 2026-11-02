@@ -462,3 +462,22 @@ func TestBuildApplicationFailureCanBeRetriedAndWorkersStop(t *testing.T) {
 	}
 	app.close()
 }
+
+func TestRunWorkerDoesNotRestartAWorkerThatReturned(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	calls := 0
+	done := make(chan struct{})
+	go func() {
+		runWorker(ctx, slog.New(slog.NewTextHandler(io.Discard, nil)), func(context.Context) { calls++ })
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("runWorker kept a finished worker alive")
+	}
+	if calls != 1 {
+		t.Fatalf("worker ran %d times", calls)
+	}
+}

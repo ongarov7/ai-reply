@@ -253,7 +253,7 @@ func (s *Service) generate(ctx context.Context, c call, prompt Prompt, started t
 		// Жауап алынбады — бронды қайтарамыз (қайталау кезінде екі рет есептелмейді).
 		s.release(ctx, c, res)
 		s.record(ctx, c, entitlement, "error", errorCode(providerErr), prompt.Version, Completion{}, latency)
-		s.logFailure(c, prompt.Version, errorCode(providerErr), latency)
+		s.logFailure(c, prompt.Version, providerErr, latency)
 		return Result{}, providerErr
 	}
 	if !res.Replay {
@@ -344,15 +344,18 @@ func (s *Service) quotaRefused(ctx context.Context, user domain.User, ent domain
 }
 
 // logFailure — сәтсіз генерация: тек режим, нұсқа, код және кідіріс.
-func (s *Service) logFailure(c call, version, code string, latency int) {
+func (s *Service) logFailure(c call, version string, err error, latency int) {
 	s.log.Warn("ai_reply_failed", "user_id", c.User.ID, "mode", c.Mode, "prompt_version", version,
-		"code", code, "latency_ms", latency, providerAlert(code))
+		"code", errorCode(err), "latency_ms", latency, providerAlert(err))
 }
 
 // providerAlert — провайдер жағындағы сәтсіздік (таймаут, 429, 5xx, бос жауап) операторға
 // WARNING ретінде жетеді; квота мен пайдаланушы қателері жетпейді.
-func providerAlert(code string) slog.Attr {
-	switch code {
+func providerAlert(err error) slog.Attr {
+	if errors.Is(err, context.Canceled) {
+		return slog.Attr{} // the client went away; OpenAI is fine
+	}
+	switch errorCode(err) {
 	case "AI_TIMEOUT", "RATE_LIMITED", "AI_PROVIDER_UNAVAILABLE", "AI_EMPTY_RESPONSE", "INTERNAL_ERROR":
 		return logging.Alert()
 	}

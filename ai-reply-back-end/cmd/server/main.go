@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"flag"
 	"fmt"
@@ -225,7 +226,11 @@ func run(envFile string) error {
 		notifier.Notify(alerts.Warning, "server shutting down", "env", cfg.App.Env, "reason", "signal")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
-		return server.Shutdown(shutdownCtx)
+		// A request still running after 15 s is cut off; that is a normal stop, not a failure.
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			log.Warn("shutdown did not drain every request", "error", err.Error())
+		}
+		return nil
 	}
 }
 
@@ -432,8 +437,15 @@ func buildApplication(ctx context.Context, cfg config.Config, log *slog.Logger, 
 		// stops answering, or the disk under it runs out (SQLite then fails every write).
 		backgroundWorkers = append(backgroundWorkers, func(ctx context.Context) {
 			notifier.Watch(ctx, time.Minute,
+				// A real read from the file and an empty write transaction on the
+				// single writer: a locked, stuck or unreadable database fails here
+				// (go-sqlite3's Ping does no I/O).
 				alerts.Check{Name: "database", Severity: alerts.Critical, Run: func(ctx context.Context) error {
-					return db.Reader().PingContext(ctx)
+					var n int
+					if err := db.Reader().QueryRowContext(ctx, `SELECT count(*) FROM schema_migrations`).Scan(&n); err != nil {
+						return err
+					}
+					return db.Tx(ctx, func(*sql.Tx) error { return nil })
 				}},
 				alerts.Check{Name: "disk space below 2 GiB", Severity: alerts.Warning, Run: alerts.DiskSpace(cfg.Database.Path, 2<<30)},
 				alerts.Check{Name: "disk space below 500 MiB", Severity: alerts.Critical, Run: alerts.DiskSpace(cfg.Database.Path, 500<<20)},
@@ -458,16 +470,20 @@ func buildApplication(ctx context.Context, cfg config.Config, log *slog.Logger, 
 // Every worker loops until ctx is done, so a normal return means shutdown.
 func runWorker(ctx context.Context, log *slog.Logger, run func(context.Context)) {
 	for ctx.Err() == nil {
-		func() {
+		panicked := func() (panicked bool) {
 			defer func() {
 				if rec := recover(); rec != nil {
+					panicked = true
 					log.LogAttrs(ctx, logging.LevelCritical, "background worker panicked",
 						slog.String("panic", fmt.Sprint(rec)), slog.String("stack", string(debug.Stack())))
 				}
 			}()
 			run(ctx)
+			return false
 		}()
-		if ctx.Err() != nil {
+		// A worker that returns by itself is done (some return at once when
+		// their feature is off); only a panic brings it back.
+		if !panicked || ctx.Err() != nil {
 			return
 		}
 		select {

@@ -123,6 +123,10 @@ func (o *OpenAI) Generate(ctx context.Context, prompt Prompt) (Completion, error
 		if errors.Is(err, context.DeadlineExceeded) {
 			return Completion{}, domain.ErrProviderTimeout
 		}
+		if errors.Is(err, context.Canceled) {
+			// The person left (keyboard closed): same answer, but no outage to report.
+			return Completion{}, fmt.Errorf("%w: %w", domain.ErrProviderDown, context.Canceled)
+		}
 		return Completion{}, domain.ErrProviderDown
 	}
 	defer res.Body.Close()
