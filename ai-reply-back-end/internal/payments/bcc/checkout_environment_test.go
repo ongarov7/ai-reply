@@ -187,7 +187,7 @@ func TestProductionFullRefundUsesLiveEndpointAndCannotBeSentTwice(t *testing.T) 
 					t.Fatal(err)
 				}
 				refund = r.Form
-				if refund.Get("TRTYPE") != "14" || refund.Get("ORDER") != order.bankOrder || refund.Get("TERMINAL") != s.cfg.Terminal || refund.Get("AMOUNT") != "100.00" || refund.Get("RRN") != original.Get("RRN") || refund.Get("INT_REF") != original.Get("INT_REF") {
+				if refund.Get("TRTYPE") != "14" || refund.Get("ORDER") != order.bankOrder || refund.Get("TERMINAL") != s.cfg.Terminal || refund.Get("AMOUNT") != original.Get("AMOUNT") || refund.Get("RRN") != original.Get("RRN") || refund.Get("INT_REF") != original.Get("INT_REF") {
 					t.Fatal("refund was not bound to the paid original")
 				}
 				if viaNotification {

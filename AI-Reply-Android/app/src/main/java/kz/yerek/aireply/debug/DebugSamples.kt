@@ -14,7 +14,6 @@ import kz.yerek.aireply.billing.StoreProduct
 import kz.yerek.aireply.billing.StorePurchase
 import kz.yerek.aireply.billing.StorePurchaseState
 import kz.yerek.aireply.billing.StoreUpdate
-import kz.yerek.aireply.data.account.PassDto
 import kz.yerek.aireply.data.account.UsageDto
 import kz.yerek.aireply.data.account.WelcomeDto
 import kz.yerek.aireply.data.support.SupportApi
@@ -38,18 +37,17 @@ import java.util.UUID
  */
 object DebugSamples {
 
-    /** 35 of 50 free replies left, a pack bought, a pass running until tomorrow. */
+    /** Seven of ten one-time welcome replies left, plus one permanent pack. */
     val usage: UsageDto
         get() = UsageDto(
-            dailyLimit = 5,
-            usedToday = 5,
+            dailyLimit = 0,
+            usedToday = 0,
             remainingToday = 0,
             resetsAt = now().plusHours(9).toString(),
             timezone = "Asia/Almaty",
-            welcome = WelcomeDto(total = 50, remaining = 35),
-            credits = 12,
-            pass = PassDto(expiresAt = now().plusHours(20).truncatedTo(ChronoUnit.HOURS).toString(), remaining = 40),
-            remainingTotal = 87
+            welcome = WelcomeDto(total = 10, remaining = 7),
+            credits = 30,
+            remainingTotal = 37
         )
 
     private fun now(): OffsetDateTime = OffsetDateTime.now(ZoneOffset.ofHours(5))
@@ -58,17 +56,13 @@ object DebugSamples {
 
     private val catalog = IapCatalogDto(
         products = listOf(
-            IapProductDto("pack_20", "pack", 20, 0, "debug.pack_20", "20 ответов"),
-            IapProductDto("pack_100", "pack", 100, 0, "debug.pack_100", "100 ответов"),
-            IapProductDto("pass_24h", "pass", 40, 24, "debug.pass_24h", "Пропуск на 24 часа")
+            IapProductDto("pack30", "pack", 30, 0, "debug.pack30", "30 ответов")
         ),
         accountToken = "00000000-0000-4000-8000-000000000000"
     )
 
     private val prices = mapOf(
-        "debug.pack_20" to "990 ₸",
-        "debug.pack_100" to "3 490 ₸",
-        "debug.pass_24h" to "590 ₸"
+        "debug.pack30" to "130 ₸"
     )
 
     fun purchaseApi(): PurchaseApi = object : PurchaseApi {

@@ -10,6 +10,8 @@ struct ModelDecodingTests {
         #expect(payload.user.email == "aigerim@mail.kz")
         #expect(payload.usage?.remainingTotal == 37)
         #expect(payload.subscription?.plan.code == "base_monthly")
+        #expect(payload.subscription?.plan.dailyMessageLimit == 40)
+        #expect(payload.usage?.dailyLimit == 40)
         #expect(payload.legalConsent?.termsVersion == "2026-10-08")
         let tokens = payload.tokens(issuedAt: Date(timeIntervalSince1970: 0))
         #expect(tokens.accessExpiresAt == Date(timeIntervalSince1970: 900))
@@ -104,7 +106,7 @@ struct GenerationTests {
 
     @Test func dailyLimitCarriesTheResetTime() async throws {
         let transport = FakeTransport { _ in
-            (429, Fixtures.error("DAILY_LIMIT_REACHED", details: #"{"daily_limit":30,"resets_at":"2026-10-31T19:00:00Z"}"#), [:])
+            (429, Fixtures.error("DAILY_LIMIT_REACHED", details: #"{"daily_limit":40,"resets_at":"2026-10-31T19:00:00Z"}"#), [:])
         }
         await #expect(throws: GenerationError.limitReached(resetsAt: RFC3339.parse("2026-10-31T19:00:00Z"))) {
             try await generator(transport).reply(to: "a", recipient: .friend, instruction: nil, inputLanguage: nil,
@@ -297,6 +299,7 @@ struct AuthAndAccountTests {
         account.apply(me)
         #expect(account.balance?.isExhausted == true)
         #expect(account.balance?.planName == "Base")
+        #expect(account.balance?.dailyLimit == 40)
         #expect(account.hasConsent == false)
         account.apply(usage: try JSONDecoder.api.decode(UsageDTO.self, from: Data(Fixtures.usage(unlimited: true).utf8)))
         #expect(account.balance?.isUnlimited == true)

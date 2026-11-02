@@ -23,7 +23,7 @@ const flush = () => new Promise(resolve => setImmediate(resolve));
 const response = (payload, status = 200, retryAfter = '') => Promise.resolve({
   ok: status < 400, status, headers: { get: () => retryAfter }, json: () => Promise.resolve(structuredClone(payload))
 });
-function session(user = 'fixture-user-A', price = 10000, version = 1) {
+function session(user = 'fixture-user-A', price = 13000, version = 1) {
   return { user: { id: user, email: user + '@example.test' }, usage: { remaining_total: 10, purchased_credits: 0, welcome: { remaining: 10 } },
     bank: { enabled: true, environment: 'sandbox', catalog_version: version, terms_version: '2026-10-30-web-purchase-v1',
       products: [{ code: 'pack30', kind: 'pack', units: 30, price_minor: price, currency: 'KZT', active: true, available_web: true, name: { en: 'Reply pack' } }] } };
@@ -73,9 +73,9 @@ test('purchase requires separate unchecked terms and sends the exact account and
   assert.equal(request.opts.credentials, 'same-origin');
   assert.equal(request.opts.headers['X-Requested-With'], 'AIReplyAccount');
   assert.deepEqual(JSON.parse(request.opts.body), { product_code: 'pack30', expected_user_id: 'fixture-user-A',
-    expected_catalog_version: 1, expected_price_minor: 10000, expected_units: 30, terms_version: '2026-10-30-web-purchase-v1', accept_terms: true, locale: 'en' });
+    expected_catalog_version: 1, expected_price_minor: 13000, expected_units: 30, terms_version: '2026-10-30-web-purchase-v1', accept_terms: true, locale: 'en' });
   assert.equal(f.redirects.length, 1);
-  assert.match(f.nodes.get('account-products').children[0].children[1].textContent, /100/);
+  assert.match(f.nodes.get('account-products').children[0].children[1].textContent, /130/);
   assert.match(f.nodes.get('account-products').children[0].children[2].textContent, /30/);
 });
 
@@ -98,8 +98,8 @@ test('a subscription requires separate renewal consent and preserves its exact m
   const payload = session();
   payload.bank.recurring_enabled = true;
   payload.bank.recurring_terms_version = '2026-11-01';
-  payload.bank.products = [{ code: 'base_monthly', kind: 'subscription', units: 0, price_minor: 59900,
-    currency: 'KZT', billing_period: 'month', daily_limit: 30, active: true, available_web: true, name: { en: 'Base' } }];
+  payload.bank.products = [{ code: 'base_monthly', kind: 'subscription', units: 0, price_minor: 79000,
+    currency: 'KZT', billing_period: 'month', daily_limit: 40, active: true, available_web: true, name: { en: 'Base' } }];
   const f = fixture(url => url.endsWith('/checkout') ? response(created()) : response(payload));
   await f.app.init();
   assert.equal(f.nodes.get('account-renewal-box').hidden, false);
@@ -118,7 +118,7 @@ test('a subscription requires separate renewal consent and preserves its exact m
   assert.equal(quote.recurring_terms_version, '2026-11-01');
   assert.equal(quote.accept_recurring, true);
   assert.equal(quote.expected_units, 0);
-  assert.equal(quote.expected_price_minor, 59900);
+  assert.equal(quote.expected_price_minor, 79000);
 });
 
 test('changing card expiry clears renewal consent without starting payment', async () => {
@@ -223,7 +223,7 @@ test('a timed-out checkout remains recoverable with its original approved reques
   assert.equal(f.app.state.busy, false);
   assert.equal(f.nodes.get('account-retry-checkout').hidden, false);
   assert.equal(f.nodes.get('account-retry-checkout').disabled, false);
-  assert.equal(f.app.state.pending.quote.expected_price_minor, 10000);
+  assert.equal(f.app.state.pending.quote.expected_price_minor, 13000);
   assert.equal(f.redirects.length, 0);
 });
 

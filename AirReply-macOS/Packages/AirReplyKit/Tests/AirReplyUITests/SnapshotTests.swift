@@ -35,7 +35,7 @@ struct SnapshotTests {
         let result = try fixture.makeEnvironment([QuickBarModelTests.output(
             "Добрый день! Документы получили, спасибо. Завтра до обеда пришлём ответ по договору.")])
         result.account.apply(usage: try JSONDecoder.api.decode(UsageDTO.self, from: Data(
-            #"{"daily_limit":30,"unlimited":false,"remaining_today":27,"credits":0,"remaining_total":27}"#.utf8)))
+            #"{"daily_limit":40,"unlimited":false,"remaining_today":27,"credits":0,"remaining_total":27}"#.utf8)))
         result.model.draft = "ответь клиенту"
         result.model.submit()
         for _ in 0..<100 where result.model.phase != .result { try await Task.sleep(for: .milliseconds(10)) }

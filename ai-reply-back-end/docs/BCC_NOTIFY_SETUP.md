@@ -200,7 +200,7 @@ access log для `/sandbox/api/v1/payments/bcc/orders/*`.
 Порядок проверки:
 
 1. В `/sandbox/admin/billing` проверить опубликованный `pack30`: 30 ответов,
-   100 ₸, Web доступен. Подписка для покупки не нужна.
+   130 ₸, Web доступен. Подписка для покупки не нужна.
 2. Авторизовать тестовый аккаунт в `/sandbox/api/v1/*`.
 3. Отправить `POST /sandbox/api/v1/payments/bcc/checkout` с JSON
    `{"product_code":"pack30"}` и новым стабильным `Idempotency-Key`.

@@ -99,7 +99,7 @@ func TestAppleBaseRenewsFromSignedExpiryAndIgnoresOldPeriod(t *testing.T) {
 	end := start.Add(30 * 24 * time.Hour)
 	first := h.subscriptionTx(s.userID, "base-1", "base-original", "base_monthly", start, end, nil)
 	mustStatus(t, h.postApple(s.access, first), http.StatusOK, "")
-	for i := 0; i < 30; i++ {
+	for i := 0; i < 40; i++ {
 		mustStatus(t, h.generate(s.access, "Сәлем"), http.StatusOK, "")
 	}
 	mustStatus(t, h.generate(s.access, "Артық"), http.StatusTooManyRequests, "DAILY_LIMIT_REACHED")
@@ -214,7 +214,7 @@ func TestPackageRecommendationUsesVerifiedSpendingAndStopsForSubscriber(t *testi
 		mustStatus(t, h.postApple(s.access, signed), http.StatusOK, "")
 	}
 	catalogue := h.products(s.access, "ios")
-	if catalogue.num("recommendation", "purchase_count") != 4 || catalogue.num("recommendation", "spent_minor") != 40000 || catalogue.num("recommendation", "base_price_minor") != 59900 {
+	if catalogue.num("recommendation", "purchase_count") != 4 || catalogue.num("recommendation", "spent_minor") != 40000 || catalogue.num("recommendation", "base_price_minor") != 79000 {
 		t.Fatalf("recommendation: %s", catalogue.raw)
 	}
 	start := h.clock.Now()

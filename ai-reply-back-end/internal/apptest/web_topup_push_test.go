@@ -56,7 +56,7 @@ func TestWebsiteOfferWaitsForExplicitConsentAndReadyRegistration(t *testing.T) {
 		t.Fatalf("sent %d messages", len(messages))
 	}
 	msg := messages[0].msg
-	if msg.Category != domain.CategoryMarketing || msg.Data["type"] != domain.TypeWebTopupOffer || msg.Data["link"] != "https://ai-reply.kz/sandbox/payment" || !strings.Contains(msg.Body, "30") || !strings.Contains(msg.Body, "100") {
+	if msg.Category != domain.CategoryMarketing || msg.Data["type"] != domain.TypeWebTopupOffer || msg.Data["link"] != "https://ai-reply.kz/sandbox/payment" || !strings.Contains(msg.Body, "30") || !strings.Contains(msg.Body, "130") {
 		t.Fatalf("wrong offer: %+v", msg)
 	}
 	if n := h.scalar(`SELECT count(*) FROM notification_deliveries WHERE channel='email'`); n != 0 {
@@ -173,7 +173,7 @@ func TestWebsiteCatalogOfferWithBankOffStillKeepsCheckoutAndCreditsDisabled(t *t
 	}
 	h.tick()
 	messages := h.push.messages()
-	if len(messages) != 1 || messages[0].msg.Category != domain.CategoryMarketing || messages[0].msg.Data["type"] != domain.TypeWebTopupOffer || messages[0].msg.Data["link"] != "https://ai-reply.kz/sandbox/payment" || !strings.Contains(messages[0].msg.Body, "30") || !strings.Contains(messages[0].msg.Body, "100") {
+	if len(messages) != 1 || messages[0].msg.Category != domain.CategoryMarketing || messages[0].msg.Data["type"] != domain.TypeWebTopupOffer || messages[0].msg.Data["link"] != "https://ai-reply.kz/sandbox/payment" || !strings.Contains(messages[0].msg.Body, "30") || !strings.Contains(messages[0].msg.Body, "130") {
 		t.Fatal("bank readiness blocked or changed the ordinary catalog offer")
 	}
 

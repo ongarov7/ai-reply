@@ -38,7 +38,7 @@ func TestDraftReviewPublishIsAtomicAndVersioned(t *testing.T) {
 		t.Fatal(err)
 	}
 	before, _ := s.Published(ctx)
-	if before.ID != initial.ID || before.Products[5].PriceMinor != 10000 {
+	if before.ID != initial.ID || before.Products[5].PriceMinor != 13000 {
 		t.Fatal("draft leaked into published prices")
 	}
 	if _, err = s.SaveDraft(ctx, "stale@example.test", 0, p); !errors.Is(err, ErrConflict) {
@@ -60,11 +60,11 @@ func TestDraftReviewPublishIsAtomicAndVersioned(t *testing.T) {
 		t.Fatalf("store mapping %d %d %q %v", price, units, id, err)
 	}
 	history, _ := s.History(ctx)
-	if len(history) != 2 || history[1].State != "superseded" || history[1].Products[5].PriceMinor != 10000 {
+	if len(history) != 2 || history[1].State != "superseded" || history[1].Products[5].PriceMinor != 13000 {
 		t.Fatal("published history rewritten")
 	}
 	audit, _ := s.AuditHistory(ctx)
-	if len(audit) != 2 || audit[0].Actor != "owner@example.test" || audit[0].Before[5].PriceMinor != 10000 {
+	if len(audit) != 2 || audit[0].Actor != "owner@example.test" || audit[0].Before[5].PriceMinor != 13000 {
 		t.Fatal("publication audit missing")
 	}
 	// A mapped store product may be pending outside our server. Even with no

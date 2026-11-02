@@ -45,14 +45,14 @@ enum Fixtures {
 
     static let subscription = """
         {"status":"active","plan":{"id":"p","code":"base_monthly","name":{"en":"Base","kk":"Base","ru":"Base","uz":"Base"},
-         "description":{"en":"","kk":"","ru":"","uz":""},"price":59900,"price_text":"599 KZT","currency":"KZT",
-         "daily_message_limit":30,"monthly_message_limit":0,"period_days":30,"is_free":false,"sort_order":20,
+         "description":{"en":"","kk":"","ru":"","uz":""},"price":79000,"price_text":"790 KZT","currency":"KZT",
+         "daily_message_limit":40,"monthly_message_limit":0,"period_days":30,"is_free":false,"sort_order":20,
          "entitlement_kind":"daily","purchasable":false},"started_at":"2026-10-20T09:00:00Z","source":"payment"}
         """
 
     static func usage(remainingTotal: Int = 37, unlimited: Bool = false) -> String {
         """
-        {"daily_limit":30,"unlimited":\(unlimited),"purchased_credits":30,"admin_credits":0,"used_today":23,"remaining_today":7,
+        {"daily_limit":40,"unlimited":\(unlimited),"purchased_credits":30,"admin_credits":0,"used_today":33,"remaining_today":7,
          "monthly_limit":0,"used_month":40,"resets_at":"2026-10-31T19:00:00Z","timezone":"Asia/Almaty",
          "welcome":{"total":10,"remaining":0},"credits":30,"remaining_total":\(remainingTotal)}
         """

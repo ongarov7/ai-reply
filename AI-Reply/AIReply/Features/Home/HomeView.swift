@@ -126,13 +126,14 @@ struct HomeView: View {
                 }
             }
             .dsCard()
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
 
     private var balance: BalanceSummary { BalanceSummary.make(account.usage) }
 
-    /// «Бесплатные ответы: 35 из 50» while a new account has free replies
+    /// «Бесплатные ответы: 7 из 10» while a new account has free replies
     /// left, otherwise the usual title.
     private var usageTitle: LocalizedStringKey {
         if account.subscription?.plan.isFree == true, let welcome = balance.welcomeHeadline {
@@ -160,20 +161,20 @@ struct HomeView: View {
     private var setupCard: some View {
         DSSection(title: "home.profile.title") {
             VStack(spacing: 0) {
-                link("home.profile.edit", "person.text.rectangle", to: .profile)
+                link("home.profile.edit", "person.text.rectangle", to: .profile, edgePadding: .top)
                 Divider().padding(.leading, 44)
                 link("home.profile.templates", "text.bubble", to: .templates)
                 Divider().padding(.leading, 44)
-                link("home.profile.hours", "clock", to: .workingHours)
+                link("home.profile.hours", "clock", to: .workingHours, edgePadding: .bottom)
             }
-            .padding(.vertical, DS.Spacing.xxs)
             .background(
                 RoundedRectangle(cornerRadius: DS.Radius.large, style: .continuous).fill(Color.dsSurface)
             )
         }
     }
 
-    private func link(_ titleKey: LocalizedStringKey, _ symbol: String, to route: AppRoute) -> some View {
+    private func link(_ titleKey: LocalizedStringKey, _ symbol: String, to route: AppRoute,
+                      edgePadding: Edge.Set = []) -> some View {
         NavigationLink(value: route) {
             HStack(spacing: DS.Spacing.s) {
                 Image(systemName: symbol)
@@ -185,6 +186,11 @@ struct HomeView: View {
             }
             .padding(.horizontal, DS.Spacing.m)
             .padding(.vertical, DS.Spacing.s)
+            .padding(edgePadding, DS.Spacing.xxs)
+            .frame(maxWidth: .infinity, minHeight: DS.Layout.minimumTouchTarget, alignment: .leading)
+            // Plain links otherwise hit only their visible text and icons.
+            // Include the spacer and all row padding in the navigation target.
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }

@@ -67,7 +67,7 @@ func TestPublicPaymentPageShowsPublishedPackBeforeSignIn(t *testing.T) {
 					t.Fatalf("status = %d: %s", w.Code, w.Body.String())
 				}
 				body := w.Body.String()
-				for _, want := range []string{`data-public-offer="pack30"`, `<strong data-offer-units>30</strong>`, traits.FormatMoney(10000, "KZT"),
+				for _, want := range []string{`data-public-offer="pack30"`, `<strong data-offer-units>30</strong>`, traits.FormatMoney(13000, "KZT"),
 					`href="` + prefix + `/static/account.css?v=`, `src="` + prefix + `/static/account.js?v=`, `"base_path":"` + prefix + `"`,
 					`id="account-purchase-terms" type="checkbox"`, `id="account-login" class="account-card account-login" hidden`} {
 					if !strings.Contains(body, want) {

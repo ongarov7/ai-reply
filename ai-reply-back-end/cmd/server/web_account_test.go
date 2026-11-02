@@ -131,7 +131,7 @@ func webTestSignIn(t *testing.T, handler http.Handler, prefix, email string) (*h
 
 func webTestQuote(snapshot webTestSnapshot) map[string]any {
 	return map[string]any{"product_code": "pack30", "expected_user_id": snapshot.User.ID,
-		"expected_catalog_version": snapshot.Bank.Version, "expected_price_minor": int64(10000), "expected_units": 30,
+		"expected_catalog_version": snapshot.Bank.Version, "expected_price_minor": int64(13000), "expected_units": 30,
 		"terms_version": snapshot.Bank.Terms, "accept_terms": true}
 }
 
@@ -273,7 +273,7 @@ func TestWebCheckoutBindsAccountAndTermsAndGrantsOnlyAfterBankNotify(t *testing.
 	if w := webTestRequest(app.handler, http.MethodPost, "/account/api/checkout", body, cookie, "https://billing.example.invalid", "stale-price-attempt"); w.Code != http.StatusConflict {
 		t.Fatal("checkout accepted a changed price")
 	}
-	body["expected_price_minor"] = int64(10000)
+	body["expected_price_minor"] = int64(13000)
 	w := webTestRequest(app.handler, http.MethodPost, "/account/api/checkout", body, cookie, "https://billing.example.invalid", "verified-purchase-attempt")
 	if w.Code != http.StatusCreated {
 		t.Fatalf("checkout failed: %d %s", w.Code, w.Body.String())
@@ -282,7 +282,7 @@ func TestWebCheckoutBindsAccountAndTermsAndGrantsOnlyAfterBankNotify(t *testing.
 	if err := json.Unmarshal(w.Body.Bytes(), &order); err != nil {
 		t.Fatal(err)
 	}
-	if order.AmountMinor != 10000 || order.Units != 30 {
+	if order.AmountMinor != 13000 || order.Units != 30 {
 		t.Fatal("order did not use the confirmed quote")
 	}
 	if w = webTestRequest(app.handler, http.MethodGet, "/account/api/orders/"+order.ID, nil, other, "", ""); w.Code != http.StatusNotFound {
@@ -307,7 +307,7 @@ func TestWebCheckoutBindsAccountAndTermsAndGrantsOnlyAfterBankNotify(t *testing.
 	retry := webTestRequest(app.handler, http.MethodPost, "/account/api/checkout", body, cookie, "https://billing.example.invalid", "verified-purchase-attempt")
 	var replay bcc.BankOrder
 	_ = json.Unmarshal(retry.Body.Bytes(), &replay)
-	if retry.Code != http.StatusCreated || replay.ID != order.ID || replay.AmountMinor != 10000 {
+	if retry.Code != http.StatusCreated || replay.ID != order.ID || replay.AmountMinor != 13000 {
 		t.Fatal("retry did not recover the original order")
 	}
 	var raw string

@@ -44,10 +44,10 @@ extension DebugSamples {
     static let products = [
         PurchaseAPI.Product(code: "base_monthly", kind: "subscription", units: 0, durationHours: 0,
                             storeProductID: "preview.base.monthly", name: "Base", planID: "base_monthly",
-                            billingPeriod: "month", entitlementKind: "daily", dailyLimit: 30),
+                            billingPeriod: "month", entitlementKind: "daily", dailyLimit: 40),
         PurchaseAPI.Product(code: "base_yearly", kind: "subscription", units: 0, durationHours: 0,
                             storeProductID: "preview.base.yearly", name: "Base", planID: "base_yearly",
-                            billingPeriod: "year", entitlementKind: "daily", dailyLimit: 30),
+                            billingPeriod: "year", entitlementKind: "daily", dailyLimit: 40),
         PurchaseAPI.Product(code: "pro_monthly", kind: "subscription", units: 0, durationHours: 0,
                             storeProductID: "preview.pro.monthly", name: "Pro", planID: "pro_monthly",
                             billingPeriod: "month", entitlementKind: "unlimited"),
@@ -68,8 +68,8 @@ struct DebugStoreKitClient: StoreKitClient {
     var canMakePayments: Bool { true }
 
     func products(for ids: [String]) async throws -> [StoreProduct] {
-        let prices = ["preview.base.monthly": "599 ₸", "preview.base.yearly": "5 999 ₸",
-                      "preview.pro.monthly": "2 999 ₸", "preview.pro.yearly": "29 990 ₸", "preview.pack30": "100 ₸"]
+        let prices = ["preview.base.monthly": "790 ₸", "preview.base.yearly": "7 900 ₸",
+                      "preview.pro.monthly": "3 450 ₸", "preview.pro.yearly": "34 500 ₸", "preview.pack30": "130 ₸"]
         return ids.compactMap { id in
             prices[id].map { StoreProduct(id: id, displayName: id, displayPrice: $0,
                                          kind: id == "preview.pack30" ? .consumable : .subscription,

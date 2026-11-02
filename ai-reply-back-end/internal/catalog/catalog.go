@@ -59,11 +59,11 @@ func InitialProducts() []Product {
 	}
 	return []Product{
 		{Code: "free", Kind: "welcome", Name: names("Бесплатно", "Free", "Тегін"), Currency: "KZT", Units: 10, Active: true, AvailableIOS: true, AvailableWeb: true},
-		{Code: "base_monthly", Kind: "subscription", Name: names("Base · месяц", "Base · monthly", "Base · ай сайын"), Currency: "KZT", PriceMinor: 59900, BillingPeriod: "month", DailyLimit: 30, Active: true, AvailableIOS: true, AvailableWeb: true},
-		{Code: "base_yearly", Kind: "subscription", Name: names("Base · год", "Base · yearly", "Base · жыл сайын"), Currency: "KZT", PriceMinor: 599900, BillingPeriod: "year", DailyLimit: 30, Active: true, AvailableIOS: true, AvailableWeb: true},
-		{Code: "pro_monthly", Kind: "subscription", Name: names("Pro · месяц", "Pro · monthly", "Pro · ай сайын"), Currency: "KZT", PriceMinor: 299900, BillingPeriod: "month", Unlimited: true, Active: true, AvailableIOS: true, AvailableWeb: true},
-		{Code: "pro_yearly", Kind: "subscription", Name: names("Pro · год", "Pro · yearly", "Pro · жыл сайын"), Currency: "KZT", PriceMinor: 2999000, BillingPeriod: "year", Unlimited: true, Active: true, AvailableIOS: true, AvailableWeb: true},
-		{Code: "pack30", Kind: "pack", Name: names("30 ответов", "30 replies", "30 жауап"), Currency: "KZT", PriceMinor: 10000, Units: 30, Active: true, AvailableIOS: true, AvailableWeb: true},
+		{Code: "base_monthly", Kind: "subscription", Name: names("Base · месяц", "Base · monthly", "Base · ай сайын"), Currency: "KZT", PriceMinor: 79000, BillingPeriod: "month", DailyLimit: 40, Active: true, AvailableIOS: true, AvailableWeb: true},
+		{Code: "base_yearly", Kind: "subscription", Name: names("Base · год", "Base · yearly", "Base · жыл сайын"), Currency: "KZT", PriceMinor: 790000, BillingPeriod: "year", DailyLimit: 40, Active: true, AvailableIOS: true, AvailableWeb: true},
+		{Code: "pro_monthly", Kind: "subscription", Name: names("Pro · месяц", "Pro · monthly", "Pro · ай сайын"), Currency: "KZT", PriceMinor: 345000, BillingPeriod: "month", Unlimited: true, Active: true, AvailableIOS: true, AvailableWeb: true},
+		{Code: "pro_yearly", Kind: "subscription", Name: names("Pro · год", "Pro · yearly", "Pro · жыл сайын"), Currency: "KZT", PriceMinor: 3450000, BillingPeriod: "year", Unlimited: true, Active: true, AvailableIOS: true, AvailableWeb: true},
+		{Code: "pack30", Kind: "pack", Name: names("30 ответов", "30 replies", "30 жауап"), Currency: "KZT", PriceMinor: 13000, Units: 30, Active: true, AvailableIOS: true, AvailableWeb: true},
 	}
 }
 
@@ -265,13 +265,13 @@ func synchronize(ctx context.Context, tx *sql.Tx, p Product, now int64) error {
 	// A published price may change; an already sold purchase's grant cannot be rewritten.
 	if p.Kind != "welcome" {
 		var units int
-		var apple string
+		var apple, google string
 		var sold int
-		err := tx.QueryRowContext(ctx, `SELECT units,coalesce(apple_product_id,''),(SELECT count(*) FROM iap_purchases WHERE product_code=iap_products.code) FROM iap_products WHERE code=?`, p.Code).Scan(&units, &apple, &sold)
+		err := tx.QueryRowContext(ctx, `SELECT units,coalesce(apple_product_id,''),coalesce(google_product_id,''),(SELECT count(*) FROM iap_purchases WHERE store_product_id IN (iap_products.apple_product_id,iap_products.google_product_id)) FROM iap_products WHERE code=?`, p.Code).Scan(&units, &apple, &google, &sold)
 		if err != nil {
 			return err
 		}
-		if (sold > 0 || apple != "") && (units != p.Units || apple != p.AppleProductID) {
+		if (sold > 0 || apple != "" || google != "") && (units != p.Units || apple != p.AppleProductID) {
 			return domain.ConflictField("product", "sold_entitlement_immutable")
 		}
 		if p.Kind == "subscription" {

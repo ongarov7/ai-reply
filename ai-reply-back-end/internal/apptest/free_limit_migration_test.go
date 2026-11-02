@@ -61,7 +61,7 @@ func TestApprovedEntitlementMigrationPreservesExistingBalancesAndPaidContract(t 
 	if _, err := db.Writer().ExecContext(ctx, `INSERT INTO users(id,email,status,kind,created_at,updated_at) VALUES ('recent','recent@example.com','active','account',?,?)`, recentAccountAt, recentAccountAt); err != nil {
 		t.Fatal(err)
 	}
-	applied, err := database.Migrate(ctx, db, migrations.FS)
+	applied, err := database.Migrate(ctx, db, migrationsBefore(t, "0023"))
 	if err != nil || len(applied) < 1 || applied[0] != "0022_ios_entitlements.sql" {
 		t.Fatalf("migration: %v %v", applied, err)
 	}
@@ -96,7 +96,7 @@ func TestApprovedEntitlementMigrationPreservesExistingBalancesAndPaidContract(t 
 	if err := db.Reader().QueryRow(`SELECT CAST(value AS INTEGER) FROM system_settings WHERE key='welcome_bonus_since'`).Scan(&cutoff); err != nil || cutoff <= recentAccountAt {
 		t.Fatal("missing release cutoff")
 	}
-	if again, err := database.Migrate(ctx, db, migrations.FS); err != nil || len(again) != 0 {
+	if again, err := database.Migrate(ctx, db, migrationsBefore(t, "0023")); err != nil || len(again) != 0 {
 		t.Fatalf("rerun: %v %v", again, err)
 	}
 	var count int

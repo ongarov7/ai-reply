@@ -262,7 +262,7 @@ func TestFullRefundRevokesOnlyUnusedCreditsAndCannotReplayGrant(t *testing.T) {
 		if err := r.ParseForm(); err != nil {
 			t.Fatal(err)
 		}
-		if r.Form.Get("TRTYPE") != "14" || r.Form.Get("AMOUNT") != "100.00" || r.Form.Get("RRN") != "123456789012" {
+		if r.Form.Get("TRTYPE") != "14" || r.Form.Get("AMOUNT") != original.Get("AMOUNT") || r.Form.Get("RRN") != "123456789012" {
 			t.Fatal("refund not bound to paid original")
 		}
 		response := url.Values{"ACTION": {"0"}, "RC": {"00"}, "ORDER": {r.Form.Get("ORDER")}, "TERMINAL": {r.Form.Get("TERMINAL")}, "AMOUNT": {r.Form.Get("AMOUNT")}, "CURRENCY": {"398"}, "RRN": {"123456789012"}, "INT_REF": {"FEDCBA9876543210"}}

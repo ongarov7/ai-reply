@@ -51,12 +51,14 @@ reverse_proxy 127.0.0.1:{APP_PORT}
 База SQLite лежит в томе `aireply-data` (`/app/data/aireply.db`) и переживает
 `docker compose down` / `up -d`. Не запускайте `docker compose down -v` — это удалит базу.
 
-При старте автоматически применяются миграции, создаются тарифы
-(`free 7/день`, `standard 30/день`, `pro 50/день`) и администратор из
-`ADMIN_EMAIL` / `ADMIN_PASSWORD`. Для существующей базы миграция
-`0021_free_daily_limit_7` один раз возвращает дневной лимит тарифа `free` к 7 и
-синхронизирует только известные стандартные описания с числом 20. Последующие
-изменения тарифа в админке сохраняются; отдельный приветственный бонус не меняется.
+При старте автоматически применяются миграции, создаются тарифы и администратор из
+`ADMIN_EMAIL` / `ADMIN_PASSWORD`. Актуальный каталог: бесплатно — 10 приветственных
+ответов однократно; Base — 40 ответов в день за 790 ₸/месяц или 7 900 ₸/год;
+Pro — безлимит за 3 450 ₸/месяц или 34 500 ₸/год; дополнительный пакет —
+30 ответов за 130 ₸. Миграция `0029_unified_pricing` публикует эти цены в новой
+версии каталога, сохраняя историю, прежние заказы, банковские договоры и остатки
+кредитов. Цены App Store настраиваются отдельно в App Store Connect; клиент
+показывает фактическую цену StoreKit.
 
 Проверка:
 
@@ -223,12 +225,13 @@ Android, и на iOS (через APNs-ключ, загруженный в Fireba
 
 ## Покупки в приложении
 
-Пакеты ответов (не сгорают) и пропуск (ответы на N часов) продаются только через магазины:
-iOS — StoreKit 2 (consumable и non-renewing subscription), Android — Google Play Billing
-(одноразовые товары). Цен на сервере нет: приложение показывает цену магазина. Сервер
-проверяет каждую покупку сам и начисляет ответы одной транзакцией через журнал кредитов
-(`credit_grants` / `credit_ledger`); порядок списания — дневной лимит тарифа → пропуск →
-бесплатные ответы → начисления админа → пакеты.
+Актуальные товары iOS: подписки Base и Pro на месяц/год (**Auto-Renewable Subscription**)
+и пакет 30 ответов (**Consumable**). iOS использует StoreKit 2, Android — Google Play
+Billing для одноразовых товаров. Бизнес-цены хранятся в опубликованном каталоге сервера;
+при оплате приложение показывает фактическую локализованную цену магазина. Сервер
+проверяет каждую покупку и применяет подписку или начисляет пакет через журнал кредитов
+(`credit_grants` / `credit_ledger`). Ранее купленные пропуски продолжают работать;
+порядок списания — дневной лимит тарифа → пропуск → бесплатные ответы → начисления админа → пакеты.
 
 - **Выключено, пока не настроено.** Продажа на платформе открыта (`features.iap_ios` /
   `features.iap_android`, `details.can_buy` в лимитных ошибках), только когда: магазин
@@ -247,54 +250,67 @@ iOS — StoreKit 2 (consumable и non-renewing subscription), Android — Google
   повторяет фоновая задача каждые 15 минут, считая от начисления (pending — от оплаты), —
   неподтверждённую покупку Google сам вернёт через 3 дня. Возвраты — опрос `voidedpurchases`
   (`IAP_GOOGLE_VOIDED_POLL`, по умолчанию раз в час).
-- **Привязка к аккаунту.** `GET /api/v1/iap/products` отдаёт `account_token` — UUID из
-  HMAC id аккаунта (ключ выводится из `JWT_ACCESS_SECRET`). iOS передаёт его в
+- **Привязка к аккаунту.** `GET /api/v1/iap/products` отдаёт `account_token` — UUID,
+  сохранённый для аккаунта в `iap_account_tokens`. iOS передаёт его в
   `appAccountToken`, Android — в `setObfuscatedAccountId`. Чужую транзакцию нельзя
   зачесть себе: `PURCHASE_INVALID` (`account_mismatch`) или
-  `409 PURCHASE_BELONGS_TO_ANOTHER_ACCOUNT`. Смена `JWT_ACCESS_SECRET` меняет все токены:
-  покупки, сделанные до смены и не отправленные на сервер, будут отклонены.
+  `409 PURCHASE_BELONGS_TO_ANOTHER_ACCOUNT`. Сохранённый токен переживает смену
+  `JWT_ACCESS_SECRET`.
 - **Возвраты.** Отзывается то, что осталось от покупки; потраченное остаётся потраченным,
   баланс не уходит в минус. Возврат по транзакции, которую сервер ещё не видел, записывается
   заранее — потом её не начислить. `REFUND_REVERSED` возвращает снятое, а заранее записанный
   возврат снимает: такая транзакция потом начисляется своему аккаунту.
 - **Пропуск.** Купленный во время другого начинается, когда тот закончится; пропуск без
   оставшихся ответов не держит ни новый, ни ждущий в очереди — они начинаются сразу.
-- **Sandbox.** TestFlight и App Review покупают в Sandbox на production-сервере. В production
-  Sandbox принимается только при `APPLE_IAP_ACCEPT_SANDBOX=true` (без него — предупреждение
-  при старте); такие покупки записываются с `environment = Sandbox` и в выручку админки не
-  входят, как и тестовые покупки Google (`Test`). Лицензионные тестеры Google платят ноль, а
-  ответы получают настоящие, поэтому в production их покупки принимаются только при
-  `GOOGLE_PLAY_ACCEPT_TEST=true` (иначе `PURCHASE_INVALID`, `environment`).
+- **Sandbox.** Обычное тестирование использует отдельные API и базу Sandbox;
+  встроенная среда включается `BILLING_SANDBOX_ENABLED=true` и доступна под `/sandbox`.
+  В production оставляйте `APPLE_IAP_ACCEPT_SANDBOX=false`: значение `true` запрещено
+  проверкой конфигурации и останавливает запуск. Для App Review или тестера TestFlight,
+  работающего с production API, разрешите конкретные email через
+  `APPLE_IAP_SANDBOX_ACCOUNTS` (через запятую). Если список пуст, исключение применяется
+  только к `REVIEW_LOGIN_EMAIL`. Покупка проверяется с привязкой к этому аккаунту,
+  сохраняется с `environment = Sandbox` и не входит в выручку. Sandbox-уведомления
+  обрабатывает отдельный Sandbox endpoint. Тестовые покупки Google (`Test`) также
+  не входят в выручку. В production они принимаются при `GOOGLE_PLAY_ACCEPT_TEST=true`;
+  лицензионные тестеры платят ноль, но получают настоящие ответы.
 - **Удаление аккаунта.** Запись о покупке остаётся (финансовая запись) с `user_id = NULL`;
   начисление и журнал удаляются вместе с аккаунтом.
 
 Переменные: `APPLE_IAP_ENABLED`, `APPLE_IAP_BUNDLE_ID` (по умолчанию
-`kz.ai-reply.reply.keyboard.keyboard`), `APPLE_IAP_ACCEPT_SANDBOX`, `GOOGLE_PLAY_PACKAGE_NAME`
+`kz.ai-reply.reply.keyboard.keyboard`), `APPLE_IAP_ACCEPT_SANDBOX`, `APPLE_IAP_SANDBOX_ACCOUNTS`, `GOOGLE_PLAY_PACKAGE_NAME`
 (по умолчанию `kz.yerek.aireply`), `GOOGLE_PLAY_ACCEPT_TEST`, `GOOGLE_PLAY_SERVICE_ACCOUNT_FILE` или вместе
 `GOOGLE_PLAY_CLIENT_EMAIL` + `GOOGLE_PLAY_PRIVATE_KEY`, `IAP_GOOGLE_VOIDED_POLL`,
 `RATE_IAP_PER_MINUTE`. Половина ключа Google — сервер не стартует.
 
 Что создать владельцу:
 
-1. App Store Connect ▸ приложение ▸ «Покупки в приложении»: пакеты — **Consumable**,
-   пропуск — **Non-Renewing Subscription**; Product ID любой, но тот же, что в админке
-   (например `kz.ai_reply.pack50`, `kz.ai_reply.pass24h`); цены, локализации, скриншот для
-   ревью. Paid Applications Agreement и банковские данные должны быть активны.
-2. App Store Connect ▸ App Information ▸ App Store Server Notifications: **Version 2**,
-   Production и Sandbox URL — `https://ai-reply.kz/api/v1/iap/apple/notifications`
-   (`<PUBLIC_BASE_URL>/api/v1/iap/apple/notifications`, он же в админке на странице «Покупки»).
-3. Play Console ▸ Монетизация ▸ Товары ▸ **Одноразовые товары** (managed products): пакет и
-   пропуск с теми же Product ID, что в админке (`pack_50`, `pass_24h`; строчные буквы, цифры,
-   `_` и `.`), цены, активировать.
+1. App Store Connect ▸ приложение: четыре **Auto-Renewable Subscription** —
+   Base месяц (`base_monthly`, 790 ₸), Base год (`base_yearly`, 7 900 ₸),
+   Pro месяц (`pro_monthly`, 3 450 ₸), Pro год (`pro_yearly`, 34 500 ₸) —
+   и один **Consumable**: 30 ответов (`pack30`, 130 ₸). В скобках указаны коды
+   бизнес-каталога; реальные Product ID берутся из App Store Connect и затем точно
+   сопоставляются с этими кодами в админке. Настроить периоды, цены Казахстана,
+   локализации и материалы для ревью. Paid Applications Agreement и банковские
+   данные должны быть активны.
+2. App Store Connect ▸ App Information ▸ App Store Server Notifications: **Version 2**.
+   Production URL — `https://ai-reply.kz/api/v1/iap/apple/notifications`.
+   Sandbox URL — `https://ai-reply.kz/sandbox/api/v1/iap/apple/notifications`
+   при `BILLING_SANDBOX_ENABLED=true`, либо URL отдельного staging API с собственной базой.
+3. Play Console ▸ Монетизация ▸ Товары ▸ **Одноразовые товары**: пакет 30 ответов
+   за 130 ₸. Реальный Google Product ID должен совпадать с настройкой товара на сервере.
 4. Google Cloud: сервисный аккаунт и JSON-ключ; в Play Console ▸ Пользователи и разрешения
    пригласить его email с доступом к приложению: «Просмотр финансовых данных» и «Управление
    заказами и подписками». Можно тот же аккаунт, что для Firebase. Лицензионные тестеры —
    Play Console ▸ Настройки ▸ Тестирование лицензий.
-5. `.env`: `APPLE_IAP_ENABLED=true`, Google-ключ, `APPLE_IAP_ACCEPT_SANDBOX=true` на время
-   ревью, `GOOGLE_PLAY_ACCEPT_TEST=true` на время проверки лицензионными тестерами; `-check`
-   покажет, что подключено.
-6. Админка ▸ «Покупки»: создать товары (количество ответов, для пропуска — часы, Product ID,
-   названия на 4 языках, «Продаётся»), затем «Настройки» ▸ «Покупки в приложении» ▸ включить.
+5. Production `.env`: `APPLE_IAP_ENABLED=true`, `APPLE_IAP_ACCEPT_SANDBOX=false`;
+   `APPLE_IAP_SANDBOX_ACCOUNTS` — только нужные аккаунты проверки, либо используется
+   `REVIEW_LOGIN_EMAIL`. Для изолированной встроенной среды добавить
+   `BILLING_SANDBOX_ENABLED=true`; она сама принимает Apple Sandbox и использует отдельную
+   базу. Google-ключ и `GOOGLE_PLAY_ACCEPT_TEST=true` нужны при проверке лицензионными
+   тестерами Google. Команда `-check` проверяет конфигурацию.
+6. Админка ▸ «Биллинг»: сопоставить пять кодов с реальными Apple Product ID,
+   проверить цены и лимиты, сохранить черновик и опубликовать каталог. Включать товары
+   после их настройки в App Store Connect; затем «Настройки» ▸ «Покупки в приложении» ▸ включить.
 
 API и порядок вызовов на клиентах — [docs/API.md](docs/API.md#покупки-в-приложении).
 
@@ -462,7 +478,8 @@ make secrets     # сгенерировать JWT/legacy секреты
 `TRANSCRIBE_ENABLED=true`, `OPENAI_TRANSCRIBE_MODEL=gpt-transcribe`, `RATE_TRANSCRIBE_PER_MINUTE=10`,
 `LIMIT_TRANSCRIBE_PER_DAY=100` (ключ тот же `OPENAI_API_KEY`); покупки в приложении —
 `APPLE_IAP_ENABLED=false`, `APPLE_IAP_BUNDLE_ID`, `APPLE_IAP_ACCEPT_SANDBOX` (пусто — `false` в
-production), `GOOGLE_PLAY_PACKAGE_NAME`, `GOOGLE_PLAY_ACCEPT_TEST` (пусто — `false` в production),
+production; `true` в production запрещён), `APPLE_IAP_SANDBOX_ACCOUNTS` (пусто — только
+`REVIEW_LOGIN_EMAIL`), `GOOGLE_PLAY_PACKAGE_NAME`, `GOOGLE_PLAY_ACCEPT_TEST` (пусто — `false` в production),
 `GOOGLE_PLAY_SERVICE_ACCOUNT_FILE` /
 `GOOGLE_PLAY_CLIENT_EMAIL` / `GOOGLE_PLAY_PRIVATE_KEY` (пусто — Google выключен; половина
 ключа или файл вместе с переменными — отказ при старте), `IAP_GOOGLE_VOIDED_POLL=1h`
@@ -470,8 +487,8 @@ production), `GOOGLE_PLAY_PACKAGE_NAME`, `GOOGLE_PLAY_ACCEPT_TEST` (пусто �
 
 Предупреждения при старте (`configuration warning: …`, сервер работает): пустой
 `LEGAL_OPERATOR_NAME` в production; Apple-вход без ключа отзыва; `APPLE_CLIENT_ID` не похож
-на bundle id; `APPLE_IAP_ENABLED=true` в production без `APPLE_IAP_ACCEPT_SANDBOX=true`
-(покупки App Review и TestFlight будут отклонены). Лимит входа в админку теперь в коде: 5 попыток за 15 минут на пару адрес+IP и
+на bundle id. Для App Review/TestFlight через production API настройте исключение
+аккаунта, описанное выше. Лимит входа в админку теперь в коде: 5 попыток за 15 минут на пару адрес+IP и
 20 неудач в час на адрес — после этого отказ получают только IP, которые сами ошибались с
 этим адресом (`RATE_ADMIN_LOGIN_PER_HOUR` на IP — как раньше).
 
