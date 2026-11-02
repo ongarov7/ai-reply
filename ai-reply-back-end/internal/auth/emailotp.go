@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"github.com/aireply/ai-reply-back-end/internal/logging"
 	"strings"
 	"time"
 
@@ -147,7 +148,8 @@ func (s *Service) requestEmailOTP(ctx context.Context, rawEmail, locale, purpose
 			// The code never reached the user: close it, so it can neither be
 			// used nor hold back an immediate retry.
 			_ = s.repo.CloseOTP(context.WithoutCancel(ctx), record.ID, domain.OTPReasonDeliveryFailed, now)
-			s.log.Warn("email otp delivery failed", "purpose", purpose, "error", err.Error())
+			// Nobody can sign in by e-mail while this repeats: the operator hears about it.
+			s.log.Warn("email otp delivery failed", "purpose", purpose, "error", err.Error(), logging.Alert())
 			return EmailChallenge{}, domain.ErrEmailDelivery
 		}
 	}

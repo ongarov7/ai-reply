@@ -3,6 +3,7 @@ package notifications
 import (
 	"context"
 	"errors"
+	"github.com/aireply/ai-reply-back-end/internal/logging"
 	"math/rand/v2"
 	"strconv"
 	"strings"
@@ -325,11 +326,17 @@ func (s *Service) deliver(ctx context.Context, d repository.ClaimedDelivery, not
 	if status == domain.DeliveryFailed || status == domain.DeliveryRetrying {
 		level = s.log.Warn
 	}
-	level("notification delivery", "event", "notification_delivery", "delivery_id", d.ID,
+	attrs := []any{"event", "notification_delivery", "delivery_id", d.ID,
 		"notification_id", d.NotificationID, "campaign_id", d.CampaignID, "channel", d.Channel,
 		"installation_id", d.InstallationID, "user_id", d.UserID, "platform", d.Platform, "provider", d.Provider,
 		"attempt", d.AttemptCount, "status", status, "error_code", o.code, "push", o.fingerprint,
-		"duration_ms", o.durationMs, "recorded", stored != "")
+		"duration_ms", o.durationMs, "recorded", stored != ""}
+	if providerFailure(o.code) {
+		// Not one stale device but the push setup itself (APNs key, credentials,
+		// project, quota): every message fails until someone fixes it.
+		attrs = append(attrs, logging.Alert())
+	}
+	level("notification delivery", attrs...)
 	if err != nil {
 		s.log.Error("delivery result not saved", "delivery_id", d.ID, "error", err.Error())
 	}
@@ -578,4 +585,13 @@ func (s *Service) Retain(ctx context.Context) (deliveries, notifications int64) 
 			"older_than_days", s.cfg.RetentionDays)
 	}
 	return deliveries, notifications
+}
+
+// providerFailure — FCM errors that mean the push setup is broken, not one device.
+func providerFailure(code string) bool {
+	switch code {
+	case "THIRD_PARTY_AUTH_ERROR", "UNAUTHENTICATED", "PERMISSION_DENIED", "OAUTH_TOKEN_UNAVAILABLE", "QUOTA_EXCEEDED", "SENDER_ID_MISMATCH":
+		return true
+	}
+	return false
 }
