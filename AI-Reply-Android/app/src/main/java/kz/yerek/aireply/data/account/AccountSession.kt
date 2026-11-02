@@ -3,6 +3,7 @@ package kz.yerek.aireply.data.account
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import kz.yerek.aireply.platform.ReplyLog
 
@@ -88,6 +89,15 @@ class AccountSession(
             RefreshRequest(refreshToken, deviceDescriptor())
         )
 
+        // Once the request is out, the server may already have rotated the
+        // refresh token: the answer must be read and stored even if the caller
+        // (a keyboard tap, a screen) is cancelled meanwhile, or the next refresh
+        // presents the old token and the server signs the user out. Bounded by
+        // the client's own timeouts.
+        withContext(NonCancellable) { exchangeRefresh(client, payload, refreshToken) }
+    }
+
+    private suspend fun exchangeRefresh(client: ApiClient, payload: String, refreshToken: String): String {
         val body = try {
             client.request("POST", "api/v1/auth/refresh", payload)
         } catch (exception: ApiException) {
@@ -113,7 +123,7 @@ class AccountSession(
         if (credentials.refreshToken != refreshToken) ApiError.Unauthorized.raise()
 
         credentials.store(tokens.accessToken, tokens.refreshToken, tokens.expiresIn)
-        tokens.accessToken
+        return tokens.accessToken
     }
 
     /** Stores a freshly issued session. */

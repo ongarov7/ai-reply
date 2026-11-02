@@ -4,6 +4,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kz.yerek.aireply.data.account.ApiClient
@@ -62,6 +63,31 @@ class AccountSessionRefreshTest {
         )
         assertEquals("new", credentials.access)
         assertEquals("the rotated refresh token is kept", "r2", credentials.refresh)
+    }
+
+    @Test
+    fun `a refresh cancelled while the answer is on its way still stores the rotated token`() = runBlocking {
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val server = meServer(onRefresh = {
+            entered.countDown()
+            release.await(5, TimeUnit.SECONDS)
+            tokenPair("new", "r2")
+        })
+        val credentials = FakeCredentials(access = "old", refresh = "r1", fresh = false)
+        val session = sessionOn(server, credentials)
+
+        val job = launch(Dispatchers.IO) {
+            runCatching { session.refreshAccessToken(rejected = "old") }
+        }
+        assertTrue("the refresh reached the server", entered.await(5, TimeUnit.SECONDS))
+        // The keyboard tap is abandoned while the server has already rotated r1.
+        job.cancel()
+        release.countDown()
+        job.join()
+
+        assertEquals("the rotated refresh token survives the cancellation", "r2", credentials.refresh)
+        assertEquals("new", credentials.access)
     }
 
     @Test
