@@ -20,6 +20,8 @@ struct AIReplyApp: App {
         #if DEBUG
         AIConfiguration.applyDebugLaunchArguments()
         #endif
+        // Crashes of earlier runs reach the server's alert channel (MetricKit, anonymous).
+        CrashDiagnostics.shared.start()
         // Sends only for a signed-in user of a server that asks for events.
         ProductEvents.sink = ProductEventReporter.shared
 

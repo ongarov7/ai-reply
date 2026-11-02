@@ -46,6 +46,7 @@
 		1FFC995290565AB7A11649F0 /* NotificationViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45BF6BD39737AA005A66F785 /* NotificationViews.swift */; };
 		2118E12127427ACD54B135CA /* BalanceSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 995232408FD8B150F3AE7DE4 /* BalanceSummary.swift */; };
 		2190966D5B55FCB858FDB953 /* ProductEvents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00522FD16FE57B903CFB1BB0 /* ProductEvents.swift */; };
+		A1C0DE0000000000000000A1 /* CrashDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DE0000000000000000A2 /* CrashDiagnostics.swift */; };
 		22F15C3C02F42E4098819624 /* AIConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB7D2F1D37929DBD114C3D9A /* AIConfiguration.swift */; };
 		230B2DC5D123996069009C9A /* PurchaseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECAE95C739B141EF4B65D003 /* PurchaseView.swift */; };
 		24C384EAF02CEB8C6843B421 /* OnboardingFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B96896F50FCC24405B4267B /* OnboardingFlowTests.swift */; };
@@ -238,6 +239,7 @@
 		D2F0BB3D968CC9F75DEA66A1 /* FirebasePush.swift in Sources */ = {isa = PBXBuildFile; fileRef = 027259A6AE3CB40A4926592F /* FirebasePush.swift */; };
 		D588EA316075FF99AECA5BD7 /* LocalizedDisplay.swift in Sources */ = {isa = PBXBuildFile; fileRef = D968CBF2153056C63D3F91A3 /* LocalizedDisplay.swift */; };
 		D62AE3C5C4788540739E9BA9 /* AILimitsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A159C6BF2C232F4DD2A56E2 /* AILimitsTests.swift */; };
+		A1C0DE0000000000000000A3 /* CrashDiagnosticsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DE0000000000000000A4 /* CrashDiagnosticsTests.swift */; };
 		D6771A72F2B74CD1F460A966 /* en.words in Resources */ = {isa = PBXBuildFile; fileRef = 6668016485DC6773D83AA600 /* en.words */; };
 		D685A039616BCAF47C05E692 /* LocalizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44038C1892A37CE406FF1FE4 /* LocalizationTests.swift */; };
 		D6A162E91837957DB3ED26B2 /* InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 81CB1970417EAEB08EB41373 /* InfoPlist.xcstrings */; };
@@ -318,6 +320,7 @@
 
 /* Begin PBXFileReference section */
 		00522FD16FE57B903CFB1BB0 /* ProductEvents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductEvents.swift; sourceTree = "<group>"; };
+		A1C0DE0000000000000000A2 /* CrashDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrashDiagnostics.swift; sourceTree = "<group>"; };
 		007CAE30B84E19B48967E9DA /* TemplateListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateListView.swift; sourceTree = "<group>"; };
 		01E2326063481AC80000952A /* UserProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfile.swift; sourceTree = "<group>"; };
 		026C7E7137E670D5E649E656 /* ReplyDraftHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyDraftHistory.swift; sourceTree = "<group>"; };
@@ -395,6 +398,7 @@
 		5751EDA12B9631A0C069E4E9 /* PreferredLanguageSyncTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferredLanguageSyncTests.swift; sourceTree = "<group>"; };
 		587FC6B56D179C913FA3942A /* AutocorrectLexicon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutocorrectLexicon.swift; sourceTree = "<group>"; };
 		5A159C6BF2C232F4DD2A56E2 /* AILimitsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AILimitsTests.swift; sourceTree = "<group>"; };
+		A1C0DE0000000000000000A4 /* CrashDiagnosticsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrashDiagnosticsTests.swift; sourceTree = "<group>"; };
 		5AFB0643ED4FBC6441570B6B /* AccountPolishTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountPolishTransport.swift; sourceTree = "<group>"; };
 		5B460028095C479EDAD8B842 /* VoiceConfigurationParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceConfigurationParser.swift; sourceTree = "<group>"; };
 		5C49CC5CC584C7F928C9E014 /* PermissionDiagnosticsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionDiagnosticsTests.swift; sourceTree = "<group>"; };
@@ -703,6 +707,7 @@
 			children = (
 				A3AC3AE14B3A9D09A5F14CAA /* AccountAPITests.swift */,
 				5A159C6BF2C232F4DD2A56E2 /* AILimitsTests.swift */,
+				A1C0DE0000000000000000A4 /* CrashDiagnosticsTests.swift */,
 				50D3D2C111D29A7911D507A8 /* AIReplyServiceTests.swift */,
 				E3173D9EA8C70233E933FFCA /* AppUpdateTests.swift */,
 				6C7ECA0D56950300F324C7F4 /* AutocorrectCaretTests.swift */,
@@ -857,6 +862,7 @@
 				D968CBF2153056C63D3F91A3 /* LocalizedDisplay.swift */,
 				7B0AC2B6C095B674360079F2 /* PreferredLanguageSync.swift */,
 				00522FD16FE57B903CFB1BB0 /* ProductEvents.swift */,
+				A1C0DE0000000000000000A2 /* CrashDiagnostics.swift */,
 				37534ABE8C75ED698C355970 /* ProfileSync.swift */,
 				70382F436399A34525547E8E /* ReplyConfigurationModel.swift */,
 			);
@@ -1187,6 +1193,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				D62AE3C5C4788540739E9BA9 /* AILimitsTests.swift in Sources */,
+				A1C0DE0000000000000000A3 /* CrashDiagnosticsTests.swift in Sources */,
 				5EAD4456B8E90AC6EFC75B5B /* AIReplyServiceTests.swift in Sources */,
 				0E8E981FD3C821B9D4349A21 /* AccountAPITests.swift in Sources */,
 				0518797B75C72CD7878737CF /* AppUpdateTests.swift in Sources */,
@@ -1417,6 +1424,7 @@
 				4166EA154623EB89C9460682 /* PolishService.swift in Sources */,
 				764AE6FF67255A7DDCD9DC3C /* PreferredLanguageSync.swift in Sources */,
 				2190966D5B55FCB858FDB953 /* ProductEvents.swift in Sources */,
+				A1C0DE0000000000000000A1 /* CrashDiagnostics.swift in Sources */,
 				9FD7BA0E98275E4D9FA42010 /* ProfileEditorView.swift in Sources */,
 				09F63EACA2EE871118789FD3 /* ProfileStore.swift in Sources */,
 				1CCCABEB12E43C3AF9A6E4A9 /* ProfileSync.swift in Sources */,
