@@ -99,6 +99,15 @@ public final class QuickBarModel {
             await account.refreshConfig()
             // A website purchase can complete seconds after the last read.
             if auth.isSignedIn { try? await account.refreshMe() }
+            clearLimitIfLifted()
+        }
+    }
+
+    /// The "no replies left" card goes as soon as a fresh balance has replies
+    /// again (a purchase on the website), instead of waiting for the next submit.
+    func clearLimitIfLifted() {
+        if case .generation(.limitReached) = issue, let balance = account.balance, !balance.isExhausted {
+            issue = nil
         }
     }
 
@@ -232,7 +241,12 @@ public final class QuickBarModel {
         issue = .generation(error)
         switch error {
         case .signedOut: auth.sessionEnded()
-        case .consentRequired, .limitReached: Task { try? await account.refreshMe() }
+        case .consentRequired: Task { try? await account.refreshMe() }
+        case .limitReached:
+            Task {
+                try? await account.refreshMe()
+                clearLimitIfLifted()
+            }
         default: break
         }
     }

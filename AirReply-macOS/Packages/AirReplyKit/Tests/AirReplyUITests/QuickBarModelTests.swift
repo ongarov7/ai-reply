@@ -73,14 +73,19 @@ final class DeniedMicrophone: MicrophonePermission {
 final class BackendStub: HTTPTransport, @unchecked Sendable {
     private let lock = NSLock()
     private var paths: [String] = []
+    private var usage: String?
     var hits: [String] { lock.withLock { paths } }
+    /// The usage object /me returns from now on (nil: no usage).
+    func setUsage(_ json: String?) { lock.withLock { usage = json } }
 
     func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         let path = request.url!.path
         lock.withLock { paths.append(path) }
         let body: String = switch path {
         case let p where p.hasSuffix("/config"): #"{"max_source_characters":400,"max_instruction_length":400,"features":{"voice_transcription":true}}"#
-        case let p where p.hasSuffix("/me"): #"{"user":{"id":"u-1"},"legal_consent":{"terms_version":"t","privacy_version":"p"}}"#
+        case let p where p.hasSuffix("/me"):
+            #"{"user":{"id":"u-1"},"legal_consent":{"terms_version":"t","privacy_version":"p"}"# +
+                (lock.withLock { usage }.map { #","usage":"# + $0 } ?? "") + "}"
         default: "{}"
         }
         return (Data(body.utf8), HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
@@ -211,6 +216,21 @@ struct QuickBarModelTests {
         await waitUntil { env.backend.hits.contains { $0.hasSuffix("/api/v1/me") } }
         #expect(env.model.issue == .generation(.limitReached(resetsAt: nil)))
         #expect(env.model.phase == .editing)
+    }
+
+    @Test func aWebsitePurchaseClearsTheLimitCardOnTheNextOpen() async throws {
+        let env = try makeEnvironment([.failure(.limitReached(resetsAt: nil))])
+        env.backend.setUsage(#"{"daily_limit":0,"unlimited":false,"used_today":0,"remaining_today":0,"credits":0,"remaining_total":0}"#)
+        env.model.draft = "x"
+        env.model.submit()
+        await waitUntil { env.account.balance != nil }
+        #expect(env.model.issue == .generation(.limitReached(resetsAt: nil)), "an empty balance keeps the card")
+        // The person pays for a pack on the website and opens the bar again.
+        env.backend.setUsage(#"{"daily_limit":0,"unlimited":false,"used_today":0,"remaining_today":0,"credits":30,"remaining_total":30}"#)
+        env.model.panelDidOpen(copied: .none)
+        await waitUntil { env.model.issue == nil }
+        #expect(env.model.issue == nil)
+        #expect(env.account.balance?.remainingTotal == 30)
     }
 
     @Test func endedSessionSignsOut() async throws {

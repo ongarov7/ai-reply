@@ -261,7 +261,10 @@ public final class AppCoordinator {
     }
 
     private func statusSnapshot() -> StatusItemController.Snapshot {
-        .init(shortcut: settings.shortcut.displayString, email: signedInEmail, signedIn: auth.isSignedIn,
-              balance: account.balance, voiceAvailable: account.config.voiceTranscription)
+        // A menu bar app is rarely "activated": opening the menu is the moment to
+        // fetch the balance (throttled), so a website purchase shows on the next open.
+        if auth.isSignedIn { Task { await refreshAccount() } }
+        return .init(shortcut: settings.shortcut.displayString, email: signedInEmail, signedIn: auth.isSignedIn,
+                     balance: account.balance, voiceAvailable: account.config.voiceTranscription)
     }
 }
