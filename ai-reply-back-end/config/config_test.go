@@ -956,3 +956,20 @@ func TestIAPRejectsHalfConfiguredGoogleAndBadValues(t *testing.T) {
 		t.Fatalf("service account file: %v", err)
 	}
 }
+
+func TestAppReviewAccountMayBuyInSandboxOnProduction(t *testing.T) {
+	setProductionEnv(t)
+	t.Setenv("REVIEW_LOGIN_EMAIL", "Review@AI-Reply.kz")
+	t.Setenv("REVIEW_LOGIN_CODE", "4826")
+	cfg, err := Load("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.IAP.AppleAcceptSandbox || len(cfg.IAP.AppleSandboxAccounts) != 1 || cfg.IAP.AppleSandboxAccounts[0] != "review@ai-reply.kz" {
+		t.Fatalf("production sandbox accounts: %v (accept all %v)", cfg.IAP.AppleSandboxAccounts, cfg.IAP.AppleAcceptSandbox)
+	}
+	t.Setenv("APPLE_IAP_SANDBOX_ACCOUNTS", "qa1@ai-reply.kz, QA2@ai-reply.kz")
+	if cfg, err = Load(""); err != nil || len(cfg.IAP.AppleSandboxAccounts) != 2 || cfg.IAP.AppleSandboxAccounts[1] != "qa2@ai-reply.kz" {
+		t.Fatalf("explicit list: %v %v", cfg.IAP.AppleSandboxAccounts, err)
+	}
+}
