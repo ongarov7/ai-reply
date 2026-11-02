@@ -21,6 +21,7 @@ public final class AppCoordinator {
     private let frontmost = FrontmostAppTracker()
     private let paste = PasteService()
     private let panel: QuickPanelController
+    private let crashDiagnostics: CrashDiagnostics
     private var statusItem: StatusItemController?
     private var settingsWindow: SettingsWindowController?
     private var observers: [NSObjectProtocol] = []
@@ -46,9 +47,12 @@ public final class AppCoordinator {
                               generator: ServerGenerator(client: client, configuration: configuration),
                               clipboard: clipboard, settings: settings)
         panel = QuickPanelController(settings: settings)
+        crashDiagnostics = CrashDiagnostics(client: client)
     }
 
     public func start() {
+        // Crashes of earlier runs reach the server's alert channel (MetricKit, anonymous).
+        crashDiagnostics.start()
         applyAppearance()
         wirePanel()
         wireAccount()
