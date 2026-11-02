@@ -26,6 +26,7 @@ func (s *CheckoutService) Refund(ctx context.Context, adminID, id string) (BankO
 	var order BankOrder
 	var fields url.Values
 	var send bool
+	var retry bool
 	err := s.db.Tx(ctx, func(tx *sql.Tx) error {
 		var err error
 		order, err = readOrder(tx.QueryRowContext(ctx, `SELECT `+orderColumns+` FROM billing_orders WHERE id=? AND environment=?`, id, s.Environment()))
@@ -40,13 +41,16 @@ func (s *CheckoutService) Refund(ctx context.Context, adminID, id string) (BankO
 		}
 		var existing string
 		err = tx.QueryRowContext(ctx, `SELECT status FROM billing_bank_operations WHERE order_id=? AND kind='refund'`, id).Scan(&existing)
-		if err == nil {
+		// needs_review is written only after the bank explicitly refused the
+		// refund (nothing moved), so that one state may be sent again.
+		if err == nil && existing != "needs_review" {
 			order.RefundStatus = existing
 			return nil
 		}
-		if !errors.Is(err, sql.ErrNoRows) {
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
+		retry = err == nil
 		var raw string
 		if err = tx.QueryRowContext(ctx, `SELECT fields_json FROM billing_order_events WHERE id=?`, "fulfilled-"+id).Scan(&raw); err != nil {
 			return err
@@ -73,13 +77,29 @@ func (s *CheckoutService) Refund(ctx context.Context, adminID, id string) (BankO
 			return ErrInvalidRequest
 		}
 		fields = url.Values{"ORDER": {order.bankOrder}, "MERCH_RN_ID": {rnID}, "MERCH_GMT": {"0"}, "LANG": {"ru"}, "ORG_AMOUNT": {amount}, "AMOUNT": {amount}, "CURRENCY": {CurrencyKZT}, "RRN": {original["RRN"]}, "INT_REF": {original["INT_REF"]}, "TERMINAL": {s.cfg.Terminal}, "TIMESTAMP": {now.Format("20060102150405")}, "TRTYPE": {"14"}, "NONCE": {strings.ToUpper(hex.EncodeToString(nonce[:]))}, "NOTIFY_URL": {s.baseURL() + "/api/v1/payments/bcc/notify"}}
+		if order.Kind == "subscription" {
+			// BCC requires RECUR_REF (the RRN that opened the recurring chain) to
+			// refund the first payment or a renewal; it is not part of the MAC.
+			var firstRRN string
+			if err = tx.QueryRowContext(ctx, `SELECT first_rrn FROM bcc_subscriptions WHERE id=(SELECT bcc_subscription_id FROM billing_orders WHERE id=?)`, id).Scan(&firstRRN); err != nil {
+				return err
+			}
+			if !bankReference(firstRRN) {
+				return ErrInvalidRequest
+			}
+			fields.Set("RECUR_REF", firstRRN)
+		}
 		signature, err := SignRequest(Refund, fields, s.cfg.MACKeyHex)
 		if err != nil {
 			return err
 		}
 		fields.Set("P_SIGN", signature)
 		request, _ := json.Marshal(fields)
-		if _, err = tx.ExecContext(ctx, `INSERT INTO billing_bank_operations(id,order_id,kind,status,request_json,created_by,created_at,updated_at) VALUES(?,?,'refund','pending',?,?,?,?)`, traits.NewID(), id, string(request), adminID, now.UnixMilli(), now.UnixMilli()); err != nil {
+		if retry {
+			if _, err = tx.ExecContext(ctx, `UPDATE billing_bank_operations SET status='pending',request_json=?,created_by=?,updated_at=? WHERE order_id=? AND kind='refund' AND status='needs_review'`, string(request), adminID, now.UnixMilli(), id); err != nil {
+				return err
+			}
+		} else if _, err = tx.ExecContext(ctx, `INSERT INTO billing_bank_operations(id,order_id,kind,status,request_json,created_by,created_at,updated_at) VALUES(?,?,'refund','pending',?,?,?,?)`, traits.NewID(), id, string(request), adminID, now.UnixMilli(), now.UnixMilli()); err != nil {
 			return err
 		}
 		send = true
@@ -94,8 +114,21 @@ func (s *CheckoutService) Refund(ctx context.Context, adminID, id string) (BankO
 	order.RefundStatus = "pending"
 	response, requestErr := s.client.post(ctx, Refund, fields)
 	if requestErr != nil {
+		// Persisted as pending; the outcome is checked in the bank cabinet, never retried blindly.
+		s.log.Error("BCC refund outcome unknown", "order_id", order.ID, "environment", string(s.Environment()), "error", requestErr.Error())
 		return order, nil
-	} // persisted pending; inspect instead of retrying
+	}
+	if (response.Action == "2" || response.Action == "3") && response.RC != "" && response.RC != "00" && response.Order == order.bankOrder {
+		// An explicit refusal: no money moved, the admin may send the refund again.
+		now := s.now().UnixMilli()
+		if _, err = s.db.Writer().ExecContext(context.WithoutCancel(ctx), `UPDATE billing_bank_operations SET status='needs_review',updated_at=? WHERE order_id=? AND kind='refund' AND status='pending'`, now, order.ID); err != nil {
+			return BankOrder{}, err
+		}
+		_ = s.recordEvent(context.WithoutCancel(ctx), order.ID, "refund_response", "refund_declined", map[string]string{"ACTION": response.Action, "RC": response.RC, "ORDER": response.Order})
+		s.log.Error("BCC refund declined by the bank", "order_id", order.ID, "action", response.Action, "rc", response.RC, "environment", string(s.Environment()))
+		order.RefundStatus = "needs_review"
+		return order, nil
+	}
 	if response.Action == "0" && response.RC == "00" && (response.TRType == "" || response.TRType == "14") && (response.ReportedOriginalType == "" || response.ReportedOriginalType == "14") && response.Order == order.bankOrder && response.Terminal == s.cfg.Terminal && response.Amount == fields.Get("AMOUNT") && response.Currency == CurrencyKZT && bankReference(response.RRN) && bankReference(response.IntRef) {
 		safe := map[string]string{"ORDER": response.Order, "TERMINAL": response.Terminal, "AMOUNT": response.Amount, "CURRENCY": response.Currency, "RRN": response.RRN, "INT_REF": response.IntRef, "ACTION": response.Action, "RC": response.RC, "TRTYPE": "14"}
 		if err = s.refundAuthenticatedPack(ctx, order, safe); err != nil {

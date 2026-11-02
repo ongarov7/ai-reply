@@ -26,12 +26,19 @@ func (s *Server) registerCatalog(mux *http.ServeMux) {
 			httpx.JSON(w, http.StatusOK, map[string]any{"orders": orders})
 		}))
 		mux.Handle("POST /api/v1/admin/billing/orders/{id}/refund", s.guard(func(w http.ResponseWriter, r *http.Request) {
+			// Money leaves the merchant account: only a full administrator, never a viewer.
+			if adminFrom(r.Context()).Role != "admin" {
+				httpx.Fail(w, domain.ErrUnauthorized)
+				return
+			}
 			order, err := s.bank.Refund(r.Context(), adminFrom(r.Context()).Email, r.PathValue("id"))
 			if err != nil {
 				httpx.Fail(w, err)
 				return
 			}
-			s.admin.Audit(r.Context(), adminFrom(r.Context()), s.ip(r), "bcc.sandbox.refund", "billing_order", order.ID, map[string]any{"status": order.Status})
+			s.admin.Audit(r.Context(), adminFrom(r.Context()), s.ip(r), "bcc.refund", "billing_order", order.ID, map[string]any{
+				"status": order.Status, "refund_status": order.RefundStatus, "amount_minor": order.AmountMinor,
+				"currency": order.Currency, "product_code": order.ProductCode, "environment": string(s.bank.Environment())})
 			httpx.JSON(w, http.StatusAccepted, order)
 		}))
 	}
