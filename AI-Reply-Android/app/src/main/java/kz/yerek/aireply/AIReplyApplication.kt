@@ -3,6 +3,7 @@ package kz.yerek.aireply
 import android.app.Application
 import kz.yerek.aireply.ai.AILimits
 import kz.yerek.aireply.analytics.ProductEvents
+import kz.yerek.aireply.diagnostics.CrashReporter
 
 /**
  * Holds the object graph.
@@ -19,6 +20,8 @@ class AIReplyApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // First, so a crash anywhere below is summarised for the next start.
+        CrashReporter.install(this)
         services = ServiceLocator(this)
         // Pull the preferences file into memory now. Everything that reads it
         // later — including the keyboard's first frame — is then an in-memory
@@ -28,6 +31,7 @@ class AIReplyApplication : Application() {
         ProductEvents.install(services.deviceState.sharedPreferences)
         ProductEvents.sink = services.productEvents
         instance = this
+        services.reportPendingCrash()
     }
 
     companion object {

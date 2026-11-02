@@ -5,6 +5,8 @@ import android.os.Build
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kz.yerek.aireply.diagnostics.CrashReporter
 import kz.yerek.aireply.ai.AIConfiguration
 import kz.yerek.aireply.ai.AILimits
 import kz.yerek.aireply.ai.AIReplyService
@@ -89,6 +91,15 @@ class ServiceLocator(context: Context) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     val settings: SettingsStore by lazy { SettingsStore(appContext) }
+
+    /** A crash summary from the previous run goes to the server's alert channel, off the main thread. */
+    fun reportPendingCrash() {
+        scope.launch {
+            CrashReporter.sendPending(CrashReporter.PreferencesStore(appContext), BuildConfig.VERSION_NAME) { body ->
+                ApiClient(aiConfiguration.backendBaseUrl).request("POST", "/api/v1/client-errors", body)
+            }
+        }
+    }
 
     /** This phone's own state: onboarding progress, unsent profile changes. Not backed up. */
     val deviceState: DeviceStateStore by lazy { DeviceStateStore(appContext) }
