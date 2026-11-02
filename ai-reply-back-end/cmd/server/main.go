@@ -160,7 +160,9 @@ func run(envFile string) error {
 	notifier := alerts.New(telegramConfig(cfg), base)
 	log := slog.New(notifier.Handler(base.Handler()))
 	for _, warning := range cfg.Warnings() {
-		log.Warn("configuration warning: " + warning)
+		// Each start repeats them in Telegram: a setting that silently weakens
+		// production (proxy, Apple revocation, legal name) is seen, not just logged.
+		log.Warn("configuration warning: "+warning, logging.Alert())
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	var workers sync.WaitGroup
@@ -417,6 +419,7 @@ func buildApplication(ctx context.Context, cfg config.Config, log *slog.Logger, 
 		middleware.RequestID,
 		middleware.Recover(log),
 		middleware.Logging(log),
+		middleware.ProxyHint(cfg.App.TrustProxy, log),
 		middleware.SecurityHeaders(cfg.App.HSTS()),
 		middleware.CORS(cfg.App.CORSOrigins),
 	)

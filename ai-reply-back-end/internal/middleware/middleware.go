@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/aireply/ai-reply-back-end/internal/logging"
@@ -157,6 +158,29 @@ func SecurityHeaders(hsts bool) func(http.Handler) http.Handler {
 					script+"; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'")
 			if hsts {
 				h.Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// ProxyHint — TRUST_PROXY=false, бірақ сұраныстар прокси арқылы келеді: бір рет ескерту.
+//
+// Behind Caddy without TRUST_PROXY every client shares the proxy's address,
+// so every per-address limit (admin login, sign-in codes, token refresh)
+// becomes one bucket for everybody. The first forwarded request says so once.
+func ProxyHint(trustProxy bool, log *slog.Logger) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		if trustProxy {
+			return next
+		}
+		var once sync.Once
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Header.Get("X-Forwarded-For") != "" {
+				once.Do(func() {
+					log.Warn("requests come through a reverse proxy but TRUST_PROXY=false: every client shares one rate-limit address",
+						logging.Alert(), "check", "trust_proxy")
+				})
 			}
 			next.ServeHTTP(w, r)
 		})

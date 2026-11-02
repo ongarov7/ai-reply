@@ -76,3 +76,26 @@ func TestInternalServerErrorsAreLoggedAtErrorWithTheRoute(t *testing.T) {
 		t.Fatalf("only a 500 is an unexpected error:\n%s", out)
 	}
 }
+
+func TestProxyHintWarnsOnceWhenForwardedRequestsAreNotTrusted(t *testing.T) {
+	var buf bytes.Buffer
+	log := slog.New(slog.NewJSONHandler(&buf, nil))
+	ok := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+	h := ProxyHint(false, log)(ok)
+	for i := 0; i < 3; i++ {
+		r := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+		r.Header.Set("X-Forwarded-For", "203.0.113.7")
+		h.ServeHTTP(httptest.NewRecorder(), r)
+	}
+	if strings.Count(buf.String(), "TRUST_PROXY=false") != 1 || !strings.Contains(buf.String(), `"alert":true`) {
+		t.Fatalf("expected one alerting warning:\n%s", buf.String())
+	}
+	buf.Reset()
+	trusted := ProxyHint(true, log)(ok)
+	r := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	r.Header.Set("X-Forwarded-For", "203.0.113.7")
+	trusted.ServeHTTP(httptest.NewRecorder(), r)
+	if buf.Len() != 0 {
+		t.Fatal("a trusted proxy must not warn")
+	}
+}
