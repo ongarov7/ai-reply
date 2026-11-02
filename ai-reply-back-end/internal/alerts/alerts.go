@@ -437,6 +437,9 @@ var (
 		"user_id": true, "installation_id": true, "device_id": true}
 )
 
+// Scrub — сырттан келген қысқа мәтінді журналға жазу алдында тазалау (пошта, токен, ұзын сан).
+func Scrub(v string) string { return scrubValue(v) }
+
 // scrubValue — ескертуге түспес бұрын мәнді тазалау: пошта, токен, ұзын сан, жаңа жол.
 func scrubValue(v string) string {
 	v = bearerPattern.ReplaceAllString(v, "$1 [redacted]")

@@ -139,6 +139,9 @@ func (s *Server) Register(mux *http.ServeMux) {
 	// itself gates /auth/refresh (reuse revokes the whole family).
 	refreshLimit := middleware.RateLimit(s.limiter, "auth_refresh", limits.GenericPerMinute*sharedAddressFactor, time.Minute, ip)
 	sharedAddress := middleware.RateLimit(s.limiter, "app_start", limits.GenericPerMinute*sharedAddressFactor, time.Minute, ip)
+	// App error reports: a crash loop on many phones must not flood the log or the alert channel.
+	clientErrorsPerAddress := middleware.RateLimit(s.limiter, "client_errors_ip", 120, time.Hour, ip)
+	clientErrorsPerSender := middleware.RateLimit(s.limiter, "client_errors", 20, time.Hour, perUser)
 	aiLimit := middleware.RateLimit(s.limiter, "ai", limits.AIPerMinute, time.Minute, perUser)
 	// Polish үзіліс сайын шақырылады: жеке шелек, генерация лимитін жемейді.
 	polishLimit := middleware.RateLimit(s.limiter, "polish", limits.PolishPerMinute, time.Minute, perUser)
@@ -203,6 +206,8 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("PUT /api/v1/me/notification-preferences", s.requireUser(http.HandlerFunc(s.handleUpdateNotificationPreferences)))
 	mux.Handle("POST /api/v1/notifications/opened",
 		s.installationLimit(s.optionalUser(http.HandlerFunc(s.handleNotificationOpened))))
+	// Critical app errors and crashes found on the next launch → log and Telegram alert.
+	mux.Handle("POST /api/v1/client-errors", clientErrorsPerAddress(s.optionalUser(clientErrorsPerSender(http.HandlerFunc(s.handleClientError)))))
 
 	// --- AI: мәтін OpenAI-ға тек ағымдағы шарттарға келісім болса кетеді.
 	mux.Handle("POST /api/v1/ai/reply", s.requireUser(s.requireConsent(aiLimit(http.HandlerFunc(s.handleReply)))))
