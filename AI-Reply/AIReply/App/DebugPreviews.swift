@@ -69,7 +69,7 @@ struct DebugStoreKitClient: StoreKitClient {
 
     func products(for ids: [String]) async throws -> [StoreProduct] {
         let prices = ["preview.base.monthly": "790 ₸", "preview.base.yearly": "7 900 ₸",
-                      "preview.pro.monthly": "3 450 ₸", "preview.pro.yearly": "34 500 ₸", "preview.pack30": "130 ₸"]
+                      "preview.pro.monthly": "3 450 ₸", "preview.pro.yearly": "34 900 ₸", "preview.pack30": "130 ₸"]
         return ids.compactMap { id in
             prices[id].map { StoreProduct(id: id, displayName: id, displayPrice: $0,
                                          kind: id == "preview.pack30" ? .consumable : .subscription,

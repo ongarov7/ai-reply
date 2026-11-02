@@ -54,7 +54,7 @@ final class SubscriptionDisplayTests: XCTestCase {
 
     func testStoreOnlySubscriptionsRemainAvailableWhilePlansAreLoading() {
         let offer = PurchaseOffer(code: "pro_yearly", kind: .subscription, units: 0, durationHours: 0,
-                                  storeProductID: "pro.yearly", name: "Pro", displayPrice: "34 500 ₸",
+                                  storeProductID: "pro.yearly", name: "Pro", displayPrice: "34 900 ₸",
                                   planID: "pro_yearly", billingPeriod: "year", entitlementKind: "unlimited")
         let catalogue = SubscriptionPlanCatalogue(plans: [], offers: [offer])
         XCTAssertEqual(catalogue.visible(period: "month").first?.offer, offer)
