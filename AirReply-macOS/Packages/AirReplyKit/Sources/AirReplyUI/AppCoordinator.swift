@@ -174,7 +174,11 @@ public final class AppCoordinator {
     }
 
     func openPlans() {
-        openURL(configuration.websiteURL("payment"))
+        // Signed in: the website opens as this account, so the purchase is credited here.
+        Task { @MainActor in
+            let handoff = auth.isSignedIn ? await account.paymentHandoffURL(locale: APIClient.preferredLanguage()) : nil
+            openURL(handoff ?? configuration.websiteURL("payment"))
+        }
     }
 
     func openAccountDeletion() {

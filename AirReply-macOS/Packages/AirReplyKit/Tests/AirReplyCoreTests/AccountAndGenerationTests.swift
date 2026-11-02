@@ -125,6 +125,39 @@ struct AuthAndAccountTests {
         return (client, sessions, auth, account)
     }
 
+    private func signedInAccount(_ transport: FakeTransport) throws -> AccountStore {
+        let sessions = SessionStore(store: InMemorySecureStore())
+        try sessions.save(SessionTokens(accessToken: "a", refreshToken: "r", accessExpiresAt: .distantFuture,
+                                        refreshExpiresAt: nil, deviceID: "d", userID: "u-1", email: "a@b.kz"))
+        let client = APIClient(configuration: Fixtures.configuration, transport: transport, sessions: sessions,
+                               languageCode: { "ru" })
+        let account = AccountStore(client: client, configuration: Fixtures.configuration)
+        account.apply(MeResponse(user: try JSONDecoder.api.decode(UserDTO.self, from: Data(#"{"id":"u-1"}"#.utf8)),
+                                 subscription: nil, usage: nil, legalConsent: nil))
+        return account
+    }
+
+    @Test func plansOpenTheWebsiteSignedInAsThisAccount() async throws {
+        let transport = FakeTransport { request in
+            request.url!.path.hasSuffix("/web/payment-handoff")
+                ? (200, #"{"url":"https://ai-reply.kz/sandbox/payment#handoff=abc","expires_in":60}"#, [:])
+                : (404, Fixtures.error("NOT_FOUND"), [:])
+        }
+        let account = try signedInAccount(transport)
+        let url = await account.paymentHandoffURL(locale: "ru")
+        #expect(url?.absoluteString == "https://ai-reply.kz/sandbox/payment#handoff=abc")
+        let request = try #require(transport.requests(to: "/web/payment-handoff").first)
+        #expect(Fixtures.bodyJSON(request)["expected_user_id"] as? String == "u-1")
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer a")
+    }
+
+    @Test func aHandoffLinkToAnotherSiteOrAnErrorFallsBackToThePlainPage() async throws {
+        let foreign = FakeTransport { _ in (200, #"{"url":"https://evil.example/payment#handoff=abc","expires_in":60}"#, [:]) }
+        #expect(await (try signedInAccount(foreign)).paymentHandoffURL(locale: "ru") == nil)
+        let failing = FakeTransport { _ in (503, Fixtures.error("WEB_HANDOFF_UNAVAILABLE"), [:]) }
+        #expect(await (try signedInAccount(failing)).paymentHandoffURL(locale: "ru") == nil)
+    }
+
     @Test func emailCodeSignIn() async throws {
         let transport = FakeTransport { request in
             switch request.url!.path {

@@ -91,6 +91,24 @@ public final class AccountStore {
         apply(try await client.send(APIRequest("GET", "/api/v1/me"), as: MeResponse.self))
     }
 
+    /// A one-time link (60 s) that opens the website's payment page signed in as
+    /// this account, so a purchase cannot land on another website account.
+    /// Nil when signed out or unavailable: the caller opens the plain page.
+    public func paymentHandoffURL(locale: String) async -> URL? {
+        struct Body: Encodable {
+            let expected_user_id: String
+            let locale: String
+        }
+        struct Answer: Decodable { let url: URL }
+        guard let userID = me?.user.id, !userID.isEmpty else { return nil }
+        guard let answer = try? await client.send(.json("POST", "/api/v1/web/payment-handoff",
+                                                        Body(expected_user_id: userID, locale: locale)), as: Answer.self)
+        else { return nil }
+        // Only our own website, over https: never a link the answer could point elsewhere.
+        guard answer.url.scheme == "https", answer.url.host == configuration.backendBaseURL.host else { return nil }
+        return answer.url
+    }
+
     /// Accepts the current terms and privacy policy for AI processing.
     public func acceptConsent() async throws(APIError) {
         struct Body: Encodable {
