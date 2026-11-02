@@ -94,11 +94,15 @@ func (s *CheckoutService) SendReceipts(ctx context.Context) error {
 		err := s.db.Tx(ctx, func(tx *sql.Tx) error {
 			now := s.now().UnixMilli()
 			// Past the provider's deduplication window, require operator review.
-			if _, err := tx.ExecContext(ctx, `UPDATE billing_receipt_outbox SET status='needs_review' WHERE status IN ('pending','sending') AND (attempts>=8 OR first_attempt_at<=?) AND lease_until<=?`, now-int64(23*time.Hour/time.Millisecond), now); err != nil {
+			parked, err := tx.ExecContext(ctx, `UPDATE billing_receipt_outbox SET status='needs_review' WHERE status IN ('pending','sending') AND (attempts>=8 OR first_attempt_at<=?) AND lease_until<=?`, now-int64(23*time.Hour/time.Millisecond), now)
+			if err != nil {
 				return err
 			}
+			if n, _ := parked.RowsAffected(); n > 0 {
+				s.log.Error("BCC payment receipts not delivered", "count", n, "environment", string(s.Environment()))
+			}
 			var raw, locale, kind, to, delivery string
-			err := tx.QueryRowContext(ctx, `SELECT o.order_id,o.params_json,o.locale,o.kind,u.email,o.delivery_json
+			err = tx.QueryRowContext(ctx, `SELECT o.order_id,o.params_json,o.locale,o.kind,u.email,o.delivery_json
  FROM billing_receipt_outbox o JOIN billing_orders b ON b.id=o.order_id JOIN users u ON u.id=o.user_id
  WHERE b.environment=? AND u.status='active' AND u.deleted_at IS NULL AND u.email_verified_at IS NOT NULL
  AND o.status IN ('pending','sending') AND o.next_attempt_at<=? AND o.lease_until<=? ORDER BY o.created_at LIMIT 1`, s.Environment(), now, now).Scan(&id, &raw, &locale, &kind, &to, &delivery)

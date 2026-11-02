@@ -14,10 +14,21 @@ import (
 
 	"github.com/aireply/ai-reply-back-end/internal/catalog"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
+	"github.com/aireply/ai-reply-back-end/internal/logging"
 	"github.com/aireply/ai-reply-back-end/internal/traits"
 )
 
 const RecurringTermsVersion = "2026-11-01"
+
+// abandonedFirstPayment — after this the first payment of a mandate counts as
+// abandoned: the hosted form is served for 15 minutes only and the bank
+// session ends soon after. The order keeps its status, so a late authenticated
+// success still grants the period (appended after any period already paid).
+const abandonedFirstPayment = 30 * time.Minute
+
+// renewalOutcomeWindow — the bank answers status queries for 24 hours; a
+// renewal still without an authenticated outcome then needs an operator.
+const renewalOutcomeWindow = 24 * time.Hour
 
 func periodDays(p catalog.Product) int {
 	switch p.Code {
@@ -48,6 +59,16 @@ func (s *CheckoutService) validateMandate(ctx context.Context, tx *sql.Tx, user 
 		!until.After(now.Add(time.Duration(periodDays(p))*24*time.Hour)) || until.After(now.AddDate(5, 0, 0)) {
 		return domain.InvalidField("recurring_until", "must_cover_the_next_period_and_not_exceed_the_card_expiry")
 	}
+	// A first payment that was declined or abandoned must not hold the account
+	// forever: such a mandate never had a paid period and is closed here.
+	stale := now.Add(-abandonedFirstPayment).UnixMilli()
+	if _, err := tx.ExecContext(ctx, `UPDATE bcc_subscriptions SET status='expired',next_due_at=NULL,updated_at=?
+ WHERE user_id=? AND environment=? AND status IN ('pending','needs_review')
+ AND NOT EXISTS(SELECT 1 FROM bcc_subscription_periods p WHERE p.subscription_id=bcc_subscriptions.id)
+ AND root_order_id IN (SELECT id FROM billing_orders WHERE status='failed' OR (status IN ('created','pending','verification_pending','needs_review') AND created_at<=?))`,
+		now.UnixMilli(), user, s.Environment(), stale); err != nil {
+		return err
+	}
 	var n int
 	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM bcc_subscriptions WHERE user_id=? AND environment=? AND status IN ('pending','active','needs_review')`, user, s.Environment()).Scan(&n); err != nil {
 		return err
@@ -62,7 +83,10 @@ func (s *CheckoutService) validateMandate(ctx context.Context, tx *sql.Tx, user 
 		return domain.ConflictField("subscription", "manage_existing_store_subscription")
 	}
 	// Canceling a mandate does not resolve an already submitted money operation.
-	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM billing_orders WHERE user_id=? AND environment=? AND bcc_subscription_id IS NOT NULL AND status IN ('created','pending','verification_pending','needs_review')`, user, s.Environment()).Scan(&n); err != nil {
+	// Only an abandoned first payment of a closed mandate stops counting: a
+	// renewal charge with an unknown outcome keeps blocking until it is resolved.
+	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM billing_orders o WHERE o.user_id=? AND o.environment=? AND o.bcc_subscription_id IS NOT NULL AND o.status IN ('created','pending','verification_pending','needs_review')
+ AND NOT (o.created_at<=? AND EXISTS(SELECT 1 FROM bcc_subscriptions b WHERE b.root_order_id=o.id AND b.status IN ('canceled','expired')))`, user, s.Environment(), stale).Scan(&n); err != nil {
 		return err
 	}
 	if n > 0 {
@@ -166,6 +190,9 @@ func (s *CheckoutService) RunDue(ctx context.Context) error {
 	if !s.RecurringEnabled() {
 		return nil
 	}
+	if err := s.escalateUnknownRenewals(ctx); err != nil {
+		return err
+	}
 	for i := 0; i < 10; i++ {
 		var fields url.Values
 		var orderID string
@@ -229,12 +256,21 @@ func (s *CheckoutService) RunDue(ctx context.Context) error {
 			return nil
 		}
 		// The final authenticated notification, not this wrapper response, grants access.
-		_, sendErr := s.client.post(ctx, RecurringCharge, fields)
-		if sendErr != nil {
+		response, sendErr := s.client.post(ctx, RecurringCharge, fields)
+		switch {
+		case sendErr != nil:
 			// The charge may or may not have reached the bank: no blind retry, an
 			// operator reconciles it (TRTYPE 90 within 24 h) — hence the alert.
 			_, _ = s.db.Writer().ExecContext(context.WithoutCancel(ctx), `UPDATE bcc_recurring_attempts SET state='uncertain' WHERE order_id=? AND state='submitted'`, orderID)
 			s.log.Error("BCC renewal charge unconfirmed", "order_id", orderID, "environment", string(s.Environment()), "error", sendErr.Error())
+		case response.Action == "2" && response.RC != "" && response.RC != "00" && response.Order == fields.Get("ORDER") && response.Terminal == s.cfg.Terminal:
+			// The bank's direct answer is a decline: the same outcome as a declined
+			// notification, recorded now in case that notification never comes.
+			s.log.Warn("BCC renewal declined", logging.Alert(), "order_id", orderID, "rc", response.RC, "environment", string(s.Environment()))
+			declined := map[string]string{"ORDER": response.Order, "TERMINAL": response.Terminal, "ACTION": response.Action, "RC": response.RC, "source": "direct_response"}
+			if err := s.recordDecline(context.WithoutCancel(ctx), BankOrder{ID: orderID}, declined); err != nil {
+				s.log.Error("BCC renewal decline not recorded", "order_id", orderID, "error", err.Error())
+			}
 		}
 		if ctx.Err() != nil {
 			return ctx.Err()
@@ -258,7 +294,9 @@ func (s *CheckoutService) recordDecline(ctx context.Context, order BankOrder, fi
 		if _, err = tx.ExecContext(ctx, `INSERT OR IGNORE INTO billing_order_events(id,order_id,source,state,fields_json,created_at) VALUES(?,?,'authenticated_notify','failed',?,?)`, "declined-"+order.ID, order.ID, string(raw), now); err != nil {
 			return err
 		}
-		if _, err = tx.ExecContext(ctx, `UPDATE bcc_subscriptions SET status=CASE WHEN status='canceled' THEN status ELSE 'needs_review' END,next_due_at=NULL,updated_at=? WHERE id=(SELECT bcc_subscription_id FROM billing_orders WHERE id=?)`, now, order.ID); err != nil {
+		// A declined first payment closes the mandate so the person can retry
+		// with another card at once; a declined renewal waits for review.
+		if _, err = tx.ExecContext(ctx, `UPDATE bcc_subscriptions SET status=CASE WHEN status='canceled' THEN status WHEN root_order_id=? AND paid_until IS NULL THEN 'expired' ELSE 'needs_review' END,next_due_at=NULL,updated_at=? WHERE id=(SELECT bcc_subscription_id FROM billing_orders WHERE id=?)`, order.ID, now, order.ID); err != nil {
 			return err
 		}
 		_, err = tx.ExecContext(ctx, `UPDATE bcc_recurring_attempts SET state='declined' WHERE order_id=?`, order.ID)
@@ -277,6 +315,17 @@ func (s *CheckoutService) fulfillSubscriptionTx(ctx context.Context, tx *sql.Tx,
 	if paid.Valid && paid.Int64 > now.UnixMilli() {
 		start = time.UnixMilli(paid.Int64)
 	}
+	// A period already paid for the same plan under another mandate (canceled
+	// and re-subscribed, or a late first payment) is not bought twice: the new
+	// period continues after it.
+	var carried int64
+	if err := tx.QueryRowContext(ctx, `SELECT coalesce(max(p.expires_at),0) FROM bcc_subscription_periods p JOIN bcc_subscriptions b ON b.id=p.subscription_id JOIN bcc_subscriptions cur ON cur.id=?
+ WHERE b.user_id=cur.user_id AND b.environment=cur.environment AND b.plan_id=cur.plan_id AND b.id<>cur.id AND p.revoked_at IS NULL`, id).Scan(&carried); err != nil {
+		return err
+	}
+	if carried > start.UnixMilli() {
+		start = time.UnixMilli(carried)
+	}
 	end := start.Add(time.Duration(days) * 24 * time.Hour)
 	if _, err := tx.ExecContext(ctx, `INSERT INTO bcc_subscription_periods(order_id,subscription_id,starts_at,expires_at) VALUES(?,?,?,?)`, order.ID, id, start.UnixMilli(), end.UnixMilli()); err != nil {
 		return err
@@ -293,4 +342,38 @@ func (s *CheckoutService) fulfillSubscriptionTx(ctx context.Context, tx *sql.Tx,
 	}
 	_, err := tx.ExecContext(ctx, `UPDATE bcc_recurring_attempts SET state='confirmed' WHERE order_id=?`, order.ID)
 	return err
+}
+
+// escalateUnknownRenewals moves a renewal charge that still has no
+// authenticated outcome after the bank's 24-hour status window to
+// needs_review, once, with an ERROR for the operator. The period is never
+// charged again automatically; the mandate keeps its state so that a late
+// authenticated notification still extends access and renewals continue.
+func (s *CheckoutService) escalateUnknownRenewals(ctx context.Context) error {
+	cutoff := s.now().Add(-renewalOutcomeWindow).UnixMilli()
+	rows, err := s.db.Reader().QueryContext(ctx, `SELECT a.order_id,a.state FROM bcc_recurring_attempts a JOIN billing_orders o ON o.id=a.order_id
+ WHERE o.environment=? AND a.state IN ('submitted','uncertain') AND a.submitted_at<=? AND o.status IN ('created','pending','verification_pending') ORDER BY a.submitted_at LIMIT 50`, s.Environment(), cutoff)
+	if err != nil {
+		return err
+	}
+	type stuck struct{ order, state string }
+	var found []stuck
+	for rows.Next() {
+		var st stuck
+		if err := rows.Scan(&st.order, &st.state); err != nil {
+			rows.Close()
+			return err
+		}
+		found = append(found, st)
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	for _, st := range found {
+		if err := s.recordEvent(ctx, st.order, "reconcile", "needs_review", map[string]string{"reason": "renewal_outcome_unknown_24h", "attempt": st.state}); err != nil {
+			return err
+		}
+		s.log.Error("BCC renewal outcome unknown after 24 hours", "order_id", st.order, "attempt_state", st.state, "environment", string(s.Environment()))
+	}
+	return nil
 }

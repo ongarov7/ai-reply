@@ -22,7 +22,10 @@ func (s *CheckoutService) fulfillAuthenticatedPack(ctx context.Context, order Ba
 		if status == "succeeded" || status == "refunded" {
 			return nil
 		}
-		if status != "created" && status != "pending" && status != "verification_pending" && status != "needs_review" {
+		// "failed" is included: a decline recorded earlier can be followed by an
+		// approval of the same order; the authenticated, fully bound success means
+		// the person was charged, so they get what they paid for (Notify alerts).
+		if status != "created" && status != "pending" && status != "verification_pending" && status != "needs_review" && status != "failed" {
 			return fmt.Errorf("bcc: order cannot be fulfilled in its current state")
 		}
 		var product catalog.Product

@@ -641,6 +641,10 @@ func (s *CheckoutService) Notify(w http.ResponseWriter, r *http.Request) {
 			err = s.refundAuthenticatedPack(r.Context(), o, safe)
 		} else {
 			err = s.fulfillAuthenticatedPack(r.Context(), o, safe)
+			if err == nil && o.Status == "failed" {
+				s.log.WarnContext(r.Context(), "BCC payment approved after a recorded decline", logging.Alert(),
+					"order_id", o.ID, "trtype", kind, "environment", string(s.Environment()))
+			}
 		}
 	} else if kind != "14" && fields.Get("ACTION") == "2" && fields.Get("RC") != "" && fields.Get("RC") != "00" {
 		// A decline is normal for the person but worth a WARNING for the operator:
