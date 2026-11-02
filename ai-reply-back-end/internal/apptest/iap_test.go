@@ -415,6 +415,25 @@ func TestSandboxPurchasesAreIsolatedFromProduction(t *testing.T) {
 	}
 }
 
+// App Review buys in the Sandbox against production: only the listed review account may.
+func TestProductionAcceptsSandboxPurchasesOnlyFromReviewAccounts(t *testing.T) {
+	h := newHarness(t, withIAP(t), withEnv("APPLE_IAP_ACCEPT_SANDBOX", "false"),
+		withEnv("APPLE_IAP_SANDBOX_ACCOUNTS", "App.Review@Example.com"))
+	h.openIAP()
+	reviewer := h.signIn("app.review@example.com")
+	stranger := h.signIn("someone@example.com")
+	sandbox := func(tx *appstoretest.Transaction) { tx.Environment = "Sandbox" }
+	mustStatus(t, h.postApple(reviewer.access, h.appleTx(reviewer.userID, "review-sandbox-tx", packApple, sandbox)), http.StatusOK, "")
+	mustStatus(t, h.postApple(stranger.access, h.appleTx(stranger.userID, "stranger-sandbox-tx", packApple, sandbox)), http.StatusBadRequest, "PURCHASE_INVALID")
+	if h.creditsLeft(reviewer.access) != 50 || h.creditsLeft(stranger.access) != 0 {
+		t.Fatal("sandbox purchases were not limited to the review account")
+	}
+	if h.scalar(`SELECT COUNT(*) FROM iap_purchases WHERE user_id=? AND environment='Sandbox'`, reviewer.userID) != 1 {
+		t.Fatal("the review purchase must be stored as Sandbox")
+	}
+	mustStatus(t, h.postApple(stranger.access, h.appleTx(stranger.userID, "stranger-production-tx", packApple, nil)), http.StatusOK, "")
+}
+
 // Қайтару хабарламасы қалғанын алады (теріс емес), қайталанса ештеңе өзгермейді; REFUND_REVERSED қайтарады.
 func TestRefundNotificationRevokesWhatIsLeft(t *testing.T) {
 	h := newHarness(t, withIAP(t))

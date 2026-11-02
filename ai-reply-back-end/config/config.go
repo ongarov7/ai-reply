@@ -367,9 +367,13 @@ type IAP struct {
 	// Әр сервер тек бір ортаны қабылдайды: production-да false, тест ортасында true.
 	// TestFlight / App Review Sandbox бөлек API мен дерекқорға бағытталуы керек.
 	AppleAcceptSandbox bool
-	GooglePackageName  string
-	GoogleClientEmail  string
-	GooglePrivateKey   string // PEM; "\n" escapes and base64 are turned into a normal key
+	// AppleSandboxAccounts — production-да Sandbox сатып алуы қабылданатын аккаунттар (App Review,
+	// ішкі тестер): APPLE_IAP_SANDBOX_ACCOUNTS, бос болса REVIEW_LOGIN_EMAIL. Environment=Sandbox
+	// болып жазылады және түсімге кірмейді; басқа аккаунттың Sandbox транзакциясы бас тартылады.
+	AppleSandboxAccounts []string
+	GooglePackageName    string
+	GoogleClientEmail    string
+	GooglePrivateKey     string // PEM; "\n" escapes and base64 are turned into a normal key
 	// GoogleAcceptTest — Google Play лицензия тестерлерінің тегін сатып алулары (purchaseType 0) қабылдана ма.
 	// Әдепкі: production-да false, басқа ортада true. Тестер шын кредит алады, әр жауап OpenAI-ға төленеді.
 	GoogleAcceptTest bool
@@ -509,7 +513,7 @@ func Load(envFile string) (Config, error) {
 			SupportPerMinute:    num("RATE_SUPPORT_PER_MINUTE", 20),
 			IAPPerMinute:        num("RATE_IAP_PER_MINUTE", 20),
 		},
-		Log:  Log{Level: str("LOG_LEVEL", "info"), Format: str("LOG_FORMAT", "json")},
+		Log: Log{Level: str("LOG_LEVEL", "info"), Format: str("LOG_FORMAT", "json")},
 		Telegram: Telegram{
 			Enabled:  boolean("TELEGRAM_ALERTS_ENABLED", false),
 			BotToken: str("TELEGRAM_BOT_TOKEN", ""),
@@ -916,6 +920,15 @@ func iapFromEnv(appEnv string) IAP {
 		// License testers pay nothing: production refuses their purchases unless the owner says so.
 		GoogleAcceptTest: boolean("GOOGLE_PLAY_ACCEPT_TEST", appEnv != "production"),
 		GoogleVoidedPoll: time.Hour,
+	}
+	// App Review buys in the Sandbox against the production API: only these
+	// accounts may do that, and only where Sandbox is not accepted anyway.
+	if !i.AppleAcceptSandbox {
+		for _, e := range list("APPLE_IAP_SANDBOX_ACCOUNTS", str("REVIEW_LOGIN_EMAIL", "")) {
+			if e = strings.ToLower(strings.TrimSpace(e)); e != "" {
+				i.AppleSandboxAccounts = append(i.AppleSandboxAccounts, e)
+			}
+		}
 	}
 	switch raw := strings.ToLower(str("IAP_GOOGLE_VOIDED_POLL", "")); raw {
 	case "":

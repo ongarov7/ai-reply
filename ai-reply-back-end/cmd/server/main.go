@@ -143,6 +143,7 @@ func checkConfig(envFile string) int {
 	fmt.Printf("in-app purchases: app_store=%v (bundle %s, sandbox %v) google_play=%v (package %s, test %v)\n",
 		cfg.IAP.Apple(), cfg.IAP.AppleBundleID, cfg.IAP.AppleAcceptSandbox, cfg.IAP.Google(), cfg.IAP.GooglePackageName,
 		cfg.IAP.GoogleAcceptTest)
+	fmt.Printf("app store sandbox accounts on this server: %d\n", len(cfg.IAP.AppleSandboxAccounts))
 	fmt.Printf("telegram alerts: %v\n", cfg.Telegram.Enabled)
 	return 0
 }

@@ -36,6 +36,19 @@ func (s *Service) appleEnvironment(env string) bool {
 	return false
 }
 
+// sandboxAccount — production серверінде Sandbox сатып алуы рұқсат етілген аккаунт (App Review).
+func (s *Service) sandboxAccount(env string, user domain.User) bool {
+	if env != appstore.EnvironmentSandbox || user.Email == "" {
+		return false
+	}
+	for _, allowed := range s.cfg.AppleSandboxAccounts {
+		if strings.EqualFold(allowed, user.Email) {
+			return true
+		}
+	}
+	return false
+}
+
 // VerifyApple — StoreKit 2 transaction.jwsRepresentation: тексеріп, береді.
 //
 // Order of checks: Apple's signature and chain, the bundle id, the
@@ -55,16 +68,21 @@ func (s *Service) VerifyApple(ctx context.Context, user domain.User, signed stri
 			"environment", tx.Environment, "transaction_id", tx.TransactionID)
 		return Result{}, domain.PurchaseInvalid(reason)
 	}
+	// A database hiccup must not look like a purchase made for another account.
+	accountToken := s.AccountToken(user.ID)
+	if accountToken == "" {
+		return Result{}, domain.ErrStoreUnavailable
+	}
 	switch {
 	case tx.BundleID != s.cfg.AppleBundleID:
 		return refuse(domain.PurchaseReasonBundle)
-	case !s.appleEnvironment(tx.Environment):
+	case !s.appleEnvironment(tx.Environment) && !s.sandboxAccount(tx.Environment, user):
 		return refuse(domain.PurchaseReasonEnvironment)
 	case tx.Type != appstore.TypeConsumable && tx.Type != appstore.TypeNonRenewing && tx.Type != appstore.TypeAutoRenewable:
 		return refuse(domain.PurchaseReasonType)
 	case tx.Quantity < 0:
 		return refuse(domain.PurchaseReasonQuantity)
-	case tx.AppAccountToken == "" || !strings.EqualFold(tx.AppAccountToken, s.AccountToken(user.ID)):
+	case tx.AppAccountToken == "" || !strings.EqualFold(tx.AppAccountToken, accountToken):
 		return refuse(domain.PurchaseReasonAccount)
 	}
 	if tx.RevocationDate != 0 && tx.Type != appstore.TypeAutoRenewable {

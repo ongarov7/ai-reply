@@ -72,7 +72,12 @@ func (s *Service) VerifyGoogle(ctx context.Context, user domain.User, productID,
 	if p.ProductID != "" && p.ProductID != productID {
 		return refuse(domain.PurchaseReasonProduct)
 	}
-	if p.ObfuscatedExternalAccountID == "" || p.ObfuscatedExternalAccountID != s.AccountToken(user.ID) {
+	accountToken := s.AccountToken(user.ID)
+	if accountToken == "" {
+		// A database hiccup, not a foreign purchase: the app retries and the purchase stays unconsumed.
+		return Result{}, domain.ErrStoreUnavailable
+	}
+	if p.ObfuscatedExternalAccountID == "" || p.ObfuscatedExternalAccountID != accountToken {
 		return refuse(domain.PurchaseReasonAccount)
 	}
 	if p.PurchaseType != nil && *p.PurchaseType == googleplay.TypeRewarded {
