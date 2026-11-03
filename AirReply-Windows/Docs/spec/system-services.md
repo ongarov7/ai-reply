@@ -58,7 +58,7 @@ AI context (MAC-1…MAC-4 and MAC-6 do not touch these services), voice capture.
 
 | WARCH | This spec | Reason |
 |---|---|---|
-| WinUI 3 + H.NotifyIcon + CsWin32 (WARCH:9-13) | Avalonia 12 + hand-written `LibraryImport` (CsWin32 output is acceptable if it matches §10, incl. the full `INPUT` union) | workflow brief; open (§11.1 Q1, QB §14 Q1) |
+| WinUI 3 + H.NotifyIcon + CsWin32 (WARCH:9-13) | Avalonia 12 + hand-written `LibraryImport` (CsWin32 output is acceptable if it matches §10, incl. the full `INPUT` union) | current plan; resolved in DECISIONS.md D1 |
 | Tokens in `PasswordVault` (WARCH:53) | DPAPI files (§8, API §3.3) | AUD:132 ("Windows — файл под DPAPI"); Credential Locker can roam with a Microsoft account, Keychain items here are ThisDeviceOnly (SEC:16-17, 53) |
 | Fallback Alt+Space → Ctrl+Alt+Space only (WARCH:41-42) | adds Ctrl+Alt+Shift+Space | three-step chain in AC:217-236 (§11.1 Q2) |
 | `IsAllowed`: Alt or Ctrl "(or Win)" (WARCH:109) | Win never allowed | MSDN RegisterHotKey reserves Windows-key shortcuts for the OS; same as QB §1.2.5 |
@@ -1369,7 +1369,7 @@ static unsafe string? ReadUnicodeText()
 
 ### 11.1 For the owner
 
-1. Q1 Stack: WARCH says WinUI 3 + CsWin32 + PasswordVault; this workflow says Avalonia 12 + `LibraryImport` + DPAPI.
+1. Q1 Stack: WARCH says WinUI 3 + CsWin32 + PasswordVault; the current plan says Avalonia 12 + `LibraryImport` + DPAPI.
    Confirm and update WARCH (also QB §14 Q1).
 2. Q2 Third fallback Ctrl+Alt+Shift+Space (parity with ⌃⌥⌘Space) — QB §1.2.3 and WARCH list two (also QB §14 Q8).
 3. Q3 macOS persists a fallback, so Alt+Space is never retried after one conflict (AC:227-229). Keep parity or retry

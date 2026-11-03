@@ -1229,7 +1229,7 @@ MAC-10 (context/output errors → generic Retry, GEN:56-64) is fixed on Windows 
 
 ## 14. Open questions
 
-1. Framework: the task says Avalonia 12; WARCH:8-14 says WinUI 3 + H.NotifyIcon + CsWin32. Which is authoritative?
+1. Framework: the current plan says Avalonia 12; WARCH:8-14 says WinUI 3 + H.NotifyIcon + CsWin32. Which is authoritative?
    (This spec is framework-neutral.)
 2. Backend accepts `context`/`output_char_limit`/compose `template_id` only for session platform `macos` (BE-mac:37-39,
    AUD CTX-B7). This spec hides the AI Context toggle until the server accepts `windows`; confirm the capability flag
