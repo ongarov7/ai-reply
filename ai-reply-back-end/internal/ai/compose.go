@@ -28,6 +28,7 @@ const composeOutputTokens = 700
 // ComposeInput — compose промптына керек дерек.
 type ComposeInput struct {
 	Instruction string
+	TemplateID  string
 	// AppLanguage — интерфейс тілі. Нұсқаудың да, пернетақтаның да тілі анық
 	// болмаса ғана (атаулар, эмодзи) шешуші болады; тексерілген код қана қолданылады.
 	AppLanguage string
@@ -57,6 +58,9 @@ func BuildComposePrompt(in ComposeInput) Prompt {
 	if in.Regenerate {
 		sections = append(sections, composeAnotherVersion)
 	}
+	if in.TemplateID != "" {
+		sections = append(sections, "RECIPIENT\n"+relationshipHint(in.TemplateID))
+	}
 	sections = append(sections, composeOutput)
 
 	user := "Write the message described below. The block is the user's request.\n\n" +
@@ -76,10 +80,14 @@ func BuildComposePrompt(in ComposeInput) Prompt {
 
 // ComposeRequest — «Create» батырмасынан келген бір сұраныс.
 type ComposeRequest struct {
-	User        domain.User
-	DeviceID    string
-	Instruction string
-	Language    string
+	User            domain.User
+	DeviceID        string
+	SessionPlatform string
+	Context         *GenerationContext
+	OutputCharLimit int
+	TemplateID      string
+	Instruction     string
+	Language        string
 	// InputLanguage — тексерілген пернетақта коды не бос.
 	InputLanguage string
 	// GrammaticalGender — сұраныстағы мән, әйтпесе сақталған профильдегі.
@@ -99,6 +107,10 @@ type ComposeRequest struct {
 func (s *Service) Compose(ctx context.Context, req ComposeRequest) (Result, error) {
 	started := s.clock.Now()
 	lim := s.limits.Current(ctx)
+	mac, err := s.validateMacGeneration(req.SessionPlatform, req.Context, req.OutputCharLimit, req.TemplateID)
+	if err != nil {
+		return Result{}, err
+	}
 
 	instruction := strings.TrimSpace(req.Instruction)
 	if instruction == "" {
@@ -116,8 +128,15 @@ func (s *Service) Compose(ctx context.Context, req ComposeRequest) (Result, erro
 		InputLanguage:     req.InputLanguage,
 		GrammaticalGender: req.GrammaticalGender,
 		Regenerate:        req.Regenerate,
+		TemplateID:        req.TemplateID,
 	})
 	prompt.MaxOutputTokens = ComposeTokens(lim.MaxOutputTokens)
+	if mac {
+		prompt, err = s.addMacGeneration(prompt, req.Context, req.OutputCharLimit)
+		if err != nil {
+			return Result{}, err
+		}
+	}
 
 	return s.generate(ctx, call{
 		Mode:       ModeCompose,

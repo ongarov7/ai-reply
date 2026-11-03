@@ -11,6 +11,7 @@ public struct QuickBarView: View {
     let legal: () -> ServerConfig.Legal?
     /// Reports the height the content needs, so the panel can follow it.
     var onHeightChange: (CGFloat) -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     public init(model: QuickBarModel, pricingURL: URL, legal: @escaping () -> ServerConfig.Legal?,
                 onHeightChange: @escaping (CGFloat) -> Void) {
@@ -39,9 +40,10 @@ public struct QuickBarView: View {
             }
         )
         .onPreferenceChange(HeightKey.self) { onHeightChange($0) }
-        .animation(.snappy(duration: 0.22), value: model.phase)
-        .animation(.snappy(duration: 0.22), value: model.issue)
-        .animation(.snappy(duration: 0.22), value: model.mode)
+        .animation(reduceMotion ? nil : .snappy(duration: 0.22), value: model.phase)
+        .animation(reduceMotion ? nil : .snappy(duration: 0.22), value: model.issue)
+        .animation(reduceMotion ? nil : .snappy(duration: 0.22), value: model.mode)
+        .animation(reduceMotion ? nil : .snappy(duration: 0.22), value: model.advancedExpanded)
     }
 
     private var bar: some View {
@@ -50,8 +52,21 @@ public struct QuickBarView: View {
                 if !model.auth.isSignedIn {
                     SignInRow(model: model)
                 } else {
+                    ContextToolbar(model: model)
                     if model.copiedText != nil, model.voice.phase == .idle {
                         CopiedRow(model: model)
+                    } else if model.isReplyMode, model.voice.phase == .idle {
+                        TextField(String(localized: "bar.reply.source"), text: $model.manualReplySource, axis: .vertical)
+                            .textFieldStyle(.roundedBorder)
+                            .lineLimit(2...3)
+                            .padding(.horizontal, 14)
+                            .padding(.top, 8)
+                        if model.sourceTooLong {
+                            Text("copied.too_long \(model.sourceLength) \(model.sourceLimit)")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.orange)
+                                .padding(.horizontal, 14)
+                        }
                     }
                     switch model.voice.phase {
                     case .recording, .requestingPermission:
@@ -60,6 +75,10 @@ public struct QuickBarView: View {
                         TranscribingRow(onCancel: model.cancelVoice)
                     default:
                         InputRow(model: model)
+                    }
+                    if model.advancedExpanded {
+                        AdvancedContextView(model: model)
+                            .transition(.opacity)
                     }
                 }
             }
@@ -106,7 +125,7 @@ private struct InputRow: View {
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
             BrandIcon()
-            TextField(model.copiedText == nil ? String(localized: "bar.placeholder.compose")
+            TextField(!model.isReplyMode ? String(localized: "bar.placeholder.compose")
                                               : String(localized: "bar.placeholder.reply"),
                       text: $model.draft, axis: .vertical)
                 .textFieldStyle(.plain)
@@ -116,7 +135,7 @@ private struct InputRow: View {
                 .onSubmit(model.submit)
                 .disabled(model.phase == .generating)
                 .accessibilityLabel(Text("bar.field.accessibility"))
-            if model.copiedText == nil, model.draftLength > model.instructionLimit * 3 / 4 {
+            if !model.isReplyMode, model.draftLength > model.instructionLimit * 3 / 4 {
                 CharacterCounter(count: model.draftLength, limit: model.instructionLimit)
             }
             if model.voiceAvailable {
@@ -465,6 +484,9 @@ private struct IssueCard: View {
             case .instructionMissing: return String(localized: "issue.instruction_missing")
             case .consentRequired: return String(localized: "issue.consent")
             case .accountDisabled: return String(localized: "issue.account_disabled")
+            case .proDeviceLimit: return String(localized: "issue.pro_device_limit")
+            case .proDeviceIdentity: return String(localized: "issue.pro_device_identity")
+            case .proDeviceRevoked: return String(localized: "issue.pro_device_revoked")
             case .rateLimited: return String(localized: "issue.rate_limited")
             case .aiUnavailable: return String(localized: "issue.ai_unavailable")
             case .offline: return String(localized: "issue.offline")
@@ -498,6 +520,10 @@ private struct IssueCard: View {
             Button("issue.action.retry", action: model.retry)
         case .voice(.permissionDenied), .voice(.permissionRestricted):
             Button("issue.action.settings", action: model.openPrivacySettings)
+        case .generation(.proDeviceLimit), .generation(.proDeviceIdentity), .generation(.proDeviceRevoked):
+            if let support = model.account.config.legal?.supportURL {
+                Button("issue.action.support") { model.openURL(support) }
+            } else { Button("issue.action.ok", action: model.clearIssue) }
         default:
             Button("issue.action.ok", action: model.clearIssue)
         }

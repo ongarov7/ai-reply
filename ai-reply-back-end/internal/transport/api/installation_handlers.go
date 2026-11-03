@@ -129,6 +129,9 @@ func (s *Server) handleRegisterInstallation(w http.ResponseWriter, r *http.Reque
 		httpx.Fail(w, err)
 		return
 	}
+	if userID != "" && s.proDevices != nil {
+		s.proDevices.BindInstallation(r.Context(), userID, DeviceFrom(r.Context()), inst.InstallationID)
+	}
 	res := installationResponse{
 		InstallationID: inst.InstallationID, Attached: inst.UserID != "", PushStatus: inst.PushStatus,
 		PushAvailable: s.notifications.Ready(), NotificationsEnabled: inst.NotificationsEnabled,

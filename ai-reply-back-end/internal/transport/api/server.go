@@ -18,6 +18,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/notifications"
 	"github.com/aireply/ai-reply-back-end/internal/payments"
 	"github.com/aireply/ai-reply-back-end/internal/plans"
+	"github.com/aireply/ai-reply-back-end/internal/prodevices"
 	"github.com/aireply/ai-reply-back-end/internal/productevents"
 	"github.com/aireply/ai-reply-back-end/internal/reports"
 	"github.com/aireply/ai-reply-back-end/internal/subscriptions"
@@ -52,6 +53,7 @@ type Server struct {
 	installations *installations.Service
 	notifications *notifications.Service
 	reports       *reports.Service
+	proDevices    *prodevices.Service
 	credits       *credits.Service
 	iap           *iap.Service
 	purchases     PurchaseOptions
@@ -82,7 +84,8 @@ type Deps struct {
 	Ping    Pinger
 	Log     *slog.Logger
 	// Credits — сәлемдесу бонусы, кредиттер және олардың журналы.
-	Credits *credits.Service
+	ProDevices *prodevices.Service
+	Credits    *credits.Service
 	// IAP — App Store / Google Play сатып алулары (/api/v1/iap/*, features.iap_ios, features.iap_android).
 	IAP *iap.Service
 	// Purchases — лимит қатесіндегі can_buy (nil — IAP-тан, ол да жоқ болса сатып алу жоқ).
@@ -99,7 +102,7 @@ func New(d Deps) *Server {
 		cfg: d.Config, auth: d.Auth, users: d.Users, plans: d.Plans, subs: d.Subs,
 		ai: d.AI, limits: d.Limits, payments: d.Payments, events: d.Events,
 		installations: d.Installations, notifications: d.Notifications, reports: d.Reports,
-		credits: d.Credits, iap: d.IAP, purchases: purchases, support: d.Support, limiter: d.Limiter, ping: d.Ping,
+		proDevices: d.ProDevices, credits: d.Credits, iap: d.IAP, purchases: purchases, support: d.Support, limiter: d.Limiter, ping: d.Ping,
 		log: d.Log,
 	}
 }
@@ -190,6 +193,9 @@ func (s *Server) Register(mux *http.ServeMux) {
 	// Поштасы жоқ тіркелгіге (телефонмен ашылған) пошта қосу — кейін сол поштамен кіру үшін.
 	mux.Handle("POST /api/v1/me/email/otp/request", s.requireUser(otpRequest(http.HandlerFunc(s.handleLinkEmailRequest))))
 	mux.Handle("POST /api/v1/me/email/otp/verify", s.requireUser(otpVerify(http.HandlerFunc(s.handleLinkEmailVerify))))
+
+	mux.Handle("GET /api/v1/me/pro-devices", s.requireUser(http.HandlerFunc(s.handleProDevices)))
+	mux.Handle("DELETE /api/v1/me/pro-devices/{authorization_id}", s.requireUser(generic(http.HandlerFunc(s.handleRevokeProDevice))))
 
 	// --- каталог
 	mux.Handle("GET /api/v1/plans", sharedAddress(http.HandlerFunc(s.handlePlans)))

@@ -6,30 +6,33 @@ import (
 
 	"github.com/aireply/ai-reply-back-end/internal/auth"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
+	"github.com/aireply/ai-reply-back-end/internal/prodevices"
 	"github.com/aireply/ai-reply-back-end/internal/traits"
 	"github.com/aireply/ai-reply-back-end/internal/transport/httpx"
 )
 
 type deviceRequest struct {
-	DeviceID   string `json:"device_id"`
-	Platform   string `json:"platform"`
-	AppVersion string `json:"app_version"`
-	OSVersion  string `json:"os_version"`
-	Model      string `json:"model"`
-	Locale     string `json:"locale"`
-	Timezone   string `json:"timezone"`
+	InstallationID string `json:"installation_id,omitempty"`
+	DeviceID       string `json:"device_id"`
+	Platform       string `json:"platform"`
+	AppVersion     string `json:"app_version"`
+	OSVersion      string `json:"os_version"`
+	Model          string `json:"model"`
+	Locale         string `json:"locale"`
+	Timezone       string `json:"timezone"`
 }
 
 func (d deviceRequest) toInfo(r *http.Request) auth.DeviceInfo {
 	return auth.DeviceInfo{
-		DeviceID:   traits.Clamp(d.DeviceID, 64),
-		Platform:   traits.Clamp(d.Platform, 16),
-		AppVersion: traits.Clamp(d.AppVersion, 32),
-		OSVersion:  traits.Clamp(d.OSVersion, 32),
-		Model:      traits.Clamp(d.Model, 64),
-		Locale:     traits.Clamp(d.Locale, 8),
-		Timezone:   traits.Clamp(d.Timezone, 64),
-		UserAgent:  traits.Clamp(r.UserAgent(), 200),
+		InstallationID: d.InstallationID,
+		DeviceID:       traits.Clamp(d.DeviceID, 64),
+		Platform:       traits.Clamp(d.Platform, 16),
+		AppVersion:     traits.Clamp(d.AppVersion, 32),
+		OSVersion:      traits.Clamp(d.OSVersion, 32),
+		Model:          traits.Clamp(d.Model, 64),
+		Locale:         traits.Clamp(d.Locale, 8),
+		Timezone:       traits.Clamp(d.Timezone, 64),
+		UserAgent:      traits.Clamp(r.UserAgent(), 200),
 	}
 }
 
@@ -160,6 +163,9 @@ func (s *Server) writeSession(w http.ResponseWriter, r *http.Request, session au
 	if err != nil {
 		httpx.Fail(w, err)
 		return
+	}
+	if s.proDevices != nil {
+		_ = s.proDevices.Authorize(prodevices.WithSessionIdentity(ctx, session.InstallationIdentity), session.User, session.DeviceID, entitlement)
 	}
 	consent, err := s.currentLegalConsent(r, session.User.ID)
 	if err != nil {

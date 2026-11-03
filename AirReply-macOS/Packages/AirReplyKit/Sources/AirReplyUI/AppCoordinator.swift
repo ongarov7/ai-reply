@@ -124,6 +124,10 @@ public final class AppCoordinator {
         model.didCopy = { [unowned self] in afterCopy() }
         model.openURL = { [unowned self] in openURL($0) }
         model.openPrivacySettings = { [unowned self] in openMicrophoneSettings() }
+        model.openAccountSettings = { [unowned self] in
+            openSettings()
+            settingsWindow?.selectAccount()
+        }
     }
 
     /// After "Copy": close so ⌘V goes to the messenger, or paste there for the user.

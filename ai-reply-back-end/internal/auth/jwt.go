@@ -13,14 +13,15 @@ import (
 
 // Claims — access токеннің мазмұны. Дербес дерек жоқ: тек UUID-тер.
 type Claims struct {
-	Subject   string `json:"sub"`
-	Issuer    string `json:"iss"`
-	IssuedAt  int64  `json:"iat"`
-	ExpiresAt int64  `json:"exp"`
-	TokenID   string `json:"jti"`
-	Type      string `json:"typ"`
-	DeviceID  string `json:"did,omitempty"`
-	Platform  string `json:"plt,omitempty"`
+	Subject              string `json:"sub"`
+	Issuer               string `json:"iss"`
+	IssuedAt             int64  `json:"iat"`
+	ExpiresAt            int64  `json:"exp"`
+	TokenID              string `json:"jti"`
+	Type                 string `json:"typ"`
+	DeviceID             string `json:"did,omitempty"`
+	Platform             string `json:"plt,omitempty"`
+	InstallationIdentity string `json:"iid,omitempty"`
 }
 
 var (
@@ -79,4 +80,13 @@ func HashToken(secret, token string) string {
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write([]byte(token))
 	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+}
+
+// InstallationIdentity binds a session to an explicitly supplied installation,
+// without copying its raw identifier into JWTs or refresh-token records.
+func InstallationIdentity(secret, installationID string) string {
+	if installationID == "" {
+		return ""
+	}
+	return HashToken(secret, "ai-reply/pro-installation/v1\x00"+installationID)
 }

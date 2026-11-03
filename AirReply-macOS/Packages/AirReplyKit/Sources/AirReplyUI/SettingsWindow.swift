@@ -40,6 +40,10 @@ final class SettingsWindowController: NSWindowController {
         showWindow(nil)
         window?.makeKeyAndOrderFront(nil)
     }
+
+    func selectAccount() {
+        (contentViewController as? NSTabViewController)?.selectedTabViewItemIndex = 2
+    }
 }
 
 /// The root of the settings, also usable from SwiftUI previews.

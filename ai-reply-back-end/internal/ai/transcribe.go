@@ -154,6 +154,15 @@ func (s *Service) Transcribe(ctx context.Context, req TranscribeRequest) (Transc
 		return TranscribeResult{}, InvalidAudio(reason)
 	}
 
+	if s.proDevices != nil {
+		ent, err := s.subs.Entitlement(ctx, req.User.ID)
+		if err != nil {
+			return TranscribeResult{}, err
+		}
+		if err := s.proDevices.Authorize(ctx, req.User, req.DeviceID, ent); err != nil {
+			return TranscribeResult{}, err
+		}
+	}
 	result, reused, err := s.voice.do(ctx, req.User.ID+"\x00"+req.RequestID, func() (TranscribeResult, error) {
 		return s.transcribe(ctx, req, info)
 	})

@@ -133,7 +133,7 @@ func (s *Service) normalize(reg Registration) (repository.InstallationUpsert, er
 		return repository.InstallationUpsert{}, fieldError("installation_id")
 	}
 	platform := strings.ToLower(strings.TrimSpace(reg.Platform))
-	if platform != domain.PlatformIOS && platform != domain.PlatformAndroid {
+	if !traits.OneOf(platform, domain.PlatformIOS, domain.PlatformAndroid, "ipados", "macos", "windows") {
 		return repository.InstallationUpsert{}, fieldError("platform")
 	}
 	permission := strings.ToLower(strings.TrimSpace(reg.Permission))
@@ -151,7 +151,7 @@ func (s *Service) normalize(reg Registration) (repository.InstallationUpsert, er
 	}
 	osName := reg.OSName
 	if osName == "" {
-		osName = map[string]string{domain.PlatformIOS: "iOS", domain.PlatformAndroid: "Android"}[platform]
+		osName = map[string]string{domain.PlatformIOS: "iOS", domain.PlatformAndroid: "Android", "ipados": "iPadOS", "macos": "macOS", "windows": "Windows"}[platform]
 	}
 	in := repository.InstallationUpsert{
 		InstallationID:       id,

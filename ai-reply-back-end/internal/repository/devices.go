@@ -36,7 +36,10 @@ func (s *Store) UpsertDevice(ctx context.Context, d domain.Device) (domain.Devic
 			                     push_token, push_enabled, created_at, last_seen_at)
 			VALUES (?,?,?,?,?,?,?,?,?,?,?)
 			ON CONFLICT (id) DO UPDATE SET
-				platform = excluded.platform,
+				platform = CASE WHEN
+                    EXISTS (SELECT 1 FROM pro_device_authorizations WHERE device_id = devices.id)
+                    OR EXISTS (SELECT 1 FROM pro_device_installations WHERE device_id = devices.id)
+                    THEN devices.platform ELSE excluded.platform END,
 				app_version = excluded.app_version,
 				os_version = excluded.os_version,
 				model = excluded.model,
@@ -69,7 +72,10 @@ func (s *Store) UpsertDevice(ctx context.Context, d domain.Device) (domain.Devic
 	if err != nil {
 		return domain.Device{}, err
 	}
-	return d, nil
+	// Protected identities retain their canonical platform. Return the stored
+	// row so a later token cannot accidentally adopt the caller's rejected
+	// platform (or a fabricated creation timestamp).
+	return s.Device(ctx, d.ID)
 }
 
 // Device — бір құрылғы.
@@ -108,10 +114,29 @@ func (s *Store) DevicesByUser(ctx context.Context, userID string) ([]domain.Devi
 
 // RevokeDevice — құрылғыны өшіру (push та тоқтайды).
 func (s *Store) RevokeDevice(ctx context.Context, userID, id string) error {
+	// The legacy management path must not race a first Pro authorization.
+	// SQLite serializes this conditional write with ClaimProDevice's writer
+	// transaction: either this revoke wins and Claim rejects the device, or
+	// the claim wins and only the trusted Pro release path may revoke it.
 	res, err := s.db.Writer().ExecContext(ctx,
 		`UPDATE devices SET revoked_at = ?, push_token = NULL, push_enabled = 0
-		 WHERE id = ? AND user_id = ? AND revoked_at IS NULL`, ms(time.Now()), id, userID)
-	return affected(res, err)
+		 WHERE id = ? AND user_id = ? AND revoked_at IS NULL
+		 AND NOT EXISTS (SELECT 1 FROM pro_device_authorizations WHERE device_id = devices.id)`, ms(time.Now()), id, userID)
+	if err != nil {
+		return err
+	}
+	if n, err := res.RowsAffected(); err != nil || n > 0 {
+		return err
+	}
+	var protected int
+	if err := s.db.Reader().QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM pro_device_authorizations WHERE device_id=? AND user_id=?`, id, userID).Scan(&protected); err != nil {
+		return err
+	}
+	if protected != 0 {
+		return domain.ErrProDeviceManagementForbidden
+	}
+	return domain.ErrNotFound
 }
 
 func scanDevice(row interface{ Scan(...any) error }) (domain.Device, error) {

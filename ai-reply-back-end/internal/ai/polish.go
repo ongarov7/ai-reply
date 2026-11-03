@@ -80,6 +80,11 @@ func (s *Service) Polish(ctx context.Context, req PolishRequest) (PolishResult, 
 		return PolishResult{}, err
 	}
 
+	if s.proDevices != nil {
+		if err := s.proDevices.Authorize(ctx, req.User, req.DeviceID, entitlement); err != nil {
+			return PolishResult{}, err
+		}
+	}
 	c := call{
 		Mode:       ModePolish,
 		User:       req.User,

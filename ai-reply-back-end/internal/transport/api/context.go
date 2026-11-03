@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/aireply/ai-reply-back-end/internal/domain"
+	"github.com/aireply/ai-reply-back-end/internal/prodevices"
 	"github.com/aireply/ai-reply-back-end/internal/transport/httpx"
 )
 
@@ -67,6 +68,7 @@ func (s *Server) requireUser(next http.Handler) http.Handler {
 			return
 		}
 		ctx := WithUser(r.Context(), user)
+		ctx = prodevices.WithSessionIdentity(ctx, claims.InstallationIdentity)
 		ctx = context.WithValue(ctx, deviceKey, claims.DeviceID)
 		ctx = context.WithValue(ctx, platformKey, claims.Platform)
 		next.ServeHTTP(w, r.WithContext(ctx))

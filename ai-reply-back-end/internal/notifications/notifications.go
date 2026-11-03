@@ -25,6 +25,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/aireply/ai-reply-back-end/config"
@@ -99,8 +100,9 @@ type Service struct {
 	mailer   Mailer
 	renderer EmailRenderer
 
-	reminders *reminderSettings
-	webTopup  *webTopupOffers
+	reminders         *reminderSettings
+	webTopup          *webTopupOffers
+	proDeviceDelivery atomic.Bool
 }
 
 // New — қызмет.
@@ -246,6 +248,9 @@ type UserNotification struct {
 	Data           map[string]string
 	// Platforms limits this event to clients that support its action.
 	Platforms []string
+	// PushInstallationIDs limits push to internal installation row IDs. Nil
+	// keeps the ordinary account audience; an empty non-nil slice targets none.
+	PushInstallationIDs []string
 	// RequirePushTarget keeps a once-only event pending until registration is ready.
 	RequirePushTarget bool
 	// Text — the push title and body for the resolved language.
@@ -379,6 +384,7 @@ func (s *Service) NotifyUser(ctx context.Context, n UserNotification) (NotifyRes
 		return NotifyResult{}, err
 	}
 	q.UserID = user.ID
+	q.InstallationIDs = n.PushInstallationIDs
 	q.RequireExternalWebTopup = n.Type == domain.TypeWebTopupOffer
 	res, err := s.repo.CreateUserNotification(ctx, domain.Notification{
 		DedupeKey:      repository.UserNotificationKey(user.ID, n.IdempotencyKey),

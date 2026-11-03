@@ -14,7 +14,8 @@ let package = Package(
         .library(name: "AirReplyKit", targets: ["AirReplyCore", "AirReplyVoice", "AirReplySystem", "AirReplyUI"]),
     ],
     targets: [
-        .target(name: "AirReplyCore"),
+        .target(name: "AirReplyArchive", publicHeadersPath: "include", linkerSettings: [.linkedLibrary("z")]),
+        .target(name: "AirReplyCore", dependencies: ["AirReplyArchive"]),
         .target(name: "AirReplyVoice", dependencies: ["AirReplyCore"]),
         .target(
             name: "AirReplySystem",

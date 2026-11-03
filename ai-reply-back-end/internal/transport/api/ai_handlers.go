@@ -15,9 +15,11 @@ import (
 )
 
 type replyRequest struct {
-	SourceText  string `json:"source_text"`
-	Instruction string `json:"instruction"`
-	Language    string `json:"language"`
+	Context         *ai.GenerationContext `json:"context"`
+	OutputCharLimit int                   `json:"output_char_limit"`
+	SourceText      string                `json:"source_text"`
+	Instruction     string                `json:"instruction"`
+	Language        string                `json:"language"`
 	// InputLanguage — Reply басылғандағы пернетақта (kk | ru | en). Жаңа
 	// клиенттер тек features.sender_profile=true болса жібереді; белгісіз мән
 	// елеусіз қалады.
@@ -100,6 +102,11 @@ func (s *Server) handleReply(w http.ResponseWriter, r *http.Request) {
 		},
 		GrammaticalGender: profile.GrammaticalGender,
 	}
+	if PlatformFrom(r.Context()) == "macos" && body.Context != nil {
+		// A selected local desktop profile supplies this request's facts. Do
+		// not silently mix in an unrelated saved mobile/business profile.
+		promptProfile = ai.Profile{GrammaticalGender: profile.GrammaticalGender}
+	}
 	if body.Profile != nil {
 		if body.Profile.Description != "" {
 			promptProfile.Description = traits.Clamp(body.Profile.Description, 1000)
@@ -124,19 +131,22 @@ func (s *Server) handleReply(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result, err := s.ai.Reply(r.Context(), ai.Request{
-		User:           user,
-		DeviceID:       DeviceFrom(r.Context()),
-		SourceText:     body.SourceText,
-		Instruction:    body.Instruction,
-		Language:       body.Language,
-		InputLanguage:  ai.InputLanguage(body.InputLanguage),
-		TemplateID:     body.TemplateID,
-		Profile:        promptProfile,
-		Template:       body.Template.toDomain(promptProfile.PreferredTone),
-		Business:       body.Business.toDomain(),
-		Platform:       traits.Clamp(body.Platform, 16),
-		AppVersion:     traits.Clamp(body.AppVersion, 32),
-		IdempotencyKey: key,
+		User:            user,
+		DeviceID:        DeviceFrom(r.Context()),
+		SessionPlatform: PlatformFrom(r.Context()),
+		Context:         body.Context,
+		OutputCharLimit: body.OutputCharLimit,
+		SourceText:      body.SourceText,
+		Instruction:     body.Instruction,
+		Language:        body.Language,
+		InputLanguage:   ai.InputLanguage(body.InputLanguage),
+		TemplateID:      body.TemplateID,
+		Profile:         promptProfile,
+		Template:        body.Template.toDomain(promptProfile.PreferredTone),
+		Business:        body.Business.toDomain(),
+		Platform:        traits.Clamp(body.Platform, 16),
+		AppVersion:      traits.Clamp(body.AppVersion, 32),
+		IdempotencyKey:  key,
 	})
 	if err != nil {
 		status, code, message := httpx.Translate(err)
@@ -165,7 +175,10 @@ func (s *Server) handleReply(w http.ResponseWriter, r *http.Request) {
 // composeRequest — «Create» режимі: пайдаланушы не жазу керегін сипаттайды.
 // source_text жоқ: бұл ешкімге жауап емес.
 type composeRequest struct {
-	Instruction string `json:"instruction"`
+	Context         *ai.GenerationContext `json:"context"`
+	OutputCharLimit int                   `json:"output_char_limit"`
+	TemplateID      string                `json:"template_id"`
+	Instruction     string                `json:"instruction"`
 	// Language — қолданбаның интерфейс тілі (метадерек және тілі анық емес
 	// нұсқауға арналған шешім). Хабарлама тілі нұсқаудың өз тілінен анықталады.
 	Language string `json:"language"`
@@ -218,6 +231,10 @@ func (s *Server) handleCompose(w http.ResponseWriter, r *http.Request) {
 	result, err := s.ai.Compose(r.Context(), ai.ComposeRequest{
 		User:              user,
 		DeviceID:          DeviceFrom(r.Context()),
+		SessionPlatform:   PlatformFrom(r.Context()),
+		Context:           body.Context,
+		OutputCharLimit:   body.OutputCharLimit,
+		TemplateID:        body.TemplateID,
 		Instruction:       body.Instruction,
 		Language:          traits.Clamp(body.Language, 16),
 		InputLanguage:     ai.InputLanguage(body.InputLanguage),
@@ -358,12 +375,16 @@ func (s *Server) handlePolish(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		status, code, message := httpx.Translate(err)
-		var details map[string]any
+		details := errorDetails(err)
 		switch {
 		case errors.Is(err, domain.ErrInstructionMissing):
-			details = map[string]any{"field": "text"}
+			details["field"] = "text"
 		case errors.Is(err, domain.ErrInstructionTooLong):
-			details = map[string]any{"field": "text", "max_characters": result.TextLimit}
+			details["field"] = "text"
+			details["max_characters"] = result.TextLimit
+		}
+		if len(details) == 0 {
+			details = nil
 		}
 		httpx.Error(w, status, code, message, details)
 		return

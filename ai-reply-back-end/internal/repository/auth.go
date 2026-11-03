@@ -107,16 +107,17 @@ func (s *Store) OTPRequestsSince(ctx context.Context, kind, value string, since 
 
 // RefreshToken — сақталатын refresh жазбасы (ашық мән емес, SHA-256 хэші).
 type RefreshToken struct {
-	ID        string
-	UserID    string
-	DeviceID  string
-	FamilyID  string
-	TokenHash string
-	IssuedAt  time.Time
-	ExpiresAt time.Time
-	RevokedAt *time.Time
-	Reason    string
-	UserAgent string
+	InstallationIdentity string
+	ID                   string
+	UserID               string
+	DeviceID             string
+	FamilyID             string
+	TokenHash            string
+	IssuedAt             time.Time
+	ExpiresAt            time.Time
+	RevokedAt            *time.Time
+	Reason               string
+	UserAgent            string
 }
 
 // CreateRefreshToken — жаңа сессия немесе ротация нәтижесі.
@@ -130,10 +131,10 @@ func (s *Store) CreateRefreshToken(ctx context.Context, t RefreshToken) (Refresh
 	t.IssuedAt = time.Now().UTC()
 	_, err := s.db.Writer().ExecContext(ctx, `
 		INSERT INTO refresh_tokens (id, user_id, device_id, family_id, token_hash, issued_at,
-		                            expires_at, user_agent)
-		VALUES (?,?,?,?,?,?,?,?)`,
+		                            expires_at, user_agent, installation_identity)
+		VALUES (?,?,?,?,?,?,?,?,?)`,
 		t.ID, t.UserID, nullText(t.DeviceID), t.FamilyID, t.TokenHash, ms(t.IssuedAt),
-		ms(t.ExpiresAt), t.UserAgent)
+		ms(t.ExpiresAt), t.UserAgent, t.InstallationIdentity)
 	return t, err
 }
 
@@ -148,10 +149,10 @@ func (s *Store) RefreshTokenByHash(ctx context.Context, hash string) (RefreshTok
 	)
 	err := s.db.Reader().QueryRowContext(ctx, `
 		SELECT id, user_id, device_id, family_id, token_hash, issued_at, expires_at, revoked_at,
-		       revoked_reason, user_agent
+		       revoked_reason, user_agent, installation_identity
 		FROM refresh_tokens WHERE token_hash = ?`, hash).
 		Scan(&t.ID, &t.UserID, &device, &t.FamilyID, &t.TokenHash, &issued, &expires, &revoked,
-			&t.Reason, &t.UserAgent)
+			&t.Reason, &t.UserAgent, &t.InstallationIdentity)
 	if errors.Is(err, sql.ErrNoRows) {
 		return RefreshToken{}, domain.ErrNotFound
 	}
@@ -181,10 +182,10 @@ func (s *Store) RotateRefreshToken(ctx context.Context, oldID string, next Refre
 		}
 		_, err = tx.ExecContext(ctx, `
 			INSERT INTO refresh_tokens (id, user_id, device_id, family_id, token_hash, issued_at,
-			                            expires_at, user_agent)
-			VALUES (?,?,?,?,?,?,?,?)`,
+			                            expires_at, user_agent, installation_identity)
+			VALUES (?,?,?,?,?,?,?,?,?)`,
 			next.ID, next.UserID, nullText(next.DeviceID), next.FamilyID, next.TokenHash,
-			ms(next.IssuedAt), ms(next.ExpiresAt), next.UserAgent)
+			ms(next.IssuedAt), ms(next.ExpiresAt), next.UserAgent, next.InstallationIdentity)
 		return err
 	})
 	return next, err
@@ -221,10 +222,10 @@ func (s *Store) RotateUnusedSuccessor(ctx context.Context, rotatedID string, sin
 		}
 		_, err = tx.ExecContext(ctx, `
 			INSERT INTO refresh_tokens (id, user_id, device_id, family_id, token_hash, issued_at,
-			                            expires_at, user_agent)
-			VALUES (?,?,?,?,?,?,?,?)`,
+			                            expires_at, user_agent, installation_identity)
+			VALUES (?,?,?,?,?,?,?,?,?)`,
 			next.ID, next.UserID, nullText(next.DeviceID), next.FamilyID, next.TokenHash,
-			ms(next.IssuedAt), ms(next.ExpiresAt), next.UserAgent)
+			ms(next.IssuedAt), ms(next.ExpiresAt), next.UserAgent, next.InstallationIdentity)
 		return err
 	})
 	return next, err
@@ -253,7 +254,7 @@ func (s *Store) RevokeUserSessions(ctx context.Context, userID, reason string) (
 func (s *Store) ActiveSessions(ctx context.Context, userID string) ([]RefreshToken, error) {
 	rows, err := s.db.Reader().QueryContext(ctx, `
 		SELECT id, user_id, device_id, family_id, token_hash, issued_at, expires_at, revoked_at,
-		       revoked_reason, user_agent
+		       revoked_reason, user_agent, installation_identity
 		FROM refresh_tokens WHERE user_id = ? AND revoked_at IS NULL AND expires_at > ?
 		ORDER BY issued_at DESC`, userID, ms(time.Now()))
 	if err != nil {
@@ -270,7 +271,7 @@ func (s *Store) ActiveSessions(ctx context.Context, userID string) ([]RefreshTok
 			revoked sql.NullInt64
 		)
 		if err := rows.Scan(&t.ID, &t.UserID, &device, &t.FamilyID, &t.TokenHash, &issued, &expires,
-			&revoked, &t.Reason, &t.UserAgent); err != nil {
+			&revoked, &t.Reason, &t.UserAgent, &t.InstallationIdentity); err != nil {
 			return nil, err
 		}
 		t.DeviceID = text(device)

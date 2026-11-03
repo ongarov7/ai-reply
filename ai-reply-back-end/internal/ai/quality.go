@@ -2,6 +2,7 @@ package ai
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"slices"
 	"strings"
@@ -28,6 +29,7 @@ const (
 	IssueGender   Issue = "gender"
 	IssueLanguage Issue = "language"
 	IssueMeta     Issue = "meta"
+	IssueLength   Issue = "length"
 )
 
 var (
@@ -293,7 +295,11 @@ func trimToSentence(text string) string {
 func BuildRepairPrompt(text string, issues []Issue, q Quality) Prompt {
 	var problems []string
 	for _, issue := range issues {
-		problems = append(problems, "- "+repairProblem(issue, q))
+		problem := repairProblem(issue, q)
+		if issue == IssueLength {
+			problem = fmt.Sprintf("The complete message must be at most %d Unicode characters including spaces and punctuation. Shorten it naturally, preserve the supplied facts, use complete words and sentences, and add no facts.", q.OutputCharLimit)
+		}
+		problems = append(problems, "- "+problem)
 	}
 	developer := repairInstructions + "\n\nPROBLEMS\n" + strings.Join(problems, "\n")
 	// A rewrite into another language gets that language's quality rules, so
@@ -358,12 +364,22 @@ func Complete(ctx context.Context, provider Provider, prompt Prompt, repair bool
 	}
 	target, gender := prompt.Quality.verifiedLanguage(), prompt.Quality.Gender
 	out.Issues = Check(out.Text, target, gender)
-	if len(out.Issues) == 0 || !repair {
+	limit := prompt.Quality.OutputCharLimit
+	if limit > 0 && (utf8.RuneCountInString(out.Text) > limit || out.Truncated) {
+		out.Issues = append(out.Issues, IssueLength)
+	}
+	finish := func() (Outcome, error) {
+		if limit > 0 && (utf8.RuneCountInString(out.Text) > limit || out.Truncated) {
+			return out, domain.ErrOutputCharacterLimit
+		}
 		return out, nil
+	}
+	if len(out.Issues) == 0 || !repair {
+		return finish()
 	}
 	remaining := repairDeadline - time.Since(started)
 	if remaining < minRepairWindow {
-		return out, nil
+		return finish()
 	}
 
 	repairCtx, cancel := context.WithTimeout(ctx, remaining)
@@ -374,17 +390,18 @@ func Complete(ctx context.Context, provider Provider, prompt Prompt, repair bool
 	second, err := provider.Generate(repairCtx, fix)
 	if err != nil {
 		out.RepairError = errorCode(err)
-		return out, nil
+		return finish()
 	}
 	out.InputTokens += second.InputTokens
 	out.OutputTokens += second.OutputTokens
 	out.ProviderMS += second.ProviderMS
-	if fixed := CleanOutput(second.Text, prompt.Quality.Compose); !second.Truncated && len(Check(fixed, target, gender)) == 0 {
+	if fixed := CleanOutput(second.Text, prompt.Quality.Compose); !second.Truncated && len(Check(fixed, target, gender)) == 0 && (limit == 0 || utf8.RuneCountInString(fixed) <= limit) {
 		out.Text = fixed
+		out.Truncated = false
 		out.Repaired = true
 		out.Version += "+" + PromptVersionRepair
 	}
-	return out, nil
+	return finish()
 }
 
 // issueCodes — журналға арналған кодтар тізімі.

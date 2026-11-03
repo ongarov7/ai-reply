@@ -112,7 +112,22 @@ func Fail(w http.ResponseWriter, err error) {
 
 // Translate — қате → (мәртебе, код, хабар).
 func Translate(err error) (int, string, string) {
+	public := func(fallback string) string {
+		var e interface{ PublicMessage() string }
+		if errors.As(err, &e) {
+			return e.PublicMessage()
+		}
+		return fallback
+	}
 	switch {
+	case errors.Is(err, domain.ErrProDeviceLimit):
+		return http.StatusForbidden, "PRO_DEVICE_LIMIT_REACHED", public("Your Pro subscription already has an authorized device in this category.")
+	case errors.Is(err, domain.ErrProDeviceRevoked):
+		return http.StatusForbidden, "PRO_DEVICE_REVOKED", public("Pro access for this device has been revoked.")
+	case errors.Is(err, domain.ErrProDeviceIdentity):
+		return http.StatusForbidden, "PRO_DEVICE_IDENTITY_REQUIRED", public("Pro requires a verified app installation. Contact support.")
+	case errors.Is(err, domain.ErrProDeviceManagementForbidden):
+		return http.StatusForbidden, "PRO_DEVICE_MANAGEMENT_FORBIDDEN", "Use an authorized device or contact support to release this slot."
 	case errors.Is(err, domain.ErrInvalidEmail):
 		return http.StatusBadRequest, CodeInvalidEmail, "The e-mail address is not valid."
 	case errors.Is(err, domain.ErrOTPAlreadyUsed):
@@ -169,6 +184,8 @@ func Translate(err error) (int, string, string) {
 		return http.StatusBadGateway, CodeProviderDown, "The AI provider is unavailable."
 	case errors.Is(err, domain.ErrEmptyCompletion):
 		return http.StatusBadGateway, CodeEmptyCompletion, "The provider returned no usable reply."
+	case errors.Is(err, domain.ErrOutputCharacterLimit):
+		return http.StatusBadGateway, "AI_OUTPUT_LIMIT_EXCEEDED", "The generated message could not fit the requested length. Try again."
 	case errors.Is(err, domain.ErrNotFound):
 		return http.StatusNotFound, CodeNotFound, "Not found."
 	case errors.Is(err, domain.ErrConflict):

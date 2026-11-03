@@ -21,6 +21,9 @@ public enum GenerationError: Error, Equatable, Sendable {
     case signedOut
     case consentRequired
     case accountDisabled
+    case proDeviceLimit
+    case proDeviceIdentity
+    case proDeviceRevoked
     case sourceTooLong(limit: Int)
     case instructionTooLong(limit: Int)
     case instructionMissing
@@ -41,6 +44,9 @@ public enum GenerationError: Error, Equatable, Sendable {
             switch code {
             case APIErrorCode.consentRequired: self = .consentRequired
             case APIErrorCode.accountDisabled: self = .accountDisabled
+            case "PRO_DEVICE_LIMIT_REACHED": self = .proDeviceLimit
+            case "PRO_DEVICE_IDENTITY_REQUIRED": self = .proDeviceIdentity
+            case "PRO_DEVICE_REVOKED": self = .proDeviceRevoked
             case APIErrorCode.unauthorized, APIErrorCode.tokenExpired: self = .signedOut
             case APIErrorCode.dailyLimit, APIErrorCode.monthlyLimit, APIErrorCode.paymentRequired, APIErrorCode.subscriptionExpired:
                 self = .limitReached(resetsAt: details["resets_at"]?.stringValue.flatMap(RFC3339.parse))
@@ -68,6 +74,21 @@ public protocol Generating: Sendable {
                idempotencyKey: String) async throws(GenerationError) -> GenerationResult
     func compose(_ instruction: String, regenerate: Bool, inputLanguage: String?,
                  idempotencyKey: String) async throws(GenerationError) -> GenerationResult
+    func reply(to source: String, recipient: Recipient, instruction: String?, inputLanguage: String?,
+               idempotencyKey: String, options: GenerationOptions) async throws(GenerationError) -> GenerationResult
+    func compose(_ instruction: String, regenerate: Bool, inputLanguage: String?, idempotencyKey: String,
+                 options: GenerationOptions) async throws(GenerationError) -> GenerationResult
+}
+
+public extension Generating {
+    func reply(to source: String, recipient: Recipient, instruction: String?, inputLanguage: String?,
+               idempotencyKey: String, options: GenerationOptions) async throws(GenerationError) -> GenerationResult {
+        try await reply(to: source, recipient: recipient, instruction: instruction, inputLanguage: inputLanguage, idempotencyKey: idempotencyKey)
+    }
+    func compose(_ instruction: String, regenerate: Bool, inputLanguage: String?, idempotencyKey: String,
+                 options: GenerationOptions) async throws(GenerationError) -> GenerationResult {
+        try await compose(instruction, regenerate: regenerate, inputLanguage: inputLanguage, idempotencyKey: idempotencyKey)
+    }
 }
 
 public struct ServerGenerator: Generating {
@@ -81,6 +102,12 @@ public struct ServerGenerator: Generating {
 
     public func reply(to source: String, recipient: Recipient, instruction: String?, inputLanguage: String?,
                       idempotencyKey: String) async throws(GenerationError) -> GenerationResult {
+        try await reply(to: source, recipient: recipient, instruction: instruction, inputLanguage: inputLanguage,
+                        idempotencyKey: idempotencyKey, options: GenerationOptions())
+    }
+
+    public func reply(to source: String, recipient: Recipient, instruction: String?, inputLanguage: String?,
+                      idempotencyKey: String, options: GenerationOptions) async throws(GenerationError) -> GenerationResult {
         struct Body: Encodable {
             let source_text: String
             let instruction: String?
@@ -89,16 +116,20 @@ public struct ServerGenerator: Generating {
             let template_id: String
             let platform: String
             let app_version: String
+            let context: DesktopGenerationContext?
+            let output_char_limit: Int?
         }
         struct Response: Decodable, Sendable {
             let reply: String
             let detected_language: String?
             let usage: UsageDTO?
         }
+        try Self.validate(options)
         let trimmed = instruction?.trimmingCharacters(in: .whitespacesAndNewlines)
         let body = Body(source_text: source, instruction: trimmed?.isEmpty == false ? trimmed : nil,
                         language: APIClient.preferredLanguage(), input_language: Self.inputLanguage(inputLanguage),
-                        template_id: recipient.rawValue, platform: configuration.platform, app_version: configuration.appVersion)
+                        template_id: recipient.rawValue, platform: configuration.platform, app_version: configuration.appVersion,
+                        context: options.context, output_char_limit: options.outputCharacterLimit)
         do {
             let response = try await client.send(.json("POST", "/api/v1/ai/reply", body, idempotencyKey: idempotencyKey, timeout: 45),
                                                  as: Response.self)
@@ -110,28 +141,48 @@ public struct ServerGenerator: Generating {
 
     public func compose(_ instruction: String, regenerate: Bool, inputLanguage: String?,
                         idempotencyKey: String) async throws(GenerationError) -> GenerationResult {
+        try await compose(instruction, regenerate: regenerate, inputLanguage: inputLanguage,
+                          idempotencyKey: idempotencyKey, options: GenerationOptions())
+    }
+
+    public func compose(_ instruction: String, regenerate: Bool, inputLanguage: String?, idempotencyKey: String,
+                        options: GenerationOptions) async throws(GenerationError) -> GenerationResult {
         struct Body: Encodable {
             let instruction: String
             let language: String
             let regenerate: Bool
+            let template_id: String?
             let input_language: String?
             let platform: String
             let app_version: String
+            let context: DesktopGenerationContext?
+            let output_char_limit: Int?
         }
         struct Response: Decodable, Sendable {
             let text: String
             let detected_language: String?
             let usage: UsageDTO?
         }
-        let body = Body(instruction: instruction, language: APIClient.preferredLanguage(), regenerate: regenerate,
+        try Self.validate(options)
+        let body = Body(instruction: instruction, language: APIClient.preferredLanguage(), regenerate: regenerate, template_id: options.recipient?.rawValue,
                         input_language: Self.inputLanguage(inputLanguage), platform: configuration.platform,
-                        app_version: configuration.appVersion)
+                        app_version: configuration.appVersion, context: options.context,
+                        output_char_limit: options.outputCharacterLimit)
         do {
             let response = try await client.send(.json("POST", "/api/v1/ai/compose", body, idempotencyKey: idempotencyKey, timeout: 45),
                                                  as: Response.self)
             return GenerationResult(text: response.text, language: response.detected_language, usage: response.usage)
         } catch {
             throw GenerationError(error)
+        }
+    }
+
+    private static func validate(_ options: GenerationOptions) throws(GenerationError) {
+        if let limit = options.outputCharacterLimit, limit != 400 && limit != 600 { throw .server }
+        if let context = options.context {
+            guard (context.profile?.unicodeScalars.count ?? 0) <= 1500, context.references.count <= 8,
+                  context.references.reduce(0, { $0 + $1.unicodeScalars.count }) <= 4000,
+                  (context.profile?.utf8.count ?? 0) + context.references.reduce(0, { $0 + $1.utf8.count }) <= 4096 else { throw .server }
         }
     }
 

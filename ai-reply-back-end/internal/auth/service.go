@@ -13,6 +13,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/config"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
 	"github.com/aireply/ai-reply-back-end/internal/email"
+	"github.com/aireply/ai-reply-back-end/internal/installations"
 	"github.com/aireply/ai-reply-back-end/internal/repository"
 	"github.com/aireply/ai-reply-back-end/internal/traits"
 )
@@ -104,25 +105,27 @@ type Challenge struct {
 
 // DeviceInfo — кіру кезінде клиент беретін метадерек.
 type DeviceInfo struct {
-	DeviceID   string
-	Platform   string
-	AppVersion string
-	OSVersion  string
-	Model      string
-	Locale     string
-	Timezone   string
-	UserAgent  string
+	InstallationID string
+	DeviceID       string
+	Platform       string
+	AppVersion     string
+	OSVersion      string
+	Model          string
+	Locale         string
+	Timezone       string
+	UserAgent      string
 }
 
 // Session — шығарылған токендер.
 type Session struct {
-	User             domain.User
-	AccessToken      string
-	RefreshToken     string
-	AccessExpiresIn  int
-	RefreshExpiresAt time.Time
-	DeviceID         string
-	IsNewUser        bool
+	InstallationIdentity string
+	User                 domain.User
+	AccessToken          string
+	RefreshToken         string
+	AccessExpiresIn      int
+	RefreshExpiresAt     time.Time
+	DeviceID             string
+	IsNewUser            bool
 }
 
 // RequestOTP — кодты сұрау. Демо режимінде код тұрақты (AUTH_DEMO_OTP).
@@ -327,6 +330,20 @@ func (s *Service) openSession(ctx context.Context, user domain.User, isNew bool,
 
 // issueSession — құрылғыны тіркеп, токендер жұбын береді.
 func (s *Service) issueSession(ctx context.Context, user domain.User, info DeviceInfo, family string) (Session, error) {
+	// Optional for older clients. Only verified sign-in reaches this function.
+	// A stable installation recovers this account's canonical device after A→B→A.
+	if info.InstallationID != "" {
+		if !installations.ValidInstallationID(info.InstallationID) {
+			return Session{}, domain.InvalidField("installation_id", "format")
+		}
+		existing, lookupErr := s.repo.DeviceByProInstallation(ctx, user.ID, info.InstallationID)
+		if lookupErr == nil {
+			info.DeviceID = existing.ID
+		} else if !errors.Is(lookupErr, domain.ErrNotFound) {
+			return Session{}, lookupErr
+		}
+	}
+	identity := InstallationIdentity(s.cfg.AccessSecret, info.InstallationID)
 	device, err := s.repo.UpsertDevice(ctx, domain.Device{
 		ID:         info.DeviceID,
 		UserID:     user.ID,
@@ -340,7 +357,7 @@ func (s *Service) issueSession(ctx context.Context, user domain.User, info Devic
 		return Session{}, err
 	}
 
-	access, expiresIn, err := s.accessToken(user, device.ID, device.Platform)
+	access, expiresIn, err := s.accessToken(user, device.ID, device.Platform, identity)
 	if err != nil {
 		return Session{}, err
 	}
@@ -348,12 +365,13 @@ func (s *Service) issueSession(ctx context.Context, user domain.User, info Devic
 	raw := traits.RandomToken(32)
 	expiresAt := s.clock.Now().Add(s.cfg.RefreshTTL)
 	record := repository.RefreshToken{
-		UserID:    user.ID,
-		DeviceID:  device.ID,
-		FamilyID:  family,
-		TokenHash: HashToken(s.cfg.RefreshSecret, raw),
-		ExpiresAt: expiresAt,
-		UserAgent: traits.Clamp(info.UserAgent, 200),
+		UserID:               user.ID,
+		InstallationIdentity: identity,
+		DeviceID:             device.ID,
+		FamilyID:             family,
+		TokenHash:            HashToken(s.cfg.RefreshSecret, raw),
+		ExpiresAt:            expiresAt,
+		UserAgent:            traits.Clamp(info.UserAgent, 200),
 	}
 	if _, err := s.repo.CreateRefreshToken(ctx, record); err != nil {
 		return Session{}, err
@@ -361,26 +379,28 @@ func (s *Service) issueSession(ctx context.Context, user domain.User, info Devic
 	_ = s.repo.TouchUser(ctx, user.ID)
 
 	return Session{
-		User:             user,
-		AccessToken:      access,
-		RefreshToken:     raw,
-		AccessExpiresIn:  expiresIn,
-		RefreshExpiresAt: expiresAt,
-		DeviceID:         device.ID,
+		User:                 user,
+		AccessToken:          access,
+		RefreshToken:         raw,
+		AccessExpiresIn:      expiresIn,
+		RefreshExpiresAt:     expiresAt,
+		DeviceID:             device.ID,
+		InstallationIdentity: identity,
 	}, nil
 }
 
-func (s *Service) accessToken(user domain.User, deviceID, platform string) (string, int, error) {
+func (s *Service) accessToken(user domain.User, deviceID, platform, identity string) (string, int, error) {
 	now := s.clock.Now()
 	claims := Claims{
-		Subject:   user.ID,
-		Issuer:    s.cfg.Issuer,
-		IssuedAt:  now.Unix(),
-		ExpiresAt: now.Add(s.cfg.AccessTTL).Unix(),
-		TokenID:   traits.NewID(),
-		Type:      "access",
-		DeviceID:  deviceID,
-		Platform:  platform,
+		Subject:              user.ID,
+		Issuer:               s.cfg.Issuer,
+		IssuedAt:             now.Unix(),
+		ExpiresAt:            now.Add(s.cfg.AccessTTL).Unix(),
+		TokenID:              traits.NewID(),
+		Type:                 "access",
+		DeviceID:             deviceID,
+		Platform:             platform,
+		InstallationIdentity: identity,
 	}
 	token, err := SignJWT(s.cfg.AccessSecret, claims)
 	return token, int(s.cfg.AccessTTL.Seconds()), err
@@ -436,12 +456,13 @@ func (s *Service) Refresh(ctx context.Context, rawToken string, info DeviceInfo)
 
 	raw := traits.RandomToken(32)
 	next := repository.RefreshToken{
-		UserID:    user.ID,
-		DeviceID:  stored.DeviceID,
-		FamilyID:  stored.FamilyID,
-		TokenHash: HashToken(s.cfg.RefreshSecret, raw),
-		ExpiresAt: now.Add(s.cfg.RefreshTTL),
-		UserAgent: traits.Clamp(info.UserAgent, 200),
+		UserID:               user.ID,
+		DeviceID:             stored.DeviceID,
+		InstallationIdentity: stored.InstallationIdentity,
+		FamilyID:             stored.FamilyID,
+		TokenHash:            HashToken(s.cfg.RefreshSecret, raw),
+		ExpiresAt:            now.Add(s.cfg.RefreshTTL),
+		UserAgent:            traits.Clamp(info.UserAgent, 200),
 	}
 	if lostAnswer {
 		// Only while the successor is still unused; otherwise someone else holds
@@ -458,19 +479,20 @@ func (s *Service) Refresh(ctx context.Context, rawToken string, info DeviceInfo)
 		return Session{}, domain.ErrUnauthorized
 	}
 
-	access, expiresIn, err := s.accessToken(user, stored.DeviceID, device.Platform)
+	access, expiresIn, err := s.accessToken(user, stored.DeviceID, device.Platform, stored.InstallationIdentity)
 	if err != nil {
 		return Session{}, err
 	}
 	_ = s.repo.TouchUser(ctx, user.ID)
 
 	return Session{
-		User:             user,
-		AccessToken:      access,
-		RefreshToken:     raw,
-		AccessExpiresIn:  expiresIn,
-		RefreshExpiresAt: next.ExpiresAt,
-		DeviceID:         stored.DeviceID,
+		User:                 user,
+		AccessToken:          access,
+		RefreshToken:         raw,
+		AccessExpiresIn:      expiresIn,
+		RefreshExpiresAt:     next.ExpiresAt,
+		DeviceID:             stored.DeviceID,
+		InstallationIdentity: stored.InstallationIdentity,
 	}, nil
 }
 

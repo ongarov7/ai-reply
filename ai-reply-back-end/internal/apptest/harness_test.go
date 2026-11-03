@@ -37,6 +37,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/notifications"
 	"github.com/aireply/ai-reply-back-end/internal/payments"
 	"github.com/aireply/ai-reply-back-end/internal/plans"
+	"github.com/aireply/ai-reply-back-end/internal/prodevices"
 	"github.com/aireply/ai-reply-back-end/internal/productevents"
 	"github.com/aireply/ai-reply-back-end/internal/push"
 	"github.com/aireply/ai-reply-back-end/internal/reports"
@@ -452,14 +453,18 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 		Repo: store, Installations: installSvc, Provider: fcm, Plans: planSvc, Config: cfg.Push,
 		Location: cfg.App.Location(), Translate: bundle.T, Log: log, Clock: pushClock,
 	}).WithEmail(mail, fakeEmailRenderer{})
+	notifySvc.WithProDeviceNotificationDelivery(cfg.ProDevices.NotificationsEnabled)
 	events := notifications.NewEvents(notifySvc).
 		WithDemoPayments(cfg.Payments.DemoCheckout && !cfg.App.IsProduction())
+	proDeviceSvc := prodevices.New(store, subSvc, cfg.ProDevices, log).WithClock(clock).WithIdentityKey(cfg.Auth.AccessSecret).
+		WithNotifications(notifySvc)
 	speech := newFakeSpeech(t)
 	speechConfig := cfg.OpenAI
 	speechConfig.BaseURL = speech.server.URL
 	aiSvc := ai.New(store, subSvc, provider, limitSvc, log).WithClock(clock).WithRepair(cfg.AI.RepairEnabled).
 		WithQuotaEvents(events).WithPolishDailyLimit(cfg.Limits.PolishPerDay).
-		WithTranscriber(ai.NewOpenAI(speechConfig)).WithTranscribeDailyLimit(cfg.Limits.TranscribePerDay)
+		WithTranscriber(ai.NewOpenAI(speechConfig)).WithTranscribeDailyLimit(cfg.Limits.TranscribePerDay).
+		WithProDevices(proDeviceSvc).WithMacContext(cfg.MacContext)
 	paymentSvc := payments.New(store, subSvc, payments.DemoProvider{}, cfg.Payments.Mode).WithEvents(events).
 		WithDemoCheckout(cfg.Payments.DemoCheckout).WithProduction(cfg.App.IsProduction())
 	eventSvc := productevents.New(store, log).WithClock(clock)
@@ -507,7 +512,7 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 		AI: aiSvc, Limits: limitSvc, Payments: paymentSvc, Events: eventSvc, Installations: installSvc,
 		Notifications: notifySvc, Reports: reportSvc, Support: supportSvc, Limiter: limiter, Log: log,
 		Ping:    func(ctx context.Context) error { return db.Reader().PingContext(ctx) },
-		Credits: creditSvc, IAP: iapSvc}).Register(mux)
+		Credits: creditSvc, IAP: iapSvc, ProDevices: proDeviceSvc}).Register(mux)
 	adminapi.New(adminapi.Deps{Config: cfg, Admin: adminSvc, Limits: limitSvc, Notifications: notifySvc,
 		Payments: paymentSvc, Reports: reportSvc, Credits: creditSvc, Support: supportSvc, IAP: iapSvc,
 		Limiter: limiter, Log: log}).Register(mux)

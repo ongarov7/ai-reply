@@ -37,6 +37,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/payments"
 	"github.com/aireply/ai-reply-back-end/internal/payments/bcc"
 	"github.com/aireply/ai-reply-back-end/internal/plans"
+	"github.com/aireply/ai-reply-back-end/internal/prodevices"
 	"github.com/aireply/ai-reply-back-end/internal/productevents"
 	"github.com/aireply/ai-reply-back-end/internal/push"
 	"github.com/aireply/ai-reply-back-end/internal/reports"
@@ -326,6 +327,7 @@ func buildApplication(ctx context.Context, cfg config.Config, log *slog.Logger, 
 		Repo: store, Installations: installSvc, Provider: pushProvider, Plans: planSvc,
 		Config: cfg.Push, Location: cfg.App.Location(), Translate: bundle.T, Log: log,
 	})
+	notifySvc.WithProDeviceNotificationDelivery(cfg.ProDevices.NotificationsEnabled)
 	notifySvc.WithWebTopupOffers(catalogSvc, cfg.App.PublicBaseURL)
 	if mailer != nil {
 		notifySvc.WithEmail(mailer, email.NotificationTemplates{Translate: bundle.T, Brand: cfg.Email.FromName})
@@ -335,13 +337,14 @@ func buildApplication(ctx context.Context, cfg config.Config, log *slog.Logger, 
 	// or expired (the expiry sweep below), quota low or exhausted (AI gateway).
 	notifyEvents := notifications.NewEvents(notifySvc).
 		WithDemoPayments(cfg.Payments.DemoCheckout && !cfg.App.IsProduction())
+	proDeviceSvc := prodevices.New(store, subSvc, cfg.ProDevices, log).WithIdentityKey(cfg.Auth.AccessSecret).WithNotifications(notifySvc)
 	provider := ai.NewOpenAI(cfg.OpenAI)
 	limitSvc := limits.New(store, limits.Limits{
 		SourceChars:      cfg.Limits.SourceTextChars,
 		InstructionChars: cfg.Limits.InstructionChars,
 		MaxOutputTokens:  cfg.OpenAI.MaxOutputTokens,
 	})
-	aiSvc := ai.New(store, subSvc, provider, limitSvc, log).WithRepair(cfg.AI.RepairEnabled).WithQuotaEvents(notifyEvents).
+	aiSvc := ai.New(store, subSvc, provider, limitSvc, log).WithProDevices(proDeviceSvc).WithMacContext(cfg.MacContext).WithRepair(cfg.AI.RepairEnabled).WithQuotaEvents(notifyEvents).
 		WithPolishDailyLimit(cfg.Limits.PolishPerDay).
 		// The same OpenAI client and key: /audio/transcriptions with OPENAI_TRANSCRIBE_MODEL.
 		WithTranscriber(provider).WithTranscribeDailyLimit(cfg.Limits.TranscribePerDay)
@@ -387,8 +390,8 @@ func buildApplication(ctx context.Context, cfg config.Config, log *slog.Logger, 
 		AI: aiSvc, Limits: limitSvc, Payments: paymentSvc, Events: eventSvc,
 		Installations: installSvc, Notifications: notifySvc, Reports: reportSvc, Support: supportSvc,
 		Limiter: limiter, Log: log,
-		Ping:    func(ctx context.Context) error { return db.Reader().PingContext(ctx) },
-		Credits: creditSvc, IAP: iapSvc,
+		Ping:       func(ctx context.Context) error { return db.Reader().PingContext(ctx) },
+		ProDevices: proDeviceSvc, Credits: creditSvc, IAP: iapSvc,
 	})
 	apiServer.Register(mux)
 	apiServer.RegisterBCC(mux, bccCheckout)
@@ -428,6 +431,23 @@ func buildApplication(ctx context.Context, cfg config.Config, log *slog.Logger, 
 		func(ctx context.Context) { bccCheckout.Run(ctx, log) },
 		func(ctx context.Context) { expireSubscriptions(ctx, subSvc, notifyEvents, creditSvc, log) },
 		func(ctx context.Context) { sweepReminders(ctx, notifyEvents) },
+		func(ctx context.Context) {
+			if !cfg.ProDevices.NotificationsEnabled {
+				return
+			}
+			ticker := time.NewTicker(5 * time.Second)
+			defer ticker.Stop()
+			for {
+				if err := notifySvc.PumpProDeviceNotifications(ctx, cfg.ProDevices.NotificationCooldown); err != nil && ctx.Err() == nil {
+					log.Error("pro device notification worker failed", "error", err)
+				}
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+				}
+			}
+		},
 		notifySvc.Run,
 		notifySvc.RunRetention,
 		// Google Play: consume retries every 15 minutes, voided purchases every IAP_GOOGLE_VOIDED_POLL.

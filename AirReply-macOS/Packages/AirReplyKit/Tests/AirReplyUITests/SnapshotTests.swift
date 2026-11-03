@@ -50,6 +50,29 @@ struct SnapshotTests {
         let consent = try fixture.makeEnvironment([], consent: false)
         states.append(("consent", consent.model))
 
+        let advanced = try fixture.makeEnvironment([])
+        advanced.backend.setDesktopContext(true)
+        await advanced.account.refreshConfig()
+        advanced.model.advancedExpanded = true
+        advanced.model.selectReplyMode()
+        advanced.model.manualReplySource = "Здравствуйте! Сколько стоит Product A и есть ли доставка?"
+        let profile = ContextProfile(name: "Мой бизнес", role: .business, company: "Example Company",
+                                     attachments: [ContextAttachment(name: "Прайс-лист.xlsx", format: "xlsx",
+                                         segments: [ReferenceSegment(text: "Product A: 1200 KZT")])])
+        try advanced.model.contextProfiles.save(profile)
+        advanced.model.selectedProfileID = profile.id
+        advanced.model.customInstructions = "Ответь вежливо и уточни удобное время доставки."
+        states.append(("advanced", advanced.model))
+
+        let editor = try fixture.makeEnvironment([])
+        editor.backend.setDesktopContext(true)
+        await editor.account.refreshConfig()
+        editor.model.advancedExpanded = true
+        editor.model.beginProfileEdit()
+        editor.model.editingProfile?.name = "Поддержка клиентов"
+        editor.model.editingProfile?.company = "Example Company"
+        states.append(("profile-editor", editor.model))
+
         for dark in [false, true] {
             let sheet = try render(states.map(\.1), dark: dark)
             let name = dark ? "quickbar-dark.png" : "quickbar-light.png"

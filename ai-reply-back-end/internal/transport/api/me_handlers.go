@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"github.com/aireply/ai-reply-back-end/internal/ai"
 	"net/http"
 	"time"
 
@@ -275,12 +276,18 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 		// The server enforces the same values; the admin panel changes them.
 		"max_source_characters":  current.SourceChars,
 		"max_instruction_length": current.InstructionChars,
+		"mac_context_limits": map[string]any{
+			"profile_characters": ai.MacProfileCharacters, "reference_characters": ai.MacReferenceCharacters,
+			"references": ai.MacReferenceCount, "context_bytes": ai.MacContextBytes,
+			"input_token_budget": s.cfg.MacContext.InputTokenBudget, "output_characters": []int{400, 600},
+		},
 		// What this server understands, so a newer app never sends a field an
 		// older server would reject (request bodies disallow unknown fields).
 		"features": map[string]bool{
 			"reply_preferences": true,
 			// POST /api/v1/ai/compose — writing a new message from an instruction.
-			"compose": true,
+			"compose":                true,
+			"mac_context_generation": s.cfg.MacContext.Enabled,
 			// profile.grammatical_gender and input_language on /ai/reply and
 			// /ai/compose; grammatical_gender and onboarding_version on /me.
 			"sender_profile": true,
@@ -400,6 +407,17 @@ func (s *Server) handleListDevices(w http.ResponseWriter, r *http.Request) {
 // handleDeleteDevice — құрылғыны өшіру.
 func (s *Server) handleDeleteDevice(w http.ResponseWriter, r *http.Request) {
 	user, _ := UserFrom(r.Context())
+	if s.proDevices != nil {
+		handled, err := s.proDevices.RevokeRegisteredDevice(r.Context(), user.ID, r.PathValue("id"), DeviceFrom(r.Context()))
+		if err != nil {
+			httpx.Fail(w, err)
+			return
+		}
+		if handled {
+			httpx.JSON(w, http.StatusOK, map[string]bool{"ok": true})
+			return
+		}
+	}
 	if err := s.users.RemoveDevice(r.Context(), user.ID, r.PathValue("id")); err != nil {
 		httpx.Fail(w, err)
 		return

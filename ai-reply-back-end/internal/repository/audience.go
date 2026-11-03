@@ -38,6 +38,9 @@ type AudienceQuery struct {
 	StaleAfter time.Duration
 	// UserID — only this account's installations (per-user notifications).
 	UserID string
+	// InstallationIDs is a server-only target restriction. Nil means all;
+	// an empty non-nil slice means no recipients, never an account broadcast.
+	InstallationIDs []string
 	// Language — only installations whose notification language is this one (campaign fan-out).
 	Language string
 }
@@ -103,6 +106,16 @@ func matchClause(q AudienceQuery) (string, []any) {
 	if q.UserID != "" {
 		where = append(where, "u.id = ?")
 		args = append(args, q.UserID)
+	}
+	if q.InstallationIDs != nil {
+		if len(q.InstallationIDs) == 0 {
+			where = append(where, "0 = 1")
+		} else {
+			where = append(where, "i.id IN ("+placeholders(len(q.InstallationIDs))+")")
+			for _, id := range q.InstallationIDs {
+				args = append(args, id)
+			}
+		}
 	}
 	if len(f.Platforms) > 0 {
 		where = append(where, "i.platform IN ("+placeholders(len(f.Platforms))+")")

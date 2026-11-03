@@ -16,6 +16,7 @@ final class FakeGenerator: Generating, @unchecked Sendable {
 
     private let lock = NSLock()
     private var recorded: [Call] = []
+    private var recordedOptions: [GenerationOptions] = []
     private var outcomes: [Result<GenerationResult, GenerationError>]
 
     init(_ outcomes: [Result<GenerationResult, GenerationError>]) {
@@ -23,6 +24,7 @@ final class FakeGenerator: Generating, @unchecked Sendable {
     }
 
     var calls: [Call] { lock.withLock { recorded } }
+    var options: [GenerationOptions] { lock.withLock { recordedOptions } }
 
     private func next(_ call: Call) throws(GenerationError) -> GenerationResult {
         let outcome: Result<GenerationResult, GenerationError> = lock.withLock {
@@ -40,6 +42,18 @@ final class FakeGenerator: Generating, @unchecked Sendable {
     func compose(_ instruction: String, regenerate: Bool, inputLanguage: String?,
                  idempotencyKey: String) async throws(GenerationError) -> GenerationResult {
         try next(.compose(instruction: instruction, regenerate: regenerate, key: idempotencyKey))
+    }
+
+    func reply(to source: String, recipient: Recipient, instruction: String?, inputLanguage: String?,
+               idempotencyKey: String, options: GenerationOptions) async throws(GenerationError) -> GenerationResult {
+        lock.withLock { recordedOptions.append(options) }
+        return try next(.reply(source: source, recipient: recipient, instruction: instruction, key: idempotencyKey))
+    }
+
+    func compose(_ instruction: String, regenerate: Bool, inputLanguage: String?, idempotencyKey: String,
+                 options: GenerationOptions) async throws(GenerationError) -> GenerationResult {
+        lock.withLock { recordedOptions.append(options) }
+        return try next(.compose(instruction: instruction, regenerate: regenerate, key: idempotencyKey))
     }
 }
 
@@ -74,15 +88,19 @@ final class BackendStub: HTTPTransport, @unchecked Sendable {
     private let lock = NSLock()
     private var paths: [String] = []
     private var usage: String?
+    private var desktopContext = false
     var hits: [String] { lock.withLock { paths } }
     /// The usage object /me returns from now on (nil: no usage).
     func setUsage(_ json: String?) { lock.withLock { usage = json } }
+    func setDesktopContext(_ available: Bool) { lock.withLock { desktopContext = available } }
 
     func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         let path = request.url!.path
         lock.withLock { paths.append(path) }
         let body: String = switch path {
-        case let p where p.hasSuffix("/config"): #"{"max_source_characters":400,"max_instruction_length":400,"features":{"voice_transcription":true}}"#
+        case let p where p.hasSuffix("/config"):
+            #"{"max_source_characters":400,"max_instruction_length":400,"features":{"voice_transcription":true,"mac_context_generation":"# +
+                (lock.withLock { desktopContext } ? "true" : "false") + "}}"
         case let p where p.hasSuffix("/me"):
             #"{"user":{"id":"u-1"},"legal_consent":{"terms_version":"t","privacy_version":"p"}"# +
                 (lock.withLock { usage }.map { #","usage":"# + $0 } ?? "") + "}"
@@ -128,8 +146,10 @@ struct QuickBarModelTests {
         let voice = VoiceController(transcriber: SilentTranscriber(), permission: DeniedMicrophone())
         let settings = AppSettings(defaults: UserDefaults(suiteName: "test-\(UUID().uuidString)")!)
         let generator = FakeGenerator(outcomes)
+        let contextDirectory = FileManager.default.temporaryDirectory.appendingPathComponent("context-ui-tests-\(UUID().uuidString)")
+        let profiles = ContextProfileStore(store: InMemorySecureStore(), directory: contextDirectory)
         let model = QuickBarModel(auth: auth, account: account, voice: voice, generator: generator,
-                                  clipboard: clipboard, settings: settings, now: { clock.now })
+                                  clipboard: clipboard, settings: settings, now: { clock.now }, contextProfiles: profiles)
         return Environment(model: model, generator: generator, pasteboard: pasteboard, backend: backend,
                            account: account, auth: auth, settings: settings)
     }
@@ -300,6 +320,130 @@ struct QuickBarModelTests {
     @Test func voiceUnavailableWhenTheServerSaysSo() throws {
         let env = try makeEnvironment([])
         #expect(!env.model.voiceAvailable)
+    }
+
+    @Test func manualReplyAndTemplateSelectionDoNotGenerateUntilSubmit() async throws {
+        let env = try makeEnvironment([Self.output("Здравствуйте! Да, поможем.")])
+        env.model.selectReplyMode()
+        env.model.selectTemplate(.business)
+        env.model.manualReplySource = "Поможете с документами?"
+        #expect(env.model.isReplyMode)
+        #expect(env.model.canSubmit)
+        #expect(env.generator.calls.isEmpty)
+        env.model.submit()
+        await waitUntil { env.model.phase == .result }
+        guard case let .reply(source, recipient, _, _) = env.generator.calls.first else {
+            Issue.record("expected reply"); return
+        }
+        #expect(source == "Поможете с документами?")
+        #expect(recipient == .business)
+    }
+
+    @Test func advancedContextIsOptionalAndRequiresServerCapability() async throws {
+        let env = try makeEnvironment([])
+        env.model.draft = "Напиши клиенту"
+        #expect(env.model.canSubmit)
+        env.model.customInstructions = "Кратко и дружелюбно"
+        #expect(!env.model.canSubmit, "old servers must not silently ignore selected private context")
+        env.model.clearContext()
+        #expect(env.model.canSubmit)
+        env.model.outputLength = .extended
+        #expect(!env.model.canSubmit)
+        env.backend.setDesktopContext(true)
+        await env.account.refreshConfig()
+        await waitUntil { !env.model.contextStorageBusy }
+        #expect(env.model.canSubmit)
+        #expect(env.generator.calls.isEmpty)
+    }
+
+    @Test func profilesAndMatchingReferencesAreSnapshottedForRetries() async throws {
+        let env = try makeEnvironment([.failure(.offline), Self.output("Товар A стоит 1200 ₸.")])
+        env.backend.setDesktopContext(true)
+        await env.account.refreshConfig()
+        await waitUntil { !env.model.contextStorageBusy }
+        let attachment = ContextAttachment(name: "prices.csv", format: "csv", segments: [
+            ReferenceSegment(text: "Product A: 1200 KZT, available"),
+            ReferenceSegment(text: "Unrelated furniture: 99999 KZT")
+        ])
+        let selected = ContextProfile(name: "My Business", role: .business, company: "Example Company", attachments: [attachment])
+        let unrelated = ContextProfile(name: "Private", description: "Never include unrelated private details")
+        try env.model.contextProfiles.save(selected)
+        try env.model.contextProfiles.save(unrelated)
+        env.model.selectedProfileID = selected.id
+        env.model.customInstructions = "Answer politely"
+        env.model.outputLength = .extended
+        env.model.draft = "What does Product A cost?"
+        #expect(env.generator.calls.isEmpty, "profile creation and reference selection cost no generations")
+        env.model.submit()
+        await waitUntil { env.model.issue != nil }
+        let first = try #require(env.generator.options.first)
+        #expect(first.outputCharacterLimit == 600)
+        #expect(first.context?.profile?.contains("Example Company") == true)
+        #expect(first.context?.profile?.contains("Answer politely") == true)
+        #expect(first.context?.profile?.contains("unrelated private") != true)
+        #expect(first.context?.references.count == 1)
+        #expect(first.context?.references.first?.contains("1200 KZT") == true)
+        env.model.selectedProfileID = unrelated.id
+        env.model.customInstructions = "Different instructions"
+        env.model.outputLength = .standard
+        env.model.retry()
+        await waitUntil { env.model.phase == .result }
+        #expect(env.generator.options == [first, first], "retry must reuse the same context and output limit")
+        #expect(keyOf(env.generator.calls.first) == keyOf(env.generator.calls.last))
+    }
+
+    @Test func customTemplatePersistsSelectedProfileAndCanClearAttachments() async throws {
+        let env = try makeEnvironment([])
+        await waitUntil { !env.model.contextStorageBusy }
+        env.model.selectTemplate(.custom)
+        #expect(env.model.advancedExpanded)
+        #expect(env.model.recipient == .work)
+        env.model.beginProfileEdit()
+        env.model.editingProfile?.name = "Customer Support"
+        env.model.editingProfile?.instructions = "Ask for an order number"
+        env.model.saveProfile()
+        await waitUntil { env.model.selectedProfile != nil }
+        let profile = try #require(env.model.selectedProfile)
+        #expect(profile.instructions == "Ask for an order number")
+        #expect(env.generator.calls.isEmpty)
+        env.model.clearContext()
+        #expect(!env.model.hasAdvancedContext)
+        #expect(env.model.selectedProfileID == nil)
+        #expect(env.model.outputLength == .standard)
+        #expect(env.model.contextProfiles.profiles.count == 1, "clearing active context must not destroy saved profiles")
+    }
+
+    @Test func importingAndRemovingAReferenceNeverGenerate() async throws {
+        let env = try makeEnvironment([])
+        await waitUntil { !env.model.contextStorageBusy }
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("prices-\(UUID().uuidString).csv")
+        try "Product,Price,Available\nProduct A,1200 KZT,yes\n".write(to: file, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: file) }
+        await env.model.importDocument(file)
+        #expect(!env.model.importingDocument)
+        #expect(env.model.contextIssue == nil)
+        let imported = try #require(env.model.attachments.first)
+        #expect(imported.segments.contains { $0.text.contains("1200") })
+        #expect(env.generator.calls.isEmpty)
+        env.model.removeAttachment(imported.id)
+        #expect(env.model.attachments.isEmpty)
+        #expect(env.generator.calls.isEmpty)
+    }
+
+    @Test func accountSwitchClearsActivePrivateContext() async throws {
+        let env = try makeEnvironment([])
+        await waitUntil { !env.model.contextStorageBusy }
+        let profile = ContextProfile(name: "Business", description: "Private business information")
+        try env.model.contextProfiles.save(profile)
+        env.model.selectedProfileID = profile.id
+        env.model.customInstructions = "Private preference"
+        env.model.outputLength = .extended
+        env.account.apply(MeResponse(user: try JSONDecoder.api.decode(UserDTO.self, from: Data(#"{"id":"another-account"}"#.utf8)),
+                                     subscription: nil, usage: nil, legalConsent: nil))
+        await waitUntil { env.model.selectedProfileID == nil }
+        #expect(!env.model.hasAdvancedContext)
+        #expect(env.model.customInstructions.isEmpty)
+        #expect(env.generator.calls.isEmpty)
     }
 
     private func keyOf(_ call: FakeGenerator.Call?) -> String {

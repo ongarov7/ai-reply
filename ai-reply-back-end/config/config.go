@@ -39,6 +39,8 @@ type Config struct {
 	Log                                Log
 	Telegram                           Telegram
 	Push                               Push
+	ProDevices                         ProDevices
+	MacContext                         MacContext
 	Legal                              Legal
 	Retention                          Retention
 	IAP                                IAP
@@ -494,6 +496,8 @@ func Load(envFile string) (Config, error) {
 		BillingSandboxBCCEnabled:           boolean("BILLING_SANDBOX_BCC_ENABLED", false),
 		BillingSandboxPushEnabled:          boolean("BILLING_SANDBOX_PUSH_ENABLED", false),
 		BillingSandboxWebTopupOfferEnabled: boolean("BILLING_SANDBOX_WEB_TOPUP_OFFER_ENABLED", false),
+		ProDevices:                         proDevicesFromEnv(),
+		MacContext:                         macContextFromEnv(),
 		Limits: Limits{
 			SourceTextChars:   num("LIMIT_SOURCE_TEXT_CHARS", 400),
 			InstructionChars:  num("LIMIT_INSTRUCTION_CHARS", 400),
@@ -664,6 +668,8 @@ func (c Config) Validate() []string {
 		}
 	}
 	problems = append(problems, c.Push.validate()...)
+	problems = append(problems, c.ProDevices.validate()...)
+	problems = append(problems, c.MacContext.validate()...)
 	if c.App.MacOSDownloadURL != "" && c.App.MacOSInstallerURL() == "" {
 		problems = append(problems, "MACOS_DOWNLOAD_URL must be an HTTPS .dmg URL under /downloads/macos/ on the PUBLIC_BASE_URL host, without credentials, query or fragment")
 	}

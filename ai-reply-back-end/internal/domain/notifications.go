@@ -87,15 +87,16 @@ const (
 	TypeClipboardHelp           = "clipboard_help"
 	TypeAccountInfo             = "account_info"
 	// TypeSupportReply — оператор қолдау чатында жауап берді.
-	TypeSupportReply  = "support_reply"
-	TypeWebTopupOffer = "web_topup_offer"
+	TypeSupportReply   = "support_reply"
+	TypeWebTopupOffer  = "web_topup_offer"
+	TypeProDeviceLimit = "pro_device_limit"
 )
 
 // AutomaticNotificationTypes — сервер өзі жіберетін түрлер (әкімші сүзгісі үшін).
 var AutomaticNotificationTypes = []string{
 	TypeSubscriptionActivated, TypeSubscriptionExpiring, TypeSubscriptionExpired, TypeQuotaLow, TypeQuotaExhausted,
 	TypeOnboardingIncomplete, TypeKeyboardSetupIncomplete, TypeClipboardHelp, TypeAccountInfo,
-	TypeSupportReply, TypeWebTopupOffer,
+	TypeSupportReply, TypeWebTopupOffer, TypeProDeviceLimit,
 }
 
 // ReminderTypes — автоматты еске салу шолуы жіберетін түрлер.

@@ -319,6 +319,7 @@ public struct ServerConfig: Decodable, Equatable, Sendable {
     public func feature(_ name: String) -> Bool { features[name] ?? false }
 
     public var voiceTranscription: Bool { feature("voice_transcription") }
+    public var desktopContext: Bool { feature("mac_context_generation") }
 
     public static let fallback = ServerConfig(maxSourceCharacters: 400, maxInstructionLength: 400, features: [:], legal: nil)
 }

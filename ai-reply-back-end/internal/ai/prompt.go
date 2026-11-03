@@ -127,6 +127,9 @@ type Quality struct {
 	// Compose — «Create» хабарламасы: соңғы «Примечание:» абзацы хабардың
 	// бөлігі, тазартуда өшірілмейді.
 	Compose bool
+	// OutputCharLimit is opt-in for trusted macOS requests. Zero retains the
+	// existing mobile output behavior; it is separate from provider token caps.
+	OutputCharLimit int
 }
 
 // verifiedLanguage — Check тексеретін тіл; тексеру керек болмаса бос.

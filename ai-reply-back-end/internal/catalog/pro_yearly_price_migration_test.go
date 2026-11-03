@@ -80,7 +80,7 @@ func TestAnnualProPriceMigrationPreservesSalesHistoryAndDraft(t *testing.T) {
 	exec(`INSERT INTO billing_orders(id,user_id,idempotency_key,catalog_version,product_code,snapshot_json,amount_minor,currency,provider,environment,bank_order,status,checkout_token_hash,request_json,created_at,updated_at) VALUES('old-order','buyer','original',1,'pro_yearly',?,3450000,'KZT','bcc','sandbox','original-bank-order','pending','token-hash','{}',1000,1000)`, string(orderRaw))
 	exec(`INSERT INTO bcc_subscriptions(id,user_id,environment,root_order_id,plan_id,snapshot_json,amount_minor,period_days,status,mandate_expires_at,merch_rn_id,created_at,updated_at) SELECT 'old-mandate','buyer','sandbox','old-order',id,?,3450000,365,'active',9999999999999,'original-mandate',1000,1000 FROM plans WHERE code='pro_yearly'`, string(orderRaw))
 	exec(`INSERT INTO iap_purchases(id,user_id,provider,environment,store_product_id,product_code,transaction_id,units,status,created_at,updated_at,price_milliunits,currency) VALUES('old-apple','buyer','app_store','Production','test.pro_yearly','pro_yearly','paid-original',0,'granted',1000,1000,34500000,'KZT')`)
-	if applied, err := database.Migrate(ctx, db, migrations.FS); err != nil || len(applied) != 1 || applied[0] != "0030_pro_yearly_store_price.sql" {
+	if applied, err := database.Migrate(ctx, db, catalogMigrationsBefore(t, "0031")); err != nil || len(applied) != 1 || applied[0] != "0030_pro_yearly_store_price.sql" {
 		t.Fatalf("migration: %v %v", applied, err)
 	}
 	s := New(db)
@@ -136,7 +136,7 @@ func TestAnnualProPriceMigrationPreservesSalesHistoryAndDraft(t *testing.T) {
 	if err != nil || len(audit) != 2 || audit[0].Action != "publish" || audit[1].Action != "rebase_price" || !reflect.DeepEqual(audit[1].After, draftProducts) {
 		t.Fatalf("audit: %+v %v", audit, err)
 	}
-	if applied, err := database.Migrate(ctx, db, migrations.FS); err != nil || len(applied) != 0 {
+	if applied, err := database.Migrate(ctx, db, catalogMigrationsBefore(t, "0031")); err != nil || len(applied) != 0 {
 		t.Fatalf("rerun: %v %v", applied, err)
 	}
 }

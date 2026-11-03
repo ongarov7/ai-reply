@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aireply/ai-reply-back-end/config"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
 	"github.com/aireply/ai-reply-back-end/internal/limits"
 	"github.com/aireply/ai-reply-back-end/internal/repository"
@@ -30,16 +31,23 @@ type QuotaEvents interface {
 	QuotaUsed(ctx context.Context, user domain.User, usage domain.Entitlement, date, month string)
 }
 
+// ProDevices is evaluated against the existing server-resolved entitlement.
+type ProDevices interface {
+	Authorize(context.Context, domain.User, string, domain.Entitlement) error
+}
+
 // Service — AI шлюзі: квота → провайдер → сапа → есеп.
 type Service struct {
-	repo     *repository.Store
-	subs     *subscriptions.Service
-	provider Provider
-	limits   LimitsSource
-	log      *slog.Logger
-	clock    traits.Clock
-	repair   bool
-	quota    QuotaEvents
+	repo       *repository.Store
+	subs       *subscriptions.Service
+	provider   Provider
+	limits     LimitsSource
+	log        *slog.Logger
+	clock      traits.Clock
+	repair     bool
+	quota      QuotaEvents
+	proDevices ProDevices
+	macContext config.MacContext
 	// polishPerDay — бір қолданушының сервер күніндегі polish шегі (0 — шексіз).
 	polishPerDay int
 	// transcriber — дауыс → мәтін провайдері (nil — мүмкіндік жоқ).
@@ -59,6 +67,8 @@ func New(repo *repository.Store, subs *subscriptions.Service, provider Provider,
 	return s
 }
 
+func (s *Service) WithProDevices(p ProDevices) *Service { s.proDevices = p; return s }
+
 // WithClock — тестке.
 func (s *Service) WithClock(c traits.Clock) *Service { s.clock = c; return s }
 
@@ -73,11 +83,15 @@ func (s *Service) WithPolishDailyLimit(n int) *Service { s.polishPerDay = n; ret
 
 // Request — бір жауап сұранысы. Мәтін тек жадта, тек осы шақыру ішінде болады.
 type Request struct {
-	User        domain.User
-	DeviceID    string
-	SourceText  string
-	Instruction string
-	Language    string
+	User     domain.User
+	DeviceID string
+	// SessionPlatform comes from signed authentication, never the body.
+	SessionPlatform string
+	Context         *GenerationContext
+	OutputCharLimit int
+	SourceText      string
+	Instruction     string
+	Language        string
 	// InputLanguage — тексерілген пернетақта коды не бос.
 	InputLanguage string
 	TemplateID    string
@@ -167,6 +181,10 @@ func (s *Service) Reply(ctx context.Context, req Request) (Result, error) {
 	// One read per request: the whole call works against the same limits
 	// even if an administrator changes them while it is in flight.
 	lim := s.limits.Current(ctx)
+	mac, err := s.validateMacGeneration(req.SessionPlatform, req.Context, req.OutputCharLimit, "")
+	if err != nil {
+		return Result{}, err
+	}
 
 	source := strings.TrimSpace(req.SourceText)
 	if source == "" {
@@ -188,6 +206,12 @@ func (s *Service) Reply(ctx context.Context, req Request) (Result, error) {
 		WorkingHours:  req.Business,
 	})
 	prompt.MaxOutputTokens = lim.MaxOutputTokens
+	if mac {
+		prompt, err = s.addMacGeneration(prompt, req.Context, req.OutputCharLimit)
+		if err != nil {
+			return Result{}, err
+		}
+	}
 
 	return s.generate(ctx, call{
 		Mode:       ModeReply,
@@ -214,6 +238,11 @@ func (s *Service) generate(ctx context.Context, c call, prompt Prompt, started t
 	entitlement, err := s.subs.Entitlement(ctx, c.User.ID)
 	if err != nil {
 		return Result{}, err
+	}
+	if s.proDevices != nil {
+		if err := s.proDevices.Authorize(ctx, c.User, c.DeviceID, entitlement); err != nil {
+			return Result{}, err
+		}
 	}
 	date, month := s.subs.Keys(started)
 
@@ -252,7 +281,13 @@ func (s *Service) generate(ctx context.Context, c call, prompt Prompt, started t
 	if providerErr != nil {
 		// Жауап алынбады — бронды қайтарамыз (қайталау кезінде екі рет есептелмейді).
 		s.release(ctx, c, res)
-		s.record(ctx, c, entitlement, "error", errorCode(providerErr), prompt.Version, Completion{}, latency)
+		completion := Completion{Model: outcome.Model, InputTokens: outcome.InputTokens, OutputTokens: outcome.OutputTokens, ProviderMS: outcome.ProviderMS}
+		if completion.InputTokens > 0 || completion.OutputTokens > 0 {
+			if err := s.repo.AddTokens(ctx, c.User.ID, date, month, completion.InputTokens, completion.OutputTokens, s.estimateCostMicros(ctx, completion)); err != nil {
+				s.log.Error("token accounting failed", "user_id", c.User.ID, "error", err.Error())
+			}
+		}
+		s.record(ctx, c, entitlement, "error", errorCode(providerErr), prompt.Version, completion, latency)
 		s.logFailure(c, prompt.Version, providerErr, latency)
 		return Result{}, providerErr
 	}
@@ -425,6 +460,8 @@ func errorCode(err error) string {
 		return "RATE_LIMITED"
 	case errors.Is(err, domain.ErrEmptyCompletion):
 		return "AI_EMPTY_RESPONSE"
+	case errors.Is(err, domain.ErrOutputCharacterLimit):
+		return "AI_OUTPUT_LIMIT_EXCEEDED"
 	case errors.Is(err, domain.ErrProviderDown):
 		return "AI_PROVIDER_UNAVAILABLE"
 	case err == nil:

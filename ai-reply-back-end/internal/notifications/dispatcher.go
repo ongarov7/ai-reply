@@ -344,6 +344,9 @@ func (s *Service) deliver(ctx context.Context, d repository.ClaimedDelivery, not
 
 // sendPush — бір құрылғыға FCM арқылы (Android және iOS).
 func (s *Service) sendPush(ctx context.Context, d repository.ClaimedDelivery, n domain.Notification, started time.Time) outcome {
+	if n.Type == TypeProDeviceLimit && !s.proDeviceDelivery.Load() {
+		return outcome{status: domain.DeliverySkipped, code: "pro_device_notifications_disabled"}
+	}
 	if d.InstallationID == "" {
 		return outcome{status: domain.DeliverySkipped, code: "installation_missing"}
 	}
@@ -383,6 +386,23 @@ func (s *Service) sendPush(ctx context.Context, d repository.ClaimedDelivery, n 
 		}
 		if !domain.CategoryEnabled(n.Category, prefs) {
 			return skip(SkipDisabledByUser)
+		}
+	}
+	if n.Type == TypeProDeviceLimit {
+		ids, err := s.repo.ProDevicePushTargets(ctx, d.UserID, n.Params["blocked_device_id"])
+		if err != nil {
+			status, next := s.retry(d, 0)
+			return outcome{status: status, next: next, code: "pro_device_authorization_lookup_failed", fingerprint: fingerprint}
+		}
+		authorized := false
+		for _, id := range ids {
+			if id == d.InstallationID {
+				authorized = true
+				break
+			}
+		}
+		if !authorized {
+			return skip("pro_device_authorization_revoked")
 		}
 	}
 	if n.Type == domain.TypeWebTopupOffer {
@@ -451,6 +471,9 @@ func (s *Service) sendPush(ctx context.Context, d repository.ClaimedDelivery, n 
 
 // sendEmail — тіркелгінің расталған поштасына бір хат (мекенжай жіберу сәтінде оқылады).
 func (s *Service) sendEmail(ctx context.Context, d repository.ClaimedDelivery, n domain.Notification, started time.Time) outcome {
+	if n.Type == TypeProDeviceLimit && !s.proDeviceDelivery.Load() {
+		return outcome{status: domain.DeliverySkipped, code: "pro_device_notifications_disabled"}
+	}
 	if n.Type == domain.TypeWebTopupOffer {
 		return outcome{status: domain.DeliverySkipped, code: "push_only_offer"}
 	}

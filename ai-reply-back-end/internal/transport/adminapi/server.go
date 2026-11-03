@@ -113,6 +113,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	s.registerSupport(mux)
 	s.registerIAP(mux)
 	s.registerCatalog(mux)
+	s.registerProDevices(mux)
 }
 
 // guard — cookie сессиясы + күй өзгертетін сұраныстарда CSRF тақырыбы.

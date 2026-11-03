@@ -3,6 +3,29 @@ import Observation
 import AirReplyCore
 import AirReplySystem
 import AirReplyVoice
+import UniformTypeIdentifiers
+
+public enum DesktopTemplate: String, CaseIterable, Sendable {
+    case friend, business, customer, custom
+
+    var labelKey: String.LocalizationValue {
+        switch self {
+        case .friend: "bar.template.friend"
+        case .business: "bar.template.business"
+        case .customer: "bar.template.customer"
+        case .custom: "bar.template.custom"
+        }
+    }
+
+    var recipient: Recipient {
+        switch self {
+        case .friend: .friend
+        case .business: .business
+        case .customer: .client
+        case .custom: .work
+        }
+    }
+}
 
 /// Something the bar explains in one line with one action.
 public enum QuickBarIssue: Equatable, Sendable {
@@ -21,6 +44,7 @@ public final class QuickBarModel {
         case compose
         /// Replying to text copied in another app.
         case reply(CopiedText)
+        case manualReply
     }
 
     public enum Phase: Equatable {
@@ -30,14 +54,43 @@ public final class QuickBarModel {
     }
 
     /// What was sent last, so "Retry" can reuse its idempotency key (never charged twice).
+    private struct ContextSnapshot: Sendable {
+        let options: GenerationOptions
+        let profile: ContextProfile?
+        let query: String
+
+        func resolve() async -> GenerationOptions {
+            var resolved = options
+            if let profile {
+                let query = query
+                resolved.context = await Task.detached(priority: .userInitiated) {
+                    ContextRetriever.context(profile: profile, query: query)
+                }.value
+            }
+            return resolved
+        }
+    }
+
     private enum Request {
-        case compose(instruction: String, regenerate: Bool, key: String)
-        case reply(source: String, recipient: Recipient, instruction: String?, key: String)
+        case compose(instruction: String, regenerate: Bool, key: String, options: ContextSnapshot)
+        case reply(source: String, recipient: Recipient, instruction: String?, key: String, options: ContextSnapshot)
     }
 
     public var draft = ""
     public var emailInput = ""
     public var codeInput = ""
+    public var manualReplySource = ""
+    public var advancedExpanded = false
+    public var template: DesktopTemplate = .customer
+    public var selectedProfileID: UUID?
+    public var customInstructions = ""
+    public var outputLength: OutputLength = .standard
+    public var editingProfile: ContextProfile?
+    public private(set) var contextIssue: String?
+    public private(set) var importingDocument = false
+    public private(set) var contextStorageBusy = true
+    public private(set) var referenceAttachments: [ContextAttachment] = []
+    public let contextProfiles: ContextProfileStore
     public private(set) var mode: Mode = .compose
     public private(set) var phase: Phase = .editing
     public private(set) var result = ""
@@ -59,6 +112,9 @@ public final class QuickBarModel {
     private var lastRequest: Request?
     private var lastActivity: Date?
     private var work: Task<Void, Never>?
+    private var choosingDocument = false
+    private var importRequestID: UUID?
+    private var contextAccountID: String?
 
     /// Hides the panel.
     public var requestClose: () -> Void = {}
@@ -66,9 +122,11 @@ public final class QuickBarModel {
     public var didCopy: () -> Void = {}
     public var openURL: (URL) -> Void = { NSWorkspace.shared.open($0) }
     public var openPrivacySettings: () -> Void = {}
+    public var openAccountSettings: () -> Void = {}
 
     public init(auth: AuthSession, account: AccountStore, voice: VoiceController, generator: any Generating,
-                clipboard: ClipboardMonitor, settings: AppSettings, now: @escaping () -> Date = Date.init) {
+                clipboard: ClipboardMonitor, settings: AppSettings, now: @escaping () -> Date = Date.init,
+                contextProfiles: ContextProfileStore = ContextProfileStore()) {
         self.auth = auth
         self.account = account
         self.voice = voice
@@ -76,8 +134,22 @@ public final class QuickBarModel {
         self.clipboard = clipboard
         self.settings = settings
         self.now = now
+        self.contextProfiles = contextProfiles
+        contextAccountID = account.me?.user.id
         recipient = Recipient(rawValue: settings.lastRecipient) ?? .client
+        switch recipient {
+        case .friend: template = .friend
+        case .business, .work: template = .business
+        case .client: template = .customer
+        }
+        Task { [weak self] in
+            guard let self else { return }
+            defer { self.contextStorageBusy = false }
+            do { try await self.contextProfiles.loadAsync() }
+            catch { self.contextIssue = String(localized: "bar.context.load_failed") }
+        }
         observeVoice()
+        observeAccount()
     }
 
     // MARK: Panel lifecycle
@@ -118,7 +190,8 @@ public final class QuickBarModel {
 
     /// Keep the panel on screen while a system prompt or the microphone needs it.
     public var holdsPanelOpen: Bool {
-        switch voice.phase {
+        if choosingDocument { return true }
+        return switch voice.phase {
         case .requestingPermission, .recording, .transcribing: true
         default: false
         }
@@ -126,6 +199,8 @@ public final class QuickBarModel {
 
     private func resetConversation() {
         draft = ""
+        manualReplySource = ""
+        referenceAttachments = []
         result = ""
         issue = nil
         phase = .editing
@@ -144,14 +219,25 @@ public final class QuickBarModel {
 
     public var sourceLimit: Int { account.config.maxSourceCharacters }
     public var instructionLimit: Int { account.config.maxInstructionLength }
-    public var sourceLength: Int { copiedText.map { TextMetrics.serverLength($0.text) } ?? 0 }
+    public var isReplyMode: Bool { mode != .compose }
+    public var sourceText: String { copiedText?.text ?? (isReplyMode ? manualReplySource : "") }
+    public var sourceLength: Int { TextMetrics.serverLength(sourceText) }
     public var draftLength: Int { TextMetrics.serverLength(draft) }
     public var sourceTooLong: Bool { sourceLength > sourceLimit }
     public var voiceAvailable: Bool { account.config.voiceTranscription }
+    public var desktopContextAvailable: Bool { account.config.desktopContext }
+    public var selectedProfile: ContextProfile? { contextProfiles.profiles.first { $0.id == selectedProfileID } }
+    public var attachments: [ContextAttachment] { (selectedProfile?.attachments ?? []) + referenceAttachments }
+    public var hasAdvancedContext: Bool {
+        selectedProfile != nil || !customInstructions.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !attachments.isEmpty || outputLength == .extended
+    }
 
     public var canSubmit: Bool {
         guard auth.isSignedIn, !needsConsent, phase != .generating else { return false }
-        if copiedText != nil { return !sourceTooLong }
+        guard !importingDocument, !hasAdvancedContext || desktopContextAvailable else { return false }
+        guard !hasAdvancedContext || !contextStorageBusy else { return false }
+        guard TextMetrics.serverLength(customInstructions) <= 1000 else { return false }
+        if isReplyMode { return sourceLength > 0 && !sourceTooLong && draftLength <= instructionLimit }
         return draftLength > 0 && draftLength <= instructionLimit
     }
 
@@ -160,32 +246,38 @@ public final class QuickBarModel {
     /// Enter in the field.
     public func submit() {
         guard canSubmit else { return }
-        if copiedText != nil {
+        if isReplyMode {
             reply(to: recipient)
         } else {
             let instruction = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-            run(.compose(instruction: instruction, regenerate: false, key: Self.newKey()))
+            run(.compose(instruction: instruction, regenerate: false, key: Self.newKey(), options: generationOptions(query: instruction)))
         }
     }
 
     /// One click on a recipient chip writes the reply at once.
     public func reply(to recipient: Recipient) {
         self.recipient = recipient
+        switch recipient {
+        case .friend: template = .friend
+        case .client: template = .customer
+        case .business: template = .business
+        case .work: if template != .custom { template = .business }
+        }
         settings.lastRecipient = recipient.rawValue
-        guard let copied = copiedText, canSubmit else { return }
+        guard isReplyMode, canSubmit else { return }
         let instruction = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        run(.reply(source: copied.text, recipient: recipient, instruction: instruction.isEmpty ? nil : instruction,
-                   key: Self.newKey()))
+        run(.reply(source: sourceText, recipient: recipient, instruction: instruction.isEmpty ? nil : instruction,
+                   key: Self.newKey(), options: generationOptions(query: sourceText + " " + instruction)))
     }
 
     /// "Another variant": a new request with a new key.
     public func regenerate() {
         guard let lastRequest, phase != .generating else { return }
         switch lastRequest {
-        case let .compose(instruction, _, _):
-            run(.compose(instruction: instruction, regenerate: true, key: Self.newKey()))
-        case let .reply(source, recipient, instruction, _):
-            run(.reply(source: source, recipient: recipient, instruction: instruction, key: Self.newKey()))
+        case let .compose(instruction, _, _, options):
+            run(.compose(instruction: instruction, regenerate: true, key: Self.newKey(), options: options))
+        case let .reply(source, recipient, instruction, _, options):
+            run(.reply(source: source, recipient: recipient, instruction: instruction, key: Self.newKey(), options: options))
         }
     }
 
@@ -212,12 +304,16 @@ public final class QuickBarModel {
             do throws(GenerationError) {
                 let output: GenerationResult
                 switch request {
-                case let .compose(instruction, regenerate, key):
+                case let .compose(instruction, regenerate, key, options):
+                    let resolved = await options.resolve()
+                    guard !Task.isCancelled else { return }
                     output = try await generator.compose(instruction, regenerate: regenerate, inputLanguage: inputLanguage,
-                                                         idempotencyKey: key)
-                case let .reply(source, recipient, instruction, key):
+                                                         idempotencyKey: key, options: resolved)
+                case let .reply(source, recipient, instruction, key, options):
+                    let resolved = await options.resolve()
+                    guard !Task.isCancelled else { return }
                     output = try await generator.reply(to: source, recipient: recipient, instruction: instruction,
-                                                       inputLanguage: inputLanguage, idempotencyKey: key)
+                                                       inputLanguage: inputLanguage, idempotencyKey: key, options: resolved)
                 }
                 guard !Task.isCancelled else { return }
                 self?.finish(with: output)
@@ -286,11 +382,149 @@ public final class QuickBarModel {
     }
 
     public func dismissCopied() {
-        guard let copied = copiedText else { return }
-        clipboard.markHandled(copied)
+        if let copied = copiedText { clipboard.markHandled(copied) }
         mode = .compose
         issue = nil
         focusRequest += 1
+    }
+
+    public func selectReplyMode() {
+        if !isReplyMode { mode = .manualReply }
+        focusRequest += 1
+    }
+
+    public func selectTemplate(_ value: DesktopTemplate) {
+        template = value
+        recipient = value.recipient
+        settings.lastRecipient = recipient.rawValue
+        if value == .custom { advancedExpanded = true }
+    }
+
+    private func generationOptions(query: String) -> ContextSnapshot {
+        guard desktopContextAvailable else { return ContextSnapshot(options: GenerationOptions(), profile: nil, query: query) }
+        var profile = selectedProfile ?? ContextProfile(name: "")
+        profile.attachments += referenceAttachments
+        let custom = customInstructions.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !custom.isEmpty { profile.instructions += (profile.instructions.isEmpty ? "" : "\n") + custom }
+        return ContextSnapshot(options: GenerationOptions(outputCharacterLimit: outputLength.rawValue, recipient: template.recipient),
+                               profile: profile, query: query)
+    }
+
+    public func beginProfileEdit() {
+        editingProfile = selectedProfile ?? ContextProfile(name: "")
+        contextIssue = nil
+    }
+
+    public func saveProfile() {
+        guard let profile = editingProfile, !contextStorageBusy else { return }
+        contextStorageBusy = true
+        let editingAccountID = account.me?.user.id
+        Task { [weak self] in
+            guard let self else { return }
+            defer { self.contextStorageBusy = false }
+            do {
+                try await self.contextProfiles.saveAsync(profile)
+                if self.account.me?.user.id == editingAccountID { self.selectedProfileID = profile.id }
+                self.editingProfile = nil
+                self.contextIssue = nil
+            } catch { self.contextIssue = String(localized: "bar.context.save_failed") }
+        }
+    }
+
+    public func removeSelectedProfile() {
+        guard let id = selectedProfileID, !contextStorageBusy else { return }
+        contextStorageBusy = true
+        Task { [weak self] in
+            guard let self else { return }
+            defer { self.contextStorageBusy = false }
+            do {
+                try await self.contextProfiles.removeAsync(id)
+                if self.selectedProfileID == id { self.selectedProfileID = nil; self.editingProfile = nil }
+                self.contextIssue = nil
+            } catch { self.contextIssue = String(localized: "bar.context.save_failed") }
+        }
+    }
+
+    public func removeAttachment(_ id: UUID) {
+        guard !contextStorageBusy else { return }
+        guard let profile = selectedProfile, profile.attachments.contains(where: { $0.id == id }) else {
+            referenceAttachments.removeAll { $0.id == id }
+            return
+        }
+        contextStorageBusy = true
+        Task { [weak self] in
+            guard let self else { return }
+            defer { self.contextStorageBusy = false }
+            do {
+                try await self.contextProfiles.removeAttachmentAsync(profileID: profile.id, attachmentID: id)
+                self.contextIssue = nil
+            } catch { self.contextIssue = String(localized: "bar.context.save_failed") }
+        }
+    }
+
+    public func clearContext() {
+        importRequestID = nil
+        selectedProfileID = nil
+        customInstructions = ""
+        referenceAttachments = []
+        editingProfile = nil
+        outputLength = .standard
+        contextIssue = nil
+    }
+
+    public func chooseDocument() {
+        guard !importingDocument, attachments.count < 4 else { return }
+        let picker = NSOpenPanel()
+        picker.allowedContentTypes = ["xlsx", "csv", "pdf", "docx", "txt"].compactMap { UTType(filenameExtension: $0) }
+        picker.allowsMultipleSelection = false
+        picker.canChooseDirectories = false
+        picker.canChooseFiles = true
+        choosingDocument = true
+        picker.begin { [weak self] result in
+            Task { @MainActor in
+                guard let self else { return }
+                self.choosingDocument = false
+                guard result == .OK, let url = picker.url else { return }
+                await self.importDocument(url)
+            }
+        }
+    }
+
+    public func importDocument(_ url: URL) async {
+        guard !importingDocument, attachments.count < 4 else { return }
+        importingDocument = true
+        let requestID = UUID()
+        importRequestID = requestID
+        let targetProfileID = selectedProfileID
+        contextIssue = nil
+        defer { importingDocument = false }
+        do {
+            let attachment = try await DocumentContextImporter().parse(url: url)
+            guard importRequestID == requestID else { return }
+            if let targetProfileID {
+                guard var profile = contextProfiles.profiles.first(where: { $0.id == targetProfileID }) else { return }
+                profile.attachments.append(attachment)
+                try await contextProfiles.saveAsync(profile)
+            } else { referenceAttachments.append(attachment) }
+        } catch {
+            if importRequestID == requestID { contextIssue = String(localized: "bar.context.import_failed") }
+        }
+    }
+
+    private func observeAccount() {
+        withObservationTracking {
+            _ = account.me?.user.id
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                let accountID = self.account.me?.user.id
+                if self.contextAccountID != accountID {
+                    self.clearContext()
+                    self.contextAccountID = accountID
+                }
+                self.observeAccount()
+            }
+        }
     }
 
     public func clearIssue() {

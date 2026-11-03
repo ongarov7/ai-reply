@@ -684,7 +684,7 @@
   var UserDetail = {
     props: { id: String },
     data: function () {
-      return { loading: true, data: null, plans: [], planID: "", expires: "",
+      return { loading: true, data: null, proDevices: null, plans: [], planID: "", expires: "",
                grant: { units: 10, reason: "" }, granting: false };
     },
     mounted: function () { this.load(); },
@@ -699,6 +699,7 @@
           this.plans = (await api("/plans")).plans;
           this.planID = this.data.entitlement.plan_id;
           this.expires = this.data.subscription.expires_at || "";
+          if (this.$root.state.admin.role === "admin") this.proDevices = await api("/users/" + this.id + "/pro-devices");
         } catch (e) { toast("danger", t("common.error")); }
         this.loading = false;
       },
@@ -715,6 +716,11 @@
         this.act("/status", { status: next }, "common.confirm");
       },
       savePlan() { this.act("/plan", { plan_id: this.planID, expires_at: this.expires }); },
+      revokeProDevice(device) {
+        var reason = window.prompt(t("admin.pro_devices.reason"), "");
+        if (reason === null || !reason.trim()) return;
+        this.act("/pro-devices/" + encodeURIComponent(device.id) + "/revoke", { reason: reason.trim() }, "common.confirm");
+      },
       subscriptionStatus() {
         var status = this.data.subscription.status;
         return status === "none" ? t("admin.user.sub_none") : status;
@@ -900,6 +906,26 @@
                   </tbody>
                 </table>
               </div>
+            </div>
+
+            <div v-if="proDevices" class="card">
+              <div class="card-head"><h2>{{ t('admin.pro_devices.title') }}</h2></div>
+              <div class="table-wrap"><table>
+                <thead><tr><th>{{ t('admin.pro_devices.category') }}</th><th>{{ t('admin.users.col_platform') }}</th>
+                  <th>{{ t('admin.users.col_last') }}</th><th>{{ t('admin.pro_devices.status') }}</th><th></th></tr></thead>
+                <tbody>
+                  <tr v-for="d in proDevices.devices" :key="d.id">
+                    <td>{{ t('pro_devices.category.' + d.device_category) }}</td><td>{{ d.platform }} {{ d.display_name }}</td>
+                    <td>{{ d.last_seen_at }}</td><td>{{ t('admin.pro_devices.' + (d.revoked_at ? 'revoked' : 'authorized')) }}</td>
+                    <td><button v-if="!d.revoked_at" class="btn btn-danger" @click="revokeProDevice(d)">{{ t('admin.pro_devices.revoke') }}</button></td>
+                  </tr>
+                  <tr v-if="!proDevices.devices.length"><td colspan="5" class="empty">{{ t('common.empty') }}</td></tr>
+                </tbody>
+              </table></div>
+              <div class="card-head"><h3>{{ t('admin.pro_devices.events') }}</h3></div>
+              <div class="card-body"><div v-for="e in proDevices.events" :key="e.id" class="small">
+                {{ e.created_at }} · {{ e.kind }} · {{ e.mode }} · {{ e.platform }} · {{ e.reason }}
+              </div><div v-if="!proDevices.events.length" class="muted">{{ t('common.empty') }}</div></div>
             </div>
 
             <div class="card">
