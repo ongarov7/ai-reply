@@ -1,5 +1,6 @@
 using System.Collections.Frozen;
 using System.Globalization;
+using System.Reflection;
 using System.Text.Json;
 
 namespace AirReply.Core.Localization;
@@ -18,7 +19,10 @@ public sealed class Localizer
     public Localizer(UiLanguage language)
     {
         Language = language;
-        strings = Shared.Value;
+        lock (SourcesGate)
+        {
+            strings = Shared.Value;
+        }
     }
 
     public UiLanguage Language { get; }
@@ -64,14 +68,49 @@ public sealed class Localizer
     /// <summary>All keys, for tests that check every language is complete.</summary>
     public IEnumerable<string> Keys => strings.Keys;
 
-    private static readonly Lazy<FrozenDictionary<string, FrozenDictionary<UiLanguage, string>>> Shared = new(Load);
+    private static readonly Lock SourcesGate = new();
+    private static readonly List<(Assembly Assembly, string Resource)> Sources =
+        [(typeof(Localizer).Assembly, "AirReply.Core.Localization.strings.json")];
+    private static Lazy<FrozenDictionary<string, FrozenDictionary<UiLanguage, string>>> Shared = new(Load);
+
+    /// <summary>
+    /// Adds another module's strings (an embedded JSON resource with the same shape as Core's strings.json).
+    /// Call at startup before the first lookup; a key defined twice keeps the later module's text.
+    /// </summary>
+    public static void Include(Assembly assembly, string resourceName)
+    {
+        ArgumentNullException.ThrowIfNull(assembly);
+        lock (SourcesGate)
+        {
+            if (Sources.Exists(s => s.Assembly == assembly && s.Resource == resourceName))
+            {
+                return;
+            }
+            Sources.Add((assembly, resourceName));
+            Shared = new(Load);
+        }
+    }
 
     private static FrozenDictionary<string, FrozenDictionary<UiLanguage, string>> Load()
     {
-        using var stream = typeof(Localizer).Assembly.GetManifestResourceStream("AirReply.Core.Localization.strings.json")
-            ?? throw new InvalidOperationException("strings.json is not embedded");
-        using var document = JsonDocument.Parse(stream);
+        (Assembly Assembly, string Resource)[] sources;
+        lock (SourcesGate)
+        {
+            sources = [.. Sources];
+        }
         var result = new Dictionary<string, FrozenDictionary<UiLanguage, string>>(StringComparer.Ordinal);
+        foreach (var (assembly, resource) in sources)
+        {
+            using var stream = assembly.GetManifestResourceStream(resource)
+                ?? throw new InvalidOperationException($"{resource} is not embedded in {assembly.GetName().Name}");
+            Merge(stream, result);
+        }
+        return result.ToFrozenDictionary(StringComparer.Ordinal);
+    }
+
+    private static void Merge(Stream stream, Dictionary<string, FrozenDictionary<UiLanguage, string>> result)
+    {
+        using var document = JsonDocument.Parse(stream);
         foreach (var entry in document.RootElement.GetProperty("strings").EnumerateObject())
         {
             var row = new Dictionary<UiLanguage, string>();
@@ -84,6 +123,5 @@ public sealed class Localizer
             }
             result[entry.Name] = row.ToFrozenDictionary();
         }
-        return result.ToFrozenDictionary(StringComparer.Ordinal);
     }
 }
