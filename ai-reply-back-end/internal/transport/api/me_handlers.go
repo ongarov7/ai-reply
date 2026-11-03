@@ -288,6 +288,9 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 			// POST /api/v1/ai/compose — writing a new message from an instruction.
 			"compose":                true,
 			"mac_context_generation": s.cfg.MacContext.Enabled,
+			// The same local context for macOS and Windows sessions; Windows apps
+			// read only this name, so an older server never gets their context.
+			"desktop_context_generation": s.cfg.MacContext.Enabled,
 			// profile.grammatical_gender and input_language on /ai/reply and
 			// /ai/compose; grammatical_gender and onboarding_version on /me.
 			"sender_profile": true,

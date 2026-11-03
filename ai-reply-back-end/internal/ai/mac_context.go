@@ -34,8 +34,8 @@ func (s *Service) validateMacGeneration(sessionPlatform string, c *GenerationCon
 	if !s.macContext.Enabled {
 		return false, domain.InvalidField("context", "feature unavailable")
 	}
-	if sessionPlatform != "macos" {
-		return false, domain.InvalidField("context", "requires an authenticated macOS session")
+	if !DesktopSessionPlatform(sessionPlatform) {
+		return false, domain.InvalidField("context", "requires an authenticated desktop session")
 	}
 	if output != 0 && output != 400 && output != 600 {
 		return false, domain.InvalidField("output_char_limit", "must be 400 or 600")
@@ -67,6 +67,12 @@ func (s *Service) validateMacGeneration(sessionPlatform string, c *GenerationCon
 		return false, domain.InvalidField("context", "maximum 4096 UTF-8 bytes")
 	}
 	return true, nil
+}
+
+// DesktopSessionPlatform reports whether the server-signed session platform is a
+// native desktop app (macOS or Windows) that may send local context.
+func DesktopSessionPlatform(platform string) bool {
+	return platform == domain.PlatformMacOS || platform == domain.PlatformWindows
 }
 
 func validComposeRelationship(id string) bool {

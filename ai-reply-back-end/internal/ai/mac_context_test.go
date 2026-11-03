@@ -115,3 +115,17 @@ func TestMacContextCompleteEnforcesUnicodeCapWithAtMostOneRepair(t *testing.T) {
 		}
 	}
 }
+
+func TestDesktopSessionPlatformCoversMacAndWindowsOnly(t *testing.T) {
+	s := (&Service{}).WithMacContext(config.MacContext{Enabled: true, InputTokenBudget: 4096})
+	for _, platform := range []string{"macos", "windows"} {
+		if enabled, err := s.validateMacGeneration(platform, &GenerationContext{Profile: "A shop"}, 400, ""); err != nil || !enabled {
+			t.Fatalf("%s: %v %v", platform, enabled, err)
+		}
+	}
+	for _, platform := range []string{"ios", "android", "ipados", "web", "", "Windows"} {
+		if _, err := s.validateMacGeneration(platform, &GenerationContext{Profile: "A shop"}, 400, ""); err == nil {
+			t.Fatalf("%q accepted desktop context", platform)
+		}
+	}
+}

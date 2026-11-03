@@ -102,7 +102,7 @@ func (s *Server) handleReply(w http.ResponseWriter, r *http.Request) {
 		},
 		GrammaticalGender: profile.GrammaticalGender,
 	}
-	if PlatformFrom(r.Context()) == "macos" && body.Context != nil {
+	if ai.DesktopSessionPlatform(PlatformFrom(r.Context())) && body.Context != nil {
 		// A selected local desktop profile supplies this request's facts. Do
 		// not silently mix in an unrelated saved mobile/business profile.
 		promptProfile = ai.Profile{GrammaticalGender: profile.GrammaticalGender}

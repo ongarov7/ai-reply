@@ -152,3 +152,22 @@ func TestMacContextSelectedProfileExcludesUnrelatedSavedProfileFacts(t *testing.
 		t.Fatal("intended explicit override not preserved")
 	}
 }
+
+func TestDesktopContextAcceptsSignedWindowsSessions(t *testing.T) {
+	h := newHarness(t)
+	config := h.do(http.MethodGet, "/api/v1/config", nil, nil)
+	if config.body["features"].(map[string]any)["desktop_context_generation"] != true {
+		t.Fatalf("config=%s", config.raw)
+	}
+	s, _ := h.signInProDevice("windows-context@example.com", "windows-context-device-01", "windows", "")
+	h.provider.reply = "Tea costs 130 KZT."
+	context := map[string]any{"profile": "A tea shop", "references": []string{"Tea: 130 KZT"}}
+	r := h.compose(s.access, map[string]any{"instruction": "Write about tea", "language": "en", "context": context, "output_char_limit": 400, "template_id": "client", "platform": "windows"})
+	if r.status != http.StatusOK || !strings.Contains(h.provider.lastUser, "Tea: 130 KZT") || h.provider.lastMaxTokens != 400 {
+		t.Fatalf("windows compose=%d %s", r.status, r.raw)
+	}
+	r = h.do(http.MethodPost, "/api/v1/ai/reply", map[string]any{"source_text": "Tea price?", "language": "en", "template_id": "client", "context": context}, h.auth(s.access))
+	if r.status != http.StatusOK || !strings.Contains(h.provider.lastUser, "A tea shop") {
+		t.Fatalf("windows reply=%d %s", r.status, r.raw)
+	}
+}
