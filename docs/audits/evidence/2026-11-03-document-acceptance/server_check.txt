@@ -1,0 +1,66 @@
+=== RUN   TestAuditMacContext
+10a  compose  accepted=true  user= 477B base= 155B ctxRaw= 273B escape+  6B headroom= 3619 @3072=true  @2048=true  
+10b  reply    accepted=true  user= 498B base= 272B ctxRaw= 183B escape+  0B headroom= 3598 @3072=true  @2048=true  
+12a  reply    accepted=true  user=4079B base=1210B ctxRaw=2166B escape+320B headroom=   17 @3072=false @2048=false 
+12b  compose  accepted=true  user= 563B base= 220B ctxRaw= 260B escape+ 40B headroom= 3533 @3072=true  @2048=true  
+12c  reply    accepted=false user=4110B base=1241B ctxRaw=2166B escape+320B headroom=  -14 @3072=false @2048=false invalid context: input token budget exceeded; shorten the supplied text
+1a   compose  accepted=true  user=1582B base= 155B ctxRaw=1169B escape+  0B headroom= 2514 @3072=true  @2048=true  
+1b   reply    accepted=true  user=1709B base= 282B ctxRaw=1169B escape+  0B headroom= 2387 @3072=true  @2048=true  
+1c   reply    accepted=true  user=1616B base= 189B ctxRaw=1169B escape+  0B headroom= 2480 @3072=true  @2048=true  
+1d   compose  accepted=true  user=1147B base= 166B ctxRaw= 809B escape+  0B headroom= 2949 @3072=true  @2048=true  
+1e   reply    accepted=true  user=1701B base= 274B ctxRaw=1169B escape+  0B headroom= 2395 @3072=true  @2048=true  
+1f   compose  accepted=true  user=1614B base= 187B ctxRaw=1169B escape+  0B headroom= 2482 @3072=true  @2048=true  
+1g   compose  accepted=true  user=1134B base= 172B ctxRaw= 790B escape+  0B headroom= 2962 @3072=true  @2048=true  
+1h   reply    accepted=true  user=1612B base= 185B ctxRaw=1169B escape+  0B headroom= 2484 @3072=true  @2048=true  
+2a   compose  accepted=true  user=1755B base= 146B ctxRaw=1265B escape+  0B headroom= 2341 @3072=true  @2048=true  
+2b   compose  accepted=true  user=1733B base= 145B ctxRaw=1244B escape+  0B headroom= 2363 @3072=true  @2048=true  
+2c   compose  accepted=true  user=1755B base= 146B ctxRaw=1265B escape+  0B headroom= 2341 @3072=true  @2048=true  
+2d   compose  accepted=true  user=1756B base= 147B ctxRaw=1265B escape+  0B headroom= 2340 @3072=true  @2048=true  
+2e   reply    accepted=true  user= 617B base= 182B ctxRaw= 349B escape+  0B headroom= 3479 @3072=true  @2048=true  
+2f   compose  accepted=true  user=1782B base= 146B ctxRaw=1292B escape+  0B headroom= 2314 @3072=true  @2048=true  
+3a   compose  accepted=true  user= 137B base= 137B ctxRaw=   0B escape+  0B headroom= 3959 @3072=true  @2048=true  
+3b   compose  accepted=true  user= 374B base= 167B ctxRaw= 164B escape+  0B headroom= 3722 @3072=true  @2048=true  
+3c   compose  accepted=true  user= 586B base= 167B ctxRaw= 333B escape+  0B headroom= 3510 @3072=true  @2048=true  
+3d   reply    accepted=true  user= 244B base= 244B ctxRaw=   0B escape+  0B headroom= 3852 @3072=true  @2048=true  
+3e   reply    accepted=true  user= 217B base= 217B ctxRaw=   0B escape+  0B headroom= 3879 @3072=true  @2048=true  
+3f   reply    accepted=true  user= 196B base= 196B ctxRaw=   0B escape+  0B headroom= 3900 @3072=true  @2048=true  
+3g   compose  accepted=true  user= 167B base= 167B ctxRaw=   0B escape+  0B headroom= 3929 @3072=true  @2048=true  
+3h   compose  accepted=true  user= 137B base= 137B ctxRaw=   0B escape+  0B headroom= 3959 @3072=true  @2048=true  
+3i   compose  accepted=true  user= 195B base= 195B ctxRaw=   0B escape+  0B headroom= 3901 @3072=true  @2048=true  
+4a   compose  accepted=true  user= 462B base= 175B ctxRaw= 244B escape+  0B headroom= 3634 @3072=true  @2048=true  
+4b   compose  accepted=true  user= 431B base= 172B ctxRaw= 216B escape+  0B headroom= 3665 @3072=true  @2048=true  
+4c   compose  accepted=true  user= 444B base= 157B ctxRaw= 244B escape+  0B headroom= 3652 @3072=true  @2048=true  
+4d   compose  accepted=true  user= 426B base= 215B ctxRaw= 168B escape+  0B headroom= 3670 @3072=true  @2048=true  
+5a   compose  accepted=true  user= 403B base= 199B ctxRaw= 161B escape+  0B headroom= 3693 @3072=true  @2048=true  
+5b   compose  accepted=true  user= 522B base= 146B ctxRaw= 290B escape+  0B headroom= 3574 @3072=true  @2048=true  
+5c   compose  accepted=true  user= 502B base= 182B ctxRaw= 277B escape+  0B headroom= 3594 @3072=true  @2048=true  
+6a   compose  accepted=true  user=1259B base= 155B ctxRaw= 846B escape+  0B headroom= 2837 @3072=true  @2048=true  
+6b   compose  accepted=true  user=1259B base= 155B ctxRaw= 846B escape+  0B headroom= 2837 @3072=true  @2048=true  
+6c   compose  accepted=true  user=1328B base= 155B ctxRaw= 915B escape+  0B headroom= 2768 @3072=true  @2048=true  
+7a   compose  accepted=true  user=1510B base= 272B ctxRaw=1156B escape+  0B headroom= 2586 @3072=true  @2048=true  
+7b   reply    accepted=true  user=2210B base= 972B ctxRaw=1156B escape+  0B headroom= 1886 @3072=true  @2048=false 
+7c   compose  accepted=true  user=2259B base= 218B ctxRaw=1787B escape+  0B headroom= 1837 @3072=true  @2048=false 
+7d   reply    accepted=true  user=3671B base=1820B ctxRaw=1640B escape+  0B headroom=  425 @3072=false @2048=false 
+8a   compose  accepted=true  user=1307B base= 172B ctxRaw= 963B escape+  0B headroom= 2789 @3072=true  @2048=true  
+8b   compose  accepted=true  user= 172B base= 172B ctxRaw=   0B escape+  0B headroom= 3924 @3072=true  @2048=true  
+8c   compose  accepted=true  user= 172B base= 172B ctxRaw=   0B escape+  0B headroom= 3924 @3072=true  @2048=true  
+8d   compose  accepted=true  user= 900B base= 172B ctxRaw= 556B escape+  0B headroom= 3196 @3072=true  @2048=true  
+8e   compose  accepted=true  user= 500B base= 172B ctxRaw= 242B escape+  0B headroom= 3596 @3072=true  @2048=true  
+8f   compose  accepted=true  user= 172B base= 172B ctxRaw=   0B escape+  0B headroom= 3924 @3072=true  @2048=true  
+8g   compose  accepted=true  user= 498B base= 184B ctxRaw= 228B escape+  0B headroom= 3598 @3072=true  @2048=true  
+8h   compose  accepted=true  user= 498B base= 184B ctxRaw= 228B escape+  0B headroom= 3598 @3072=true  @2048=true  
+8i   compose  accepted=true  user= 184B base= 184B ctxRaw=   0B escape+  0B headroom= 3912 @3072=true  @2048=true  
+8j   compose  accepted=true  user= 184B base= 184B ctxRaw=   0B escape+  0B headroom= 3912 @3072=true  @2048=true  
+8k   compose  accepted=true  user= 645B base= 172B ctxRaw= 301B escape+  0B headroom= 3451 @3072=true  @2048=true  
+9a   compose  accepted=true  user= 288B base= 182B ctxRaw=  63B escape+  0B headroom= 3808 @3072=true  @2048=true  
+9b   compose  accepted=true  user= 299B base= 182B ctxRaw=  74B escape+  0B headroom= 3797 @3072=true  @2048=true  
+9c   compose  accepted=true  user= 263B base= 174B ctxRaw=  46B escape+  0B headroom= 3833 @3072=true  @2048=true  
+9d   reply    accepted=true  user= 753B base= 245B ctxRaw= 379B escape+  0B headroom= 3343 @3072=true  @2048=true  
+9e   compose  accepted=true  user= 599B base= 172B ctxRaw= 298B escape+  0B headroom= 3497 @3072=true  @2048=true  
+9f   compose  accepted=true  user= 316B base= 182B ctxRaw=  91B escape+  0B headroom= 3780 @3072=true  @2048=true  
+9g   compose  accepted=true  user= 182B base= 182B ctxRaw=   0B escape+  0B headroom= 3914 @3072=true  @2048=true  
+9h   compose  accepted=true  user= 182B base= 182B ctxRaw=   0B escape+  0B headroom= 3914 @3072=true  @2048=true  
+9i   compose  accepted=true  user= 182B base= 182B ctxRaw=   0B escape+  0B headroom= 3914 @3072=true  @2048=true  
+--- PASS: TestAuditMacContext (0.02s)
+PASS
+ok  	github.com/aireply/ai-reply-back-end/internal/ai	0.821s

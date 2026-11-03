@@ -1,0 +1,59 @@
+package config
+
+import "testing"
+
+func advProEnv(t *testing.T, kv map[string]string) ProDevices {
+	t.Helper()
+	for _, key := range []string{"PRO_DEVICE_LIMIT_ENABLED", "PRO_DEVICE_LIMIT_SHADOW_MODE", "PRO_DEVICE_LIMIT_CLIENTS_READY",
+		"PRO_DEVICE_LIMIT_NOTIFICATIONS_ENABLED", "PRO_MAX_MOBILE_DEVICES", "PRO_MAX_DESKTOP_DEVICES", "PRO_DEVICE_LIMIT_NOTIFICATION_COOLDOWN"} {
+		t.Setenv(key, "")
+	}
+	for k, v := range kv {
+		t.Setenv(k, v)
+	}
+	return proDevicesFromEnv()
+}
+
+// Rejected combinations (these hold): strict without readiness, relaxed
+// maxima, notifications outside strict mode.
+func TestAdvConfig_UnsafeCombinationsAreRejected(t *testing.T) {
+	for name, kv := range map[string]map[string]string{
+		"enabled_not_ready":       {"PRO_DEVICE_LIMIT_ENABLED": "true", "PRO_DEVICE_LIMIT_SHADOW_MODE": "false"},
+		"max_mobile_2":            {"PRO_MAX_MOBILE_DEVICES": "2"},
+		"max_desktop_2":           {"PRO_MAX_DESKTOP_DEVICES": "2"},
+		"notifications_in_shadow": {"PRO_DEVICE_LIMIT_NOTIFICATIONS_ENABLED": "true"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if p := advProEnv(t, kv); len(p.validate()) == 0 {
+				t.Errorf("accepted: %+v", p)
+			}
+		})
+	}
+}
+
+// PRO_MAX_*=0 is silently replaced by 1 (config.num ignores values <= 0),
+// so the "must both be 1" validation never sees the operator's value.
+func TestAdvConfig_ZeroMaximumIsNotSilentlyRewritten(t *testing.T) {
+	p := advProEnv(t, map[string]string{"PRO_MAX_MOBILE_DEVICES": "0", "PRO_MAX_DESKTOP_DEVICES": "-1"})
+	if len(p.validate()) == 0 {
+		t.Errorf("PRO_MAX_MOBILE_DEVICES=0 / PRO_MAX_DESKTOP_DEVICES=-1 accepted silently as mobile=%d desktop=%d", p.MaxMobileDevices, p.MaxDesktopDevices)
+	}
+}
+
+// Unparseable booleans fall back to the default without any validation
+// problem. The fallbacks are the safe defaults, but the operator's intent is lost silently.
+func TestAdvConfig_UnparseableRolloutFlagsAreReported(t *testing.T) {
+	for _, tc := range []struct{ key, value string }{
+		{"PRO_DEVICE_LIMIT_SHADOW_MODE", "off"},
+		{"PRO_DEVICE_LIMIT_SHADOW_MODE", "no"},
+		{"PRO_DEVICE_LIMIT_ENABLED", "yes"},
+		{"PRO_DEVICE_LIMIT_ENABLED", "on"},
+	} {
+		t.Run(tc.key+"="+tc.value, func(t *testing.T) {
+			p := advProEnv(t, map[string]string{tc.key: tc.value})
+			if len(p.validate()) == 0 {
+				t.Errorf("%s=%q ignored silently (enabled=%v shadow=%v)", tc.key, tc.value, p.Enabled, p.ShadowMode)
+			}
+		})
+	}
+}

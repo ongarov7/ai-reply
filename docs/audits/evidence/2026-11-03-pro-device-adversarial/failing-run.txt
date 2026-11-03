@@ -1,0 +1,60 @@
+    zz_adv_pro_devices_test.go:249: reply: 200  x2, 403 PRO_DEVICE_LIMIT_REACHED x14
+    zz_adv_pro_devices_test.go:249: refresh: 200  x16
+    zz_adv_pro_devices_test.go:284: post-race usable (old access tokens): map[desktop:1 mobile:1]
+    zz_adv_pro_devices_test.go:249: registration: 200  x16
+    zz_adv_pro_devices_test.go:249: mixed_endpoints: 200  x2, 403 PRO_DEVICE_LIMIT_REACHED x14
+    zz_adv_pro_devices_test.go:328: events after burst: map[authorized/enforce:1]
+    zz_adv_pro_devices_test.go:352: revoke=200; contenders: 200  x1, 403 PRO_DEVICE_LIMIT_REACHED x9
+    zz_adv_pro_devices_test.go:415: platform="web"      stored="web"      registration=400 ai=403 PRO_DEVICE_IDENTITY_REQUIRED
+    zz_adv_pro_devices_test.go:415: platform="linux"    stored="linux"    registration=400 ai=403 PRO_DEVICE_IDENTITY_REQUIRED
+    zz_adv_pro_devices_test.go:415: platform=""         stored=""         registration=400 ai=403 PRO_DEVICE_IDENTITY_REQUIRED
+    zz_adv_pro_devices_test.go:415: platform="iOS"      stored="iOS"      registration=200 ai=403 PRO_DEVICE_IDENTITY_REQUIRED
+    zz_adv_pro_devices_test.go:415: platform="IOS"      stored="IOS"      registration=200 ai=403 PRO_DEVICE_IDENTITY_REQUIRED
+    zz_adv_pro_devices_test.go:415: platform="MacOS"    stored="MacOS"    registration=200 ai=403 PRO_DEVICE_IDENTITY_REQUIRED
+    zz_adv_pro_devices_test.go:415: platform="Windows"  stored="Windows"  registration=200 ai=403 PRO_DEVICE_IDENTITY_REQUIRED
+    zz_adv_pro_devices_test.go:415: platform="Android"  stored="Android"  registration=200 ai=403 PRO_DEVICE_IDENTITY_REQUIRED
+    zz_adv_pro_devices_test.go:415: platform="iphone"   stored="iphone"   registration=400 ai=403 PRO_DEVICE_IDENTITY_REQUIRED
+    zz_adv_pro_devices_test.go:415: platform="ipad"     stored="ipad"     registration=400 ai=403 PRO_DEVICE_IDENTITY_REQUIRED
+    zz_adv_pro_devices_test.go:415: platform="darwin"   stored="darwin"   registration=400 ai=403 PRO_DEVICE_IDENTITY_REQUIRED
+    zz_adv_pro_devices_test.go:415: platform="win32"    stored="win32"    registration=400 ai=403 PRO_DEVICE_IDENTITY_REQUIRED
+    zz_adv_pro_devices_test.go:415: platform="legacy"   stored="legacy"   registration=400 ai=403 PRO_DEVICE_IDENTITY_REQUIRED
+    zz_adv_pro_devices_test.go:415: platform="ios\x00"  stored="ios\x00"  registration=400 ai=403 PRO_DEVICE_IDENTITY_REQUIRED
+    zz_adv_pro_devices_test.go:415: platform="i os"     stored="i os"     registration=400 ai=403 PRO_DEVICE_IDENTITY_REQUIRED
+    zz_adv_pro_devices_test.go:457: re-sign-in declaring windows: device=adv-pin-phone ai=403 PRO_DEVICE_IDENTITY_REQUIRED
+    zz_adv_pro_devices_test.go:525: same device id + other installation -> 403 PRO_DEVICE_IDENTITY_REQUIRED
+    zz_adv_pro_devices_test.go:541: victim's authorized phone denied after another account registered its installation id: 403 PRO_DEVICE_IDENTITY_REQUIRED
+    zz_adv_pro_devices_test.go:550: unauthenticated detach disabled the victim's Pro: 403 PRO_DEVICE_IDENTITY_REQUIRED
+--- FAIL: TestAdv_ForeignRegistrationOrAnonymousDetachDisablesOwnersPro (0.18s)
+    zz_adv_pro_devices_test.go:588: B's own phone after B used A's phone: 403 PRO_DEVICE_LIMIT_REACHED
+    zz_adv_pro_keys_test.go:44: after rotating JWT_ACCESS_SECRET the already-authorized phone is denied PRO_DEVICE_IDENTITY_REQUIRED until its user signs out and in again
+--- FAIL: TestAdv_AccessSecretRotationKeepsBoundSessionsBound (0.17s)
+    zz_adv_pro_keys_test.go:60: legacy Pro generate in strict mode: 500 {"error":{"code":"internal"}}
+    zz_adv_pro_keys_test.go:62: legacy Pro user cannot generate in strict mode: 500
+--- FAIL: TestAdv_LegacyProUserBehaviourInStrict (0.17s)
+    zz_adv_pro_recovery_test.go:41: restored phone before recovery: 403 PRO_DEVICE_IDENTITY_REQUIRED (device_id=adv-restore-did)
+    zz_adv_pro_recovery_test.go:52: restored phone after admin release: 403 PRO_DEVICE_IDENTITY_REQUIRED (device_id=adv-restore-did)
+    zz_adv_pro_recovery_test.go:54: replacement phone cannot use the released Pro slot: 403 PRO_DEVICE_IDENTITY_REQUIRED
+    zz_adv_pro_recovery_test.go:60: still locked after another sign-in: 403 PRO_DEVICE_IDENTITY_REQUIRED; mobile slot free=true
+    zz_adv_pro_recovery_test.go:64: after app reinstall (new device id, same Keychain installation): 200
+--- FAIL: TestAdv_BackupRestoredPhoneCanUseReleasedSlotAfterAdminRecovery (0.26s)
+    zz_adv_pro_recovery_test.go:91: admin POST .../reactivate -> 404
+    zz_adv_pro_recovery_test.go:91: admin POST .../restore -> 404
+    zz_adv_pro_recovery_test.go:91: admin POST .../unrevoke -> 404
+    zz_adv_pro_recovery_test.go:97: phone A sign-in: 403 PRO_DEVICE_REVOKED; after reinstall (device_id mapped to adv-ts-phone-a): 403 PRO_DEVICE_REVOKED
+    zz_adv_pro_recovery_test.go:99: installation revoked once is barred forever although the slot is empty and no admin control can lift it
+--- FAIL: TestAdv_RevokedInstallationCanReclaimEmptySlotOnlyViaSomeSupportedPath (0.32s)
+    zz_adv_pro_recovery_test.go:125: newer desktop revokes owner: 200; blocked phone afterwards: 200 ; owner afterwards: 403 PRO_DEVICE_REVOKED
+    zz_adv_pro_recovery_test.go:128: a device authorized after the owner evicted the owner's phone and the blocked phone took over the mobile slot
+    zz_adv_pro_recovery_test.go:134: account notifications before/after the revocation: 1/1
+    zz_adv_pro_recovery_test.go:136: no security notice is created when an authorized device is revoked by another device
+--- FAIL: TestAdv_LaterAuthorizedDesktopCannotEvictOriginalPhone (0.18s)
+    zz_adv_pro_recovery_test.go:316: device list shows the re-signed-in phone: true
+    zz_adv_pro_recovery_test.go:320: DELETE /devices -> 200, DELETE /me/pro-devices -> 200, thief refresh afterwards -> 200
+    zz_adv_pro_recovery_test.go:322: device removal reported success but the removed phone's session keeps refreshing
+--- FAIL: TestAdv_DeviceRemovalStillEndsSessionsOfFormerProDevice (0.18s)
+    zz_adv_pro_shadow_test.go:55: production_flags: 20 AI requests wrote 40 pro_device_events rows; 5 refreshes wrote 10 more; by kind: map[identity_missing/shadow:26 limit_reached/shadow:25]
+    zz_adv_pro_shadow_test.go:58: 20 AI requests wrote 40 security-event rows (2.0 per request) on the single SQLite writer
+    zz_adv_pro_shadow_test.go:62: 5 token refreshes wrote 10 security-event rows
+    zz_adv_pro_shadow_test.go:55: documented_rollback_ENABLED_false_only: 20 AI requests wrote 40 pro_device_events rows; 5 refreshes wrote 10 more; by kind: map[identity_missing/shadow:26 limit_reached/shadow:25]
+    zz_adv_pro_shadow_test.go:58: 20 AI requests wrote 40 security-event rows (2.0 per request) on the single SQLite writer
+    zz_adv_pro_shadow_test.go:62: 5 token refreshes wrote 10 security-event rows

@@ -1,0 +1,98 @@
+import Foundation
+import Testing
+@testable import AirReplyCore
+@testable import AirReplyUI
+
+// Audit confirmation tests (run against a copy of the package). Each test asserts the behaviour
+// the product needs; a failure confirms the corresponding audit finding.
+@Suite("Audit confirmation")
+@MainActor
+struct AuditConfirmTests {
+    let fixture = QuickBarModelTests()
+
+    private func ready(_ env: QuickBarModelTests.Environment) async throws {
+        env.backend.setDesktopContext(true)
+        await env.account.refreshConfig()
+        for _ in 0..<300 where env.model.contextStorageBusy { try await Task.sleep(for: .milliseconds(10)) }
+    }
+
+    private func waitIdle(_ env: QuickBarModelTests.Environment) async throws {
+        for _ in 0..<300 where env.model.phase == .generating || env.model.contextStorageBusy {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+    }
+
+    // MAC-1: a plain message without any context must keep the ordinary contract.
+    @Test func plainComposeSendsNoMacOnlyFields() async throws {
+        let env = try fixture.makeEnvironment([QuickBarModelTests.output("ok")])
+        try await ready(env)
+        env.model.draft = "Поздравь коллегу с днём рождения"
+        env.model.submit()
+        try await waitIdle(env)
+        let options = try #require(env.generator.options.first)
+        #expect(options.outputCharacterLimit == nil, "ordinary request carries output_char_limit=\(String(describing: options.outputCharacterLimit))")
+        #expect(options.context == nil)
+    }
+
+    // MAC-2: "Custom style" must not be sent as the colleague template.
+    @Test func customTemplateIsNotColleague() async throws {
+        let env = try fixture.makeEnvironment([QuickBarModelTests.output("ok")])
+        try await ready(env)
+        env.model.selectTemplate(.custom)
+        env.model.draft = "Напиши клиенту про акцию"
+        env.model.submit()
+        try await waitIdle(env)
+        let options = try #require(env.generator.options.first)
+        #expect(options.recipient != .work, "custom template sent recipient=\(String(describing: options.recipient))")
+    }
+
+    // MAC-3: saving the profile editor must keep a document imported while it was open.
+    @Test func editorSaveKeepsDocumentImportedWhileEditing() async throws {
+        let env = try fixture.makeEnvironment([])
+        try await ready(env)
+        let profile = ContextProfile(name: "Магазин")
+        try env.model.contextProfiles.save(profile)
+        env.model.selectedProfileID = profile.id
+        env.model.beginProfileEdit()
+        env.model.editingProfile?.company = "ТОО Магазин"
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("price-\(UUID().uuidString).csv")
+        try "Товар;Цена\nКофе Арабика 250 г;4500\n".write(to: url, atomically: true, encoding: .utf8)
+        await env.model.importDocument(url)
+        #expect(env.model.selectedProfile?.attachments.count == 1, "import itself did not attach")
+        env.model.saveProfile()
+        try await waitIdle(env)
+        #expect(env.model.selectedProfile?.company == "ТОО Магазин")
+        #expect(env.model.selectedProfile?.attachments.count == 1,
+                "after Save the profile has \(env.model.selectedProfile?.attachments.count ?? -1) attachments")
+    }
+
+    // MAC-4: per-conversation instructions must reach the server even with a filled profile.
+    @Test func conversationInstructionsSurviveAFilledProfile() async throws {
+        let env = try fixture.makeEnvironment([QuickBarModelTests.output("ok")])
+        try await ready(env)
+        let long = String(repeating: "Доставка по Алматы в течение дня, по Казахстану 2–5 дней. ", count: 8)
+        let profile = ContextProfile(name: "Магазин", role: .business, company: "ТОО Магазин", industry: "Электроника",
+                                     products: "Смартфоны, ноутбуки, аксессуары", policies: long,
+                                     description: "Магазин электроники в Алматы, работаем с 2015 года.")
+        try env.model.contextProfiles.save(profile)
+        env.model.selectedProfileID = profile.id
+        env.model.customInstructions = "МАРКЕР-777: предложи клиенту скидку 5% при оплате сегодня."
+        env.model.draft = "Ответь клиенту про наличие iPhone 15"
+        env.model.submit()
+        try await waitIdle(env)
+        let sent = try #require(env.generator.options.first?.context?.profile)
+        #expect(sent.contains("МАРКЕР-777"), "profile sent (\(sent.utf8.count) bytes) ends with: …\(sent.suffix(80))")
+    }
+
+    // MAC-5: another account on the same Mac must not see the first account's saved profiles.
+    @Test func savedProfilesAreIsolatedPerAccount() async throws {
+        let env = try fixture.makeEnvironment([])
+        try await ready(env)
+        try env.model.contextProfiles.save(ContextProfile(name: "Бизнес первого аккаунта", company: "Секретная компания"))
+        env.account.apply(MeResponse(user: try JSONDecoder.api.decode(UserDTO.self, from: Data(#"{"id":"u-2"}"#.utf8)),
+                                     subscription: nil, usage: nil, legalConsent: nil))
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(env.model.contextProfiles.profiles.isEmpty,
+                "account u-2 sees \(env.model.contextProfiles.profiles.map(\.name))")
+    }
+}

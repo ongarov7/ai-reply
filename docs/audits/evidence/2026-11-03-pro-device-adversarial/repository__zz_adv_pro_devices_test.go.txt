@@ -1,0 +1,197 @@
+package repository
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/aireply/ai-reply-back-end/internal/database"
+	"github.com/aireply/ai-reply-back-end/internal/domain"
+)
+
+// 24 devices (12 mobile, 12 desktop, all platforms) claim at once through four
+// independent SQLite connections (separate writer pools, like separate
+// processes): exactly one winner per category, every loser gets ErrProDeviceLimit.
+func TestAdvRepo_ManyConcurrentClaimsAcrossConnections(t *testing.T) {
+	s, path := proTestStore(t)
+	proTestUser(t, s, "user")
+	stores := []*Store{s}
+	for i := 0; i < 3; i++ {
+		db, err := database.Open(database.Options{Path: path, BusyTimeout: 10 * time.Second})
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = db.Close() })
+		stores = append(stores, New(db))
+	}
+	type dev struct{ id, platform string }
+	var devs []dev
+	for i, p := range []string{"ios", "android", "ipados", "ios", "android", "ipados", "ios", "android", "ipados", "ios", "android", "ipados",
+		"macos", "windows", "macos", "windows", "macos", "windows", "macos", "windows", "macos", "windows", "macos", "windows"} {
+		d := dev{fmt.Sprintf("d%02d", i), p}
+		proTestDevice(t, s, "user", d.id, d.platform)
+		devs = append(devs, d)
+	}
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	wins := map[string]int{}
+	other := []error{}
+	start := make(chan struct{})
+	for i, d := range devs {
+		wg.Add(1)
+		go func(store *Store, d dev) {
+			defer wg.Done()
+			<-start
+			_, created, err := store.ClaimProDevice(context.Background(), "user", d.id, proCategory(d.platform), d.platform, "", time.Now())
+			mu.Lock()
+			defer mu.Unlock()
+			switch {
+			case err == nil && created:
+				wins[proCategory(d.platform)]++
+			case errors.Is(err, domain.ErrProDeviceLimit):
+			default:
+				other = append(other, fmt.Errorf("%s: created=%v err=%v", d.id, created, err))
+			}
+		}(stores[i%len(stores)], d)
+	}
+	close(start)
+	wg.Wait()
+	if wins["mobile"] != 1 || wins["desktop"] != 1 || len(other) != 0 {
+		t.Fatalf("wins=%v other=%v", wins, other)
+	}
+	var active int
+	if err := s.db.Reader().QueryRow(`SELECT COUNT(*) FROM pro_device_authorizations WHERE user_id='user' AND revoked_at IS NULL`).Scan(&active); err != nil || active != 2 {
+		t.Fatalf("active=%d err=%v", active, err)
+	}
+}
+
+// Admin revocation of the owner races two replacement claims on separate
+// connections, 40 times: never two active mobile rows, a replacement only
+// wins after the revocation, and the revoked owner never re-claims.
+func TestAdvRepo_RevokeVersusClaimInterleavings(t *testing.T) {
+	s, path := proTestStore(t)
+	db2, err := database.Open(database.Options{Path: path, BusyTimeout: 10 * time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db2.Close() })
+	s2 := New(db2)
+	ctx := context.Background()
+	admin, err := s.CreateAdmin(ctx, domain.AdminUser{Email: "adv-admin@example.test", PasswordHash: "x", Role: "admin"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	outcomes := map[string]int{}
+	for iter := 0; iter < 40; iter++ {
+		user := fmt.Sprintf("u%02d", iter)
+		proTestUser(t, s, user)
+		proTestDevice(t, s, user, user+"-owner", "ios")
+		proTestDevice(t, s, user, user+"-c1", "android")
+		proTestDevice(t, s, user, user+"-c2", "ipados")
+		owner, _, err := s.ClaimProDevice(ctx, user, user+"-owner", "mobile", "ios", "", time.Now())
+		if err != nil {
+			t.Fatal(err)
+		}
+		var wg sync.WaitGroup
+		start := make(chan struct{})
+		errs := make([]error, 4)
+		run := func(i int, f func() error) {
+			wg.Add(1)
+			go func() { defer wg.Done(); <-start; errs[i] = f() }()
+		}
+		run(0, func() error { return s.RevokeProDevice(ctx, user, owner.ID, admin.ID, "race", true, time.Now()) })
+		run(1, func() error {
+			_, _, err := s2.ClaimProDevice(ctx, user, user+"-c1", "mobile", "android", "", time.Now())
+			return err
+		})
+		run(2, func() error {
+			_, _, err := s.ClaimProDevice(ctx, user, user+"-c2", "mobile", "ipados", "", time.Now())
+			return err
+		})
+		run(3, func() error {
+			_, _, err := s2.ClaimProDevice(ctx, user, user+"-owner", "mobile", "ios", "", time.Now())
+			return err
+		})
+		close(start)
+		wg.Wait()
+		if errs[0] != nil {
+			t.Fatalf("revoke: %v", errs[0])
+		}
+		wins := 0
+		for i := 1; i <= 2; i++ {
+			switch {
+			case errs[i] == nil:
+				wins++
+			case errors.Is(errs[i], domain.ErrProDeviceLimit):
+			default:
+				t.Fatalf("iter %d claim %d: %v", iter, i, errs[i])
+			}
+		}
+		// The owner's concurrent re-claim may run before the revoke (idempotent
+		// success on its own row) or after it (tombstone / revoked device).
+		if errs[3] != nil && !errors.Is(errs[3], domain.ErrProDeviceRevoked) && !errors.Is(errs[3], domain.ErrProDeviceIdentity) {
+			t.Fatalf("owner re-claim: %v", errs[3])
+		}
+		var active int
+		if err := s.db.Reader().QueryRow(`SELECT COUNT(*) FROM pro_device_authorizations WHERE user_id=? AND revoked_at IS NULL`, user).Scan(&active); err != nil {
+			t.Fatal(err)
+		}
+		if active != wins || wins > 1 {
+			t.Fatalf("iter %d: wins=%d active=%d", iter, wins, active)
+		}
+		if _, _, err := s.ClaimProDevice(ctx, user, user+"-owner", "mobile", "ios", "", time.Now()); err == nil {
+			t.Fatalf("iter %d: revoked owner re-claimed", iter)
+		}
+		outcomes[fmt.Sprintf("replacement_wins=%d", wins)]++
+	}
+	t.Logf("interleavings: %v", outcomes)
+}
+
+// A refresh rotation racing a Pro revocation never leaves a live refresh
+// token on the revoked device (RotateRefreshToken requires an unrevoked
+// predecessor; RevokeProDevice revokes every unrevoked row of the device).
+func TestAdvRepo_RotationRacingRevocationLeavesNoLiveSession(t *testing.T) {
+	s, path := proTestStore(t)
+	db2, err := database.Open(database.Options{Path: path, BusyTimeout: 10 * time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db2.Close() })
+	s2 := New(db2)
+	ctx := context.Background()
+	for iter := 0; iter < 30; iter++ {
+		user := fmt.Sprintf("r%02d", iter)
+		proTestUser(t, s, user)
+		proTestDevice(t, s, user, user+"-phone", "ios")
+		a, _, err := s.ClaimProDevice(ctx, user, user+"-phone", "mobile", "ios", "", time.Now())
+		if err != nil {
+			t.Fatal(err)
+		}
+		tok, err := s.CreateRefreshToken(ctx, RefreshToken{UserID: user, DeviceID: user + "-phone", FamilyID: user + "-fam", TokenHash: user + "-h0", ExpiresAt: time.Now().Add(time.Hour)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var wg sync.WaitGroup
+		start := make(chan struct{})
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			<-start
+			_ = s.RevokeProDevice(ctx, user, a.ID, user+"-phone", "self release", false, time.Now())
+		}()
+		go func() {
+			defer wg.Done()
+			<-start
+			_, _ = s2.RotateRefreshToken(ctx, tok.ID, RefreshToken{UserID: user, DeviceID: user + "-phone", FamilyID: user + "-fam", TokenHash: user + "-h1", ExpiresAt: time.Now().Add(time.Hour)})
+		}()
+		close(start)
+		wg.Wait()
+		var live int
+		if err := s.db.Reader().QueryRow(`SELECT COUNT(*) FROM refresh_tokens WHERE device_id=? AND revoked_at IS NULL`, user+"-phone").Scan(&live); err != nil || live != 0 {
+			t.Fatalf("iter %d: %d live refresh tokens on a revoked device (err=%v)", iter, live, err)
+		}
+	}
+}

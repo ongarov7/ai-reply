@@ -1,0 +1,28 @@
+file	bytes	result	wall_s	max_rss_MB	peak_footprint_MB
+case01/catalog.xlsx	3331	OK 14 segs	0.01	12.1	3.1
+case11/absolute_targets.xlsx	2778	ERR unsafeArchive	0.01	12.1	3.0
+case11/billion_laughs.xlsx	2599	ERR unsafeArchive	0.01	12.1	3.1
+case11/bomb_15MiB_whitespace.xlsx	17907	ERR tooLarge	1.04	63.4	54.3
+case11/bomb_declared_100MiB.xlsx	104490	ERR tooLarge	0.01	12.0	3.1
+case11/bomb_lying_1GiB.xlsx	1046060	ERR malformed	0.01	16.2	7.2
+case11/corrupt_deflate.xlsx	3331	ERR malformed	0.01	12.1	3.1
+case11/docx_renamed.xlsx	1404	ERR malformed	0.01	11.8	2.9
+case11/entries_2048_ok.xlsx	265885	OK 3 segs	0.02	13.5	4.5
+case11/entries_2049.xlsx	266015	ERR unsafeArchive	0.01	12.3	3.5
+case11/pdf_renamed.xlsx	28433	ERR malformed	0.01	11.8	3.0
+case11/rel_prefix_x.xlsx	2774	ERR noReadableText	0.01	12.1	3.0
+case11/rows_25000_ok.xlsx	573135	OK 25000 segs	1.13	48.2	39.3
+case11/rows_50001.xlsx	1144648	ERR tooLarge	1.88	56.1	47.1
+case11/streamed_data_descriptor.xlsx	2887	OK 3 segs	0.01	12.0	3.0
+case11/truncated.xlsx	1998	ERR malformed	0.01	11.7	2.9
+case11/with_chartsheet.xlsx	3129	ERR unsafeArchive	0.01	12.1	3.1
+case11/xxe.xlsx	2329	ERR unsafeArchive	0.01	12.0	3.0
+case11/billion_laughs.docx	1007	ERR unsafeArchive	0.01	11.7	2.8
+case11/billion_laughs_utf7.docx	1213	ERR malformed	0.01	12.4	3.3
+case11/deep_nesting.docx	992	ERR tooLarge	0.01	12.0	3.1
+case11/internal_entity_utf7.docx	1250	OK 2 segs	0.01	12.1	3.1
+case11/plain_control.docx	992	OK 1 segs	0.01	11.9	2.9
+case11/xxe.docx	1081	ERR unsafeArchive	0.01	11.8	2.9
+case11/xxe_utf7.docx	1300	OK 1 segs	0.01	12.1	3.1
+case11/xlsx_renamed.txt	3331	ERR unreadable	0.01	11.7	2.9
+case09/price_table.pdf	28433	OK 6 segs	0.06	18.9	5.9

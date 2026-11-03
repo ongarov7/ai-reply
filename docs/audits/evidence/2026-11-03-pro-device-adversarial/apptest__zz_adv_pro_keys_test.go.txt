@@ -1,0 +1,64 @@
+package apptest
+
+import (
+	"context"
+	"errors"
+	"net/http"
+	"testing"
+
+	"github.com/aireply/ai-reply-back-end/internal/auth"
+	"github.com/aireply/ai-reply-back-end/internal/domain"
+	"github.com/aireply/ai-reply-back-end/internal/plans"
+	"github.com/aireply/ai-reply-back-end/internal/prodevices"
+	"github.com/aireply/ai-reply-back-end/internal/subscriptions"
+)
+
+// The installation fingerprint is keyed with JWT_ACCESS_SECRET
+// (cmd/server/main.go WithIdentityKey(cfg.Auth.AccessSecret)), and refresh
+// rotation copies the stored fingerprint. Simulate a restart with a rotated
+// access secret on the same database: refresh tokens (keyed by the separate
+// refresh secret) stay valid, but every rotated session is now "unbound".
+func TestAdv_AccessSecretRotationKeepsBoundSessionsBound(t *testing.T) {
+	h := newHarness(t, approvedEntitlements(), strictProDevices(), advOTPLimits())
+	phone := h.advBound("adv-rotate@example.com", "adv-rotate-phone", "ios", 8000)
+	h.advMakePro(phone.s.userID)
+	mustStatus(t, h.generate(phone.s.access, "Сәлем"), http.StatusOK, "")
+
+	rotated := h.cfg.Auth
+	rotated.AccessSecret = "rotated-access-secret-that-is-long-enough-1"
+	subSvc := subscriptions.New(h.store, plans.New(h.store), h.cfg.App.Location()).WithClock(h.clock)
+	authSvc := auth.New(h.store, rotated, auth.StubSender{Log: slogDiscard()}, subSvc, slogDiscard()).WithClock(h.clock)
+	proSvc := prodevices.New(h.store, subSvc, h.cfg.ProDevices, slogDiscard()).WithClock(h.clock).WithIdentityKey(rotated.AccessSecret)
+	ctx := context.Background()
+	sess, err := authSvc.Refresh(ctx, phone.s.refresh, auth.DeviceInfo{})
+	if err != nil {
+		t.Fatalf("refresh after rotation: %v", err)
+	}
+	user, err := h.store.UserByID(ctx, phone.s.userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ent := h.entitlement(phone.s.userID)
+	err = proSvc.Authorize(prodevices.WithSessionIdentity(ctx, sess.InstallationIdentity), user, sess.DeviceID, ent)
+	if errors.Is(err, domain.ErrProDeviceIdentity) {
+		t.Errorf("after rotating JWT_ACCESS_SECRET the already-authorized phone is denied PRO_DEVICE_IDENTITY_REQUIRED until its user signs out and in again")
+	} else if err != nil {
+		t.Fatalf("authorize: %v", err)
+	}
+}
+
+// Legacy install-token users (POST /v1/reply/generate) carry no device id. If
+// such an account is Pro, strict mode denies every legacy generation.
+func TestAdv_LegacyProUserBehaviourInStrict(t *testing.T) {
+	h := newHarness(t, approvedEntitlements(), strictProDevices())
+	reg := h.do(http.MethodPost, "/v1/auth/register", map[string]any{"install_id": "5C4D3B2A-1111-2222-3333-444455556666"}, nil)
+	mustStatus(t, reg, http.StatusOK, "")
+	token := reg.str("token")
+	userID := h.text(`SELECT id FROM users WHERE kind='legacy_install' LIMIT 1`)
+	h.advMakePro(userID)
+	r := h.do(http.MethodPost, "/v1/reply/generate", map[string]any{"message": "Сәлем", "template_id": "client", "keyboard_language": "kk"}, h.auth(token))
+	t.Logf("legacy Pro generate in strict mode: %d %s", r.status, r.raw)
+	if r.status != http.StatusOK {
+		t.Errorf("legacy Pro user cannot generate in strict mode: %d", r.status)
+	}
+}

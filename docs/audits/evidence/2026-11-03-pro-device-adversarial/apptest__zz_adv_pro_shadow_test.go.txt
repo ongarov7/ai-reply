@@ -1,0 +1,330 @@
+package apptest
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"log/slog"
+	"net/http"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/aireply/ai-reply-back-end/internal/domain"
+	"github.com/aireply/ai-reply-back-end/internal/notifications"
+	"github.com/aireply/ai-reply-back-end/internal/retention"
+)
+
+// ---------------------------------------------------------------- 7. shadow mode
+
+// Released clients send no installation_id at sign-in, so every production
+// Pro session is "unbound". The code claims activity writes happen at most
+// every 15 minutes (repository/pro_devices.go ObserveProDevice/TouchProDevice);
+// security events must not be written on every AI request or refresh.
+func TestAdv_ShadowModeDoesNotWritePerRequest(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opt  harnessOption
+		max  int
+	}{
+		{"production_flags", productionProFlags(), 4},
+		{"documented_rollback_ENABLED_false_only", withEnv("PRO_DEVICE_LIMIT_ENABLED", "false"), 4},
+		{"fully_off", func(env map[string]string) {
+			env["PRO_DEVICE_LIMIT_ENABLED"] = "false"
+			env["PRO_DEVICE_LIMIT_SHADOW_MODE"] = "false"
+		}, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t, approvedEntitlements(), advOTPLimits(), tc.opt)
+			email := "adv-shadow-" + strings.ToLower(tc.name) + "@example.com"
+			phone, _ := h.signInProDevice(email, "adv-shadow-phone", "ios", "")
+			tablet, _ := h.signInProDevice(email, "adv-shadow-tablet", "ipados", "")
+			h.advMakePro(phone.userID)
+			mustStatus(t, h.generate(tablet.access, "Сәлем"), http.StatusOK, "")
+			base := h.scalar(`SELECT COUNT(*) FROM pro_device_events WHERE user_id=?`, phone.userID)
+			const requests = 20
+			for i := 0; i < requests; i++ {
+				mustStatus(t, h.generate(phone.access, "Сәлем"), http.StatusOK, "")
+			}
+			afterAI := h.scalar(`SELECT COUNT(*) FROM pro_device_events WHERE user_id=?`, phone.userID)
+			s := phone
+			for i := 0; i < 5; i++ {
+				s = h.refresh(s)
+			}
+			afterRefresh := h.scalar(`SELECT COUNT(*) FROM pro_device_events WHERE user_id=?`, phone.userID)
+			t.Logf("%s: %d AI requests wrote %d pro_device_events rows; 5 refreshes wrote %d more; by kind: %v",
+				tc.name, requests, afterAI-base, afterRefresh-afterAI, h.advEventsByKind(phone.userID))
+			if afterAI-base > tc.max {
+				t.Errorf("%d AI requests wrote %d security-event rows (%.1f per request) on the single SQLite writer",
+					requests, afterAI-base, float64(afterAI-base)/requests)
+			}
+			if afterRefresh-afterAI > tc.max {
+				t.Errorf("5 token refreshes wrote %d security-event rows", afterRefresh-afterAI)
+			}
+			if n := h.scalar(`SELECT COUNT(*) FROM pro_device_authorizations WHERE user_id=?`, phone.userID); n != 0 {
+				t.Errorf("shadow claimed %d slots", n)
+			}
+			if n := h.scalar(`SELECT COUNT(*) FROM pro_device_notification_jobs WHERE user_id=?`, phone.userID) + h.notices(phone.userID, notifications.TypeProDeviceLimit); n != 0 {
+				t.Errorf("shadow mode created %d blocked-device notices", n)
+			}
+		})
+	}
+}
+
+// Shadow "limit_reached" should mirror strict mode: the first installation
+// would own the slot, so it must not itself be recorded as limit_reached.
+func TestAdv_ShadowDecisionsMatchStrictFirstClaimSemantics(t *testing.T) {
+	h := newHarness(t, approvedEntitlements(), advOTPLimits(), productionProFlags())
+	email := "adv-shadow-fidelity@example.com"
+	first, _ := h.signInProDevice(email, "adv-sf-first", "ios", installID(7000))
+	second, _ := h.signInProDevice(email, "adv-sf-second", "android", installID(7001))
+	h.advMakePro(first.userID)
+	mustStatus(t, h.generate(first.access, "Сәлем"), http.StatusOK, "")
+	mustStatus(t, h.generate(second.access, "Сәлем"), http.StatusOK, "")
+	firstDevice := h.text(`SELECT id FROM devices WHERE user_id=? AND id='adv-sf-first'`, first.userID)
+	before := h.scalar(`SELECT COUNT(*) FROM pro_device_events WHERE user_id=? AND device_id=? AND kind='limit_reached'`, first.userID, firstDevice)
+	for i := 0; i < 5; i++ {
+		mustStatus(t, h.generate(first.access, "Сәлем"), http.StatusOK, "")
+	}
+	after := h.scalar(`SELECT COUNT(*) FROM pro_device_events WHERE user_id=? AND device_id=? AND kind='limit_reached'`, first.userID, firstDevice)
+	if after > before {
+		t.Errorf("shadow recorded %d limit_reached decisions for the installation strict mode would have authorized", after-before)
+	}
+	// Even 90 days after the second installation went silent, the first is still "over the limit".
+	h.clock.Advance(90 * 24 * time.Hour)
+	h.advMakePro(first.userID) // renewed
+	again, _ := h.signInProDevice(email, "adv-sf-first", "ios", installID(7000))
+	b2 := h.scalar(`SELECT COUNT(*) FROM pro_device_events WHERE user_id=? AND device_id=? AND kind='limit_reached'`, first.userID, firstDevice)
+	mustStatus(t, h.generate(again.access, "Сәлем"), http.StatusOK, "")
+	if a2 := h.scalar(`SELECT COUNT(*) FROM pro_device_events WHERE user_id=? AND device_id=? AND kind='limit_reached'`, first.userID, firstDevice); a2 > b2 {
+		t.Errorf("observation never ages out: limit_reached still recorded 90 days after the other device was last seen")
+	}
+}
+
+// A Pro client whose stored platform differs only in letter case makes the
+// shadow evaluator log ERROR "device authorization transaction failed" on
+// every request. Every ERROR record becomes a Telegram alert
+// (internal/alerts/alerts.go handler).
+func TestAdv_ShadowEvaluationDoesNotLogErrorsForRequests(t *testing.T) {
+	h := newHarness(t, approvedEntitlements(), advOTPLimits(), productionProFlags())
+	email := "adv-case@example.com"
+	s, _ := h.advSignInRaw(email, map[string]any{"device_id": "adv-case-phone", "platform": "iOS", "installation_id": installID(7100), "locale": "en"})
+	h.mustRegister(installation(installID(7100), "iOS", ""), s.access)
+	h.advMakePro(s.userID)
+	count := func() int { return strings.Count(h.logs.String(), `"msg":"device authorization transaction failed"`) }
+	before := count()
+	for i := 0; i < 5; i++ {
+		mustStatus(t, h.generate(s.access, "Сәлем"), http.StatusOK, "")
+	}
+	time.Sleep(50 * time.Millisecond)
+	if n := count() - before; n > 0 {
+		t.Errorf("shadow evaluation logged %d ERROR records for 5 successful requests (platform %q)", n, "iOS")
+	}
+}
+
+// ---------------------------------------------------------------- 8. flag combinations
+
+func TestAdv_FlagCombinationsEnforceOnlyInStrict(t *testing.T) {
+	for _, tc := range []struct {
+		name                   string
+		enabled, shadow, ready string
+		wantSecond             int
+		wantClaims             int
+	}{
+		{"enabled_true_shadow_true_ready_true", "true", "true", "true", http.StatusOK, 0},
+		{"enabled_true_shadow_true_ready_false", "true", "true", "false", http.StatusOK, 0},
+		{"enabled_false_shadow_false", "false", "false", "false", http.StatusOK, 0},
+		{"strict", "true", "false", "true", http.StatusForbidden, 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t, approvedEntitlements(), advOTPLimits(), func(env map[string]string) {
+				env["PRO_DEVICE_LIMIT_ENABLED"], env["PRO_DEVICE_LIMIT_SHADOW_MODE"], env["PRO_DEVICE_LIMIT_CLIENTS_READY"] = tc.enabled, tc.shadow, tc.ready
+				env["PRO_DEVICE_LIMIT_NOTIFICATIONS_ENABLED"] = "false"
+			})
+			email := "adv-flags-" + tc.name + "@example.com"
+			first := h.advBound(email, "adv-flags-1", "ios", 7200)
+			second := h.advBound(email, "adv-flags-2", "android", 7201)
+			h.advMakePro(first.s.userID)
+			mustStatus(t, h.generate(first.s.access, "Сәлем"), http.StatusOK, "")
+			if r := h.generate(second.s.access, "Сәлем"); r.status != tc.wantSecond {
+				t.Errorf("second device: %d %s, want %d", r.status, r.errorCode(), tc.wantSecond)
+			}
+			if n := h.scalar(`SELECT COUNT(*) FROM pro_device_authorizations WHERE user_id=?`, first.s.userID); n != tc.wantClaims {
+				t.Errorf("claims=%d want %d", n, tc.wantClaims)
+			}
+			t.Logf("%s: events=%v observations=%d", tc.name, h.advEventsByKind(first.s.userID),
+				h.scalar(`SELECT COUNT(*) FROM pro_device_observations WHERE user_id=?`, first.s.userID))
+		})
+	}
+}
+
+// ---------------------------------------------------------------- 9. notification jobs
+
+// 30 enforced denials from 6 installations at once: at most 3 jobs per
+// account per cooldown, at most one per installation, delivery only to the
+// authorized installation.
+func TestAdv_NotificationDedupeUnderConcurrentDenials(t *testing.T) {
+	h := newHarness(t, approvedEntitlements(), advOTPLimits(), strictWithNotifications())
+	email := "adv-notice-race@example.com"
+	owner := h.advBound(email, "adv-nr-owner", "ios", 7300)
+	h.mustRegister(installation(owner.install, "ios", fcmToken(7300)), owner.s.access)
+	var blocked []advDevice
+	for i := 0; i < 6; i++ {
+		d := h.advBound(email, fmt.Sprintf("adv-nr-b-%02d", i), "android", 7310+i)
+		h.mustRegister(installation(d.install, "android", fcmToken(7310+i)), d.s.access)
+		blocked = append(blocked, d)
+	}
+	h.advMakePro(owner.s.userID)
+	mustStatus(t, h.generate(owner.s.access, "Сәлем"), http.StatusOK, "")
+	var calls []advCall
+	for round := 0; round < 5; round++ {
+		for _, d := range blocked {
+			calls = append(calls, advCall{http.MethodPost, "/api/v1/ai/reply", advReplyBody(), h.auth(d.s.access)})
+		}
+	}
+	results := h.advParallel(t, calls)
+	t.Logf("denials: %s", advSummary(results))
+	jobs := h.scalar(`SELECT COUNT(*) FROM pro_device_notification_jobs WHERE user_id=?`, owner.s.userID)
+	perDevice := h.scalar(`SELECT COALESCE(MAX(n),0) FROM (SELECT COUNT(*) n FROM pro_device_notification_jobs WHERE user_id=? GROUP BY device_id)`, owner.s.userID)
+	if jobs > 3 || perDevice > 1 {
+		t.Errorf("jobs=%d (max 3) per-device max=%d (max 1)", jobs, perDevice)
+	}
+	// The harness drives notifications with a separate clock; production uses one clock.
+	h.pushClock.T = h.clock.T
+	for i := 0; i < 3; i++ {
+		if err := h.notify.PumpProDeviceNotifications(context.Background(), time.Hour); err != nil {
+			t.Fatal(err)
+		}
+	}
+	h.tick()
+	notices := h.notices(owner.s.userID, notifications.TypeProDeviceLimit)
+	if notices > 3 || notices != jobs {
+		t.Errorf("notices=%d jobs=%d", notices, jobs)
+	}
+	pushes := 0
+	for _, m := range h.push.messages() {
+		if m.msg.Data["type"] != notifications.TypeProDeviceLimit {
+			continue
+		}
+		pushes++
+		if m.token != fcmToken(7300) {
+			t.Errorf("blocked-device notice pushed to an unauthorized installation %s", m.token)
+		}
+	}
+	t.Logf("jobs=%d notices=%d device-limit pushes=%d emails(all types)=%d intents=%d", jobs, notices, pushes, len(h.mail.messages()),
+		h.scalar(`SELECT COUNT(*) FROM pro_device_events WHERE user_id=? AND notify_requested=1`, owner.s.userID))
+}
+
+// Outbox transfer retries are bounded (10 attempts, then 'failed').
+func TestAdv_NotificationTransferRetriesAreBounded(t *testing.T) {
+	h := newHarness(t)
+	s := h.signIn("adv-retry-bound@example.com")
+	_, blocked := proNoticeDevices(t, h, s, 7400)
+	ctx := context.Background()
+	if err := h.notify.QueueProDeviceLimit(ctx, s.userID, blocked.ID, "mobile", "android", h.pushClock.Now(), time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	h.exec(`ALTER TABLE notifications RENAME TO adv_unavailable_notices`)
+	for i := 0; i < 15; i++ {
+		_ = h.notify.PumpProDeviceNotifications(ctx)
+		h.pushClock.Advance(time.Minute + time.Second)
+	}
+	got := h.text(`SELECT status||':'||attempts FROM pro_device_notification_jobs`)
+	h.exec(`ALTER TABLE adv_unavailable_notices RENAME TO notifications`)
+	if got != "failed:10" {
+		t.Errorf("job after 15 failing pumps = %s, want failed:10", got)
+	}
+	if err := h.notify.PumpProDeviceNotifications(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if n := h.notices(s.userID, notifications.TypeProDeviceLimit); n != 0 {
+		t.Errorf("failed job was resurrected: %d notices", n)
+	}
+}
+
+// A denial recorded while notifications are enabled, followed by a rollback
+// (delivery off, worker stopped) and re-enable two weeks later: the stale
+// "new device blocked" alert should not be sent as if it were current.
+func TestAdv_StaleNoticeIsNotDeliveredAfterReenable(t *testing.T) {
+	h := newHarness(t, approvedEntitlements(), advOTPLimits(), strictWithNotifications())
+	email := "adv-stale@example.com"
+	owner := h.advBound(email, "adv-stale-owner", "ios", 7500)
+	h.mustRegister(installation(owner.install, "ios", fcmToken(7500)), owner.s.access)
+	blocked := h.advBound(email, "adv-stale-blocked", "android", 7501)
+	h.advMakePro(owner.s.userID)
+	h.pushClock.T = h.clock.T
+	h.tick() // deliver the unrelated "plan activated" notices now
+	mustStatus(t, h.generate(owner.s.access, "Сәлем"), http.StatusOK, "")
+	mustStatus(t, h.generate(blocked.s.access, "Сәлем"), http.StatusForbidden, "PRO_DEVICE_LIMIT_REACHED")
+	if n := h.scalar(`SELECT COUNT(*) FROM pro_device_notification_jobs WHERE status='pending'`); n != 1 {
+		t.Fatalf("pending jobs=%d", n)
+	}
+	pushesBefore, mailsBefore := len(h.push.messages()), len(h.mail.messages())
+	// Rollback: NOTIFICATIONS_ENABLED=false stops the pump goroutine in main.go.
+	h.notify.WithProDeviceNotificationDelivery(false)
+	h.pushClock.Advance(14 * 24 * time.Hour)
+	h.clock.Advance(14 * 24 * time.Hour)
+	// Re-enable.
+	h.notify.WithProDeviceNotificationDelivery(true)
+	if err := h.notify.PumpProDeviceNotifications(context.Background(), time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	h.tick()
+	var limitPushes, limitMails int
+	for _, m := range h.push.messages()[pushesBefore:] {
+		if m.msg.Data["type"] == notifications.TypeProDeviceLimit {
+			limitPushes++
+		}
+	}
+	for _, m := range h.mail.messages()[mailsBefore:] {
+		if strings.HasPrefix(m.Content.Subject, notifications.TypeProDeviceLimit) {
+			limitMails++
+		}
+	}
+	occurred := h.text(`SELECT datetime(occurred_at/1000,'unixepoch') FROM pro_device_notification_jobs`)
+	t.Logf("job occurred_at=%s, delivered at pushClock=%s: device-limit push=%d email=%d", occurred, h.pushClock.Now().Format(time.RFC3339), limitPushes, limitMails)
+	if limitPushes > 0 || limitMails > 0 {
+		t.Errorf("a 14-day-old blocked-device alert was delivered after re-enable (push=%d email=%d)", limitPushes, limitMails)
+	}
+}
+
+// Rows written by the device policy are never purged by any retention job.
+func TestAdv_ProDeviceTablesAreCoveredByRetention(t *testing.T) {
+	h := newHarness(t, approvedEntitlements(), advOTPLimits(), productionProFlags())
+	phone, _ := h.signInProDevice("adv-retention@example.com", "adv-ret-phone", "ios", "")
+	tablet, _ := h.signInProDevice("adv-retention@example.com", "adv-ret-tablet", "ipados", "")
+	h.advMakePro(phone.userID)
+	for i := 0; i < 5; i++ {
+		mustStatus(t, h.generate(phone.access, "Сәлем"), http.StatusOK, "")
+		mustStatus(t, h.generate(tablet.access, "Сәлем"), http.StatusOK, "")
+	}
+	ctx := context.Background()
+	deviceID := h.text(`SELECT id FROM devices WHERE user_id=? LIMIT 1`, phone.userID)
+	if _, err := h.store.QueueProDeviceNotification(ctx, phone.userID, deviceID, "mobile", "ios", h.clock.Now(), time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	h.exec(`UPDATE pro_device_notification_jobs SET status='queued'`)
+	count := func() (int, int, int) {
+		return h.scalar(`SELECT COUNT(*) FROM pro_device_events`), h.scalar(`SELECT COUNT(*) FROM pro_device_observations`), h.scalar(`SELECT COUNT(*) FROM pro_device_notification_jobs`)
+	}
+	e0, o0, j0 := count()
+	h.clock.Advance(800 * 24 * time.Hour)
+	h.pushClock.Advance(800 * 24 * time.Hour)
+	retention.New(h.store, h.cfg.Retention, slogDiscard()).WithClock(h.clock).Sweep(ctx)
+	h.notify.Retain(ctx)
+	e1, o1, j1 := count()
+	t.Logf("after an 800-day retention sweep: events %d->%d observations %d->%d jobs %d->%d", e0, e1, o0, o1, j0, j1)
+	if e1 == e0 && e0 > 0 {
+		t.Errorf("pro_device_events (%d per-request shadow rows) are never purged", e1)
+	}
+	if j1 == j0 && j0 > 0 {
+		t.Errorf("finished pro_device_notification_jobs are never purged")
+	}
+}
+
+// ---------------------------------------------------------------- misc helpers
+
+func slogDiscard() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, nil)) }
+
+// keep the domain import used for clarity in assertions above
+var _ = domain.ProDeviceMobile

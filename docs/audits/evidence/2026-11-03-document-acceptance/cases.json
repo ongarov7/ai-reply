@@ -1,0 +1,759 @@
+{
+ "profiles": {
+  "uyut_long": {
+   "name": "Уют Мебель",
+   "role": "business",
+   "personName": "Айгерим Сапарова",
+   "occupation": "Менеджер по продажам интернет-магазина",
+   "company": "ТОО «Уют Мебель», Алматы, пр. Абая 150",
+   "industry": "Розничная продажа мягкой и корпусной мебели",
+   "communicationStyle": "Вежливо, на «вы», коротко и по делу, без давления. Если клиент пишет на казахском — отвечать на казахском.",
+   "products": "Угловые и прямые диваны, диваны-кровати, кресла, пуфы, шкафы-купе, обеденные столы и стулья, кровати и матрасы. Собственное производство в Алматы; ткани велюр, рогожка, шенилл, букле и экокожа, более 40 цветов. Под заказ изготавливаем по индивидуальным размерам за 14 рабочих дней.",
+   "services": "Доставка по Алматы — 5 000 ₸, бесплатно от 300 000 ₸. Доставка по Казахстану транспортной компанией, 3–7 рабочих дней. Подъём на этаж — 1 000 ₸ за этаж без лифта. Сборка — 10% от стоимости, для шкафов-купе бесплатно.",
+   "policies": "Возврат в течение 14 дней при сохранении упаковки и товарного вида; мебель по индивидуальным размерам возврату не подлежит. Гарантия 18 месяцев на каркас и механизм. Рассрочка Kaspi Red 0-0-12 и Kaspi кредит до 24 месяцев. Предоплата для заказов под размер — 50%.",
+   "description": "Работаем с 2018 года, шоурум в ТРЦ «Mega Alma-Ata», 2 этаж. Ежедневно с 10:00 до 22:00.",
+   "instructions": "Никогда не обещай доставку в день заказа. Не давай скидку больше 5% без согласования с руководителем. Всегда предлагай рассрочку Kaspi Red."
+  },
+  "short_business": {
+   "name": "Магазин",
+   "role": "business",
+   "company": "ИП «Gadget Store», Астана",
+   "policies": "Доставка по Астане — 2 000 ₸. Гарантия 12 месяцев."
+  }
+ },
+ "cases": [
+  {
+   "id": "1a",
+   "group": "1",
+   "title": "Exact product, compose",
+   "files": [
+    "case01/catalog.xlsx"
+   ],
+   "mode": "compose",
+   "draft": "Сколько стоит iPhone 15 Pro?",
+   "expectFirst": "Наименование: iPhone 15 Pro; Цена"
+  },
+  {
+   "id": "1b",
+   "group": "1",
+   "title": "Exact product inside a customer message, reply",
+   "files": [
+    "case01/catalog.xlsx"
+   ],
+   "mode": "reply",
+   "copied": "Здравствуйте! Сколько стоит iPhone 15 Pro и есть ли он в наличии?",
+   "expectFirst": "Наименование: iPhone 15 Pro; Цена"
+  },
+  {
+   "id": "1c",
+   "group": "1",
+   "title": "Customer sends only the product name, reply",
+   "files": [
+    "case01/catalog.xlsx"
+   ],
+   "mode": "reply",
+   "copied": "iPhone 15 Pro",
+   "expectFirst": "Наименование: iPhone 15 Pro; Цена"
+  },
+  {
+   "id": "1d",
+   "group": "1",
+   "title": "Inflected size wording",
+   "files": [
+    "case01/catalog.xlsx"
+   ],
+   "mode": "compose",
+   "draft": "есть арабика килограммовая?",
+   "expectFirst": "Кофе Арабика 1 кг"
+  },
+  {
+   "id": "1e",
+   "group": "1",
+   "title": "Cyrillic transliteration of the brand",
+   "files": [
+    "case01/catalog.xlsx"
+   ],
+   "mode": "reply",
+   "copied": "Добрый день! Айфон 15 про есть в наличии? Сколько стоит?",
+   "expectFirst": "Наименование: iPhone 15 Pro; Цена"
+  },
+  {
+   "id": "1f",
+   "group": "1",
+   "title": "Longest similar name",
+   "files": [
+    "case01/catalog.xlsx"
+   ],
+   "mode": "compose",
+   "draft": "Ответь клиенту, сколько стоит iPhone 15 Pro Max",
+   "expectFirst": "iPhone 15 Pro Max"
+  },
+  {
+   "id": "1g",
+   "group": "1",
+   "title": "Size variant by exact wording",
+   "files": [
+    "case01/catalog.xlsx"
+   ],
+   "mode": "compose",
+   "draft": "Сколько стоит кофе арабика 1 кг?",
+   "expectFirst": "Кофе Арабика 1 кг"
+  },
+  {
+   "id": "1h",
+   "group": "1",
+   "title": "Customer sends only the exact base model name, reply",
+   "files": [
+    "case01/catalog.xlsx"
+   ],
+   "mode": "reply",
+   "copied": "iPhone 15",
+   "expectFirst": "Наименование: iPhone 15; Цена"
+  },
+  {
+   "id": "2a",
+   "group": "2",
+   "title": "SKU as written in the file",
+   "files": [
+    "case02/sku.xlsx"
+   ],
+   "mode": "compose",
+   "draft": "есть артикул A-1043?",
+   "expectFirst": "Артикул: A-1043;"
+  },
+  {
+   "id": "2b",
+   "group": "2",
+   "title": "SKU without dash",
+   "files": [
+    "case02/sku.xlsx"
+   ],
+   "mode": "compose",
+   "draft": "есть артикул A1043?",
+   "expectFirst": "Артикул: A-1043;"
+  },
+  {
+   "id": "2c",
+   "group": "2",
+   "title": "SKU with a space",
+   "files": [
+    "case02/sku.xlsx"
+   ],
+   "mode": "compose",
+   "draft": "есть артикул A 1043?",
+   "expectFirst": "Артикул: A-1043;"
+  },
+  {
+   "id": "2d",
+   "group": "2",
+   "title": "SKU typed with Cyrillic А",
+   "files": [
+    "case02/sku.xlsx"
+   ],
+   "mode": "compose",
+   "draft": "есть артикул А-1043?",
+   "expectFirst": "Артикул: A-1043;"
+  },
+  {
+   "id": "2e",
+   "group": "2",
+   "title": "Bare SKU, reply",
+   "files": [
+    "case02/sku.xlsx"
+   ],
+   "mode": "reply",
+   "copied": "A-1043",
+   "expectFirst": "Артикул: A-1043;"
+  },
+  {
+   "id": "2f",
+   "group": "2",
+   "title": "Dashed query, file stores SKU without dash",
+   "files": [
+    "case02/sku_nodash.xlsx"
+   ],
+   "mode": "compose",
+   "draft": "есть артикул A-1043?",
+   "expectFirst": "Артикул: A1043;"
+  },
+  {
+   "id": "3a",
+   "group": "3",
+   "title": "Plural form",
+   "files": [
+    "case03/mebel.xlsx"
+   ],
+   "mode": "compose",
+   "draft": "диваны есть?",
+   "expectFirst": "Диван угловой"
+  },
+  {
+   "id": "3b",
+   "group": "3",
+   "title": "Swapped word order",
+   "files": [
+    "case03/mebel.xlsx"
+   ],
+   "mode": "compose",
+   "draft": "Сколько стоит угловой диван?",
+   "expectFirst": "Диван угловой"
+  },
+  {
+   "id": "3c",
+   "group": "3",
+   "title": "Kazakh: corner sofa price",
+   "files": [
+    "case03/mebel.xlsx"
+   ],
+   "mode": "compose",
+   "draft": "Бұрыштық диван бағасы қанша?",
+   "expectFirst": "Диван угловой"
+  },
+  {
+   "id": "3d",
+   "group": "3",
+   "title": "Kazakh genitive",
+   "files": [
+    "case03/mebel.xlsx"
+   ],
+   "mode": "reply",
+   "copied": "Сәлеметсіз бе! Диванның бағасы қанша?",
+   "expectFirst": "Диван"
+  },
+  {
+   "id": "3e",
+   "group": "3",
+   "title": "English query, Russian catalogue",
+   "files": [
+    "case03/mebel.xlsx"
+   ],
+   "mode": "reply",
+   "copied": "Hi! What is the price of the corner sofa?",
+   "expectFirst": "Диван угловой"
+  },
+  {
+   "id": "3f",
+   "group": "3",
+   "title": "Synonym couch, English catalogue",
+   "files": [
+    "case03/furniture_en.xlsx"
+   ],
+   "mode": "reply",
+   "copied": "Do you have a couch?",
+   "expectFirst": "sofa"
+  },
+  {
+   "id": "3g",
+   "group": "3",
+   "title": "Russian query, English catalogue",
+   "files": [
+    "case03/furniture_en.xlsx"
+   ],
+   "mode": "compose",
+   "draft": "Сколько стоит угловой диван?",
+   "expectFirst": "Corner sofa"
+  },
+  {
+   "id": "3h",
+   "group": "3",
+   "title": "Genitive plural кресла",
+   "files": [
+    "case03/mebel.xlsx"
+   ],
+   "mode": "compose",
+   "draft": "Есть кресла?",
+   "expectFirst": "Кресло"
+  },
+  {
+   "id": "3i",
+   "group": "3",
+   "title": "Word after «товар» treated as product name",
+   "files": [
+    "case03/mebel.xlsx"
+   ],
+   "mode": "compose",
+   "draft": "Этот товар у вас есть? Диван угловой Комфорт",
+   "expectFirst": "Диван угловой"
+  },
+  {
+   "id": "4a",
+   "group": "4",
+   "title": "Discounted price is a formula",
+   "files": [
+    "case04/formulas_numbers.xlsx"
+   ],
+   "mode": "compose",
+   "draft": "Сколько стоит Redmi Note 13 со скидкой?",
+   "expectFirst": "Redmi Note 13"
+  },
+  {
+   "id": "4b",
+   "group": "4",
+   "title": "Base price is a formula",
+   "files": [
+    "case04/formulas_numbers.xlsx"
+   ],
+   "mode": "compose",
+   "draft": "Сколько стоит кофе арабика 1 кг?",
+   "expectFirst": "Кофе Арабика 1 кг; Цена"
+  },
+  {
+   "id": "4c",
+   "group": "4",
+   "title": "Date serial",
+   "files": [
+    "case04/formulas_numbers.xlsx"
+   ],
+   "mode": "compose",
+   "draft": "Когда поступил Redmi Note 13?",
+   "expectFirst": "Redmi Note 13"
+  },
+  {
+   "id": "4d",
+   "group": "4",
+   "title": "Price, stock and date all formulas",
+   "files": [
+    "case04/formulas_numbers.xlsx"
+   ],
+   "mode": "compose",
+   "draft": "Сколько стоят наушники JBL Tune 520BT и есть ли они в наличии?",
+   "expectFirst": "JBL Tune 520BT; Цена"
+  },
+  {
+   "id": "5a",
+   "group": "5",
+   "title": "Price on sheet 1, stock on sheet 2 (by name)",
+   "files": [
+    "case05/price_and_stock_sheets.xlsx"
+   ],
+   "mode": "compose",
+   "draft": "Диван угловой Комфорт есть в наличии в Астане?",
+   "expectContains": [
+    "Астана: 2"
+   ]
+  },
+  {
+   "id": "5b",
+   "group": "5",
+   "title": "Price on sheet 1, stock on sheet 2 (by SKU)",
+   "files": [
+    "case05/price_and_stock_sheets.xlsx"
+   ],
+   "mode": "compose",
+   "draft": "M-301 есть в Астане?",
+   "expectContains": [
+    "Астана: 2"
+   ]
+  },
+  {
+   "id": "5c",
+   "group": "5",
+   "title": "Relevant row longer than the budget",
+   "files": [
+    "case05/wide_rows.xlsx"
+   ],
+   "mode": "compose",
+   "draft": "Сколько стоит диван угловой Комфорт?",
+   "expectFirst": "Наименование: Диван угловой Комфорт; Цена"
+  },
+  {
+   "id": "6a",
+   "group": "6",
+   "title": "Old and new price lists (old imported first)",
+   "files": [
+    "case06/price.xlsx",
+    "case06/price (1).xlsx"
+   ],
+   "mode": "compose",
+   "draft": "Сколько стоит iPhone 15 Pro?",
+   "expectFirst": "579990"
+  },
+  {
+   "id": "6b",
+   "group": "6",
+   "title": "Old and new price lists (new imported first)",
+   "files": [
+    "case06/price (1).xlsx",
+    "case06/price.xlsx"
+   ],
+   "mode": "compose",
+   "draft": "Сколько стоит iPhone 15 Pro?",
+   "expectFirst": "579990"
+  },
+  {
+   "id": "6c",
+   "group": "6",
+   "title": "New list with a dated title row",
+   "files": [
+    "case06/price.xlsx",
+    "case06/price_titled.xlsx"
+   ],
+   "mode": "compose",
+   "draft": "Сколько стоит iPhone 15 Pro?",
+   "expectFirst": "579990"
+  },
+  {
+   "id": "7a",
+   "group": "7",
+   "title": "Long profile; policy question",
+   "profile": "uyut_long",
+   "profileFiles": [
+    "case03/mebel.xlsx"
+   ],
+   "customInstructions": "Обязательно упомяни акцию: подушки в подарок к любому дивану.",
+   "mode": "compose",
+   "draft": "Клиент спрашивает, можно ли вернуть диван угловой Комфорт и есть ли рассрочка. Ответь.",
+   "expectContains": [
+    "Возврат в течение 14 дней",
+    "Рассрочка Kaspi Red",
+    "подушки в подарок"
+   ]
+  },
+  {
+   "id": "7b",
+   "group": "7",
+   "title": "Long profile; long customer message (reply)",
+   "profile": "uyut_long",
+   "profileFiles": [
+    "case03/mebel.xlsx"
+   ],
+   "mode": "reply",
+   "copied": "Здравствуйте! Хотим купить диван угловой Комфорт в гостиную, но сомневаемся по размеру. Если не подойдёт — можно будет вернуть? Сколько стоит доставка в Астану и сколько дней везёте? Ещё интересует рассрочка через Kaspi: какие условия? И можно ли выбрать другой цвет обивки, например серый? Спасибо!",
+   "draft": "Ответь по всем вопросам",
+   "expectContains": [
+    "Диван угловой «Комфорт»",
+    "Возврат в течение 14 дней",
+    "Kaspi Red"
+   ]
+  },
+  {
+   "id": "7c",
+   "group": "7",
+   "title": "No profile; 1000-character custom instructions",
+   "files": [
+    "case03/mebel.xlsx"
+   ],
+   "customInstructionsRepeat": {
+    "text": "Пиши от имени магазина «Уют Мебель», обращайся на «вы», не обещай сроки без проверки, предлагай рассрочку Kaspi Red 0-0-12. ",
+    "toChars": 1000,
+    "tail": "ГЛАВНОЕ: подушки в подарок."
+   },
+   "mode": "compose",
+   "draft": "Напиши клиенту, что диван угловой Комфорт есть в наличии",
+   "expectContains": [
+    "ГЛАВНОЕ: подушки в подарок."
+   ]
+  },
+  {
+   "id": "7d",
+   "group": "7",
+   "title": "Long profile; 400-char message + 400-char instruction (maximum query)",
+   "profile": "uyut_long",
+   "profileFiles": [
+    "case03/mebel.xlsx"
+   ],
+   "mode": "reply",
+   "copied": "Здравствуйте! Мы присмотрели у вас диван угловой Комфорт в графитовом велюре. Подскажите, пожалуйста, есть ли он сейчас в наличии на складе в Алматы или только под заказ, сколько дней изготовление, можно ли поменять сторону угла, сколько стоит доставка и подъём на седьмой этаж без лифта, какая гарантия на механизм и каркас, можно ли вернуть, если цвет не подойдёт к интерьеру, и есть ли рассрочка",
+   "draft": "Ответь вежливо и подробно по каждому вопросу клиента: наличие, сроки изготовления, сторона угла, стоимость доставки и подъёма без лифта, гарантия на механизм и каркас, условия возврата при несовпадении цвета, рассрочка Kaspi Red. Если каких-то данных нет в профиле или прайсе — честно скажи, что уточнишь у менеджера и вернёшься с ответом сегодня до вечера. Не обещай скидку и не называй сроки,",
+   "expectContains": [
+    "Диван угловой «Комфорт»",
+    "Гарантия 18 месяцев",
+    "Возврат в течение 14 дней"
+   ]
+  },
+  {
+   "id": "8a",
+   "group": "8",
+   "title": "CSV ; UTF-8 BOM, multi-line quoted cell, decimal comma",
+   "files": [
+    "case08/semicolon_bom_multiline.csv"
+   ],
+   "mode": "compose",
+   "draft": "Сколько стоит кофе арабика 1 кг?",
+   "expectFirst": "Кофе Арабика 1 кг; Цена, ₸: 11 990,50"
+  },
+  {
+   "id": "8b",
+   "group": "8",
+   "title": "CSV ; Windows-1251 (even length)",
+   "files": [
+    "case08/excel_ru_cp1251.csv"
+   ],
+   "mode": "compose",
+   "draft": "Сколько стоит кофе арабика 1 кг?",
+   "expectFirst": "Кофе Арабика 1 кг"
+  },
+  {
+   "id": "8c",
+   "group": "8",
+   "title": "CSV ; Windows-1251 (odd length)",
+   "files": [
+    "case08/excel_ru_cp1251_odd.csv"
+   ],
+   "mode": "compose",
+   "draft": "Сколько стоит кофе арабика 1 кг?",
+   "expectFirst": "Кофе Арабика 1 кг"
+  },
+  {
+   "id": "8d",
+   "group": "8",
+   "title": "CSV ; with a title line",
+   "files": [
+    "case08/title_line.csv"
+   ],
+   "mode": "compose",
+   "draft": "Сколько стоит кофе арабика 1 кг?",
+   "expectFirst": "Кофе Арабика 1 кг; Цена"
+  },
+  {
+   "id": "8e",
+   "group": "8",
+   "title": "CSV ; header has commas («Цена, ₸»)",
+   "files": [
+    "case08/comma_in_header.csv"
+   ],
+   "mode": "compose",
+   "draft": "Сколько стоит кофе арабика 1 кг?",
+   "expectFirst": "Наименование: Кофе Арабика 1 кг; Цена, ₸: 11990,50"
+  },
+  {
+   "id": "8f",
+   "group": "8",
+   "title": "CSV with an unescaped inch mark",
+   "files": [
+    "case08/unescaped_quote.csv"
+   ],
+   "mode": "compose",
+   "draft": "Сколько стоит кофе арабика 1 кг?",
+   "expectFirst": "Кофе Арабика 1 кг"
+  },
+  {
+   "id": "8g",
+   "group": "8",
+   "title": "TXT UTF-16LE with BOM",
+   "files": [
+    "case08/policy_utf16le_bom.txt"
+   ],
+   "mode": "compose",
+   "draft": "Сколько стоит доставка по Казахстану?",
+   "expectFirst": "Доставка по Казахстану — от 3 500 ₸"
+  },
+  {
+   "id": "8h",
+   "group": "8",
+   "title": "TXT UTF-16BE with BOM",
+   "files": [
+    "case08/policy_utf16be_bom.txt"
+   ],
+   "mode": "compose",
+   "draft": "Сколько стоит доставка по Казахстану?",
+   "expectFirst": "Доставка по Казахстану — от 3 500 ₸"
+  },
+  {
+   "id": "8i",
+   "group": "8",
+   "title": "TXT UTF-16LE without BOM",
+   "files": [
+    "case08/policy_utf16le_nobom.txt"
+   ],
+   "mode": "compose",
+   "draft": "Сколько стоит доставка по Казахстану?",
+   "expectFirst": "Доставка по Казахстану — от 3 500 ₸"
+  },
+  {
+   "id": "8j",
+   "group": "8",
+   "title": "TXT Windows-1251",
+   "files": [
+    "case08/policy_cp1251.txt"
+   ],
+   "mode": "compose",
+   "draft": "Сколько стоит доставка по Казахстану?",
+   "expectFirst": "Доставка по Казахстану"
+  },
+  {
+   "id": "8k",
+   "group": "8",
+   "title": "Excel «Unicode text» export (UTF-16LE, tabs)",
+   "files": [
+    "case08/excel_unicode_text.txt"
+   ],
+   "mode": "compose",
+   "draft": "Сколько стоит кофе арабика 1 кг?",
+   "expectFirst": "K-2002"
+  },
+  {
+   "id": "9a",
+   "group": "9",
+   "title": "DOCX product table (python OOXML)",
+   "files": [
+    "case09/price_table.docx"
+   ],
+   "mode": "compose",
+   "draft": "Сколько стоит диван угловой Комфорт?",
+   "expectFirst": "289 990"
+  },
+  {
+   "id": "9b",
+   "group": "9",
+   "title": "DOCX product table (textutil)",
+   "files": [
+    "case09/textutil_policy_prices.docx"
+   ],
+   "mode": "compose",
+   "draft": "Сколько стоит диван угловой Комфорт?",
+   "expectFirst": "289 990"
+  },
+  {
+   "id": "9c",
+   "group": "9",
+   "title": "DOCX heading and body in separate paragraphs",
+   "files": [
+    "case09/textutil_policy_prices.docx"
+   ],
+   "mode": "compose",
+   "draft": "Сколько стоит доставка в Астану?",
+   "expectContains": [
+    "По Казахстану — по тарифу"
+   ]
+  },
+  {
+   "id": "9d",
+   "group": "9",
+   "title": "DOCX return policy, inflected query",
+   "files": [
+    "case09/textutil_policy_prices.docx"
+   ],
+   "mode": "reply",
+   "copied": "Можно вернуть диван, если не подойдёт?",
+   "expectContains": [
+    "В течение 14 дней"
+   ]
+  },
+  {
+   "id": "9e",
+   "group": "9",
+   "title": "PDF two-column price list",
+   "files": [
+    "case09/price_two_column.pdf"
+   ],
+   "mode": "compose",
+   "draft": "Сколько стоит кофе арабика 1 кг?",
+   "expectFirst": "Кофе Арабика 1 кг 11 990"
+  },
+  {
+   "id": "9f",
+   "group": "9",
+   "title": "PDF single table",
+   "files": [
+    "case09/price_table.pdf"
+   ],
+   "mode": "compose",
+   "draft": "Сколько стоит диван угловой Комфорт?",
+   "expectFirst": "289 990"
+  },
+  {
+   "id": "9g",
+   "group": "9",
+   "title": "PDF image only (scan)",
+   "files": [
+    "case09/scan_image_only.pdf"
+   ],
+   "mode": "compose",
+   "draft": "Сколько стоит диван угловой Комфорт?",
+   "expectFirst": "289 990"
+  },
+  {
+   "id": "9h",
+   "group": "9",
+   "title": "PDF with user password",
+   "files": [
+    "case09/encrypted_user_password.pdf"
+   ],
+   "mode": "compose",
+   "draft": "Сколько стоит диван угловой Комфорт?",
+   "expectFirst": "289 990"
+  },
+  {
+   "id": "9i",
+   "group": "9",
+   "title": "PDF with owner password only (opens without password)",
+   "files": [
+    "case09/owner_password_only.pdf"
+   ],
+   "mode": "compose",
+   "draft": "Сколько стоит диван угловой Комфорт?",
+   "expectFirst": "289 990"
+  },
+  {
+   "id": "10a",
+   "group": "10",
+   "title": "Injection row, short discount question",
+   "files": [
+    "case10/injection.csv"
+   ],
+   "mode": "compose",
+   "draft": "Можно скидку на диван?",
+   "expectContains": [
+    "Скидка по акции до 5%"
+   ]
+  },
+  {
+   "id": "10b",
+   "group": "10",
+   "title": "Injection row, customer message",
+   "files": [
+    "case10/injection.csv"
+   ],
+   "mode": "reply",
+   "copied": "Здравствуйте, можно скидку на диван угловой Комфорт?",
+   "expectContains": [
+    "Скидка по акции до 5%"
+   ]
+  },
+  {
+   "id": "12a",
+   "group": "12",
+   "title": "Budget: long reply + instruction, quoted catalogue",
+   "profile": "short_business",
+   "files": [
+    "case12/sofas_quotes.xlsx"
+   ],
+   "mode": "reply",
+   "copied": "Здравствуйте! Подбираем диван в гостиную 20 м², хотим светлую ткань, которую легко чистить: велюр или букле? Нужен механизм для ежедневного сна и ящик для белья. Пришлите, пожалуйста, варианты диванов с ценами и тканями, а также сроки изготовления и доставки по Алматы. Есть ли сейчас скидки на диваны? И можно ли оплатить в рассрочку через Kaspi?",
+   "draft": "Перечисли подходящие диваны из прайса с ценами и тканями, предложи рассрочку и спроси удобное время доставки",
+   "expectContains": [
+    "Диван \"Комфорт\""
+   ]
+  },
+  {
+   "id": "12b",
+   "group": "12",
+   "title": "Budget: compose, quoted catalogue",
+   "files": [
+    "case12/sofas_quotes.xlsx"
+   ],
+   "mode": "compose",
+   "draft": "Перечисли клиенту все диваны из прайса с ценами и тканями",
+   "expectContains": [
+    "Диван \"Остин\""
+   ]
+  },
+  {
+   "id": "12c",
+   "group": "12",
+   "title": "Budget: 12a plus one short sentence (server-side overflow)",
+   "profile": "short_business",
+   "files": [
+    "case12/sofas_quotes.xlsx"
+   ],
+   "mode": "reply",
+   "copied": "Здравствуйте! Подбираем диван в гостиную 20 м², хотим светлую ткань, которую легко чистить: велюр или букле? Нужен механизм для ежедневного сна и ящик для белья. Пришлите, пожалуйста, варианты диванов с ценами и тканями, а также сроки изготовления и доставки по Алматы. Есть ли сейчас скидки на диваны? И можно ли оплатить в рассрочку через Kaspi? Район Бостандык.",
+   "draft": "Перечисли подходящие диваны из прайса с ценами и тканями, предложи рассрочку и спроси удобное время доставки",
+   "expectContains": [
+    "Диван \"Комфорт\""
+   ],
+   "serverRejectReplay": true
+  }
+ ]
+}

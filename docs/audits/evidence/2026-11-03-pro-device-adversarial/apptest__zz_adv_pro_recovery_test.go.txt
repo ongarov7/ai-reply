@@ -1,0 +1,330 @@
+package apptest
+
+import (
+	"net/http"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/aireply/ai-reply-back-end/internal/audio/audiotest"
+	"github.com/aireply/ai-reply-back-end/internal/domain"
+)
+
+// ---------------------------------------------------------------- 4. revocation and recovery
+
+func (h *harness) advAdminRevoke(userID, authorizationID, reason string) response {
+	h.t.Helper()
+	admin := h.signInAdmin()
+	return h.do(http.MethodPost, "/api/v1/admin/users/"+userID+"/pro-devices/"+authorizationID+"/revoke",
+		map[string]any{"reason": reason}, admin.headers(h.cfg.Admin.CookieName))
+}
+
+// iPhone upgrade by backup restore: the App Group device id is restored, the
+// ThisDeviceOnly installation id is not (AI-Reply/Shared/Account/
+// AccountCredentials.swift, AIReply/Features/Notifications/ClientContext.swift).
+// Policy: after the old phone is released by support, "a replacement may
+// claim the released slot".
+func TestAdv_BackupRestoredPhoneCanUseReleasedSlotAfterAdminRecovery(t *testing.T) {
+	h := newHarness(t, approvedEntitlements(), strictProDevices(), advOTPLimits())
+	email := "adv-restore@example.com"
+	old := h.advBound(email, "adv-restore-did", "ios", 6000)
+	h.advMakePro(old.s.userID)
+	mustStatus(t, h.generate(old.s.access, "Сәлем"), http.StatusOK, "")
+	oldAuth := h.proDeviceAuthorization(old.s.access, "mobile")
+
+	// New phone: same device id (restored), new installation id.
+	restored := h.advBound(email, "adv-restore-did", "ios", 6001)
+	if restored.deviceID != old.deviceID {
+		t.Logf("server minted a fresh device for the new installation: %s", restored.deviceID)
+	}
+	before := h.generate(restored.s.access, "Сәлем")
+	t.Logf("restored phone before recovery: %d %s (device_id=%s)", before.status, before.errorCode(), restored.deviceID)
+
+	// Old phone wiped; support releases it through the documented admin control.
+	mustStatus(t, h.advAdminRevoke(old.s.userID, oldAuth, "phone replaced via backup restore"), http.StatusOK, "")
+	if n := h.advActive(old.s.userID, "mobile"); n != 0 {
+		t.Fatalf("slot not released: %d", n)
+	}
+	// The restored phone signs in again (as its app would after the revocation
+	// closed its refresh family) and registers its installation.
+	again := h.advBound(email, "adv-restore-did", "ios", 6001)
+	after := h.generate(again.s.access, "Сәлем")
+	t.Logf("restored phone after admin release: %d %s (device_id=%s)", after.status, after.errorCode(), again.deviceID)
+	if after.status != http.StatusOK {
+		t.Errorf("replacement phone cannot use the released Pro slot: %d %s", after.status, after.errorCode())
+	}
+	// Signing out and in again does not help either: the server keeps mapping
+	// the restored device id to the old row (pinned to the old installation).
+	third := h.advBound(email, "adv-restore-did", "ios", 6001)
+	if r := h.generate(third.s.access, "Сәлем"); r.status != http.StatusOK {
+		t.Errorf("still locked after another sign-in: %d %s; mobile slot free=%v", r.status, r.errorCode(), h.advActive(old.s.userID, "mobile") == 0)
+	}
+	// The only escape is a client-side device-id reset (app reinstall).
+	fresh := h.advBound(email, "adv-restore-reinstalled", "ios", 6001)
+	t.Logf("after app reinstall (new device id, same Keychain installation): %d", h.generate(fresh.s.access, "Сәлем").status)
+}
+
+// User moves Pro from phone A to phone B, B is lost, support releases B. The
+// mobile slot is now empty, yet A can never claim it again, not even after an
+// app reinstall, and no admin control can lift the tombstone.
+func TestAdv_RevokedInstallationCanReclaimEmptySlotOnlyViaSomeSupportedPath(t *testing.T) {
+	h := newHarness(t, approvedEntitlements(), strictProDevices(), advOTPLimits())
+	email := "adv-tombstone@example.com"
+	a := h.advBound(email, "adv-ts-phone-a", "ios", 6100)
+	desk := h.advBound(email, "adv-ts-desk", "macos", 6101)
+	h.advMakePro(a.s.userID)
+	mustStatus(t, h.generate(a.s.access, "Сәлем"), http.StatusOK, "")
+	mustStatus(t, h.generate(desk.s.access, "Сәлем"), http.StatusOK, "")
+	aAuth := h.proDeviceAuthorization(a.s.access, "mobile")
+	mustStatus(t, h.do(http.MethodDelete, "/api/v1/me/pro-devices/"+aAuth, nil, h.auth(desk.s.access)), http.StatusOK, "")
+	b := h.advBound(email, "adv-ts-phone-b", "android", 6102)
+	mustStatus(t, h.generate(b.s.access, "Сәлем"), http.StatusOK, "")
+	bAuth := h.proDeviceAuthorization(b.s.access, "mobile")
+	mustStatus(t, h.advAdminRevoke(a.s.userID, bAuth, "phone B lost"), http.StatusOK, "")
+	if n := h.advActive(a.s.userID, "mobile"); n != 0 {
+		t.Fatalf("mobile slot not empty: %d", n)
+	}
+	// Admin has no reactivation endpoint.
+	admin := h.signInAdmin()
+	for _, p := range []string{"/reactivate", "/restore", "/unrevoke"} {
+		r := h.do(http.MethodPost, "/api/v1/admin/users/"+a.s.userID+"/pro-devices/"+aAuth+p, map[string]any{"reason": "restore"}, admin.headers(h.cfg.Admin.CookieName))
+		t.Logf("admin POST ...%s -> %d", p, r.status)
+	}
+	again := h.advBound(email, "adv-ts-phone-a", "ios", 6100)
+	r1 := h.generate(again.s.access, "Сәлем")
+	reinstalled := h.advBound(email, "adv-ts-phone-a-reinstalled", "ios", 6100) // iOS: Keychain installation survives reinstall
+	r2 := h.generate(reinstalled.s.access, "Сәлем")
+	t.Logf("phone A sign-in: %d %s; after reinstall (device_id mapped to %s): %d %s", r1.status, r1.errorCode(), reinstalled.deviceID, r2.status, r2.errorCode())
+	if r1.status != http.StatusOK && r2.status != http.StatusOK {
+		t.Errorf("installation revoked once is barred forever although the slot is empty and no admin control can lift it")
+	}
+}
+
+// A device authorized *after* the owner (here: a desktop app installed by
+// whoever holds the credentials) can revoke the owner's phone; the blocked
+// phone then takes the slot and the owner gets no revocation notice.
+func TestAdv_LaterAuthorizedDesktopCannotEvictOriginalPhone(t *testing.T) {
+	h := newHarness(t, approvedEntitlements(), strictWithNotifications(), advOTPLimits())
+	email := "adv-evict@example.com"
+	owner := h.advBound(email, "adv-ev-owner", "ios", 6200)
+	h.advMakePro(owner.s.userID)
+	mustStatus(t, h.generate(owner.s.access, "Сәлем"), http.StatusOK, "")
+	ownerAuth := h.proDeviceAuthorization(owner.s.access, "mobile")
+	intruder := h.advBound(email, "adv-ev-intruder-phone", "android", 6201)
+	mustStatus(t, h.generate(intruder.s.access, "Сәлем"), http.StatusForbidden, "PRO_DEVICE_LIMIT_REACHED")
+	if err := h.notify.PumpProDeviceNotifications(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	notificationsBefore := h.scalar(`SELECT COUNT(*) FROM notifications WHERE user_id=?`, owner.s.userID)
+	// Same person installs a desktop app (or declares platform=windows from the phone).
+	desk := h.advBound(email, "adv-ev-intruder-desk", "windows", 6202)
+	mustStatus(t, h.generate(desk.s.access, "Сәлем"), http.StatusOK, "")
+	rev := h.do(http.MethodDelete, "/api/v1/me/pro-devices/"+ownerAuth, nil, h.auth(desk.s.access))
+	takeover := h.generate(intruder.s.access, "Сәлем")
+	ownerAfter := h.generate(owner.s.access, "Сәлем")
+	t.Logf("newer desktop revokes owner: %d; blocked phone afterwards: %d %s; owner afterwards: %d %s",
+		rev.status, takeover.status, takeover.errorCode(), ownerAfter.status, ownerAfter.errorCode())
+	if rev.status == http.StatusOK && takeover.status == http.StatusOK {
+		t.Errorf("a device authorized after the owner evicted the owner's phone and the blocked phone took over the mobile slot")
+	}
+	if err := h.notify.PumpProDeviceNotifications(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	notificationsAfter := h.scalar(`SELECT COUNT(*) FROM notifications WHERE user_id=?`, owner.s.userID)
+	t.Logf("account notifications before/after the revocation: %d/%d", notificationsBefore, notificationsAfter)
+	if rev.status == http.StatusOK && notificationsAfter == notificationsBefore {
+		t.Errorf("no security notice is created when an authorized device is revoked by another device")
+	}
+}
+
+// Documents (passes): a mobile-only user who reinstalls Android (new device
+// id and installation id) has no self-service path back to Pro.
+func TestAdvRisk_MobileOnlyReinstallRecoveryIsSupportOnly(t *testing.T) {
+	h := newHarness(t, approvedEntitlements(), strictProDevices(), advOTPLimits())
+	email := "adv-reinstall@example.com"
+	first := h.advBound(email, "adv-ri-first", "android", 6300)
+	h.advMakePro(first.s.userID)
+	mustStatus(t, h.generate(first.s.access, "Сәлем"), http.StatusOK, "")
+	auth := h.proDeviceAuthorization(first.s.access, "mobile")
+	re := h.advBound(email, "adv-ri-reinstalled", "android", 6301)
+	mustStatus(t, h.generate(re.s.access, "Сәлем"), http.StatusForbidden, "PRO_DEVICE_LIMIT_REACHED")
+	mustStatus(t, h.do(http.MethodGet, "/api/v1/me/pro-devices", nil, h.auth(re.s.access)), http.StatusOK, "")
+	mustStatus(t, h.do(http.MethodDelete, "/api/v1/me/pro-devices/"+auth, nil, h.auth(re.s.access)), http.StatusForbidden, "PRO_DEVICE_MANAGEMENT_FORBIDDEN")
+	mustStatus(t, h.do(http.MethodDelete, "/api/v1/devices/"+first.deviceID, nil, h.auth(re.s.access)), http.StatusForbidden, "PRO_DEVICE_MANAGEMENT_FORBIDDEN")
+	// No inactivity-based release: 180 days later the dead install still holds the slot.
+	h.clock.Advance(180 * 24 * time.Hour)
+	h.advMakePro(first.s.userID) // renewed subscription
+	later := h.advBound(email, "adv-ri-reinstalled", "android", 6301)
+	mustStatus(t, h.generate(later.s.access, "Сәлем"), http.StatusForbidden, "PRO_DEVICE_LIMIT_REACHED")
+	mustStatus(t, h.advAdminRevoke(first.s.userID, auth, "reinstall"), http.StatusOK, "")
+	mustStatus(t, h.generate(later.s.access, "Сәлем"), http.StatusOK, "")
+}
+
+// IDOR: user A (with a trusted desktop) cannot revoke user B's authorization
+// through any route, and the admin route checks the user/authorization pair.
+func TestAdv_NoCrossAccountRevocation(t *testing.T) {
+	h := newHarness(t, approvedEntitlements(), strictProDevices(), advOTPLimits())
+	aPhone := h.advBound("adv-idor-a@example.com", "adv-idor-a-phone", "ios", 6400)
+	aDesk := h.advBound("adv-idor-a@example.com", "adv-idor-a-desk", "macos", 6401)
+	h.advMakePro(aPhone.s.userID)
+	mustStatus(t, h.generate(aPhone.s.access, "Сәлем"), http.StatusOK, "")
+	mustStatus(t, h.generate(aDesk.s.access, "Сәлем"), http.StatusOK, "")
+	b := h.advBound("adv-idor-b@example.com", "adv-idor-b-phone", "android", 6402)
+	h.advMakePro(b.s.userID)
+	mustStatus(t, h.generate(b.s.access, "Сәлем"), http.StatusOK, "")
+	bAuth := h.proDeviceAuthorization(b.s.access, "mobile")
+	for _, r := range []response{
+		h.do(http.MethodDelete, "/api/v1/me/pro-devices/"+bAuth, nil, h.auth(aDesk.s.access)),
+		h.do(http.MethodDelete, "/api/v1/devices/"+b.deviceID, nil, h.auth(aDesk.s.access)),
+		h.advAdminRevoke(aPhone.s.userID, bAuth, "wrong user"),
+	} {
+		if r.status == http.StatusOK {
+			t.Errorf("cross-account revocation accepted: %s", r.raw)
+		}
+	}
+	mustStatus(t, h.generate(b.s.access, "Сәлем"), http.StatusOK, "")
+	if h.advActive(b.s.userID, "mobile") != 1 {
+		t.Fatal("B's authorization changed")
+	}
+}
+
+// Revocation closes every refresh family of the target device only.
+func TestAdv_RevocationClosesExactlyTargetSessions(t *testing.T) {
+	h := newHarness(t, approvedEntitlements(), strictProDevices(), advOTPLimits())
+	email := "adv-scope@example.com"
+	phone := h.advBound(email, "adv-scope-phone", "ios", 6500)
+	phone2, _ := h.signInProDevice(email, phone.deviceID, "ios", phone.install) // second family, same installation
+	desk := h.advBound(email, "adv-scope-desk", "macos", 6501)
+	h.advMakePro(phone.s.userID)
+	mustStatus(t, h.generate(phone.s.access, "Сәлем"), http.StatusOK, "")
+	mustStatus(t, h.generate(desk.s.access, "Сәлем"), http.StatusOK, "")
+	other, _ := h.signInProDevice("adv-scope-other@example.com", phone.deviceID, "ios", phone.install) // other account on the same phone
+	auth := h.proDeviceAuthorization(phone.s.access, "mobile")
+	mustStatus(t, h.do(http.MethodDelete, "/api/v1/me/pro-devices/"+auth, nil, h.auth(desk.s.access)), http.StatusOK, "")
+	for name, refresh := range map[string]string{"phone family 1": phone.s.refresh, "phone family 2": phone2.refresh} {
+		if r := h.do(http.MethodPost, "/api/v1/auth/refresh", map[string]any{"refresh_token": refresh}, nil); r.status != http.StatusUnauthorized {
+			t.Errorf("%s survived revocation: %d", name, r.status)
+		}
+	}
+	for name, refresh := range map[string]string{"desktop": desk.s.refresh, "other account on same installation": other.refresh} {
+		if r := h.do(http.MethodPost, "/api/v1/auth/refresh", map[string]any{"refresh_token": refresh}, nil); r.status != http.StatusOK {
+			t.Errorf("%s session was closed by revocation: %d %s", name, r.status, r.raw)
+		}
+	}
+	// Still-valid access token of the revoked phone: Pro refused, account reachable.
+	mustStatus(t, h.generate(phone.s.access, "Сәлем"), http.StatusForbidden, "PRO_DEVICE_REVOKED")
+	mustStatus(t, h.do(http.MethodGet, "/api/v1/me", nil, h.auth(phone.s.access)), http.StatusOK, "")
+}
+
+// ---------------------------------------------------------------- 6. entitlement transitions
+
+func TestAdv_DenialConsumesNothingAndNonProIsNeverBlocked(t *testing.T) {
+	h := newHarness(t, approvedEntitlements(), strictProDevices(), advOTPLimits(), withWelcomeBonus(10))
+	email := "adv-ent@example.com"
+	owner := h.advBound(email, "adv-ent-owner", "ios", 6600)
+	desk := h.advBound(email, "adv-ent-desk", "macos", 6601)
+	h.advMakePro(owner.s.userID)
+	pack := h.addGrant(owner.s.userID, domain.GrantPack, 5, h.clock.Now(), nil, h.clock.Now())
+	mustStatus(t, h.generate(owner.s.access, "Сәлем"), http.StatusOK, "")
+	mustStatus(t, h.generate(desk.s.access, "Сәлем"), http.StatusOK, "")
+	blocked := h.advBound(email, "adv-ent-blocked", "android", 6602)
+	reservations := h.scalar(`SELECT COUNT(*) FROM usage_reservations WHERE user_id=?`, owner.s.userID)
+	calls, speech := h.provider.calls, len(h.speech.requests())
+	key := map[string]string{"Idempotency-Key": "adv-idem-key-0001"}
+	hdr := h.auth(blocked.s.access)
+	hdr["Idempotency-Key"] = key["Idempotency-Key"]
+	mustStatus(t, h.do(http.MethodPost, "/api/v1/ai/reply", advReplyBody(), hdr), http.StatusForbidden, "PRO_DEVICE_LIMIT_REACHED")
+	mustStatus(t, h.transcribe(blocked.s.access, audiotest.M4A(2*time.Second, nil), voiceFields()), http.StatusForbidden, "PRO_DEVICE_LIMIT_REACHED")
+	mustStatus(t, h.polish(blocked.s.access, map[string]any{"text": polishNote, "input_language": "ru"}), http.StatusForbidden, "PRO_DEVICE_LIMIT_REACHED")
+	if h.provider.calls != calls || len(h.speech.requests()) != speech {
+		t.Errorf("denied installation reached a provider")
+	}
+	if n := h.scalar(`SELECT COUNT(*) FROM usage_reservations WHERE user_id=?`, owner.s.userID); n != reservations {
+		t.Errorf("denial created %d reservations", n-reservations)
+	}
+	if n := h.scalar(`SELECT units_remaining FROM credit_grants WHERE id=?`, pack.ID); n != 5 {
+		t.Errorf("denial consumed a purchased reply: %d left", n)
+	}
+	if ent := h.entitlement(owner.s.userID); !ent.Unlimited || ent.Subscription == nil || ent.Subscription.Status != domain.SubActive {
+		t.Errorf("denials changed the subscription: unlimited=%v sub=%+v", ent.Unlimited, ent.Subscription)
+	}
+	ownerHdr := h.auth(owner.s.access)
+	ownerHdr["Idempotency-Key"] = key["Idempotency-Key"]
+	mustStatus(t, h.do(http.MethodPost, "/api/v1/ai/reply", advReplyBody(), ownerHdr), http.StatusOK, "")
+	// Revoke the owner phone, then downgrade to Base: neither the revoked nor
+	// the previously blocked device may be blocked by the device policy.
+	auth := h.proDeviceAuthorization(owner.s.access, "mobile")
+	mustStatus(t, h.do(http.MethodDelete, "/api/v1/me/pro-devices/"+auth, nil, h.auth(desk.s.access)), http.StatusOK, "")
+	h.assignPlan(h.signInAdmin(), owner.s.userID, "base_monthly", "")
+	mustStatus(t, h.generate(blocked.s.access, "Сәлем"), http.StatusOK, "")
+	revokedAgain := h.advBound(email, "adv-ent-owner", "ios", 6600)
+	mustStatus(t, h.generate(revokedAgain.s.access, "Сәлем"), http.StatusOK, "")
+	mustStatus(t, h.transcribe(blocked.s.access, audiotest.M4A(2*time.Second, nil), voiceFields()), http.StatusOK, "")
+	if n := h.scalar(`SELECT COUNT(*) FROM subscriptions WHERE user_id=? AND status='canceled'`, owner.s.userID); n != 0 {
+		t.Logf("canceled subscriptions rows: %d (plan change history)", n)
+	}
+}
+
+// A revoked installation that signs in again (which clears devices.revoked_at)
+// must not be able to revoke its replacement or re-claim by any route.
+func TestAdv_RevokedInstallationCannotStrikeBack(t *testing.T) {
+	h := newHarness(t, approvedEntitlements(), strictProDevices(), advOTPLimits())
+	email := "adv-strike@example.com"
+	old := h.advBound(email, "adv-strike-old", "ios", 6700)
+	desk := h.advBound(email, "adv-strike-desk", "macos", 6701)
+	h.advMakePro(old.s.userID)
+	mustStatus(t, h.generate(old.s.access, "Сәлем"), http.StatusOK, "")
+	mustStatus(t, h.generate(desk.s.access, "Сәлем"), http.StatusOK, "")
+	oldAuth := h.proDeviceAuthorization(old.s.access, "mobile")
+	mustStatus(t, h.do(http.MethodDelete, "/api/v1/me/pro-devices/"+oldAuth, nil, h.auth(desk.s.access)), http.StatusOK, "")
+	repl := h.advBound(email, "adv-strike-new", "android", 6702)
+	mustStatus(t, h.generate(repl.s.access, "Сәлем"), http.StatusOK, "")
+	replAuth := h.proDeviceAuthorization(repl.s.access, "mobile")
+	back := h.advBound(email, "adv-strike-old", "ios", 6700) // re-login + re-registration
+	for name, r := range map[string]response{
+		"revoke replacement":     h.do(http.MethodDelete, "/api/v1/me/pro-devices/"+replAuth, nil, h.auth(back.s.access)),
+		"legacy delete":          h.do(http.MethodDelete, "/api/v1/devices/"+repl.deviceID, nil, h.auth(back.s.access)),
+		"revoke desktop":         h.do(http.MethodDelete, "/api/v1/me/pro-devices/"+h.proDeviceAuthorization(desk.s.access, "desktop"), nil, h.auth(back.s.access)),
+		"ai":                     h.generate(back.s.access, "Сәлем"),
+		"legacy device upsert":   h.do(http.MethodPost, "/api/v1/devices", map[string]any{"device_id": back.deviceID, "platform": "android"}, h.auth(back.s.access)),
+		"ai after legacy upsert": h.generate(back.s.access, "Сәлем"),
+	} {
+		if (name == "legacy device upsert" && r.status != http.StatusOK) || (name != "legacy device upsert" && r.status == http.StatusOK) {
+			t.Errorf("%s: %d %s", name, r.status, r.raw)
+		}
+	}
+	mustStatus(t, h.generate(repl.s.access, "Сәлем"), http.StatusOK, "")
+	mustStatus(t, h.generate(desk.s.access, "Сәлем"), http.StatusOK, "")
+}
+
+// Device management regression: once a device has ever held a Pro
+// authorization, DELETE /api/v1/devices/{id} answers 200 but no longer ends
+// its sessions after the device signed in again (e.g. a stolen phone whose
+// mail app received the OTP). A never-authorized device is still signed out.
+func TestAdv_DeviceRemovalStillEndsSessionsOfFormerProDevice(t *testing.T) {
+	h := newHarness(t, approvedEntitlements(), strictProDevices(), advOTPLimits())
+	email := "adv-stolen@example.com"
+	phone := h.advBound(email, "adv-stolen-phone", "ios", 6800)
+	desk := h.advBound(email, "adv-stolen-desk", "macos", 6801)
+	h.advMakePro(phone.s.userID)
+	mustStatus(t, h.generate(phone.s.access, "Сәлем"), http.StatusOK, "")
+	mustStatus(t, h.generate(desk.s.access, "Сәлем"), http.StatusOK, "")
+	auth := h.proDeviceAuthorization(phone.s.access, "mobile")
+	mustStatus(t, h.do(http.MethodDelete, "/api/v1/me/pro-devices/"+auth, nil, h.auth(desk.s.access)), http.StatusOK, "")
+	thief := h.advBound(email, "adv-stolen-phone", "ios", 6800) // signs in again on the stolen phone
+	listed := h.do(http.MethodGet, "/api/v1/me/devices", nil, h.auth(desk.s.access))
+	t.Logf("device list shows the re-signed-in phone: %v", strings.Contains(string(listed.raw), "adv-stolen-phone"))
+	del := h.do(http.MethodDelete, "/api/v1/devices/"+thief.deviceID, nil, h.auth(desk.s.access))
+	again := h.do(http.MethodDelete, "/api/v1/me/pro-devices/"+auth, nil, h.auth(desk.s.access))
+	ref := h.do(http.MethodPost, "/api/v1/auth/refresh", map[string]any{"refresh_token": thief.s.refresh}, nil)
+	t.Logf("DELETE /devices -> %d, DELETE /me/pro-devices -> %d, thief refresh afterwards -> %d", del.status, again.status, ref.status)
+	if del.status == http.StatusOK && ref.status == http.StatusOK {
+		t.Errorf("device removal reported success but the removed phone's session keeps refreshing")
+	}
+	// Control: an ordinary (never Pro-authorized) device is still signed out.
+	other := h.advBound(email, "adv-stolen-other", "android", 6802)
+	mustStatus(t, h.generate(other.s.access, "Сәлем"), http.StatusOK, "") // takes the free mobile slot
+	plain, _ := h.advSignInRaw(email, map[string]any{"device_id": "adv-stolen-plain", "platform": "ios", "locale": "en"})
+	mustStatus(t, h.do(http.MethodDelete, "/api/v1/devices/adv-stolen-plain", nil, h.auth(desk.s.access)), http.StatusOK, "")
+	mustStatus(t, h.do(http.MethodPost, "/api/v1/auth/refresh", map[string]any{"refresh_token": plain.refresh}, nil), http.StatusUnauthorized, "UNAUTHORIZED")
+}

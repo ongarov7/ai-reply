@@ -1,0 +1,589 @@
+package apptest
+
+// Adversarial verification of the Pro device limit (independent review).
+// Tests prefixed TestAdv_ assert an invariant: a failure is a finding.
+// Tests prefixed TestAdvRisk_ pass and document a confirmed risky behaviour.
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"sort"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+)
+
+// ---------------------------------------------------------------- helpers
+
+func advOTPLimits() harnessOption {
+	return func(env map[string]string) {
+		env["RATE_OTP_REQUEST_PER_ADDRESS_PER_HOUR"] = "1000"
+		env["RATE_OTP_REQUEST_PER_DAY"] = "1000"
+		env["OTP_MAX_FAILED_PER_DAY"] = "1000"
+	}
+}
+
+// productionProFlags is the configuration production runs today.
+func productionProFlags() harnessOption {
+	return func(env map[string]string) {
+		env["PRO_DEVICE_LIMIT_ENABLED"] = "false"
+		env["PRO_DEVICE_LIMIT_SHADOW_MODE"] = "true"
+		env["PRO_DEVICE_LIMIT_CLIENTS_READY"] = "false"
+		env["PRO_DEVICE_LIMIT_NOTIFICATIONS_ENABLED"] = "false"
+	}
+}
+
+func strictWithNotifications() harnessOption {
+	return func(env map[string]string) {
+		env["PRO_DEVICE_LIMIT_ENABLED"] = "true"
+		env["PRO_DEVICE_LIMIT_SHADOW_MODE"] = "false"
+		env["PRO_DEVICE_LIMIT_CLIENTS_READY"] = "true"
+		env["PRO_DEVICE_LIMIT_NOTIFICATIONS_ENABLED"] = "true"
+		env["PRO_DEVICE_LIMIT_NOTIFICATION_COOLDOWN"] = "1h"
+	}
+}
+
+// advTry is safe to call from goroutines: it never touches testing.T.
+func (h *harness) advTry(method, path string, body any, headers map[string]string) (response, error) {
+	var reader io.Reader
+	if body != nil {
+		raw, err := json.Marshal(body)
+		if err != nil {
+			return response{}, err
+		}
+		reader = bytes.NewReader(raw)
+	}
+	req, err := http.NewRequest(method, h.server.URL+path, reader)
+	if err != nil {
+		return response{}, err
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	res, err := h.server.Client().Do(req)
+	if err != nil {
+		return response{}, err
+	}
+	defer res.Body.Close()
+	raw, err := io.ReadAll(res.Body)
+	if err != nil {
+		return response{}, err
+	}
+	parsed := map[string]any{}
+	_ = json.Unmarshal(raw, &parsed)
+	return response{status: res.StatusCode, body: parsed, raw: raw, header: res.Header}, nil
+}
+
+type advCall struct {
+	method, path string
+	body         any
+	headers      map[string]string
+}
+
+// advParallel releases every call at once behind a barrier.
+func (h *harness) advParallel(t *testing.T, calls []advCall) []response {
+	t.Helper()
+	out := make([]response, len(calls))
+	errs := make([]error, len(calls))
+	var wg sync.WaitGroup
+	start := make(chan struct{})
+	for i := range calls {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			<-start
+			out[i], errs[i] = h.advTry(calls[i].method, calls[i].path, calls[i].body, calls[i].headers)
+		}(i)
+	}
+	close(start)
+	wg.Wait()
+	for i, err := range errs {
+		if err != nil {
+			t.Fatalf("call %d: %v", i, err)
+		}
+	}
+	return out
+}
+
+func advReplyBody() map[string]any {
+	return map[string]any{"source_text": "Сәлем", "instruction": "Сыпайы жауап бер", "language": "kk",
+		"template_id": "client", "platform": "ios", "app_version": "1.0.0"}
+}
+
+func advCategory(platform string) string {
+	switch platform {
+	case "ios", "android", "ipados":
+		return "mobile"
+	case "macos", "windows":
+		return "desktop"
+	}
+	return ""
+}
+
+type advDevice struct {
+	s        session
+	deviceID string
+	platform string
+	category string
+	install  string
+}
+
+// advBound signs in with the compatible-client contract (installation_id at
+// sign-in + authenticated installation registration).
+func (h *harness) advBound(email, deviceID, platform string, seed int) advDevice {
+	h.t.Helper()
+	s, res := h.signInProDevice(email, deviceID, platform, installID(seed))
+	return advDevice{s: s, deviceID: res.str("device_id"), platform: platform, category: advCategory(platform), install: installID(seed)}
+}
+
+// advSignInRaw signs in with an arbitrary device object; no registration.
+func (h *harness) advSignInRaw(email string, device map[string]any) (session, response) {
+	h.t.Helper()
+	h.clock.Advance(33 * time.Second)
+	mustStatus(h.t, h.do(http.MethodPost, "/api/v1/auth/request-otp",
+		map[string]any{"identifier": email, "locale": "en"}, nil), http.StatusOK, "")
+	res := h.do(http.MethodPost, "/api/v1/auth/verify-otp", map[string]any{"identifier": email, "code": "1111", "device": device}, nil)
+	mustStatus(h.t, res, http.StatusOK, "")
+	s := session{access: res.str("access_token"), refresh: res.str("refresh_token"), userID: res.str("user", "id")}
+	h.consent(s.access)
+	return s, res
+}
+
+func (h *harness) advMakePro(userID string) {
+	h.t.Helper()
+	h.assignPlan(h.signInAdmin(), userID, "pro_monthly", "")
+}
+
+func (h *harness) advActive(userID, category string) int {
+	h.t.Helper()
+	return h.scalar(`SELECT COUNT(*) FROM pro_device_authorizations WHERE user_id=? AND category=? AND revoked_at IS NULL`, userID, category)
+}
+
+func (h *harness) advEventsByKind(userID string) map[string]int {
+	h.t.Helper()
+	rows, err := h.db.Reader().Query(`SELECT kind||'/'||mode, COUNT(*) FROM pro_device_events WHERE user_id=? GROUP BY 1`, userID)
+	if err != nil {
+		h.t.Fatal(err)
+	}
+	defer rows.Close()
+	out := map[string]int{}
+	for rows.Next() {
+		var k string
+		var n int
+		if err := rows.Scan(&k, &n); err != nil {
+			h.t.Fatal(err)
+		}
+		out[k] = n
+	}
+	return out
+}
+
+func advSummary(rs []response) string {
+	counts := map[string]int{}
+	for _, r := range rs {
+		counts[fmt.Sprintf("%d %s", r.status, r.errorCode())]++
+	}
+	keys := make([]string, 0, len(counts))
+	for k := range counts {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	parts := []string{}
+	for _, k := range keys {
+		parts = append(parts, fmt.Sprintf("%s x%d", k, counts[k]))
+	}
+	return strings.Join(parts, ", ")
+}
+
+// ---------------------------------------------------------------- 1. concurrency
+
+// Many installations in each category make their first Pro claim at the same
+// instant, through each claim path (AI request, refresh, installation
+// registration). Exactly one per category may win.
+func TestAdv_ParallelFirstClaimsExactlyOneWinnerPerCategory(t *testing.T) {
+	for _, path := range []string{"reply", "refresh", "registration", "mixed_endpoints"} {
+		t.Run(path, func(t *testing.T) {
+			h := newHarness(t, approvedEntitlements(), strictProDevices(), advOTPLimits())
+			email := "adv-race-" + path + "@example.com"
+			mobile, desktop := []string{"ios", "android", "ipados"}, []string{"macos", "windows"}
+			var devs []advDevice
+			for i := 0; i < 8; i++ {
+				devs = append(devs, h.advBound(email, fmt.Sprintf("adv-race-m-%02d", i), mobile[i%3], 5000+i))
+			}
+			for i := 0; i < 8; i++ {
+				devs = append(devs, h.advBound(email, fmt.Sprintf("adv-race-d-%02d", i), desktop[i%2], 5100+i))
+			}
+			userID := devs[0].s.userID
+			if n := h.scalar(`SELECT COUNT(*) FROM pro_device_authorizations WHERE user_id=?`, userID); n != 0 {
+				t.Fatalf("setup on Free claimed %d slots", n)
+			}
+			h.advMakePro(userID)
+			calls := make([]advCall, len(devs))
+			for i, d := range devs {
+				switch {
+				case path == "reply":
+					calls[i] = advCall{http.MethodPost, "/api/v1/ai/reply", advReplyBody(), h.auth(d.s.access)}
+				case path == "refresh":
+					calls[i] = advCall{http.MethodPost, "/api/v1/auth/refresh", map[string]any{"refresh_token": d.s.refresh}, nil}
+				case path == "registration":
+					calls[i] = advCall{http.MethodPost, "/api/v1/installations", installation(d.install, d.platform, ""), h.auth(d.s.access)}
+				default:
+					switch i % 3 {
+					case 0:
+						calls[i] = advCall{http.MethodPost, "/api/v1/ai/reply", advReplyBody(), h.auth(d.s.access)}
+					case 1:
+						calls[i] = advCall{http.MethodPost, "/api/v1/ai/compose", map[string]any{"instruction": "Әріптесімді құттықта", "language": "kk", "platform": d.platform}, h.auth(d.s.access)}
+					default:
+						calls[i] = advCall{http.MethodPost, "/api/v1/ai/polish", map[string]any{"text": polishNote, "input_language": "ru"}, h.auth(d.s.access)}
+					}
+				}
+			}
+			results := h.advParallel(t, calls)
+			t.Logf("%s: %s", path, advSummary(results))
+			for i, r := range results {
+				if r.status >= 500 {
+					t.Errorf("device %d got %d %s", i, r.status, r.raw)
+				}
+			}
+			for _, c := range []string{"mobile", "desktop"} {
+				if n := h.advActive(userID, c); n != 1 {
+					t.Errorf("%s: %d active %s authorizations after a parallel first claim", path, n, c)
+				}
+			}
+			if path == "reply" || path == "mixed_endpoints" {
+				okByCategory := map[string]int{}
+				for i, r := range results {
+					switch {
+					case r.status == http.StatusOK:
+						okByCategory[devs[i].category]++
+					case r.status == http.StatusForbidden && r.errorCode() == "PRO_DEVICE_LIMIT_REACHED":
+					default:
+						t.Errorf("device %d (%s): unexpected %d %s", i, devs[i].platform, r.status, r.raw)
+					}
+				}
+				if okByCategory["mobile"] != 1 || okByCategory["desktop"] != 1 {
+					t.Errorf("Pro granted to %v installations per category", okByCategory)
+				}
+			}
+			// Afterwards, exactly one installation per category can use Pro.
+			ok := map[string]int{}
+			for _, d := range devs {
+				if r := h.generate(d.s.access, "Сәлем"); r.status == http.StatusOK {
+					ok[d.category]++
+				}
+			}
+			if path == "refresh" {
+				// Refreshed tokens replaced the originals; the old access tokens are still valid JWTs.
+				t.Logf("post-race usable (old access tokens): %v", ok)
+			}
+			if ok["mobile"] != 1 || ok["desktop"] != 1 {
+				t.Errorf("after race, usable installations per category = %v", ok)
+			}
+		})
+	}
+}
+
+// The keyboard and host app of one authorized installation hammer every AI
+// endpoint at once on their very first Pro use: one row, one audit event.
+func TestAdv_BurstFromOneInstallationCreatesSingleAuthorization(t *testing.T) {
+	h := newHarness(t, approvedEntitlements(), strictProDevices(), advOTPLimits())
+	d := h.advBound("adv-burst@example.com", "adv-burst-0001", "android", 5200)
+	h.advMakePro(d.s.userID)
+	refreshed := h.refresh(d.s) // a second, independently rotated access token for the same installation
+	var calls []advCall
+	for i := 0; i < 24; i++ {
+		token := d.s.access
+		if i%2 == 1 {
+			token = refreshed.access
+		}
+		switch i % 3 {
+		case 0:
+			calls = append(calls, advCall{http.MethodPost, "/api/v1/ai/reply", advReplyBody(), h.auth(token)})
+		case 1:
+			calls = append(calls, advCall{http.MethodPost, "/api/v1/ai/compose", map[string]any{"instruction": "Әріптесімді құттықта", "language": "kk"}, h.auth(token)})
+		default:
+			calls = append(calls, advCall{http.MethodPost, "/api/v1/ai/polish", map[string]any{"text": polishNote, "input_language": "ru"}, h.auth(token)})
+		}
+	}
+	results := h.advParallel(t, calls)
+	for i, r := range results {
+		if r.status != http.StatusOK {
+			t.Errorf("call %d: %d %s", i, r.status, r.raw)
+		}
+	}
+	if n := h.scalar(`SELECT COUNT(*) FROM pro_device_authorizations WHERE user_id=?`, d.s.userID); n != 1 {
+		t.Errorf("authorization rows = %d, want 1", n)
+	}
+	events := h.advEventsByKind(d.s.userID)
+	if events["authorized/enforce"] != 1 {
+		t.Errorf("authorized events = %v, want exactly one", events)
+	}
+	t.Logf("events after burst: %v", events)
+}
+
+// A trusted device revokes the mobile owner while ten other phones race for
+// the slot: never more than one active mobile authorization, the revoked
+// installation cannot come back, and HTTP results match the database.
+func TestAdv_RevokeRacingContendersNeverExceedsOneMobile(t *testing.T) {
+	h := newHarness(t, approvedEntitlements(), strictProDevices(), advOTPLimits())
+	email := "adv-revoke-race@example.com"
+	owner := h.advBound(email, "adv-rr-owner", "ios", 5300)
+	desk := h.advBound(email, "adv-rr-desk", "macos", 5301)
+	var contenders []advDevice
+	for i := 0; i < 10; i++ {
+		contenders = append(contenders, h.advBound(email, fmt.Sprintf("adv-rr-c-%02d", i), []string{"android", "ios", "ipados"}[i%3], 5310+i))
+	}
+	h.advMakePro(owner.s.userID)
+	mustStatus(t, h.generate(owner.s.access, "Сәлем"), http.StatusOK, "")
+	mustStatus(t, h.generate(desk.s.access, "Сәлем"), http.StatusOK, "")
+	ownerAuth := h.proDeviceAuthorization(owner.s.access, "mobile")
+	calls := []advCall{{http.MethodDelete, "/api/v1/me/pro-devices/" + ownerAuth, nil, h.auth(desk.s.access)}}
+	for _, c := range contenders {
+		calls = append(calls, advCall{http.MethodPost, "/api/v1/ai/reply", advReplyBody(), h.auth(c.s.access)})
+	}
+	results := h.advParallel(t, calls)
+	t.Logf("revoke=%d; contenders: %s", results[0].status, advSummary(results[1:]))
+	if results[0].status != http.StatusOK {
+		t.Fatalf("trusted revoke failed: %s", results[0].raw)
+	}
+	winners := 0
+	for i, r := range results[1:] {
+		switch {
+		case r.status == http.StatusOK:
+			winners++
+			if n := h.scalar(`SELECT COUNT(*) FROM pro_device_authorizations WHERE user_id=? AND device_id=? AND revoked_at IS NULL`, owner.s.userID, contenders[i].deviceID); n != 1 {
+				t.Errorf("contender %d served Pro without holding the slot", i)
+			}
+		case r.status == http.StatusForbidden && r.errorCode() == "PRO_DEVICE_LIMIT_REACHED":
+		default:
+			t.Errorf("contender %d: %d %s", i, r.status, r.raw)
+		}
+	}
+	if winners > 1 || h.advActive(owner.s.userID, "mobile") > 1 {
+		t.Errorf("winners=%d active mobile=%d", winners, h.advActive(owner.s.userID, "mobile"))
+	}
+	mustStatus(t, h.generate(owner.s.access, "Сәлем"), http.StatusForbidden, "PRO_DEVICE_REVOKED")
+	// Sequential follow-up: exactly one contender ends up with the slot.
+	served := 0
+	for _, c := range contenders {
+		if h.generate(c.s.access, "Сәлем").status == http.StatusOK {
+			served++
+		}
+	}
+	if served != 1 || h.advActive(owner.s.userID, "mobile") != 1 {
+		t.Errorf("after race: served=%d active=%d", served, h.advActive(owner.s.userID, "mobile"))
+	}
+}
+
+// ---------------------------------------------------------------- 2. category / platform spoofing
+
+// Platform strings outside the exact mapped set must never hold or consume a
+// slot and must not be silently unguarded (fail closed in strict mode).
+func TestAdv_UnmappedPlatformStringsFailClosedInStrict(t *testing.T) {
+	h := newHarness(t, approvedEntitlements(), strictProDevices(), advOTPLimits())
+	email := "adv-platforms@example.com"
+	root, _ := h.advSignInRaw(email, map[string]any{"device_id": "adv-plat-root", "platform": "ios", "locale": "en"})
+	h.advMakePro(root.userID)
+	// Leading/trailing whitespace is trimmed by traits.Clamp at sign-in, so
+	// " macos" is simply macOS; those are checked separately below.
+	weird := []string{"web", "linux", "", "iOS", "IOS", "MacOS", "Windows", "Android", "iphone", "ipad", "darwin", "win32", "legacy", "ios\u0000", "i os"}
+	type outcome struct{ platform, stored, reg, ai string }
+	var outcomes []outcome
+	for i, p := range weird {
+		inst := installID(5400 + i)
+		s, res := h.advSignInRaw(email, map[string]any{"device_id": fmt.Sprintf("adv-plat-%02d", i), "platform": p, "app_version": "1.0.0", "locale": "en", "installation_id": inst})
+		reg := h.register(installation(inst, p, ""), s.access)
+		r := h.generate(s.access, "Сәлем")
+		stored := h.text(`SELECT platform FROM devices WHERE id=?`, res.str("device_id"))
+		outcomes = append(outcomes, outcome{fmt.Sprintf("%q", p), fmt.Sprintf("%q", stored), fmt.Sprint(reg.status), fmt.Sprintf("%d %s", r.status, r.errorCode())})
+		if r.status == http.StatusOK {
+			t.Errorf("platform %q obtained Pro without a mapped category", p)
+		}
+		// Shadow behaviour must remain the default elsewhere; here strict must deny.
+		if r.status != http.StatusForbidden {
+			t.Errorf("platform %q: %d %s", p, r.status, r.raw)
+		}
+	}
+	for _, o := range outcomes {
+		t.Logf("platform=%-10s stored=%-10s registration=%s ai=%s", o.platform, o.stored, o.reg, o.ai)
+	}
+	if n := h.scalar(`SELECT COUNT(*) FROM pro_device_authorizations WHERE user_id=?`, root.userID); n != 0 {
+		t.Fatalf("an unmapped platform consumed %d slots", n)
+	}
+	m := h.advBound(email, "adv-plat-legit-m", "ios", 5490)
+	mustStatus(t, h.generate(m.s.access, "Сәлем"), http.StatusOK, "")
+	d := h.advBound(email, "adv-plat-legit-d", "macos", 5491)
+	mustStatus(t, h.generate(d.s.access, "Сәлем"), http.StatusOK, "")
+	// Whitespace variants normalise to the mapped value and compete for the same slot.
+	for i, p := range []string{" macos", "macos ", " ios", "android\n", "ios\t"} {
+		inst := installID(5480 + i)
+		s, _ := h.advSignInRaw(email, map[string]any{"device_id": fmt.Sprintf("adv-plat-ws-%02d", i), "platform": p, "installation_id": inst, "locale": "en"})
+		h.register(installation(inst, p, ""), s.access)
+		if r := h.generate(s.access, "Сәлем"); r.status == http.StatusOK {
+			t.Errorf("whitespace variant %q obtained a second slot", p)
+		}
+	}
+	for _, c := range []string{"mobile", "desktop"} {
+		if n := h.advActive(root.userID, c); n != 1 {
+			t.Errorf("%s active=%d", c, n)
+		}
+	}
+}
+
+// After a mobile claim, no sign-in/refresh/legacy-device path can move that
+// installation into the desktop category or make it consume a second slot.
+func TestAdv_PlatformPinnedAcrossSignInRefreshAndLegacyDeviceAPI(t *testing.T) {
+	h := newHarness(t, approvedEntitlements(), strictProDevices(), advOTPLimits())
+	email := "adv-pin@example.com"
+	phone := h.advBound(email, "adv-pin-phone", "ios", 5500)
+	h.advMakePro(phone.s.userID)
+	mustStatus(t, h.generate(phone.s.access, "Сәлем"), http.StatusOK, "")
+	// (a) refresh with a desktop platform and another installation in the body
+	ref := h.do(http.MethodPost, "/api/v1/auth/refresh", map[string]any{"refresh_token": phone.s.refresh,
+		"device": map[string]any{"device_id": "adv-pin-other", "platform": "macos", "installation_id": installID(5501)}}, nil)
+	mustStatus(t, ref, http.StatusOK, "")
+	mustStatus(t, h.generate(ref.str("access_token"), "Сәлем"), http.StatusOK, "")
+	// (b) sign in again with the same device id + installation, declaring windows
+	again, res := h.advSignInRaw(email, map[string]any{"device_id": phone.deviceID, "platform": "windows", "installation_id": phone.install, "locale": "en"})
+	h.mustRegister(installation(phone.install, "windows", ""), again.access)
+	r := h.generate(again.access, "Сәлем")
+	t.Logf("re-sign-in declaring windows: device=%s ai=%d %s", res.str("device_id"), r.status, r.errorCode())
+	// (c) legacy device registration rewriting the platform
+	mustStatus(t, h.do(http.MethodPost, "/api/v1/devices", map[string]any{"device_id": phone.deviceID, "platform": "windows", "model": "Forged"}, h.auth(phone.s.access)), http.StatusOK, "")
+	if p := h.text(`SELECT platform FROM devices WHERE id=?`, phone.deviceID); p != "ios" {
+		t.Errorf("authorized device platform changed to %q", p)
+	}
+	if n := h.advActive(phone.s.userID, "desktop"); n != 0 {
+		t.Errorf("mobile installation acquired %d desktop authorizations", n)
+	}
+	if n := h.advActive(phone.s.userID, "mobile"); n != 1 {
+		t.Errorf("mobile authorizations = %d", n)
+	}
+	desk := h.advBound(email, "adv-pin-desk", "macos", 5502)
+	mustStatus(t, h.generate(desk.s.access, "Сәлем"), http.StatusOK, "")
+}
+
+// Nothing in an AI request (body fields, headers) can replace the signed
+// installation identity or device.
+func TestAdv_AIRequestCannotOverrideSignedIdentity(t *testing.T) {
+	h := newHarness(t, approvedEntitlements(), strictProDevices(), advOTPLimits())
+	email := "adv-override@example.com"
+	owner := h.advBound(email, "adv-ov-owner", "ios", 5600)
+	h.advMakePro(owner.s.userID)
+	mustStatus(t, h.generate(owner.s.access, "Сәлем"), http.StatusOK, "")
+	blocked := h.advBound(email, "adv-ov-blocked", "android", 5601)
+	headers := h.auth(blocked.s.access)
+	headers["X-Installation-ID"] = owner.install
+	headers["X-Device-ID"] = owner.deviceID
+	headers["X-Platform"] = "macos"
+	body := advReplyBody()
+	body["platform"] = "macos"
+	mustStatus(t, h.do(http.MethodPost, "/api/v1/ai/reply", body, headers), http.StatusForbidden, "PRO_DEVICE_LIMIT_REACHED")
+	for _, field := range []string{"installation_id", "device_id", "did", "iid"} {
+		b := advReplyBody()
+		b[field] = owner.install
+		r := h.do(http.MethodPost, "/api/v1/ai/reply", b, headers)
+		if r.status == http.StatusOK {
+			t.Errorf("body field %q let a blocked installation use Pro", field)
+		}
+	}
+	mustStatus(t, h.compose(blocked.s.access, map[string]any{"instruction": "Әріптесімді құттықта", "language": "kk", "platform": "windows"}), http.StatusForbidden, "PRO_DEVICE_LIMIT_REACHED")
+}
+
+// ---------------------------------------------------------------- 3. identity binding
+
+// Registering another installation cannot rebind an existing device, and a
+// session signed for another installation does not satisfy the binding.
+func TestAdv_RegistrationCannotRebindSignedSession(t *testing.T) {
+	h := newHarness(t, approvedEntitlements(), strictProDevices(), advOTPLimits())
+	email := "adv-rebind@example.com"
+	owner := h.advBound(email, "adv-rb-owner", "ios", 5700)
+	h.advMakePro(owner.s.userID)
+	mustStatus(t, h.generate(owner.s.access, "Сәлем"), http.StatusOK, "")
+	h.mustRegister(installation(installID(5701), "ios", ""), owner.s.access) // try to rebind to Y
+	mustStatus(t, h.generate(owner.s.access, "Сәлем"), http.StatusOK, "")
+	linked := h.text(`SELECT i.installation_id FROM pro_device_installations p JOIN app_installations i ON i.id=p.installation_id WHERE p.device_id=?`, owner.deviceID)
+	if linked != owner.install {
+		t.Errorf("device rebound from %s to %s", owner.install, linked)
+	}
+	// A session for the same device id but signed with installation Y.
+	other, res := h.advSignInRaw(email, map[string]any{"device_id": owner.deviceID, "platform": "ios", "installation_id": installID(5701), "locale": "en"})
+	if res.str("device_id") != owner.deviceID {
+		t.Logf("server minted a new device for the foreign installation: %s", res.str("device_id"))
+	}
+	r := h.generate(other.access, "Сәлем")
+	if r.status == http.StatusOK && res.str("device_id") == owner.deviceID {
+		t.Errorf("session signed for installation Y used installation X's slot")
+	}
+	t.Logf("same device id + other installation -> %d %s", r.status, r.errorCode())
+}
+
+// User B (any account) registering A's installation id moves the attachment,
+// and an unauthenticated detach does the same: A's authorized phone loses Pro
+// until its app registers again.
+func TestAdv_ForeignRegistrationOrAnonymousDetachDisablesOwnersPro(t *testing.T) {
+	h := newHarness(t, approvedEntitlements(), strictProDevices(), advOTPLimits())
+	owner := h.advBound("adv-victim@example.com", "adv-victim-phone", "ios", 5800)
+	h.advMakePro(owner.s.userID)
+	mustStatus(t, h.generate(owner.s.access, "Сәлем"), http.StatusOK, "")
+	t.Run("other_account_registers_victim_installation", func(t *testing.T) {
+		attacker, _ := h.advSignInRaw("adv-attacker@example.com", map[string]any{"device_id": "adv-attacker-dev", "platform": "ios", "locale": "en"})
+		h.mustRegister(installation(owner.install, "ios", ""), attacker.access)
+		r := h.generate(owner.s.access, "Сәлем")
+		if r.status != http.StatusOK {
+			t.Errorf("victim's authorized phone denied after another account registered its installation id: %d %s", r.status, r.errorCode())
+		}
+		h.mustRegister(installation(owner.install, "ios", ""), owner.s.access) // victim app re-registers
+		mustStatus(t, h.generate(owner.s.access, "Сәлем"), http.StatusOK, "")
+	})
+	t.Run("anonymous_detach", func(t *testing.T) {
+		mustStatus(t, h.do(http.MethodPost, "/api/v1/installations/"+owner.install+"/detach", map[string]any{}, nil), http.StatusOK, "")
+		r := h.generate(owner.s.access, "Сәлем")
+		if r.status != http.StatusOK {
+			t.Errorf("unauthenticated detach disabled the victim's Pro: %d %s", r.status, r.errorCode())
+		}
+	})
+}
+
+// One installation can serve only the account it is currently attached to;
+// switching A→B→A keeps one authorization per account.
+func TestAdv_AccountSwitchABAAndSharedInstallation(t *testing.T) {
+	h := newHarness(t, approvedEntitlements(), strictProDevices(), advOTPLimits())
+	a := h.advBound("adv-switch-a@example.com", "adv-switch-did", "ios", 5900)
+	h.advMakePro(a.s.userID)
+	mustStatus(t, h.generate(a.s.access, "Сәлем"), http.StatusOK, "")
+	aAuth := h.proDeviceAuthorization(a.s.access, "mobile")
+	b, bRes := h.signInProDevice("adv-switch-b@example.com", a.deviceID, "ios", a.install)
+	h.advMakePro(b.userID)
+	mustStatus(t, h.generate(b.access, "Сәлем"), http.StatusOK, "")
+	// A's still-valid token on the same installation while B is attached.
+	if r := h.generate(a.s.access, "Сәлем"); r.status == http.StatusOK {
+		t.Errorf("one installation served two accounts at once")
+	}
+	back, backRes := h.signInProDevice("adv-switch-a@example.com", bRes.str("device_id"), "ios", a.install)
+	if backRes.str("device_id") != a.deviceID {
+		t.Errorf("A→B→A changed A's canonical device: %s -> %s", a.deviceID, backRes.str("device_id"))
+	}
+	mustStatus(t, h.generate(back.access, "Сәлем"), http.StatusOK, "")
+	if got := h.proDeviceAuthorization(back.access, "mobile"); got != aAuth {
+		t.Errorf("A acquired a different authorization")
+	}
+	if r := h.generate(b.access, "Сәлем"); r.status == http.StatusOK {
+		t.Errorf("B kept Pro on the installation now attached to A")
+	}
+	for _, u := range []string{a.s.userID, b.userID} {
+		if n := h.scalar(`SELECT COUNT(*) FROM pro_device_authorizations WHERE user_id=?`, u); n != 1 {
+			t.Errorf("user %s has %d authorizations", u, n)
+		}
+	}
+	// B's own phone is now blocked because B once signed in on A's phone.
+	bPhone := h.advBound("adv-switch-b@example.com", "adv-switch-b-phone", "android", 5901)
+	t.Logf("B's own phone after B used A's phone: %d %s", h.generate(bPhone.s.access, "Сәлем").status, h.generate(bPhone.s.access, "Сәлем").errorCode())
+}
