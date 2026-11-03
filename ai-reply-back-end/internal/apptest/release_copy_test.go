@@ -128,10 +128,10 @@ func TestPrivacyPolicyDescribesTheRealProcessing(t *testing.T) {
 func TestTermsDescribeTheCurrentService(t *testing.T) {
 	h := newHarness(t)
 	for locale, needles := range map[string][]string{
-		"en": {"Apple, Google or a one-time code", "10 free replies", "App Store or Google Play", "one-time reply pack", "do not expire", "final confirmation", "9. Contact"},
-		"ru": {"через Apple, Google или по одноразовому коду", "10 бесплатных ответов", "App Store или Google Play", "разовый пакет", "не имеют срока действия", "окончательного подтверждения", "9. Контакты"},
-		"kk": {"Apple, Google арқылы", "10 тегін жауап", "App Store не Google Play", "бір реттік жауап пакетін", "мерзімі шектелмейді", "түпкілікті растауын", "9. Байланыс"},
-		"uz": {"Apple, Google orqali", "10 ta bepul javob", "App Store yoki Google Play", "bir martalik javoblar", "muddati cheklanmagan", "yakuniy tasdigʻini", "9. Aloqa"},
+		"en": {"Apple, Google or a one-time code", "20 free replies", "App Store or Google Play", "one-time reply pack", "do not expire", "final confirmation", "9. Contact"},
+		"ru": {"через Apple, Google или по одноразовому коду", "20 бесплатных ответов", "App Store или Google Play", "разовый пакет", "не имеют срока действия", "окончательного подтверждения", "9. Контакты"},
+		"kk": {"Apple, Google арқылы", "20 тегін жауап", "App Store не Google Play", "бір реттік жауап пакетін", "мерзімі шектелмейді", "түпкілікті растауын", "9. Байланыс"},
+		"uz": {"Apple, Google orqali", "20 ta bepul javob", "App Store yoki Google Play", "bir martalik javoblar", "muddati cheklanmagan", "yakuniy tasdigʻini", "9. Aloqa"},
 	} {
 		_, page := fetch(t, h, "/offer?lang="+locale)
 		page = html.UnescapeString(page)

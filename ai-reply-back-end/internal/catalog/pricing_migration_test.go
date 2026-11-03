@@ -16,7 +16,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/migrations"
 )
 
-func assertUnifiedProducts(t *testing.T, products []Product, annualProPrice int64) {
+func assertUnifiedProducts(t *testing.T, products []Product, annualProPrice int64, welcomeUnits int) {
 	t.Helper()
 	prices := map[string]int64{"free": 0, "base_monthly": 79000, "base_yearly": 790000, "pro_monthly": 345000, "pro_yearly": annualProPrice, "pack30": 13000}
 	if len(products) != len(prices) {
@@ -29,7 +29,7 @@ func assertUnifiedProducts(t *testing.T, products []Product, annualProPrice int6
 		}
 		switch product.Kind {
 		case "welcome":
-			if product.Units != 10 || product.DailyLimit != 0 || product.Unlimited {
+			if product.Units != welcomeUnits || product.DailyLimit != 0 || product.Unlimited {
 				t.Fatalf("welcome: %+v", product)
 			}
 		case "pack":
@@ -52,7 +52,7 @@ func TestUnifiedPricesOnFreshInstall(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertUnifiedProducts(t, version.Products, 3490000)
+	assertUnifiedProducts(t, version.Products, 3490000, 20)
 	for _, product := range version.Products {
 		if product.Kind == "welcome" {
 			continue
@@ -132,7 +132,7 @@ func TestUnifiedPricesUpgradePreservesHistoryAndSoldPurchases(t *testing.T) {
 	if err != nil || current.BaseVersion != 1 || current.ID == 1 {
 		t.Fatalf("new version: %+v %v", current, err)
 	}
-	assertUnifiedProducts(t, current.Products, 3450000)
+	assertUnifiedProducts(t, current.Products, 3450000, 10)
 	if current.Products[2].AvailableWeb || current.Products[1].AppleProductID != "test.base_monthly" {
 		t.Fatal("store mapping or availability changed")
 	}
@@ -235,7 +235,7 @@ func TestUnifiedPricesCustomizedPackKeepsDelayedStoreFulfillment(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			assertUnifiedProducts(t, current.Products, 3450000)
+			assertUnifiedProducts(t, current.Products, 3450000, 10)
 			if provider == "unmapped" {
 				return
 			}

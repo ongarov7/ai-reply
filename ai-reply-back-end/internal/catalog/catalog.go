@@ -58,7 +58,7 @@ func InitialProducts() []Product {
 		return map[string]string{"ru": ru, "en": en, "kk": kk, "uz": en}
 	}
 	return []Product{
-		{Code: "free", Kind: "welcome", Name: names("Бесплатно", "Free", "Тегін"), Currency: "KZT", Units: 10, Active: true, AvailableIOS: true, AvailableWeb: true},
+		{Code: "free", Kind: "welcome", Name: names("Бесплатно", "Free", "Тегін"), Currency: "KZT", Units: 20, Active: true, AvailableIOS: true, AvailableWeb: true},
 		{Code: "base_monthly", Kind: "subscription", Name: names("Base · месяц", "Base · monthly", "Base · ай сайын"), Currency: "KZT", PriceMinor: 79000, BillingPeriod: "month", DailyLimit: 40, Active: true, AvailableIOS: true, AvailableWeb: true},
 		{Code: "base_yearly", Kind: "subscription", Name: names("Base · год", "Base · yearly", "Base · жыл сайын"), Currency: "KZT", PriceMinor: 790000, BillingPeriod: "year", DailyLimit: 40, Active: true, AvailableIOS: true, AvailableWeb: true},
 		{Code: "pro_monthly", Kind: "subscription", Name: names("Pro · месяц", "Pro · monthly", "Pro · ай сайын"), Currency: "KZT", PriceMinor: 345000, BillingPeriod: "month", Unlimited: true, Active: true, AvailableIOS: true, AvailableWeb: true},
