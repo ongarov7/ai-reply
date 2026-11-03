@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Exercises real Win32 services; every test is skipped unless running on Windows (CI windows-latest). -->
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+    <ProjectReference Include="../../src/AirReply.Platform.Windows/AirReply.Platform.Windows.csproj" />
+  </ItemGroup>
+</Project>

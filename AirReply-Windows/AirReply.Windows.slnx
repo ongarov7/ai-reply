@@ -1,0 +1,16 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AirReply.App/AirReply.App.csproj" />
+    <Project Path="src/AirReply.Context/AirReply.Context.csproj" />
+    <Project Path="src/AirReply.Core/AirReply.Core.csproj" />
+    <Project Path="src/AirReply.Platform.Windows/AirReply.Platform.Windows.csproj" />
+    <Project Path="src/AirReply.Presentation/AirReply.Presentation.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/AirReply.App.Tests/AirReply.App.Tests.csproj" />
+    <Project Path="tests/AirReply.Context.Tests/AirReply.Context.Tests.csproj" />
+    <Project Path="tests/AirReply.Core.Tests/AirReply.Core.Tests.csproj" />
+    <Project Path="tests/AirReply.Platform.Windows.Tests/AirReply.Platform.Windows.Tests.csproj" />
+    <Project Path="tests/AirReply.Presentation.Tests/AirReply.Presentation.Tests.csproj" />
+  </Folder>
+</Solution>

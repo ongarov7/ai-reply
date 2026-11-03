@@ -1,0 +1,855 @@
+{
+ "_comment": "Ported from AirReply-macOS/AirReply/Localizable.xcstrings (ru source, kk, en). Placeholders are .NET composite format {0}, {1}.",
+ "strings": {
+  "balance.empty": {
+   "ru": "Ответы закончились",
+   "kk": "Жауаптар таусылды",
+   "en": "No replies left"
+  },
+  "balance.remaining": {
+   "ru": "Осталось ответов: {0}",
+   "kk": "Қалған жауаптар: {0}",
+   "en": "Replies left: {0}"
+  },
+  "balance.unlimited": {
+   "ru": "Безлимит · {0}",
+   "kk": "Шектеусіз · {0}",
+   "en": "Unlimited · {0}"
+  },
+  "bar.context.attach": {
+   "ru": "Добавить документ",
+   "kk": "Құжат қосу",
+   "en": "Attach document"
+  },
+  "bar.context.business": {
+   "ru": "Рабочий",
+   "kk": "Жұмыс",
+   "en": "Business"
+  },
+  "bar.context.cancel": {
+   "ru": "Отмена",
+   "kk": "Бас тарту",
+   "en": "Cancel"
+  },
+  "bar.context.clear": {
+   "ru": "Убрать контекст",
+   "kk": "Контексті алып тастау",
+   "en": "Clear context"
+  },
+  "bar.context.collapsed": {
+   "ru": "Свёрнуто",
+   "kk": "Жабық",
+   "en": "Collapsed"
+  },
+  "bar.context.company": {
+   "ru": "Компания",
+   "kk": "Компания",
+   "en": "Company"
+  },
+  "bar.context.delete": {
+   "ru": "Удалить профиль",
+   "kk": "Профильді жою",
+   "en": "Delete profile"
+  },
+  "bar.context.description": {
+   "ru": "О компании, работе и других важных деталях",
+   "kk": "Компания, жұмыс және басқа маңызды мәліметтер",
+   "en": "Company, work and other relevant details"
+  },
+  "bar.context.edit": {
+   "ru": "Создать или изменить профиль",
+   "kk": "Профиль жасау немесе өзгерту",
+   "en": "Create or edit profile"
+  },
+  "bar.context.expanded": {
+   "ru": "Развёрнуто",
+   "kk": "Ашық",
+   "en": "Expanded"
+  },
+  "bar.context.extended": {
+   "ru": "Расширенный · 600",
+   "kk": "Кеңейтілген · 600",
+   "en": "Extended · 600"
+  },
+  "bar.context.formats": {
+   "ru": "Excel, CSV, PDF, Word, TXT · до 8 МБ",
+   "kk": "Excel, CSV, PDF, Word, TXT · 8 МБ дейін",
+   "en": "Excel, CSV, PDF, Word, TXT · up to 8 MB"
+  },
+  "bar.context.import_failed": {
+   "ru": "Документ не прочитан. Проверьте формат и размер до 8 МБ. Для сканов PDF нужен текстовый слой.",
+   "kk": "Құжат оқылмады. Пішімін және 8 МБ дейінгі өлшемін тексеріңіз. Сканерленген PDF үшін мәтін қабаты қажет.",
+   "en": "The document could not be read. Check its format and 8 MB size limit. Scanned PDFs need a text layer."
+  },
+  "bar.context.importing": {
+   "ru": "Обрабатываю на Mac…",
+   "kk": "Mac-та өңделуде…",
+   "en": "Processing on this Mac…"
+  },
+  "bar.context.industry": {
+   "ru": "Сфера деятельности",
+   "kk": "Қызмет саласы",
+   "en": "Industry"
+  },
+  "bar.context.instructions": {
+   "ru": "Дополнительные инструкции и свой стиль — до 1000 символов",
+   "kk": "Қосымша нұсқаулар мен өз стиліңіз — 1000 таңбаға дейін",
+   "en": "Additional instructions and custom style — up to 1000 characters"
+  },
+  "bar.context.load_failed": {
+   "ru": "Не удалось открыть сохранённые профили. Попробуйте снова после разблокировки связки ключей.",
+   "kk": "Сақталған профильдерді ашу мүмкін болмады. Кілттер тізбегін ашқаннан кейін қайталап көріңіз.",
+   "en": "Saved profiles could not be opened. Try again after unlocking the keychain."
+  },
+  "bar.context.new": {
+   "ru": "Новый профиль",
+   "kk": "Жаңа профиль",
+   "en": "New profile"
+  },
+  "bar.context.none": {
+   "ru": "Без профиля",
+   "kk": "Профильсіз",
+   "en": "No profile"
+  },
+  "bar.context.occupation": {
+   "ru": "Профессия или должность",
+   "kk": "Мамандық немесе лауазым",
+   "en": "Occupation or job role"
+  },
+  "bar.context.output": {
+   "ru": "Длина ответа",
+   "kk": "Жауап ұзындығы",
+   "en": "Reply length"
+  },
+  "bar.context.person": {
+   "ru": "Ваше имя",
+   "kk": "Атыңыз",
+   "en": "Your name"
+  },
+  "bar.context.personal": {
+   "ru": "Личный",
+   "kk": "Жеке",
+   "en": "Personal"
+  },
+  "bar.context.policies": {
+   "ru": "Правила бизнеса, доставка, возвраты",
+   "kk": "Бизнес ережелері, жеткізу, қайтару",
+   "en": "Business policies, delivery and returns"
+  },
+  "bar.context.privacy": {
+   "ru": "Документы обрабатываются на Mac. При генерации отправляются только подходящие фрагменты и выбранный профиль. Проверяйте цены и другие важные сведения перед отправкой.",
+   "kk": "Құжаттар Mac-та өңделеді. Генерация кезінде тек сәйкес үзінділер мен таңдалған профиль жіберіледі. Жібермес бұрын бағалар мен басқа маңызды деректерді тексеріңіз.",
+   "en": "Documents are processed on this Mac. Generation sends only matching excerpts and the selected profile. Review prices and other important details before sending."
+  },
+  "bar.context.products": {
+   "ru": "Товары и условия продаж",
+   "kk": "Тауарлар мен сату шарттары",
+   "en": "Products and sales information"
+  },
+  "bar.context.profile": {
+   "ru": "Профиль",
+   "kk": "Профиль",
+   "en": "Profile"
+  },
+  "bar.context.profile_instructions": {
+   "ru": "Инструкции для этого профиля",
+   "kk": "Осы профильге арналған нұсқаулар",
+   "en": "Instructions for this profile"
+  },
+  "bar.context.profile_name": {
+   "ru": "Название профиля, например «Мой бизнес»",
+   "kk": "Профиль атауы, мысалы «Менің бизнесім»",
+   "en": "Profile name, e.g. My Business"
+  },
+  "bar.context.purpose": {
+   "ru": "Тип профиля",
+   "kk": "Профиль түрі",
+   "en": "Profile type"
+  },
+  "bar.context.remove_attachment": {
+   "ru": "Удалить документ и извлечённые данные",
+   "kk": "Құжат пен алынған деректерді жою",
+   "en": "Remove document and extracted data"
+  },
+  "bar.context.save": {
+   "ru": "Сохранить",
+   "kk": "Сақтау",
+   "en": "Save"
+  },
+  "bar.context.save_failed": {
+   "ru": "Не удалось сохранить профиль. Проверьте длину полей и доступ к локальному хранилищу.",
+   "kk": "Профильді сақтау мүмкін болмады. Өрістердің ұзындығы мен жергілікті сақтау орнын тексеріңіз.",
+   "en": "The profile could not be saved. Check field lengths and access to local storage."
+  },
+  "bar.context.server_update": {
+   "ru": "Для контекста и расширенного ответа требуется обновление сервера. Обычная генерация доступна без контекста.",
+   "kk": "Контекст пен кеңейтілген жауап үшін сервер жаңартылуы керек. Контекстсіз қалыпты генерация қолжетімді.",
+   "en": "Context and extended replies need a server update. Standard generation remains available without context."
+  },
+  "bar.context.services": {
+   "ru": "Услуги и поддержка клиентов",
+   "kk": "Қызметтер мен клиенттерді қолдау",
+   "en": "Services and customer support"
+  },
+  "bar.context.standard": {
+   "ru": "Обычный · 400",
+   "kk": "Қалыпты · 400",
+   "en": "Standard · 400"
+  },
+  "bar.context.style": {
+   "ru": "Стиль общения, например «вежливо и кратко»",
+   "kk": "Қарым-қатынас стилі, мысалы «сыпайы әрі қысқа»",
+   "en": "Communication style, e.g. polite and concise"
+  },
+  "bar.context.title": {
+   "ru": "AI Context",
+   "kk": "AI Context",
+   "en": "AI Context"
+  },
+  "bar.counter": {
+   "ru": "{0} из {1} символов",
+   "kk": "{0} / {1} таңба",
+   "en": "{0} of {1} characters"
+  },
+  "bar.field.accessibility": {
+   "ru": "Текст запроса",
+   "kk": "Сұрау мәтіні",
+   "en": "Request text"
+  },
+  "bar.mic": {
+   "ru": "Диктовка (⌘D)",
+   "kk": "Дауыспен енгізу (⌘D)",
+   "en": "Dictate (⌘D)"
+  },
+  "bar.mode": {
+   "ru": "Режим",
+   "kk": "Режим",
+   "en": "Mode"
+  },
+  "bar.mode.message": {
+   "ru": "Сообщение",
+   "kk": "Хабарлама",
+   "en": "Message"
+  },
+  "bar.mode.reply": {
+   "ru": "Ответ",
+   "kk": "Жауап",
+   "en": "Reply"
+  },
+  "bar.placeholder.compose": {
+   "ru": "Что написать? Например: вежливо ответь клиенту, что документы получили",
+   "kk": "Не жазу керек? Мысалы: клиентке құжаттарды алғанымызды сыпайы түрде жаз",
+   "en": "What should I write? E.g. politely tell the client we got the documents"
+  },
+  "bar.placeholder.reply": {
+   "ru": "Как ответить? Можно оставить пустым",
+   "kk": "Қалай жауап беру керек? Бос қалдыруға болады",
+   "en": "How should I reply? You can leave this empty"
+  },
+  "bar.reply.source": {
+   "ru": "Сообщение, на которое нужно ответить",
+   "kk": "Жауап берілетін хабарлама",
+   "en": "Message to reply to"
+  },
+  "bar.send": {
+   "ru": "Написать",
+   "kk": "Жазу",
+   "en": "Write"
+  },
+  "bar.send.help": {
+   "ru": "Написать (Return)",
+   "kk": "Жазу (Return)",
+   "en": "Write (Return)"
+  },
+  "bar.template": {
+   "ru": "Шаблон сообщения",
+   "kk": "Хабарлама үлгісі",
+   "en": "Message template"
+  },
+  "bar.template.business": {
+   "ru": "Деловой",
+   "kk": "Іскерлік",
+   "en": "Business"
+  },
+  "bar.template.custom": {
+   "ru": "Свой стиль",
+   "kk": "Өз стилім",
+   "en": "Custom"
+  },
+  "bar.template.customer": {
+   "ru": "Клиент / Продажи",
+   "kk": "Клиент / Сату",
+   "en": "Customer / Sales"
+  },
+  "bar.template.friend": {
+   "ru": "Друг",
+   "kk": "Дос",
+   "en": "Friend"
+  },
+  "consent.accept": {
+   "ru": "Принимаю",
+   "kk": "Келісемін",
+   "en": "Accept"
+  },
+  "consent.body": {
+   "ru": "Чтобы написать ответ, AI Reply передаёт ваш текст на свой сервер и в {0}. Мы не сохраняем этот текст.",
+   "kk": "Жауап жазу үшін AI Reply мәтініңізді өз серверіне және {0} жүйесіне жібереді. Біз бұл мәтінді сақтамаймыз.",
+   "en": "To write a reply, AI Reply sends your text to its server and to {0}. We don't store this text."
+  },
+  "consent.privacy": {
+   "ru": "Политика конфиденциальности",
+   "kk": "Құпиялылық саясаты",
+   "en": "Privacy Policy"
+  },
+  "consent.terms": {
+   "ru": "Условия",
+   "kk": "Шарттар",
+   "en": "Terms"
+  },
+  "consent.title": {
+   "ru": "Разрешите обработку текста",
+   "kk": "Мәтінді өңдеуге рұқсат беріңіз",
+   "en": "Allow text processing"
+  },
+  "copied.accessibility": {
+   "ru": "Ответ на скопированное сообщение: {0}",
+   "kk": "Көшірілген хабарға жауап: {0}",
+   "en": "Reply to the copied message: {0}"
+  },
+  "copied.dismiss": {
+   "ru": "Убрать скопированное сообщение",
+   "kk": "Көшірілген хабарды алып тастау",
+   "en": "Remove the copied message"
+  },
+  "copied.too_long": {
+   "ru": "Скопировано {0} символов, можно до {1} — сократите сообщение",
+   "kk": "{0} таңба көшірілді, {1} таңбаға дейін болады — хабарды қысқартыңыз",
+   "en": "{0} characters copied, the limit is {1} — shorten the message"
+  },
+  "issue.account_disabled": {
+   "ru": "Аккаунт отключён. Напишите в поддержку",
+   "kk": "Аккаунт өшірілген. Қолдау қызметіне жазыңыз",
+   "en": "This account is disabled. Contact support"
+  },
+  "issue.action.ok": {
+   "ru": "Понятно",
+   "kk": "Түсінікті",
+   "en": "OK"
+  },
+  "issue.action.plans": {
+   "ru": "Тарифы",
+   "kk": "Тарифтер",
+   "en": "Plans"
+  },
+  "issue.action.retry": {
+   "ru": "Повторить",
+   "kk": "Қайталау",
+   "en": "Retry"
+  },
+  "issue.action.settings": {
+   "ru": "Открыть настройки",
+   "kk": "Баптауларды ашу",
+   "en": "Open Settings"
+  },
+  "issue.action.support": {
+   "ru": "Поддержка",
+   "kk": "Қолдау",
+   "en": "Support"
+  },
+  "issue.ai_unavailable": {
+   "ru": "Сервис ИИ сейчас не ответил. Ответ не списан — попробуйте ещё раз",
+   "kk": "ЖИ сервисі қазір жауап бермеді. Жауап есептелмеді — қайталап көріңіз",
+   "en": "The AI service didn't respond. Nothing was charged — try again"
+  },
+  "issue.consent": {
+   "ru": "Нужно согласие на обработку текста",
+   "kk": "Мәтінді өңдеуге келісім керек",
+   "en": "Consent to text processing is needed"
+  },
+  "issue.instruction_missing": {
+   "ru": "Напишите, что нужно сделать",
+   "kk": "Не істеу керегін жазыңыз",
+   "en": "Write what you need"
+  },
+  "issue.instruction_too_long": {
+   "ru": "Запрос длиннее {0} символов — сократите его",
+   "kk": "Сұрау {0} таңбадан ұзын — қысқартыңыз",
+   "en": "The request is longer than {0} characters — shorten it"
+  },
+  "issue.limit.daily": {
+   "ru": "Лимит на сегодня исчерпан. Новые ответы появятся в {0}",
+   "kk": "Бүгінгі лимит таусылды. Жаңа жауаптар уақыты: {0}",
+   "en": "Today's limit is used up. New replies at {0}"
+  },
+  "issue.limit.empty": {
+   "ru": "Ответы закончились. Выберите тариф или пакет на сайте",
+   "kk": "Жауаптар таусылды. Сайттан тариф немесе пакет таңдаңыз",
+   "en": "No replies left. Choose a plan or a pack on the website"
+  },
+  "issue.offline": {
+   "ru": "Нет соединения с интернетом",
+   "kk": "Интернет байланысы жоқ",
+   "en": "No internet connection"
+  },
+  "issue.pro_device_identity": {
+   "ru": "Не удалось подтвердить установку для Pro. Обновите приложение или обратитесь в поддержку. Подписка остаётся активной.",
+   "kk": "Pro үшін орнатуды растау мүмкін болмады. Қолданбаны жаңартыңыз немесе қолдау қызметіне жүгініңіз. Жазылым белсенді қалады.",
+   "en": "This installation could not be verified for Pro. Update the app or contact support. Your subscription remains active."
+  },
+  "issue.pro_device_limit": {
+   "ru": "Для Pro уже выбран другой компьютер. Освободите прежнее устройство с авторизованного устройства или обратитесь в поддержку.",
+   "kk": "Pro үшін басқа компьютер таңдалған. Бұрынғы құрылғыны рұқсат етілген құрылғыдан босатыңыз немесе қолдау қызметіне жүгініңіз.",
+   "en": "Pro already has an authorized desktop. Release the previous device from an authorized device or contact support."
+  },
+  "issue.pro_device_revoked": {
+   "ru": "Доступ Pro на этом устройстве отозван. Для восстановления обратитесь в поддержку.",
+   "kk": "Осы құрылғыдағы Pro қолжетімділігі қайтарылды. Қалпына келтіру үшін қолдау қызметіне жүгініңіз.",
+   "en": "Pro access on this device was revoked. Contact support to restore access."
+  },
+  "issue.rate_limited": {
+   "ru": "Слишком много запросов. Подождите немного",
+   "kk": "Сұраулар тым көп. Сәл күте тұрыңыз",
+   "en": "Too many requests. Wait a moment"
+  },
+  "issue.server": {
+   "ru": "Что-то пошло не так. Попробуйте ещё раз",
+   "kk": "Бірдеңе дұрыс болмады. Қайталап көріңіз",
+   "en": "Something went wrong. Try again"
+  },
+  "issue.signed_out": {
+   "ru": "Сеанс завершён. Войдите снова",
+   "kk": "Сеанс аяқталды. Қайта кіріңіз",
+   "en": "Your session ended. Sign in again"
+  },
+  "issue.source_too_long": {
+   "ru": "Сообщение длиннее {0} символов — сократите его",
+   "kk": "Хабар {0} таңбадан ұзын — қысқартыңыз",
+   "en": "The message is longer than {0} characters — shorten it"
+  },
+  "language.auto": {
+   "ru": "Автоматически",
+   "kk": "Автоматты",
+   "en": "Automatic"
+  },
+  "menu.account": {
+   "ru": "Аккаунт",
+   "kk": "Аккаунт",
+   "en": "Account"
+  },
+  "menu.balance.remaining": {
+   "ru": "осталось {0}",
+   "kk": "{0} қалды",
+   "en": "{0} left"
+  },
+  "menu.balance.unlimited": {
+   "ru": "безлимит",
+   "kk": "шектеусіз",
+   "en": "unlimited"
+  },
+  "menu.dictate": {
+   "ru": "Диктовать",
+   "kk": "Дауыспен жазу",
+   "en": "Dictate"
+  },
+  "menu.open": {
+   "ru": "Открыть AI Reply",
+   "kk": "AI Reply ашу",
+   "en": "Open AI Reply"
+  },
+  "menu.plans": {
+   "ru": "Тарифы и оплата…",
+   "kk": "Тарифтер мен төлем…",
+   "en": "Plans & Payment…"
+  },
+  "menu.quit": {
+   "ru": "Выйти из AI Reply",
+   "kk": "AI Reply-дан шығу",
+   "en": "Quit AI Reply"
+  },
+  "menu.settings": {
+   "ru": "Настройки…",
+   "kk": "Баптаулар…",
+   "en": "Settings…"
+  },
+  "menu.sign_in": {
+   "ru": "Войти…",
+   "kk": "Кіру…",
+   "en": "Sign In…"
+  },
+  "menu.updates": {
+   "ru": "Проверить обновления…",
+   "kk": "Жаңартуларды тексеру…",
+   "en": "Check for Updates…"
+  },
+  "recipient.client": {
+   "ru": "Клиенту",
+   "kk": "Клиентке",
+   "en": "Client"
+  },
+  "recipient.colleague": {
+   "ru": "Коллеге",
+   "kk": "Әріптеске",
+   "en": "Colleague"
+  },
+  "recipient.friend": {
+   "ru": "Другу",
+   "kk": "Досқа",
+   "en": "Friend"
+  },
+  "recipient.help": {
+   "ru": "Написать ответ сразу (⌘1–⌘4)",
+   "kk": "Жауапты бірден жазу (⌘1–⌘4)",
+   "en": "Write the reply now (⌘1–⌘4)"
+  },
+  "recipient.partner": {
+   "ru": "Партнёру",
+   "kk": "Серіктеске",
+   "en": "Partner"
+  },
+  "result.copied": {
+   "ru": "Скопировано",
+   "kk": "Көшірілді",
+   "en": "Copied"
+  },
+  "result.copy": {
+   "ru": "Копировать",
+   "kk": "Көшіру",
+   "en": "Copy"
+  },
+  "result.copy.help": {
+   "ru": "Скопировать ответ (⌘Return), затем вставьте его ⌘V",
+   "kk": "Жауапты көшіру (⌘Return), содан кейін ⌘V арқылы қойыңыз",
+   "en": "Copy the reply (⌘Return), then paste it with ⌘V"
+  },
+  "result.regenerate": {
+   "ru": "Ещё вариант",
+   "kk": "Басқа нұсқа",
+   "en": "Another version"
+  },
+  "settings.about": {
+   "ru": "О программе",
+   "kk": "Бағдарлама туралы",
+   "en": "About"
+  },
+  "settings.about.copied": {
+   "ru": "Скопировано",
+   "kk": "Көшірілді",
+   "en": "Copied"
+  },
+  "settings.about.copy_diagnostics": {
+   "ru": "Скопировать сведения для поддержки",
+   "kk": "Қолдау үшін мәліметтерді көшіру",
+   "en": "Copy Info for Support"
+  },
+  "settings.about.support": {
+   "ru": "Поддержка",
+   "kk": "Қолдау",
+   "en": "Support"
+  },
+  "settings.about.version": {
+   "ru": "Версия {0} ({1})",
+   "kk": "Нұсқа {0} ({1})",
+   "en": "Version {0} ({1})"
+  },
+  "settings.account": {
+   "ru": "Аккаунт",
+   "kk": "Аккаунт",
+   "en": "Account"
+  },
+  "settings.account.balance": {
+   "ru": "Баланс",
+   "kk": "Баланс",
+   "en": "Balance"
+  },
+  "settings.account.delete": {
+   "ru": "Удалить аккаунт…",
+   "kk": "Аккаунтты жою…",
+   "en": "Delete Account…"
+  },
+  "settings.account.email": {
+   "ru": "Почта",
+   "kk": "Пошта",
+   "en": "Email"
+  },
+  "settings.account.plan": {
+   "ru": "Тариф",
+   "kk": "Тариф",
+   "en": "Plan"
+  },
+  "settings.account.plans": {
+   "ru": "Тарифы и оплата",
+   "kk": "Тарифтер мен төлем",
+   "en": "Plans & Payment"
+  },
+  "settings.account.refresh": {
+   "ru": "Обновить баланс",
+   "kk": "Теңгерімді жаңарту",
+   "en": "Refresh balance"
+  },
+  "settings.account.sign_out": {
+   "ru": "Выйти из аккаунта",
+   "kk": "Аккаунттан шығу",
+   "en": "Sign Out"
+  },
+  "settings.account.signed_out": {
+   "ru": "Вы не вошли в аккаунт",
+   "kk": "Аккаунтқа кірмегенсіз",
+   "en": "You're not signed in"
+  },
+  "settings.appearance": {
+   "ru": "Оформление",
+   "kk": "Безендіру",
+   "en": "Appearance"
+  },
+  "settings.appearance.dark": {
+   "ru": "Тёмное",
+   "kk": "Қараңғы",
+   "en": "Dark"
+  },
+  "settings.appearance.light": {
+   "ru": "Светлое",
+   "kk": "Ашық",
+   "en": "Light"
+  },
+  "settings.appearance.system": {
+   "ru": "Как в системе",
+   "kk": "Жүйедегідей",
+   "en": "System"
+  },
+  "settings.close_after_copy": {
+   "ru": "Скрывать строку после копирования",
+   "kk": "Көшіргеннен кейін жолды жасыру",
+   "en": "Hide the bar after copying"
+  },
+  "settings.dictation_language": {
+   "ru": "Язык диктовки",
+   "kk": "Дауыспен енгізу тілі",
+   "en": "Dictation language"
+  },
+  "settings.general": {
+   "ru": "Основные",
+   "kk": "Негізгі",
+   "en": "General"
+  },
+  "settings.login_item": {
+   "ru": "Открывать при входе в систему",
+   "kk": "Жүйеге кіргенде ашу",
+   "en": "Open at login"
+  },
+  "settings.login_item.approval": {
+   "ru": "Разрешите запуск в Системных настройках",
+   "kk": "Жүйе баптауларында іске қосуға рұқсат беріңіз",
+   "en": "Allow it in System Settings"
+  },
+  "settings.microphone": {
+   "ru": "Доступ к микрофону",
+   "kk": "Микрофонға рұқсат",
+   "en": "Microphone access"
+  },
+  "settings.offer_copied": {
+   "ru": "Показывать скопированное сообщение",
+   "kk": "Көшірілген хабарды көрсету",
+   "en": "Show the copied message"
+  },
+  "settings.open_system_settings": {
+   "ru": "Открыть Системные настройки",
+   "kk": "Жүйе баптауларын ашу",
+   "en": "Open System Settings"
+  },
+  "settings.paste_after_copy": {
+   "ru": "Вставлять ответ автоматически",
+   "kk": "Жауапты автоматты түрде қою",
+   "en": "Paste the reply automatically"
+  },
+  "settings.paste_after_copy.footer": {
+   "ru": "AI Reply сам нажмёт ⌘V в окне, где вы были. Для этого macOS попросит разрешение в разделе «Универсальный доступ».",
+   "kk": "AI Reply сіз болған терезеде ⌘V басады. Ол үшін macOS «Арнайы мүмкіндіктер» бөлімінде рұқсат сұрайды.",
+   "en": "AI Reply will press ⌘V in the window you were using. macOS will ask for permission under Accessibility."
+  },
+  "settings.placement": {
+   "ru": "Положение строки",
+   "kk": "Жолдың орны",
+   "en": "Bar position"
+  },
+  "settings.placement.bottom": {
+   "ru": "Снизу, над Dock",
+   "kk": "Төменде, Dock үстінде",
+   "en": "Bottom, above the Dock"
+  },
+  "settings.placement.remembered": {
+   "ru": "Где оставили",
+   "kk": "Қалдырған жерде",
+   "en": "Where I left it"
+  },
+  "settings.placement.top": {
+   "ru": "Сверху",
+   "kk": "Жоғарыда",
+   "en": "Top"
+  },
+  "settings.shortcut": {
+   "ru": "Быстрый вызов",
+   "kk": "Жылдам шақыру",
+   "en": "Shortcut"
+  },
+  "settings.shortcut.fallback": {
+   "ru": "{0} занято, поэтому используется {1}",
+   "kk": "{0} бос емес, сондықтан {1} пайдаланылады",
+   "en": "{0} is taken, so {1} is used"
+  },
+  "settings.shortcut.recording": {
+   "ru": "Нажмите сочетание…",
+   "kk": "Пернелер тіркесімін басыңыз…",
+   "en": "Press a shortcut…"
+  },
+  "settings.shortcut.system": {
+   "ru": "{0} уже использует macOS (например, для смены раскладки). Выберите другое сочетание",
+   "kk": "{0} тіркесімін macOS пайдаланады (мысалы, тілді ауыстыру үшін). Басқа тіркесім таңдаңыз",
+   "en": "macOS already uses {0} (for example, to switch the keyboard layout). Choose another shortcut"
+  },
+  "settings.shortcut.taken": {
+   "ru": "Сочетание {0} занято другой программой",
+   "kk": "{0} тіркесімін басқа бағдарлама пайдаланып жатыр",
+   "en": "{0} is used by another app"
+  },
+  "settings.voice": {
+   "ru": "Голос",
+   "kk": "Дауыс",
+   "en": "Voice"
+  },
+  "settings.voice.footer": {
+   "ru": "Запись отправляется на сервер AI Reply и распознаётся OpenAI. На этом Mac она удаляется сразу после распознавания.",
+   "kk": "Жазба AI Reply серверіне жіберіліп, OpenAI арқылы танылады. Осы Mac-тағы жазба танылған соң бірден өшіріледі.",
+   "en": "Audio is sent to the AI Reply server and recognized by OpenAI. The recording on this Mac is deleted right after."
+  },
+  "signin.another_email": {
+   "ru": "Другой email",
+   "kk": "Басқа email",
+   "en": "Another email"
+  },
+  "signin.code.hint": {
+   "ru": "Введите код из письма",
+   "kk": "Хаттағы кодты енгізіңіз",
+   "en": "Enter the code from the email"
+  },
+  "signin.code.placeholder": {
+   "ru": "Код из письма на {0}",
+   "kk": "{0} поштасына келген код",
+   "en": "Code sent to {0}"
+  },
+  "signin.email.placeholder": {
+   "ru": "Email для входа",
+   "kk": "Кіру үшін email",
+   "en": "Email to sign in"
+  },
+  "signin.error.attempts": {
+   "ru": "Слишком много попыток — запросите новый код",
+   "kk": "Әрекет тым көп — жаңа код сұраңыз",
+   "en": "Too many attempts — request a new code"
+  },
+  "signin.error.code": {
+   "ru": "Неверный код",
+   "kk": "Код қате",
+   "en": "Wrong code"
+  },
+  "signin.error.cooldown": {
+   "ru": "Новый код можно запросить через {0} с",
+   "kk": "Жаңа кодты {0} с кейін сұрауға болады",
+   "en": "You can request a new code in {0} s"
+  },
+  "signin.error.delivery": {
+   "ru": "Не удалось отправить письмо. Попробуйте позже",
+   "kk": "Хат жіберілмеді. Кейінірек қайталаңыз",
+   "en": "Couldn't send the email. Try again later"
+  },
+  "signin.error.email": {
+   "ru": "Проверьте адрес почты",
+   "kk": "Пошта мекенжайын тексеріңіз",
+   "en": "Check the email address"
+  },
+  "signin.error.expired": {
+   "ru": "Код устарел — запросите новый",
+   "kk": "Кодтың мерзімі өтті — жаңасын сұраңыз",
+   "en": "The code expired — request a new one"
+  },
+  "signin.error.used": {
+   "ru": "Код уже использован — запросите новый",
+   "kk": "Код қолданылған — жаңасын сұраңыз",
+   "en": "The code was already used — request a new one"
+  },
+  "signin.hint": {
+   "ru": "Войдите той же почтой, что и в приложении на телефоне",
+   "kk": "Телефондағы қолданбадағы поштамен кіріңіз",
+   "en": "Use the same email as in the phone app"
+  },
+  "signin.resend": {
+   "ru": "Отправить снова",
+   "kk": "Қайта жіберу",
+   "en": "Send again"
+  },
+  "signin.resend.wait": {
+   "ru": "Отправить снова через {0} с",
+   "kk": "{0} с кейін қайта жіберу",
+   "en": "Send again in {0} s"
+  },
+  "voice.cancel": {
+   "ru": "Отменить (Esc)",
+   "kk": "Бас тарту (Esc)",
+   "en": "Cancel (Esc)"
+  },
+  "voice.issue.limit": {
+   "ru": "Лимит голосового ввода на сегодня исчерпан",
+   "kk": "Бүгінгі дауыспен енгізу лимиті таусылды",
+   "en": "Today's voice input limit is used up"
+  },
+  "voice.issue.no_device": {
+   "ru": "Микрофон не найден",
+   "kk": "Микрофон табылмады",
+   "en": "No microphone found"
+  },
+  "voice.issue.nothing_heard": {
+   "ru": "Ничего не расслышал. Попробуйте ещё раз",
+   "kk": "Ештеңе естілмеді. Қайталап көріңіз",
+   "en": "Didn't catch that. Try again"
+  },
+  "voice.issue.permission": {
+   "ru": "Нет доступа к микрофону. Разрешите его в Системных настройках",
+   "kk": "Микрофонға рұқсат жоқ. Жүйе баптауларынан рұқсат беріңіз",
+   "en": "No microphone access. Allow it in System Settings"
+  },
+  "voice.issue.recording_failed": {
+   "ru": "Не удалось записать звук",
+   "kk": "Дыбысты жазу мүмкін болмады",
+   "en": "Couldn't record audio"
+  },
+  "voice.issue.server": {
+   "ru": "Не удалось распознать речь. Попробуйте ещё раз",
+   "kk": "Сөзді тану мүмкін болмады. Қайталап көріңіз",
+   "en": "Couldn't recognize speech. Try again"
+  },
+  "voice.issue.too_short": {
+   "ru": "Запись слишком короткая",
+   "kk": "Жазба тым қысқа",
+   "en": "The recording is too short"
+  },
+  "voice.issue.unavailable": {
+   "ru": "Голосовой ввод сейчас недоступен",
+   "kk": "Дауыспен енгізу қазір қолжетімсіз",
+   "en": "Voice input is unavailable right now"
+  },
+  "voice.recording": {
+   "ru": "Идёт запись",
+   "kk": "Жазылып жатыр",
+   "en": "Recording"
+  },
+  "voice.stop": {
+   "ru": "Готово (Return)",
+   "kk": "Дайын (Return)",
+   "en": "Done (Return)"
+  },
+  "voice.transcribing": {
+   "ru": "Распознаю…",
+   "kk": "Танып жатырмын…",
+   "en": "Recognizing…"
+  }
+ }
+}

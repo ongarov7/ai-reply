@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+    <ProjectReference Include="../../src/AirReply.Presentation/AirReply.Presentation.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Headless Avalonia: renders every screen (light/dark × ru/kk/en) to PNG and checks UI behaviour. -->
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Headless.XUnit" />
+    <PackageReference Include="Avalonia.Skia" />
+    <PackageReference Include="xunit.v3" />
+    <ProjectReference Include="../../src/AirReply.App/AirReply.App.csproj" />
+  </ItemGroup>
+</Project>

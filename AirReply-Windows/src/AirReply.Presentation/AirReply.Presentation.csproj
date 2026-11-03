@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- View models and platform-service abstractions. No Avalonia, no Win32: fully unit-testable. -->
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" />
+    <ProjectReference Include="../AirReply.Core/AirReply.Core.csproj" />
+    <ProjectReference Include="../AirReply.Context/AirReply.Context.csproj" />
+    <InternalsVisibleTo Include="AirReply.Presentation.Tests" />
+  </ItemGroup>
+</Project>

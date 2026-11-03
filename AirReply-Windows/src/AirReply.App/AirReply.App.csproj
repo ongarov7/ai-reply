@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>AIReply</AssemblyName>
+    <RootNamespace>AirReply.App</RootNamespace>
+    <ApplicationIcon>Assets/AIReply.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <BuiltInComInteropSupport>false</BuiltInComInteropSupport>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia" />
+    <PackageReference Include="Avalonia.Desktop" />
+    <PackageReference Include="Avalonia.Themes.Fluent" />
+    <PackageReference Include="Avalonia.Fonts.Inter" />
+    <ProjectReference Include="../AirReply.Presentation/AirReply.Presentation.csproj" />
+    <ProjectReference Include="../AirReply.Platform.Windows/AirReply.Platform.Windows.csproj" />
+    <AvaloniaResource Include="Assets/**" />
+    <InternalsVisibleTo Include="AirReply.App.Tests" />
+  </ItemGroup>
+</Project>

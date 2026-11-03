@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- API contract, session, account, generation, voice upload, installation identity. No UI, no Win32. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Localization/strings.json" LogicalName="AirReply.Core.Localization.strings.json" />
+    <InternalsVisibleTo Include="AirReply.Core.Tests" />
+  </ItemGroup>
+</Project>

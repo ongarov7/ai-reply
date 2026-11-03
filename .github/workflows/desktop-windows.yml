@@ -1,0 +1,82 @@
+name: desktop-windows
+
+on:
+  push:
+    branches: [windows-app, main]
+    paths: ["AirReply-Windows/**", ".github/workflows/desktop-windows.yml"]
+  pull_request:
+    paths: ["AirReply-Windows/**", ".github/workflows/desktop-windows.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: AirReply-Windows
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      DOTNET_NOLOGO: "1"
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: AirReply-Windows/global.json
+
+      - name: Restore
+        run: dotnet restore AirReply.Windows.slnx
+
+      - name: Build
+        run: dotnet build AirReply.Windows.slnx -c Release --no-restore
+
+      - name: Test
+        run: dotnet test --solution AirReply.Windows.slnx -c Release --no-build --report-trx --results-directory "${{ github.workspace }}/test-results"
+
+      # Failed tests become annotations, readable from the public checks API without a log download.
+      - name: Annotate failed tests
+        if: failure()
+        run: |
+          Get-ChildItem "${{ github.workspace }}/test-results" -Filter *.trx -Recurse | ForEach-Object {
+            [xml]$trx = Get-Content $_.FullName
+            $trx.TestRun.Results.UnitTestResult | Where-Object { $_.outcome -eq 'Failed' } | ForEach-Object {
+              $message = ($_.Output.ErrorInfo.Message -replace "`r?`n", ' ')
+              if ($message.Length -gt 900) { $message = $message.Substring(0, 900) }
+              Write-Output "::error title=$($_.testName)::$message"
+            }
+          }
+
+      - name: Publish
+        run: |
+          foreach ($rid in 'win-x64', 'win-arm64') {
+            dotnet publish src/AirReply.App/AirReply.App.csproj -c Release -r $rid --self-contained `
+              -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
+              -p:EnableCompressionInSingleFile=true -p:DebugType=none -o "out/$rid"
+            Compress-Archive -Path "out/$rid/*" -DestinationPath "out/AIReply-$rid.zip" -Force
+          }
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: AIReply-windows
+          path: |
+            AirReply-Windows/out/AIReply-win-x64.zip
+            AirReply-Windows/out/AIReply-win-arm64.zip
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: test-results
+          path: |
+            ${{ github.workspace }}/test-results
+            AirReply-Windows/tests/AirReply.App.Tests/bin/Release/net10.0/renders
+          if-no-files-found: ignore

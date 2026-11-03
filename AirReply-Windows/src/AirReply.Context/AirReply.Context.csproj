@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- AI Context: profiles, local document import and retrieval. Runs on any OS. -->
+  <ItemGroup>
+    <PackageReference Include="DocumentFormat.OpenXml" />
+    <PackageReference Include="PdfPig" />
+    <ProjectReference Include="../AirReply.Core/AirReply.Core.csproj" />
+    <InternalsVisibleTo Include="AirReply.Context.Tests" />
+  </ItemGroup>
+</Project>

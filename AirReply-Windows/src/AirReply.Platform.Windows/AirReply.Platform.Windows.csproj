@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Win32 services behind the Presentation abstractions. Compiles everywhere; every entry point is
+       [SupportedOSPlatform("windows")] and is only constructed when OperatingSystem.IsWindows(). -->
+  <PropertyGroup>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="NAudio.Wasapi" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" />
+    <ProjectReference Include="../AirReply.Presentation/AirReply.Presentation.csproj" />
+    <InternalsVisibleTo Include="AirReply.Platform.Windows.Tests" />
+  </ItemGroup>
+</Project>
