@@ -1,0 +1,83 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:m="using:Mock"
+             x:Class="Mock.Screens.TrayMenu">
+  <!-- 9 · Tray menu: Windows 11 context menu (radius 8, 4 px inset rows, full-bleed separators) above the taskbar. -->
+  <Grid RowDefinitions="*,48">
+    <Border Classes="menu" Width="288" Padding="4" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,44,12">
+      <StackPanel>
+        <Border Classes="menuitem hover">
+          <Grid ColumnDefinitions="28,*,Auto">
+            <m:BrandGlyph Size="16" HorizontalAlignment="Left"/>
+            <TextBlock Grid.Column="1" Text="Открыть AI Reply" VerticalAlignment="Center"/>
+            <TextBlock Grid.Column="2" Classes="caption" Text="Alt+Space" VerticalAlignment="Center"/>
+          </Grid>
+        </Border>
+        <Border Classes="menuitem">
+          <Grid ColumnDefinitions="28,*">
+            <Path Classes="ic primary" Data="{StaticResource IcMic}" HorizontalAlignment="Left"/>
+            <TextBlock Grid.Column="1" Text="Диктовать" VerticalAlignment="Center"/>
+          </Grid>
+        </Border>
+        <Border Classes="hair" Margin="-4,4"/>
+        <Border Classes="menuitem">
+          <Grid ColumnDefinitions="28,*">
+            <Path Classes="ic disabled" Data="{StaticResource IcPerson}" HorizontalAlignment="Left"/>
+            <TextBlock Grid.Column="1" Classes="disabled" Text="aigerim@shop.kz" VerticalAlignment="Center"/>
+          </Grid>
+        </Border>
+        <Border Classes="menuitem">
+          <Grid ColumnDefinitions="28,*">
+            <TextBlock Grid.Column="1" Classes="disabled" Text="Pro · безлимит" VerticalAlignment="Center"/>
+          </Grid>
+        </Border>
+        <Border Classes="menuitem">
+          <Grid ColumnDefinitions="28,*">
+            <Path Classes="ic primary" Data="{StaticResource IcCard}" HorizontalAlignment="Left"/>
+            <TextBlock Grid.Column="1" Text="Тарифы и оплата…" VerticalAlignment="Center"/>
+          </Grid>
+        </Border>
+        <Border Classes="hair" Margin="-4,4"/>
+        <Border Classes="menuitem">
+          <Grid ColumnDefinitions="28,*">
+            <m:GearIcon Classes="ic primary" HorizontalAlignment="Left"/>
+            <TextBlock Grid.Column="1" Text="Настройки…" VerticalAlignment="Center"/>
+          </Grid>
+        </Border>
+        <Border Classes="menuitem">
+          <Grid ColumnDefinitions="28,*">
+            <Path Classes="ic primary" Data="{StaticResource IcRefresh}" HorizontalAlignment="Left"/>
+            <TextBlock Grid.Column="1" Text="Проверить обновления…" VerticalAlignment="Center"/>
+          </Grid>
+        </Border>
+        <Border Classes="hair" Margin="-4,4"/>
+        <Border Classes="menuitem">
+          <Grid ColumnDefinitions="28,*">
+            <Path Classes="ic primary" Data="{StaticResource IcPower}" HorizontalAlignment="Left"/>
+            <TextBlock Grid.Column="1" Text="Выйти из AI Reply" VerticalAlignment="Center"/>
+          </Grid>
+        </Border>
+      </StackPanel>
+    </Border>
+
+    <Border Grid.Row="1" Background="{DynamicResource SurfaceTaskbar}" BorderBrush="{DynamicResource StrokeDivider}" BorderThickness="0,1,0,0">
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,10,0" Spacing="2">
+        <Border Width="32" Height="40" CornerRadius="4" VerticalAlignment="Center">
+          <Path Classes="ic primary" Data="{StaticResource IcChevronUp}" HorizontalAlignment="Center"/>
+        </Border>
+        <Border Width="32" Height="40" CornerRadius="4" VerticalAlignment="Center" Background="{DynamicResource FillSubtleStrong}">
+          <m:BrandGlyph Size="16" Classes="brand mono" HorizontalAlignment="Center"/>
+        </Border>
+        <Border Width="44" Height="40" CornerRadius="4" VerticalAlignment="Center">
+          <TextBlock Classes="caption" Foreground="{DynamicResource TextPrimary}" Text="РУС" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Border>
+        <Border Height="40" CornerRadius="4" Padding="8,0" VerticalAlignment="Center">
+          <StackPanel VerticalAlignment="Center">
+            <TextBlock Classes="caption" Foreground="{DynamicResource TextPrimary}" Text="21:58" HorizontalAlignment="Right"/>
+            <TextBlock Classes="caption" Foreground="{DynamicResource TextPrimary}" Text="03.11.2026" HorizontalAlignment="Right"/>
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </Border>
+  </Grid>
+</UserControl>

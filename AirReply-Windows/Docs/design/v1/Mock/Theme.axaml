@@ -1,0 +1,448 @@
+<Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!--
+    Direction A — "Windows 11 native flyout".
+    Tokens follow the WinUI 3 / Fluent 2 theme resources (names in comments) so the app can map 1:1
+    to Windows App SDK brushes. Accent = Windows 11 default palette: AccentDark1 #0067C0 (light),
+    AccentLight2 #4CC2FF (dark). In the real app read UISettings accent values; these are the fallback.
+  -->
+  <Styles.Resources>
+    <ResourceDictionary>
+      <FontFamily x:Key="UiFont">Segoe UI Variable Text, Segoe UI, Inter</FontFamily>
+
+      <!-- Icons: 16×16 grid, 1.25 px round strokes (Segoe Fluent Icons proportions) -->
+      <StreamGeometry x:Key="IcMic">M8,1.75 C6.76,1.75 5.75,2.76 5.75,4 V7.5 C5.75,8.74 6.76,9.75 8,9.75 C9.24,9.75 10.25,8.74 10.25,7.5 V4 C10.25,2.76 9.24,1.75 8,1.75 Z M3.5,7.25 C3.5,9.74 5.51,11.75 8,11.75 C10.49,11.75 12.5,9.74 12.5,7.25 M8,11.75 V14.25</StreamGeometry>
+      <StreamGeometry x:Key="IcArrowUp">M8,12.75 V3.5 M4,7.5 L8,3.5 L12,7.5</StreamGeometry>
+      <StreamGeometry x:Key="IcClose">M4.5,4.5 L11.5,11.5 M11.5,4.5 L4.5,11.5</StreamGeometry>
+      <StreamGeometry x:Key="IcCloseSm">M5.25,5.25 L10.75,10.75 M10.75,5.25 L5.25,10.75</StreamGeometry>
+      <StreamGeometry x:Key="IcCheck">M3.25,8.25 L6.5,11.5 L12.75,4.75</StreamGeometry>
+      <StreamGeometry x:Key="IcReply">M6.25,3.75 L2.5,7.5 L6.25,11.25 M2.5,7.5 H9.25 C11.6,7.5 13.5,9.4 13.5,11.75 V12.5</StreamGeometry>
+      <StreamGeometry x:Key="IcCopy">M6.75,5 H12 C12.83,5 13.5,5.67 13.5,6.5 V12.75 C13.5,13.58 12.83,14.25 12,14.25 H6.75 C5.92,14.25 5.25,13.58 5.25,12.75 V6.5 C5.25,5.67 5.92,5 6.75,5 Z M2.75,10.75 V3.5 C2.75,2.53 3.53,1.75 4.5,1.75 H9.75</StreamGeometry>
+      <StreamGeometry x:Key="IcRefresh">M13.25,8 A5.25,5.25 0 1 1 8,2.75 C9.47,2.75 10.88,3.33 11.93,4.35 L13.25,5.67 M13.25,2.75 V5.67 H10.33</StreamGeometry>
+      <StreamGeometry x:Key="IcPlus">M8,3.25 V12.75 M3.25,8 H12.75</StreamGeometry>
+      <StreamGeometry x:Key="IcChevronDown">M4.5,6.25 L8,9.75 L11.5,6.25</StreamGeometry>
+      <StreamGeometry x:Key="IcChevronUp">M4.5,9.75 L8,6.25 L11.5,9.75</StreamGeometry>
+      <StreamGeometry x:Key="IcTable">M4,2.5 H12 A1.5,1.5 0 0 1 13.5,4 V12 A1.5,1.5 0 0 1 12,13.5 H4 A1.5,1.5 0 0 1 2.5,12 V4 A1.5,1.5 0 0 1 4,2.5 Z M2.5,6.25 H13.5 M2.5,9.75 H13.5 M6.25,6.25 V13.5</StreamGeometry>
+      <StreamGeometry x:Key="IcDoc">M4.75,1.75 H9.25 L12.75,5.25 V12.75 A1.5,1.5 0 0 1 11.25,14.25 H4.75 A1.5,1.5 0 0 1 3.25,12.75 V3.25 A1.5,1.5 0 0 1 4.75,1.75 Z M9,1.75 V4.25 A1.25,1.25 0 0 0 10.25,5.5 H12.75 M5.75,8.5 H10.25 M5.75,11 H9</StreamGeometry>
+      <StreamGeometry x:Key="IcPin">M9.6,2.1 L13.9,6.4 L11.6,7.3 L9.4,9.5 L9.7,12.4 L8.9,13.2 L2.8,7.1 L3.6,6.3 L6.5,6.6 L8.7,4.4 Z M5.6,10.4 L2.25,13.75</StreamGeometry>
+      <StreamGeometry x:Key="IcBriefcase">M3.75,4.75 H12.25 A1.5,1.5 0 0 1 13.75,6.25 V12 A1.5,1.5 0 0 1 12.25,13.5 H3.75 A1.5,1.5 0 0 1 2.25,12 V6.25 A1.5,1.5 0 0 1 3.75,4.75 Z M5.75,4.75 V3.5 A1,1 0 0 1 6.75,2.5 H9.25 A1,1 0 0 1 10.25,3.5 V4.75 M2.25,8.75 H13.75</StreamGeometry>
+      <StreamGeometry x:Key="IcPerson">M10.75,4.75 A2.75,2.75 0 1 1 5.25,4.75 A2.75,2.75 0 1 1 10.75,4.75 Z M2.75,14 C2.75,11.65 5.1,10 8,10 C10.9,10 13.25,11.65 13.25,14</StreamGeometry>
+      <StreamGeometry x:Key="IcPeople">M8.5,5 A2.25,2.25 0 1 1 4,5 A2.25,2.25 0 1 1 8.5,5 Z M1.5,13 C1.5,11 3.6,9.5 6.25,9.5 C8.9,9.5 11,11 11,13 M10.25,7.25 A1.9,1.9 0 1 0 10.25,3.45 M11.5,9.6 C13.2,9.9 14.5,11 14.5,12.5</StreamGeometry>
+      <StreamGeometry x:Key="IcGear">M6.54,3.22 L6.74,1.52 L9.26,1.52 L9.46,3.22 L10.35,3.59 L11.69,2.53 L13.47,4.31 L12.41,5.65 L12.78,6.54 L14.48,6.74 L14.48,9.26 L12.78,9.46 L12.41,10.35 L13.47,11.69 L11.69,13.47 L10.35,12.41 L9.46,12.78 L9.26,14.48 L6.74,14.48 L6.54,12.78 L5.65,12.41 L4.31,13.47 L2.53,11.69 L3.59,10.35 L3.22,9.46 L1.52,9.26 L1.52,6.74 L3.22,6.54 L3.59,5.65 L2.53,4.31 L4.31,2.53 L5.65,3.59 Z M10.25,8 A2.25,2.25 0 1 1 5.75,8 A2.25,2.25 0 1 1 10.25,8 Z</StreamGeometry>
+      <StreamGeometry x:Key="IcInfo">M14.25,8 A6.25,6.25 0 1 1 1.75,8 A6.25,6.25 0 1 1 14.25,8 Z M8,7.25 V11.25 M8,4.9 L8,4.95</StreamGeometry>
+      <StreamGeometry x:Key="IcPower">M8,1.75 V7.25 M4.75,3.6 A5.25,5.25 0 1 0 11.25,3.6</StreamGeometry>
+      <StreamGeometry x:Key="IcCard">M3.5,3.25 H12.5 A1.5,1.5 0 0 1 14,4.75 V11.25 A1.5,1.5 0 0 1 12.5,12.75 H3.5 A1.5,1.5 0 0 1 2,11.25 V4.75 A1.5,1.5 0 0 1 3.5,3.25 Z M2,6.5 H14 M4.5,10 H6.75</StreamGeometry>
+      <StreamGeometry x:Key="IcDownload">M8,2 V10.25 M4.75,7 L8,10.25 L11.25,7 M3,13.75 H13</StreamGeometry>
+      <StreamGeometry x:Key="IcSignOut">M6.25,2.25 H3.75 A1.25,1.25 0 0 0 2.5,3.5 V12.5 A1.25,1.25 0 0 0 3.75,13.75 H6.25 M10.25,4.75 L13.5,8 L10.25,11.25 M13.5,8 H6</StreamGeometry>
+      <StreamGeometry x:Key="IcKeyboard">M2.75,3.75 H13.25 A1.5,1.5 0 0 1 14.75,5.25 V10.75 A1.5,1.5 0 0 1 13.25,12.25 H2.75 A1.5,1.5 0 0 1 1.25,10.75 V5.25 A1.5,1.5 0 0 1 2.75,3.75 Z M4.25,6.5 L4.3,6.5 M6.75,6.5 L6.8,6.5 M9.25,6.5 L9.3,6.5 M11.75,6.5 L11.8,6.5 M5.75,9.5 H10.25</StreamGeometry>
+      <StreamGeometry x:Key="IcClipboard">M5.5,2.75 H4.5 A1.25,1.25 0 0 0 3.25,4 V13 A1.25,1.25 0 0 0 4.5,14.25 H11.5 A1.25,1.25 0 0 0 12.75,13 V4 A1.25,1.25 0 0 0 11.5,2.75 H10.5 M6.25,1.75 H9.75 A0.75,0.75 0 0 1 10.5,2.5 V3 A0.75,0.75 0 0 1 9.75,3.75 H6.25 A0.75,0.75 0 0 1 5.5,3 V2.5 A0.75,0.75 0 0 1 6.25,1.75 Z</StreamGeometry>
+      <StreamGeometry x:Key="IcPaste">M5.5,2.75 H4.5 A1.25,1.25 0 0 0 3.25,4 V13 A1.25,1.25 0 0 0 4.5,14.25 H11.5 A1.25,1.25 0 0 0 12.75,13 V4 A1.25,1.25 0 0 0 11.5,2.75 H10.5 M6.25,1.75 H9.75 A0.75,0.75 0 0 1 10.5,2.5 V3 A0.75,0.75 0 0 1 9.75,3.75 H6.25 A0.75,0.75 0 0 1 5.5,3 V2.5 A0.75,0.75 0 0 1 6.25,1.75 Z M8,6.5 V11.25 M6,9.25 L8,11.25 L10,9.25</StreamGeometry>
+      <StreamGeometry x:Key="IcWindowClose">M3.75,2.25 H12.25 A1.5,1.5 0 0 1 13.75,3.75 V12.25 A1.5,1.5 0 0 1 12.25,13.75 H3.75 A1.5,1.5 0 0 1 2.25,12.25 V3.75 A1.5,1.5 0 0 1 3.75,2.25 Z M6.25,6.25 L9.75,9.75 M9.75,6.25 L6.25,9.75</StreamGeometry>
+      <StreamGeometry x:Key="IcLaunch">M3.75,2.25 H12.25 A1.5,1.5 0 0 1 13.75,3.75 V12.25 A1.5,1.5 0 0 1 12.25,13.75 H3.75 A1.5,1.5 0 0 1 2.25,12.25 V3.75 A1.5,1.5 0 0 1 3.75,2.25 Z M2.25,5.25 H13.75 M8,11.75 V7.75 M6.25,9.5 L8,7.75 L9.75,9.5</StreamGeometry>
+      <StreamGeometry x:Key="IcPosition">M2.75,2.75 H13.25 A1.5,1.5 0 0 1 14.75,4.25 V11.75 A1.5,1.5 0 0 1 13.25,13.25 H2.75 A1.5,1.5 0 0 1 1.25,11.75 V4.25 A1.5,1.5 0 0 1 2.75,2.75 Z M5.25,5.75 H10.75</StreamGeometry>
+      <StreamGeometry x:Key="IcThemeRing">M14,8 A6,6 0 1 1 2,8 A6,6 0 1 1 14,8 Z</StreamGeometry>
+      <StreamGeometry x:Key="IcThemeHalf">M8,2 A6,6 0 0 1 8,14 Z</StreamGeometry>
+      <StreamGeometry x:Key="IcEdit">M10.4,2.85 A1.4,1.4 0 0 1 12.4,2.85 L13.15,3.6 A1.4,1.4 0 0 1 13.15,5.6 L5.75,13 L2.75,13.25 L3,10.25 Z M9.25,4 L12,6.75</StreamGeometry>
+      <StreamGeometry x:Key="IcMinimize">M3,8 H13</StreamGeometry>
+      <StreamGeometry x:Key="IcWifi">M1.75,6.25 C5.25,3 10.75,3 14.25,6.25 M3.75,8.6 C6.25,6.4 9.75,6.4 12.25,8.6 M5.85,10.9 C7.1,9.85 8.9,9.85 10.15,10.9 M8,13 L8.01,13</StreamGeometry>
+      <StreamGeometry x:Key="IcSpeaker">M2.25,6 H4.75 L8,3.25 V12.75 L4.75,10 H2.25 Z M10.5,5.5 C11.4,6.5 11.4,9.5 10.5,10.5 M12.25,3.75 C14.1,5.75 14.1,10.25 12.25,12.25</StreamGeometry>
+      <StreamGeometry x:Key="IcBattery">M2.75,4.75 H12.25 A1,1 0 0 1 13.25,5.75 V10.25 A1,1 0 0 1 12.25,11.25 H2.75 A1,1 0 0 1 1.75,10.25 V5.75 A1,1 0 0 1 2.75,4.75 Z M15,7 V9</StreamGeometry>
+      <StreamGeometry x:Key="IcBatteryLevel">M3.5,6.5 H9.5 V9.5 H3.5 Z</StreamGeometry>
+      <StreamGeometry x:Key="IcBell">M8,1.75 C5.65,1.75 4,3.6 4,5.9 V9 L2.75,11.25 H13.25 L12,9 V5.9 C12,3.6 10.35,1.75 8,1.75 Z M6.25,13.25 C6.6,14.05 7.25,14.5 8,14.5 C8.75,14.5 9.4,14.05 9.75,13.25</StreamGeometry>
+
+      <ResourceDictionary.ThemeDictionaries>
+        <!-- ===================== LIGHT ===================== -->
+        <ResourceDictionary x:Key="Light">
+          <SolidColorBrush x:Key="Wallpaper" Color="#DCE3EC"/>
+
+          <!-- Accent: AccentFillColorDefault = SystemAccentColorDark1 -->
+          <SolidColorBrush x:Key="Accent" Color="#0067C0"/>
+          <SolidColorBrush x:Key="AccentText" Color="#003E92"/>
+          <SolidColorBrush x:Key="AccentDisabled" Color="#37000000"/>
+          <SolidColorBrush x:Key="AccentHalo" Color="#2E0067C0"/>
+          <SolidColorBrush x:Key="OnAccent" Color="#FFFFFF"/>
+          <SolidColorBrush x:Key="OnAccentSecondary" Color="#B3FFFFFF"/>
+          <SolidColorBrush x:Key="OnAccentDisabled" Color="#FFFFFF"/>
+
+          <!-- Text (TextFillColor*) -->
+          <SolidColorBrush x:Key="TextPrimary" Color="#E4000000"/>
+          <SolidColorBrush x:Key="TextSecondary" Color="#9E000000"/>
+          <SolidColorBrush x:Key="TextTertiary" Color="#72000000"/>
+          <SolidColorBrush x:Key="TextDisabled" Color="#5C000000"/>
+
+          <!-- Surfaces. Flyout = acrylic stand-in (tint #F9F9F9 at 88 % over the wallpaper). -->
+          <SolidColorBrush x:Key="FlyoutFill" Color="#E0F9F9F9"/>
+          <SolidColorBrush x:Key="FlyoutStroke" Color="#14000000"/>
+          <SolidColorBrush x:Key="FooterFill" Color="#08000000"/>
+          <SolidColorBrush x:Key="MicaFill" Color="#F2F3F3F3"/>
+          <SolidColorBrush x:Key="WindowStroke" Color="#1F000000"/>
+          <SolidColorBrush x:Key="LayerFill" Color="#80FFFFFF"/>
+          <SolidColorBrush x:Key="LayerStroke" Color="#0F000000"/>
+          <SolidColorBrush x:Key="CardFill" Color="#B3FFFFFF"/>
+          <SolidColorBrush x:Key="CardStroke" Color="#0F000000"/>
+          <SolidColorBrush x:Key="TaskbarFill" Color="#E6F0F0F0"/>
+          <SolidColorBrush x:Key="TaskbarStroke" Color="#14000000"/>
+
+          <!-- Controls -->
+          <SolidColorBrush x:Key="ControlFill" Color="#B3FFFFFF"/>
+          <SolidColorBrush x:Key="ControlStroke" Color="#0F000000"/>
+          <SolidColorBrush x:Key="ControlStrongStroke" Color="#72000000"/>
+          <SolidColorBrush x:Key="ControlAltFill" Color="#06000000"/>
+          <SolidColorBrush x:Key="InputFill" Color="#FFFFFF"/>
+          <SolidColorBrush x:Key="InputStroke" Color="#0F000000"/>
+          <SolidColorBrush x:Key="SubtleFill" Color="#09000000"/>
+          <SolidColorBrush x:Key="SubtleFillStrong" Color="#0F000000"/>
+          <SolidColorBrush x:Key="Divider" Color="#0F000000"/>
+          <SolidColorBrush x:Key="KnobOff" Color="#9E000000"/>
+
+          <!-- Status: InfoBar caution (amber). Red is reserved for true errors only. -->
+          <SolidColorBrush x:Key="Caution" Color="#9D5D00"/>
+          <SolidColorBrush x:Key="CautionBg" Color="#FFF4CE"/>
+          <SolidColorBrush x:Key="CautionStroke" Color="#14000000"/>
+          <SolidColorBrush x:Key="OnCaution" Color="#FFFFFF"/>
+          <SolidColorBrush x:Key="Critical" Color="#C42B1C"/>
+
+          <!-- Elevation edge: 1 px darker bottom stroke (WinUI ControlElevationBorderBrush) -->
+          <LinearGradientBrush x:Key="Elev28" StartPoint="0%,0%" EndPoint="0%,100%">
+            <GradientStop Offset="0" Color="#0F000000"/><GradientStop Offset="0.96" Color="#0F000000"/>
+            <GradientStop Offset="0.96" Color="#29000000"/><GradientStop Offset="1" Color="#29000000"/>
+          </LinearGradientBrush>
+          <LinearGradientBrush x:Key="Elev32" StartPoint="0%,0%" EndPoint="0%,100%">
+            <GradientStop Offset="0" Color="#0F000000"/><GradientStop Offset="0.965" Color="#0F000000"/>
+            <GradientStop Offset="0.965" Color="#29000000"/><GradientStop Offset="1" Color="#29000000"/>
+          </LinearGradientBrush>
+          <LinearGradientBrush x:Key="ElevAccent32" StartPoint="0%,0%" EndPoint="0%,100%">
+            <GradientStop Offset="0" Color="#14FFFFFF"/><GradientStop Offset="0.965" Color="#14FFFFFF"/>
+            <GradientStop Offset="0.965" Color="#66000000"/><GradientStop Offset="1" Color="#66000000"/>
+          </LinearGradientBrush>
+          <LinearGradientBrush x:Key="ElevInput40" StartPoint="0%,0%" EndPoint="0%,100%">
+            <GradientStop Offset="0" Color="#0F000000"/><GradientStop Offset="0.97" Color="#0F000000"/>
+            <GradientStop Offset="0.97" Color="#72000000"/><GradientStop Offset="1" Color="#72000000"/>
+          </LinearGradientBrush>
+
+          <LinearGradientBrush x:Key="Focus40" StartPoint="0%,0%" EndPoint="0%,100%">
+            <GradientStop Offset="0" Color="#0F000000"/><GradientStop Offset="0.95" Color="#0F000000"/>
+            <GradientStop Offset="0.95" Color="#0067C0"/><GradientStop Offset="1" Color="#0067C0"/>
+          </LinearGradientBrush>
+          <BoxShadows x:Key="ShadowFlyout">0 0 2 0 #1A000000, 0 8 24 0 #24000000</BoxShadows>
+          <BoxShadows x:Key="ShadowWindow">0 0 2 0 #26000000, 0 8 32 0 #33000000</BoxShadows>
+          <BoxShadows x:Key="ShadowKnob">0 0 0 0 #00000000</BoxShadows>
+        </ResourceDictionary>
+
+        <!-- ===================== DARK ===================== -->
+        <ResourceDictionary x:Key="Dark">
+          <SolidColorBrush x:Key="Wallpaper" Color="#1B1F24"/>
+
+          <!-- Accent: AccentFillColorDefault = SystemAccentColorLight2; text on accent is black -->
+          <SolidColorBrush x:Key="Accent" Color="#4CC2FF"/>
+          <SolidColorBrush x:Key="AccentText" Color="#99EBFF"/>
+          <SolidColorBrush x:Key="AccentDisabled" Color="#28FFFFFF"/>
+          <SolidColorBrush x:Key="AccentHalo" Color="#384CC2FF"/>
+          <SolidColorBrush x:Key="OnAccent" Color="#000000"/>
+          <SolidColorBrush x:Key="OnAccentSecondary" Color="#80000000"/>
+          <SolidColorBrush x:Key="OnAccentDisabled" Color="#87FFFFFF"/>
+
+          <SolidColorBrush x:Key="TextPrimary" Color="#FFFFFF"/>
+          <SolidColorBrush x:Key="TextSecondary" Color="#C5FFFFFF"/>
+          <SolidColorBrush x:Key="TextTertiary" Color="#87FFFFFF"/>
+          <SolidColorBrush x:Key="TextDisabled" Color="#5DFFFFFF"/>
+
+          <SolidColorBrush x:Key="FlyoutFill" Color="#F02C2C2C"/>
+          <SolidColorBrush x:Key="FlyoutStroke" Color="#1AFFFFFF"/>
+          <SolidColorBrush x:Key="FooterFill" Color="#26000000"/>
+          <SolidColorBrush x:Key="MicaFill" Color="#F5202020"/>
+          <SolidColorBrush x:Key="WindowStroke" Color="#24FFFFFF"/>
+          <SolidColorBrush x:Key="LayerFill" Color="#4C3A3A3A"/>
+          <SolidColorBrush x:Key="LayerStroke" Color="#19000000"/>
+          <SolidColorBrush x:Key="CardFill" Color="#0DFFFFFF"/>
+          <SolidColorBrush x:Key="CardStroke" Color="#19000000"/>
+          <SolidColorBrush x:Key="TaskbarFill" Color="#E6202020"/>
+          <SolidColorBrush x:Key="TaskbarStroke" Color="#14FFFFFF"/>
+
+          <SolidColorBrush x:Key="ControlFill" Color="#0FFFFFFF"/>
+          <SolidColorBrush x:Key="ControlStroke" Color="#12FFFFFF"/>
+          <SolidColorBrush x:Key="ControlStrongStroke" Color="#8BFFFFFF"/>
+          <SolidColorBrush x:Key="ControlAltFill" Color="#19000000"/>
+          <SolidColorBrush x:Key="InputFill" Color="#B31E1E1E"/>
+          <SolidColorBrush x:Key="InputStroke" Color="#12FFFFFF"/>
+          <SolidColorBrush x:Key="SubtleFill" Color="#0FFFFFFF"/>
+          <SolidColorBrush x:Key="SubtleFillStrong" Color="#15FFFFFF"/>
+          <SolidColorBrush x:Key="Divider" Color="#15FFFFFF"/>
+          <SolidColorBrush x:Key="KnobOff" Color="#C5FFFFFF"/>
+
+          <SolidColorBrush x:Key="Caution" Color="#FCE100"/>
+          <SolidColorBrush x:Key="CautionBg" Color="#433519"/>
+          <SolidColorBrush x:Key="CautionStroke" Color="#1AFFFFFF"/>
+          <SolidColorBrush x:Key="OnCaution" Color="#000000"/>
+          <SolidColorBrush x:Key="Critical" Color="#FF99A4"/>
+
+          <LinearGradientBrush x:Key="Elev28" StartPoint="0%,0%" EndPoint="0%,100%">
+            <GradientStop Offset="0" Color="#18FFFFFF"/><GradientStop Offset="0.04" Color="#18FFFFFF"/>
+            <GradientStop Offset="0.04" Color="#12FFFFFF"/><GradientStop Offset="1" Color="#12FFFFFF"/>
+          </LinearGradientBrush>
+          <LinearGradientBrush x:Key="Elev32" StartPoint="0%,0%" EndPoint="0%,100%">
+            <GradientStop Offset="0" Color="#18FFFFFF"/><GradientStop Offset="0.035" Color="#18FFFFFF"/>
+            <GradientStop Offset="0.035" Color="#12FFFFFF"/><GradientStop Offset="1" Color="#12FFFFFF"/>
+          </LinearGradientBrush>
+          <LinearGradientBrush x:Key="ElevAccent32" StartPoint="0%,0%" EndPoint="0%,100%">
+            <GradientStop Offset="0" Color="#14000000"/><GradientStop Offset="0.965" Color="#14000000"/>
+            <GradientStop Offset="0.965" Color="#24000000"/><GradientStop Offset="1" Color="#24000000"/>
+          </LinearGradientBrush>
+          <LinearGradientBrush x:Key="ElevInput40" StartPoint="0%,0%" EndPoint="0%,100%">
+            <GradientStop Offset="0" Color="#12FFFFFF"/><GradientStop Offset="0.97" Color="#12FFFFFF"/>
+            <GradientStop Offset="0.97" Color="#8BFFFFFF"/><GradientStop Offset="1" Color="#8BFFFFFF"/>
+          </LinearGradientBrush>
+
+          <LinearGradientBrush x:Key="Focus40" StartPoint="0%,0%" EndPoint="0%,100%">
+            <GradientStop Offset="0" Color="#12FFFFFF"/><GradientStop Offset="0.95" Color="#12FFFFFF"/>
+            <GradientStop Offset="0.95" Color="#4CC2FF"/><GradientStop Offset="1" Color="#4CC2FF"/>
+          </LinearGradientBrush>
+          <BoxShadows x:Key="ShadowFlyout">0 0 2 0 #47000000, 0 8 24 0 #66000000</BoxShadows>
+          <BoxShadows x:Key="ShadowWindow">0 0 2 0 #52000000, 0 8 32 0 #73000000</BoxShadows>
+          <BoxShadows x:Key="ShadowKnob">0 0 0 0 #00000000</BoxShadows>
+        </ResourceDictionary>
+      </ResourceDictionary.ThemeDictionaries>
+    </ResourceDictionary>
+  </Styles.Resources>
+
+  <!-- ===================== Type ramp (Windows 11) ===================== -->
+  <Style Selector="TextBlock">
+    <Setter Property="FontFamily" Value="{StaticResource UiFont}"/>
+    <Setter Property="FontSize" Value="14"/>
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+  </Style>
+  <Style Selector="TextBlock.cap"><Setter Property="FontSize" Value="12"/></Style>
+  <Style Selector="TextBlock.body"><Setter Property="FontSize" Value="14"/></Style>
+  <Style Selector="TextBlock.strong"><Setter Property="FontWeight" Value="SemiBold"/></Style>
+  <Style Selector="TextBlock.large"><Setter Property="FontSize" Value="18"/></Style>
+  <Style Selector="TextBlock.sub"><Setter Property="FontSize" Value="20"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
+  <Style Selector="TextBlock.title"><Setter Property="FontSize" Value="28"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
+  <Style Selector="TextBlock.sec"><Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/></Style>
+  <Style Selector="TextBlock.ter"><Setter Property="Foreground" Value="{DynamicResource TextTertiary}"/></Style>
+  <Style Selector="TextBlock.dis"><Setter Property="Foreground" Value="{DynamicResource TextDisabled}"/></Style>
+  <Style Selector="TextBlock.acc"><Setter Property="Foreground" Value="{DynamicResource AccentText}"/></Style>
+  <Style Selector="TextBlock.on"><Setter Property="Foreground" Value="{DynamicResource OnAccent}"/></Style>
+  <Style Selector="TextBlock.on2"><Setter Property="Foreground" Value="{DynamicResource OnAccentSecondary}"/></Style>
+
+  <!-- ===================== Icons ===================== -->
+  <Style Selector="Path.ic">
+    <Setter Property="Width" Value="16"/>
+    <Setter Property="Height" Value="16"/>
+    <Setter Property="Stroke" Value="{DynamicResource TextPrimary}"/>
+    <Setter Property="StrokeThickness" Value="1.25"/>
+    <Setter Property="StrokeLineCap" Value="Round"/>
+    <Setter Property="StrokeJoin" Value="Round"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+    <Setter Property="HorizontalAlignment" Value="Center"/>
+  </Style>
+  <Style Selector="Path.ic.bold"><Setter Property="StrokeThickness" Value="1.5"/></Style>
+  <Style Selector="Path.ic.sec"><Setter Property="Stroke" Value="{DynamicResource TextSecondary}"/></Style>
+  <Style Selector="Path.ic.ter"><Setter Property="Stroke" Value="{DynamicResource TextTertiary}"/></Style>
+  <Style Selector="Path.ic.dis"><Setter Property="Stroke" Value="{DynamicResource TextDisabled}"/></Style>
+  <Style Selector="Path.ic.acc"><Setter Property="Stroke" Value="{DynamicResource Accent}"/></Style>
+  <Style Selector="Path.ic.on"><Setter Property="Stroke" Value="{DynamicResource OnAccent}"/></Style>
+  <Style Selector="Path.ic.ondis"><Setter Property="Stroke" Value="{DynamicResource OnAccentDisabled}"/></Style>
+
+  <!-- ===================== Surfaces ===================== -->
+  <!-- Flyout / bar: OverlayCornerRadius 8, acrylic stand-in, hairline, soft shadow -->
+  <Style Selector="Border.flyout">
+    <Setter Property="Background" Value="{DynamicResource FlyoutFill}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource FlyoutStroke}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="8"/>
+    <Setter Property="BoxShadow" Value="{DynamicResource ShadowFlyout}"/>
+  </Style>
+  <Style Selector="Border.footer">
+    <Setter Property="Background" Value="{DynamicResource FooterFill}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource Divider}"/>
+    <Setter Property="BorderThickness" Value="0,1,0,0"/>
+  </Style>
+  <Style Selector="Border.window">
+    <Setter Property="Background" Value="{DynamicResource MicaFill}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource WindowStroke}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="8"/>
+    <Setter Property="BoxShadow" Value="{DynamicResource ShadowWindow}"/>
+  </Style>
+  <Style Selector="Border.card">
+    <Setter Property="Background" Value="{DynamicResource CardFill}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource CardStroke}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="4"/>
+  </Style>
+  <Style Selector="Border.divider">
+    <Setter Property="Height" Value="1"/>
+    <Setter Property="Background" Value="{DynamicResource Divider}"/>
+  </Style>
+  <Style Selector="Border.vdivider">
+    <Setter Property="Width" Value="1"/>
+    <Setter Property="Height" Value="16"/>
+    <Setter Property="Background" Value="{DynamicResource Divider}"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+  </Style>
+  <!-- Selection indicator pill (NavigationView / SelectorBar) -->
+  <Style Selector="Border.pill">
+    <Setter Property="Background" Value="{DynamicResource Accent}"/>
+    <Setter Property="CornerRadius" Value="1.5"/>
+  </Style>
+
+  <!-- Text box: ControlCornerRadius 4, focused = 2 px accent bottom edge -->
+  <Style Selector="Border.input">
+    <Setter Property="Background" Value="{DynamicResource InputFill}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource InputStroke}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="4"/>
+    <Setter Property="ClipToBounds" Value="True"/>
+  </Style>
+  <Style Selector="Border.input.rest"><Setter Property="BorderBrush" Value="{DynamicResource ElevInput40}"/></Style>
+  <Style Selector="Border.input.focus">
+    <Setter Property="BorderBrush" Value="{DynamicResource Focus40}"/>
+    <Setter Property="BorderThickness" Value="1,1,1,2"/>
+  </Style>
+  <Style Selector="Border.caret">
+    <Setter Property="Width" Value="1"/>
+    <Setter Property="Height" Value="18"/>
+    <Setter Property="Background" Value="{DynamicResource TextPrimary}"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+  </Style>
+
+  <!-- Copied-message quote: subtle fill, ControlCornerRadius -->
+  <Style Selector="Border.quote">
+    <Setter Property="Background" Value="{DynamicResource SubtleFill}"/>
+    <Setter Property="CornerRadius" Value="4"/>
+  </Style>
+  <!-- InfoBar (caution) card -->
+  <Style Selector="Border.flyout.caution">
+    <Setter Property="Background" Value="{DynamicResource CautionBg}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource CautionStroke}"/>
+  </Style>
+  <Style Selector="Ellipse.caution"><Setter Property="Fill" Value="{DynamicResource Caution}"/></Style>
+  <Style Selector="Path.oncaution">
+    <Setter Property="Stroke" Value="{DynamicResource OnCaution}"/>
+    <Setter Property="StrokeThickness" Value="1.5"/>
+    <Setter Property="StrokeLineCap" Value="Round"/>
+  </Style>
+  <!-- Long-form reply text -->
+  <Style Selector="TextBlock.reply">
+    <Setter Property="FontSize" Value="14"/>
+    <Setter Property="LineHeight" Value="22"/>
+    <Setter Property="TextWrapping" Value="Wrap"/>
+  </Style>
+  <!-- Window chrome and NavigationView -->
+  <Style Selector="Border.layer">
+    <Setter Property="Background" Value="{DynamicResource LayerFill}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource LayerStroke}"/>
+    <Setter Property="BorderThickness" Value="1,1,0,0"/>
+    <Setter Property="CornerRadius" Value="8,0,0,0"/>
+  </Style>
+  <Style Selector="Border.navsel">
+    <Setter Property="Background" Value="{DynamicResource SubtleFill}"/>
+    <Setter Property="CornerRadius" Value="4"/>
+  </Style>
+  <Style Selector="Border.taskbar">
+    <Setter Property="Background" Value="{DynamicResource TaskbarFill}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource TaskbarStroke}"/>
+    <Setter Property="BorderThickness" Value="0,1,0,0"/>
+  </Style>
+  <Style Selector="Border.mi">
+    <Setter Property="Height" Value="32"/>
+    <Setter Property="Margin" Value="4,0"/>
+    <Setter Property="CornerRadius" Value="4"/>
+    <Setter Property="Background" Value="Transparent"/>
+  </Style>
+  <Style Selector="Border.mi.hover"><Setter Property="Background" Value="{DynamicResource SubtleFill}"/></Style>
+
+  <!-- Buttons: standard / accent / subtle / disabled accent -->
+  <Style Selector="Border.btn">
+    <Setter Property="Height" Value="32"/>
+    <Setter Property="CornerRadius" Value="4"/>
+    <Setter Property="Background" Value="{DynamicResource ControlFill}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource Elev32}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+  </Style>
+  <Style Selector="Border.btn.h28"><Setter Property="Height" Value="28"/><Setter Property="BorderBrush" Value="{DynamicResource Elev28}"/></Style>
+  <Style Selector="Border.btn.acc">
+    <Setter Property="Background" Value="{DynamicResource Accent}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource ElevAccent32}"/>
+  </Style>
+  <Style Selector="Border.btn.accdis">
+    <Setter Property="Background" Value="{DynamicResource AccentDisabled}"/>
+    <Setter Property="BorderThickness" Value="0"/>
+  </Style>
+  <Style Selector="Border.btn.subtle">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="BorderThickness" Value="0"/>
+  </Style>
+  <Style Selector="Border.btn.hover"><Setter Property="Background" Value="{DynamicResource SubtleFill}"/></Style>
+
+  <!-- Keycap -->
+  <Style Selector="Border.kbd">
+    <Setter Property="Height" Value="28"/>
+    <Setter Property="MinWidth" Value="28"/>
+    <Setter Property="Padding" Value="10,0"/>
+    <Setter Property="CornerRadius" Value="4"/>
+    <Setter Property="Background" Value="{DynamicResource ControlFill}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource Elev28}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+  </Style>
+
+  <!-- Segmented control (Windows Community Toolkit look) -->
+  <Style Selector="Border.seg">
+    <Setter Property="Background" Value="{DynamicResource ControlAltFill}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource ControlStroke}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="4"/>
+    <Setter Property="Padding" Value="2"/>
+  </Style>
+  <Style Selector="Border.segitem">
+    <Setter Property="CornerRadius" Value="3"/>
+    <Setter Property="Padding" Value="12,0"/>
+    <Setter Property="Height" Value="26"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="BorderBrush" Value="Transparent"/>
+    <Setter Property="Background" Value="Transparent"/>
+  </Style>
+  <Style Selector="Border.segitem.sel">
+    <Setter Property="Background" Value="{DynamicResource ControlFill}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource Elev28}"/>
+  </Style>
+
+  <!-- Toggle switch (40×20) -->
+  <Style Selector="Border.track">
+    <Setter Property="Width" Value="40"/>
+    <Setter Property="Height" Value="20"/>
+    <Setter Property="CornerRadius" Value="10"/>
+    <Setter Property="BorderThickness" Value="1"/>
+  </Style>
+  <Style Selector="Border.track.on">
+    <Setter Property="Background" Value="{DynamicResource Accent}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+  </Style>
+  <Style Selector="Border.track.off">
+    <Setter Property="Background" Value="{DynamicResource ControlAltFill}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource ControlStrongStroke}"/>
+  </Style>
+  <Style Selector="Ellipse.knob">
+    <Setter Property="Width" Value="12"/>
+    <Setter Property="Height" Value="12"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+  </Style>
+  <Style Selector="Ellipse.knob.on">
+    <Setter Property="Fill" Value="{DynamicResource OnAccent}"/>
+    <Setter Property="HorizontalAlignment" Value="Right"/>
+    <Setter Property="Margin" Value="0,0,4,0"/>
+  </Style>
+  <Style Selector="Ellipse.knob.off">
+    <Setter Property="Fill" Value="{DynamicResource KnobOff}"/>
+    <Setter Property="HorizontalAlignment" Value="Left"/>
+    <Setter Property="Margin" Value="4,0,0,0"/>
+  </Style>
+
+  <!-- Waveform bar -->
+  <Style Selector="Border.wave">
+    <Setter Property="Width" Value="3"/>
+    <Setter Property="CornerRadius" Value="1.5"/>
+    <Setter Property="Background" Value="{DynamicResource Accent}"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+  </Style>
+</Styles>

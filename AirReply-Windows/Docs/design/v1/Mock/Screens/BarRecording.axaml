@@ -1,0 +1,40 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:p="using:Mock.Parts" x:Class="Mock.Screens.BarRecording">
+  <!-- 4 · Recording: live waveform replaces the text; Esc cancels, Enter recognises -->
+  <Border Classes="flyout" Margin="40" Width="680" VerticalAlignment="Top" HorizontalAlignment="Left" Padding="8,8,8,10">
+    <StackPanel Spacing="8">
+      <Border Classes="input focus" Height="40">
+        <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto">
+          <Panel Width="18" Height="18" Margin="11,0,10,0">
+            <Ellipse Width="18" Height="18" Fill="{DynamicResource AccentHalo}"/>
+            <Ellipse Width="8" Height="8" Fill="{DynamicResource Accent}"/>
+          </Panel>
+          <StackPanel Grid.Column="1" x:Name="Wave" Orientation="Horizontal" Spacing="5" VerticalAlignment="Center"/>
+          <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="4" Margin="0,0,12,0">
+            <TextBlock Text="0:07"/>
+            <TextBlock Classes="ter" Text="/ 0:40"/>
+          </StackPanel>
+          <Border Grid.Column="4" Classes="btn subtle" Width="32" Margin="0,0,4,0">
+            <Path Classes="ic sec" Data="{StaticResource IcClose}"/>
+          </Border>
+          <Border Grid.Column="5" Classes="btn acc" Width="32" Margin="0,0,3,0">
+            <Path Classes="ic bold on" Data="{StaticResource IcCheck}"/>
+          </Border>
+        </Grid>
+      </Border>
+      <Grid ColumnDefinitions="*,Auto" Margin="12,0,10,0">
+        <TextBlock Classes="cap ter" Text="Идёт запись"/>
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="20">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <TextBlock Classes="cap sec" Text="Отменить"/>
+            <TextBlock Classes="cap ter" Text="Esc"/>
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <TextBlock Classes="cap sec" Text="Готово"/>
+            <TextBlock Classes="cap ter" Text="Enter"/>
+          </StackPanel>
+        </StackPanel>
+      </Grid>
+    </StackPanel>
+  </Border>
+</UserControl>

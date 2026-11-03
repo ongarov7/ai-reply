@@ -1,0 +1,47 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:p="using:Mock.Parts" x:Class="Mock.Screens.BarResult">
+  <!-- 3 · Result: instruction already sent (send drops to neutral), result card is the single accent -->
+  <StackPanel Margin="40" Width="680" VerticalAlignment="Top" HorizontalAlignment="Left" Spacing="8">
+    <Border Classes="flyout" Padding="8">
+      <Border Classes="input rest" Height="40">
+        <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+          <p:BrandGlyph Margin="11,0,10,0"/>
+          <TextBlock Grid.Column="1" Classes="body" TextTrimming="CharacterEllipsis"
+                     Text="Ответь клиенту, что документы получили, по договору ответим до пятницы"/>
+          <Border Grid.Column="2" Classes="btn subtle" Width="32" Margin="8,0,4,0">
+            <Path Classes="ic sec" Data="{StaticResource IcMic}"/>
+          </Border>
+          <Border Grid.Column="3" Classes="btn" Width="32" Margin="0,0,3,0">
+            <Path Classes="ic bold" Data="{StaticResource IcArrowUp}"/>
+          </Border>
+        </Grid>
+      </Border>
+    </Border>
+
+    <Border Classes="flyout" ClipToBounds="True">
+      <StackPanel>
+        <TextBlock Classes="reply" Margin="16,14,16,16"
+                   Text="Добрый день! Да, документы получили, спасибо. По договору ответим до конца пятницы — сейчас его смотрит юрист. Если появятся вопросы, напишу вам заранее."/>
+        <Border Classes="footer" Padding="16,12,12,12">
+          <Grid ColumnDefinitions="*,Auto,Auto">
+            <TextBlock Classes="cap sec" Text="Осталось сегодня: 27"/>
+            <Border Grid.Column="1" Classes="btn">
+              <StackPanel Orientation="Horizontal" Spacing="8" Margin="11,0,12,0">
+                <Path Classes="ic" Data="{StaticResource IcRefresh}"/>
+                <TextBlock Text="Ещё вариант"/>
+                <TextBlock Classes="cap ter" Text="Ctrl+R"/>
+              </StackPanel>
+            </Border>
+            <Border Grid.Column="2" Classes="btn acc" Margin="8,0,0,0">
+              <StackPanel Orientation="Horizontal" Spacing="8" Margin="11,0,12,0">
+                <Path Classes="ic on" Data="{StaticResource IcCopy}"/>
+                <TextBlock Classes="on" Text="Копировать"/>
+                <TextBlock Classes="cap on2" Text="Ctrl+Enter"/>
+              </StackPanel>
+            </Border>
+          </Grid>
+        </Border>
+      </StackPanel>
+    </Border>
+  </StackPanel>
+</UserControl>

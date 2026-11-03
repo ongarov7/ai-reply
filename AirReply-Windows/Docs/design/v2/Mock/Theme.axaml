@@ -1,0 +1,482 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:m="using:Mock">
+  <!--
+    AI Reply for Windows · Direction B "Premium command palette"
+    Tokens follow WinUI 3 / Fluent 2 theme resources (alpha-on-surface fills and strokes), with the Windows 11
+    default accent pair: AccentDark1 #0067C0 (light) / AccentLight2 #4CC2FF (dark).
+    Materials are simulated: Desktop Acrylic = semi-transparent surface over Wallpaper + 1 px hairline + soft shadow.
+  -->
+  <Styles.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.ThemeDictionaries>
+
+        <!-- ═══════════════ LIGHT ═══════════════ -->
+        <ResourceDictionary x:Key="Light">
+          <SolidColorBrush x:Key="Wallpaper" Color="#DCE3EC"/>
+
+          <!-- materials -->
+          <SolidColorBrush x:Key="SurfaceAcrylic" Color="#E0FCFCFC"/>
+          <SolidColorBrush x:Key="SurfaceMica" Color="#EBF3F3F3"/>
+          <SolidColorBrush x:Key="SurfaceLayer" Color="#80FFFFFF"/>
+          <SolidColorBrush x:Key="SurfaceTaskbar" Color="#E0EEEEEE"/>
+
+          <!-- strokes -->
+          <SolidColorBrush x:Key="StrokeSurface" Color="#17000000"/>
+          <SolidColorBrush x:Key="StrokeDivider" Color="#0F000000"/>
+          <SolidColorBrush x:Key="StrokeCard" Color="#0F000000"/>
+          <SolidColorBrush x:Key="StrokeControl" Color="#12000000"/>
+          <SolidColorBrush x:Key="StrokeStrong" Color="#72000000"/>
+          <SolidColorBrush x:Key="StrokeKeycap" Color="#17000000"/>
+
+          <!-- fills -->
+          <SolidColorBrush x:Key="FillCard" Color="#B3FFFFFF"/>
+          <SolidColorBrush x:Key="FillControl" Color="#C7FFFFFF"/>
+          <SolidColorBrush x:Key="FillInput" Color="#B3FFFFFF"/>
+          <SolidColorBrush x:Key="FillInputActive" Color="#FFFFFFFF"/>
+          <SolidColorBrush x:Key="FillSubtle" Color="#09000000"/>
+          <SolidColorBrush x:Key="FillSubtleStrong" Color="#0F000000"/>
+          <SolidColorBrush x:Key="FillKeycap" Color="#F2FFFFFF"/>
+          <SolidColorBrush x:Key="FillToggleOff" Color="#06000000"/>
+          <SolidColorBrush x:Key="FillKnobOff" Color="#72000000"/>
+          <SolidColorBrush x:Key="SegTrack" Color="#09000000"/>
+          <SolidColorBrush x:Key="SegThumb" Color="#FFFFFFFF"/>
+
+          <!-- text -->
+          <SolidColorBrush x:Key="TextPrimary" Color="#E4000000"/>
+          <SolidColorBrush x:Key="TextSecondary" Color="#9E000000"/>
+          <SolidColorBrush x:Key="TextTertiary" Color="#72000000"/>
+          <SolidColorBrush x:Key="TextDisabled" Color="#5C000000"/>
+          <SolidColorBrush x:Key="TextPlaceholder" Color="#9E000000"/>
+
+          <!-- accent -->
+          <SolidColorBrush x:Key="Accent" Color="#0067C0"/>
+          <SolidColorBrush x:Key="AccentText" Color="#0067C0"/>
+          <SolidColorBrush x:Key="OnAccent" Color="#FFFFFF"/>
+          <SolidColorBrush x:Key="AccentSubtle" Color="#140067C0"/>
+          <SolidColorBrush x:Key="AccentSubtleStroke" Color="#4D0067C0"/>
+          <SolidColorBrush x:Key="AccentHalo" Color="#260067C0"/>
+          <SolidColorBrush x:Key="AccentDisabled" Color="#0F000000"/>
+          <SolidColorBrush x:Key="OnAccentDisabled" Color="#5C000000"/>
+          <SolidColorBrush x:Key="KeycapOnAccent" Color="#2EFFFFFF"/>
+
+          <!-- status (red only for real errors) -->
+          <SolidColorBrush x:Key="Caution" Color="#9D5D00"/>
+          <SolidColorBrush x:Key="Critical" Color="#C42B1C"/>
+          <SolidColorBrush x:Key="Success" Color="#0F7B0F"/>
+
+          <!-- depth -->
+          <BoxShadows x:Key="ShadowFloat">0 16 40 0 #24000000, 0 2 8 0 #14000000</BoxShadows>
+          <BoxShadows x:Key="ShadowCard">0 10 28 0 #1C000000, 0 1 4 0 #10000000</BoxShadows>
+          <BoxShadows x:Key="ShadowMenu">0 8 24 0 #24000000, 0 1 3 0 #12000000</BoxShadows>
+          <BoxShadows x:Key="ShadowWindow">0 24 60 0 #2E000000, 0 4 12 0 #14000000</BoxShadows>
+          <BoxShadows x:Key="ShadowControl">0 1 0 0 #0F000000</BoxShadows>
+          <BoxShadows x:Key="ShadowAccent">0 1 0 0 #29000000</BoxShadows>
+          <BoxShadows x:Key="ShadowRaised">0 1 3 0 #1A000000</BoxShadows>
+          <BoxShadows x:Key="ShadowKey">0 1 0 0 #1F000000</BoxShadows>
+        </ResourceDictionary>
+
+        <!-- ═══════════════ DARK ═══════════════ -->
+        <ResourceDictionary x:Key="Dark">
+          <SolidColorBrush x:Key="Wallpaper" Color="#1B1F24"/>
+
+          <SolidColorBrush x:Key="SurfaceAcrylic" Color="#E02B2B2B"/>
+          <SolidColorBrush x:Key="SurfaceMica" Color="#F0202020"/>
+          <SolidColorBrush x:Key="SurfaceLayer" Color="#4C3A3A3A"/>
+          <SolidColorBrush x:Key="SurfaceTaskbar" Color="#E61C1C1C"/>
+
+          <SolidColorBrush x:Key="StrokeSurface" Color="#1FFFFFFF"/>
+          <SolidColorBrush x:Key="StrokeDivider" Color="#15FFFFFF"/>
+          <SolidColorBrush x:Key="StrokeCard" Color="#19000000"/>
+          <SolidColorBrush x:Key="StrokeControl" Color="#14FFFFFF"/>
+          <SolidColorBrush x:Key="StrokeStrong" Color="#8BFFFFFF"/>
+          <SolidColorBrush x:Key="StrokeKeycap" Color="#17FFFFFF"/>
+
+          <SolidColorBrush x:Key="FillCard" Color="#0DFFFFFF"/>
+          <SolidColorBrush x:Key="FillControl" Color="#0FFFFFFF"/>
+          <SolidColorBrush x:Key="FillInput" Color="#0FFFFFFF"/>
+          <SolidColorBrush x:Key="FillInputActive" Color="#B31E1E1E"/>
+          <SolidColorBrush x:Key="FillSubtle" Color="#0FFFFFFF"/>
+          <SolidColorBrush x:Key="FillSubtleStrong" Color="#15FFFFFF"/>
+          <SolidColorBrush x:Key="FillKeycap" Color="#12FFFFFF"/>
+          <SolidColorBrush x:Key="FillToggleOff" Color="#0AFFFFFF"/>
+          <SolidColorBrush x:Key="FillKnobOff" Color="#C5FFFFFF"/>
+          <SolidColorBrush x:Key="SegTrack" Color="#26000000"/>
+          <SolidColorBrush x:Key="SegThumb" Color="#1FFFFFFF"/>
+
+          <SolidColorBrush x:Key="TextPrimary" Color="#FFFFFF"/>
+          <SolidColorBrush x:Key="TextSecondary" Color="#C5FFFFFF"/>
+          <SolidColorBrush x:Key="TextTertiary" Color="#87FFFFFF"/>
+          <SolidColorBrush x:Key="TextDisabled" Color="#5DFFFFFF"/>
+          <SolidColorBrush x:Key="TextPlaceholder" Color="#9EFFFFFF"/>
+
+          <SolidColorBrush x:Key="Accent" Color="#4CC2FF"/>
+          <SolidColorBrush x:Key="AccentText" Color="#4CC2FF"/>
+          <SolidColorBrush x:Key="OnAccent" Color="#000000"/>
+          <SolidColorBrush x:Key="AccentSubtle" Color="#244CC2FF"/>
+          <SolidColorBrush x:Key="AccentSubtleStroke" Color="#734CC2FF"/>
+          <SolidColorBrush x:Key="AccentHalo" Color="#334CC2FF"/>
+          <SolidColorBrush x:Key="AccentDisabled" Color="#12FFFFFF"/>
+          <SolidColorBrush x:Key="OnAccentDisabled" Color="#5DFFFFFF"/>
+          <SolidColorBrush x:Key="KeycapOnAccent" Color="#1F000000"/>
+
+          <SolidColorBrush x:Key="Caution" Color="#FFB900"/>
+          <SolidColorBrush x:Key="Critical" Color="#FF99A4"/>
+          <SolidColorBrush x:Key="Success" Color="#6CCB5F"/>
+
+          <BoxShadows x:Key="ShadowFloat">0 16 40 0 #8C000000, 0 2 8 0 #59000000</BoxShadows>
+          <BoxShadows x:Key="ShadowCard">0 10 28 0 #73000000, 0 1 4 0 #4D000000</BoxShadows>
+          <BoxShadows x:Key="ShadowMenu">0 8 24 0 #80000000, 0 1 3 0 #4D000000</BoxShadows>
+          <BoxShadows x:Key="ShadowWindow">0 24 60 0 #99000000, 0 4 12 0 #59000000</BoxShadows>
+          <BoxShadows x:Key="ShadowControl">0 1 0 0 #1A000000</BoxShadows>
+          <BoxShadows x:Key="ShadowAccent">0 1 0 0 #24000000</BoxShadows>
+          <BoxShadows x:Key="ShadowRaised">0 1 3 0 #4D000000</BoxShadows>
+          <BoxShadows x:Key="ShadowKey">0 1 0 0 #66000000</BoxShadows>
+        </ResourceDictionary>
+      </ResourceDictionary.ThemeDictionaries>
+
+      <!-- type: Segoe UI Variable on Windows; embedded Inter stands in here -->
+      <FontFamily x:Key="FontUI">Segoe UI Variable Text, Segoe UI, fonts:Inter#Inter</FontFamily>
+
+      <!-- radii -->
+      <CornerRadius x:Key="RadiusFloat">12</CornerRadius>
+      <CornerRadius x:Key="RadiusOverlay">8</CornerRadius>
+      <CornerRadius x:Key="RadiusControl">6</CornerRadius>
+      <CornerRadius x:Key="RadiusSmall">4</CornerRadius>
+
+      <!-- outline icons, 16 px grid, 1.25 px stroke -->
+      <StreamGeometry x:Key="IcMic">M8,1.75 C9.243,1.75 10.25,2.757 10.25,4 V7.5 C10.25,8.743 9.243,9.75 8,9.75 C6.757,9.75 5.75,8.743 5.75,7.5 V4 C5.75,2.757 6.757,1.75 8,1.75 Z M3.75,7.5 C3.75,9.847 5.653,11.75 8,11.75 C10.347,11.75 12.25,9.847 12.25,7.5 M8,11.75 V14.25</StreamGeometry>
+      <StreamGeometry x:Key="IcArrowUp">M8,13 V3.25 M3.75,7.5 L8,3.25 L12.25,7.5</StreamGeometry>
+      <StreamGeometry x:Key="IcArrowRight">M3,8 H12.75 M8.5,3.75 L12.75,8 L8.5,12.25</StreamGeometry>
+      <StreamGeometry x:Key="IcClose">M4.25,4.25 L11.75,11.75 M11.75,4.25 L4.25,11.75</StreamGeometry>
+      <StreamGeometry x:Key="IcCheck">M3,8.5 L6.5,12 L13,4.5</StreamGeometry>
+      <StreamGeometry x:Key="IcReply">M6.25,3.25 L2.75,6.75 L6.25,10.25 M2.75,6.75 H9.25 C11.459,6.75 13.25,8.541 13.25,10.75 V12.75</StreamGeometry>
+      <StreamGeometry x:Key="IcDoc">M4.5,1.75 H9.25 L12.75,5.25 V13 C12.75,13.69 12.19,14.25 11.5,14.25 H4.5 C3.81,14.25 3.25,13.69 3.25,13 V3 C3.25,2.31 3.81,1.75 4.5,1.75 Z M9.25,1.75 V5.25 H12.75</StreamGeometry>
+      <StreamGeometry x:Key="IcTable">M4,2.75 H12 A1.75,1.75 0 0 1 13.75,4.5 V11.5 A1.75,1.75 0 0 1 12,13.25 H4 A1.75,1.75 0 0 1 2.25,11.5 V4.5 A1.75,1.75 0 0 1 4,2.75 Z M2.25,6.25 H13.75 M2.25,9.75 H13.75 M6.25,6.25 V13.25</StreamGeometry>
+      <StreamGeometry x:Key="IcPlus">M8,3.25 V12.75 M3.25,8 H12.75</StreamGeometry>
+      <StreamGeometry x:Key="IcChevronDown">M4.5,6.25 L8,9.75 L11.5,6.25</StreamGeometry>
+      <StreamGeometry x:Key="IcChevronUp">M4.5,9.75 L8,6.25 L11.5,9.75</StreamGeometry>
+      <StreamGeometry x:Key="IcRefresh">M12.55,5.63 A5.25,5.25 0 1 1 8,3 M6,0.9 L8.2,3 L6,5.1</StreamGeometry>
+      <StreamGeometry x:Key="IcCopy">M3.25,10.75 V3.5 C3.25,2.534 4.034,1.75 5,1.75 H10.5 M6.75,4.75 H11.75 C12.578,4.75 13.25,5.422 13.25,6.25 V12.75 C13.25,13.578 12.578,14.25 11.75,14.25 H6.75 C5.922,14.25 5.25,13.578 5.25,12.75 V6.25 C5.25,5.422 5.922,4.75 6.75,4.75 Z</StreamGeometry>
+      <StreamGeometry x:Key="IcPerson">M5.25,5 A2.75,2.75 0 1 1 10.75,5 A2.75,2.75 0 1 1 5.25,5 Z M2.75,14 C2.75,11.5 5.1,9.75 8,9.75 C10.9,9.75 13.25,11.5 13.25,14</StreamGeometry>
+      <StreamGeometry x:Key="IcContact">M3.5,2.75 H12.5 A1.75,1.75 0 0 1 14.25,4.5 V11.5 A1.75,1.75 0 0 1 12.5,13.25 H3.5 A1.75,1.75 0 0 1 1.75,11.5 V4.5 A1.75,1.75 0 0 1 3.5,2.75 Z M4.25,6.5 A1.5,1.5 0 1 1 7.25,6.5 A1.5,1.5 0 1 1 4.25,6.5 Z M3.5,10.5 C3.5,9.4 4.5,8.75 5.75,8.75 C7,8.75 8,9.4 8,10.5 M10,6.25 H12.25 M10,9.25 H12.25</StreamGeometry>
+      <StreamGeometry x:Key="IcInfo">M1.75,8 A6.25,6.25 0 1 1 14.25,8 A6.25,6.25 0 1 1 1.75,8 Z M8,7.25 V11.25 M8,4.8 V4.9</StreamGeometry>
+      <StreamGeometry x:Key="IcPower">M8,1.75 V7.5 M4.75,3.75 A5.25,5.25 0 1 0 11.25,3.75</StreamGeometry>
+      <StreamGeometry x:Key="IcCard">M3.5,3.25 H12.5 A1.75,1.75 0 0 1 14.25,5 V11 A1.75,1.75 0 0 1 12.5,12.75 H3.5 A1.75,1.75 0 0 1 1.75,11 V5 A1.75,1.75 0 0 1 3.5,3.25 Z M1.75,6.5 H14.25 M4.25,10 H6.75</StreamGeometry>
+      <StreamGeometry x:Key="IcPencil">M10.5,2.5 L13.5,5.5 L5.5,13.5 L2.25,13.75 L2.5,10.5 Z M9,4 L12,7</StreamGeometry>
+      <StreamGeometry x:Key="IcExternal">M9.25,2.75 H13.25 V6.75 M13.25,2.75 L7.75,8.25 M11.25,9.5 V12.25 C11.25,12.802 10.802,13.25 10.25,13.25 H3.75 C3.198,13.25 2.75,12.802 2.75,12.25 V5.75 C2.75,5.198 3.198,4.75 3.75,4.75 H6.5</StreamGeometry>
+      <!-- filled glyphs -->
+      <StreamGeometry x:Key="IcCaution">F0 M8,1 A7,7 0 1 1 8,15 A7,7 0 1 1 8,1 Z M7.2,4.25 H8.8 L8.55,9.25 H7.45 Z M8,10.4 A0.95,0.95 0 1 1 8,12.3 A0.95,0.95 0 1 1 8,10.4 Z</StreamGeometry>
+      <!-- window caption glyphs, 10 px -->
+      <StreamGeometry x:Key="IcCapMin">M0,5.5 H10</StreamGeometry>
+      <StreamGeometry x:Key="IcCapClose">M0.5,0.5 L9.5,9.5 M9.5,0.5 L0.5,9.5</StreamGeometry>
+    </ResourceDictionary>
+  </Styles.Resources>
+
+  <!-- ═══════════════ base ═══════════════ -->
+  <Style Selector="UserControl">
+    <Setter Property="FontFamily" Value="{StaticResource FontUI}"/>
+    <Setter Property="FontSize" Value="14"/>
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+  </Style>
+
+  <!-- ═══════════════ type ramp ═══════════════ -->
+  <!-- input 18/24 · reading 16/24 · body 14/20 · caption 12/16 · keycap 11/14 · title 28/36 -->
+  <Style Selector="TextBlock.input"><Setter Property="FontSize" Value="18"/><Setter Property="LineHeight" Value="24"/></Style>
+  <Style Selector="TextBlock.placeholder">
+    <Setter Property="FontSize" Value="18"/><Setter Property="LineHeight" Value="24"/>
+    <Setter Property="Foreground" Value="{DynamicResource TextPlaceholder}"/>
+  </Style>
+  <Style Selector="TextBlock.reading"><Setter Property="FontSize" Value="16"/><Setter Property="LineHeight" Value="24"/></Style>
+  <Style Selector="TextBlock.body"><Setter Property="FontSize" Value="14"/><Setter Property="LineHeight" Value="20"/></Style>
+  <Style Selector="TextBlock.strong"><Setter Property="FontSize" Value="14"/><Setter Property="LineHeight" Value="20"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
+  <Style Selector="TextBlock.caption">
+    <Setter Property="FontSize" Value="12"/><Setter Property="LineHeight" Value="16"/>
+    <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+  </Style>
+  <Style Selector="TextBlock.title"><Setter Property="FontSize" Value="28"/><Setter Property="LineHeight" Value="36"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
+  <Style Selector="TextBlock.secondary"><Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/></Style>
+  <Style Selector="TextBlock.tertiary"><Setter Property="Foreground" Value="{DynamicResource TextTertiary}"/></Style>
+  <Style Selector="TextBlock.disabled"><Setter Property="Foreground" Value="{DynamicResource TextDisabled}"/></Style>
+  <Style Selector="TextBlock.accent"><Setter Property="Foreground" Value="{DynamicResource AccentText}"/></Style>
+  <Style Selector="TextBlock.caution"><Setter Property="Foreground" Value="{DynamicResource Caution}"/></Style>
+  <Style Selector="TextBlock.medium"><Setter Property="FontWeight" Value="Medium"/></Style>
+
+  <!-- ═══════════════ surfaces ═══════════════ -->
+  <Style Selector="Border.float">
+    <Setter Property="Background" Value="{DynamicResource SurfaceAcrylic}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource StrokeSurface}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusFloat}"/>
+    <Setter Property="BoxShadow" Value="{DynamicResource ShadowFloat}"/>
+  </Style>
+  <Style Selector="Border.card">
+    <Setter Property="Background" Value="{DynamicResource SurfaceAcrylic}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource StrokeSurface}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusFloat}"/>
+    <Setter Property="BoxShadow" Value="{DynamicResource ShadowCard}"/>
+  </Style>
+  <Style Selector="Border.menu">
+    <Setter Property="Background" Value="{DynamicResource SurfaceAcrylic}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource StrokeSurface}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusOverlay}"/>
+    <Setter Property="BoxShadow" Value="{DynamicResource ShadowMenu}"/>
+  </Style>
+  <Style Selector="Border.window">
+    <Setter Property="Background" Value="{DynamicResource SurfaceMica}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource StrokeSurface}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusOverlay}"/>
+    <Setter Property="BoxShadow" Value="{DynamicResource ShadowWindow}"/>
+  </Style>
+  <Style Selector="Border.hair">
+    <Setter Property="Height" Value="1"/>
+    <Setter Property="Background" Value="{DynamicResource StrokeDivider}"/>
+  </Style>
+  <Style Selector="Border.vhair">
+    <Setter Property="Width" Value="1"/>
+    <Setter Property="Background" Value="{DynamicResource StrokeDivider}"/>
+  </Style>
+  <Style Selector="Border.setcard">
+    <Setter Property="Background" Value="{DynamicResource FillCard}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource StrokeCard}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusControl}"/>
+  </Style>
+
+  <!-- ═══════════════ icons ═══════════════ -->
+  <Style Selector="Path.ic">
+    <Setter Property="Width" Value="16"/><Setter Property="Height" Value="16"/>
+    <Setter Property="Stretch" Value="None"/>
+    <Setter Property="StrokeThickness" Value="1.25"/>
+    <Setter Property="StrokeLineCap" Value="Round"/>
+    <Setter Property="StrokeJoin" Value="Round"/>
+    <Setter Property="Stroke" Value="{DynamicResource TextSecondary}"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+  </Style>
+  <Style Selector="Path.ic.primary"><Setter Property="Stroke" Value="{DynamicResource TextPrimary}"/></Style>
+  <Style Selector="Path.ic.tertiary"><Setter Property="Stroke" Value="{DynamicResource TextTertiary}"/></Style>
+  <Style Selector="Path.ic.disabled"><Setter Property="Stroke" Value="{DynamicResource TextDisabled}"/></Style>
+  <Style Selector="Path.ic.accent"><Setter Property="Stroke" Value="{DynamicResource AccentText}"/></Style>
+  <Style Selector="Path.ic.bold"><Setter Property="StrokeThickness" Value="1.6"/></Style>
+  <Style Selector="Path.fill">
+    <Setter Property="Width" Value="16"/><Setter Property="Height" Value="16"/>
+    <Setter Property="Stretch" Value="None"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+  </Style>
+  <Style Selector="Path.fill.caution"><Setter Property="Fill" Value="{DynamicResource Caution}"/></Style>
+  <Style Selector="Path.brand"><Setter Property="Fill" Value="{DynamicResource Accent}"/><Setter Property="VerticalAlignment" Value="Center"/></Style>
+  <Style Selector="Path.brand.mono"><Setter Property="Fill" Value="{DynamicResource TextPrimary}"/></Style>
+
+  <!-- ═══════════════ buttons ═══════════════ -->
+  <!-- standard: 32 px, radius 6, solid-ish white with a 1 px stroke and a darker bottom edge (no gradient) -->
+  <Style Selector="Border.btn">
+    <Setter Property="Height" Value="32"/>
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusControl}"/>
+    <Setter Property="Padding" Value="12,0"/>
+    <Setter Property="Background" Value="{DynamicResource FillControl}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource StrokeControl}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="BoxShadow" Value="{DynamicResource ShadowControl}"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+  </Style>
+  <Style Selector="Border.btn.accent">
+    <Setter Property="Background" Value="{DynamicResource Accent}"/>
+    <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="BoxShadow" Value="{DynamicResource ShadowAccent}"/>
+  </Style>
+  <Style Selector="Border.btn.accent TextBlock"><Setter Property="Foreground" Value="{DynamicResource OnAccent}"/></Style>
+  <Style Selector="Border.btn.accent Path.ic"><Setter Property="Stroke" Value="{DynamicResource OnAccent}"/></Style>
+  <Style Selector="Border.btn.ghost">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="BoxShadow" Value="0 0 0 0 #00000000"/>
+    <Setter Property="Padding" Value="8,0"/>
+  </Style>
+  <Style Selector="Border.btn.small"><Setter Property="Height" Value="28"/></Style>
+  <Style Selector="Border.btn.hover"><Setter Property="Background" Value="{DynamicResource FillSubtle}"/></Style>
+
+  <!-- square icon buttons (mic, send, cancel, confirm) -->
+  <Style Selector="Border.iconbtn">
+    <Setter Property="Width" Value="32"/><Setter Property="Height" Value="32"/>
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusControl}"/>
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+  </Style>
+  <Style Selector="Border.iconbtn > Path.ic"><Setter Property="HorizontalAlignment" Value="Center"/></Style>
+  <Style Selector="Border.iconbtn.subtle"><Setter Property="Background" Value="{DynamicResource FillSubtle}"/></Style>
+  <Style Selector="Border.iconbtn.accent">
+    <Setter Property="Background" Value="{DynamicResource Accent}"/>
+    <Setter Property="BoxShadow" Value="{DynamicResource ShadowAccent}"/>
+  </Style>
+  <Style Selector="Border.iconbtn.accent > Path.ic"><Setter Property="Stroke" Value="{DynamicResource OnAccent}"/><Setter Property="StrokeThickness" Value="1.6"/></Style>
+  <Style Selector="Border.iconbtn.off"><Setter Property="Background" Value="{DynamicResource AccentDisabled}"/></Style>
+  <Style Selector="Border.iconbtn.off > Path.ic"><Setter Property="Stroke" Value="{DynamicResource OnAccentDisabled}"/><Setter Property="StrokeThickness" Value="1.6"/></Style>
+  <Style Selector="Border.iconbtn.small"><Setter Property="Width" Value="24"/><Setter Property="Height" Value="24"/><Setter Property="CornerRadius" Value="{StaticResource RadiusSmall}"/></Style>
+
+  <!-- ═══════════════ keycaps ═══════════════ -->
+  <Style Selector="Border.keycap">
+    <Setter Property="MinWidth" Value="20"/><Setter Property="Height" Value="20"/>
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusSmall}"/>
+    <Setter Property="Padding" Value="5,0"/>
+    <Setter Property="Background" Value="{DynamicResource FillKeycap}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource StrokeKeycap}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="BoxShadow" Value="{DynamicResource ShadowKey}"/>
+  </Style>
+  <Style Selector="Border.keycap > TextBlock">
+    <Setter Property="FontSize" Value="11"/>
+    <Setter Property="FontWeight" Value="Medium"/>
+    <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+    <Setter Property="HorizontalAlignment" Value="Center"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+  </Style>
+  <Style Selector="m|Keys.onaccent Border.keycap">
+    <Setter Property="Background" Value="{DynamicResource KeycapOnAccent}"/>
+    <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="BoxShadow" Value="0 0 0 0 #00000000"/>
+  </Style>
+  <Style Selector="m|Keys.onaccent Border.keycap > TextBlock"><Setter Property="Foreground" Value="{DynamicResource OnAccent}"/></Style>
+  <Style Selector="m|Keys.large Border.keycap"><Setter Property="Height" Value="24"/><Setter Property="MinWidth" Value="24"/><Setter Property="Padding" Value="7,0"/></Style>
+  <Style Selector="m|Keys.large Border.keycap > TextBlock"><Setter Property="FontSize" Value="12"/></Style>
+
+  <!-- ═══════════════ chips (pills) ═══════════════ -->
+  <Style Selector="Border.chip">
+    <Setter Property="Height" Value="32"/>
+    <Setter Property="CornerRadius" Value="16"/>
+    <Setter Property="Padding" Value="14,0,10,0"/>
+    <Setter Property="Background" Value="{DynamicResource FillControl}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource StrokeControl}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="BoxShadow" Value="{DynamicResource ShadowControl}"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+  </Style>
+  <Style Selector="Border.chip.selected">
+    <Setter Property="Background" Value="{DynamicResource AccentSubtle}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentSubtleStroke}"/>
+    <Setter Property="BoxShadow" Value="0 0 0 0 #00000000"/>
+  </Style>
+  <Style Selector="Border.chip.selected TextBlock.label"><Setter Property="Foreground" Value="{DynamicResource AccentText}"/></Style>
+  <Style Selector="Border.chip.selected Border.keycap">
+    <Setter Property="Background" Value="{DynamicResource AccentSubtle}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentSubtleStroke}"/>
+    <Setter Property="BoxShadow" Value="0 0 0 0 #00000000"/>
+  </Style>
+  <Style Selector="Border.chip.selected Border.keycap > TextBlock"><Setter Property="Foreground" Value="{DynamicResource AccentText}"/></Style>
+  <Style Selector="Border.chip.compact"><Setter Property="Height" Value="28"/><Setter Property="CornerRadius" Value="14"/><Setter Property="Padding" Value="10,0"/></Style>
+  <Style Selector="Border.chip.compact TextBlock"><Setter Property="FontSize" Value="13"/></Style>
+  <Style Selector="Border.chip.link">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="BoxShadow" Value="0 0 0 0 #00000000"/>
+  </Style>
+
+  <!-- ═══════════════ segmented control ═══════════════ -->
+  <Style Selector="Border.seg">
+    <Setter Property="Background" Value="{DynamicResource SegTrack}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource StrokeControl}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusControl}"/>
+    <Setter Property="Padding" Value="2"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+  </Style>
+  <Style Selector="Border.seg.pill"><Setter Property="CornerRadius" Value="14"/></Style>
+  <Style Selector="Border.segitem">
+    <Setter Property="Height" Value="26"/>
+    <Setter Property="CornerRadius" Value="4"/>
+    <Setter Property="Padding" Value="12,0"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="BorderBrush" Value="Transparent"/>
+  </Style>
+  <Style Selector="Border.seg.pill Border.segitem"><Setter Property="CornerRadius" Value="12"/><Setter Property="Height" Value="24"/></Style>
+  <Style Selector="Border.segitem > TextBlock">
+    <Setter Property="FontSize" Value="13"/>
+    <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+  </Style>
+  <Style Selector="Border.segitem.on">
+    <Setter Property="Background" Value="{DynamicResource SegThumb}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource StrokeControl}"/>
+    <Setter Property="BoxShadow" Value="{DynamicResource ShadowRaised}"/>
+  </Style>
+  <Style Selector="Border.segitem.on > TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+    <Setter Property="FontWeight" Value="Medium"/>
+  </Style>
+
+  <!-- ═══════════════ toggle switch ═══════════════ -->
+  <Style Selector="m|Toggle">
+    <Setter Property="Width" Value="40"/><Setter Property="Height" Value="20"/>
+    <Setter Property="CornerRadius" Value="10"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="Background" Value="{DynamicResource FillToggleOff}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource StrokeStrong}"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+  </Style>
+  <Style Selector="m|Toggle > Ellipse">
+    <Setter Property="Width" Value="12"/><Setter Property="Height" Value="12"/>
+    <Setter Property="Margin" Value="3,0"/>
+    <Setter Property="HorizontalAlignment" Value="Left"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+    <Setter Property="Fill" Value="{DynamicResource FillKnobOff}"/>
+  </Style>
+  <Style Selector="m|Toggle.on">
+    <Setter Property="Background" Value="{DynamicResource Accent}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+  </Style>
+  <Style Selector="m|Toggle.on > Ellipse">
+    <Setter Property="HorizontalAlignment" Value="Right"/>
+    <Setter Property="Fill" Value="{DynamicResource OnAccent}"/>
+  </Style>
+
+  <!-- ═══════════════ misc ═══════════════ -->
+  <Style Selector="Border.caret">
+    <Setter Property="Width" Value="1"/><Setter Property="Height" Value="22"/>
+    <Setter Property="Background" Value="{DynamicResource TextPrimary}"/>
+    <Setter Property="HorizontalAlignment" Value="Left"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+  </Style>
+  <Style Selector="Border.wavebar"><Setter Property="Background" Value="{DynamicResource Accent}"/></Style>
+  <Style Selector="Border.quote">
+    <Setter Property="Background" Value="{DynamicResource FillSubtle}"/>
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusOverlay}"/>
+  </Style>
+  <Style Selector="Border.slot">
+    <Setter Property="Width" Value="34"/><Setter Property="Height" Value="40"/>
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusControl}"/>
+    <Setter Property="Background" Value="{DynamicResource FillInput}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource StrokeControl}"/>
+    <Setter Property="BorderThickness" Value="1,1,1,1"/>
+  </Style>
+  <Style Selector="Border.slot > TextBlock">
+    <Setter Property="FontSize" Value="18"/>
+    <Setter Property="FontWeight" Value="Medium"/>
+    <Setter Property="HorizontalAlignment" Value="Center"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+  </Style>
+  <Style Selector="Border.slot.focus">
+    <Setter Property="Background" Value="{DynamicResource FillInputActive}"/>
+  </Style>
+  <Style Selector="Border.navitem">
+    <Setter Property="Height" Value="36"/>
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusSmall}"/>
+    <Setter Property="Background" Value="Transparent"/>
+  </Style>
+  <Style Selector="Border.navitem.on"><Setter Property="Background" Value="{DynamicResource FillSubtle}"/></Style>
+  <Style Selector="Border.pip">
+    <Setter Property="Width" Value="3"/><Setter Property="Height" Value="16"/>
+    <Setter Property="CornerRadius" Value="1.5"/>
+    <Setter Property="Background" Value="{DynamicResource Accent}"/>
+    <Setter Property="HorizontalAlignment" Value="Left"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+  </Style>
+  <Style Selector="Border.menuitem">
+    <Setter Property="Height" Value="32"/>
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusSmall}"/>
+    <Setter Property="Padding" Value="12,0"/>
+    <Setter Property="Background" Value="Transparent"/>
+  </Style>
+  <Style Selector="Border.menuitem.hover"><Setter Property="Background" Value="{DynamicResource FillSubtle}"/></Style>
+</Styles>

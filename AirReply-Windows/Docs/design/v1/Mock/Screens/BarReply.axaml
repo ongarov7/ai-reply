@@ -1,0 +1,57 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:p="using:Mock.Parts" x:Class="Mock.Screens.BarReply">
+  <!-- 2 · Reply: copied message, one-click recipients (Ctrl+1…4), optional instruction -->
+  <Border Classes="flyout" Margin="40" Width="680" VerticalAlignment="Top" HorizontalAlignment="Left" Padding="8">
+    <StackPanel Spacing="8">
+      <Border Classes="quote" Height="36" Padding="12,0,4,0">
+        <Grid ColumnDefinitions="Auto,*,Auto">
+          <Path Classes="ic sec" Data="{StaticResource IcReply}" Margin="0,0,10,0"/>
+          <TextBlock Grid.Column="1" Classes="body" TextTrimming="CharacterEllipsis"
+                     Text="«Добрый день! Документы дошли? Когда сможете ответить по договору?»"/>
+          <Border Grid.Column="2" Classes="btn subtle" Width="28" Height="28">
+            <Path Classes="ic sec" Data="{StaticResource IcCloseSm}"/>
+          </Border>
+        </Grid>
+      </Border>
+
+      <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,0">
+        <Border Classes="btn">
+          <StackPanel Orientation="Horizontal" Spacing="8" Margin="12,0">
+            <TextBlock Text="Другу"/><TextBlock Classes="cap ter" Text="Ctrl+1"/>
+          </StackPanel>
+        </Border>
+        <Panel>
+          <Border Classes="btn">
+            <StackPanel Orientation="Horizontal" Spacing="8" Margin="12,0">
+              <TextBlock Classes="acc" Text="Клиенту"/><TextBlock Classes="cap ter" Text="Ctrl+2"/>
+            </StackPanel>
+          </Border>
+          <Border Classes="pill" Width="16" Height="3" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,1"/>
+        </Panel>
+        <Border Classes="btn">
+          <StackPanel Orientation="Horizontal" Spacing="8" Margin="12,0">
+            <TextBlock Text="Коллеге"/><TextBlock Classes="cap ter" Text="Ctrl+3"/>
+          </StackPanel>
+        </Border>
+        <Border Classes="btn">
+          <StackPanel Orientation="Horizontal" Spacing="8" Margin="12,0">
+            <TextBlock Text="Партнёру"/><TextBlock Classes="cap ter" Text="Ctrl+4"/>
+          </StackPanel>
+        </Border>
+      </StackPanel>
+
+      <Border Classes="input focus" Height="40">
+        <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+          <p:BrandGlyph Margin="11,0,10,0"/>
+          <TextBlock Grid.Column="1" Classes="body sec" TextTrimming="CharacterEllipsis" Text="Как ответить? Можно оставить пустым"/>
+          <Border Grid.Column="2" Classes="btn subtle" Width="32" Margin="8,0,4,0">
+            <Path Classes="ic sec" Data="{StaticResource IcMic}"/>
+          </Border>
+          <Border Grid.Column="3" Classes="btn acc" Width="32" Margin="0,0,3,0">
+            <Path Classes="ic bold on" Data="{StaticResource IcArrowUp}"/>
+          </Border>
+        </Grid>
+      </Border>
+    </StackPanel>
+  </Border>
+</UserControl>

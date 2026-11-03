@@ -1,0 +1,107 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:p="using:Mock.Parts" x:Class="Mock.Screens.BarContext">
+  <!-- 7 · AI context: profile + saved/one-off documents + reply length; result shows its evidence -->
+  <StackPanel Margin="40" Width="680" VerticalAlignment="Top" HorizontalAlignment="Left" Spacing="8">
+    <Border Classes="flyout" Padding="8,8,8,10">
+      <StackPanel Spacing="8">
+        <Border Classes="input rest" Height="40">
+          <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+            <p:BrandGlyph Margin="11,0,10,0"/>
+            <TextBlock Grid.Column="1" Classes="body" TextTrimming="CharacterEllipsis"
+                       Text="Ответь клиенту про цены на iPhone 15 и срок доставки в Астану"/>
+            <Border Grid.Column="2" Classes="btn subtle" Width="32" Margin="8,0,4,0">
+              <Path Classes="ic sec" Data="{StaticResource IcMic}"/>
+            </Border>
+            <Border Grid.Column="3" Classes="btn" Width="32" Margin="0,0,3,0">
+              <Path Classes="ic bold" Data="{StaticResource IcArrowUp}"/>
+            </Border>
+          </Grid>
+        </Border>
+
+        <!-- Profile + reply length -->
+        <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+          <Border Classes="btn h28">
+            <StackPanel Orientation="Horizontal" Spacing="8" Margin="9,0,8,0">
+              <Path Classes="ic sec" Data="{StaticResource IcBriefcase}"/>
+              <TextBlock Classes="cap" Text="Мой магазин"/>
+              <Path Classes="ic sec" Data="{StaticResource IcChevronDown}"/>
+            </StackPanel>
+          </Border>
+          <TextBlock Grid.Column="2" Classes="cap ter" Text="Длина ответа" Margin="0,0,10,0"/>
+          <Border Grid.Column="3" Classes="seg" VerticalAlignment="Center">
+            <StackPanel Orientation="Horizontal" Spacing="2">
+              <Border Classes="segitem sel" Height="22"><TextBlock Classes="cap" Text="Обычный · 400"/></Border>
+              <Border Classes="segitem" Height="22"><TextBlock Classes="cap sec" Text="Расширенный · 600"/></Border>
+            </StackPanel>
+          </Border>
+        </Grid>
+
+        <!-- Documents: saved in profile │ only for this reply -->
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <Border Classes="btn h28">
+            <StackPanel Orientation="Horizontal" Spacing="8" Margin="9,0,8,0">
+              <Path Classes="ic sec" Data="{StaticResource IcTable}"/>
+              <TextBlock Classes="cap" Text="Прайс_ноябрь.xlsx"/>
+              <Path Classes="ic ter" Data="{StaticResource IcPin}"/>
+            </StackPanel>
+          </Border>
+          <Border Classes="vdivider" Margin="4,0"/>
+          <Border Classes="btn h28">
+            <StackPanel Orientation="Horizontal" Spacing="8" Margin="9,0,6,0">
+              <Path Classes="ic sec" Data="{StaticResource IcDoc}"/>
+              <TextBlock Classes="cap" Text="Условия_доставки.pdf"/>
+              <Path Classes="ic sec" Data="{StaticResource IcCloseSm}"/>
+            </StackPanel>
+          </Border>
+          <Border Classes="btn subtle h28">
+            <StackPanel Orientation="Horizontal" Spacing="6" Margin="8,0,10,0">
+              <Path Classes="ic sec" Data="{StaticResource IcPlus}"/>
+              <TextBlock Classes="cap" Text="Документ"/>
+            </StackPanel>
+          </Border>
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <Border Classes="flyout" ClipToBounds="True">
+      <StackPanel>
+        <TextBlock Classes="reply" Margin="16,14,16,16"
+                   Text="Здравствуйте! iPhone 15 на 128 ГБ стоит 389 990 ₸, на 256 ГБ — 449 990 ₸, оба есть в наличии. Срок доставки в Астану уточню у курьерской службы и напишу вам сегодня."/>
+        <Border Classes="footer" Padding="16,12,12,12">
+          <StackPanel Spacing="12">
+            <StackPanel Spacing="6">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Path Classes="ic ter" Data="{StaticResource IcTable}"/>
+                <TextBlock Classes="cap sec" Text="Источники: Прайс_ноябрь.xlsx · лист «Телефоны» · 2 строки"/>
+              </StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Panel Width="16" Height="16">
+                  <Ellipse Classes="caution" Width="14" Height="14"/>
+                  <Path Classes="oncaution" StrokeThickness="1.25" Data="M8,4.75 V8.5 M8,10.75 L8,10.8"/>
+                </Panel>
+                <TextBlock Classes="cap" Text="В документах не найдено: срок доставки"/>
+              </StackPanel>
+            </StackPanel>
+            <Grid ColumnDefinitions="*,Auto,Auto">
+              <TextBlock Classes="cap sec" Text="Осталось сегодня: 26"/>
+              <Border Grid.Column="1" Classes="btn">
+                <StackPanel Orientation="Horizontal" Spacing="8" Margin="11,0,12,0">
+                  <Path Classes="ic" Data="{StaticResource IcRefresh}"/>
+                  <TextBlock Text="Ещё вариант"/>
+                  <TextBlock Classes="cap ter" Text="Ctrl+R"/>
+                </StackPanel>
+              </Border>
+              <Border Grid.Column="2" Classes="btn acc" Margin="8,0,0,0">
+                <StackPanel Orientation="Horizontal" Spacing="8" Margin="11,0,12,0">
+                  <Path Classes="ic on" Data="{StaticResource IcCopy}"/>
+                  <TextBlock Classes="on" Text="Копировать"/>
+                  <TextBlock Classes="cap on2" Text="Ctrl+Enter"/>
+                </StackPanel>
+              </Border>
+            </Grid>
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </Border>
+  </StackPanel>
+</UserControl>

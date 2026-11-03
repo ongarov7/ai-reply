@@ -1,0 +1,46 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:p="using:Mock.Parts" x:Class="Mock.Screens.BarSignin">
+  <!-- 6 · Sign-in inside the bar: step 1 e-mail, step 2 six-digit code -->
+  <StackPanel Margin="40" Width="680" VerticalAlignment="Top" HorizontalAlignment="Left" Spacing="24">
+    <Border Classes="flyout" Padding="8,8,8,10">
+      <StackPanel Spacing="8">
+        <Border Classes="input focus" Height="40">
+          <Grid ColumnDefinitions="Auto,*,Auto">
+            <p:BrandGlyph Margin="11,0,10,0"/>
+            <TextBlock Grid.Column="1" Classes="body sec" Text="Email для входа"/>
+            <Border Grid.Column="2" Classes="btn accdis" Width="32" Margin="0,0,3,0">
+              <Path Classes="ic bold ondis" Data="{StaticResource IcArrowUp}"/>
+            </Border>
+          </Grid>
+        </Border>
+        <TextBlock Classes="cap sec" Margin="12,0,10,0" Text="Войдите той же почтой, что и в приложении на телефоне"/>
+      </StackPanel>
+    </Border>
+
+    <Border Classes="flyout" Padding="8,8,8,10">
+      <StackPanel Spacing="8">
+        <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" Height="40">
+          <p:BrandGlyph Margin="12,0,10,0"/>
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+            <Border Classes="input rest" Width="36" Height="40"><TextBlock Classes="large" Text="4" HorizontalAlignment="Center"/></Border>
+            <Border Classes="input rest" Width="36" Height="40"><TextBlock Classes="large" Text="8" HorizontalAlignment="Center"/></Border>
+            <Border Classes="input rest" Width="36" Height="40"><TextBlock Classes="large" Text="2" HorizontalAlignment="Center"/></Border>
+            <Border Classes="input focus" Width="36" Height="40"><Border Classes="caret" HorizontalAlignment="Center"/></Border>
+            <Border Classes="input rest" Width="36" Height="40"/>
+            <Border Classes="input rest" Width="36" Height="40"/>
+          </StackPanel>
+          <Border Grid.Column="3" Classes="btn">
+            <StackPanel Orientation="Horizontal" Spacing="8" Margin="11,0,12,0">
+              <Path Classes="ic" Data="{StaticResource IcRefresh}"/>
+              <TextBlock Text="Отправить снова"/>
+            </StackPanel>
+          </Border>
+          <Border Grid.Column="4" Classes="btn" Margin="8,0,3,0">
+            <TextBlock Text="Другой email" Margin="12,0"/>
+          </Border>
+        </Grid>
+        <TextBlock Classes="cap sec" Margin="12,0,10,0" Text="Код из письма на aigerim@shop.kz"/>
+      </StackPanel>
+    </Border>
+  </StackPanel>
+</UserControl>

@@ -1,0 +1,33 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:m="using:Mock"
+             x:Class="Mock.Screens.BarIssue">
+  <!-- 5 · Issue: one line + one action in the result slot. A limit is a warning (amber), never red. -->
+  <StackPanel Margin="40,40,40,0" VerticalAlignment="Top">
+    <Border Classes="float">
+      <Grid ColumnDefinitions="52,*,Auto" MinHeight="56">
+        <m:BrandGlyph Margin="20,19,0,0" VerticalAlignment="Top" HorizontalAlignment="Left"/>
+        <TextBlock Grid.Column="1" Classes="input" TextWrapping="Wrap" Margin="0,16,16,16"
+                   Text="напомни клиенту, что оплата до пятницы"/>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" Margin="0,0,12,12" VerticalAlignment="Bottom">
+          <Border Classes="iconbtn"><Path Classes="ic" Data="{StaticResource IcMic}"/></Border>
+          <Border Classes="iconbtn accent"><Path Classes="ic" Data="{StaticResource IcArrowUp}"/></Border>
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <Border Classes="card" Margin="0,8,0,0">
+      <Grid ColumnDefinitions="52,*,Auto" Height="56">
+        <Path Classes="fill caution" Data="{StaticResource IcCaution}" HorizontalAlignment="Left" Margin="21,0,0,0"/>
+        <TextBlock Grid.Column="1" Classes="body" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                   Text="Лимит на сегодня исчерпан. Новые ответы появятся в 00:00"/>
+        <Border Grid.Column="2" Classes="btn" Margin="12,0,12,0">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBlock Text="Тарифы" VerticalAlignment="Center"/>
+            <Path Classes="ic" Data="{StaticResource IcExternal}"/>
+          </StackPanel>
+        </Border>
+      </Grid>
+    </Border>
+  </StackPanel>
+</UserControl>

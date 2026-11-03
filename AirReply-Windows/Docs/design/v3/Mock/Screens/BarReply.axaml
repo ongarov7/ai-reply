@@ -1,0 +1,53 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="Mock.Screens.BarReply">
+  <Border Classes="bar" Margin="0,40,0,0">
+    <StackPanel>
+      <!-- Context: copied message + recipients -->
+      <StackPanel Margin="12,12,12,12" Spacing="8">
+        <Border Classes="capsule">
+          <Grid ColumnDefinitions="36,*,Auto">
+            <Path Classes="ic ter" Data="{StaticResource IcReply}" HorizontalAlignment="Left" Margin="5,0,0,0"/>
+            <TextBlock Grid.Column="1" Classes="sec" TextTrimming="CharacterEllipsis"
+                       Text="«Добрый день! Документы дошли? Когда сможете ответить по договору?»"/>
+            <Border Grid.Column="2" Classes="ibtn sm" Margin="8,0,6,0"><Path Classes="ic s12 ter" Data="{StaticResource Ic12Dismiss}" HorizontalAlignment="Center"/></Border>
+          </Grid>
+        </Border>
+        <StackPanel Orientation="Horizontal" Spacing="8" Margin="36,0,0,0">
+          <Border Classes="chip"><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Другу"/><TextBlock Classes="hint" Text="Ctrl+1"/></StackPanel></Border>
+          <Border Classes="chip on"><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Classes="strong" Text="Клиенту"/><TextBlock Classes="hint" Text="Ctrl+2"/></StackPanel></Border>
+          <Border Classes="chip"><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Коллеге"/><TextBlock Classes="hint" Text="Ctrl+3"/></StackPanel></Border>
+          <Border Classes="chip"><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Партнёру"/><TextBlock Classes="hint" Text="Ctrl+4"/></StackPanel></Border>
+        </StackPanel>
+      </StackPanel>
+      <Border Classes="hair"/>
+      <!-- Input row -->
+      <Grid Height="56" ColumnDefinitions="48,*,Auto">
+        <ContentControl Classes="glyph" Margin="16,0,0,0" HorizontalAlignment="Left"/>
+        <Rectangle Grid.Column="1" Width="1" Height="20" HorizontalAlignment="Left" Margin="-1,0,0,0" Fill="{DynamicResource TextPrimary}"/>
+        <TextBlock Grid.Column="1" Classes="field ph" TextTrimming="CharacterEllipsis" Text="Как ответить? Можно оставить пустым"/>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" Margin="12,0,12,0" VerticalAlignment="Center">
+          <Border Classes="ibtn"><Path Classes="ic" Data="{StaticResource IcMic}"/></Border>
+          <Border Classes="send"><Path Classes="ic" Data="{StaticResource IcArrowUp}"/></Border>
+        </StackPanel>
+      </Grid>
+      <Border Classes="hair"/>
+      <Border Classes="foot" Height="36">
+        <Grid ColumnDefinitions="*,Auto" Margin="48,0,12,0">
+          <StackPanel Orientation="Horizontal" Spacing="16">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <Border Classes="kbd"><TextBlock Text="Enter"/></Border>
+              <TextBlock Classes="cap sec" Text="Написать"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <Border Classes="kbd"><TextBlock Text="Ctrl+D"/></Border>
+              <TextBlock Classes="cap sec" Text="Диктовка"/>
+            </StackPanel>
+          </StackPanel>
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+            <TextBlock Classes="cap sec" Text="Быстрый вызов"/>
+            <Border Classes="kbd"><TextBlock Text="Alt+Space"/></Border>
+          </StackPanel>
+        </Grid>
+      </Border>
+    </StackPanel>
+  </Border>
+</UserControl>

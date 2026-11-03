@@ -1,0 +1,61 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:m="using:Mock"
+             x:Class="Mock.Screens.BarSignin">
+  <!-- 6 · Sign-in inside the bar: step 1 e-mail, step 2 six-digit code. -->
+  <StackPanel Margin="40,40,40,0" VerticalAlignment="Top" Spacing="40">
+    <Border Classes="float">
+      <StackPanel>
+        <Grid ColumnDefinitions="52,*,Auto" MinHeight="56">
+          <m:BrandGlyph Margin="20,19,0,0" VerticalAlignment="Top" HorizontalAlignment="Left"/>
+          <Panel Grid.Column="1" Margin="0,16,16,16">
+            <TextBlock Classes="placeholder" Text="Email для входа"/>
+            <Border Classes="caret" VerticalAlignment="Top" Margin="0,1,0,0"/>
+          </Panel>
+          <Border Grid.Column="2" Classes="iconbtn off" Margin="0,0,12,12" VerticalAlignment="Bottom">
+            <Path Classes="ic" Data="{StaticResource IcArrowRight}"/>
+          </Border>
+        </Grid>
+        <Border Classes="hair"/>
+        <Grid ColumnDefinitions="*,Auto" Height="36" Margin="20,0,12,0">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Path Classes="ic tertiary" Data="{StaticResource IcInfo}"/>
+            <TextBlock Classes="caption" Text="Войдите той же почтой, что и в приложении на телефоне" VerticalAlignment="Center"/>
+          </StackPanel>
+        </Grid>
+      </StackPanel>
+    </Border>
+
+    <Border Classes="float">
+      <StackPanel>
+        <Grid ColumnDefinitions="52,*,Auto" Height="56">
+          <m:BrandGlyph Margin="20,0,0,0" HorizontalAlignment="Left"/>
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+            <Border Classes="slot"><TextBlock Text="4"/></Border>
+            <Border Classes="slot"><TextBlock Text="8"/></Border>
+            <Border Classes="slot"><TextBlock Text="2"/></Border>
+            <Border Classes="slot focus">
+              <Panel>
+                <Border Classes="caret" HorizontalAlignment="Center" Height="20"/>
+                <Border Height="2" CornerRadius="1" Background="{DynamicResource Accent}" VerticalAlignment="Bottom" Margin="-1,0,-1,-1"/>
+              </Panel>
+            </Border>
+            <Border Classes="slot"/>
+            <Border Classes="slot"/>
+          </StackPanel>
+          <Border Grid.Column="2" Classes="iconbtn off" Margin="0,0,12,0">
+            <Path Classes="ic" Data="{StaticResource IcArrowRight}"/>
+          </Border>
+        </Grid>
+        <Border Classes="hair"/>
+        <Grid ColumnDefinitions="*,Auto" Height="36" Margin="20,0,12,0">
+          <TextBlock Classes="caption" Text="Код из письма на aigerim@shop.kz" VerticalAlignment="Center"/>
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+            <Border Classes="btn ghost small"><TextBlock Classes="caption accent medium" Text="Отправить снова" VerticalAlignment="Center"/></Border>
+            <Border Classes="btn ghost small"><TextBlock Classes="caption" Text="Другой email" VerticalAlignment="Center"/></Border>
+          </StackPanel>
+        </Grid>
+      </StackPanel>
+    </Border>
+  </StackPanel>
+</UserControl>

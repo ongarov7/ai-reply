@@ -1,0 +1,136 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:m="using:Mock"
+             x:Class="Mock.Screens.Settings">
+  <!-- 8 · Settings (720 x 520): WinUI 3 NavigationView on Mica, content layer, Windows 11 settings cards. -->
+  <Border Classes="window" Width="720" Height="520" Margin="40" HorizontalAlignment="Left" VerticalAlignment="Top" ClipToBounds="True">
+    <Grid RowDefinitions="32,*">
+      <Grid ColumnDefinitions="*,Auto">
+        <StackPanel Orientation="Horizontal" Spacing="12" Margin="16,0,0,0" VerticalAlignment="Center">
+          <Image Source="avares://Mock/Assets/app-32.png" Width="16" Height="16" RenderOptions.BitmapInterpolationMode="HighQuality"/>
+          <TextBlock Classes="caption" Foreground="{DynamicResource TextPrimary}" Text="Настройки AI Reply" VerticalAlignment="Center"/>
+        </StackPanel>
+        <StackPanel Grid.Column="1" Orientation="Horizontal">
+          <Border Width="46" Height="32">
+            <Path Data="{StaticResource IcCapMin}" Stroke="{DynamicResource TextPrimary}" StrokeThickness="1" Width="10" Height="10" Stretch="None" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+          <Border Width="46" Height="32">
+            <Path Data="{StaticResource IcCapClose}" Stroke="{DynamicResource TextPrimary}" StrokeThickness="1" Width="10" Height="10" Stretch="None" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+        </StackPanel>
+      </Grid>
+
+      <Grid Grid.Row="1" ColumnDefinitions="196,*">
+        <StackPanel Margin="4,4,4,0" Spacing="4">
+          <Border Classes="navitem on">
+            <Panel>
+              <Border Classes="pip"/>
+              <StackPanel Orientation="Horizontal" Spacing="14" Margin="14,0,0,0">
+                <m:GearIcon Classes="ic primary"/>
+                <TextBlock Text="Общие" VerticalAlignment="Center"/>
+              </StackPanel>
+            </Panel>
+          </Border>
+          <Border Classes="navitem">
+            <StackPanel Orientation="Horizontal" Spacing="14" Margin="14,0,0,0">
+              <Path Classes="ic primary" Data="{StaticResource IcMic}"/>
+              <TextBlock Text="Голос" VerticalAlignment="Center"/>
+            </StackPanel>
+          </Border>
+          <Border Classes="navitem">
+            <StackPanel Orientation="Horizontal" Spacing="14" Margin="14,0,0,0">
+              <Path Classes="ic primary" Data="{StaticResource IcPerson}"/>
+              <TextBlock Text="Аккаунт" VerticalAlignment="Center"/>
+            </StackPanel>
+          </Border>
+          <Border Classes="navitem">
+            <StackPanel Orientation="Horizontal" Spacing="14" Margin="14,0,0,0">
+              <Path Classes="ic primary" Data="{StaticResource IcContact}"/>
+              <TextBlock Text="Профили" VerticalAlignment="Center"/>
+            </StackPanel>
+          </Border>
+          <Border Classes="navitem">
+            <StackPanel Orientation="Horizontal" Spacing="14" Margin="14,0,0,0">
+              <Path Classes="ic primary" Data="{StaticResource IcInfo}"/>
+              <TextBlock Text="О программе" VerticalAlignment="Center"/>
+            </StackPanel>
+          </Border>
+        </StackPanel>
+
+        <Border Grid.Column="1" Background="{DynamicResource SurfaceLayer}" BorderBrush="{DynamicResource StrokeCard}"
+                BorderThickness="1,1,0,0" CornerRadius="8,0,0,0">
+          <StackPanel Margin="24,16,24,0">
+            <TextBlock Classes="title" Text="Общие"/>
+            <StackPanel Margin="0,16,0,0" Spacing="12">
+
+              <Border Classes="setcard" Height="60">
+                <Grid ColumnDefinitions="*,Auto" Margin="16,0,14,0">
+                  <TextBlock Classes="body" Text="Быстрый вызов" VerticalAlignment="Center"/>
+                  <Border Grid.Column="1" Classes="btn" Padding="6,0,10,0">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                      <m:Keys Classes="large" Combo="Alt Space"/>
+                      <Path Classes="ic" Data="{StaticResource IcPencil}"/>
+                    </StackPanel>
+                  </Border>
+                </Grid>
+              </Border>
+
+              <Border Classes="setcard">
+                <StackPanel>
+                  <Grid ColumnDefinitions="*,Auto" Height="48" Margin="16,0,14,0">
+                    <TextBlock Classes="body" Text="Запускать вместе с Windows" VerticalAlignment="Center"/>
+                    <m:Toggle Grid.Column="1" IsOn="False"/>
+                  </Grid>
+                  <Border Classes="hair"/>
+                  <Grid ColumnDefinitions="*,Auto" Height="48" Margin="16,0,14,0">
+                    <TextBlock Classes="body" Text="Показывать скопированное сообщение" VerticalAlignment="Center"/>
+                    <m:Toggle Grid.Column="1" IsOn="True"/>
+                  </Grid>
+                  <Border Classes="hair"/>
+                  <Grid ColumnDefinitions="*,Auto" Height="48" Margin="16,0,14,0">
+                    <TextBlock Classes="body" Text="Скрывать строку после копирования" VerticalAlignment="Center"/>
+                    <m:Toggle Grid.Column="1" IsOn="True"/>
+                  </Grid>
+                  <Border Classes="hair"/>
+                  <Grid ColumnDefinitions="*,Auto" Height="60" Margin="16,0,14,0">
+                    <StackPanel VerticalAlignment="Center" Spacing="2">
+                      <TextBlock Classes="body" Text="Вставлять ответ автоматически"/>
+                      <TextBlock Classes="caption" Text="AI Reply сам нажмёт Ctrl+V в окне, где вы были."/>
+                    </StackPanel>
+                    <m:Toggle Grid.Column="1" IsOn="False"/>
+                  </Grid>
+                </StackPanel>
+              </Border>
+
+              <Border Classes="setcard">
+                <StackPanel>
+                  <Grid ColumnDefinitions="*,Auto" Height="52" Margin="16,0,10,0">
+                    <TextBlock Classes="body" Text="Положение строки" VerticalAlignment="Center"/>
+                    <Border Grid.Column="1" Classes="seg">
+                      <StackPanel Orientation="Horizontal" Spacing="2">
+                        <Border Classes="segitem on"><TextBlock Text="Сверху"/></Border>
+                        <Border Classes="segitem"><TextBlock Text="Снизу"/></Border>
+                        <Border Classes="segitem"><TextBlock Text="Где оставили"/></Border>
+                      </StackPanel>
+                    </Border>
+                  </Grid>
+                  <Border Classes="hair"/>
+                  <Grid ColumnDefinitions="*,Auto" Height="52" Margin="16,0,10,0">
+                    <TextBlock Classes="body" Text="Тема" VerticalAlignment="Center"/>
+                    <Border Grid.Column="1" Classes="seg">
+                      <StackPanel Orientation="Horizontal" Spacing="2">
+                        <Border Classes="segitem on"><TextBlock Text="Системная"/></Border>
+                        <Border Classes="segitem"><TextBlock Text="Светлая"/></Border>
+                        <Border Classes="segitem"><TextBlock Text="Тёмная"/></Border>
+                      </StackPanel>
+                    </Border>
+                  </Grid>
+                </StackPanel>
+              </Border>
+            </StackPanel>
+          </StackPanel>
+        </Border>
+      </Grid>
+    </Grid>
+  </Border>
+</UserControl>

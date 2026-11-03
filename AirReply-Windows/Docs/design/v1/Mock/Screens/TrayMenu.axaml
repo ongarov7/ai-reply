@@ -1,0 +1,93 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:p="using:Mock.Parts" x:Class="Mock.Screens.TrayMenu">
+  <!-- 9 · Tray context menu above the notification area -->
+  <Grid>
+    <Border Classes="flyout" Width="296" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="376,0,0,56" Padding="0,4">
+      <StackPanel>
+        <Border Classes="mi hover">
+          <Grid ColumnDefinitions="Auto,*,Auto">
+            <p:BrandGlyph Width="16" Height="16" Margin="12,0,12,0" Foreground="{DynamicResource TextPrimary}"/>
+            <TextBlock Grid.Column="1" Text="Открыть AI Reply"/>
+            <TextBlock Grid.Column="2" Classes="cap ter" Text="Alt+Space" Margin="0,0,12,0"/>
+          </Grid>
+        </Border>
+        <Border Classes="mi">
+          <Grid ColumnDefinitions="Auto,*">
+            <Path Classes="ic" Data="{StaticResource IcMic}" Margin="12,0,12,0"/>
+            <TextBlock Grid.Column="1" Text="Диктовать"/>
+          </Grid>
+        </Border>
+        <Border Classes="divider" Margin="0,4"/>
+        <Border Classes="mi">
+          <Grid ColumnDefinitions="Auto,*">
+            <Path Classes="ic dis" Data="{StaticResource IcPerson}" Margin="12,0,12,0"/>
+            <TextBlock Grid.Column="1" Classes="dis" Text="aigerim@shop.kz"/>
+          </Grid>
+        </Border>
+        <Border Classes="mi">
+          <Grid ColumnDefinitions="Auto,*">
+            <Border Width="16" Margin="12,0,12,0"/>
+            <TextBlock Grid.Column="1" Classes="dis" Text="Pro · безлимит"/>
+          </Grid>
+        </Border>
+        <Border Classes="mi">
+          <Grid ColumnDefinitions="Auto,*">
+            <Path Classes="ic" Data="{StaticResource IcCard}" Margin="12,0,12,0"/>
+            <TextBlock Grid.Column="1" Text="Тарифы и оплата…"/>
+          </Grid>
+        </Border>
+        <Border Classes="divider" Margin="0,4"/>
+        <Border Classes="mi">
+          <Grid ColumnDefinitions="Auto,*">
+            <Path Classes="ic" Data="{StaticResource IcGear}" Margin="12,0,12,0"/>
+            <TextBlock Grid.Column="1" Text="Настройки…"/>
+          </Grid>
+        </Border>
+        <Border Classes="mi">
+          <Grid ColumnDefinitions="Auto,*">
+            <Path Classes="ic" Data="{StaticResource IcDownload}" Margin="12,0,12,0"/>
+            <TextBlock Grid.Column="1" Text="Проверить обновления…"/>
+          </Grid>
+        </Border>
+        <Border Classes="divider" Margin="0,4"/>
+        <Border Classes="mi">
+          <Grid ColumnDefinitions="Auto,*">
+            <Path Classes="ic" Data="{StaticResource IcSignOut}" Margin="12,0,12,0"/>
+            <TextBlock Grid.Column="1" Text="Выйти из AI Reply"/>
+          </Grid>
+        </Border>
+      </StackPanel>
+    </Border>
+
+    <!-- Taskbar slice: notification area -->
+    <Border Classes="taskbar" Height="48" VerticalAlignment="Bottom">
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,0" Spacing="2">
+        <Border Width="24" Height="40" CornerRadius="4">
+          <Path Classes="ic" Data="{StaticResource IcChevronUp}"/>
+        </Border>
+        <Border Width="32" Height="40" CornerRadius="4" Background="{DynamicResource SubtleFill}">
+          <p:BrandGlyph Width="16" Height="16" Foreground="{DynamicResource TextPrimary}"/>
+        </Border>
+        <Border Height="40" CornerRadius="4" Padding="10,0">
+          <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+            <Path Classes="ic" Data="{StaticResource IcWifi}"/>
+            <Path Classes="ic" Data="{StaticResource IcSpeaker}"/>
+            <Panel Width="16" Height="16">
+              <Path Classes="ic" Data="{StaticResource IcBattery}"/>
+              <Path Fill="{DynamicResource TextPrimary}" Data="{StaticResource IcBatteryLevel}"/>
+            </Panel>
+          </StackPanel>
+        </Border>
+        <Border Height="40" CornerRadius="4" Padding="8,0">
+          <StackPanel VerticalAlignment="Center">
+            <TextBlock Classes="cap" Text="21:57" HorizontalAlignment="Right"/>
+            <TextBlock Classes="cap" Text="03.11.2026" HorizontalAlignment="Right"/>
+          </StackPanel>
+        </Border>
+        <Border Width="32" Height="40" CornerRadius="4">
+          <Path Classes="ic" Data="{StaticResource IcBell}"/>
+        </Border>
+      </StackPanel>
+    </Border>
+  </Grid>
+</UserControl>

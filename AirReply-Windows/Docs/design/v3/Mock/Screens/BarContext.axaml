@@ -1,0 +1,105 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="Mock.Screens.BarContext">
+  <Border Classes="bar" Margin="0,40,0,0">
+    <StackPanel>
+      <!-- AI context: profile (with its saved document), a one-off document, add, reply length -->
+      <StackPanel Margin="48,12,12,12" Spacing="8">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <!-- Profile chip groups the document saved in that profile -->
+          <Border Classes="chip on" Padding="0">
+            <StackPanel Orientation="Horizontal">
+              <StackPanel Orientation="Horizontal" Spacing="6" Margin="8,0,8,0">
+                <Path Classes="ic" Data="{StaticResource IcBag}"/>
+                <TextBlock Classes="strong" Text="Мой магазин"/>
+                <Path Classes="ic s12" Data="{StaticResource Ic12Chevron}"/>
+              </StackPanel>
+              <Border Width="1" Height="16" Background="{DynamicResource AccentTintStroke}" VerticalAlignment="Center"/>
+              <StackPanel Orientation="Horizontal" Spacing="6" Margin="8,0,10,0">
+                <Path Classes="ic" Data="{StaticResource IcTable}"/>
+                <TextBlock Text="Прайс_ноябрь.xlsx"/>
+              </StackPanel>
+            </StackPanel>
+          </Border>
+          <!-- One-off document: dashed outline, removable -->
+          <Panel Height="28">
+            <Rectangle RadiusX="4" RadiusY="4" Stroke="{DynamicResource DashStroke}" StrokeThickness="1" StrokeDashArray="3,2" Fill="{DynamicResource ControlFill}"/>
+            <StackPanel Orientation="Horizontal" Spacing="6" Margin="8,0,4,0">
+              <Path Classes="ic" Data="{StaticResource IcDoc}"/>
+              <TextBlock Text="Условия_доставки.pdf"/>
+              <Border Classes="ibtn sm" Width="20" Height="20"><Path Classes="ic s12 ter" Data="{StaticResource Ic12Dismiss}" HorizontalAlignment="Center"/></Border>
+            </StackPanel>
+          </Panel>
+        </StackPanel>
+        <Grid ColumnDefinitions="Auto,*,Auto">
+          <Border Classes="btn subtle" Height="28" Margin="-8,0,0,0">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <Path Classes="ic" Data="{StaticResource IcPlus}"/>
+              <TextBlock Classes="sec" Text="Документ"/>
+            </StackPanel>
+          </Border>
+          <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10">
+            <TextBlock Classes="cap sec" Text="Длина ответа"/>
+            <Border Classes="seg">
+              <StackPanel Orientation="Horizontal" Spacing="2">
+                <Border Classes="segi on"><TextBlock Classes="cap" Text="Обычный · 400"/></Border>
+                <Border Classes="segi"><TextBlock Classes="cap" Text="Расширенный · 600"/></Border>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </Grid>
+      </StackPanel>
+      <Border Classes="hair"/>
+      <!-- Input row -->
+      <Grid Height="56" ColumnDefinitions="48,*,Auto">
+        <ContentControl Classes="glyph" Margin="16,0,0,0" HorizontalAlignment="Left"/>
+        <TextBlock Grid.Column="1" Classes="field" TextTrimming="CharacterEllipsis"
+                   Text="Ответь клиенту про цену iPhone 15 и доставку в Караганду"/>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" Margin="12,0,12,0" VerticalAlignment="Center">
+          <Border Classes="ibtn"><Path Classes="ic" Data="{StaticResource IcMic}"/></Border>
+          <Border Classes="send quiet"><Path Classes="ic" Data="{StaticResource IcArrowUp}"/></Border>
+        </StackPanel>
+      </Grid>
+      <Border Classes="hair"/>
+      <!-- Result + evidence -->
+      <Grid ColumnDefinitions="48,*" RowDefinitions="Auto,Auto,Auto" Margin="0,16,24,16">
+        <TextBlock Grid.Column="1" Classes="read" TextWrapping="Wrap"
+                   Text="Здравствуйте! iPhone 15 на 128 ГБ стоит 389 990 ₸, в наличии чёрный и голубой. Срок доставки в Караганду уточню у курьерской службы и напишу вам сегодня до 18:00 — сразу с точной датой."/>
+        <Path Grid.Row="1" Classes="ic s12 ter" Data="{StaticResource Ic12Doc}" HorizontalAlignment="Left" Margin="19,12,0,0"/>
+        <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Margin="0,12,0,0">
+          <TextBlock Classes="cap sec strong" Text="Источники:"/>
+          <TextBlock Classes="cap sec" Text=" Прайс_ноябрь.xlsx · лист «Телефоны» · 2 строки"/>
+        </StackPanel>
+        <Panel Grid.Row="2" Width="12" Height="12" HorizontalAlignment="Left" Margin="19,6,0,0">
+          <Ellipse Fill="{DynamicResource Warning}"/>
+          <Path Classes="ic s12" Data="{StaticResource Ic12Bang}" Stroke="{DynamicResource OnWarning}" StrokeThickness="1.5"/>
+        </Panel>
+        <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Margin="0,6,0,0">
+          <TextBlock Classes="cap" Text="В документах не найдено:"/>
+          <TextBlock Classes="cap strong" Text=" срок доставки"/>
+        </StackPanel>
+      </Grid>
+      <Border Classes="hair"/>
+      <!-- Action footer -->
+      <Border Classes="foot" Height="52">
+        <Grid ColumnDefinitions="*,Auto" Margin="48,0,12,0">
+          <TextBlock Classes="cap sec" Text="Осталось сегодня: 27"/>
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+            <Border Classes="btn">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Path Classes="ic pri" Data="{StaticResource IcRefresh}"/>
+                <TextBlock Text="Ещё вариант"/>
+                <TextBlock Classes="hint" Text="Ctrl+R"/>
+              </StackPanel>
+            </Border>
+            <Border Classes="btn accent">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Path Classes="ic" Data="{StaticResource IcCopy}"/>
+                <TextBlock Classes="strong" Text="Копировать"/>
+                <TextBlock Classes="hint" Text="Ctrl+Enter"/>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </Grid>
+      </Border>
+    </StackPanel>
+  </Border>
+</UserControl>

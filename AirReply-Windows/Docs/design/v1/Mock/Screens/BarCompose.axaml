@@ -1,0 +1,34 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:p="using:Mock.Parts" x:Class="Mock.Screens.BarCompose">
+  <!-- 1 · Compose: empty focused field, send disabled, quiet hint row -->
+  <Border Classes="flyout" Margin="40" Width="680" VerticalAlignment="Top" HorizontalAlignment="Left" Padding="8,8,8,10">
+    <StackPanel Spacing="8">
+      <Border Classes="input focus" Height="40">
+        <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+          <p:BrandGlyph Margin="11,0,10,0"/>
+          <TextBlock Grid.Column="1" Classes="body sec" TextTrimming="CharacterEllipsis"
+                     Text="Что написать? Например: вежливо ответь клиенту, что документы получили"/>
+          <Border Grid.Column="2" Classes="btn subtle" Width="32" Margin="8,0,4,0">
+            <Path Classes="ic sec" Data="{StaticResource IcMic}"/>
+          </Border>
+          <Border Grid.Column="3" Classes="btn accdis" Width="32" Margin="0,0,3,0">
+            <Path Classes="ic bold ondis" Data="{StaticResource IcArrowUp}"/>
+          </Border>
+        </Grid>
+      </Border>
+      <Grid ColumnDefinitions="*,Auto" Margin="12,0,10,0">
+        <TextBlock Classes="cap ter" Text="Осталось сегодня: 27"/>
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="20">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <TextBlock Classes="cap sec" Text="Диктовка"/>
+            <TextBlock Classes="cap ter" Text="Ctrl+D"/>
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <TextBlock Classes="cap sec" Text="Написать"/>
+            <TextBlock Classes="cap ter" Text="Enter"/>
+          </StackPanel>
+        </StackPanel>
+      </Grid>
+    </StackPanel>
+  </Border>
+</UserControl>

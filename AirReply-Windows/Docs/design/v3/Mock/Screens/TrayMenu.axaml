@@ -1,0 +1,55 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="Mock.Screens.TrayMenu">
+  <Grid RowDefinitions="*,48">
+    <!-- Tray context menu -->
+    <Border Classes="menu" Width="272" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,180,8">
+      <StackPanel Margin="4">
+        <Border Classes="mi">
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Text="Открыть AI Reply"/>
+            <TextBlock Grid.Column="1" Classes="cap sec" Text="Alt+Space"/>
+          </Grid>
+        </Border>
+        <Border Classes="mi"><TextBlock Text="Диктовать"/></Border>
+        <Border Classes="msep"/>
+        <Border Classes="mi"><TextBlock Classes="sec" Text="aigerim.n@mail.kz"/></Border>
+        <Border Classes="mi">
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Classes="sec strong" Text="Pro"/>
+            <TextBlock Classes="sec" Text=" · безлимит"/>
+          </StackPanel>
+        </Border>
+        <Border Classes="mi"><TextBlock Text="Тарифы и оплата…"/></Border>
+        <Border Classes="msep"/>
+        <Border Classes="mi"><TextBlock Text="Настройки…"/></Border>
+        <Border Classes="mi"><TextBlock Text="Проверить обновления…"/></Border>
+        <Border Classes="msep"/>
+        <Border Classes="mi"><TextBlock Text="Выйти из AI Reply"/></Border>
+      </StackPanel>
+    </Border>
+
+    <!-- Taskbar (right end) -->
+    <Border Grid.Row="1" Background="{DynamicResource TaskbarFill}" BorderBrush="{DynamicResource TaskbarStroke}" BorderThickness="0,1,0,0">
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,12,0" Spacing="4">
+        <Border Width="32" Height="40" CornerRadius="4" VerticalAlignment="Center">
+          <Path Classes="ic pri" Data="{StaticResource IcChevronUp}" HorizontalAlignment="Center"/>
+        </Border>
+        <Border Width="32" Height="40" CornerRadius="4" VerticalAlignment="Center" Background="{DynamicResource SubtleFillStrong}">
+          <ContentControl Classes="glyph mono" Width="18" Height="18" HorizontalAlignment="Center"/>
+        </Border>
+        <Border Height="40" CornerRadius="4" Padding="10,0" VerticalAlignment="Center">
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <Path Classes="ic pri" Data="{StaticResource IcWifi}"/>
+            <Path Classes="ic pri" Data="{StaticResource IcSpeaker}"/>
+            <Path Classes="ic pri" Data="{StaticResource IcBattery}"/>
+          </StackPanel>
+        </Border>
+        <Border Height="40" CornerRadius="4" Padding="8,0" VerticalAlignment="Center">
+          <StackPanel VerticalAlignment="Center">
+            <TextBlock Classes="cap" Text="14:32" HorizontalAlignment="Right"/>
+            <TextBlock Classes="cap" Text="03.11.2026" HorizontalAlignment="Right"/>
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </Border>
+  </Grid>
+</UserControl>

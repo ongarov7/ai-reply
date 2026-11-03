@@ -1,0 +1,33 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="Mock.Screens.BarIssue">
+  <Border Classes="bar" Margin="0,40,0,0">
+    <StackPanel>
+      <!-- Input row with the user's request -->
+      <Grid Height="56" ColumnDefinitions="48,*,Auto">
+        <ContentControl Classes="glyph" Margin="16,0,0,0" HorizontalAlignment="Left"/>
+        <TextBlock Grid.Column="1" Classes="field" TextTrimming="CharacterEllipsis"
+                   Text="Напиши клиенту, что заказ отправим завтра до обеда"/>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" Margin="12,0,12,0" VerticalAlignment="Center">
+          <Border Classes="ibtn"><Path Classes="ic" Data="{StaticResource IcMic}"/></Border>
+          <Border Classes="send off"><Path Classes="ic" Data="{StaticResource IcArrowUp}"/></Border>
+        </StackPanel>
+      </Grid>
+      <Border Classes="hair"/>
+      <!-- Issue: one line + one action, in the footer slot -->
+      <Border Classes="foot warn" Height="52">
+        <Grid ColumnDefinitions="48,*,Auto">
+          <Panel Width="16" Height="16" HorizontalAlignment="Left" Margin="17,0,0,0" VerticalAlignment="Center">
+            <Ellipse Fill="{DynamicResource Warning}"/>
+            <Path Classes="ic bold" Data="{StaticResource IcBang}" Stroke="{DynamicResource OnWarning}"/>
+          </Panel>
+          <TextBlock Grid.Column="1" TextTrimming="CharacterEllipsis" Text="Лимит на сегодня исчерпан. Новые ответы появятся в 00:00"/>
+          <Border Grid.Column="2" Classes="btn" Margin="12,0,12,0">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock Text="Тарифы"/>
+              <Path Classes="ic" Data="{StaticResource IcOpen}"/>
+            </StackPanel>
+          </Border>
+        </Grid>
+      </Border>
+    </StackPanel>
+  </Border>
+</UserControl>
