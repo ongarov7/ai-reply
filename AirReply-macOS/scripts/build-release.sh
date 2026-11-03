@@ -41,7 +41,7 @@ xcodebuild -exportArchive -archivePath "$WORK/AirReply.xcarchive" \
 
 APP="$WORK/export/AI Reply.app"
 codesign --verify --deep --strict --verbose=2 "$APP"
-lipo -verify_arch arm64 x86_64 "$APP/Contents/MacOS/AI Reply"
+lipo "$APP/Contents/MacOS/AI Reply" -verify_arch arm64 x86_64
 codesign -d --verbose=4 "$APP" 2>&1 | grep -qx "TeamIdentifier=$TEAM_ID"
 /usr/libexec/PlistBuddy -c 'Print :AIReplyBackendBaseURL' "$APP/Contents/Info.plist" | grep -qx 'https://ai-reply.kz'
 
