@@ -14242,25 +14242,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Choose a subscription or buy extra replies once. A subscription is optional."
+            "value" : "Choose a subscription or buy extra replies once."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Жазылымды немесе бір реттік жауап пакетін таңда. Жазылым міндетті емес."
+            "value" : "Жазылымды немесе бір реттік жауап пакетін таңда."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Выбери подписку или разовый пакет ответов. Подписываться необязательно."
+            "value" : "Выбери подписку или разовый пакет ответов."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Obuna yoki bir martalik javoblar paketini tanlang. Obuna majburiy emas."
+            "value" : "Obuna yoki bir martalik javoblar paketini tanlang."
           }
         }
       }
