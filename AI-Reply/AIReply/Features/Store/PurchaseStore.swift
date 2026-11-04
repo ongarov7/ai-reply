@@ -163,6 +163,9 @@ final class PurchaseStore {
     @ObservationIgnored private let preferences: UserDefaults
     @ObservationIgnored private let allowsNewPurchases: Bool
     @ObservationIgnored private var accountToken: UUID?
+    /// Invalidates requests across account changes and sales closing/reopening,
+    /// including a sign-out followed by signing back into the same account.
+    @ObservationIgnored private var catalogueRevision = 0
     @ObservationIgnored private var userID: String?
     /// Signed in, against a server that has purchases at all (the flag is
     /// published, on or off): a transaction can be sent. One bought while
@@ -198,6 +201,7 @@ final class PurchaseStore {
 
     func accountDidChange(isSignedIn: Bool, userID: String?, features: AccountAPI.Features?) {
         if userID != self.userID {
+            catalogueRevision += 1
             // Another account: its token and its products are not this one's.
             self.userID = userID
             accountToken = nil
@@ -210,8 +214,10 @@ final class PurchaseStore {
         }
         let enabled = allowsNewPurchases && isSignedIn && features?.iapIOS == true
         if enabled != isEnabled {
+            catalogueRevision += 1
             isEnabled = enabled
             if !enabled {
+                accountToken = nil
                 offers = []
                 catalogueState = .idle
                 recommendation = nil
@@ -333,19 +339,21 @@ final class PurchaseStore {
     func loadCatalogue() async {
         guard isEnabled, catalogueState != .loading else { return }
         let loadingUserID = userID
+        let loadingRevision = catalogueRevision
         catalogueState = .loading
         do {
             let catalogue = try await backend.catalogue()
-            guard userID == loadingUserID, isEnabled else { return }
+            guard userID == loadingUserID, isEnabled, catalogueRevision == loadingRevision else { return }
             guard let token = UUID(uuidString: catalogue.accountToken) else {
                 offers = []
                 catalogueState = .unavailable
+                recommendation = nil
                 return
             }
             accountToken = token
             let ids = catalogue.products.map(\.storeProductID).filter { !$0.isEmpty }
             let products = ids.isEmpty ? [] : try await storeKit.products(for: ids)
-            guard userID == loadingUserID, isEnabled else { return }
+            guard userID == loadingUserID, isEnabled, catalogueRevision == loadingRevision else { return }
             offers = PurchaseOffer.match(server: catalogue.products, store: products)
             recommendation = catalogue.recommendation.flatMap { value in
                 guard (4...5).contains(value.purchaseCount), value.spentMinor > 0,
@@ -354,12 +362,12 @@ final class PurchaseStore {
             }
             catalogueState = offers.isEmpty ? .unavailable : .loaded
         } catch APIError.purchasesUnavailable {
-            guard userID == loadingUserID, isEnabled else { return }
+            guard userID == loadingUserID, isEnabled, catalogueRevision == loadingRevision else { return }
             offers = []
             catalogueState = .unavailable
             recommendation = nil
         } catch {
-            guard userID == loadingUserID, isEnabled else { return }
+            guard userID == loadingUserID, isEnabled, catalogueRevision == loadingRevision else { return }
             catalogueState = offers.isEmpty ? .failed : .loaded
         }
     }

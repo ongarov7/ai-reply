@@ -276,7 +276,11 @@ Billing для одноразовых товаров. Бизнес-цены хр
   `APPLE_IAP_SANDBOX_ACCOUNTS` (через запятую). Если список пуст, исключение применяется
   только к `REVIEW_LOGIN_EMAIL`. Покупка проверяется с привязкой к этому аккаунту,
   сохраняется с `environment = Sandbox` и не входит в выручку. Sandbox-уведомления
-  обрабатывает отдельный Sandbox endpoint. Тестовые покупки Google (`Test`) также
+  для такого аккаунта должен получать **production endpoint**
+  `/api/v1/iap/apple/notifications`: он принимает их только после проверки подписи
+  и привязки `appAccountToken` к разрешённому аккаунту. Отдельный `/sandbox` endpoint
+  обновляет только свою базу и не передаёт уведомления в production автоматически.
+  Тестовые покупки Google (`Test`) также
   не входят в выручку. В production они принимаются при `GOOGLE_PLAY_ACCEPT_TEST=true`;
   лицензионные тестеры платят ноль, но получают настоящие ответы.
 - **Удаление аккаунта.** Запись о покупке остаётся (финансовая запись) с `user_id = NULL`;
@@ -300,8 +304,13 @@ Billing для одноразовых товаров. Бизнес-цены хр
    данные должны быть активны.
 2. App Store Connect ▸ App Information ▸ App Store Server Notifications: **Version 2**.
    Production URL — `https://ai-reply.kz/api/v1/iap/apple/notifications`.
-   Sandbox URL — `https://ai-reply.kz/sandbox/api/v1/iap/apple/notifications`
-   при `BILLING_SANDBOX_ENABLED=true`, либо URL отдельного staging API с собственной базой.
+   Если App Review проверяет покупки через production API, Sandbox URL тоже должен
+   вести на `https://ai-reply.kz/api/v1/iap/apple/notifications`. Для тестирования
+   только через изолированный Sandbox API используйте
+   `https://ai-reply.kz/sandbox/api/v1/iap/apple/notifications` при
+   `BILLING_SANDBOX_ENABLED=true`, либо endpoint отдельного staging API. Уведомление
+   должно попасть в ту базу, где сохранён аккаунт покупателя; эти endpoint не
+   пересылают его друг другу.
 3. Play Console ▸ Монетизация ▸ Товары ▸ **Одноразовые товары**: пакет 30 ответов
    за 130 ₸. Реальный Google Product ID должен совпадать с настройкой товара на сервере.
 4. Google Cloud: сервисный аккаунт и JSON-ключ; в Play Console ▸ Пользователи и разрешения

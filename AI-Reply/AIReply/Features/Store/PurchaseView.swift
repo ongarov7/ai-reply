@@ -26,9 +26,8 @@ struct PurchaseView: View {
     }
 }
 
-/// One catalogue for the plan and purchase routes. Server plans remain
-/// readable before their App Store mappings are ready; checkout requires a
-/// matched StoreKit offer. A missing selected period falls back to one period,
+/// One catalogue for the plan and purchase routes. Paid plans appear only
+/// with a matched StoreKit offer. A missing selected period falls back to one period,
 /// never to both monthly and yearly cards together.
 struct SubscriptionPlanCatalogue {
     struct Option: Identifiable {
@@ -37,21 +36,21 @@ struct SubscriptionPlanCatalogue {
         }
 
         let plan: AccountAPI.Plan?
-        let offer: PurchaseOffer?
+        let offer: PurchaseOffer
         let billingPeriod: String
         let id: String
 
-        var planID: String? { offer?.planID ?? plan?.id }
+        var planID: String? { offer.planID ?? plan?.id }
         var allowance: Allowance {
-            let kind = offer?.entitlementKind ?? plan?.entitlementKind
-            let limit = offer?.dailyLimit ?? plan?.dailyLimit ?? 0
+            let kind = offer.entitlementKind ?? plan?.entitlementKind
+            let limit = offer.dailyLimit
             if kind == "unlimited" { return .unlimited }
             if kind == "daily", limit > 0 { return .daily(limit) }
             return .unspecified
         }
 
         func name(_ language: String) -> String {
-            offer?.name ?? plan?.localizedName(language) ?? ""
+            offer.name
         }
     }
 
@@ -70,9 +69,9 @@ struct SubscriptionPlanCatalogue {
             case 365: period = "year"
             default: continue
             }
-            let offer = subscriptions.first { $0.planID == plan.id && $0.billingPeriod == period }
-            if let offer { included.insert(offer.id) }
-            result.append(Option(plan: plan, offer: offer, billingPeriod: period, id: offer?.id ?? plan.id))
+            guard let offer = subscriptions.first(where: { $0.planID == plan.id && $0.billingPeriod == period }) else { continue }
+            included.insert(offer.id)
+            result.append(Option(plan: plan, offer: offer, billingPeriod: period, id: offer.id))
         }
         for offer in subscriptions where !included.contains(offer.id) {
             guard let period = offer.billingPeriod, period == "month" || period == "year" else { continue }
@@ -91,8 +90,8 @@ struct SubscriptionPlanCatalogue {
     }
 }
 
-/// Plans can be read before Store setup is complete. Purchases and prices
-/// appear only after both the server and the App Store return the product.
+/// Paid plans and prices appear only after both the server and the App Store
+/// return the product. The current plan and free allowance remain readable.
 struct PurchaseOptionsView: View {
     var onSelectOffer: (String) -> Void = { _ in }
     @Environment(PurchaseStore.self) private var store
@@ -158,6 +157,11 @@ struct PurchaseOptionsView: View {
             }
         }
         .manageSubscriptionsSheet(isPresented: $isManaging)
+        // Config can finish refreshing after the parent screen's task. Load
+        // when sales become available instead of requiring a second visit.
+        .task(id: store.isEnabled) {
+            if store.isEnabled { await store.loadCatalogue() }
+        }
         .onChange(of: isManaging) { _, presented in
             if !presented { Task { await store.processUnfinished(); await account.refresh() } }
         }
@@ -173,7 +177,7 @@ struct PurchaseOptionsView: View {
         case .failed:
             VStack(alignment: .leading, spacing: DS.Spacing.s) {
                 Text("purchase.failed.load").foregroundStyle(.secondary)
-                Button("common.retry") { Task { await store.loadCatalogue() } }
+                Button("common.retry") { Task { await reloadCatalogue() } }
             }.dsCard()
         case .unavailable: unavailable
         case .loaded: products
@@ -181,7 +185,17 @@ struct PurchaseOptionsView: View {
     }
 
     private var unavailable: some View {
-        Label("purchase.unavailable", systemImage: "bag").foregroundStyle(.secondary).dsCard()
+        VStack(alignment: .leading, spacing: DS.Spacing.s) {
+            Label("purchase.unavailable", systemImage: "bag").foregroundStyle(.secondary)
+            Button("common.retry") { Task { await reloadCatalogue() } }
+        }.dsCard()
+    }
+
+    private func reloadCatalogue() async {
+        await account.loadServerConfig()
+        await account.refresh()
+        await account.loadPlans()
+        await store.loadCatalogue()
     }
 
     @ViewBuilder
@@ -260,15 +274,11 @@ struct PurchaseOptionsView: View {
             }
             Text(option.billingPeriod == "year" ? LocalizedStringKey("purchase.year") : LocalizedStringKey("purchase.month"))
                 .font(.subheadline).foregroundStyle(.secondary)
-            if let offer = option.offer {
-                Text(verbatim: offer.displayPrice).font(.title2.weight(.semibold))
-                Text(offer.billingPeriod == "year" ? LocalizedStringKey("purchase.billed.year") : LocalizedStringKey("purchase.billed.month"))
-                    .font(.footnote).foregroundStyle(.secondary)
-                buyButton(offer, current: current)
-                if offer.hasPriceMismatch { mismatchNotice }
-            } else {
-                Text("purchase.catalogueOnly").font(.footnote).foregroundStyle(.secondary)
-            }
+            Text(verbatim: option.offer.displayPrice).font(.title2.weight(.semibold))
+            Text(option.offer.billingPeriod == "year" ? LocalizedStringKey("purchase.billed.year") : LocalizedStringKey("purchase.billed.month"))
+                .font(.footnote).foregroundStyle(.secondary)
+            buyButton(option.offer, current: current)
+            if option.offer.hasPriceMismatch { mismatchNotice }
         }
         .dsCard()
         .overlay(RoundedRectangle(cornerRadius: DS.Radius.large).strokeBorder(current || selectedOfferID == option.id ? Color.accentColor : Color.clear, lineWidth: 1.5))

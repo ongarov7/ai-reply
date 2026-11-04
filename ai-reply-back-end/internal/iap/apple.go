@@ -49,6 +49,26 @@ func (s *Service) sandboxAccount(env string, user domain.User) bool {
 	return false
 }
 
+// Review purchases live in the production account database. Their signed
+// notifications must follow the same account allowlist as checkout, so renewal
+// and refund state stays current without accepting other Sandbox purchases.
+func (s *Service) appleNotificationEnvironment(ctx context.Context, tx appstore.Transaction) (bool, error) {
+	if s.appleEnvironment(tx.Environment) {
+		return true, nil
+	}
+	if tx.Environment != appstore.EnvironmentSandbox || len(s.cfg.AppleSandboxAccounts) == 0 {
+		return false, nil
+	}
+	user, err := s.repo.UserByIAPAccountToken(ctx, tx.AppAccountToken)
+	if errors.Is(err, domain.ErrNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return s.sandboxAccount(tx.Environment, user), nil
+}
+
 // VerifyApple — StoreKit 2 transaction.jwsRepresentation: тексеріп, береді.
 //
 // Order of checks: Apple's signature and chain, the bundle id, the
@@ -193,12 +213,12 @@ func (s *Service) appleNotification(ctx context.Context, n appstore.Notification
 	if n.Data.BundleID != "" && n.Data.BundleID != s.cfg.AppleBundleID {
 		return OutcomeIgnored, "", nil
 	}
-	if n.Data.Environment != "" && !s.appleEnvironment(n.Data.Environment) {
-		return OutcomeIgnored, "", nil
-	}
 	switch n.NotificationType {
 	case appstore.NotificationRefund, appstore.NotificationRevoke, appstore.NotificationRefundReversed:
 	case appstore.NotificationTest, appstore.NotificationConsumption, appstore.NotificationRefundDeclined:
+		if n.Data.Environment != "" && !s.appleEnvironment(n.Data.Environment) {
+			return OutcomeIgnored, "", nil
+		}
 		return OutcomeLogged, "", nil
 	case appstore.NotificationSubscribed, appstore.NotificationRenewed, appstore.NotificationFailedRenewal,
 		appstore.NotificationExpired, appstore.NotificationGraceExpired, appstore.NotificationRenewalStatus, appstore.NotificationRenewalPreference:
@@ -213,7 +233,14 @@ func (s *Service) appleNotification(ctx context.Context, n appstore.Notification
 	if tx.BundleID != s.cfg.AppleBundleID {
 		return OutcomeIgnored, tx.TransactionID, nil
 	}
-	if !s.appleEnvironment(tx.Environment) {
+	if n.Data.Environment != "" && n.Data.Environment != tx.Environment {
+		return OutcomeIgnored, tx.TransactionID, nil
+	}
+	accepted, err := s.appleNotificationEnvironment(ctx, tx)
+	if err != nil {
+		return "", "", err
+	}
+	if !accepted {
 		return OutcomeIgnored, tx.TransactionID, nil
 	}
 	if tx.Type == appstore.TypeAutoRenewable {
@@ -339,7 +366,7 @@ func (s *Service) appleSubscriptionNotification(ctx context.Context, n appstore.
 		if err != nil {
 			return "", "", s.appleRejected(err, user.ID)
 		}
-		if renewal.OriginalTransactionID != tx.OriginalTransactionID || !s.appleEnvironment(renewal.Environment) {
+		if renewal.OriginalTransactionID != tx.OriginalTransactionID || renewal.Environment != tx.Environment {
 			return OutcomeIgnored, tx.TransactionID, nil
 		}
 		auto := renewal.AutoRenewStatus == 1

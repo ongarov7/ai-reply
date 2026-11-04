@@ -17,39 +17,48 @@ final class SubscriptionDisplayTests: XCTestCase {
          plan("pro_yearly", days: 365, kind: "unlimited")]
     }
 
-    func testUnmappedPlansRemainReadableWithoutDuplicatePeriods() {
+    private func offer(_ planID: String, period: String, unlimited: Bool = false) -> PurchaseOffer {
+        PurchaseOffer(code: planID, kind: .subscription, units: 0, durationHours: 0,
+                      storeProductID: "store.\(planID)", name: unlimited ? "Pro" : "Base", displayPrice: "790 ₸",
+                      planID: planID, billingPeriod: period,
+                      entitlementKind: unlimited ? "unlimited" : "daily", dailyLimit: unlimited ? 0 : 40)
+    }
+
+    func testUnmappedPaidPlansDoNotAdvertiseAnUnfinishedPurchase() {
         let catalogue = SubscriptionPlanCatalogue(plans: plans, offers: [])
         XCTAssertEqual(catalogue.freePlan?.code, "free")
-        XCTAssertEqual(catalogue.periods, ["month", "year"])
-        XCTAssertEqual(catalogue.visible(period: "month").map(\.planID), ["base_monthly", "pro_monthly"])
-        XCTAssertEqual(catalogue.visible(period: "year").map(\.planID), ["base_yearly", "pro_yearly"])
-        XCTAssertEqual(catalogue.visible(period: "month").map(\.allowance), [.daily(40), .unlimited])
-        XCTAssertTrue(catalogue.options.allSatisfy { $0.offer == nil }, "information alone cannot open checkout")
+        XCTAssertTrue(catalogue.options.isEmpty)
+        XCTAssertTrue(catalogue.periods.isEmpty)
+        XCTAssertTrue(catalogue.visible(period: "month").isEmpty)
+        XCTAssertTrue(catalogue.visible(period: "year").isEmpty)
     }
 
     func testMissingSelectedPeriodFallsBackToOnePeriod() {
         let yearly = plans.filter { $0.periodDays == 365 }
-        let catalogue = SubscriptionPlanCatalogue(plans: yearly, offers: [])
+        let catalogue = SubscriptionPlanCatalogue(plans: yearly,
+                                                   offers: [offer("base_yearly", period: "year"),
+                                                            offer("pro_yearly", period: "year", unlimited: true)])
         XCTAssertEqual(catalogue.visible(period: "month").map(\.planID), ["base_yearly", "pro_yearly"])
         XCTAssertTrue(catalogue.visible(period: "month").allSatisfy { $0.billingPeriod == "year" })
     }
 
-    func testMatchedStoreOfferReplacesInformationWithoutLegacyCheckoutFlag() throws {
+    func testOnlyMatchedStoreOffersAppearWithoutLegacyCheckoutFlag() throws {
         let offer = PurchaseOffer(code: "base_monthly", kind: .subscription, units: 0, durationHours: 0,
                                   storeProductID: "base.monthly", name: "Base", displayPrice: "790 ₸",
                                   planID: "base_monthly", billingPeriod: "month", entitlementKind: "daily", dailyLimit: 40)
         XCTAssertFalse(plans[1].purchasable, "the legacy checkout flag does not govern StoreKit")
         let catalogue = SubscriptionPlanCatalogue(plans: plans, offers: [offer])
-        XCTAssertEqual(catalogue.options.count, 4)
+        XCTAssertEqual(catalogue.options.count, 1)
+        XCTAssertEqual(catalogue.periods, ["month"], "unmapped yearly plans must not create a dead-end period")
         let monthlyBase = try XCTUnwrap(catalogue.visible(period: "month").first)
         XCTAssertEqual(monthlyBase.id, offer.id)
-        XCTAssertEqual(monthlyBase.offer?.displayPrice, "790 ₸")
+        XCTAssertEqual(monthlyBase.offer.displayPrice, "790 ₸")
     }
 
-    func testZeroDailyLimitNeverBecomesZeroRepliesPerDay() {
+    func testUnmappedPlanWithUnknownAllowanceIsNotOffered() {
         let invalid = plan("unknown_monthly", days: 30, kind: "daily")
         let catalogue = SubscriptionPlanCatalogue(plans: [invalid], offers: [])
-        XCTAssertEqual(catalogue.options.first?.allowance, .unspecified)
+        XCTAssertTrue(catalogue.options.isEmpty)
     }
 
     func testStoreOnlySubscriptionsRemainAvailableWhilePlansAreLoading() {
@@ -79,13 +88,19 @@ final class PurchaseStoreTests: XCTestCase {
         var unfinished: [StoreTransaction] = []
         var entitlements: [StoreTransaction] = []
         var syncError: Error?
+        var suspendFirstProducts = false
+        var resumeFirstProducts: CheckedContinuation<Void, Never>?
         private(set) var syncCount = 0
         private(set) var tokens: [UUID] = []
         private(set) var requestedProducts: [[String]] = []
 
         func products(for ids: [String]) async throws -> [StoreProduct] {
             requestedProducts.append(ids)
-            return products.filter { ids.contains($0.id) }
+            let result = products.filter { ids.contains($0.id) }
+            if suspendFirstProducts && requestedProducts.count == 1 {
+                await withCheckedContinuation { resumeFirstProducts = $0 }
+            }
+            return result
         }
 
         func purchase(productID: String, appAccountToken: UUID) async throws -> StorePurchaseResult {
@@ -108,6 +123,8 @@ final class PurchaseStoreTests: XCTestCase {
         var verdicts: [Result<PurchaseAPI.Verdict, APIError>] = []
         /// While true, every submit waits before it answers.
         var holdsAnswers = false
+        var suspendFirstCatalogue = false
+        var resumeFirstCatalogue: CheckedContinuation<Void, Never>?
         private(set) var submitted: [String] = []
         private(set) var catalogueCalls = 0
 
@@ -117,7 +134,11 @@ final class PurchaseStoreTests: XCTestCase {
 
         func catalogue() async throws -> PurchaseAPI.Catalogue {
             catalogueCalls += 1
-            return try catalogueResult.get()
+            let result = catalogueResult
+            if suspendFirstCatalogue && catalogueCalls == 1 {
+                await withCheckedContinuation { resumeFirstCatalogue = $0 }
+            }
+            return try result.get()
         }
 
         func submit(signedTransaction: String) async throws -> PurchaseAPI.Verdict {
@@ -303,6 +324,69 @@ final class PurchaseStoreTests: XCTestCase {
         let (third, _, _) = makeStore(backend: offline)
         await third.loadCatalogue()
         XCTAssertEqual(third.catalogueState, .failed)
+    }
+
+    func testMissingAppStoreProductsCanBeRetriedWithoutRelaunch() async {
+        let (store, apple, backend) = makeStore()
+        let availableProducts = apple.products
+        apple.products = []
+        await store.loadCatalogue()
+        XCTAssertTrue(store.offers.isEmpty)
+        XCTAssertEqual(store.catalogueState, .unavailable)
+
+        apple.products = availableProducts
+        await store.loadCatalogue()
+        XCTAssertEqual(store.catalogueState, .loaded)
+        XCTAssertEqual(store.offers.map(\.storeProductID), ["pack.50", "pass.24h"])
+        XCTAssertEqual(backend.catalogueCalls, 2)
+    }
+
+    func testReopeningSalesIgnoresACatalogueFromBeforeTheyClosed() async throws {
+        let (store, apple, backend) = makeStore()
+        backend.suspendFirstCatalogue = true
+        let oldLoad = Task { await store.loadCatalogue() }
+        for _ in 0..<100 where backend.resumeFirstCatalogue == nil { await Task.yield() }
+        XCTAssertNotNil(backend.resumeFirstCatalogue)
+        store.accountDidChange(isSignedIn: true, userID: "u1", features: features(#"{"iap_ios": false}"#))
+        store.accountDidChange(isSignedIn: true, userID: "u1", features: features(#"{"iap_ios": true}"#))
+        let newToken = "8aa16755-f89c-4b09-b3d5-aa6c3b8becdf"
+        backend.catalogueResult = .success(PurchaseAPI.Catalogue(products: [serverProducts[2]], accountToken: newToken))
+        await store.loadCatalogue()
+        backend.resumeFirstCatalogue?.resume()
+        await oldLoad.value
+
+        XCTAssertEqual(store.catalogueState, .loaded)
+        XCTAssertEqual(store.offers.map(\.storeProductID), ["pass.24h"])
+        await store.purchase(try XCTUnwrap(store.offers.first))
+        XCTAssertEqual(apple.tokens, [try XCTUnwrap(UUID(uuidString: newToken))])
+    }
+
+    func testReturningToSameAccountIgnoresAnEarlierStoreKitResponse() async throws {
+        let (store, apple, backend) = makeStore()
+        apple.suspendFirstProducts = true
+        let oldLoad = Task { await store.loadCatalogue() }
+        for _ in 0..<100 where apple.resumeFirstProducts == nil { await Task.yield() }
+        XCTAssertNotNil(apple.resumeFirstProducts)
+        store.accountDidChange(isSignedIn: false, userID: nil, features: features(#"{"iap_ios": true}"#))
+        store.accountDidChange(isSignedIn: true, userID: "u1", features: features(#"{"iap_ios": true}"#))
+        backend.catalogueResult = .success(PurchaseAPI.Catalogue(products: [serverProducts[2]], accountToken: token))
+        await store.loadCatalogue()
+        apple.resumeFirstProducts?.resume()
+        await oldLoad.value
+
+        XCTAssertEqual(store.catalogueState, .loaded)
+        XCTAssertEqual(store.offers.map(\.storeProductID), ["pass.24h"])
+    }
+
+    func testClosingSalesInvalidatesTokenUntilCatalogueIsLoadedAgain() async throws {
+        let (store, apple, _) = makeStore()
+        await store.loadCatalogue()
+        let oldOffer = try XCTUnwrap(store.offers.first)
+        store.accountDidChange(isSignedIn: true, userID: "u1", features: features(#"{"iap_ios": false}"#))
+        store.accountDidChange(isSignedIn: true, userID: "u1", features: features(#"{"iap_ios": true}"#))
+        await store.purchase(oldOffer)
+        XCTAssertTrue(apple.tokens.isEmpty)
+        XCTAssertEqual(store.status, .failed(.unavailable))
     }
 
     // MARK: Purchase
