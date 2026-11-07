@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 import StoreKit
 
 /// A product as the App Store describes it: its name and its price, in the
@@ -62,6 +63,18 @@ enum StoreKitClientError: Error, Equatable {
 struct AppStoreClient: StoreKitClient {
 
     var canMakePayments: Bool { AppStore.canMakePayments }
+
+    /// Expired subscriptions still belong in management, so inspect history
+    /// rather than only the currently active entitlements.
+    static func hasSubscriptionHistory() async -> Bool {
+        for await verification in Transaction.all {
+            if case .verified(let transaction) = verification,
+               transaction.productType == .autoRenewable {
+                return true
+            }
+        }
+        return false
+    }
 
     func products(for ids: [String]) async throws -> [StoreProduct] {
         try await Product.products(for: ids).map {
@@ -144,5 +157,40 @@ struct AppStoreClient: StoreKitClient {
             signedTransaction: verification.jwsRepresentation,
             finish: { await transaction.finish() }
         )
+    }
+}
+
+/// Keeps one subscription-management presentation in flight through the
+/// subsequent balance refresh, and lets the view offer help if StoreKit fails.
+@MainActor
+@Observable
+final class SubscriptionManagement {
+    enum PresentationError: Error {
+        case unavailableScene
+    }
+
+    private(set) var isPresenting = false
+    private(set) var hasNoSubscription = false
+    var needsHelp = false
+
+    func show(hasSubscription: () async -> Bool = { true },
+              present: () async throws -> Void, refresh: () async -> Void) async {
+        guard !isPresenting else { return }
+        isPresenting = true
+        needsHelp = false
+        hasNoSubscription = false
+        defer { isPresenting = false }
+
+        if await hasSubscription() {
+            do {
+                try await present()
+            } catch {
+                needsHelp = true
+            }
+        } else {
+            hasNoSubscription = true
+            needsHelp = true
+        }
+        await refresh()
     }
 }

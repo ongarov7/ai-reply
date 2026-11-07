@@ -15105,6 +15105,151 @@
           }
         }
       }
+    },
+    "purchase.manage.appStore" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open subscriptions in App Store"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Открыть подписки в App Store"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Жазылымдарды App Store арқылы ашу"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Obunalarni App Store orqali ochish"
+          }
+        }
+      }
+    },
+    "purchase.manage.failed.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t open subscriptions"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось открыть подписки"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Жазылымдарды ашу мүмкін болмады"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Obunalarni ochib boʻlmadi"
+          }
+        }
+      }
+    },
+    "purchase.manage.failed.detail" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Try again, or open subscriptions in the App Store. You can also go to Settings → your Apple Account → Subscriptions."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Попробуй ещё раз или открой подписки в App Store. Также можно перейти в «Настройки» → Аккаунт Apple → «Подписки»."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Қайталап көр немесе жазылымдарды App Store арқылы аш. Сондай-ақ «Реттеулер» → Apple аккаунты → «Жазылымдар» бөліміне өтуге болады."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qayta urining yoki obunalarni App Store orqali oching. Shuningdek, Sozlamalar → Apple hisobingiz → Obunalar boʻlimiga oʻtishingiz mumkin."
+          }
+        }
+      }
+    },
+    "purchase.manage.empty.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No subscription found"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Подписка не найдена"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Жазылым табылмады"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Obuna topilmadi"
+          }
+        }
+      }
+    },
+    "purchase.manage.empty.detail" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No AI Reply subscription was found for this Apple Account. If you already subscribed, restore purchases. You can also check your subscriptions in the App Store."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Для этого Аккаунта Apple подписка AI Reply не найдена. Если подписка уже оформлена, восстанови покупки. Также можно проверить подписки в App Store."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Бұл Apple аккаунты үшін AI Reply жазылымы табылмады. Жазылымды бұрын рәсімдеген болсаң, сатып алуларды қалпына келтір. Жазылымдарды App Store арқылы да тексеруге болады."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu Apple hisobi uchun AI Reply obunasi topilmadi. Avval obuna boʻlgan boʻlsangiz, xaridlarni tiklang. Obunalarni App Store orqali ham tekshirishingiz mumkin."
+          }
+        }
+      }
     }
   },
   "version" : "1.1"

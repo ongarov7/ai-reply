@@ -1,6 +1,162 @@
 import XCTest
 @testable import AIReply
 
+@MainActor
+final class SubscriptionManagementTests: XCTestCase {
+    func testNoSubscriptionHistorySkipsNativeManagementAndRefreshes() async {
+        let management = SubscriptionManagement()
+        var refreshed = false
+
+        await management.show(hasSubscription: { false }, present: {
+            XCTFail("an account without Apple subscription history must not open an empty native sheet")
+        }, refresh: {
+            XCTAssertTrue(management.isPresenting)
+            refreshed = true
+        })
+
+        XCTAssertTrue(refreshed)
+        XCTAssertTrue(management.hasNoSubscription)
+        XCTAssertTrue(management.needsHelp)
+        XCTAssertFalse(management.isPresenting)
+    }
+
+    func testHistoryFoundOnRetryClearsNoSubscriptionNotice() async {
+        let management = SubscriptionManagement()
+        await management.show(hasSubscription: { false }, present: {}, refresh: {})
+        XCTAssertTrue(management.hasNoSubscription)
+
+        var presented = false
+        await management.show(hasSubscription: { true }, present: {
+            XCTAssertFalse(management.hasNoSubscription)
+            XCTAssertFalse(management.needsHelp)
+            presented = true
+        }, refresh: {})
+
+        XCTAssertTrue(presented)
+        XCTAssertFalse(management.hasNoSubscription)
+        XCTAssertFalse(management.needsHelp)
+    }
+
+    func testPresentationErrorAfterNoHistoryUsesErrorNotice() async {
+        let management = SubscriptionManagement()
+        await management.show(hasSubscription: { false }, present: {}, refresh: {})
+
+        await management.show(hasSubscription: { true }, present: {
+            throw SubscriptionManagement.PresentationError.unavailableScene
+        }, refresh: {})
+
+        XCTAssertFalse(management.hasNoSubscription)
+        XCTAssertTrue(management.needsHelp)
+        XCTAssertFalse(management.isPresenting)
+    }
+
+    func testSuccessfulPresentationRefreshesBeforeClearingBusyState() async {
+        let management = SubscriptionManagement()
+        var calls: [String] = []
+
+        await management.show(present: {
+            XCTAssertTrue(management.isPresenting)
+            calls.append("present")
+        }, refresh: {
+            XCTAssertTrue(management.isPresenting)
+            calls.append("refresh")
+        })
+
+        XCTAssertEqual(calls, ["present", "refresh"])
+        XCTAssertFalse(management.isPresenting)
+        XCTAssertFalse(management.needsHelp)
+    }
+
+    func testPresentationFailureOffersHelpAndStillRefreshes() async {
+        let management = SubscriptionManagement()
+        var refreshed = false
+
+        await management.show(present: {
+            throw SubscriptionManagement.PresentationError.unavailableScene
+        }, refresh: {
+            XCTAssertTrue(management.isPresenting)
+            refreshed = true
+        })
+
+        XCTAssertTrue(refreshed)
+        XCTAssertTrue(management.needsHelp)
+        XCTAssertFalse(management.isPresenting)
+    }
+
+    func testRepeatedTapDoesNotPresentOrRefreshWhilePresentationIsOpen() async {
+        let management = SubscriptionManagement()
+        let presented = expectation(description: "native management is open")
+        var dismissal: CheckedContinuation<Void, Never>?
+        var presentationCount = 0
+        var refreshCount = 0
+        let first = Task {
+            await management.show(present: {
+                presentationCount += 1
+                await withCheckedContinuation { continuation in
+                    dismissal = continuation
+                    presented.fulfill()
+                }
+            }, refresh: { refreshCount += 1 })
+        }
+        await fulfillment(of: [presented], timeout: 1)
+
+        await management.show(present: { presentationCount += 1 }, refresh: { refreshCount += 1 })
+        XCTAssertEqual(presentationCount, 1)
+        XCTAssertEqual(refreshCount, 0)
+        XCTAssertTrue(management.isPresenting)
+
+        dismissal?.resume()
+        await first.value
+        XCTAssertEqual(refreshCount, 1)
+        XCTAssertFalse(management.isPresenting)
+    }
+
+    func testRepeatedTapWaitsUntilBalanceRefreshFinishes() async {
+        let management = SubscriptionManagement()
+        let refreshing = expectation(description: "balance refresh is running")
+        var finishRefresh: CheckedContinuation<Void, Never>?
+        var presentationCount = 0
+        var refreshCount = 0
+        let first = Task {
+            await management.show(present: { presentationCount += 1 }, refresh: {
+                refreshCount += 1
+                await withCheckedContinuation { continuation in
+                    finishRefresh = continuation
+                    refreshing.fulfill()
+                }
+            })
+        }
+        await fulfillment(of: [refreshing], timeout: 1)
+
+        await management.show(present: { presentationCount += 1 }, refresh: { refreshCount += 1 })
+        XCTAssertTrue(management.isPresenting)
+        XCTAssertEqual(presentationCount, 1)
+        XCTAssertEqual(refreshCount, 1)
+
+        finishRefresh?.resume()
+        await first.value
+        XCTAssertFalse(management.isPresenting)
+    }
+
+    func testRetryAfterFailureClearsHelpAndCanPresentAgain() async {
+        let management = SubscriptionManagement()
+        await management.show(present: {
+            throw SubscriptionManagement.PresentationError.unavailableScene
+        }, refresh: {})
+        XCTAssertTrue(management.needsHelp)
+
+        var retried = false
+        await management.show(present: {
+            XCTAssertFalse(management.needsHelp)
+            retried = true
+        }, refresh: {})
+
+        XCTAssertTrue(retried)
+        XCTAssertFalse(management.needsHelp)
+        XCTAssertFalse(management.isPresenting)
+    }
+}
+
 final class SubscriptionDisplayTests: XCTestCase {
     private func plan(_ code: String, days: Int, kind: String, limit: Int = 0, free: Bool = false) -> AccountAPI.Plan {
         AccountAPI.Plan(id: code, code: code, name: ["en": code.hasPrefix("base") ? "Base" : "Pro"],

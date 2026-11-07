@@ -1,5 +1,6 @@
 import SwiftUI
 import StoreKit
+import UIKit
 
 struct PurchaseView: View {
     @Environment(PurchaseStore.self) private var store
@@ -94,11 +95,13 @@ struct SubscriptionPlanCatalogue {
 /// return the product. The current plan and free allowance remain readable.
 struct PurchaseOptionsView: View {
     var onSelectOffer: (String) -> Void = { _ in }
+    @Environment(\.openURL) private var openURL
     @Environment(PurchaseStore.self) private var store
     @Environment(AccountModel.self) private var account
     @Environment(AppSettings.self) private var settings
     @State private var period = "month"
-    @State private var isManaging = false
+    @State private var management = SubscriptionManagement()
+    @State private var subscriptionWindow = SubscriptionWindow()
     @State private var selectedOfferID: String?
 
     var body: some View {
@@ -136,7 +139,27 @@ struct PurchaseOptionsView: View {
                 .disabled(!store.canRestore)
                 .frame(maxWidth: .infinity, minHeight: DS.Layout.minimumTouchTarget)
                 if !ProcessInfo.processInfo.isiOSAppOnMac {
-                    Button("purchase.manage") { isManaging = true }
+                    Button("purchase.manage") {
+                        Task {
+                            await management.show(hasSubscription: {
+                                await AppStoreClient.hasSubscriptionHistory()
+                            }, present: {
+                                guard let scene = subscriptionWindow.window?.windowScene,
+                                      scene.activationState == .foregroundActive else {
+                                    throw SubscriptionManagement.PresentationError.unavailableScene
+                                }
+                                try await AppStore.showManageSubscriptions(in: scene)
+                            }, refresh: {
+                                await store.processUnfinished()
+                                await account.refresh()
+                            })
+                        }
+                    }
+                        .disabled(management.isPresenting)
+                        .accessibilityIdentifier("purchase.manage")
+                        .frame(maxWidth: .infinity, minHeight: DS.Layout.minimumTouchTarget)
+                    Link("purchase.manage.appStore", destination: SubscriptionWindow.subscriptionsURL)
+                        .font(.footnote)
                         .frame(maxWidth: .infinity, minHeight: DS.Layout.minimumTouchTarget)
                 }
                 Text("purchase.restore.detail")
@@ -156,14 +179,22 @@ struct PurchaseOptionsView: View {
                 }
             }
         }
-        .manageSubscriptionsSheet(isPresented: $isManaging)
+        .background(SubscriptionWindowReader(anchor: subscriptionWindow).allowsHitTesting(false))
+        .alert(LocalizedStringKey(management.hasNoSubscription ? "purchase.manage.empty.title" : "purchase.manage.failed.title"), isPresented: $management.needsHelp) {
+            if management.hasNoSubscription {
+                Button("purchase.restore") {
+                    Task { await store.restore(); await account.refresh() }
+                }
+            }
+            Button("purchase.manage.appStore") { openURL(SubscriptionWindow.subscriptionsURL) }
+            Button("common.cancel", role: .cancel) { }
+        } message: {
+            Text(LocalizedStringKey(management.hasNoSubscription ? "purchase.manage.empty.detail" : "purchase.manage.failed.detail"))
+        }
         // Config can finish refreshing after the parent screen's task. Load
         // when sales become available instead of requiring a second visit.
         .task(id: store.isEnabled) {
             if store.isEnabled { await store.loadCatalogue() }
-        }
-        .onChange(of: isManaging) { _, presented in
-            if !presented { Task { await store.processUnfinished(); await account.refresh() } }
         }
     }
 
@@ -401,5 +432,36 @@ struct PurchaseOptionsView: View {
         components.queryItems = [URLQueryItem(name: "lang", value: settings.effectiveLanguage.rawValue)]
         guard let url = components.url, case .web = DeepLink.destination(for: url.absoluteString) else { return nil }
         return url
+    }
+}
+
+/// Resolve the scene from this view, including iPhone compatibility windows on
+/// iPad, so StoreKit uses the active scene without a nested SwiftUI sheet.
+private final class SubscriptionWindow {
+    weak var window: UIWindow?
+    static let subscriptionsURL = URL(string: "https://apps.apple.com/account/subscriptions")!
+}
+
+private struct SubscriptionWindowReader: UIViewRepresentable {
+    let anchor: SubscriptionWindow
+
+    func makeUIView(context: Context) -> WindowView {
+        let view = WindowView()
+        view.anchor = anchor
+        return view
+    }
+
+    func updateUIView(_ uiView: WindowView, context: Context) {
+        uiView.anchor = anchor
+        anchor.window = uiView.window
+    }
+
+    final class WindowView: UIView {
+        var anchor: SubscriptionWindow?
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            anchor?.window = window
+        }
     }
 }
