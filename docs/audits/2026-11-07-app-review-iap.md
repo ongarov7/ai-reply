@@ -56,5 +56,39 @@ Apple submission guidance requires first purchases of each type to accompany
 an app version and the subscription group:
 https://developer.apple.com/help/app-store-connect/manage-submissions-to-app-review/submit-an-in-app-purchase/.
 
-Upload processing, TestFlight group assignment and the final review-submission
-status are recorded after they are visibly confirmed in App Store Connect.
+## Confirmed TestFlight delivery
+
+Apple accepted the upload at 16:32:18 Asia/Almaty. App Store Connect subsequently
+showed build 23 as Ready to Submit with `AI-Reply Internal` assigned. Build ID:
+`5d921a48-eb0d-476d-a81e-fb558dff1022`.
+
+The app's review notes now contain all five product IDs and navigation steps,
+the active agreement status, Kazakhstan sandbox-storefront instructions and
+the distinction between purchasing and managing an existing subscription.
+All five purchases and their subscription group were added to the same draft
+(six objects). Build 23 was selected and saved for version 1.2.0; the review
+notes were verified unchanged at 3,646 characters. Automatic release after
+approval remains selected.
+
+Apple does not allow adding items to a submission with Unresolved Issues. The
+sole rejected app item was removed from the old submission so that version
+1.2.0 could accompany all five purchases and the group in the new draft. The
+app, version metadata and uploaded build were retained.
+
+## Confirmed App Review submission
+
+At 16:58 Asia/Almaty, Apple confirmed **7 items submitted**. The submission
+details subsequently showed **Waiting for Review** for every item:
+
+- Version 1.2.0, build 23
+- 30 replies / `kz.aireply.pack30`
+- AI Reply Base & Pro / group `22528719`
+- Pro Monthly / `kz.aireply.pro.monthly`
+- Pro Yearly / `kz.aireply.pro.yearly`
+- Base Monthly / `kz.aireply.base.monthly`
+- Base Yearly / `kz.aireply.base.yearly`
+
+Submission ID: `34d1df1b-aeb4-4015-8dff-caca75753b93`.
+[App Review submission](https://appstoreconnect.apple.com/apps/6818570150/distribution/reviewsubmissions/details/34d1df1b-aeb4-4015-8dff-caca75753b93).
+Automatic public release after approval is selected. Submission is complete;
+Apple approval and public availability are still pending.
