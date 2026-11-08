@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -66,6 +67,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kz.yerek.aireply.R
@@ -76,7 +78,9 @@ import kz.yerek.aireply.core.text.codePointLength
 import kz.yerek.aireply.domain.model.TemplateSummary
 import kz.yerek.aireply.keyboard.KeyboardTheme
 import kz.yerek.aireply.keyboard.autocorrect.Suggestion
+import kz.yerek.aireply.keyboard.layout.Box as KeyBox
 import kz.yerek.aireply.keyboard.layout.PersonaRowLayout
+import kz.yerek.aireply.keyboard.layout.ResultActionsLayout
 import kz.yerek.aireply.keyboard.reply.ReplyComposerFlow
 import kz.yerek.aireply.keyboard.reply.ReplySession
 import kz.yerek.aireply.ui.common.RelationshipIcons
@@ -732,7 +736,7 @@ private fun ComposingRow(
             enabled = canGenerate || generating,
             busy = generating,
             theme = theme,
-            modifier = Modifier.widthIn(min = 96.dp),
+            modifier = Modifier.widthIn(min = 104.dp),
             onClick = actions.onPrimary
         )
     }
@@ -759,93 +763,81 @@ internal fun ResultRow(
     val drafts = flow.drafts
     val canInsert = (stage == ReplyComposerFlow.Stage.Result || editing) && draftText.isNotBlank()
 
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val regenerateTitle = strings[R.string.kb_another_reply]
+    val insertTitle = strings[R.string.kb_insert]
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val compact = maxWidth < 360.dp || LocalDensity.current.fontScale > 1.2f
-        val inlineVersions = maxWidth >= 540.dp && !compact
-        val versions: @Composable () -> Unit = {
-            VersionNavigation(flow, strings, theme, onPreviousVersion, onNextVersion)
+        // Measured with the normal title even while Stop is shown, so starting
+        // or finishing a new version never moves the controls.
+        val layout = remember(maxWidth, regenerateTitle, insertTitle) {
+            fun width(text: String, style: TextStyle) =
+                with(density) { measurer.measure(text, style).size.width.toDp().value }
+            ResultActionsLayout.of(
+                width = maxWidth.value,
+                regenerateWidth = width(regenerateTitle, TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Medium)) + 44f,
+                insertWidth = width(insertTitle, TextStyle(fontSize = 15.sp, fontWeight = FontWeight.SemiBold)) + 24f
+            )
         }
-        val editButton: @Composable () -> Unit = {
+        val target = ResultActionsLayout.TARGET.dp
+        fun Modifier.at(box: KeyBox) = this.offset(box.left.dp, box.top.dp).size(box.width.dp, box.height.dp)
+        Box(Modifier.fillMaxWidth().height(layout.height.dp)) {
+            CircleIcon(
+                Icons.AutoMirrored.Filled.ArrowBack, backDescription, theme, size = target,
+                modifier = Modifier.at(layout.back), onClick = onBack
+            )
+            ActionPill(
+                label = if (regenerating) strings[R.string.kb_stop] else regenerateTitle,
+                enabled = stage == ReplyComposerFlow.Stage.Result || editing || regenerating,
+                theme = theme,
+                modifier = Modifier.at(layout.regenerate).semantics {
+                    contentDescription = strings[if (regenerating) R.string.kb_stop else R.string.kb_another_reply]
+                },
+                quiet = true,
+                busy = regenerating,
+                icon = if (regenerating) null else Icons.Filled.Refresh,
+                height = target,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                onClick = onRegenerate
+            )
             CircleIcon(
                 icon = if (editing) Icons.Filled.Check else Icons.Filled.Edit,
                 description = if (editing) strings[R.string.kb_done_editing] else strings[R.string.kb_edit_reply],
-                theme = theme, size = 48.dp, selected = editing,
-                enabled = stage == ReplyComposerFlow.Stage.Result || editing, onClick = onEdit
+                theme = theme, size = target, selected = editing,
+                enabled = stage == ReplyComposerFlow.Stage.Result || editing,
+                modifier = Modifier.at(layout.edit), onClick = onEdit
+            )
+            if (drafts.count > 1) {
+                CircleIcon(
+                    Icons.Filled.ChevronLeft, strings[R.string.kb_previous_version], theme, target, 20.dp,
+                    filled = false, enabled = drafts.canSelectPrevious && !flow.isGenerating,
+                    modifier = Modifier.at(layout.previous), onClick = onPreviousVersion
+                )
+                Box(Modifier.at(layout.version), contentAlignment = Alignment.Center) {
+                    Text(
+                        text = "${drafts.position}/${drafts.count}", fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                        color = theme.secondaryText,
+                        modifier = Modifier.semantics {
+                            contentDescription = strings.get(R.string.kb_version_position, drafts.position, drafts.count)
+                        }
+                    )
+                }
+                CircleIcon(
+                    Icons.Filled.ChevronRight, strings[R.string.kb_next_version], theme, target, 20.dp,
+                    filled = false, enabled = drafts.canSelectNext && !flow.isGenerating,
+                    modifier = Modifier.at(layout.next), onClick = onNextVersion
+                )
+            }
+            ActionPill(
+                label = insertTitle,
+                enabled = canInsert,
+                theme = theme,
+                modifier = Modifier.at(layout.insert),
+                height = target,
+                onClick = onInsert
             )
         }
-        Column {
-            Row(
-                modifier = Modifier.fillMaxWidth().height(48.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                CircleIcon(Icons.AutoMirrored.Filled.ArrowBack, backDescription, theme, size = 48.dp, onClick = onBack)
-                ActionPill(
-                    label = when {
-                        regenerating -> strings[R.string.kb_stop]
-                        compact -> strings[R.string.kb_another_reply_compact]
-                        else -> strings[R.string.kb_another_reply]
-                    },
-                    enabled = stage == ReplyComposerFlow.Stage.Result || editing || regenerating,
-                    theme = theme,
-                    modifier = Modifier.weight(1f).semantics { contentDescription = strings[if (regenerating) R.string.kb_stop else R.string.kb_another_reply] },
-                    quiet = true,
-                    busy = regenerating,
-                    icon = if (regenerating) null else Icons.Filled.Refresh,
-                    height = 48.dp,
-                    onClick = onRegenerate
-                )
-                if (!compact) editButton()
-                if (inlineVersions && drafts.count > 1) versions()
-                ActionPill(
-                    label = strings[R.string.kb_insert],
-                    enabled = canInsert,
-                    theme = theme,
-                    modifier = Modifier.widthIn(min = if (compact) 80.dp else 96.dp),
-                    height = 48.dp,
-                    onClick = onInsert
-                )
-            }
-            // Versions get their own space rather than squeezing the labeled
-            // action or Insert off a compact screen. Selection behavior is unchanged.
-            if ((drafts.count > 1 && !inlineVersions) || compact) {
-                Row(Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
-                    if (compact) editButton()
-                    Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                        if (drafts.count > 1) versions()
-                    }
-                    if (compact) Spacer(Modifier.width(48.dp))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun VersionNavigation(
-    flow: ReplyComposerFlow,
-    strings: AppStrings,
-    theme: KeyboardTheme,
-    onPrevious: () -> Unit,
-    onNext: () -> Unit
-) {
-    val drafts = flow.drafts
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        CircleIcon(
-            Icons.Filled.ChevronLeft, strings[R.string.kb_previous_version], theme, 48.dp, 20.dp,
-            filled = false, enabled = drafts.canSelectPrevious && !flow.isGenerating, onClick = onPrevious
-        )
-        Text(
-            text = "${drafts.position}/${drafts.count}", fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
-            color = theme.secondaryText,
-            modifier = Modifier.semantics {
-                contentDescription = strings.get(R.string.kb_version_position, drafts.position, drafts.count)
-            }
-        )
-        CircleIcon(
-            Icons.Filled.ChevronRight, strings[R.string.kb_next_version], theme, 48.dp, 20.dp,
-            filled = false, enabled = drafts.canSelectNext && !flow.isGenerating, onClick = onNext
-        )
     }
 }
 
@@ -967,6 +959,8 @@ internal fun ActionPill(
     busy: Boolean = false,
     icon: ImageVector? = null,
     height: Dp = 32.dp,
+    fontSize: TextUnit = 15.sp,
+    fontWeight: FontWeight = FontWeight.SemiBold,
     onClick: () -> Unit
 ) {
     val background = when {
@@ -997,8 +991,8 @@ internal fun ActionPill(
         }
         Text(
             text = label,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.SemiBold,
+            fontSize = fontSize,
+            fontWeight = fontWeight,
             color = if (quiet) theme.primaryText else Color.White,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -1022,6 +1016,7 @@ internal fun CircleIcon(
     busy: Boolean = false,
     enabled: Boolean = true,
     tint: Color? = null,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     val background = when {
@@ -1031,7 +1026,7 @@ internal fun CircleIcon(
     }
     val glyph = if (selected) Color.White else tint ?: theme.primaryText
     Box(
-        modifier = Modifier
+        modifier = modifier
             .size(size)
             .alpha(if (enabled) 1f else 0.35f)
             .clip(CircleShape)
@@ -1080,7 +1075,7 @@ internal fun voiceLineHeight(lines: Int): Dp =
 
 val PERSONA_ROW_HEIGHT = PersonaRowLayout.HEIGHT.dp
 internal val PERSONA_PILL_HEIGHT = PersonaRowLayout.PILL_HEIGHT.dp
-internal val ROW_HEIGHT = 34.dp
+internal val ROW_HEIGHT = 32.dp
 private val INSTRUCTION_HEIGHT = 56.dp
 internal const val LINE_HEIGHT_SP = 21
 private const val LINE_HEIGHT_DP = 21

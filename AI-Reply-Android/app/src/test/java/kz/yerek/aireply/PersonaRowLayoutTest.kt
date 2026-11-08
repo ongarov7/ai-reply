@@ -179,3 +179,35 @@ class PersonaRowLayoutTest {
         }
     }
 }
+
+class ResultActionsLayoutTest {
+
+    private val of = kz.yerek.aireply.keyboard.layout.ResultActionsLayout.Companion
+
+    @Test
+    fun `a wide row keeps everything on one line, the pager between edit and insert`() {
+        val layout = of.of(width = 480f, regenerateWidth = 120f, insertWidth = 100f)
+        assertEquals(44f, layout.height)
+        assertTrue(layout.previous.left >= layout.edit.right)
+        assertTrue(layout.next.right <= layout.insert.left)
+        assertEquals(480f, layout.insert.right, 0.001f)
+    }
+
+    @Test
+    fun `a narrow row moves the pager and insert to a second line and nothing overlaps`() {
+        val layout = of.of(width = 290f, regenerateWidth = 150f, insertWidth = 100f)
+        assertEquals(94f, layout.height)
+        assertEquals(50f, layout.insert.top)
+        assertEquals(0f, layout.previous.left)
+        assertTrue(layout.edit.right <= 290f)
+        assertTrue(layout.next.right <= layout.insert.left)
+    }
+
+    @Test
+    fun `the pager has its room even with one version`() {
+        for (width in listOf(280f, 320f, 360f, 411f)) {
+            val layout = of.of(width, 130f, 96f)
+            assertTrue("w=$width", layout.next.right <= layout.insert.left || layout.height > 44f)
+        }
+    }
+}

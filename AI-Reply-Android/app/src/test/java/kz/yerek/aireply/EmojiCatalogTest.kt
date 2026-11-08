@@ -161,15 +161,19 @@ class EmojiCatalogTest {
     }
 
     @Test
-    fun `the grid has big enough cells on every phone`() {
-        assertEquals(7, EmojiGridLayout.columns(314f))
-        assertEquals(8, EmojiGridLayout.columns(354f))
-        assertEquals(9, EmojiGridLayout.columns(387f))
-        assertEquals(9, EmojiGridLayout.columns(405f))
-        for (width in listOf(314f, 354f, 387f, 405f, 474f, 900f)) {
-            val columns = EmojiGridLayout.columns(width)
-            assertTrue("w=$width", width / columns >= EmojiGridLayout.MIN_CELL_WIDTH || columns == EmojiGridLayout.MIN_COLUMNS)
+    fun `the grid scrolls sideways in three to five rows, sized to fill the panel`() {
+        for ((width, height) in listOf(320f to 186f, 360f to 196f, 393f to 208f, 411f to 208f, 480f to 220f, 640f to 120f)) {
+            val metrics = EmojiGridLayout.metrics(width, height, sideInset = 3f, topInset = 7f, density = 2.625f)
+            val label = "w=$width h=$height"
+            assertTrue(label, metrics.rows in EmojiGridLayout.MIN_ROWS..EmojiGridLayout.MAX_ROWS)
+            assertTrue(label, metrics.cellHeight >= 26f)
+            assertTrue(label, metrics.cellHeight * metrics.rows <= height)
+            assertTrue(label, metrics.glyphSize <= EmojiGridLayout.MAX_GLYPH)
+            assertTrue(label, metrics.glyphSize <= minOf(metrics.cellWidth, metrics.cellHeight))
         }
+        // A short panel gives up its title before its rows.
+        assertNull(EmojiGridLayout.metrics(640f, 110f, 4f, 4f, 3f).titleTop)
+        assertTrue(EmojiGridLayout.metrics(393f, 208f, 3f, 7f, 3f).titleTop != null)
     }
 
     // ------------------------------------------------------------ recents

@@ -2,17 +2,20 @@ package kz.yerek.aireply.keyboard.ui
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridState
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.material.icons.Icons
@@ -42,6 +45,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -57,6 +61,7 @@ import kotlinx.coroutines.launch
 import kz.yerek.aireply.keyboard.KeyboardTheme
 import kz.yerek.aireply.keyboard.emoji.EmojiCatalog
 import kz.yerek.aireply.keyboard.emoji.EmojiGridLayout
+import kz.yerek.aireply.keyboard.emoji.EmojiGridMetrics
 import kz.yerek.aireply.keyboard.emoji.EmojiPageModel
 import kz.yerek.aireply.keyboard.emoji.EmojiTab
 import kz.yerek.aireply.keyboard.layout.KeyboardLabels
@@ -108,10 +113,11 @@ class EmojiPanelState {
 }
 
 /**
- * The emoji grid: every category in one vertical scroll, a header over each,
- * the tabs below following along. Its box is the panel's whole touch area,
- * so a tap between two emoji never reaches the keys underneath. The headers
- * are in the layout's language ([KeyboardLabels]), like the ABC key below.
+ * The emoji grid: every category in one sideways scroll, a few rows tall, the
+ * name of the section at the leading edge above it, the tabs below following
+ * along. Its box is the panel's whole touch area, so a tap between two emoji
+ * never reaches the keys underneath. The names are in the layout's language
+ * ([KeyboardLabels]), like the ABC key below.
  *
  * The emoji are drawn by the system font, exactly as the app they go into
  * will draw them - never swapped for EmojiCompat's - and only the ones that
@@ -127,10 +133,10 @@ internal fun EmojiGrid(
     onEmoji: (String) -> Unit
 ) {
     val page = state.page
-    val inner = panel.innerPadding()
     LaunchedEffect(state.openings) {
         if (state.grid.firstVisibleItemIndex != 0 || state.grid.firstVisibleItemScrollOffset != 0) state.grid.scrollToItem(0)
     }
+    val density = LocalDensity.current.density
     Box(Modifier.fillMaxSize()) {
         if (page.isEmpty) {
             // Read once per process, in the background: a moment at most.
@@ -143,13 +149,36 @@ internal fun EmojiGrid(
             }
             return@Box
         }
-        val columns = EmojiGridLayout.columns(panel.frame.width)
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(columns),
+        val inset = (panel.frame.left - panel.hitFrame.left).coerceAtLeast(0f)
+        val metrics = EmojiGridLayout.metrics(
+            width = panel.hitFrame.width,
+            height = panel.hitFrame.height,
+            sideInset = inset,
+            topInset = (panel.frame.top - panel.hitFrame.top).coerceAtLeast(0f),
+            density = density
+        )
+        metrics.titleTop?.let { top ->
+            state.selectedTab?.let { tab ->
+                Text(
+                    text = labels.emojiTab(tab).uppercase(),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = theme.secondaryText,
+                    maxLines = 1,
+                    modifier = Modifier
+                        .padding(start = (inset + 6f).dp, top = top.dp)
+                        .semantics { heading() }
+                )
+            }
+        }
+        LazyHorizontalGrid(
+            rows = GridCells.Fixed(metrics.rows),
             state = state.grid,
+            contentPadding = PaddingValues(horizontal = metrics.contentInset.dp),
             modifier = Modifier
-                .fillMaxSize()
-                .padding(start = inner.start.dp, top = inner.top.dp, end = inner.end.dp, bottom = inner.bottom.dp)
+                .fillMaxWidth()
+                .padding(top = metrics.gridTop.dp)
+                .height((metrics.cellHeight * metrics.rows).dp)
                 .alpha(if (dimmed) 0.45f else 1f)
         ) {
             items(
@@ -159,8 +188,9 @@ internal fun EmojiGrid(
                 contentType = { index -> if (page.items[index] is EmojiPageModel.Header) 0 else 1 }
             ) { index ->
                 when (val item = page.items[index]) {
-                    is EmojiPageModel.Header -> EmojiHeader(labels.emojiTab(item.tab), theme)
-                    is EmojiPageModel.Cell -> EmojiCell(item.emoji, enabled = !dimmed, onEmoji = onEmoji)
+                    // No header in a sideways grid: the gap between two sections.
+                    is EmojiPageModel.Header -> Spacer(Modifier.width(if (index == 0) 0.dp else EmojiGridLayout.SECTION_GAP.dp))
+                    is EmojiPageModel.Cell -> EmojiCell(item.emoji, metrics, enabled = !dimmed, onEmoji = onEmoji)
                 }
             }
         }
@@ -168,32 +198,18 @@ internal fun EmojiGrid(
 }
 
 @Composable
-private fun EmojiHeader(name: String, theme: KeyboardTheme) {
+private fun EmojiCell(emoji: String, metrics: EmojiGridMetrics, enabled: Boolean, onEmoji: (String) -> Unit) {
     Box(
         modifier = Modifier
-            .fillMaxWidth()
-            .height(EmojiGridLayout.HEADER_HEIGHT.dp)
-            .padding(start = 8.dp, bottom = 2.dp)
-            .semantics { heading() },
-        contentAlignment = Alignment.BottomStart
-    ) {
-        Text(text = name, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = theme.secondaryText, maxLines = 1)
-    }
-}
-
-@Composable
-private fun EmojiCell(emoji: String, enabled: Boolean, onEmoji: (String) -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(EmojiGridLayout.CELL_HEIGHT.dp)
+            .width(metrics.cellWidth.dp)
+            .height(metrics.cellHeight.dp)
             .clip(RoundedCornerShape(8.dp))
             .clickable(enabled = enabled, role = Role.Button) { onEmoji(emoji) }
             // TalkBack names an emoji itself, in the phone's language.
             .semantics { contentDescription = emoji },
         contentAlignment = Alignment.Center
     ) {
-        BasicText(text = emoji, style = EMOJI_STYLE)
+        BasicText(text = emoji, style = EMOJI_STYLE.copy(fontSize = metrics.glyphSize.sp))
     }
 }
 
@@ -271,8 +287,7 @@ private fun tabIcon(tab: EmojiTab): ImageVector = when (tab) {
     EmojiTab.FLAGS -> Icons.Outlined.EmojiFlags
 }
 
-/** The system font's own emoji, at the grid's size; never EmojiCompat's replacements. */
+/** The system font's own emoji; never EmojiCompat's replacements. */
 private val EMOJI_STYLE = TextStyle(
-    fontSize = EmojiGridLayout.EMOJI_SIZE_SP.sp,
     platformStyle = PlatformTextStyle(emojiSupportMatch = EmojiSupportMatch.None)
 )

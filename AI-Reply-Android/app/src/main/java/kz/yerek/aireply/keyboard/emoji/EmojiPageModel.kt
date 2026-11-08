@@ -83,22 +83,65 @@ class EmojiPageModel private constructor(
     }
 }
 
-/** The grid's sizes, in dp and sp. */
+/**
+ * Where the emoji page's grid goes: a few rows of emoji scrolling sideways,
+ * section after section, the section's name above them, worked out from the
+ * panel's size. Pure, so it is tested on the JVM.
+ *
+ * [titleTop] is null when the panel is too short for a title.
+ */
+data class EmojiGridMetrics(
+    val rows: Int,
+    val cellWidth: Float,
+    val cellHeight: Float,
+    val glyphSize: Float,
+    val titleTop: Float?,
+    val gridTop: Float,
+    val contentInset: Float
+)
+
 object EmojiGridLayout {
 
-    /** Narrower than this and an emoji is hard to hit. */
-    const val MIN_CELL_WIDTH = 42f
+    /** A row is never shorter than this: fewer rows instead, never fewer than [MIN_ROWS]. */
+    const val MIN_CELL_HEIGHT = 34f
+    const val MIN_ROWS = 3
+    const val MAX_ROWS = 5
 
-    const val MIN_COLUMNS = 6
-    const val MAX_COLUMNS = 18
+    /** Bigger glyphs only look bloated. */
+    const val MAX_GLYPH = 32f
 
-    const val CELL_HEIGHT = 44f
+    /** Between one section's last column and the next one's first. */
+    const val SECTION_GAP = 12f
+    const val TITLE_HEIGHT = 16f
 
-    /** The emoji, drawn at a size that fills a cell without touching its neighbours. */
-    const val EMOJI_SIZE_SP = 26f
+    /**
+     * The grid for a panel [width] by [height] dp, inset by the keyboard's
+     * [sideInset]; [topInset] places the section's name.
+     */
+    fun metrics(width: Float, height: Float, sideInset: Float, topInset: Float, density: Float): EmojiGridMetrics {
+        val titleTop = maxOf(2f, topInset - 3f)
+        val withTitle = titleTop + TITLE_HEIGHT + 2f
+        val bottom = height - 2f
+        val showsTitle = bottom - withTitle >= MIN_CELL_HEIGHT * MIN_ROWS
+        val gridTop = if (showsTitle) withTitle else 2f
+        val available = maxOf(1f, bottom - gridTop)
+        val rows = (available / MIN_CELL_HEIGHT).toInt().coerceIn(MIN_ROWS, MAX_ROWS)
+        val cellHeight = floorToPixel(available / rows, density)
+        val gridWidth = maxOf(1f, width - sideInset * 2)
+        val target = minOf(cellHeight * 1.15f, 46f)
+        val columns = maxOf(1, kotlin.math.round(gridWidth / target).toInt())
+        val cellWidth = floorToPixel(gridWidth / columns, density)
+        return EmojiGridMetrics(
+            rows = rows,
+            cellWidth = cellWidth,
+            cellHeight = cellHeight,
+            glyphSize = minOf(MAX_GLYPH, kotlin.math.floor(minOf(cellWidth, cellHeight) * 0.78f)),
+            titleTop = titleTop.takeIf { showsTitle },
+            gridTop = gridTop + (available - cellHeight * rows) / 2f,
+            contentInset = sideInset
+        )
+    }
 
-    const val HEADER_HEIGHT = 26f
-
-    /** Columns for a grid [width] dp wide: 7 on a 320 dp phone, 8 at 360, 9 at 393 and 411. */
-    fun columns(width: Float): Int = (width / MIN_CELL_WIDTH).toInt().coerceIn(MIN_COLUMNS, MAX_COLUMNS)
+    private fun floorToPixel(value: Float, density: Float): Float =
+        kotlin.math.floor(value * density) / density
 }

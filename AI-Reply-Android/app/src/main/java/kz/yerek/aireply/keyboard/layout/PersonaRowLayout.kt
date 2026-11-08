@@ -134,3 +134,49 @@ object PersonaRowLayout {
         return natural.map { it + extra }
     }
 }
+
+/**
+ * The reply controls under a result: Back, Regenerate and Edit on the left,
+ * Insert on the right, the version pager between them - or, where that does
+ * not fit, the pager and Insert on a second row. The pager's room is reserved
+ * even for the first version, so a new one never changes the panel's height.
+ *
+ * Plain numbers in dp, so JVM tests can pin it.
+ */
+data class ResultActionsLayout(
+    val back: Box,
+    val regenerate: Box,
+    val edit: Box,
+    val previous: Box,
+    val version: Box,
+    val next: Box,
+    val insert: Box,
+    val height: Float
+) {
+    companion object {
+        const val TARGET = 44f
+        const val GAP = 6f
+        private const val VERSION_WIDTH = 34f
+        private const val MIN_REGENERATE = 112f
+        private const val MIN_INSERT = 96f
+
+        fun of(width: Float, regenerateWidth: Float, insertWidth: Float): ResultActionsLayout {
+            val row = max(0f, width)
+            val pager = TARGET * 2 + VERSION_WIDTH
+            val regenerate = min(max(MIN_REGENERATE, regenerateWidth), max(TARGET, row - TARGET * 2 - GAP * 2))
+            val insert = min(row, max(MIN_INSERT, insertWidth))
+            val first = TARGET * 2 + regenerate + GAP * 2
+            val oneRow = first + GAP + pager + GAP + insert <= row
+            val second = if (oneRow) 0f else TARGET + GAP
+            val backBox = Box(0f, 0f, TARGET, TARGET)
+            val regenerateBox = Box(backBox.right + GAP, 0f, backBox.right + GAP + regenerate, TARGET)
+            val editBox = Box(regenerateBox.right + GAP, 0f, regenerateBox.right + GAP + TARGET, TARGET)
+            val insertBox = Box(row - insert, second, row, second + TARGET)
+            val pagerLeft = if (oneRow) editBox.right + GAP + max(0f, (insertBox.left - GAP - editBox.right - GAP - pager) / 2f) else 0f
+            val previousBox = Box(pagerLeft, second, pagerLeft + TARGET, second + TARGET)
+            val versionBox = Box(previousBox.right, second, previousBox.right + VERSION_WIDTH, second + TARGET)
+            val nextBox = Box(versionBox.right, second, versionBox.right + TARGET, second + TARGET)
+            return ResultActionsLayout(backBox, regenerateBox, editBox, previousBox, versionBox, nextBox, insertBox, second + TARGET)
+        }
+    }
+}
