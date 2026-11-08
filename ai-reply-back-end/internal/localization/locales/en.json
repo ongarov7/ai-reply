@@ -22,6 +22,8 @@
  "account.recurring_terms": "I authorize automatic charges for the selected subscription every 30 or 365 days at the price shown, until the card expiry date (up to five years). I can cancel future charges in this account; paid access remains until the end of its period.",
  "account.period_days": "{days} days",
  "account.daily_units": "{count} replies per day",
+ "account.monthly_units": "{count} replies each paid month. Unused replies never expire.",
+ "admin.billing.monthly_bundle": "replies each paid month",
  "account.unlimited": "Unlimited replies",
  "account.paid_until": "Paid access until {date}",
  "account.next_charge": "Next charge: {amount} on {date}",

@@ -36,6 +36,9 @@ func (s *CheckoutService) enqueueReceiptTx(ctx context.Context, tx *sql.Tx, orde
 		name = product.Name["en"]
 	}
 	params := map[string]string{"product": name, "amount": traits.FormatMoney(order.AmountMinor, order.Currency), "units": fmt.Sprint(product.Units), "order": order.ID, "manage_url": s.baseURL() + "/account?lang=" + locale}
+	if product.MonthlyLimit > 0 {
+		params["units"] = fmt.Sprint(product.MonthlyLimit)
+	}
 	kind := "bcc_pack_receipt"
 	if product.Kind == "subscription" {
 		kind = "bcc_subscription_receipt"

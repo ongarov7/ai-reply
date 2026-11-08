@@ -410,6 +410,11 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 			t.Fatal(err)
 		}
 	}
+	if env["TEST_LEGACY_DAILY_BASE"] == "true" {
+		if _, err := db.Writer().Exec(`UPDATE plans SET daily_message_limit=40,monthly_message_limit=0,entitlement_kind='daily',price=79000 WHERE code='base_monthly'; UPDATE plans SET is_visible=1,is_active=1 WHERE code='base_yearly'; UPDATE plans SET price=345000 WHERE code='pro_monthly'; UPDATE plans SET price=3490000 WHERE code='pro_yearly'; UPDATE iap_products SET price_minor=79000 WHERE code='base_monthly'; UPDATE iap_products SET price_minor=345000 WHERE code='pro_monthly'; UPDATE iap_products SET price_minor=3490000 WHERE code='pro_yearly'`); err != nil {
+			t.Fatal(err)
+		}
+	}
 	// The migration writes the production default (50); a test opts in with withWelcomeBonus.
 	if _, err := db.Writer().Exec(`UPDATE system_settings SET value = ? WHERE key = ?`,
 		env[welcomeBonusEnv], credits.SettingWelcomeUnits); err != nil {

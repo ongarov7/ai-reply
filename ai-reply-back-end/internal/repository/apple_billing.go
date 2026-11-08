@@ -112,7 +112,14 @@ func (s *Store) ApplyAppleSubscription(ctx context.Context, in AppleSubscription
 		if _, err = tx.ExecContext(ctx, `UPDATE iap_purchases SET price_milliunits=?,currency=? WHERE provider=? AND transaction_id=? AND price_milliunits=0`, in.PriceMilliunits, in.Currency, domain.ProviderAppStore, in.TransactionID); err != nil {
 			return err
 		}
-		if err = recordAppleBasePeriod(ctx, tx, in, existing.ID); err != nil {
+		monthly, err := recordAppleBaseMonthly(ctx, tx, in, existing.ID, now)
+		if err != nil {
+			return err
+		}
+		if !monthly {
+			err = recordAppleBasePeriod(ctx, tx, in, existing.ID)
+		}
+		if err != nil {
 			return err
 		}
 		if err = reconcileAppleBaseCreditDays(ctx, tx, in.UserID, now); err != nil {

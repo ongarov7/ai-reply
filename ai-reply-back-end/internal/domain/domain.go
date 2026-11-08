@@ -241,7 +241,9 @@ type Plan struct {
 }
 
 const (
-	EntitlementDaily     = "daily"
+	EntitlementDaily = "daily"
+	// Monthly is a permanent reply grant per paid billing period, not a calendar quota.
+	EntitlementMonthly   = "monthly"
 	EntitlementWelcome   = "welcome"
 	EntitlementUnlimited = "unlimited"
 )

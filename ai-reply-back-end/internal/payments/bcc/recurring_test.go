@@ -54,6 +54,9 @@ func TestBankRenewalIsPersistentSingleAttemptAndRequiresFinalNotification(t *tes
 	if err != nil || first.ExpiresAt == nil || !first.ExpiresAt.Equal(now.Add(30*24*time.Hour)) {
 		t.Fatalf("first paid period: %+v %v", first, err)
 	}
+	if balance, err := store.CreditBalance(ctx, "bank-user", now); err != nil || balance.Packs != 1000 {
+		t.Fatalf("first monthly bundle: %+v %v", balance, err)
+	}
 	if _, err := s.StartExpected(ctx, "bank-user", "pro_monthly", "duplicate-subscription", subscriptionQuote(t, s, "pro_monthly")); err == nil {
 		t.Fatal("second renewing mandate accepted")
 	}
@@ -114,6 +117,9 @@ func TestBankRenewalIsPersistentSingleAttemptAndRequiresFinalNotification(t *tes
 	if err != nil || renewed.ExpiresAt == nil || !renewed.ExpiresAt.Equal(now.Add(30*24*time.Hour)) {
 		t.Fatalf("renewal access: %+v %v", renewed, err)
 	}
+	if balance, err := store.CreditBalance(ctx, "bank-user", now); err != nil || balance.Packs != 2000 {
+		t.Fatalf("renewal/repeated notification duplicated or lost credits: %+v %v", balance, err)
+	}
 	if err := s.CancelSubscription(ctx, "bank-user", renewed.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -121,6 +127,9 @@ func TestBankRenewalIsPersistentSingleAttemptAndRequiresFinalNotification(t *tes
 		t.Fatal("cancellation removed paid access or retained renewal")
 	}
 	now = *renewed.ExpiresAt
+	if balance, err := store.CreditBalance(ctx, "bank-user", now.Add(400*24*time.Hour)); err != nil || balance.Packs != 2000 {
+		t.Fatalf("cancellation/expiry removed purchased replies: %+v %v", balance, err)
+	}
 	if err := s.RunDue(ctx); err != nil || calls != 1 {
 		t.Fatal("cancellation did not stop the scheduler")
 	}
@@ -267,5 +276,8 @@ func TestRefundedBankSubscriptionCannotReturnThroughAnOldPaymentNotify(t *testin
 	}
 	if _, err := repository.New(s.db).ActiveBankSubscription(ctx, "bank-user", time.Now()); !errors.Is(err, domain.ErrNotFound) {
 		t.Fatal("refunded subscription was restored")
+	}
+	if balance, err := repository.New(s.db).CreditBalance(ctx, "bank-user", time.Now()); err != nil || balance.Packs != 0 {
+		t.Fatalf("refunded monthly bundle remained spendable: %+v %v", balance, err)
 	}
 }

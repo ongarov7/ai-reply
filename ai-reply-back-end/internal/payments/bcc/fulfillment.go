@@ -49,6 +49,20 @@ func (s *CheckoutService) fulfillAuthenticatedPack(ctx context.Context, order Ba
 			if err := s.fulfillSubscriptionTx(ctx, tx, order, safe, s.now()); err != nil {
 				return err
 			}
+			if product.MonthlyLimit > 0 {
+				var starts int64
+				if err := tx.QueryRowContext(ctx, `SELECT starts_at FROM bcc_subscription_periods WHERE order_id=?`, order.ID).Scan(&starts); err != nil {
+					return err
+				}
+				grant := traits.NewID()
+				if _, err := tx.ExecContext(ctx, `INSERT INTO credit_grants(id,user_id,kind,units_total,units_remaining,starts_at,expires_at,status,product_code,granted_by,reason,created_at,updated_at,billing_order_id)
+ VALUES(?,?,'pack',?,?,?,NULL,'active','bcc_base_monthly','system','Paid monthly reply bundle',?,?,?)`, grant, user, product.MonthlyLimit, product.MonthlyLimit, starts, now, now, order.ID); err != nil {
+					return err
+				}
+				if _, err := tx.ExecContext(ctx, `INSERT INTO credit_ledger(id,user_id,grant_id,entry,kind,delta,actor,reason,created_at) VALUES(?,?,?,'grant','pack',?,'system','Paid monthly reply bundle',?)`, traits.NewID(), user, grant, product.MonthlyLimit, now); err != nil {
+					return err
+				}
+			}
 		} else {
 			grantID := traits.NewID()
 			reason := "Verified BCC " + string(s.Environment()) + " purchase"

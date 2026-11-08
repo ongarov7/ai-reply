@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/aireply/ai-reply-back-end/internal/database"
-	"github.com/aireply/ai-reply-back-end/migrations"
 )
 
 func welcomeTwentyFixture(t *testing.T) (*database.DB, func(string, ...any)) {
@@ -33,7 +32,7 @@ func welcomeTwentyFixture(t *testing.T) (*database.DB, func(string, ...any)) {
 func TestWelcomeTwentyMigrationVersionsOnlyDefaultFreeAndPreservesCustomers(t *testing.T) {
 	ctx := context.Background()
 	db, exec := welcomeTwentyFixture(t)
-	old := InitialProducts()
+	old := legacyDailyProducts()
 	old[0].Units = 10
 	old[1].PriceMinor = 81111 // A later owner price must never be rewound.
 	old[2].AvailableWeb = false
@@ -120,14 +119,14 @@ func TestWelcomeTwentyMigrationPreservesDisabledAndCustomSettings(t *testing.T) 
 	for _, units := range []string{"0", "7", "50"} {
 		t.Run(units, func(t *testing.T) {
 			db, exec := welcomeTwentyFixture(t)
-			old := InitialProducts()
+			old := legacyDailyProducts()
 			old[0].Units = 10
 			raw, _ := json.Marshal(old)
 			exec(`INSERT INTO billing_catalog_versions(id,state,products_json,created_by,updated_by,created_at,updated_at)
  VALUES(1,'published',?,'owner','owner',1000,1000)`, string(raw))
 			exec(`UPDATE system_settings SET value=? WHERE key='welcome_bonus_units'`, units)
 			exec(`UPDATE system_settings SET value='1234' WHERE key='welcome_bonus_since'`)
-			if _, err := database.Migrate(context.Background(), db, migrations.FS); err != nil {
+			if _, err := database.Migrate(context.Background(), db, catalogMigrationsBefore(t, "0036")); err != nil {
 				t.Fatal(err)
 			}
 			var actual, cutoff, after string
@@ -147,7 +146,7 @@ func TestWelcomeTwentyMigrationPreservesDisabledAndCustomSettings(t *testing.T) 
 func TestWelcomeTwentyMigrationPreservesCustomDraftAndAlreadyAlignedPublication(t *testing.T) {
 	ctx := context.Background()
 	db, exec := welcomeTwentyFixture(t)
-	products := InitialProducts()
+	products := legacyDailyProducts()
 	raw, _ := json.Marshal(products)
 	exec(`INSERT INTO billing_catalog_versions(id,state,products_json,created_by,updated_by,created_at,updated_at)
  VALUES(1,'published',?,'owner','owner',1000,1000)`, string(raw))
@@ -161,7 +160,7 @@ func TestWelcomeTwentyMigrationPreservesCustomDraftAndAlreadyAlignedPublication(
 	}
 	s := New(db)
 	published, err := s.Published(ctx)
-	if err != nil || published.ID != 1 || published.UpdatedAt != 1000 || !reflect.DeepEqual(published.Products, InitialProducts()) {
+	if err != nil || published.ID != 1 || published.UpdatedAt != 1000 || !reflect.DeepEqual(published.Products, legacyDailyProducts()) {
 		t.Fatalf("already aligned publication rewritten: %+v %v", published, err)
 	}
 	draft, err := s.Draft(ctx)
@@ -182,7 +181,7 @@ func TestWelcomeTwentyMigrationRebasesOnlyCurrentDraftAndKeepsCustomQuantity(t *
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
 			db, exec := welcomeTwentyFixture(t)
-			products := InitialProducts()
+			products := legacyDailyProducts()
 			products[0].Units = 10
 			raw, _ := json.Marshal(products)
 			exec(`INSERT INTO billing_catalog_versions(id,state,products_json,created_by,updated_by,created_at,updated_at)
@@ -217,7 +216,7 @@ func TestWelcomeTwentyMigrationRebasesOnlyCurrentDraftAndKeepsCustomQuantity(t *
 func TestWelcomeTwentyMigrationFailureRollsBackAndCanRetry(t *testing.T) {
 	ctx := context.Background()
 	db, exec := welcomeTwentyFixture(t)
-	products := InitialProducts()
+	products := legacyDailyProducts()
 	products[0].Units = 10
 	raw, _ := json.Marshal(products)
 	exec(`INSERT INTO billing_catalog_versions(id,state,products_json,created_by,updated_by,created_at,updated_at)

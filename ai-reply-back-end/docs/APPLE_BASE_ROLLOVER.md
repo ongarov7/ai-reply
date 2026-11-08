@@ -1,4 +1,41 @@
-# Apple Base reply rollover (migration 0036)
+# Apple Base permanent replies
+
+## Monthly bundle (migration 0037)
+
+New Base Monthly purchases after `apple_base_monthly_since` grant the full
+1,000-reply bundle for each verified paid transaction. The unique
+`credit_grants.iap_purchase_id` index prevents duplicate delivery. Grants use
+the existing permanent pack balance with `expires_at=NULL` and product code
+`apple_base_monthly`. They remain spendable across devices after cancellation,
+expiry or an upgrade to Pro. Pro access does not consume these credits.
+
+Refunds remove only the remaining units in the same database transaction as
+the subscription lifecycle update. A newer signed refund reversal restores
+exactly those removed units. Replaying a purchase or changing the current
+catalog cannot increase its already sold grant quantity. Historical daily
+periods retain their own immutable accounting, including delayed replays of
+transactions purchased before the rollout boundary.
+
+The IAP product publishes `entitlement_kind:monthly`, `monthly_limit:1000`,
+`daily_limit:0` and `credits_never_expire:true`. Usage has both quota limits zero:
+generation spends the permanent balance, rather than a resetting calendar cap.
+
+The new business prices are Base Monthly 990 KZT, Pro Monthly 3,990 KZT,
+Pro Yearly 39,990 KZT; the permanent 30-reply pack remains 130 KZT.
+Base Yearly is hidden from new sales while its existing periods remain usable.
+App Store price points must be saved and verified separately before rollout.
+
+BCC monthly purchases use the immutable order's `monthly_limit` to grant one
+permanent bundle per authenticated paid order. Duplicate notifications cannot
+grant it twice; cancellation and expiry retain it, while a confirmed refund
+revokes its remainder. Legacy bank mandates retain their saved daily terms
+and prices. Manually assigned legacy Base access retains its prior daily quota.
+
+These changes require a backend deployment; rebuilding iOS does not deploy them.
+Do not roll back the binary over the migrated database without an explicit
+accounting decision and a consistent backup.
+
+## Historical daily rollover (migration 0036)
 
 Base Monthly and Base Yearly bought through Apple continue to add the sold daily
 quantity (currently 40). Unused replies accumulate permanently. They remain

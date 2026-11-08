@@ -141,6 +141,9 @@ func (s *Server) handleLanding(w http.ResponseWriter, r *http.Request) {
 				case product.Kind == "pack":
 					allowance = strconv.Itoa(product.Units) + " · " + s.bundle.T(locale, "admin.billing.permanent")
 					description = s.bundle.T(locale, "pricing.pack_description")
+				case product.MonthlyLimit > 0:
+					allowance = strconv.Itoa(product.MonthlyLimit) + " · " + s.bundle.T(locale, "admin.billing.monthly_bundle")
+					description = s.bundle.T(locale, "admin.billing.permanent")
 				default:
 					allowance = strconv.Itoa(product.DailyLimit) + " / " + s.bundle.T(locale, "pricing.per_day")
 				}

@@ -253,6 +253,24 @@ final class SubscriptionDisplayTests: XCTestCase {
         ]).isEmpty)
     }
 
+    func testMonthlyBaseShowsPermanentThousandReplyBundleAtStorePrice() throws {
+        let product = try JSONDecoder().decode(PurchaseAPI.Product.self, from: Data("""
+        {"code":"base_monthly","kind":"subscription","units":0,
+         "store_product_id":"base.monthly","plan_id":"base_monthly","billing_period":"month",
+         "entitlement_kind":"monthly","daily_limit":0,"monthly_limit":1000,
+         "credits_never_expire":true,"price":99000,"currency":"KZT"}
+        """.utf8))
+        let matched = PurchaseOffer.match(server: [product], store: [
+            StoreProduct(id: "base.monthly", displayName: "Base", displayPrice: "990 ₸",
+                         kind: .subscription, billingPeriod: "month", price: 990, currency: "KZT")
+        ])
+        let option = try XCTUnwrap(SubscriptionPlanCatalogue(plans: plans, offers: matched).options.first)
+        XCTAssertEqual(option.allowance, .monthly(1000))
+        XCTAssertTrue(option.offer.creditsNeverExpire)
+        XCTAssertFalse(option.offer.hasPriceMismatch)
+        XCTAssertEqual(option.offer.displayPrice, "990 ₸")
+    }
+
     func testPermanentDailyGrantsKeepTheirDisclosureAfterStoreKitMatching() throws {
         let product = try JSONDecoder().decode(PurchaseAPI.Product.self, from: Data("""
         {"code":"base_monthly","kind":"subscription","units":0,

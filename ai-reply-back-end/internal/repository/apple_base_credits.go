@@ -26,7 +26,16 @@ func recordAppleBasePeriod(ctx context.Context, tx *sql.Tx, in AppleSubscription
 		return err
 	}
 	if units <= 0 {
-		return nil
+		// Historical signed purchases keep the quantity sold before the monthly
+		// rollout; replaying one must not mint a new 1,000-reply bundle.
+		if err := tx.QueryRowContext(ctx, `SELECT COALESCE(
+ (SELECT daily_units FROM apple_base_credit_periods WHERE purchase_id=?),
+ (SELECT CAST(value AS INTEGER) FROM system_settings WHERE key='apple_base_legacy_daily_units'),0)`, purchaseID).Scan(&units); err != nil {
+			return err
+		}
+		if units <= 0 {
+			return nil
+		}
 	}
 	end := in.ExpiresAt
 	// Keep verified billing-grace access while retaining the raw signed end
@@ -82,6 +91,9 @@ func (s *Store) AccrueAppleBaseCredits(ctx context.Context, user string, now tim
 	var allowance int
 	var hasHistory bool
 	err := s.db.Tx(ctx, func(tx *sql.Tx) error {
+		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM credit_grants WHERE user_id=? AND product_code IN ('apple_base_monthly','bcc_base_monthly'))`, user).Scan(&hasHistory); err != nil {
+			return err
+		}
 		rows, err := tx.QueryContext(ctx, `SELECT period.purchase_id,period.starts_at,
     CASE WHEN period.upgraded AND period.accrual_cap_at IS NULL THEN period.starts_at ELSE MIN(period.expires_at,COALESCE(period.accrual_cap_at,period.expires_at)) END,period.daily_units,
     period.revoked_at IS NOT NULL OR purchase.status IN ('refunded','revoked')

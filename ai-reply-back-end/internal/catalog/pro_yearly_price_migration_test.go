@@ -54,7 +54,7 @@ func annualPriceFixture(t *testing.T) (*database.DB, func(string, ...any)) {
 func TestAnnualProPriceMigrationPreservesSalesHistoryAndDraft(t *testing.T) {
 	ctx := context.Background()
 	db, exec := annualPriceFixture(t)
-	old := InitialProducts()
+	old := legacyDailyProducts()
 	old[4].PriceMinor = 3450000
 	for i := 1; i < len(old); i++ {
 		old[i].AppleProductID = "test." + old[i].Code
@@ -62,7 +62,7 @@ func TestAnnualProPriceMigrationPreservesSalesHistoryAndDraft(t *testing.T) {
 	old[2].AvailableWeb = false
 	oldRaw, _ := json.Marshal(old)
 	exec(`INSERT INTO billing_catalog_versions(id,state,products_json,created_by,updated_by,published_by,created_at,updated_at,published_at) VALUES(1,'published',?,'owner','owner','owner',1000,1000,1000)`, string(oldRaw))
-	draftProducts := InitialProducts()
+	draftProducts := legacyDailyProducts()
 	for i := range old {
 		draftProducts[i] = old[i]
 	}
@@ -144,18 +144,18 @@ func TestAnnualProPriceMigrationPreservesSalesHistoryAndDraft(t *testing.T) {
 func TestAnnualProPriceMigrationAlreadyPublishedDoesNotRewriteHistory(t *testing.T) {
 	ctx := context.Background()
 	db, exec := annualPriceFixture(t)
-	products := InitialProducts()
+	products := legacyDailyProducts()
 	raw, _ := json.Marshal(products)
 	exec(`INSERT INTO billing_catalog_versions(id,state,products_json,created_by,updated_by,published_by,created_at,updated_at,published_at) VALUES(1,'published',?,'owner','owner','owner',1000,1000,1000)`, string(raw))
 	products[4].PriceMinor = 3450000
 	draftRaw, _ := json.Marshal(products)
 	exec(`INSERT INTO billing_catalog_versions(id,state,base_version,revision,products_json,created_by,updated_by,created_at,updated_at) VALUES(2,'draft',1,2,?,'owner','owner',1000,1000)`, string(draftRaw))
-	if _, err := database.Migrate(ctx, db, migrations.FS); err != nil {
+	if _, err := database.Migrate(ctx, db, catalogMigrationsBefore(t, "0031")); err != nil {
 		t.Fatal(err)
 	}
 	s := New(db)
 	current, err := s.Published(ctx)
-	if err != nil || current.ID != 1 || current.UpdatedAt != 1000 || !reflect.DeepEqual(current.Products, InitialProducts()) {
+	if err != nil || current.ID != 1 || current.UpdatedAt != 1000 || !reflect.DeepEqual(current.Products, legacyDailyProducts()) {
 		t.Fatalf("already aligned publication changed: %+v %v", current, err)
 	}
 	draft, err := s.Draft(ctx)

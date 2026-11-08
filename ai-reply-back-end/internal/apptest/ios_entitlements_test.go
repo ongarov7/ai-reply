@@ -15,7 +15,13 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/iap/appstore/appstoretest"
 )
 
-func approvedEntitlements() harnessOption { return withEnv("TEST_APPROVED_ENTITLEMENTS", "true") }
+// These regressions retain the daily Base contracts sold before the monthly rollout.
+func approvedEntitlements() harnessOption {
+	return func(env map[string]string) {
+		env["TEST_APPROVED_ENTITLEMENTS"] = "true"
+		env["TEST_LEGACY_DAILY_BASE"] = "true"
+	}
+}
 
 func (h *harness) enableApprovedProducts() {
 	h.t.Helper()

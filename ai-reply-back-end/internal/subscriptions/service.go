@@ -219,7 +219,7 @@ func (s *Service) Entitlement(ctx context.Context, userID string) (domain.Entitl
 		return domain.Entitlement{}, bankErr
 	}
 	if bankErr == nil {
-		bankPlan, err := s.repo.Plan(ctx, bank.PlanID)
+		bankPlan, err := s.repo.BankSubscriptionPlan(ctx, bank.ID, bank.PlanID)
 		if err != nil {
 			return domain.Entitlement{}, err
 		}
@@ -241,6 +241,17 @@ func (s *Service) Entitlement(ctx context.Context, userID string) (domain.Entitl
 	dailyLimit, monthlyLimit := plan.DailyLimit, plan.MonthlyLimit
 	if sub != nil && sub.Source == domain.ProviderAppStore && (plan.Code == "base_monthly" || plan.Code == "base_yearly") {
 		dailyLimit, monthlyLimit = 0, 0
+	} else if sub != nil && sub.Source == "bcc" && plan.EntitlementKind == domain.EntitlementMonthly {
+		// The paid billing period already granted permanent credits. It does
+		// not also create a resetting calendar-month quota.
+		dailyLimit, monthlyLimit = 0, 0
+	} else if sub != nil && plan.Code == "base_monthly" && plan.EntitlementKind == domain.EntitlementMonthly {
+		// Existing manually assigned Base access keeps its daily allowance.
+		dailyLimit, err = s.repo.LegacyBaseDailyUnits(ctx)
+		if err != nil {
+			return domain.Entitlement{}, err
+		}
+		monthlyLimit = 0
 	}
 	return domain.Entitlement{
 		Plan:               plan,

@@ -36,10 +36,12 @@ type webTestSnapshot struct {
 		} `json:"plan"`
 	} `json:"subscription"`
 	Usage struct {
-		Purchased  int  `json:"purchased_credits"`
-		Remaining  int  `json:"remaining_total"`
-		DailyLimit int  `json:"daily_limit"`
-		Unlimited  bool `json:"unlimited"`
+		Purchased          int  `json:"purchased_credits"`
+		Remaining          int  `json:"remaining_total"`
+		DailyLimit         int  `json:"daily_limit"`
+		MonthlyLimit       int  `json:"monthly_limit"`
+		CreditsNeverExpire bool `json:"credits_never_expire"`
+		Unlimited          bool `json:"unlimited"`
 	} `json:"usage"`
 	Bank struct {
 		Enabled     bool              `json:"enabled"`
@@ -366,7 +368,7 @@ func TestWebCheckoutBindsAccountAndTermsAndGrantsOnlyAfterBankNotify(t *testing.
 }
 
 func TestWebsiteSubscriptionReachesAlreadySignedInIOSAndPreservesPaidAccessOnCancellation(t *testing.T) {
-	for _, code := range []string{"base_monthly", "base_yearly", "pro_monthly", "pro_yearly"} {
+	for _, code := range []string{"base_monthly", "pro_monthly", "pro_yearly"} {
 		t.Run(code, func(t *testing.T) {
 			cfg := webTestConfig(t)
 			cfg.BCCCheckout.RecurringEnabled = true
@@ -399,6 +401,9 @@ func TestWebsiteSubscriptionReachesAlreadySignedInIOSAndPreservesPaidAccessOnCan
 			}
 			var product catalog.Product
 			for _, p := range snapshot.Bank.Products {
+				if p.Code == "base_yearly" {
+					t.Fatal("legacy annual Base is still offered to new customers")
+				}
 				if p.Code == code {
 					product = p
 				}
@@ -445,8 +450,11 @@ func TestWebsiteSubscriptionReachesAlreadySignedInIOSAndPreservesPaidAccessOnCan
 			if paid.Subscription.Plan.Code != code || paid.Subscription.Source != "bcc" || paid.Subscription.AutoRenews == nil || !*paid.Subscription.AutoRenews {
 				t.Fatalf("iOS did not receive the bank subscription: %+v", paid.Subscription)
 			}
-			if product.Unlimited != paid.Usage.Unlimited || product.DailyLimit != paid.Usage.DailyLimit || paid.Usage.Purchased != 0 {
+			if product.Unlimited != paid.Usage.Unlimited || product.DailyLimit != paid.Usage.DailyLimit || paid.Usage.Purchased != product.MonthlyLimit || paid.Usage.MonthlyLimit != 0 {
 				t.Fatalf("wrong subscription allowance: %+v", paid.Usage)
+			}
+			if product.MonthlyLimit > 0 && !paid.Usage.CreditsNeverExpire {
+				t.Fatal("monthly bundle does not disclose permanent credits")
 			}
 			var periods, receipts int
 			if err := db.Reader().QueryRow(`SELECT (SELECT count(*) FROM bcc_subscription_periods),(SELECT count(*) FROM billing_receipt_outbox)`).Scan(&periods, &receipts); err != nil || periods != 1 || receipts != 1 {
@@ -459,6 +467,9 @@ func TestWebsiteSubscriptionReachesAlreadySignedInIOSAndPreservesPaidAccessOnCan
 			canceled := readIOS()
 			if canceled.Subscription.Plan.Code != code || canceled.Subscription.AutoRenews == nil || *canceled.Subscription.AutoRenews {
 				t.Fatalf("cancel removed paid access or retained renewal: %+v", canceled.Subscription)
+			}
+			if canceled.Usage.Purchased != paid.Usage.Purchased {
+				t.Fatal("cancel removed purchased replies")
 			}
 		})
 	}

@@ -52,7 +52,7 @@ func TestUnifiedPricesOnFreshInstall(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertUnifiedProducts(t, version.Products, 3490000, 20)
+	assertMonthlyBundleProducts(t, version.Products)
 	for _, product := range version.Products {
 		if product.Kind == "welcome" {
 			continue
@@ -94,7 +94,7 @@ func TestUnifiedPricesUpgradePreservesHistoryAndSoldPurchases(t *testing.T) {
 	if _, err := database.Migrate(ctx, db, before); err != nil {
 		t.Fatal(err)
 	}
-	oldProducts := InitialProducts()
+	oldProducts := legacyDailyProducts()
 	oldPrices := []int64{0, 59900, 599900, 299900, 2999000, 10000}
 	for i := range oldProducts {
 		oldProducts[i].PriceMinor = oldPrices[i]
@@ -207,7 +207,7 @@ func TestUnifiedPricesCustomizedPackKeepsDelayedStoreFulfillment(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			products := InitialProducts()
+			products := legacyDailyProducts()
 			products[5].Units = 60
 			if provider == domain.ProviderAppStore {
 				products[5].AppleProductID = "test.legacy60"

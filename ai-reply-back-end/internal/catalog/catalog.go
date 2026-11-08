@@ -29,6 +29,7 @@ type Product struct {
 	BillingPeriod  string            `json:"billing_period"`
 	Units          int               `json:"units"`
 	DailyLimit     int               `json:"daily_limit"`
+	MonthlyLimit   int               `json:"monthly_limit,omitempty"`
 	Unlimited      bool              `json:"unlimited"`
 	AppleProductID string            `json:"apple_product_id"`
 	AvailableIOS   bool              `json:"available_ios"`
@@ -59,10 +60,10 @@ func InitialProducts() []Product {
 	}
 	return []Product{
 		{Code: "free", Kind: "welcome", Name: names("Бесплатно", "Free", "Тегін"), Currency: "KZT", Units: 20, Active: true, AvailableIOS: true, AvailableWeb: true},
-		{Code: "base_monthly", Kind: "subscription", Name: names("Base · месяц", "Base · monthly", "Base · ай сайын"), Currency: "KZT", PriceMinor: 79000, BillingPeriod: "month", DailyLimit: 40, Active: true, AvailableIOS: true, AvailableWeb: true},
-		{Code: "base_yearly", Kind: "subscription", Name: names("Base · год", "Base · yearly", "Base · жыл сайын"), Currency: "KZT", PriceMinor: 790000, BillingPeriod: "year", DailyLimit: 40, Active: true, AvailableIOS: true, AvailableWeb: true},
-		{Code: "pro_monthly", Kind: "subscription", Name: names("Pro · месяц", "Pro · monthly", "Pro · ай сайын"), Currency: "KZT", PriceMinor: 345000, BillingPeriod: "month", Unlimited: true, Active: true, AvailableIOS: true, AvailableWeb: true},
-		{Code: "pro_yearly", Kind: "subscription", Name: names("Pro · год", "Pro · yearly", "Pro · жыл сайын"), Currency: "KZT", PriceMinor: 3490000, BillingPeriod: "year", Unlimited: true, Active: true, AvailableIOS: true, AvailableWeb: true},
+		{Code: "base_monthly", Kind: "subscription", Name: names("Base · месяц", "Base · monthly", "Base · ай сайын"), Currency: "KZT", PriceMinor: 99000, BillingPeriod: "month", MonthlyLimit: 1000, Active: true, AvailableIOS: true, AvailableWeb: true},
+		{Code: "base_yearly", Kind: "subscription", Name: names("Base · год", "Base · yearly", "Base · жыл сайын"), Currency: "KZT", PriceMinor: 790000, BillingPeriod: "year", DailyLimit: 40},
+		{Code: "pro_monthly", Kind: "subscription", Name: names("Pro · месяц", "Pro · monthly", "Pro · ай сайын"), Currency: "KZT", PriceMinor: 399000, BillingPeriod: "month", Unlimited: true, Active: true, AvailableIOS: true, AvailableWeb: true},
+		{Code: "pro_yearly", Kind: "subscription", Name: names("Pro · год", "Pro · yearly", "Pro · жыл сайын"), Currency: "KZT", PriceMinor: 3999000, BillingPeriod: "year", Unlimited: true, Active: true, AvailableIOS: true, AvailableWeb: true},
 		{Code: "pack30", Kind: "pack", Name: names("30 ответов", "30 replies", "30 жауап"), Currency: "KZT", PriceMinor: 13000, Units: 30, Active: true, AvailableIOS: true, AvailableWeb: true},
 	}
 }
@@ -141,19 +142,25 @@ func Validate(products []Product) error {
 			return domain.InvalidField("code", "value")
 		}
 		seen[p.Code] = true
-		if p.Kind != base.Kind || p.BillingPeriod != base.BillingPeriod || p.Currency != "KZT" || p.PriceMinor < 0 || p.PriceMinor > 100000000 || p.Units < 0 || p.Units > 1000000 || p.DailyLimit < 0 || p.DailyLimit > 1000000 {
+		if p.Kind != base.Kind || p.BillingPeriod != base.BillingPeriod || p.Currency != "KZT" || p.PriceMinor < 0 || p.PriceMinor > 100000000 || p.Units < 0 || p.Units > 1000000 || p.DailyLimit < 0 || p.DailyLimit > 1000000 || p.MonthlyLimit < 0 || p.MonthlyLimit > 1000000 {
 			return domain.InvalidField(p.Code, "value")
 		}
-		if p.Kind == "welcome" && (p.PriceMinor != 0 || p.Unlimited || p.DailyLimit != 0 || !p.Active || p.Units < 1) {
+		if p.Kind == "welcome" && (p.PriceMinor != 0 || p.Unlimited || p.DailyLimit != 0 || p.MonthlyLimit != 0 || !p.Active || p.Units < 1) {
 			return domain.InvalidField(p.Code, "welcome")
 		}
 		if p.Kind != "welcome" && p.PriceMinor <= 0 {
 			return domain.InvalidField("price_minor", "positive")
 		}
-		if p.Kind == "pack" && (p.Units < 1 || p.DailyLimit != 0 || p.Unlimited) {
+		if p.Kind == "pack" && (p.Units < 1 || p.DailyLimit != 0 || p.MonthlyLimit != 0 || p.Unlimited) {
 			return domain.InvalidField(p.Code, "pack")
 		}
-		if p.Kind == "subscription" && (p.Units != 0 || p.Unlimited == (p.DailyLimit > 0)) {
+		allowances := 0
+		for _, enabled := range []bool{p.Unlimited, p.DailyLimit > 0, p.MonthlyLimit > 0} {
+			if enabled {
+				allowances++
+			}
+		}
+		if p.Kind == "subscription" && (p.Units != 0 || allowances != 1 || p.MonthlyLimit > 0 && (p.BillingPeriod != "month" || p.Code != "base_monthly")) {
 			return domain.InvalidField(p.Code, "allowance")
 		}
 		for _, l := range []string{"ru", "kk", "en"} {
@@ -275,20 +282,22 @@ func synchronize(ctx context.Context, tx *sql.Tx, p Product, now int64) error {
 			return domain.ConflictField("product", "sold_entitlement_immutable")
 		}
 		if p.Kind == "subscription" {
-			var daily int
+			var daily, monthly int
 			var kind string
-			if err = tx.QueryRowContext(ctx, `SELECT daily_message_limit,entitlement_kind FROM plans WHERE code=?`, p.Code).Scan(&daily, &kind); err != nil {
+			if err = tx.QueryRowContext(ctx, `SELECT daily_message_limit,monthly_message_limit,entitlement_kind FROM plans WHERE code=?`, p.Code).Scan(&daily, &monthly, &kind); err != nil {
 				return err
 			}
 			target := "daily"
 			if p.Unlimited {
 				target = "unlimited"
+			} else if p.MonthlyLimit > 0 {
+				target = "monthly"
 			}
 			var subscribers int
 			if err = tx.QueryRowContext(ctx, `SELECT (SELECT count(*) FROM subscriptions WHERE plan_id=(SELECT id FROM plans WHERE code=?))+(SELECT count(*) FROM bcc_subscriptions WHERE plan_id=(SELECT id FROM plans WHERE code=?))`, p.Code, p.Code).Scan(&subscribers); err != nil {
 				return err
 			}
-			if (sold > 0 || subscribers > 0 || apple != "") && (daily != p.DailyLimit || kind != target) {
+			if (sold > 0 || subscribers > 0 || apple != "") && (daily != p.DailyLimit || monthly != p.MonthlyLimit || kind != target) {
 				return domain.ConflictField("plan", "sold_entitlement_immutable")
 			}
 		}
@@ -303,8 +312,10 @@ func synchronize(ctx context.Context, tx *sql.Tx, p Product, now int64) error {
 		entitlement := "daily"
 		if p.Unlimited {
 			entitlement = "unlimited"
+		} else if p.MonthlyLimit > 0 {
+			entitlement = "monthly"
 		}
-		if _, err := tx.ExecContext(ctx, `UPDATE plans SET price=?,currency=?,daily_message_limit=?,monthly_message_limit=0,entitlement_kind=?,is_active=?,is_visible=?,name_ru=?,name_en=?,name_kk=?,name_uz=?,updated_at=? WHERE code=?`, p.PriceMinor, p.Currency, p.DailyLimit, entitlement, p.Active, p.Active, p.Name["ru"], p.Name["en"], p.Name["kk"], p.Name["uz"], now, p.Code); err != nil {
+		if _, err := tx.ExecContext(ctx, `UPDATE plans SET price=?,currency=?,daily_message_limit=?,monthly_message_limit=?,entitlement_kind=?,is_active=?,is_visible=?,name_ru=?,name_en=?,name_kk=?,name_uz=?,updated_at=? WHERE code=?`, p.PriceMinor, p.Currency, p.DailyLimit, p.MonthlyLimit, entitlement, p.Active, p.Active, p.Name["ru"], p.Name["en"], p.Name["kk"], p.Name["uz"], now, p.Code); err != nil {
 			return err
 		}
 		var id string

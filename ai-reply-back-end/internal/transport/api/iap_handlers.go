@@ -54,6 +54,7 @@ type iapProductDTO struct {
 	BillingPeriod      string `json:"billing_period,omitempty"`
 	EntitlementKind    string `json:"entitlement_kind,omitempty"`
 	DailyLimit         int    `json:"daily_limit"`
+	MonthlyLimit       int    `json:"monthly_limit,omitempty"`
 	Price              int64  `json:"price"`
 	Currency           string `json:"currency"`
 }
@@ -89,6 +90,7 @@ func (s *Server) handleIAPProducts(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			product.EntitlementKind, product.DailyLimit = plan.EntitlementKind, plan.DailyLimit
+			product.MonthlyLimit = plan.MonthlyLimit
 			product.CreditsNeverExpire = platform == domain.PlatformIOS && (plan.Code == "base_monthly" || plan.Code == "base_yearly")
 			if product.Currency == "" {
 				product.Price, product.Currency = plan.Price, plan.Currency

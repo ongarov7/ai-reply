@@ -268,7 +268,7 @@
       return JSON.stringify([payload.user && payload.user.id, payload.bank.environment, payload.bank.catalog_version,
         payload.terms_version || payload.bank.terms_version,
         payload.bank.recurring_enabled, payload.bank.recurring_terms_version,
-        (payload.bank.products || []).map(function (p) { return [p.code, p.price_minor, p.currency, p.units, p.daily_limit, p.unlimited, p.billing_period, p.active, p.available_web]; })]);
+        (payload.bank.products || []).map(function (p) { return [p.code, p.price_minor, p.currency, p.units, p.daily_limit, p.monthly_limit, p.unlimited, p.billing_period, p.active, p.available_web]; })]);
     }
     function recurringUntil() {
       var value = nodes['card-expiry'].value;
@@ -310,7 +310,7 @@
         price.textContent = money(product.price_minor, product.currency) + (product.kind === 'subscription' ? ' / ' + t('period_days', { days: days }) : '');
         var units = document.createElement('p');
         units.className = 'account-product-units';
-        units.textContent = product.kind === 'subscription' ? (product.unlimited ? t('unlimited') : t('daily_units', { count: product.daily_limit })) : t('pack_units', { count: product.units });
+        units.textContent = product.kind === 'subscription' ? (product.unlimited ? t('unlimited') : product.monthly_limit > 0 ? t('monthly_units', { count: product.monthly_limit }) : t('daily_units', { count: product.daily_limit })) : t('pack_units', { count: product.units });
         var button = document.createElement('button');
         button.type = 'button'; button.className = 'btn btn-primary'; button.textContent = t('buy');
         button.recurring = product.kind === 'subscription';

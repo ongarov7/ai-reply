@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -30,4 +31,40 @@ func (s *Store) ActiveBankSubscription(ctx context.Context, user string, now tim
 	sub.ExpiresAt = &expiry
 	sub.AutoRenews = &renew
 	return sub, nil
+}
+
+// BankSubscriptionPlan uses the immutable mandate snapshot. Publishing a new
+// Base bundle must not silently rewrite an already sold daily bank contract.
+func (s *Store) BankSubscriptionPlan(ctx context.Context, subscriptionID, planID string) (domain.Plan, error) {
+	plan, err := s.Plan(ctx, planID)
+	if err != nil {
+		return plan, err
+	}
+	var raw string
+	if err = s.db.Reader().QueryRowContext(ctx, `SELECT snapshot_json FROM bcc_subscriptions WHERE id=?`, subscriptionID).Scan(&raw); err != nil {
+		return plan, err
+	}
+	var sold struct {
+		DailyLimit   int   `json:"daily_limit"`
+		MonthlyLimit int   `json:"monthly_limit"`
+		Unlimited    bool  `json:"unlimited"`
+		Price        int64 `json:"price_minor"`
+	}
+	if err = json.Unmarshal([]byte(raw), &sold); err != nil {
+		return plan, err
+	}
+	plan.DailyLimit, plan.MonthlyLimit, plan.Price = sold.DailyLimit, sold.MonthlyLimit, sold.Price
+	plan.EntitlementKind = domain.EntitlementDaily
+	if sold.Unlimited {
+		plan.EntitlementKind = domain.EntitlementUnlimited
+	} else if sold.MonthlyLimit > 0 {
+		plan.EntitlementKind = domain.EntitlementMonthly
+	}
+	return plan, nil
+}
+
+func (s *Store) LegacyBaseDailyUnits(ctx context.Context) (int, error) {
+	var units int
+	err := s.db.Reader().QueryRowContext(ctx, `SELECT CAST(value AS INTEGER) FROM system_settings WHERE key='apple_base_legacy_daily_units'`).Scan(&units)
+	return units, err
 }

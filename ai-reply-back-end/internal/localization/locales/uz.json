@@ -22,6 +22,8 @@
  "account.recurring_terms": "Tanlangan obuna uchun koʻrsatilgan narxda har 30 yoki 365 kunda karta muddati tugaguncha (besh yildan oshmaydi) avtomatik toʻlovlarga roziman. Kelgusi toʻlovlarni shu hisobda bekor qila olaman; toʻlangan kirish davr oxirigacha saqlanadi.",
  "account.period_days": "{days} kun",
  "account.daily_units": "Kuniga {count} ta javob",
+ "account.monthly_units": "Har to‘langan oy uchun {count} javob. Qolgan javoblar muddatsiz.",
+ "admin.billing.monthly_bundle": "to‘langan oy uchun javoblar",
  "account.unlimited": "Cheksiz javoblar",
  "account.paid_until": "Toʻlangan kirish {date} gacha",
  "account.next_charge": "Keyingi toʻlov: {amount}, {date}",
