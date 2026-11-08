@@ -196,7 +196,7 @@ fun KeyboardSetupAction(status: KeyboardStatus.Snapshot, context: Context) {
     when {
         !status.isEnabled -> PrimaryButton(
             text = stringResource(R.string.android_open_keyboard_settings),
-            onClick = { KeyboardStatus.openKeyboardSettings(context) }
+            onClick = { openKeyboardSettings(context) }
         )
         !status.isSelected -> PrimaryButton(
             text = stringResource(R.string.android_switch_keyboard),

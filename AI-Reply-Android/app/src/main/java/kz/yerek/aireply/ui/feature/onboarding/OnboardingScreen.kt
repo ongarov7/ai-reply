@@ -100,6 +100,7 @@ fun OnboardingScreen(mode: OnboardingMode, onFinished: () -> Unit) {
     var recipient by rememberSaveable { mutableStateOf<RelationshipKind?>(null) }
     var messageCopied by rememberSaveable { mutableStateOf(false) }
     var replyCopied by rememberSaveable { mutableStateOf(false) }
+    var practiced by rememberSaveable { mutableStateOf(false) }
     val keyboard by rememberKeyboardStatus()
 
     var announced by rememberSaveable { mutableStateOf(false) }
@@ -160,6 +161,14 @@ fun OnboardingScreen(mode: OnboardingMode, onFinished: () -> Unit) {
         ProductEvents.track(ProductEvent.ONBOARDING_SKIPPED, mapOf("step" to ProductEventValue.Code(at.id)))
     }
 
+    // The first copy of the example is the practice done; another recipient's is not a second one.
+    fun practiceCopied() {
+        replyCopied = true
+        if (practiced) return
+        practiced = true
+        ProductEvents.track(ProductEvent.ONBOARDING_PRACTICE_COMPLETED)
+    }
+
     // Coming back to this step and continuing with the same answer is not a new choice.
     fun saveGender(choice: GrammaticalGender) {
         if (choice == services.configuration.profile.grammaticalGender) return
@@ -186,10 +195,6 @@ fun OnboardingScreen(mode: OnboardingMode, onFinished: () -> Unit) {
         skipTutorial = {
             skipped(step)
             leaveTo(flow.afterTutorial)
-        },
-        startUsing = {
-            ProductEvents.track(ProductEvent.ONBOARDING_PRACTICE_COMPLETED)
-            go(flow.next(step))
         },
         openKeyboardSettings = { openKeyboardSettings(context) },
         chooseKeyboard = { KeyboardStatus.showKeyboardPicker(context) },
@@ -235,7 +240,7 @@ fun OnboardingScreen(mode: OnboardingMode, onFinished: () -> Unit) {
                                     replyCopied = false
                                 },
                                 copied = replyCopied,
-                                onCopied = { replyCopied = true }
+                                onCopied = ::practiceCopied
                             )
                             OnboardingStep.PERMISSIONS -> ConnectStep(keyboard)
                             OnboardingStep.GENDER -> GenderStep(selected = gender, onSelect = { gender = it })
@@ -270,7 +275,6 @@ private class OnboardingActions(
     val choosePath: (OnboardingPath) -> Unit,
     val next: () -> Unit,
     val skipTutorial: () -> Unit,
-    val startUsing: () -> Unit,
     val openKeyboardSettings: () -> Unit,
     val chooseKeyboard: () -> Unit,
     val setUpLater: () -> Unit,
@@ -283,11 +287,7 @@ private fun trackViewed(step: OnboardingStep) {
         ProductEvent.ONBOARDING_STEP_VIEWED,
         mapOf("step" to ProductEventValue.Code(step.id))
     )
-    when (step) {
-        OnboardingStep.PERMISSIONS -> ProductEvents.track(ProductEvent.ONBOARDING_KEYBOARD_STEP_VIEWED)
-        OnboardingStep.TUTORIAL_COPY -> ProductEvents.track(ProductEvent.PASTE_TUTORIAL_VIEWED)
-        else -> Unit
-    }
+    if (step == OnboardingStep.PERMISSIONS) ProductEvents.track(ProductEvent.ONBOARDING_KEYBOARD_STEP_VIEWED)
 }
 
 /**
@@ -363,7 +363,7 @@ private fun BottomBar(
             Action(stringResource(R.string.onboarding_next), actions.next) to
                 Action(stringResource(R.string.onboarding_skip), actions.skipTutorial)
         OnboardingStep.TUTORIAL_REPLY ->
-            Action(stringResource(R.string.onboarding_start_using), actions.startUsing) to null
+            Action(stringResource(R.string.onboarding_start_using), actions.next) to null
         OnboardingStep.PERMISSIONS -> when {
             !keyboard.isEnabled ->
                 Action(stringResource(R.string.permissions_action_keyboard_settings), actions.openKeyboardSettings) to

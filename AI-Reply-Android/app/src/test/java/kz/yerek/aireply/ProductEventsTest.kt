@@ -6,8 +6,11 @@ import kz.yerek.aireply.analytics.ProductEventValue
 import kz.yerek.aireply.analytics.ProductEvents
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.io.File
 
 /** The events facade: names on the wire, values never free text, "once" means once. */
 class ProductEventsTest {
@@ -57,6 +60,35 @@ class ProductEventsTest {
         ProductEvents.install(InMemoryPreferences())
         ProductEvents.trackOnce(ProductEvent.KEYBOARD_ENABLED_DETECTED)
         assertEquals("a new install does", 2, recorded.size)
+    }
+
+    private fun source(path: String) = File("src/main/java/kz/yerek/aireply/$path").readText()
+
+    @Test
+    fun `every way to the system keyboard list is counted`() {
+        val direct = File("src/main/java").walkTopDown()
+            .filter { it.isFile && it.extension == "kt" && "KeyboardStatus.openKeyboardSettings(" in it.readText() }
+            .map { it.name }
+            .toList()
+        assertEquals("only the function that counts it opens the list", listOf("KeyboardPermissionsSection.kt"), direct)
+        assertTrue(
+            source("ui/feature/setup/KeyboardPermissionsSection.kt").substringAfter("internal fun openKeyboardSettings")
+                .substringBefore("KeyboardStatus.openKeyboardSettings(").contains("KEYBOARD_SETTINGS_OPENED")
+        )
+    }
+
+    @Test
+    fun `the paste tutorial is counted on the paste help, not in the onboarding`() {
+        assertTrue("PASTE_TUTORIAL_VIEWED" in source("ui/feature/setup/PasteHelpScreen.kt"))
+        assertFalse("PASTE_TUTORIAL_VIEWED" in source("ui/feature/onboarding/OnboardingScreen.kt"))
+    }
+
+    @Test
+    fun `the practice is done by copying the example, not by the last button`() {
+        val screen = source("ui/feature/onboarding/OnboardingScreen.kt")
+        assertEquals("one place", 1, Regex("ONBOARDING_PRACTICE_COMPLETED").findAll(screen).count())
+        assertTrue(screen.substringAfter("fun practiceCopied()").substringBefore("Coming back").contains("ONBOARDING_PRACTICE_COMPLETED"))
+        assertTrue("onCopied = ::practiceCopied" in screen)
     }
 
     @Test

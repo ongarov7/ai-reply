@@ -16,13 +16,20 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import kz.yerek.aireply.R
+import kz.yerek.aireply.analytics.ProductEvent
+import kz.yerek.aireply.analytics.ProductEvents
 import kz.yerek.aireply.ui.LocalServices
 import kz.yerek.aireply.ui.common.AppScreen
 import kz.yerek.aireply.ui.common.Footnote
@@ -49,6 +56,13 @@ import kz.yerek.aireply.ui.design.StepRow
 fun PasteHelpScreen(onBack: () -> Unit) {
     val services = LocalServices.current
     val lastPaste = remember { services.deviceState.lastSuccessfulPasteAt }
+
+    var counted by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        if (counted) return@LaunchedEffect
+        counted = true
+        ProductEvents.track(ProductEvent.PASTE_TUTORIAL_VIEWED)
+    }
 
     AppScreen(title = stringResource(R.string.paste_help_title), onBack = onBack) {
         ReadableColumn {
