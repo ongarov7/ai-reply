@@ -287,8 +287,9 @@ private fun DrawScope.drawPage(
     state.layout.keys.forEachIndexed { index, key ->
         val face = faceOf(key, state)
         // Only keys that edit text dim: the rest still change the keyboard itself.
-        val keyAlpha = if (state.dimmed && key.key.editsText) 0.45f else 1f
-        val pressed = index in visual.pressed && !state.dimmed
+        val inert = state.dimmed && key.key.editsText
+        val keyAlpha = if (inert) 0.45f else 1f
+        val pressed = index in visual.pressed && !inert
         val fill = when (face) {
             Face.LETTER -> if (pressed) theme.letterKeyPressed else theme.letterKey
             Face.SPECIAL -> if (pressed) theme.specialKeyPressed else theme.specialKey
