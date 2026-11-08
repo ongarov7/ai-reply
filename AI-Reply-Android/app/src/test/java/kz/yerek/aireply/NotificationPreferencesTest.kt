@@ -4,13 +4,21 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.yield
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kz.yerek.aireply.data.account.ApiClient
 import kz.yerek.aireply.data.account.ApiError
 import kz.yerek.aireply.data.account.ApiException
+import kz.yerek.aireply.data.account.SessionAuth
+import kz.yerek.aireply.push.HttpPushApi
 import kz.yerek.aireply.push.NotificationPermission
 import kz.yerek.aireply.push.NotificationPreferencesApi
 import kz.yerek.aireply.push.NotificationPreferencesDto
 import kz.yerek.aireply.push.NotificationPreferencesRepository
 import kz.yerek.aireply.push.PushUiState
+import kz.yerek.aireply.support.FakeResponse
+import kz.yerek.aireply.support.FakeServer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -32,11 +40,13 @@ class NotificationPreferencesTest {
         var gate: CompletableDeferred<Unit>? = null
         var fail = false
         val updates = mutableListOf<Map<String, Boolean>>()
+        val owners = mutableListOf<String?>()
 
         override suspend fun load() = NotificationPreferencesDto(server, optional)
 
-        override suspend fun update(changes: Map<String, Boolean>): NotificationPreferencesDto {
+        override suspend fun update(changes: Map<String, Boolean>, expectedUserId: String?): NotificationPreferencesDto {
             updates += changes
+            owners += expectedUserId
             gate?.await()
             if (fail) throw ApiException(ApiError.Offline)
             server = server + changes
@@ -112,6 +122,48 @@ class NotificationPreferencesTest {
         repository.load()
         repository.clear()
         assertFalse(repository.state.value.isLoaded)
+    }
+
+    @Test
+    fun `a change stays bound to the account that made it`() = runBlocking {
+        val api = FakePreferencesApi()
+        var account: String? = "first"
+        val repository = NotificationPreferencesRepository(api, accountId = { account })
+        repository.load()
+
+        api.gate = CompletableDeferred()
+        val change = async { repository.set("marketing", false) }
+        yield()
+        account = "second"
+        repository.clear()
+        api.gate!!.complete(Unit)
+        change.await()
+
+        assertEquals(listOf<String?>("first"), api.owners)
+        assertFalse("the next account does not inherit the answer", repository.state.value.isLoaded)
+    }
+
+    @Test
+    fun `a change names its account on the wire, and none when it is not known`() = runBlocking {
+        val server = FakeServer { FakeResponse(200, """{"preferences":{"marketing":true},"optional":["marketing"]}""") }
+        val api = HttpPushApi(
+            client = { ApiClient("https://example.test", openConnection = server::open) },
+            session = object : SessionAuth {
+                override val isSignedIn: Boolean get() = true
+                override suspend fun <T> authenticated(work: suspend (String) -> T): T = work("t1")
+            }
+        )
+
+        api.update(mapOf("marketing" to true), "user-a")
+        api.update(mapOf("marketing" to false), null)
+
+        val (named, unknown) = server.requests.toList()
+        assertEquals("PUT", named.method)
+        assertEquals("/api/v1/me/notification-preferences", named.path)
+        val body = Json.parseToJsonElement(named.body).jsonObject
+        assertEquals(setOf("preferences", "expected_user_id"), body.keys)
+        assertEquals("user-a", body["expected_user_id"]!!.jsonPrimitive.content)
+        assertEquals(setOf("preferences"), Json.parseToJsonElement(unknown.body).jsonObject.keys)
     }
 
     // ------------------------------------------------------------ Home card

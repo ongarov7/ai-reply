@@ -16,9 +16,14 @@ import kz.yerek.aireply.platform.ReplyLog
  *
  * A switch moves the moment it is tapped (optimistic) and moves back if the
  * server refuses or cannot be reached. Changes go out one at a time, each
- * naming only its own category, so two quick taps cannot overwrite each other.
+ * naming only its own category, so two quick taps cannot overwrite each other,
+ * and the account it was made for, so it can never land on another one.
  */
-class NotificationPreferencesRepository(private val api: NotificationPreferencesApi) {
+class NotificationPreferencesRepository(
+    private val api: NotificationPreferencesApi,
+    /** The signed-in account, when known. */
+    private val accountId: () -> String? = { null }
+) {
 
     data class State(
         /** What the server last said, or null before the first answer. */
@@ -79,11 +84,15 @@ class NotificationPreferencesRepository(private val api: NotificationPreferences
      */
     suspend fun set(category: String, enabled: Boolean): Boolean {
         if (_state.value.isLocked(category)) return false
+        // Read now: a change waiting for its turn still belongs to whoever made it.
+        val owner = accountId()
         _state.update { it.copy(pending = it.pending + (category to enabled), failed = false) }
         return writes.withLock {
             try {
-                val result = api.update(mapOf(category to enabled))
+                val result = api.update(mapOf(category to enabled), owner)
                 _state.update {
+                    // Signed out or another account meanwhile: this answer is not theirs.
+                    if (accountId() != owner) return@update it
                     it.copy(
                         server = result.preferences,
                         optional = result.optional.toSet().ifEmpty { it.optional },

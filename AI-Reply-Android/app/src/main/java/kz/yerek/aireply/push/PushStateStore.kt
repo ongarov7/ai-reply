@@ -28,8 +28,8 @@ class PushStateStore internal constructor(private val prefs: SharedPreferences) 
 
     /**
      * The signed-in account's user id, for "has the owner changed since the
-     * last sync". Never sent anywhere: the server takes the account from the
-     * token.
+     * last sync". The server takes the account from the token; this is only
+     * ever sent to bind a change of notification categories to its owner.
      */
     var accountUserId: String?
         get() = prefs.getString(KEY_ACCOUNT, null)

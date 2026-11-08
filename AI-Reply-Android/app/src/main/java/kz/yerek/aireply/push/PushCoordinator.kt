@@ -98,7 +98,7 @@ class PushCoordinator(
     private val clock: () -> Long = System::currentTimeMillis
 ) : AccountObserver {
 
-    val preferences = NotificationPreferencesRepository(api)
+    val preferences = NotificationPreferencesRepository(api, accountId = { store.accountUserId })
 
     private val tokenRenewal = InvalidTokenRenewal()
 

@@ -63,7 +63,11 @@ data class NotificationPreferencesDto(
 )
 
 @Serializable
-private data class NotificationPreferencesUpdate(val preferences: Map<String, Boolean>)
+private data class NotificationPreferencesUpdate(
+    val preferences: Map<String, Boolean>,
+    /** The server refuses the change when the token belongs to anyone else. */
+    @SerialName("expected_user_id") val expectedUserId: String? = null
+)
 
 /** `POST /api/v1/notifications/opened`: a tap on one delivery to this installation. */
 @Serializable
@@ -88,7 +92,9 @@ fun interface InstallationApi {
 /** The signed-in user's notification categories. */
 interface NotificationPreferencesApi {
     suspend fun load(): NotificationPreferencesDto
-    suspend fun update(changes: Map<String, Boolean>): NotificationPreferencesDto
+
+    /** [expectedUserId] is the account the change was made for; a token refreshed meanwhile cannot change it. */
+    suspend fun update(changes: Map<String, Boolean>, expectedUserId: String?): NotificationPreferencesDto
 }
 
 /** Records that a notification was opened. Throws [kz.yerek.aireply.data.account.ApiException]. */
@@ -117,8 +123,11 @@ class HttpPushApi(
         )
     }
 
-    override suspend fun update(changes: Map<String, Boolean>): NotificationPreferencesDto {
-        val body = json.encodeToString(NotificationPreferencesUpdate.serializer(), NotificationPreferencesUpdate(changes))
+    override suspend fun update(changes: Map<String, Boolean>, expectedUserId: String?): NotificationPreferencesDto {
+        val body = json.encodeToString(
+            NotificationPreferencesUpdate.serializer(),
+            NotificationPreferencesUpdate(changes, expectedUserId)
+        )
         return session.authenticated { token ->
             decode(NotificationPreferencesDto.serializer(), client().request("PUT", PREFERENCES, body, token))
         }
