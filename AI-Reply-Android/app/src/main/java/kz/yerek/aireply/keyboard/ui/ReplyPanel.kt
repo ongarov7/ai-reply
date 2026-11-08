@@ -211,9 +211,9 @@ fun PersonaRow(
                     PersonaRowLayout.Slot.CREATE -> Row(
                         modifier = Modifier
                             .width(PersonaRowLayout.CREATE_WIDTH.dp)
-                            .height(PERSONA_ROW_HEIGHT)
-                            .clip(RoundedCornerShape(24.dp))
-                            .background(theme.fieldBackground)
+                            .height(PERSONA_PILL_HEIGHT)
+                            .clip(RoundedCornerShape(PersonaRowLayout.CREATE_RADIUS.dp))
+                            .background(theme.letterKey)
                             .clickable(role = Role.Button, onClick = onCreate)
                             .semantics { contentDescription = strings[R.string.kb_compose_open] },
                         horizontalArrangement = Arrangement.Center,
@@ -231,7 +231,7 @@ fun PersonaRow(
                         label = "suggestions"
                     ) { typing ->
                         if (typing) {
-                            SuggestionStrip(suggestions, theme, strings, onPick, Modifier.fillMaxWidth().height(PERSONA_ROW_HEIGHT - 8.dp))
+                            SuggestionStrip(suggestions, theme, strings, onPick, Modifier.fillMaxWidth().height(PERSONA_PILL_HEIGHT))
                         } else {
                             PersonaChips(
                                 chips = chips,
@@ -272,7 +272,7 @@ private fun PersonaChips(
         val fit = remember(names, icons, available) {
             val text = names.map { name ->
                 with(density) {
-                    measurer.measure(name, TextStyle(fontSize = 14.sp, fontWeight = FontWeight.SemiBold)).size.width.toDp().value
+                    measurer.measure(name, TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Medium)).size.width.toDp().value
                 }
             }
             PersonaRowLayout.chipFit(text, icons.map { it != null }, available.value)
@@ -289,10 +289,10 @@ private fun PersonaChips(
                     val content = if (selected) Color.White else theme.primaryText
                     Row(
                         modifier = Modifier
-                            .height(30.dp)
+                            .height(PERSONA_PILL_HEIGHT)
                             .width(fit.widths.getOrNull(index)?.dp ?: 64.dp)
-                            .clip(RoundedCornerShape(15.dp))
-                            .background(if (selected) theme.accent else theme.fieldBackground)
+                            .clip(RoundedCornerShape(PersonaRowLayout.CHIP_RADIUS.dp))
+                            .background(if (selected) theme.accent else theme.letterKey)
                             .clickable(role = Role.Button) { onSelect(chip.id) }
                             .semantics { contentDescription = name },
                         horizontalArrangement = Arrangement.Center,
@@ -306,7 +306,7 @@ private fun PersonaChips(
                         Text(
                             text = name,
                             fontSize = 14.sp,
-                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                            fontWeight = FontWeight.Medium,
                             color = content,
                             maxLines = 1
                         )
@@ -321,7 +321,7 @@ private fun PersonaChips(
                     Modifier
                         .align(Alignment.CenterEnd)
                         .width(24.dp)
-                        .height(30.dp)
+                        .height(PERSONA_PILL_HEIGHT)
                         .background(Brush.horizontalGradient(listOf(Color.Transparent, theme.background)))
                 )
             }
@@ -506,7 +506,7 @@ internal fun draftFieldHeight(flow: ReplyComposerFlow, width: Dp, maxLines: Int,
 internal fun Modifier.fieldFrame(theme: KeyboardTheme, focused: Boolean): Modifier = this
     .clip(RoundedCornerShape(9.dp))
     .background(theme.fieldBackground)
-    .border(1.dp, if (focused) theme.accent else theme.fieldBorder, RoundedCornerShape(9.dp))
+    .border(1.dp, if (focused) theme.fieldBorderFocused else theme.fieldBorder, RoundedCornerShape(9.dp))
 
 // --------------------------------------------------------------------- header
 
@@ -573,7 +573,7 @@ private fun Header(model: ComposerModel, actions: ComposerActions, strings: AppS
                     text = preview,
                     fontSize = 13.sp,
                     fontWeight = if (hasSource) FontWeight.Normal else FontWeight.Medium,
-                    color = if (hasSource) theme.secondaryText else theme.primaryText,
+                    color = theme.quoteText,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
@@ -650,7 +650,7 @@ private fun SourceCard(
             state = model.session.source,
             placeholder = strings[R.string.kb_err_no_source],
             textStyle = TextStyle(fontSize = 14.sp, lineHeight = 19.sp),
-            textColor = theme.primaryText,
+            textColor = theme.quoteText,
             placeholderColor = theme.secondaryText,
             caretColor = theme.accent,
             isActive = composing && model.focus == PanelFocus.SOURCE,
@@ -1079,6 +1079,7 @@ internal fun voiceLineHeight(lines: Int): Dp =
     with(LocalDensity.current) { (lines * VOICE_LINE_SP).sp.toDp() } + VOICE_LINE_HEADROOM
 
 val PERSONA_ROW_HEIGHT = PersonaRowLayout.HEIGHT.dp
+internal val PERSONA_PILL_HEIGHT = PersonaRowLayout.PILL_HEIGHT.dp
 internal val ROW_HEIGHT = 34.dp
 private val INSTRUCTION_HEIGHT = 56.dp
 internal const val LINE_HEIGHT_SP = 21

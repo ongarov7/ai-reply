@@ -56,6 +56,7 @@ import kz.yerek.aireply.R
 import kz.yerek.aireply.ai.AppStrings
 import kz.yerek.aireply.core.text.codePointLength
 import kz.yerek.aireply.keyboard.KeyboardTheme
+import kz.yerek.aireply.keyboard.layout.PersonaRowLayout
 import kz.yerek.aireply.keyboard.voice.DictationController
 import kz.yerek.aireply.keyboard.voice.DictationMessage
 import kz.yerek.aireply.keyboard.voice.DictationPhase
@@ -497,14 +498,18 @@ private fun RecordingProgress(fraction: Float, urgent: Boolean, paused: Boolean,
  */
 @Composable
 internal fun HostMicButton(strings: AppStrings, theme: KeyboardTheme, onClick: () -> Unit) {
-    CircleIcon(
-        icon = Icons.Filled.Mic,
-        description = strings[R.string.voice_kb_dictate],
-        theme = theme,
-        size = kz.yerek.aireply.keyboard.layout.PersonaRowLayout.MIC_SIZE.dp,
-        iconSize = 18.dp,
-        onClick = onClick
-    )
+    val description = strings[R.string.voice_kb_dictate]
+    Box(
+        modifier = Modifier
+            .size(PersonaRowLayout.MIC_SIZE.dp)
+            .clip(RoundedCornerShape(PersonaRowLayout.CREATE_RADIUS.dp))
+            .background(theme.letterKey)
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = description },
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(Icons.Filled.Mic, contentDescription = null, tint = theme.primaryText, modifier = Modifier.size(20.dp))
+    }
 }
 
 /**

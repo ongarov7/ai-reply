@@ -32,21 +32,32 @@ object PersonaRowLayout {
 
     fun order(hasMic: Boolean): List<Slot> = if (hasMic) order + Slot.MIC else order
 
+    /** The row: the pills and two dp above and below them. */
     const val HEIGHT = 48f
 
+    /** ✨, the chips and 🎙: as tall as the row's touch targets need. */
+    const val PILL_HEIGHT = 44f
+
+    /** ✨ and 🎙 are a touch rounder than the chips beside them. */
+    const val CREATE_RADIUS = 16f
+    const val CHIP_RADIUS = 15f
+
     /** Between the row's content and the keyboard's edges. */
-    const val SIDE_PADDING = 6f
+    const val SIDE_PADDING = 8f
 
     /** A recognizable ✨ AI pill, with a native-size interactive height. */
     const val CREATE_WIDTH = 64f
 
     /** The microphone keeps a separate, square touch target. */
-    const val MIC_SIZE = 48f
+    const val MIC_SIZE = 44f
 
     /** Between ✨ and the chips (or the suggestions), and between them and 🎙. */
     const val SLOT_GAP = 6f
 
     const val CHIP_GAP = 6f
+
+    /** No chip is narrower than a touch target. */
+    const val CHIP_MIN_WIDTH = 44f
 
     /** Horizontal chip padding, roomiest first: the first at which the whole set fits wins. */
     val CHIP_PADDINGS = listOf(14f, 11f, 8f)
@@ -114,9 +125,10 @@ object PersonaRowLayout {
     /** The set at the roomiest of [paddings] that fits, stretched to fill; null when none fits. */
     private fun fitting(contentWidths: List<Float>, available: Float, paddings: List<Float>): List<Float>? {
         val gaps = CHIP_GAP * (contentWidths.size - 1)
-        val padding = paddings.firstOrNull { p -> contentWidths.sumOf { (it + p * 2).toDouble() } + gaps <= available }
-            ?: return null
-        val natural = contentWidths.map { it + padding * 2 }
+        val padding = paddings.firstOrNull { p ->
+            contentWidths.sumOf { max(CHIP_MIN_WIDTH, it + p * 2).toDouble() } + gaps <= available
+        } ?: return null
+        val natural = contentWidths.map { max(CHIP_MIN_WIDTH, it + padding * 2) }
         val used = natural.sum() + gaps
         val extra = floor(min((available - used) / natural.size, CHIP_MAX_STRETCH))
         return natural.map { it + extra }

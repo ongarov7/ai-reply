@@ -20,10 +20,10 @@ import org.junit.Test
 
 /**
  * The emoji page in the page model (contract §3.10): the key right after
- * ?123 on the letters and nowhere else, the page itself, and the fields it
+ * 123 on the letters and nowhere else, the page itself, and the fields it
  * never reaches.
  *
- * Эмодзи беті: ?123-тен кейінгі перне, тек әріптер бетінде.
+ * Эмодзи беті: 123-тен кейінгі перне, тек әріптер бетінде.
  */
 class EmojiPageTest {
 
@@ -36,10 +36,10 @@ class EmojiPageTest {
             val keys = bottomKeys(language, KeyboardPlane.LETTERS, PageOptions(showsGlobeKey = globe, showsEmojiKey = true))
             assertEquals("$language", KeyboardKey.Plane(KeyboardPlane.NUMBERS), keys[0])
             assertEquals("$language", KeyboardKey.Plane(KeyboardPlane.EMOJI), keys[1])
-            assertEquals("$language globe=$globe", if (globe) KeyboardKey.Globe else KeyboardKey.Character(","), keys[2])
-            // A whole key, like the comma's.
+            assertEquals("$language globe=$globe", if (globe) KeyboardKey.Globe else KeyboardKey.Layout, keys[2])
+            // A control like its neighbours.
             val slot = KeyboardLayout.page(language, KeyboardPlane.LETTERS, PageOptions(showsEmojiKey = true)).rows.last().slots[1]
-            assertEquals(KeyWidth.Units(1f), slot.width)
+            assertEquals(KeyboardLayout.BOTTOM_CONTROL, slot.width)
             assertTrue(slot.alternates.isEmpty())
         }
     }

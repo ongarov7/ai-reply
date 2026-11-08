@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -60,11 +61,11 @@ class TypingAssistActions(
 )
 
 /**
- * The suggestion strip, in the system keyboards' manner: three equal slots
- * divided by hairlines, plain text on the keyboard's own background. A pending
- * correction sits in the middle in bold, what was typed to its left in quotes
- * (tap: keep it). Slots never move while typing, so the eye can rest on the
- * middle one.
+ * The suggestion strip, in the system keyboards' manner: three equal slots,
+ * what was typed in quotes (tap: keep it), the word a space would put in its
+ * place in bold on a raised background. A single word sits in the middle
+ * slot, so the eye can rest there, and slots never move while typing. A
+ * hairline stands only between two plain words, never beside the raised one.
  */
 @Composable
 internal fun SuggestionStrip(
@@ -74,15 +75,22 @@ internal fun SuggestionStrip(
     onPick: (Suggestion) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val slots = StripSlots.place(suggestions, AutocorrectEngine.SUGGESTION_COUNT)
     Row(
         modifier = modifier.semantics { contentDescription = strings[R.string.kb_suggestions] },
         verticalAlignment = Alignment.CenterVertically
     ) {
-        repeat(AutocorrectEngine.SUGGESTION_COUNT) { index ->
+        slots.forEachIndexed { index, suggestion ->
             if (index > 0) {
-                Box(Modifier.width(1.dp).height(18.dp).background(theme.divider))
+                val left = slots[index - 1]
+                val visible = StripSlots.showsHairline(left, suggestion)
+                Box(
+                    Modifier
+                        .width(1.dp)
+                        .height(20.dp)
+                        .background(if (visible) theme.divider else Color.Transparent)
+                )
             }
-            val suggestion = suggestions.getOrNull(index)
             if (suggestion == null) {
                 Spacer(Modifier.weight(1f))
             } else {
@@ -90,6 +98,26 @@ internal fun SuggestionStrip(
             }
         }
     }
+}
+
+/** Where the strip's words go. Pure, so the placement is tested on the JVM. */
+internal object StripSlots {
+
+    /** A single word in the middle; otherwise the engine's order. */
+    fun place(suggestions: List<Suggestion>, count: Int): List<Suggestion?> {
+        val placed = MutableList<Suggestion?>(count) { null }
+        if (suggestions.size == 1 && count >= 2) {
+            placed[count / 2] = suggestions.single()
+        } else {
+            suggestions.take(count).forEachIndexed { index, suggestion -> placed[index] = suggestion }
+        }
+        return placed
+    }
+
+    /** Only between two words, and never next to the raised correction. */
+    fun showsHairline(left: Suggestion?, right: Suggestion?): Boolean =
+        left != null && right != null &&
+            left.kind != Suggestion.Kind.CORRECTION && right.kind != Suggestion.Kind.CORRECTION
 }
 
 @Composable
@@ -107,19 +135,22 @@ private fun SuggestionSlot(
             strings.get(R.string.kb_suggestion_correction_description, suggestion.text)
         else -> suggestion.text to suggestion.text
     }
+    val raised = suggestion.kind == Suggestion.Kind.CORRECTION
     Box(
         modifier = modifier
             .fillMaxHeight()
-            .clip(RoundedCornerShape(8.dp))
+            .padding(horizontal = 3.dp, vertical = 2.dp)
+            .clip(RoundedCornerShape(7.dp))
+            .background(if (raised) theme.letterKey else Color.Transparent)
             .clickable(role = Role.Button) { onPick(suggestion) }
             .semantics { contentDescription = description }
-            .padding(horizontal = 4.dp),
+            .padding(horizontal = 5.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = label,
             fontSize = 16.sp,
-            fontWeight = if (suggestion.kind == Suggestion.Kind.CORRECTION) FontWeight.SemiBold else FontWeight.Normal,
+            fontWeight = if (raised) FontWeight.SemiBold else FontWeight.Normal,
             color = theme.primaryText,
             textAlign = TextAlign.Center,
             maxLines = 1,

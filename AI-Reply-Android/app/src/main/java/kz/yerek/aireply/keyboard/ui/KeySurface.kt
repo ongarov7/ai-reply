@@ -14,13 +14,10 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.outlined.Backspace
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.KeyboardCapslock
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SpaceBar
-import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.material.icons.outlined.EmojiEmotions
-import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
@@ -28,11 +25,17 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.VectorPainter
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -121,9 +124,9 @@ fun KeySurface(
     CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale = 1f)) {
         val measurer = rememberTextMeasurer(cacheSize = 96)
         val icons = KeyIcons(
-            shift = rememberVectorPainter(Icons.Outlined.ArrowUpward),
-            shiftOn = rememberVectorPainter(Icons.Filled.ArrowUpward),
-            capsLock = rememberVectorPainter(Icons.Filled.KeyboardCapslock),
+            shift = rememberVectorPainter(KeyGlyphs.Shift),
+            shiftOn = rememberVectorPainter(KeyGlyphs.ShiftFilled),
+            capsLock = rememberVectorPainter(KeyGlyphs.CapsLock),
             delete = rememberVectorPainter(Icons.AutoMirrored.Outlined.Backspace),
             globe = rememberVectorPainter(Icons.Filled.Language),
             newline = rememberVectorPainter(Icons.AutoMirrored.Filled.KeyboardReturn),
@@ -239,21 +242,25 @@ private class KeyIcons(
     val emoji: VectorPainter
 )
 
-private enum class Face { LETTER, SPECIAL, ENGAGED, PROMINENT }
+private enum class Face { LETTER, SPECIAL, ENGAGED, PROMINENT, DISABLED }
 
-private fun faceOf(key: LaidOutKey, state: KeySurfaceState, lastRow: Int): Face = when (val k = key.key) {
-    is KeyboardKey.Character -> when {
-        // A pad says: digits like letters, its side columns like the controls.
-        key.style != null -> key.style.face
-        // Gboard draws the punctuation beside space like the other controls.
-        key.row == lastRow && k.value.length <= 2 -> Face.SPECIAL
-        else -> Face.LETTER
-    }
+private fun faceOf(key: LaidOutKey, state: KeySurfaceState): Face = when (key.key) {
+    // A pad says: digits like letters, its side columns like the controls.
+    is KeyboardKey.Character -> key.style?.face ?: Face.LETTER
     KeyboardKey.Space -> key.style?.face ?: Face.LETTER
     KeyboardKey.Shift -> if (state.shiftMode != ShiftState.Mode.OFF) Face.ENGAGED else Face.SPECIAL
-    KeyboardKey.Return -> if (state.returnProminent && state.returnEnabled) Face.PROMINENT else Face.SPECIAL
+    KeyboardKey.Return -> when {
+        !state.returnEnabled -> Face.DISABLED
+        state.returnProminent -> Face.PROMINENT
+        else -> Face.SPECIAL
+    }
     else -> Face.SPECIAL
 }
+
+/** Keys whose only job is to put text somewhere, or take it away. */
+private val KeyboardKey.editsText: Boolean
+    get() = this is KeyboardKey.Character || this == KeyboardKey.Backspace ||
+        this == KeyboardKey.Space || this == KeyboardKey.Return
 
 private val KeyVisualStyle.face: Face
     get() = when (this) {
@@ -271,27 +278,29 @@ private fun DrawScope.drawPage(
     icons: KeyIcons
 ) {
     val dp = density
-    val lastRow = state.layout.keys.maxOfOrNull { it.row } ?: 0
-    val keyAlpha = if (state.dimmed) 0.45f else 1f
-    val labelAlpha = if (visual.trackpad) 0.25f else 1f
-    val radius = CornerRadius(if (state.layout.rowMetrics.key >= 44f) 7f * dp else 6f * dp)
+    val labelAlpha = if (visual.trackpad) 0f else 1f
+    val radius = CornerRadius(if (state.layout.rowMetrics.key >= 40f) 6f * dp else 5f * dp)
     val shifted = state.shiftMode != ShiftState.Mode.OFF
-    val compactLetters = state.layout.page.columns >= 11
     val pad = state.layout.page.plane.isPad
+    val letterSize = letterFontSize(state.layout)
 
     state.layout.keys.forEachIndexed { index, key ->
-        val face = faceOf(key, state, lastRow)
+        val face = faceOf(key, state)
+        // Only keys that edit text dim: the rest still change the keyboard itself.
+        val keyAlpha = if (state.dimmed && key.key.editsText) 0.45f else 1f
         val pressed = index in visual.pressed && !state.dimmed
         val fill = when (face) {
             Face.LETTER -> if (pressed) theme.letterKeyPressed else theme.letterKey
             Face.SPECIAL -> if (pressed) theme.specialKeyPressed else theme.specialKey
             Face.ENGAGED -> theme.engagedKey
-            Face.PROMINENT -> if (pressed) theme.accent.copy(alpha = 0.72f) else theme.accent
+            Face.PROMINENT -> if (pressed) theme.accent.copy(alpha = 0.7f) else theme.accent
+            Face.DISABLED -> theme.specialKey
         }
         val content = when (face) {
             Face.LETTER, Face.SPECIAL -> theme.primaryText
             Face.ENGAGED -> theme.engagedKeyGlyph
             Face.PROMINENT -> Color.White
+            Face.DISABLED -> theme.secondaryText
         }.copy(alpha = labelAlpha)
 
         val frame = key.frame
@@ -314,11 +323,10 @@ private fun DrawScope.drawPage(
                 val fontSize = when {
                     // A pad's digits are a dialler's: large on large keys.
                     pad -> if (key.style == KeyVisualStyle.LETTER) 26f else 22f
-                    key.row == lastRow -> 22f
-                    compactLetters -> 21f
-                    else -> 23f
+                    k.value.length > 1 -> CONTROL_FONT
+                    else -> letterSize
                 }
-                drawCentered(measurer, text, center, TextStyle(fontSize = fontSize.sp, color = content), keyAlpha)
+                drawFitted(measurer, text, frame, center, TextStyle(fontSize = fontSize.sp, color = content), keyAlpha)
                 key.hint?.let { hint ->
                     drawCorner(measurer, hint, frame, theme.secondaryText.copy(alpha = labelAlpha), keyAlpha)
                 }
@@ -326,9 +334,9 @@ private fun DrawScope.drawPage(
             KeyboardKey.Space -> if (pad) {
                 drawIcon(icons.space, center, 22f, content, keyAlpha)
             } else {
-                drawCentered(
-                    measurer, state.spaceCaption, center,
-                    TextStyle(fontSize = 13.sp, color = theme.secondaryText.copy(alpha = labelAlpha)), keyAlpha
+                drawFitted(
+                    measurer, state.spaceCaption, frame, center,
+                    TextStyle(fontSize = CONTROL_FONT.sp, color = content), keyAlpha
                 )
             }
             KeyboardKey.Shift -> drawIcon(
@@ -341,30 +349,34 @@ private fun DrawScope.drawPage(
             )
             KeyboardKey.Backspace -> drawIcon(icons.delete, center, 22f, content, keyAlpha)
             KeyboardKey.Globe -> drawIcon(icons.globe, center, 21f, content, keyAlpha)
-            KeyboardKey.Layout -> drawCentered(
-                measurer, state.labels.badge, center,
-                TextStyle(fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = content), keyAlpha
+            KeyboardKey.Layout -> drawFitted(
+                measurer, state.labels.badge, frame, center,
+                TextStyle(fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = content), keyAlpha
             )
             is KeyboardKey.Plane -> if (k.target == KeyboardPlane.EMOJI) {
                 // A face, drawn like the globe: an icon on a control key.
-                drawIcon(icons.emoji, center, 21f, content, keyAlpha)
+                drawIcon(icons.emoji, center, 22f, content, keyAlpha)
             } else {
-                drawCentered(
-                    measurer, state.labels.planeKey(k.target), center,
-                    TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Medium, color = content), keyAlpha
+                drawFitted(
+                    measurer, state.labels.planeKey(k.target), frame, center,
+                    TextStyle(fontSize = CONTROL_FONT.sp, color = content), keyAlpha
                 )
             }
             KeyboardKey.Return -> {
-                val painter = when (state.returnFace) {
-                    ReturnFace.NEWLINE -> icons.newline
-                    ReturnFace.SEND -> icons.send
-                    ReturnFace.SEARCH -> icons.search
-                    ReturnFace.GO, ReturnFace.NEXT -> icons.go
-                    ReturnFace.PREVIOUS -> icons.previous
-                    ReturnFace.DONE -> icons.done
+                val caption = state.labels.returnCaption(state.returnFace)
+                if (caption != null) {
+                    drawFitted(measurer, caption, frame, center, TextStyle(fontSize = CONTROL_FONT.sp, color = content), keyAlpha)
+                } else {
+                    val painter = when (state.returnFace) {
+                        ReturnFace.NEWLINE -> icons.newline
+                        ReturnFace.SEND -> icons.send
+                        ReturnFace.SEARCH -> icons.search
+                        ReturnFace.GO, ReturnFace.NEXT -> icons.go
+                        ReturnFace.PREVIOUS -> icons.previous
+                        ReturnFace.DONE -> icons.done
+                    }
+                    drawIcon(painter, center, 22f, content, keyAlpha)
                 }
-                val alpha = if (state.returnEnabled) keyAlpha else keyAlpha * 0.4f
-                drawIcon(painter, center, 22f, content, alpha)
             }
         }
     }
@@ -378,18 +390,7 @@ private fun DrawScope.drawPage(
         val text = if (shifted && character.firstOrNull()?.isLetter() == true &&
             state.layout.page.plane == KeyboardPlane.LETTERS
         ) character.uppercase() else character
-        val width = maxOf(key.frame.width + 14f, 44f)
-        val height = key.frame.height + 10f
-        val left = (key.frame.centerX - width / 2f).coerceIn(1f, state.layout.width - width - 1f)
-        val top = key.frame.top - height - 5f
-        val topLeft = Offset(left * dp, top * dp)
-        val size = Size(width * dp, height * dp)
-        drawRoundRect(theme.keyShadow, topLeft + Offset(0f, 1.5f * dp), size, CornerRadius(9f * dp))
-        drawRoundRect(theme.letterKey, topLeft, size, CornerRadius(9f * dp))
-        drawCentered(
-            measurer, text, Offset((left + width / 2f) * dp, (top + height / 2f) * dp),
-            TextStyle(fontSize = 30.sp, color = theme.primaryText), 1f
-        )
+        drawBalloon(key.frame, state.layout.width, theme, measurer, text)
     }
 
     // Long-press alternates.
@@ -409,7 +410,7 @@ private fun DrawScope.drawPage(
                     CornerRadius(7f * dp)
                 )
             }
-            val fontSize = if (option.length > 2) 15f else 22f
+            val fontSize = if (panel.options.any { it.length > 1 }) 17f else 26f
             drawCentered(
                 measurer, option,
                 Offset((cellLeft + panel.cellWidth / 2f) * dp, (panel.top + panel.cellHeight / 2f) * dp),
@@ -417,6 +418,94 @@ private fun DrawScope.drawPage(
             )
         }
     }
+}
+
+/** The letters' size: a little smaller on narrow keys and on a phone on its side, as on the iOS keyboard. */
+private fun letterFontSize(layout: PageLayout): Float {
+    val width = layout.keys.firstOrNull { it.key is KeyboardKey.Character }?.frame?.width ?: 32f
+    return when {
+        layout.rowMetrics.key < 36f -> 20f
+        width < 31f -> 22f
+        else -> 23.5f
+    }
+}
+
+/**
+ * Centred text that shrinks to fit its key, down to half its size, rather
+ * than spilling over the edges: "Отправить" on the return key.
+ */
+private fun DrawScope.drawFitted(
+    measurer: TextMeasurer,
+    text: String,
+    frame: KeyBox,
+    center: Offset,
+    style: TextStyle,
+    alpha: Float
+) {
+    if (text.isEmpty()) return
+    val available = (frame.width - 4f) * density
+    val natural = measurer.measure(text, style, maxLines = 1)
+    val scale = (available / natural.size.width.coerceAtLeast(1)).coerceIn(0.5f, 1f)
+    val result = if (scale < 1f) measurer.measure(text, style.copy(fontSize = style.fontSize * scale), maxLines = 1) else natural
+    drawText(
+        result,
+        topLeft = Offset(center.x - result.size.width / 2f, center.y - result.size.height / 2f),
+        alpha = alpha
+    )
+}
+
+/**
+ * The balloon: the pressed letter, large, above the finger, growing out of
+ * the key itself. It leans inwards at the edges and flattens under the top of
+ * the area above the keys.
+ */
+private fun DrawScope.drawBalloon(key: KeyBox, pageWidth: Float, theme: KeyboardTheme, measurer: TextMeasurer, text: String) {
+    val dp = density
+    val neck = 10f
+    val topWidth = minOf(maxOf(key.width * 1.5f, key.width + 18f), key.width + 30f)
+    var topHeight = key.height + 6f
+    val topLeft = (key.centerX - topWidth / 2f).coerceIn(1f, maxOf(1f, pageWidth - 1f - topWidth))
+    var topTop = key.top - neck - topHeight
+    val ceiling = -PersonaRowHeadroom + 1f
+    if (topTop < ceiling) {
+        topHeight = maxOf(key.height * 0.8f, topHeight - (ceiling - topTop))
+        topTop = maxOf(ceiling, key.top - neck - topHeight)
+    }
+    val top = Rect(topLeft * dp, topTop * dp, (topLeft + topWidth) * dp, (topTop + topHeight) * dp)
+    val base = Rect(key.left * dp, key.top * dp, key.right * dp, key.bottom * dp)
+    val radius = 9f * dp
+    val keyRadius = 6f * dp
+    val neckBottom = base.top + minOf(neck * dp, base.height / 3f)
+    val rise = neckBottom - top.bottom
+
+    val path = Path().apply {
+        moveTo(top.left, top.top + radius)
+        arcTo(Rect(top.left, top.top, top.left + radius * 2, top.top + radius * 2), 180f, 90f, false)
+        lineTo(top.right - radius, top.top)
+        arcTo(Rect(top.right - radius * 2, top.top, top.right, top.top + radius * 2), 270f, 90f, false)
+        lineTo(top.right, top.bottom)
+        cubicTo(top.right, top.bottom + rise * 0.6f, base.right, top.bottom + rise * 0.4f, base.right, neckBottom)
+        lineTo(base.right, base.bottom - keyRadius)
+        arcTo(Rect(base.right - keyRadius * 2, base.bottom - keyRadius * 2, base.right, base.bottom), 0f, 90f, false)
+        lineTo(base.left + keyRadius, base.bottom)
+        arcTo(Rect(base.left, base.bottom - keyRadius * 2, base.left + keyRadius * 2, base.bottom), 90f, 90f, false)
+        lineTo(base.left, neckBottom)
+        cubicTo(base.left, top.bottom + rise * 0.4f, top.left, top.bottom + rise * 0.6f, top.left, top.bottom)
+        close()
+    }
+    drawIntoCanvas { canvas ->
+        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            color = theme.letterKey.toArgb()
+            setShadowLayer(3f * dp, 0f, 1f * dp, Color.Black.copy(alpha = 0.28f).toArgb())
+        }
+        canvas.nativeCanvas.drawPath(path.asAndroidPath(), paint)
+    }
+    val style = TextStyle(fontSize = (if (text.length > 1) 20f else 36f).sp, color = theme.primaryText)
+    val result = measurer.measure(text, style, maxLines = 1)
+    drawText(
+        result,
+        topLeft = Offset(top.center.x - result.size.width / 2f, top.center.y - result.size.height / 2f)
+    )
 }
 
 private fun DrawScope.drawCentered(measurer: TextMeasurer, text: String, center: Offset, style: TextStyle, alpha: Float) {
@@ -446,6 +535,12 @@ private fun DrawScope.drawIcon(painter: VectorPainter, center: Offset, sizeDp: F
         }
     }
 }
+
+/** The control keys' captions: 123, ABC, space, return. */
+private const val CONTROL_FONT = 16f
+
+/** How far above the keys the balloon may reach: the persona row. */
+private const val PersonaRowHeadroom = 48f
 
 private fun describe(key: LaidOutKey, state: KeySurfaceState): String = when (val k = key.key) {
     is KeyboardKey.Character ->

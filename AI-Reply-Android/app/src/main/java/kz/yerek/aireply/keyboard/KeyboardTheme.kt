@@ -56,20 +56,35 @@ data class KeyboardTheme(val isDark: Boolean) {
     val accent: Color
         get() = if (isDark) Color(0xFF0A84FF) else Color(0xFF007AFF)
 
-    // Reply panel
+    // Composer surfaces. Three surfaces, three jobs: the quoted message is
+    // recessed, an editable field is raised and reads like a key, and the
+    // panel sits between them.
 
-    val panelBackground: Color
-        get() = if (isDark) Color(0xFF2C2C30) else Color(0xFFBEC2CB)
+    val panelBackground: Color get() = specialKey
+
     val panelField: Color get() = letterKey
-    val fieldBackground: Color
-        get() = if (isDark) Color(0xFF3A3A3E) else Color(0xFFFFFFFF)
+
+    /** Raised surface for a field the user types into. */
+    val fieldBackground: Color get() = letterKey
+
     val fieldBorder: Color
-        get() = if (isDark) Color.White.copy(alpha = 0.10f) else Color.Black.copy(alpha = 0.08f)
+        get() = if (isDark) Color.White.copy(alpha = 0.10f) else Color.Black.copy(alpha = 0.10f)
+
+    /** The ring on the field the keys are editing. */
+    val fieldBorderFocused: Color get() = accent.copy(alpha = 0.9f)
+
+    /** Recessed surface for the quoted message. */
     val quoteBackground: Color
-        get() = if (isDark) Color(0xFF38383C) else Color(0xFFE4E6EB)
+        get() = if (isDark) Color.Black.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.42f)
+
+    /** Quoted text: readable, but quieter than anything about to be sent. */
+    val quoteText: Color
+        get() = if (isDark) Color.White.copy(alpha = 0.80f) else Color.Black.copy(alpha = 0.72f)
+
     val destructive: Color
-        get() = if (isDark) Color(0xFFFF6961) else Color(0xFFD70015)
-    val divider: Color get() = secondaryText.copy(alpha = 0.22f)
+        get() = if (isDark) Color(0xFFFF6961) else Color(0xFFCD2721)
+
+    val divider: Color get() = secondaryText.copy(alpha = 0.35f)
 
     val keyShadow: Color
         get() = if (isDark) Color.Black.copy(alpha = 0.55f) else Color.Black.copy(alpha = 0.32f)

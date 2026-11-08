@@ -19,10 +19,10 @@ import org.junit.Test
 
 /**
  * Numbers and symbols: the pads a number, phone or date field opens on, the
- * ?123 / =\< / ABC pages and the keys between them, and a password field's
+ * 123 / #+= / ABC pages and the keys between them, and a password field's
  * row of digits.
  *
- * Сандар мен таңбалар: сандық панельдер, ?123 / =\< / ABC, құпиясөз өрісі.
+ * Сандар мен таңбалар: сандық панельдер, 123 / #+= / ABC, құпиясөз өрісі.
  */
 class KeyboardPadsTest {
 
@@ -168,10 +168,10 @@ class KeyboardPadsTest {
         pads.forEach { assertEquals("123", KeyboardLabels(KeyboardLanguage.KAZAKH).planeKey(it)) }
     }
 
-    // --------------------------------------------------------- ?123 and =\<
+    // --------------------------------------------------------- 123 and #+=
 
     @Test
-    fun `every letters page in every field has ?123 in the bottom left`() {
+    fun `every letters page in every field has 123 in the bottom left`() {
         for (language in KeyboardLanguage.entries) for (field in FieldKind.entries) for (globe in listOf(false, true)) {
             for (numberRow in listOf(false, true)) {
                 val letters = page(KeyboardPlane.LETTERS, PageOptions(showsGlobeKey = globe, field = field, numberRow = numberRow), language)
@@ -182,11 +182,11 @@ class KeyboardPadsTest {
                 )
             }
         }
-        assertEquals("?123", KeyboardLabels(KeyboardLanguage.ENGLISH).planeKey(KeyboardPlane.NUMBERS))
+        assertEquals("123", KeyboardLabels(KeyboardLanguage.ENGLISH).planeKey(KeyboardPlane.NUMBERS))
     }
 
     @Test
-    fun `?123 leads to the symbols page and back, and both lead to ABC`() {
+    fun `123 leads to the symbols page and back, and both lead to ABC`() {
         for (language in KeyboardLanguage.entries) {
             val numbers = page(KeyboardPlane.NUMBERS, language = language)
             assertEquals(KeyboardKey.Plane(KeyboardPlane.SYMBOLS), numbers.rows[2].slots.first().key)
@@ -200,33 +200,36 @@ class KeyboardPadsTest {
             assertEquals(KeyboardKey.Backspace, numbers.rows[2].slots.last().key)
             assertEquals(KeyboardKey.Backspace, symbols.rows[2].slots.last().key)
         }
-        assertEquals("=\\<", KeyboardLabels(KeyboardLanguage.ENGLISH).planeKey(KeyboardPlane.SYMBOLS))
+        assertEquals("#+=", KeyboardLabels(KeyboardLanguage.ENGLISH).planeKey(KeyboardPlane.SYMBOLS))
     }
 
     @Test
     fun `the punctuation pages have every common character, each typed as itself`() {
         for (language in KeyboardLanguage.entries) {
-            // The pages' own rows; the bottom row's comma and full stop are on both.
-            val numbers = page(KeyboardPlane.NUMBERS, language = language).characterRows.dropLast(1).flatten()
-            val symbols = page(KeyboardPlane.SYMBOLS, language = language).characterRows.dropLast(1).flatten()
-            "0123456789@#*+-/&!?()\"':;_".forEach { assertTrue("$language ?123 has $it", it.toString() in numbers) }
-            "%=<>[]{}\\~|^`".forEach { assertTrue("$language =\\< has $it", it.toString() in symbols) }
-            // Every printable ASCII character that is not a letter has a key of
-            // its own: on ?123, on =\<, or the comma and full stop beside space.
-            val bottom = listOf(",", ".")
+            val numbersPage = page(KeyboardPlane.NUMBERS, language = language)
+            val symbolsPage = page(KeyboardPlane.SYMBOLS, language = language)
+            val numbers = numbersPage.characterRows.flatten()
+            val symbols = symbolsPage.characterRows.flatten()
+            "0123456789-/:;()&@\".,?!'".forEach { assertTrue("$language 123 has $it", it.toString() in numbers) }
+            "[]{}#%^*+=_\\|~<>".forEach { assertTrue("$language #+= has $it", it.toString() in symbols) }
+            // Every printable ASCII character that is not a letter has a key
+            // of its own, or a long press on one.
+            val pressed = (numbersPage.rows + symbolsPage.rows).flatMap { row -> row.slots.flatMap { it.alternates } }
             (33..126).map { it.toChar() }.filter { !it.isLetter() }.forEach { character ->
-                assertTrue("$language '$character' has a key", character.toString() in numbers + symbols + bottom)
+                assertTrue("$language '$character' can be typed", character.toString() in numbers + symbols + pressed)
             }
-            // One character per key, never a word: what the key shows is what it types.
-            (numbers + symbols).forEach { assertEquals(it, 1, it.codePointCount(0, it.length)) }
-            assertEquals("no character twice", (numbers + symbols).size, (numbers + symbols).toSet().size)
+            // One character per key, never a word, and none twice on a page.
+            listOf(numbers, symbols).forEach { keys ->
+                keys.forEach { assertEquals(it, 1, it.codePointCount(0, it.length)) }
+                assertEquals("no character twice", keys.size, keys.toSet().size)
+            }
         }
     }
 
     // -------------------------------------------------------- password row
 
     @Test
-    fun `a password page gets the digits on top and drops their corner hints`() {
+    fun `a password page gets the digits on top`() {
         for (language in listOf(KeyboardLanguage.ENGLISH, KeyboardLanguage.RUSSIAN)) {
             val plain = page(KeyboardPlane.LETTERS, language = language)
             val password = page(KeyboardPlane.LETTERS, PageOptions(numberRow = true), language)
@@ -326,7 +329,7 @@ class KeyboardPadsTest {
         val chat = FieldKeys.of(InputType.TYPE_CLASS_TEXT)
         // ABC on the phone pad, then the app restarts the field: still letters.
         assertEquals(KeyboardPlane.LETTERS, phone.startPlane(KeyboardPlane.LETTERS, phone, restarting = true, composing = false))
-        // ?123 in a chat, the messenger restarts it after Send: still ?123.
+        // 123 in a chat, the messenger restarts it after Send: still 123.
         assertEquals(KeyboardPlane.NUMBERS, chat.startPlane(KeyboardPlane.NUMBERS, chat, restarting = true, composing = false))
         // A restart that turned the field into a number field opens its pad,
         assertEquals(KeyboardPlane.PHONE_PAD, phone.startPlane(KeyboardPlane.NUMBERS, chat, restarting = true, composing = false))

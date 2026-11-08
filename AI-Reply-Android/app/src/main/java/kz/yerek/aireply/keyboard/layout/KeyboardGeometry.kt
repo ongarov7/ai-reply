@@ -1,5 +1,7 @@
 package kz.yerek.aireply.keyboard.layout
 
+import kz.yerek.aireply.core.lang.KeyboardLanguage
+import kz.yerek.aireply.core.lang.KeyboardPlane
 import kz.yerek.aireply.keyboard.KeyVisualStyle
 import kz.yerek.aireply.keyboard.KeyboardKey
 import kotlin.math.max
@@ -25,7 +27,7 @@ data class KeyboardSizing(
     val density: Float = 3f
 ) {
     val sideInset: Float get() = if (isLandscape) 4f else 3f
-    val topInset: Float get() = if (isLandscape) 4f else 6f
+    val topInset: Float get() = if (isLandscape) 4f else 7f
     val bottomInset: Float get() = if (isLandscape) 3f else 4f
 
     /**
@@ -98,7 +100,8 @@ data class LaidOutKey(
     val hitFrame: Box,
     val row: Int,
     val alternates: List<String>,
-    val hint: String?,
+    /** [KeySlot.hint]: a pad's corner caption. */
+    val hint: String? = null,
     /** [KeySlot.style]: how the key is drawn when its place does not say. */
     val style: KeyVisualStyle? = null
 )
@@ -154,6 +157,31 @@ data class PageLayout(
 private class PlacedSlot(val slot: KeySlot, val left: Float, val right: Float)
 
 object KeyboardGeometry {
+
+    /** The narrowest the space bar may get for the emoji key to stay, in units of the bottom row. */
+    const val MINIMUM_SPACE_UNITS_WITH_EMOJI_KEY = 2.5f
+
+    /**
+     * Whether the letters have room for the emoji key with these [options]:
+     * always, except that where the row has to carry the globe too it stays
+     * only while the space bar keeps at least
+     * [MINIMUM_SPACE_UNITS_WITH_EMOJI_KEY] units.
+     */
+    fun fitsEmojiKey(options: PageOptions, sizing: KeyboardSizing): Boolean {
+        if (!options.showsGlobeKey) return true
+        return spaceBarUnits(options.copy(showsEmojiKey = true), sizing) >= MINIMUM_SPACE_UNITS_WITH_EMOJI_KEY
+    }
+
+    /** The letters' space bar in units of its row's grid; the bottom row is the same on every layout. */
+    private fun spaceBarUnits(options: PageOptions, sizing: KeyboardSizing): Float {
+        val page = KeyboardLayout.page(KeyboardLanguage.ENGLISH, KeyboardPlane.LETTERS, options)
+        val laidOut = layout(page, sizing, sizing.keyAreaHeight(maximumRows = 4))
+        val space = laidOut.keys.firstOrNull { it.key == KeyboardKey.Space } ?: return 0f
+        val columns = page.rows.last().unitColumns ?: page.columns
+        val innerWidth = sizing.width - sizing.sideInset * 2
+        val unit = (innerWidth - (columns - 1) * sizing.columnGap(columns)) / columns
+        return space.frame.width / unit
+    }
 
     /**
      * Row metrics for [rows] rows in [available] dp.
@@ -217,9 +245,8 @@ object KeyboardGeometry {
             // A row on its own grid (the bottom row) also takes that grid's
             // gap, so it is identical on every layout.
             val columns = max(row.unitColumns ?: page.columns, 1)
-            val gridGap = sizing.columnGap(columns)
-            val gap = row.keyGap ?: gridGap
-            val unit = (innerWidth - (columns - 1) * gridGap) / columns
+            val gap = sizing.columnGap(columns)
+            val unit = (innerWidth - (columns - 1) * gap) / columns
 
             // Gaps sit only between two KEYS. A spacer is itself the space
             // between its neighbours, so it never gets a gap of its own. A
@@ -230,6 +257,7 @@ object KeyboardGeometry {
             row.slots.forEachIndexed { index, slot ->
                 when (val w = slot.width) {
                     is KeyWidth.Units -> fixedWidth += w.units * unit
+                    is KeyWidth.AtLeast -> fixedWidth += max(w.minimum, w.units * unit)
                     is KeyWidth.Flexible -> {
                         flexibleWeight += max(w.weight, 0f)
                         gapCount += max(w.gaps, 0)
@@ -250,6 +278,7 @@ object KeyboardGeometry {
                 if (index > 0 && slot.isSolid && row.slots[index - 1].isSolid) x += gap
                 val slotWidth = when (val w = slot.width) {
                     is KeyWidth.Units -> w.units * unit
+                    is KeyWidth.AtLeast -> max(w.minimum, w.units * unit)
                     is KeyWidth.Flexible ->
                         (if (flexibleWeight > 0f) flexibleWidth * max(w.weight, 0f) / flexibleWeight else 0f) +
                             max(w.gaps, 0) * gap

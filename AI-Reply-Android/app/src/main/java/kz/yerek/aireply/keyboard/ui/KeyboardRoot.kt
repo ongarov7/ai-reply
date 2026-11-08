@@ -2,8 +2,12 @@ package kz.yerek.aireply.keyboard.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.captionBar
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import kz.yerek.aireply.keyboard.KeyboardKey
@@ -33,8 +37,10 @@ fun KeyboardRoot(
         modifier = modifier
             .fillMaxWidth()
             .background(theme.background)
-            // Above the gesture bar rather than under it.
-            .navigationBarsPadding()
+            // Above the gesture bar rather than under it. In gesture navigation the
+            // system also draws the hide and switch-keyboard buttons below the
+            // keyboard, and those are reported as a caption bar.
+            .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.captionBar))
     ) {
         top()
         KeySurface(

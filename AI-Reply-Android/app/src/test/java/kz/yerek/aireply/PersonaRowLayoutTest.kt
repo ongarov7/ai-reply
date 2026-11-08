@@ -170,7 +170,7 @@ class PersonaRowLayoutTest {
         assertEquals(listOf(Slot.CREATE, Slot.CHIPS, Slot.MIC), PersonaRowLayout.order(hasMic = true))
         assertEquals(listOf(Slot.CREATE, Slot.CHIPS), PersonaRowLayout.order(hasMic = false))
         assertTrue(PersonaRowLayout.CREATE_WIDTH > PersonaRowLayout.MIC_SIZE)
-        assertTrue(PersonaRowLayout.MIC_SIZE >= 48f)
+        assertTrue(PersonaRowLayout.MIC_SIZE >= 44f)
         for (width in listOf(320f, 360f, 411f, 600f)) {
             val withMic = PersonaRowLayout.chipsWidth(width, hasMic = true)
             val end = PersonaRowLayout.CHIPS_START + withMic + PersonaRowLayout.SLOT_GAP + PersonaRowLayout.MIC_SIZE

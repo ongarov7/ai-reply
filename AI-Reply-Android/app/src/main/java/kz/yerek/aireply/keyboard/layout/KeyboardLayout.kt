@@ -13,6 +13,9 @@ sealed interface KeyWidth {
     /** Multiples of the row's key unit. */
     data class Units(val units: Float) : KeyWidth
 
+    /** [units] of the row's key unit, but never narrower than [minimum] dp. */
+    data class AtLeast(val minimum: Float, val units: Float) : KeyWidth
+
     /**
      * A share of whatever width is left once the fixed slots are placed.
      *
@@ -46,7 +49,7 @@ data class KeySlot(
     val width: KeyWidth = ONE,
     /** Offered on a long press, in the order the panel shows them. */
     val alternates: List<String> = emptyList(),
-    /** The small caption in the corner: what a long press types first. */
+    /** A pad's small corner caption: what a long press types first. */
     val hint: String? = null,
     /**
      * How a character or space key is drawn, when its place on the page does
@@ -71,12 +74,10 @@ data class KeyRow(
     val slots: List<KeySlot>,
     /**
      * Columns the row's key unit is derived from; null means the page's own
-     * grid. The bottom row uses the 10-column grid on every layout, so ?123,
+     * grid. The bottom row uses the 10-column grid on every layout, so 123,
      * space and return keep one size whatever language is up.
      */
-    val unitColumns: Int? = null,
-    /** Spacing between controls; their unit size stays on the page grid. */
-    val keyGap: Float? = null
+    val unitColumns: Int? = null
 )
 
 /** A complete page: every row, the bottom one included. */
@@ -133,32 +134,33 @@ data class PageOptions(
 // ----------------------------------------------------------------- layouts
 
 /**
- * The layouts, following Gboard and the national standards rather than
- * invented:
+ * The layouts: the same pages as the iOS keyboard, so a person who knows one
+ * knows the other.
  *
  *  * English - QWERTY 10 / 9 / 7, the middle row inset by half a key, shift
- *    and delete one and a half keys wide.
+ *    and delete one and a third keys wide.
  *  * Russian - ЙЦУКЕН on an 11-column grid: 11 / 11 / shift + 9 + delete.
- *    `ё` and `ъ` are long presses on `е` and `ь`, as on Gboard.
+ *    `ё` and `ъ` are long presses on `е` and `ь`.
  *  * Kazakh - the Russian rows under a row of the nine Kazakh letters in the
  *    standard order `ә і ң ғ ү ұ қ ө һ`, centred on the same grid with keys
  *    the same size as every other row.
  *
- * The top letter row carries the digits on a long press, Gboard style, with
- * the digit drawn small in the key's corner.
+ * The bottom row is 123, the emoji key, the layout key, space and return. A
+ * key's face shows its letter and nothing else: a long press on the top row
+ * still types its digit, with no caption in the corner.
  *
- * ?123 and =\< are Gboard's two punctuation pages. The currency key is `₸` on
- * the Kazakh and Russian layouts and `$` on the English one; the other
- * currencies are a long press away.
+ * 123 and #+= are the two punctuation pages. The currency key is `₸` on the
+ * Kazakh and Russian layouts and `$` on the English one; the other currencies
+ * are a long press away.
  *
- * The emoji key sits right after ?123 on the letters ([PageOptions.showsEmojiKey]);
+ * The emoji key sits right after 123 on the letters ([PageOptions.showsEmojiKey]);
  * its page ([emojiPage]) is the emoji grid over a bottom row of ABC, the
  * categories and delete, at the letters' own height.
  *
  * A field that only takes numbers opens on a pad instead ([padPage]): a
  * phone keypad, a number pad or a date pad, with big keys and ABC to escape
- * to the letters. A password field gets Gboard's row of digits over the
- * letters, where the keyboard's one height has room for it ([numberRowFits]).
+ * to the letters. A password field gets a row of digits over the letters,
+ * where the keyboard's one height has room for it ([numberRowFits]).
  */
 object KeyboardLayout {
 
@@ -178,10 +180,18 @@ object KeyboardLayout {
 
     val KAZAKH_LETTERS: List<List<String>> = listOf(KAZAKH_TOP_ROW) + RUSSIAN_LETTERS
 
-    /** Shift and delete on the Latin rows, and the Return key. */
-    const val MODIFIER_UNITS = 1.5f
-    const val BOTTOM_PLANE_UNITS = 1.35f
-    private const val BOTTOM_ROW_GAP = 3f
+    /** Shift and delete on the Latin rows and the punctuation pages. */
+    const val MODIFIER_UNITS = 4f / 3f
+
+    /** Between the punctuation pages' third row and its side keys. */
+    private const val PUNCTUATION_GAP_UNITS = 0.35f
+
+    /**
+     * The bottom row's controls give what they do not need to the space bar.
+     * Half a gap either side brings a 39 dp key close to a 44 dp touch target.
+     */
+    val BOTTOM_CONTROL: KeyWidth = KeyWidth.AtLeast(39f, 1.15f)
+    val BOTTOM_RETURN: KeyWidth = KeyWidth.AtLeast(66f, 2.25f)
 
     private const val DIGITS = "1234567890"
 
@@ -194,23 +204,22 @@ object KeyboardLayout {
     fun currency(language: KeyboardLanguage): String =
         if (language == KeyboardLanguage.ENGLISH) "$" else "₸"
 
-    /** Gboard's ?123 page, without its bottom row. */
+    /** The 123 page, without its bottom row. */
     fun numbers(language: KeyboardLanguage): List<List<String>> = listOf(
         listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "0"),
-        listOf("@", "#", currency(language), "_", "&", "-", "+", "(", ")", "/"),
-        listOf("*", "\"", "'", ":", ";", "!", "?")
+        listOf("-", "/", ":", ";", "(", ")", currency(language), "&", "@", "\""),
+        listOf(".", ",", "?", "!", "'")
     )
 
-    /**
-     * Gboard's =\< page, without its bottom row - with `<` and `>` on keys of
-     * their own where Gboard has `¶` and `∆` (now long presses on `•` and
-     * `π`): the page is named after `<`, and with it every printable ASCII
-     * character has a key, not only a long press.
-     */
+    /** The #+= page, without its bottom row. */
     fun symbols(language: KeyboardLanguage): List<List<String>> = listOf(
-        listOf("~", "`", "|", "•", "√", "π", "÷", "×", "<", ">"),
-        listOf("£", if (language == KeyboardLanguage.ENGLISH) "¢" else "$", "€", "¥", "^", "°", "=", "{", "}", "\\"),
-        listOf("%", "©", "®", "™", "✓", "[", "]")
+        listOf("[", "]", "{", "}", "#", "%", "^", "*", "+", "="),
+        if (language == KeyboardLanguage.ENGLISH) {
+            listOf("_", "\\", "|", "~", "<", ">", "€", "£", "¥", "•")
+        } else {
+            listOf("_", "\\", "|", "~", "<", ">", "$", "€", "£", "•")
+        },
+        listOf(".", ",", "?", "!", "'")
     )
 
     /**
@@ -260,7 +269,7 @@ object KeyboardLayout {
             KeyboardPlane.LETTERS -> lettersPage(language, options)
             KeyboardPlane.NUMBERS -> punctuationPage(language, plane, numbers(language), options)
             KeyboardPlane.SYMBOLS -> punctuationPage(language, plane, symbols(language), options)
-            KeyboardPlane.EMOJI -> emojiPage(language)
+            KeyboardPlane.EMOJI -> emojiPage(language, options)
             KeyboardPlane.PHONE_PAD -> padPage(
                 language, plane,
                 side = listOf("+", "(", ")", "-"),
@@ -287,16 +296,16 @@ object KeyboardLayout {
         val edge = KeySlot.spacer(KeyWidth.Flexible(1f))
 
         // A password's digits get a row of their own, across the 10-column
-        // grid on every layout, and the corner hints they replace go.
+        // grid on every layout, and the long presses they replace go.
         if (options.numberRow) {
             result += KeyRow(characterSlots(DIGITS.map { it.toString() }, language), unitColumns = 10)
         }
-        val hints = !options.numberRow
+        val digits = !options.numberRow
 
         when (language) {
             KeyboardLanguage.ENGLISH -> {
                 val modifier = KeyWidth.Units(MODIFIER_UNITS)
-                result += KeyRow(characterSlots(rows[0], language, withDigits = hints))
+                result += KeyRow(characterSlots(rows[0], language, withDigits = digits))
                 result += KeyRow(listOf(edge) + characterSlots(rows[1], language) + edge)
                 result += KeyRow(
                     listOf(KeySlot(KeyboardKey.Shift, modifier), edge) +
@@ -310,7 +319,7 @@ object KeyboardLayout {
                 // Russian and the one under the Kazakh letters in Kazakh.
                 val digitRow = if (language == KeyboardLanguage.KAZAKH) 1 else 0
                 rows.forEachIndexed { index, row ->
-                    val keys = characterSlots(row, language, withDigits = hints && index == digitRow)
+                    val keys = characterSlots(row, language, withDigits = digits && index == digitRow)
                     result += when {
                         index == rows.lastIndex ->
                             KeyRow(listOf(KeySlot(KeyboardKey.Shift)) + keys + KeySlot(KeyboardKey.Backspace))
@@ -340,14 +349,21 @@ object KeyboardLayout {
     ): KeyboardPage {
         val toggle = if (plane == KeyboardPlane.NUMBERS) KeyboardPlane.SYMBOLS else KeyboardPlane.NUMBERS
         val modifier = KeyWidth.Units(MODIFIER_UNITS)
-        val edge = KeySlot.spacer(KeyWidth.Flexible(1f))
+        val gap = KeySlot.spacer(KeyWidth.Units(PUNCTUATION_GAP_UNITS))
+        val punctuation = rows[2].map { character ->
+            KeySlot(
+                key = KeyboardKey.Character(character),
+                width = KeyWidth.Flexible(1f),
+                alternates = alternates(character, language)
+            )
+        }
         val result = listOf(
             KeyRow(characterSlots(rows[0], language)),
             KeyRow(characterSlots(rows[1], language)),
             KeyRow(
-                listOf(KeySlot(KeyboardKey.Plane(toggle), modifier), edge) +
-                    characterSlots(rows[2], language) +
-                    listOf(edge, KeySlot(KeyboardKey.Backspace, modifier))
+                listOf(KeySlot(KeyboardKey.Plane(toggle), modifier), gap) +
+                    punctuation +
+                    listOf(gap, KeySlot(KeyboardKey.Backspace, modifier))
             ),
             bottomRow(language, KeyboardPlane.LETTERS, options)
         )
@@ -362,16 +378,15 @@ object KeyboardLayout {
      *
      * Эмодзи беті: тор, астында ABC, санаттар және өшіру.
      */
-    private fun emojiPage(language: KeyboardLanguage): KeyboardPage {
-        val modifier = KeyWidth.Units(MODIFIER_UNITS)
+    private fun emojiPage(language: KeyboardLanguage, options: PageOptions): KeyboardPage {
         val bar = KeyRow(
-            listOf(
-                KeySlot(KeyboardKey.Plane(KeyboardPlane.LETTERS), KeyWidth.Units(BOTTOM_PLANE_UNITS)),
-                KeySlot.panel(PanelKind.EMOJI_CATEGORIES, KeyWidth.Flexible(1f)),
-                KeySlot(KeyboardKey.Backspace, modifier)
-            ),
-            unitColumns = 10,
-            keyGap = BOTTOM_ROW_GAP
+            buildList {
+                add(KeySlot(KeyboardKey.Plane(KeyboardPlane.LETTERS), BOTTOM_CONTROL))
+                if (options.showsGlobeKey) add(KeySlot(KeyboardKey.Globe, BOTTOM_CONTROL))
+                add(KeySlot.panel(PanelKind.EMOJI_CATEGORIES, KeyWidth.Flexible(1f)))
+                add(KeySlot(KeyboardKey.Backspace, BOTTOM_CONTROL))
+            },
+            unitColumns = 10
         )
         return KeyboardPage(
             language = language,
@@ -477,48 +492,44 @@ object KeyboardLayout {
         KeySlot(
             key = KeyboardKey.Character(character),
             // The language's own letters come first: `ё` matters more to a
-            // Russian speaker than the `5` that ?123 also has.
-            alternates = if (digit == null) specific else specific + digit,
-            hint = digit
+            // Russian speaker than the `5` that 123 also has.
+            alternates = if (digit == null) specific else specific + digit
         )
     }
 
     /**
-     * ?123 / ABC, the emoji key (letters only), the comma (or the globe when
-     * Android asks for one), the layout key, space, the full stop and return -
-     * sized on the 10-column grid so the row is identical on every layout.
+     * 123 / ABC, the emoji key (letters only), the globe when Android wants
+     * one offered and the system bar has none, the layout key, the field's
+     * own characters, space and return - on the 10-column grid, so the row is
+     * identical on every layout.
      */
     private fun bottomRow(language: KeyboardLanguage, planeKey: KeyboardPlane, options: PageOptions): KeyRow {
-        val slots = mutableListOf(KeySlot(KeyboardKey.Plane(planeKey), KeyWidth.Units(BOTTOM_PLANE_UNITS)))
+        val slots = mutableListOf(KeySlot(KeyboardKey.Plane(planeKey), BOTTOM_CONTROL))
 
-        // The letters' row only: ?123 and =\< stay exactly as they were.
-        if (options.showsEmojiKey && planeKey == KeyboardPlane.NUMBERS) slots += KeySlot(KeyboardKey.Plane(KeyboardPlane.EMOJI))
+        // The letters' row only.
+        if (options.showsEmojiKey && planeKey == KeyboardPlane.NUMBERS && options.field == FieldKind.TEXT) {
+            slots += KeySlot(KeyboardKey.Plane(KeyboardPlane.EMOJI), BOTTOM_CONTROL)
+        }
+        if (options.showsGlobeKey) slots += KeySlot(KeyboardKey.Globe, BOTTOM_CONTROL)
+        if (options.showsLanguageKey) slots += KeySlot(KeyboardKey.Layout, BOTTOM_CONTROL)
 
-        // The left of space holds one key: the system keyboard switch when
-        // Android wants one offered, otherwise the field's own character.
-        if (options.showsGlobeKey) {
-            slots += KeySlot(KeyboardKey.Globe)
-        } else {
-            val extra = when (options.field) {
-                FieldKind.TEXT -> ","
-                FieldKind.EMAIL -> "@"
-                FieldKind.URL -> "/"
+        val space = KeySlot(KeyboardKey.Space, KeyWidth.Flexible(1f))
+        val stop = KeySlot(KeyboardKey.Character("."), alternates = listOf(".com", ".kz", ".ru"))
+        when (options.field) {
+            FieldKind.TEXT -> slots += space
+            FieldKind.EMAIL -> {
+                slots += space
+                slots += KeySlot(KeyboardKey.Character("@"), alternates = alternates("@", language))
+                slots += stop
             }
-            slots += KeySlot(KeyboardKey.Character(extra), alternates = alternates(extra, language))
+            FieldKind.URL -> {
+                slots += KeySlot(KeyboardKey.Character("/"), alternates = alternates("/", language))
+                slots += space
+                slots += stop
+            }
         }
-        if (options.showsLanguageKey) slots += KeySlot(KeyboardKey.Layout, KeyWidth.Units(1f))
-
-        slots += KeySlot(KeyboardKey.Space, KeyWidth.Flexible(1f))
-
-        val stopAlternates = when (options.field) {
-            FieldKind.TEXT -> listOf(",", "?", "!", "…", ":", ";", "'", "\"", "-")
-            FieldKind.EMAIL, FieldKind.URL -> listOf(".com", ".kz", ".ru")
-        }
-        slots += KeySlot(KeyboardKey.Character("."), KeyWidth.Units(0.9f), alternates = stopAlternates)
-        slots += KeySlot(KeyboardKey.Return, KeyWidth.Units(MODIFIER_UNITS))
-        // Reclaim secondary-key width and spare spacing for Space, retaining
-        // the full system-switch and Return widths on the shared grid.
-        return KeyRow(slots, unitColumns = 10, keyGap = BOTTOM_ROW_GAP)
+        slots += KeySlot(KeyboardKey.Return, BOTTOM_RETURN)
+        return KeyRow(slots, unitColumns = 10)
     }
 
     // ---------------------------------------------------------- long press
@@ -561,6 +572,7 @@ object KeyboardLayout {
         "2" to listOf("²", "⅔"),
         "3" to listOf("³", "¾", "⅜"),
         "-" to listOf("–", "—", "·"),
+        "." to listOf("…"),
         "/" to listOf("\\"),
         "$" to listOf("₸", "₽", "€", "£", "¥", "¢"),
         "₸" to listOf("₽", "$", "€", "£", "¥"),
@@ -595,10 +607,15 @@ enum class ReturnFace { NEWLINE, SEND, SEARCH, GO, NEXT, PREVIOUS, DONE }
  */
 data class KeyboardLabels(val language: KeyboardLanguage) {
 
-    /** Gboard shows the layout's name on the space bar. */
-    val space: String get() = language.nativeName
+    /** The space bar's caption. Right after a layout switch it shows the layout's name instead. */
+    val space: String
+        get() = when (language) {
+            KeyboardLanguage.ENGLISH -> "space"
+            KeyboardLanguage.RUSSIAN -> "Пробел"
+            KeyboardLanguage.KAZAKH -> "бос орын"
+        }
 
-    /** The key that goes back to letters from ?123 or =\<. */
+    /** The key that goes back to letters from 123 or #+=. */
     val letters: String
         get() = when (language) {
             KeyboardLanguage.ENGLISH -> "ABC"
@@ -608,8 +625,8 @@ data class KeyboardLabels(val language: KeyboardLanguage) {
 
     fun planeKey(plane: KeyboardPlane): String = when (plane) {
         KeyboardPlane.LETTERS -> letters
-        KeyboardPlane.NUMBERS -> "?123"
-        KeyboardPlane.SYMBOLS -> "=\\<"
+        KeyboardPlane.NUMBERS -> "123"
+        KeyboardPlane.SYMBOLS -> "#+="
         // Drawn as a face; the name is what TalkBack reads.
         KeyboardPlane.EMOJI -> emoji
         // No key leads to a pad - the field opens on it - but a name it has.
@@ -698,6 +715,40 @@ data class KeyboardLabels(val language: KeyboardLanguage) {
             KeyboardLanguage.RUSSIAN -> "Сменить раскладку"
             KeyboardLanguage.KAZAKH -> "Тілді ауыстыру"
         }
+
+    /**
+     * What the return key says on its face, null for the arrow: a plain
+     * Kazakh return is an arrow, and "previous" has no short word anywhere.
+     */
+    fun returnCaption(face: ReturnFace): String? = when (language) {
+        KeyboardLanguage.ENGLISH -> when (face) {
+            ReturnFace.NEWLINE -> "return"
+            ReturnFace.SEND -> "send"
+            ReturnFace.SEARCH -> "search"
+            ReturnFace.GO -> "go"
+            ReturnFace.NEXT -> "next"
+            ReturnFace.PREVIOUS -> null
+            ReturnFace.DONE -> "done"
+        }
+        KeyboardLanguage.RUSSIAN -> when (face) {
+            ReturnFace.NEWLINE -> "Ввод"
+            ReturnFace.SEND -> "Отправить"
+            ReturnFace.SEARCH -> "Найти"
+            ReturnFace.GO -> "Перейти"
+            ReturnFace.NEXT -> "Далее"
+            ReturnFace.PREVIOUS -> null
+            ReturnFace.DONE -> "Готово"
+        }
+        KeyboardLanguage.KAZAKH -> when (face) {
+            ReturnFace.NEWLINE -> null
+            ReturnFace.SEND -> "Жіберу"
+            ReturnFace.SEARCH -> "Іздеу"
+            ReturnFace.GO -> "Өту"
+            ReturnFace.NEXT -> "Келесі"
+            ReturnFace.PREVIOUS -> null
+            ReturnFace.DONE -> "Дайын"
+        }
+    }
 
     fun returnDescription(face: ReturnFace): String = when (language) {
         KeyboardLanguage.ENGLISH -> when (face) {

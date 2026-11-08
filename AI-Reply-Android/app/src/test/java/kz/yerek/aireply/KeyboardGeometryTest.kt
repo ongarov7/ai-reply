@@ -164,7 +164,7 @@ class KeyboardGeometryTest {
 
     /**
      * The one-height promise, for every set of layouts a user can switch on:
-     * every page they can meet - letters, ?123, =\<, the pads, a password's
+     * every page they can meet - letters, 123, #+=, the pads, a password's
      * letters where its number row fits - lays out inside the same area.
      */
     @Test
@@ -276,9 +276,9 @@ class KeyboardGeometryTest {
     }
 
     /**
-     * ABC is where ?123 is and delete where return is: the emoji page's
-     * bottom row is the letters' own, for every layout set, so the keys
-     * under the thumbs do not move when the page changes.
+     * ABC is where 123 is and delete ends where return ends: the emoji
+     * page's bottom row is the letters' own, for every layout set, so the
+     * keys under the thumbs do not move when the page changes.
      */
     @Test
     fun `the emoji page's bottom row sits exactly where the letters' does`() {
@@ -302,7 +302,9 @@ class KeyboardGeometryTest {
                 assertEquals(label, a.bottom, b.bottom, pixel)
             }
             same(numbers.frame, abc.frame)
-            same(enter.frame, delete.frame)
+            assertEquals(label, enter.frame.right, delete.frame.right, pixel)
+            assertEquals(label, enter.frame.top, delete.frame.top, pixel)
+            assertEquals(label, enter.frame.bottom, delete.frame.bottom, pixel)
             same(numbers.hitFrame, abc.hitFrame)
             assertEquals(label, letters.rowMetrics, emoji.rowMetrics)
 
@@ -319,49 +321,43 @@ class KeyboardGeometryTest {
     }
 
     @Test
-    fun `the emoji key leaves the space bar wide enough`() {
+    fun `the emoji key stays only while the space bar keeps room beside a drawn globe`() {
         for (width in widths) {
             val sizing = KeyboardSizing(width, isLandscape = false, density = 2.625f)
             val height = sizing.keyAreaHeight(KeyboardLayout.maximumRowCount(KeyboardLanguage.CYCLE_ORDER))
-            val crowded = PageOptions(showsGlobeKey = true, showsLanguageKey = true, showsEmojiKey = true)
-            val layout = KeyboardGeometry.layout(KeyboardLayout.page(KeyboardLanguage.KAZAKH, KeyboardPlane.LETTERS, crowded), sizing, height)
+            assertTrue("w=$width", KeyboardGeometry.fitsEmojiKey(PageOptions(showsLanguageKey = true), sizing))
+            val crowded = PageOptions(showsGlobeKey = true, showsLanguageKey = true)
+            val layout = KeyboardGeometry.layout(
+                KeyboardLayout.page(KeyboardLanguage.KAZAKH, KeyboardPlane.LETTERS, crowded.copy(showsEmojiKey = true)), sizing, height
+            )
             val space = layout.keys.first { it.key == KeyboardKey.Space }
-            val numbers = layout.keys.first { it.key == KeyboardKey.Plane(KeyboardPlane.NUMBERS) }
-            val unit = numbers.frame.width / KeyboardLayout.BOTTOM_PLANE_UNITS
-            assertTrue("w=$width space=${space.frame.width}", space.frame.width >= 85f)
-            assertTrue("w=$width space=${space.frame.width} unit=$unit", space.frame.width >= unit * 3f)
-            // The emoji key is a whole key, the size of the comma's.
-            val emoji = layout.keys.first { it.key == KeyboardKey.Plane(KeyboardPlane.EMOJI) }
-            assertTrue("w=$width", emoji.frame.width >= unit - 0.5f)
+            val columns = layout.page.rows.last().unitColumns!!
+            val unit = (width - sizing.sideInset * 2 - (columns - 1) * sizing.columnGap(columns)) / columns
+            assertEquals("w=$width", space.frame.width / unit >= 2.5f, KeyboardGeometry.fitsEmojiKey(crowded, sizing))
         }
     }
+
     @Test
-    fun `space gains a quarter to a third while system controls keep their widths`() {
+    fun `the bottom row's controls keep their touch width and give the rest to space`() {
         for (width in widths) for (density in listOf(1f, 2.625f, 3.5f)) {
             for (language in KeyboardLanguage.entries) for (globe in listOf(false, true)) {
                 val sizing = KeyboardSizing(width, false, density)
                 val options = PageOptions(showsGlobeKey = globe, showsLanguageKey = true, showsEmojiKey = true)
                 val page = KeyboardLayout.page(language, KeyboardPlane.LETTERS, options)
-                val oldBottom = page.rows.last().copy(keyGap = null, slots = page.rows.last().slots.map { slot ->
-                    slot.copy(width = when (slot.key) {
-                        is KeyboardKey.Plane -> KeyWidth.Units(if ((slot.key as KeyboardKey.Plane).target == KeyboardPlane.NUMBERS) 1.5f else 1f)
-                        KeyboardKey.Layout -> KeyWidth.Units(1.25f)
-                        KeyboardKey.Character(".") -> KeyWidth.Units(1f)
-                        else -> slot.width
-                    })
-                })
                 val height = sizing.keyAreaHeight(KeyboardLayout.maximumRowCount(KeyboardLanguage.CYCLE_ORDER))
-                val previous = KeyboardGeometry.layout(page.copy(rows = page.rows.dropLast(1) + oldBottom), sizing, height)
                 val current = KeyboardGeometry.layout(page, sizing, height)
                 val space = current.keys.first { it.key == KeyboardKey.Space }
-                val oldSpace = previous.keys.first { it.key == KeyboardKey.Space }
-                val gain = space.frame.width / oldSpace.frame.width
-                val label = "$language width=$width density=$density globe=$globe gain=$gain"
-                assertTrue(label, gain in 1.25f..1.35f)
-                for (key in listOf(KeyboardKey.Return, KeyboardKey.Globe, KeyboardKey.Plane(KeyboardPlane.EMOJI))) {
-                    val before = previous.keys.firstOrNull { it.key == key } ?: continue
-                    assertEquals(label, before.frame.width, current.keys.first { it.key == key }.frame.width, 1f / density)
-                }
+                val label = "$language width=$width density=$density globe=$globe"
+                val controls = listOfNotNull(
+                    current.keys.first { it.key == KeyboardKey.Plane(KeyboardPlane.NUMBERS) },
+                    current.keys.first { it.key == KeyboardKey.Plane(KeyboardPlane.EMOJI) },
+                    current.keys.first { it.key == KeyboardKey.Layout },
+                    current.keys.firstOrNull { it.key == KeyboardKey.Globe }
+                )
+                controls.forEach { assertTrue("$label ${it.key}", it.frame.width >= 39f - 1f / density) }
+                val enter = current.keys.first { it.key == KeyboardKey.Return }
+                assertTrue(label, enter.frame.width >= 66f - 1f / density)
+                assertTrue(label, space.frame.width > enter.frame.width * 0.9f)
                 // Every sampled point of the visible Space key resolves exclusively to Space.
                 for (x in listOf(space.frame.left + 0.01f, space.frame.centerX, space.frame.right - 0.01f)) {
                     for (y in listOf(space.frame.top + 0.01f, space.frame.centerY, space.frame.bottom - 0.01f)) {

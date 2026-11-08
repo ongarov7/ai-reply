@@ -55,13 +55,17 @@ class KeyboardLayoutTest {
     }
 
     @Test
-    fun `digits ride on the qwerty and ytsuken rows`() {
-        val english = page(KeyboardLanguage.ENGLISH).rows[0].slots.mapNotNull { it.hint }
-        assertEquals("1234567890".map { it.toString() }, english)
+    fun `digits ride on the qwerty and ytsuken rows as long presses, with nothing drawn in the corner`() {
+        fun digits(row: kz.yerek.aireply.keyboard.layout.KeyRow) = row.slots.mapNotNull { slot -> slot.alternates.lastOrNull()?.takeIf { it.single().isDigit() } }
+        val english = page(KeyboardLanguage.ENGLISH).rows[0]
+        assertEquals("1234567890".map { it.toString() }, digits(english))
         // Kazakh: on the ЙЦУКЕН row under the Kazakh letters.
-        val kazakh = page(KeyboardLanguage.KAZAKH).rows[1].slots.mapNotNull { it.hint }
-        assertEquals("1234567890".map { it.toString() }, kazakh)
-        assertTrue(page(KeyboardLanguage.KAZAKH).rows[0].slots.all { it.hint == null })
+        val kazakh = page(KeyboardLanguage.KAZAKH)
+        assertEquals("1234567890".map { it.toString() }, digits(kazakh.rows[1]))
+        assertTrue(digits(kazakh.rows[0]).isEmpty())
+        for (language in KeyboardLanguage.entries) {
+            assertTrue("$language", page(language).rows.all { row -> row.slots.all { it.hint == null } })
+        }
     }
 
     @Test
@@ -73,15 +77,18 @@ class KeyboardLayoutTest {
     }
 
     @Test
-    fun `numbers and symbols are gboard's pages`() {
+    fun `numbers and symbols are the same pages as on ios`() {
         val numbers = page(KeyboardLanguage.ENGLISH, KeyboardPlane.NUMBERS).characterRows
         assertEquals("1234567890", numbers[0].joinToString(""))
-        assertEquals("@#\$_&-+()/", numbers[1].joinToString(""))
+        assertEquals("-/:;()\$&@\"", numbers[1].joinToString(""))
+        assertEquals(".,?!'", numbers[2].joinToString(""))
         val symbols = page(KeyboardLanguage.ENGLISH, KeyboardPlane.SYMBOLS).characterRows
-        // `<` and `>` where Gboard has `¶` and `∆`, which are long presses.
-        assertEquals("~`|•√π÷×<>", symbols[0].joinToString(""))
-        assertTrue("¶" in KeyboardLayout.alternates("•", KeyboardLanguage.ENGLISH))
-        assertTrue("∆" in KeyboardLayout.alternates("π", KeyboardLanguage.ENGLISH))
+        assertEquals("[]{}#%^*+=", symbols[0].joinToString(""))
+        assertEquals("_\\|~<>€£¥•", symbols[1].joinToString(""))
+        assertEquals(".,?!'", symbols[2].joinToString(""))
+        // Tenge on the Cyrillic layouts' 123 page, the dollar one page on.
+        assertTrue("₸" in page(KeyboardLanguage.RUSSIAN, KeyboardPlane.NUMBERS).characterRows[1])
+        assertTrue("$" in page(KeyboardLanguage.RUSSIAN, KeyboardPlane.SYMBOLS).characterRows[1])
     }
 
     @Test
@@ -94,13 +101,16 @@ class KeyboardLayoutTest {
     }
 
     @Test
-    fun `the globe replaces the comma only when android asks for it`() {
-        val plain = page(KeyboardLanguage.KAZAKH).rows.last().slots.map { it.key }
-        assertTrue(KeyboardKey.Character(",") in plain)
-        assertFalse(KeyboardKey.Globe in plain)
-        val globe = page(KeyboardLanguage.KAZAKH, options = PageOptions(showsGlobeKey = true)).rows.last().slots.map { it.key }
-        assertTrue(KeyboardKey.Globe in globe)
-        assertFalse(KeyboardKey.Character(",") in globe)
+    fun `the bottom row is 123, emoji, the layout, space and return, with the globe only when asked for`() {
+        val options = PageOptions(showsEmojiKey = true)
+        assertEquals(
+            listOf(KeyboardKey.Plane(KeyboardPlane.NUMBERS), KeyboardKey.Plane(KeyboardPlane.EMOJI), KeyboardKey.Layout, KeyboardKey.Space, KeyboardKey.Return),
+            page(KeyboardLanguage.KAZAKH, options = options).rows.last().slots.map { it.key }
+        )
+        assertEquals(
+            listOf(KeyboardKey.Plane(KeyboardPlane.NUMBERS), KeyboardKey.Plane(KeyboardPlane.EMOJI), KeyboardKey.Globe, KeyboardKey.Layout, KeyboardKey.Space, KeyboardKey.Return),
+            page(KeyboardLanguage.KAZAKH, options = options.copy(showsGlobeKey = true)).rows.last().slots.map { it.key }
+        )
     }
 
     @Test
@@ -139,9 +149,11 @@ class KeyboardLayoutTest {
 
     @Test
     fun `captions follow the layout`() {
-        assertEquals("Қазақша", KeyboardLabels(KeyboardLanguage.KAZAKH).space)
+        assertEquals("бос орын", KeyboardLabels(KeyboardLanguage.KAZAKH).space)
+        assertEquals("Пробел", KeyboardLabels(KeyboardLanguage.RUSSIAN).space)
+        assertEquals("space", KeyboardLabels(KeyboardLanguage.ENGLISH).space)
         assertEquals("АӘБ", KeyboardLabels(KeyboardLanguage.KAZAKH).planeKey(KeyboardPlane.LETTERS))
-        assertEquals("?123", KeyboardLabels(KeyboardLanguage.RUSSIAN).planeKey(KeyboardPlane.NUMBERS))
+        assertEquals("123", KeyboardLabels(KeyboardLanguage.RUSSIAN).planeKey(KeyboardPlane.NUMBERS))
         assertEquals("ҚАЗ", KeyboardLabels(KeyboardLanguage.KAZAKH).badge)
     }
 }

@@ -32,11 +32,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExecutorCoroutineDispatcher
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -222,6 +224,9 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
     private var showsGlobeKey by mutableStateOf(false)
     private var isSecureField by mutableStateOf(false)
     private var returnFace by mutableStateOf(ReturnFace.NEWLINE)
+    /** The layout's own name on the space bar for a moment after a switch. */
+    private var spaceCaption by mutableStateOf<String?>(null)
+    private var spaceCaptionReset: Job? = null
     /** What the host field takes: its pad, its bottom-row key, a password's number row. */
     private var fieldKeys by mutableStateOf(FieldKeys())
     /** `features.ai_reports`, as the app or the last refresh stored it. */
@@ -516,18 +521,21 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         // ONE height for every page of every enabled layout.
         val areaHeight = sizing.keyAreaHeight(KeyboardLayout.maximumRowCount(enabledLanguages), screenHeight)
         val composing = isComposing
-        val options = PageOptions(
+        val baseOptions = PageOptions(
             showsGlobeKey = showsGlobeKey,
             showsLanguageKey = enabledLanguages.size > 1,
             // The composer's fields are plain text whatever the host field is.
             field = if (composing) FieldKind.TEXT else fieldKeys.kind,
             signed = fieldKeys.signed,
             decimal = fieldKeys.decimal,
-            // Gboard's digits over the letters in a password field, where the
+            // A row of digits over the letters in a password field, where the
             // keyboard's one height has room for them.
-            numberRow = !composing && fieldKeys.password && KeyboardLayout.numberRowFits(language, enabledLanguages),
-            // Emoji where text goes: the panels' fields, or a plain text field.
-            showsEmojiKey = takesEmoji(composing)
+            numberRow = !composing && fieldKeys.password && KeyboardLayout.numberRowFits(language, enabledLanguages)
+        )
+        val options = baseOptions.copy(
+            // Emoji where text goes: the panels' fields, or a plain text field,
+            // and only while the space bar keeps room beside a drawn globe.
+            showsEmojiKey = takesEmoji(composing) && KeyboardGeometry.fitsEmojiKey(baseOptions, sizing)
         )
         val page = remember(language, plane, options, sizing, areaHeight) {
             KeyboardGeometry.layout(KeyboardLayout.page(language, plane, options), sizing, areaHeight)
@@ -547,11 +555,13 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
             // Inside the composer return is a newline; it never reaches the
             // messenger's Send while a reply is open.
             returnFace = if (composing) ReturnFace.NEWLINE else returnFace,
-            returnProminent = !composing && returnFace != ReturnFace.NEWLINE,
+            // Tinted where the key confirms an action, as on the system keyboards.
+            returnProminent = !composing && returnFace != ReturnFace.NEWLINE && returnFace != ReturnFace.NEXT &&
+                returnFace != ReturnFace.PREVIOUS,
             // With a reply on screen, return starts editing it like any key.
             returnEnabled = !composing || target == Target.COMPOSER ||
                 flow.stage == ReplyComposerFlow.Stage.Result,
-            spaceCaption = language.nativeName,
+            spaceCaption = spaceCaption ?: KeyboardLabels(language).space,
             // Nothing to type into while a report is open either.
             dimmed = composing && (flow.isGenerating || reports.isOpen),
             languages = enabledLanguages
@@ -1231,6 +1241,17 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         // Off the main thread: it only matters to the next launch.
         scope.launch(Dispatchers.IO) { services.settings.keyboardLanguage = next }
         refreshAutoShift()
+        flashLanguageName()
+    }
+
+    /** The layout's name on the space bar for a moment, confirming a switch. */
+    private fun flashLanguageName() {
+        spaceCaptionReset?.cancel()
+        spaceCaption = language.nativeName
+        spaceCaptionReset = scope.launch {
+            delay(1_200)
+            spaceCaption = null
+        }
     }
 
     // ------------------------------------------------------------ host field
@@ -1767,7 +1788,7 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
     // -------------------------------------------------------- system keyboards
 
     private fun refreshGlobeKey() {
-        showsGlobeKey = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        val offered = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             shouldOfferSwitchingToNextInputMethod()
         } else {
             @Suppress("DEPRECATION")
@@ -1775,6 +1796,18 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
             val manager = getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager
             token != null && manager?.shouldOfferSwitchingToNextInputMethod(token) == true
         }
+        // The key is ours to draw only where the system bar has no switch of its own.
+        showsGlobeKey = offered && !systemBarSwitchesKeyboards()
+    }
+
+    /**
+     * Button navigation always has the keyboard switch in the bar; gesture
+     * navigation has it under the keyboard since Android 13. Before that a
+     * gesture phone has none, and the keyboard must offer its own.
+     */
+    private fun systemBarSwitchesKeyboards(): Boolean {
+        val gestures = android.provider.Settings.Secure.getInt(contentResolver, "navigation_mode", 0) == 2
+        return !gestures || Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
     }
 
     private fun switchToNextKeyboard() {
