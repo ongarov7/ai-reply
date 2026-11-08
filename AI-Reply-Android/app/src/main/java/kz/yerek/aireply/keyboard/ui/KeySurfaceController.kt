@@ -77,7 +77,7 @@ class KeySurfaceController(private val listener: KeySurfaceListener) {
     /** Uppercase alternates while shift is on. */
     var isShifted: Boolean = false
 
-    /** True while a request runs: touches still click, but nothing is picked up. */
+    /** True while a request runs or a report is open: the keys that edit text ignore touches. */
     var isDimmed: Boolean = false
 
     /** Everything the surface draws that a touch changes. Read in the draw phase only. */
@@ -120,6 +120,11 @@ class KeySurfaceController(private val listener: KeySurfaceListener) {
             .forEach { commit(it) }
 
         val key = page.keys[index]
+        // Nowhere to type: no click, no alternates, no trackpad.
+        if (isDimmed && key.key.editsText) {
+            refreshVisual()
+            return
+        }
         val track = Track(id, index, x, y, time)
         tracks[id] = track
         listener.onKeyDown(key.key)

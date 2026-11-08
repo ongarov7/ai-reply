@@ -13,6 +13,7 @@ import kz.yerek.aireply.keyboard.layout.PanelKind
 import kz.yerek.aireply.keyboard.ui.KeySurfaceController
 import kz.yerek.aireply.keyboard.ui.KeySurfaceListener
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -28,7 +29,8 @@ class KeySurfaceTouchTest {
 
     private class Recorder : KeySurfaceListener {
         val events = mutableListOf<String>()
-        override fun onKeyDown(key: KeyboardKey) = Unit
+        val downs = mutableListOf<KeyboardKey>()
+        override fun onKeyDown(key: KeyboardKey) { downs += key }
         override fun onKeyCommit(key: KeyboardKey) { events += "commit $key" }
         override fun onTextCommit(text: String) { events += "text $text" }
         override fun onDelete(word: Boolean) { events += "delete" }
@@ -171,5 +173,53 @@ class KeySurfaceTouchTest {
         surface.down(2, space.centerX, space.centerY, time = 200)
         surface.up(2, space.centerX, layout.height + 12f, time = 260)
         assertEquals(listOf("commit ${KeyboardKey.Character("w")}", "commit ${KeyboardKey.Space}"), recorder.events)
+    }
+
+    // --------------------------------------------------------------- dimmed
+
+    @Test
+    fun `while dimmed a key that edits text answers nothing`() {
+        val layout = page(KeyboardLanguage.RUSSIAN, KeyboardPlane.LETTERS, screens[1])
+        val (surface, recorder) = controller(layout)
+        surface.isDimmed = true
+        for (key in listOf(KeyboardKey.Character("е"), KeyboardKey.Space, KeyboardKey.Backspace, KeyboardKey.Return)) {
+            val frame = layout.key(key).frame
+            surface.down(1, frame.centerX, frame.centerY, time = 0)
+            assertTrue("$key shows no press", surface.visual.pressed.isEmpty())
+            surface.tick(time = 2_000)
+            assertNull("$key opens nothing", surface.visual.panel)
+            surface.move(1, frame.centerX + 40f, frame.centerY, time = 2_100)
+            assertFalse("$key is no trackpad", surface.visual.trackpad)
+            surface.up(1, frame.centerX + 40f, frame.centerY, time = 2_200)
+        }
+        assertEquals("no click, no vibration", emptyList<KeyboardKey>(), recorder.downs)
+        assertEquals(emptyList<String>(), recorder.events)
+    }
+
+    @Test
+    fun `while dimmed the keys that change the keyboard still press and work`() {
+        val layout = page(KeyboardLanguage.RUSSIAN, KeyboardPlane.LETTERS, screens[1])
+        val (surface, recorder) = controller(layout)
+        surface.isDimmed = true
+        val numbers = KeyboardKey.Plane(KeyboardPlane.NUMBERS)
+        val frame = layout.key(numbers).frame
+        surface.down(1, frame.centerX, frame.centerY, time = 0)
+        assertEquals(listOf<KeyboardKey>(numbers), recorder.downs)
+        assertEquals(setOf(layout.keys.indexOfFirst { it.key == numbers }), surface.visual.pressed)
+        surface.up(1, frame.centerX, frame.centerY, time = 60)
+        assertEquals(listOf("commit $numbers"), recorder.events)
+    }
+
+    @Test
+    fun `a letter resting when the keys dimmed is still typed by the next finger`() {
+        val layout = page(KeyboardLanguage.ENGLISH, KeyboardPlane.LETTERS, screens[1])
+        val q = layout.key(KeyboardKey.Character("q")).frame
+        val w = layout.key(KeyboardKey.Character("w")).frame
+        val (surface, recorder) = controller(layout)
+        surface.down(1, q.centerX, q.centerY, time = 0)
+        surface.isDimmed = true
+        surface.down(2, w.centerX, w.centerY, time = 40)
+        assertEquals(listOf("commit ${KeyboardKey.Character("q")}"), recorder.events)
+        assertTrue("neither finger holds a key now", surface.visual.pressed.isEmpty())
     }
 }
