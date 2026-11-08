@@ -28,6 +28,8 @@ import kz.yerek.aireply.support.sessionOn
 import kz.yerek.aireply.ui.feature.support.ChatMessage
 import kz.yerek.aireply.ui.feature.support.SendFailure
 import kz.yerek.aireply.ui.feature.support.SupportChatController
+import kz.yerek.aireply.ui.feature.support.chatDayStarts
+import kz.yerek.aireply.ui.feature.support.formatChatDay
 import kz.yerek.aireply.ui.feature.support.formatChatTime
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -52,6 +54,8 @@ class SupportChatTest {
         val messages = mutableListOf<SupportMessageDto>()
         val calls = mutableListOf<String>()
         val sent = mutableListOf<Pair<String, String>>()
+        /** Thrown instead of a page. */
+        var pageError: ApiError? = null
         /** Thrown before the message is stored. */
         var sendError: ApiError? = null
         /** Thrown after it is stored: the answer is lost on the way, as on a timeout. */
@@ -78,6 +82,7 @@ class SupportChatTest {
 
         override suspend fun messages(before: String?, after: String?, limit: Int): SupportMessagesPage {
             calls += "messages before=$before after=$after"
+            pageError?.let { throw ApiException(it) }
             val index = { id: String -> messages.indexOfFirst { it.id == id } }
             return when {
                 after != null -> messages.drop(index(after) + 1).let { SupportMessagesPage(it.take(pageSize), it.size > pageSize) }
@@ -321,6 +326,29 @@ class SupportChatTest {
     }
 
     @Test
+    fun `a failed load waits for Retry instead of asking again by itself`() = runBlocking {
+        server.userWrote("Здравствуйте")
+        server.pageError = ApiError.Offline
+        chat.open()
+        assertTrue(chat.state.value.loadFailed)
+        assertFalse(chat.state.value.loaded)
+
+        val asked = server.calls.size
+        server.pageError = null
+        chat.poll()
+        assertEquals("the note and its button do not flicker", asked, server.calls.size)
+        assertTrue(chat.state.value.loadFailed)
+
+        chat.retryLoad()
+        assertFalse(chat.state.value.loadFailed)
+        assertEquals(listOf("Здравствуйте"), texts)
+
+        server.operatorWrites("Добрый день")
+        chat.poll()
+        assertEquals("loaded: polling goes on", listOf("Здравствуйте", "Добрый день"), texts)
+    }
+
+    @Test
     fun `the draft stays in memory and goes with the account`() {
         chat.draft = "Не приходит ответ"
         assertEquals("Не приходит ответ", chat.draft)
@@ -354,6 +382,15 @@ class SupportChatTest {
         assertTrue(SupportChatController.isTooLong("я".repeat(2001)))
         assertTrue(SupportChatController.isSendable("😀".repeat(2000)))
         assertTrue(server.sent.isEmpty())
+    }
+
+    @Test
+    fun `the field counts only near the limit, the way the server does`() {
+        assertFalse(SupportChatController.showsCounter("я".repeat(1800)))
+        assertTrue(SupportChatController.showsCounter("я".repeat(1801)))
+        assertFalse("spaces around it do not count", SupportChatController.showsCounter(" ".repeat(1900) + "я"))
+        assertEquals("one code point each", 1801, SupportChatController.length("😀".repeat(1801)))
+        assertTrue(SupportChatController.showsCounter("😀".repeat(1801)))
     }
 
     @Test
@@ -424,12 +461,55 @@ class SupportChatTest {
     }
 
     @Test
-    fun `times read as the phone's clock`() {
+    fun `times read as the phone's clock, the date is on the separator`() {
         val zone = ZoneId.of("Asia/Almaty")
-        assertEquals("10:05", formatChatTime("2026-10-20T10:05:00+05:00", Locale.ENGLISH, zone, LocalDate.of(2026, 10, 20)))
-        assertTrue(formatChatTime("2026-10-19T10:05:00+05:00", Locale.ENGLISH, zone, LocalDate.of(2026, 10, 20))!!.contains("19"))
+        assertEquals("10:05", formatChatTime("2026-10-20T10:05:00+05:00", Locale.ENGLISH, zone))
+        assertEquals("another day has no date of its own", "10:05", formatChatTime("2026-10-19T10:05:00+05:00", Locale.ENGLISH, zone))
         assertNull(formatChatTime("yesterday", Locale.ENGLISH, zone))
         assertNull(formatChatTime(null, Locale.ENGLISH, zone))
+    }
+
+    private fun message(key: String, createdAt: String?, writtenAt: Long? = null) =
+        ChatMessage(key = key, id = key, clientMessageId = null, fromOperator = false, text = key, createdAt = createdAt, writtenAt = writtenAt)
+
+    @Test
+    fun `each day opens with a separator, on the phone's own clock`() {
+        val zone = ZoneId.of("Asia/Almaty")
+        val today = LocalDate.of(2026, 10, 20)
+        val starts = chatDayStarts(
+            listOf(
+                message("a", "2026-10-18T23:30:00+05:00"),
+                // Still the 18th in UTC, already the 19th in Almaty.
+                message("b", "2026-10-18T19:10:00Z"),
+                message("c", "2026-10-19T00:20:00+05:00"),
+                message("d", "2026-10-20T09:00:00+05:00"),
+                message("e", "2026-10-20T10:00:00+05:00")
+            ),
+            zone,
+            today
+        )
+        assertEquals(
+            mapOf("a" to LocalDate.of(2026, 10, 18), "b" to LocalDate.of(2026, 10, 19), "d" to today),
+            starts
+        )
+    }
+
+    @Test
+    fun `a message not on the server yet belongs to when it was written`() {
+        val zone = ZoneId.of("Asia/Almaty")
+        val today = LocalDate.of(2026, 10, 20)
+        val yesterdayNoon = LocalDate.of(2026, 10, 19).atTime(12, 0).atZone(zone).toInstant().toEpochMilli()
+        assertEquals(
+            mapOf("failed" to LocalDate.of(2026, 10, 19), "unreadable" to today),
+            chatDayStarts(listOf(message("failed", null, yesterdayNoon), message("unreadable", "soon")), zone, today)
+        )
+        assertTrue(chatDayStarts(emptyList(), zone, today).isEmpty())
+    }
+
+    @Test
+    fun `a separator names the day and month`() {
+        assertEquals("20 октября", formatChatDay(LocalDate.of(2026, 10, 20), Locale.forLanguageTag("ru")))
+        assertEquals("1 October", formatChatDay(LocalDate.of(2026, 10, 1), Locale.ENGLISH))
     }
 
     @Test

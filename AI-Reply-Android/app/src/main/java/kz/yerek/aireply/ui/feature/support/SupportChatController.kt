@@ -105,13 +105,18 @@ class SupportChatController(
         isVisible = false
     }
 
+    /** «Повторить» after the chat could not be read. */
+    fun retryLoad() {
+        scope.launch { open() }
+    }
+
     /**
      * What arrived after the newest message a page brought, page by page as
      * the server has them. While one of ours is on its way, it waits for it.
+     * Nothing until the chat has loaded: after a failed load, Retry asks again.
      */
     suspend fun poll() {
-        if (!isEnabled()) return
-        if (!_state.value.loaded) return open()
+        if (!isEnabled() || !_state.value.loaded) return
         loading.withLock {
             val after = _state.value.afterId
             val page = try {
@@ -271,11 +276,16 @@ class SupportChatController(
         /** The server's limit, in characters. */
         const val MAX_LENGTH = 2000
 
-        fun isSendable(text: String): Boolean {
-            val trimmed = text.trim()
-            return trimmed.isNotEmpty() && trimmed.codePointCount(0, trimmed.length) <= MAX_LENGTH
-        }
+        /** How close to the limit the field starts counting. */
+        private const val COUNTER_MARGIN = 200
 
-        fun isTooLong(text: String): Boolean = text.trim().let { it.codePointCount(0, it.length) > MAX_LENGTH }
+        /** The length as the server counts it: code points, not the characters on screen. */
+        fun length(text: String): Int = text.trim().let { it.codePointCount(0, it.length) }
+
+        fun isSendable(text: String): Boolean = length(text) in 1..MAX_LENGTH
+
+        fun isTooLong(text: String): Boolean = length(text) > MAX_LENGTH
+
+        fun showsCounter(text: String): Boolean = length(text) > MAX_LENGTH - COUNTER_MARGIN
     }
 }

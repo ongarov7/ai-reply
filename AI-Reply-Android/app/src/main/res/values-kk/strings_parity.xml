@@ -6,4 +6,5 @@
     <string name="push_card_offers">Жауап пакеттері туралы ұсыныстар алу</string>
     <string name="push_card_offers_optional">Міндетті емес. Таңдауыңды хабарлама баптауларында өзгерте аласың.</string>
     <string name="push_card_save_failed">Сақталмады. Байланысты тексеріп, қайталап көріңіз.</string>
+    <string name="support_today">Бүгін</string>
 </resources>

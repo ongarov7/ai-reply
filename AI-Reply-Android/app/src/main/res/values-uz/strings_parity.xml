@@ -6,4 +6,5 @@
     <string name="push_card_offers">Javob paketlari haqida takliflar olish</string>
     <string name="push_card_offers_optional">Ixtiyoriy. Buni bildirishnoma sozlamalarida o‘zgartirish mumkin.</string>
     <string name="push_card_save_failed">Saqlab boʻlmadi. Aloqani tekshirib, qayta urinib koʻring.</string>
+    <string name="support_today">Bugun</string>
 </resources>

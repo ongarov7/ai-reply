@@ -6,4 +6,5 @@
     <string name="push_card_offers">Получать предложения о пакетах ответов</string>
     <string name="push_card_offers_optional">Необязательно. Выбор можно изменить в настройках уведомлений.</string>
     <string name="push_card_save_failed">Не удалось сохранить. Проверьте соединение и попробуйте ещё раз.</string>
+    <string name="support_today">Сегодня</string>
 </resources>

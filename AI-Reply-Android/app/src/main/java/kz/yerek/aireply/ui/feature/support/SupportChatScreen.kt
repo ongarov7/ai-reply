@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.outlined.SupportAgent
@@ -31,6 +32,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -62,6 +64,7 @@ import kz.yerek.aireply.ui.design.LocalExtraColors
 import kz.yerek.aireply.ui.design.ReadableColumn
 import kz.yerek.aireply.ui.design.SecondaryButton
 import kz.yerek.aireply.ui.design.Spacing
+import java.time.Instant
 import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.time.ZoneId
@@ -113,7 +116,7 @@ fun SupportChatScreen(onBack: () -> Unit) {
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 when {
                     !enabled -> Unavailable(account.legalConfig.supportUrl, services.settings.effectiveAppLanguage.code)
-                    !state.loaded && state.loadFailed -> CenteredNote(stringResource(R.string.support_load_failed))
+                    !state.loaded && state.loadFailed -> LoadFailed(onRetry = chat::retryLoad)
                     !state.loaded -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                     state.isEmpty -> EmptyChat()
                     else -> Messages(state, onRetry = chat::retry, onTop = chat::loadOlder)
@@ -136,6 +139,7 @@ private fun Messages(state: SupportChatState, onRetry: (String) -> Unit, onTop: 
             message.fromOperator && (index == 0 || !state.messages[index - 1].fromOperator)
         }.map { it.key }.toSet()
     }
+    val dayStarts = remember(state.messages) { chatDayStarts(state.messages) }
 
     LaunchedEffect(listState, state.hasOlder) {
         if (!state.hasOlder) return@LaunchedEffect
@@ -157,7 +161,10 @@ private fun Messages(state: SupportChatState, onRetry: (String) -> Unit, onTop: 
         verticalArrangement = Arrangement.spacedBy(Spacing.xs)
     ) {
         items(reversed, key = { it.key }) { message ->
-            Bubble(message, showsName = message.key in runStarts, locale = locale, onRetry = onRetry)
+            Column(modifier = Modifier.fillMaxWidth()) {
+                dayStarts[message.key]?.let { day -> DaySeparator(day, locale) }
+                Bubble(message, showsName = message.key in runStarts, locale = locale, onRetry = onRetry)
+            }
         }
         if (state.hasOlder) {
             item(key = "older") {
@@ -167,6 +174,18 @@ private fun Messages(state: SupportChatState, onRetry: (String) -> Unit, onTop: 
             }
         }
     }
+}
+
+/** «Сегодня», or «20 октября», centred above the first message of the day. */
+@Composable
+private fun DaySeparator(day: LocalDate, locale: Locale) {
+    Text(
+        if (day == LocalDate.now()) stringResource(R.string.support_today) else formatChatDay(day, locale),
+        style = MaterialTheme.typography.labelMedium,
+        color = LocalExtraColors.current.textSecondary,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.xs)
+    )
 }
 
 @Composable
@@ -203,11 +222,13 @@ private fun Bubble(message: ChatMessage, showsName: Boolean, locale: Locale, onR
                     contentDescription = (if (mine) yours else operatorName) + ": " + message.text
                 }
         ) {
-            Text(
-                message.text,
-                style = MaterialTheme.typography.bodyLarge,
-                color = if (mine) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
-            )
+            SelectionContainer {
+                Text(
+                    message.text,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (mine) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                )
+            }
         }
         val status = when (message.status) {
             ChatMessage.Status.SENDING -> stringResource(R.string.support_sending)
@@ -294,6 +315,14 @@ private fun InputBar(draft: String, onDraftChange: (String) -> Unit, onSend: (St
                 Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.support_send))
             }
         }
+        if (SupportChatController.showsCounter(text)) {
+            Text(
+                stringResource(R.string.compose_counter, SupportChatController.length(text), SupportChatController.MAX_LENGTH),
+                style = MaterialTheme.typography.labelSmall,
+                color = if (tooLong) MaterialTheme.colorScheme.error else LocalExtraColors.current.textSecondary,
+                modifier = Modifier.padding(top = Spacing.xxs)
+            )
+        }
     }
 }
 
@@ -345,29 +374,57 @@ private fun Unavailable(supportUrl: String, language: String) {
     }
 }
 
+/** The chat could not be read: says so, with the way to ask again. */
 @Composable
-private fun CenteredNote(text: String) {
-    Box(Modifier.fillMaxSize().padding(Spacing.l), contentAlignment = Alignment.Center) {
+private fun LoadFailed(onRetry: () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(Spacing.l),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(Spacing.xs, Alignment.CenterVertically)
+    ) {
         Text(
-            text,
+            stringResource(R.string.support_load_failed),
             style = MaterialTheme.typography.bodyMedium,
             color = LocalExtraColors.current.textSecondary,
             textAlign = TextAlign.Center
         )
+        TextButton(onClick = onRetry) { Text(stringResource(R.string.support_retry)) }
     }
 }
 
-/** «14:05» today, «21 окт., 14:05» on another day, on this phone's clock; null for an unreadable time. */
-internal fun formatChatTime(
-    raw: String?,
-    locale: Locale,
+private fun parseChatTime(raw: String?): Instant? =
+    raw?.let { runCatching { OffsetDateTime.parse(it).toInstant() }.getOrNull() }
+
+/** «14:05» on this phone's clock, the day being on its separator; null for an unreadable time. */
+internal fun formatChatTime(raw: String?, locale: Locale, zone: ZoneId = ZoneId.systemDefault()): String? {
+    val instant = parseChatTime(raw) ?: return null
+    val pattern = runCatching { DateFormat.getBestDateTimePattern(locale, "Hm") }.getOrNull() ?: "HH:mm"
+    return DateTimeFormatter.ofPattern(pattern, locale).format(instant.atZone(zone))
+}
+
+/** «20 октября»: a day other than today. */
+internal fun formatChatDay(day: LocalDate, locale: Locale): String {
+    val pattern = runCatching { DateFormat.getBestDateTimePattern(locale, "dMMMM") }.getOrNull() ?: "d MMMM"
+    return DateTimeFormatter.ofPattern(pattern, locale).format(day)
+}
+
+/**
+ * The messages, by key, that open a new day on this phone's clock, each with
+ * its day; [messages] are oldest first. One not on the server yet belongs to
+ * when it was written.
+ */
+internal fun chatDayStarts(
+    messages: List<ChatMessage>,
     zone: ZoneId = ZoneId.systemDefault(),
     today: LocalDate = LocalDate.now(zone)
-): String? {
-    val instant = raw?.let { runCatching { OffsetDateTime.parse(it).toInstant() }.getOrNull() } ?: return null
-    val local = instant.atZone(zone)
-    val skeleton = if (local.toLocalDate() == today) "Hm" else "dMMMHm"
-    val pattern = runCatching { DateFormat.getBestDateTimePattern(locale, skeleton) }.getOrNull()
-        ?: if (skeleton == "Hm") "HH:mm" else "d MMM, HH:mm"
-    return DateTimeFormatter.ofPattern(pattern, locale).format(local)
+): Map<String, LocalDate> {
+    val starts = LinkedHashMap<String, LocalDate>()
+    var previous: LocalDate? = null
+    messages.forEach { message ->
+        val day = (parseChatTime(message.createdAt) ?: message.writtenAt?.let(Instant::ofEpochMilli))
+            ?.atZone(zone)?.toLocalDate() ?: today
+        if (day != previous) starts[message.key] = day
+        previous = day
+    }
+    return starts
 }
