@@ -368,7 +368,8 @@ class BillingRepository(
                         busyProductId = null,
                         notice = when (update.error) {
                             // An earlier purchase of it is not finished yet: hand it over now.
-                            StoreError.ALREADY_OWNED -> it.notice
+                            // Another account's stays with that account, so nothing else would be said.
+                            StoreError.ALREADY_OWNED -> if (heldByAnotherAccount(it.busyProductId)) PurchaseNotice.OTHER_ACCOUNT else it.notice
                             StoreError.UNAVAILABLE -> PurchaseNotice.UNAVAILABLE
                             StoreError.FAILED -> PurchaseNotice.FAILED
                         }
@@ -377,6 +378,11 @@ class BillingRepository(
                 if (update.error == StoreError.ALREADY_OWNED) scope.launch { reconcile() }
             }
         }
+    }
+
+    private fun heldByAnotherAccount(productId: String?): Boolean {
+        val mine = accountToken ?: return false
+        return held.any { productId in it.productIds && it.accountToken != null && it.accountToken != mine }
     }
 
     /**

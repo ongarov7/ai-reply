@@ -541,6 +541,20 @@ class BillingTest {
     }
 
     @Test
+    fun `a plan another account holds on this Google account says so`() = runBlocking {
+        sellsBaseAndPro()
+        store.held += runningBase(account = OTHER_TOKEN)
+        billing.load()
+        store.launchError = StoreError.ALREADY_OWNED
+
+        billing.buy(activity, state.subscriptions.first { it.storeProductId == "play.base.month" })
+
+        assertEquals(PurchaseNotice.OTHER_ACCOUNT, state.notice)
+        assertNull(state.busyProductId)
+        assertTrue("that account hands it over", api.verified.isEmpty())
+    }
+
+    @Test
     fun `signing out forgets the account's token`() = runBlocking {
         billing.load()
         billing.reset()
