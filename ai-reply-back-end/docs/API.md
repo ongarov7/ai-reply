@@ -927,7 +927,8 @@ languages, purpose, latency_ms, status, code, retried), `ai_voice_reused` (по�
 Пакеты ответов (`kind = pack`, не сгорают) и пропуск (`kind = pass`: `units` ответов на
 `duration_hours` часов) продаются только через магазины: iOS — StoreKit 2 (пакет —
 Consumable, пропуск — Non-Renewing Subscription), Android — Google Play Billing (одноразовые
-товары). Цены сервер не знает: приложение показывает `displayPrice` / `formattedPrice`
+товары). Подписки Base/Pro продаются через StoreKit и, когда администратор укажет Google Product ID
+и включит Android, через Google Play. Цены сервер не знает: приложение показывает `displayPrice` / `formattedPrice`
 магазина. Включено, только когда `features.iap_ios` / `features.iap_android` = `true`.
 
 | Метод | Путь | Тело | Ответ |
@@ -979,12 +980,25 @@ Consumable, пропуск — Non-Renewing Subscription), Android — Google Pl
    снова, когда `purchaseState` станет `PURCHASED`. На каждом запуске — `queryPurchasesAsync`
    (`INAPP`) и отправить все покупки (уже начисленные вернут `already_granted`).
 
+Подписки на Android (`kind = subscription`, `store_product_id` — Product ID подписки Play с
+одним базовым планом с автопродлением; запрос и ответ те же):
+
+1. `queryProductDetailsAsync` с `ProductType.SUBS`, в покупку передать тот же `account_token`
+   через `setObfuscatedAccountId`.
+2. После покупки — `POST /api/v1/iap/google/purchases` с `product_id` и `purchase_token`.
+   **Клиент не вызывает `acknowledgePurchase`**: сервер сначала выдаёт подписку, потом сам её
+   подтверждает и повторяет подтверждение в фоне.
+3. При каждом возвращении в приложение — `queryPurchasesAsync(SUBS)` и отправить активные
+   покупки: так продление доходит сразу, не дожидаясь фоновой проверки.
+4. Смена тарифа — обычная покупка с заменой старой: новый токен приходит с
+   `linkedPurchaseToken`, старый сервер закрывает.
+
 Ошибки:
 
 | Код | HTTP | Когда | Что делать клиенту |
 |---|---|---|---|
 | `IAP_UNAVAILABLE` | 403 | магазин этой платформы не подключён на сервере; для `products` — продажи на платформе закрыты | скрыть покупки; транзакцию не завершать |
-| `PURCHASE_INVALID` | 400 | магазин не подтвердил покупку: `details.reason` — `malformed`, `signature`, `bundle_mismatch`, `environment` (Sandbox или тестовая покупка Google на сервере, который их не принимает), `product_type`, `product_unknown`, `account_mismatch`, `revoked`, `canceled`, `not_found`, `already_consumed`, `unsupported_type`, `quantity` | показать «покупка не подтверждена»; не повторять |
+| `PURCHASE_INVALID` | 400 | магазин не подтвердил покупку: `details.reason` — `expired`, `on_hold`, `paused` (подписка Google сейчас не даёт доступа), `malformed`, `signature`, `bundle_mismatch`, `environment` (Sandbox или тестовая покупка Google на сервере, который их не принимает), `product_type`, `product_unknown`, `account_mismatch`, `revoked`, `canceled`, `not_found`, `already_consumed`, `unsupported_type`, `quantity` | показать «покупка не подтверждена»; не повторять |
 | `PURCHASE_BELONGS_TO_ANOTHER_ACCOUNT` | 409 | транзакция уже начислена другому (или удалённому) аккаунту | предложить войти в тот аккаунт |
 | `STORE_UNAVAILABLE` | 503 | API Google временно не ответил | повторить позже; ничего не потреблять |
 | `RATE_LIMITED` | 429 | больше `RATE_IAP_PER_MINUTE` в минуту | повторить позже |
@@ -1009,6 +1023,21 @@ Consumable, пропуск — Non-Renewing Subscription), Android — Google Pl
   (промокод) — `Promo`. Сначала начисление, потом `consume`; неудачный consume повторяется
   каждые 15 минут, считая от начисления (pending-покупка — от оплаты), до 4 суток (Google
   возвращает деньги за неподтверждённую покупку через 3 дня).
+- **Google, подписка**: `purchases.subscriptionsv2.get`; строка покупки с этим `product_id`
+  (иначе `product_unknown`), `externalAccountIdentifiers.obfuscatedExternalAccountId =
+  account_token`, `testPurchase` — как выше. `ACTIVE` и `IN_GRACE_PERIOD` выдают тариф,
+  `CANCELED` — до `expiryTime`, `PENDING` — `202`, `ON_HOLD`, `PAUSED`, `EXPIRED` — `400` и ничего
+  не дают. Состояние хранится в `google_subscriptions` (SHA-256 токена, зашифрованный токен,
+  тариф, срок, автопродление, состояние, связанный токен); источник в `subscription.source` —
+  `google_play`. Сначала выдача, потом `purchases.subscriptions.acknowledge`; неудачное
+  подтверждение повторяется до 4 суток от выдачи. `linkedPurchaseToken` закрывает старый токен
+  в любом порядке получения: повторно он ничего не даёт. Рядом с автопродляемой подпиской Google
+  банковское автопродление не оформляется.
+- **Google, продление и потеря**: push от Google пока нет. Фоновая задача (каждые 15 минут,
+  партии по 100) читает подписки, которым осталось меньше суток или срок уже вышел, и
+  обновляет срок и состояние. При недоступности Google состояние и доступ не меняются,
+  строка откладывается с удвоением паузы до 6 часов, раунд останавливается. Позже можно
+  подключить Real-time developer notifications: они лишь ускорят то же чтение.
 - Одна транзакция начисляется один раз: `UNIQUE (provider, transaction_id)`, где
   `transaction_id` — `transactionId` Apple или SHA-256 токена Google (сам токен в открытом
   виде не хранится; до consume — зашифрованная копия, потом стирается). Транзакция,
@@ -1028,7 +1057,10 @@ Consumable, пропуск — Non-Renewing Subscription), Android — Google Pl
   возврат отменит (`REFUND_REVERSED`), запись снимается (в журнале уведомлений — `cleared`), и
   транзакция начисляется, когда приложение её отправит, — только аккаунту из `appAccountToken`.
 - Google: опрос `purchases.voidedpurchases` раз в `IAP_GOOGLE_VOIDED_POLL` (по умолчанию час;
-  первый опрос после старта — за 30 дней, дальше — за 72 часа); результат тот же.
+  первый опрос после старта — за 30 дней, дальше — за 72 часа); результат тот же. В списке и
+  подписки (`type=1`). У продлений один токен, поэтому заказ различается по `orderId`: возврат
+  последнего оплаченного заказа снимает доступ, возврат более раннего только записывается. Новый
+  оплаченный заказ доступ возвращает.
 
 Удаление аккаунта: запись о покупке остаётся с `user_id = NULL` (финансовая запись, без
 данных о человеке); начисление и журнал удаляются с аккаунтом. Таблицы — миграция `0018_iap`.

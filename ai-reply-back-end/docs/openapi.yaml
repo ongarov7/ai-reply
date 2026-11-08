@@ -783,7 +783,9 @@ paths:
         админки, productId в ответе Google (если есть) тот же. Сначала начисление, затем consume;
         неудачный consume повторяет фоновая задача. purchaseType 0 (лицензионный тестер) —
         только при GOOGLE_PLAY_ACCEPT_TEST=true (по умолчанию в production — нет), environment
-        Test. Лимит RATE_IAP_PER_MINUTE.
+        Test. Лимит RATE_IAP_PER_MINUTE. Для подписки — purchases.subscriptionsv2.get и серверный
+        acknowledge: ACTIVE, IN_GRACE_PERIOD, CANCELED (до expiryTime) выдают тариф; PENDING — 202;
+        ON_HOLD, PAUSED, EXPIRED — 400 (expired, on_hold, paused).
       security: [{ bearerAuth: [] }]
       requestBody:
         required: true
