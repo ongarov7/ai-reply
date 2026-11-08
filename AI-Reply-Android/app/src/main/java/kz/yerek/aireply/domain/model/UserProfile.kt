@@ -57,7 +57,14 @@ data class UserProfile(
      * How Russian replies speak about the user. `null` until the user was
      * asked; an unknown value from a newer build decodes to `null` too.
      */
-    val grammaticalGender: GrammaticalGender? = null
+    val grammaticalGender: GrammaticalGender? = null,
+
+    /**
+     * The language replies should be written in. `null`, the default, means the
+     * language of the copied message, which is what most people want most of
+     * the time. An unknown value from a newer build decodes to `null` too.
+     */
+    val replyLanguage: ReplyLanguagePreference? = null
 ) {
 
     fun withRole(value: String) = copy(role = value.clampToCodePoints(MAX_ROLE))

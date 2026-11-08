@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- The reply language in the profile -->
+    <string name="profile_replylanguage">Reply language</string>
+    <string name="profile_replylanguage_auto">Automatic</string>
+    <string name="profile_replylanguage_footer">Automatic: the reply is in the language of the message you copied\u00A0— a Kazakh message gets a Kazakh reply, whatever language your phone or this app uses. Choose a language only if every reply should be in it. A request in the instruction, such as “answer in Russian”, always wins.</string>
+
+</resources>

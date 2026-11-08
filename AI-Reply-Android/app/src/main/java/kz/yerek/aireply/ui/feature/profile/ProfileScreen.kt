@@ -29,6 +29,7 @@ import kz.yerek.aireply.R
 import kz.yerek.aireply.core.text.clampToCodePoints
 import kz.yerek.aireply.core.text.codePointLength
 import kz.yerek.aireply.domain.model.BusinessContext
+import kz.yerek.aireply.domain.model.ReplyLanguagePreference
 import kz.yerek.aireply.domain.model.ReplyTone
 import kz.yerek.aireply.domain.model.UserProfile
 import kz.yerek.aireply.ui.LocalServices
@@ -59,17 +60,22 @@ fun ProfileScreen(onBack: () -> Unit) {
     var about by remember { mutableStateOf(stored.descriptionText) }
     var business by remember { mutableStateOf(stored.business) }
     var tone by remember { mutableStateOf(stored.preferredTone) }
+    var replyLanguage by remember { mutableStateOf(stored.replyLanguage) }
     var dictating by remember { mutableStateOf(false) }
 
     // Saved on the way out rather than on every keystroke: the store writes a
     // file the keyboard reads, and rewriting it per character would be pointless
     // disk traffic.
-    val latest = rememberUpdatedState(Quad(role, about, business, tone))
+    val latest = rememberUpdatedState(ProfileDraft(role, about, business, tone, replyLanguage))
     DisposableEffect(Unit) {
         onDispose {
-            val (r, a, b, t) = latest.value
+            val draft = latest.value
             services.configuration.updateProfile { profile ->
-                profile.withRole(r).withDescription(a).copy(business = b, preferredTone = t)
+                profile.withRole(draft.role).withDescription(draft.about).copy(
+                    business = draft.business,
+                    preferredTone = draft.tone,
+                    replyLanguage = draft.replyLanguage
+                )
             }
         }
     }
@@ -175,6 +181,8 @@ fun ProfileScreen(onBack: () -> Unit) {
                 }
             }
 
+            ReplyLanguageSection(selection = replyLanguage, onSelect = { replyLanguage = it })
+
             GenderSection()
         }
     }
@@ -197,11 +205,12 @@ fun ProfileScreen(onBack: () -> Unit) {
     }
 }
 
-private data class Quad(
+private data class ProfileDraft(
     val role: String,
     val about: String,
     val business: BusinessContext,
-    val tone: ReplyTone
+    val tone: ReplyTone,
+    val replyLanguage: ReplyLanguagePreference?
 )
 
 fun toneResource(tone: ReplyTone): Int = when (tone) {

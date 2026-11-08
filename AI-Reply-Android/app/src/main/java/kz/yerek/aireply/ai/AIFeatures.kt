@@ -10,7 +10,7 @@ package kz.yerek.aireply.ai
  * which keeps a new build working against an older server.
  */
 data class AIFeatures(
-    /** The `profile` block on a reply: description, role, preferred tone, business. */
+    /** The `profile` block on a reply: description, role, preferred tone, business, reply language. */
     val replyPreferences: Boolean,
     /** `grammatical_gender` and `input_language` on replies and compose, and on `/me`. */
     val senderProfile: Boolean,

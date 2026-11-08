@@ -74,7 +74,7 @@ class ReplyLanguageTest {
             assertEquals(ui.name, "Сәлем! Ертең кездесуге уақытың бар ма?", body["source_text"]!!.jsonPrimitive.content)
             assertFalse("${ui.name}: no instruction was typed", "instruction" in body.keys)
             assertFalse("${ui.name}: the app has no keyboard layout to hint with", "input_language" in body.keys)
-            assertFalse("${ui.name}: Android has no reply-language preference", "reply_language" in body.toString())
+            assertFalse("${ui.name}: a profile on Automatic names no language", "reply_language" in body.toString())
             assertEquals("${ui.name}: the app language is only a hint", ui.code, body["language"]!!.jsonPrimitive.content)
         }
     }

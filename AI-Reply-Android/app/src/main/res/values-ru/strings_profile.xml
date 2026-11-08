@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- The reply language in the profile -->
+    <string name="profile_replylanguage">Язык ответа</string>
+    <string name="profile_replylanguage_auto">Автоматически</string>
+    <string name="profile_replylanguage_footer">«Автоматически»\u00A0— ответ пишется на языке скопированного сообщения: на казахское сообщение придёт ответ на казахском, на каком бы языке ни работали телефон и приложение. Выбирайте язык, только если все ответы должны быть на нём. Просьба вроде «ответь по-русски» всегда важнее.</string>
+
+</resources>

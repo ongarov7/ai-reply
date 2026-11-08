@@ -12,6 +12,7 @@ import kz.yerek.aireply.data.account.ReplyResponseDto
 import kz.yerek.aireply.domain.model.BusinessContext
 import kz.yerek.aireply.domain.model.EmojiPolicy
 import kz.yerek.aireply.domain.model.GrammaticalGender
+import kz.yerek.aireply.domain.model.ReplyLanguagePreference
 import kz.yerek.aireply.domain.model.ReplyLength
 import kz.yerek.aireply.domain.model.ReplyTone
 import kz.yerek.aireply.domain.model.WorkingHours
@@ -59,7 +60,8 @@ class AccountReplyTransport(
         val templateBusiness: BusinessContext?,
         /**
          * The APP's language, used for logging and template naming only. The
-         * reply's language follows the incoming message, always.
+         * reply's language follows the incoming message unless the user set
+         * [replyLanguage].
          */
         val appLanguage: String,
         val business: WorkingHours.Context?,
@@ -69,6 +71,8 @@ class AccountReplyTransport(
         val profileRole: String = "",
         val profileTone: ReplyTone = ReplyTone.NATURAL,
         val profileBusiness: BusinessContext = BusinessContext.EMPTY,
+        /** Null answers in the language of the copied message. */
+        val replyLanguage: ReplyLanguagePreference? = null,
         /** Null until the user was asked. Only the enum value is ever sent. */
         val grammaticalGender: GrammaticalGender? = null,
         /** The keyboard layout's code (`kk`, `ru`, `en`) when Reply was tapped. */
@@ -132,6 +136,7 @@ class AccountReplyTransport(
         val role: String? = null,
         @SerialName("preferred_tone") val preferredTone: String? = null,
         val business: Business? = null,
+        @SerialName("reply_language") val replyLanguage: String? = null,
         @SerialName("grammatical_gender") val grammaticalGender: String? = null
     )
 
@@ -198,8 +203,9 @@ class AccountReplyTransport(
          * The wire format, exposed so tests can pin it without a server.
          *
          * Each optional field goes only to a server that announced it: the
-         * profile basics with [AIFeatures.replyPreferences], the gender and the
-         * layout language with [AIFeatures.senderProfile].
+         * profile basics and the reply language with
+         * [AIFeatures.replyPreferences], the gender and the layout language
+         * with [AIFeatures.senderProfile].
          */
         internal fun encode(context: RequestContext, features: AIFeatures): String =
             json.encodeToString(
@@ -236,17 +242,21 @@ class AccountReplyTransport(
             )
 
         /**
-         * Null when there is nothing to say: no text, the default tone and no
-         * gender. A gender on its own still sends the block.
+         * Null when there is nothing to say: no text, the default tone, no
+         * reply language and no gender. A language or a gender on its own still
+         * sends the block.
          */
         private fun profileBlock(context: RequestContext, features: AIFeatures): ProfileBlock? {
             val basics = features.replyPreferences
             val description = context.profileDescription.takeIf { basics && it.isNotEmpty() }
             val role = context.profileRole.takeIf { basics && it.isNotEmpty() }
             val business = if (basics) Business.of(context.profileBusiness) else null
+            val language = context.replyLanguage?.raw.takeIf { basics }
             val gender = context.grammaticalGender?.raw.takeIf { features.senderProfile }
             val customTone = basics && context.profileTone != ReplyTone.NATURAL
-            if (description == null && role == null && business == null && gender == null && !customTone) {
+            if (description == null && role == null && business == null && language == null &&
+                gender == null && !customTone
+            ) {
                 return null
             }
             return ProfileBlock(
@@ -254,6 +264,7 @@ class AccountReplyTransport(
                 role = role,
                 preferredTone = context.profileTone.raw.takeIf { basics },
                 business = business,
+                replyLanguage = language,
                 grammaticalGender = gender
             )
         }

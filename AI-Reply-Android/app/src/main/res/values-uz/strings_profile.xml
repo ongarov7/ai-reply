@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- The reply language in the profile -->
+    <string name="profile_replylanguage">Javob tili</string>
+    <string name="profile_replylanguage_auto">Avtomatik</string>
+    <string name="profile_replylanguage_footer">«Avtomatik»\u00A0— javob nusxalangan xabar tilida yoziladi: qozoqcha xabarga qozoqcha javob beriladi, telefon va ilova qaysi tilda boʻlishidan qatʼi nazar. Barcha javoblar bitta tilda boʻlishi kerak boʻlsa, oʻsha tilni tanlang. «Ruscha javob ber» kabi koʻrsatma doim ustun turadi.</string>
+
+    <!-- Dictation suggestions and the template hours editor -->
+    <string name="common_apply">Qoʻllash</string>
+    <string name="hours_from">Boshlanishi</string>
+    <string name="hours_to">Tugashi</string>
+    <string name="voice_suggestions_title">Nimani tushundik</string>
+    <string name="voice_suggestions_body">Nimani saqlashni tanlang. Aytganlaringizning hammasi baribir eslatmalaringizda qoladi.</string>
+    <string name="voice_suggestions_hours">Ish vaqti</string>
+    <string name="voice_suggestions_rules">Qoidalar</string>
+    <string name="voice_suggestions_rules_footer">Qoida boʻlishi kerak boʻlgan jumlalarni belgilang.</string>
+    <string name="voice_suggestions_skip">Oʻtkazib yuborish</string>
+
+</resources>

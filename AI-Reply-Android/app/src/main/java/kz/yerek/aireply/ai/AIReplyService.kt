@@ -49,7 +49,8 @@ class AIReplyService(
         /**
          * The APP's language, used only to name the selected template in the
          * prompt the way the user saw it on the chip. It is NOT the reply
-         * language: that follows the incoming message, always.
+         * language: that follows the incoming message unless the instruction
+         * or the profile's reply language says otherwise.
          */
         val uiLanguage: AppLanguage,
         /** What the user typed or dictated for this reply. May be blank. */
@@ -159,6 +160,7 @@ class AIReplyService(
                 profileRole = profile.role.trim(),
                 profileTone = profile.preferredTone,
                 profileBusiness = profile.business,
+                replyLanguage = profile.replyLanguage,
                 grammaticalGender = profile.grammaticalGender,
                 inputLanguage = request.inputLanguage?.code,
                 idempotencyKey = request.idempotencyKey ?: IdempotencyKey.create()

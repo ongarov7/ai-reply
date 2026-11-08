@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- The reply language in the profile -->
+    <string name="profile_replylanguage">Жауап тілі</string>
+    <string name="profile_replylanguage_auto">Автоматты түрде</string>
+    <string name="profile_replylanguage_footer">«Автоматты түрде»\u00A0— жауап көшірілген хабарламаның тілінде жазылады: қазақша хабарламаға қазақша жауап беріледі, телефон мен қолданба қай тілде болса да. Тілді барлық жауап сол тілде болуы керек болса ғана таңдаңыз. «Орысша жауап бер» сияқты нұсқау әрқашан басым болады.</string>
+
+</resources>
