@@ -381,6 +381,36 @@ class BillingTest {
         assertEquals("Play not reachable", BillingState.Phase.UNAVAILABLE, state.phase)
     }
 
+    @Test
+    fun `sales closing takes the plans already on screen away`() = runBlocking {
+        billing.load()
+        assertTrue(state.products.isNotEmpty())
+        val offer = state.packs.single()
+
+        api.catalogError = ApiError.PurchasesUnavailable
+        billing.load()
+
+        assertEquals(BillingState.Phase.OFF, state.phase)
+        assertTrue(state.products.isEmpty())
+        billing.buy(activity, offer)
+        assertTrue("nothing can be bought once sales are closed", store.launched.isEmpty())
+    }
+
+    @Test
+    fun `sales closing while a purchase is checked takes the plans away too`() = runBlocking {
+        billing.load()
+        val offer = state.packs.single()
+        api.answer = { throw ApiException(ApiError.PurchasesUnavailable, 403) }
+
+        store.reports(purchase("token-1"))
+
+        assertEquals(BillingState.Phase.OFF, state.phase)
+        assertTrue(state.products.isEmpty())
+        assertEquals("the purchase stays with Play", PurchaseNotice.RETRY_LATER, state.notice)
+        billing.buy(activity, offer)
+        assertTrue(store.launched.isEmpty())
+    }
+
     // ---------------------------------------------------------- purchase
 
     @Test

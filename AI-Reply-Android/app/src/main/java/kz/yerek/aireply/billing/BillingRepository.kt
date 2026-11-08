@@ -156,8 +156,11 @@ class BillingRepository(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (failure: ApiException) {
-            val closed = failure.error is ApiError.PurchasesUnavailable
-            _state.update { it.copy(phase = if (closed) BillingState.Phase.OFF else BillingState.Phase.UNAVAILABLE) }
+            if (failure.error is ApiError.PurchasesUnavailable) {
+                closeSales()
+            } else {
+                _state.update { it.copy(phase = BillingState.Phase.UNAVAILABLE) }
+            }
             return
         }
         accountToken = catalog.accountToken.ifBlank { null }
@@ -183,6 +186,12 @@ class BillingRepository(
         val offered = known.mapNotNull { product -> offered(product, byId[product.storeProductId]) }
         _state.update { it.copy(phase = BillingState.Phase.READY, products = offered) }
         reconcile()
+    }
+
+    /** The server closed sales: nothing stays on offer, however recently it was loaded. */
+    private fun closeSales() {
+        accountToken = null
+        _state.update { it.copy(phase = BillingState.Phase.OFF, products = emptyList()) }
     }
 
     /** What the server sells that this build understands: anything else is not offered. */
@@ -416,7 +425,7 @@ class BillingRepository(
                 }
                 // Sales closed on the server: hide them; the purchase stays with Play, unconsumed.
                 ApiError.PurchasesUnavailable -> {
-                    _state.update { it.copy(phase = BillingState.Phase.OFF) }
+                    closeSales()
                     PurchaseNotice.RETRY_LATER
                 }
                 else -> PurchaseNotice.RETRY_LATER
