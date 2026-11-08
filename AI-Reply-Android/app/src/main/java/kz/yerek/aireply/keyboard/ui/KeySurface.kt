@@ -301,7 +301,7 @@ private fun DrawScope.drawPage(
             Face.ENGAGED -> theme.engagedKeyGlyph
             Face.PROMINENT -> Color.White
             Face.DISABLED -> theme.secondaryText
-        }.copy(alpha = labelAlpha)
+        }.let { it.copy(alpha = it.alpha * labelAlpha) }
 
         val frame = key.frame
         val topLeft = Offset(frame.left * dp, frame.top * dp)
