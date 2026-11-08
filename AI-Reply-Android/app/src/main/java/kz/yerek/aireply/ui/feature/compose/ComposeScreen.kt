@@ -2,11 +2,11 @@ package kz.yerek.aireply.ui.feature.compose
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -21,13 +21,13 @@ import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.ContentPaste
 import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.outlined.Mic
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -43,13 +43,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -78,7 +82,6 @@ import kz.yerek.aireply.ui.common.RecipientOption
 import kz.yerek.aireply.ui.common.RelationshipIcons
 import kz.yerek.aireply.ui.common.RowGroup
 import kz.yerek.aireply.ui.design.AppCard
-import kz.yerek.aireply.ui.design.AppSection
 import kz.yerek.aireply.ui.design.Layout
 import kz.yerek.aireply.ui.design.LocalExtraColors
 import kz.yerek.aireply.ui.design.PrimaryButton
@@ -274,56 +277,71 @@ fun ComposeScreen(onBack: () -> Unit, onOpen: (String) -> Unit = {}) {
     ) {
         ReadableColumn {
 
-            AppSection(stringResource(R.string.compose_message)) {
-                AppCard {
-                    OutlinedTextField(
-                        value = message,
-                        onValueChange = {
-                            message = it
-                            pasteNotice = null
-                        },
-                        placeholder = { Text(stringResource(R.string.compose_message_placeholder)) },
-                        isError = overLimit,
-                        minLines = 4,
-                        supportingText = {
-                            Text(
-                                stringResource(R.string.compose_counter, count, AIConfiguration.maxMessageCharacters),
-                                modifier = Modifier.fillMaxWidth(),
-                                textAlign = TextAlign.End
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                ComposeSection(stringResource(R.string.compose_message)) {
+                    AppCard {
+                        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s)) {
+                            OutlinedTextField(
+                                value = message,
+                                onValueChange = {
+                                    message = it
+                                    pasteNotice = null
+                                },
+                                placeholder = { Text(stringResource(R.string.compose_message_placeholder)) },
+                                isError = overLimit,
+                                minLines = 4,
+                                modifier = Modifier.fillMaxWidth()
                             )
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        MessageAction(Icons.Outlined.ContentPaste, stringResource(R.string.compose_paste), ::paste)
-                        MessageAction(Icons.Outlined.Mic, stringResource(R.string.compose_dictate)) {
-                            dictatingMessage = true
-                        }
-                        MessageAction(Icons.Outlined.Lightbulb, stringResource(R.string.compose_example)) {
-                            message = context.getString(R.string.compose_example_message)
-                            pasteNotice = null
+                            // On one line when they fit; else the counter, and the buttons under it.
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    stringResource(R.string.compose_counter, count, AIConfiguration.maxMessageCharacters),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (overLimit) {
+                                        MaterialTheme.colorScheme.error
+                                    } else {
+                                        LocalExtraColors.current.textSecondary
+                                    },
+                                    modifier = Modifier.weight(1f).align(Alignment.CenterVertically)
+                                )
+                                FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                                    MessageAction(Icons.Outlined.ContentPaste, stringResource(R.string.compose_paste), ::paste)
+                                    MessageAction(Icons.Outlined.Mic, stringResource(R.string.compose_dictate)) {
+                                        dictatingMessage = true
+                                    }
+                                }
+                            }
+                            pasteNotice?.let { notice -> PasteNoticeLine(notice) { onOpen(Routes.PasteHelp) } }
+                            if (overLimit) {
+                                // The exact wording the keyboard shows, so the rule
+                                // reads the same wherever the user meets it.
+                                Text(
+                                    stringResource(
+                                        R.string.kb_err_message_too_long,
+                                        AIConfiguration.maxMessageCharacters
+                                    ),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
                         }
                     }
-                    pasteNotice?.let { notice -> PasteNoticeLine(notice) { onOpen(Routes.PasteHelp) } }
-                    if (overLimit) {
-                        // The exact wording the keyboard shows, so the rule
-                        // reads the same wherever the user meets it.
-                        Text(
-                            stringResource(
-                                R.string.kb_err_message_too_long,
-                                AIConfiguration.maxMessageCharacters
-                            ),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
+                }
+                TextButton(
+                    onClick = {
+                        message = context.getString(R.string.compose_example_message)
+                        pasteNotice = null
+                    },
+                    contentPadding = PaddingValues(horizontal = 0.dp)
+                ) {
+                    Text(stringResource(R.string.compose_example))
                 }
             }
 
-            AppSection(stringResource(R.string.compose_template)) {
+            ComposeSection(stringResource(R.string.compose_template)) {
                 val (builtIns, custom) = recipientGroups(configuration.visibleTemplates)
                 RecipientGrid(
                     options = builtIns.map { template ->
@@ -350,7 +368,7 @@ fun ComposeScreen(onBack: () -> Unit, onOpen: (String) -> Unit = {}) {
                 }
             }
 
-            AppSection(stringResource(R.string.compose_instruction)) {
+            ComposeSection(stringResource(R.string.compose_instruction)) {
                 AppCard {
                     OutlinedTextField(
                         value = instruction,
@@ -383,61 +401,22 @@ fun ComposeScreen(onBack: () -> Unit, onOpen: (String) -> Unit = {}) {
             }
 
             if (reply.isNotEmpty()) {
-                AppSection(stringResource(R.string.compose_result)) {
-                    AppCard {
+                AppCard {
+                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s)) {
+                        Text(
+                            stringResource(R.string.compose_result),
+                            style = MaterialTheme.typography.titleLarge,
+                            modifier = Modifier.semantics { heading() }
+                        )
                         Text(reply, style = MaterialTheme.typography.bodyLarge)
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            TextButton(onClick = {
-                                copied = AppClipboard.copy(context, reply)
-                            }) {
-                                Icon(
-                                    if (copied) Icons.Filled.Check else Icons.Outlined.ContentCopy,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Text(
-                                    stringResource(
-                                        if (copied) R.string.compose_copied else R.string.common_copy
-                                    ),
-                                    modifier = Modifier.padding(start = Spacing.xxs)
-                                )
-                            }
-                            Spacer(Modifier.weight(1f))
-                            TextButton(onClick = { generate() }, enabled = !generating) {
-                                Icon(
-                                    Icons.Filled.Refresh,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Text(
-                                    stringResource(R.string.compose_regenerate),
-                                    modifier = Modifier.padding(start = Spacing.xxs)
-                                )
-                            }
-                        }
-                        // Quiet and on its own line: Copy and Regenerate keep their places.
-                        if (canReport) {
-                            TextButton(
-                                onClick = { reports.open(AIReportMode.REPLY, reply) },
-                                enabled = !generating,
-                                colors = ButtonDefaults.textButtonColors(
-                                    contentColor = LocalExtraColors.current.textSecondary
-                                )
-                            ) {
-                                Icon(
-                                    Icons.Outlined.Flag,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Text(
-                                    stringResource(R.string.report_action),
-                                    modifier = Modifier.padding(start = Spacing.xxs)
-                                )
-                            }
-                        }
+                        ReplyActions(
+                            copied = copied,
+                            generating = generating,
+                            canReport = canReport,
+                            onCopy = { copied = AppClipboard.copy(context, reply) },
+                            onRegenerate = { generate() },
+                            onReport = { reports.open(AIReportMode.REPLY, reply) }
+                        )
                     }
                 }
             }
@@ -514,16 +493,96 @@ private fun CustomRecipientRow(label: String, selected: Boolean, onSelect: () ->
     }
 }
 
-/** Paste, Dictate, Try an example: chips under the message. */
+/** A part of the form under its bold title, a real heading for screen readers. */
+@Composable
+private fun ComposeSection(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s)) {
+        Text(
+            title,
+            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+            modifier = Modifier.semantics { heading() }
+        )
+        content()
+    }
+}
+
+/** Paste and Dictate, beside the counter. */
 @Composable
 private fun MessageAction(icon: ImageVector, label: String, onClick: () -> Unit) {
-    AssistChip(
-        onClick = onClick,
-        label = { Text(label) },
-        leadingIcon = { Icon(icon, contentDescription = null, modifier = Modifier.size(AssistChipDefaults.IconSize)) },
-        colors = AssistChipDefaults.assistChipColors(leadingIconContentColor = MaterialTheme.colorScheme.primary)
-    )
+    OutlinedButton(onClick = onClick, contentPadding = CompactButtonPadding) {
+        Icon(icon, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
+        Text(label, modifier = Modifier.padding(start = Spacing.xxs))
+    }
 }
+
+/**
+ * Copy, Regenerate and, on a server that takes reports, the flag, in one row.
+ * Regenerate breaks at its own space rather than squeezing Copy, and goes under
+ * Copy on a phone too narrow for both; the flag stays at the end either way.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ReplyActions(
+    copied: Boolean,
+    generating: Boolean,
+    canReport: Boolean,
+    onCopy: () -> Unit,
+    onRegenerate: () -> Unit,
+    onReport: () -> Unit
+) {
+    val regenerateWidth = with(LocalDensity.current) { RegenerateMaxWidth.toDp() }
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+        FlowRow(modifier = Modifier.weight(1f)) {
+            OutlinedButton(
+                onClick = onCopy,
+                contentPadding = CompactButtonPadding,
+                modifier = Modifier.align(Alignment.CenterVertically)
+            ) {
+                Icon(
+                    if (copied) Icons.Filled.Check else Icons.Outlined.ContentCopy,
+                    contentDescription = null,
+                    modifier = Modifier.size(ButtonDefaults.IconSize)
+                )
+                Text(
+                    stringResource(if (copied) R.string.compose_copied else R.string.common_copy),
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(start = Spacing.xxs)
+                )
+            }
+            TextButton(
+                onClick = onRegenerate,
+                enabled = !generating,
+                contentPadding = PaddingValues(horizontal = Spacing.xs, vertical = Spacing.xxs),
+                modifier = Modifier.widthIn(max = regenerateWidth).align(Alignment.CenterVertically)
+            ) {
+                Icon(
+                    Icons.Filled.Refresh,
+                    contentDescription = null,
+                    modifier = Modifier.size(ButtonDefaults.IconSize)
+                )
+                Text(
+                    stringResource(R.string.compose_regenerate),
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(start = Spacing.xxs)
+                )
+            }
+        }
+        if (canReport) {
+            IconButton(
+                onClick = onReport,
+                enabled = !generating,
+                colors = IconButtonDefaults.iconButtonColors(contentColor = LocalExtraColors.current.textSecondary)
+            ) {
+                Icon(Icons.Outlined.Flag, contentDescription = stringResource(R.string.report_action))
+            }
+        }
+    }
+}
+
+private val CompactButtonPadding = PaddingValues(horizontal = Spacing.s, vertical = Spacing.xs)
+
+/** Wide enough for the longest word of the label at any text size, narrow enough to sit beside Copy. */
+private val RegenerateMaxWidth = 136.sp
 
 /** Why Paste brought nothing - informational, never an error colour - and where to read more. */
 @Composable
