@@ -73,38 +73,71 @@ class AppLinksTest {
     // ------------------------------------------------------------- https://
 
     @Test
-    fun `pages on ai-reply kz open in the browser`() {
-        assertEquals(AppLink.Web("https://ai-reply.kz/pricing"), AppLinks.parse("https://ai-reply.kz/pricing"))
-        assertEquals(AppLink.Web("https://ai-reply.kz"), AppLinks.parse("https://ai-reply.kz"))
-        assertEquals(
-            AppLink.Web("https://help.ai-reply.kz/a/b?lang=kk#faq"),
-            AppLinks.parse("https://help.ai-reply.kz/a/b?lang=kk#faq")
-        )
+    fun `the information pages on ai-reply kz open in the browser`() {
+        listOf(
+            "/app", "/offer", "/terms", "/privacy", "/support", "/account/delete",
+            "/sandbox/app", "/sandbox/offer", "/sandbox/terms", "/sandbox/privacy", "/sandbox/support",
+            "/sandbox/account/delete"
+        ).forEach { path ->
+            assertEquals(path, AppLink.Web("https://ai-reply.kz$path"), AppLinks.parse("https://ai-reply.kz$path"))
+        }
+        listOf("ru", "kk", "en", "uz").forEach { language ->
+            assertEquals(
+                AppLink.Web("https://ai-reply.kz/sandbox/app?lang=$language"),
+                AppLinks.parse("https://ai-reply.kz/sandbox/app?lang=$language")
+            )
+        }
         assertEquals(
             "scheme and host are normalized: Android matches schemes case-sensitively",
-            AppLink.Web("https://ai-reply.kz/Offer"),
-            AppLinks.parse("HTTPS://AI-REPLY.KZ/Offer")
+            AppLink.Web("https://ai-reply.kz/offer"),
+            AppLinks.parse("HTTPS://AI-REPLY.KZ/offer")
         )
+    }
+
+    @Test
+    fun `a page that is not listed, a subdomain or another argument is never opened`() {
+        listOf(
+            "https://ai-reply.kz",
+            "https://ai-reply.kz/",
+            "https://ai-reply.kz/account",
+            "https://ai-reply.kz/pricing",
+            "https://ai-reply.kz/payment",
+            "https://ai-reply.kz/sandbox/payment",
+            "https://ai-reply.kz/checkout",
+            "https://ai-reply.kz/Offer",
+            "https://ai-reply.kz/offer/",
+            "https://ai-reply.kz/%61pp",
+            "https://help.ai-reply.kz/app",
+            "https://www.ai-reply.kz/app",
+            "https://ai-reply.kz/app?",
+            "https://ai-reply.kz/app?lang=de",
+            "https://ai-reply.kz/app?lang=kk&redirect=/payment",
+            "https://ai-reply.kz/app?redirect=/payment",
+            "https://ai-reply.kz/app#faq",
+            "https://ai-reply.kz/app?lang=kk#handoff=abc"
+        ).forEach { link ->
+            assertEquals(link, AppLink.None, AppLinks.parse(link))
+        }
     }
 
     @Test
     fun `anything else is never opened`() {
         listOf(
             null, "", "   ",
-            "http://ai-reply.kz/pricing",
-            "https://ai-reply.kz.evil.com/",
-            "https://evilai-reply.kz/",
-            "https://ai-reply.kz@evil.com/",
-            "https://user@ai-reply.kz/",
-            "https://ai-reply.kz:8443/",
-            "https://ai-reply.kz\\@evil.com/",
+            "http://ai-reply.kz/offer",
+            "https://ai-reply.kz.evil.com/offer",
+            "https://evilai-reply.kz/offer",
+            "https://ai-reply.kz@evil.com/offer",
+            "https://user@ai-reply.kz/offer",
+            "https://ai-reply.kz:8443/offer",
+            "https://ai-reply.kz\\@evil.com/offer",
             "https://ai-reply.kz/a b",
             "javascript:alert(1)",
             "intent://settings#Intent;scheme=aireply;end",
             "file:///data/data/kz.yerek.aireply/",
             "content://kz.yerek.aireply/",
             "market://details?id=kz.yerek.aireply",
-            "https://" + "a".repeat(600) + ".ai-reply.kz/"
+            "https://ai-reply.kz/" + "a".repeat(600)
         ).forEach { link ->
             assertEquals(link.toString(), AppLink.None, AppLinks.parse(link))
         }

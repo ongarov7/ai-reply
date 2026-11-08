@@ -16,7 +16,7 @@ enum class AppScreen(val key: String) {
     /** Older links for the keyboard setup: now the permissions section, like [PERMISSIONS]. */
     KEYBOARD("keyboard"),
     COMPOSE("compose"),
-    /** The onboarding again: the real run for someone who left it with «Позже», else the tutorial. */
+    /** The tutorial again, over Home. */
     ONBOARDING("onboarding"),
     /** «Настройка клавиатуры и разрешений». */
     PERMISSIONS("permissions"),
@@ -37,7 +37,7 @@ sealed interface AppLink {
     /** A screen of this app. */
     data class Screen(val screen: AppScreen) : AppLink
 
-    /** A page on ai-reply.kz, opened in the browser. [url] is normalized https. */
+    /** An information page on ai-reply.kz, opened in the browser. [url] is normalized https. */
     data class Web(val url: String) : AppLink
 
     /** No link, or one the app will not follow: the app just opens. */
@@ -52,16 +52,26 @@ sealed interface AppLink {
  *
  * - `aireply://<screen>` — one of [AppScreen]; an unknown screen, or anything
  *   more than the bare screen name (a path, a query, a port), opens Home.
- * - `https://ai-reply.kz/…` or a subdomain — no user info, no port — opens in
- *   the browser.
- * - Anything else — http, other hosts, intent: or javascript: URLs — is never
- *   opened; the app simply comes to the front.
+ * - `https://ai-reply.kz` and one of its information pages, at most with
+ *   `?lang=` — no subdomain, user info, port or fragment — opens in the browser.
+ * - Anything else — http, other hosts or pages, intent: or javascript: URLs — is
+ *   never opened; the app simply comes to the front.
  */
 object AppLinks {
 
     const val SCHEME = "aireply"
     const val WEB_HOST = "ai-reply.kz"
     private const val MAX_LENGTH = 512
+
+    /** Information only: a notification can never lead to a payment page or a redirect. */
+    private val INFORMATION_PATHS = setOf(
+        "/app", "/offer", "/terms", "/privacy", "/support", "/account/delete",
+        "/sandbox/app", "/sandbox/offer", "/sandbox/terms", "/sandbox/privacy", "/sandbox/support",
+        "/sandbox/account/delete"
+    )
+
+    /** The language is the only argument a page may carry. */
+    private val LANGUAGE_QUERIES = setOf("lang=ru", "lang=kk", "lang=en", "lang=uz")
 
     fun parse(raw: String?): AppLink {
         val value = raw?.trim().orEmpty()
@@ -92,15 +102,15 @@ object AppLinks {
     private fun web(uri: URI): AppLink {
         if (uri.isOpaque) return AppLink.None
         val host = uri.host?.lowercase(Locale.ROOT) ?: return AppLink.None
-        if (uri.rawUserInfo != null || uri.port != -1) return AppLink.None
-        if (host != WEB_HOST && !host.endsWith(".$WEB_HOST")) return AppLink.None
+        if (uri.rawUserInfo != null || uri.port != -1 || uri.rawFragment != null) return AppLink.None
+        if (host != WEB_HOST || uri.rawPath !in INFORMATION_PATHS) return AppLink.None
+        val query = uri.rawQuery
+        if (query != null && query !in LANGUAGE_QUERIES) return AppLink.None
         // Rebuilt with a lower-case scheme and host: Android matches intent
         // filters on the scheme case-sensitively.
         val url = buildString {
-            append("https://").append(host)
-            append(uri.rawPath.orEmpty())
-            uri.rawQuery?.let { append('?').append(it) }
-            uri.rawFragment?.let { append('#').append(it) }
+            append("https://").append(host).append(uri.rawPath)
+            query?.let { append('?').append(it) }
         }
         return AppLink.Web(url)
     }
