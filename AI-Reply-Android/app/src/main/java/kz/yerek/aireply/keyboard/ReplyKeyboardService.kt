@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.captionBar
+import androidx.compose.foundation.layout.union
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -516,7 +518,8 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         val windowHeight = remember(configuration.orientation, configuration.screenWidthDp, configuration.screenHeightDp, density) {
             windowHeightDp()
         }
-        val navigationBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding().value
+        // What KeyboardRoot keeps free below the keys, so the panels plan with the same number.
+        val navigationBar = WindowInsets.navigationBars.union(WindowInsets.captionBar).asPaddingValues().calculateBottomPadding().value
         val sizing = KeyboardSizing(width, KeyboardSizing.isLandscape(width, screenHeight), density)
         // ONE height for every page of every enabled layout.
         val areaHeight = sizing.keyAreaHeight(KeyboardLayout.maximumRowCount(enabledLanguages), screenHeight)
