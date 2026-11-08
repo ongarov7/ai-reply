@@ -44,13 +44,19 @@ class NotificationPreferencesRepository(
         fun isOn(category: String): Boolean =
             pending[category] ?: server?.get(category) ?: (category !in OFF_BY_DEFAULT)
 
-        /** Security, and anything the server does not list as optional, cannot be switched off. */
-        fun isLocked(category: String): Boolean = category !in optional
+        /**
+         * Security, and anything the server does not list as optional, cannot
+         * be switched off. Until it has answered only security is sure to be.
+         */
+        fun isLocked(category: String): Boolean = if (isLoaded) category !in optional else category == SECURITY
     }
 
     companion object {
+        const val MARKETING = "marketing"
+        private const val SECURITY = "security"
+
         /** Marketing is opt-in: never on before the user switched it on. */
-        val OFF_BY_DEFAULT = setOf("marketing")
+        val OFF_BY_DEFAULT = setOf(MARKETING)
     }
 
     private val _state = MutableStateFlow(State())

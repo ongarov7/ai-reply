@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Strings ported from the iOS catalogue, with its translations. -->
+    <string name="push_card_title">Xabardor boʻling</string>
+    <string name="push_card_body">Bugungi javoblar tugab borayotganda yoki tarif tugashiga oz qolganda sizga bildiramiz. Nimalarni olishni sozlamalarda tanlaysiz.</string>
+    <string name="push_card_offers">Javob paketlari haqida takliflar olish</string>
+    <string name="push_card_offers_optional">Ixtiyoriy. Buni bildirishnoma sozlamalarida o‘zgartirish mumkin.</string>
+    <string name="push_card_save_failed">Saqlab boʻlmadi. Aloqani tekshirib, qayta urinib koʻring.</string>
+</resources>

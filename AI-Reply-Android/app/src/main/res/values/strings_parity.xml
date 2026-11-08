@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Strings ported from the iOS catalogue, with its translations. -->
+    <string name="push_card_title">Stay up to date</string>
+    <string name="push_card_body">We\'ll let you know when today\'s replies are running out or your plan is about to end. Choose what to receive in Settings.</string>
+    <string name="push_card_offers">Receive offers for reply packs</string>
+    <string name="push_card_offers_optional">Optional. You can change this in notification settings.</string>
+    <string name="push_card_save_failed">Couldn\'t save. Check your connection and try again.</string>
+</resources>

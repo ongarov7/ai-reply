@@ -47,16 +47,21 @@ data class PushUiState(
     /** Push can work end to end: this build has Firebase and the server can send. */
     val isAvailable: Boolean get() = debugForced || (supportedInBuild && serverDelivers)
 
+    /** The server has notification categories, which the Home card's offers switch is one of. */
+    val hasCategories: Boolean get() = serverHasInstallations || debugForced
+
     /**
      * The Home card: never at first launch, only after sign-in (Home comes
-     * after it), only where the system dialog can still be shown, never while
-     * the in-app switch is off, and never again after "Not now" or a denial.
+     * after it), never while the in-app switch is off, and never again once
+     * this account has answered it. It asks where the system dialog can still
+     * be shown, and also where notifications are allowed but [offersOn] is
+     * off: the permission may have been given for another account on this
+     * phone, and says nothing about offers.
      */
-    val showsPrompt: Boolean
-        get() = debugForced || (
-            supportedInBuild && serverDelivers && runtimePermission && !granted &&
-                !permanentlyDenied && !promptDismissed && notificationsEnabled
-            )
+    fun showsPrompt(offersOn: Boolean): Boolean = debugForced || (
+        supportedInBuild && serverDelivers && notificationsEnabled && !promptDismissed &&
+            (canAskSystem || (canPost && hasCategories && !offersOn))
+        )
 
     /** The system dialog can still be shown; otherwise only system settings can help. */
     val canAskSystem: Boolean get() = runtimePermission && !granted && !permanentlyDenied
@@ -200,7 +205,7 @@ class PushCoordinator(
             canPost = NotificationPermission.canPost(appContext),
             permission = NotificationPermission.status(appContext, store),
             permanentlyDenied = store.permissionPermanentlyDenied,
-            promptDismissed = store.promptDismissed,
+            promptDismissed = store.isPromptDismissed(store.accountUserId),
             notificationsEnabled = settings.notificationsEnabled,
             debugForced = BuildConfig.DEBUG && settings.debugForcePushPrompt
         )
@@ -330,7 +335,7 @@ class PushCoordinator(
      * `shouldShowRequestPermissionRationale` just before the request and
      * right after it (see [NotificationPermission.isPermanentDenial]: a
      * dismissed dialog is not a permanent denial). [fromPrompt]: it was the
-     * Home card, which then stays hidden either way.
+     * Home card, answered whichever way this went.
      */
     fun onPermissionResult(granted: Boolean, rationaleBefore: Boolean, rationaleAfter: Boolean, fromPrompt: Boolean) {
         if (granted) {
@@ -344,15 +349,15 @@ class PushCoordinator(
             )
             if (permanent) store.permissionPermanentlyDenied = true
             if (rationaleAfter) store.permissionDeniedOnce = true
-            if (fromPrompt) store.promptDismissed = true
         }
+        if (fromPrompt) store.setPromptDismissed(store.accountUserId, true)
         refreshUi()
         registrar.requestSync()
     }
 
-    /** "Not now" on the Home card. */
+    /** "Not now" or "Done" on the Home card. */
     fun dismissPrompt() {
-        store.promptDismissed = true
+        store.setPromptDismissed(store.accountUserId, true)
         refreshUi()
     }
 
@@ -368,7 +373,7 @@ class PushCoordinator(
     fun setDebugForcePrompt(enabled: Boolean) {
         if (!BuildConfig.DEBUG) return
         settings.debugForcePushPrompt = enabled
-        if (enabled) store.promptDismissed = false
+        if (enabled) store.setPromptDismissed(store.accountUserId, false)
         refreshUi()
     }
 
@@ -391,12 +396,14 @@ class PushCoordinator(
     override fun onSignedIn(userId: String) {
         store.accountUserId = userId
         preferences.clear()
+        refreshUi()
         registrar.requestSync()
     }
 
     override fun onAccountLoaded(userId: String) {
         if (store.accountUserId == userId) return
         store.accountUserId = userId
+        refreshUi()
         registrar.requestSync()
     }
 
@@ -408,6 +415,7 @@ class PushCoordinator(
     override fun onSignedOut(userInitiated: Boolean) {
         store.accountUserId = null
         preferences.clear()
+        refreshUi()
         registrar.requestSync()
     }
 

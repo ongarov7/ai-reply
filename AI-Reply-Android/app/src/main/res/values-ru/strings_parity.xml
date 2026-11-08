@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Strings ported from the iOS catalogue, with its translations. -->
+    <string name="push_card_title">Будьте в курсе</string>
+    <string name="push_card_body">Сообщим, когда ответы на сегодня заканчиваются или тариф подходит к концу. Что получать, можно выбрать в настройках.</string>
+    <string name="push_card_offers">Получать предложения о пакетах ответов</string>
+    <string name="push_card_offers_optional">Необязательно. Выбор можно изменить в настройках уведомлений.</string>
+    <string name="push_card_save_failed">Не удалось сохранить. Проверьте соединение и попробуйте ещё раз.</string>
+</resources>

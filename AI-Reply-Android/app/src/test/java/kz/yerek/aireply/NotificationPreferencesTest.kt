@@ -16,6 +16,7 @@ import kz.yerek.aireply.push.NotificationPermission
 import kz.yerek.aireply.push.NotificationPreferencesApi
 import kz.yerek.aireply.push.NotificationPreferencesDto
 import kz.yerek.aireply.push.NotificationPreferencesRepository
+import kz.yerek.aireply.push.PushStateStore
 import kz.yerek.aireply.push.PushUiState
 import kz.yerek.aireply.support.FakeResponse
 import kz.yerek.aireply.support.FakeServer
@@ -176,20 +177,64 @@ class NotificationPreferencesTest {
         granted = false
     )
 
+    private val allowed = eligible.copy(granted = true, canPost = true)
+
     @Test
-    fun `the card appears only where the system can still ask`() {
-        assertTrue(eligible.showsPrompt)
-        assertFalse("no Firebase in this build", eligible.copy(supportedInBuild = false).showsPrompt)
-        assertFalse("the server cannot deliver", eligible.copy(serverDelivers = false).showsPrompt)
-        assertFalse("before Android 13 there is nothing to ask", eligible.copy(runtimePermission = false).showsPrompt)
-        assertFalse("already allowed", eligible.copy(granted = true).showsPrompt)
-        assertFalse("denied for good", eligible.copy(permanentlyDenied = true).showsPrompt)
-        assertFalse("Not now", eligible.copy(promptDismissed = true).showsPrompt)
-        assertFalse("switched off in the app", eligible.copy(notificationsEnabled = false).showsPrompt)
+    fun `the card asks where the system still can`() {
+        assertTrue(eligible.showsPrompt(offersOn = false))
+        assertTrue("offers already on: the permission is still worth asking", eligible.showsPrompt(offersOn = true))
+        assertFalse("no Firebase in this build", eligible.copy(supportedInBuild = false).showsPrompt(false))
+        assertFalse("the server cannot deliver", eligible.copy(serverDelivers = false).showsPrompt(false))
+        assertFalse("denied for good", eligible.copy(permanentlyDenied = true).showsPrompt(false))
+        assertFalse("answered", eligible.copy(promptDismissed = true).showsPrompt(false))
+        assertFalse("switched off in the app", eligible.copy(notificationsEnabled = false).showsPrompt(false))
         assertTrue(
             "debug builds can force it",
-            eligible.copy(supportedInBuild = false, promptDismissed = true, debugForced = true).showsPrompt
+            eligible.copy(supportedInBuild = false, promptDismissed = true, debugForced = true).showsPrompt(false)
         )
+    }
+
+    @Test
+    fun `allowed notifications still leave the choice about offers to the account`() {
+        assertTrue("granted for an earlier account", allowed.showsPrompt(offersOn = false))
+        assertFalse("nothing left to choose", allowed.showsPrompt(offersOn = true))
+        assertFalse("answered", allowed.copy(promptDismissed = true).showsPrompt(false))
+        assertFalse("no categories on this server", allowed.copy(serverHasInstallations = false).showsPrompt(false))
+        assertTrue(
+            "before Android 13 only the choice is left",
+            allowed.copy(runtimePermission = false).showsPrompt(false)
+        )
+        assertFalse(
+            "granted, but switched off in system settings: nothing would arrive",
+            eligible.copy(granted = true, canPost = false).showsPrompt(false)
+        )
+    }
+
+    @Test
+    fun `the card is answered per account`() {
+        val store = PushStateStore(InMemoryPreferences())
+        assertFalse(store.isPromptDismissed("first"))
+
+        store.setPromptDismissed("first", true)
+        assertTrue(store.isPromptDismissed("first"))
+        assertFalse("another account has not answered it", store.isPromptDismissed("second"))
+        assertFalse("nor has an unknown one", store.isPromptDismissed(null))
+
+        store.setPromptDismissed(null, true)
+        assertTrue(store.isPromptDismissed(null))
+        assertFalse(store.isPromptDismissed("third"))
+    }
+
+    @Test
+    fun `offers can be chosen before the categories have loaded`() = runBlocking {
+        val api = FakePreferencesApi().apply { server = server + ("marketing" to false) }
+        val repository = NotificationPreferencesRepository(api)
+
+        assertFalse(repository.state.value.isLocked("marketing"))
+        assertTrue(repository.state.value.isLocked("security"))
+        assertTrue(repository.set("marketing", true))
+        assertTrue(repository.state.value.isOn("marketing"))
+        assertEquals(listOf(mapOf("marketing" to true)), api.updates)
     }
 
     @Test
@@ -221,5 +266,7 @@ class NotificationPreferencesTest {
         assertFalse(eligible.copy(runtimePermission = false).canAskSystem)
         assertFalse(PushUiState().isAvailable)
         assertTrue(eligible.isAvailable)
+        assertTrue(eligible.hasCategories)
+        assertFalse(PushUiState().hasCategories)
     }
 }

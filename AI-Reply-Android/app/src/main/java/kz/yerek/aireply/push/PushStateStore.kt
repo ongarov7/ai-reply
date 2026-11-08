@@ -120,10 +120,18 @@ class PushStateStore internal constructor(private val prefs: SharedPreferences) 
         get() = prefs.getBoolean(KEY_PERMISSION_BLOCKED, false)
         set(value) = prefs.edit().putBoolean(KEY_PERMISSION_BLOCKED, value).apply()
 
-    /** "Not now" on the Home card, or a denial from it: the card stays hidden. */
-    var promptDismissed: Boolean
-        get() = prefs.getBoolean(KEY_PROMPT_DISMISSED, false)
-        set(value) = prefs.edit().putBoolean(KEY_PROMPT_DISMISSED, value).apply()
+    /**
+     * The Home card was answered: it stays hidden. Kept per account, so another
+     * account on this phone still gets its own choice about offers.
+     */
+    fun isPromptDismissed(userId: String?): Boolean = prefs.getBoolean(promptKey(userId), false)
+
+    fun setPromptDismissed(userId: String?, dismissed: Boolean) {
+        prefs.edit().putBoolean(promptKey(userId), dismissed).apply()
+    }
+
+    private fun promptKey(userId: String?): String =
+        if (userId == null) KEY_PROMPT_DISMISSED else "$KEY_PROMPT_DISMISSED.$userId"
 
     private fun putString(key: String, value: String?) {
         prefs.edit().apply {
