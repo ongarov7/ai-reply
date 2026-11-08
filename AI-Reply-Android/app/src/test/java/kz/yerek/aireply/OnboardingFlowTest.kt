@@ -12,6 +12,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 /**
  * Which onboarding steps a run shows, where it resumes, and who sees it again.
@@ -180,10 +181,19 @@ class OnboardingFlowTest {
     }
 
     @Test
-    fun `opened again it is the tutorial once finished, the real run after later`() {
-        assertEquals(OnboardingMode.TUTORIAL, OnboardingFlow.reopenMode(OnboardingStatus.COMPLETED))
-        assertEquals(OnboardingMode.FIRST_RUN, OnboardingFlow.reopenMode(OnboardingStatus.SKIPPED))
-        assertEquals(OnboardingMode.FIRST_RUN, OnboardingFlow.reopenMode(OnboardingStatus.IN_PROGRESS))
+    fun `opened again it is always the tutorial`() {
+        val route = File("src/main/java/kz/yerek/aireply/ui/navigation/AppNavHost.kt").readText()
+            .substringAfter("composable(Routes.Tutorial)")
+            .substringBefore("composable(Routes.Home)")
+        assertTrue(route, "OnboardingMode.TUTORIAL" in route)
+        assertFalse(route, "FIRST_RUN" in route)
+    }
+
+    @Test
+    fun `going through the tutorial counts only for a guide once skipped`() {
+        assertTrue(OnboardingFlow.tutorialCompletes(OnboardingStatus.SKIPPED, skipped = false))
+        assertFalse("closed or skipped: nothing changes", OnboardingFlow.tutorialCompletes(OnboardingStatus.SKIPPED, skipped = true))
+        assertFalse("already done", OnboardingFlow.tutorialCompletes(OnboardingStatus.COMPLETED, skipped = false))
     }
 
     // ------------------------------------------------------- device storage

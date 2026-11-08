@@ -48,7 +48,7 @@ enum class OnboardingMode {
     /** Shown once per device after sign-in; finishing it is recorded. */
     FIRST_RUN,
 
-    /** "How to use AI Reply" from Settings after it was finished: no gender step, nothing recorded. */
+    /** "How to use AI Reply" from Settings or a link: no gender step, and closing it changes nothing. */
     TUTORIAL
 }
 
@@ -170,12 +170,11 @@ data class OnboardingFlow(
         }
 
         /**
-         * Opened again - from Settings or `aireply://onboarding`: someone who
-         * finished it sees the tutorial, which records nothing; someone who
-         * left it with «Позже» gets the real run, so finishing it now counts.
+         * Whether reaching the end of the tutorial is worth recording: a guide
+         * once left with «Позже» counts as done when it was gone through.
          */
-        fun reopenMode(status: OnboardingStatus): OnboardingMode =
-            if (status == OnboardingStatus.COMPLETED) OnboardingMode.TUTORIAL else OnboardingMode.FIRST_RUN
+        fun tutorialCompletes(status: OnboardingStatus, skipped: Boolean): Boolean =
+            !skipped && status == OnboardingStatus.SKIPPED
 
         /**
          * Whether a run shows the gender step. A first run asks when the

@@ -19,6 +19,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -70,13 +71,11 @@ import kz.yerek.aireply.ui.feature.setup.openKeyboardSettings
  * path, so a run that was closed halfway comes back there; finishing it
  * records the version on this device and never touches the replies balance.
  * Which steps exist and in what order is [OnboardingFlow]'s decision. No
- * step moves by itself: the user turns every page.
- *
- * @param reopened opened from Settings or a link rather than at first launch,
- *   for the `trigger` of `onboarding_started`.
+ * step moves by itself: the user turns every page. Opened again from Settings
+ * or a link it is always the tutorial, with a way to close it on every page.
  */
 @Composable
-fun OnboardingScreen(mode: OnboardingMode, onFinished: () -> Unit, reopened: Boolean = false) {
+fun OnboardingScreen(mode: OnboardingMode, onFinished: () -> Unit) {
     val services = LocalServices.current
     val context = LocalContext.current
     val device = services.deviceState
@@ -113,7 +112,7 @@ fun OnboardingScreen(mode: OnboardingMode, onFinished: () -> Unit, reopened: Boo
                 ProductEvent.ONBOARDING_STARTED,
                 mapOf(
                     "version" to ProductEventValue.Number(OnboardingFlow.CURRENT_VERSION),
-                    "trigger" to ProductEventValue.Code(if (mode == OnboardingMode.FIRST_RUN && !reopened) "auto" else "settings")
+                    "trigger" to ProductEventValue.Code(if (mode == OnboardingMode.FIRST_RUN) "auto" else "settings")
                 )
             )
         } else {
@@ -142,6 +141,8 @@ fun OnboardingScreen(mode: OnboardingMode, onFinished: () -> Unit, reopened: Boo
                     "skipped" to ProductEventValue.Flag(skipped)
                 )
             )
+        } else if (OnboardingFlow.tutorialCompletes(onboardingStatus(services), skipped)) {
+            device.completeOnboarding(OnboardingFlow.CURRENT_VERSION)
         }
         onFinished()
     }
@@ -290,11 +291,13 @@ private fun trackViewed(step: OnboardingStep) {
 }
 
 /**
- * The welcome screen's mark and «Позже»; elsewhere Back and, in the
- * tutorial, «Как пользоваться · 1 из 3».
+ * The welcome screen's mark and «Позже» («Закрыть» when reopened); elsewhere
+ * Back, in the tutorial «Как пользоваться · 1 из 3», and when reopened a
+ * close control.
  */
 @Composable
 private fun TopBar(step: OnboardingStep, flow: OnboardingFlow, onBack: (() -> Unit)?, onLater: () -> Unit) {
+    val reopened = flow.mode == OnboardingMode.TUTORIAL
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -311,7 +314,9 @@ private fun TopBar(step: OnboardingStep, flow: OnboardingFlow, onBack: (() -> Un
                 modifier = Modifier.padding(start = Spacing.xs)
             )
             Spacer(Modifier.weight(1f))
-            TextButton(onClick = onLater) { Text(stringResource(R.string.onboarding_later)) }
+            TextButton(onClick = onLater) {
+                Text(stringResource(if (reopened) R.string.kb_close else R.string.onboarding_later))
+            }
         } else {
             if (onBack != null) {
                 IconButton(onClick = onBack) {
@@ -320,12 +325,19 @@ private fun TopBar(step: OnboardingStep, flow: OnboardingFlow, onBack: (() -> Un
             } else {
                 Spacer(Modifier.width(Spacing.m))
             }
-            flow.tutorialNumber(step)?.let { number ->
-                Text(
-                    stringResource(R.string.onboarding_tutorial_title, number, flow.tutorialCount),
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.semantics { heading() }
-                )
+            Box(modifier = Modifier.weight(1f)) {
+                flow.tutorialNumber(step)?.let { number ->
+                    Text(
+                        stringResource(R.string.onboarding_tutorial_title, number, flow.tutorialCount),
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.semantics { heading() }
+                    )
+                }
+            }
+            if (reopened) {
+                IconButton(onClick = onLater) {
+                    Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.kb_close))
+                }
             }
         }
     }
