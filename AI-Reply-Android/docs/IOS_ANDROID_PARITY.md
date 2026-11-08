@@ -130,7 +130,7 @@ decoding that lets a configuration written by an older build still load.
 | Feature | iOS | Android | Status | Notes |
 |---|---|---|---|---|
 | Languages | en, ru, kk (249 keys in `Localizable.xcstrings`) | same three, `values/`, `values-ru/`, `values-kk/` | IMPLEMENTED_NOT_DEVICE_VERIFIED | Converted from the catalogue, not retyped |
-| UI language ≠ AI reply language | Reply language follows the incoming message, always | same rule, same developer-message wording | IMPLEMENTED_NOT_DEVICE_VERIFIED | UI ru + reply kk is expressible, as required |
+| UI language ≠ AI reply language | Reply language follows the incoming message unless the instruction or the profile's `reply_language` says otherwise | same rule, same developer-message wording, same picker | IMPLEMENTED_NOT_DEVICE_VERIFIED | UI ru + reply kk is expressible, as required. `reply_language` goes only to a server announcing `reply_preferences` |
 | UI language ≠ key-cap language | `AIReplyStrings` (app language) vs `KeyboardStrings` (layout language) — two hard-coded Swift tables, because an extension cannot see the app's chosen language | Two `createConfigurationContext` contexts over the same `strings.xml` | IMPLEMENTED_NOT_DEVICE_VERIFIED | **Android is better here**: the duplication iOS needed disappears, and no UI string is written in Kotlin |
 | Language override | Settings picker, `nil` = system | same | IMPLEMENTED_NOT_DEVICE_VERIFIED | |
 
@@ -144,7 +144,7 @@ decoding that lets a configuration written by an older build still load.
 | Provider abstraction | n/a | `SpeechRecognitionClient` interface; `AndroidSpeechRecognitionClient` is one implementation | IMPLEMENTED_NOT_DEVICE_VERIFIED | Swapping to server-side transcription is a new class, not a keyboard rewrite |
 | On-device recognition | `supportsOnDeviceRecognition` | `createOnDeviceSpeechRecognizer` on API 33+, network recogniser below | IMPLEMENTED_NOT_DEVICE_VERIFIED | |
 | Unsupported language | Named plainly ("not available for Қазақша on this device") | same, from `ERROR_LANGUAGE_NOT_SUPPORTED` / `ERROR_LANGUAGE_UNAVAILABLE` | IMPLEMENTED_NOT_DEVICE_VERIFIED | Kazakh coverage is genuinely patchy on both platforms |
-| Voice → structured config | `VoiceConfigurationParser` proposes working hours / rules from dictation, applied only on confirmation | **NOT_IMPLEMENTED** | NOT_IMPLEMENTED | Deliberate: it is a heuristic Russian/Kazakh/English phrase parser with its own test suite, orthogonal to the port, and no Android surface needs it yet. Dictated text still lands verbatim in the profile, which is the behaviour that matters. Recorded as a follow-up in the README |
+| Voice → structured config | `VoiceConfigurationParser` proposes working hours / rules from dictation, applied only on confirmation | `VoiceConfigurationParser` + `VoiceSuggestionSheet`, same rules, same confirmation | IMPLEMENTED_NOT_DEVICE_VERIFIED | Dictated text still lands verbatim in the profile or the template's notes |
 
 ## 9. Main app screens
 

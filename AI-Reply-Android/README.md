@@ -247,9 +247,10 @@ questions:
 * **Keyboard layout** — the `ҚАЗ`/`РУС`/`ENG` key cycles the layouts switched on
   in Settings ▸ Keyboard layouts; hold it for a list. Drives the character keys
   and the space/return captions only.
-* **Reply language** — follows the incoming message, always. Russian in, Russian
-  out. It is never the app's language, so a Kazakh interface can produce a
-  Russian reply to a Russian message.
+* **Reply language** — follows the incoming message unless the instruction or
+  the reply language in the profile says otherwise. Russian in, Russian out. It
+  is never the app's language, so a Kazakh interface can produce a Russian reply
+  to a Russian message.
 
 ---
 
@@ -409,10 +410,6 @@ builds neither show the switch nor use the mock.
 
 **Other gaps, deliberate:**
 
-* `VoiceConfigurationParser` was not ported. On iOS it proposes working hours and
-  rules from dictated speech, applied only on confirmation. It is a heuristic
-  phrase parser with its own test suite, orthogonal to the port. Dictated text
-  still lands verbatim in the profile, which is the behaviour that matters.
 * Template reordering is up/down buttons rather than drag-and-drop. Compose has
   no built-in equivalent of `List` + `EditButton`, and a hand-rolled drag in a
   list this short would be more code than the rest of the screen and worse with
