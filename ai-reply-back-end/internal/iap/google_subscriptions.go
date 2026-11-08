@@ -142,8 +142,8 @@ func (s *Service) verifyGoogleSubscription(ctx context.Context, user domain.User
 		}
 		return refuse(domain.PurchaseReasonMalformed)
 	case !expires.After(now):
-		// CANCELED or ACTIVE, but this item's period is already over.
-		p.SubscriptionState = domain.GoogleSubExpired
+		// CANCELED or ACTIVE, but this item's period is over: no access now,
+		// and only Google's own EXPIRED ends the reading of it.
 		if err := s.storeGoogleState(ctx, txn, p, item, now); err != nil {
 			return Result{}, err
 		}
@@ -362,9 +362,6 @@ func (s *Service) applyRefreshedSubscription(ctx context.Context, row repository
 		expires = now.Add(graceRead)
 	}
 	if !grantsAccess(state) || !expires.After(now) {
-		if grantsAccess(state) {
-			p.SubscriptionState = domain.GoogleSubExpired
-		}
 		return s.storeGoogleState(ctx, row.TokenHash, p, item, now)
 	}
 	in := repository.GoogleSubscription{TokenHash: row.TokenHash, UserID: row.UserID, ProductID: row.ProductID, ProductCode: row.ProductCode,
@@ -381,7 +378,7 @@ func (s *Service) applyRefreshedSubscription(ctx context.Context, row repository
 		var purchaseErr *domain.PurchaseError
 		if errors.As(err, &purchaseErr) || errors.Is(err, domain.ErrPurchaseOwnedElsewhere) {
 			s.log.Warn("google play subscription read refused", "error", err.Error())
-			return nil
+			return s.deferRead(ctx, row, now)
 		}
 		return err
 	}

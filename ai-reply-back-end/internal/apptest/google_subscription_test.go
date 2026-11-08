@@ -792,3 +792,56 @@ func TestGoogleJoinsAppleAndBankWithoutChangingThem(t *testing.T) {
 		t.Fatalf("bank Pro over Google Base: %+v", ent)
 	}
 }
+
+// Google has not moved a just-ended period on yet: it is read again, not given up.
+func TestGoogleStaleEndKeepsTheSubscriptionBeingRead(t *testing.T) {
+	h := newHarness(t, approvedEntitlements(), withIAP(t))
+	h.enableGoogleSubscriptions()
+	s := h.signIn("gsub-stale@example.com")
+	token := playToken(240)
+	end := h.clock.Now().Add(time.Hour)
+	h.playSubscription(s.userID, googlePro, token, end, nil)
+	mustStatus(t, h.postGoogle(s.access, googlePro, token), http.StatusOK, "")
+
+	h.clock.Advance(90 * time.Minute)
+	if h.entitlement(s.userID).Unlimited {
+		t.Fatal("access outlived the paid end")
+	}
+	h.iap.Tick(context.Background())
+	if h.scalar(`SELECT purchase_token_sealed IS NOT NULL AND next_check_at IS NOT NULL FROM google_subscriptions`) != 1 ||
+		h.text(`SELECT state FROM google_subscriptions`) != domain.GoogleSubActive {
+		t.Fatal("a stale end stopped the reading")
+	}
+	s = h.refresh(s)
+	refused := h.postGoogle(s.access, googlePro, token)
+	if refused.status != http.StatusBadRequest || refused.str("error", "details", "reason") != "expired" ||
+		h.scalar(`SELECT purchase_token_sealed IS NOT NULL FROM google_subscriptions`) != 1 {
+		t.Fatalf("post with a stale end: %s", refused.raw)
+	}
+
+	h.renewOn(token, "GPA.3333-0240..0", end.Add(30*24*time.Hour))
+	h.clock.Advance(7 * time.Hour)
+	h.iap.Tick(context.Background())
+	if !h.entitlement(s.userID).Unlimited {
+		t.Fatal("the late renewal was lost")
+	}
+}
+
+func TestDeletedAccountLeavesAFinancialRecordOnly(t *testing.T) {
+	h := newHarness(t, approvedEntitlements(), withIAP(t))
+	h.enableGoogleSubscriptions()
+	s := h.signIn("gsub-gone@example.com")
+	token := playToken(241)
+	h.playSubscription(s.userID, googleBase, token, h.clock.Now().Add(30*24*time.Hour), nil)
+	mustStatus(t, h.postGoogle(s.access, googleBase, token), http.StatusOK, "")
+	mustStatus(t, h.do(http.MethodDelete, "/api/v1/me", nil, h.auth(s.access)), http.StatusOK, "")
+	if h.scalar(`SELECT COUNT(*) FROM google_subscriptions`) != 0 ||
+		h.scalar(`SELECT COUNT(*) FROM iap_purchases WHERE transaction_id=? AND user_id IS NULL`, sha256Hex(token)) != 1 {
+		t.Fatal("account deletion")
+	}
+	next := h.signIn("gsub-gone-new@example.com")
+	h.play.UpdateSubscription(token, func(p *googleplay.Subscription) {
+		p.ExternalAccountIdentifiers.ObfuscatedExternalAccountID = h.iap.AccountToken(next.userID)
+	})
+	mustStatus(t, h.postGoogle(next.access, googleBase, token), http.StatusConflict, "PURCHASE_BELONGS_TO_ANOTHER_ACCOUNT")
+}
