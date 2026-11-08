@@ -294,7 +294,7 @@ fun ComposeScreen(onBack: () -> Unit, onOpen: (String) -> Unit = {}) {
                             )
                             // On one line when they fit; else the counter, and the buttons under it.
                             FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                                horizontalArrangement = Arrangement.SpaceBetween,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Text(
@@ -305,7 +305,7 @@ fun ComposeScreen(onBack: () -> Unit, onOpen: (String) -> Unit = {}) {
                                     } else {
                                         LocalExtraColors.current.textSecondary
                                     },
-                                    modifier = Modifier.weight(1f).align(Alignment.CenterVertically)
+                                    modifier = Modifier.align(Alignment.CenterVertically).padding(end = Spacing.xs)
                                 )
                                 FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
                                     MessageAction(Icons.Outlined.ContentPaste, stringResource(R.string.compose_paste), ::paste)
