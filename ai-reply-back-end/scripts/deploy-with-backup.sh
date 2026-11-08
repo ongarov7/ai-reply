@@ -23,7 +23,16 @@ aireply_backup="/home/ai-reply-backups/$aireply_stamp"
 # before replacement; named data volumes are backed up separately below.
 if ! docker image inspect "$aireply_image" >/dev/null 2>&1; then
   printf 'Original image was removed; retaining the running container image.\n'
-  aireply_image=$(docker commit --pause=true "$aireply_container")
+  if ! aireply_image=$(docker commit --pause=true "$aireply_container"); then
+    # Missing layer content can also prevent commit. Export the mounted root
+    # filesystem and restore the Dockerfile's runtime settings. Compose supplies
+    # the existing environment; never copy credentials into image metadata.
+    printf 'Image layers unavailable; retaining the running root filesystem.\n'
+    aireply_image=$(docker export "$aireply_container" | docker import \
+      --change 'ENTRYPOINT ["/app/server"]' \
+      --change 'USER aireply' --change 'WORKDIR /app' \
+      --change 'ENV APP_HOST=0.0.0.0 SQLITE_PATH=/app/data/aireply.db' -)
+  fi
 fi
 docker tag "$aireply_image" "ai-reply-backend:before-$aireply_stamp"
 mkdir -p /home/ai-reply-backups
