@@ -1492,6 +1492,7 @@
  "admin.billing.live_version": "Опубликована версия",
  "admin.billing.workflow": "Изменения сохраняются в черновик. Проверьте их и отдельно опубликуйте, чтобы применить к новым покупкам.",
  "admin.billing.store_hint": "App Store списывает цену из App Store Connect. Публикация здесь не меняет её. Укажите реальные Product ID и проверьте цены в StoreKit перед включением продаж.",
+ "admin.billing.google_hint": "Google Play: одна подписка Play на строку с одним базовым планом с автопродлением; укажите её Product ID и включите Android.",
  "admin.billing.reload": "Обновить",
  "admin.billing.save_draft": "Сохранить черновик",
  "admin.billing.review": "Проверить изменения",

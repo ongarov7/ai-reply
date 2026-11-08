@@ -1492,6 +1492,7 @@
  "admin.billing.live_version": "Eʼlon qilingan versiya",
  "admin.billing.workflow": "Oʻzgarishlarni qoralamaga saqlang, tekshiring va yangi xaridlarga qoʻllash uchun alohida eʼlon qiling.",
  "admin.billing.store_hint": "App Store narxi App Store Connect orqali belgilanadi. Bu yerda eʼlon qilish uni oʻzgartirmaydi. Savdoni yoqishdan oldin haqiqiy Product ID va StoreKit narxlarini tekshiring.",
+ "admin.billing.google_hint": "Google Play: har qatorga bitta avtomatik yangilanadigan asosiy rejali bitta Play obunasi; Product ID kiriting va Androidni yoqing.",
  "admin.billing.reload": "Yangilash",
  "admin.billing.save_draft": "Qoralamani saqlash",
  "admin.billing.review": "Oʻzgarishlarni tekshirish",
