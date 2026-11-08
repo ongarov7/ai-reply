@@ -1,5 +1,6 @@
 package kz.yerek.aireply.keyboard.ui
 
+import android.os.Build
 import android.os.SystemClock
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
@@ -495,6 +496,10 @@ private fun DrawScope.drawBalloon(key: KeyBox, pageWidth: Float, theme: Keyboard
         lineTo(base.left, neckBottom)
         cubicTo(base.left, top.bottom + rise * 0.4f, top.left, top.bottom + rise * 0.6f, top.left, top.bottom)
         close()
+    }
+    // Hardware canvases draw a path's shadow layer only from API 28: below it, a hard edge.
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
+        translate(top = 1.5f * dp) { drawPath(path, theme.keyShadow) }
     }
     drawIntoCanvas { canvas ->
         val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
