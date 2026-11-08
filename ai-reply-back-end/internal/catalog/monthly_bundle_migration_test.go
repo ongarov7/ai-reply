@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/aireply/ai-reply-back-end/internal/database"
+	"github.com/aireply/ai-reply-back-end/internal/repository"
 	"github.com/aireply/ai-reply-back-end/migrations"
 )
 
@@ -63,6 +64,8 @@ func TestMonthlyBundleMigrationPreservesBalancesHistoryAndDraft(t *testing.T) {
 	exec(`INSERT INTO credit_grants(id,user_id,kind,units_total,units_remaining,starts_at,status,created_at,updated_at) VALUES('paid','buyer','pack',30,17,1000,'active',1000,1000)`)
 	order, _ := json.Marshal(old[1])
 	exec(`INSERT INTO billing_orders(id,user_id,idempotency_key,catalog_version,product_code,snapshot_json,amount_minor,currency,provider,environment,bank_order,status,checkout_token_hash,request_json,created_at,updated_at) VALUES('old-order','buyer','old',1,'base_monthly',?,79000,'KZT','bcc','sandbox','old-bank','pending','hash','{}',1000,1000)`, string(order))
+	exec(`INSERT INTO bcc_subscriptions(id,user_id,environment,root_order_id,plan_id,snapshot_json,amount_minor,period_days,status,mandate_expires_at,merch_rn_id,created_at,updated_at)
+ SELECT 'legacy-bank','buyer','sandbox','old-order',id,?,79000,30,'active',9999999999999,'legacy-mandate',1000,1000 FROM plans WHERE code='base_monthly'`, string(order))
 	if _, err = database.Migrate(ctx, db, migrations.FS); err != nil {
 		t.Fatal(err)
 	}
@@ -94,6 +97,14 @@ func TestMonthlyBundleMigrationPreservesBalancesHistoryAndDraft(t *testing.T) {
 	}
 	if err = db.Reader().QueryRow(`SELECT units_remaining FROM credit_grants WHERE id='paid'`).Scan(&left); err != nil || left != 17 {
 		t.Fatal("balance changed", err)
+	}
+	var planID string
+	if err = db.Reader().QueryRow(`SELECT plan_id FROM bcc_subscriptions WHERE id='legacy-bank'`).Scan(&planID); err != nil {
+		t.Fatal(err)
+	}
+	legacy, err := repository.New(db).BankSubscriptionPlan(ctx, "legacy-bank", planID)
+	if err != nil || legacy.Price != 79000 || legacy.DailyLimit != 40 || legacy.MonthlyLimit != 0 || legacy.EntitlementKind != "daily" {
+		t.Fatalf("legacy mandate was reinterpreted as the new bundle: %+v %v", legacy, err)
 	}
 	if _, err = s.Publish(ctx, "owner", updated.ID, updated.Revision); err != nil {
 		t.Fatalf("aligned draft cannot publish: %v", err)
