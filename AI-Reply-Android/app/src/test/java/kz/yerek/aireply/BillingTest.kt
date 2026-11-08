@@ -150,6 +150,17 @@ class BillingTest {
         api.catalog = IapCatalogDto(products.toList(), TOKEN)
     }
 
+    private fun sellsBaseAndPro() {
+        sells(subscription(), subscription(id = "play.pro.month", kind = "unlimited", monthly = 0))
+        store.prices["play.base.month"] = "990 ₸"
+        store.periods["play.base.month"] = "month"
+        store.prices["play.pro.month"] = "3 990 ₸"
+        store.periods["play.pro.month"] = "month"
+    }
+
+    private fun runningBase(token: String = "running-token", account: String? = TOKEN) =
+        StorePurchase(listOf("play.base.month"), token, StorePurchaseState.PURCHASED, account, isSubscription = true)
+
     @Test
     fun `a subscription is offered with Play's price and the server's allowance`() = runBlocking {
         sells(subscription())
@@ -214,6 +225,16 @@ class BillingTest {
         billing.load()
         billing.buy(activity, state.subscriptions.first { it.storeProductId == "play.pro.month" })
         assertEquals("running-token", store.replaced)
+    }
+
+    @Test
+    fun `an upgrade leaves another account's running subscription alone`() = runBlocking {
+        sellsBaseAndPro()
+        store.held += runningBase(account = OTHER_TOKEN)
+        billing.load()
+        billing.buy(activity, state.subscriptions.first { it.storeProductId == "play.pro.month" })
+        assertEquals(listOf("play.pro.month" to TOKEN), store.launched)
+        assertNull(store.replaced)
     }
 
     @Test
@@ -532,6 +553,7 @@ class BillingTest {
 
     private companion object {
         const val TOKEN = "6f1c3c4e-2b9a-4c3e-9f0e-6a7b8c9d0e1f"
+        const val OTHER_TOKEN = "11111111-1111-4111-8111-111111111111"
 
         val USAGE = UsageDto(dailyLimit = 5, resetsAt = "2026-10-20T19:00:00Z", credits = 20, remainingTotal = 20)
 

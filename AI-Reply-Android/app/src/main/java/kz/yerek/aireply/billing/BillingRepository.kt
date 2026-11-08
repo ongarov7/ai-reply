@@ -233,7 +233,11 @@ class BillingRepository(
         if (_state.value.busyProductId != null || product.hasPriceMismatch) return
         _state.update { it.copy(busyProductId = product.storeProductId, notice = null) }
         val replacing = if (product.kind == OfferedProduct.Kind.SUBSCRIPTION) {
-            held.firstOrNull { it.isSubscription && product.storeProductId !in it.productIds && it.state == StorePurchaseState.PURCHASED }?.purchaseToken
+            held.firstOrNull {
+                it.isSubscription && product.storeProductId !in it.productIds && it.state == StorePurchaseState.PURCHASED &&
+                    // Bought by another AI Reply account on this phone: not this one's to replace.
+                    (it.accountToken == null || it.accountToken == token)
+            }?.purchaseToken
         } else {
             null
         }
