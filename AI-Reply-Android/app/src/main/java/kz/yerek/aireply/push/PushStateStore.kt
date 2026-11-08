@@ -59,6 +59,19 @@ class PushStateStore internal constructor(private val prefs: SharedPreferences) 
             .apply()
     }
 
+    /** The server answered, but nothing it said may hold the next sync back. */
+    fun forgetSync() {
+        prefs.edit()
+            .remove(KEY_SYNC_FINGERPRINT)
+            .remove(KEY_SYNC_AT)
+            .remove(KEY_REJECTED_FINGERPRINT)
+            .remove(KEY_REJECTED_AT)
+            .remove(KEY_FAILED_FINGERPRINT)
+            .remove(KEY_FAILURES)
+            .remove(KEY_NEXT_ATTEMPT)
+            .apply()
+    }
+
     /** The server refused this exact payload (a 4xx): sending it again cannot help. */
     fun recordRejected(fingerprint: String, at: Long) {
         prefs.edit()

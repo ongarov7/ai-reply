@@ -499,6 +499,34 @@ class InstallationRegistrarTest {
     }
 
     @Test
+    fun `a dead token is not counted as registered, so a relaunch can repair it`() = runBlocking {
+        request = sample().copy(push = PushTokenDto("fcm", "old-token"))
+        api.answer = { sent, _ -> InstallationResponse(installationId = sent.installationId, pushStatus = "invalid") }
+        val session = SimpleSession(signedIn = false)
+
+        assertTrue(registrar(session).syncOnce() is Outcome.Synced)
+        assertNull("nothing suppresses the repair", store.lastSyncFingerprint)
+        assertEquals(0L, store.lastSyncAt)
+
+        assertTrue("it does not wait a day after a relaunch", registrar(session).syncOnce() is Outcome.Synced)
+        assertEquals(2, api.calls.size)
+
+        api.answer = { sent, _ -> InstallationResponse(installationId = sent.installationId, pushStatus = "active") }
+        request = sample().copy(push = PushTokenDto("fcm", "new-token"))
+        assertTrue(registrar(session).syncOnce() is Outcome.Synced)
+        assertEquals("a healthy registration still dedupes", Outcome.UpToDate, registrar(session).syncOnce())
+        assertEquals(3, api.calls.size)
+    }
+
+    @Test
+    fun `an invalid status without a token sent counts as registered`() = runBlocking {
+        api.answer = { sent, _ -> InstallationResponse(installationId = sent.installationId, pushStatus = "invalid") }
+        val registrar = registrar(SimpleSession(signedIn = false))
+        assertTrue(registrar.syncOnce() is Outcome.Synced)
+        assertEquals("no token of ours to repair", Outcome.UpToDate, registrar.syncOnce())
+    }
+
+    @Test
     fun `the registrar hands the answer for the token it sent to its listener`() = runBlocking {
         request = sample().copy(push = PushTokenDto("fcm", "old-token"))
         api.answer = { sent, _ -> InstallationResponse(installationId = sent.installationId, pushStatus = "invalid") }

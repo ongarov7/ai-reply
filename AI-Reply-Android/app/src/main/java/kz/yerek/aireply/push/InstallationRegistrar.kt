@@ -158,7 +158,13 @@ class InstallationRegistrar(
             } else {
                 api.register(request, null)
             }
-            store.recordSuccess(fingerprint, now)
+            // A dead token is not a finished registration: if its replacement fails and
+            // the app closes, the next launch must hear `invalid` again, not wait a day.
+            if (request.push != null && response.pushStatus == InvalidTokenRenewal.STATUS_INVALID) {
+                store.forgetSync()
+            } else {
+                store.recordSuccess(fingerprint, now)
+            }
             listener.onSynced(request, response)
             Outcome.Synced(response)
         } catch (cancelled: CancellationException) {
