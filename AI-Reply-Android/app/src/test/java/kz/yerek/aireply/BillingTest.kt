@@ -89,6 +89,7 @@ class BillingTest {
     private class FakeApi : PurchaseApi {
         var catalogError: ApiError? = null
         var catalogs = 0
+        var catalog: IapCatalogDto = CATALOG
         val verified = mutableListOf<Pair<String, String>>()
         var answer: (String) -> PurchaseResultDto = { PurchaseResultDto(PurchaseResultDto.STATUS_GRANTED, USAGE) }
         var gate: CompletableDeferred<Unit>? = null
@@ -96,7 +97,7 @@ class BillingTest {
         override suspend fun catalog(): IapCatalogDto {
             catalogs++
             catalogError?.let { throw ApiException(it, 403) }
-            return CATALOG
+            return catalog
         }
 
         override suspend fun verify(productId: String, purchaseToken: String): PurchaseResultDto {
@@ -131,6 +132,118 @@ class BillingTest {
         StorePurchase(listOf("play.pack_20"), token, state, account)
 
     private val state: BillingState get() = billing.state.value
+
+    // ------------------------------------------------------ subscriptions
+
+    private fun subscription(
+        id: String = "play.base.month",
+        period: String = "month",
+        kind: String = "monthly",
+        monthly: Int = 1000,
+        price: Long? = null
+    ) = IapProductDto(
+        code = "base", kind = "subscription", storeProductId = id, name = "Base", planId = "base", billingPeriod = period,
+        entitlementKind = kind, monthlyLimit = monthly, price = price, currency = "KZT".takeIf { price != null }
+    )
+
+    private fun sells(vararg products: IapProductDto) {
+        api.catalog = IapCatalogDto(products.toList(), TOKEN)
+    }
+
+    @Test
+    fun `a subscription is offered with Play's price and the server's allowance`() = runBlocking {
+        sells(subscription())
+        store.prices["play.base.month"] = "990 ₸"
+        store.periods["play.base.month"] = "month"
+        billing.load()
+        val offer = state.subscriptions.single()
+        assertEquals("990 ₸", offer.price)
+        assertEquals(1000, offer.monthlyLimit)
+        assertEquals("month", offer.billingPeriod)
+    }
+
+    @Test
+    fun `a subscription Play sells for another period is not offered`() = runBlocking {
+        sells(subscription())
+        store.prices["play.base.month"] = "990 ₸"
+        store.periods["play.base.month"] = "year"
+        billing.load()
+        assertTrue(state.subscriptions.isEmpty())
+    }
+
+    @Test
+    fun `a subscription whose allowance this build cannot show is not offered`() = runBlocking {
+        sells(subscription(monthly = 0))
+        store.prices["play.base.month"] = "990 ₸"
+        store.periods["play.base.month"] = "month"
+        billing.load()
+        assertTrue(state.subscriptions.isEmpty())
+    }
+
+    @Test
+    fun `a price the server and Play disagree on cannot be bought`() = runBlocking {
+        sells(subscription(price = 99900))
+        store.prices["play.base.month"] = "1 090 ₸"
+        store.periods["play.base.month"] = "month"
+        store.micros["play.base.month"] = 1_090_000_000L
+        billing.load()
+        val offer = state.subscriptions.single()
+        assertTrue(offer.hasPriceMismatch)
+        billing.buy(activity, offer)
+        assertTrue(store.launched.isEmpty())
+    }
+
+    @Test
+    fun `a matching price is not a mismatch`() = runBlocking {
+        sells(subscription(price = 99900))
+        store.prices["play.base.month"] = "999 ₸"
+        store.periods["play.base.month"] = "month"
+        store.micros["play.base.month"] = 999_000_000L
+        billing.load()
+        assertFalse(state.subscriptions.single().hasPriceMismatch)
+    }
+
+    @Test
+    fun `a new subscription replaces the one already running`() = runBlocking {
+        sells(subscription(), subscription(id = "play.pro.month", kind = "unlimited", monthly = 0))
+        store.prices["play.base.month"] = "990 ₸"
+        store.periods["play.base.month"] = "month"
+        store.prices["play.pro.month"] = "3 990 ₸"
+        store.periods["play.pro.month"] = "month"
+        store.held += StorePurchase(listOf("play.base.month"), "running-token", StorePurchaseState.PURCHASED, TOKEN, isSubscription = true)
+        billing.load()
+        billing.buy(activity, state.subscriptions.first { it.storeProductId == "play.pro.month" })
+        assertEquals("running-token", store.replaced)
+    }
+
+    @Test
+    fun `restore hands everything to the server and says what came of it`() = runBlocking {
+        billing.load()
+        store.held += StorePurchase(listOf("play.pack_20"), "paid-token", StorePurchaseState.PURCHASED, TOKEN, isSubscription = true)
+        billing.restore()
+        assertTrue(api.verified.any { it.second == "paid-token" })
+        assertEquals(PurchaseNotice.RESTORED, state.notice)
+        assertFalse(state.restoring)
+    }
+
+    @Test
+    fun `restore with nothing held says so`() = runBlocking {
+        billing.load()
+        store.held.clear()
+        billing.restore()
+        assertEquals(PurchaseNotice.NOTHING_TO_RESTORE, state.notice)
+    }
+
+    @Test
+    fun `a running subscription is sent again on each return, a pack only once`() = runBlocking {
+        billing.load()
+        store.held += StorePurchase(listOf("play.base.month"), "sub-token", StorePurchaseState.PURCHASED, TOKEN, isSubscription = true)
+        store.held += StorePurchase(listOf("play.pack_20"), "pack-token", StorePurchaseState.PURCHASED, TOKEN)
+        billing.reconcile()
+        billing.reconcile()
+        assertEquals(2, api.verified.count { it.second == "sub-token" })
+        assertEquals(1, api.verified.count { it.second == "pack-token" })
+    }
 
     // ---------------------------------------------------------- catalogue
 
