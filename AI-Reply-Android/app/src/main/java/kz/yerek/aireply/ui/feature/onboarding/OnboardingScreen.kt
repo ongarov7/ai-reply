@@ -67,12 +67,12 @@ import kz.yerek.aireply.ui.feature.setup.openKeyboardSettings
  * Welcome → (try first) the tutorial, then «Подключи AI Reply»; or (set up
  * the keyboard) the other way round. The gender, when it was never answered,
  * comes right before the tutorial. «Позже» leaves it for good (Settings and
- * reminders offer it again); each part can be skipped. A first run remembers its step and its
- * path, so a run that was closed halfway comes back there; finishing it
- * records the version on this device and never touches the replies balance.
- * Which steps exist and in what order is [OnboardingFlow]'s decision. No
- * step moves by itself: the user turns every page. Opened again from Settings
- * or a link it is always the tutorial, with a way to close it on every page.
+ * reminders offer it again); each part can be skipped. A first run remembers
+ * its step and its path, so a run that was closed halfway comes back there;
+ * finishing it records the version on this device and never touches the
+ * replies balance. Which steps exist and in what order is [OnboardingFlow]'s
+ * decision. No step moves by itself: the user turns every page. Opened again
+ * from Settings or a link it is always the tutorial, which every page can close.
  */
 @Composable
 fun OnboardingScreen(mode: OnboardingMode, onFinished: () -> Unit) {
