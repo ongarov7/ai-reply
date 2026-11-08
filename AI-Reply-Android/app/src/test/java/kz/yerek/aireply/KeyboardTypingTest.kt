@@ -155,6 +155,32 @@ class KeyboardTypingTest {
     }
 
     @Test
+    fun `an apostrophe leaves both punctuation pages, and no other character does`() {
+        for (plane in listOf(KeyboardPlane.NUMBERS, KeyboardPlane.SYMBOLS)) {
+            assertTrue("$plane", PunctuationSpaceShortcut.apostropheReturnsToLetters(plane, "'", true))
+            assertFalse("$plane", PunctuationSpaceShortcut.apostropheReturnsToLetters(plane, "\"", true))
+            assertFalse("$plane", PunctuationSpaceShortcut.apostropheReturnsToLetters(plane, "’", true))
+        }
+        for (plane in KeyboardPlane.entries.filter { it != KeyboardPlane.NUMBERS && it != KeyboardPlane.SYMBOLS }) {
+            assertFalse("$plane", PunctuationSpaceShortcut.apostropheReturnsToLetters(plane, "'", true))
+        }
+    }
+
+    @Test
+    fun `an apostrophe stays on the page in fields without sentences`() {
+        assertFalse(
+            PunctuationSpaceShortcut.apostropheReturnsToLetters(
+                KeyboardPlane.NUMBERS, "'", FieldKeys(kind = FieldKind.EMAIL).takesSentenceShortcuts
+            )
+        )
+        assertFalse(
+            PunctuationSpaceShortcut.apostropheReturnsToLetters(
+                KeyboardPlane.NUMBERS, "'", FieldKeys(password = true).takesSentenceShortcuts
+            )
+        )
+    }
+
+    @Test
     fun `password address and numeric fields never apply sentence shortcuts`() {
         val specialized = listOf(
             FieldKeys(kind = FieldKind.EMAIL), FieldKeys(kind = FieldKind.URL), FieldKeys(password = true),

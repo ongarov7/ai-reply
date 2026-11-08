@@ -1102,14 +1102,18 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         val text = if (plane == KeyboardPlane.LETTERS) shift.apply(value) else value
         insert(text)
         if (plane == KeyboardPlane.LETTERS) shift.characterTyped()
+        if (PunctuationSpaceShortcut.apostropheReturnsToLetters(plane, value, takesSentenceShortcuts)) plane = KeyboardPlane.LETTERS
         refreshAutoShift()
     }
+
+    /** No ". " in a number, phone or date field: digits are not a sentence. */
+    private val takesSentenceShortcuts: Boolean
+        get() = target != Target.HOST || (!isSecureField && fieldKeys.takesSentenceShortcuts)
 
     private fun typeSpace() {
         prepareComposerForTyping()
         val now = SystemClock.uptimeMillis()
-        // No ". " in a number, phone or date field: digits are not a sentence.
-        val sentences = target != Target.HOST || (!isSecureField && fieldKeys.takesSentenceShortcuts)
+        val sentences = takesSentenceShortcuts
         val before = textBeforeCursor()
         val returnsToLetters = PunctuationSpaceShortcut.returnsToLetters(plane, before, sentences)
         if (sentences && SpaceShortcut.shouldInsertPeriod(before, now - lastSpaceTap)) {

@@ -175,9 +175,13 @@ object TextDeletion {
     }
 }
 
-/** Only sentence punctuation followed by Space leaves the punctuation pages. */
+/** Only sentence punctuation followed by Space, or an apostrophe, leaves the punctuation pages. */
 object PunctuationSpaceShortcut {
     fun returnsToLetters(plane: KeyboardPlane, before: String?, sentenceField: Boolean): Boolean =
         sentenceField && (plane == KeyboardPlane.NUMBERS || plane == KeyboardPlane.SYMBOLS) &&
             before?.lastOrNull()?.let { it in ".,!?:;…" } == true
+
+    /** The letters have no apostrophe: "don't" needs no second switch back to them. */
+    fun apostropheReturnsToLetters(plane: KeyboardPlane, typed: String, sentenceField: Boolean): Boolean =
+        sentenceField && (plane == KeyboardPlane.NUMBERS || plane == KeyboardPlane.SYMBOLS) && typed == "'"
 }
