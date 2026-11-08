@@ -242,6 +242,18 @@ class AppLinksTest {
     }
 
     @Test
+    fun `finishing the first run answers a waiting link to the guide and no other`() {
+        val navigation = PendingNavigation()
+        navigation.open(AppScreen.ONBOARDING)
+        navigation.firstRunFinished()
+        assertNull("the guide was just gone through", navigation.route.value)
+
+        navigation.open(AppScreen.SUBSCRIPTION)
+        navigation.firstRunFinished()
+        assertEquals("other links still open", Routes.Subscription, navigation.route.value)
+    }
+
+    @Test
     fun `a pending destination is dropped after fifteen minutes`() {
         var now = 1_800_000_000_000L
         val navigation = PendingNavigation(clock = { now })

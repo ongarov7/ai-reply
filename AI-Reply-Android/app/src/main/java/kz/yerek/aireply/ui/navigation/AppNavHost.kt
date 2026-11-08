@@ -134,7 +134,10 @@ fun AppNavHost(debugScreen: String? = null) {
     NavHost(navController = navController, startDestination = start) {
 
         composable(Routes.Onboarding) {
-            OnboardingScreen(mode = OnboardingMode.FIRST_RUN, onFinished = { needsOnboarding = false })
+            OnboardingScreen(mode = OnboardingMode.FIRST_RUN, onFinished = {
+                services.navigation.firstRunFinished()
+                needsOnboarding = false
+            })
         }
 
         // Settings and aireply://onboarding: always the tutorial, which can be closed at any step.

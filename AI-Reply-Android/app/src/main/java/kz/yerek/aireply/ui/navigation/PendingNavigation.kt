@@ -40,6 +40,14 @@ class PendingNavigation(private val clock: () -> Long = System::currentTimeMilli
     fun consume(route: String): Boolean =
         _route.compareAndSet(route, null) && clock() - openedAt <= LIFETIME_MS
 
+    /**
+     * The first run has just ended: a link to the guide that waited behind it
+     * has been answered by the guide itself. Any other link goes on waiting.
+     */
+    fun firstRunFinished() {
+        consume(Routes.Tutorial)
+    }
+
     companion object {
         /** How long a link waits behind the gates: fifteen minutes. */
         const val LIFETIME_MS = 15L * 60 * 1000
