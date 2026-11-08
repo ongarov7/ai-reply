@@ -119,7 +119,7 @@ object PersonaRowLayout {
     fun chipWidths(textWidths: List<Float>, available: Float): List<Float> {
         if (textWidths.isEmpty()) return emptyList()
         return fitting(textWidths, available, CHIP_PADDINGS + TIGHT_PADDING)
-            ?: textWidths.map { it + CHIP_PADDINGS.last() * 2 }
+            ?: textWidths.map { max(CHIP_MIN_WIDTH, it + CHIP_PADDINGS.last() * 2) }
     }
 
     /** The set at the roomiest of [paddings] that fits, stretched to fill; null when none fits. */

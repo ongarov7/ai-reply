@@ -77,6 +77,16 @@ class PersonaRowLayoutTest {
     }
 
     @Test
+    fun `a very short name is a whole touch target on a scrolling row too`() {
+        val many = builtIns + listOf(8f, 70f, 80f, 90f)
+        val available = PersonaRowLayout.chipsWidth(320f)
+        val chips = PersonaRowLayout.chipWidths(many, available)
+        assertTrue("the set scrolls", chips.sum() + PersonaRowLayout.CHIP_GAP * (chips.size - 1) > available)
+        assertEquals(PersonaRowLayout.CHIP_MIN_WIDTH, chips[4], 0.001f)
+        chips.forEach { assertTrue(it >= PersonaRowLayout.CHIP_MIN_WIDTH) }
+    }
+
+    @Test
     fun `no personas, no chips`() {
         assertEquals(emptyList<Float>(), PersonaRowLayout.chipWidths(emptyList(), 300f))
         assertEquals(PersonaRowLayout.ChipFit(emptyList(), false), PersonaRowLayout.chipFit(emptyList(), emptyList(), 300f))
