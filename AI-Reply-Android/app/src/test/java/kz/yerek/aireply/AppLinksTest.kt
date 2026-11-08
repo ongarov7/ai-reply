@@ -13,6 +13,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 /**
  * Notification links and payloads: what a tap may open, and nothing else.
@@ -251,6 +252,15 @@ class AppLinksTest {
         navigation.open(AppScreen.SUBSCRIPTION)
         navigation.firstRunFinished()
         assertEquals("other links still open", Routes.Subscription, navigation.route.value)
+    }
+
+    /** The gates return early: what is remembered after them goes when one comes back. */
+    @Test
+    fun `a gate in front of the graph takes the back stack with it`() {
+        val host = File("src/main/java/kz/yerek/aireply/ui/navigation/AppNavHost.kt").readText()
+        val controller = host.indexOf("val navController = rememberNavController()")
+        assertTrue(controller >= 0)
+        assertTrue("past every gate", controller > host.lastIndexOf("Phase.AwaitingCode"))
     }
 
     @Test

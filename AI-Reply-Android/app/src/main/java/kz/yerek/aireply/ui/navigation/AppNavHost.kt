@@ -62,7 +62,6 @@ import kz.yerek.aireply.ui.feature.templates.TemplateListScreen
 @Composable
 fun AppNavHost(debugScreen: String? = null) {
     val services = LocalServices.current
-    val navController = rememberNavController()
 
     val accountState by services.account.state.collectAsStateWithLifecycle()
     var completingRegistration by rememberSaveable { mutableStateOf(false) }
@@ -129,6 +128,10 @@ fun AppNavHost(debugScreen: String? = null) {
             }
     }
 
+    // Remembered here, past the gates: a gate that comes back in front of the
+    // graph takes the back stack with it, so Home starts from its root next
+    // time, whoever signs in.
+    val navController = rememberNavController()
     val start = reviewRoute ?: if (needsOnboarding) Routes.Onboarding else Routes.Home
 
     NavHost(navController = navController, startDestination = start) {
