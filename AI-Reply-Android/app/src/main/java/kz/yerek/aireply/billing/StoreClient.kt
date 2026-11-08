@@ -9,8 +9,8 @@ import android.app.Activity
  *
  * Дүкен интерфейсі: Google Play Billing, сынақта — жалған дүкен.
  *
- * The client never consumes or acknowledges a purchase: the server consumes it
- * after granting the replies (contract §3.8), so nothing here can lose one.
+ * The client never consumes or acknowledges a purchase: the server consumes or
+ * acknowledges it after granting (contract §3.8), so nothing here can lose one.
  */
 interface StoreClient {
 
@@ -20,21 +20,35 @@ interface StoreClient {
     /** Connects if needed; false when Play cannot be reached on this phone. */
     suspend fun connect(): Boolean
 
-    /** The products Play knows among [ids], with Play's own prices; null when Play did not answer. */
-    suspend fun products(ids: List<String>): List<StoreProduct>?
+    /**
+     * The products Play knows among [oneTime] and [subscriptions], with
+     * Play's own prices; null when Play did not answer.
+     */
+    suspend fun products(oneTime: List<String>, subscriptions: List<String>): List<StoreProduct>?
 
-    /** One-time purchases Play still holds (not consumed yet); null when Play did not answer. */
+    /** Purchases Play still holds: one-time ones not consumed yet, subscriptions still running. Null when Play did not answer. */
     suspend fun purchases(): List<StorePurchase>?
 
     /**
      * Opens Play's purchase sheet for [productId], bound to [accountToken]
-     * (`setObfuscatedAccountId`). The outcome arrives at the listener.
+     * (`setObfuscatedAccountId`). With [replacing] it switches that running
+     * subscription to this one. The outcome arrives at the listener.
      */
-    fun launch(activity: Activity, productId: String, accountToken: String): StoreError?
+    fun launch(activity: Activity, productId: String, accountToken: String, replacing: String? = null): StoreError?
 }
 
-/** A product as Play describes it. [formattedPrice] is the only price the app ever shows. */
-data class StoreProduct(val productId: String, val formattedPrice: String)
+/**
+ * A product as Play describes it. [formattedPrice] is the only price the app
+ * ever shows; [priceMicros] and [currency] are for comparing with the server's.
+ */
+data class StoreProduct(
+    val productId: String,
+    val formattedPrice: String,
+    /** A subscription's period: `month` or `year`; null for a one-time product. */
+    val billingPeriod: String? = null,
+    val priceMicros: Long? = null,
+    val currency: String? = null
+)
 
 enum class StorePurchaseState { PURCHASED, PENDING, UNKNOWN }
 
@@ -44,7 +58,9 @@ data class StorePurchase(
     val purchaseToken: String,
     val state: StorePurchaseState,
     /** The account token the purchase was bound to, when Play says. */
-    val accountToken: String? = null
+    val accountToken: String? = null,
+    /** A subscription (rather than a one-time product). */
+    val isSubscription: Boolean = false
 )
 
 /** How a purchase sheet ended, or a purchase Play finished meanwhile. */
@@ -57,7 +73,7 @@ sealed interface StoreUpdate {
 enum class StoreError {
     /** Play is missing, signed out, or its service is down. */
     UNAVAILABLE,
-    /** An earlier purchase of this product is not consumed yet: the server will finish it. */
+    /** An earlier purchase of this product is not finished yet: the server will finish it. */
     ALREADY_OWNED,
     /** Anything else Play reported. */
     FAILED

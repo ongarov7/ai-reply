@@ -4,7 +4,7 @@
     <!-- Balance -->
     <string name="balance_title">Ответы</string>
     <string name="balance_welcome_title">Бесплатные ответы: %1$d из %2$d</string>
-    <string name="balance_today">Сегодня доступно</string>
+    <string name="balance_today">Доступные ответы</string>
     <string name="balance_unlimited">Безлимит</string>
     <string name="balance_welcome">Приветственный бонус</string>
     <string name="balance_welcome_value">%1$d из %2$d</string>

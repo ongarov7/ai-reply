@@ -6,7 +6,6 @@ import kz.yerek.aireply.data.account.AccountUsageCache
 import kz.yerek.aireply.data.account.PlanDto
 import kz.yerek.aireply.data.account.UsageDto
 import kz.yerek.aireply.ui.feature.account.UsageSummary
-import kz.yerek.aireply.ui.feature.account.canOfferPurchase
 import kz.yerek.aireply.ui.feature.account.formatExpiry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -27,26 +26,6 @@ import java.time.format.FormatStyle
 class SubscriptionDisplayTest {
 
     private val json = Json { ignoreUnknownKeys = true }
-
-    private fun plan(isFree: Boolean = false, purchasable: Boolean = true) = PlanDto(
-        id = "plan-pro",
-        code = "pro",
-        isFree = isFree,
-        purchasable = purchasable
-    )
-
-    @Test
-    fun `a release build never offers a purchase`() {
-        assertFalse(canOfferPurchase(plan(purchasable = true), debugBuild = false))
-        assertFalse(canOfferPurchase(plan(purchasable = false), debugBuild = false))
-    }
-
-    @Test
-    fun `a debug build offers only what the server would sell`() {
-        assertTrue(canOfferPurchase(plan(purchasable = true), debugBuild = true))
-        assertFalse(canOfferPurchase(plan(purchasable = false), debugBuild = true))
-        assertFalse("nothing to buy in a free plan", canOfferPurchase(plan(isFree = true), debugBuild = true))
-    }
 
     @Test
     fun `purchasable is off unless the server says so`() {

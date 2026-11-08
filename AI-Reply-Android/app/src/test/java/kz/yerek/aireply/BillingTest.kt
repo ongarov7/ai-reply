@@ -53,6 +53,9 @@ class BillingTest {
         var reachable = true
         var connects = 0
         val prices = mutableMapOf("play.pack_20" to "990 ₸", "play.pass_24h" to "590 ₸")
+        val periods = mutableMapOf<String, String>()
+        val micros = mutableMapOf<String, Long>()
+        var replaced: String? = null
         val held = mutableListOf<StorePurchase>()
         val launched = mutableListOf<Pair<String, String>>()
         var launchError: StoreError? = null
@@ -66,12 +69,14 @@ class BillingTest {
             return reachable
         }
 
-        override suspend fun products(ids: List<String>) = ids.mapNotNull { id -> prices[id]?.let { StoreProduct(id, it) } }
+        override suspend fun products(oneTime: List<String>, subscriptions: List<String>) =
+            (oneTime + subscriptions).mapNotNull { id -> prices[id]?.let { StoreProduct(id, it, periods[id], micros[id], "KZT".takeIf { _ -> id in micros }) } }
 
         override suspend fun purchases() = held.toList()
 
-        override fun launch(activity: Activity, productId: String, accountToken: String): StoreError? {
+        override fun launch(activity: Activity, productId: String, accountToken: String, replacing: String?): StoreError? {
             launched += productId to accountToken
+            replaced = replacing
             return launchError
         }
 

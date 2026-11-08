@@ -57,7 +57,7 @@
     <string name="home_setup_step_keyboards">Клавиатуры</string>
     <string name="home_setup_step_settings">Откройте «Настройки»</string>
     <string name="home_setup_title">Подключение клавиатуры</string>
-    <string name="home_subtitle">Готовые ответы прямо с клавиатуры.</string>
+    <string name="home_subtitle">Твой личный ассистент в переписке.</string>
     <string name="home_title">AI Reply</string>
     <string name="home_tryit">Создать ответ</string>
 
@@ -309,9 +309,9 @@
     <string name="registration_subtitle">Двух ответов достаточно, чтобы ответы звучали как ваши. Изменить можно в любой момент.</string>
     <string name="registration_finish">Сохранить и продолжить</string>
     <string name="registration_skip">Пропустить пока</string>
-    <string name="subscription_title">Тариф</string>
-    <string name="subscription_current">Текущий тариф</string>
-    <string name="subscription_remaining">осталось сегодня</string>
+    <string name="subscription_title">Баланс и доступ</string>
+    <string name="subscription_current">Текущий доступ</string>
+    <string name="subscription_remaining">доступно</string>
     <string name="subscription_used_today">Использовано %1$d из %2$d за сегодня</string>
     <string name="subscription_remaining_month">осталось в этом месяце</string>
     <string name="subscription_used_month">Использовано %1$d из %2$d в этом месяце</string>

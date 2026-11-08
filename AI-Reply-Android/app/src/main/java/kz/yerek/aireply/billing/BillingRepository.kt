@@ -24,9 +24,18 @@ data class OfferedProduct(
     /** The server's name, in the account's language. */
     val name: String,
     /** Play's formatted price, the only price ever shown. */
-    val price: String
+    val price: String,
+    /** A subscription's plan on the server. */
+    val planId: String? = null,
+    /** A subscription's period: `month` or `year`. */
+    val billingPeriod: String? = null,
+    val entitlementKind: String? = null,
+    val dailyLimit: Int = 0,
+    val monthlyLimit: Int = 0,
+    /** The server's price and Play's differ: the sale waits until they agree. */
+    val hasPriceMismatch: Boolean = false
 ) {
-    enum class Kind { PACK, PASS }
+    enum class Kind { PACK, PASS, SUBSCRIPTION }
 }
 
 /** What the purchase screen says after something happened. Only a real failure is an error. */
@@ -45,7 +54,11 @@ enum class PurchaseNotice {
     /** The purchase was granted to another AI Reply account. */
     OTHER_ACCOUNT,
     /** Paid, but the server could not finish it now; it is sent again on the next return. */
-    RETRY_LATER
+    RETRY_LATER,
+    /** Restore found paid purchases and the server confirmed them. */
+    RESTORED,
+    /** Restore found nothing to hand over. */
+    NOTHING_TO_RESTORE
 }
 
 data class BillingState(
@@ -56,7 +69,9 @@ data class BillingState(
     val busyProductId: String? = null,
     /** Products with a payment Play holds as pending. */
     val pendingProductIds: Set<String> = emptySet(),
-    val notice: PurchaseNotice? = null
+    val notice: PurchaseNotice? = null,
+    /** «Восстановить покупки» is running. */
+    val restoring: Boolean = false
 ) {
     enum class Phase {
         IDLE,
@@ -70,6 +85,7 @@ data class BillingState(
 
     val packs: List<OfferedProduct> get() = products.filter { it.kind == OfferedProduct.Kind.PACK }
     val passes: List<OfferedProduct> get() = products.filter { it.kind == OfferedProduct.Kind.PASS }
+    val subscriptions: List<OfferedProduct> get() = products.filter { it.kind == OfferedProduct.Kind.SUBSCRIPTION }
 }
 
 /**
@@ -112,6 +128,10 @@ class BillingRepository(
     @Volatile
     private var accountToken: String? = null
 
+    /** What Play held the last time it was asked: a running subscription is what a new one replaces. */
+    @Volatile
+    private var held: List<StorePurchase> = emptyList()
+
     private val lock = Any()
     /** Tokens on their way to the server: a second callback for one purchase sends nothing. */
     private val inFlight = HashSet<String>()
@@ -142,40 +162,121 @@ class BillingRepository(
         }
         accountToken = catalog.accountToken.ifBlank { null }
         val known = catalog.products.filter { product ->
-            product.storeProductId.isNotBlank() && product.units > 0 && kindOf(product) != null
+            product.storeProductId.isNotBlank() && kindOf(product) != null && isSellable(product)
         }
         if (accountToken == null || !store.connect()) {
             _state.update { it.copy(phase = BillingState.Phase.UNAVAILABLE) }
             return
         }
-        val prices = store.products(known.map { it.storeProductId }.distinct())
+        val prices = store.products(
+            oneTime = known.filter { kindOf(it) != OfferedProduct.Kind.SUBSCRIPTION }.map { it.storeProductId }.distinct(),
+            subscriptions = known.filter { kindOf(it) == OfferedProduct.Kind.SUBSCRIPTION }.map { it.storeProductId }.distinct()
+        )
         if (prices == null) {
             _state.update { it.copy(phase = BillingState.Phase.UNAVAILABLE) }
             return
         }
         val byId = prices.associateBy { it.productId }
-        val offered = known.mapNotNull { product ->
-            val price = byId[product.storeProductId]?.formattedPrice?.takeIf(String::isNotBlank) ?: return@mapNotNull null
-            OfferedProduct(
-                code = product.code,
-                kind = kindOf(product) ?: return@mapNotNull null,
-                units = product.units,
-                durationHours = product.durationHours.coerceAtLeast(0),
-                storeProductId = product.storeProductId,
-                name = product.name.ifBlank { product.code },
-                price = price
-            )
-        }
+        val offered = known.mapNotNull { product -> offered(product, byId[product.storeProductId]) }
         _state.update { it.copy(phase = BillingState.Phase.READY, products = offered) }
         reconcile()
+    }
+
+    /** What the server sells that this build understands: anything else is not offered. */
+    private fun isSellable(product: IapProductDto): Boolean = when (kindOf(product)) {
+        OfferedProduct.Kind.SUBSCRIPTION -> !product.planId.isNullOrBlank() &&
+            (product.billingPeriod == "month" || product.billingPeriod == "year") &&
+            when (product.entitlementKind) {
+                "unlimited" -> true
+                "daily" -> product.dailyLimit > 0
+                "monthly" -> product.monthlyLimit > 0
+                else -> false
+            }
+        OfferedProduct.Kind.PASS -> product.units > 0 && product.durationHours > 0
+        OfferedProduct.Kind.PACK -> product.units > 0
+        null -> false
+    }
+
+    /** The server's terms and Play's price; a product Play does not price, or prices for another period, is not offered. */
+    private fun offered(product: IapProductDto, store: StoreProduct?): OfferedProduct? {
+        val price = store?.formattedPrice?.takeIf(String::isNotBlank) ?: return null
+        val kind = kindOf(product) ?: return null
+        if (kind == OfferedProduct.Kind.SUBSCRIPTION && store.billingPeriod != product.billingPeriod) return null
+        return OfferedProduct(
+            code = product.code,
+            kind = kind,
+            units = product.units,
+            durationHours = product.durationHours.coerceAtLeast(0),
+            storeProductId = product.storeProductId,
+            name = product.name.ifBlank { product.code },
+            price = price,
+            planId = product.planId,
+            billingPeriod = product.billingPeriod,
+            entitlementKind = product.entitlementKind,
+            dailyLimit = product.dailyLimit,
+            monthlyLimit = product.monthlyLimit,
+            hasPriceMismatch = hasPriceMismatch(product, store)
+        )
+    }
+
+    /** Compared only where both sides name the same currency: a buyer abroad pays in their own. */
+    private fun hasPriceMismatch(product: IapProductDto, store: StoreProduct): Boolean {
+        val server = product.price?.takeIf { it > 0 } ?: return false
+        val micros = store.priceMicros ?: return false
+        if (product.currency.isNullOrBlank() || product.currency != store.currency) return false
+        return micros != server * MICROS_PER_MINOR
     }
 
     /** «Купить»: Play's sheet for [product]. The outcome arrives through the store's listener. */
     fun buy(activity: Activity, product: OfferedProduct) {
         val token = accountToken ?: return
-        if (_state.value.busyProductId != null) return
+        if (_state.value.busyProductId != null || product.hasPriceMismatch) return
         _state.update { it.copy(busyProductId = product.storeProductId, notice = null) }
-        store.launch(activity, product.storeProductId, token)?.let { onStoreUpdate(StoreUpdate.Failed(it)) }
+        val replacing = if (product.kind == OfferedProduct.Kind.SUBSCRIPTION) {
+            held.firstOrNull { it.isSubscription && product.storeProductId !in it.productIds && it.state == StorePurchaseState.PURCHASED }?.purchaseToken
+        } else {
+            null
+        }
+        store.launch(activity, product.storeProductId, token, replacing)?.let { onStoreUpdate(StoreUpdate.Failed(it)) }
+    }
+
+    /**
+     * «Восстановить покупки»: everything Play holds goes to the server, and the
+     * screen says what came of it. Purchases are also handed over by themselves
+     * on every return to the app; this is the explicit way for someone who
+     * expects to see it happen.
+     */
+    suspend fun restore() {
+        if (!canDeliver() || _state.value.restoring) return
+        _state.update { it.copy(restoring = true, notice = null) }
+        try {
+            if (!store.connect()) {
+                _state.update { it.copy(notice = PurchaseNotice.UNAVAILABLE) }
+                return
+            }
+            val purchases = store.purchases()
+            if (purchases == null) {
+                _state.update { it.copy(notice = PurchaseNotice.UNAVAILABLE) }
+                return
+            }
+            held = purchases
+            val paid = purchases.filter { it.state == StorePurchaseState.PURCHASED }
+            synchronized(lock) { finished -= paid.map { it.purchaseToken }.toSet() }
+            var restored = false
+            paid.forEach { purchase -> if (verify(purchase, fromSheet = false)) restored = true }
+            refreshUsage()
+            _state.update { state ->
+                state.copy(
+                    notice = when {
+                        restored -> PurchaseNotice.RESTORED
+                        paid.isEmpty() -> PurchaseNotice.NOTHING_TO_RESTORE
+                        else -> state.notice ?: PurchaseNotice.RETRY_LATER
+                    }
+                )
+            }
+        } finally {
+            _state.update { it.copy(restoring = false) }
+        }
     }
 
     /** Back in the app: a purchase paid meanwhile, or never handed over, goes to the server now. */
@@ -191,6 +292,7 @@ class BillingRepository(
     /** Another account may sign in next: nothing of this one's is kept. */
     fun reset() {
         accountToken = null
+        held = emptyList()
         synchronized(lock) { finished.clear() }
         _state.value = BillingState()
     }
@@ -202,11 +304,12 @@ class BillingRepository(
     suspend fun reconcile() {
         if (!canDeliver()) return
         if (!store.connect()) return
-        val held = store.purchases() ?: return
+        val current = store.purchases() ?: return
+        held = current
         _state.update { state ->
-            state.copy(pendingProductIds = held.filter { it.state == StorePurchaseState.PENDING }.flatMap { it.productIds }.toSet())
+            state.copy(pendingProductIds = current.filter { it.state == StorePurchaseState.PENDING }.flatMap { it.productIds }.toSet())
         }
-        val paid = held.filter { it.state == StorePurchaseState.PURCHASED }
+        val paid = current.filter { it.state == StorePurchaseState.PURCHASED }
         if (paid.isEmpty()) return
         // With sales closed the catalogue is refused, so the token stays unknown and
         // every purchase goes: the server refuses another account's and keeps nothing.
@@ -264,18 +367,21 @@ class BillingRepository(
      * One purchase to the server, once at a time. [fromSheet]: the user just
      * paid, so even a repeat (`already_granted`) is news worth saying.
      */
-    private suspend fun verify(purchase: StorePurchase, fromSheet: Boolean) {
+    private suspend fun verify(purchase: StorePurchase, fromSheet: Boolean): Boolean {
         val token = purchase.purchaseToken
-        val productId = purchase.productIds.firstOrNull() ?: return
+        val productId = purchase.productIds.firstOrNull() ?: return false
         synchronized(lock) {
-            if (token in finished || !inFlight.add(token)) return
+            if (token in finished || !inFlight.add(token)) return false
         }
         var notice: PurchaseNotice? = null
+        var granted = false
         try {
             val result = api.verify(productId, token)
             when {
                 result.isGranted -> {
-                    synchronized(lock) { finished += token }
+                    granted = true
+                    // A running subscription is checked again on the next return: it can renew or end.
+                    if (!purchase.isSubscription) synchronized(lock) { finished += token }
                     _state.update { it.copy(pendingProductIds = it.pendingProductIds - purchase.productIds.toSet()) }
                     val usage = result.usage?.takeIf { it.isKnown }
                     if (usage != null) onUsage(usage) else refreshUsage()
@@ -317,16 +423,21 @@ class BillingRepository(
                 )
             }
         }
+        return granted
     }
 
     private fun kindOf(product: IapProductDto): OfferedProduct.Kind? = when (product.kind) {
         "pack" -> OfferedProduct.Kind.PACK
         "pass" -> OfferedProduct.Kind.PASS
+        "subscription" -> OfferedProduct.Kind.SUBSCRIPTION
         else -> null
     }
 
     private companion object {
         /** `PURCHASE_INVALID` `details.reason`: Play's obfuscated account id is not this account's token. */
         const val REASON_ACCOUNT = "account_mismatch"
+
+        /** One minor unit of a currency in Play's micros: 1 ₸ = 100 тиын = 1 000 000 micros. */
+        const val MICROS_PER_MINOR = 10_000L
     }
 }

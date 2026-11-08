@@ -28,34 +28,49 @@ import java.time.format.DateTimeFormatter
  * Today's total comes first and is the only one in the primary text weight;
  * the parts it is made of follow, each only when the server sent it.
  *
+ * [extraOnly] leaves today's total out, for the cards that show it large.
+ *
  * Балансты жолдар: бүгін қолжетімді, бонус, сатып алынған, рұқсаттама.
  */
 @Composable
-fun BalanceRows(summary: BalanceSummary, modifier: Modifier = Modifier) {
+fun BalanceRows(summary: BalanceSummary, modifier: Modifier = Modifier, extraOnly: Boolean = false) {
     val locale = LocalServices.current.settings.effectiveAppLanguage.locale
     Column(modifier = modifier.fillMaxWidth()) {
-        BalanceRow(
-            stringResource(R.string.balance_today),
-            if (summary.unlimited) stringResource(R.string.balance_unlimited) else summary.availableNow.toString(),
-            isTotal = true
-        )
+        var first = true
+        fun divider(): Boolean = first.also { first = false }
+        if (!extraOnly) {
+            divider()
+            BalanceRow(
+                stringResource(R.string.balance_today),
+                if (summary.unlimited) "∞" else summary.availableNow.toString(),
+                isTotal = true
+            )
+        }
         summary.welcome?.let { welcome ->
-            RowDivider()
+            if (!divider()) RowDivider()
             BalanceRow(
                 stringResource(R.string.balance_welcome),
                 stringResource(R.string.balance_welcome_value, welcome.remaining, welcome.total)
             )
         }
         summary.purchased?.let { purchased ->
-            RowDivider()
+            if (!divider()) RowDivider()
             BalanceRow(stringResource(R.string.balance_purchased), purchased.toString())
         }
+        summary.admin?.let { admin ->
+            if (!divider()) RowDivider()
+            BalanceRow(stringResource(R.string.balance_admin), admin.toString())
+        }
         summary.pass?.let { pass ->
-            RowDivider()
+            if (!divider()) RowDivider()
             BalanceRow(stringResource(R.string.balance_pass, formatPassEnd(pass.until, locale)), pass.remaining.toString())
         }
     }
 }
+
+/** Whether the balance has anything to list beyond today's total. */
+val BalanceSummary.hasExtraRows: Boolean
+    get() = welcome != null || purchased != null || admin != null || pass != null
 
 @Composable
 private fun BalanceRow(title: String, value: String, isTotal: Boolean = false) {

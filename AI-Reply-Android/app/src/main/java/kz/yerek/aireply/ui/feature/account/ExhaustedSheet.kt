@@ -8,7 +8,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -20,12 +24,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import kz.yerek.aireply.R
 import kz.yerek.aireply.ai.AIReplyError
 import kz.yerek.aireply.domain.model.GrammaticalGender
 import kz.yerek.aireply.ui.design.LocalExtraColors
 import kz.yerek.aireply.ui.design.PrimaryButton
-import kz.yerek.aireply.ui.design.SecondaryButton
 import kz.yerek.aireply.ui.design.Spacing
 
 /**
@@ -85,20 +90,30 @@ fun ExhaustedSheet(
             verticalArrangement = Arrangement.spacedBy(Spacing.s),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Icon(
+                Icons.Outlined.HourglassEmpty,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(34.dp)
+            )
             Text(
                 stringResource(R.string.kb_limit_title),
                 style = MaterialTheme.typography.titleLarge,
+                textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth().semantics { heading() }
             )
             Text(
                 stringResource(ExhaustedRules.body(offersPurchase, gender)),
                 style = MaterialTheme.typography.bodyMedium,
                 color = LocalExtraColors.current.textSecondary,
+                textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth().padding(bottom = Spacing.xs)
             )
             if (offersPurchase) {
                 PrimaryButton(stringResource(R.string.purchase_title), onClick = onBuy)
-                SecondaryButton(stringResource(R.string.purchase_see_plans), modifier = Modifier.fillMaxWidth(), onClick = onPlans)
+                TextButton(onClick = onPlans, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.purchase_see_plans))
+                }
             } else {
                 PrimaryButton(stringResource(R.string.purchase_see_plans), onClick = onPlans)
             }

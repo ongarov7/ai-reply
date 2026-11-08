@@ -108,7 +108,9 @@ data class PlanDto(
      * billing integration and the administrator's switch. Absent (older
      * servers) means no.
      */
-    val purchasable: Boolean = false
+    val purchasable: Boolean = false,
+    /** `welcome`, `daily`, `monthly` or `unlimited`. Empty on an older server. */
+    @SerialName("entitlement_kind") val entitlementKind: String = ""
 ) {
     /** Localized name with an English fallback, mirroring the server. */
     fun localizedName(language: String): String =
@@ -128,7 +130,9 @@ data class SubscriptionDto(
     val status: String = "active",
     val plan: PlanDto,
     @SerialName("expires_at") val expiresAt: String? = null,
-    val source: String? = null
+    val source: String? = null,
+    /** Whether the store renews it. Null when the server does not say. */
+    @SerialName("auto_renews") val autoRenews: Boolean? = null
 )
 
 /**
@@ -159,10 +163,17 @@ data class UsageDto(
     /** Plan + pass + welcome + credits: everything usable right now. */
     @SerialName("remaining_total") val remainingTotal: Int? = null,
     /** What paid for this generation (`daily | pass | welcome | admin | pack`); reply and compose answers only. */
-    val bucket: String? = null
+    val bucket: String? = null,
+    /** Purchased packs left; with [adminCredits] it makes [credits]. Null on an older server. */
+    @SerialName("purchased_credits") val purchasedCredits: Int? = null,
+    @SerialName("admin_credits") val adminCredits: Int? = null,
+    /** Replies earned under an older daily plan stay usable after it ends. */
+    @SerialName("credits_never_expire") val creditsNeverExpire: Boolean = false,
+    /** Permanent replies added each paid day of an older daily plan; zero after it ends. */
+    @SerialName("daily_credit_grant") val dailyCreditGrant: Int = 0
 ) {
     /** The server has answered: every real usage carries its reset time. */
-    val isKnown: Boolean get() = dailyLimit > 0 || resetsAt.isNotEmpty() || remainingTotal != null
+    val isKnown: Boolean get() = unlimited || dailyLimit > 0 || resetsAt.isNotEmpty() || remainingTotal != null
 
     companion object {
         val UNKNOWN = UsageDto()

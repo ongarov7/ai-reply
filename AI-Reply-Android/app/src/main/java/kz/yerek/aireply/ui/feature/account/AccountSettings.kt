@@ -212,10 +212,10 @@ internal fun DeleteAccountDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
  */
 @Composable
 private fun planSummary(state: AccountController.State, language: String): String {
-    val plan = state.subscription?.plan ?: return ""
+    val plan = state.subscription?.plan ?: return "—"
     val name = plan.localizedName(language)
     val balance = BalanceSummary.of(state.usage)
-    if (balance.unlimited) return "$name · ${stringResource(R.string.balance_unlimited)}"
+    if (balance.unlimited) return "$name · ∞"
     if (balance.hasBalance) return stringResource(R.string.settings_account_plan_available, name, balance.availableNow)
     val summary = UsageSummary.of(state.usage) ?: return name
     return "$name · ${summary.remaining}/${summary.limit}"

@@ -20,14 +20,25 @@ data class IapCatalogDto(
 @Serializable
 data class IapProductDto(
     val code: String = "",
-    /** `pack` (never expires) or `pass` ([units] for [durationHours]). */
+    /** `pack` (never expires), `pass` ([units] for [durationHours]) or `subscription`. */
     val kind: String = "",
     val units: Int = 0,
     @SerialName("duration_hours") val durationHours: Int = 0,
     /** The Play product id. */
     @SerialName("store_product_id") val storeProductId: String = "",
     /** In the account's language. */
-    val name: String = ""
+    val name: String = "",
+    /** A subscription's plan on the server. */
+    @SerialName("plan_id") val planId: String? = null,
+    /** A subscription's period: `month` or `year`. */
+    @SerialName("billing_period") val billingPeriod: String? = null,
+    /** A subscription's allowance: `daily`, `monthly` or `unlimited`. */
+    @SerialName("entitlement_kind") val entitlementKind: String? = null,
+    @SerialName("daily_limit") val dailyLimit: Int = 0,
+    @SerialName("monthly_limit") val monthlyLimit: Int = 0,
+    /** The server's price in minor units, to compare with Play's; never shown. */
+    val price: Long? = null,
+    val currency: String? = null
 )
 
 /** `POST /api/v1/iap/google/purchases`. The server refuses any other field. */

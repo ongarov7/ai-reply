@@ -29,7 +29,7 @@
     <string name="home_profile_hours">Ish vaqti</string>
     <string name="home_profile_templates">Javob shablonlari</string>
     <string name="home_profile_title">Sizning sozlamalaringiz</string>
-    <string name="home_subtitle">Yaxshi javoblar bevosita klaviaturangizda.</string>
+    <string name="home_subtitle">Yozishmalardagi shaxsiy yordamchingiz.</string>
     <string name="home_title">AI Reply</string>
     <string name="home_tryit">Javob yaratish</string>
     <string name="home_usage_title">Bugungi javoblar</string>
@@ -234,9 +234,9 @@
     <string name="registration_finish">Saqlash va davom etish</string>
     <string name="registration_skip">Hozircha oʻtkazib yuborish</string>
 
-    <string name="subscription_title">Tarif</string>
-    <string name="subscription_current">Joriy tarif</string>
-    <string name="subscription_remaining">bugun qoldi</string>
+    <string name="subscription_title">Balans va foydalanish</string>
+    <string name="subscription_current">Joriy foydalanish</string>
+    <string name="subscription_remaining">mavjud</string>
     <string name="subscription_used_today">Bugun %2$d tadan %1$d tasi ishlatildi</string>
     <string name="subscription_remaining_month">bu oy qoldi</string>
     <string name="subscription_used_month">Bu oy %2$d tadan %1$d tasi ishlatildi</string>

@@ -57,7 +57,7 @@
     <string name="home_setup_step_keyboards">Keyboards</string>
     <string name="home_setup_step_settings">Open Settings</string>
     <string name="home_setup_title">Set up the keyboard</string>
-    <string name="home_subtitle">Better replies, straight from your keyboard.</string>
+    <string name="home_subtitle">Your personal messaging assistant.</string>
     <string name="home_title">AI Reply</string>
     <string name="home_tryit">Create a reply</string>
 
@@ -310,9 +310,9 @@
     <string name="registration_subtitle">Two answers are enough to make replies sound like you. You can change them any time.</string>
     <string name="registration_finish">Save and continue</string>
     <string name="registration_skip">Skip for now</string>
-    <string name="subscription_title">Plan</string>
-    <string name="subscription_current">Current plan</string>
-    <string name="subscription_remaining">left today</string>
+    <string name="subscription_title">Balance and access</string>
+    <string name="subscription_current">Current access</string>
+    <string name="subscription_remaining">available</string>
     <string name="subscription_used_today">Used %1$d of %2$d today</string>
     <string name="subscription_remaining_month">left this month</string>
     <string name="subscription_used_month">Used %1$d of %2$d this month</string>

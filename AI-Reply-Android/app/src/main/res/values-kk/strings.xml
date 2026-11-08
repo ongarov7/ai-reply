@@ -57,7 +57,7 @@
     <string name="home_setup_step_keyboards">Пернетақталар</string>
     <string name="home_setup_step_settings">«Параметрлер» бөлімін ашыңыз</string>
     <string name="home_setup_title">Пернетақтаны қосу</string>
-    <string name="home_subtitle">Дайын жауаптар — тікелей пернетақтадан.</string>
+    <string name="home_subtitle">Хат алмасудағы жеке көмекшің.</string>
     <string name="home_title">AI Reply</string>
     <string name="home_tryit">Жауап жасау</string>
 
@@ -309,9 +309,9 @@
     <string name="registration_subtitle">Жауаптар сіздің мәнеріңізде шығуы үшін екі жауап та жеткілікті. Кейін өзгертуге болады.</string>
     <string name="registration_finish">Сақтап, жалғастыру</string>
     <string name="registration_skip">Әзірге өткізіп жіберу</string>
-    <string name="subscription_title">Тариф</string>
-    <string name="subscription_current">Ағымдағы тариф</string>
-    <string name="subscription_remaining">бүгін қалды</string>
+    <string name="subscription_title">Баланс және қолжетімділік</string>
+    <string name="subscription_current">Қазіргі қолжетімділік</string>
+    <string name="subscription_remaining">қолжетімді</string>
     <string name="subscription_used_today">Бүгін %2$d-тің %1$d-і қолданылды</string>
     <string name="subscription_remaining_month">осы айда қалды</string>
     <string name="subscription_used_month">Осы айда %2$d-тің %1$d-і қолданылды</string>

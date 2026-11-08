@@ -21,9 +21,9 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.resume
 
 /**
- * [StoreClient] over Google Play Billing 8: one-time (INAPP) products,
- * pending purchases on, automatic reconnection on. Built on first use, so a
- * phone where purchases are switched off never binds to Play.
+ * [StoreClient] over Google Play Billing 8: one-time (INAPP) products and
+ * subscriptions, pending purchases on, automatic reconnection on. Built on
+ * first use, so a phone where purchases are switched off never binds to Play.
  *
  * Google Play арқылы сатып алу: тұтыну мен растауды сервер жасайды.
  */
@@ -42,7 +42,9 @@ class PlayStoreClient(context: Context) : StoreClient {
     private val client: BillingClient by lazy {
         BillingClient.newBuilder(appContext)
             .setListener { result, purchases -> listener(update(result, purchases)) }
-            .enablePendingPurchases(PendingPurchasesParams.newBuilder().enableOneTimeProducts().build())
+            .enablePendingPurchases(
+                PendingPurchasesParams.newBuilder().enableOneTimeProducts().enablePrepaidPlans().build()
+            )
             .enableAutoServiceReconnection()
             .build()
     }
@@ -67,15 +69,18 @@ class PlayStoreClient(context: Context) : StoreClient {
         }
     }
 
-    override suspend fun products(ids: List<String>): List<StoreProduct>? {
+    override suspend fun products(oneTime: List<String>, subscriptions: List<String>): List<StoreProduct>? {
+        val inApp = query(oneTime, BillingClient.ProductType.INAPP) ?: return null
+        val subs = query(subscriptions, BillingClient.ProductType.SUBS) ?: return null
+        return inApp.mapNotNull(::oneTimeProduct) + subs.mapNotNull(::subscriptionProduct)
+    }
+
+    private suspend fun query(ids: List<String>, type: String): List<ProductDetails>? {
         if (ids.isEmpty()) return emptyList()
         val params = QueryProductDetailsParams.newBuilder()
             .setProductList(
                 ids.map { id ->
-                    QueryProductDetailsParams.Product.newBuilder()
-                        .setProductId(id)
-                        .setProductType(BillingClient.ProductType.INAPP)
-                        .build()
+                    QueryProductDetailsParams.Product.newBuilder().setProductId(id).setProductType(type).build()
                 }
             )
             .build()
@@ -84,42 +89,88 @@ class PlayStoreClient(context: Context) : StoreClient {
             ReplyLog.warn(null) { "play products not loaded: ${result.billingResult.responseCode}" }
             return null
         }
-        return result.productDetailsList.orEmpty().mapNotNull { product ->
-            // Only Play's own price is ever shown; a product without one is not offered.
-            @Suppress("DEPRECATION")
-            val price = product.oneTimePurchaseOfferDetails?.formattedPrice ?: return@mapNotNull null
-            details[product.productId] = product
-            StoreProduct(product.productId, price)
-        }
+        return result.productDetailsList.orEmpty().onEach { details[it.productId] = it }
     }
+
+    private fun oneTimeProduct(product: ProductDetails): StoreProduct? {
+        // Only Play's own price is ever shown; a product without one is not offered.
+        @Suppress("DEPRECATION")
+        val offer = product.oneTimePurchaseOfferDetails ?: return null
+        @Suppress("DEPRECATION")
+        return StoreProduct(
+            productId = product.productId,
+            formattedPrice = offer.formattedPrice,
+            priceMicros = offer.priceAmountMicros,
+            currency = offer.priceCurrencyCode
+        )
+    }
+
+    /** The base plan: the offer that is not a developer's promotion, at its recurring price. */
+    private fun subscriptionProduct(product: ProductDetails): StoreProduct? {
+        val offer = basePlanOffer(product) ?: return null
+        val phase = offer.pricingPhases.pricingPhaseList.lastOrNull() ?: return null
+        return StoreProduct(
+            productId = product.productId,
+            formattedPrice = phase.formattedPrice,
+            billingPeriod = when (phase.billingPeriod) {
+                "P1M", "P4W" -> "month"
+                "P1Y" -> "year"
+                else -> null
+            },
+            priceMicros = phase.priceAmountMicros,
+            currency = phase.priceCurrencyCode
+        )
+    }
+
+    private fun basePlanOffer(product: ProductDetails): ProductDetails.SubscriptionOfferDetails? =
+        product.subscriptionOfferDetails?.firstOrNull { it.offerId == null }
 
     override suspend fun purchases(): List<StorePurchase>? {
-        val params = QueryPurchasesParams.newBuilder().setProductType(BillingClient.ProductType.INAPP).build()
-        val result = client.queryPurchasesAsync(params)
-        if (result.billingResult.responseCode != BillingClient.BillingResponseCode.OK) return null
-        return result.purchasesList.map(::purchase)
+        val inApp = held(BillingClient.ProductType.INAPP) ?: return null
+        val subs = held(BillingClient.ProductType.SUBS) ?: return null
+        return inApp.map { purchase(it, isSubscription = false) } + subs.map { purchase(it, isSubscription = true) }
     }
 
-    override fun launch(activity: Activity, productId: String, accountToken: String): StoreError? {
+    private suspend fun held(type: String): List<Purchase>? {
+        val params = QueryPurchasesParams.newBuilder().setProductType(type).build()
+        val result = client.queryPurchasesAsync(params)
+        if (result.billingResult.responseCode != BillingClient.BillingResponseCode.OK) return null
+        return result.purchasesList
+    }
+
+    override fun launch(activity: Activity, productId: String, accountToken: String, replacing: String?): StoreError? {
         val product = details[productId] ?: return StoreError.FAILED
+        val productParams = BillingFlowParams.ProductDetailsParams.newBuilder().setProductDetails(product)
+        if (product.productType == BillingClient.ProductType.SUBS) {
+            productParams.setOfferToken(basePlanOffer(product)?.offerToken ?: return StoreError.FAILED)
+        }
         val params = BillingFlowParams.newBuilder()
-            .setProductDetailsParamsList(
-                listOf(BillingFlowParams.ProductDetailsParams.newBuilder().setProductDetails(product).build())
-            )
+            .setProductDetailsParamsList(listOf(productParams.build()))
             // Exactly as the server sent it: the server checks it against the purchase.
             .setObfuscatedAccountId(accountToken)
-            .build()
-        val result = client.launchBillingFlow(activity, params)
+        if (replacing != null) {
+            params.setSubscriptionUpdateParams(
+                BillingFlowParams.SubscriptionUpdateParams.newBuilder()
+                    .setOldPurchaseToken(replacing)
+                    .setSubscriptionReplacementMode(
+                        BillingFlowParams.SubscriptionUpdateParams.ReplacementMode.WITH_TIME_PRORATION
+                    )
+                    .build()
+            )
+        }
+        val result = client.launchBillingFlow(activity, params.build())
         return if (result.responseCode == BillingClient.BillingResponseCode.OK) null else error(result.responseCode)
     }
 
     private fun update(result: BillingResult, purchases: List<Purchase>?): StoreUpdate = when (result.responseCode) {
-        BillingClient.BillingResponseCode.OK -> StoreUpdate.Purchases(purchases.orEmpty().map(::purchase))
+        BillingClient.BillingResponseCode.OK -> StoreUpdate.Purchases(
+            purchases.orEmpty().map { purchase(it, isSubscription = details[it.products.firstOrNull()]?.productType == BillingClient.ProductType.SUBS) }
+        )
         BillingClient.BillingResponseCode.USER_CANCELED -> StoreUpdate.Cancelled
         else -> StoreUpdate.Failed(error(result.responseCode))
     }
 
-    private fun purchase(purchase: Purchase) = StorePurchase(
+    private fun purchase(purchase: Purchase, isSubscription: Boolean) = StorePurchase(
         productIds = purchase.products,
         purchaseToken = purchase.purchaseToken,
         state = when (purchase.purchaseState) {
@@ -127,7 +178,8 @@ class PlayStoreClient(context: Context) : StoreClient {
             Purchase.PurchaseState.PENDING -> StorePurchaseState.PENDING
             else -> StorePurchaseState.UNKNOWN
         },
-        accountToken = purchase.accountIdentifiers?.obfuscatedAccountId
+        accountToken = purchase.accountIdentifiers?.obfuscatedAccountId,
+        isSubscription = isSubscription
     )
 
     private fun error(code: Int): StoreError = when (code) {

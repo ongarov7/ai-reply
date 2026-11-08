@@ -47,6 +47,8 @@ object DebugSamples {
             timezone = "Asia/Almaty",
             welcome = WelcomeDto(total = 10, remaining = 7),
             credits = 30,
+            purchasedCredits = 30,
+            adminCredits = 0,
             remainingTotal = 37
         )
 
@@ -56,12 +58,20 @@ object DebugSamples {
 
     private val catalog = IapCatalogDto(
         products = listOf(
+            IapProductDto("base_monthly", "subscription", 0, 0, "debug.base.monthly", "Base", planId = "base_monthly", billingPeriod = "month", entitlementKind = "monthly", monthlyLimit = 1000),
+            IapProductDto("base_yearly", "subscription", 0, 0, "debug.base.yearly", "Base", planId = "base_yearly", billingPeriod = "year", entitlementKind = "monthly", monthlyLimit = 1000),
+            IapProductDto("pro_monthly", "subscription", 0, 0, "debug.pro.monthly", "Pro", planId = "pro_monthly", billingPeriod = "month", entitlementKind = "unlimited"),
+            IapProductDto("pro_yearly", "subscription", 0, 0, "debug.pro.yearly", "Pro", planId = "pro_yearly", billingPeriod = "year", entitlementKind = "unlimited"),
             IapProductDto("pack30", "pack", 30, 0, "debug.pack30", "30 ответов")
         ),
         accountToken = "00000000-0000-4000-8000-000000000000"
     )
 
     private val prices = mapOf(
+        "debug.base.monthly" to "990 ₸",
+        "debug.base.yearly" to "9 990 ₸",
+        "debug.pro.monthly" to "3 990 ₸",
+        "debug.pro.yearly" to "39 900 ₸",
         "debug.pack30" to "130 ₸"
     )
 
@@ -80,12 +90,24 @@ object DebugSamples {
 
         override suspend fun connect() = true
 
-        override suspend fun products(ids: List<String>) =
-            ids.mapNotNull { id -> prices[id]?.let { StoreProduct(id, it) } }
+        override suspend fun products(oneTime: List<String>, subscriptions: List<String>) =
+            (oneTime + subscriptions).mapNotNull { id ->
+                prices[id]?.let { price ->
+                    StoreProduct(
+                        productId = id,
+                        formattedPrice = price,
+                        billingPeriod = when {
+                            id.endsWith("monthly") -> "month"
+                            id.endsWith("yearly") -> "year"
+                            else -> null
+                        }
+                    )
+                }
+            }
 
         override suspend fun purchases() = emptyList<StorePurchase>()
 
-        override fun launch(activity: Activity, productId: String, accountToken: String): StoreError? {
+        override fun launch(activity: Activity, productId: String, accountToken: String, replacing: String?): StoreError? {
             scope.launch {
                 delay(600)
                 listener(

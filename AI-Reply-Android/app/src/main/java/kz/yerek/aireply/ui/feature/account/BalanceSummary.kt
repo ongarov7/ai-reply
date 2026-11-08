@@ -24,12 +24,14 @@ data class BalanceSummary(
     val availableNow: Int,
     /** The free replies of a new account; a row while the account has a grant. */
     val welcome: Part?,
-    /** Administrator grants and purchased packs; a row while some are left. */
+    /** Purchased packs; a row while some are left. */
     val purchased: Int?,
     /** A running pass; a row until it ends. */
     val pass: Pass?,
     /** An unlimited plan (Pro): no count to show, whatever availableNow says. */
-    val unlimited: Boolean = false
+    val unlimited: Boolean = false,
+    /** Replies an administrator granted; a row while some are left. */
+    val admin: Int? = null
 ) {
     data class Part(val remaining: Int, val total: Int)
 
@@ -55,13 +57,16 @@ data class BalanceSummary(
             val pass = usage.pass?.let { pass ->
                 parse(pass.expiresAt)?.takeIf { it.toInstant().isAfter(now) }?.let { Pass(it, pass.remaining.coerceAtLeast(0)) }
             }
+            val purchased = usage.purchasedCredits
+                ?: usage.credits?.let { (it - (usage.adminCredits ?: 0)).coerceAtLeast(0) }
             return BalanceSummary(
                 hasBalance = true,
                 availableNow = total.coerceAtLeast(0),
                 welcome = welcome,
-                purchased = usage.credits?.takeIf { it > 0 },
+                purchased = purchased?.takeIf { it > 0 },
                 pass = pass,
-                unlimited = usage.unlimited
+                unlimited = usage.unlimited,
+                admin = usage.adminCredits?.takeIf { it > 0 }
             )
         }
 
