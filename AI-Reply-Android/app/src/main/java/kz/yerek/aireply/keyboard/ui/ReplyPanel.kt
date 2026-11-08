@@ -553,7 +553,10 @@ private fun Header(model: ComposerModel, actions: ComposerActions, strings: AppS
         Spacer(Modifier.width(6.dp))
 
         if (!model.sourceExpanded || flow.isConflict) {
-            val preview = if (hasSource) source.lines().joinToString(" ") else strings[R.string.kb_paste_message]
+            // After a read that found nothing, the card opens to be typed into instead.
+            val typingOffered = model.session.typingOffered
+            val emptyAction = strings[if (typingOffered) R.string.kb_type_source_message else R.string.kb_paste_message]
+            val preview = if (hasSource) source.lines().joinToString(" ") else emptyAction
             Row(
                 modifier = Modifier
                     .weight(1f)
@@ -561,13 +564,13 @@ private fun Header(model: ComposerModel, actions: ComposerActions, strings: AppS
                     .clip(RoundedCornerShape(8.dp))
                     .background(theme.quoteBackground)
                     .clickable(enabled = !flow.isGenerating && !flow.isConflict, role = Role.Button) {
-                        if (hasSource) actions.onToggleSource() else actions.onPaste()
+                        if (hasSource || typingOffered) actions.onToggleSource() else actions.onPaste()
                     }
                     .semantics {
                         contentDescription = if (hasSource) {
                             "${strings[R.string.kb_copied_message]}: $preview"
                         } else {
-                            strings[R.string.kb_paste_message]
+                            emptyAction
                         }
                     }
                     .padding(start = 8.dp, end = 6.dp),
@@ -583,7 +586,11 @@ private fun Header(model: ComposerModel, actions: ComposerActions, strings: AppS
                     modifier = Modifier.weight(1f)
                 )
                 Icon(
-                    if (hasSource) Icons.Filled.ExpandMore else Icons.Filled.ContentPaste,
+                    when {
+                        hasSource -> Icons.Filled.ExpandMore
+                        typingOffered -> Icons.Filled.Edit
+                        else -> Icons.Filled.ContentPaste
+                    },
                     null,
                     tint = theme.secondaryText,
                     modifier = Modifier.size(14.dp)
@@ -652,7 +659,7 @@ private fun SourceCard(
         )
         KeyboardTextField(
             state = model.session.source,
-            placeholder = strings[R.string.kb_err_no_source],
+            placeholder = strings[if (model.session.typingOffered) R.string.kb_type_source_message else R.string.kb_err_no_source],
             textStyle = TextStyle(fontSize = 14.sp, lineHeight = 19.sp),
             textColor = theme.quoteText,
             placeholderColor = theme.secondaryText,

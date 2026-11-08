@@ -700,6 +700,10 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
                 autocorrect.clear()
                 sourceExpanded = !sourceExpanded
                 if (!sourceExpanded && focus == PanelFocus.SOURCE) focus = PanelFocus.INSTRUCTION
+                // Opened empty, the card is there to be typed into.
+                if (sourceExpanded && replies.flow.stage == ReplyComposerFlow.Stage.Composing &&
+                    replies.session?.source?.text?.isBlank() == true
+                ) focus = PanelFocus.SOURCE
                 polish.focusMoved(activeField)
                 refreshAutoShift()
             },
@@ -1311,7 +1315,10 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         val pending = panels.openReply(template) { readCopied(currentInputConnection) }
         val opened = replies.session
         if (pending != null && opened != null) {
-            readLater(pending) { late -> panels.lateSource(opened, late, replacing = false) }
+            readLater(pending) { late ->
+                panels.lateSource(opened, late, replacing = false)
+                if (replies.session === opened) offerTypedSource(lateRead = true)
+            }
         }
         if (resuming) {
             // Back to the instruction from a number field: letters, not its pad.
@@ -1323,6 +1330,7 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         sourceExpanded = false
         plane = KeyboardPlane.LETTERS
         shift.reset()
+        offerTypedSource()
         refreshAutoShift()
     }
 
@@ -1355,17 +1363,48 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         when (val result = readCopied(null)) {
             is ContextTextProvider.Result.Success -> {
                 replies.replaceSource(result.context.text)
-                sourceExpanded = false
+                foldSource()
             }
-            is ContextTextProvider.Result.Failure -> replies.showError(result.error, result.miss)
+            is ContextTextProvider.Result.Failure -> {
+                replies.showError(result.error, result.miss)
+                offerTypedSource()
+            }
             is ContextTextProvider.Result.Deferred -> {
                 val session = replies.session ?: return
                 readLater(result) { late ->
                     panels.lateSource(session, late, replacing = true)
-                    if (late is ContextTextProvider.Result.Success && replies.session === session) sourceExpanded = false
+                    if (replies.session === session) {
+                        if (late is ContextTextProvider.Result.Success) foldSource() else offerTypedSource(lateRead = true)
+                    }
                 }
             }
         }
+    }
+
+    /** A message was pasted: the card folds away and typing goes back to the instruction. */
+    private fun foldSource() {
+        sourceExpanded = false
+        if (focus != PanelFocus.SOURCE) return
+        autocorrect.clear()
+        focus = PanelFocus.INSTRUCTION
+        refreshAutoShift()
+    }
+
+    /**
+     * A read found nothing and the panel says so: the message card opens,
+     * empty, with the caret in it, so the message can be typed instead. A
+     * read that ended late leaves the caret with anyone already writing the
+     * instruction.
+     */
+    private fun offerTypedSource(lateRead: Boolean = false) {
+        val instruction = replies.session?.instruction ?: return
+        if (!replies.offerTypedSource()) return
+        sourceExpanded = true
+        if (lateRead && instruction.text.isNotEmpty()) return
+        autocorrect.clear()
+        focus = PanelFocus.SOURCE
+        polish.focusMoved(activeField)
+        refreshAutoShift()
     }
 
     /**

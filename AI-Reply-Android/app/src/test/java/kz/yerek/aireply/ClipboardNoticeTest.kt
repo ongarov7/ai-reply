@@ -109,6 +109,76 @@ class ClipboardNoticeTest {
         assertNull(h.replies.session)
     }
 
+    // ------------------------------------------------------- typing it instead
+
+    @Test
+    fun `a private clip offers the card to type into at once`() {
+        h.panels.openReply(h.friend) { private }
+        assertTrue(h.replies.offerTypedSource())
+        assertTrue(h.replies.session!!.typingOffered)
+    }
+
+    @Test
+    fun `an empty clipboard offers nothing until Paste has found nothing`() {
+        h.panels.openReply(h.friend) { ContextTextProvider.Result.Failure(AIReplyError.NoSourceMessage) }
+        assertFalse("a persona tap stays quiet", h.replies.offerTypedSource())
+        assertFalse(h.replies.session!!.typingOffered)
+
+        h.replies.showError(AIReplyError.NoSourceMessage, ClipboardMiss.NOTHING_COPIED)
+        assertTrue(h.replies.offerTypedSource())
+        assertTrue(h.replies.session!!.typingOffered)
+    }
+
+    @Test
+    fun `a failed Paste over a message offers nothing, and copied text needs no offer`() {
+        h.openReply(message = copied)
+        h.replies.showError(AIReplyError.NoSourceMessage, ClipboardMiss.NOTHING_COPIED)
+        assertFalse(h.replies.offerTypedSource())
+        assertFalse(h.replies.session!!.typingOffered)
+
+        h.panels.closeAll()
+        h.panels.openReply(h.friend) { success() }
+        assertFalse(h.replies.offerTypedSource())
+    }
+
+    @Test
+    fun `the offer outlives its notice, and only for its own session`() {
+        h.panels.openReply(h.friend) { private }
+        h.replies.offerTypedSource()
+        val offered = h.replies.session!!
+        offered.source.set("набрано вручную")
+        h.replies.composerEdited()
+        assertNull(offered.flow.error)
+        offered.source.set("")
+        assertTrue("Clear and the preview still offer typing", offered.typingOffered)
+        assertFalse("no failure on screen now", h.replies.offerTypedSource())
+
+        h.panels.closeAll()
+        h.panels.openReply(h.friend) { ContextTextProvider.Result.Failure(AIReplyError.NoSourceMessage) }
+        assertFalse(h.replies.session!!.typingOffered)
+    }
+
+    @Test
+    fun `a late read that says what failed offers the card, a quiet one does not`() {
+        val pending = ContextTextProvider.Result.Deferred { success() }
+        h.panels.openReply(h.friend) { pending }
+        val session = h.replies.session!!
+        assertFalse("nothing has failed yet", h.replies.offerTypedSource())
+
+        h.panels.lateSource(session, ContextTextProvider.Result.Failure(AIReplyError.NoSourceMessage, ClipboardMiss.NOTHING_COPIED), replacing = false)
+        assertFalse(h.replies.offerTypedSource())
+
+        h.panels.lateSource(session, ContextTextProvider.Result.Failure(AIReplyError.ClipboardUnavailable, ClipboardMiss.UNREADABLE), replacing = false)
+        assertTrue(h.replies.offerTypedSource())
+    }
+
+    @Test
+    fun `a reply put aside takes no offer`() {
+        h.panels.openReply(h.friend) { private }
+        h.panels.putReplyAside()
+        assertFalse(h.replies.offerTypedSource())
+    }
+
     // ---------------------------------------------------------- late reads
 
     @Test

@@ -52,6 +52,10 @@ class ReplySession(template: ReplyTemplate, source: String, val acquiredFrom: Re
     var clipboardMiss: ClipboardMiss? by mutableStateOf(null)
         internal set
 
+    /** A read found nothing with no message there: from now on the message is offered to be typed. */
+    var typingOffered: Boolean by mutableStateOf(false)
+        internal set
+
     /** Puts the current version's text in the draft field, caret at the end. */
     internal fun showCurrentVersion() {
         val text = flow.draftText
@@ -159,6 +163,20 @@ class ReplySessionController(
         val current = session ?: return
         current.flow = current.flow.copy(error = error.takeIf { it != AIReplyError.Cancelled })
         current.clipboardMiss = miss
+    }
+
+    /**
+     * After a read: true when its failure is on screen and there is no
+     * message yet, so the message card should open to be typed into. An empty
+     * clipboard on a persona tap says nothing ([open]) and opens nothing.
+     */
+    fun offerTypedSource(): Boolean {
+        val current = session?.takeIf { isComposing } ?: return false
+        val flow = current.flow
+        val nothingRead = flow.error == AIReplyError.NoSourceMessage || flow.error == AIReplyError.ClipboardUnavailable
+        if (!nothingRead || flow.stage != ReplyComposerFlow.Stage.Composing || current.source.text.isNotBlank()) return false
+        current.typingOffered = true
+        return true
     }
 
     /** The source or the instruction was edited: an old error no longer describes it. */
