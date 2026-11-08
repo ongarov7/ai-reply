@@ -72,7 +72,13 @@ class BillingTest {
         override suspend fun products(oneTime: List<String>, subscriptions: List<String>) =
             (oneTime + subscriptions).mapNotNull { id -> prices[id]?.let { StoreProduct(id, it, periods[id], micros[id], "KZT".takeIf { _ -> id in micros }) } }
 
-        override suspend fun purchases() = held.toList()
+        var answersPurchases = true
+        var onPurchases: () -> Unit = {}
+
+        override suspend fun purchases(): List<StorePurchase>? {
+            onPurchases()
+            return held.toList().takeIf { answersPurchases }
+        }
 
         override fun launch(activity: Activity, productId: String, accountToken: String, replacing: String?): StoreError? {
             launched += productId to accountToken
@@ -235,6 +241,27 @@ class BillingTest {
         billing.buy(activity, state.subscriptions.first { it.storeProductId == "play.pro.month" })
         assertEquals(listOf("play.pro.month" to TOKEN), store.launched)
         assertNull(store.replaced)
+    }
+
+    @Test
+    fun `what Play holds is known before any plan can be tapped`() = runBlocking {
+        sellsBaseAndPro()
+        store.held += runningBase()
+        val phases = mutableListOf<BillingState.Phase>()
+        store.onPurchases = { phases += state.phase }
+        billing.load()
+        assertEquals(BillingState.Phase.LOADING, phases.first())
+        billing.buy(activity, state.subscriptions.first { it.storeProductId == "play.pro.month" })
+        assertEquals("running-token", store.replaced)
+    }
+
+    @Test
+    fun `Play not saying what it holds offers a retry, not a second subscription`() = runBlocking {
+        sellsBaseAndPro()
+        store.answersPurchases = false
+        billing.load()
+        assertEquals(BillingState.Phase.UNAVAILABLE, state.phase)
+        assertTrue(state.subscriptions.isEmpty())
     }
 
     @Test

@@ -172,10 +172,13 @@ class BillingRepository(
             oneTime = known.filter { kindOf(it) != OfferedProduct.Kind.SUBSCRIPTION }.map { it.storeProductId }.distinct(),
             subscriptions = known.filter { kindOf(it) == OfferedProduct.Kind.SUBSCRIPTION }.map { it.storeProductId }.distinct()
         )
-        if (prices == null) {
+        // Known before anything can be tapped: a subscription bought without it runs alongside the current one.
+        val current = prices?.let { store.purchases() }
+        if (prices == null || current == null) {
             _state.update { it.copy(phase = BillingState.Phase.UNAVAILABLE) }
             return
         }
+        held = current
         val byId = prices.associateBy { it.productId }
         val offered = known.mapNotNull { product -> offered(product, byId[product.storeProductId]) }
         _state.update { it.copy(phase = BillingState.Phase.READY, products = offered) }
