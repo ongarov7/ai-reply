@@ -112,7 +112,10 @@ class NotificationPreferencesRepository(
             } catch (failure: Exception) {
                 ReplyLog.warn(failure) { "notification preference not saved" }
                 // Rolled back: the switch shows the server's value again.
-                _state.update { it.copy(pending = it.pending.withoutIf(category, enabled), failed = true) }
+                _state.update {
+                    if (accountId() != owner) it
+                    else it.copy(pending = it.pending.withoutIf(category, enabled), failed = true)
+                }
                 false
             }
         }

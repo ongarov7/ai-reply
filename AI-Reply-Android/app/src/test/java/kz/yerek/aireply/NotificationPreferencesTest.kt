@@ -145,6 +145,24 @@ class NotificationPreferencesTest {
     }
 
     @Test
+    fun `a failed change is not reported to the next account`() = runBlocking {
+        val api = FakePreferencesApi().apply { fail = true }
+        var account: String? = "first"
+        val repository = NotificationPreferencesRepository(api, accountId = { account })
+        repository.load()
+
+        api.gate = CompletableDeferred()
+        val change = async { repository.set("marketing", false) }
+        yield()
+        account = "second"
+        repository.clear()
+        api.gate!!.complete(Unit)
+
+        assertFalse(change.await())
+        assertFalse(repository.state.value.failed)
+    }
+
+    @Test
     fun `a change names its account on the wire, and none when it is not known`() = runBlocking {
         val server = FakeServer { FakeResponse(200, """{"preferences":{"marketing":true},"optional":["marketing"]}""") }
         val api = HttpPushApi(
