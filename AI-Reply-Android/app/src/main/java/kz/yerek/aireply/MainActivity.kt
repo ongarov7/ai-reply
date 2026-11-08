@@ -115,6 +115,11 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         val services = AIReplyApplication.services(this)
         services.configuration.reload()
+        // The balance may have changed while the app was away, a website payment for one. A tapped
+        // notification also arrives just before this, so it opens on current numbers. Start-up reads
+        // the account by itself.
+        val account = services.account.state.value
+        if (account.bootstrapComplete && account.isSignedIn) lifecycleScope.launch { services.account.refresh() }
         // A profile change that could not reach the server is retried on every return.
         lifecycleScope.launch { services.profileSync.pushPending() }
         // A feature switched on meanwhile (purchases, the support chat) shows without a restart.
