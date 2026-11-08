@@ -10607,6 +10607,71 @@
         }
       }
     },
+    "subscription.perMonth %lld" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld reply a month"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld replies a month"
+                }
+              }
+            }
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Айына %lld жауап"
+          }
+        },
+        "ru" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld ответ в месяц"
+                }
+              },
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld ответа в месяц"
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld ответов в месяц"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld ответа в месяц"
+                }
+              }
+            }
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oyiga %lld ta javob"
+          }
+        }
+      }
+    },
     "subscription.remaining" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -10690,6 +10755,35 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Balans va foydalanish"
+          }
+        }
+      }
+    },
+    "subscription.usedMonth %lld %lld" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Used %1$lld of %2$lld this month"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Осы айда %2$lld-тің %1$lld-і қолданылды"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Использовано %1$lld из %2$lld за месяц"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu oy %2$lld tadan %1$lld tasi ishlatildi"
           }
         }
       }
@@ -14783,6 +14877,35 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Qo‘shimcha javoblar uchun %@ sarfladingiz. Oyiga %@ evaziga Base bilan har kuni %lld ta javob oling."
+          }
+        }
+      }
+    },
+    "purchase.recommendation.bodyMonthly %@ %@ %lld" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You’ve spent %@ on extra reply packs. With Base at %@ per month, you get %lld replies every month."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Қосымша жауаптарға %@ жұмсадың. Айына %@ тұратын Base арқылы ай сайын %lld жауап ал."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "На дополнительные ответы уже ушло %@. Base за %@ в месяц даёт %lld ответов каждый месяц."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qo‘shimcha javoblar uchun %@ sarfladingiz. Oyiga %@ evaziga Base bilan har oy %lld ta javob oling."
           }
         }
       }

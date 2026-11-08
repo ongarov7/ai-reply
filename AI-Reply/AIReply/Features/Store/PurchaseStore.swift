@@ -34,6 +34,7 @@ struct PurchaseOffer: Identifiable, Equatable, Sendable {
     var billingPeriod: String? = nil
     var entitlementKind: String? = nil
     var dailyLimit = 0
+    var monthlyLimit = 0
     var hasPriceMismatch = false
     var creditsNeverExpire = false
 
@@ -50,7 +51,9 @@ struct PurchaseOffer: Identifiable, Equatable, Sendable {
                 guard storeProduct.kind == .subscription, product.planID != nil,
                       product.billingPeriod == "month" || product.billingPeriod == "year",
                       storeProduct.billingPeriod == product.billingPeriod,
-                      product.entitlementKind == "unlimited" || (product.entitlementKind == "daily" && product.dailyLimit > 0)
+                      product.entitlementKind == "unlimited"
+                        || (product.entitlementKind == "daily" && product.dailyLimit > 0)
+                        || (product.entitlementKind == "monthly" && product.monthlyLimit > 0)
                 else { return nil }
             } else {
                 guard product.units > 0 else { return nil }
@@ -69,7 +72,7 @@ struct PurchaseOffer: Identifiable, Equatable, Sendable {
                                  name: name.isEmpty ? storeProduct.displayName : name,
                                  displayPrice: storeProduct.displayPrice, planID: product.planID,
                                  billingPeriod: product.billingPeriod, entitlementKind: product.entitlementKind,
-                                 dailyLimit: product.dailyLimit, hasPriceMismatch: mismatch,
+                                 dailyLimit: product.dailyLimit, monthlyLimit: product.monthlyLimit, hasPriceMismatch: mismatch,
                                  creditsNeverExpire: product.creditsNeverExpire)
         }
     }

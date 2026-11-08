@@ -33,7 +33,7 @@ struct PurchaseView: View {
 struct SubscriptionPlanCatalogue {
     struct Option: Identifiable {
         enum Allowance: Equatable {
-            case daily(Int), unlimited, unspecified
+            case daily(Int), monthly(Int), unlimited, unspecified
         }
 
         let plan: AccountAPI.Plan?
@@ -47,6 +47,7 @@ struct SubscriptionPlanCatalogue {
             let limit = offer.dailyLimit
             if kind == "unlimited" { return .unlimited }
             if kind == "daily", limit > 0 { return .daily(limit) }
+            if kind == "monthly", offer.monthlyLimit > 0 { return .monthly(offer.monthlyLimit) }
             return .unspecified
         }
 
@@ -299,6 +300,8 @@ struct PurchaseOptionsView: View {
                         } else {
                             Text("subscription.perDay \(limit)").font(.subheadline).foregroundStyle(.secondary)
                         }
+                    } else if case .monthly(let limit) = option.allowance {
+                        Text("subscription.perMonth \(limit)").font(.subheadline).foregroundStyle(.secondary)
                     }
                 }
                 Spacer(minLength: DS.Spacing.s)
@@ -370,14 +373,21 @@ struct PurchaseOptionsView: View {
               !(account.subscription?.status == "active" && account.subscription?.plan.isFree == false) else { return nil }
         return subscriptions.first {
             $0.storeProductID == recommendation.baseStoreProductID && $0.billingPeriod == "month"
-                && $0.entitlementKind == "daily" && $0.dailyLimit > 0 && !$0.hasPriceMismatch
+                && (($0.entitlementKind == "daily" && $0.dailyLimit > 0) || ($0.entitlementKind == "monthly" && $0.monthlyLimit > 0))
+                && !$0.hasPriceMismatch
         }
     }
 
     private func recommendationCard(_ recommendation: PurchaseAPI.Recommendation, offer: PurchaseOffer) -> some View {
         VStack(alignment: .leading, spacing: DS.Spacing.s) {
             Label("purchase.recommendation.title", systemImage: "sparkles").font(.headline)
-            Text("purchase.recommendation.body \(formattedSpend(recommendation)) \(offer.displayPrice) \(offer.dailyLimit)")
+            Group {
+                if offer.monthlyLimit > 0 {
+                    Text("purchase.recommendation.bodyMonthly \(formattedSpend(recommendation)) \(offer.displayPrice) \(offer.monthlyLimit)")
+                } else {
+                    Text("purchase.recommendation.body \(formattedSpend(recommendation)) \(offer.displayPrice) \(offer.dailyLimit)")
+                }
+            }
                 .font(.subheadline).fixedSize(horizontal: false, vertical: true)
             Button("purchase.recommendation.choose") {
                 period = "month"

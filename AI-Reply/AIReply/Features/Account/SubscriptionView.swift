@@ -75,6 +75,12 @@ struct SubscriptionView: View {
                 Text("subscription.usedToday \(account.usage.usedToday) \(account.usage.dailyLimit)")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+            } else if !account.usage.unlimited && account.usage.monthlyLimit > 0 {
+                ProgressView(value: monthProgress)
+                    .tint(Color.accentColor)
+                Text("subscription.usedMonth \(account.usage.usedMonth) \(account.usage.monthlyLimit)")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
 
             if !balance.extraRows.isEmpty {
@@ -125,6 +131,11 @@ struct SubscriptionView: View {
     private var progress: Double {
         guard account.usage.dailyLimit > 0 else { return 0 }
         return min(1, Double(account.usage.usedToday) / Double(account.usage.dailyLimit))
+    }
+
+    private var monthProgress: Double {
+        guard account.usage.monthlyLimit > 0 else { return 0 }
+        return min(1, Double(account.usage.usedMonth) / Double(account.usage.monthlyLimit))
     }
 
     /// The server sends ISO-8601; the user gets their own locale's date.

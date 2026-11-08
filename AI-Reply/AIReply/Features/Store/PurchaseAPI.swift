@@ -24,6 +24,7 @@ enum PurchaseAPI {
         var billingPeriod: String? = nil
         var entitlementKind: String? = nil
         var dailyLimit = 0
+        var monthlyLimit = 0
         var price: Int? = nil
         var currency: String? = nil
         var creditsNeverExpire = false
@@ -36,13 +37,14 @@ enum PurchaseAPI {
             case billingPeriod = "billing_period"
             case entitlementKind = "entitlement_kind"
             case dailyLimit = "daily_limit"
+            case monthlyLimit = "monthly_limit"
             case price, currency
             case creditsNeverExpire = "credits_never_expire"
         }
 
         init(code: String, kind: String, units: Int, durationHours: Int, storeProductID: String, name: String,
              planID: String? = nil, billingPeriod: String? = nil, entitlementKind: String? = nil,
-             dailyLimit: Int = 0, price: Int? = nil, currency: String? = nil, creditsNeverExpire: Bool = false) {
+             dailyLimit: Int = 0, monthlyLimit: Int = 0, price: Int? = nil, currency: String? = nil, creditsNeverExpire: Bool = false) {
             self.code = code
             self.kind = kind
             self.units = units
@@ -53,6 +55,7 @@ enum PurchaseAPI {
             self.billingPeriod = billingPeriod
             self.entitlementKind = entitlementKind
             self.dailyLimit = dailyLimit
+            self.monthlyLimit = monthlyLimit
             self.price = price
             self.currency = currency
             self.creditsNeverExpire = creditsNeverExpire
@@ -70,6 +73,7 @@ enum PurchaseAPI {
             billingPeriod = try? container.decodeIfPresent(String.self, forKey: .billingPeriod)
             entitlementKind = try? container.decodeIfPresent(String.self, forKey: .entitlementKind)
             dailyLimit = (try? container.decodeIfPresent(Int.self, forKey: .dailyLimit)) ?? 0
+            monthlyLimit = (try? container.decodeIfPresent(Int.self, forKey: .monthlyLimit)) ?? 0
             price = try? container.decodeIfPresent(Int.self, forKey: .price)
             currency = try? container.decodeIfPresent(String.self, forKey: .currency)
             creditsNeverExpire = (try? container.decodeIfPresent(Bool.self, forKey: .creditsNeverExpire)) ?? false
