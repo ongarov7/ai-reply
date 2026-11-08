@@ -62,21 +62,26 @@ type Server struct {
 	Package string
 
 	TokenCalls, GetCalls, ConsumeCalls, VoidedCalls atomic.Int32
+	SubscriptionCalls, AcknowledgeCalls             atomic.Int32
 
-	mu        sync.Mutex
-	purchases map[string]*googleplay.ProductPurchase
-	voided    []googleplay.VoidedPurchase
-	failNext  int // the next n purchase calls answer 503
-	failEat   int // the next n consume calls answer 503
-	pageSize  int
-	lastSince string
+	mu            sync.Mutex
+	purchases     map[string]*googleplay.ProductPurchase
+	subscriptions map[string]*googleplay.Subscription
+	voided        []googleplay.VoidedPurchase
+	failNext      int // the next n purchase calls answer 503
+	failEat       int // the next n consume calls answer 503
+	failAck       int // the next n acknowledge calls answer 503
+	refuseAck     int // the next n acknowledge calls answer 400
+	pageSize      int
+	lastSince     string
+	lastType      string
 }
 
 // New — сервер; тест біткенде жабылады.
 func New(t testing.TB, pkg string) *Server {
 	t.Helper()
 	pub, _ := Key(t)
-	s := &Server{Package: pkg, purchases: map[string]*googleplay.ProductPurchase{}, pageSize: 1000}
+	s := &Server{Package: pkg, purchases: map[string]*googleplay.ProductPurchase{}, subscriptions: map[string]*googleplay.Subscription{}, pageSize: 1000}
 	s.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { s.handle(t, &pub.PublicKey, w, r) }))
 	t.Cleanup(s.Close)
 	return s
@@ -116,6 +121,54 @@ func (s *Server) Update(productID, token string, change func(p *googleplay.Produ
 	if p := s.purchases[purchaseKey(productID, token)]; p != nil {
 		change(p)
 	}
+}
+
+// PutSubscription — Google білетін жазылым.
+func (s *Server) PutSubscription(token string, p googleplay.Subscription) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	stored := p
+	s.subscriptions[token] = &stored
+}
+
+// Subscription — жазылымның қазіргі күйі.
+func (s *Server) Subscription(token string) googleplay.Subscription {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if p := s.subscriptions[token]; p != nil {
+		return *p
+	}
+	return googleplay.Subscription{}
+}
+
+// UpdateSubscription — жазылым күйін өзгерту (ұзарту, тоқтату).
+func (s *Server) UpdateSubscription(token string, change func(p *googleplay.Subscription)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if p := s.subscriptions[token]; p != nil {
+		change(p)
+	}
+}
+
+// FailAcknowledges — келесі n растау сұранысы 503 қайтарады (тексеру сәтті өтеді).
+func (s *Server) FailAcknowledges(n int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.failAck = n
+}
+
+// RefuseAcknowledges — келесі n растау сұранысы 400 қайтарады.
+func (s *Server) RefuseAcknowledges(n int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.refuseAck = n
+}
+
+// LastVoidedType — соңғы voidedpurchases сұранысының type мәні.
+func (s *Server) LastVoidedType() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.lastType
 }
 
 // FailNext — келесі n сатып алу сұранысы 503 қайтарады.
@@ -193,6 +246,10 @@ func (s *Server) handle(t testing.TB, pub *rsa.PublicKey, w http.ResponseWriter,
 		_, _ = io.WriteString(w, `{"error":{"code":503,"status":"UNAVAILABLE","errors":[{"reason":"backendError"}]}}`)
 		return
 	}
+	if strings.HasPrefix(rest, "subscriptionsv2/tokens/") || strings.HasPrefix(rest, "subscriptions/") {
+		s.subscriptionCall(w, r, rest)
+		return
+	}
 	// products/{productId}/tokens/{token}[:consume]
 	parts := strings.Split(strings.TrimPrefix(rest, "products/"), "/tokens/")
 	if len(parts) != 2 {
@@ -243,10 +300,54 @@ func (s *Server) handle(t testing.TB, pub *rsa.PublicKey, w http.ResponseWriter,
 	}
 }
 
+// subscriptionCall — subscriptionsv2/tokens/{token} and subscriptions/{id}/tokens/{token}:acknowledge.
+func (s *Server) subscriptionCall(w http.ResponseWriter, r *http.Request, rest string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if strings.HasPrefix(rest, "subscriptionsv2/tokens/") {
+		token, _ := url.PathUnescape(strings.TrimPrefix(rest, "subscriptionsv2/tokens/"))
+		s.SubscriptionCalls.Add(1)
+		p := s.subscriptions[token]
+		if p == nil {
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = io.WriteString(w, `{"error":{"code":404,"status":"NOT_FOUND","errors":[{"reason":"subscriptionPurchaseNotFound"}]}}`)
+			return
+		}
+		raw, _ := json.Marshal(p)
+		_, _ = w.Write(raw)
+		return
+	}
+	parts := strings.Split(strings.TrimPrefix(rest, "subscriptions/"), "/tokens/")
+	if len(parts) != 2 || !strings.HasSuffix(parts[1], ":acknowledge") || r.Method != http.MethodPost {
+		http.NotFound(w, r)
+		return
+	}
+	token, _ := url.PathUnescape(strings.TrimSuffix(parts[1], ":acknowledge"))
+	s.AcknowledgeCalls.Add(1)
+	p := s.subscriptions[token]
+	switch {
+	case p == nil:
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = io.WriteString(w, `{"error":{"code":404,"status":"NOT_FOUND","errors":[{"reason":"subscriptionPurchaseNotFound"}]}}`)
+	case s.failAck > 0:
+		s.failAck--
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = io.WriteString(w, `{"error":{"code":503,"status":"UNAVAILABLE","errors":[{"reason":"backendError"}]}}`)
+	case s.refuseAck > 0:
+		s.refuseAck--
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = io.WriteString(w, `{"error":{"code":400,"status":"FAILED_PRECONDITION","errors":[{"reason":"subscriptionNotAcknowledgeable"}]}}`)
+	default:
+		p.AcknowledgementState = googleplay.AcknowledgementAcknowledged
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
 func (s *Server) voidedPage(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.lastSince = r.URL.Query().Get("startTime")
+	s.lastType = r.URL.Query().Get("type")
 	start := 0
 	if token := r.URL.Query().Get("token"); token != "" {
 		for i, v := range s.voided {

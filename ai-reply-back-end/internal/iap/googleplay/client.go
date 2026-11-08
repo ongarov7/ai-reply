@@ -1,5 +1,5 @@
 // Package googleplay — Google Play Developer API (androidpublisher v3): бір реттік өнімдерді
-// тексеру, тұтыну және қайтарылғандар тізімі.
+// тексеру, тұтыну, жазылымдарды оқу және растау, қайтарылғандар тізімі.
 //
 // The server calls Google as a service account (internal/googleauth) with the
 // androidpublisher scope; the account needs "View financial data" and "Manage
@@ -9,6 +9,7 @@
 package googleplay
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -158,13 +159,116 @@ func (c *Client) productPath(productID, token string) string {
 // GetProductPurchase — purchases.products.get.
 func (c *Client) GetProductPurchase(ctx context.Context, productID, token string) (ProductPurchase, error) {
 	var out ProductPurchase
-	err := c.call(ctx, http.MethodGet, c.productPath(productID, token), &out)
+	err := c.call(ctx, http.MethodGet, c.productPath(productID, token), nil, &out)
 	return out, err
 }
 
 // Consume — purchases.products.consume (сервер бергеннен кейін ғана).
 func (c *Client) Consume(ctx context.Context, productID, token string) error {
-	return c.call(ctx, http.MethodPost, c.productPath(productID, token)+":consume", nil)
+	return c.call(ctx, http.MethodPost, c.productPath(productID, token)+":consume", nil, nil)
+}
+
+// AcknowledgementAcknowledged — purchases.subscriptionsv2 acknowledgementState of a confirmed purchase.
+const AcknowledgementAcknowledged = "ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED"
+
+// Subscription — purchases.subscriptionsv2 resource (the fields the server needs).
+type Subscription struct {
+	StartTime                  string                      `json:"startTime"`
+	SubscriptionState          string                      `json:"subscriptionState"`
+	LatestOrderID              string                      `json:"latestOrderId,omitempty"`
+	LinkedPurchaseToken        string                      `json:"linkedPurchaseToken,omitempty"`
+	AcknowledgementState       string                      `json:"acknowledgementState,omitempty"`
+	RegionCode                 string                      `json:"regionCode,omitempty"`
+	ExternalAccountIdentifiers *ExternalAccountIdentifiers `json:"externalAccountIdentifiers,omitempty"`
+	TestPurchase               *TestPurchase               `json:"testPurchase,omitempty"`
+	LineItems                  []SubscriptionLineItem      `json:"lineItems"`
+}
+
+// ExternalAccountIdentifiers — what the app passed to Play Billing.
+type ExternalAccountIdentifiers struct {
+	ObfuscatedExternalAccountID string `json:"obfuscatedExternalAccountId,omitempty"`
+}
+
+// TestPurchase — present (empty) on a license tester's purchase.
+type TestPurchase struct{}
+
+// AutoRenewingPlan — the line item renews by itself while AutoRenewEnabled.
+type AutoRenewingPlan struct {
+	AutoRenewEnabled bool `json:"autoRenewEnabled"`
+}
+
+// SubscriptionLineItem — one product of the purchase.
+type SubscriptionLineItem struct {
+	ProductID               string            `json:"productId"`
+	ExpiryTime              string            `json:"expiryTime"`
+	LatestSuccessfulOrderID string            `json:"latestSuccessfulOrderId,omitempty"`
+	AutoRenewingPlan        *AutoRenewingPlan `json:"autoRenewingPlan,omitempty"`
+}
+
+// LineItem — the item of this product, if the purchase has one.
+func (s Subscription) LineItem(productID string) (SubscriptionLineItem, bool) {
+	for _, item := range s.LineItems {
+		if item.ProductID == productID {
+			return item, true
+		}
+	}
+	return SubscriptionLineItem{}, false
+}
+
+// AccountID — obfuscatedExternalAccountId ("" when the app set none).
+func (s Subscription) AccountID() string {
+	if s.ExternalAccountIdentifiers == nil {
+		return ""
+	}
+	return s.ExternalAccountIdentifiers.ObfuscatedExternalAccountID
+}
+
+// Acknowledged — the purchase needs no acknowledgement from the server.
+func (s Subscription) Acknowledged() bool {
+	return s.AcknowledgementState == AcknowledgementAcknowledged
+}
+
+// Started — when the subscription began (zero when Google did not say).
+func (s Subscription) Started() time.Time { return parseTime(s.StartTime) }
+
+// OrderID — the latest paid order of this item.
+func (s Subscription) OrderID(item SubscriptionLineItem) string {
+	if item.LatestSuccessfulOrderID != "" {
+		return item.LatestSuccessfulOrderID
+	}
+	return s.LatestOrderID
+}
+
+// Expires — when access ends unless the item renews (zero when Google did not say).
+func (i SubscriptionLineItem) Expires() time.Time { return parseTime(i.ExpiryTime) }
+
+// AutoRenews — the item is set to renew.
+func (i SubscriptionLineItem) AutoRenews() bool {
+	return i.AutoRenewingPlan != nil && i.AutoRenewingPlan.AutoRenewEnabled
+}
+
+func parseTime(v string) time.Time {
+	t, err := time.Parse(time.RFC3339Nano, v)
+	if err != nil {
+		return time.Time{}
+	}
+	return t.UTC()
+}
+
+// GetSubscription — purchases.subscriptionsv2.get: all a subscription's state by its token.
+func (c *Client) GetSubscription(ctx context.Context, token string) (Subscription, error) {
+	var out Subscription
+	endpoint := c.base + "/androidpublisher/v3/applications/" + url.PathEscape(c.pkg) +
+		"/purchases/subscriptionsv2/tokens/" + url.PathEscape(token)
+	err := c.call(ctx, http.MethodGet, endpoint, nil, &out)
+	return out, err
+}
+
+// AcknowledgeSubscription — purchases.subscriptions.acknowledge (only after the server has granted it).
+func (c *Client) AcknowledgeSubscription(ctx context.Context, productID, token string) error {
+	endpoint := c.base + "/androidpublisher/v3/applications/" + url.PathEscape(c.pkg) + "/purchases/subscriptions/" +
+		url.PathEscape(productID) + "/tokens/" + url.PathEscape(token) + ":acknowledge"
+	return c.call(ctx, http.MethodPost, endpoint, []byte(`{}`), nil)
 }
 
 // VoidedPurchase — қайтарылған не болдырылмаған сатып алу.
@@ -193,12 +297,15 @@ type VoidedPage struct {
 	Next      string
 }
 
-// VoidedPurchases — purchases.voidedpurchases.list (бір реттік өнімдер, startTime-нан бері).
+// VoidedPurchases — purchases.voidedpurchases.list (бір реттік өнімдер мен жазылымдар, startTime-нан бері).
+//
+// type=1 adds subscription orders. Renewal orders share one purchase token, so
+// an order is told apart by its orderId, not by the token.
 func (c *Client) VoidedPurchases(ctx context.Context, since time.Time, pageToken string) (VoidedPage, error) {
 	q := url.Values{}
 	q.Set("startTime", strconv.FormatInt(since.UnixMilli(), 10))
 	q.Set("maxResults", "1000")
-	q.Set("type", "0")
+	q.Set("type", "1")
 	if pageToken != "" {
 		q.Set("token", pageToken)
 	}
@@ -209,16 +316,16 @@ func (c *Client) VoidedPurchases(ctx context.Context, since time.Time, pageToken
 		VoidedPurchases []VoidedPurchase `json:"voidedPurchases"`
 	}
 	endpoint := c.base + "/androidpublisher/v3/applications/" + url.PathEscape(c.pkg) + "/purchases/voidedpurchases?" + q.Encode()
-	if err := c.call(ctx, http.MethodGet, endpoint, &out); err != nil {
+	if err := c.call(ctx, http.MethodGet, endpoint, nil, &out); err != nil {
 		return VoidedPage{}, err
 	}
 	return VoidedPage{Purchases: out.VoidedPurchases, Next: out.TokenPagination.NextPageToken}, nil
 }
 
 // call — бір сұраныс; 401 болса токенді ұмытып, бір рет қайталайды.
-func (c *Client) call(ctx context.Context, method, endpoint string, out any) error {
+func (c *Client) call(ctx context.Context, method, endpoint string, payload []byte, out any) error {
 	for attempt := 0; ; attempt++ {
-		status, reason, body, err := c.do(ctx, method, endpoint)
+		status, reason, body, err := c.do(ctx, method, endpoint, payload)
 		if err != nil {
 			return err
 		}
@@ -242,18 +349,25 @@ func (c *Client) call(ctx context.Context, method, endpoint string, out any) err
 	}
 }
 
-func (c *Client) do(ctx context.Context, method, endpoint string) (int, string, []byte, error) {
+func (c *Client) do(ctx context.Context, method, endpoint string, payload []byte) (int, string, []byte, error) {
 	access, err := c.tokens.Token(ctx)
 	if err != nil {
 		return 0, "", nil, fmt.Errorf("%w: %s", ErrUnavailable, googleauth.SafeDetail(err.Error()))
 	}
-	req, err := http.NewRequestWithContext(ctx, method, endpoint, nil)
+	var content io.Reader
+	if payload != nil {
+		content = bytes.NewReader(payload)
+	}
+	req, err := http.NewRequestWithContext(ctx, method, endpoint, content)
 	if err != nil {
 		return 0, "", nil, fmt.Errorf("%w: request could not be built", ErrUnavailable)
 	}
 	req.Header.Set("Authorization", "Bearer "+access)
 	req.Header.Set("Accept", "application/json")
-	if method == http.MethodPost {
+	switch {
+	case payload != nil:
+		req.Header.Set("Content-Type", "application/json")
+	case method == http.MethodPost:
 		req.Header.Set("Content-Length", "0")
 	}
 	res, err := c.client.Do(req)

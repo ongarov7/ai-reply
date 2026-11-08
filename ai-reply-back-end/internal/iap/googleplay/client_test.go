@@ -80,6 +80,39 @@ func TestErrorsAreClassifiedWithoutTheToken(t *testing.T) {
 	}
 }
 
+func TestSubscriptionIsReadAndAcknowledged(t *testing.T) {
+	g := playtest.New(t, "kz.yerek.aireply")
+	g.PutSubscription(token, googleplay.Subscription{StartTime: "2026-11-01T10:00:00.5Z", SubscriptionState: "SUBSCRIPTION_STATE_ACTIVE",
+		LatestOrderID: "GPA.old", AcknowledgementState: "ACKNOWLEDGEMENT_STATE_PENDING", LinkedPurchaseToken: "old-token",
+		ExternalAccountIdentifiers: &googleplay.ExternalAccountIdentifiers{ObfuscatedExternalAccountID: "acc"},
+		TestPurchase:               &googleplay.TestPurchase{},
+		LineItems: []googleplay.SubscriptionLineItem{{ProductID: "kz.aireply.base.monthly", ExpiryTime: "2026-12-01T10:00:00Z",
+			LatestSuccessfulOrderID: "GPA.new", AutoRenewingPlan: &googleplay.AutoRenewingPlan{AutoRenewEnabled: true}}}})
+	c := client(t, g)
+	p, err := c.GetSubscription(context.Background(), token)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	item, ok := p.LineItem("kz.aireply.base.monthly")
+	if !ok || p.AccountID() != "acc" || p.TestPurchase == nil || p.Acknowledged() || p.LinkedPurchaseToken != "old-token" ||
+		p.OrderID(item) != "GPA.new" || !item.AutoRenews() || !item.Expires().Equal(time.Date(2026, 12, 1, 10, 0, 0, 0, time.UTC)) ||
+		!p.Started().Equal(time.Date(2026, 11, 1, 10, 0, 0, 500000000, time.UTC)) {
+		t.Fatalf("subscription %+v", p)
+	}
+	if _, ok := p.LineItem("other"); ok {
+		t.Fatal("found a line item of another product")
+	}
+	if err := c.AcknowledgeSubscription(context.Background(), "kz.aireply.base.monthly", token); err != nil {
+		t.Fatalf("acknowledge: %v", err)
+	}
+	if !g.Subscription(token).Acknowledged() || g.AcknowledgeCalls.Load() != 1 {
+		t.Fatal("not acknowledged")
+	}
+	if _, err := c.GetSubscription(context.Background(), "unknown-token"); !errors.Is(err, googleplay.ErrNotFound) {
+		t.Fatalf("unknown token: %v", err)
+	}
+}
+
 func TestVoidedPurchasesArePaged(t *testing.T) {
 	g := playtest.New(t, "kz.yerek.aireply")
 	g.PageSize(2)
@@ -94,6 +127,9 @@ func TestVoidedPurchasesArePaged(t *testing.T) {
 	}
 	if g.LastVoidedSince() != "1760000000000" {
 		t.Fatalf("startTime %q", g.LastVoidedSince())
+	}
+	if g.LastVoidedType() != "1" {
+		t.Fatalf("subscription orders are not requested: type %q", g.LastVoidedType())
 	}
 	second, err := c.VoidedPurchases(context.Background(), since, first.Next)
 	if err != nil || len(second.Purchases) != 1 || second.Next != "" || second.Purchases[0].PurchaseToken != "t-3" {
