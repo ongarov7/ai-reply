@@ -73,6 +73,28 @@ data class WorkingHours(
         return copy(days = updated)
     }
 
+    fun togglingDay(weekday: Int): WorkingHours =
+        withDay(weekday) { it.copy(isEnabled = !it.isEnabled) }
+
+    /** The start the quick editor shows: the first open day's, or 10:00 with every day closed. */
+    val quickStart: TimeOfDay
+        get() = days.firstOrNull { it.isEnabled }?.start ?: TimeOfDay.of(10, 0)
+
+    /** The end the quick editor shows: the first open day's, or 18:00 with every day closed. */
+    val quickEnd: TimeOfDay
+        get() = days.firstOrNull { it.isEnabled }?.end ?: TimeOfDay.of(18, 0)
+
+    /**
+     * Editing one time applies it to every open day, which is what a single
+     * "from / to" control implies. Per-day differences stay possible in the
+     * full editor.
+     */
+    fun withQuickStart(value: TimeOfDay): WorkingHours =
+        copy(days = days.map { if (it.isEnabled) it.copy(start = value) else it })
+
+    fun withQuickEnd(value: TimeOfDay): WorkingHours =
+        copy(days = days.map { if (it.isEnabled) it.copy(end = value) else it })
+
     /**
      * Everything the model needs to reason about time, and nothing more.
      *

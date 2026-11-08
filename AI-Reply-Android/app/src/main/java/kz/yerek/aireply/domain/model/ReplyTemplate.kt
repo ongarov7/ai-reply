@@ -108,6 +108,15 @@ data class ReplyTemplate(
         workingHoursOverride?.takeIf { it.isEnabled } ?: profile
 
     /**
+     * Turning this template's own hours on starts from [profile], so the user
+     * edits the schedule they already have. Off drops the override rather than
+     * disabling it, so "off" means exactly one thing: follow the profile.
+     */
+    fun withHoursOverride(isOn: Boolean, profile: WorkingHours): ReplyTemplate = copy(
+        workingHoursOverride = if (isOn) (workingHoursOverride ?: profile).copy(isEnabled = true) else null
+    )
+
+    /**
      * Ensures the business container exists before an editor writes into it, so
      * a custom template created before this field existed can still be given one.
      */

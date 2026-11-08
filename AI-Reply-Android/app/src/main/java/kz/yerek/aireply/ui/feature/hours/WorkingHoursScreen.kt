@@ -1,19 +1,13 @@
 package kz.yerek.aireply.ui.feature.hours
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TimePicker
-import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -37,8 +31,6 @@ import kz.yerek.aireply.ui.design.LocalExtraColors
 import kz.yerek.aireply.ui.design.ReadableColumn
 import kz.yerek.aireply.ui.design.Spacing
 import java.time.LocalDateTime
-import java.time.format.TextStyle
-import java.util.Locale
 
 /**
  * The full per-day working-hours editor.
@@ -49,10 +41,10 @@ import java.util.Locale
  * No timezone, city or coordinate is stored or sent; the model is told only
  * whether it is currently inside the user's hours and when the next window opens.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WorkingHoursScreen(onBack: () -> Unit) {
     val services = LocalServices.current
+    val language = services.settings.effectiveAppLanguage
     var hours by remember { mutableStateOf(services.configuration.profile.workingHours) }
     var editing by remember { mutableStateOf<Editing?>(null) }
 
@@ -98,8 +90,7 @@ fun WorkingHoursScreen(onBack: () -> Unit) {
                                     horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
                                 ) {
                                     Text(
-                                        text = WorkingHours.dayOfWeek(weekday)
-                                            .getDisplayName(TextStyle.SHORT_STANDALONE, Locale.getDefault()),
+                                        text = weekdayName(weekday, language),
                                         style = MaterialTheme.typography.bodyLarge,
                                         fontWeight = FontWeight.Medium,
                                         modifier = Modifier.weight(1f)
@@ -156,42 +147,17 @@ fun WorkingHoursScreen(onBack: () -> Unit) {
     }
 
     editing?.let { target ->
-        val picker = rememberTimePickerState(
-            initialHour = target.value.hour,
-            initialMinute = target.value.minute,
-            is24Hour = true
-        )
-        AlertDialog(
-            onDismissRequest = { editing = null },
-            text = { TimePicker(state = picker) },
-            confirmButton = {
-                TextButton(onClick = {
-                    val value = TimeOfDay.of(picker.hour, picker.minute)
-                    hours = hours.withDay(target.weekday) { day ->
-                        if (target.isStart) day.copy(start = value) else day.copy(end = value)
-                    }
-                    editing = null
-                }) { Text(stringResource(R.string.common_done)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { editing = null }) {
-                    Text(stringResource(R.string.common_cancel))
+        TimeOfDayDialog(
+            initial = target.value,
+            onDismiss = { editing = null },
+            onConfirm = { value ->
+                hours = hours.withDay(target.weekday) { day ->
+                    if (target.isStart) day.copy(start = value) else day.copy(end = value)
                 }
+                editing = null
             }
         )
     }
-}
-
-@Composable
-private fun TimeChip(label: String, onClick: () -> Unit) {
-    Text(
-        text = label,
-        style = MaterialTheme.typography.bodyLarge,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier
-            .clickable(onClick = onClick)
-            .padding(horizontal = Spacing.xs, vertical = Spacing.xxs)
-    )
 }
 
 private data class Editing(val weekday: Int, val isStart: Boolean, val value: TimeOfDay)

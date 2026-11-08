@@ -37,7 +37,6 @@ import kz.yerek.aireply.domain.model.EmojiPolicy
 import kz.yerek.aireply.domain.model.ReplyLength
 import kz.yerek.aireply.domain.model.ReplyTemplate
 import kz.yerek.aireply.domain.model.ReplyTone
-import kz.yerek.aireply.domain.model.WorkingHours
 import kz.yerek.aireply.domain.model.WorkingHoursBehaviour
 import kz.yerek.aireply.ui.LocalServices
 import kz.yerek.aireply.ui.common.AppScreen
@@ -47,6 +46,7 @@ import kz.yerek.aireply.ui.design.AppSection
 import kz.yerek.aireply.ui.design.LocalExtraColors
 import kz.yerek.aireply.ui.design.ReadableColumn
 import kz.yerek.aireply.ui.design.Spacing
+import kz.yerek.aireply.ui.feature.hours.QuickHoursEditor
 import kz.yerek.aireply.ui.feature.profile.RulesEditor
 import kz.yerek.aireply.ui.feature.profile.SelectableRow
 import kz.yerek.aireply.ui.feature.profile.toneResource
@@ -162,15 +162,18 @@ fun TemplateEditorScreen(templateId: String, onBack: () -> Unit) {
                                 Switch(
                                     checked = draft.workingHoursOverride?.isEnabled == true,
                                     onCheckedChange = { enabled ->
-                                        draft = draft.copy(
-                                            workingHoursOverride = if (enabled) {
-                                                (draft.workingHoursOverride ?: WorkingHours.DEFAULT)
-                                                    .copy(isEnabled = true)
-                                            } else {
-                                                null
-                                            }
+                                        draft = draft.withHoursOverride(
+                                            enabled,
+                                            services.configuration.profile.workingHours
                                         )
                                     }
+                                )
+                            }
+                            draft.workingHoursOverride?.takeIf { it.isEnabled }?.let { hours ->
+                                QuickHoursEditor(
+                                    hours = hours,
+                                    language = services.settings.effectiveAppLanguage,
+                                    onChange = { draft = draft.copy(workingHoursOverride = it) }
                                 )
                             }
                             WorkingHoursBehaviour.entries.forEach { option ->
