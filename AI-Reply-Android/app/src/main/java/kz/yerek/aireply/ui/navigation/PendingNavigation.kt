@@ -14,23 +14,36 @@ import kz.yerek.aireply.push.AppScreen
  * The request survives the gates: while sign-in, the legal consent, the
  * registration step or onboarding is on screen, it stays pending and is applied
  * the moment Home is reachable, never around a gate. A newer request replaces
- * an older one; applying it consumes it, so it cannot fire twice.
+ * an older one; applying it consumes it, so it cannot fire twice. One that
+ * waited longer than [LIFETIME_MS] is dropped: signing in much later must not
+ * jump to a screen the user has forgotten asking for.
  */
-class PendingNavigation {
+class PendingNavigation(private val clock: () -> Long = System::currentTimeMillis) {
 
     private val _route = MutableStateFlow<String?>(null)
     val route: StateFlow<String?> = _route.asStateFlow()
 
+    @Volatile
+    private var openedAt = 0L
+
     fun open(route: String) {
+        openedAt = clock()
         _route.value = route
     }
 
     fun open(screen: AppScreen) = open(routeFor(screen))
 
-    /** Taken by the navigation host; false if another request replaced it meanwhile. */
-    fun consume(route: String): Boolean = _route.compareAndSet(route, null)
+    /**
+     * Taken by the navigation host; false if another request replaced it
+     * meanwhile, or it waited too long and is gone.
+     */
+    fun consume(route: String): Boolean =
+        _route.compareAndSet(route, null) && clock() - openedAt <= LIFETIME_MS
 
     companion object {
+        /** How long a link waits behind the gates: fifteen minutes. */
+        const val LIFETIME_MS = 15L * 60 * 1000
+
         /** Where each `aireply://<screen>` leads. */
         fun routeFor(screen: AppScreen): String = when (screen) {
             AppScreen.HOME -> Routes.Home

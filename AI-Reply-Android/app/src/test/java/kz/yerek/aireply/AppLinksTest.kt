@@ -241,6 +241,28 @@ class AppLinksTest {
         assertFalse("applied once only", navigation.consume(Routes.Templates))
     }
 
+    @Test
+    fun `a pending destination is dropped after fifteen minutes`() {
+        var now = 1_800_000_000_000L
+        val navigation = PendingNavigation(clock = { now })
+
+        navigation.open(AppScreen.COMPOSE)
+        now += PendingNavigation.LIFETIME_MS
+        assertTrue("fifteen minutes is still in time", navigation.consume(Routes.Compose))
+
+        navigation.open(AppScreen.COMPOSE)
+        now += PendingNavigation.LIFETIME_MS + 1
+        assertFalse("signing in much later must not jump to an old screen", navigation.consume(Routes.Compose))
+        assertNull("and it does not stay behind", navigation.route.value)
+
+        navigation.open(AppScreen.TEMPLATES)
+        now += PendingNavigation.LIFETIME_MS - 1
+        navigation.open(AppScreen.SETTINGS)
+        now += PendingNavigation.LIFETIME_MS - 1
+        assertTrue("a newer tap starts its own wait", navigation.consume(Routes.Settings))
+        assertEquals(15L * 60 * 1000, PendingNavigation.LIFETIME_MS)
+    }
+
     private companion object {
         const val INSTALLATION = "0b7c9a52-4f5e-4d0a-9c1e-1d2f3a4b5c6d"
     }
