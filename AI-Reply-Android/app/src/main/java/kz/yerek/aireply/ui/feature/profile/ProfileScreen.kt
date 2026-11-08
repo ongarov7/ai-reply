@@ -41,6 +41,8 @@ import kz.yerek.aireply.ui.design.LocalExtraColors
 import kz.yerek.aireply.ui.design.ReadableColumn
 import kz.yerek.aireply.ui.design.Spacing
 import kz.yerek.aireply.ui.feature.voice.DictationSheet
+import kz.yerek.aireply.ui.feature.voice.VoiceSuggestionSheet
+import kz.yerek.aireply.voice.VoiceConfigurationParser
 
 /**
  * "About me" — the context that is true of the user in every conversation.
@@ -54,6 +56,7 @@ import kz.yerek.aireply.ui.feature.voice.DictationSheet
 @Composable
 fun ProfileScreen(onBack: () -> Unit) {
     val services = LocalServices.current
+    val language = services.settings.effectiveAppLanguage
     val stored = remember { services.configuration.profile }
 
     var role by remember { mutableStateOf(stored.role) }
@@ -62,6 +65,7 @@ fun ProfileScreen(onBack: () -> Unit) {
     var tone by remember { mutableStateOf(stored.preferredTone) }
     var replyLanguage by remember { mutableStateOf(stored.replyLanguage) }
     var dictating by remember { mutableStateOf(false) }
+    var suggestion by remember { mutableStateOf<VoiceConfigurationParser.Suggestion?>(null) }
 
     // Saved on the way out rather than on every keystroke: the store writes a
     // file the keyboard reads, and rewriting it per character would be pointless
@@ -189,17 +193,35 @@ fun ProfileScreen(onBack: () -> Unit) {
 
     if (dictating) {
         DictationSheet(
-            language = services.settings.effectiveAppLanguage,
+            language = language,
             onDismiss = { dictating = false },
             onAccept = { transcript ->
-                // What the user said is kept verbatim; the app does not rewrite
-                // it, guess at structure in it, or move it somewhere else.
+                // What the user said is kept verbatim; what the app recognised
+                // in it is offered separately and applied only on confirmation.
                 val addition = transcript.trim()
                 if (addition.isNotEmpty()) {
                     val separator = if (about.isEmpty() || about.endsWith(" ")) "" else " "
                     about = (about + separator + addition)
                         .clampToCodePoints(UserProfile.MAX_DESCRIPTION)
+
+                    val parsed = VoiceConfigurationParser.parse(addition, language)
+                    if (!parsed.isEmpty) suggestion = parsed
                 }
+            }
+        )
+    }
+
+    suggestion?.let { value ->
+        VoiceSuggestionSheet(
+            suggestion = value,
+            existingHours = services.configuration.profile.workingHours,
+            language = language,
+            onDismiss = { suggestion = null },
+            onApply = { confirmed ->
+                confirmed.workingHours(basedOn = services.configuration.profile.workingHours)?.let { updated ->
+                    services.configuration.updateProfile { it.copy(workingHours = updated) }
+                }
+                business = confirmed.rules.fold(business, BusinessContext::addingRule)
             }
         )
     }

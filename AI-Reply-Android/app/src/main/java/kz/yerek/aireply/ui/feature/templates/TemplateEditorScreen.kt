@@ -51,6 +51,8 @@ import kz.yerek.aireply.ui.feature.profile.RulesEditor
 import kz.yerek.aireply.ui.feature.profile.SelectableRow
 import kz.yerek.aireply.ui.feature.profile.toneResource
 import kz.yerek.aireply.ui.feature.voice.DictationSheet
+import kz.yerek.aireply.ui.feature.voice.VoiceSuggestionSheet
+import kz.yerek.aireply.voice.VoiceConfigurationParser
 
 /**
  * One template's settings.
@@ -63,6 +65,7 @@ import kz.yerek.aireply.ui.feature.voice.DictationSheet
 fun TemplateEditorScreen(templateId: String, onBack: () -> Unit) {
     val services = LocalServices.current
     val context = LocalContext.current
+    val language = services.settings.effectiveAppLanguage
 
     val original = remember(templateId) { services.configuration.current.template(templateId) }
     if (original == null) {
@@ -73,6 +76,7 @@ fun TemplateEditorScreen(templateId: String, onBack: () -> Unit) {
 
     var draft by remember(templateId) { mutableStateOf(original) }
     var dictating by remember { mutableStateOf(false) }
+    var suggestion by remember { mutableStateOf<VoiceConfigurationParser.Suggestion?>(null) }
     var confirmingDelete by remember { mutableStateOf(false) }
 
     val latest = rememberUpdatedState(draft)
@@ -172,7 +176,7 @@ fun TemplateEditorScreen(templateId: String, onBack: () -> Unit) {
                             draft.workingHoursOverride?.takeIf { it.isEnabled }?.let { hours ->
                                 QuickHoursEditor(
                                     hours = hours,
-                                    language = services.settings.effectiveAppLanguage,
+                                    language = language,
                                     onChange = { draft = draft.copy(workingHoursOverride = it) }
                                 )
                             }
@@ -279,9 +283,12 @@ fun TemplateEditorScreen(templateId: String, onBack: () -> Unit) {
 
     if (dictating) {
         DictationSheet(
-            language = services.settings.effectiveAppLanguage,
+            language = language,
             onDismiss = { dictating = false },
             onAccept = { transcript ->
+                // The sentence goes into the notes verbatim. Structured values
+                // are only ever suggested on top of it, so nothing the user said
+                // is replaced by the app's interpretation of it.
                 val addition = transcript.trim()
                 if (addition.isNotEmpty()) {
                     val existing = draft.instructions
@@ -290,7 +297,22 @@ fun TemplateEditorScreen(templateId: String, onBack: () -> Unit) {
                         (existing + separator + addition)
                             .clampToCodePoints(ReplyTemplate.MAX_INSTRUCTIONS)
                     )
+
+                    val parsed = VoiceConfigurationParser.parse(addition, language)
+                    if (!parsed.isEmpty) suggestion = parsed
                 }
+            }
+        )
+    }
+
+    suggestion?.let { value ->
+        VoiceSuggestionSheet(
+            suggestion = value,
+            existingHours = draft.workingHoursOverride ?: services.configuration.profile.workingHours,
+            language = language,
+            onDismiss = { suggestion = null },
+            onApply = { confirmed ->
+                draft = confirmed.appliedTo(draft, services.configuration.profile.workingHours)
             }
         )
     }
