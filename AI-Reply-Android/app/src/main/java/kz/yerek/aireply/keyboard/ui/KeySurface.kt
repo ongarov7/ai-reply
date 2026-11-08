@@ -411,8 +411,9 @@ private fun DrawScope.drawPage(
                 )
             }
             val fontSize = if (panel.options.any { it.length > 1 }) 17f else 26f
-            drawCentered(
+            drawFitted(
                 measurer, option,
+                KeyBox(cellLeft, panel.top, cellLeft + panel.cellWidth, panel.top + panel.cellHeight),
                 Offset((cellLeft + panel.cellWidth / 2f) * dp, (panel.top + panel.cellHeight / 2f) * dp),
                 TextStyle(fontSize = fontSize.sp, color = if (selected) Color.White else theme.primaryText), 1f
             )
@@ -432,7 +433,8 @@ private fun letterFontSize(layout: PageLayout): Float {
 
 /**
  * Centred text that shrinks to fit its key, down to half its size, rather
- * than spilling over the edges: "Отправить" on the return key.
+ * than spilling over the edges: "Отправить" on the return key, ".com" in its
+ * cell of the long-press panel.
  */
 private fun DrawScope.drawFitted(
     measurer: TextMeasurer,
@@ -505,16 +507,6 @@ private fun DrawScope.drawBalloon(key: KeyBox, pageWidth: Float, theme: Keyboard
     drawText(
         result,
         topLeft = Offset(top.center.x - result.size.width / 2f, top.center.y - result.size.height / 2f)
-    )
-}
-
-private fun DrawScope.drawCentered(measurer: TextMeasurer, text: String, center: Offset, style: TextStyle, alpha: Float) {
-    if (text.isEmpty()) return
-    val result = measurer.measure(text, style, maxLines = 1)
-    drawText(
-        result,
-        topLeft = Offset(center.x - result.size.width / 2f, center.y - result.size.height / 2f),
-        alpha = alpha
     )
 }
 
