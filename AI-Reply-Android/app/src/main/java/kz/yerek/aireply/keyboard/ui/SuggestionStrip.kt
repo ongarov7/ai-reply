@@ -1,7 +1,10 @@
 package kz.yerek.aireply.keyboard.ui
 
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.indication
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -18,6 +21,7 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -136,14 +140,17 @@ private fun SuggestionSlot(
         else -> suggestion.text to suggestion.text
     }
     val raised = suggestion.kind == Suggestion.Kind.CORRECTION
+    val press = remember { MutableInteractionSource() }
     Box(
         modifier = modifier
             .fillMaxHeight()
+            // The whole slot takes the tap; only the highlight is inset.
+            .clickable(interactionSource = press, indication = null, role = Role.Button) { onPick(suggestion) }
+            .semantics { contentDescription = description }
             .padding(horizontal = 3.dp, vertical = 2.dp)
             .clip(RoundedCornerShape(7.dp))
             .background(if (raised) theme.letterKey else Color.Transparent)
-            .clickable(role = Role.Button) { onPick(suggestion) }
-            .semantics { contentDescription = description }
+            .indication(press, LocalIndication.current)
             .padding(horizontal = 5.dp),
         contentAlignment = Alignment.Center
     ) {
