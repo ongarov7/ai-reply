@@ -25,6 +25,8 @@ import kz.yerek.aireply.ai.VoiceTranscriptionService
 import kz.yerek.aireply.analytics.ProductEventReporter
 import kz.yerek.aireply.analytics.ProductEventsTransport
 import kz.yerek.aireply.billing.BillingRepository
+import kz.yerek.aireply.update.AppUpdateController
+import kz.yerek.aireply.update.PlayUpdateSource
 import kz.yerek.aireply.billing.PlayStoreClient
 import kz.yerek.aireply.billing.PurchaseApi
 import kz.yerek.aireply.core.lang.AppLanguage
@@ -356,6 +358,11 @@ class ServiceLocator(context: Context) {
 
     @Volatile
     private var supportCreated = false
+
+    /** Whether a newer version is on Google Play. Off in debug builds, which are not from the store. */
+    val updates: AppUpdateController by lazy {
+        AppUpdateController(PlayUpdateSource(appContext), deviceState, BuildConfig.VERSION_CODE, enabled = !BuildConfig.DEBUG)
+    }
 
     // ------------------------------------------------------------ purchases
 

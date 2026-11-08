@@ -212,6 +212,7 @@ dependencies {
     implementation(libs.firebase.messaging)
 
     implementation(libs.billing.ktx)
+    implementation(libs.play.app.update)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 

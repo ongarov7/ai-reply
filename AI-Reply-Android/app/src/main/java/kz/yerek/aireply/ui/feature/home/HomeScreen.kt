@@ -5,9 +5,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.AutoAwesome
@@ -18,6 +21,9 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.PersonOutline
 import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -29,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kz.yerek.aireply.R
 import kz.yerek.aireply.debug.DebugSamples
@@ -44,14 +51,17 @@ import kz.yerek.aireply.ui.common.rememberKeyboardStatus
 import kz.yerek.aireply.ui.design.AppCard
 import kz.yerek.aireply.ui.design.AppMark
 import kz.yerek.aireply.ui.design.AppSection
+import kz.yerek.aireply.ui.design.Layout
 import kz.yerek.aireply.ui.design.LocalExtraColors
+import kz.yerek.aireply.ui.design.Radius
 import kz.yerek.aireply.ui.design.ReadableColumn
 import kz.yerek.aireply.ui.feature.setup.KeyboardSetupAction
 import kz.yerek.aireply.ui.design.Spacing
 import kz.yerek.aireply.ui.design.StepRow
 import kz.yerek.aireply.ui.feature.account.BalanceRows
 import kz.yerek.aireply.ui.feature.account.BalanceSummary
-import kz.yerek.aireply.ui.feature.account.UsageSummary
+import kz.yerek.aireply.ui.feature.account.hasExtraRows
+import kz.yerek.aireply.ui.feature.account.headlineNumber
 import kz.yerek.aireply.ui.navigation.Routes
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -94,7 +104,7 @@ fun HomeScreen(onOpen: (String) -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(Spacing.m),
                 verticalAlignment = Alignment.Top
             ) {
-                AppMark(size = 56.dp)
+                AppMark(size = 64.dp)
                 Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
                     Text(
                         stringResource(R.string.home_title),
@@ -108,32 +118,19 @@ fun HomeScreen(onOpen: (String) -> Unit) {
                 }
             }
 
-            AppCard(modifier = Modifier.clickable { onOpen(Routes.Compose) }) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.s),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Filled.AutoAwesome,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(22.dp)
-                    )
-                    Text(stringResource(R.string.home_tryit), style = MaterialTheme.typography.bodyLarge)
-                    Spacer(Modifier.weight(1f))
-                    Icon(
-                        Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                        contentDescription = null,
-                        tint = LocalExtraColors.current.textTertiary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
+            Text(
+                stringResource(R.string.home_description),
+                style = MaterialTheme.typography.bodyLarge,
+                color = LocalExtraColors.current.textSecondary
+            )
 
             UsageCard(onOpen = onOpen)
 
+            AppUpdateCard()
+
             NotificationPromptCard()
+
+            CreateReplyButton { onOpen(Routes.Compose) }
 
             AppSection(stringResource(R.string.home_profile_title)) {
                 RowGroup {
@@ -215,13 +212,30 @@ fun HomeScreen(onOpen: (String) -> Unit) {
     }
 }
 
+/** The way into «Создать ответ»: the screen's main action. */
+@Composable
+private fun CreateReplyButton(onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        shape = RoundedCornerShape(Radius.medium),
+        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+        modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = Layout.minimumTouchTarget)
+    ) {
+        Icon(Icons.Filled.AutoAwesome, contentDescription = null, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(Spacing.xs))
+        Text(stringResource(R.string.home_tryit), style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, modifier = Modifier.size(20.dp))
+    }
+}
+
 /**
- * What is left today, and a way to the plans.
+ * What can be used now and where it comes from, and a way to the plans.
  *
- * Бүгін неше жауап қалғаны — серверден, кештен емес.
+ * Қолжетімді жауаптар — серверден, кештен емес.
  *
- * Shown only for accounts, because only the server knows the number. The cached
- * value renders instantly and the fresh one replaces it a moment later.
+ * Shown only for accounts, because only the server knows the numbers: a dash
+ * until it has answered, and a spent part is a number like any other, never a
+ * warning. The cached value renders instantly and the fresh one replaces it.
  */
 @Composable
 private fun UsageCard(onOpen: (String) -> Unit) {
@@ -235,92 +249,40 @@ private fun UsageCard(onOpen: (String) -> Unit) {
     val usage = if (services.sampleData) DebugSamples.usage else state.usage
     if (!state.isSignedIn && !services.sampleData) return
 
-    val cached = services.usageCache.current()
-    val balance = BalanceSummary.of(usage, cached)
-    if (balance.hasBalance) {
-        BalanceCard(balance, state.subscription?.plan?.localizedName(language).orEmpty()) { onOpen(Routes.Subscription) }
-        return
-    }
-
-    // A server without the balance: the plan's own count, as before.
-    val summary = UsageSummary.of(state.usage, cached)
+    val balance = BalanceSummary.of(usage, services.usageCache.current())
+    val plan = state.subscription?.plan
+    val welcome = balance.welcomeHeadline?.takeIf { plan?.isFree == true || services.sampleData }
 
     AppCard(modifier = Modifier.clickable { onOpen(Routes.Subscription) }) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.s),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.m),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
-                Text(
-                    stringResource(
-                        if (summary?.period == UsageSummary.Period.MONTH) R.string.home_usage_title_month
-                        else R.string.home_usage_title
-                    ),
-                    style = MaterialTheme.typography.titleSmall
-                )
-                Text(
-                    state.subscription?.plan?.localizedName(language).orEmpty(),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = LocalExtraColors.current.textSecondary
-                )
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // No number at all rather than a zero that is not one.
-                if (summary != null) {
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(
-                            summary.remaining.toString(),
-                            style = MaterialTheme.typography.headlineSmall,
-                            color = if (summary.hasReplies) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            stringResource(R.string.home_usage_left, summary.limit),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = LocalExtraColors.current.textSecondary
-                        )
-                    }
-                }
-                Spacer(Modifier.size(Spacing.xs))
-                Icon(
-                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = null,
-                    tint = LocalExtraColors.current.textTertiary,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-        }
-    }
-}
-
-/**
- * The balance from a server that sends it: «Бесплатные ответы: 35 из 50»
- * while free replies are left, then what is available today and what it is
- * made of. Plain numbers in the text colours: nothing here is an error.
- */
-@Composable
-private fun BalanceCard(balance: BalanceSummary, planName: String, onOpen: () -> Unit) {
-    AppCard(modifier = Modifier.clickable(onClick = onOpen)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.s),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
-                val welcome = balance.welcomeHeadline
                 Text(
                     if (welcome != null) {
                         stringResource(R.string.balance_welcome_title, welcome.remaining, welcome.total)
                     } else {
-                        stringResource(R.string.balance_title)
+                        stringResource(R.string.home_usage_available)
                     },
                     style = MaterialTheme.typography.titleSmall
                 )
-                if (planName.isNotEmpty()) {
+                plan?.localizedName(language)?.takeIf(String::isNotEmpty)?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = LocalExtraColors.current.textSecondary)
+                }
+            }
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
+                Text(
+                    balance.headlineNumber(usage.isKnown),
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                if (usage.isKnown && !balance.unlimited) {
                     Text(
-                        planName,
-                        style = MaterialTheme.typography.bodySmall,
+                        stringResource(R.string.home_usage_left_short),
+                        style = MaterialTheme.typography.labelSmall,
                         color = LocalExtraColors.current.textSecondary
                     )
                 }
@@ -332,6 +294,9 @@ private fun BalanceCard(balance: BalanceSummary, planName: String, onOpen: () ->
                 modifier = Modifier.size(20.dp)
             )
         }
-        BalanceRows(balance, modifier = Modifier.padding(top = Spacing.xs))
+        if (balance.hasExtraRows) {
+            HorizontalDivider(modifier = Modifier.padding(top = Spacing.xs))
+            BalanceRows(balance, extraOnly = true)
+        }
     }
 }

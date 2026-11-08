@@ -28,6 +28,8 @@ firebaseBom = "33.7.0"
 # 8.0.0 is the newest that builds with Kotlin 2.0 (8.1+ needs the 2.2 stdlib);
 # Play accepts version 8 until its own deprecation date.
 billing = "8.0.0"
+# Tells Home when a newer version is on Google Play.
+playAppUpdate = "2.1.0"
 junit = "4.13.2"
 androidxTestJunit = "1.2.1"
 espresso = "3.6.1"
@@ -58,6 +60,7 @@ firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.r
 firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging" }
 
 billing-ktx = { group = "com.android.billingclient", name = "billing-ktx", version.ref = "billing" }
+play-app-update = { group = "com.google.android.play", name = "app-update", version.ref = "playAppUpdate" }
 
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "serialization" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }

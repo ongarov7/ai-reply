@@ -65,6 +65,7 @@ import kz.yerek.aireply.ui.common.openWebPage
 import kz.yerek.aireply.ui.common.privacyStatement
 import kz.yerek.aireply.ui.design.AppCard
 import kz.yerek.aireply.ui.design.AppSection
+import kz.yerek.aireply.ui.feature.home.AppUpdateSettingsSection
 import kz.yerek.aireply.ui.design.ReadableColumn
 import kz.yerek.aireply.ui.design.Spacing
 import kz.yerek.aireply.ui.feature.setup.KeyboardPermissionsContent
@@ -107,6 +108,12 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit, focusSection: S
 
     AppScreen(title = stringResource(R.string.settings_title), onBack = onBack) {
         ReadableColumn {
+
+            AccountSection(onOpenSubscription = { onOpen(Routes.Subscription) })
+
+            NotificationSettingsSection(
+                modifier = Modifier.bringIntoViewRequester(notificationsSection)
+            )
 
             AppSection(stringResource(R.string.home_profile_title)) {
                 RowGroup {
@@ -174,12 +181,6 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit, focusSection: S
                 Footnote(stringResource(R.string.settings_smart_correction_footer))
                 Footnote(stringResource(R.string.settings_smart_correction_attribution))
             }
-
-            AccountSection(onOpenSubscription = { onOpen(Routes.Subscription) })
-
-            NotificationSettingsSection(
-                modifier = Modifier.bringIntoViewRequester(notificationsSection)
-            )
 
             AppSection(stringResource(R.string.settings_appearance)) {
                 SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
@@ -347,7 +348,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit, focusSection: S
                 }
             }
 
-            Footnote(stringResource(R.string.settings_version, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE))
+            AppUpdateSettingsSection()
         }
     }
 

@@ -2,6 +2,7 @@ package kz.yerek.aireply.data.settings
 
 import android.content.Context
 import android.content.SharedPreferences
+import kz.yerek.aireply.update.UpdateStore
 
 /**
  * State that belongs to THIS phone and must not follow the user to another
@@ -17,11 +18,40 @@ import android.content.SharedPreferences
  *
  * Nothing secret and no text the user typed is kept here.
  */
-class DeviceStateStore internal constructor(private val prefs: SharedPreferences) {
+class DeviceStateStore internal constructor(private val prefs: SharedPreferences) : UpdateStore {
 
     constructor(context: Context) : this(
         context.applicationContext.getSharedPreferences(NAME, Context.MODE_PRIVATE)
     )
+
+    override var updateLastCheck: Long?
+        get() = longOrNull(KEY_UPDATE_LAST_CHECK)
+        set(value) = putLong(KEY_UPDATE_LAST_CHECK, value)
+
+    /** The newest version code Google Play reported; kept so a card survives a moment offline. */
+    override var updateOfferedVersion: Int?
+        get() = intOrNull(KEY_UPDATE_OFFERED)
+        set(value) = putInt(KEY_UPDATE_OFFERED, value)
+
+    override var updateDismissedVersion: Int?
+        get() = intOrNull(KEY_UPDATE_DISMISSED_VERSION)
+        set(value) = putInt(KEY_UPDATE_DISMISSED_VERSION, value)
+
+    override var updateDismissedAt: Long?
+        get() = longOrNull(KEY_UPDATE_DISMISSED_AT)
+        set(value) = putLong(KEY_UPDATE_DISMISSED_AT, value)
+
+    private fun longOrNull(key: String): Long? = if (prefs.contains(key)) prefs.getLong(key, 0L) else null
+
+    private fun intOrNull(key: String): Int? = if (prefs.contains(key)) prefs.getInt(key, 0) else null
+
+    private fun putLong(key: String, value: Long?) {
+        prefs.edit().apply { if (value == null) remove(key) else putLong(key, value) }.apply()
+    }
+
+    private fun putInt(key: String, value: Int?) {
+        prefs.edit().apply { if (value == null) remove(key) else putInt(key, value) }.apply()
+    }
 
     /** The onboarding version this device finished; null when it never finished one. */
     val completedOnboardingVersion: Int?
@@ -186,6 +216,10 @@ class DeviceStateStore internal constructor(private val prefs: SharedPreferences
         private const val NAME = "aireply_device"
 
         private const val KEY_ONBOARDING_VERSION = "onboarding.completedVersion"
+private const val KEY_UPDATE_LAST_CHECK = "update.lastCheck"
+private const val KEY_UPDATE_OFFERED = "update.offeredVersion"
+private const val KEY_UPDATE_DISMISSED_VERSION = "update.dismissedVersion"
+private const val KEY_UPDATE_DISMISSED_AT = "update.dismissedAt"
         private const val KEY_RESUME_STEP = "onboarding.resumeStep"
         private const val KEY_ASKS_GENDER = "onboarding.asksGender"
         private const val KEY_PATH = "onboarding.path"
