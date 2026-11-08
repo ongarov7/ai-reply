@@ -43,13 +43,28 @@ type AppleSubscription struct {
 	Currency                                                                     string
 	Restore                                                                      bool
 	MayShorten                                                                   bool
+	PaidExpiresAt                                                                time.Time
+	Upgraded                                                                     bool
 }
 
 // ApplyAppleSubscription records a verified period and its entitlement atomically.
-// Old periods cannot replace newer renewals; replaying a signed transaction never creates credits.
+// Old periods cannot replace newer renewals; replaying a signed transaction never duplicates credits.
 func (s *Store) ApplyAppleSubscription(ctx context.Context, in AppleSubscription, now time.Time) (GrantResult, error) {
 	var out GrantResult
 	err := s.db.Tx(ctx, func(tx *sql.Tx) error {
+		if in.RevokedAt != nil || in.Restore {
+			state := "revoked"
+			if in.Restore {
+				state = "restored"
+			}
+			advanced, err := advanceApplePurchaseLifecycle(ctx, tx, in.TransactionID, state, in.SignedAt, now)
+			if err != nil {
+				return err
+			}
+			if !advanced {
+				return nil
+			}
+		}
 		var owner string
 		err := tx.QueryRowContext(ctx, `SELECT user_id FROM apple_subscriptions WHERE original_transaction_id=?`, in.OriginalTransactionID).Scan(&owner)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
@@ -97,6 +112,12 @@ func (s *Store) ApplyAppleSubscription(ctx context.Context, in AppleSubscription
 		if _, err = tx.ExecContext(ctx, `UPDATE iap_purchases SET price_milliunits=?,currency=? WHERE provider=? AND transaction_id=? AND price_milliunits=0`, in.PriceMilliunits, in.Currency, domain.ProviderAppStore, in.TransactionID); err != nil {
 			return err
 		}
+		if err = recordAppleBasePeriod(ctx, tx, in, existing.ID); err != nil {
+			return err
+		}
+		if err = reconcileAppleBaseCreditDays(ctx, tx, in.UserID, now); err != nil {
+			return err
+		}
 		autoRenew := true
 		if in.AutoRenew != nil {
 			autoRenew = *in.AutoRenew
@@ -106,7 +127,8 @@ func (s *Store) ApplyAppleSubscription(ctx context.Context, in AppleSubscription
     transaction_id=excluded.transaction_id,product_id=excluded.product_id,plan_id=excluded.plan_id,environment=excluded.environment,
     purchased_at=excluded.purchased_at,expires_at=CASE WHEN excluded.transaction_id=apple_subscriptions.transaction_id AND NOT ? THEN MAX(apple_subscriptions.expires_at,excluded.expires_at) ELSE excluded.expires_at END,signed_at=excluded.signed_at,revoked_at=excluded.revoked_at,
     auto_renew=CASE WHEN ? THEN excluded.auto_renew ELSE apple_subscriptions.auto_renew END,updated_at=excluded.updated_at
-    WHERE excluded.purchased_at>=apple_subscriptions.purchased_at AND excluded.signed_at>=apple_subscriptions.signed_at
+    WHERE (excluded.purchased_at>apple_subscriptions.purchased_at
+      OR (excluded.purchased_at=apple_subscriptions.purchased_at AND excluded.signed_at>=apple_subscriptions.signed_at))
       AND (apple_subscriptions.revoked_at IS NULL OR excluded.revoked_at IS NOT NULL OR excluded.transaction_id<>apple_subscriptions.transaction_id OR ?)`,
 			in.OriginalTransactionID, in.UserID, in.TransactionID, in.ProductID, in.PlanID, in.Environment, ms(in.PurchasedAt), ms(in.ExpiresAt), ms(in.SignedAt), msPtr(in.RevokedAt), autoRenew, ms(now), in.MayShorten || in.RevokedAt != nil, in.AutoRenew != nil, in.Restore)
 		if err != nil {

@@ -118,8 +118,8 @@ func TestAppleBaseRenewsFromSignedExpiryAndIgnoresOldPeriod(t *testing.T) {
 	if n := h.scalar(`SELECT COUNT(*) FROM iap_purchases WHERE user_id=?`, s.userID); n != 2 {
 		t.Fatalf("history count %d", n)
 	}
-	if n := h.scalar(`SELECT COUNT(*) FROM credit_grants WHERE user_id=? AND kind='pack'`, s.userID); n != 0 {
-		t.Fatal("subscription created package credits")
+	if n := h.scalar(`SELECT COUNT(*) FROM credit_grants WHERE user_id=? AND product_code='apple_base_daily' AND expires_at IS NULL`, s.userID); n != 2 {
+		t.Fatalf("expected two accrued permanent daily grants, got %d", n)
 	}
 }
 

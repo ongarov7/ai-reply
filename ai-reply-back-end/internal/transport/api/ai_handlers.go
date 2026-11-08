@@ -272,15 +272,17 @@ func (s *Server) handleCompose(w http.ResponseWriter, r *http.Request) {
 // resultUsage — генерациядан кейінгі санағыштар (GET /me/usage-пен бірдей өрістер және bucket).
 func (s *Server) resultUsage(result ai.Result) usageDTO {
 	dto := usageDTO{
-		DailyLimit:     result.DailyLimit,
-		Unlimited:      result.Unlimited,
-		UsedToday:      result.UsedToday,
-		RemainingToday: result.Remaining,
-		MonthlyLimit:   result.MonthlyLimit,
-		UsedMonth:      result.UsedMonth,
-		ResetsAt:       result.ResetsAt.Format(time.RFC3339),
-		Timezone:       s.cfg.App.Timezone,
-		Bucket:         result.Bucket,
+		DailyCreditGrant:   result.DailyCreditGrant,
+		CreditsNeverExpire: result.CreditsNeverExpire,
+		DailyLimit:         result.DailyLimit,
+		Unlimited:          result.Unlimited,
+		UsedToday:          result.UsedToday,
+		RemainingToday:     result.Remaining,
+		MonthlyLimit:       result.MonthlyLimit,
+		UsedMonth:          result.UsedMonth,
+		ResetsAt:           result.ResetsAt.Format(time.RFC3339),
+		Timezone:           s.cfg.App.Timezone,
+		Bucket:             result.Bucket,
 	}
 	dto.withBalance(result.Balance, s.cfg.App.Location())
 	return dto

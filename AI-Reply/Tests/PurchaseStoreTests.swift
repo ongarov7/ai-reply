@@ -225,6 +225,22 @@ final class SubscriptionDisplayTests: XCTestCase {
         XCTAssertEqual(catalogue.visible(period: "month").first?.offer, offer)
         XCTAssertEqual(catalogue.options.first?.allowance, .unlimited)
     }
+
+    func testPermanentDailyGrantsKeepTheirDisclosureAfterStoreKitMatching() throws {
+        let product = try JSONDecoder().decode(PurchaseAPI.Product.self, from: Data("""
+        {"code":"base_monthly","kind":"subscription","units":0,
+         "store_product_id":"base.monthly","plan_id":"base_monthly","billing_period":"month",
+         "entitlement_kind":"daily","daily_limit":40,"credits_never_expire":true}
+        """.utf8))
+        let matched = PurchaseOffer.match(server: [product], store: [
+            StoreProduct(id: "base.monthly", displayName: "Base", displayPrice: "790 ₸",
+                         kind: .subscription, billingPeriod: "month")
+        ])
+        let catalogue = SubscriptionPlanCatalogue(plans: plans, offers: matched)
+        let option = try XCTUnwrap(catalogue.options.first)
+        XCTAssertTrue(option.offer.creditsNeverExpire)
+        XCTAssertEqual(option.allowance, .daily(40))
+    }
 }
 
 /// Packs and the pass through StoreKit 2, with the App Store and the server

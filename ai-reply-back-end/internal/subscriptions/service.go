@@ -172,6 +172,10 @@ func (s *Service) ExpireDue(ctx context.Context) (int64, error) {
 // түседі. Клиенттің «мен неше рет қолдандым» деген сөзіне ешқашан сенбейміз.
 func (s *Service) Entitlement(ctx context.Context, userID string) (domain.Entitlement, error) {
 	now := s.clock.Now()
+	dailyCredits, hasAppleBase, err := s.repo.AccrueAppleBaseCredits(ctx, userID, now, s.loc)
+	if err != nil {
+		return domain.Entitlement{}, err
+	}
 	var (
 		plan domain.Plan
 		sub  *domain.Subscription
@@ -234,16 +238,22 @@ func (s *Service) Entitlement(ctx context.Context, userID string) (domain.Entitl
 		return domain.Entitlement{}, err
 	}
 
+	dailyLimit, monthlyLimit := plan.DailyLimit, plan.MonthlyLimit
+	if sub != nil && sub.Source == domain.ProviderAppStore && (plan.Code == "base_monthly" || plan.Code == "base_yearly") {
+		dailyLimit, monthlyLimit = 0, 0
+	}
 	return domain.Entitlement{
-		Plan:         plan,
-		Subscription: sub,
-		DailyLimit:   plan.DailyLimit,
-		MonthlyLimit: plan.MonthlyLimit,
-		Unlimited:    plan.Unlimited(),
-		UsedToday:    usedDay,
-		UsedMonth:    usedMonth,
-		ResetsAt:     s.NextReset(now),
-		Balance:      balance,
+		Plan:               plan,
+		Subscription:       sub,
+		DailyLimit:         dailyLimit,
+		MonthlyLimit:       monthlyLimit,
+		DailyCreditGrant:   dailyCredits,
+		CreditsNeverExpire: hasAppleBase,
+		Unlimited:          plan.Unlimited(),
+		UsedToday:          usedDay,
+		UsedMonth:          usedMonth,
+		ResetsAt:           s.NextReset(now),
+		Balance:            balance,
 	}, nil
 }
 

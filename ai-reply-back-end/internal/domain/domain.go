@@ -303,14 +303,16 @@ func (s Subscription) IsUsable(now time.Time) bool {
 
 // Entitlement — қолданушының нақты дәл қазіргі құқығы.
 type Entitlement struct {
-	Plan         Plan
-	Subscription *Subscription
-	DailyLimit   int
-	MonthlyLimit int
-	Unlimited    bool
-	UsedToday    int
-	UsedMonth    int
-	ResetsAt     time.Time
+	DailyCreditGrant   int
+	CreditsNeverExpire bool
+	Plan               Plan
+	Subscription       *Subscription
+	DailyLimit         int
+	MonthlyLimit       int
+	Unlimited          bool
+	UsedToday          int
+	UsedMonth          int
+	ResetsAt           time.Time
 	// Balance — тарифтен тыс бөліктер (pass, бонус, кредиттер).
 	Balance CreditBalance
 }

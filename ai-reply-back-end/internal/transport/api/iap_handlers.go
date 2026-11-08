@@ -43,18 +43,19 @@ func (s *Server) registerIAP(mux *http.ServeMux, perUser middleware.KeyFunc) {
 
 // iapProductDTO — қолданбаға көрінетін өнім (бағасы дүкенде: StoreKit / Play Billing).
 type iapProductDTO struct {
-	Code            string `json:"code"`
-	Kind            string `json:"kind"`
-	Units           int    `json:"units"`
-	DurationHours   int    `json:"duration_hours"`
-	StoreProductID  string `json:"store_product_id"`
-	Name            string `json:"name"`
-	PlanID          string `json:"plan_id,omitempty"`
-	BillingPeriod   string `json:"billing_period,omitempty"`
-	EntitlementKind string `json:"entitlement_kind,omitempty"`
-	DailyLimit      int    `json:"daily_limit"`
-	Price           int64  `json:"price"`
-	Currency        string `json:"currency"`
+	CreditsNeverExpire bool   `json:"credits_never_expire,omitempty"`
+	Code               string `json:"code"`
+	Kind               string `json:"kind"`
+	Units              int    `json:"units"`
+	DurationHours      int    `json:"duration_hours"`
+	StoreProductID     string `json:"store_product_id"`
+	Name               string `json:"name"`
+	PlanID             string `json:"plan_id,omitempty"`
+	BillingPeriod      string `json:"billing_period,omitempty"`
+	EntitlementKind    string `json:"entitlement_kind,omitempty"`
+	DailyLimit         int    `json:"daily_limit"`
+	Price              int64  `json:"price"`
+	Currency           string `json:"currency"`
 }
 
 // handleIAPProducts — GET /api/v1/iap/products?platform=ios|android.
@@ -88,6 +89,7 @@ func (s *Server) handleIAPProducts(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			product.EntitlementKind, product.DailyLimit = plan.EntitlementKind, plan.DailyLimit
+			product.CreditsNeverExpire = platform == domain.PlatformIOS && (plan.Code == "base_monthly" || plan.Code == "base_yearly")
 			if product.Currency == "" {
 				product.Price, product.Currency = plan.Price, plan.Currency
 			}

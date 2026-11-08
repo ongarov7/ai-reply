@@ -185,7 +185,7 @@ extension AccountAPI {
         let timezone: String
         /// The free replies of a new account; nil when it never had any.
         var welcome: Welcome? = nil
-        /// Administrator grants and purchased packs left.
+        /// Administrator grants, purchased packs and accrued subscription replies left.
         var credits: Int? = nil
         /// The pass running now; nil when there is none.
         var pass: Pass? = nil
@@ -197,6 +197,10 @@ extension AccountAPI {
         var unlimited = false
         var purchasedCredits: Int? = nil
         var adminCredits: Int? = nil
+        /// Replies accrued during a paid subscription remain usable afterward.
+        var creditsNeverExpire = false
+        /// New permanent replies added each paid day; zero after expiry.
+        var dailyCreditGrant = 0
 
         struct Welcome: Decodable, Sendable, Equatable {
             let total: Int
@@ -227,6 +231,8 @@ extension AccountAPI {
             case unlimited
             case purchasedCredits = "purchased_credits"
             case adminCredits = "admin_credits"
+            case creditsNeverExpire = "credits_never_expire"
+            case dailyCreditGrant = "daily_credit_grant"
         }
 
         static let unknown = Usage(dailyLimit: 0, usedToday: 0, remainingToday: 0,
@@ -487,6 +493,8 @@ extension AccountAPI.Usage {
         unlimited = (try? container.decodeIfPresent(Bool.self, forKey: .unlimited)) ?? false
         purchasedCredits = (try? container.decodeIfPresent(Int.self, forKey: .purchasedCredits)) ?? nil
         adminCredits = (try? container.decodeIfPresent(Int.self, forKey: .adminCredits)) ?? nil
+        creditsNeverExpire = (try? container.decodeIfPresent(Bool.self, forKey: .creditsNeverExpire)) ?? false
+        dailyCreditGrant = max(0, (try? container.decodeIfPresent(Int.self, forKey: .dailyCreditGrant)) ?? 0)
     }
 }
 

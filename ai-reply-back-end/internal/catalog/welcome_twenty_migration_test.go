@@ -57,7 +57,7 @@ func TestWelcomeTwentyMigrationVersionsOnlyDefaultFreeAndPreservesCustomers(t *t
 	orderRaw, _ := json.Marshal(old[1])
 	exec(`INSERT INTO billing_orders(id,user_id,idempotency_key,catalog_version,product_code,snapshot_json,amount_minor,currency,provider,environment,bank_order,status,checkout_token_hash,request_json,created_at,updated_at)
  VALUES('sold','existing','original',1,'base_monthly',?,81111,'KZT','bcc','sandbox','original-bank','pending','test-hash','{}',1000,1000)`, string(orderRaw))
-	if applied, err := database.Migrate(ctx, db, migrations.FS); err != nil || !reflect.DeepEqual(applied, []string{"0035_free_welcome_twenty.sql"}) {
+	if applied, err := database.Migrate(ctx, db, catalogMigrationsBefore(t, "0036")); err != nil || !reflect.DeepEqual(applied, []string{"0035_free_welcome_twenty.sql"}) {
 		t.Fatalf("migration: %v %v", applied, err)
 	}
 	s := New(db)
@@ -111,7 +111,7 @@ func TestWelcomeTwentyMigrationVersionsOnlyDefaultFreeAndPreservesCustomers(t *t
 	if err != nil || len(audit) != 2 || audit[0].Action != "publish" || audit[1].Action != "rebase_welcome" {
 		t.Fatalf("missing migration audit: %+v %v", audit, err)
 	}
-	if applied, err := database.Migrate(ctx, db, migrations.FS); err != nil || len(applied) != 0 {
+	if applied, err := database.Migrate(ctx, db, catalogMigrationsBefore(t, "0036")); err != nil || len(applied) != 0 {
 		t.Fatalf("repeat migration: %v %v", applied, err)
 	}
 }
@@ -156,7 +156,7 @@ func TestWelcomeTwentyMigrationPreservesCustomDraftAndAlreadyAlignedPublication(
 	exec(`INSERT INTO billing_catalog_versions(id,state,base_version,revision,products_json,created_by,updated_by,created_at,updated_at)
  VALUES(2,'draft',1,4,?,'owner','owner',1000,1000)`, string(draftRaw))
 	exec(`UPDATE system_settings SET value='20' WHERE key='welcome_bonus_units'`)
-	if _, err := database.Migrate(ctx, db, migrations.FS); err != nil {
+	if _, err := database.Migrate(ctx, db, catalogMigrationsBefore(t, "0036")); err != nil {
 		t.Fatal(err)
 	}
 	s := New(db)
@@ -191,7 +191,7 @@ func TestWelcomeTwentyMigrationRebasesOnlyCurrentDraftAndKeepsCustomQuantity(t *
 			draftRaw, _ := json.Marshal(products)
 			exec(`INSERT INTO billing_catalog_versions(id,state,base_version,revision,products_json,created_by,updated_by,created_at,updated_at)
  VALUES(2,'draft',?,4,?,'owner','owner',1000,1000)`, tc.base, string(draftRaw))
-			if _, err := database.Migrate(ctx, db, migrations.FS); err != nil {
+			if _, err := database.Migrate(ctx, db, catalogMigrationsBefore(t, "0036")); err != nil {
 				t.Fatal(err)
 			}
 			s := New(db)
@@ -224,7 +224,7 @@ func TestWelcomeTwentyMigrationFailureRollsBackAndCanRetry(t *testing.T) {
  VALUES(1,'published',?,'owner','owner',1000,1000)`, string(raw))
 	exec(`CREATE TRIGGER fail_welcome_migration BEFORE INSERT ON billing_catalog_audit
  WHEN NEW.actor='migration:0035' BEGIN SELECT RAISE(ABORT,'test audit failure'); END`)
-	if _, err := database.Migrate(ctx, db, migrations.FS); err == nil {
+	if _, err := database.Migrate(ctx, db, catalogMigrationsBefore(t, "0036")); err == nil {
 		t.Fatal("expected simulated migration failure")
 	}
 	var units string
@@ -236,7 +236,7 @@ func TestWelcomeTwentyMigrationFailureRollsBackAndCanRetry(t *testing.T) {
 		t.Fatalf("partial catalog publication survived rollback: %+v %v", current, err)
 	}
 	exec(`DROP TRIGGER fail_welcome_migration`)
-	if applied, err := database.Migrate(ctx, db, migrations.FS); err != nil || !reflect.DeepEqual(applied, []string{"0035_free_welcome_twenty.sql"}) {
+	if applied, err := database.Migrate(ctx, db, catalogMigrationsBefore(t, "0036")); err != nil || !reflect.DeepEqual(applied, []string{"0035_free_welcome_twenty.sql"}) {
 		t.Fatalf("migration retry: %v %v", applied, err)
 	}
 }

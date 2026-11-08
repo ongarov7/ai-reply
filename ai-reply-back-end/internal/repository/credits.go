@@ -311,6 +311,18 @@ func (s *Store) RefundGeneration(ctx context.Context, id string, now time.Time) 
 			return err
 		}
 		if bucket == domain.BucketDaily || bucket == domain.BucketUnlimited || !grant.Valid {
+			if bucket == domain.BucketDaily {
+				var rollover string
+				err := tx.QueryRowContext(ctx, `UPDATE credit_grants SET units_remaining=units_remaining+1,updated_at=?
+				 WHERE id=(SELECT grant_id FROM apple_base_legacy_charges WHERE reservation_id=?)
+				 AND status='active' AND units_remaining<units_total RETURNING id`, at, id).Scan(&rollover)
+				if err != nil && !errors.Is(err, sql.ErrNoRows) {
+					return err
+				}
+				if err == nil {
+					return insertLedger(ctx, tx, domain.LedgerEntry{UserID: userID, GrantID: rollover, Entry: domain.LedgerRefund, Kind: domain.GrantPack, Delta: 1, Reason: "Legacy Base generation failed", CreatedAt: now}, id)
+				}
+			}
 			return nil
 		}
 		var kind string

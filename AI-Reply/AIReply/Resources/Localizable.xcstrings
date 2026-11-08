@@ -1138,25 +1138,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Available today"
+            "value" : "Available replies"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Бүгін қолжетімді"
+            "value" : "Қолжетімді жауаптар"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Сегодня доступно"
+            "value" : "Доступные ответы"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bugun mavjud"
+            "value" : "Mavjud javoblar"
           }
         }
       }
@@ -14706,25 +14706,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Access until %@"
+            "value" : "Subscription until %@"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ дейін қолжетімді"
+            "value" : "Жазылым: %@ дейін"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Доступ до %@"
+            "value" : "Подписка до %@"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ gacha foydalanish mumkin"
+            "value" : "Obuna: %@ gacha"
           }
         }
       }
@@ -15083,25 +15083,25 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Автопродление отключено. Доступ сохранится до конца оплаченного периода."
+            "value" : "Автопродление отключено. Подписка закончится после оплаченного периода."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Автоматты ұзарту өшірулі. Қолжетімділік төленген кезеңнің соңына дейін сақталады."
+            "value" : "Автоматты ұзарту өшірулі. Жазылым төленген кезеңнен кейін аяқталады."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Automatic renewal is off. Access continues until the end of the paid period."
+            "value" : "Automatic renewal is off. The subscription ends after the paid period."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Avtomatik yangilanish o‘chirilgan. Foydalanish huquqi to‘langan muddat oxirigacha saqlanadi."
+            "value" : "Avtomatik yangilanish o‘chirilgan. Obuna to‘langan muddatdan keyin tugaydi."
           }
         }
       }
@@ -15247,6 +15247,64 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bu Apple hisobi uchun AI Reply obunasi topilmadi. Avval obuna boʻlgan boʻlsangiz, xaridlarni tiklang. Obunalarni App Store orqali ham tekshirishingiz mumkin."
+          }
+        }
+      }
+    },
+    "subscription.dailyAccrual %lld" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld replies added each day of your Base subscription"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Начисляем %lld ответов каждый день подписки Base"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Base жазылымы кезінде күн сайын %lld жауап қосылады"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Base obunasi davomida har kuni %lld ta javob qo‘shiladi"
+          }
+        }
+      }
+    },
+    "subscription.repliesNeverExpire" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unused Base subscription replies roll over and never expire. You can use them after your Base subscription ends."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Неиспользованные ответы по подписке Base накапливаются и не сгорают. Ими можно пользоваться после окончания подписки Base."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Base жазылымындағы пайдаланылмаған жауаптар жинақталады және мерзімі шектелмейді. Base жазылымы аяқталғаннан кейін де оларды қолдана аласыз."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Base obunasidagi ishlatilmagan javoblar jamlanadi va muddati cheklanmaydi. Base obunasi tugagandan keyin ham ulardan foydalanishingiz mumkin."
           }
         }
       }

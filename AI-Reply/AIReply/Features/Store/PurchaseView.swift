@@ -294,7 +294,11 @@ struct PurchaseOptionsView: View {
                         Label("purchase.unlimited", systemImage: "infinity")
                             .foregroundStyle(Color.accentColor).font(.subheadline)
                     } else if case .daily(let limit) = option.allowance {
-                        Text("subscription.perDay \(limit)").font(.subheadline).foregroundStyle(.secondary)
+                        if option.offer.creditsNeverExpire {
+                            Text("subscription.dailyAccrual \(limit)").font(.subheadline).foregroundStyle(.secondary)
+                        } else {
+                            Text("subscription.perDay \(limit)").font(.subheadline).foregroundStyle(.secondary)
+                        }
                     }
                 }
                 Spacer(minLength: DS.Spacing.s)
@@ -308,6 +312,11 @@ struct PurchaseOptionsView: View {
             Text(verbatim: option.offer.displayPrice).font(.title2.weight(.semibold))
             Text(option.offer.billingPeriod == "year" ? LocalizedStringKey("purchase.billed.year") : LocalizedStringKey("purchase.billed.month"))
                 .font(.footnote).foregroundStyle(.secondary)
+            if option.offer.creditsNeverExpire {
+                Text("subscription.repliesNeverExpire")
+                    .font(.footnote).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             buyButton(option.offer, current: current)
             if option.offer.hasPriceMismatch { mismatchNotice }
         }

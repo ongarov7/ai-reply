@@ -26,6 +26,7 @@ enum PurchaseAPI {
         var dailyLimit = 0
         var price: Int? = nil
         var currency: String? = nil
+        var creditsNeverExpire = false
 
         enum CodingKeys: String, CodingKey {
             case code, kind, units, name
@@ -36,11 +37,12 @@ enum PurchaseAPI {
             case entitlementKind = "entitlement_kind"
             case dailyLimit = "daily_limit"
             case price, currency
+            case creditsNeverExpire = "credits_never_expire"
         }
 
         init(code: String, kind: String, units: Int, durationHours: Int, storeProductID: String, name: String,
              planID: String? = nil, billingPeriod: String? = nil, entitlementKind: String? = nil,
-             dailyLimit: Int = 0, price: Int? = nil, currency: String? = nil) {
+             dailyLimit: Int = 0, price: Int? = nil, currency: String? = nil, creditsNeverExpire: Bool = false) {
             self.code = code
             self.kind = kind
             self.units = units
@@ -53,6 +55,7 @@ enum PurchaseAPI {
             self.dailyLimit = dailyLimit
             self.price = price
             self.currency = currency
+            self.creditsNeverExpire = creditsNeverExpire
         }
 
         init(from decoder: Decoder) throws {
@@ -69,6 +72,7 @@ enum PurchaseAPI {
             dailyLimit = (try? container.decodeIfPresent(Int.self, forKey: .dailyLimit)) ?? 0
             price = try? container.decodeIfPresent(Int.self, forKey: .price)
             currency = try? container.decodeIfPresent(String.self, forKey: .currency)
+            creditsNeverExpire = (try? container.decodeIfPresent(Bool.self, forKey: .creditsNeverExpire)) ?? false
         }
     }
 

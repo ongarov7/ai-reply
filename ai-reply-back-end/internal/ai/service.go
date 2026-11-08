@@ -106,15 +106,17 @@ type Request struct {
 
 // Result — клиентке қайтатын нәтиже.
 type Result struct {
-	Text             string
-	DetectedLanguage string
-	Model            string
-	InputTokens      int
-	OutputTokens     int
-	DailyLimit       int
-	Unlimited        bool
-	UsedToday        int
-	Remaining        int
+	DailyCreditGrant   int
+	CreditsNeverExpire bool
+	Text               string
+	DetectedLanguage   string
+	Model              string
+	InputTokens        int
+	OutputTokens       int
+	DailyLimit         int
+	Unlimited          bool
+	UsedToday          int
+	Remaining          int
 	// MonthlyLimit — 0 болса айлық шек жоқ; UsedMonth — осы айда жұмсалғаны.
 	MonthlyLimit int
 	UsedMonth    int
@@ -325,21 +327,23 @@ func (s *Service) generate(ctx context.Context, c call, prompt Prompt, started t
 	}
 
 	return Result{
-		Text:             outcome.Text,
-		DetectedLanguage: DetectLanguage(outcome.Text),
-		Model:            outcome.Model,
-		InputTokens:      outcome.InputTokens,
-		OutputTokens:     outcome.OutputTokens,
-		DailyLimit:       entitlement.DailyLimit,
-		Unlimited:        entitlement.Unlimited,
-		UsedToday:        usage.UsedToday,
-		Remaining:        usage.Remaining(),
-		MonthlyLimit:     entitlement.MonthlyLimit,
-		UsedMonth:        usage.UsedMonth,
-		ResetsAt:         entitlement.ResetsAt,
-		LatencyMS:        latency,
-		Balance:          usage.Balance,
-		Bucket:           res.Bucket,
+		Text:               outcome.Text,
+		DailyCreditGrant:   entitlement.DailyCreditGrant,
+		CreditsNeverExpire: entitlement.CreditsNeverExpire,
+		DetectedLanguage:   DetectLanguage(outcome.Text),
+		Model:              outcome.Model,
+		InputTokens:        outcome.InputTokens,
+		OutputTokens:       outcome.OutputTokens,
+		DailyLimit:         entitlement.DailyLimit,
+		Unlimited:          entitlement.Unlimited,
+		UsedToday:          usage.UsedToday,
+		Remaining:          usage.Remaining(),
+		MonthlyLimit:       entitlement.MonthlyLimit,
+		UsedMonth:          usage.UsedMonth,
+		ResetsAt:           entitlement.ResetsAt,
+		LatencyMS:          latency,
+		Balance:            usage.Balance,
+		Bucket:             res.Bucket,
 	}, nil
 }
 

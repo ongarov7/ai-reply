@@ -35,6 +35,7 @@ struct PurchaseOffer: Identifiable, Equatable, Sendable {
     var entitlementKind: String? = nil
     var dailyLimit = 0
     var hasPriceMismatch = false
+    var creditsNeverExpire = false
 
     var id: String { storeProductID }
 
@@ -68,7 +69,8 @@ struct PurchaseOffer: Identifiable, Equatable, Sendable {
                                  name: name.isEmpty ? storeProduct.displayName : name,
                                  displayPrice: storeProduct.displayPrice, planID: product.planID,
                                  billingPeriod: product.billingPeriod, entitlementKind: product.entitlementKind,
-                                 dailyLimit: product.dailyLimit, hasPriceMismatch: mismatch)
+                                 dailyLimit: product.dailyLimit, hasPriceMismatch: mismatch,
+                                 creditsNeverExpire: product.creditsNeverExpire)
         }
     }
 }

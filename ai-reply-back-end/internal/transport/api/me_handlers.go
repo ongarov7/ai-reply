@@ -81,11 +81,12 @@ func (s *Server) handleCredits(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, domain.ErrNotFound)
 		return
 	}
-	balance, err := s.credits.Balance(r.Context(), user.ID)
+	entitlement, err := s.subs.Entitlement(r.Context(), user.ID)
 	if err != nil {
 		httpx.Fail(w, err)
 		return
 	}
+	balance := entitlement.Balance
 	ledger, err := s.credits.Ledger(r.Context(), user.ID, credits.LedgerLimit)
 	if err != nil {
 		httpx.Fail(w, err)

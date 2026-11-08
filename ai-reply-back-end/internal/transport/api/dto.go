@@ -145,16 +145,18 @@ type subscriptionDTO struct {
 // usageDTO — квота және баланс. Ескі өрістердің мағынасы өзгермейді:
 // remaining_today — тек тарифтің бүгінгі қалдығы.
 type usageDTO struct {
-	DailyLimit       int    `json:"daily_limit"`
-	Unlimited        bool   `json:"unlimited"`
-	PurchasedCredits int    `json:"purchased_credits"`
-	AdminCredits     int    `json:"admin_credits"`
-	UsedToday        int    `json:"used_today"`
-	RemainingToday   int    `json:"remaining_today"`
-	MonthlyLimit     int    `json:"monthly_limit"`
-	UsedMonth        int    `json:"used_month"`
-	ResetsAt         string `json:"resets_at"`
-	Timezone         string `json:"timezone"`
+	DailyCreditGrant   int    `json:"daily_credit_grant,omitempty"`
+	CreditsNeverExpire bool   `json:"credits_never_expire"`
+	DailyLimit         int    `json:"daily_limit"`
+	Unlimited          bool   `json:"unlimited"`
+	PurchasedCredits   int    `json:"purchased_credits"`
+	AdminCredits       int    `json:"admin_credits"`
+	UsedToday          int    `json:"used_today"`
+	RemainingToday     int    `json:"remaining_today"`
+	MonthlyLimit       int    `json:"monthly_limit"`
+	UsedMonth          int    `json:"used_month"`
+	ResetsAt           string `json:"resets_at"`
+	Timezone           string `json:"timezone"`
 	// Welcome — сәлемдесу бонусы; тіркелгіде жоқ болса өріс жоқ.
 	Welcome *welcomeDTO `json:"welcome,omitempty"`
 	// Credits — әкімші кредиттері мен сатып алынған пакеттердің қалдығы.
@@ -179,14 +181,16 @@ type passDTO struct {
 
 func toUsageDTO(e domain.Entitlement, tz string, loc *time.Location) usageDTO {
 	dto := usageDTO{
-		DailyLimit:     e.DailyLimit,
-		Unlimited:      e.Unlimited,
-		UsedToday:      e.UsedToday,
-		RemainingToday: e.Remaining(),
-		MonthlyLimit:   e.MonthlyLimit,
-		UsedMonth:      e.UsedMonth,
-		ResetsAt:       e.ResetsAt.Format(time.RFC3339),
-		Timezone:       tz,
+		DailyCreditGrant:   e.DailyCreditGrant,
+		CreditsNeverExpire: e.CreditsNeverExpire,
+		DailyLimit:         e.DailyLimit,
+		Unlimited:          e.Unlimited,
+		UsedToday:          e.UsedToday,
+		RemainingToday:     e.Remaining(),
+		MonthlyLimit:       e.MonthlyLimit,
+		UsedMonth:          e.UsedMonth,
+		ResetsAt:           e.ResetsAt.Format(time.RFC3339),
+		Timezone:           tz,
 	}
 	dto.withBalance(e.Balance, loc)
 	return dto

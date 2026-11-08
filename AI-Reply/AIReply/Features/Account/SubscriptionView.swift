@@ -62,7 +62,13 @@ struct SubscriptionView: View {
                 }
             }
 
-            // The plan's own day: its allowance and what was used of it.
+            // Paid daily grants accumulate in the permanent reply balance.
+            // A daily usage cap would misrepresent these replies as expiring.
+            if account.usage.dailyCreditGrant > 0 {
+                Text("subscription.dailyAccrual \(account.usage.dailyCreditGrant)")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
             if !account.usage.unlimited && account.usage.dailyLimit > 0 {
                 ProgressView(value: progress)
                     .tint(Color.accentColor)
@@ -74,6 +80,13 @@ struct SubscriptionView: View {
             if !balance.extraRows.isEmpty {
                 Divider()
                 BalanceRows(rows: balance.extraRows)
+            }
+
+            if account.usage.creditsNeverExpire {
+                Text("subscription.repliesNeverExpire")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             if let expiry = account.subscription?.expiresAt, !expiry.isEmpty {

@@ -35,6 +35,8 @@ final class BalanceTests: XCTestCase {
         XCTAssertFalse(plan.hasBalance)
         XCTAssertTrue(plan.isKnown)
         XCTAssertEqual(plan.availableNow, 0, "the plan's day is all there is")
+        XCTAssertFalse(plan.creditsNeverExpire)
+        XCTAssertEqual(plan.dailyCreditGrant, 0)
     }
 
     func testTheBalanceIsRead() throws {
@@ -54,7 +56,8 @@ final class BalanceTests: XCTestCase {
         let broken = try usage("""
         {"daily_limit": 7, "used_today": 1, "remaining_today": 6, "monthly_limit": 0, "used_month": 1,
          "resets_at": "2026-10-21T19:00:00Z", "timezone": "Asia/Almaty",
-         "welcome": {"total": "fifty"}, "credits": "many", "pass": 3, "remaining_total": 56, "bucket": 1}
+         "welcome": {"total": "fifty"}, "credits": "many", "pass": 3, "remaining_total": 56, "bucket": 1,
+         "credits_never_expire": "yes", "daily_credit_grant": "forty"}
         """)
         XCTAssertEqual(broken.remainingToday, 6)
         XCTAssertNil(broken.welcome)
@@ -62,6 +65,8 @@ final class BalanceTests: XCTestCase {
         XCTAssertNil(broken.pass)
         XCTAssertNil(broken.bucket)
         XCTAssertEqual(broken.remainingTotal, 56)
+        XCTAssertFalse(broken.creditsNeverExpire)
+        XCTAssertEqual(broken.dailyCreditGrant, 0)
     }
 
     func testTheReplyAnswerCarriesTheBucket() throws {
@@ -97,6 +102,35 @@ final class BalanceTests: XCTestCase {
         """)
         XCTAssertTrue(free.isKnown)
         XCTAssertEqual(BalanceSummary.make(free).rows, [.today(7), .welcome(remaining: 7, total: 10)])
+    }
+
+    func testAccumulatedSubscriptionRepliesRemainAvailableWithoutAnActiveDailyAllowance() throws {
+        let expired = try usage("""
+        {"daily_limit": 0, "used_today": 0, "remaining_today": 0,
+         "credits": 85, "purchased_credits": 85, "remaining_total": 85,
+         "credits_never_expire": true, "daily_credit_grant": 0}
+        """)
+        XCTAssertTrue(expired.creditsNeverExpire)
+        XCTAssertEqual(expired.dailyCreditGrant, 0)
+        XCTAssertEqual(BalanceSummary.make(expired).rows, [.today(85), .purchased(85)])
+
+        let group = try XCTUnwrap(UserDefaults(suiteName: "ExpiredBaseBalanceTests.\(UUID())"))
+        defer { AccountUsageCache.clear(defaults: group) }
+        AccountUsageCache.store(expired, defaults: group)
+        XCTAssertEqual(AccountUsageCache.snapshot(defaults: group).remainingTotal, 85)
+        XCTAssertFalse(AccountUsageCache.snapshot(defaults: group).isExhausted,
+                       "the keyboard can spend accrued replies after the subscription ends")
+    }
+
+    func testDailySubscriptionAccrualDoesNotLimitTheAccumulatedBalance() throws {
+        let base = try usage("""
+        {"daily_limit": 0, "used_today": 63, "remaining_today": 0,
+         "credits": 97, "purchased_credits": 97, "remaining_total": 97,
+         "credits_never_expire": true, "daily_credit_grant": 40}
+        """)
+        XCTAssertEqual(base.dailyCreditGrant, 40)
+        XCTAssertEqual(base.availableNow, 97)
+        XCTAssertEqual(BalanceSummary.make(base).rows, [.today(97), .purchased(97)])
     }
 
     func testExhaustedWelcomeDoesNotBecomeTenRepliesAgain() throws {

@@ -333,6 +333,7 @@ func (s *Service) applyAppleSubscription(ctx context.Context, user domain.User, 
 		UserID: user.ID, OriginalTransactionID: tx.OriginalTransactionID, TransactionID: tx.TransactionID, ProductID: tx.ProductID,
 		PlanID: product.PlanID, Environment: tx.Environment, PurchasedAt: time.UnixMilli(tx.PurchaseDate), ExpiresAt: expires,
 		SignedAt: time.UnixMilli(tx.SignedDate), RevokedAt: revoked, AutoRenew: autoRenew, PriceMilliunits: tx.Price, Currency: tx.Currency, Restore: restore, MayShorten: mayShorten,
+		PaidExpiresAt: time.UnixMilli(tx.ExpiresDate), Upgraded: tx.IsUpgraded,
 	}, s.clock.Now())
 	if err != nil {
 		return Result{}, err
