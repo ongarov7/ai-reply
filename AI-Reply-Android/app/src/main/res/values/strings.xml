@@ -330,7 +330,7 @@
     <string name="subscription_choose">Choose</string>
     <string name="settings_account">Account</string>
     <string name="settings_account_identifier">Signed in as</string>
-    <string name="settings_account_plan">Plan and limit</string>
+    <string name="settings_account_plan">Balance and access</string>
     <string name="settings_account_sign_out">Sign out</string>
     <string name="settings_account_sign_out_confirm">Sign out of this account?</string>
     <string name="settings_account_signed_out">Not signed in</string>

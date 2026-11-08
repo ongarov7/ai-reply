@@ -333,7 +333,7 @@
     <string name="subscription_choose">Выбрать</string>
     <string name="settings_account">Аккаунт</string>
     <string name="settings_account_identifier">Вы вошли как</string>
-    <string name="settings_account_plan">Тариф и лимит</string>
+    <string name="settings_account_plan">Баланс и доступ</string>
     <string name="settings_account_sign_out">Выйти</string>
     <string name="settings_account_sign_out_confirm">Выйти из этого аккаунта?</string>
     <string name="settings_account_signed_out">Вы не вошли</string>

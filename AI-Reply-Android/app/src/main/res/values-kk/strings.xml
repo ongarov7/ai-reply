@@ -329,7 +329,7 @@
     <string name="subscription_choose">Таңдау</string>
     <string name="settings_account">Тіркелгі</string>
     <string name="settings_account_identifier">Кірген тіркелгі</string>
-    <string name="settings_account_plan">Тариф және лимит</string>
+    <string name="settings_account_plan">Баланс және қолжетімділік</string>
     <string name="settings_account_sign_out">Шығу</string>
     <string name="settings_account_sign_out_confirm">Осы тіркелгіден шығасыз ба?</string>
     <string name="settings_account_signed_out">Кірмегенсіз</string>

@@ -255,7 +255,7 @@
 
     <string name="settings_account">Hisob</string>
     <string name="settings_account_identifier">Kirgan hisob</string>
-    <string name="settings_account_plan">Tarif va limit</string>
+    <string name="settings_account_plan">Balans va foydalanish</string>
     <string name="settings_account_sign_out">Chiqish</string>
     <string name="settings_account_sign_out_confirm">Bu hisobdan chiqilsinmi?</string>
     <string name="settings_account_signed_out">Hisobga kirilmagan</string>
