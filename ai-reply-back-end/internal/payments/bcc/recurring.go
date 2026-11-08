@@ -82,6 +82,13 @@ func (s *CheckoutService) validateMandate(ctx context.Context, tx *sql.Tx, user 
 	if n > 0 {
 		return domain.ConflictField("subscription", "manage_existing_store_subscription")
 	}
+	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM google_subscriptions WHERE user_id=? AND auto_renew=1 AND revoked_at IS NULL AND superseded_by='' AND expires_at>? AND state IN (?,?)`,
+		user, now.UnixMilli(), domain.GoogleSubActive, domain.GoogleSubGrace).Scan(&n); err != nil {
+		return err
+	}
+	if n > 0 {
+		return domain.ConflictField("subscription", "manage_existing_store_subscription")
+	}
 	// Canceling a mandate does not resolve an already submitted money operation.
 	// Only an abandoned first payment of a closed mandate stops counting: a
 	// renewal charge with an unknown outcome keeps blocking until it is resolved.

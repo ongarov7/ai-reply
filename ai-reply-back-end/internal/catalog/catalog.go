@@ -19,22 +19,26 @@ import (
 
 var ErrConflict = fmt.Errorf("%w: catalog changed; reload before saving", domain.ErrConflict)
 var productID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$`)
+var googleProductID = regexp.MustCompile(`^[a-z0-9][a-z0-9._]{0,99}$`)
 
 type Product struct {
-	Code           string            `json:"code"`
-	Kind           string            `json:"kind"`
-	Name           map[string]string `json:"name"`
-	PriceMinor     int64             `json:"price_minor"`
-	Currency       string            `json:"currency"`
-	BillingPeriod  string            `json:"billing_period"`
-	Units          int               `json:"units"`
-	DailyLimit     int               `json:"daily_limit"`
-	MonthlyLimit   int               `json:"monthly_limit,omitempty"`
-	Unlimited      bool              `json:"unlimited"`
-	AppleProductID string            `json:"apple_product_id"`
-	AvailableIOS   bool              `json:"available_ios"`
-	AvailableWeb   bool              `json:"available_web"`
-	Active         bool              `json:"active"`
+	Code            string            `json:"code"`
+	Kind            string            `json:"kind"`
+	Name            map[string]string `json:"name"`
+	PriceMinor      int64             `json:"price_minor"`
+	Currency        string            `json:"currency"`
+	BillingPeriod   string            `json:"billing_period"`
+	Units           int               `json:"units"`
+	DailyLimit      int               `json:"daily_limit"`
+	MonthlyLimit    int               `json:"monthly_limit,omitempty"`
+	Unlimited       bool              `json:"unlimited"`
+	AppleProductID  string            `json:"apple_product_id"`
+	GoogleProductID string            `json:"google_product_id,omitempty"`
+	AvailableIOS    bool              `json:"available_ios"`
+	// AvailableAndroid — off until an administrator maps the Google id and switches it on.
+	AvailableAndroid bool `json:"available_android,omitempty"`
+	AvailableWeb     bool `json:"available_web"`
+	Active           bool `json:"active"`
 }
 
 type Version struct {
@@ -135,6 +139,7 @@ func Validate(products []Product) error {
 		expected[p.Code] = p
 	}
 	ids := map[string]bool{}
+	googleIDs := map[string]bool{}
 	seen := map[string]bool{}
 	for _, p := range products {
 		base, ok := expected[p.Code]
@@ -173,6 +178,12 @@ func Validate(products []Product) error {
 				return domain.InvalidField("apple_product_id", "unique")
 			}
 			ids[p.AppleProductID] = true
+		}
+		if p.GoogleProductID != "" {
+			if !googleProductID.MatchString(p.GoogleProductID) || googleIDs[p.GoogleProductID] {
+				return domain.InvalidField("google_product_id", "unique")
+			}
+			googleIDs[p.GoogleProductID] = true
 		}
 	}
 	return nil
@@ -278,8 +289,18 @@ func synchronize(ctx context.Context, tx *sql.Tx, p Product, now int64) error {
 		if err != nil {
 			return err
 		}
-		if (sold > 0 || apple != "" || google != "") && (units != p.Units || apple != p.AppleProductID) {
+		// A mapped store id is a durable contract; a store that has none yet can be added.
+		if (sold > 0 || apple != "" || google != "") && units != p.Units || apple != "" && apple != p.AppleProductID || google != "" && google != p.GoogleProductID {
 			return domain.ConflictField("product", "sold_entitlement_immutable")
+		}
+		if p.GoogleProductID != "" && google != p.GoogleProductID {
+			var taken int
+			if err = tx.QueryRowContext(ctx, `SELECT count(*) FROM iap_products WHERE google_product_id=? AND code<>?`, p.GoogleProductID, p.Code).Scan(&taken); err != nil {
+				return err
+			}
+			if taken > 0 {
+				return domain.ConflictField("google_product_id", "taken")
+			}
 		}
 		if p.Kind == "subscription" {
 			var daily, monthly int
@@ -297,7 +318,7 @@ func synchronize(ctx context.Context, tx *sql.Tx, p Product, now int64) error {
 			if err = tx.QueryRowContext(ctx, `SELECT (SELECT count(*) FROM subscriptions WHERE plan_id=(SELECT id FROM plans WHERE code=?))+(SELECT count(*) FROM bcc_subscriptions WHERE plan_id=(SELECT id FROM plans WHERE code=?))`, p.Code, p.Code).Scan(&subscribers); err != nil {
 				return err
 			}
-			if (sold > 0 || subscribers > 0 || apple != "") && (daily != p.DailyLimit || monthly != p.MonthlyLimit || kind != target) {
+			if (sold > 0 || subscribers > 0 || apple != "" || google != "") && (daily != p.DailyLimit || monthly != p.MonthlyLimit || kind != target) {
 				return domain.ConflictField("plan", "sold_entitlement_immutable")
 			}
 		}
@@ -324,11 +345,16 @@ func synchronize(ctx context.Context, tx *sql.Tx, p Product, now int64) error {
 		}
 		planID = id
 	}
-	var apple any
+	var apple, google any
 	if p.AppleProductID != "" {
 		apple = p.AppleProductID
 	}
-	_, err := tx.ExecContext(ctx, `UPDATE iap_products SET apple_product_id=?,units=?,plan_id=?,billing_period=?,price_minor=?,currency=?,is_active=?,name_ru=?,name_en=?,name_kk=?,updated_at=? WHERE code=? AND archived_at IS NULL`, apple, p.Units, planID, p.BillingPeriod, p.PriceMinor, p.Currency, p.Active && p.AvailableIOS && p.AppleProductID != "", p.Name["ru"], p.Name["en"], p.Name["kk"], now, p.Code)
+	if p.GoogleProductID != "" {
+		google = p.GoogleProductID
+	}
+	onIOS := p.AvailableIOS && p.AppleProductID != ""
+	onAndroid := p.AvailableAndroid && p.GoogleProductID != ""
+	_, err := tx.ExecContext(ctx, `UPDATE iap_products SET apple_product_id=?,google_product_id=?,units=?,plan_id=?,billing_period=?,price_minor=?,currency=?,is_active=?,off_ios=?,off_android=?,name_ru=?,name_en=?,name_kk=?,updated_at=? WHERE code=? AND archived_at IS NULL`, apple, google, p.Units, planID, p.BillingPeriod, p.PriceMinor, p.Currency, p.Active && (onIOS || onAndroid), !p.AvailableIOS, !p.AvailableAndroid, p.Name["ru"], p.Name["en"], p.Name["kk"], now, p.Code)
 	return err
 }
 

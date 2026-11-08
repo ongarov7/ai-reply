@@ -75,6 +75,8 @@ type Play interface {
 	GetProductPurchase(ctx context.Context, productID, token string) (googleplay.ProductPurchase, error)
 	Consume(ctx context.Context, productID, token string) error
 	VoidedPurchases(ctx context.Context, since time.Time, pageToken string) (googleplay.VoidedPage, error)
+	GetSubscription(ctx context.Context, token string) (googleplay.Subscription, error)
+	AcknowledgeSubscription(ctx context.Context, productID, token string) error
 }
 
 // Deps — қызмет тәуелділіктері.
@@ -448,7 +450,7 @@ func validate(in ProductInput) (domain.IAPProduct, error) {
 		return p, domain.InvalidField("kind", "value")
 	case p.Kind != domain.ProductSubscription && !UnitsRange.has(p.Units):
 		return p, domain.InvalidField("units", "range")
-	case p.Kind == domain.ProductSubscription && (p.PlanID == "" || (p.BillingPeriod != "month" && p.BillingPeriod != "year") || p.Units != 0 || p.DurationHours != 0 || p.GoogleProductID != ""):
+	case p.Kind == domain.ProductSubscription && (p.PlanID == "" || (p.BillingPeriod != "month" && p.BillingPeriod != "year") || p.Units != 0 || p.DurationHours != 0):
 		return p, domain.InvalidField("plan_id", "subscription_configuration")
 	case p.Kind == domain.ProductPass && !DurationRange.has(p.DurationHours):
 		return p, domain.InvalidField("duration_hours", "range")
@@ -540,6 +542,9 @@ func (s *Service) UpdateProduct(ctx context.Context, id string, in ProductInput)
 	}
 	// A mapped store ID is a durable contract. Change its entitlement through a new product ID.
 	if before.AppleProductID != "" && (after.Units != before.Units || after.DurationHours != before.DurationHours || after.PlanID != before.PlanID || after.AppleProductID != before.AppleProductID) {
+		return before, after, domain.ConflictField("product", "new_store_product_required")
+	}
+	if before.Kind == domain.ProductSubscription && before.GoogleProductID != "" && (after.PlanID != before.PlanID || after.GoogleProductID != before.GoogleProductID) {
 		return before, after, domain.ConflictField("product", "new_store_product_required")
 	}
 	after.ID, after.CreatedAt = before.ID, before.CreatedAt

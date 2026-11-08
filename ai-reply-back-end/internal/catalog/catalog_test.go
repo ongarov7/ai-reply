@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/aireply/ai-reply-back-end/internal/database"
+	"github.com/aireply/ai-reply-back-end/internal/domain"
 	"github.com/aireply/ai-reply-back-end/migrations"
 )
 
@@ -101,5 +102,115 @@ func TestCatalogRejectsInvalidOrAmbiguousProducts(t *testing.T) {
 				t.Fatal("invalid catalog accepted")
 			}
 		})
+	}
+}
+
+func TestCatalogGoogleIDsAreValidatedAndUnique(t *testing.T) {
+	for name, change := range map[string]func([]Product){
+		"format":    func(p []Product) { p[1].GoogleProductID = "Bad ID" },
+		"duplicate": func(p []Product) { p[1].GoogleProductID, p[2].GoogleProductID = "kz.same", "kz.same" },
+	} {
+		p := InitialProducts()
+		change(p)
+		if err := Validate(p); err == nil {
+			t.Fatalf("%s accepted", name)
+		}
+	}
+	// The same id on two different stores is fine; Android is off until asked for.
+	p := InitialProducts()
+	for i := range p {
+		if p[i].GoogleProductID != "" || p[i].AvailableAndroid {
+			t.Fatalf("Android is on by default: %+v", p[i])
+		}
+	}
+	p[1].AppleProductID, p[1].GoogleProductID = "kz.aireply.base.monthly", "kz.aireply.base.monthly"
+	if err := Validate(p); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func publishProducts(t *testing.T, s *Service, p []Product) error {
+	t.Helper()
+	ctx := context.Background()
+	draft, err := s.Draft(ctx)
+	revision := 0
+	if err == nil {
+		revision = draft.Revision
+	}
+	saved, err := s.SaveDraft(ctx, "owner@example.test", revision, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = s.Publish(ctx, "owner@example.test", saved.ID, saved.Revision)
+	return err
+}
+
+func TestPublishMapsEachStoreAndItsSwitch(t *testing.T) {
+	s, db := testCatalog(t)
+	read := func() (apple, google string, active, offIOS, offAndroid int) {
+		t.Helper()
+		if err := db.Reader().QueryRow(`SELECT coalesce(apple_product_id,''),coalesce(google_product_id,''),is_active,off_ios,off_android FROM iap_products WHERE code='base_monthly'`).
+			Scan(&apple, &google, &active, &offIOS, &offAndroid); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+	// Nothing configured: nothing sold, and Android stays off.
+	if err := publishProducts(t, s, InitialProducts()); err != nil {
+		t.Fatal(err)
+	}
+	if _, google, active, _, off := read(); google != "" || active != 0 || off != 1 {
+		t.Fatalf("unconfigured: %q %d %d", google, active, off)
+	}
+
+	p := InitialProducts()
+	p[1].AppleProductID = "test.base"
+	if err := publishProducts(t, s, p); err != nil {
+		t.Fatal(err)
+	}
+	if apple, google, active, offIOS, offAndroid := read(); apple != "test.base" || google != "" || active != 1 || offIOS != 0 || offAndroid != 1 {
+		t.Fatalf("Apple only: %q %q %d %d %d", apple, google, active, offIOS, offAndroid)
+	}
+
+	// A Google id joins an Apple-mapped product; Android opens only with its switch.
+	p[1].GoogleProductID = "kz.aireply.base.monthly"
+	if err := publishProducts(t, s, p); err != nil {
+		t.Fatalf("adding a Google id to a mapped product: %v", err)
+	}
+	if _, google, active, _, offAndroid := read(); google != "kz.aireply.base.monthly" || active != 1 || offAndroid != 1 {
+		t.Fatalf("mapped, switch off: %q %d %d", google, active, offAndroid)
+	}
+	p[1].AvailableAndroid = true
+	if err := publishProducts(t, s, p); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, active, _, offAndroid := read(); active != 1 || offAndroid != 0 {
+		t.Fatalf("switched on: %d %d", active, offAndroid)
+	}
+
+	// Android alone keeps the product on sale there without reopening iOS.
+	p[1].AvailableIOS = false
+	if err := publishProducts(t, s, p); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, active, offIOS, offAndroid := read(); active != 1 || offIOS != 1 || offAndroid != 0 {
+		t.Fatalf("Android only: %d %d %d", active, offIOS, offAndroid)
+	}
+
+	// A mapped Google id is a contract, like an Apple one.
+	p[1].GoogleProductID = "kz.aireply.base.other"
+	if err := publishProducts(t, s, p); err == nil {
+		t.Fatal("a mapped Google id was replaced")
+	}
+
+	// An id held by another product, even an archived one, is refused cleanly.
+	if _, err := db.Writer().Exec(`UPDATE iap_products SET google_product_id='kz.taken',archived_at=1 WHERE code='pack30'`); err != nil {
+		t.Fatal(err)
+	}
+	p = InitialProducts()
+	p[1].AppleProductID, p[1].GoogleProductID, p[1].AvailableAndroid = "test.base", "kz.aireply.base.monthly", true
+	p[2].GoogleProductID = "kz.taken"
+	if err := publishProducts(t, s, p); !errors.Is(err, domain.ErrConflict) {
+		t.Fatalf("taken id: %v", err)
 	}
 }

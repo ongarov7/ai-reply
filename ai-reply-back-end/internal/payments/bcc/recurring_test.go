@@ -28,6 +28,31 @@ func subscriptionQuote(t *testing.T, s *CheckoutService, code string) ExpectedQu
 	return ExpectedQuote{CatalogVersion: version, PriceMinor: p.PriceMinor, Units: p.Units, Currency: p.Currency, TermsVersion: legal.WebPurchaseTermsVersion, Locale: "ru", RecurringConsent: true, RecurringTermsVersion: RecurringTermsVersion, RecurringUntil: s.now().UTC().AddDate(2, 0, 0).Format("20060102")}
 }
 
+func TestBankMandateWaitsForARenewingGoogleSubscription(t *testing.T) {
+	s, _ := testCheckout(t)
+	s.cfg.RecurringEnabled = true
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	s.now = func() time.Time { return now }
+	ctx := context.Background()
+	insert := func(state string, expires time.Time) {
+		t.Helper()
+		if _, err := s.db.Writer().Exec(`INSERT OR REPLACE INTO google_subscriptions(token_hash,user_id,product_id,plan_id,environment,state,started_at,expires_at,auto_renew,granted_at,read_at,updated_at)
+			SELECT 'hash','bank-user','kz.aireply.pro.monthly',id,'Production',?,?,?,1,?,?,? FROM plans WHERE code='pro_monthly'`,
+			state, now.UnixMilli(), expires.UnixMilli(), now.UnixMilli(), now.UnixMilli(), now.UnixMilli()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	insert(domain.GoogleSubActive, now.Add(time.Hour))
+	if _, err := s.StartExpected(ctx, "bank-user", "base_monthly", "with-google", subscriptionQuote(t, s, "base_monthly")); err == nil ||
+		!strings.Contains(err.Error(), "manage_existing_store_subscription") {
+		t.Fatalf("a bank mandate next to a renewing Google subscription: %v", err)
+	}
+	insert(domain.GoogleSubOnHold, now.Add(time.Hour))
+	if _, err := s.StartExpected(ctx, "bank-user", "base_monthly", "after-google", subscriptionQuote(t, s, "base_monthly")); err != nil {
+		t.Fatalf("a subscription on hold blocks nothing: %v", err)
+	}
+}
+
 func TestBankRenewalIsPersistentSingleAttemptAndRequiresFinalNotification(t *testing.T) {
 	s, _ := testCheckout(t)
 	s.cfg.RecurringEnabled = true

@@ -214,6 +214,20 @@ func (s *Service) Entitlement(ctx context.Context, userID string) (domain.Entitl
 		}
 	}
 
+	google, err := s.repo.ActiveGoogleSubscription(ctx, userID, now)
+	if err != nil && !errors.Is(err, domain.ErrNotFound) {
+		return domain.Entitlement{}, err
+	}
+	if err == nil {
+		googlePlan, err := s.repo.Plan(ctx, google.PlanID)
+		if err != nil {
+			return domain.Entitlement{}, err
+		}
+		if plan.IsFree || googlePlan.Unlimited() || (!plan.Unlimited() && googlePlan.DailyLimit >= plan.DailyLimit) {
+			plan, sub = googlePlan, &google
+		}
+	}
+
 	bank, bankErr := s.repo.ActiveBankSubscription(ctx, userID, now)
 	if bankErr != nil && !errors.Is(bankErr, domain.ErrNotFound) {
 		return domain.Entitlement{}, bankErr

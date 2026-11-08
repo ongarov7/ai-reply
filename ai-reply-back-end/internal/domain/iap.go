@@ -68,6 +68,21 @@ const (
 	PurchaseReasonConsumed     = "already_consumed" // Google: consumed, but not by this server
 	PurchaseReasonQuantity     = "quantity"         // quantity is not a positive number
 	PurchaseReasonPurchaseType = "unsupported_type" // Google: rewarded product
+	PurchaseReasonExpired      = "expired"          // Google: the subscription has ended
+	PurchaseReasonOnHold       = "on_hold"          // Google: payment failed, access is suspended
+	PurchaseReasonPaused       = "paused"           // Google: the subscriber paused it
+)
+
+// Google Play subscription states (purchases.subscriptionsv2 subscriptionState).
+const (
+	GoogleSubPending         = "SUBSCRIPTION_STATE_PENDING"
+	GoogleSubActive          = "SUBSCRIPTION_STATE_ACTIVE"
+	GoogleSubGrace           = "SUBSCRIPTION_STATE_IN_GRACE_PERIOD"
+	GoogleSubOnHold          = "SUBSCRIPTION_STATE_ON_HOLD"
+	GoogleSubPaused          = "SUBSCRIPTION_STATE_PAUSED"
+	GoogleSubCanceled        = "SUBSCRIPTION_STATE_CANCELED"
+	GoogleSubExpired         = "SUBSCRIPTION_STATE_EXPIRED"
+	GoogleSubPendingCanceled = "SUBSCRIPTION_STATE_PENDING_PURCHASE_CANCELED"
 )
 
 // IAP қателері.
@@ -117,10 +132,13 @@ type IAPProduct struct {
 	GoogleProductID string
 	Name            map[string]string
 	IsActive        bool
-	SortOrder       int
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-	ArchivedAt      *time.Time
+	// OffIOS, OffAndroid — the catalog switched this store off for the product.
+	OffIOS     bool
+	OffAndroid bool
+	SortOrder  int
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+	ArchivedAt *time.Time
 }
 
 // StoreID — платформаның дүкендегі идентификаторы.
@@ -138,9 +156,10 @@ func (p IAPProduct) StoreID(platform string) string {
 func (p IAPProduct) Offered(platform string) bool {
 	valid := p.Units > 0
 	if p.Kind == ProductSubscription {
-		valid = p.PlanID != "" && (p.BillingPeriod == "month" || p.BillingPeriod == "year") && platform == PlatformIOS
+		valid = p.PlanID != "" && (p.BillingPeriod == "month" || p.BillingPeriod == "year")
 	}
-	return p.IsActive && p.ArchivedAt == nil && valid && p.StoreID(platform) != ""
+	off := platform == PlatformIOS && p.OffIOS || platform == PlatformAndroid && p.OffAndroid
+	return p.IsActive && p.ArchivedAt == nil && valid && !off && p.StoreID(platform) != ""
 }
 
 // LocalizedName — тілдегі атау, болмаса ru → en → код.

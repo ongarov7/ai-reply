@@ -68,4 +68,18 @@ func TestProductRules(t *testing.T) {
 		(domain.IAPProduct{IsActive: true, Units: 1, AppleProductID: "x"}).Offered(domain.PlatformAndroid) {
 		t.Fatal("Offered must follow the platform's store id")
 	}
+	sub := ProductInput{Code: "base_x", Kind: "subscription", PlanID: "plan", BillingPeriod: "month", GoogleProductID: "kz.aireply.base.x", IsActive: true}
+	if _, err := validate(sub); err != nil {
+		t.Fatalf("a subscription may carry a Google id: %v", err)
+	}
+	both := domain.IAPProduct{IsActive: true, Kind: domain.ProductSubscription, PlanID: "plan", BillingPeriod: "month", AppleProductID: "a", GoogleProductID: "g"}
+	if !both.Offered(domain.PlatformIOS) || !both.Offered(domain.PlatformAndroid) {
+		t.Fatal("a subscription is offered on both stores")
+	}
+	androidOff, iosOff := both, both
+	androidOff.OffAndroid, iosOff.OffIOS = true, true
+	if !androidOff.Offered(domain.PlatformIOS) || androidOff.Offered(domain.PlatformAndroid) ||
+		iosOff.Offered(domain.PlatformIOS) || !iosOff.Offered(domain.PlatformAndroid) {
+		t.Fatal("each store has its own switch")
+	}
 }

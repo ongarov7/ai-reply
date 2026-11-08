@@ -242,6 +242,12 @@ func TestUnifiedPricesCustomizedPackKeepsDelayedStoreFulfillment(t *testing.T) {
 			if active != 0 || current.Products[5].AppleProductID != "" || current.Products[5].AvailableIOS {
 				t.Fatal("replacement offer reused a legacy store identity")
 			}
+			if _, err := database.Migrate(ctx, db, migrations.FS); err != nil {
+				t.Fatal(err)
+			}
+			if current, err = s.Published(ctx); err != nil {
+				t.Fatal(err)
+			}
 			repo := repository.New(db)
 			legacy, err := repo.IAPProductByStoreID(ctx, provider, "test.legacy60")
 			if err != nil || legacy.Units != 60 || legacy.IsActive || legacy.ArchivedAt == nil {

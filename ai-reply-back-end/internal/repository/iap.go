@@ -15,7 +15,7 @@ import (
 
 const iapProductColumns = `id, code, kind, units, duration_hours, COALESCE(apple_product_id, ''),
 	COALESCE(google_product_id, ''), name_kk, name_ru, name_en, name_uz, is_active, sort_order,
-	created_at, updated_at, archived_at, plan_id, billing_period, price_minor, currency`
+	created_at, updated_at, archived_at, plan_id, billing_period, price_minor, currency, off_ios, off_android`
 
 // IAPProducts — әкімші баптаған өнімдер (sort_order, code бойынша). archived — мұрағаттағылар да.
 func (s *Store) IAPProducts(ctx context.Context, archived bool) ([]domain.IAPProduct, error) {
@@ -131,7 +131,7 @@ func scanIAPProducts(rows *sql.Rows) ([]domain.IAPProduct, error) {
 			archived         sql.NullInt64
 		)
 		if err := rows.Scan(&p.ID, &p.Code, &p.Kind, &p.Units, &p.DurationHours, &p.AppleProductID,
-			&p.GoogleProductID, &kk, &ru, &en, &uz, &active, &p.SortOrder, &created, &updated, &archived, &p.PlanID, &p.BillingPeriod, &p.PriceMinor, &p.Currency); err != nil {
+			&p.GoogleProductID, &kk, &ru, &en, &uz, &active, &p.SortOrder, &created, &updated, &archived, &p.PlanID, &p.BillingPeriod, &p.PriceMinor, &p.Currency, &p.OffIOS, &p.OffAndroid); err != nil {
 			return nil, err
 		}
 		p.Name = map[string]string{"kk": kk, "ru": ru, "en": en, "uz": uz}

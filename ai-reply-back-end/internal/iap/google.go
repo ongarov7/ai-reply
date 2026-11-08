@@ -34,6 +34,7 @@ func (s *Service) playUnavailable(err error, userID string) error {
 }
 
 // VerifyGoogle — Play Billing сатып алуы: purchases.products.get, береді, содан кейін тұтынады.
+// A subscription product goes to verifyGoogleSubscription.
 //
 // Rules: the token and product id are well-formed, the product is one an
 // administrator configured, Google knows the purchase and names the same
@@ -61,6 +62,9 @@ func (s *Service) VerifyGoogle(ctx context.Context, user domain.User, productID,
 	}
 	if err != nil {
 		return Result{}, err
+	}
+	if product.Kind == domain.ProductSubscription {
+		return s.verifyGoogleSubscription(ctx, user, product, productID, token)
 	}
 	p, err := s.google.GetProductPurchase(ctx, productID, token)
 	switch {
@@ -259,7 +263,8 @@ func (s *Service) RetryConsumes(ctx context.Context) (int, error) {
 // back 72 hours, because Google may list a purchase some time after its
 // voided time. Revoking is idempotent, so reading a purchase twice changes
 // nothing. A voided token this server never saw is recorded as a tombstone
-// and never granted.
+// and never granted. Subscription orders are in the list too; they are told
+// apart by order, because renewals share one token.
 func (s *Service) PollVoided(ctx context.Context) (int, error) {
 	if s.google == nil {
 		return 0, nil
@@ -279,6 +284,18 @@ func (s *Service) PollVoided(ctx context.Context) (int, error) {
 		}
 		for _, v := range res.Purchases {
 			if v.PurchaseToken == "" {
+				continue
+			}
+			sub, err := s.repo.VoidGoogleSubscription(ctx, repository.GoogleVoid{TokenHash: tokenHash(v.PurchaseToken), OrderID: v.OrderID,
+				Reason: "voided:" + strconv.Itoa(v.VoidedReason), At: v.VoidedAt(), Now: now})
+			if err != nil {
+				return revoked, err
+			}
+			if sub.Found {
+				if sub.Revoked {
+					revoked++
+					s.log.Info("google play subscription revoked", "user_id", sub.UserID, "order_id", v.OrderID)
+				}
 				continue
 			}
 			out, err := s.repo.RevokePurchase(ctx, repository.PurchaseRevocation{
@@ -304,8 +321,8 @@ func (s *Service) PollVoided(ctx context.Context) (int, error) {
 	return revoked, nil
 }
 
-// Run — Google Play фон жұмысшысы: 15 минут сайын тұтынуды қайталау, IAP_GOOGLE_VOIDED_POLL сайын
-// қайтарылғандарды тексеру. Google бапталмаса бірден қайтады.
+// Run — Google Play фон жұмысшысы: 15 минут сайын тұтынуды, растауды қайталау және жазылымдарды
+// қайта оқу, IAP_GOOGLE_VOIDED_POLL сайын қайтарылғандарды тексеру. Google бапталмаса бірден қайтады.
 func (s *Service) Run(ctx context.Context) {
 	if s.google == nil {
 		return
@@ -326,6 +343,12 @@ func (s *Service) Run(ctx context.Context) {
 func (s *Service) Tick(ctx context.Context) {
 	if _, err := s.RetryConsumes(ctx); err != nil && ctx.Err() == nil {
 		s.log.Error("google play consume retry failed", "error", err.Error())
+	}
+	if _, err := s.RetryAcknowledges(ctx); err != nil && ctx.Err() == nil {
+		s.log.Error("google play acknowledgement retry failed", "error", err.Error())
+	}
+	if _, err := s.RefreshSubscriptions(ctx); err != nil && ctx.Err() == nil {
+		s.log.Error("google play subscription refresh failed", "error", err.Error())
 	}
 	if s.cfg.GoogleVoidedPoll <= 0 {
 		return
