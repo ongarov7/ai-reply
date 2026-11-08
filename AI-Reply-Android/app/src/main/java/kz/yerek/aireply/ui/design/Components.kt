@@ -20,7 +20,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -86,6 +88,8 @@ fun PrimaryButton(
     text: String,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    /** The action is on its way: a small spinner before the label. */
+    loading: Boolean = false,
     onClick: () -> Unit
 ) {
     Button(
@@ -100,6 +104,13 @@ fun PrimaryButton(
             .fillMaxWidth()
             .defaultMinSize(minHeight = Layout.minimumTouchTarget)
     ) {
+        if (loading) {
+            CircularProgressIndicator(
+                modifier = Modifier.padding(end = Spacing.xs).size(18.dp),
+                color = LocalContentColor.current,
+                strokeWidth = 2.dp
+            )
+        }
         Text(text, style = MaterialTheme.typography.labelLarge)
     }
 }

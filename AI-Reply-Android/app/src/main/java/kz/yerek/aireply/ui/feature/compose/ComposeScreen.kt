@@ -26,7 +26,6 @@ import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -267,6 +266,7 @@ fun ComposeScreen(onBack: () -> Unit, onOpen: (String) -> Unit = {}) {
                     text = stringResource(R.string.compose_generate),
                     onClick = { generate() },
                     enabled = canGenerate,
+                    loading = generating,
                     modifier = Modifier.widthIn(max = Layout.readableWidth)
                 )
             }
@@ -374,31 +374,12 @@ fun ComposeScreen(onBack: () -> Unit, onOpen: (String) -> Unit = {}) {
                 }
             }
 
-            if (generating || error != null) {
-                Column(verticalArrangement = Arrangement.spacedBy(Spacing.s)) {
-                    if (generating) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
-                        ) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                strokeWidth = 2.dp
-                            )
-                            Text(
-                                stringResource(R.string.kb_generating),
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                    }
-                    error?.let {
-                        Text(
-                            it,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (errorIsLimit) LocalExtraColors.current.textSecondary else MaterialTheme.colorScheme.error
-                        )
-                    }
-                }
+            error?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (errorIsLimit) LocalExtraColors.current.textSecondary else MaterialTheme.colorScheme.error
+                )
             }
 
             if (reply.isNotEmpty()) {
