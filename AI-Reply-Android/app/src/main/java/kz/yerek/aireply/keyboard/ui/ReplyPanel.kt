@@ -773,10 +773,12 @@ internal fun ResultRow(
         val layout = remember(maxWidth, regenerateTitle, insertTitle) {
             fun width(text: String, style: TextStyle) =
                 with(density) { measurer.measure(text, style).size.width.toDp().value }
+            val padding = PILL_PADDING * 2 + PILL_ROUNDING
             ResultActionsLayout.of(
                 width = maxWidth.value,
-                regenerateWidth = width(regenerateTitle, TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Medium)) + 44f,
-                insertWidth = width(insertTitle, TextStyle(fontSize = 15.sp, fontWeight = FontWeight.SemiBold)) + 24f
+                regenerateWidth = width(regenerateTitle, TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Medium)) +
+                    padding + PILL_ICON + PILL_ICON_GAP,
+                insertWidth = width(insertTitle, TextStyle(fontSize = 15.sp, fontWeight = FontWeight.SemiBold)) + padding
             )
         }
         val target = ResultActionsLayout.TARGET.dp
@@ -974,7 +976,7 @@ internal fun ActionPill(
             .clip(RoundedCornerShape(height / 2))
             .background(background)
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
-            .padding(horizontal = 14.dp),
+            .padding(horizontal = PILL_PADDING.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -986,8 +988,8 @@ internal fun ActionPill(
             )
             Spacer(Modifier.width(6.dp))
         } else if (icon != null) {
-            Icon(icon, contentDescription = null, tint = if (quiet) theme.primaryText else Color.White, modifier = Modifier.size(15.dp))
-            Spacer(Modifier.width(5.dp))
+            Icon(icon, contentDescription = null, tint = if (quiet) theme.primaryText else Color.White, modifier = Modifier.size(PILL_ICON.dp))
+            Spacer(Modifier.width(PILL_ICON_GAP.dp))
         }
         Text(
             text = label,
@@ -1082,3 +1084,11 @@ private const val LINE_HEIGHT_DP = 21
 private const val SUGGESTIONS_FADE_MS = 120
 private const val VOICE_LINE_SP = 14
 private val VOICE_LINE_HEADROOM = 2.dp
+
+/** An [ActionPill]'s inset on each side, its icon and the space after it. */
+private const val PILL_PADDING = 14f
+private const val PILL_ICON = 15f
+private const val PILL_ICON_GAP = 5f
+
+/** Each of those rounds to whole pixels on its own: a label planned exactly can come out a pixel short. */
+private const val PILL_ROUNDING = 1f
