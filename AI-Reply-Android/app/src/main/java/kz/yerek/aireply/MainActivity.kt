@@ -137,7 +137,9 @@ class MainActivity : ComponentActivity() {
     override fun onStop() {
         super.onStop()
         // The only Activity: stopping it is the app going to the background.
-        AIReplyApplication.services(this).productEvents.flush()
+        val services = AIReplyApplication.services(this)
+        services.productEvents.flush()
+        services.push.onBackground()
     }
 
     /**

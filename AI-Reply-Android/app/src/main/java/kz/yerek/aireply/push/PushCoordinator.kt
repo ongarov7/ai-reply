@@ -123,8 +123,21 @@ class PushCoordinator(
     private val _ui = MutableStateFlow(PushUiState())
     val ui: StateFlow<PushUiState> = _ui.asStateFlow()
 
+    /** The Activity is resumed; a token retry waits for the next return otherwise. */
     @Volatile
-    private var tokenFetched = false
+    private var inForeground = false
+
+    private val tokens = PushTokenFetcher(
+        current = { PushSupport.fetchToken(appContext) },
+        replacement = { PushSupport.renewToken(appContext) },
+        canFetch = { isSupportedInBuild && consentGiven() },
+        isForeground = { inForeground },
+        onToken = { token ->
+            if (store.fcmToken != token) store.fcmToken = token
+            registrar.requestSync()
+        },
+        scope = scope
+    )
 
     @Volatile
     private var lastConfigAttempt = 0L
@@ -141,7 +154,7 @@ class PushCoordinator(
         scope.launch {
             ensureChannels()
             // Firebase is told about this install only once the terms are accepted.
-            if (isSupportedInBuild && !tokenFetched && consentGiven()) fetchToken()
+            tokens.fetchIfNeeded()
             registrar.requestSync()
         }
     }
@@ -152,6 +165,7 @@ class PushCoordinator(
      * may have passed: the registrar sends only if something did.
      */
     fun onResume() {
+        inForeground = true
         // Allowed in system settings after a permanent denial: the app may ask again one day.
         if (NotificationPermission.isGranted(appContext) && store.permissionPermanentlyDenied) {
             store.permissionPermanentlyDenied = false
@@ -160,8 +174,15 @@ class PushCoordinator(
         scope.launch {
             ensureChannels()
             if (bootstrapped()) ensureServerFeatures()
+            // A token Firebase could not give earlier, or a replacement still owed.
+            tokens.fetchIfNeeded()
             registrar.requestSync()
         }
+    }
+
+    /** The app went to the background. */
+    fun onBackground() {
+        inForeground = false
     }
 
     fun refreshUi() {
@@ -208,34 +229,17 @@ class PushCoordinator(
         }
     }
 
-    private suspend fun fetchToken() {
-        when (val result = PushSupport.fetchToken(appContext)) {
-            is PushSupport.TokenResult.Token -> {
-                tokenFetched = true
-                if (store.fcmToken != result.value) store.fcmToken = result.value
-            }
-            // Logged by PushSupport; the next launch, or onNewToken, tries again.
-            PushSupport.TokenResult.Failed, PushSupport.TokenResult.Unsupported -> Unit
-        }
-    }
-
     /**
      * The server found the token it was sent unregistered at FCM: it is
      * deleted and a new one asked for, and the next sync sends that one. The
-     * invalid one is never sent again, even if no new one comes now
-     * ([onNewToken] brings it later).
+     * invalid one is never sent again; a replacement that fails is tried
+     * again ([PushTokenFetcher]).
      */
     private fun renewToken(invalid: String?) {
         if (!isSupportedInBuild) return
         scope.launch {
             if (invalid != null && store.fcmToken == invalid) store.fcmToken = null
-            when (val result = PushSupport.renewToken(appContext)) {
-                is PushSupport.TokenResult.Token -> {
-                    tokenFetched = true
-                    store.fcmToken = result.value
-                }
-                PushSupport.TokenResult.Failed, PushSupport.TokenResult.Unsupported -> Unit
-            }
+            tokens.fetch(replacing = true)
             registrar.requestSync()
         }
     }
@@ -374,7 +378,7 @@ class PushCoordinator(
     override fun onLegalAccepted() {
         refreshUi()
         scope.launch {
-            if (isSupportedInBuild && !tokenFetched) fetchToken()
+            tokens.fetchIfNeeded()
             registrar.requestSync()
         }
     }
