@@ -1,6 +1,7 @@
 package kz.yerek.aireply
 
 import kz.yerek.aireply.data.settings.DeviceStateStore
+import kz.yerek.aireply.domain.model.GrammaticalGender
 import kz.yerek.aireply.ui.feature.onboarding.OnboardingFlow
 import kz.yerek.aireply.ui.feature.onboarding.OnboardingMode
 import kz.yerek.aireply.ui.feature.onboarding.OnboardingPath
@@ -42,11 +43,11 @@ class OnboardingFlowTest {
     }
 
     @Test
-    fun `try first shows the tutorial, then the keyboard, then the gender`() {
+    fun `try first asks the gender, then the tutorial, then the keyboard`() {
         assertEquals(
             listOf(
-                OnboardingStep.WELCOME, OnboardingStep.TUTORIAL_COPY, OnboardingStep.TUTORIAL_RECIPIENT,
-                OnboardingStep.TUTORIAL_REPLY, OnboardingStep.PERMISSIONS, OnboardingStep.GENDER
+                OnboardingStep.WELCOME, OnboardingStep.GENDER, OnboardingStep.TUTORIAL_COPY,
+                OnboardingStep.TUTORIAL_RECIPIENT, OnboardingStep.TUTORIAL_REPLY, OnboardingStep.PERMISSIONS
             ),
             firstRun.steps
         )
@@ -54,18 +55,17 @@ class OnboardingFlowTest {
     }
 
     @Test
-    fun `set up the keyboard first puts the tutorial after it`() {
+    fun `set up the keyboard first puts the gender and the tutorial after it`() {
         assertEquals(
             listOf(
-                OnboardingStep.WELCOME, OnboardingStep.PERMISSIONS, OnboardingStep.TUTORIAL_COPY,
-                OnboardingStep.TUTORIAL_RECIPIENT, OnboardingStep.TUTORIAL_REPLY, OnboardingStep.GENDER
+                OnboardingStep.WELCOME, OnboardingStep.PERMISSIONS, OnboardingStep.GENDER, OnboardingStep.TUTORIAL_COPY,
+                OnboardingStep.TUTORIAL_RECIPIENT, OnboardingStep.TUTORIAL_REPLY
             ),
             setupFirst.steps
         )
         assertEquals(OnboardingStep.PERMISSIONS, setupFirst.next(OnboardingStep.WELCOME))
-        assertEquals(OnboardingStep.GENDER, setupFirst.afterTutorial)
-        val answered = setupFirst.copy(asksGender = false)
-        assertNull("nothing after the tutorial: skipping it finishes", answered.afterTutorial)
+        assertNull("nothing after the tutorial: skipping it finishes", setupFirst.afterTutorial)
+        assertEquals(OnboardingStep.TUTORIAL_COPY, setupFirst.copy(asksGender = false).next(OnboardingStep.PERMISSIONS))
         assertEquals(OnboardingPath.SETUP_FIRST, OnboardingPath.fromId("setup_first"))
         assertEquals("an unknown path is the default", OnboardingPath.TRY_FIRST, OnboardingPath.fromId(null))
     }
@@ -86,15 +86,16 @@ class OnboardingFlowTest {
 
     @Test
     fun `steps go forward and back and the last one finishes`() {
-        assertEquals(OnboardingStep.TUTORIAL_COPY, firstRun.next(OnboardingStep.WELCOME))
-        assertEquals(OnboardingStep.GENDER, firstRun.next(OnboardingStep.PERMISSIONS))
-        assertNull("after the last step the run is finished", firstRun.next(OnboardingStep.GENDER))
-        assertTrue(firstRun.isLast(OnboardingStep.GENDER))
+        assertEquals(OnboardingStep.GENDER, firstRun.next(OnboardingStep.WELCOME))
+        assertEquals(OnboardingStep.TUTORIAL_COPY, firstRun.next(OnboardingStep.GENDER))
+        assertNull("after the last step the run is finished", firstRun.next(OnboardingStep.PERMISSIONS))
+        assertTrue(firstRun.isLast(OnboardingStep.PERMISSIONS))
 
         assertNull(firstRun.previous(OnboardingStep.WELCOME))
-        assertEquals(OnboardingStep.WELCOME, firstRun.previous(OnboardingStep.TUTORIAL_COPY))
+        assertEquals(OnboardingStep.GENDER, firstRun.previous(OnboardingStep.TUTORIAL_COPY))
         assertEquals("back follows the chosen path", OnboardingStep.WELCOME, setupFirst.previous(OnboardingStep.PERMISSIONS))
-        assertEquals(OnboardingStep.PERMISSIONS, setupFirst.previous(OnboardingStep.TUTORIAL_COPY))
+        assertEquals(OnboardingStep.PERMISSIONS, setupFirst.previous(OnboardingStep.GENDER))
+        assertEquals(OnboardingStep.GENDER, setupFirst.previous(OnboardingStep.TUTORIAL_COPY))
     }
 
     @Test
@@ -142,6 +143,14 @@ class OnboardingFlowTest {
             "the tutorial never asks",
             OnboardingFlow.asksGender(OnboardingMode.TUTORIAL, genderAnswered = false, startedAsking = true)
         )
+    }
+
+    @Test
+    fun `skipping the gender never erases an answer already known`() {
+        assertEquals(GrammaticalGender.UNSPECIFIED, OnboardingFlow.skippedGender(null))
+        assertEquals(GrammaticalGender.UNSPECIFIED, OnboardingFlow.skippedGender(GrammaticalGender.UNSPECIFIED))
+        assertNull(OnboardingFlow.skippedGender(GrammaticalGender.MALE))
+        assertNull(OnboardingFlow.skippedGender(GrammaticalGender.FEMALE))
     }
 
     @Test

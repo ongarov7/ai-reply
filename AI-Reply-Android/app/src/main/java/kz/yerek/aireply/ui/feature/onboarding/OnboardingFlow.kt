@@ -1,5 +1,7 @@
 package kz.yerek.aireply.ui.feature.onboarding
 
+import kz.yerek.aireply.domain.model.GrammaticalGender
+
 /**
  * One screen of the onboarding. [id] is stable: it is what the resume point
  * stores and what analytics reports (the server's allow-list has these
@@ -70,8 +72,9 @@ enum class OnboardingStatus(val wire: String) {
  *
  * Pure on purpose: no Android, no storage. The screen asks it, the tests pin
  * it. Android has no Full Access, so the iOS `fullAccess` step does not exist
- * here. The gender comes last: short, skippable, and only in a first run that
- * never had it answered.
+ * here. The gender comes right before the tutorial, whose replies speak for
+ * the user: short, skippable, and only in a first run that never had it
+ * answered.
  *
  * @param asksGender whether this run has the gender step; see [asksGender]
  *   in the companion. Fixed for the whole run, so choosing a gender does not
@@ -84,18 +87,21 @@ data class OnboardingFlow(
 ) {
 
     val steps: List<OnboardingStep> = buildList {
+        val tutorial = buildList {
+            if (asksGender && mode == OnboardingMode.FIRST_RUN) add(OnboardingStep.GENDER)
+            addAll(OnboardingStep.TUTORIAL)
+        }
         add(OnboardingStep.WELCOME)
         when (path) {
             OnboardingPath.TRY_FIRST -> {
-                addAll(OnboardingStep.TUTORIAL)
+                addAll(tutorial)
                 add(OnboardingStep.PERMISSIONS)
             }
             OnboardingPath.SETUP_FIRST -> {
                 add(OnboardingStep.PERMISSIONS)
-                addAll(OnboardingStep.TUTORIAL)
+                addAll(tutorial)
             }
         }
-        if (asksGender && mode == OnboardingMode.FIRST_RUN) add(OnboardingStep.GENDER)
     }
 
     /** A saved resume point when it is still part of this run, else the beginning. */
@@ -180,6 +186,14 @@ data class OnboardingFlow(
          */
         fun asksGender(mode: OnboardingMode, genderAnswered: Boolean, startedAsking: Boolean?): Boolean =
             mode == OnboardingMode.FIRST_RUN && (startedAsking ?: !genderAnswered)
+
+        /**
+         * What Skip on the gender step records: neutral wording, unless a male
+         * or female answer is already known. Coming back to the step and
+         * skipping it never erases one.
+         */
+        fun skippedGender(current: GrammaticalGender?): GrammaticalGender? =
+            GrammaticalGender.UNSPECIFIED.takeUnless { current?.isSpecified == true }
 
         /**
          * Whether opening the screen starts a run, for `onboarding_started`.

@@ -61,12 +61,12 @@ import kz.yerek.aireply.ui.feature.setup.openKeyboardSettings
 /**
  * The first run, and the same screens again from Settings.
  *
- * Онбординг: сәлемдесу, үш қадамды оқыту, пернетақтаны қосу, жыныс.
+ * Онбординг: сәлемдесу, жыныс, үш қадамды оқыту, пернетақтаны қосу.
  *
  * Welcome → (try first) the tutorial, then «Подключи AI Reply»; or (set up
- * the keyboard) the other way round → the gender, when it was never
- * answered. «Позже» leaves it for good (Settings and reminders offer it
- * again); each part can be skipped. A first run remembers its step and its
+ * the keyboard) the other way round. The gender, when it was never answered,
+ * comes right before the tutorial. «Позже» leaves it for good (Settings and
+ * reminders offer it again); each part can be skipped. A first run remembers its step and its
  * path, so a run that was closed halfway comes back there; finishing it
  * records the version on this device and never touches the replies balance.
  * Which steps exist and in what order is [OnboardingFlow]'s decision. No
@@ -150,6 +150,11 @@ fun OnboardingScreen(mode: OnboardingMode, onFinished: () -> Unit, reopened: Boo
         if (next != null) step = next else finish(skipped = false)
     }
 
+    /** A skip: on to [next], or, with nothing left after it, the run ends as left early. */
+    fun leaveTo(next: OnboardingStep?) {
+        if (next != null) step = next else finish(skipped = true)
+    }
+
     fun skipped(at: OnboardingStep) {
         ProductEvents.track(ProductEvent.ONBOARDING_SKIPPED, mapOf("step" to ProductEventValue.Code(at.id)))
     }
@@ -179,7 +184,7 @@ fun OnboardingScreen(mode: OnboardingMode, onFinished: () -> Unit, reopened: Boo
         next = { go(flow.next(step)) },
         skipTutorial = {
             skipped(step)
-            go(flow.afterTutorial)
+            leaveTo(flow.afterTutorial)
         },
         startUsing = {
             ProductEvents.track(ProductEvent.ONBOARDING_PRACTICE_COMPLETED)
@@ -189,14 +194,14 @@ fun OnboardingScreen(mode: OnboardingMode, onFinished: () -> Unit, reopened: Boo
         chooseKeyboard = { KeyboardStatus.showKeyboardPicker(context) },
         setUpLater = {
             skipped(OnboardingStep.PERMISSIONS)
-            go(flow.next(step))
+            leaveTo(flow.next(step))
         },
         saveGender = {
             gender?.let(::saveGender)
             go(flow.next(step))
         },
         skipGender = {
-            saveGender(GrammaticalGender.UNSPECIFIED)
+            OnboardingFlow.skippedGender(services.configuration.profile.grammaticalGender)?.let(::saveGender)
             go(flow.next(step))
         }
     )
