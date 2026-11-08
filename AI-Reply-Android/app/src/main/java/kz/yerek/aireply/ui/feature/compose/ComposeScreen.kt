@@ -7,10 +7,13 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Refresh
@@ -43,6 +46,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -73,12 +77,14 @@ import kz.yerek.aireply.ui.common.Footnote
 import kz.yerek.aireply.ui.common.RecipientGrid
 import kz.yerek.aireply.ui.common.RecipientOption
 import kz.yerek.aireply.ui.common.RelationshipIcons
+import kz.yerek.aireply.ui.common.RowGroup
 import kz.yerek.aireply.ui.design.AppCard
 import kz.yerek.aireply.ui.design.AppSection
 import kz.yerek.aireply.ui.design.Layout
 import kz.yerek.aireply.ui.design.LocalExtraColors
 import kz.yerek.aireply.ui.design.PrimaryButton
 import kz.yerek.aireply.ui.design.ReadableColumn
+import kz.yerek.aireply.ui.design.RowDivider
 import kz.yerek.aireply.ui.design.Spacing
 import kz.yerek.aireply.ui.feature.account.ExhaustedRules
 import kz.yerek.aireply.ui.feature.account.ExhaustedSheet
@@ -116,6 +122,10 @@ internal fun tryReplyRequest(
  */
 internal fun initialRecipient(visibleIds: List<String>, lastTemplateId: String?): String? =
     lastTemplateId?.takeIf { it in visibleIds } ?: visibleIds.firstOrNull()
+
+/** The built-ins, which go in the grid, and the templates the user made, a row each under it. */
+internal fun recipientGroups(visible: List<ReplyTemplate>): Pair<List<ReplyTemplate>, List<ReplyTemplate>> =
+    visible.partition { it.isBuiltIn }
 
 /**
  * «Создать ответ»: paste, dictate or take the example message, choose who it
@@ -213,6 +223,12 @@ fun ComposeScreen(onBack: () -> Unit, onOpen: (String) -> Unit = {}) {
         }
     }
 
+    fun chooseRecipient(id: String) {
+        chosenId = id
+        // The keyboard's row reads the same key on its next appearance.
+        services.settings.lastTemplateId = id
+    }
+
     fun paste() {
         scope.launch {
             when (val outcome = ComposePaste.read(context)) {
@@ -308,8 +324,9 @@ fun ComposeScreen(onBack: () -> Unit, onOpen: (String) -> Unit = {}) {
             }
 
             AppSection(stringResource(R.string.compose_template)) {
+                val (builtIns, custom) = recipientGroups(configuration.visibleTemplates)
                 RecipientGrid(
-                    options = configuration.visibleTemplates.map { template ->
+                    options = builtIns.map { template ->
                         RecipientOption(
                             id = template.id,
                             label = TemplateNaming.recipientName(context, template),
@@ -317,12 +334,20 @@ fun ComposeScreen(onBack: () -> Unit, onOpen: (String) -> Unit = {}) {
                         )
                     },
                     selectedId = templateId,
-                    onSelect = { id ->
-                        chosenId = id
-                        // The keyboard's row reads the same key on its next appearance.
-                        services.settings.lastTemplateId = id
-                    }
+                    onSelect = ::chooseRecipient
                 )
+                if (custom.isNotEmpty()) {
+                    RowGroup(modifier = Modifier.selectableGroup()) {
+                        custom.forEachIndexed { index, template ->
+                            if (index > 0) RowDivider(startIndent = Spacing.m)
+                            CustomRecipientRow(
+                                label = TemplateNaming.recipientName(context, template),
+                                selected = template.id == templateId,
+                                onSelect = { chooseRecipient(template.id) }
+                            )
+                        }
+                    }
+                }
             }
 
             AppSection(stringResource(R.string.compose_instruction)) {
@@ -481,6 +506,30 @@ fun ComposeScreen(onBack: () -> Unit, onOpen: (String) -> Unit = {}) {
             onDismiss = { dictatingInstruction = false },
             onAccept = { transcript -> instruction = append(instruction, transcript) }
         )
+    }
+}
+
+/** A template the user made: its own name, and a check when it is the one chosen. */
+@Composable
+private fun CustomRecipientRow(label: String, selected: Boolean, onSelect: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onSelect)
+            .defaultMinSize(minHeight = Layout.minimumTouchTarget + Spacing.xxs)
+            .padding(horizontal = Spacing.m, vertical = Spacing.xs),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        if (selected) {
+            Icon(
+                Icons.Filled.Check,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(22.dp)
+            )
+        }
     }
 }
 

@@ -1,11 +1,14 @@
 package kz.yerek.aireply
 
 import kz.yerek.aireply.data.settings.SettingsStore
+import kz.yerek.aireply.domain.model.ReplyConfiguration
+import kz.yerek.aireply.domain.model.ReplyTemplate
 import kz.yerek.aireply.keyboard.input.ContextTextProvider
 import kz.yerek.aireply.ui.feature.compose.ComposePaste
 import kz.yerek.aireply.ui.feature.compose.PasteNotice
 import kz.yerek.aireply.ui.feature.compose.PasteOutcome
 import kz.yerek.aireply.ui.feature.compose.initialRecipient
+import kz.yerek.aireply.ui.feature.compose.recipientGroups
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -51,6 +54,17 @@ class CreateReplyTest {
         assertEquals("hidden or deleted: the first one shown", "friend", initialRecipient(shown, "gone"))
         assertEquals("friend", initialRecipient(shown, null))
         assertNull(initialRecipient(emptyList(), "client"))
+    }
+
+    @Test
+    fun `the built-ins go in the grid and the user's own under it, each still choosable`() {
+        val custom = ReplyTemplate.custom("Шеф", sortIndex = 4)
+        val shown = ReplyConfiguration.INITIAL.visibleTemplates + custom
+
+        val (builtIns, own) = recipientGroups(shown)
+        assertEquals(listOf("friend", "client", "work", "business"), builtIns.map { it.id })
+        assertEquals(listOf(custom.id), own.map { it.id })
+        assertEquals("still the keyboard's selection", custom.id, initialRecipient(shown.map { it.id }, custom.id))
     }
 
     @Test

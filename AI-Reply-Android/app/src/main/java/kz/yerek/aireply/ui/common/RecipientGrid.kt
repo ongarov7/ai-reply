@@ -1,7 +1,6 @@
 package kz.yerek.aireply.ui.common
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,8 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -29,21 +26,20 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
-import kz.yerek.aireply.ui.design.LocalExtraColors
 import kz.yerek.aireply.ui.design.Radius
 import kz.yerek.aireply.ui.design.Spacing
 
-/** One choice of «Кому отвечаем?»: a template id, its «to whom» name, its icon (none for a custom one). */
+/** One choice of «Кому отвечаем?»: a template id, its «to whom» name, its icon. */
 data class RecipientOption(val id: String, val label: String, val icon: ImageVector?)
 
 /**
  * «Кому отвечаем?» as a two-column grid of cards: Другу, Клиенту, Коллеге,
- * Партнёру with their icons, then the user's own templates by name.
+ * Партнёру with their icons.
  *
  * Алушы торы: екі бағанды, белгішесі мен барыс септігіндегі атауы бар.
  *
- * A single-choice group for screen readers. The selected card is outlined in
- * the accent and tinted, with a check; nothing moves when it changes.
+ * A single-choice group for screen readers. The selected card is filled with
+ * the accent and its text turns white; nothing moves when it changes.
  */
 @Composable
 fun RecipientGrid(
@@ -83,32 +79,31 @@ fun RecipientGrid(
 
 @Composable
 private fun RecipientCard(option: RecipientOption, selected: Boolean, onSelect: () -> Unit, modifier: Modifier) {
-    val shape = RoundedCornerShape(Radius.medium)
-    val accent = MaterialTheme.colorScheme.primary
+    val colors = MaterialTheme.colorScheme
     Box(
         modifier = modifier
-            .clip(shape)
-            .background(if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface)
-            .border(if (selected) 1.5.dp else 0.5.dp, if (selected) accent else LocalExtraColors.current.separator, shape)
+            .clip(RoundedCornerShape(Radius.medium))
+            .background(if (selected) colors.primary else colors.surface)
             .selectable(selected = selected, role = Role.RadioButton, onClick = onSelect)
             .defaultMinSize(minHeight = 64.dp)
             .padding(horizontal = Spacing.s, vertical = Spacing.s)
     ) {
         Column(
-            modifier = Modifier.align(Alignment.CenterStart).padding(end = Spacing.l),
+            modifier = Modifier.align(Alignment.CenterStart),
             verticalArrangement = Arrangement.spacedBy(Spacing.xxs)
         ) {
             option.icon?.let { icon ->
-                Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(22.dp))
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = if (selected) colors.onPrimary else colors.primary,
+                    modifier = Modifier.size(22.dp)
+                )
             }
-            Text(option.label, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-        }
-        if (selected) {
-            Icon(
-                Icons.Filled.CheckCircle,
-                contentDescription = null,
-                tint = accent,
-                modifier = Modifier.align(Alignment.TopEnd).size(18.dp)
+            Text(
+                option.label,
+                style = MaterialTheme.typography.titleMedium,
+                color = if (selected) colors.onPrimary else colors.onSurface
             )
         }
     }
