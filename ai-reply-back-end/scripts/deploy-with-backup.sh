@@ -19,6 +19,12 @@ fi
 
 aireply_stamp=$(date -u +%Y%m%dT%H%M%SZ)
 aireply_backup="/home/ai-reply-backups/$aireply_stamp"
+# A running container can outlive a removed image. Retain its actual filesystem
+# before replacement; named data volumes are backed up separately below.
+if ! docker image inspect "$aireply_image" >/dev/null 2>&1; then
+  printf 'Original image was removed; retaining the running container image.\n'
+  aireply_image=$(docker commit --pause=true "$aireply_container")
+fi
 docker tag "$aireply_image" "ai-reply-backend:before-$aireply_stamp"
 mkdir -p /home/ai-reply-backups
 chmod 700 /home/ai-reply-backups
