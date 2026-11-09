@@ -61,7 +61,7 @@ class PolishTest {
         transportOverride = { transport }
     )
     private var allowed = true
-    private val polish = InstructionPolish(scope, service).apply {
+    private val polish = InstructionPolish(scope, service, { scope.testScheduler.currentTime }).apply {
         isAllowed = { allowed }
         inputLanguage = { KeyboardLanguage.KAZAKH }
     }
@@ -305,6 +305,79 @@ class PolishTest {
         field.set("$note ещё")
         assertNull(polish.accept())
         assertEquals("$note ещё", field.text)
+    }
+
+    // ------------------------------------------------------- the shared slot
+
+    private fun offered() {
+        write(note)
+        pause()
+        transport.answer(polished)
+        scope.runCurrent()
+    }
+
+    @Test
+    fun `a tap meant for an intent cannot take a suggestion that just appeared`() {
+        assertTrue("nothing changed yet", polish.acceptsSlotTap())
+        offered()
+        assertFalse(polish.acceptsSlotTap())
+        pause(InstructionPolish.SLOT_QUIET_MS - 1)
+        assertFalse(polish.acceptsSlotTap())
+        pause(1)
+        assertTrue(polish.acceptsSlotTap())
+    }
+
+    @Test
+    fun `a double tap cannot undo what its first tap took`() {
+        offered()
+        pause(InstructionPolish.SLOT_QUIET_MS)
+        assertTrue(polish.acceptsSlotTap())
+        polish.accept()
+        assertFalse(polish.acceptsSlotTap())
+        pause(InstructionPolish.SLOT_QUIET_MS)
+        assertTrue("Undo answers once the moment is over", polish.acceptsSlotTap())
+    }
+
+    @Test
+    fun `a late tap on Undo cannot pick the intent that came back`() {
+        offered()
+        polish.accept()
+        pause(InstructionPolish.UNDO_MS)
+        assertNull(polish.taken)
+        assertFalse(polish.acceptsSlotTap())
+        pause(InstructionPolish.SLOT_QUIET_MS)
+        assertTrue(polish.acceptsSlotTap())
+    }
+
+    @Test
+    fun `a chip going away holds taps too, Undo or an edit alike`() {
+        offered()
+        pause(InstructionPolish.SLOT_QUIET_MS)
+        polish.accept()
+        pause(InstructionPolish.SLOT_QUIET_MS)
+        polish.undo()
+        assertFalse(polish.acceptsSlotTap())
+
+        pause(InstructionPolish.SLOT_QUIET_MS)
+        write(polished)
+        pause()
+        transport.answer(note)
+        scope.runCurrent()
+        pause(InstructionPolish.SLOT_QUIET_MS)
+        assertTrue(polish.acceptsSlotTap())
+        write("$polished!")
+        assertFalse("the chip left under an edit", polish.acceptsSlotTap())
+    }
+
+    @Test
+    fun `typing with no chip on screen holds nothing back`() {
+        write(note)
+        assertTrue(polish.acceptsSlotTap())
+        pause(100)
+        write("$note и")
+        assertTrue("the word suggestions are never held back", polish.acceptsSlotTap())
+        polish.dismiss()
+        assertTrue("nothing was showing", polish.acceptsSlotTap())
     }
 
     // ------------------------------------------------------------- the wire

@@ -37,6 +37,8 @@ import kz.yerek.aireply.platform.ReplyLog
 class InstructionPolish(
     private val scope: CoroutineScope,
     private val service: PolishService,
+    /** Monotonic milliseconds, for [acceptsSlotTap]. */
+    private val clock: () -> Long,
     private val pauseMs: Long = PAUSE_MS,
     private val undoMs: Long = UNDO_MS
 ) {
@@ -75,6 +77,9 @@ class InstructionPolish(
     /** The trimmed text last sent, or last settled by the user: not asked about again. */
     private var settled: String? = null
 
+    /** Until when [acceptsSlotTap] says no. */
+    private var quietUntil = Long.MIN_VALUE
+
     /** The user edited the instruction [field]: the chip goes, and a pause asks again. */
     fun edited(field: KeyboardTextFieldState) {
         dismiss()
@@ -100,7 +105,24 @@ class InstructionPolish(
             if (mine != ticket || polished == null || field.text.trim() != text) return@launch
             asking = null
             offer = Offer(field, field.text, polished)
+            chipChanged()
         }
+    }
+
+    /**
+     * Whether a tap on an intent, the chip or Undo counts right now. They
+     * share one slot and swap in place, and a tap aimed at what was there a
+     * moment ago must not land on what replaced it: a tap meant for an intent
+     * taking a suggestion that just appeared, a double tap undoing what its
+     * first tap took, a late tap on Undo choosing an intent. So for
+     * [SLOT_QUIET_MS] after the chip appears, changes or goes they ignore
+     * taps. Typing alone never starts this, so the word suggestions in the
+     * slot are never held back.
+     */
+    fun acceptsSlotTap(): Boolean = clock() >= quietUntil
+
+    private fun chipChanged() {
+        quietUntil = clock() + SLOT_QUIET_MS
     }
 
     /** The polished text to show while [field] is the one being typed in: only its own offer. */
@@ -134,6 +156,7 @@ class InstructionPolish(
         undoJob = scope.launch {
             delay(undoMs)
             taken = null
+            chipChanged()
         }
         return current.field
     }
@@ -157,6 +180,7 @@ class InstructionPolish(
         asking = null
         undoJob?.cancel()
         undoJob = null
+        if (offer != null || taken != null) chipChanged()
         offer = null
         taken = null
     }
@@ -174,6 +198,9 @@ class InstructionPolish(
 
         /** How long Undo stays after a suggestion was taken. */
         const val UNDO_MS = 5_000L
+
+        /** How long the intents and the chip ignore taps after the chip changes. */
+        const val SLOT_QUIET_MS = 450L
 
         /** Failures in a row after which the keyboard stops asking. */
         const val MAX_FAILURES = 2

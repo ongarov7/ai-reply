@@ -296,7 +296,7 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
             scope = scope,
             worker = suggestionWorker
         )
-        polish = InstructionPolish(scope, polishService()).apply {
+        polish = InstructionPolish(scope, polishService(), SystemClock::uptimeMillis).apply {
             isAllowed = {
                 smartCorrection && AILimits.features.instructionPolish && isComposing &&
                     activeFlow.stage == ReplyComposerFlow.Stage.Composing
@@ -853,14 +853,18 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         TypingAssistActions(
             onPick = ::pickSuggestion,
             onAcceptPolish = {
-                autocorrect.clear()
-                polish.accept()?.let { field -> fieldEdited(field, byUser = false) }
-                refreshAutoShift()
+                if (polish.acceptsSlotTap()) {
+                    autocorrect.clear()
+                    polish.accept()?.let { field -> fieldEdited(field, byUser = false) }
+                    refreshAutoShift()
+                }
             },
             onUndoPolish = {
-                autocorrect.clear()
-                polish.undo()?.let { field -> fieldEdited(field, byUser = false) }
-                refreshAutoShift()
+                if (polish.acceptsSlotTap()) {
+                    autocorrect.clear()
+                    polish.undo()?.let { field -> fieldEdited(field, byUser = false) }
+                    refreshAutoShift()
+                }
             }
         )
     }
@@ -1492,6 +1496,7 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
 
     /** Intents WRITE INTO THE INSTRUCTION: readable, editable, stackable. */
     private fun applyIntent(intent: QuickIntent) {
+        if (!polish.acceptsSlotTap()) return
         val field = compose.session?.takeIf { it.flow.stage == ReplyComposerFlow.Stage.Composing }?.instruction
             ?: replies.session?.takeIf { it.flow.stage == ReplyComposerFlow.Stage.Composing }?.instruction
             ?: return
