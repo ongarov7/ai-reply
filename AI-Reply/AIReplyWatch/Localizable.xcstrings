@@ -175,6 +175,151 @@
         }
       }
     },
+    "watch.consent.allow" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Рұқсат беру"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Разрешить"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ruxsat berish"
+          }
+        }
+      }
+    },
+    "watch.consent.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When you tap Speak, your recording goes through your iPhone and the AI Reply server to OpenAI (USA) to be turned into text. AI Reply does not store it. OpenAI may keep API data for a limited time to detect abuse. Nothing is recorded until you tap Speak."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«Сөйлеу» түймесін басқанда жазба мәтінге айналу үшін iPhone мен AI Reply сервері арқылы OpenAI-ға (АҚШ) жіберіледі. AI Reply оны сақтамайды. OpenAI теріс пайдалануды анықтау үшін API деректерін шектеулі уақыт сақтай алады. «Сөйлеу» түймесін баспайынша ештеңе жазылмайды."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Когда вы нажимаете «Говорить», запись через iPhone и сервер AI Reply идёт в OpenAI (США), чтобы превратиться в текст. AI Reply её не сохраняет. OpenAI может ограниченное время хранить данные API для выявления злоупотреблений. Пока вы не нажмёте «Говорить», ничего не записывается."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«Gapirish»ni bosganingizda yozuv matnga aylantirish uchun iPhone va AI Reply serveri orqali OpenAI’ga (AQSh) yuboriladi. AI Reply uni saqlamaydi. OpenAI suiisteʼmolni aniqlash uchun API maʼlumotlarini cheklangan vaqt saqlashi mumkin. «Gapirish»ni bosmaguningizcha hech narsa yozilmaydi."
+          }
+        }
+      }
+    },
+    "watch.consent.decline" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not now"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Қазір емес"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не сейчас"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hozir emas"
+          }
+        }
+      }
+    },
+    "watch.consent.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your voice and OpenAI"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Дауыс және OpenAI"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Голос и OpenAI"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ovoz va OpenAI"
+          }
+        }
+      }
+    },
+    "watch.consent.withdraw" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stop sending voice to OpenAI"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Дауысты OpenAI-ға жібермеу"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не отправлять голос в OpenAI"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ovozni OpenAI’ga yubormaslik"
+          }
+        }
+      }
+    },
     "watch.done" : {
       "extractionState" : "manual",
       "localizations" : {

@@ -36,6 +36,8 @@ struct WatchRootView: View {
         switch model.stage {
         case .ready:
             HomeScreen()
+        case .voiceConsent:
+            VoiceConsentScreen()
         case .listening:
             ListeningScreen()
         case .processing:
@@ -80,7 +82,7 @@ private struct HomeScreen: View {
                 .accessibilityElement(children: .combine)
 
                 if model.canUseMicrophone {
-                    Button(action: model.startListening) {
+                    Button(action: model.speakTapped) {
                         Label("watch.speak", systemImage: "mic.fill")
                             .frame(maxWidth: .infinity)
                     }
@@ -133,6 +135,13 @@ private struct HomeScreen: View {
                     }
                 }
             }
+
+            if model.hasVoiceConsent {
+                Section {
+                    Button("watch.consent.withdraw", role: .destructive, action: model.withdrawVoiceConsent)
+                        .font(.footnote)
+                }
+            }
         }
     }
 
@@ -145,6 +154,29 @@ private struct HomeScreen: View {
             return "watch.template.keyboard \(name)"
         }
         return "watch.template.auto"
+    }
+}
+
+// MARK: - Consent
+
+/// Shown once, before the first recording: where the voice goes, and a real
+/// choice. "Not now" leaves typing and Apple's dictation as they are.
+private struct VoiceConsentScreen: View {
+
+    @Environment(WatchVoiceModel.self) private var model
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("watch.consent.title")
+                    .font(.headline)
+                Text("watch.consent.body")
+                    .font(.footnote)
+                Button("watch.consent.allow", action: model.acceptVoiceConsent)
+                    .buttonStyle(.borderedProminent)
+                Button("watch.consent.decline", action: model.declineVoiceConsent)
+            }
+        }
     }
 }
 

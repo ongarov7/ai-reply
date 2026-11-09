@@ -50,6 +50,10 @@ enum WatchVoice {
 
     /// Shortest recording the server accepts, in milliseconds.
     static let minimumAudioMilliseconds = 300
+
+    /// The voice disclosure the user agreed to on the watch. A new wording
+    /// that changes where a recording goes asks again.
+    static let voiceConsentVersion = "2026-11-09"
 }
 
 // MARK: - Identifiers

@@ -3458,25 +3458,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Reply: your copied or selected message, instruction, chosen template, profile (description, role, tone, business details, reply language and grammatical gender) and working-hours context, when you tap Reply.\n\nWrite: your instruction and grammatical gender, when you tap Write.\n\nSmart correction: the instruction in AI Reply’s own field while you type, if enabled. Messages and profile text may contain personal data about you or other people."
+            "value" : "Reply: your copied or selected message, instruction, chosen template, profile (description, role, tone, business details, reply language and grammatical gender) and working-hours context, when you tap Reply.\n\nWrite: your instruction and grammatical gender, when you tap Write.\n\nApple Watch microphone: your voice recording, when you tap Speak on the watch and agree there.\n\nSmart correction: the instruction in AI Reply’s own field while you type, if enabled. Messages and profile text may contain personal data about you or other people."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "«Жауап беру»: басқан кезде көшірілген не белгіленген хабарлама, нұсқау, таңдалған үлгі, профиль (сипаттама, рөл, үн, бизнес деректері, жауап тілі және грамматикалық тек) және жұмыс уақытының мәнмәтіні.\n\n«Жазу»: басқан кезде нұсқау мен грамматикалық тек.\n\nАқылды түзету: қосулы болса, AI Reply өрісіндегі нұсқау теру кезінде. Хабарлама мен профильде сіздің және басқа адамдардың жеке деректері болуы мүмкін."
+            "value" : "«Жауап беру»: басқан кезде көшірілген не белгіленген хабарлама, нұсқау, таңдалған үлгі, профиль (сипаттама, рөл, үн, бизнес деректері, жауап тілі және грамматикалық тек) және жұмыс уақытының мәнмәтіні.\n\n«Жазу»: басқан кезде нұсқау мен грамматикалық тек.\n\nApple Watch микрофоны: дауыс жазбасы — сағатта «Сөйлеу» түймесін басып, келіскен кезде.\n\nАқылды түзету: қосулы болса, AI Reply өрісіндегі нұсқау теру кезінде. Хабарлама мен профильде сіздің және басқа адамдардың жеке деректері болуы мүмкін."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "«Ответить»: скопированное или выделенное сообщение, инструкция, выбранный шаблон, профиль (описание, роль, тон, сведения о бизнесе, язык ответа и грамматический род) и контекст рабочего времени — при нажатии.\n\n«Написать»: инструкция и грамматический род — при нажатии.\n\nУмная коррекция: инструкция в поле AI Reply во время набора, если функция включена. Сообщения и профиль могут содержать персональные данные о вас и других людях."
+            "value" : "«Ответить»: скопированное или выделенное сообщение, инструкция, выбранный шаблон, профиль (описание, роль, тон, сведения о бизнесе, язык ответа и грамматический род) и контекст рабочего времени — при нажатии.\n\n«Написать»: инструкция и грамматический род — при нажатии.\n\nМикрофон Apple Watch: запись голоса — когда вы нажимаете «Говорить» на часах и соглашаетесь там.\n\nУмная коррекция: инструкция в поле AI Reply во время набора, если функция включена. Сообщения и профиль могут содержать персональные данные о вас и других людях."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "«Javob berish»: bosilganda nusxalangan yoki belgilangan xabar, koʻrsatma, tanlangan shablon, profil (tavsif, rol, ohang, biznes maʼlumotlari, javob tili va grammatik jins) va ish vaqti konteksti.\n\n«Yozish»: bosilganda koʻrsatma va grammatik jins.\n\nAqlli tuzatish: yoqilgan boʻlsa, AI Reply maydonidagi koʻrsatma yozish paytida. Xabarlar va profilda siz va boshqa odamlar haqidagi shaxsiy maʼlumotlar boʻlishi mumkin."
+            "value" : "«Javob berish»: bosilganda nusxalangan yoki belgilangan xabar, koʻrsatma, tanlangan shablon, profil (tavsif, rol, ohang, biznes maʼlumotlari, javob tili va grammatik jins) va ish vaqti konteksti.\n\n«Yozish»: bosilganda koʻrsatma va grammatik jins.\n\nApple Watch mikrofoni: ovoz yozuvi — soatda «Gapirish»ni bosib, rozilik berganingizda.\n\nAqlli tuzatish: yoqilgan boʻlsa, AI Reply maydonidagi koʻrsatma yozish paytida. Xabarlar va profilda siz va boshqa odamlar haqidagi shaxsiy maʼlumotlar boʻlishi mumkin."
           }
         }
       }
@@ -9794,25 +9794,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "When you tap Reply, the message you copied or selected and any instruction you wrote go through the AI Reply server to OpenAI; when you tap Write, only your instruction does. With Smart correction on, an instruction you type in AI Reply's own field may be sent before you tap, to suggest a correction. Neither these texts nor the replies are stored in the database or written to logs; only a generated text you send with a report is kept. Nothing you type in other apps is sent unless you select it yourself and tap Reply."
+            "value" : "When you tap Reply, the message you copied or selected and any instruction you wrote go through the AI Reply server to OpenAI; when you tap Write, only your instruction does. With Smart correction on, an instruction you type in AI Reply's own field may be sent before you tap, to suggest a correction. Neither these texts nor the replies are stored in the database or written to logs; only a generated text you send with a report is kept. Nothing you type in other apps is sent unless you select it yourself and tap Reply. If you use the microphone on Apple Watch, your recording goes through your iPhone and the AI Reply server to OpenAI to be turned into text, after you agree on the watch; it is not stored."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "«Жауап беру» түймесін басқанда көшірілген не белгіленген хабарлама мен нұсқауыңыз (бар болса) AI Reply сервері арқылы OpenAI-ға жіберіледі, ал «Жазу» түймесін басқанда — тек нұсқау. Ақылды түзету қосулы болса, AI Reply-дың өз өрісіне жазып жатқан нұсқауыңыз түзету ұсыну үшін түймені баспай тұрып та жіберілуі мүмкін. Бұл мәтіндер де, жауаптар да дерекқорда сақталмайды және журналға жазылмайды; тек шағыммен бірге жіберген дайын мәтініңіз сақталады. Басқа қолданбаларда терген мәтініңізді өзіңіз белгілеп, «Жауап беру» түймесін баспасаңыз, ол жіберілмейді."
+            "value" : "«Жауап беру» түймесін басқанда көшірілген не белгіленген хабарлама мен нұсқауыңыз (бар болса) AI Reply сервері арқылы OpenAI-ға жіберіледі, ал «Жазу» түймесін басқанда — тек нұсқау. Ақылды түзету қосулы болса, AI Reply-дың өз өрісіне жазып жатқан нұсқауыңыз түзету ұсыну үшін түймені баспай тұрып та жіберілуі мүмкін. Бұл мәтіндер де, жауаптар да дерекқорда сақталмайды және журналға жазылмайды; тек шағыммен бірге жіберген дайын мәтініңіз сақталады. Басқа қолданбаларда терген мәтініңізді өзіңіз белгілеп, «Жауап беру» түймесін баспасаңыз, ол жіберілмейді. Apple Watch микрофонын қолдансаңыз, сағаттағы келісіміңізден кейін жазба мәтінге айналу үшін iPhone мен AI Reply сервері арқылы OpenAI-ға жіберіледі және сақталмайды."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Когда вы нажимаете «Ответить», скопированное или выделенное сообщение и ваша просьба, если она есть, передаются в OpenAI через сервер AI Reply, а когда «Написать» — только просьба. При включённой умной коррекции просьба, которую вы пишете в поле самого AI Reply, может отправиться и до нажатия кнопки — чтобы предложить исправление. Ни эти тексты, ни ответы не сохраняются в базе и не записываются в логи; сохраняется только готовый текст, который вы отправили вместе с жалобой. То, что вы печатаете в других приложениях, не отправляется, если вы сами не выделили это и не нажали «Ответить»."
+            "value" : "Когда вы нажимаете «Ответить», скопированное или выделенное сообщение и ваша просьба, если она есть, передаются в OpenAI через сервер AI Reply, а когда «Написать» — только просьба. При включённой умной коррекции просьба, которую вы пишете в поле самого AI Reply, может отправиться и до нажатия кнопки — чтобы предложить исправление. Ни эти тексты, ни ответы не сохраняются в базе и не записываются в логи; сохраняется только готовый текст, который вы отправили вместе с жалобой. То, что вы печатаете в других приложениях, не отправляется, если вы сами не выделили это и не нажали «Ответить». Если вы пользуетесь микрофоном на Apple Watch, запись после вашего согласия на часах идёт через iPhone и сервер AI Reply в OpenAI, чтобы превратиться в текст, и не сохраняется."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "«Javob berish»ni bosganingizda nusxalangan yoki belgilangan xabar va koʻrsatmangiz (agar boʻlsa) AI Reply serveri orqali OpenAI’ga yuboriladi, «Yozish»ni bosganingizda esa faqat koʻrsatma. Aqlli tuzatish yoqilgan boʻlsa, AI Replyning oʻz maydonida yozayotgan koʻrsatmangiz tuzatish taklif qilish uchun tugmani bosishingizdan oldin ham yuborilishi mumkin. Bu matnlar ham, javoblar ham bazada saqlanmaydi va jurnallarga yozilmaydi; faqat shikoyat bilan birga yuborgan tayyor matningiz saqlanadi. Boshqa ilovalarda yozganlaringizni oʻzingiz belgilab, «Javob berish»ni bosmaguningizcha ular yuborilmaydi."
+            "value" : "«Javob berish»ni bosganingizda nusxalangan yoki belgilangan xabar va koʻrsatmangiz (agar boʻlsa) AI Reply serveri orqali OpenAI’ga yuboriladi, «Yozish»ni bosganingizda esa faqat koʻrsatma. Aqlli tuzatish yoqilgan boʻlsa, AI Replyning oʻz maydonida yozayotgan koʻrsatmangiz tuzatish taklif qilish uchun tugmani bosishingizdan oldin ham yuborilishi mumkin. Bu matnlar ham, javoblar ham bazada saqlanmaydi va jurnallarga yozilmaydi; faqat shikoyat bilan birga yuborgan tayyor matningiz saqlanadi. Boshqa ilovalarda yozganlaringizni oʻzingiz belgilab, «Javob berish»ni bosmaguningizcha ular yuborilmaydi. Apple Watch mikrofonidan foydalansangiz, soatda roziligingizdan keyin yozuv matnga aylantirish uchun iPhone va AI Reply serveri orqali OpenAI’ga yuboriladi va saqlanmaydi."
           }
         }
       }

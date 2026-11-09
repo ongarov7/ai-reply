@@ -10,6 +10,8 @@ final class WatchVoiceModel {
 
     enum Stage: Equatable {
         case ready
+        /// First use: what happens to the voice, before anything is recorded.
+        case voiceConsent
         case listening
         /// The recording is on its way to text.
         case processing
@@ -45,6 +47,7 @@ final class WatchVoiceModel {
     private(set) var isReachable = false
     private(set) var phone: WatchPhoneSnapshot?
     private(set) var recent: RecentResult?
+    private(set) var hasVoiceConsent: Bool
 
     var mode: WatchVoiceMode { didSet { save(mode.rawValue, Key.mode) } }
     var language: WatchVoiceLanguage { didSet { save(language.rawValue, Key.language) } }
@@ -78,6 +81,7 @@ final class WatchVoiceModel {
         static let responseLanguage = "watch.responseLanguage"
         static let length = "watch.length"
         static let template = "watch.template"
+        static let voiceConsent = "watch.voiceConsent"
     }
 
     init() {
@@ -89,6 +93,7 @@ final class WatchVoiceModel {
         responseLanguage = defaults.string(forKey: Key.responseLanguage).flatMap(WatchVoiceLanguage.init(rawValue:))
         length = defaults.string(forKey: Key.length).flatMap(WatchVoiceLength.init(rawValue:))
         templateID = defaults.string(forKey: Key.template)
+        hasVoiceConsent = defaults.string(forKey: Key.voiceConsent) == WatchVoice.voiceConsentVersion
 
         client.onEvent = { [weak self] event in
             Task { @MainActor in self?.handle(event) }
@@ -104,6 +109,8 @@ final class WatchVoiceModel {
     /// because a Watch simulator cannot be driven from the command line.
     private func runSmokeTestIfRequested() {
         guard CommandLine.arguments.contains("-AIReplyWatchSmokeTest") else { return }
+        defaults.set(WatchVoice.voiceConsentVersion, forKey: Key.voiceConsent)
+        hasVoiceConsent = true
         Task {
             try? await Task.sleep(for: .seconds(4))
             startListening()
@@ -188,6 +195,32 @@ final class WatchVoiceModel {
     }
 
     // MARK: Microphone
+
+    /// Speak: the disclosure comes first, then the system's microphone prompt.
+    func speakTapped() {
+        guard hasVoiceConsent else {
+            stage = .voiceConsent
+            return
+        }
+        startListening()
+    }
+
+    /// Explicit permission before a voice goes to a third-party AI.
+    func acceptVoiceConsent() {
+        defaults.set(WatchVoice.voiceConsentVersion, forKey: Key.voiceConsent)
+        hasVoiceConsent = true
+        stage = .ready
+        startListening()
+    }
+
+    func declineVoiceConsent() {
+        stage = .ready
+    }
+
+    func withdrawVoiceConsent() {
+        defaults.removeObject(forKey: Key.voiceConsent)
+        hasVoiceConsent = false
+    }
 
     /// The user's tap on the microphone. Nothing listens before or after.
     func startListening() {

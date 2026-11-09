@@ -84,6 +84,32 @@ final class WatchVoiceLocalizationTests: XCTestCase {
         }
     }
 
+    /// App Review 5.1.2: the screen before the first recording says who gets
+    /// the voice, in every language.
+    func testTheWatchConsentNamesWhereTheVoiceGoes() throws {
+        let strings = try catalog("Localizable.xcstrings")
+        let body = strings["watch.consent.body"] as? [String: Any]
+        let localizations = body?["localizations"] as? [String: Any] ?? [:]
+        XCTAssertEqual(Set(localizations.keys), ["en", "ru", "kk", "uz"])
+        for (language, value) in localizations {
+            let text = ((value as? [String: Any])?["stringUnit"] as? [String: Any])?["value"] as? String ?? ""
+            XCTAssertTrue(text.contains("OpenAI"), language)
+        }
+        XCTAssertNotNil(strings["watch.consent.allow"])
+        XCTAssertNotNil(strings["watch.consent.decline"])
+        XCTAssertNotNil(strings["watch.consent.withdraw"])
+    }
+
+    func testTheAppsOwnDisclosureCoversTheWatchMicrophone() {
+        let settings = AppSettings(store: SharedSettings(defaults: UserDefaults(suiteName: "WatchVoiceLocalizationTests.\(UUID())")!))
+        for language in AppLanguage.allCases {
+            settings.setLanguage(language)
+            for key in ["legal.consent.ai", "settings.privacy.body"] {
+                XCTAssertTrue(settings.localized(key).contains("Apple Watch"), "\(key) in \(language.rawValue)")
+            }
+        }
+    }
+
     /// The guide has fourteen steps and the screen lists them by number.
     func testTheGuideIsComplete() throws {
         let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()

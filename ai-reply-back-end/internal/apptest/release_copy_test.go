@@ -198,6 +198,7 @@ func TestPrivacyPolicyMatchesWhatTheAppsSend(t *testing.T) {
 		"When you tap Write, only your instruction and your grammatical gender are sent",
 		"Reply to copied", "Nothing else you type in other apps is sent",
 		"In the iPhone app you can dictate", "Apple speech recognition", "AI Reply receives only the recognised text",
+		"On Apple Watch you can say your instruction", "our server to OpenAI (USA) to be turned into text",
 		"if you enter it or Apple or Google shares it",
 		"A log of administrator actions on an account", "is not removed automatically, including after the account is deleted",
 		"finished notification deliveries — after 7 days", "the notifications themselves — after 40 days",
@@ -216,11 +217,11 @@ func TestPrivacyPolicyMatchesWhatTheAppsSend(t *testing.T) {
 		}
 	}
 	for locale, needles := range map[string][]string{
-		"ru": {"выделили в текущем поле", "«Ответить на скопированное»", "В приложении для iPhone можно надиктовать",
+		"ru": {"На Apple Watch инструкцию можно сказать голосом", "выделили в текущем поле", "«Ответить на скопированное»", "В приложении для iPhone можно надиктовать",
 			"передаст Apple или Google", "Журнал действий администраторов", "сами уведомления — через 40 дней"},
-		"kk": {"өзіңіз белгілеген мәтін", "«Көшірілгенге жауап беру»", "iPhone қосымшасында", "Apple немесе Google берсе",
+		"kk": {"Apple Watch-та нұсқауды дауыспен айтуға болады", "өзіңіз белгілеген мәтін", "«Көшірілгенге жауап беру»", "iPhone қосымшасында", "Apple немесе Google берсе",
 			"Параметрлер → Тіркелгі → Тіркелгіні жою", "хабарламалардың өзі — 40 күннен кейін"},
-		"uz": {"oʻzingiz belgilagan matn", "«Nusxalanganga javob berish»", "iPhone ilovasida", "Apple yoki Google bersa",
+		"uz": {"Apple Watch’da koʻrsatmani ovoz bilan aytish mumkin", "oʻzingiz belgilagan matn", "«Nusxalanganga javob berish»", "iPhone ilovasida", "Apple yoki Google bersa",
 			"Administratorlarning hisob bilan bogʻliq harakatlari jurnali", "bildirishnomalarning oʻzi — 40 kundan keyin"},
 	} {
 		_, body := fetch(t, h, "/privacy?lang="+locale)
