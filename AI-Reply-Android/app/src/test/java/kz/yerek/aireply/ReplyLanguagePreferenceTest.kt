@@ -15,6 +15,7 @@ import kz.yerek.aireply.ai.GeneratedReply
 import kz.yerek.aireply.ai.ReplyPromptBuilder
 import kz.yerek.aireply.ai.ReplyTransport
 import kz.yerek.aireply.core.lang.AppLanguage
+import kz.yerek.aireply.data.profile.ProfileSync
 import kz.yerek.aireply.domain.model.EmojiPolicy
 import kz.yerek.aireply.domain.model.ReplyConfiguration
 import kz.yerek.aireply.domain.model.ReplyLanguagePreference
@@ -149,6 +150,13 @@ class ReplyLanguagePreferenceTest {
         )
         assertNull(newer.profile.replyLanguage)
         assertEquals("Дизайнер", newer.profile.role)
+    }
+
+    @Test
+    fun `a deleted account leaves no fixed language for the next one`() {
+        val left = ProfileSync.withoutAccount(UserProfile(role = "Дизайнер", replyLanguage = ReplyLanguagePreference.KAZAKH))
+        assertNull(left.replyLanguage)
+        assertEquals("", left.role)
     }
 
     // ------------------------------------------------------------- the wire

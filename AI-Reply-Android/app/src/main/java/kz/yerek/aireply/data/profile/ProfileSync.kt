@@ -12,6 +12,7 @@ import kz.yerek.aireply.data.settings.DeviceStateStore
 import kz.yerek.aireply.domain.model.BusinessContext
 import kz.yerek.aireply.domain.model.GrammaticalGender
 import kz.yerek.aireply.domain.model.ReplyTone
+import kz.yerek.aireply.domain.model.UserProfile
 
 /**
  * Keeps the grammatical gender the same on every device of one account, gives
@@ -79,20 +80,10 @@ class ProfileSync(
 
     /**
      * The account was deleted: what this phone kept of the profile the server
-     * had a copy of goes too - about me, role, business, tone, gender. The
-     * personas, their order and the working hours are this phone's settings
-     * and stay.
+     * had a copy of goes too - see [withoutAccount].
      */
     fun accountDeleted() {
-        configuration.updateProfile {
-            it.copy(
-                descriptionText = "",
-                role = "",
-                business = BusinessContext.EMPTY,
-                preferredTone = ReplyTone.NATURAL,
-                grammaticalGender = null
-            )
-        }
+        configuration.updateProfile { withoutAccount(it) }
         device.accountSignedOut()
     }
 
@@ -120,6 +111,21 @@ class ProfileSync(
     private fun canSend(): Boolean = isSignedIn() && features().senderProfile
 
     companion object {
+        /**
+         * [profile] once its account is gone: about me, role, business, tone,
+         * gender and the fixed reply language go, so the next account does not
+         * start with them. The personas, their order and the working hours
+         * are this phone's settings and stay.
+         */
+        fun withoutAccount(profile: UserProfile): UserProfile = profile.copy(
+            descriptionText = "",
+            role = "",
+            business = BusinessContext.EMPTY,
+            preferredTone = ReplyTone.NATURAL,
+            grammaticalGender = null,
+            replyLanguage = null
+        )
+
         /**
          * What a `/me` answer changes locally, or null for nothing.
          *
