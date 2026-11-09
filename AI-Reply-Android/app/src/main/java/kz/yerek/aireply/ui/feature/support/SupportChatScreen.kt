@@ -20,7 +20,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.outlined.SupportAgent
@@ -34,6 +36,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -222,12 +225,23 @@ private fun Bubble(message: ChatMessage, showsName: Boolean, locale: Locale, onR
                     contentDescription = (if (mine) yours else operatorName) + ": " + message.text
                 }
         ) {
-            SelectionContainer {
-                Text(
-                    message.text,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = if (mine) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+            // The theme selects in the accent colour, which is what our own bubble is filled with.
+            val selection = if (mine) {
+                TextSelectionColors(
+                    handleColor = MaterialTheme.colorScheme.onBackground,
+                    backgroundColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.4f)
                 )
+            } else {
+                LocalTextSelectionColors.current
+            }
+            CompositionLocalProvider(LocalTextSelectionColors provides selection) {
+                SelectionContainer {
+                    Text(
+                        message.text,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = if (mine) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                    )
+                }
             }
         }
         val status = when (message.status) {
