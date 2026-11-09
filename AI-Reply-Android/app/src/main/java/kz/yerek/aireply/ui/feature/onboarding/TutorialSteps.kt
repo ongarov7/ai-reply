@@ -36,6 +36,7 @@ import kz.yerek.aireply.ui.common.RecipientOption
 import kz.yerek.aireply.ui.common.RelationshipIcons
 import kz.yerek.aireply.ui.design.AppCard
 import kz.yerek.aireply.ui.design.LocalExtraColors
+import kz.yerek.aireply.ui.design.RowDivider
 import kz.yerek.aireply.ui.design.Spacing
 
 /*
@@ -80,13 +81,15 @@ internal fun ColumnScope.TutorialRecipientStep(selected: RelationshipKind?, onSe
 
 /**
  * 3 of 3: the same message, the recipients, and the reply for the one chosen
- * - it changes as the choice does. Its Copy copies the example.
+ * - it changes as the choice does. Its Copy copies the example, and only that
+ * earns «Получилось!» ([practiced]).
  */
 @Composable
 internal fun ColumnScope.TutorialReplyStep(
     selected: RelationshipKind,
     onSelect: (RelationshipKind) -> Unit,
     copied: Boolean,
+    practiced: Boolean,
     onCopied: () -> Unit
 ) {
     val context = LocalContext.current
@@ -133,21 +136,25 @@ internal fun ColumnScope.TutorialReplyStep(
                     )
                 }
             }
-        }
-    }
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(Spacing.s),
-        verticalAlignment = Alignment.Top
-    ) {
-        Icon(
-            Icons.Filled.CheckCircle,
-            contentDescription = null,
-            tint = LocalExtraColors.current.success,
-            modifier = Modifier.size(24.dp)
-        )
-        Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
-            Text(stringResource(R.string.onboarding_success), style = MaterialTheme.typography.titleLarge)
-            Footnote(stringResource(R.string.onboarding_success_body))
+            // Right where the user tapped, so it is seen without scrolling.
+            if (practiced) {
+                RowDivider(modifier = Modifier.padding(vertical = Spacing.xxs))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Icon(
+                        Icons.Filled.CheckCircle,
+                        contentDescription = null,
+                        tint = LocalExtraColors.current.success,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
+                        Text(stringResource(R.string.onboarding_success), style = MaterialTheme.typography.titleLarge)
+                        Footnote(stringResource(R.string.onboarding_success_body))
+                    }
+                }
+            }
         }
     }
 }

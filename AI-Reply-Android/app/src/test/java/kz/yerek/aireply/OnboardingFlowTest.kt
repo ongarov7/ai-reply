@@ -206,6 +206,14 @@ class OnboardingFlowTest {
     }
 
     @Test
+    fun `the tutorial says it worked only after the example was copied`() {
+        val step = File("src/main/java/kz/yerek/aireply/ui/feature/onboarding/TutorialSteps.kt").readText()
+        val gate = step.indexOf("if (practiced)")
+        assertTrue(gate >= 0)
+        assertTrue("behind the copy", step.indexOf("R.string.onboarding_success)") > gate)
+    }
+
+    @Test
     fun `going through the tutorial counts only for a guide once skipped`() {
         assertTrue(OnboardingFlow.tutorialCompletes(OnboardingStatus.SKIPPED, skipped = false))
         assertFalse("closed or skipped: nothing changes", OnboardingFlow.tutorialCompletes(OnboardingStatus.SKIPPED, skipped = true))

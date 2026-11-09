@@ -240,6 +240,7 @@ fun OnboardingScreen(mode: OnboardingMode, onFinished: () -> Unit) {
                                     replyCopied = false
                                 },
                                 copied = replyCopied,
+                                practiced = practiced,
                                 onCopied = ::practiceCopied
                             )
                             OnboardingStep.PERMISSIONS -> ConnectStep(keyboard)
