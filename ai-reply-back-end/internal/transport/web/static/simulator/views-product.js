@@ -80,7 +80,7 @@
       <div class="row"><span>{{ t('sim.usage.plan') }}</span>
         <select class="sel" style="max-width:158px" :value="plan ? plan.id : ''" @change="setPlan"
                 :aria-label="t('sim.usage.plan')">
-          <option v-for="p in state.plans" :key="p.id" :value="p.id">{{ planName(p) }} · {{ p.daily_message_limit }}/{{ t('sim.usage.day') }}</option>
+          <option v-for="p in state.plans" :key="p.id" :value="p.id">{{ planName(p) }}{{ p.daily_message_limit > 0 ? ' · ' + p.daily_message_limit + '/' + t('sim.usage.day') : '' }}</option>
         </select></div>
     </div>
     <button class="btn btn-sm" style="margin-top:10px;width:100%" @click="resetQuota">{{ t('sim.usage.reset') }}</button>

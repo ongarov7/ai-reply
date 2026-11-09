@@ -276,7 +276,7 @@
           {{ priceLabel(plan.draft ? plan.draft.price : plan.price, plan) }}
           <s v-if="plan.draft">{{ priceLabel(plan.price, plan) }}</s>
         </div>
-        <div class="muted" style="font-size:13px;margin-top:-6px">
+        <div class="muted" style="font-size:13px;margin-top:-6px" v-if="(plan.draft ? plan.draft.daily_message_limit : plan.daily_message_limit) > 0">
           {{ (plan.draft ? plan.draft.daily_message_limit : plan.daily_message_limit) }} {{ t('sim.pricing.per_day') }}
         </div>
 

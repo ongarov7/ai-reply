@@ -959,7 +959,7 @@
                 <label class="field"><span>{{ t('admin.user.change_plan') }}</span>
                   <select v-model="planID">
                     <option v-for="p in plans" :key="p.id" :value="p.id">
-                      {{ p.code }} · {{ p.daily_message_limit }}/{{ t('pricing.per_day') }}</option>
+                      {{ p.code }}{{ p.daily_message_limit > 0 ? ' · ' + p.daily_message_limit + '/' + t('pricing.per_day') : '' }}</option>
                   </select></label>
                 <label class="field"><span>{{ t('admin.user.set_expiry') }}</span>
                   <input type="date" v-model="expires"></label>
