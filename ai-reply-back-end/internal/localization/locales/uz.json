@@ -80,6 +80,7 @@
  "account.error.WEB_ACCOUNT_CHANGED": "Hisob o‘zgardi. Xariddan oldin pochtani tekshiring.",
  "account.error.WEB_QUOTE_CHANGED": "Xarid shartlari o‘zgardi. Narx va javoblar sonini tekshiring, shartlarni yana qabul qilib, to‘lovni bosing.",
  "account.error.WEB_TERMS_CHANGED": "Xarid shartlari o‘zgardi. Narx va javoblar sonini tekshiring, shartlarni yana qabul qilib, to‘lovni bosing.",
+ "account.error.SUBSCRIPTION_CONFLICT": "Bu hisobda obuna yoki yakunlanmagan to‘lov bor. Yangilashni App Store, Google Play yoki shu sahifada o‘chiring yoki to‘lov yakunlanishini kuting va qayta urinib ko‘ring.",
  "account.open": "Kabinet",
  "account.title": "Shaxsiy kabinet",
  "account.intro": "Sayt va ilovada bitta hisob va javoblarning umumiy balansi.",

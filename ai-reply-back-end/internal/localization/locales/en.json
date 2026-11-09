@@ -80,6 +80,7 @@
  "account.error.WEB_ACCOUNT_CHANGED": "The account changed. Check the email before purchasing.",
  "account.error.WEB_QUOTE_CHANGED": "The purchase terms changed. Check the price and reply count, accept the terms again, then select payment.",
  "account.error.WEB_TERMS_CHANGED": "The purchase terms changed. Check the price and reply count, accept the terms again, then select payment.",
+ "account.error.SUBSCRIPTION_CONFLICT": "This account already has a subscription or an unfinished payment. Turn off renewal in the App Store, Google Play or on this page, or wait for the payment to finish, then try again.",
  "account.open": "Account",
  "account.title": "Your account",
  "account.intro": "One account and a shared reply balance on the website and in the app.",

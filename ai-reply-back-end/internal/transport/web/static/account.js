@@ -155,6 +155,7 @@
         return;
       }
       var code = error && error.message || '';
+      if (error && error.details && error.details.field === 'subscription') code = 'SUBSCRIPTION_CONFLICT';
       notice(words['error.' + code] || t('error.generic'));
     }
     function clearHandoff() {
@@ -579,7 +580,8 @@
         if (error.status === 409) {
           // A conflict must never silently create a replacement payment.
           nodes['purchase-terms'].checked = false; state.acceptedQuote = '';
-          if (error.message === 'WEB_QUOTE_CHANGED' || error.message === 'WEB_TERMS_CHANGED') {
+          // A refused subscription created no order, so there is nothing to recover.
+          if (error.message === 'WEB_QUOTE_CHANGED' || error.message === 'WEB_TERMS_CHANGED' || error.details.field === 'subscription') {
             state.pending = null; savePending();
           }
           return loadSession(false).then(function () { fail(error); }).catch(fail);

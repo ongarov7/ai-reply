@@ -182,6 +182,45 @@ test('definitive quote conflict refreshes the offer without automatically starti
   assert.equal(f.redirects.length, 0);
 });
 
+for (const reason of ['manage_existing_store_subscription', 'already_active', 'payment_still_pending']) {
+  test('a subscription refused with ' + reason + ' leaves nothing pending and the pack can still be bought', async () => {
+    const payload = session();
+    payload.bank.recurring_enabled = true;
+    payload.bank.recurring_terms_version = '2026-11-01';
+    payload.bank.products.push({ code: 'base_monthly', kind: 'subscription', units: 0, price_minor: 99000,
+      currency: 'KZT', billing_period: 'month', monthly_limit: 1000, active: true, available_web: true, name: { en: 'Base' } });
+    let refused = 0;
+    const f = fixture((url, opts) => {
+      if (!url.endsWith('/checkout')) return response(payload);
+      if (JSON.parse(opts.body).product_code === 'pack30') return response(created());
+      refused++;
+      return response({ error: { code: 'CONFLICT', details: { field: 'subscription', reason } } }, 409);
+    });
+    await f.app.init(); f.accept();
+    const expiry = f.nodes.get('account-card-expiry');
+    expiry.value = '2028-02'; expiry.listeners.change();
+    const consent = f.nodes.get('account-recurring-terms');
+    consent.checked = true; consent.listeners.change();
+    await f.app.checkout('base_monthly');
+    assert.equal(refused, 1);
+    assert.equal(f.redirects.length, 0);
+    assert.equal(f.app.state.pending, null);
+    assert.equal(f.stored.has(pendingKey('/sandbox', 'sandbox', 'fixture-user-A')), false);
+    assert.equal(f.nodes.get('account-purchase-terms').checked, false);
+    assert.equal(f.nodes.get('account-error').textContent, f.words['error.SUBSCRIPTION_CONFLICT']);
+
+    const reloaded = fixture(() => response(payload), { stored: f.stored });
+    await reloaded.app.init();
+    assert.equal(reloaded.app.state.pending, null);
+
+    f.accept();
+    assert.equal(f.nodes.get('account-purchase-terms').disabled, false);
+    assert.equal(f.nodes.get('account-products').children[0].children[3].disabled, false);
+    await f.app.checkout('pack30');
+    assert.equal(f.redirects.length, 1);
+  });
+}
+
 test('status errors stop automatic polling and honor Retry-After for manual checks', async () => {
   const f = fixture(url => url.includes('/orders/') ? response({ error: { code: 'RATE_LIMITED' } }, 429, '30') : response(session()), { search: '?order=fixture-order-1' });
   await f.app.init();
