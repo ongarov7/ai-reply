@@ -95,8 +95,9 @@
 ### Письмо «тариф подключён»
 
 Рендерится в момент отправки из ключей `email.subscription_activated.{subject, greeting,
-body, expires, manage, footer}` (тот же макет, что у письма с кодом входа: HTML + текст).
-`{plan}` — название тарифа на языке письма, `{limit}` — дневной лимит, `{date}` — дата
+body, body_plain, expires, manage, footer}` (тот же макет, что у письма с кодом входа: HTML + текст).
+`{plan}` — название тарифа на языке письма, `{limit}` — дневной лимит (у тарифа без дневного
+лимита, как Base и Pro, вместо `body` идёт `body_plain` без числа), `{date}` — дата
 окончания (строка `expires` пропадает у бессрочного тарифа). Адрес берётся из аккаунта в
 момент отправки и только подтверждённый (`email_verified_at`), иначе `skipped
 no_verified_email`. `Idempotency-Key` в Resend — `notification-<delivery_id>`. Письмо
