@@ -1,8 +1,6 @@
 package kz.yerek.aireply.ui.feature.account
 
 import android.app.Activity
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -177,12 +175,7 @@ internal fun PurchaseOptions(onOpenPlans: (() -> Unit)? = null) {
         }
         if (catalogue.options.isNotEmpty() || account.subscription?.source == PLAY_SOURCE) {
             TextButton(
-                onClick = {
-                    context.startActivity(
-                        Intent(Intent.ACTION_VIEW, Uri.parse(managementUrl(account.subscription?.plan?.id, state.subscriptions, context.packageName)))
-                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    )
-                },
+                onClick = { context.openWebPage(managementUrl(account.subscription?.plan?.id, state.subscriptions, context.packageName)) },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(stringResource(R.string.plans_manage))
