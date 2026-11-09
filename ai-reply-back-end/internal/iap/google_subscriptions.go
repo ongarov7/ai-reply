@@ -24,6 +24,8 @@ const (
 	googleKeepsExpired = 60 * 24 * time.Hour
 	// graceRead — a grace period Google reports without a future end is valid until the next read.
 	graceRead = time.Hour
+	// ackFailuresPerRound — this many transient acknowledgement failures in a row end the round.
+	ackFailuresPerRound = 3
 )
 
 // grantsAccess — the states that give the plan while the period lasts.
@@ -245,7 +247,8 @@ func (s *Service) acknowledgeSubscription(ctx context.Context, txn, productID, t
 //
 // Google refunds a subscription that is not acknowledged within three days, so
 // the worker keeps trying while that can help. Refused for good, the purchase
-// is read again to see why. A transient failure stops the round.
+// is read again to see why. One purchase that keeps failing must not hold the
+// others back: only a run of transient failures, an outage, stops the round.
 func (s *Service) RetryAcknowledges(ctx context.Context) (int, error) {
 	if s.google == nil {
 		return 0, nil
@@ -255,7 +258,7 @@ func (s *Service) RetryAcknowledges(ctx context.Context) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	done := 0
+	done, failures := 0, 0
 	for _, row := range rows {
 		if ctx.Err() != nil {
 			return done, ctx.Err()
@@ -277,6 +280,7 @@ func (s *Service) RetryAcknowledges(ctx context.Context) (int, error) {
 		}
 		err = s.google.AcknowledgeSubscription(ctx, row.ProductID, token)
 		if err == nil {
+			failures = 0
 			if err := s.repo.MarkGoogleSubscriptionAcknowledged(ctx, row.TokenHash, now); err != nil {
 				return done, err
 			}
@@ -286,8 +290,12 @@ func (s *Service) RetryAcknowledges(ctx context.Context) (int, error) {
 		var apiErr *googleplay.APIError
 		if !errors.As(err, &apiErr) || !apiErr.Permanent() {
 			s.log.Warn("google play acknowledgement retry failed", "error", err.Error())
-			break
+			if failures++; failures >= ackFailuresPerRound {
+				break
+			}
+			continue
 		}
+		failures = 0
 		p, getErr := s.google.GetSubscription(ctx, token)
 		switch {
 		case getErr == nil && p.Acknowledged():
