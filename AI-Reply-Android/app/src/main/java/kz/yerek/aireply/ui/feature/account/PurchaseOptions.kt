@@ -209,6 +209,7 @@ internal fun PurchaseOptions(onOpenPlans: (() -> Unit)? = null) {
 }
 
 private suspend fun reloadPlans(services: kz.yerek.aireply.ServiceLocator) {
+    services.account.loadServerConfig()
     services.account.refresh()
     services.account.loadPlans()
     services.billing.load()
