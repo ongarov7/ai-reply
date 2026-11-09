@@ -91,7 +91,7 @@ func (s *Store) AccrueAppleBaseCredits(ctx context.Context, user string, now tim
 	var allowance int
 	var hasHistory bool
 	err := s.db.Tx(ctx, func(tx *sql.Tx) error {
-		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM credit_grants WHERE user_id=? AND product_code IN ('apple_base_monthly','bcc_base_monthly'))`, user).Scan(&hasHistory); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM credit_grants WHERE user_id=? AND product_code IN ('apple_base_monthly','bcc_base_monthly','google_base_monthly'))`, user).Scan(&hasHistory); err != nil {
 			return err
 		}
 		rows, err := tx.QueryContext(ctx, `SELECT period.purchase_id,period.starts_at,

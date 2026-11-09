@@ -255,7 +255,7 @@ func (s *Service) Entitlement(ctx context.Context, userID string) (domain.Entitl
 	dailyLimit, monthlyLimit := plan.DailyLimit, plan.MonthlyLimit
 	if sub != nil && sub.Source == domain.ProviderAppStore && (plan.Code == "base_monthly" || plan.Code == "base_yearly") {
 		dailyLimit, monthlyLimit = 0, 0
-	} else if sub != nil && sub.Source == "bcc" && plan.EntitlementKind == domain.EntitlementMonthly {
+	} else if sub != nil && (sub.Source == "bcc" || sub.Source == domain.ProviderGooglePlay) && plan.EntitlementKind == domain.EntitlementMonthly {
 		// The paid billing period already granted permanent credits. It does
 		// not also create a resetting calendar-month quota.
 		dailyLimit, monthlyLimit = 0, 0

@@ -100,6 +100,11 @@ func (s *Store) ApplyGoogleSubscription(ctx context.Context, in GoogleSubscripti
 		if out.Purchase, out.Granted, out.Revoked, err = recordGoogleOrder(ctx, tx, in, previous, now); err != nil {
 			return err
 		}
+		if out.Granted {
+			if err := grantGoogleBaseMonthly(ctx, tx, in, &out.Purchase, now); err != nil {
+				return err
+			}
+		}
 
 		var acknowledged, nextCheck any
 		if in.Acknowledged {
@@ -367,7 +372,7 @@ func (s *Store) VoidGoogleSubscription(ctx context.Context, in GoogleVoid) (Goog
 			return err
 		}
 		out.Found, out.UserID = true, row.userID
-		if err := refundGoogleOrder(ctx, tx, row, in, at); err != nil {
+		if _, err := refundGoogleOrder(ctx, tx, row, in, at); err != nil {
 			return err
 		}
 		latest := in.OrderID == "" || row.orderID == "" || in.OrderID == row.orderID
@@ -384,24 +389,45 @@ func (s *Store) VoidGoogleSubscription(ctx context.Context, in GoogleVoid) (Goog
 	return out, err
 }
 
-// refundGoogleOrder marks the order's purchase row. A renewal this server has
-// not read yet gets its refunded row now, so a later read cannot grant it.
-func refundGoogleOrder(ctx context.Context, tx *sql.Tx, row googleSubscriptionRow, in GoogleVoid, at time.Time) error {
+// refundGoogleOrder marks the order's purchase row and takes back what is left
+// of that order's bundle. A renewal this server has not read yet gets its
+// refunded row now, so a later read cannot grant it. fresh is false when the
+// voided list only repeats an order already refunded.
+func refundGoogleOrder(ctx context.Context, tx *sql.Tx, row googleSubscriptionRow, in GoogleVoid, at time.Time) (fresh bool, err error) {
 	first, err := purchaseInTx(ctx, tx, domain.ProviderGooglePlay, in.TokenHash)
 	if err != nil {
-		return err
+		return false, err
 	}
+	purchaseID := first.ID
+	var res sql.Result
 	if in.OrderID == "" || first.OrderID == "" || first.OrderID == in.OrderID {
-		_, err := tx.ExecContext(ctx, `UPDATE iap_purchases SET status=?,revoked_at=?,revoke_reason=?,updated_at=? WHERE id=? AND status<>?`,
+		res, err = tx.ExecContext(ctx, `UPDATE iap_purchases SET status=?,revoked_at=?,revoke_reason=?,updated_at=? WHERE id=? AND status<>?`,
 			domain.PurchaseRefunded, ms(at), in.Reason, ms(in.Now), first.ID, domain.PurchaseRefunded)
-		return err
+		if err != nil {
+			return false, err
+		}
+	} else {
+		transaction := googleOrderTransaction(in.TokenHash, in.OrderID)
+		res, err = tx.ExecContext(ctx, `INSERT INTO iap_purchases (id,user_id,provider,environment,store_product_id,product_code,transaction_id,original_transaction_id,order_id,quantity,units,status,revoked_at,revoke_reason,created_at,updated_at)
+			VALUES (?,?,?,?,?,?,?,?,?,1,0,?,?,?,?,?)
+			ON CONFLICT(provider,transaction_id) DO UPDATE SET status=excluded.status,revoked_at=excluded.revoked_at,revoke_reason=excluded.revoke_reason,updated_at=excluded.updated_at
+			WHERE iap_purchases.status<>excluded.status`,
+			traits.NewID(), row.userID, domain.ProviderGooglePlay, first.Environment, first.StoreProductID, first.ProductCode, transaction,
+			in.TokenHash, in.OrderID, domain.PurchaseRefunded, ms(at), in.Reason, ms(in.Now), ms(in.Now))
+		if err != nil {
+			return false, err
+		}
+		renewal, err := purchaseInTx(ctx, tx, domain.ProviderGooglePlay, transaction)
+		if err != nil {
+			return false, err
+		}
+		purchaseID = renewal.ID
 	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO iap_purchases (id,user_id,provider,environment,store_product_id,product_code,transaction_id,original_transaction_id,order_id,quantity,units,status,revoked_at,revoke_reason,created_at,updated_at)
-		VALUES (?,?,?,?,?,?,?,?,?,1,0,?,?,?,?,?)
-		ON CONFLICT(provider,transaction_id) DO UPDATE SET status=excluded.status,revoked_at=excluded.revoked_at,revoke_reason=excluded.revoke_reason,updated_at=excluded.updated_at`,
-		traits.NewID(), row.userID, domain.ProviderGooglePlay, first.Environment, first.StoreProductID, first.ProductCode, googleOrderTransaction(in.TokenHash, in.OrderID),
-		in.TokenHash, in.OrderID, domain.PurchaseRefunded, ms(at), in.Reason, ms(in.Now), ms(in.Now))
-	return err
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	return n > 0, revokeGoogleBaseMonthly(ctx, tx, purchaseID, in.Reason, in.Now)
 }
 
 // ActiveGoogleSubscription — the strongest Play subscription that gives access now.
@@ -412,9 +438,7 @@ func (s *Store) ActiveGoogleSubscription(ctx context.Context, userID string, now
 	err := s.db.Reader().QueryRowContext(ctx, `SELECT g.token_hash,g.plan_id,g.started_at,g.expires_at,g.auto_renew
 		FROM google_subscriptions g JOIN plans p ON p.id=g.plan_id
 		WHERE g.user_id=? AND g.revoked_at IS NULL AND g.superseded_by='' AND g.expires_at>? AND g.state IN (?,?,?)
-		ORDER BY p.entitlement_kind='unlimited' DESC,
-		 CASE WHEN p.daily_message_limit>0 THEN p.daily_message_limit*30 ELSE p.monthly_message_limit END DESC,
-		 g.expires_at DESC LIMIT 1`, userID, ms(now), domain.GoogleSubActive, domain.GoogleSubGrace, domain.GoogleSubCanceled).
+		ORDER BY p.entitlement_kind='unlimited' DESC,p.daily_message_limit DESC,g.expires_at DESC LIMIT 1`, userID, ms(now), domain.GoogleSubActive, domain.GoogleSubGrace, domain.GoogleSubCanceled).
 		Scan(&sub.ID, &sub.PlanID, &started, &expires, &auto)
 	if errors.Is(err, sql.ErrNoRows) {
 		return sub, domain.ErrNotFound
