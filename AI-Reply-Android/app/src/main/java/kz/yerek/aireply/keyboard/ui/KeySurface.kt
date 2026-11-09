@@ -421,6 +421,39 @@ private fun DrawScope.drawPage(
             )
         }
     }
+
+    visual.picker?.let { drawLayoutPicker(it, theme, measurer) }
+}
+
+/** The column over the held language key: the layouts by name, the chosen one on the accent. */
+private fun DrawScope.drawLayoutPicker(picker: LayoutPicker, theme: KeyboardTheme, measurer: TextMeasurer) {
+    val dp = density
+    val topLeft = Offset(picker.left * dp, picker.top * dp)
+    val size = Size(LayoutPicker.WIDTH * dp, picker.height * dp)
+    drawRoundRect(theme.keyShadow, topLeft + Offset(0f, 1.5f * dp), size, CornerRadius(9f * dp))
+    drawRoundRect(theme.letterKey, topLeft, size, CornerRadius(9f * dp))
+    val rowLeft = picker.left + LayoutPicker.PADDING
+    picker.options.forEachIndexed { i, name ->
+        val rowTop = picker.top + LayoutPicker.PADDING + i * LayoutPicker.ROW_HEIGHT
+        val selected = i == picker.selected
+        if (selected) {
+            drawRoundRect(
+                theme.accent,
+                Offset(rowLeft * dp, rowTop * dp),
+                Size((LayoutPicker.WIDTH - LayoutPicker.PADDING * 2) * dp, LayoutPicker.ROW_HEIGHT * dp),
+                CornerRadius(7f * dp)
+            )
+        }
+        val result = measurer.measure(
+            name,
+            TextStyle(fontSize = 17.sp, color = if (selected) Color.White else theme.primaryText),
+            maxLines = 1
+        )
+        drawText(
+            result,
+            topLeft = Offset((rowLeft + 10f) * dp, (rowTop + LayoutPicker.ROW_HEIGHT / 2f) * dp - result.size.height / 2f)
+        )
+    }
 }
 
 /** The letters' size: a little smaller on narrow keys and on a phone on its side, as on the iOS keyboard. */
@@ -537,8 +570,8 @@ private fun DrawScope.drawIcon(painter: VectorPainter, center: Offset, sizeDp: F
 /** The control keys' captions: 123, ABC, space, return. */
 private const val CONTROL_FONT = 16f
 
-/** How far above the keys the balloon may reach: the persona row. */
-private const val PersonaRowHeadroom = 48f
+/** How far above the keys the balloon and the layout picker may reach: the persona row. */
+internal const val PersonaRowHeadroom = 48f
 
 private fun describe(key: LaidOutKey, state: KeySurfaceState): String = when (val k = key.key) {
     is KeyboardKey.Character ->

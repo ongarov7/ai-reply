@@ -30,7 +30,7 @@ interface KeySurfaceListener {
     /** Held globe or held space: the system keyboard picker. */
     fun onShowInputMethodPicker()
 
-    /** Held language key, then a layout picked from the row. */
+    /** Held language key, then a layout picked from the column; it may be the one in use. */
     fun onLanguagePicked(language: KeyboardLanguage)
 }
 
@@ -84,7 +84,7 @@ class KeySurfaceController(private val listener: KeySurfaceListener) {
     var visual by mutableStateOf(TouchVisual())
         private set
 
-    private enum class Mode { NORMAL, ALTERNATES, TRACKPAD, DELETE, DONE }
+    private enum class Mode { NORMAL, ALTERNATES, LAYOUTS, TRACKPAD, DELETE, DONE }
 
     private class Track(
         val id: Long,
@@ -100,6 +100,7 @@ class KeySurfaceController(private val listener: KeySurfaceListener) {
         var longPressAt: Long = Long.MAX_VALUE,
         var alternates: List<String> = emptyList(),
         var panel: AlternatesPanel? = null,
+        var picker: LayoutPicker? = null,
         /** Slid off its key into a page panel: lifting here types nothing. */
         var overPanel: Boolean = false
     )
@@ -161,6 +162,10 @@ class KeySurfaceController(private val listener: KeySurfaceListener) {
                 track.panel = track.panel?.selecting(x)
                 refreshVisual()
             }
+            Mode.LAYOUTS -> {
+                track.picker = track.picker?.selecting(y)
+                refreshVisual()
+            }
             Mode.TRACKPAD -> {
                 val step = TRACKPAD_STEP_DP
                 val moved = ((x - track.trackpadAnchor) / step).toInt()
@@ -211,14 +216,8 @@ class KeySurfaceController(private val listener: KeySurfaceListener) {
                 val overPanel = track.overPanel || layout?.panelAt(x, y) != null
                 if (y > -CANCEL_ABOVE_DP && !overPanel) commit(track)
             }
-            Mode.ALTERNATES -> track.panel?.selectedText?.let { text ->
-                val key = layout?.keys?.getOrNull(track.keyIndex)?.key
-                if (key == KeyboardKey.Layout) {
-                    languages.getOrNull(track.panel?.selected ?: -1)?.let(listener::onLanguagePicked)
-                } else {
-                    listener.onTextCommit(text)
-                }
-            }
+            Mode.ALTERNATES -> track.panel?.selectedText?.let(listener::onTextCommit)
+            Mode.LAYOUTS -> track.picker?.let { languages.getOrNull(it.selected) }?.let(listener::onLanguagePicked)
             Mode.TRACKPAD, Mode.DELETE, Mode.DONE -> Unit
         }
         refreshVisual()
@@ -260,7 +259,10 @@ class KeySurfaceController(private val listener: KeySurfaceListener) {
                         listener.onShowInputMethodPicker()
                     }
                     KeyboardKey.Layout -> if (languages.size > 1) {
-                        openPanel(track, key, languages.map { it.badge })
+                        track.mode = Mode.LAYOUTS
+                        track.picker = LayoutPicker.anchored(
+                            key, languages.map { it.nativeName }, languages.indexOf(page.page.language).coerceAtLeast(0), page.width
+                        )
                     }
                     else -> {
                         val options = displayedAlternates(key)
@@ -306,7 +308,8 @@ class KeySurfaceController(private val listener: KeySurfaceListener) {
         }?.keyIndex
         val panel = tracks.values.lastOrNull { it.mode == Mode.ALTERNATES }?.panel
         val trackpad = tracks.values.any { it.mode == Mode.TRACKPAD }
-        visual = TouchVisual(pressed, if (isDimmed) null else preview, panel, trackpad)
+        val picker = tracks.values.lastOrNull { it.mode == Mode.LAYOUTS }?.picker
+        visual = TouchVisual(pressed, if (isDimmed) null else preview, panel, trackpad, picker)
     }
 
     companion object {
@@ -329,7 +332,8 @@ data class TouchVisual(
     /** Key whose character balloon is up. */
     val preview: Int? = null,
     val panel: AlternatesPanel? = null,
-    val trackpad: Boolean = false
+    val trackpad: Boolean = false,
+    val picker: LayoutPicker? = null
 )
 
 /** The row of long-press alternates above a key, in dp. */
@@ -360,6 +364,41 @@ data class AlternatesPanel(
             val left = preferred.coerceIn(2f, maxOf(2f, pageWidth - total - 2f))
             val top = key.frame.top - cellHeight - 6f
             return AlternatesPanel(keyIndex, options, left, top, cellWidth, cellHeight, selected = 0)
+        }
+    }
+}
+
+/**
+ * The column of layouts over a held language key, by their own names, in dp.
+ * It opens on the layout in use, so a long press with no slide changes nothing.
+ */
+data class LayoutPicker(
+    val options: List<String>,
+    val left: Float,
+    val top: Float,
+    val selected: Int
+) {
+    val height: Float get() = heightOf(options.size)
+    val bottom: Float get() = top + height
+
+    /** The row level with the finger. Still on the key below the column, the finger has chosen nothing. */
+    fun selecting(y: Float): LayoutPicker {
+        if (y >= bottom) return this
+        val index = floor((y - top - PADDING) / ROW_HEIGHT).toInt().coerceIn(0, options.lastIndex)
+        return if (index == selected) this else copy(selected = index)
+    }
+
+    companion object {
+        const val WIDTH = 150f
+        const val ROW_HEIGHT = 40f
+        const val PADDING = 5f
+
+        private fun heightOf(rows: Int): Float = rows * ROW_HEIGHT + PADDING * 2
+
+        fun anchored(key: LaidOutKey, options: List<String>, selected: Int, pageWidth: Float): LayoutPicker {
+            val left = key.frame.left.coerceIn(1f, maxOf(1f, pageWidth - 1f - WIDTH))
+            val top = maxOf(1f - PersonaRowHeadroom, key.frame.top - heightOf(options.size) - 6f)
+            return LayoutPicker(options, left, top, selected)
         }
     }
 }

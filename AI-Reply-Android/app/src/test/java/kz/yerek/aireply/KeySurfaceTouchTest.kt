@@ -12,6 +12,7 @@ import kz.yerek.aireply.keyboard.layout.PageOptions
 import kz.yerek.aireply.keyboard.layout.PanelKind
 import kz.yerek.aireply.keyboard.ui.KeySurfaceController
 import kz.yerek.aireply.keyboard.ui.KeySurfaceListener
+import kz.yerek.aireply.keyboard.ui.LayoutPicker
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -221,5 +222,84 @@ class KeySurfaceTouchTest {
         surface.down(2, w.centerX, w.centerY, time = 40)
         assertEquals(listOf("commit ${KeyboardKey.Character("q")}"), recorder.events)
         assertTrue("neither finger holds a key now", surface.visual.pressed.isEmpty())
+    }
+
+    // --------------------------------------------------------- layout picker
+
+    private fun hold(surface: KeySurfaceController, layout: PageLayout) {
+        val key = layout.key(KeyboardKey.Layout).frame
+        surface.down(1, key.centerX, key.centerY, time = 0)
+        surface.tick(time = KeySurfaceController.LONG_PRESS_MS)
+    }
+
+    private val KeyboardLanguage.row get() = KeyboardLanguage.CYCLE_ORDER.indexOf(this)
+
+    @Test
+    fun `a held language key lists the layouts by name, on the one in use`() {
+        for (sizing in screens) for (language in KeyboardLanguage.entries) {
+            val layout = page(language, KeyboardPlane.LETTERS, sizing)
+            val (surface, _) = controller(layout)
+            hold(surface, layout)
+            val picker = surface.visual.picker!!
+            assertNull("no row of badges", surface.visual.panel)
+            assertEquals(KeyboardLanguage.CYCLE_ORDER.map { it.nativeName }, picker.options)
+            assertEquals("$language w=${sizing.width}", language.row, picker.selected)
+            assertTrue("above its key", picker.bottom <= layout.key(KeyboardKey.Layout).frame.top)
+            assertTrue("on the page", picker.left >= 1f && picker.left + LayoutPicker.WIDTH <= layout.width - 1f)
+        }
+    }
+
+    @Test
+    fun `a long press with no slide keeps the layout, however the finger trembles`() {
+        for (language in KeyboardLanguage.entries) {
+            val layout = page(language, KeyboardPlane.LETTERS, screens[1])
+            val key = layout.key(KeyboardKey.Layout).frame
+            val (surface, recorder) = controller(layout)
+            hold(surface, layout)
+            surface.move(1, key.centerX + 4f, key.centerY - 3f, time = 500)
+            surface.move(1, key.centerX - 6f, key.top + 1f, time = 520)
+            surface.move(1, key.right + 30f, key.bottom - 1f, time = 540)
+            assertEquals(language.row, surface.visual.picker!!.selected)
+            surface.up(1, key.right + 30f, key.bottom - 1f, time = 560)
+            assertEquals(listOf("language $language"), recorder.events)
+        }
+    }
+
+    @Test
+    fun `sliding up the column picks the row under the finger, and lifting takes it`() {
+        val layout = page(KeyboardLanguage.ENGLISH, KeyboardPlane.LETTERS, screens[1])
+        val (surface, recorder) = controller(layout)
+        hold(surface, layout)
+        val opened = surface.visual.picker!!
+        val rowY = { row: Int -> opened.top + LayoutPicker.PADDING + (row + 0.5f) * LayoutPicker.ROW_HEIGHT }
+        val x = opened.left + 20f
+        surface.move(1, x, rowY(KeyboardLanguage.RUSSIAN.row), time = 500)
+        assertEquals(KeyboardLanguage.RUSSIAN.row, surface.visual.picker!!.selected)
+        surface.move(1, x, rowY(KeyboardLanguage.KAZAKH.row), time = 520)
+        assertEquals(KeyboardLanguage.KAZAKH.row, surface.visual.picker!!.selected)
+        surface.move(1, x, opened.top - 30f, time = 540)
+        assertEquals("above the column: its top row", 0, surface.visual.picker!!.selected)
+        surface.up(1, x, rowY(KeyboardLanguage.KAZAKH.row), time = 560)
+        assertEquals(listOf("language ${KeyboardLanguage.KAZAKH}"), recorder.events)
+        assertNull(surface.visual.picker)
+    }
+
+    @Test
+    fun `sideways does not matter in the column, and a tap still takes the next layout`() {
+        val layout = page(KeyboardLanguage.RUSSIAN, KeyboardPlane.LETTERS, screens[1])
+        val (surface, recorder) = controller(layout)
+        hold(surface, layout)
+        val opened = surface.visual.picker!!
+        val y = opened.top + LayoutPicker.PADDING + LayoutPicker.ROW_HEIGHT * 2.5f
+        surface.move(1, layout.width - 5f, y, time = 500)
+        assertEquals(2, surface.visual.picker!!.selected)
+        surface.up(1, layout.width - 5f, y, time = 520)
+        assertEquals(listOf("language ${KeyboardLanguage.ENGLISH}"), recorder.events)
+
+        recorder.events.clear()
+        val key = layout.key(KeyboardKey.Layout).frame
+        surface.down(2, key.centerX, key.centerY, time = 1_000)
+        surface.up(2, key.centerX, key.centerY, time = 1_060)
+        assertEquals(listOf("commit ${KeyboardKey.Layout}"), recorder.events)
     }
 }
