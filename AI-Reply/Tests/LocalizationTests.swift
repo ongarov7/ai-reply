@@ -392,12 +392,12 @@ final class LocalizationTests: XCTestCase {
     /// language, and none of them is English left in another language.
     func testKeyboardReleaseStringsAreTranslated() {
         let english = AIReplyStrings.forLanguage(.english)
-        XCTAssertEqual(english.message(for: .quotaExhausted), "You have used all available replies for today.")
+        XCTAssertEqual(english.message(for: .quotaExhausted), "You have used all available replies.")
         XCTAssertEqual(english.message(for: .monthlyQuotaExhausted),
-                       "You have used all available replies for this month.")
+                       "Your reply balance is empty.")
         XCTAssertEqual(english.message(for: .consentRequired),
                        "Open AI Reply and accept the terms to use AI replies.")
-        XCTAssertEqual(AIReplyStrings.forLanguage(.uzbek).quotaExhausted, "Bugun uchun mavjud javoblar tugadi.")
+        XCTAssertEqual(AIReplyStrings.forLanguage(.uzbek).quotaExhausted, "Mavjud javoblar tugadi.")
 
         for language in AppLanguage.allCases where language != .english {
             let strings = AIReplyStrings.forLanguage(language)

@@ -616,25 +616,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "This month's replies are used up"
+            "value" : "Your reply balance is empty"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ответы на этот месяц закончились"
+            "value" : "Баланс ответов исчерпан"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Осы айдағы жауаптар бітті"
+            "value" : "Жауаптар балансы таусылды"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bu oylik javoblar tugadi"
+            "value" : "Javoblar balansi tugadi"
           }
         }
       }
@@ -761,25 +761,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Today's replies are used up"
+            "value" : "No replies available"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ответы на сегодня закончились"
+            "value" : "Доступные ответы закончились"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Бүгінгі жауаптар бітті"
+            "value" : "Қолжетімді жауаптар таусылды"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bugungi javoblar tugadi"
+            "value" : "Mavjud javoblar tugadi"
           }
         }
       }

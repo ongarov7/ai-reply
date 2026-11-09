@@ -761,25 +761,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Today's replies are used up."
+            "value" : "You have used all available replies."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Бүгінгі жауаптар бітті."
+            "value" : "Қолжетімді жауаптар таусылды."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ответы на сегодня закончились."
+            "value" : "Доступные ответы закончились."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bugungi javoblar tugadi."
+            "value" : "Mavjud javoblar tugadi."
           }
         }
       }
@@ -3951,25 +3951,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "We'll let you know when today's replies are running out or your plan is about to end. Choose what to receive in Settings."
+            "value" : "We'll let you know when your reply balance is running low or your subscription is about to end. Unused purchased replies never expire. Choose what to receive in Settings."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Бүгінгі жауаптар таусылып бара жатқанда немесе тариф аяқталуға жақындағанда хабарлаймыз. Нені алатыныңызды параметрлерде таңдай аласыз."
+            "value" : "Жауаптар қалдығы азайғанда немесе жазылым аяқталуға жақындағанда хабарлаймыз. Пайдаланылмаған сатып алынған жауаптардың мерзімі шектелмейді. Нені алатыныңызды параметрлерде таңдай аласыз."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Сообщим, когда ответы на сегодня заканчиваются или тариф подходит к концу. Что получать, можно выбрать в настройках."
+            "value" : "Сообщим, когда остаток ответов заканчивается или подписка подходит к концу. Неиспользованные купленные ответы не сгорают. Что получать, можно выбрать в настройках."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bugungi javoblar tugab borayotganda yoki tarif tugashiga oz qolganda sizga bildiramiz. Nimalarni olishni sozlamalarda tanlaysiz."
+            "value" : "Javoblar qoldig‘i kamayganda yoki obuna tugashiga oz qolganda xabar beramiz. Ishlatilmagan sotib olingan javoblarning muddati cheklanmaydi. Nimalarni olishni sozlamalarda tanlaysiz."
           }
         }
       }
@@ -10707,25 +10707,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Valid until %@"
+            "value" : "Subscription until %@"
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ дейін жарамды"
+            "value" : "Жазылым: %@ дейін"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Действует до %@"
+            "value" : "Подписка до %@"
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ gacha amal qiladi"
+            "value" : "Obuna: %@ gacha"
           }
         }
       }
@@ -16453,25 +16453,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Payment is charged to your Apple Account. Subscriptions renew automatically until cancelled in App Store settings. Cancellation keeps access until the end of the paid period. Extra reply packs are a one-time purchase."
+            "value" : "Payment is charged to your Apple Account. Subscriptions renew automatically until cancelled in App Store settings. Subscription benefits continue until the end of the paid period. Unused replies already added to your account roll over and never expire, including after cancellation or the end of your subscription. Extra reply packs are a one-time purchase."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Төлем Apple Account есебінен алынады. Жазылым App Store баптауларында тоқтатылғанша автоматты түрде ұзартылады. Тоқтатқаннан кейін қолжетімділік төленген кезеңнің соңына дейін сақталады. Жауап пакеті үшін бір рет төленеді."
+            "value" : "Төлем Apple Account есебінен алынады. Жазылым App Store баптауларында тоқтатылғанша автоматты түрде ұзартылады. Жазылым мүмкіндіктері төленген кезеңнің соңына дейін сақталады. Тіркелгіге қосылған пайдаланылмаған жауаптар жинақталады және мерзімі шектелмейді: жазылым тоқтатылса немесе аяқталса да, оларды қолдана аласыз. Жауап пакеті үшін бір рет төленеді."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Оплата списывается с Apple Account. Подписка продлевается автоматически до отмены в настройках App Store. После отмены доступ сохраняется до конца оплаченного периода. Пакеты ответов оплачиваются один раз."
+            "value" : "Оплата списывается с Apple Account. Подписка продлевается автоматически до отмены в настройках App Store. Возможности подписки действуют до конца оплаченного периода. Уже начисленные неиспользованные ответы накапливаются и не сгорают, в том числе после отмены или окончания подписки. Пакеты ответов оплачиваются один раз."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "To‘lov Apple Account hisobidan olinadi. Obuna App Store sozlamalarida bekor qilinmaguncha avtomatik uzaytiriladi. Bekor qilingandan keyin foydalanish to‘langan davr oxirigacha davom etadi. Javoblar paketi uchun bir marta to‘lanadi."
+            "value" : "To‘lov Apple Account hisobidan olinadi. Obuna App Store sozlamalarida bekor qilinmaguncha avtomatik uzaytiriladi. Obuna imkoniyatlari to‘langan davr oxirigacha amal qiladi. Hisobingizga qo‘shilgan ishlatilmagan javoblar jamlanadi va muddati cheklanmaydi, jumladan obuna bekor qilingandan yoki tugagandan keyin ham. Javoblar paketi uchun bir marta to‘lanadi."
           }
         }
       }
@@ -16801,25 +16801,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "You’ve spent %@ on extra reply packs. With Base at %@ per month, you get %lld replies every day."
+            "value" : "You’ve spent %@ on extra reply packs. With Base at %@ per month, %lld replies are added for each paid day."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Қосымша жауаптарға %@ жұмсадың. Айына %@ тұратын Base арқылы күн сайын %lld жауап ал."
+            "value" : "Қосымша жауаптарға %@ жұмсадың. Айына %@ тұратын Base әр төленген күнге %lld жауап қосады."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "На дополнительные ответы уже ушло %@. Base за %@ в месяц даёт %lld ответов каждый день."
+            "value" : "На дополнительные ответы уже ушло %@. Base за %@ в месяц начисляет %lld ответов за каждый оплаченный день."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Qo‘shimcha javoblar uchun %@ sarfladingiz. Oyiga %@ evaziga Base bilan har kuni %lld ta javob oling."
+            "value" : "Qo‘shimcha javoblar uchun %@ sarfladingiz. Oyiga %@ evaziga Base har bir to‘langan kun uchun %lld ta javob qo‘shadi."
           }
         }
       }
@@ -16830,25 +16830,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "You’ve spent %@ on extra reply packs. With Base at %@ per month, you get %lld replies every month."
+            "value" : "You’ve spent %@ on extra reply packs. With Base at %@ per month, %lld replies are added for each paid month."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Қосымша жауаптарға %@ жұмсадың. Айына %@ тұратын Base арқылы ай сайын %lld жауап ал."
+            "value" : "Қосымша жауаптарға %@ жұмсадың. Айына %@ тұратын Base әр төленген айға %lld жауап қосады."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "На дополнительные ответы уже ушло %@. Base за %@ в месяц даёт %lld ответов каждый месяц."
+            "value" : "На дополнительные ответы уже ушло %@. Base за %@ в месяц начисляет %lld ответов за каждый оплаченный месяц."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Qo‘shimcha javoblar uchun %@ sarfladingiz. Oyiga %@ evaziga Base bilan har oy %lld ta javob oling."
+            "value" : "Qo‘shimcha javoblar uchun %@ sarfladingiz. Oyiga %@ evaziga Base har bir to‘langan oy uchun %lld ta javob qo‘shadi."
           }
         }
       }
@@ -17149,25 +17149,25 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Автопродление отключено. Подписка закончится после оплаченного периода."
+            "value" : "Автопродление отключено. Подписка закончится после оплаченного периода. Неиспользованные купленные ответы сохранятся без срока действия."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Автоматты ұзарту өшірулі. Жазылым төленген кезеңнен кейін аяқталады."
+            "value" : "Автоматты ұзарту өшірулі. Жазылым төленген кезеңнен кейін аяқталады. Пайдаланылмаған сатып алынған жауаптар мерзімсіз сақталады."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Automatic renewal is off. The subscription ends after the paid period."
+            "value" : "Automatic renewal is off. The subscription ends after the paid period. Unused purchased replies remain available and never expire."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Avtomatik yangilanish o‘chirilgan. Obuna to‘langan muddatdan keyin tugaydi."
+            "value" : "Avtomatik yangilanish o‘chirilgan. Obuna to‘langan muddatdan keyin tugaydi. Ishlatilmagan sotib olingan javoblar muddatsiz saqlanadi."
           }
         }
       }
@@ -17342,6 +17342,35 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Base obunasi davomida har kuni %lld ta javob qo‘shiladi"
+          }
+        }
+      }
+    },
+    "subscription.monthlyAccrual %lld" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld replies added for each paid month"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Начисляем %lld ответов за каждый оплаченный месяц"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Әр төленген ай үшін %lld жауап қосылады"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Har bir to‘langan oy uchun %lld ta javob qo‘shiladi"
           }
         }
       }

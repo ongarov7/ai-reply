@@ -230,7 +230,7 @@ func TestActivationEmailUsesTheLocalizedTemplate(t *testing.T) {
 	if c.Subject != "«"+h.planName("standard", "kk")+"» тарифі қосылды" {
 		t.Fatalf("subject = %q", c.Subject)
 	}
-	for _, part := range []string{"Сәлеметсіз бе!", "күніне 30 жауапқа дейін", "Тариф 09.04.2026 дейін жарамды.", "«Тариф» бөлімінен",
+	for _, part := range []string{"Сәлеметсіз бе!", "күніне 30 жауапқа дейін", "Жазылымның төленген кезеңі 09.04.2026 аяқталады.", "Тұрақты баланстағы жауаптардың мерзімі шектелмейді.", "«Тариф» бөлімінен",
 		"тариф қосылғандықтан жіберілді"} {
 		if !strings.Contains(c.Text, part) || !strings.Contains(c.HTML, part) {
 			t.Fatalf("%q missing:\n%s", part, c.Text)
@@ -267,7 +267,8 @@ func TestActivationNoticeNamesNoNumberForAPlanWithoutADailyLimit(t *testing.T) {
 		}
 		text := mails[i].Content.Text
 		if !strings.Contains(text, "«"+h.planName(code, "ru")+"» уже действует.") || strings.Contains(text, "лимит") ||
-			strings.Contains(text, "на сегодня") || !strings.Contains(text, "Тариф действует до") {
+			strings.Contains(text, "на сегодня") || !strings.Contains(text, "Оплаченный период подписки заканчивается") ||
+			!strings.Contains(text, "Ответы на постоянном балансе не имеют срока действия.") {
 			t.Fatalf("%s e-mail:\n%s", code, text)
 		}
 	}
@@ -367,7 +368,7 @@ func TestSubscriptionRemindersAreSentOncePerPeriod(t *testing.T) {
 	h.tick()
 	msgs := h.pushesOf(domain.TypeSubscriptionExpiring)
 	if len(msgs) != 1 || msgs[0].Title != "Жазылым мерзімі аяқталуға жақын" ||
-		msgs[0].Body != "«"+h.planName("standard", "kk")+"» тарифі 12.03.2026 дейін жарамды. Одан кейін тегін тариф лимиттері қолданылады." ||
+		msgs[0].Body != "«"+h.planName("standard", "kk")+"» тарифі 12.03.2026 дейін жарамды. Тұрақты баланстағы жауаптар ол аяқталғаннан кейін де қолжетімді болады." ||
 		msgs[0].Data["link"] != "aireply://subscription" {
 		t.Fatalf("reminder = %+v", msgs)
 	}

@@ -21,11 +21,11 @@ enum DebugSamples {
     static var usage: AccountAPI.Usage {
         var usage = AccountAPI.Usage(dailyLimit: 0, usedToday: 0, remainingToday: 0, monthlyLimit: 0, usedMonth: 3,
                                      resetsAt: "", timezone: "Asia/Almaty")
-        usage.welcome = AccountAPI.Usage.Welcome(total: 10, remaining: 7)
+        usage.welcome = AccountAPI.Usage.Welcome(total: 20, remaining: 17)
         usage.credits = 60
         usage.purchasedCredits = 60
         usage.adminCredits = 0
-        usage.remainingTotal = 67
+        usage.remainingTotal = 77
         return usage
     }
 }
@@ -44,10 +44,8 @@ extension DebugSamples {
     static let products = [
         PurchaseAPI.Product(code: "base_monthly", kind: "subscription", units: 0, durationHours: 0,
                             storeProductID: "preview.base.monthly", name: "Base", planID: "base_monthly",
-                            billingPeriod: "month", entitlementKind: "daily", dailyLimit: 40),
-        PurchaseAPI.Product(code: "base_yearly", kind: "subscription", units: 0, durationHours: 0,
-                            storeProductID: "preview.base.yearly", name: "Base", planID: "base_yearly",
-                            billingPeriod: "year", entitlementKind: "daily", dailyLimit: 40),
+                            billingPeriod: "month", entitlementKind: "monthly", monthlyLimit: 1000,
+                            price: 99000, currency: "KZT", creditsNeverExpire: true),
         PurchaseAPI.Product(code: "pro_monthly", kind: "subscription", units: 0, durationHours: 0,
                             storeProductID: "preview.pro.monthly", name: "Pro", planID: "pro_monthly",
                             billingPeriod: "month", entitlementKind: "unlimited"),
@@ -68,8 +66,8 @@ struct DebugStoreKitClient: StoreKitClient {
     var canMakePayments: Bool { true }
 
     func products(for ids: [String]) async throws -> [StoreProduct] {
-        let prices = ["preview.base.monthly": "790 ₸", "preview.base.yearly": "7 900 ₸",
-                      "preview.pro.monthly": "3 450 ₸", "preview.pro.yearly": "34 900 ₸", "preview.pack30": "130 ₸"]
+        let prices = ["preview.base.monthly": "990 ₸",
+                      "preview.pro.monthly": "3 990 ₸", "preview.pro.yearly": "39 990 ₸", "preview.pack30": "130 ₸"]
         return ids.compactMap { id in
             prices[id].map { StoreProduct(id: id, displayName: id, displayPrice: $0,
                                          kind: id == "preview.pack30" ? .consumable : .subscription,

@@ -301,7 +301,11 @@ struct PurchaseOptionsView: View {
                             Text("subscription.perDay \(limit)").font(.subheadline).foregroundStyle(.secondary)
                         }
                     } else if case .monthly(let limit) = option.allowance {
-                        Text("subscription.perMonth \(limit)").font(.subheadline).foregroundStyle(.secondary)
+                        if option.offer.creditsNeverExpire {
+                            Text("subscription.monthlyAccrual \(limit)").font(.subheadline).foregroundStyle(.secondary)
+                        } else {
+                            Text("subscription.perMonth \(limit)").font(.subheadline).foregroundStyle(.secondary)
+                        }
                     }
                 }
                 Spacer(minLength: DS.Spacing.s)
@@ -389,6 +393,11 @@ struct PurchaseOptionsView: View {
                 }
             }
                 .font(.subheadline).fixedSize(horizontal: false, vertical: true)
+            if offer.creditsNeverExpire {
+                Text("subscription.repliesNeverExpire")
+                    .font(.footnote).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             Button("purchase.recommendation.choose") {
                 period = "month"
                 selectedOfferID = offer.id

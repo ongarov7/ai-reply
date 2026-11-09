@@ -85,8 +85,8 @@ struct WatchVoiceStrings: Sendable {
         offline: "No internet connection",
         timedOut: "The response took too long",
         rateLimited: "Too many requests. Try in a moment",
-        quotaExhausted: "Today's replies are used up",
-        monthlyQuotaExhausted: "This month's replies are used up",
+        quotaExhausted: "No replies available",
+        monthlyQuotaExhausted: "Your reply balance is empty",
         serviceUnavailable: "AI Reply is unavailable. Try again",
         requestProblem: "This instruction could not be used"
     )
@@ -113,8 +113,8 @@ struct WatchVoiceStrings: Sendable {
         offline: "Нет интернета",
         timedOut: "Ответ не пришёл вовремя",
         rateLimited: "Слишком много запросов, подождите немного",
-        quotaExhausted: "Ответы на сегодня закончились",
-        monthlyQuotaExhausted: "Ответы на этот месяц закончились",
+        quotaExhausted: "Доступные ответы закончились",
+        monthlyQuotaExhausted: "Баланс ответов исчерпан",
         serviceUnavailable: "AI Reply недоступен, попробуйте ещё раз",
         requestProblem: "Это указание нельзя использовать"
     )
@@ -141,8 +141,8 @@ struct WatchVoiceStrings: Sendable {
         offline: "Интернет жоқ",
         timedOut: "Жауап уақытында келмеді",
         rateLimited: "Сұраныс тым көп, сәл күтіңіз",
-        quotaExhausted: "Бүгінгі жауаптар бітті",
-        monthlyQuotaExhausted: "Осы айдағы жауаптар бітті",
+        quotaExhausted: "Қолжетімді жауаптар таусылды",
+        monthlyQuotaExhausted: "Жауаптар балансы таусылды",
         serviceUnavailable: "AI Reply қолжетімсіз, қайталап көріңіз",
         requestProblem: "Бұл нұсқауды пайдалану мүмкін емес"
     )
@@ -169,8 +169,8 @@ struct WatchVoiceStrings: Sendable {
         offline: "Internet yo‘q",
         timedOut: "Javob o‘z vaqtida kelmadi",
         rateLimited: "So‘rovlar juda ko‘p, biroz kuting",
-        quotaExhausted: "Bugungi javoblar tugadi",
-        monthlyQuotaExhausted: "Bu oylik javoblar tugadi",
+        quotaExhausted: "Mavjud javoblar tugadi",
+        monthlyQuotaExhausted: "Javoblar balansi tugadi",
         serviceUnavailable: "AI Reply mavjud emas, qayta urinib ko‘ring",
         requestProblem: "Bu ko‘rsatmani ishlatib bo‘lmaydi"
     )

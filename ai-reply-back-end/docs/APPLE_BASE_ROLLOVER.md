@@ -108,6 +108,11 @@ No production deployment is performed by this code change.
 ## Validation
 
 - `go test ./...` and `go vet ./...` passed.
+- The Base Yearly regression verifies the complete paid year's balance after
+  another offline year, cancellation, spending after expiry from another
+  platform, and repeated restore after the yearly product is removed from sale.
+  It also checks that no grant has an expiry and that the ledger matches the
+  spendable remainder.
 - Seven independent rollover regressions passed with `-race`, including spending
   41 accumulated replies in one day, delayed upgrades and overlapping refunds.
 - The populated-database migration test covers preserved balances, prior usage,

@@ -117,8 +117,8 @@ struct AIReplyStrings: Sendable {
     /// Backend mode only: the session is gone, and a keyboard extension cannot
     /// sign anybody in, so it says where to do it.
     let signInRequired: String
-    /// Every reply available today is spent - the plan's, and whatever else
-    /// the account had. Promises no date: more can be bought.
+    /// Every available reply is spent, including the permanent balance.
+    /// Promises no reset date: more can be bought.
     let quotaExhausted: String
     /// The same for a monthly limit.
     let monthlyQuotaExhausted: String
@@ -250,8 +250,8 @@ struct AIReplyStrings: Sendable {
         emptyResponse: "No reply came back. Try again.",
         serviceUnavailable: "The service is unavailable right now. Try again.",
         signInRequired: "Open the AI Reply app and sign in to keep replying.",
-        quotaExhausted: "You have used all available replies for today.",
-        monthlyQuotaExhausted: "You have used all available replies for this month.",
+        quotaExhausted: "You have used all available replies.",
+        monthlyQuotaExhausted: "Your reply balance is empty.",
         limitReachedTitle: "Reply limit reached",
         limitReachedHint: "Open AI Reply to buy more replies or choose a plan.",
         consentRequired: "Open AI Reply and accept the terms to use AI replies.",
@@ -311,8 +311,8 @@ struct AIReplyStrings: Sendable {
         emptyResponse: "Ответ не получен. Попробуйте ещё раз.",
         serviceUnavailable: "Сервис сейчас недоступен. Попробуйте позже.",
         signInRequired: "Откройте приложение AI Reply и войдите, чтобы продолжить.",
-        quotaExhausted: "Доступные ответы на сегодня закончились.",
-        monthlyQuotaExhausted: "Доступные ответы на этот месяц закончились.",
+        quotaExhausted: "Доступные ответы закончились.",
+        monthlyQuotaExhausted: "Баланс ответов исчерпан.",
         limitReachedTitle: "Лимит ответов исчерпан",
         limitReachedHint: "Откройте AI Reply, чтобы докупить ответы или выбрать тариф.",
         consentRequired: "Откройте AI Reply и примите условия, чтобы пользоваться AI-ответами.",
@@ -372,8 +372,8 @@ struct AIReplyStrings: Sendable {
         emptyResponse: "Жауап келмеді. Қайталап көріңіз.",
         serviceUnavailable: "Қызмет қазір қолжетімсіз. Кейінірек көріңіз.",
         signInRequired: "Жалғастыру үшін AI Reply қолданбасын ашып, кіріңіз.",
-        quotaExhausted: "Бүгінге қолжетімді жауаптар бітті.",
-        monthlyQuotaExhausted: "Осы айға қолжетімді жауаптар бітті.",
+        quotaExhausted: "Қолжетімді жауаптар таусылды.",
+        monthlyQuotaExhausted: "Жауаптар балансы таусылды.",
         limitReachedTitle: "Жауап лимиті таусылды",
         limitReachedHint: "Қосымша жауап сатып алу не тариф таңдау үшін AI Reply қолданбасын ашыңыз.",
         consentRequired: "AI жауаптары үшін AI Reply қосымшасын ашып, шарттарды қабылдаңыз.",
@@ -433,8 +433,8 @@ struct AIReplyStrings: Sendable {
         emptyResponse: "Javob kelmadi. Qayta urinib ko‘ring.",
         serviceUnavailable: "Xizmat hozir mavjud emas. Keyinroq urinib ko‘ring.",
         signInRequired: "Davom etish uchun AI Reply ilovasini ochib, tizimga kiring.",
-        quotaExhausted: "Bugun uchun mavjud javoblar tugadi.",
-        monthlyQuotaExhausted: "Bu oy uchun mavjud javoblar tugadi.",
+        quotaExhausted: "Mavjud javoblar tugadi.",
+        monthlyQuotaExhausted: "Javoblar balansi tugadi.",
         limitReachedTitle: "Javoblar limiti tugadi",
         limitReachedHint: "Qo\u{02BB}shimcha javob sotib olish yoki tarif tanlash uchun AI Reply ilovasini oching.",
         consentRequired: "AI javoblar uchun AI Reply ilovasini ochib, shartlarni qabul qiling.",
