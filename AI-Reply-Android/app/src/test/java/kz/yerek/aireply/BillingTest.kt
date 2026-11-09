@@ -294,6 +294,26 @@ class BillingTest {
     }
 
     @Test
+    fun `restore after switching accounts does not read the old account's answer`() = runBlocking {
+        billing.load()
+        store.held += purchase("switched")
+        var answers = 0
+        api.answer = {
+            if (answers++ == 0) PurchaseResultDto(PurchaseResultDto.STATUS_GRANTED, USAGE) else throw ApiException(ApiError.PurchaseOtherAccount, 409)
+        }
+        api.gate = CompletableDeferred()
+        store.reports(purchase("switched"))
+
+        billing.reset()
+        val restoring = launch(start = CoroutineStart.UNDISPATCHED) { billing.restore() }
+        assertEquals("each account needs its own answer", 2, api.verified.size)
+        api.gate!!.complete(Unit)
+        restoring.join()
+
+        assertEquals(PurchaseNotice.OTHER_ACCOUNT, state.notice)
+    }
+
+    @Test
     fun `restoring another account's purchase says whose it is`() = runBlocking {
         billing.load()
         store.held += purchase("theirs", account = OTHER_TOKEN)

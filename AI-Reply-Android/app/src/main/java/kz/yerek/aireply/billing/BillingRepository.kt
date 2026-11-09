@@ -137,7 +137,9 @@ class BillingRepository(
 
     private val lock = Any()
     /** The request for each token on its way to the server: a second caller for one purchase waits for it. */
-    private val inFlight = HashMap<String, Deferred<Delivery>>()
+    private val inFlight = HashMap<Pair<Int, String>, Deferred<Delivery>>()
+    /** Moves on with each [reset]: an account never reads the answer to another account's request. */
+    private var accountGeneration = 0
     /** Tokens the server finished in this process (granted, or refused for good). */
     private val finished = HashSet<String>()
 
@@ -312,7 +314,10 @@ class BillingRepository(
     fun reset() {
         accountToken = null
         held = emptyList()
-        synchronized(lock) { finished.clear() }
+        synchronized(lock) {
+            finished.clear()
+            accountGeneration++
+        }
         _state.value = BillingState()
     }
 
@@ -398,7 +403,8 @@ class BillingRepository(
         val productId = purchase.productIds.firstOrNull() ?: return false
         val request = synchronized(lock) {
             if (token in finished) return false
-            inFlight.getOrPut(token) { scope.async(start = CoroutineStart.LAZY) { deliver(purchase, productId) } }
+            val key = accountGeneration to token
+            inFlight.getOrPut(key) { scope.async(start = CoroutineStart.LAZY) { deliver(purchase, productId, key) } }
         }
         var notice: PurchaseNotice? = null
         var granted = false
@@ -432,7 +438,7 @@ class BillingRepository(
     }
 
     /** The one request for [purchase]. It finishes even if the caller that started it has gone. */
-    private suspend fun deliver(purchase: StorePurchase, productId: String): Delivery {
+    private suspend fun deliver(purchase: StorePurchase, productId: String, key: Pair<Int, String>): Delivery {
         val token = purchase.purchaseToken
         try {
             val result = api.verify(productId, token)
@@ -472,7 +478,7 @@ class BillingRepository(
                 else -> Delivery.LATER
             }
         } finally {
-            synchronized(lock) { inFlight -= token }
+            synchronized(lock) { inFlight -= key }
         }
     }
 
