@@ -282,7 +282,7 @@ class BillingRepository(
             val paid = purchases.filter { it.state == StorePurchaseState.PURCHASED }
             synchronized(lock) { finished -= paid.map { it.purchaseToken }.toSet() }
             var restored = false
-            paid.forEach { purchase -> if (verify(purchase, fromSheet = false)) restored = true }
+            paid.forEach { purchase -> if (verify(purchase, Origin.RESTORE)) restored = true }
             refreshUsage()
             _state.update { state ->
                 state.copy(
@@ -341,7 +341,7 @@ class BillingRepository(
         paid
             // Bought by another AI Reply account on this phone: that account hands it over.
             .filter { mine == null || it.accountToken == null || it.accountToken == mine }
-            .forEach { verify(it, fromSheet = false) }
+            .forEach { verify(it, Origin.RETURN) }
     }
 
     internal fun onStoreUpdate(update: StoreUpdate) {
@@ -349,7 +349,7 @@ class BillingRepository(
             is StoreUpdate.Purchases -> {
                 update.purchases.forEach { purchase ->
                     when (purchase.state) {
-                        StorePurchaseState.PURCHASED -> scope.launch { verify(purchase, fromSheet = true) }
+                        StorePurchaseState.PURCHASED -> scope.launch { verify(purchase, Origin.SHEET) }
                         StorePurchaseState.PENDING -> _state.update {
                             it.copy(
                                 busyProductId = null,
@@ -391,10 +391,9 @@ class BillingRepository(
     /**
      * One purchase to the server, one request at a time: a caller that finds it
      * already on its way waits for that request and reads the same answer.
-     * [fromSheet]: the user just paid, so even a repeat (`already_granted`) is
-     * news worth saying.
+     * [origin] decides what that answer tells the screen.
      */
-    private suspend fun verify(purchase: StorePurchase, fromSheet: Boolean): Boolean {
+    private suspend fun verify(purchase: StorePurchase, origin: Origin): Boolean {
         val token = purchase.purchaseToken
         val productId = purchase.productIds.firstOrNull() ?: return false
         val request = synchronized(lock) {
@@ -406,7 +405,7 @@ class BillingRepository(
         try {
             val delivery = request.await()
             granted = delivery == Delivery.GRANTED || delivery == Delivery.ALREADY_GRANTED
-            notice = noticeFor(delivery, fromSheet)
+            notice = noticeFor(delivery, origin)
         } finally {
             _state.update { state ->
                 state.copy(
@@ -419,10 +418,12 @@ class BillingRepository(
     }
 
     /** What [delivery] tells this caller. Someone who just paid hears all of it. */
-    private fun noticeFor(delivery: Delivery, fromSheet: Boolean): PurchaseNotice? = when {
-        fromSheet -> delivery.notice
-        // A repeat found on return is not news.
+    private fun noticeFor(delivery: Delivery, origin: Origin): PurchaseNotice? = when {
+        origin == Origin.SHEET -> delivery.notice
+        // A repeat found on return, or by restore, is not news: restore sums up on its own.
         delivery == Delivery.ALREADY_GRANTED -> null
+        // Restoring it will never work, and the one asking is told why.
+        delivery == Delivery.ACCOUNT_MISMATCH && origin == Origin.RESTORE -> PurchaseNotice.OTHER_ACCOUNT
         // Found on return, bound to another account: not this one's to report.
         delivery == Delivery.ACCOUNT_MISMATCH -> null
         else -> delivery.notice
@@ -478,6 +479,16 @@ class BillingRepository(
         "pass" -> OfferedProduct.Kind.PASS
         "subscription" -> OfferedProduct.Kind.SUBSCRIPTION
         else -> null
+    }
+
+    /** Who is handing a purchase over. */
+    private enum class Origin {
+        /** Play's sheet: the user just paid, so even a repeat (`already_granted`) is news worth saying. */
+        SHEET,
+        /** The routine check on every return to the app. */
+        RETURN,
+        /** «Восстановить покупки»: someone is waiting to hear what came of it. */
+        RESTORE
     }
 
     /** How handing one purchase to the server ended, and what someone who just paid is told. */

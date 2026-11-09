@@ -294,6 +294,18 @@ class BillingTest {
     }
 
     @Test
+    fun `restoring another account's purchase says whose it is`() = runBlocking {
+        billing.load()
+        store.held += purchase("theirs", account = OTHER_TOKEN)
+        api.answer = { throw ApiException(ApiError.PurchaseInvalid("account_mismatch"), 400) }
+
+        billing.restore()
+
+        assertEquals(PurchaseNotice.OTHER_ACCOUNT, state.notice)
+        assertFalse(state.restoring)
+    }
+
+    @Test
     fun `restore with nothing held says so`() = runBlocking {
         billing.load()
         store.held.clear()
