@@ -372,12 +372,20 @@ func (s *Store) VoidGoogleSubscription(ctx context.Context, in GoogleVoid) (Goog
 			return err
 		}
 		out.Found, out.UserID = true, row.userID
-		if _, err := refundGoogleOrder(ctx, tx, row, in, at); err != nil {
+		fresh, err := refundGoogleOrder(ctx, tx, row, in, at)
+		if err != nil {
 			return err
 		}
 		latest := in.OrderID == "" || row.orderID == "" || in.OrderID == row.orderID
 		if !latest || row.revoked && row.revokedOrderID == in.OrderID {
-			return nil
+			if !fresh {
+				return nil
+			}
+			// A charge-back of an earlier order can end the whole subscription, and
+			// this list is the only sign of it between reads: Google's state decides.
+			_, err = tx.ExecContext(ctx, `UPDATE google_subscriptions SET next_check_at=CASE WHEN next_check_at IS NULL THEN NULL ELSE ? END,updated_at=? WHERE token_hash=?`,
+				ms(in.Now), ms(in.Now), in.TokenHash)
+			return err
 		}
 		out.Revoked = true
 		soon := ms(in.Now)
