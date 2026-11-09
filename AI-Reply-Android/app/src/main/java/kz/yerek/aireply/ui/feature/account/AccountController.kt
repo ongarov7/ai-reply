@@ -34,6 +34,7 @@ import kz.yerek.aireply.data.account.SubscriptionDto
 import kz.yerek.aireply.data.account.UsageDto
 import kz.yerek.aireply.data.account.raise
 import kz.yerek.aireply.data.legal.LegalConsentStore
+import kz.yerek.aireply.data.legal.StoredLegalConsent
 import kz.yerek.aireply.data.profile.ProfileSync
 import kz.yerek.aireply.keyboard.autocorrect.LearnedWordsStore
 import java.util.TimeZone
@@ -166,6 +167,7 @@ class AccountController(
             // The administrator's character limits, for the keyboard too.
             AILimits.apply(config)
             val legal = config.legal ?: LegalConfigDto.PRODUCTION
+            hasServerLegalConfig = config.legal != null
             // The keyboard checks the consent against these versions too.
             legalConsentStore.rememberConfig(legal)
             trackingConsent {
@@ -184,6 +186,13 @@ class AccountController(
 
     @Volatile
     private var configLoadedAt = 0L
+
+    /**
+     * The legal versions came from the server in this launch. Until they have,
+     * a consent missing from an account's answer proves nothing.
+     */
+    @Volatile
+    private var hasServerLegalConfig = false
 
     /**
      * Back in the app: a feature the administrator switched on (purchases,
@@ -232,6 +241,7 @@ class AccountController(
             return
         }
         val session = currentSession
+        val consentBefore = legalConsentStore.current()
         try {
             val account = service.account()
             // Signed out, or someone else signed in, while this was on its way.
@@ -239,7 +249,7 @@ class AccountController(
             usageCache.store(account.usage)
             usageCache.storePlanCode(account.subscription.plan.code)
             credentials.displayIdentifier = account.user.identifier
-            applyLegalConsent(account.legalConsent)
+            applyLegalConsent(account.legalConsent, consentBefore)
             profileSync?.adopt(account.profile)
             profileSync?.adoptPreferredLanguage(account.user.preferredLanguage)
             _state.update {
@@ -427,7 +437,7 @@ class AccountController(
         deletionMayHaveSucceeded = false
         usageCache.store(session.usage)
         usageCache.storePlanCode(session.subscription.plan.code)
-        applyLegalConsent(session.legalConsent)
+        applyLegalConsent(session.legalConsent, legalConsentStore.current())
         // Before onboarding asks: a returning user's choice comes back with the session.
         profileSync?.adopt(session.profile)
         profileSync?.adoptPreferredLanguage(session.user.preferredLanguage)
@@ -674,11 +684,28 @@ class AccountController(
         if (!before && _state.value.hasAcceptedLegal) observer?.onLegalAccepted()
     }
 
-    private fun applyLegalConsent(consent: LegalConsentDto?) {
+    /**
+     * The server's record decides. Without a consent there for the documents
+     * in force, one this phone had confirmed is out of date - withdrawn on
+     * another device, or another account's - and the consent screen comes
+     * back. An acceptance still waiting to be sent stays, and so does anything
+     * written since [recordBefore] was read: that request was already out.
+     * Compared by reference, because accepting again can bring back the very
+     * same values from the server.
+     */
+    private fun applyLegalConsent(consent: LegalConsentDto?, recordBefore: StoredLegalConsent?) {
         val config = _state.value.legalConfig
         if (consent == null || consent.termsVersion != config.termsVersion ||
             consent.privacyVersion != config.privacyVersion
-        ) return
+        ) {
+            if (!hasServerLegalConfig || recordBefore == null || recordBefore.pendingSync ||
+                legalConsentStore.current() !== recordBefore
+            ) return
+            legalConsentStore.clear()
+            legalRecheckPending = true
+            _state.update { it.copy(hasAcceptedLegal = false) }
+            return
+        }
         legalConsentStore.restore(consent)
         trackingConsent { _state.update { it.copy(hasAcceptedLegal = true) } }
     }
@@ -692,7 +719,7 @@ class AccountController(
         ) return
         runCatching { service.recordLegalConsent(record) }
             .getOrNull()
-            ?.let(::applyLegalConsent)
+            ?.let { applyLegalConsent(it, record) }
     }
 
     // ------------------------------------------------------------- profile
