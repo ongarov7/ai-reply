@@ -13340,6 +13340,1949 @@
         }
       }
     },
+    "watchGuide.1" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pair your Apple Watch with your iPhone."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Watch-ты iPhone-мен жұптаңыз."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Создайте пару между Apple Watch и iPhone."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Watch’ni iPhone bilan juftlang."
+          }
+        }
+      }
+    },
+    "watchGuide.10" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap Speak."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«Сөйлеу» түймесін басыңыз."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нажмите «Говорить»."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«Gapirish»ni bosing."
+          }
+        }
+      }
+    },
+    "watchGuide.11" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Say what the reply should say, then tap Stop."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Жауапта не болуы керегін айтып, «Тоқтату» түймесін басыңыз."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скажите, что должно быть в ответе, и нажмите «Стоп»."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Javobda nima bo‘lishi kerakligini ayting va «To‘xtatish»ni bosing."
+          }
+        }
+      }
+    },
+    "watchGuide.12" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check the text and tap Send."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Мәтінді тексеріп, «Жіберу» түймесін басыңыз."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Проверьте текст и нажмите «Отправить»."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Matnni tekshiring va «Yuborish»ni bosing."
+          }
+        }
+      }
+    },
+    "watchGuide.13" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wait a moment while AI Reply writes the message."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply хабарлама жазғанша сәл күтіңіз."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Подождите, пока AI Reply напишет сообщение."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply xabarni yozguncha biroz kuting."
+          }
+        }
+      }
+    },
+    "watchGuide.14" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Review the text in your messaging app and send it yourself."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Мәтінді мессенджерде тексеріп, өзіңіз жіберіңіз."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Проверьте текст в мессенджере и отправьте его сами."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Matnni messenjerda tekshiring va o‘zingiz yuboring."
+          }
+        }
+      }
+    },
+    "watchGuide.2" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Install AI Reply on your iPhone."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone-ға AI Reply орнатыңыз."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Установите AI Reply на iPhone."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone’ga AI Reply o‘rnating."
+          }
+        }
+      }
+    },
+    "watchGuide.3" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Install AI Reply on Apple Watch: in the Watch app on iPhone, under Available Apps."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сағатқа AI Reply орнатыңыз: iPhone-дағы Watch қолданбасы, қолжетімді бағдарламалар бөлімі."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Установите AI Reply на часы: приложение Watch на iPhone, раздел «Доступные программы»."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Soatga AI Reply o‘rnating: iPhone’dagi Watch ilovasi, mavjud ilovalar bo‘limi."
+          }
+        }
+      }
+    },
+    "watchGuide.4" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enable the AI Reply keyboard in iOS Settings."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS баптауларында AI Reply пернетақтасын қосыңыз."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Включите клавиатуру AI Reply в настройках iOS."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS sozlamalarida AI Reply klaviaturasini yoqing."
+          }
+        }
+      }
+    },
+    "watchGuide.5" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on Full Access for it: the AI needs the internet."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оған толық рұқсат беріңіз: AI-ға интернет керек."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Включите для неё полный доступ: AI нужен интернет."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unga to‘liq ruxsat bering: AI’ga internet kerak."
+          }
+        }
+      }
+    },
+    "watchGuide.6" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open a messaging app."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Мессенджерді ашыңыз."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Откройте мессенджер."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Messenjerni oching."
+          }
+        }
+      }
+    },
+    "watchGuide.7" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose the AI Reply keyboard with the globe key."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Глобус түймесімен AI Reply пернетақтасын таңдаңыз."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Выберите клавиатуру AI Reply кнопкой с глобусом."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Globus tugmasi bilan AI Reply klaviaturasini tanlang."
+          }
+        }
+      }
+    },
+    "watchGuide.8" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy the message you want to answer."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Жауап бергіңіз келетін хабарламаны көшіріңіз."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скопируйте сообщение, на которое хотите ответить."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Javob bermoqchi bo‘lgan xabarni nusxalang."
+          }
+        }
+      }
+    },
+    "watchGuide.9" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open AI Reply on Apple Watch."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Watch-та AI Reply-ды ашыңыз."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Откройте AI Reply на Apple Watch."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Watch’da AI Reply’ni oching."
+          }
+        }
+      }
+    },
+    "watchHelp.bluetooth" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bluetooth or connection problems"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bluetooth немесе байланыс ақаулары"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Проблемы с Bluetooth или связью"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bluetooth yoki aloqa muammolari"
+          }
+        }
+      }
+    },
+    "watchHelp.bluetooth.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on Bluetooth and Wi-Fi on the iPhone, keep the devices close, and check that Control Center on the watch shows it is connected. Then tap Test connection above."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone-да Bluetooth пен Wi-Fi қосып, құрылғыларды жақын ұстаңыз, сағаттың басқару орталығында қосылғанын тексеріңіз. Содан кейін жоғарыдағы «Байланысты тексеру» түймесін басыңыз."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Включите Bluetooth и Wi-Fi на iPhone, держите устройства рядом и проверьте в Пункте управления на часах, что они подключены. Затем нажмите «Проверить связь» выше."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone’da Bluetooth va Wi-Fi’ni yoqing, qurilmalarni yaqin tuting, soatdagi boshqaruv markazida ulanganini tekshiring. So‘ng yuqoridagi «Aloqani tekshirish»ni bosing."
+          }
+        }
+      }
+    },
+    "watchHelp.field" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No text field is active"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Белсенді мәтін өрісі жоқ"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нет активного поля ввода"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Faol matn maydoni yo‘q"
+          }
+        }
+      }
+    },
+    "watchHelp.field.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap the message field so the AI Reply keyboard is on screen. An instruction sent without it waits on the iPhone for a few minutes; the reply then comes with Insert Response."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply пернетақтасы экранға шығуы үшін хабарлама өрісін басыңыз. Онсыз жіберілген нұсқау iPhone-да бірнеше минут күтеді, ал жауап «Жауапты кірістіру» батырмасымен келеді."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нажмите на поле сообщения, чтобы на экране была клавиатура AI Reply. Указание, отправленное без неё, несколько минут ждёт на iPhone, а ответ придёт с кнопкой «Вставить ответ»."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply klaviaturasi ekranga chiqishi uchun xabar maydonini bosing. Usiz yuborilgan ko‘rsatma iPhone’da bir necha daqiqa kutadi, javob esa «Javobni kiritish» tugmasi bilan keladi."
+          }
+        }
+      }
+    },
+    "watchHelp.fullAccess" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Full Access is off"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Толық рұқсат өшірулі"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Полный доступ выключен"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To‘liq ruxsat o‘chirilgan"
+          }
+        }
+      }
+    },
+    "watchHelp.fullAccess.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Without it the keyboard has no network. Go to Settings ▸ General ▸ Keyboard ▸ Keyboards ▸ AI Reply and turn on Allow Full Access."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Онсыз пернетақтада интернет болмайды. Баптаулар ▸ Негізгі ▸ Пернетақта ▸ Пернетақталар ▸ AI Reply бөлімінде толық рұқсатты қосыңыз."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Без него у клавиатуры нет интернета. Откройте Настройки ▸ Основные ▸ Клавиатура ▸ Клавиатуры ▸ AI Reply и включите «Разрешить полный доступ»."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Busiz klaviaturada internet bo‘lmaydi. Sozlamalar ▸ Umumiy ▸ Klaviatura ▸ Klaviaturalar ▸ AI Reply bo‘limida to‘liq ruxsatni yoqing."
+          }
+        }
+      }
+    },
+    "watchHelp.install" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The watch app is not installed"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сағаттағы қолданба орнатылмаған"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Приложение на часах не установлено"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Soatdagi ilova o‘rnatilmagan"
+          }
+        }
+      }
+    },
+    "watchHelp.install.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On iPhone open the Watch app, find AI Reply under Available Apps and tap Install."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone-да Watch қолданбасын ашып, қолжетімді бағдарламалардан AI Reply-ды тауып, «Орнату» түймесін басыңыз."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "На iPhone откройте приложение Watch, найдите AI Reply в разделе «Доступные программы» и нажмите «Установить»."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone’da Watch ilovasini oching, mavjud ilovalar orasidan AI Reply’ni toping va «O‘rnatish»ni bosing."
+          }
+        }
+      }
+    },
+    "watchHelp.internet" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No internet"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Интернет жоқ"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нет интернета"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Internet yo‘q"
+          }
+        }
+      }
+    },
+    "watchHelp.internet.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speech recognition and replies both need the internet on the iPhone. Check it and tap Retry on the watch."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Дауысты тану мен жауаптарға iPhone-да интернет керек. Тексеріп, сағатта «Қайталау» түймесін басыңыз."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Для распознавания речи и ответов нужен интернет на iPhone. Проверьте его и нажмите «Повторить» на часах."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nutqni tanish va javoblar uchun iPhone’da internet kerak. Tekshiring va soatda «Qayta urinish»ni bosing."
+          }
+        }
+      }
+    },
+    "watchHelp.keyboard" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The keyboard is not enabled"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пернетақта қосылмаған"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Клавиатура не включена"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Klaviatura yoqilmagan"
+          }
+        }
+      }
+    },
+    "watchHelp.keyboard.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Go to Settings ▸ General ▸ Keyboard ▸ Keyboards ▸ Add New Keyboard and choose AI Reply."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Баптаулар ▸ Негізгі ▸ Пернетақта ▸ Пернетақталар ▸ Жаңа пернетақта қосу бөлімінен AI Reply таңдаңыз."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Откройте Настройки ▸ Основные ▸ Клавиатура ▸ Клавиатуры ▸ Новые клавиатуры и выберите AI Reply."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sozlamalar ▸ Umumiy ▸ Klaviatura ▸ Klaviaturalar ▸ Yangi klaviatura qo‘shish bo‘limidan AI Reply’ni tanlang."
+          }
+        }
+      }
+    },
+    "watchHelp.language" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The language is not recognized"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тіл танылмайды"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Язык не распознаётся"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Til tanilmayapti"
+          }
+        }
+      }
+    },
+    "watchHelp.language.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose the language you speak under Language on the watch. Speak recognizes Russian, English and Kazakh through AI Reply. Apple's dictation under Type or dictate does not offer Kazakh."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сағаттағы «Тіл» бөлімінен сөйлейтін тіліңізді таңдаңыз. «Сөйлеу» түймесі AI Reply арқылы орыс, ағылшын және қазақ тілдерін түсінеді. «Теру не айтып жазу» ішіндегі Apple диктовкасында қазақ тілі жоқ."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Выберите язык речи в пункте «Язык» на часах. Кнопка «Говорить» понимает русский, английский и казахский через AI Reply. Диктовка Apple в пункте «Ввести или надиктовать» казахский не поддерживает."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Soatdagi «Til» bo‘limida gapiradigan tilingizni tanlang. «Gapirish» tugmasi AI Reply orqali rus, ingliz va qozoq tillarini tushunadi. «Yozish yoki aytib yozdirish»dagi Apple diktovkasida qozoq tili yo‘q."
+          }
+        }
+      }
+    },
+    "watchHelp.paste" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS asks to allow pasting"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS қоюға рұқсат сұрайды"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS спрашивает разрешение на вставку"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS joylashga ruxsat so‘rayapti"
+          }
+        }
+      }
+    },
+    "watchHelp.paste.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That is iOS protecting what you copied. Tap Allow Paste, or go to Settings ▸ AI Reply ▸ Paste from Other Apps and choose Allow to stop being asked."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Осылай iOS көшірілгенді қорғайды. «Қоюға рұқсат беру» түймесін басыңыз немесе сұрақ шықпауы үшін Баптаулар ▸ AI Reply ▸ Басқа қолданбалардан қою бөлімінде «Рұқсат беру» таңдаңыз."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Так iOS защищает скопированное. Нажмите «Разрешить вставку» или откройте Настройки ▸ AI Reply ▸ Вставка из других приложений и выберите «Разрешить», чтобы вопрос больше не появлялся."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS nusxalangan matnni shunday himoya qiladi. «Joylashga ruxsat berish»ni bosing yoki savol chiqmasligi uchun Sozlamalar ▸ AI Reply ▸ Boshqa ilovalardan joylash bo‘limida «Ruxsat berish»ni tanlang."
+          }
+        }
+      }
+    },
+    "watchHelp.unavailable" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The watch does not respond"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сағат жауап бермейді"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Часы не отвечают"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Soat javob bermayapti"
+          }
+        }
+      }
+    },
+    "watchHelp.unavailable.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wear the watch unlocked and keep AI Reply open on it. iOS does not let the iPhone open the watch app for you."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сағатты тағып, құлпын ашып, AI Reply-ды ашық ұстаңыз. iOS iPhone-ға сағаттағы қолданбаны ашуға мүмкіндік бермейді."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Наденьте часы, разблокируйте их и держите AI Reply открытым. iOS не позволяет iPhone открыть приложение на часах за вас."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Soatni taqing, qulfdan chiqaring va AI Reply’ni ochiq saqlang. iOS iPhone’ga soatdagi ilovani ochishga ruxsat bermaydi."
+          }
+        }
+      }
+    },
+    "watchSettings.autoInsert" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Insert automatically"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Автоматты кірістіру"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вставлять автоматически"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avtomatik kiritish"
+          }
+        }
+      }
+    },
+    "watchSettings.autoInsert.footer" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The reply goes into the field by itself only when it is the same empty field you started in. Otherwise the keyboard offers Insert Response. AI Reply never presses Send."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Жауап тек сіз бастаған бос өріс болса ғана өзі кірістіріледі. Әйтпесе пернетақта «Жауапты кірістіру» батырмасын ұсынады. AI Reply ешқашан «Жіберу» батырмасын баспайды."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ответ вставляется сам, только если это то же пустое поле, в котором вы начали. Иначе клавиатура предложит «Вставить ответ». AI Reply никогда не нажимает «Отправить»."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Javob faqat siz boshlagan bo‘sh maydon bo‘lsagina o‘zi kiritiladi. Aks holda klaviatura «Javobni kiritish» tugmasini taklif qiladi. AI Reply hech qachon «Yuborish»ni bosmaydi."
+          }
+        }
+      }
+    },
+    "watchSettings.companion" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Watch app"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сағаттағы қолданба"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Приложение на часах"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Soatdagi ilova"
+          }
+        }
+      }
+    },
+    "watchSettings.connection" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connection"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Байланыс"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Связь"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aloqa"
+          }
+        }
+      }
+    },
+    "watchSettings.features" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What it does"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не істей алады"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Что умеет"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nimalar qila oladi"
+          }
+        }
+      }
+    },
+    "watchSettings.features.languages" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Russian, English and Kazakh, recognized by AI Reply"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Орыс, ағылшын және қазақ тілдерін AI Reply таниды"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Русский, английский и казахский, распознаёт AI Reply"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rus, ingliz va qozoq tillarini AI Reply taniydi"
+          }
+        }
+      }
+    },
+    "watchSettings.features.modes" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reply to a copied message, write a new one, rewrite, shorten or expand"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Көшірілгенге жауап, жаңа хабарлама, қайта жазу, қысқарту немесе кеңейту"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ответ на скопированное, новое сообщение, переписать, сократить или расширить"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nusxalanganga javob, yangi xabar, qayta yozish, qisqartirish yoki kengaytirish"
+          }
+        }
+      }
+    },
+    "watchSettings.features.never" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You read it and send it yourself"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тексеріп, өзіңіз жібересіз"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Проверяете и отправляете вы сами"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tekshirib, o‘zingiz yuborasiz"
+          }
+        }
+      }
+    },
+    "watchSettings.features.voice" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Say on your watch what to answer: the reply appears in the AI Reply keyboard"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сағатта не жауап беру керегін айтыңыз, жауап AI Reply пернетақтасында шығады"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скажите на часах, что ответить, и ответ появится в клавиатуре AI Reply"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Soatda nima deb javob berishni ayting, javob AI Reply klaviaturasida chiqadi"
+          }
+        }
+      }
+    },
+    "watchSettings.fullAccess" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Full Access"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Толық рұқсат"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Полный доступ"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To‘liq ruxsat"
+          }
+        }
+      }
+    },
+    "watchSettings.guide" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "How to set it up"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Қалай баптау керек"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Как настроить"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qanday sozlash kerak"
+          }
+        }
+      }
+    },
+    "watchSettings.help" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If something does not work"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Бірдеңе істемесе"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Если что-то не работает"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Biror narsa ishlamasa"
+          }
+        }
+      }
+    },
+    "watchSettings.keyboard" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply keyboard"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply пернетақтасы"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Клавиатура AI Reply"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply klaviaturasi"
+          }
+        }
+      }
+    },
+    "watchSettings.pairing" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pairing"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Жұптау"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сопряжение"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Juftlash"
+          }
+        }
+      }
+    },
+    "watchSettings.paste" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paste from Other Apps"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Басқа қолданбалардан қою"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вставка из других приложений"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Boshqa ilovalardan joylash"
+          }
+        }
+      }
+    },
+    "watchSettings.paste.footer" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When AI Reply reads the copied message, iOS may ask to allow pasting. To answer from your wrist without tapping the iPhone, set this to Allow for AI Reply."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply көшірілгенді оқығанда iOS қоюға рұқсат сұрауы мүмкін. Сағаттан iPhone-ға тимей жауап беру үшін AI Reply-ға қоюға рұқсат беріңіз."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Когда AI Reply читает скопированное, iOS может спросить разрешение на вставку. Чтобы отвечать с часов, не трогая iPhone, разрешите вставку для AI Reply."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply nusxalanganni o‘qiganda iOS joylashga ruxsat so‘rashi mumkin. Soatdan iPhone’ga tegmasdan javob berish uchun AI Reply’ga ruxsat bering."
+          }
+        }
+      }
+    },
+    "watchSettings.privacy" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Microphone and privacy"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Микрофон және құпиялылық"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Микрофон и приватность"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mikrofon va maxfiylik"
+          }
+        }
+      }
+    },
+    "watchSettings.privacy.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The watch asks for the microphone the first time you tap Speak, and records only between Speak and Stop. Through your iPhone the recording goes to the AI Reply server and OpenAI to be turned into text; it is not stored. Your Apple Watch is not a separate device on your plan: it works through this iPhone."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сағат «Сөйлеу» батырмасын алғаш басқанда микрофонға рұқсат сұрайды және тек «Сөйлеу» мен «Тоқтату» аралығында жазады. Жазба iPhone арқылы мәтінге айналу үшін AI Reply серверіне және OpenAI-ға жіберіледі, сақталмайды. Apple Watch тарифте бөлек құрылғы болып есептелмейді: ол осы iPhone арқылы жұмыс істейді."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Часы спросят разрешение на микрофон при первом нажатии «Говорить» и записывают только между «Говорить» и «Стоп». Через iPhone запись идёт на сервер AI Reply и в OpenAI, чтобы превратиться в текст, и не сохраняется. Apple Watch не считается отдельным устройством тарифа: часы работают через этот iPhone."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Soat «Gapirish»ni birinchi bosganingizda mikrofonga ruxsat so‘raydi va faqat «Gapirish» bilan «To‘xtatish» orasida yozib oladi. Yozuv iPhone orqali matnga aylantirish uchun AI Reply serveriga va OpenAI’ga yuboriladi va saqlanmaydi. Apple Watch tarifda alohida qurilma hisoblanmaydi: u shu iPhone orqali ishlaydi."
+          }
+        }
+      }
+    },
+    "watchSettings.status" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Status"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Күйі"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Состояние"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Holat"
+          }
+        }
+      }
+    },
+    "watchSettings.test" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test connection"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Байланысты тексеру"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Проверить связь"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aloqani tekshirish"
+          }
+        }
+      }
+    },
+    "watchSettings.test.failed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No answer. Open AI Reply on Apple Watch and try again."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Жауап жоқ. Сағатта AI Reply ашып, қайталап көріңіз."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нет ответа. Откройте AI Reply на часах и попробуйте снова."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Javob yo‘q. Soatda AI Reply’ni ochib, qayta urinib ko‘ring."
+          }
+        }
+      }
+    },
+    "watchSettings.test.ok %lld" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Watch answered in %lld ms"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сағат %lld мс ішінде жауап берді"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Часы ответили за %lld мс"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Soat %lld ms ichida javob berdi"
+          }
+        }
+      }
+    },
+    "watchSettings.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Watch Integration"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Watch интеграциясы"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Интеграция с Apple Watch"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Watch integratsiyasi"
+          }
+        }
+      }
+    },
+    "watchSettings.value.checking" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Checking…"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тексерілуде…"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Проверяю…"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tekshirilmoqda…"
+          }
+        }
+      }
+    },
+    "watchSettings.value.connected" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connected"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Қосылған"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Подключено"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ulangan"
+          }
+        }
+      }
+    },
+    "watchSettings.value.installed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installed"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Орнатылған"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Установлено"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O‘rnatilgan"
+          }
+        }
+      }
+    },
+    "watchSettings.value.notInstalled" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not installed"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Орнатылмаған"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не установлено"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O‘rnatilmagan"
+          }
+        }
+      }
+    },
+    "watchSettings.value.notOpen" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open AI Reply on Watch"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сағатта AI Reply ашыңыз"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Откройте AI Reply на часах"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Soatda AI Reply’ni oching"
+          }
+        }
+      }
+    },
+    "watchSettings.value.notPaired" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No Apple Watch paired"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Watch жұпталмаған"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Часы не сопряжены"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Watch juftlanmagan"
+          }
+        }
+      }
+    },
+    "watchSettings.value.off" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Off"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Өшірулі"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Выключено"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O‘chirilgan"
+          }
+        }
+      }
+    },
+    "watchSettings.value.on" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Қосулы"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Включено"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yoqilgan"
+          }
+        }
+      }
+    },
+    "watchSettings.value.paired" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paired"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Жұпталған"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сопряжены"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Juftlangan"
+          }
+        }
+      }
+    },
+    "watchSettings.value.unavailable" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unavailable"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Қолжетімсіз"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Недоступно"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mavjud emas"
+          }
+        }
+      }
+    },
+    "watchSettings.value.unknown" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not confirmed yet"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Әлі расталмаған"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пока не подтверждено"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hali tasdiqlanmagan"
+          }
+        }
+      }
+    },
+    "watchSettings.value.unsupported" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not supported here"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Мұнда қолжетімсіз"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Здесь не поддерживается"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu yerda ishlamaydi"
+          }
+        }
+      }
+    },
     "·" : {
       "comment" : "A period.",
       "isCommentAutoGenerated" : true

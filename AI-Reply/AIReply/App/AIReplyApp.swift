@@ -214,6 +214,8 @@ enum DebugScreen: String {
     /// «Чат с оператором» over sample messages; `-AIReplyDebugChat empty`
     /// shows a chat with none yet.
     case support
+    /// Settings ▸ Apple Watch.
+    case watch
 
     static var requested: DebugScreen? {
         let arguments = CommandLine.arguments
@@ -260,6 +262,7 @@ private struct DebugScreenHost: View {
         // The router's own stack, so `-AIReplyOpenLink` can be tried here.
         case .home:      RootNavigationView()
         case .settings:  NavigationStack { SettingsView() }
+        case .watch:     NavigationStack { AppleWatchSettingsView() }
         case .notifications: NavigationStack { SettingsView(focus: .notifications) }
         case .profile:   NavigationStack { ProfileEditorView() }
         case .templates: NavigationStack { TemplateEditorView(templateID: "client") }

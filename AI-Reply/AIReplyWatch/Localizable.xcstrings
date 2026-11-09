@@ -1,1949 +1,1949 @@
 {
-  "sourceLanguage": "en",
-  "strings": {
-    "watch.cancel": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cancel"
+  "sourceLanguage" : "en",
+  "strings" : {
+    "watch.cancel" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Отмена"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Отмена"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Бас тарту"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Бас тарту"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bekor qilish"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bekor qilish"
           }
         }
       }
     },
-    "watch.clear": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Clear"
+    "watch.clear" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Очистить"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Очистить"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Тазарту"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тазарту"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tozalash"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tozalash"
           }
         }
       }
     },
-    "watch.completed.inserted": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Inserted on iPhone. Review it and send"
+    "watch.completed.inserted" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inserted on iPhone. Review it and send"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Вставлено на iPhone. Проверьте и отправьте"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вставлено на iPhone. Проверьте и отправьте"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iPhone-ға кірістірілді. Тексеріп, жіберіңіз"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone-ға кірістірілді. Тексеріп, жіберіңіз"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iPhone’ga kiritildi. Tekshirib, yuboring"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone’ga kiritildi. Tekshirib, yuboring"
           }
         }
       }
     },
-    "watch.completed.ready": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Response ready on iPhone"
+    "watch.completed.ready" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Response ready on iPhone"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ответ готов на iPhone"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ответ готов на iPhone"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Жауап iPhone-да дайын"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Жауап iPhone-да дайын"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Javob iPhone’da tayyor"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Javob iPhone’da tayyor"
           }
         }
       }
     },
-    "watch.connection.connected": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Connected"
+    "watch.connection.connected" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connected"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Подключено"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Подключено"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Қосылған"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Қосылған"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ulangan"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ulangan"
           }
         }
       }
     },
-    "watch.connection.unavailable": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iPhone unavailable"
+    "watch.connection.unavailable" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone unavailable"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iPhone недоступен"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone недоступен"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iPhone қолжетімсіз"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone қолжетімсіз"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iPhone mavjud emas"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone mavjud emas"
           }
         }
       }
     },
-    "watch.done": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Done"
+    "watch.done" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Готово"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Готово"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Дайын"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Дайын"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tayyor"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tayyor"
           }
         }
       }
     },
-    "watch.failure.consent": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Open AI Reply on iPhone to accept the terms"
+    "watch.failure.consent" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open AI Reply on iPhone to accept the terms"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Откройте AI Reply на iPhone и примите условия"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Откройте AI Reply на iPhone и примите условия"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iPhone-да AI Reply-ды ашып, шарттарды қабылдаңыз"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone-да AI Reply-ды ашып, шарттарды қабылдаңыз"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iPhone’da AI Reply’ni ochib, shartlarni qabul qiling"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone’da AI Reply’ni ochib, shartlarni qabul qiling"
           }
         }
       }
     },
-    "watch.failure.copiedTooLong": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The copied message is too long"
+    "watch.failure.copiedTooLong" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The copied message is too long"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Скопированное сообщение слишком длинное"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скопированное сообщение слишком длинное"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Көшірілген хабарлама тым ұзын"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Көшірілген хабарлама тым ұзын"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nusxalangan xabar juda uzun"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nusxalangan xabar juda uzun"
           }
         }
       }
     },
-    "watch.failure.copiedUnreadable": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iOS did not allow reading the copied message. Open the keyboard on iPhone"
+    "watch.failure.copiedUnreadable" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS did not allow reading the copied message. Open the keyboard on iPhone"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iOS не разрешила прочитать скопированное. Откройте клавиатуру на iPhone"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS не разрешила прочитать скопированное. Откройте клавиатуру на iPhone"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iOS көшірілгенді оқуға рұқсат бермеді. iPhone-да пернетақтаны ашыңыз"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS көшірілгенді оқуға рұқсат бермеді. iPhone-да пернетақтаны ашыңыз"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iOS nusxalanganni o‘qishga ruxsat bermadi. iPhone’da klaviaturani oching"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS nusxalanganni o‘qishga ruxsat bermadi. iPhone’da klaviaturani oching"
           }
         }
       }
     },
-    "watch.failure.expired": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The instruction is too old. Say it again"
+    "watch.failure.expired" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The instruction is too old. Say it again"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Указание устарело, скажите ещё раз"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Указание устарело, скажите ещё раз"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Нұсқау ескірді, қайта айтыңыз"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нұсқау ескірді, қайта айтыңыз"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ko‘rsatma eskirdi, qayta ayting"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ko‘rsatma eskirdi, qayta ayting"
           }
         }
       }
     },
-    "watch.failure.fullAccess": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Turn on Full Access for the AI Reply keyboard"
+    "watch.failure.fullAccess" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on Full Access for the AI Reply keyboard"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Включите полный доступ для клавиатуры AI Reply"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Включите полный доступ для клавиатуры AI Reply"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "AI Reply пернетақтасына толық рұқсатты қосыңыз"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply пернетақтасына толық рұқсатты қосыңыз"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "AI Reply klaviaturasi uchun to‘liq ruxsatni yoqing"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply klaviaturasi uchun to‘liq ruxsatni yoqing"
           }
         }
       }
     },
-    "watch.failure.instructionTooLong": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The instruction is too long"
+    "watch.failure.instructionTooLong" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The instruction is too long"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Указание слишком длинное"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Указание слишком длинное"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Нұсқау тым ұзын"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нұсқау тым ұзын"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ko‘rsatma juda uzun"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ko‘rsatma juda uzun"
           }
         }
       }
     },
-    "watch.failure.invalid": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "This instruction could not be used"
+    "watch.failure.invalid" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This instruction could not be used"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Это указание нельзя использовать"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Это указание нельзя использовать"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Бұл нұсқауды пайдалану мүмкін емес"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Бұл нұсқауды пайдалану мүмкін емес"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bu ko‘rsatmani ishlatib bo‘lmaydi"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu ko‘rsatmani ishlatib bo‘lmaydi"
           }
         }
       }
     },
-    "watch.failure.microphone": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Allow the microphone for AI Reply in Watch Settings"
+    "watch.failure.microphone" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow the microphone for AI Reply in Watch Settings"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Разрешите микрофон для AI Reply в настройках часов"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Разрешите микрофон для AI Reply в настройках часов"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Сағат баптауларында AI Reply-ға микрофонға рұқсат беріңіз"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сағат баптауларында AI Reply-ға микрофонға рұқсат беріңіз"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Soat sozlamalarida AI Reply uchun mikrofonga ruxsat bering"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Soat sozlamalarida AI Reply uchun mikrofonga ruxsat bering"
           }
         }
       }
     },
-    "watch.failure.monthlyQuota": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "This month's replies are used up"
+    "watch.failure.monthlyQuota" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This month's replies are used up"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ответы на этот месяц закончились"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ответы на этот месяц закончились"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Осы айдағы жауаптар бітті"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Осы айдағы жауаптар бітті"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bu oylik javoblar tugadi"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu oylik javoblar tugadi"
           }
         }
       }
     },
-    "watch.failure.nothingHeard": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nothing was heard. Try again"
+    "watch.failure.nothingHeard" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing was heard. Try again"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ничего не услышал, попробуйте ещё раз"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ничего не услышал, попробуйте ещё раз"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ештеңе естілмеді, қайталап көріңіз"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ештеңе естілмеді, қайталап көріңіз"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Hech narsa eshitilmadi, qayta urinib ko‘ring"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hech narsa eshitilmadi, qayta urinib ko‘ring"
           }
         }
       }
     },
-    "watch.failure.nothingToRewrite": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nothing to rewrite. Type or select text in the field"
+    "watch.failure.nothingToRewrite" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing to rewrite. Type or select text in the field"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Нечего переписывать. Введите или выделите текст в поле"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нечего переписывать. Введите или выделите текст в поле"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Қайта жазатын мәтін жоқ. Өрісте мәтін теріңіз не белгілеңіз"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Қайта жазатын мәтін жоқ. Өрісте мәтін теріңіз не белгілеңіз"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Qayta yoziladigan matn yo‘q. Maydonda matn yozing yoki belgilang"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qayta yoziladigan matn yo‘q. Maydonda matn yozing yoki belgilang"
           }
         }
       }
     },
-    "watch.failure.offline": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No internet on iPhone"
+    "watch.failure.offline" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No internet on iPhone"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "На iPhone нет интернета"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "На iPhone нет интернета"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iPhone-да интернет жоқ"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone-да интернет жоқ"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iPhone’da internet yo‘q"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone’da internet yo‘q"
           }
         }
       }
     },
-    "watch.failure.phone": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iPhone is unavailable. Check the connection"
+    "watch.failure.phone" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone is unavailable. Check the connection"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iPhone недоступен, проверьте связь"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone недоступен, проверьте связь"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iPhone қолжетімсіз, байланысты тексеріңіз"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone қолжетімсіз, байланысты тексеріңіз"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iPhone mavjud emas, aloqani tekshiring"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone mavjud emas, aloqani tekshiring"
           }
         }
       }
     },
-    "watch.failure.quota": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Today's replies are used up"
+    "watch.failure.quota" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Today's replies are used up"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ответы на сегодня закончились"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ответы на сегодня закончились"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Бүгінгі жауаптар бітті"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Бүгінгі жауаптар бітті"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bugungi javoblar tugadi"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bugungi javoblar tugadi"
           }
         }
       }
     },
-    "watch.failure.rateLimited": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Too many requests. Try in a moment"
+    "watch.failure.rateLimited" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Too many requests. Try in a moment"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Слишком много запросов, подождите немного"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Слишком много запросов, подождите немного"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Сұраныс тым көп, сәл күтіңіз"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сұраныс тым көп, сәл күтіңіз"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "So‘rovlar juda ko‘p, biroz kuting"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "So‘rovlar juda ko‘p, biroz kuting"
           }
         }
       }
     },
-    "watch.failure.service": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "AI Reply is unavailable. Try again"
+    "watch.failure.service" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply is unavailable. Try again"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "AI Reply недоступен, попробуйте ещё раз"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply недоступен, попробуйте ещё раз"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "AI Reply қолжетімсіз, қайталап көріңіз"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply қолжетімсіз, қайталап көріңіз"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "AI Reply mavjud emas, qayta urinib ko‘ring"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply mavjud emas, qayta urinib ko‘ring"
           }
         }
       }
     },
-    "watch.failure.signIn": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sign in to AI Reply on iPhone"
+    "watch.failure.signIn" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sign in to AI Reply on iPhone"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Войдите в AI Reply на iPhone"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Войдите в AI Reply на iPhone"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iPhone-да AI Reply-ға кіріңіз"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone-да AI Reply-ға кіріңіз"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iPhone’da AI Reply’ga kiring"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone’da AI Reply’ga kiring"
           }
         }
       }
     },
-    "watch.failure.storage": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Could not save on iPhone. Try again"
+    "watch.failure.storage" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not save on iPhone. Try again"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Не удалось сохранить на iPhone, попробуйте ещё раз"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось сохранить на iPhone, попробуйте ещё раз"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iPhone-да сақталмады, қайталап көріңіз"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone-да сақталмады, қайталап көріңіз"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iPhone’da saqlab bo‘lmadi, qayta urinib ko‘ring"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone’da saqlab bo‘lmadi, qayta urinib ko‘ring"
           }
         }
       }
     },
-    "watch.failure.timedOut": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The response took too long"
+    "watch.failure.timedOut" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The response took too long"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ответ не пришёл вовремя"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ответ не пришёл вовремя"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Жауап уақытында келмеді"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Жауап уақытында келмеді"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Javob o‘z vaqtida kelmadi"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Javob o‘z vaqtida kelmadi"
           }
         }
       }
     },
-    "watch.failure.transcription": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Could not recognize speech. Try again"
+    "watch.failure.transcription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not recognize speech. Try again"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Не удалось распознать речь, попробуйте ещё раз"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось распознать речь, попробуйте ещё раз"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Дауыс танылмады, қайталап көріңіз"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Дауыс танылмады, қайталап көріңіз"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nutqni tanib bo‘lmadi, qayta urinib ko‘ring"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nutqni tanib bo‘lmadi, qayta urinib ko‘ring"
           }
         }
       }
     },
-    "watch.failure.transcriptionUnavailable": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Speech recognition is off on the server. Type instead"
+    "watch.failure.transcriptionUnavailable" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speech recognition is off on the server. Type instead"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Распознавание речи отключено на сервере. Введите текстом"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Распознавание речи отключено на сервере. Введите текстом"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Серверде дауысты тану өшірулі. Мәтінмен теріңіз"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Серверде дауысты тану өшірулі. Мәтінмен теріңіз"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Serverda nutqni tanish o‘chirilgan. Matn yozing"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Serverda nutqni tanish o‘chirilgan. Matn yozing"
           }
         }
       }
     },
-    "watch.failure.update": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Update AI Reply on iPhone and Watch"
+    "watch.failure.update" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Update AI Reply on iPhone and Watch"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Обновите AI Reply на iPhone и часах"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Обновите AI Reply на iPhone и часах"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iPhone мен сағаттағы AI Reply-ды жаңартыңыз"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone мен сағаттағы AI Reply-ды жаңартыңыз"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iPhone va soatdagi AI Reply’ni yangilang"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone va soatdagi AI Reply’ni yangilang"
           }
         }
       }
     },
-    "watch.failure.voiceLimit": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Today's voice limit is used up"
+    "watch.failure.voiceLimit" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Today's voice limit is used up"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Лимит голоса на сегодня исчерпан"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Лимит голоса на сегодня исчерпан"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Бүгінгі дауыс шегі бітті"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Бүгінгі дауыс шегі бітті"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bugungi ovoz limiti tugadi"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bugungi ovoz limiti tugadi"
           }
         }
       }
     },
-    "watch.generating": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Generating response…"
+    "watch.generating" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Generating response…"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Создаю ответ…"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Создаю ответ…"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Жауап дайындалуда…"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Жауап дайындалуда…"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Javob tayyorlanmoqda…"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Javob tayyorlanmoqda…"
           }
         }
       }
     },
-    "watch.kazakhNeedsServer": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Kazakh speech needs your iPhone and the AI Reply server. You can type instead."
+    "watch.kazakhNeedsServer" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kazakh speech needs your iPhone and the AI Reply server. You can type instead."
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Для казахской речи нужны iPhone и сервер AI Reply. Можно ввести текстом."
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Для казахской речи нужны iPhone и сервер AI Reply. Можно ввести текстом."
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Қазақша сөйлеу үшін iPhone мен AI Reply сервері керек. Мәтінмен теруге болады."
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Қазақша сөйлеу үшін iPhone мен AI Reply сервері керек. Мәтінмен теруге болады."
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Qozoqcha nutq uchun iPhone va AI Reply serveri kerak. Matn yozsangiz ham bo‘ladi."
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qozoqcha nutq uchun iPhone va AI Reply serveri kerak. Matn yozsangiz ham bo‘ladi."
           }
         }
       }
     },
-    "watch.language": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Language"
+    "watch.language" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Language"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Язык"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Язык"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Тіл"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тіл"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Til"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Til"
           }
         }
       }
     },
-    "watch.length": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Length"
+    "watch.length" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Length"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Длина"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Длина"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ұзындығы"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ұзындығы"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Uzunlik"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uzunlik"
           }
         }
       }
     },
-    "watch.length.auto": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "As in template"
+    "watch.length.auto" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As in template"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Как в шаблоне"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Как в шаблоне"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Үлгідегідей"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Үлгідегідей"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Shablondagidek"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shablondagidek"
           }
         }
       }
     },
-    "watch.length.long": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Long"
+    "watch.length.long" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Long"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Длинный"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Длинный"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ұзын"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ұзын"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Uzun"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uzun"
           }
         }
       }
     },
-    "watch.length.medium": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Medium"
+    "watch.length.medium" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Medium"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Средний"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Средний"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Орташа"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Орташа"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "O‘rtacha"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O‘rtacha"
           }
         }
       }
     },
-    "watch.length.short": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Short"
+    "watch.length.short" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Short"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Короткий"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Короткий"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Қысқа"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Қысқа"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Qisqa"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qisqa"
           }
         }
       }
     },
-    "watch.listening": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Listening…"
+    "watch.listening" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Listening…"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Слушаю…"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Слушаю…"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Тыңдап тұрмын…"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тыңдап тұрмын…"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tinglayapman…"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tinglayapman…"
           }
         }
       }
     },
-    "watch.listening.seconds %lld": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld seconds"
+    "watch.listening.seconds %lld" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld seconds"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld сек"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld сек"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld сек"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld сек"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld soniya"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld soniya"
           }
         }
       }
     },
-    "watch.mode": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mode"
+    "watch.mode" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mode"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Режим"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Режим"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Режим"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Режим"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Rejim"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rejim"
           }
         }
       }
     },
-    "watch.mode.expand": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Expand"
+    "watch.mode.expand" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Expand"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Расширить"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Расширить"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Кеңейту"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Кеңейту"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Kengaytirish"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kengaytirish"
           }
         }
       }
     },
-    "watch.mode.new": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "New message"
+    "watch.mode.new" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New message"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Новое сообщение"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Новое сообщение"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Жаңа хабарлама"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Жаңа хабарлама"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Yangi xabar"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yangi xabar"
           }
         }
       }
     },
-    "watch.mode.reply": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Reply to copied"
+    "watch.mode.reply" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reply to copied"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ответ на скопированное"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ответ на скопированное"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Көшірілгенге жауап"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Көшірілгенге жауап"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nusxalanganga javob"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nusxalanganga javob"
           }
         }
       }
     },
-    "watch.mode.rewrite": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Rewrite"
+    "watch.mode.rewrite" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rewrite"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Переписать"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Переписать"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Қайта жазу"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Қайта жазу"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Qayta yozish"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qayta yozish"
           }
         }
       }
     },
-    "watch.mode.shorten": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Shorten"
+    "watch.mode.shorten" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shorten"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Сократить"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сократить"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Қысқарту"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Қысқарту"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Qisqartirish"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qisqartirish"
           }
         }
       }
     },
-    "watch.processing": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Processing…"
+    "watch.processing" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Processing…"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Обрабатываю…"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Обрабатываю…"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Өңделуде…"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Өңделуде…"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Qayta ishlanmoqda…"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qayta ishlanmoqda…"
           }
         }
       }
     },
-    "watch.queued": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Will be delivered when iPhone is reachable"
+    "watch.queued" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Will be delivered when iPhone is reachable"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Доставится, когда iPhone будет доступен"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Доставится, когда iPhone будет доступен"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iPhone қолжетімді болғанда жеткізіледі"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone қолжетімді болғанда жеткізіледі"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iPhone mavjud bo‘lganda yetkaziladi"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone mavjud bo‘lganda yetkaziladi"
           }
         }
       }
     },
-    "watch.recent": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Recent result"
+    "watch.recent" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recent result"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Последний результат"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Последний результат"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Соңғы нәтиже"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Соңғы нәтиже"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "So‘nggi natija"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "So‘nggi natija"
           }
         }
       }
     },
-    "watch.responseLanguage": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Write in"
+    "watch.responseLanguage" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Write in"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Писать на"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Писать на"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Жазу тілі"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Жазу тілі"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Yozish tili"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yozish tili"
           }
         }
       }
     },
-    "watch.responseLanguage.auto": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Auto"
+    "watch.responseLanguage.auto" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Авто"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Авто"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Авто"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Авто"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Avto"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avto"
           }
         }
       }
     },
-    "watch.result.unavailable": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The text is on your iPhone"
+    "watch.result.unavailable" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The text is on your iPhone"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Текст на iPhone"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Текст на iPhone"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Мәтін iPhone-да"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Мәтін iPhone-да"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Matn iPhone’da"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Matn iPhone’da"
           }
         }
       }
     },
-    "watch.retry": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Retry"
+    "watch.retry" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retry"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Повторить"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Повторить"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Қайталау"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Қайталау"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Qayta urinish"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qayta urinish"
           }
         }
       }
     },
-    "watch.review.placeholder": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Your instruction"
+    "watch.review.placeholder" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your instruction"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ваше указание"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ваше указание"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Нұсқауыңыз"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нұсқауыңыз"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ko‘rsatmangiz"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ko‘rsatmangiz"
           }
         }
       }
     },
-    "watch.send": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Send"
+    "watch.send" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Отправить"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Отправить"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Жіберу"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Жіберу"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Yuborish"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yuborish"
           }
         }
       }
     },
-    "watch.sending": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sending…"
+    "watch.sending" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sending…"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Отправляю…"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Отправляю…"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Жіберілуде…"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Жіберілуде…"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Yuborilmoqda…"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yuborilmoqda…"
           }
         }
       }
     },
-    "watch.sent": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Instruction sent to iPhone"
+    "watch.sent" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Instruction sent to iPhone"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Указание отправлено на iPhone"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Указание отправлено на iPhone"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Нұсқау iPhone-ға жіберілді"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нұсқау iPhone-ға жіберілді"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ko‘rsatma iPhone’ga yuborildi"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ko‘rsatma iPhone’ga yuborildi"
           }
         }
       }
     },
-    "watch.speak": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Speak"
+    "watch.speak" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speak"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Говорить"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Говорить"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Сөйлеу"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сөйлеу"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Gapirish"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gapirish"
           }
         }
       }
     },
-    "watch.stop": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Stop"
+    "watch.stop" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stop"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Стоп"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Стоп"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Тоқтату"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тоқтату"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "To‘xtatish"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To‘xtatish"
           }
         }
       }
     },
-    "watch.template": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Template"
+    "watch.template" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Template"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Шаблон"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Шаблон"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Үлгі"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Үлгі"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Shablon"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shablon"
           }
         }
       }
     },
-    "watch.template.auto": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "As on iPhone"
+    "watch.template.auto" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As on iPhone"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Как на iPhone"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Как на iPhone"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iPhone-дағыдай"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone-дағыдай"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iPhone’dagidek"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone’dagidek"
           }
         }
       }
     },
-    "watch.template.keyboard %@": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ (keyboard)"
+    "watch.template.keyboard %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ (keyboard)"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ (клавиатура)"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ (клавиатура)"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ (пернетақта)"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ (пернетақта)"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ (klaviatura)"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ (klaviatura)"
           }
         }
       }
     },
-    "watch.tooLong %lld": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Too long. Limit: %lld characters"
+    "watch.tooLong %lld" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Too long. Limit: %lld characters"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Слишком длинно. Лимит: %lld символов"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Слишком длинно. Лимит: %lld символов"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Тым ұзын. Шегі: %lld таңба"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тым ұзын. Шегі: %lld таңба"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Juda uzun. Cheklov: %lld belgi"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Juda uzun. Cheklov: %lld belgi"
           }
         }
       }
     },
-    "watch.type": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Type"
+    "watch.type" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Type"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ввести текстом"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ввести текстом"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Мәтінмен теру"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Мәтінмен теру"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Matn yozish"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Matn yozish"
           }
         }
       }
     },
-    "watch.typeOrDictate": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Type or dictate"
+    "watch.typeOrDictate" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Type or dictate"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ввести или надиктовать"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ввести или надиктовать"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Теру не айтып жазу"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Теру не айтып жазу"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Yozish yoki aytib yozdirish"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yozish yoki aytib yozdirish"
           }
         }
       }
     },
-    "watch.viewResult": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "View result"
+    "watch.viewResult" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View result"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Показать результат"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Показать результат"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Нәтижені көру"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нәтижені көру"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Natijani ko‘rish"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Natijani ko‘rish"
           }
         }
       }
     },
-    "watch.waitingKeyboard": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Saved on iPhone. Open the AI Reply keyboard"
+    "watch.waitingKeyboard" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved on iPhone. Open the AI Reply keyboard"
           }
         },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Сохранено на iPhone. Откройте клавиатуру AI Reply"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сохранено на iPhone. Откройте клавиатуру AI Reply"
           }
         },
-        "kk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iPhone-да сақталды. AI Reply пернетақтасын ашыңыз"
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone-да сақталды. AI Reply пернетақтасын ашыңыз"
           }
         },
-        "uz": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iPhone’da saqlandi. AI Reply klaviaturasini oching"
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone’da saqlandi. AI Reply klaviaturasini oching"
           }
         }
       }
     }
   },
-  "version": "1.1"
+  "version" : "1.1"
 }

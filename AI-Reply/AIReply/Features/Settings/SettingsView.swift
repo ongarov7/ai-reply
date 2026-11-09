@@ -80,6 +80,12 @@ struct SettingsView: View {
             }
 
             Section {
+                NavigationLink { AppleWatchSettingsView() } label: {
+                    Label("watchSettings.title", systemImage: "applewatch")
+                }
+            }
+
+            Section {
                 ForEach(KeyboardLanguage.cycleOrder, id: \.self) { language in
                     Toggle(language.nativeName, isOn: layoutBinding(language))
                         .disabled(settings.keyboardLanguages == [language])
