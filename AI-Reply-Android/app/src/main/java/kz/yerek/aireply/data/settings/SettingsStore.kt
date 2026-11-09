@@ -225,6 +225,10 @@ class SettingsStore internal constructor(
             }.apply()
         }
 
+    var cachedUnlimited: Boolean
+        get() = account().getBoolean(KEY_USAGE_UNLIMITED, false)
+        set(value) = account().edit().putBoolean(KEY_USAGE_UNLIMITED, value).apply()
+
     var cachedPlanCode: String?
         get() = account().getString(KEY_USAGE_PLAN, null)
         set(value) {
@@ -241,6 +245,7 @@ class SettingsStore internal constructor(
             .remove(KEY_USAGE_USED)
             .remove(KEY_USAGE_REMAINING)
             .remove(KEY_USAGE_TOTAL)
+            .remove(KEY_USAGE_UNLIMITED)
             .remove(KEY_USAGE_PLAN)
             .apply()
     }
@@ -252,6 +257,7 @@ class SettingsStore internal constructor(
             .remove(KEY_USAGE_USED)
             .remove(KEY_USAGE_REMAINING)
             .remove(KEY_USAGE_TOTAL)
+            .remove(KEY_USAGE_UNLIMITED)
             .remove(KEY_USAGE_PLAN)
             .apply()
     }
@@ -422,6 +428,7 @@ class SettingsStore internal constructor(
         const val KEY_USAGE_REMAINING = "account.usage.remainingToday"
         const val KEY_USAGE_PLAN = "account.usage.planCode"
         const val KEY_USAGE_TOTAL = "account.usage.remainingTotal"
+        const val KEY_USAGE_UNLIMITED = "account.usage.unlimited"
 
         val ACCOUNT_KEYS = setOf(
             KEY_ACCESS_EXPIRY, KEY_ACCOUNT_IDENTIFIER, KEY_ACCOUNT_DEVICE,

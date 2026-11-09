@@ -47,9 +47,16 @@ data class BalanceSummary(
         fun of(usage: UsageDto, cached: AccountUsageCache.Snapshot? = null, now: Instant = Instant.now()): BalanceSummary {
             val total = usage.remainingTotal
             if (total == null) {
+                // A server that does not send the balance: the plan's own day.
+                if (usage.isKnown) return NONE.copy(availableNow = usage.remainingToday.coerceAtLeast(0), unlimited = usage.unlimited)
                 // Before the server's first answer, the last known total renders at once.
                 val cachedTotal = cached?.remainingTotal
-                return if (!usage.isKnown && cachedTotal != null) NONE.copy(hasBalance = true, availableNow = cachedTotal) else NONE
+                val cachedUnlimited = cached?.unlimited == true
+                return if (cachedTotal != null || cachedUnlimited) {
+                    NONE.copy(hasBalance = true, availableNow = cachedTotal ?: 0, unlimited = cachedUnlimited)
+                } else {
+                    NONE
+                }
             }
             val welcome = usage.welcome?.takeIf { it.total > 0 }?.let {
                 Part(remaining = it.remaining.coerceIn(0, it.total), total = it.total)

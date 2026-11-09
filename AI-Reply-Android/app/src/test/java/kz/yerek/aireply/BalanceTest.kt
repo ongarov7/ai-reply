@@ -11,6 +11,7 @@ import kz.yerek.aireply.data.account.UsageDto
 import kz.yerek.aireply.data.account.WelcomeDto
 import kz.yerek.aireply.data.settings.SettingsStore
 import kz.yerek.aireply.ui.feature.account.BalanceSummary
+import kz.yerek.aireply.ui.feature.account.headlineNumber
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -195,6 +196,31 @@ class BalanceTest {
         val summary = kz.yerek.aireply.ui.feature.account.BalanceSummary.of(usage)
         org.junit.Assert.assertTrue(summary.unlimited)
         org.junit.Assert.assertTrue(summary.hasBalance)
+    }
+
+    @Test
+    fun `an unlimited plan read from the cache is unlimited, never 0`() {
+        val cache = AccountUsageCache(SettingsStore(InMemoryPreferences()))
+        cache.store(UsageDto(unlimited = true, resetsAt = "x", remainingTotal = 0))
+
+        val before = BalanceSummary.of(UsageDto.UNKNOWN, cache.current(), now)
+        assertTrue(before.unlimited)
+        assertEquals("∞", before.headlineNumber(known = false))
+
+        cache.store(UsageDto(dailyLimit = 5, remainingToday = 4, resetsAt = "x", remainingTotal = 4))
+        assertFalse("the plan changed", BalanceSummary.of(UsageDto.UNKNOWN, cache.current(), now).unlimited)
+
+        cache.store(UsageDto(unlimited = true, resetsAt = "x", remainingTotal = 0))
+        cache.clear()
+        assertFalse("the account is gone", cache.current().unlimited)
+    }
+
+    @Test
+    fun `a known usage without the balance counts the plan's day`() {
+        val counted = BalanceSummary.of(UsageDto(dailyLimit = 10, remainingToday = 7, resetsAt = "x"), now = now)
+        assertEquals("7", counted.headlineNumber(known = true))
+        val unlimited = BalanceSummary.of(UsageDto(unlimited = true, resetsAt = "x"), now = now)
+        assertEquals("∞", unlimited.headlineNumber(known = true))
     }
 
     @Test
