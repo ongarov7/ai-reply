@@ -582,6 +582,7 @@
  "admin.user.push_devices": "Устройства для push",
  "admin.user.push_history": "История уведомлений",
  "admin.user.reset_quota": "Сбросить квоту за сегодня",
+ "admin.user.reset_quota_none": "У этого аккаунта нет дневного лимита. Чтобы добавить ответы, используйте «Начислить ответы».",
  "admin.user.revoke": "Отозвать сессии",
  "admin.user.send_push": "Отправить push",
  "admin.user.sessions": "Активные сессии",

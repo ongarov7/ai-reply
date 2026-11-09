@@ -582,6 +582,7 @@
  "admin.user.push_devices": "Push devices",
  "admin.user.push_history": "Notification history",
  "admin.user.reset_quota": "Reset today's quota",
+ "admin.user.reset_quota_none": "This account has no daily limit. To add replies, use Give replies.",
  "admin.user.revoke": "Revoke sessions",
  "admin.user.send_push": "Send a push",
  "admin.user.sessions": "Active sessions",

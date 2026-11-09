@@ -582,6 +582,7 @@
  "admin.user.push_devices": "Push құрылғылары",
  "admin.user.push_history": "Хабарландыру тарихы",
  "admin.user.reset_quota": "Бүгінгі квотаны нөлдеу",
+ "admin.user.reset_quota_none": "Бұл аккаунтта күндік лимит жоқ. Жауап қосу үшін «Жауап беру» әрекетін пайдаланыңыз.",
  "admin.user.revoke": "Сессияларды жабу",
  "admin.user.send_push": "Push жіберу",
  "admin.user.sessions": "Белсенді сессиялар",

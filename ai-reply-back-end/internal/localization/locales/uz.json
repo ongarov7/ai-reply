@@ -582,6 +582,7 @@
  "admin.user.push_devices": "Push qurilmalari",
  "admin.user.push_history": "Bildirishnomalar tarixi",
  "admin.user.reset_quota": "Bugungi kvotani nolga tushirish",
+ "admin.user.reset_quota_none": "Bu hisobda kunlik limit yoʻq. Javob qoʻshish uchun «Javob berish» amalidan foydalaning.",
  "admin.user.revoke": "Sessiyalarni bekor qilish",
  "admin.user.send_push": "Push yuborish",
  "admin.user.sessions": "Faol sessiyalar",

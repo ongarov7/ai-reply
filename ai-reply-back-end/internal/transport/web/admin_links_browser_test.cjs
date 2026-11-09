@@ -80,6 +80,16 @@ test('the admin plan picker states a daily number only for a plan that has one',
   assert.deepEqual(optionLabels(view), ['base_monthly', 'pro_monthly', 'base_yearly · 40/pricing.per_day']);
 });
 
+test('reset quota is offered only to an account with a daily limit', () => {
+  const { runtime, root } = loadAdmin();
+  const button = root.components.UserDetail.template.match(/<button\b(?:(?!<button\b)[\s\S])*?act\('\/reset-quota'[\s\S]*?<\/button>/)[0];
+  const render = runtime.compile('<div>' + button + '</div>');
+  const props = limit => render({ data: { entitlement: { daily_limit: limit } }, t: key => key, act() {} }, []).children[0].props;
+  assert.equal(props(0).disabled, true);
+  assert.equal(props(0).title, 'admin.user.reset_quota_none');
+  assert.equal(props(40).disabled, false);
+});
+
 test('the simulator states a daily number only for a plan that has one', () => {
   const { runtime, views } = loadSimulator();
   const option = views['sim-step-panel'].template.match(/<option v-for="p in state.plans"[\s\S]*?<\/option>/)[0];

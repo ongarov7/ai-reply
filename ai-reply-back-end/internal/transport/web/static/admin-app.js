@@ -965,7 +965,8 @@
                   <input type="date" v-model="expires"></label>
                 <button class="btn btn-primary" style="width:100%; margin-bottom:14px" @click="savePlan">
                   {{ t('common.save') }}</button>
-                <button class="btn" style="width:100%; margin-bottom:10px"
+                <button class="btn" style="width:100%; margin-bottom:10px" :disabled="!data.entitlement.daily_limit"
+                        :title="data.entitlement.daily_limit ? '' : t('admin.user.reset_quota_none')"
                         @click="act('/reset-quota', {}, 'admin.user.reset_quota')">{{ t('admin.user.reset_quota') }}</button>
                 <button class="btn btn-danger" style="width:100%"
                         @click="act('/revoke-sessions', {}, 'admin.user.revoke')">
