@@ -5,6 +5,7 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import com.google.android.play.core.appupdate.AppUpdateManagerFactory
 import com.google.android.play.core.install.model.UpdateAvailability
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -100,9 +101,18 @@ class AppUpdateController(
 
     private suspend fun run(manual: Boolean) {
         if (_state.value.status == Status.CHECKING) return
+        val lastCheck = store.updateLastCheck
         store.updateLastCheck = clock()
         _state.update { it.copy(status = Status.CHECKING) }
-        val status = when (val answer = source.check()) {
+        val answer = try {
+            source.check()
+        } catch (cancelled: CancellationException) {
+            // Whoever asked has gone: nothing stays "checking", and the day's check is not spent.
+            store.updateLastCheck = lastCheck
+            _state.value = snapshot(Status.IDLE)
+            throw cancelled
+        }
+        val status = when (answer) {
             is UpdateCheck.Answered -> {
                 store.updateOfferedVersion = answer.availableVersionCode
                 if (answer.availableVersionCode == null) Status.CURRENT else Status.IDLE

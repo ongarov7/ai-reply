@@ -1,5 +1,9 @@
 package kz.yerek.aireply
 
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kz.yerek.aireply.update.AppUpdateController
 import kz.yerek.aireply.update.AppUpdatePolicy
@@ -106,6 +110,36 @@ class AppUpdateTest {
         answer = UpdateCheck.Failed
         updates.checkIfDue()
         assertEquals(AppUpdateController.Status.IDLE, updates.state.value.status)
+        assertTrue(updates.state.value.showsCard)
+    }
+
+    @Test
+    fun `a check cancelled halfway does not stay checking and does not spend the day`() = runBlocking {
+        val before = now - 2 * day
+        store.updateLastCheck = before
+        var hanging = true
+        val updates = AppUpdateController(
+            source = {
+                if (hanging) awaitCancellation()
+                calls++
+                answer
+            },
+            store = store,
+            installedVersion = 4,
+            enabled = true,
+            clock = { now }
+        )
+
+        val check = launch(start = CoroutineStart.UNDISPATCHED) { updates.checkIfDue() }
+        assertEquals(AppUpdateController.Status.CHECKING, updates.state.value.status)
+        check.cancelAndJoin()
+
+        assertEquals(AppUpdateController.Status.IDLE, updates.state.value.status)
+        assertEquals(before, store.updateLastCheck)
+
+        hanging = false
+        updates.checkIfDue()
+        assertEquals("the next look at Home asks again", 1, calls)
         assertTrue(updates.state.value.showsCard)
     }
 
