@@ -314,8 +314,10 @@ class BillingRepository(
         }
     }
 
-    /** Back in the app: a purchase paid meanwhile, or never handed over, goes to the server now. */
+    /** Back in the app, or the flags read again: a purchase paid meanwhile, or never handed over, goes to the server now. */
     fun resume() {
+        // Switched off while the plans are open: [load] does not run again for a screen already up.
+        if (!isOffered() && _state.value.products.isNotEmpty()) closeSales()
         if (!canDeliver()) return
         scope.launch { reconcile() }
     }

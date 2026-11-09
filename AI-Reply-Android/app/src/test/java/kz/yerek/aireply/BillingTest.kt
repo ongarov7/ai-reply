@@ -564,6 +564,31 @@ class BillingTest {
         assertTrue(store.launched.isEmpty())
     }
 
+    @Test
+    fun `sales switched off take the plans on screen away, and what was paid still goes`() = runBlocking {
+        billing.load()
+        val offer = state.packs.single()
+        billing.resume()
+        assertEquals("still on sale: the plans stay", BillingState.Phase.READY, state.phase)
+
+        offered = false
+        store.held += purchase("paid-meanwhile")
+        billing.resume()
+
+        assertEquals(BillingState.Phase.OFF, state.phase)
+        assertTrue(state.products.isEmpty())
+        assertEquals(listOf("paid-meanwhile"), api.verified.map { it.second })
+        billing.buy(activity, offer)
+        assertTrue("nothing can be bought once sales are closed", store.launched.isEmpty())
+    }
+
+    @Test
+    fun `flags read before any plan was loaded leave the screen waiting`() = runBlocking {
+        offered = false
+        billing.resume()
+        assertEquals(BillingState.Phase.IDLE, state.phase)
+    }
+
     // ---------------------------------------------------------- purchase
 
     @Test
