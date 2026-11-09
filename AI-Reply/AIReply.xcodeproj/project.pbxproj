@@ -306,6 +306,9 @@
 		22F8C29EFF5932E7A74D0523 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 4F208514CD01EB26494BF443 /* Localizable.xcstrings */; };
 		34F8533E048277A254AD75BE /* InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 2BD1261A54733714A6B2A98C /* InfoPlist.xcstrings */; };
 		B16E82E51499181C35E09B46 /* AIReplyWatchApp.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = D47C71B176886328BF986B9A /* AIReplyWatchApp.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		BB712E8C1C33B2AE81201A93 /* WatchCompanionCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23124A4DE5B3D2538DB874F /* WatchCompanionCore.swift */; };
+		4E5F5DF064B4EBC7399CACF3 /* WatchCompanion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BBEDA8BBCA449F300B31DE5 /* WatchCompanion.swift */; };
+		7BA3160A34FA67919BC03D51 /* WatchTranscriber.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAE57269C5623BE1D569E421 /* WatchTranscriber.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -591,6 +594,9 @@
 		698EA55EB6B5CB39E18D24AF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		4F208514CD01EB26494BF443 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		2BD1261A54733714A6B2A98C /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
+		C23124A4DE5B3D2538DB874F /* WatchCompanionCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchCompanionCore.swift; sourceTree = "<group>"; };
+		0BBEDA8BBCA449F300B31DE5 /* WatchCompanion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchCompanion.swift; sourceTree = "<group>"; };
+		DAE57269C5623BE1D569E421 /* WatchTranscriber.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchTranscriber.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -955,6 +961,7 @@
 				5AA26E3A716BBD024CF8EBB5 /* Support */,
 				173DAB703FD44FE7CB8718F8 /* Templates */,
 				284F811FB11CC12ACBBD066E /* Voice */,
+				515603B02233EAB347CA55BE /* Watch */,
 			);
 			path = Features;
 			sourceTree = "<group>";
@@ -1100,6 +1107,16 @@
 				2BD1261A54733714A6B2A98C /* InfoPlist.xcstrings */,
 			);
 			path = AIReplyWatch;
+			sourceTree = "<group>";
+		};
+		515603B02233EAB347CA55BE /* Watch */ = {
+			isa = PBXGroup;
+			children = (
+				C23124A4DE5B3D2538DB874F /* WatchCompanionCore.swift */,
+				0BBEDA8BBCA449F300B31DE5 /* WatchCompanion.swift */,
+				DAE57269C5623BE1D569E421 /* WatchTranscriber.swift */,
+			);
+			path = Watch;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -1596,6 +1613,9 @@
 				78C8461099C5131900F9745B /* WatchVoiceRouting.swift in Sources */,
 				66DF5C1702345D6A6327D611 /* WatchVoiceCoordinator.swift in Sources */,
 				B6833CF12DAA12D1FA21FA23 /* WatchVoiceStrings.swift in Sources */,
+				BB712E8C1C33B2AE81201A93 /* WatchCompanionCore.swift in Sources */,
+				4E5F5DF064B4EBC7399CACF3 /* WatchCompanion.swift in Sources */,
+				7BA3160A34FA67919BC03D51 /* WatchTranscriber.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

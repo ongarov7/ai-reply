@@ -420,6 +420,9 @@ extension AccountAPI {
         /// Reply packs and the pass can be bought on iOS right now. nil from
         /// a server that has no purchases at all; false while they are closed.
         var iapIOS: Bool? = nil
+        /// `POST /api/v1/ai/transcribe` exists: the server turns a recording
+        /// into text.
+        var voiceTranscription: Bool? = nil
 
         enum CodingKeys: String, CodingKey {
             case replyPreferences = "reply_preferences"
@@ -443,6 +446,7 @@ extension AccountAPI {
             case pushReminders = "push_reminders"
             case supportChat = "support_chat"
             case iapIOS = "iap_ios"
+            case voiceTranscription = "voice_transcription"
         }
     }
 

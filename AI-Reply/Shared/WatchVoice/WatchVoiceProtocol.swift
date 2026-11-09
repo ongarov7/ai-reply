@@ -194,7 +194,7 @@ enum WatchVoiceDeliveryStatus: String, Codable, Sendable {
 }
 
 /// Why something did not work, as a value each screen words for itself.
-enum WatchVoiceFailure: String, Codable, Sendable {
+enum WatchVoiceFailure: String, Codable, Sendable, Error {
     case unsupportedVersion
     case invalidRequest
     case instructionEmpty

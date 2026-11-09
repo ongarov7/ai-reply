@@ -133,6 +133,9 @@ final class AppServices {
         // Before anything else can buy: Ask to Buy approvals and purchases
         // left unfinished arrive here, and wait for the account if need be.
         purchases.start()
+        // At launch, background launches included: WatchConnectivity wakes
+        // the app for a message from the watch and delivers it right here.
+        WatchCompanion.shared.start()
     }
 
     // MARK: Inputs from the app

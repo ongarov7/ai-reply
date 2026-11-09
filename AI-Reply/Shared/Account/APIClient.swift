@@ -24,6 +24,9 @@ enum APIError: Error, Equatable, Sendable {
     /// A new code was asked for too soon. The server's wait, in seconds.
     case resendCooldown(retryAfter: Int?)
     case rateLimited(retryAfter: Int?)
+    /// VOICE_LIMIT_REACHED: the day's speech recognition is spent. Tomorrow
+    /// helps; a few seconds do not, so it is not `rateLimited`.
+    case voiceLimitReached
     case invalidEmail
     /// The code e-mail could not be sent (the mail provider refused or is down).
     case emailDeliveryFailed
@@ -296,6 +299,7 @@ struct APIClient: Sendable {
         case "OTP_ATTEMPTS_EXCEEDED":           return .otpAttemptsExceeded
         case "OTP_RESEND_COOLDOWN":             return .resendCooldown(retryAfter: retryAfter)
         case "RATE_LIMITED":                    return .rateLimited(retryAfter: retryAfter)
+        case "VOICE_LIMIT_REACHED":             return .voiceLimitReached
         case "INVALID_EMAIL":                   return .invalidEmail
         case "EMAIL_DELIVERY_FAILED":           return .emailDeliveryFailed
         case "EMAIL_ALREADY_IN_USE":            return .emailInUse

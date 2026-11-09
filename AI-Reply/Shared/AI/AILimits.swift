@@ -54,6 +54,7 @@ extension AILimits {
         static let instructionPolish = "ai.features.instructionPolish"
         static let aiReports = "ai.features.aiReports"
         static let idempotentGeneration = "ai.features.idempotentGeneration"
+        static let voiceTranscription = "ai.features.voiceTranscription"
     }
 
     private static let lock = NSLock()
@@ -149,6 +150,12 @@ extension AILimits {
         AppGroup.defaults.bool(forKey: Key.idempotentGeneration)
     }
 
+    /// Whether `POST /api/v1/ai/transcribe` takes a recording: the Apple
+    /// Watch microphone goes through it, as Android's does.
+    static var serverSupportsVoiceTranscription: Bool {
+        AppGroup.defaults.bool(forKey: Key.voiceTranscription)
+    }
+
     /// Stores the request-shaping flags. Anything the server did not publish
     /// is false: a field is only ever sent to a server that asked for it.
     static func storeFeatures(_ features: AccountAPI.Features?, defaults: UserDefaults = AppGroup.defaults) {
@@ -157,6 +164,7 @@ extension AILimits {
         defaults.set(features?.instructionPolish ?? false, forKey: Key.instructionPolish)
         defaults.set(features?.aiReports ?? false, forKey: Key.aiReports)
         defaults.set(features?.idempotentGeneration ?? false, forKey: Key.idempotentGeneration)
+        defaults.set(features?.voiceTranscription ?? false, forKey: Key.voiceTranscription)
     }
 
     /// Everything `/api/v1/config` publishes that the reply flow uses,
