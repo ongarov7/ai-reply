@@ -332,6 +332,13 @@ private fun SubscriptionCard(option: PlanCatalogue.Option, state: BillingState, 
                 style = MaterialTheme.typography.bodySmall,
                 color = LocalExtraColors.current.textSecondary
             )
+            if (option.offer.creditsNeverExpire) {
+                Text(
+                    stringResource(R.string.plans_replies_never_expire),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = LocalExtraColors.current.textSecondary
+                )
+            }
             BuyButton(
                 option.offer,
                 state,

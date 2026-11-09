@@ -188,6 +188,34 @@ class BillingTest {
     }
 
     @Test
+    fun `replies that never expire are said on the plan, and only when the server says so`() = runBlocking {
+        val server = FakeServer { request ->
+            when (request.path) {
+                "/api/v1/iap/products" -> FakeResponse(
+                    200,
+                    """{"products":[
+                       {"code":"base_monthly","kind":"subscription","store_product_id":"play.base.month","name":"Base","credits_never_expire":true},
+                       {"code":"pro_monthly","kind":"subscription","store_product_id":"play.pro.month","name":"Pro"}
+                       ],"account_token":"$TOKEN"}"""
+                )
+                else -> FakeResponse(404)
+            }
+        }
+        val products = accountServiceOn(server).iapProducts().products
+        assertTrue(products.first { it.code == "base_monthly" }.creditsNeverExpire)
+        assertFalse("an old server changes nothing", products.first { it.code == "pro_monthly" }.creditsNeverExpire)
+
+        sells(subscription().copy(creditsNeverExpire = true), subscription(id = "play.pro.month", kind = "unlimited", monthly = 0))
+        store.prices["play.base.month"] = "990 ₸"
+        store.periods["play.base.month"] = "month"
+        store.prices["play.pro.month"] = "3 990 ₸"
+        store.periods["play.pro.month"] = "month"
+        billing.load()
+        assertTrue(state.subscriptions.first { it.storeProductId == "play.base.month" }.creditsNeverExpire)
+        assertFalse(state.subscriptions.first { it.storeProductId == "play.pro.month" }.creditsNeverExpire)
+    }
+
+    @Test
     fun `a subscription Play sells for another period is not offered`() = runBlocking {
         sells(subscription())
         store.prices["play.base.month"] = "990 ₸"
@@ -742,6 +770,13 @@ class BillingTest {
         assertEquals(ApiError.PurchaseOtherAccount, error("PURCHASE_BELONGS_TO_ANOTHER_ACCOUNT"))
         assertEquals(ApiError.StoreUnavailable, error("STORE_UNAVAILABLE"))
     }
+
+    private fun accountServiceOn(server: FakeServer) = AccountService(
+        session = sessionOn(server, FakeCredentials(access = "a", refresh = "r")),
+        baseUrlProvider = { "https://example.test" },
+        deviceDescriptor = { DeviceDescriptor("device-1", "android", "1.0", "15", "en", "Asia/Almaty") },
+        clientFactory = { baseUrl -> ApiClient(baseUrl, openConnection = server::open) }
+    )
 
     private companion object {
         const val TOKEN = "6f1c3c4e-2b9a-4c3e-9f0e-6a7b8c9d0e1f"

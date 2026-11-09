@@ -38,7 +38,9 @@ data class IapProductDto(
     @SerialName("monthly_limit") val monthlyLimit: Int = 0,
     /** The server's price in minor units, to compare with Play's; never shown. */
     val price: Long? = null,
-    val currency: String? = null
+    val currency: String? = null,
+    /** A subscription whose replies stay with the account after it ends. */
+    @SerialName("credits_never_expire") val creditsNeverExpire: Boolean = false
 )
 
 /** `POST /api/v1/iap/google/purchases`. The server refuses any other field. */

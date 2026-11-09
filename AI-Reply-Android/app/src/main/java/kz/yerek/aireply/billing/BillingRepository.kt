@@ -36,7 +36,9 @@ data class OfferedProduct(
     val dailyLimit: Int = 0,
     val monthlyLimit: Int = 0,
     /** The server's price and Play's differ: the sale waits until they agree. */
-    val hasPriceMismatch: Boolean = false
+    val hasPriceMismatch: Boolean = false,
+    /** A subscription whose replies stay with the account after it ends. */
+    val creditsNeverExpire: Boolean = false
 ) {
     enum class Kind { PACK, PASS, SUBSCRIPTION }
 }
@@ -234,7 +236,8 @@ class BillingRepository(
             entitlementKind = product.entitlementKind,
             dailyLimit = product.dailyLimit,
             monthlyLimit = product.monthlyLimit,
-            hasPriceMismatch = hasPriceMismatch(product, store)
+            hasPriceMismatch = hasPriceMismatch(product, store),
+            creditsNeverExpire = product.creditsNeverExpire
         )
     }
 
