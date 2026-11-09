@@ -12,6 +12,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 /**
  * E-mail and Google sign-in: the rules the screens rely on.
@@ -111,5 +112,19 @@ class SignInTest {
             .forEach { assertTrue("$it", AccountController.codeIsSpent(ApiException(it))) }
         listOf(ApiError.Offline, ApiError.TimedOut, ApiError.Server, ApiError.RateLimited(null))
             .forEach { assertFalse("a network failure must keep the typed code", AccountController.codeIsSpent(ApiException(it))) }
+    }
+
+    // ------------------------------------------------------ registration
+
+    /** Sign out or Delete account on the consent screen comes between sign-in and the step. */
+    @Test
+    fun `the registration step is only for someone signed in`() {
+        val host = File("src/main/java/kz/yerek/aireply/ui/navigation/AppNavHost.kt").readText()
+        val step = host.indexOf("completingRegistration && accountState.isSignedIn ->")
+        assertTrue(step >= 0)
+        assertTrue("signed out goes on to sign-in", step < host.indexOf("accountState.phase is AccountController.Phase.SignedOut ->"))
+
+        val reset = host.substringAfter("LaunchedEffect(accountState.phase) {").substringBefore("\n    }")
+        assertTrue(reset, "AccountController.Phase.SignedOut) completingRegistration = false" in reset)
     }
 }

@@ -86,6 +86,11 @@ fun AppNavHost(debugScreen: String? = null) {
 
     LaunchedEffect(Unit) { services.account.bootstrap() }
 
+    // The step belongs to the session that opened it, and goes when that one does.
+    LaunchedEffect(accountState.phase) {
+        if (accountState.phase is AccountController.Phase.SignedOut) completingRegistration = false
+    }
+
     if (reviewingOnboarding) {
         OnboardingScreen(mode = OnboardingMode.FIRST_RUN, onFinished = {
             reviewingOnboarding = false
@@ -106,7 +111,8 @@ fun AppNavHost(debugScreen: String? = null) {
                 LegalConsentScreen()
                 return
             }
-            completingRegistration -> {
+            // Signing out on the consent screen in front of it leaves nobody to register.
+            completingRegistration && accountState.isSignedIn -> {
                 RegistrationStepScreen(onFinished = { completingRegistration = false })
                 return
             }
