@@ -58,5 +58,9 @@ class TemplateNameTest {
     fun `a name nobody touched stays as it was`() {
         assertNull(friend.withFinishedName(friend).customName)
         assertEquals(custom, custom.withFinishedName(custom))
+
+        // The add dialog has no limit: opening the editor must not cut what it made.
+        val long = ReplyTemplate.custom("я".repeat(ReplyTemplate.MAX_NAME + 5), 5)
+        assertEquals(long, long.withFinishedName(long))
     }
 }

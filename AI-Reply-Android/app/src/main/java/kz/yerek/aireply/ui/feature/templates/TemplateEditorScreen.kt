@@ -353,10 +353,12 @@ internal fun ReplyTemplate.withTypedName(value: String): ReplyTemplate =
 /**
  * The name to keep when the screen closes: [ReplyTemplate.withName] on what
  * was typed, so a built-in left empty goes back to its own name and one the
- * user made keeps the name it had in [original].
+ * user made keeps the name it had in [original]. A name nobody touched stays
+ * exactly as it was.
  */
 internal fun ReplyTemplate.withFinishedName(original: ReplyTemplate): ReplyTemplate =
-    copy(customName = original.customName).withName(customName.orEmpty())
+    if (customName == original.customName) this
+    else copy(customName = original.customName).withName(customName.orEmpty())
 
 private fun behaviourResource(value: WorkingHoursBehaviour): Int = when (value) {
     WorkingHoursBehaviour.IGNORE -> R.string.templates_hours_ignore
