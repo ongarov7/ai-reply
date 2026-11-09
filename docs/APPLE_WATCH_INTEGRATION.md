@@ -192,6 +192,19 @@ editable on the watch before sending.
   Paste from Other Apps ▸ Allow removes it.
 - A force-quit iPhone app may not be woken. This has to be checked on a device.
 
+## Next update: copied-message preview on Apple Watch
+
+On 9 November 2026, the owner chose to submit 1.2.0 (25) first and defer showing
+the copied source message on the watch to the next update. Build 25 uses that
+message in the iPhone keyboard's reply pipeline; the watch displays the dictated
+instruction, not the copied source message. `WatchPhoneSnapshot` does not carry
+the source text. Do not describe source-message preview as a build 25 feature.
+
+The planned addition is a readable preview of the message the user selected on
+iPhone, followed by the existing voice instruction, review and generation flow.
+It must preserve explicit clipboard access and prevent an old preview from being
+used after the user switches the source message or keyboard session.
+
 ## Build
 
 ```bash
