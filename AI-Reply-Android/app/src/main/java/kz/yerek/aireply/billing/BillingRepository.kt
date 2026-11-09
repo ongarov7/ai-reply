@@ -348,8 +348,10 @@ class BillingRepository(
     /**
      * Every unconsumed purchase Play holds for this account goes to the server;
      * pending ones are shown. Runs with sales closed too ([canDeliver]).
+     * [tapped] is a product Play just refused as already owned: whoever tapped
+     * hears what came of that one.
      */
-    suspend fun reconcile() {
+    suspend fun reconcile(tapped: String? = null) {
         if (!canDeliver()) return
         if (!store.connect()) return
         val current = store.purchases() ?: return
@@ -370,7 +372,7 @@ class BillingRepository(
         paid
             // Bought by another AI Reply account on this phone: that account hands it over.
             .filter { mine == null || it.accountToken == null || it.accountToken == mine }
-            .forEach { verify(it, Origin.RETURN) }
+            .forEach { verify(it, if (tapped in it.productIds) Origin.SHEET else Origin.RETURN) }
     }
 
     internal fun onStoreUpdate(update: StoreUpdate) {
@@ -395,6 +397,7 @@ class BillingRepository(
             }
             StoreUpdate.Cancelled -> _state.update { it.copy(busyProductId = null, notice = PurchaseNotice.CANCELLED) }
             is StoreUpdate.Failed -> {
+                val tapped = _state.value.busyProductId
                 _state.update {
                     it.copy(
                         busyProductId = null,
@@ -407,7 +410,7 @@ class BillingRepository(
                         }
                     )
                 }
-                if (update.error == StoreError.ALREADY_OWNED) scope.launch { reconcile() }
+                if (update.error == StoreError.ALREADY_OWNED) scope.launch { reconcile(tapped) }
             }
         }
     }
@@ -449,7 +452,7 @@ class BillingRepository(
         return granted
     }
 
-    /** What [delivery] tells this caller. Someone who just paid hears all of it. */
+    /** What [delivery] tells this caller. Someone who just tapped hears all of it. */
     private fun noticeFor(delivery: Delivery, purchase: StorePurchase, origin: Origin): PurchaseNotice? = when {
         origin == Origin.SHEET -> delivery.notice
         // A repeat found on return, or by restore, is not news: restore sums up on its own.
@@ -517,7 +520,7 @@ class BillingRepository(
 
     /** Who is handing a purchase over. */
     private enum class Origin {
-        /** Play's sheet: the user just paid, so even a repeat (`already_granted`) is news worth saying. */
+        /** Play's answer to a tap: the user just paid or already owns it, so even a repeat (`already_granted`) is news worth saying. */
         SHEET,
         /** The routine check on every return to the app. */
         RETURN,

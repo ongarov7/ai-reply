@@ -733,6 +733,52 @@ class BillingTest {
     }
 
     @Test
+    fun `tapping your own plan the server cannot check yet says so`() = runBlocking {
+        sellsBaseAndPro()
+        store.held += runningBase()
+        api.answer = { throw ApiException(ApiError.StoreUnavailable, 503) }
+        billing.load()
+        assertNull("the routine re-check stays quiet", state.notice)
+        store.launchError = StoreError.ALREADY_OWNED
+
+        billing.buy(activity, state.subscriptions.first { it.storeProductId == "play.base.month" })
+
+        assertEquals(PurchaseNotice.RETRY_LATER, state.notice)
+        assertNull(state.busyProductId)
+    }
+
+    @Test
+    fun `tapping your own plan the server already granted shows the plan`() = runBlocking {
+        sellsBaseAndPro()
+        store.held += runningBase()
+        api.answer = { PurchaseResultDto(PurchaseResultDto.STATUS_ALREADY_GRANTED, USAGE) }
+        billing.load()
+        assertEquals("the routine re-check reads nothing", 0, accountRefreshes)
+        store.launchError = StoreError.ALREADY_OWNED
+
+        billing.buy(activity, state.subscriptions.first { it.storeProductId == "play.base.month" })
+
+        assertEquals(PurchaseNotice.GRANTED, state.notice)
+        assertEquals(1, accountRefreshes)
+    }
+
+    @Test
+    fun `when Play says already owned only the tapped purchase speaks`() = runBlocking {
+        billing.load()
+        store.held += purchase("old-pack")
+        store.held += runningBase()
+        api.answer = { token ->
+            if (token == "running-token") throw ApiException(ApiError.Offline, null)
+            PurchaseResultDto(PurchaseResultDto.STATUS_ALREADY_GRANTED, USAGE)
+        }
+        store.launchError = StoreError.ALREADY_OWNED
+
+        billing.buy(activity, state.packs.single())
+
+        assertEquals("the running plan's failed re-check says nothing", PurchaseNotice.GRANTED, state.notice)
+    }
+
+    @Test
     fun `signing out forgets the account's token`() = runBlocking {
         billing.load()
         billing.reset()
