@@ -27,6 +27,9 @@ enum class OnboardingStep(val id: String, private val legacyIds: Set<String> = e
 
         fun fromId(id: String?): OnboardingStep? =
             entries.firstOrNull { it.id == id } ?: entries.firstOrNull { id in it.legacyIds }
+
+        /** An id only the version 2 screens saved. */
+        fun isLegacy(id: String?): Boolean = entries.any { id in it.legacyIds }
     }
 }
 
@@ -41,6 +44,13 @@ enum class OnboardingPath(val id: String) {
 
     companion object {
         fun fromId(id: String?): OnboardingPath = entries.firstOrNull { it.id == id } ?: TRY_FIRST
+
+        /**
+         * The path of a run coming back. One saved by version 2 has none
+         * stored, and showed the keyboard before the tutorial.
+         */
+        fun saved(id: String?, resumeStep: String?): OnboardingPath =
+            if (id == null && OnboardingStep.isLegacy(resumeStep)) SETUP_FIRST else fromId(id)
     }
 }
 

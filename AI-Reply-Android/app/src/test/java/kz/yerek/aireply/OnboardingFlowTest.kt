@@ -43,6 +43,22 @@ class OnboardingFlowTest {
         assertEquals(OnboardingStep.PERMISSIONS, firstRun.start("keyboard"))
     }
 
+    /** Version 2 went keyboard, copy, practice; nothing it saved names a path. */
+    @Test
+    fun `a run saved by the previous version keeps the keyboard first`() {
+        listOf("keyboard", "copyReply", "practice").forEach { step ->
+            assertEquals(step, OnboardingPath.SETUP_FIRST, OnboardingPath.saved(null, step))
+        }
+
+        val resumed = OnboardingFlow(OnboardingMode.FIRST_RUN, asksGender = false, path = OnboardingPath.saved(null, "keyboard"))
+        assertEquals("the tutorial is still ahead", OnboardingStep.TUTORIAL_COPY, resumed.next(resumed.start("keyboard")))
+        assertTrue("the keyboard is not asked for twice", resumed.isLast(resumed.start("practice")))
+
+        assertEquals("nothing saved yet", OnboardingPath.TRY_FIRST, OnboardingPath.saved(null, null))
+        assertEquals("today's ids save their path", OnboardingPath.TRY_FIRST, OnboardingPath.saved(null, "tutorial_copy"))
+        assertEquals("a saved path wins", OnboardingPath.TRY_FIRST, OnboardingPath.saved("try_first", "keyboard"))
+    }
+
     @Test
     fun `try first asks the gender, then the tutorial, then the keyboard`() {
         assertEquals(

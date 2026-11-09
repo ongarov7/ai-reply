@@ -92,7 +92,7 @@ fun OnboardingScreen(mode: OnboardingMode, onFinished: () -> Unit) {
         )
     }
     var path by rememberSaveable {
-        mutableStateOf(OnboardingPath.fromId(if (mode == OnboardingMode.FIRST_RUN) device.onboardingPath else null))
+        mutableStateOf(OnboardingPath.saved(if (mode == OnboardingMode.FIRST_RUN) device.onboardingPath else null, savedStep))
     }
     val flow = remember(asksGender, path) { OnboardingFlow(mode, asksGender, path) }
     var step by rememberSaveable { mutableStateOf(flow.start(savedStep)) }
