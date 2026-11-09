@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Refresh
@@ -408,7 +409,7 @@ fun ComposeScreen(onBack: () -> Unit, onOpen: (String) -> Unit = {}) {
                             style = MaterialTheme.typography.titleLarge,
                             modifier = Modifier.semantics { heading() }
                         )
-                        Text(reply, style = MaterialTheme.typography.bodyLarge)
+                        SelectionContainer { Text(reply, style = MaterialTheme.typography.bodyLarge) }
                         ReplyActions(
                             copied = copied,
                             generating = generating,
