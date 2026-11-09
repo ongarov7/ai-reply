@@ -81,7 +81,7 @@ fun TemplateEditorScreen(templateId: String, onBack: () -> Unit) {
 
     val latest = rememberUpdatedState(draft)
     DisposableEffect(templateId) {
-        onDispose { services.configuration.update(latest.value) }
+        onDispose { services.configuration.update(latest.value.withFinishedName(original)) }
     }
 
     val usesBusiness = draft.relationship.usesBusinessContext
@@ -94,7 +94,7 @@ fun TemplateEditorScreen(templateId: String, onBack: () -> Unit) {
                     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s)) {
                         OutlinedTextField(
                             value = draft.customName ?: "",
-                            onValueChange = { draft = draft.withName(it) },
+                            onValueChange = { draft = draft.withTypedName(it) },
                             label = { Text(stringResource(R.string.templates_name)) },
                             placeholder = {
                                 Text(stringResource(TemplateNaming.resource(draft.relationship)))
@@ -341,6 +341,22 @@ fun TemplateEditorScreen(templateId: String, onBack: () -> Unit) {
         )
     }
 }
+
+/**
+ * The name as it is being typed, written straight into the field: a space
+ * stays for the next word, and the last letter can go on the way to a new
+ * name. It is made a proper name once, by [withFinishedName].
+ */
+internal fun ReplyTemplate.withTypedName(value: String): ReplyTemplate =
+    copy(customName = value.clampToCodePoints(ReplyTemplate.MAX_NAME))
+
+/**
+ * The name to keep when the screen closes: [ReplyTemplate.withName] on what
+ * was typed, so a built-in left empty goes back to its own name and one the
+ * user made keeps the name it had in [original].
+ */
+internal fun ReplyTemplate.withFinishedName(original: ReplyTemplate): ReplyTemplate =
+    copy(customName = original.customName).withName(customName.orEmpty())
 
 private fun behaviourResource(value: WorkingHoursBehaviour): Int = when (value) {
     WorkingHoursBehaviour.IGNORE -> R.string.templates_hours_ignore
