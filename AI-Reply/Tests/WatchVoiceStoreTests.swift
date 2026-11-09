@@ -6,7 +6,9 @@ final class WatchVoiceStoreTests: XCTestCase {
 
     private var root: URL!
     private var store: WatchVoiceStore!
-    private let now = Date()
+    // Whole seconds survive the millisecond JSON codec exactly. Keep the
+    // fixture near file creation times for the store's orphan/marker checks.
+    private let now = Date(timeIntervalSince1970: Date().timeIntervalSince1970.rounded(.down))
 
     override func setUpWithError() throws {
         root = FileManager.default.temporaryDirectory.appendingPathComponent("watch-store-\(UUID().uuidString)", isDirectory: true)
