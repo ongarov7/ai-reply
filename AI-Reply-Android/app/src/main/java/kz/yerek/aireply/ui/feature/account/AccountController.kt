@@ -231,8 +231,11 @@ class AccountController(
             if (wasSignedIn) observer?.onSignedOut(userInitiated = false)
             return
         }
+        val session = currentSession
         try {
             val account = service.account()
+            // Signed out, or someone else signed in, while this was on its way.
+            if (session !== currentSession || !credentials.isSignedIn) return
             usageCache.store(account.usage)
             usageCache.storePlanCode(account.subscription.plan.code)
             credentials.displayIdentifier = account.user.identifier
@@ -254,6 +257,8 @@ class AccountController(
             // the keyboard can be refused for it.
             syncPendingLegalConsent()
         } catch (exception: ApiException) {
+            // A refusal of the session that has ended says nothing about this one.
+            if (session !== currentSession) return
             when (exception.error) {
                 is ApiError.Unauthorized -> sessionEnded()
                 is ApiError.AccountDisabled -> {
@@ -265,6 +270,13 @@ class AccountController(
             }
         }
     }
+
+    /**
+     * Replaced when a session ends or another begins: a `GET /me` answer that
+     * was on its way by then belongs to a session that is over.
+     */
+    @Volatile
+    private var currentSession = Any()
 
     suspend fun refreshUsage() {
         if (!credentials.isSignedIn) return
@@ -411,6 +423,7 @@ class AccountController(
      * the moment the phase changes.
      */
     private fun completeSignIn(session: AccountSessionDto): SignInOutcome {
+        currentSession = Any()
         deletionMayHaveSucceeded = false
         usageCache.store(session.usage)
         usageCache.storePlanCode(session.subscription.plan.code)
@@ -621,6 +634,7 @@ class AccountController(
      * detaches it at once; the observer then registers it anonymously.
      */
     suspend fun signOut() {
+        currentSession = Any()
         _state.update { it.copy(busy = true) }
         service.signOut()
         signOutLocally(userInitiated = true)
@@ -629,6 +643,7 @@ class AccountController(
     }
 
     private fun signOutLocally(userInitiated: Boolean) {
+        currentSession = Any()
         deletionMayHaveSucceeded = false
         credentials.clear()
         profileSync?.signedOut()
