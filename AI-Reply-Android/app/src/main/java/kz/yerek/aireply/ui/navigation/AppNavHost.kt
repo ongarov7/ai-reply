@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -65,6 +67,7 @@ fun AppNavHost(debugScreen: String? = null) {
 
     val accountState by services.account.state.collectAsStateWithLifecycle()
     var completingRegistration by rememberSaveable { mutableStateOf(false) }
+    var signIns by rememberSaveable { mutableIntStateOf(0) }
     var reviewingOnboarding by rememberSaveable {
         mutableStateOf(BuildConfig.DEBUG && debugScreen == MainActivity.DEBUG_SCREEN_ONBOARDING)
     }
@@ -89,6 +92,11 @@ fun AppNavHost(debugScreen: String? = null) {
     // The step belongs to the session that opened it, and goes when that one does.
     LaunchedEffect(accountState.phase) {
         if (accountState.phase is AccountController.Phase.SignedOut) completingRegistration = false
+    }
+
+    fun signedIn(isNewUser: Boolean) {
+        completingRegistration = isNewUser
+        signIns++
     }
 
     if (reviewingOnboarding) {
@@ -117,7 +125,7 @@ fun AppNavHost(debugScreen: String? = null) {
                 return
             }
             accountState.phase is AccountController.Phase.SignedOut -> {
-                SignInScreen(onSignedIn = { isNewUser -> completingRegistration = isNewUser })
+                SignInScreen(onSignedIn = ::signedIn)
                 return
             }
             accountState.phase is AccountController.Phase.EnteringEmail -> {
@@ -128,7 +136,7 @@ fun AppNavHost(debugScreen: String? = null) {
                 val phase = accountState.phase as AccountController.Phase.AwaitingCode
                 VerifyCodeScreen(
                     phase = phase,
-                    onVerified = { isNewUser -> completingRegistration = isNewUser }
+                    onVerified = ::signedIn
                 )
                 return
             }
@@ -136,8 +144,9 @@ fun AppNavHost(debugScreen: String? = null) {
 
     // Remembered here, past the gates: a gate that comes back in front of the
     // graph takes the back stack with it, so Home starts from its root next
-    // time, whoever signs in.
-    val navController = rememberNavController()
+    // time, whoever signs in. A stack saved before the process died was never
+    // composed to be taken; the key, one per sign-in, keeps it from coming back.
+    val navController = key(signIns) { rememberNavController() }
     val start = reviewRoute ?: if (needsOnboarding) Routes.Onboarding else Routes.Home
 
     NavHost(navController = navController, startDestination = start) {

@@ -258,9 +258,24 @@ class AppLinksTest {
     @Test
     fun `a gate in front of the graph takes the back stack with it`() {
         val host = File("src/main/java/kz/yerek/aireply/ui/navigation/AppNavHost.kt").readText()
-        val controller = host.indexOf("val navController = rememberNavController()")
+        val controller = host.indexOf("rememberNavController()")
         assertTrue(controller >= 0)
         assertTrue("past every gate", controller > host.lastIndexOf("Phase.AwaitingCode"))
+    }
+
+    /**
+     * A process that died leaves its stack in the saved state, and the graph
+     * reads it the first time it is composed, which can be after a sign-in.
+     */
+    @Test
+    fun `a back stack saved before a sign-in does not come back after it`() {
+        val host = File("src/main/java/kz/yerek/aireply/ui/navigation/AppNavHost.kt").readText()
+        assertTrue("val navController = key(signIns) { rememberNavController() }" in host)
+        assertTrue("survives the process with the stack", "var signIns by rememberSaveable" in host)
+
+        val signedIn = host.substringAfter("fun signedIn(").substringBefore("\n    }")
+        assertTrue(signedIn, "signIns++" in signedIn)
+        assertTrue("every way in counts", "SignInScreen(onSignedIn = ::signedIn)" in host && "onVerified = ::signedIn" in host)
     }
 
     @Test
