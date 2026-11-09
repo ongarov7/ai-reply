@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/aireply/ai-reply-back-end/config"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
 )
 
@@ -49,6 +50,39 @@ func TestSealedTokensOpenOnlyWithTheirKey(t *testing.T) {
 	}
 	if _, err := a.sealer.open(sealed[:len(sealed)-2] + "AA"); err == nil {
 		t.Fatal("a tampered token opened")
+	}
+}
+
+func TestSubscriptionTokensSurviveARotationOfTheAccessSecret(t *testing.T) {
+	stable := strings.Repeat("s", 40)
+	first, err := New(Deps{Secret: strings.Repeat("a", 40), Config: config.IAP{GoogleTokenSecret: stable}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rotated, err := New(Deps{Secret: strings.Repeat("b", 40), Config: config.IAP{GoogleTokenSecret: stable}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sealed, err := first.sealer.seal("purchase-token-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plain, err := rotated.sealer.open(sealed); err != nil || plain != "purchase-token-1" {
+		t.Fatalf("after a rotation: %q %v", plain, err)
+	}
+
+	// What was sealed under the access secret before the stable one was set stays readable.
+	before := newTestService(t, strings.Repeat("a", 40))
+	old, err := before.sealer.seal("purchase-token-2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plain, err := first.sealer.open(old); err != nil || plain != "purchase-token-2" {
+		t.Fatalf("an older token: %q %v", plain, err)
+	}
+	// New tokens do not depend on the access secret.
+	if _, err := before.sealer.open(sealed); err == nil {
+		t.Fatal("a token sealed with the stable secret opened without it")
 	}
 }
 

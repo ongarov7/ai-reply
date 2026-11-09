@@ -71,6 +71,7 @@ type Server struct {
 	failNext      int // the next n purchase calls answer 503
 	failEat       int // the next n consume calls answer 503
 	failAck       int // the next n acknowledge calls answer 503
+	failAckFor    map[string]int
 	refuseAck     int // the next n acknowledge calls answer 400
 	pageSize      int
 	lastSince     string
@@ -155,6 +156,16 @@ func (s *Server) FailAcknowledges(n int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.failAck = n
+}
+
+// FailAcknowledgesFor — this token's next n acknowledge calls answer 503, the others go through.
+func (s *Server) FailAcknowledgesFor(token string, n int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.failAckFor == nil {
+		s.failAckFor = map[string]int{}
+	}
+	s.failAckFor[token] = n
 }
 
 // RefuseAcknowledges — келесі n растау сұранысы 400 қайтарады.
@@ -329,8 +340,12 @@ func (s *Server) subscriptionCall(w http.ResponseWriter, r *http.Request, rest s
 	case p == nil:
 		w.WriteHeader(http.StatusNotFound)
 		_, _ = io.WriteString(w, `{"error":{"code":404,"status":"NOT_FOUND","errors":[{"reason":"subscriptionPurchaseNotFound"}]}}`)
-	case s.failAck > 0:
-		s.failAck--
+	case s.failAck > 0 || s.failAckFor[token] > 0:
+		if s.failAckFor[token] > 0 {
+			s.failAckFor[token]--
+		} else {
+			s.failAck--
+		}
 		w.WriteHeader(http.StatusServiceUnavailable)
 		_, _ = io.WriteString(w, `{"error":{"code":503,"status":"UNAVAILABLE","errors":[{"reason":"backendError"}]}}`)
 	case s.refuseAck > 0:

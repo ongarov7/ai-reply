@@ -113,6 +113,37 @@ func TestSubscriptionIsReadAndAcknowledged(t *testing.T) {
 	}
 }
 
+func TestOutOfAppResubscriptionIsRead(t *testing.T) {
+	g := playtest.New(t, "kz.yerek.aireply")
+	g.PutSubscription(token, googleplay.Subscription{SubscriptionState: "SUBSCRIPTION_STATE_ACTIVE", OutOfAppPurchaseContext: &googleplay.OutOfAppPurchaseContext{
+		ExpiredPurchaseToken:              "old-token",
+		ExpiredExternalAccountIdentifiers: &googleplay.ExternalAccountIdentifiers{ObfuscatedExternalAccountID: "acc"},
+	}})
+	p, err := client(t, g).GetSubscription(context.Background(), token)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if p.AccountID() != "" || p.OutOfAppPurchaseContext == nil || p.OutOfAppPurchaseContext.ExpiredAccountID() != "acc" || p.OutOfAppPurchaseContext.ExpiredPurchaseToken != "old-token" {
+		t.Fatalf("subscription %+v", p)
+	}
+	if (googleplay.OutOfAppPurchaseContext{}).ExpiredAccountID() != "" {
+		t.Fatal("no identifiers, no account")
+	}
+}
+
+func TestOrderIDIsThePaidOrder(t *testing.T) {
+	item := googleplay.SubscriptionLineItem{LatestSuccessfulOrderID: "GPA.paid"}
+	active := googleplay.Subscription{SubscriptionState: "SUBSCRIPTION_STATE_ACTIVE", LatestOrderID: "GPA.latest"}
+	grace := googleplay.Subscription{SubscriptionState: "SUBSCRIPTION_STATE_IN_GRACE_PERIOD", LatestOrderID: "GPA.declined"}
+	if active.OrderID(item) != "GPA.paid" || grace.OrderID(item) != "GPA.paid" {
+		t.Fatal("the successful order comes first")
+	}
+	none := googleplay.SubscriptionLineItem{}
+	if active.OrderID(none) != "GPA.latest" || grace.OrderID(none) != "" {
+		t.Fatalf("fallback: %q %q", active.OrderID(none), grace.OrderID(none))
+	}
+}
+
 func TestVoidedPurchasesArePaged(t *testing.T) {
 	g := playtest.New(t, "kz.yerek.aireply")
 	g.PageSize(2)

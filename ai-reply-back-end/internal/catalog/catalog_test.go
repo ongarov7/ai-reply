@@ -3,7 +3,11 @@ package catalog
 import (
 	"context"
 	"errors"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/aireply/ai-reply-back-end/internal/database"
@@ -129,6 +133,50 @@ func TestCatalogGoogleIDsAreValidatedAndUnique(t *testing.T) {
 	}
 }
 
+// Older Android builds list only packs: with subscriptions alone on sale they
+// would be told purchases are open and show an empty screen.
+func TestAndroidSubscriptionsNeedThePackOnAndroid(t *testing.T) {
+	p := InitialProducts()
+	p[1].GoogleProductID, p[1].AvailableAndroid = "kz.aireply.base.monthly", true
+	err := Validate(p)
+	if !errors.Is(err, domain.ErrInvalidRequest) || !strings.Contains(fmt.Sprint(err), "available_android") {
+		t.Fatalf("subscriptions alone: %v", err)
+	}
+	p[5].GoogleProductID = "kz.aireply.pack30"
+	if err := Validate(p); err == nil {
+		t.Fatal("the pack is mapped but its switch is off")
+	}
+	p[5].AvailableAndroid = true
+	if err := Validate(p); err != nil {
+		t.Fatalf("together: %v", err)
+	}
+	// An id alone does not put a subscription on sale.
+	p = InitialProducts()
+	p[1].GoogleProductID = "kz.aireply.base.monthly"
+	if err := Validate(p); err != nil {
+		t.Fatalf("mapped, switch off: %v", err)
+	}
+}
+
+// The public catalogue stays as it was once Play ids are configured.
+func TestPublicCatalogDoesNotCarryPlayMapping(t *testing.T) {
+	s, _ := testCatalog(t)
+	p := InitialProducts()
+	p[1].AppleProductID, p[1].GoogleProductID, p[1].AvailableAndroid = "test.base", "kz.aireply.base.monthly", true
+	p[5].GoogleProductID, p[5].AvailableAndroid = "kz.aireply.pack30", true
+	if err := publishProducts(t, s, p); err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	s.RegisterPublic(mux)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/billing/catalog", nil))
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "test.base") ||
+		strings.Contains(rec.Body.String(), "google_product_id") || strings.Contains(rec.Body.String(), "available_android") {
+		t.Fatalf("public catalog: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
 func publishProducts(t *testing.T, s *Service, p []Product) error {
 	t.Helper()
 	ctx := context.Background()
@@ -155,12 +203,12 @@ func TestPublishMapsEachStoreAndItsSwitch(t *testing.T) {
 		}
 		return
 	}
-	// Nothing configured: nothing sold, and Android stays off.
+	// Nothing configured: nothing sold, and nothing but what was written before.
 	if err := publishProducts(t, s, InitialProducts()); err != nil {
 		t.Fatal(err)
 	}
-	if _, google, active, _, off := read(); google != "" || active != 0 || off != 1 {
-		t.Fatalf("unconfigured: %q %d %d", google, active, off)
+	if _, google, active, offIOS, offAndroid := read(); google != "" || active != 0 || offIOS != 0 || offAndroid != 0 {
+		t.Fatalf("unconfigured: %q %d %d %d", google, active, offIOS, offAndroid)
 	}
 
 	p := InitialProducts()
@@ -168,7 +216,7 @@ func TestPublishMapsEachStoreAndItsSwitch(t *testing.T) {
 	if err := publishProducts(t, s, p); err != nil {
 		t.Fatal(err)
 	}
-	if apple, google, active, offIOS, offAndroid := read(); apple != "test.base" || google != "" || active != 1 || offIOS != 0 || offAndroid != 1 {
+	if apple, google, active, offIOS, offAndroid := read(); apple != "test.base" || google != "" || active != 1 || offIOS != 0 || offAndroid != 0 {
 		t.Fatalf("Apple only: %q %q %d %d %d", apple, google, active, offIOS, offAndroid)
 	}
 
@@ -181,6 +229,7 @@ func TestPublishMapsEachStoreAndItsSwitch(t *testing.T) {
 		t.Fatalf("mapped, switch off: %q %d %d", google, active, offAndroid)
 	}
 	p[1].AvailableAndroid = true
+	p[5].GoogleProductID, p[5].AvailableAndroid = "kz.aireply.pack30", true
 	if err := publishProducts(t, s, p); err != nil {
 		t.Fatal(err)
 	}
@@ -208,7 +257,7 @@ func TestPublishMapsEachStoreAndItsSwitch(t *testing.T) {
 		t.Fatal(err)
 	}
 	p = InitialProducts()
-	p[1].AppleProductID, p[1].GoogleProductID, p[1].AvailableAndroid = "test.base", "kz.aireply.base.monthly", true
+	p[1].AppleProductID, p[1].GoogleProductID = "test.base", "kz.aireply.base.monthly"
 	p[2].GoogleProductID = "kz.taken"
 	if err := publishProducts(t, s, p); !errors.Is(err, domain.ErrConflict) {
 		t.Fatalf("taken id: %v", err)

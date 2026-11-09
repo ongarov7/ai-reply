@@ -67,6 +67,71 @@ func TestGoogleMigrationCarriesAnExistingMappingIntoTheCatalog(t *testing.T) {
 	}
 }
 
+// Production has applied 0036 and 0037 and runs the catalogue version 0037 published.
+func TestGoogleMigrationAppliesOnTopOfTheMonthlyBundle(t *testing.T) {
+	for _, mapped := range []bool{false, true} {
+		ctx := context.Background()
+		db, err := database.Open(database.Options{Path: filepath.Join(t.TempDir(), "production.sqlite")})
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = db.Close() })
+		if _, err := database.Migrate(ctx, db, catalogMigrationsBefore(t, "0037")); err != nil {
+			t.Fatal(err)
+		}
+		exec := func(query string, args ...any) {
+			t.Helper()
+			if _, err := db.Writer().Exec(query, args...); err != nil {
+				t.Fatal(err)
+			}
+		}
+		old := legacyDailyProducts()
+		for i := 1; i < len(old); i++ {
+			old[i].AppleProductID = "test." + old[i].Code
+		}
+		raw, _ := json.Marshal(old)
+		for id := 1; id < 5; id++ {
+			exec(`INSERT INTO billing_catalog_versions(id,state,products_json,created_by,updated_by,created_at,updated_at) VALUES(?,'superseded',?,'owner','owner',1000,1000)`, id, string(raw))
+		}
+		exec(`INSERT INTO billing_catalog_versions(id,state,products_json,created_by,updated_by,published_by,created_at,updated_at,published_at) VALUES(5,'published',?,'owner','owner','owner',1000,1000,1000)`, string(raw))
+		exec(`UPDATE iap_products SET apple_product_id='test.'||code,is_active=1 WHERE code<>'free'`)
+		if _, err := database.Migrate(ctx, db, catalogMigrationsBefore(t, "0038")); err != nil {
+			t.Fatal(err)
+		}
+		s := New(db)
+		version6, err := s.Published(ctx)
+		if err != nil || version6.ID != 6 || version6.CreatedBy != "migration:0037" {
+			t.Fatalf("after 0037: %+v %v", version6, err)
+		}
+		if mapped {
+			exec(`UPDATE iap_products SET google_product_id='pack_30' WHERE code='pack30'`)
+		}
+		if _, err := database.Migrate(ctx, db, migrations.FS); err != nil {
+			t.Fatal(err)
+		}
+		current, err := s.Published(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !mapped {
+			if current.ID != 6 || !reflect.DeepEqual(current.Products, version6.Products) {
+				t.Fatalf("0038 changed the catalogue: %+v", current)
+			}
+			var versions, offIOS, offAndroid int
+			if err := db.Reader().QueryRow(`SELECT (SELECT count(*) FROM billing_catalog_versions),coalesce(SUM(off_ios),0),coalesce(SUM(off_android),0) FROM iap_products`).Scan(&versions, &offIOS, &offAndroid); err != nil ||
+				versions != 6 || offIOS != 0 || offAndroid != 0 {
+				t.Fatalf("0038 wrote more than its columns: %d %d %d %v", versions, offIOS, offAndroid, err)
+			}
+			continue
+		}
+		want := append([]Product(nil), version6.Products...)
+		want[5].GoogleProductID, want[5].AvailableAndroid = "pack_30", true
+		if current.ID != 7 || current.BaseVersion != 6 || !reflect.DeepEqual(current.Products, want) {
+			t.Fatalf("mapped: %+v", current)
+		}
+	}
+}
+
 func TestGoogleMigrationDoesNothingWithoutAMapping(t *testing.T) {
 	ctx := context.Background()
 	db, exec := googleMigrationFixture(t)

@@ -871,6 +871,20 @@ func TestIAPIsOffUntilConfigured(t *testing.T) {
 	}
 }
 
+func TestGooglePlayTokenSecretIsOptionalAndLong(t *testing.T) {
+	if got := iapFromEnv("production"); got.GoogleTokenSecret != "" || len(got.validate()) != 0 {
+		t.Fatalf("unset: %+v", got.validate())
+	}
+	t.Setenv("GOOGLE_PLAY_TOKEN_SECRET", "short")
+	if problems := strings.Join(iapFromEnv("production").validate(), "\n"); !strings.Contains(problems, "GOOGLE_PLAY_TOKEN_SECRET") {
+		t.Fatalf("a short secret accepted: %q", problems)
+	}
+	t.Setenv("GOOGLE_PLAY_TOKEN_SECRET", strings.Repeat("s", 32))
+	if got := iapFromEnv("production"); got.GoogleTokenSecret == "" || len(got.validate()) != 0 {
+		t.Fatalf("a valid secret refused: %+v", got.validate())
+	}
+}
+
 // Sandbox purchases require a backend and database separate from production.
 func TestProductionRefusesSandboxPurchasesByDefault(t *testing.T) {
 	if got := iapFromEnv("production"); got.AppleAcceptSandbox {
