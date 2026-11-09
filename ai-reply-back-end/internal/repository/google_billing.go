@@ -430,6 +430,13 @@ func refundGoogleOrder(ctx context.Context, tx *sql.Tx, row googleSubscriptionRo
 	return n > 0, revokeGoogleBaseMonthly(ctx, tx, purchaseID, in.Reason, in.Now)
 }
 
+// GoogleSubscriptionHeldBy — this token already belongs to this account.
+func (s *Store) GoogleSubscriptionHeldBy(ctx context.Context, tokenHash, userID string) (bool, error) {
+	var held bool
+	err := s.db.Reader().QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM google_subscriptions WHERE token_hash=? AND user_id=?)`, tokenHash, userID).Scan(&held)
+	return held, err
+}
+
 // ActiveGoogleSubscription — the strongest Play subscription that gives access now.
 func (s *Store) ActiveGoogleSubscription(ctx context.Context, userID string, now time.Time) (domain.Subscription, error) {
 	var sub domain.Subscription

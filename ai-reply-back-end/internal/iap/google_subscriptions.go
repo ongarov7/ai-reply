@@ -83,7 +83,12 @@ func (s *Service) verifyGoogleSubscription(ctx context.Context, user domain.User
 	if accountToken == "" {
 		return Result{}, domain.ErrStoreUnavailable
 	}
-	if p.AccountID() == "" || p.AccountID() != accountToken {
+	txn := tokenHash(token)
+	bound, err := s.boundToAccount(ctx, p, user.ID, accountToken, txn)
+	if err != nil {
+		return Result{}, err
+	}
+	if !bound {
 		return refuse(domain.PurchaseReasonAccount)
 	}
 	environment := domain.EnvironmentProduction
@@ -101,7 +106,6 @@ func (s *Service) verifyGoogleSubscription(ctx context.Context, user domain.User
 		return refuse(domain.PurchaseReasonProduct)
 	}
 
-	txn := tokenHash(token)
 	now := s.clock.Now()
 	expires := item.Expires()
 	state := p.SubscriptionState
@@ -188,6 +192,30 @@ func (s *Service) verifyGoogleSubscription(ctx context.Context, user domain.User
 		s.log.Info("google play subscription granted", "user_id", user.ID, "product", product.Code, "environment", environment, "purchase_id", res.Purchase.ID)
 	}
 	return Result{Status: status, Purchase: res.Purchase}, nil
+}
+
+// boundToAccount — this purchase is this account's.
+//
+// A purchase made in the app names its account. A re-subscription from the Play
+// subscriptions center does not: only the expired subscription it continues
+// says whose it is, and Google stops saying so after the acknowledgement, when
+// the row written for it holds the binding instead.
+func (s *Service) boundToAccount(ctx context.Context, p googleplay.Subscription, userID, accountToken, txn string) (bool, error) {
+	if id := p.AccountID(); id != "" {
+		return id == accountToken, nil
+	}
+	if c := p.OutOfAppPurchaseContext; c != nil {
+		if id := c.ExpiredAccountID(); id != "" {
+			return id == accountToken, nil
+		}
+		if c.ExpiredPurchaseToken != "" {
+			held, err := s.repo.GoogleSubscriptionHeldBy(ctx, tokenHash(c.ExpiredPurchaseToken), userID)
+			if held || err != nil {
+				return held, err
+			}
+		}
+	}
+	return s.repo.GoogleSubscriptionHeldBy(ctx, txn, userID)
 }
 
 // storeGoogleState — the subscription gives nothing now; a known row follows Google.

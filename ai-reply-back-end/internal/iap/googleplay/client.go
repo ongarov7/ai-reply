@@ -180,6 +180,7 @@ type Subscription struct {
 	AcknowledgementState       string                      `json:"acknowledgementState,omitempty"`
 	RegionCode                 string                      `json:"regionCode,omitempty"`
 	ExternalAccountIdentifiers *ExternalAccountIdentifiers `json:"externalAccountIdentifiers,omitempty"`
+	OutOfAppPurchaseContext    *OutOfAppPurchaseContext    `json:"outOfAppPurchaseContext,omitempty"`
 	TestPurchase               *TestPurchase               `json:"testPurchase,omitempty"`
 	LineItems                  []SubscriptionLineItem      `json:"lineItems"`
 }
@@ -187,6 +188,22 @@ type Subscription struct {
 // ExternalAccountIdentifiers — what the app passed to Play Billing.
 type ExternalAccountIdentifiers struct {
 	ObfuscatedExternalAccountID string `json:"obfuscatedExternalAccountId,omitempty"`
+}
+
+// OutOfAppPurchaseContext — a re-subscription made in the Play subscriptions
+// center: no app ran, so the purchase names no account of its own, only the
+// expired one it continues. Google drops this once the purchase is acknowledged.
+type OutOfAppPurchaseContext struct {
+	ExpiredExternalAccountIdentifiers *ExternalAccountIdentifiers `json:"expiredExternalAccountIdentifiers,omitempty"`
+	ExpiredPurchaseToken              string                      `json:"expiredPurchaseToken,omitempty"`
+}
+
+// ExpiredAccountID — the account of the expired subscription ("" when Google did not say).
+func (c OutOfAppPurchaseContext) ExpiredAccountID() string {
+	if c.ExpiredExternalAccountIdentifiers == nil {
+		return ""
+	}
+	return c.ExpiredExternalAccountIdentifiers.ObfuscatedExternalAccountID
 }
 
 // TestPurchase — present (empty) on a license tester's purchase.
