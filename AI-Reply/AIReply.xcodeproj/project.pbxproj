@@ -285,6 +285,18 @@
 		FD7BF7EA41A1203B3C3B474F /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = AC6DEC8781EA6DD173A05B4D /* FirebaseMessaging */; };
 		FEF45880C36B767675C5DCD3 /* CommunicationTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90E39000C4ED61ADBA6BA9DB /* CommunicationTypes.swift */; };
 		FF2AEDE04A685DDED7727F16 /* ExhaustedSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADB1D5B4DBF9CFD908D3A39E /* ExhaustedSheet.swift */; };
+		00336B13CDB41EBF20445497 /* WatchVoiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA78E2CAE3642524EDFB9DD0 /* WatchVoiceProtocol.swift */; };
+		FDA7C4F83E344E1A1F7A23E4 /* WatchVoiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA78E2CAE3642524EDFB9DD0 /* WatchVoiceProtocol.swift */; };
+		84811705794477B7607E4F79 /* WatchVoiceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E5981158FF0D973BB8A8FCE /* WatchVoiceStore.swift */; };
+		7047D920B6ED5C182B987460 /* WatchVoiceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E5981158FF0D973BB8A8FCE /* WatchVoiceStore.swift */; };
+		66C3D64335458178D9F3B0D4 /* WatchVoiceSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAD4D4B7464F0F86C8D577E3 /* WatchVoiceSession.swift */; };
+		7B3A84DAA41F1EB59074F492 /* WatchVoiceSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAD4D4B7464F0F86C8D577E3 /* WatchVoiceSession.swift */; };
+		78C8461099C5131900F9745B /* WatchVoiceRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 419B7D29BF7ADA33CCE6896F /* WatchVoiceRouting.swift */; };
+		21CF74FCF7D7CBCD8B49E2B0 /* WatchVoiceRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 419B7D29BF7ADA33CCE6896F /* WatchVoiceRouting.swift */; };
+		66DF5C1702345D6A6327D611 /* WatchVoiceCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A306F9F1CE032D6A19849AB0 /* WatchVoiceCoordinator.swift */; };
+		31FDA11803B9DAFFC4C6BEBF /* WatchVoiceCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A306F9F1CE032D6A19849AB0 /* WatchVoiceCoordinator.swift */; };
+		B6833CF12DAA12D1FA21FA23 /* WatchVoiceStrings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02FF8C575EE4993C2D038899 /* WatchVoiceStrings.swift */; };
+		F4C32FC8BD19D2DE7711590D /* WatchVoiceStrings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02FF8C575EE4993C2D038899 /* WatchVoiceStrings.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -537,6 +549,12 @@
 		FB782395C8E12E9AA4901D84 /* SenderProfileTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SenderProfileTests.swift; sourceTree = "<group>"; };
 		FBEB5CCD94940E7852F9E36A /* ExhaustedSheetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExhaustedSheetTests.swift; sourceTree = "<group>"; };
 		FC2B497C0588CE17BB277DBB /* AutocorrectDistanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutocorrectDistanceTests.swift; sourceTree = "<group>"; };
+		EA78E2CAE3642524EDFB9DD0 /* WatchVoiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchVoiceProtocol.swift; sourceTree = "<group>"; };
+		2E5981158FF0D973BB8A8FCE /* WatchVoiceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchVoiceStore.swift; sourceTree = "<group>"; };
+		DAD4D4B7464F0F86C8D577E3 /* WatchVoiceSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchVoiceSession.swift; sourceTree = "<group>"; };
+		419B7D29BF7ADA33CCE6896F /* WatchVoiceRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchVoiceRouting.swift; sourceTree = "<group>"; };
+		A306F9F1CE032D6A19849AB0 /* WatchVoiceCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchVoiceCoordinator.swift; sourceTree = "<group>"; };
+		02FF8C575EE4993C2D038899 /* WatchVoiceStrings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchVoiceStrings.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -633,6 +651,7 @@
 				42B48CCB9F8963E92D95661D /* AI */,
 				A02E7161CE7DE02433571BD4 /* Keyboard */,
 				CDF314CD6881A75774FD8AD8 /* Model */,
+				463F7CA10A88949542096D38 /* WatchVoice */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -1017,6 +1036,19 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		463F7CA10A88949542096D38 /* WatchVoice */ = {
+			isa = PBXGroup;
+			children = (
+				EA78E2CAE3642524EDFB9DD0 /* WatchVoiceProtocol.swift */,
+				2E5981158FF0D973BB8A8FCE /* WatchVoiceStore.swift */,
+				DAD4D4B7464F0F86C8D577E3 /* WatchVoiceSession.swift */,
+				419B7D29BF7ADA33CCE6896F /* WatchVoiceRouting.swift */,
+				A306F9F1CE032D6A19849AB0 /* WatchVoiceCoordinator.swift */,
+				02FF8C575EE4993C2D038899 /* WatchVoiceStrings.swift */,
+			);
+			path = WatchVoice;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -1326,6 +1358,12 @@
 				39A76347547C3E5641A67A21 /* VoiceConfigurationParser.swift in Sources */,
 				994752001103ADBBD8CDBF07 /* WordList.swift in Sources */,
 				A0E343AD2D3D657620A8B2BE /* WorkingHours.swift in Sources */,
+				FDA7C4F83E344E1A1F7A23E4 /* WatchVoiceProtocol.swift in Sources */,
+				7047D920B6ED5C182B987460 /* WatchVoiceStore.swift in Sources */,
+				7B3A84DAA41F1EB59074F492 /* WatchVoiceSession.swift in Sources */,
+				21CF74FCF7D7CBCD8B49E2B0 /* WatchVoiceRouting.swift in Sources */,
+				31FDA11803B9DAFFC4C6BEBF /* WatchVoiceCoordinator.swift in Sources */,
+				F4C32FC8BD19D2DE7711590D /* WatchVoiceStrings.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1464,6 +1502,12 @@
 				1157C1E2158C7855998A3AE5 /* WordList.swift in Sources */,
 				6FCA6398A7ED53E311C79C7D /* WorkingHours.swift in Sources */,
 				52A7FEB74AF1B7907FB28345 /* WorkingHoursView.swift in Sources */,
+				00336B13CDB41EBF20445497 /* WatchVoiceProtocol.swift in Sources */,
+				84811705794477B7607E4F79 /* WatchVoiceStore.swift in Sources */,
+				66C3D64335458178D9F3B0D4 /* WatchVoiceSession.swift in Sources */,
+				78C8461099C5131900F9745B /* WatchVoiceRouting.swift in Sources */,
+				66DF5C1702345D6A6327D611 /* WatchVoiceCoordinator.swift in Sources */,
+				B6833CF12DAA12D1FA21FA23 /* WatchVoiceStrings.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
