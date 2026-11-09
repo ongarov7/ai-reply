@@ -76,7 +76,9 @@ data class BillingState(
     val pendingProductIds: Set<String> = emptySet(),
     val notice: PurchaseNotice? = null,
     /** «Восстановить покупки» is running. */
-    val restoring: Boolean = false
+    val restoring: Boolean = false,
+    /** Base, for an account on its fourth or fifth pack that has not turned it down. */
+    val recommendation: IapRecommendationDto? = null
 ) {
     enum class Phase {
         IDLE,
@@ -126,6 +128,7 @@ class BillingRepository(
     private val refreshUsage: suspend () -> Unit,
     /** A subscription was granted: the answer has the balance, not the plan, so the account is read again. */
     private val refreshAccount: suspend () -> Unit,
+    private val recommendations: RecommendationStore,
     private val scope: CoroutineScope
 ) {
 
@@ -193,15 +196,21 @@ class BillingRepository(
         held = current
         val byId = prices.associateBy { it.productId }
         val offered = known.mapNotNull { product -> offered(product, byId[product.storeProductId]) }
-        _state.update { it.copy(phase = BillingState.Phase.READY, products = offered) }
+        val recommendation = catalog.recommendation?.takeIf { stillRecommended(it, catalog.accountToken) }
+        _state.update { it.copy(phase = BillingState.Phase.READY, products = offered, recommendation = recommendation) }
         reconcile()
     }
 
     /** The server closed sales: nothing stays on offer, however recently it was loaded. */
     private fun closeSales() {
         accountToken = null
-        _state.update { it.copy(phase = BillingState.Phase.OFF, products = emptyList()) }
+        _state.update { it.copy(phase = BillingState.Phase.OFF, products = emptyList(), recommendation = null) }
     }
+
+    /** Only around the fourth and fifth pack, and not once this account has said no. */
+    private fun stillRecommended(recommendation: IapRecommendationDto, account: String): Boolean =
+        recommendation.purchaseCount in 4..5 && recommendation.spentMinor > 0 &&
+            !recommendations.isRecommendationDismissed(account, recommendation.id)
 
     /** What the server sells that this build understands: anything else is not offered. */
     private fun isSellable(product: IapProductDto): Boolean = when (kindOf(product)) {
@@ -313,6 +322,14 @@ class BillingRepository(
 
     fun clearNotice() {
         _state.update { it.copy(notice = null) }
+    }
+
+    /** «Продолжить без подписки»: this account is not offered this one again. */
+    fun dismissRecommendation() {
+        val account = accountToken ?: return
+        val id = _state.value.recommendation?.id ?: return
+        recommendations.dismissRecommendation(account, id)
+        _state.update { it.copy(recommendation = null) }
     }
 
     /** Another account may sign in next: nothing of this one's is kept. */

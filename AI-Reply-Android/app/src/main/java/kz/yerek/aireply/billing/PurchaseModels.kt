@@ -1,7 +1,13 @@
 package kz.yerek.aireply.billing
 
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.nullable
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonDecoder
 import kz.yerek.aireply.data.account.UsageDto
 
 /**
@@ -14,8 +20,39 @@ import kz.yerek.aireply.data.account.UsageDto
 data class IapCatalogDto(
     val products: List<IapProductDto> = emptyList(),
     /** A stable UUID for this account; sent as Play's obfuscated account id, exactly as received. */
-    @SerialName("account_token") val accountToken: String = ""
+    @SerialName("account_token") val accountToken: String = "",
+    /** Base, for an account that keeps buying packs; null when there is nothing to recommend. */
+    @Serializable(with = OptionalRecommendationSerializer::class)
+    val recommendation: IapRecommendationDto? = null
 )
+
+/** What the server knows of an account's pack purchases. All of it or none: see [OptionalRecommendationSerializer]. */
+@Serializable
+data class IapRecommendationDto(
+    /** Names this recommendation, so turning it down does not turn down a later one. */
+    val id: String,
+    @SerialName("purchase_count") val purchaseCount: Int,
+    @SerialName("spent_minor") val spentMinor: Long,
+    val currency: String,
+    @SerialName("base_price_minor") val basePriceMinor: Long,
+    /** The Play product id of the Base plan. */
+    @SerialName("base_store_product_id") val baseStoreProductId: String
+)
+
+/** An extra on the catalogue: an answer this build cannot read costs the card, never the products. */
+internal object OptionalRecommendationSerializer : KSerializer<IapRecommendationDto?> {
+    private val strict = IapRecommendationDto.serializer().nullable
+
+    override val descriptor: SerialDescriptor = strict.descriptor
+
+    override fun deserialize(decoder: Decoder): IapRecommendationDto? {
+        val input = decoder as? JsonDecoder ?: return strict.deserialize(decoder)
+        val element = input.decodeJsonElement()
+        return runCatching { input.json.decodeFromJsonElement(strict, element) }.getOrNull()
+    }
+
+    override fun serialize(encoder: Encoder, value: IapRecommendationDto?) = strict.serialize(encoder, value)
+}
 
 @Serializable
 data class IapProductDto(
@@ -69,4 +106,10 @@ data class PurchaseResultDto(
 interface PurchaseApi {
     suspend fun catalog(): IapCatalogDto
     suspend fun verify(productId: String, purchaseToken: String): PurchaseResultDto
+}
+
+/** The recommendations an account turned down, on this phone. */
+interface RecommendationStore {
+    fun isRecommendationDismissed(account: String, id: String): Boolean
+    fun dismissRecommendation(account: String, id: String)
 }

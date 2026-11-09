@@ -1,5 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="purchase_recommendation_title">Ответы на каждый день</string>
+    <string name="purchase_recommendation_choose">Посмотреть Base</string>
+    <string name="purchase_recommendation_dismiss">Продолжить без подписки</string>
+    <plurals name="purchase_recommendation_body">
+        <item quantity="one">На дополнительные ответы уже ушло %1$s. Base за %2$s в месяц даёт %3$d ответ каждый день.</item>
+        <item quantity="few">На дополнительные ответы уже ушло %1$s. Base за %2$s в месяц даёт %3$d ответа каждый день.</item>
+        <item quantity="many">На дополнительные ответы уже ушло %1$s. Base за %2$s в месяц даёт %3$d ответов каждый день.</item>
+        <item quantity="other">На дополнительные ответы уже ушло %1$s. Base за %2$s в месяц даёт %3$d ответа каждый день.</item>
+    </plurals>
+    <plurals name="purchase_recommendation_body_monthly">
+        <item quantity="one">На дополнительные ответы уже ушло %1$s. Base за %2$s в месяц даёт %3$d ответ каждый месяц.</item>
+        <item quantity="few">На дополнительные ответы уже ушло %1$s. Base за %2$s в месяц даёт %3$d ответа каждый месяц.</item>
+        <item quantity="many">На дополнительные ответы уже ушло %1$s. Base за %2$s в месяц даёт %3$d ответов каждый месяц.</item>
+        <item quantity="other">На дополнительные ответы уже ушло %1$s. Base за %2$s в месяц даёт %3$d ответа каждый месяц.</item>
+    </plurals>
     <plurals name="subscription_daily_accrual">
         <item quantity="one">Начисляем %1$d ответ каждый день подписки Base</item>
         <item quantity="few">Начисляем %1$d ответа каждый день подписки Base</item>

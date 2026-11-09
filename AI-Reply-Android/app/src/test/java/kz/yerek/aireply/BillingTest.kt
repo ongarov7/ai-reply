@@ -15,6 +15,7 @@ import kz.yerek.aireply.billing.BillingRepository
 import kz.yerek.aireply.billing.BillingState
 import kz.yerek.aireply.billing.IapCatalogDto
 import kz.yerek.aireply.billing.IapProductDto
+import kz.yerek.aireply.billing.IapRecommendationDto
 import kz.yerek.aireply.billing.OfferedProduct
 import kz.yerek.aireply.billing.PurchaseApi
 import kz.yerek.aireply.billing.PurchaseNotice
@@ -31,12 +32,14 @@ import kz.yerek.aireply.data.account.ApiError
 import kz.yerek.aireply.data.account.ApiException
 import kz.yerek.aireply.data.account.DeviceDescriptor
 import kz.yerek.aireply.data.account.UsageDto
+import kz.yerek.aireply.data.settings.DeviceStateStore
 import kz.yerek.aireply.support.FakeCredentials
 import kz.yerek.aireply.support.FakeResponse
 import kz.yerek.aireply.support.FakeServer
 import kz.yerek.aireply.support.sessionOn
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -139,6 +142,7 @@ class BillingTest {
             accountRefreshes++
             onAccountRefresh()
         },
+        recommendations = DeviceStateStore(InMemoryPreferences()),
         scope = scope
     )
 
@@ -710,6 +714,107 @@ class BillingTest {
         assertEquals(BillingState(), state)
         billing.buy(activity, OfferedProduct("pack_20", OfferedProduct.Kind.PACK, 20, 0, "play.pack_20", "x", "990 ₸"))
         assertTrue("no purchase without this account's token", store.launched.isEmpty())
+    }
+
+    // ------------------------------------------- the Base recommendation
+
+    private fun recommendation(id: String = "base_after_pack_4", count: Int = 4, spent: Long = 396_000) =
+        IapRecommendationDto(id, count, spent, "KZT", 99_000, "play.base.month")
+
+    private fun recommends(value: IapRecommendationDto, account: String = TOKEN) {
+        sellsBaseAndPro()
+        api.catalog = api.catalog.copy(accountToken = account, recommendation = value)
+    }
+
+    @Test
+    fun `an account on its fourth or fifth pack is recommended Base`() = runBlocking {
+        recommends(recommendation(id = "base_after_pack_5", count = 5))
+        billing.load()
+        assertEquals("base_after_pack_5", state.recommendation?.id)
+    }
+
+    @Test
+    fun `outside the fourth and fifth pack, or with nothing spent, nothing is recommended`() = runBlocking {
+        listOf(recommendation(count = 3), recommendation(count = 6), recommendation(spent = 0)).forEach { value ->
+            recommends(value)
+            billing.load()
+            assertNull(value.toString(), state.recommendation)
+        }
+    }
+
+    @Test
+    fun `a dismissed recommendation stays away for this account only`() = runBlocking {
+        recommends(recommendation())
+        billing.load()
+        billing.dismissRecommendation()
+        assertNull(state.recommendation)
+
+        billing.load()
+        assertNull("still no on the next visit", state.recommendation)
+
+        recommends(recommendation(id = "base_after_pack_5", count = 5))
+        billing.load()
+        assertEquals("a later recommendation is a new one", "base_after_pack_5", state.recommendation?.id)
+
+        billing.reset()
+        recommends(recommendation(), account = OTHER_TOKEN)
+        billing.load()
+        assertEquals("another account never said no", "base_after_pack_4", state.recommendation?.id)
+    }
+
+    @Test
+    fun `sales closing takes the recommendation away`() = runBlocking {
+        recommends(recommendation())
+        billing.load()
+        assertNotNull(state.recommendation)
+
+        api.catalogError = ApiError.PurchasesUnavailable
+        billing.load()
+
+        assertNull(state.recommendation)
+    }
+
+    @Test
+    fun `the recommendation is read from the server's fields`() = runBlocking {
+        val server = FakeServer { request ->
+            when (request.path) {
+                "/api/v1/iap/products" -> FakeResponse(
+                    200,
+                    """{"products":[],"account_token":"$TOKEN","recommendation":{"id":"base_after_pack_4","purchase_count":4,
+                       "spent_minor":396000,"currency":"KZT","base_price_minor":99000,"base_store_product_id":"play.base.month"}}"""
+                )
+                else -> FakeResponse(404)
+            }
+        }
+        assertEquals(recommendation(), accountServiceOn(server).iapProducts().recommendation)
+    }
+
+    @Test
+    fun `a server without a recommendation has none`() = runBlocking {
+        val server = FakeServer { request ->
+            when (request.path) {
+                "/api/v1/iap/products" -> FakeResponse(200, """{"products":[],"account_token":"$TOKEN"}""")
+                else -> FakeResponse(404)
+            }
+        }
+        assertNull(accountServiceOn(server).iapProducts().recommendation)
+    }
+
+    @Test
+    fun `a recommendation that cannot be read costs the card, not the products`() = runBlocking {
+        val server = FakeServer { request ->
+            when (request.path) {
+                "/api/v1/iap/products" -> FakeResponse(
+                    200,
+                    """{"products":[{"code":"pack","kind":"pack","units":30,"store_product_id":"pack30"}],
+                       "account_token":"$TOKEN","recommendation":{"purchase_count":"four"}}"""
+                )
+                else -> FakeResponse(404)
+            }
+        }
+        val catalog = accountServiceOn(server).iapProducts()
+        assertEquals(30, catalog.products.single().units)
+        assertNull(catalog.recommendation)
     }
 
     // ---------------------------------------------------------- the wire

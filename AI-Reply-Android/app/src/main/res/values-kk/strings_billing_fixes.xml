@@ -1,5 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="purchase_recommendation_title">Күн сайынғы жауаптар</string>
+    <string name="purchase_recommendation_choose">Base тарифін көру</string>
+    <string name="purchase_recommendation_dismiss">Жазылымсыз жалғастыру</string>
+    <plurals name="purchase_recommendation_body">
+        <item quantity="one">Қосымша жауаптарға %1$s жұмсадың. Айына %2$s тұратын Base арқылы күн сайын %3$d жауап ал.</item>
+        <item quantity="other">Қосымша жауаптарға %1$s жұмсадың. Айына %2$s тұратын Base арқылы күн сайын %3$d жауап ал.</item>
+    </plurals>
+    <plurals name="purchase_recommendation_body_monthly">
+        <item quantity="one">Қосымша жауаптарға %1$s жұмсадың. Айына %2$s тұратын Base арқылы ай сайын %3$d жауап ал.</item>
+        <item quantity="other">Қосымша жауаптарға %1$s жұмсадың. Айына %2$s тұратын Base арқылы ай сайын %3$d жауап ал.</item>
+    </plurals>
     <plurals name="subscription_daily_accrual">
         <item quantity="one">Base жазылымы кезінде күн сайын %1$d жауап қосылады</item>
         <item quantity="other">Base жазылымы кезінде күн сайын %1$d жауап қосылады</item>

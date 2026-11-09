@@ -1,12 +1,17 @@
 package kz.yerek.aireply
 
 import kotlinx.serialization.json.Json
+import kz.yerek.aireply.billing.IapRecommendationDto
+import kz.yerek.aireply.billing.OfferedProduct
 import kz.yerek.aireply.core.lang.AppLanguage
 import kz.yerek.aireply.data.account.AccountUsageCache
 import kz.yerek.aireply.data.account.PlanDto
+import kz.yerek.aireply.data.account.SubscriptionDto
 import kz.yerek.aireply.data.account.UsageDto
 import kz.yerek.aireply.ui.feature.account.UsageSummary
 import kz.yerek.aireply.ui.feature.account.formatExpiry
+import kz.yerek.aireply.ui.feature.account.formatSpend
+import kz.yerek.aireply.ui.feature.account.recommendedOffer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -33,6 +38,56 @@ class SubscriptionDisplayTest {
         assertFalse(older.purchasable)
         val current = json.decodeFromString(PlanDto.serializer(), """{"id":"p","code":"pro","purchasable":true}""")
         assertTrue(current.purchasable)
+    }
+
+    private val baseRecommendation = IapRecommendationDto("base_after_pack_4", 4, 396_000, "KZT", 99_000, "play.base.month")
+    private val balance = UsageDto(resetsAt = "x", remainingTotal = 3)
+
+    private fun baseOffer(
+        id: String = "play.base.month",
+        period: String = "month",
+        kind: String = "monthly",
+        monthly: Int = 1000,
+        mismatch: Boolean = false
+    ) = OfferedProduct(
+        code = "base_monthly", kind = OfferedProduct.Kind.SUBSCRIPTION, units = 0, durationHours = 0, storeProductId = id, name = "Base",
+        price = "990 ₸", planId = "base", billingPeriod = period, entitlementKind = kind, monthlyLimit = monthly, hasPriceMismatch = mismatch
+    )
+
+    @Test
+    fun `the recommendation points at the monthly Base that can be bought`() {
+        val offer = baseOffer()
+        val pro = baseOffer(id = "play.pro.month", kind = "unlimited", monthly = 0)
+        assertEquals(offer, recommendedOffer(baseRecommendation, listOf(pro, offer), balance, null))
+        assertNull("not the yearly one", recommendedOffer(baseRecommendation, listOf(baseOffer(period = "year")), balance, null))
+        assertNull("not a price being updated", recommendedOffer(baseRecommendation, listOf(baseOffer(mismatch = true)), balance, null))
+        assertNull("not without an allowance to name", recommendedOffer(baseRecommendation, listOf(baseOffer(monthly = 0)), balance, null))
+        assertNull("not another product", recommendedOffer(baseRecommendation, listOf(pro), balance, null))
+    }
+
+    @Test
+    fun `only an account without a paid plan is recommended Base`() {
+        val offers = listOf(baseOffer())
+        fun on(status: String, free: Boolean) = SubscriptionDto(status = status, plan = PlanDto(id = "p", code = "c", isFree = free))
+        assertNull(recommendedOffer(baseRecommendation, offers, balance, on("active", free = false)))
+        assertNull(recommendedOffer(baseRecommendation, offers, UsageDto(unlimited = true, resetsAt = "x"), null))
+        assertEquals(offers.single(), recommendedOffer(baseRecommendation, offers, balance, on("active", free = true)))
+        assertEquals(offers.single(), recommendedOffer(baseRecommendation, offers, balance, on("expired", free = false)))
+    }
+
+    @Test
+    fun `what was spent is written with the tenge sign in every language`() {
+        AppLanguage.entries.forEach { language ->
+            val text = formatSpend(396_000, "KZT", language.locale)
+            assertTrue(text, text.contains("₸"))
+            assertEquals(text, "396000", text.filter(Char::isDigit))
+        }
+    }
+
+    @Test
+    fun `what was spent in another currency keeps its own sign, and an unknown one its code`() {
+        assertEquals("\$12.50", formatSpend(1250, "USD", AppLanguage.ENGLISH.locale))
+        assertEquals("12.50 ???", formatSpend(1250, "???", AppLanguage.ENGLISH.locale))
     }
 
     @Test

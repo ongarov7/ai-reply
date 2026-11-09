@@ -1,5 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="purchase_recommendation_title">Har kunlik javoblar</string>
+    <string name="purchase_recommendation_choose">Base tarifini ko‘rish</string>
+    <string name="purchase_recommendation_dismiss">Obunasiz davom etish</string>
+    <plurals name="purchase_recommendation_body">
+        <item quantity="one">Qo‘shimcha javoblar uchun %1$s sarfladingiz. Oyiga %2$s evaziga Base bilan har kuni %3$d ta javob oling.</item>
+        <item quantity="other">Qo‘shimcha javoblar uchun %1$s sarfladingiz. Oyiga %2$s evaziga Base bilan har kuni %3$d ta javob oling.</item>
+    </plurals>
+    <plurals name="purchase_recommendation_body_monthly">
+        <item quantity="one">Qo‘shimcha javoblar uchun %1$s sarfladingiz. Oyiga %2$s evaziga Base bilan har oy %3$d ta javob oling.</item>
+        <item quantity="other">Qo‘shimcha javoblar uchun %1$s sarfladingiz. Oyiga %2$s evaziga Base bilan har oy %3$d ta javob oling.</item>
+    </plurals>
     <plurals name="subscription_daily_accrual">
         <item quantity="one">Base obunasi davomida har kuni %1$d ta javob qo‘shiladi</item>
         <item quantity="other">Base obunasi davomida har kuni %1$d ta javob qo‘shiladi</item>

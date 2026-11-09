@@ -2,6 +2,7 @@ package kz.yerek.aireply.data.settings
 
 import android.content.Context
 import android.content.SharedPreferences
+import kz.yerek.aireply.billing.RecommendationStore
 import kz.yerek.aireply.update.UpdateStore
 
 /**
@@ -18,7 +19,7 @@ import kz.yerek.aireply.update.UpdateStore
  *
  * Nothing secret and no text the user typed is kept here.
  */
-class DeviceStateStore internal constructor(private val prefs: SharedPreferences) : UpdateStore {
+class DeviceStateStore internal constructor(private val prefs: SharedPreferences) : UpdateStore, RecommendationStore {
 
     constructor(context: Context) : this(
         context.applicationContext.getSharedPreferences(NAME, Context.MODE_PRIVATE)
@@ -40,6 +41,15 @@ class DeviceStateStore internal constructor(private val prefs: SharedPreferences
     override var updateDismissedAt: Long?
         get() = longOrNull(KEY_UPDATE_DISMISSED_AT)
         set(value) = putLong(KEY_UPDATE_DISMISSED_AT, value)
+
+    override fun isRecommendationDismissed(account: String, id: String): Boolean =
+        prefs.getBoolean(recommendationKey(account, id), false)
+
+    override fun dismissRecommendation(account: String, id: String) {
+        prefs.edit().putBoolean(recommendationKey(account, id), true).apply()
+    }
+
+    private fun recommendationKey(account: String, id: String) = "$KEY_RECOMMENDATION_DISMISSED.$account.$id"
 
     private fun longOrNull(key: String): Long? = if (prefs.contains(key)) prefs.getLong(key, 0L) else null
 
@@ -215,6 +225,7 @@ class DeviceStateStore internal constructor(private val prefs: SharedPreferences
 
         private const val NAME = "aireply_device"
 
+        private const val KEY_RECOMMENDATION_DISMISSED = "purchase.recommendation.dismissed"
         private const val KEY_ONBOARDING_VERSION = "onboarding.completedVersion"
 private const val KEY_UPDATE_LAST_CHECK = "update.lastCheck"
 private const val KEY_UPDATE_OFFERED = "update.offeredVersion"

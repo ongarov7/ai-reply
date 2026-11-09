@@ -1,5 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="purchase_recommendation_title">A plan for everyday replies</string>
+    <string name="purchase_recommendation_choose">View Base</string>
+    <string name="purchase_recommendation_dismiss">Continue without a subscription</string>
+    <plurals name="purchase_recommendation_body">
+        <item quantity="one">You’ve spent %1$s on extra reply packs. With Base at %2$s per month, you get %3$d reply every day.</item>
+        <item quantity="other">You’ve spent %1$s on extra reply packs. With Base at %2$s per month, you get %3$d replies every day.</item>
+    </plurals>
+    <plurals name="purchase_recommendation_body_monthly">
+        <item quantity="one">You’ve spent %1$s on extra reply packs. With Base at %2$s per month, you get %3$d reply every month.</item>
+        <item quantity="other">You’ve spent %1$s on extra reply packs. With Base at %2$s per month, you get %3$d replies every month.</item>
+    </plurals>
     <plurals name="subscription_daily_accrual">
         <item quantity="one">%1$d reply added each day of your Base subscription</item>
         <item quantity="other">%1$d replies added each day of your Base subscription</item>

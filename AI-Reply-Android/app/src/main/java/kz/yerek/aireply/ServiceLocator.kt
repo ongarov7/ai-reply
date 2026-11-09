@@ -395,6 +395,7 @@ class ServiceLocator(context: Context) {
             onUsage = { usage -> account.applyUsage(usage) },
             refreshUsage = { account.refreshUsage() },
             refreshAccount = { account.refresh() },
+            recommendations = deviceState,
             scope = scope
         )
     }
