@@ -4,6 +4,9 @@ package apptest
 import (
 	"bytes"
 	"context"
+	"crypto/pbkdf2"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -353,6 +356,22 @@ const (
 	adminPassword = "super-secret-admin-pass"
 )
 
+// seedTestAdmin writes the row admin.Bootstrap would, with a low PBKDF2 round
+// count. A stored hash names its own rounds, and the production count costs over
+// a second under the race detector, in every harness and every admin sign-in.
+func seedTestAdmin(store *repository.Store, cfg config.Config) error {
+	const rounds = 1000
+	salt := []byte("test-admin-salt")
+	key, err := pbkdf2.Key(sha256.New, cfg.Admin.BootstrapPassword, salt, rounds, 32)
+	if err != nil {
+		return err
+	}
+	hash := "pbkdf2-sha256$" + strconv.Itoa(rounds) + "$" + base64.RawStdEncoding.EncodeToString(salt) + "$" + base64.RawStdEncoding.EncodeToString(key)
+	_, err = store.CreateAdmin(context.Background(), domain.AdminUser{Email: cfg.Admin.BootstrapEmail, Name: "Administrator",
+		PasswordHash: hash, Role: "admin", Locale: "ru"})
+	return err
+}
+
 func newHarness(t *testing.T, opts ...harnessOption) *harness {
 	t.Helper()
 
@@ -506,7 +525,7 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 		Repo: store, Users: userSvc, Subs: subSvc, Plans: planSvc, AI: aiSvc, Limits: limitSvc,
 		Config: cfg, Log: log,
 	})
-	if err := adminSvc.Bootstrap(context.Background()); err != nil {
+	if err := seedTestAdmin(store, cfg); err != nil {
 		t.Fatalf("admin bootstrap: %v", err)
 	}
 
