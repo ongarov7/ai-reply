@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="subscription_daily_accrual">
+        <item quantity="one">Начисляем %1$d ответ каждый день подписки Base</item>
+        <item quantity="few">Начисляем %1$d ответа каждый день подписки Base</item>
+        <item quantity="many">Начисляем %1$d ответов каждый день подписки Base</item>
+        <item quantity="other">Начисляем %1$d ответа каждый день подписки Base</item>
+    </plurals>
+</resources>

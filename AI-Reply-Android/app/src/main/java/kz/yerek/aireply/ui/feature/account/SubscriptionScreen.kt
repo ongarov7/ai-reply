@@ -15,6 +15,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -88,6 +89,11 @@ fun SubscriptionScreen(onBack: () -> Unit, onBuy: () -> Unit = {}) {
                                 color = LocalExtraColors.current.textSecondary
                             )
                         }
+                    }
+
+                    // Paid daily grants go to the permanent balance, so they are not a daily allowance.
+                    if (usage.dailyCreditGrant > 0) {
+                        Footnote(pluralStringResource(R.plurals.subscription_daily_accrual, usage.dailyCreditGrant, usage.dailyCreditGrant))
                     }
 
                     if (summary != null && summary.limit > 0 && !balance.unlimited) {

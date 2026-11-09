@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="subscription_daily_accrual">
+        <item quantity="one">%1$d reply added each day of your Base subscription</item>
+        <item quantity="other">%1$d replies added each day of your Base subscription</item>
+    </plurals>
+</resources>

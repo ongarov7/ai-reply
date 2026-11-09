@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="subscription_daily_accrual">
+        <item quantity="one">Base obunasi davomida har kuni %1$d ta javob qo‘shiladi</item>
+        <item quantity="other">Base obunasi davomida har kuni %1$d ta javob qo‘shiladi</item>
+    </plurals>
+</resources>

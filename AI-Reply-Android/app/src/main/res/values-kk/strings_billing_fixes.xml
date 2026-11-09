@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="subscription_daily_accrual">
+        <item quantity="one">Base жазылымы кезінде күн сайын %1$d жауап қосылады</item>
+        <item quantity="other">Base жазылымы кезінде күн сайын %1$d жауап қосылады</item>
+    </plurals>
+</resources>
