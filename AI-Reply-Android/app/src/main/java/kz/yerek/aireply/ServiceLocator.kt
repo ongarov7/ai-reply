@@ -394,6 +394,7 @@ class ServiceLocator(context: Context) {
             canDeliver = { purchasesDeliverable },
             onUsage = { usage -> account.applyUsage(usage) },
             refreshUsage = { account.refreshUsage() },
+            refreshAccount = { account.refresh() },
             scope = scope
         )
     }

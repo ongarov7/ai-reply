@@ -122,6 +122,8 @@ class BillingRepository(
     private val onUsage: (UsageDto) -> Unit,
     /** A grant without a balance in the answer: read it again. */
     private val refreshUsage: suspend () -> Unit,
+    /** A subscription was granted: the answer has the balance, not the plan, so the account is read again. */
+    private val refreshAccount: suspend () -> Unit,
     private val scope: CoroutineScope
 ) {
 
@@ -412,6 +414,8 @@ class BillingRepository(
             val delivery = request.await()
             granted = delivery == Delivery.GRANTED || delivery == Delivery.ALREADY_GRANTED
             notice = noticeFor(delivery, purchase, origin)
+            // Before the buttons come back: they are drawn from the plan.
+            if (purchase.isSubscription && notice == PurchaseNotice.GRANTED) refreshAccount()
         } finally {
             _state.update { state ->
                 state.copy(

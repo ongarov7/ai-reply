@@ -123,6 +123,8 @@ class BillingTest {
     private var deliverable = true
     private val usages = mutableListOf<UsageDto>()
     private var refreshes = 0
+    private var accountRefreshes = 0
+    private var onAccountRefresh: () -> Unit = {}
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
     private val activity = Activity()
 
@@ -133,6 +135,10 @@ class BillingTest {
         canDeliver = { deliverable },
         onUsage = { usages += it },
         refreshUsage = { refreshes++ },
+        refreshAccount = {
+            accountRefreshes++
+            onAccountRefresh()
+        },
         scope = scope
     )
 
@@ -233,6 +239,45 @@ class BillingTest {
         billing.load()
         billing.buy(activity, state.subscriptions.first { it.storeProductId == "play.pro.month" })
         assertEquals("running-token", store.replaced)
+    }
+
+    @Test
+    fun `a new subscription shows the new plan before the buttons come back`() = runBlocking {
+        sellsBaseAndPro()
+        billing.load()
+        var busyWhenRead: String? = null
+        onAccountRefresh = { busyWhenRead = state.busyProductId }
+
+        billing.buy(activity, state.subscriptions.first { it.storeProductId == "play.base.month" })
+        store.reports(runningBase())
+
+        assertEquals(1, accountRefreshes)
+        assertEquals("play.base.month", busyWhenRead)
+        assertNull(state.busyProductId)
+        assertEquals(PurchaseNotice.GRANTED, state.notice)
+    }
+
+    @Test
+    fun `a subscription the server already had still shows the plan after the sheet`() = runBlocking {
+        sellsBaseAndPro()
+        billing.load()
+        api.answer = { PurchaseResultDto(PurchaseResultDto.STATUS_ALREADY_GRANTED, USAGE) }
+
+        store.reports(runningBase())
+
+        assertEquals(1, accountRefreshes)
+    }
+
+    @Test
+    fun `a routine re-check and a pack do not read the account again`() = runBlocking {
+        billing.load()
+        store.reports(purchase("pack-token"))
+        assertEquals(0, accountRefreshes)
+
+        store.held += runningBase()
+        api.answer = { PurchaseResultDto(PurchaseResultDto.STATUS_ALREADY_GRANTED, USAGE) }
+        billing.reconcile()
+        assertEquals(0, accountRefreshes)
     }
 
     @Test
