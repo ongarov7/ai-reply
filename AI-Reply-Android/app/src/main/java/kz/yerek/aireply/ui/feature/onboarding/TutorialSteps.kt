@@ -1,5 +1,6 @@
 package kz.yerek.aireply.ui.feature.onboarding
 
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -18,6 +19,9 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -90,10 +94,21 @@ internal fun ColumnScope.TutorialReplyStep(
     onSelect: (RelationshipKind) -> Unit,
     copied: Boolean,
     practiced: Boolean,
-    onCopied: () -> Unit
+    onCopied: () -> Unit,
+    page: ScrollState
 ) {
     val context = LocalContext.current
     val reply = stringResource(OnboardingExamples.demoReply(selected))
+
+    // «Получилось!» is added at the very end of the page, below the fold of most
+    // phones, so the copy that earns it takes the page there. A step that comes
+    // back with it already earned starts at its top, like every other page.
+    val earnedBefore = remember { practiced }
+    LaunchedEffect(practiced) {
+        if (!practiced || earnedBefore) return@LaunchedEffect
+        withFrameNanos { } // By the next frame the new block is measured, so the end is the new one.
+        page.animateScrollTo(page.maxValue)
+    }
 
     StepHeader(stringResource(R.string.onboarding_try_title), stringResource(R.string.onboarding_try_prompt))
     AppCard {

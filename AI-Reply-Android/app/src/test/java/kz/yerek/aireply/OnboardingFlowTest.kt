@@ -213,6 +213,20 @@ class OnboardingFlowTest {
         assertTrue("behind the copy", step.indexOf("R.string.onboarding_success)") > gate)
     }
 
+    /** The confirmation is added at the end of the page, below the fold of a phone. */
+    @Test
+    fun `the copy that earns the confirmation takes the page to it`() {
+        val step = File("src/main/java/kz/yerek/aireply/ui/feature/onboarding/TutorialSteps.kt").readText()
+        val effect = step.substringAfter("LaunchedEffect(practiced) {").substringBefore("StepHeader(")
+        assertTrue(effect, "if (!practiced || earnedBefore) return@LaunchedEffect" in effect)
+        assertTrue("once the block is measured", effect.indexOf("withFrameNanos") in 0 until effect.indexOf("animateScrollTo"))
+        assertTrue(effect, "page.animateScrollTo(page.maxValue)" in effect)
+        assertTrue("a page that comes back starts at its top", "val earnedBefore = remember { practiced }" in step)
+
+        val screen = File("src/main/java/kz/yerek/aireply/ui/feature/onboarding/OnboardingScreen.kt").readText()
+        assertTrue("the page's own scroll", "verticalScroll(page)" in screen && "page = page" in screen)
+    }
+
     @Test
     fun `going through the tutorial counts only for a guide once skipped`() {
         assertTrue(OnboardingFlow.tutorialCompletes(OnboardingStatus.SKIPPED, skipped = false))

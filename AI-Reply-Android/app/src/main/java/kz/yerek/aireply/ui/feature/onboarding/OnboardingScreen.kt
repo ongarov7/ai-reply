@@ -227,7 +227,8 @@ fun OnboardingScreen(mode: OnboardingMode, onFinished: () -> Unit) {
             )
             // Every page starts at its top.
             key(step) {
-                Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                val page = rememberScrollState()
+                Column(modifier = Modifier.weight(1f).verticalScroll(page)) {
                     ReadableColumn(verticalArrangement = Arrangement.spacedBy(Spacing.l)) {
                         when (step) {
                             OnboardingStep.WELCOME -> WelcomeStep(profileGender)
@@ -241,7 +242,8 @@ fun OnboardingScreen(mode: OnboardingMode, onFinished: () -> Unit) {
                                 },
                                 copied = replyCopied,
                                 practiced = practiced,
-                                onCopied = ::practiceCopied
+                                onCopied = ::practiceCopied,
+                                page = page
                             )
                             OnboardingStep.PERMISSIONS -> ConnectStep(keyboard)
                             OnboardingStep.GENDER -> GenderStep(selected = gender, onSelect = { gender = it })
