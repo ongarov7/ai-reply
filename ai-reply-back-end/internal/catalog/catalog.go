@@ -371,7 +371,9 @@ func synchronize(ctx context.Context, tx *sql.Tx, p Product, now int64) error {
 	}
 	onIOS := p.AvailableIOS && p.AppleProductID != ""
 	onAndroid := p.AvailableAndroid && p.GoogleProductID != ""
-	_, err := tx.ExecContext(ctx, `UPDATE iap_products SET apple_product_id=?,google_product_id=?,units=?,plan_id=?,billing_period=?,price_minor=?,currency=?,is_active=?,off_ios=?,off_android=?,name_ru=?,name_en=?,name_kk=?,updated_at=? WHERE code=? AND archived_at IS NULL`, apple, google, p.Units, planID, p.BillingPeriod, p.PriceMinor, p.Currency, p.Active && (onIOS || onAndroid), !p.AvailableIOS, !p.AvailableAndroid, p.Name["ru"], p.Name["en"], p.Name["kk"], now, p.Code)
+	// The per-store switches only matter once a product can sell in two stores.
+	twoStores := p.GoogleProductID != ""
+	_, err := tx.ExecContext(ctx, `UPDATE iap_products SET apple_product_id=?,google_product_id=?,units=?,plan_id=?,billing_period=?,price_minor=?,currency=?,is_active=?,off_ios=?,off_android=?,name_ru=?,name_en=?,name_kk=?,updated_at=? WHERE code=? AND archived_at IS NULL`, apple, google, p.Units, planID, p.BillingPeriod, p.PriceMinor, p.Currency, p.Active && (onIOS || onAndroid), twoStores && !p.AvailableIOS, twoStores && !p.AvailableAndroid, p.Name["ru"], p.Name["en"], p.Name["kk"], now, p.Code)
 	return err
 }
 
@@ -387,6 +389,8 @@ func (s *Service) RegisterPublic(mux *http.ServeMux) {
 		products := []Product{}
 		for _, p := range v.Products {
 			if p.Active {
+				// The Play mapping is the server's business: this response stays as it was.
+				p.GoogleProductID, p.AvailableAndroid = "", false
 				products = append(products, p)
 			}
 		}
