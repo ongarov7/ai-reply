@@ -63,12 +63,13 @@ class KeySurfaceController(private val listener: KeySurfaceListener) {
 
     var layout: PageLayout? = null
         set(value) {
-            if (field != value) {
-                // A new page (shift does not make one) ends every touch on the old one.
-                tracks.clear()
-                visual = TouchVisual()
-            }
+            if (field == value) return
+            val old = field
             field = value
+            // A new page (shift does not make one) ends every touch on the old
+            // one, except a finger with its key still to type.
+            tracks.values.retainAll { carryOver(it, old, value) }
+            refreshVisual()
         }
 
     /** Languages the picker lists, in cycle order. */
@@ -94,6 +95,7 @@ class KeySurfaceController(private val listener: KeySurfaceListener) {
         val downTime: Long,
         var mode: Mode = Mode.NORMAL,
         var lastX: Float = downX,
+        var lastY: Float = downY,
         var trackpadAnchor: Float = downX,
         var repeats: Int = 0,
         var nextRepeatAt: Long = Long.MAX_VALUE,
@@ -156,6 +158,7 @@ class KeySurfaceController(private val listener: KeySurfaceListener) {
         val track = tracks[id] ?: return
         val page = layout ?: return
         track.lastX = x
+        track.lastY = y
 
         when (track.mode) {
             Mode.ALTERNATES -> {
@@ -276,6 +279,24 @@ class KeySurfaceController(private val listener: KeySurfaceListener) {
     }
 
     // --------------------------------------------------------------- helpers
+
+    /**
+     * Puts a finger that has yet to type on the new page's key under it, or
+     * returns false to end its touch. The page an apostrophe or Space goes
+     * back to is the one the next thumb, already down, is aiming at. A control
+     * has to stay itself: ABC does not become the 123 that takes its place.
+     */
+    private fun carryOver(track: Track, from: PageLayout?, to: PageLayout?): Boolean {
+        if (track.mode != Mode.NORMAL || track.overPanel || to == null) return false
+        if (to.panelAt(track.lastX, track.lastY) != null) return false
+        val index = to.keyIndex(track.lastX, track.lastY) ?: return false
+        val key = to.keys[index].key
+        val held = from?.keys?.getOrNull(track.keyIndex)?.key
+        if (key != held && !(key.isCharacter && held?.isCharacter == true)) return false
+        if (isDimmed && key.editsText) return false
+        track.keyIndex = index
+        return true
+    }
 
     private fun commit(track: Track) {
         track.mode = Mode.DONE

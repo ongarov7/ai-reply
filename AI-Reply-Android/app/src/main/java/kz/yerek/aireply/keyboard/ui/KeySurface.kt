@@ -113,9 +113,10 @@ fun KeySurface(
     panel: @Composable (LaidOutPanel) -> Unit = {}
 ) {
     SideEffect {
+        // Before the page: a finger it carries over must not land on a dimmed key.
+        controller.isDimmed = state.dimmed
         controller.layout = state.layout
         controller.isShifted = state.shiftMode != ShiftState.Mode.OFF
-        controller.isDimmed = state.dimmed
         controller.languages = state.languages
     }
 

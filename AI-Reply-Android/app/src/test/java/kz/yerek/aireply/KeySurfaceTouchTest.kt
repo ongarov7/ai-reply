@@ -254,6 +254,156 @@ class KeySurfaceTouchTest {
         assertTrue("neither finger holds a key now", surface.visual.pressed.isEmpty())
     }
 
+    // ----------------------------------------- the page changes under a finger
+
+    private val apostrophe = KeyboardKey.Character("'")
+    private val numbers = page(KeyboardLanguage.ENGLISH, KeyboardPlane.NUMBERS, screens[1])
+    private val letters = page(KeyboardLanguage.ENGLISH, KeyboardPlane.LETTERS, screens[1])
+
+    private fun PageLayout.indexOf(key: KeyboardKey) = keys.indexOfFirst { it.key == key }
+
+    @Test
+    fun `a letter down while the apostrophe is held is typed from the letters`() {
+        val quote = numbers.key(apostrophe).frame
+        val t = KeyboardKey.Character("t")
+        val at = letters.key(t).frame
+        val (surface, recorder) = controller(numbers)
+        surface.down(1, quote.centerX, quote.centerY, time = 0)
+        surface.down(2, at.centerX, at.centerY, time = 40)
+        assertEquals(listOf("commit $apostrophe"), recorder.events)
+
+        // The apostrophe went back to the letters; the next frame brings them.
+        surface.layout = letters
+        assertEquals("held on its new key", setOf(letters.indexOf(t)), surface.visual.pressed)
+        assertEquals(letters.indexOf(t), surface.visual.preview)
+
+        surface.up(1, quote.centerX, quote.centerY, time = 70)
+        surface.up(2, at.centerX, at.centerY, time = 100)
+        assertEquals(listOf("commit $apostrophe", "commit $t"), recorder.events)
+        assertEquals("one click each", listOf(apostrophe, KeyboardKey.Character("5")), recorder.downs)
+    }
+
+    @Test
+    fun `a letter down while Space goes back to the letters is typed from the letters`() {
+        val space = numbers.key(KeyboardKey.Space).frame
+        val q = KeyboardKey.Character("q")
+        val at = letters.key(q).frame
+        val (surface, recorder) = controller(numbers)
+        surface.down(1, space.centerX, space.centerY, time = 0)
+        surface.down(2, at.centerX, at.centerY, time = 40)
+        surface.up(1, space.centerX, space.centerY, time = 70)
+        surface.layout = letters
+        surface.up(2, at.centerX, at.centerY, time = 100)
+        assertEquals(listOf("commit ${KeyboardKey.Space}", "commit $q"), recorder.events)
+    }
+
+    @Test
+    fun `Space down while the apostrophe is held is still Space`() {
+        val quote = numbers.key(apostrophe).frame
+        val space = letters.key(KeyboardKey.Space).frame
+        val (surface, recorder) = controller(numbers)
+        surface.down(1, quote.centerX, quote.centerY, time = 0)
+        surface.down(2, space.centerX, space.centerY, time = 40)
+        surface.layout = letters
+        surface.up(2, space.centerX, space.centerY, time = 100)
+        assertEquals(listOf("commit $apostrophe", "commit ${KeyboardKey.Space}"), recorder.events)
+    }
+
+    @Test
+    fun `a finger that slid before the page came types from where it is now`() {
+        val quote = numbers.key(apostrophe).frame
+        val t = letters.key(KeyboardKey.Character("t")).frame
+        val y = KeyboardKey.Character("y")
+        val slidTo = letters.key(y).frame
+        val (surface, recorder) = controller(numbers)
+        surface.down(1, quote.centerX, quote.centerY, time = 0)
+        surface.down(2, t.centerX, t.centerY, time = 40)
+        surface.move(2, slidTo.centerX, slidTo.centerY, time = 60)
+        surface.layout = letters
+        surface.up(2, slidTo.centerX, slidTo.centerY, time = 100)
+        assertEquals(listOf("commit $apostrophe", "commit $y"), recorder.events)
+    }
+
+    @Test
+    fun `a control does not turn into the one that takes its place`() {
+        val quote = numbers.key(apostrophe).frame
+        val abc = numbers.key(KeyboardKey.Plane(KeyboardPlane.LETTERS)).frame
+        val space = numbers.key(KeyboardKey.Space).frame
+        val spaceLeft = space.left + 2f
+        assertEquals(numbers.indexOf(KeyboardKey.Space), numbers.keyIndex(spaceLeft, space.centerY))
+        assertEquals("the letters' language key is there", letters.indexOf(KeyboardKey.Layout), letters.keyIndex(spaceLeft, space.centerY))
+
+        for ((x, y) in listOf(abc.centerX to abc.centerY, spaceLeft to space.centerY)) {
+            val (surface, recorder) = controller(numbers)
+            surface.down(1, quote.centerX, quote.centerY, time = 0)
+            surface.down(2, x, y, time = 40)
+            surface.layout = letters
+            assertTrue("nothing held at ($x, $y)", surface.visual.pressed.isEmpty())
+            surface.up(2, x, y, time = 100)
+            assertEquals(listOf("commit $apostrophe"), recorder.events)
+        }
+    }
+
+    @Test
+    fun `a page whose panel comes under the finger types nothing`() {
+        val emoji = page(KeyboardLanguage.ENGLISH, KeyboardPlane.EMOJI, screens[1])
+        val emojiKey = KeyboardKey.Plane(KeyboardPlane.EMOJI)
+        val smile = letters.key(emojiKey).frame
+        val e = letters.key(KeyboardKey.Character("e")).frame
+        val (surface, recorder) = controller(letters)
+        surface.down(1, smile.centerX, smile.centerY, time = 0)
+        surface.down(2, e.centerX, e.centerY, time = 40)
+        surface.up(1, smile.centerX, smile.centerY, time = 70)
+        surface.layout = emoji
+        assertTrue(surface.visual.pressed.isEmpty())
+        surface.up(2, e.centerX, e.centerY, time = 100)
+        assertEquals(listOf("commit $emojiKey"), recorder.events)
+    }
+
+    @Test
+    fun `a finger already over a panel does not come back to a key with the new page`() {
+        val emoji = page(KeyboardLanguage.ENGLISH, KeyboardPlane.EMOJI, screens[1])
+        val abc = emoji.key(KeyboardKey.Plane(KeyboardPlane.LETTERS)).frame
+        val grid = emoji.panel(PanelKind.EMOJI_GRID).frame
+        val (surface, recorder) = controller(emoji)
+        surface.down(1, abc.centerX, abc.centerY, time = 0)
+        surface.move(1, grid.centerX, grid.centerY, time = 60)
+        surface.layout = letters
+        surface.up(1, grid.centerX, grid.centerY, time = 100)
+        assertEquals(emptyList<String>(), recorder.events)
+    }
+
+    @Test
+    fun `a page that comes while the keys are dimmed wakes nothing under a resting finger`() {
+        val e = letters.key(KeyboardKey.Character("e")).frame
+        val (surface, recorder) = controller(letters)
+        surface.down(1, e.centerX, e.centerY, time = 0)
+        surface.isDimmed = true
+        surface.layout = numbers
+        assertTrue(surface.visual.pressed.isEmpty())
+        surface.up(1, e.centerX, e.centerY, time = 100)
+        assertEquals(emptyList<String>(), recorder.events)
+    }
+
+    @Test
+    fun `a held delete and open alternates still end with the page`() {
+        val delete = letters.key(KeyboardKey.Backspace).frame
+        val e = letters.key(KeyboardKey.Character("e")).frame
+        val (surface, recorder) = controller(letters)
+        surface.down(1, delete.centerX, delete.centerY, time = 0)
+        surface.down(2, e.centerX, e.centerY, time = 10)
+        surface.tick(time = 10 + KeySurfaceController.LONG_PRESS_MS)
+        assertTrue(surface.visual.panel != null)
+
+        surface.layout = numbers
+        assertNull(surface.visual.panel)
+        assertTrue(surface.visual.pressed.isEmpty())
+        surface.tick(time = 2_000)
+        surface.up(1, delete.centerX, delete.centerY, time = 2_100)
+        surface.up(2, e.centerX, e.centerY, time = 2_100)
+        assertEquals(listOf("delete"), recorder.events)
+    }
+
     // --------------------------------------------------------- layout picker
 
     private fun hold(surface: KeySurfaceController, layout: PageLayout) {
