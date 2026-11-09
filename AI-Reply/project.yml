@@ -151,6 +151,12 @@ targets:
     dependencies:
       - target: ReplyKeyboard
         embed: true
+      # The Apple Watch companion, where iOS looks for one.
+      - target: AIReplyWatchApp
+        embed: true
+        copy:
+          destination: productsDirectory
+          subpath: $(CONTENTS_FOLDER_PATH)/Watch
       - package: GoogleSignIn
         product: GoogleSignIn
       - package: Firebase
@@ -208,6 +214,40 @@ targets:
       TARGETED_DEVICE_FAMILY: "1"
       APPLICATION_EXTENSION_API_ONLY: true
       SKIP_INSTALL: true
+
+  # Voice companion for the keyboard. Only the protocol is shared: the account,
+  # the AI and the App Group stay on the iPhone.
+  AIReplyWatchApp:
+    type: application
+    platform: watchOS
+    deploymentTarget: "10.0"
+    sources:
+      - AIReplyWatch
+      - Shared/WatchVoice/WatchVoiceProtocol.swift
+    info:
+      path: AIReplyWatch/Info.plist
+      properties:
+        CFBundleDisplayName: AI Reply
+        CFBundleShortVersionString: "1.2.0"
+        CFBundleVersion: "24"
+        ITSAppUsesNonExemptEncryption: false
+        NSMicrophoneUsageDescription: "AI Reply records your voice only while you speak an instruction, after you tap the microphone. Through your iPhone the recording goes to the AI Reply server and OpenAI to be turned into text, and it is not stored."
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+        WKApplication: true
+        WKCompanionAppBundleIdentifier: kz.ai-reply.reply.keyboard.keyboard
+        WKRunsIndependentlyOfCompanionApp: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: kz.ai-reply.reply.keyboard.keyboard.watchkitapp
+        PRODUCT_NAME: AIReplyWatchApp
+        DEVELOPMENT_TEAM: 2PK6339Q47
+        CODE_SIGN_STYLE: Automatic
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        TARGETED_DEVICE_FAMILY: "4"
+        SKIP_INSTALL: true
 
 schemes:
   AIReply:

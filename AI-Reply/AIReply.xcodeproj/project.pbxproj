@@ -297,6 +297,15 @@
 		31FDA11803B9DAFFC4C6BEBF /* WatchVoiceCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A306F9F1CE032D6A19849AB0 /* WatchVoiceCoordinator.swift */; };
 		B6833CF12DAA12D1FA21FA23 /* WatchVoiceStrings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02FF8C575EE4993C2D038899 /* WatchVoiceStrings.swift */; };
 		F4C32FC8BD19D2DE7711590D /* WatchVoiceStrings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02FF8C575EE4993C2D038899 /* WatchVoiceStrings.swift */; };
+		1C84403AD78B825D64906E8E /* WatchConnectivityClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DC0F7F8ED9ABCB23E3EE77B /* WatchConnectivityClient.swift */; };
+		CBD761A157C82962EC8930E1 /* WatchAudioRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01AE216DAD1535CDFF8D133B /* WatchAudioRecorder.swift */; };
+		2A1718166716942E5BD4EECC /* WatchVoiceModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 125C23A18BB88460E6694FA5 /* WatchVoiceModel.swift */; };
+		767C3B0DD2ABE775CB8F2DF5 /* WatchViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97ECA98839D685CDA949A929 /* WatchViews.swift */; };
+		B0E823E80FF51E95C1A08090 /* WatchVoiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA78E2CAE3642524EDFB9DD0 /* WatchVoiceProtocol.swift */; };
+		740E20F61BBF37EF80ED6EB4 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 698EA55EB6B5CB39E18D24AF /* Assets.xcassets */; };
+		22F8C29EFF5932E7A74D0523 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 4F208514CD01EB26494BF443 /* Localizable.xcstrings */; };
+		34F8533E048277A254AD75BE /* InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 2BD1261A54733714A6B2A98C /* InfoPlist.xcstrings */; };
+		B16E82E51499181C35E09B46 /* AIReplyWatchApp.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = D47C71B176886328BF986B9A /* AIReplyWatchApp.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -314,6 +323,13 @@
 			remoteGlobalIDString = 45475D25BF12923E0E2A2A7A;
 			remoteInfo = AIReply;
 		};
+		15F4AADC5AAE62A7B4693C23 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9BEE77F8F75DACB9233F22A5 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8AFE848066075635151F2DC9;
+			remoteInfo = AIReplyWatchApp;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -326,6 +342,17 @@
 				A91B032371106BB2F6916381 /* ReplyKeyboard.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A0A687EEE216B80FF34B2A3D /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				B16E82E51499181C35E09B46 /* AIReplyWatchApp.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
@@ -555,6 +582,15 @@
 		419B7D29BF7ADA33CCE6896F /* WatchVoiceRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchVoiceRouting.swift; sourceTree = "<group>"; };
 		A306F9F1CE032D6A19849AB0 /* WatchVoiceCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchVoiceCoordinator.swift; sourceTree = "<group>"; };
 		02FF8C575EE4993C2D038899 /* WatchVoiceStrings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchVoiceStrings.swift; sourceTree = "<group>"; };
+		D47C71B176886328BF986B9A /* AIReplyWatchApp.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AIReplyWatchApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		CB8F930ABEFF927D11119986 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		1DC0F7F8ED9ABCB23E3EE77B /* WatchConnectivityClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchConnectivityClient.swift; sourceTree = "<group>"; };
+		01AE216DAD1535CDFF8D133B /* WatchAudioRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchAudioRecorder.swift; sourceTree = "<group>"; };
+		125C23A18BB88460E6694FA5 /* WatchVoiceModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchVoiceModel.swift; sourceTree = "<group>"; };
+		97ECA98839D685CDA949A929 /* WatchViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchViews.swift; sourceTree = "<group>"; };
+		698EA55EB6B5CB39E18D24AF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		4F208514CD01EB26494BF443 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
+		2BD1261A54733714A6B2A98C /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -931,6 +967,7 @@
 				21416BC9E03291BA639EB4F7 /* Shared */,
 				4AC0DF6833E6A4D0D4F6B5EE /* Tests */,
 				FCC92F39FFA303C939DFD6B0 /* Products */,
+				CC2911C4AB08A780F5C89D3C /* AIReplyWatch */,
 			);
 			sourceTree = "<group>";
 		};
@@ -1032,6 +1069,7 @@
 				9BD51094A5D0AE5A7214A53A /* AIReply.app */,
 				25D447C9C9552C1760443634 /* AIReplyTests.xctest */,
 				B706BBF3211F06DE9C734E67 /* ReplyKeyboard.appex */,
+				D47C71B176886328BF986B9A /* AIReplyWatchApp.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -1047,6 +1085,21 @@
 				02FF8C575EE4993C2D038899 /* WatchVoiceStrings.swift */,
 			);
 			path = WatchVoice;
+			sourceTree = "<group>";
+		};
+		CC2911C4AB08A780F5C89D3C /* AIReplyWatch */ = {
+			isa = PBXGroup;
+			children = (
+				CB8F930ABEFF927D11119986 /* Info.plist */,
+				1DC0F7F8ED9ABCB23E3EE77B /* WatchConnectivityClient.swift */,
+				01AE216DAD1535CDFF8D133B /* WatchAudioRecorder.swift */,
+				125C23A18BB88460E6694FA5 /* WatchVoiceModel.swift */,
+				97ECA98839D685CDA949A929 /* WatchViews.swift */,
+				698EA55EB6B5CB39E18D24AF /* Assets.xcassets */,
+				4F208514CD01EB26494BF443 /* Localizable.xcstrings */,
+				2BD1261A54733714A6B2A98C /* InfoPlist.xcstrings */,
+			);
+			path = AIReplyWatch;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -1079,11 +1132,13 @@
 				D125F1DEE264EBB6EDDB658E /* Frameworks */,
 				F5EB05726054928BF5FDEC86 /* Embed Foundation Extensions */,
 				DF84AC135F17DFFF599C7249 /* Firebase config */,
+				A0A687EEE216B80FF34B2A3D /* Embed Watch Content */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				27CD4590102E82D6A4707CBB /* PBXTargetDependency */,
+				779E1199A2AAEE9C4EE4C4A9 /* PBXTargetDependency */,
 			);
 			name = AIReply;
 			packageProductDependencies = (
@@ -1113,6 +1168,24 @@
 			productReference = 25D447C9C9552C1760443634 /* AIReplyTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		8AFE848066075635151F2DC9 /* AIReplyWatchApp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 6E5F0CA915280D206A26CE83 /* Build configuration list for PBXNativeTarget "AIReplyWatchApp" */;
+			buildPhases = (
+				329CF9CF35C32EAA8ACC1D7F /* Sources */,
+				2E94CA2A63123E1517545AD6 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = AIReplyWatchApp;
+			packageProductDependencies = (
+			);
+			productName = AIReplyWatchApp;
+			productReference = D47C71B176886328BF986B9A /* AIReplyWatchApp.app */;
+			productType = "com.apple.product-type.application";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -1122,6 +1195,10 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					8AFE848066075635151F2DC9 = {
+						DevelopmentTeam = 2PK6339Q47;
+						ProvisioningStyle = Automatic;
+					};
 					1F6D393FF0A4AA2046A9D3DF = {
 						DevelopmentTeam = 2PK6339Q47;
 						ProvisioningStyle = Automatic;
@@ -1160,6 +1237,7 @@
 				45475D25BF12923E0E2A2A7A /* AIReply */,
 				9C64F4310B1D7794DD1D0046 /* AIReplyTests */,
 				1F6D393FF0A4AA2046A9D3DF /* ReplyKeyboard */,
+				8AFE848066075635151F2DC9 /* AIReplyWatchApp */,
 			);
 		};
 /* End PBXProject section */
@@ -1192,6 +1270,16 @@
 				C353C645EB7991A99596C393 /* paste-permission-kk.mp4 in Resources */,
 				F17D2ED51CD7910CF30B53DE /* paste-permission-ru.mp4 in Resources */,
 				5CEB960AF9D1A704FB7E984A /* paste-permission-uz.mp4 in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		2E94CA2A63123E1517545AD6 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				740E20F61BBF37EF80ED6EB4 /* Assets.xcassets in Resources */,
+				22F8C29EFF5932E7A74D0523 /* Localizable.xcstrings in Resources */,
+				34F8533E048277A254AD75BE /* InfoPlist.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1511,6 +1599,18 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		329CF9CF35C32EAA8ACC1D7F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1C84403AD78B825D64906E8E /* WatchConnectivityClient.swift in Sources */,
+				CBD761A157C82962EC8930E1 /* WatchAudioRecorder.swift in Sources */,
+				2A1718166716942E5BD4EECC /* WatchVoiceModel.swift in Sources */,
+				767C3B0DD2ABE775CB8F2DF5 /* WatchViews.swift in Sources */,
+				B0E823E80FF51E95C1A08090 /* WatchVoiceProtocol.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -1523,6 +1623,11 @@
 			isa = PBXTargetDependency;
 			target = 1F6D393FF0A4AA2046A9D3DF /* ReplyKeyboard */;
 			targetProxy = 6D30C91700858D988CF7DFDE /* PBXContainerItemProxy */;
+		};
+		779E1199A2AAEE9C4EE4C4A9 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8AFE848066075635151F2DC9 /* AIReplyWatchApp */;
+			targetProxy = 15F4AADC5AAE62A7B4693C23 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -1794,6 +1899,48 @@
 			};
 			name = Debug;
 		};
+		D904B41CF9B42534DE98DFD7 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 2PK6339Q47;
+				INFOPLIST_FILE = AIReplyWatch/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "kz.ai-reply.reply.keyboard.keyboard.watchkitapp";
+				PRODUCT_NAME = AIReplyWatchApp;
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+			};
+			name = Debug;
+		};
+		A680E31D9082332AC0463444 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 2PK6339Q47;
+				INFOPLIST_FILE = AIReplyWatch/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "kz.ai-reply.reply.keyboard.keyboard.watchkitapp";
+				PRODUCT_NAME = AIReplyWatchApp;
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -1829,6 +1976,15 @@
 			buildConfigurations = (
 				FF5C3C5CB7256C801B888413 /* Debug */,
 				4A6DB38E49F0333A39EC9849 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		6E5F0CA915280D206A26CE83 /* Build configuration list for PBXNativeTarget "AIReplyWatchApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D904B41CF9B42534DE98DFD7 /* Debug */,
+				A680E31D9082332AC0463444 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
