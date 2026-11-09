@@ -203,6 +203,8 @@ func (s *Server) userPurchaseDTO(p domain.IAPPurchase) map[string]any {
 func (s *Server) purchaseDTO(p domain.IAPPurchase) map[string]any {
 	out := s.userPurchaseDTO(p)
 	out["store_product_id"], out["transaction_id"], out["order_id"] = p.StoreProductID, p.TransactionID, p.OrderID
+	// A Play subscription order is acknowledged per token, never consumed.
+	out["subscription_order"] = p.Provider == domain.ProviderGooglePlay && p.OriginalTransactionID != ""
 	return out
 }
 

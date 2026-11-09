@@ -3623,7 +3623,7 @@
                   <td><b>{{ p.product_code || '—' }}</b><div class="mono muted small">{{ p.store_product_id }}</div></td>
                   <td>{{ nf(p.units) }}<span v-if="p.quantity > 1" class="muted"> ({{ p.quantity }}×)</span></td>
                   <td class="nowrap"><span :class="'badge ' + iapStatusBadge(p.status)">{{ iapStatus(p.status) }}</span>
-                    <div class="muted small" v-if="p.provider === 'google_play' && p.status === 'granted'">
+                    <div class="muted small" v-if="p.provider === 'google_play' && p.status === 'granted' && !p.subscription_order">
                       {{ p.consumed ? t('admin.iap.consumed') : t('admin.iap.not_consumed') }}</div>
                     <div class="muted small" v-if="p.revoked_at">{{ p.revoked_at }} · {{ p.revoke_reason }}</div></td>
                   <td class="mono small" :title="p.transaction_id">{{ shortTxn(p.transaction_id) }}
