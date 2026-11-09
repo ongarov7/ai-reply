@@ -430,6 +430,12 @@ func refundGoogleOrder(ctx context.Context, tx *sql.Tx, row googleSubscriptionRo
 	return n > 0, revokeGoogleBaseMonthly(ctx, tx, purchaseID, in.Reason, in.Now)
 }
 
+// googleRenewalBridge — how long a renewing subscription keeps its access past
+// an end no read has looked at yet. Google moves the end when it charges, and
+// the first read after the old end decides; this only bounds an outage of
+// Google or of the worker.
+const googleRenewalBridge = 48 * time.Hour
+
 // GoogleSubscriptionHeldBy — this token already belongs to this account.
 func (s *Store) GoogleSubscriptionHeldBy(ctx context.Context, tokenHash, userID string) (bool, error) {
 	var held bool
@@ -444,8 +450,10 @@ func (s *Store) ActiveGoogleSubscription(ctx context.Context, userID string, now
 	var auto bool
 	err := s.db.Reader().QueryRowContext(ctx, `SELECT g.token_hash,g.plan_id,g.started_at,g.expires_at,g.auto_renew
 		FROM google_subscriptions g JOIN plans p ON p.id=g.plan_id
-		WHERE g.user_id=? AND g.revoked_at IS NULL AND g.superseded_by='' AND g.expires_at>? AND g.state IN (?,?,?)
-		ORDER BY p.entitlement_kind='unlimited' DESC,p.daily_message_limit DESC,g.expires_at DESC LIMIT 1`, userID, ms(now), domain.GoogleSubActive, domain.GoogleSubGrace, domain.GoogleSubCanceled).
+		WHERE g.user_id=? AND g.revoked_at IS NULL AND g.superseded_by='' AND g.state IN (?,?,?)
+		 AND (g.expires_at>? OR (g.auto_renew=1 AND g.state<>? AND g.read_at<g.expires_at AND g.expires_at>?))
+		ORDER BY p.entitlement_kind='unlimited' DESC,p.daily_message_limit DESC,g.expires_at DESC LIMIT 1`,
+		userID, domain.GoogleSubActive, domain.GoogleSubGrace, domain.GoogleSubCanceled, ms(now), domain.GoogleSubCanceled, ms(now.Add(-googleRenewalBridge))).
 		Scan(&sub.ID, &sub.PlanID, &started, &expires, &auto)
 	if errors.Is(err, sql.ErrNoRows) {
 		return sub, domain.ErrNotFound
