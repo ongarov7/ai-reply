@@ -405,7 +405,7 @@ class BillingRepository(
         try {
             val delivery = request.await()
             granted = delivery == Delivery.GRANTED || delivery == Delivery.ALREADY_GRANTED
-            notice = noticeFor(delivery, origin)
+            notice = noticeFor(delivery, purchase, origin)
         } finally {
             _state.update { state ->
                 state.copy(
@@ -418,7 +418,7 @@ class BillingRepository(
     }
 
     /** What [delivery] tells this caller. Someone who just paid hears all of it. */
-    private fun noticeFor(delivery: Delivery, origin: Origin): PurchaseNotice? = when {
+    private fun noticeFor(delivery: Delivery, purchase: StorePurchase, origin: Origin): PurchaseNotice? = when {
         origin == Origin.SHEET -> delivery.notice
         // A repeat found on return, or by restore, is not news: restore sums up on its own.
         delivery == Delivery.ALREADY_GRANTED -> null
@@ -426,6 +426,8 @@ class BillingRepository(
         delivery == Delivery.ACCOUNT_MISMATCH && origin == Origin.RESTORE -> PurchaseNotice.OTHER_ACCOUNT
         // Found on return, bound to another account: not this one's to report.
         delivery == Delivery.ACCOUNT_MISMATCH -> null
+        // A running subscription is sent on every return: one that could not be checked was not bought just now.
+        delivery == Delivery.LATER && origin == Origin.RETURN && purchase.isSubscription -> null
         else -> delivery.notice
     }
 

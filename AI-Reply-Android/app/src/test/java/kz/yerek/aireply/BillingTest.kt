@@ -324,6 +324,31 @@ class BillingTest {
         assertEquals(1, api.verified.count { it.second == "pack-token" })
     }
 
+    @Test
+    fun `a routine re-check the server could not answer says nothing, a pack on return still does`() = runBlocking {
+        billing.load()
+        store.held += runningBase()
+        api.answer = { throw ApiException(ApiError.Offline, null) }
+
+        billing.reconcile()
+        assertNull("nobody bought anything just now", state.notice)
+
+        store.held += purchase("unfinished-pack")
+        billing.reconcile()
+        assertEquals(PurchaseNotice.RETRY_LATER, state.notice)
+    }
+
+    @Test
+    fun `restore still says when a running subscription could not be checked`() = runBlocking {
+        billing.load()
+        store.held += runningBase()
+        api.answer = { throw ApiException(ApiError.Offline, null) }
+
+        billing.restore()
+
+        assertEquals(PurchaseNotice.RETRY_LATER, state.notice)
+    }
+
     // ---------------------------------------------------------- catalogue
 
     @Test
