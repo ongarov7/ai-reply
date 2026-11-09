@@ -1493,6 +1493,7 @@
  "admin.billing.workflow": "Өзгерістерді жобаға сақтап, тексеріңіз. Жаңа сатып алуларға қолдану үшін бөлек жариялаңыз.",
  "admin.billing.store_hint": "App Store бағасы App Store Connect арқылы белгіленеді. Мұнда жариялау оны өзгертпейді. Сатуды қоспас бұрын нақты Product ID мен StoreKit бағаларын тексеріңіз.",
  "admin.billing.google_hint": "Google Play: әр жолға бір автоұзартылатын негізгі жоспары бар бір Play жазылымы; Product ID енгізіп, Android-ты қосыңыз.",
+ "admin.billing.android_pack_required": "жазылымдармен бірге Android үшін жауап пакетін де қосыңыз",
  "admin.billing.reload": "Жаңарту",
  "admin.billing.save_draft": "Жобаға сақтау",
  "admin.billing.review": "Өзгерістерді тексеру",

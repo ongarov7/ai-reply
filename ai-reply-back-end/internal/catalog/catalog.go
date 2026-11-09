@@ -186,6 +186,23 @@ func Validate(products []Product) error {
 			googleIDs[p.GoogleProductID] = true
 		}
 	}
+	return validateAndroidLineup(products)
+}
+
+// validateAndroidLineup keeps a pack on sale next to Android subscriptions.
+// Builds from before subscriptions list only packs: told that purchases are
+// open with nothing else on sale, they would show an empty purchase screen.
+func validateAndroidLineup(products []Product) error {
+	subscription, pack := false, false
+	for _, p := range products {
+		if p.Active && p.AvailableAndroid && p.GoogleProductID != "" {
+			subscription = subscription || p.Kind == "subscription"
+			pack = pack || p.Kind == "pack"
+		}
+	}
+	if subscription && !pack {
+		return domain.InvalidField("available_android", "pack_required")
+	}
 	return nil
 }
 func (s *Service) SaveDraft(ctx context.Context, actor string, expectedRevision int, products []Product) (Version, error) {

@@ -1493,6 +1493,7 @@
  "admin.billing.workflow": "Save changes as a draft, review them, then publish separately to apply them to new purchases.",
  "admin.billing.store_hint": "App Store charges the App Store Connect price. Publishing here does not change it. Configure real Product IDs and verify StoreKit prices before enabling sales.",
  "admin.billing.google_hint": "Google Play: one Play subscription per row with one auto-renewing base plan; enter its Product ID and switch Android on.",
+ "admin.billing.android_pack_required": "switch the reply pack on for Android together with the subscriptions",
  "admin.billing.reload": "Reload",
  "admin.billing.save_draft": "Save draft",
  "admin.billing.review": "Review changes",

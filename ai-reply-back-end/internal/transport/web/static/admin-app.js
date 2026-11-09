@@ -147,6 +147,7 @@
     "required": "admin.error.reason.required",
     "too_long": "admin.error.reason.too_long",
     "value": "admin.error.reason.unknown_value",
+    "pack_required": "admin.billing.android_pack_required",
     "format": "admin.iap.reason.format",
     "pass_only": "admin.iap.reason.pass_only",
     "store_id_required": "admin.iap.reason.store_id_required",
@@ -167,7 +168,8 @@
     units: "admin.credits.units", reason: "admin.credits.reason",
     code: "admin.iap.code", kind: "admin.iap.kind", duration_hours: "admin.iap.duration",
     apple_product_id: "admin.iap.apple_id", google_product_id: "admin.iap.google_id", is_active: "admin.iap.active",
-    sort_order: "admin.iap.sort", provider: "admin.iap.provider", environment: "admin.iap.environment"
+    sort_order: "admin.iap.sort", provider: "admin.iap.provider", environment: "admin.iap.environment",
+    available_android: "admin.billing.availability"
   };
 
   function fieldLabel(field) {
@@ -3684,7 +3686,7 @@
       async save() {
         this.saving = true;
         try { var d = await api('/billing/catalog/draft', { method: 'PUT', body: { revision: this.draft ? this.draft.revision : 0, products: this.products } }); this.draft = d.draft; this.dirty = false; this.reviewing = true; toast('ok', t('admin.billing.draft_saved')); }
-        catch (e) { toast('danger', e.code === 'CONFLICT' ? t('admin.billing.reload_conflict') : t('common.error')); }
+        catch (e) { toast('danger', e.code === 'CONFLICT' ? t('admin.billing.reload_conflict') : errorText(e)); }
         this.saving = false;
       },
 
