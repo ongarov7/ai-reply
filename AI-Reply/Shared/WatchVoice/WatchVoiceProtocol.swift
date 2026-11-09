@@ -44,8 +44,9 @@ enum WatchVoice {
     static let maximumAudioBytes = 4 << 20
 
     /// A recording up to this size goes in one `sendMessageData`, the fast
-    /// channel, which refuses anything over about 65 KB. At 24 kbit/s that is
-    /// some twenty seconds of speech; longer ones go as a file transfer.
+    /// channel, which refuses anything over about 65 KB. With the recorder's
+    /// 24 KB header that is some ten seconds of speech at 24 kbit/s; longer
+    /// ones go as a file transfer.
     static let maximumDirectAudioBytes = 58 * 1024
 
     /// Shortest recording the server accepts, in milliseconds.
