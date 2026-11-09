@@ -190,7 +190,11 @@ func matchClause(q AudienceQuery) (string, []any) {
 // credits. Someone whose plan is used up but who still has bonus replies is
 // not "exhausted".
 func quotaClause(q AudienceQuery) (string, []any) {
-	limit := `COALESCE((SELECT p.daily_message_limit FROM plans p WHERE p.id = ` + currentPlan + `), 0)`
+	// Base in the subscriptions table was assigned by hand and keeps its daily
+	// allowance, as in subscriptions.Entitlement; a bought Base has only credits.
+	limit := `COALESCE((SELECT CASE WHEN p.code = 'base_monthly' AND p.entitlement_kind = 'monthly'
+		THEN (SELECT CAST(value AS INTEGER) FROM system_settings WHERE key = 'apple_base_legacy_daily_units')
+		ELSE p.daily_message_limit END FROM plans p WHERE p.id = ` + currentPlan + `), 0)`
 	limitArgs := []any{ms(q.Now), q.DefaultPlanID}
 	used := `COALESCE((SELECT ud.used FROM usage_daily ud WHERE ud.user_id = u.id AND ud.usage_date = ?), 0)`
 	extra := `COALESCE((SELECT SUM(g.units_remaining) FROM credit_grants g

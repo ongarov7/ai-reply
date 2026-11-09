@@ -636,6 +636,33 @@ func TestAudienceQuotaFilterCountsCredits(t *testing.T) {
 	}
 }
 
+// A Base given by an administrator keeps its daily allowance, so a campaign counts it as the card does.
+func TestAudienceQuotaFilterCountsAnAssignedBase(t *testing.T) {
+	h := newHarness(t, withEnv("TEST_APPROVED_ENTITLEMENTS", "true"))
+	admin := h.signInAdmin()
+	headers := admin.headers(h.cfg.Admin.CookieName)
+	s := h.signIn("audience-assigned-base@example.com")
+	h.mustRegister(installation(installID(681), "android", fcmToken(681)), s.access)
+	h.assignPlan(admin, s.userID, "base_monthly", "")
+
+	count := func(quota string) float64 {
+		t.Helper()
+		res := h.do(http.MethodPost, "/api/v1/admin/notifications/audience/preview",
+			map[string]any{"audience": map[string]any{"quota": quota}, "category": "system"}, headers)
+		mustStatus(t, res, http.StatusOK, "")
+		return res.num("preview", "users")
+	}
+	for _, tc := range []struct {
+		used                  int
+		exhausted, near, left float64
+	}{{0, 0, 0, 1}, {37, 0, 1, 0}, {40, 1, 0, 0}} {
+		h.useQuota(s.userID, tc.used)
+		if exhausted, near, left := count("exhausted"), count("near_exhaustion"), count("has_remaining"); exhausted != tc.exhausted || near != tc.near || left != tc.left {
+			t.Fatalf("used %d: exhausted %v, near %v, has_remaining %v; want %v, %v, %v", tc.used, exhausted, near, left, tc.exhausted, tc.near, tc.left)
+		}
+	}
+}
+
 // GET /me/credits: баланс және журнал, жаңасы бірінші; брон мен кредит идентификаторларынсыз.
 func TestMeCreditsListsTheLedger(t *testing.T) {
 	h := newHarness(t, withWelcomeBonus(3))
