@@ -370,6 +370,11 @@ HMAC, лимиты). Новые сборки их не вызывают.
   Границы начислений — календарные дни часового пояса сервера; восстановление,
   повтор транзакции и продление в тот же день не создают второй дневной пакет.
   Детали миграции и восстановления истории: `APPLE_BASE_ROLLOVER.md`.
+- **Base из Google Play** начисляется так же, как Base Monthly из App Store: каждый оплаченный
+  заказ добавляет один постоянный пакет на `monthly_message_limit` ответов. В usage
+  `daily_limit = 0`, `monthly_limit = 0`, `credits_never_expire = true`, как только на аккаунте
+  есть такой пакет; ответы входят в `purchased_credits`, `credits` и `remaining_total`.
+  Настройка и правила: `GOOGLE_PLAY.md`.
 - `pass` — действующий пропуск (`expires_at` в часовом поясе приложения); поля нет, если
   пропуска нет. Пропуск, у которого кончились ответы, остаётся до `expires_at` с `remaining: 0`.
 - `remaining_total` = `remaining_today` + пропуск + бесплатные ответы + `credits`.
@@ -933,7 +938,7 @@ Consumable, пропуск — Non-Renewing Subscription), Android — Google Pl
 
 | Метод | Путь | Тело | Ответ |
 |---|---|---|---|
-| GET | `/api/v1/iap/products?platform=ios\|android` | — | `{ "products": [ { "code", "kind", "units", "duration_hours", "store_product_id", "name" } ], "account_token": "<uuid>" }` |
+| GET | `/api/v1/iap/products?platform=ios\|android` | — | `{ "products": [ { "code", "kind", "units", "duration_hours", "store_product_id", "name", … } ], "account_token": "<uuid>", "recommendation": { … } }` (`recommendation` — только когда есть) |
 | POST | `/api/v1/iap/apple/transactions` | `{ "signed_transaction": "<jwsRepresentation>" }` | `200 { "status": "granted" \| "already_granted", "usage": {…} }` |
 | POST | `/api/v1/iap/google/purchases` | `{ "product_id", "purchase_token" }` | `200` как выше, `202 { "status": "pending" }` |
 | POST | `/api/v1/iap/apple/notifications` | App Store Server Notifications V2: `{ "signedPayload" }` | `200 { "ok": true }` |
@@ -942,6 +947,16 @@ Consumable, пропуск — Non-Renewing Subscription), Android — Google Pl
   этого магазина), включил и не отправил в архив; порядок — `sort_order`. `name` — на языке
   аккаунта (`preferred_language`, иначе `locale`), запасной — ru → en → код. Без `platform`
   берётся платформа из токена. Пока продажи на платформе закрыты — `403 IAP_UNAVAILABLE`.
+- Подписка (`kind = subscription`) — ещё `plan_id`, `billing_period` (`month` \| `year`),
+  `entitlement_kind`, `daily_limit`, `monthly_limit`, `price`, `currency`. На Android подписка есть
+  в списке, только если администратор задал ей Google Product ID и включил Android. У
+  `base_monthly` — `entitlement_kind = monthly`, `monthly_limit = 1000` и `credits_never_expire = true`
+  на обеих платформах; `monthly_limit` здесь — размер пакета за оплаченный месяц, а не квота.
+- `recommendation` — бесплатному тарифу после 4 или 5 купленных пакетов: `{ "id", "purchase_count",
+  "spent_minor", "currency", "base_price_minor", "base_store_product_id" }`, где
+  `base_store_product_id` — Product ID подписки Base в магазине этой платформы. iOS считает пакеты
+  App Store. Android, пока на нём продаётся подписка, — пакеты обоих магазинов; пакет Play
+  считается по цене каталога, потому что Google не сообщает цену разовой покупки.
 - `account_token` — постоянный UUID аккаунта (HMAC id аккаунта ключом сервера): одинаковый на
   всех устройствах и после переустановки, ничего не говорит об аккаунте.
 - Тела запросов строгие (неизвестное поле — `400 INVALID_REQUEST`), кроме уведомлений Apple.
@@ -992,6 +1007,8 @@ Consumable, пропуск — Non-Renewing Subscription), Android — Google Pl
    покупки: так продление доходит сразу, не дожидаясь фоновой проверки.
 4. Смена тарифа — обычная покупка с заменой старой: новый токен приходит с
    `linkedPurchaseToken`, старый сервер закрывает.
+5. Повторная подписка из центра подписок Google приходит без аккаунта, и отправлять её надо
+   всё равно: сервер определит владельца по истёкшей подписке.
 
 Ошибки:
 
@@ -1025,7 +1042,9 @@ Consumable, пропуск — Non-Renewing Subscription), Android — Google Pl
   возвращает деньги за неподтверждённую покупку через 3 дня).
 - **Google, подписка**: `purchases.subscriptionsv2.get`; строка покупки с этим `product_id`
   (иначе `product_unknown`), `externalAccountIdentifiers.obfuscatedExternalAccountId =
-  account_token`, `testPurchase` — как выше. `ACTIVE` и `IN_GRACE_PERIOD` выдают тариф,
+  account_token` либо, у повторной подписки из центра подписок Google, по
+  `outOfAppPurchaseContext` или уже сохранённой подписке этого аккаунта, `testPurchase` — как
+  выше. `ACTIVE` и `IN_GRACE_PERIOD` выдают тариф,
   `CANCELED` — до `expiryTime`, `PENDING` — `202`, `ON_HOLD`, `PAUSED`, `EXPIRED` — `400` и ничего
   не дают. Состояние хранится в `google_subscriptions` (SHA-256 токена, зашифрованный токен,
   тариф, срок, автопродление, состояние, связанный токен); источник в `subscription.source` —
@@ -1033,11 +1052,19 @@ Consumable, пропуск — Non-Renewing Subscription), Android — Google Pl
   подтверждение повторяется до 4 суток от выдачи. `linkedPurchaseToken` закрывает старый токен
   в любом порядке получения: повторно он ничего не даёт. Рядом с автопродляемой подпиской Google
   банковское автопродление не оформляется.
+- **Google, Base**: каждый оплаченный заказ (первый и каждое продление) один раз добавляет
+  `monthly_message_limit` тарифа постоянным пакетом (`kind = pack`, `expires_at = NULL`,
+  `product_code = google_base_monthly`, привязка к строке заказа в `iap_purchases`). Повтор
+  запроса, чтение фоновой задачей и восстановление ничего не добавляют. Отмена, окончание и
+  переход на Pro остаток не трогают. Смена тарифа денег сразу не берёт, поэтому первый заказ
+  заменяющего токена добавляет пакет, только если у аккаунта не было пакета Google Base за
+  последний месяц. Pro — безлимит до конца оплаченного периода, постоянные ответы не расходует.
 - **Google, продление и потеря**: push от Google пока нет. Фоновая задача (каждые 15 минут,
   партии по 100) читает подписки, которым осталось меньше суток или срок уже вышел, и
-  обновляет срок и состояние. При недоступности Google состояние и доступ не меняются,
-  строка откладывается с удвоением паузы до 6 часов, раунд останавливается. Позже можно
-  подключить Real-time developer notifications: они лишь ускорят то же чтение.
+  обновляет срок и состояние. При недоступности Google состояние не меняется, строка
+  откладывается с удвоением паузы до 6 часов, раунд останавливается. Подписка с автопродлением
+  сохраняет доступ за прежним концом периода, пока его не проверит успешное чтение, но не дольше
+  48 часов. Позже можно подключить Real-time developer notifications: они лишь ускорят то же чтение.
 - Одна транзакция начисляется один раз: `UNIQUE (provider, transaction_id)`, где
   `transaction_id` — `transactionId` Apple или SHA-256 токена Google (сам токен в открытом
   виде не хранится; до consume — зашифрованная копия, потом стирается). Транзакция,
@@ -1059,8 +1086,9 @@ Consumable, пропуск — Non-Renewing Subscription), Android — Google Pl
 - Google: опрос `purchases.voidedpurchases` раз в `IAP_GOOGLE_VOIDED_POLL` (по умолчанию час;
   первый опрос после старта — за 30 дней, дальше — за 72 часа); результат тот же. В списке и
   подписки (`type=1`). У продлений один токен, поэтому заказ различается по `orderId`: возврат
-  последнего оплаченного заказа снимает доступ, возврат более раннего только записывается. Новый
-  оплаченный заказ доступ возвращает.
+  последнего оплаченного заказа снимает доступ, возврат более раннего записывается и запускает
+  чтение подписки: её судьбу решает состояние у Google. Новый оплаченный заказ доступ возвращает.
+  Возврат заказа Base снимает только остаток пакета этого заказа.
 
 Удаление аккаунта: запись о покупке остаётся с `user_id = NULL` (финансовая запись, без
 данных о человеке); начисление и журнал удаляются с аккаунтом. Таблицы — миграция `0018_iap`.
