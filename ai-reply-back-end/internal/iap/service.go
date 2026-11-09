@@ -118,10 +118,15 @@ func New(d Deps) (*Service, error) {
 	if len(d.Secret) < 32 {
 		return nil, errors.New("iap: the server secret is required")
 	}
+	sealKeys := [][]byte{deriveKey(d.Secret, "ai-reply/iap-purchase-token/v1")}
+	if d.Config.GoogleTokenSecret != "" {
+		// Tokens sealed under the access secret before this was set stay readable.
+		sealKeys = append([][]byte{deriveKey(d.Config.GoogleTokenSecret, "ai-reply/iap-purchase-token/v2")}, sealKeys...)
+	}
 	s := &Service{
 		repo: d.Repo, cfg: d.Config, log: d.Log, clock: traits.SystemClock{}, ttl: 5 * time.Second, now: time.Now,
 		accountKey: deriveKey(d.Secret, "ai-reply/iap-account-token/v1"),
-		sealer:     newSealer(deriveKey(d.Secret, "ai-reply/iap-purchase-token/v1")),
+		sealer:     newSealer(sealKeys...),
 	}
 	if d.Config.Apple() {
 		v, err := appstore.New()

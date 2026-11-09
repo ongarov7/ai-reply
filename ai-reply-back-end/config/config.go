@@ -381,6 +381,9 @@ type IAP struct {
 	GoogleAcceptTest bool
 	// GoogleServiceAccountFile — the JSON file the two values came from ("" — from the variables).
 	GoogleServiceAccountFile string
+	// GoogleTokenSecret — seals stored Play subscription tokens. Unlike the JWT secrets it
+	// is never rotated: a subscription needs its token for as long as it lives.
+	GoogleTokenSecret string
 	// GoogleVoidedPoll — қайтарылған сатып алуларды қаншалықты жиі сұрау (0 — сұралмайды).
 	GoogleVoidedPoll time.Duration
 	problems         []string
@@ -928,6 +931,7 @@ func iapFromEnv(appEnv string) IAP {
 		GooglePackageName:  str("GOOGLE_PLAY_PACKAGE_NAME", "kz.yerek.aireply"),
 		GoogleClientEmail:  str("GOOGLE_PLAY_CLIENT_EMAIL", ""),
 		GooglePrivateKey:   PEM(str("GOOGLE_PLAY_PRIVATE_KEY", "")),
+		GoogleTokenSecret:  str("GOOGLE_PLAY_TOKEN_SECRET", ""),
 		// License testers pay nothing: production refuses their purchases unless the owner says so.
 		GoogleAcceptTest: boolean("GOOGLE_PLAY_ACCEPT_TEST", appEnv != "production"),
 		GoogleVoidedPoll: time.Hour,
@@ -977,6 +981,9 @@ func (i IAP) validate() []string {
 	}
 	if i.GoogleClientEmail != "" && !strings.Contains(i.GoogleClientEmail, "@") {
 		problems = append(problems, "GOOGLE_PLAY_CLIENT_EMAIL must be the service account e-mail")
+	}
+	if i.GoogleTokenSecret != "" && len(i.GoogleTokenSecret) < 32 {
+		problems = append(problems, "GOOGLE_PLAY_TOKEN_SECRET must be at least 32 characters")
 	}
 	if i.AppleEnabled && !looksLikeBundleID(i.AppleBundleID) {
 		problems = append(problems, "APPLE_IAP_BUNDLE_ID must be the iOS app's bundle id, e.g. kz.ai-reply.reply.keyboard.keyboard")

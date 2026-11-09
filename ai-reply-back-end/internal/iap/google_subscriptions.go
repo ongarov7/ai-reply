@@ -272,10 +272,8 @@ func (s *Service) RetryAcknowledges(ctx context.Context) (int, error) {
 		}
 		token, err := s.sealer.open(row.SealedToken)
 		if err != nil {
+			// The app's next post seals it again: the time limit above ends the wait.
 			s.log.Error("google play subscription token cannot be opened")
-			if err := s.repo.AbandonGoogleAcknowledge(ctx, row.TokenHash, now); err != nil {
-				return done, err
-			}
 			continue
 		}
 		err = s.google.AcknowledgeSubscription(ctx, row.ProductID, token)
