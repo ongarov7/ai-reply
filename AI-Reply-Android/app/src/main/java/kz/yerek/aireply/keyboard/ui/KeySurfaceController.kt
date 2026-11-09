@@ -238,6 +238,16 @@ class KeySurfaceController(private val listener: KeySurfaceListener) {
         refreshVisual()
     }
 
+    /**
+     * TalkBack's double tap on [key]. A dimmed key does nothing and says so:
+     * drawn as inert, it must not turn the page or spend a shift either.
+     */
+    fun activate(key: KeyboardKey, onKey: (KeyboardKey) -> Unit): Boolean {
+        if (isDimmed && key.editsText) return false
+        onKey(key)
+        return true
+    }
+
     /** The earliest time something happens without a touch event, or null. */
     fun nextDeadline(): Long? =
         tracks.values.flatMap { listOf(it.longPressAt, it.nextRepeatAt) }.filter { it != Long.MAX_VALUE }.minOrNull()

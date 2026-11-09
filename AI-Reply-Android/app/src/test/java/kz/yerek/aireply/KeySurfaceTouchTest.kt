@@ -254,6 +254,38 @@ class KeySurfaceTouchTest {
         assertTrue("neither finger holds a key now", surface.visual.pressed.isEmpty())
     }
 
+    @Test
+    fun `while dimmed TalkBack gets nothing from a key that edits text`() {
+        val (surface, _) = controller(page(KeyboardLanguage.ENGLISH, KeyboardPlane.NUMBERS, screens[1]))
+        surface.isDimmed = true
+        val activated = mutableListOf<KeyboardKey>()
+        for (key in listOf(KeyboardKey.Character("'"), KeyboardKey.Space, KeyboardKey.Backspace, KeyboardKey.Return)) {
+            assertFalse("$key says it did nothing", surface.activate(key) { activated += it })
+        }
+        assertEquals(emptyList<KeyboardKey>(), activated)
+    }
+
+    @Test
+    fun `while dimmed TalkBack still works the keys that change the keyboard`() {
+        val (surface, _) = controller(page(KeyboardLanguage.ENGLISH, KeyboardPlane.NUMBERS, screens[1]))
+        surface.isDimmed = true
+        val activated = mutableListOf<KeyboardKey>()
+        val keys = listOf(
+            KeyboardKey.Plane(KeyboardPlane.LETTERS), KeyboardKey.Shift, KeyboardKey.Layout, KeyboardKey.Globe
+        )
+        for (key in keys) assertTrue("$key", surface.activate(key) { activated += it })
+        assertEquals(keys, activated)
+    }
+
+    @Test
+    fun `not dimmed TalkBack types as before`() {
+        val (surface, _) = controller(page(KeyboardLanguage.ENGLISH, KeyboardPlane.NUMBERS, screens[1]))
+        val activated = mutableListOf<KeyboardKey>()
+        assertTrue(surface.activate(KeyboardKey.Character("'")) { activated += it })
+        assertTrue(surface.activate(KeyboardKey.Backspace) { activated += it })
+        assertEquals(listOf(KeyboardKey.Character("'"), KeyboardKey.Backspace), activated)
+    }
+
     // ----------------------------------------- the page changes under a finger
 
     private val apostrophe = KeyboardKey.Character("'")

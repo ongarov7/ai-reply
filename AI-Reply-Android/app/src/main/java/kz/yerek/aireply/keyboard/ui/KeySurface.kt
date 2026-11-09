@@ -160,10 +160,7 @@ fun KeySurface(
                         .semantics {
                             contentDescription = describe(key, state)
                             role = Role.Button
-                            onClick {
-                                onAccessibilityKey(key.key)
-                                true
-                            }
+                            onClick { controller.activate(key.key, onAccessibilityKey) }
                         }
                 )
             }
