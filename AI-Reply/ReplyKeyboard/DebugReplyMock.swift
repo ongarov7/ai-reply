@@ -30,6 +30,13 @@ struct DebugReplyMock: ReplyTransport {
         try Task.checkCancellation()
         if tags.contains("#offline") { throw AIReplyError.offline }
         if tags.contains("#quota") { throw AIReplyError.quotaExhausted }
+        // The mock microphone's sentences get an answer in their language.
+        if instruction.contains("Сәрсенбі") {
+            return GeneratedReply(text: "Сәлеметсіз бе! Бүгін де, ертең де бос емеспін. Сәрсенбі түстен кейін кездесейік пе?", detectedLanguage: nil)
+        }
+        if instruction.contains("среду после обеда") {
+            return GeneratedReply(text: "Здравствуйте! Сегодня и завтра я занят. Давайте встретимся в среду после обеда?", detectedLanguage: nil)
+        }
 
         Self.lock.lock()
         let index = Self.served % Self.replies.count

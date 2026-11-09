@@ -50,7 +50,14 @@ final class WatchVoiceModel {
     private(set) var hasVoiceConsent: Bool
 
     var mode: WatchVoiceMode { didSet { save(mode.rawValue, Key.mode) } }
-    var language: WatchVoiceLanguage { didSet { save(language.rawValue, Key.language) } }
+    var language: WatchVoiceLanguage {
+        didSet {
+            // The phone's language is a default, not the user's choice.
+            guard !isAdoptingPhoneLanguage else { return }
+            hasChosenLanguage = true
+            save(language.rawValue, Key.language)
+        }
+    }
     var responseLanguage: WatchVoiceLanguage? { didSet { save(responseLanguage?.rawValue, Key.responseLanguage) } }
     var length: WatchVoiceLength? { didSet { save(length?.rawValue, Key.length) } }
     /// nil: inherit the persona the keyboard uses.
@@ -74,6 +81,7 @@ final class WatchVoiceModel {
     @ObservationIgnored private var listenTask: Task<Void, Never>?
     @ObservationIgnored private var transcriptionTimeout: Task<Void, Never>?
     @ObservationIgnored private var hasChosenLanguage: Bool
+    @ObservationIgnored private var isAdoptingPhoneLanguage = false
 
     private enum Key {
         static let mode = "watch.mode"
@@ -111,15 +119,17 @@ final class WatchVoiceModel {
         guard CommandLine.arguments.contains("-AIReplyWatchSmokeTest") else { return }
         defaults.set(WatchVoice.voiceConsentVersion, forKey: Key.voiceConsent)
         hasVoiceConsent = true
+        // Slower with `-AIReplyWatchDemo`, for screenshots of each stage.
+        let pause: TimeInterval = CommandLine.arguments.contains("-AIReplyWatchDemo") ? 6 : 3
         Task {
-            try? await Task.sleep(for: .seconds(4))
+            try? await Task.sleep(for: .seconds(pause + 1))
             startListening()
-            try? await Task.sleep(for: .seconds(3))
+            try? await Task.sleep(for: .seconds(pause))
             stopListening()
             for _ in 0..<40 where stage != .review {
                 try? await Task.sleep(for: .milliseconds(500))
             }
-            try? await Task.sleep(for: .seconds(1))
+            try? await Task.sleep(for: .seconds(pause / 3 + (pause > 3 ? 4 : 0)))
             NSLog("[WatchVoice] smoke: send, session %@", phone?.keyboardSessionID ?? "none")
             send()
         }
@@ -134,7 +144,6 @@ final class WatchVoiceModel {
     }
 
     private func save(_ value: String?, _ key: String) {
-        if key == Key.language { hasChosenLanguage = true }
         defaults.set(value, forKey: key)
     }
 
@@ -159,7 +168,10 @@ final class WatchVoiceModel {
         guard phase == .active else {
             pollTask?.cancel()
             pollTask = nil
-            if stage == .listening { cancelListening() }
+            // Lowering the wrist is `.inactive` and keeps recording. Only
+            // really leaving the app ends it, keeping what was said: it is
+            // still reviewed before anything is sent.
+            if phase == .background, stage == .listening { stopListening() }
             return
         }
         isReachable = client.isReachable
@@ -189,8 +201,9 @@ final class WatchVoiceModel {
     private func apply(_ snapshot: WatchPhoneSnapshot) {
         phone = snapshot
         if !hasChosenLanguage, let code = snapshot.appLanguage, let match = WatchVoiceLanguage(rawValue: code) {
+            isAdoptingPhoneLanguage = true
             language = match
-            hasChosenLanguage = false
+            isAdoptingPhoneLanguage = false
         }
     }
 
@@ -472,6 +485,13 @@ final class WatchVoiceModel {
                 guard !Task.isCancelled, let self, self.isForeground else { return }
                 await self.refreshStatus()
                 guard !Task.isCancelled, self.isAwaitingPhone else { return }
+            }
+            guard !Task.isCancelled, let self else { return }
+            // Asked for long enough. Nothing is known to have failed before this.
+            if self.stage == .generating {
+                self.fail(.timedOut)
+            } else if self.stage == .sentToPhone {
+                self.stage = .waitingForKeyboard
             }
         }
     }

@@ -19,6 +19,10 @@ struct AIReplyApp: App {
     init() {
         #if DEBUG
         AIConfiguration.applyDebugLaunchArguments()
+        // `-AIReplyDebugLanguage kk`: the app and its keyboard in one language.
+        if let code = DebugScreen.value(after: "-AIReplyDebugLanguage"), let language = AppLanguage(rawValue: code) {
+            SharedSettings.shared.setAppLanguage(language)
+        }
         #endif
         // Crashes of earlier runs reach the server's alert channel (MetricKit, anonymous).
         CrashDiagnostics.shared.start()
@@ -216,6 +220,9 @@ enum DebugScreen: String {
     case support
     /// Settings ▸ Apple Watch.
     case watch
+    /// A chat with the keyboard up, for the Apple Watch screenshots;
+    /// `-AIReplyDebugMessage` is the message on screen.
+    case chat
 
     static var requested: DebugScreen? {
         let arguments = CommandLine.arguments
@@ -263,6 +270,7 @@ private struct DebugScreenHost: View {
         case .home:      RootNavigationView()
         case .settings:  NavigationStack { SettingsView() }
         case .watch:     NavigationStack { AppleWatchSettingsView() }
+        case .chat:      DebugChatHost()
         case .notifications: NavigationStack { SettingsView(focus: .notifications) }
         case .profile:   NavigationStack { ProfileEditorView() }
         case .templates: NavigationStack { TemplateEditorView(templateID: "client") }
@@ -294,6 +302,40 @@ private struct DebugOnboardingHost: View {
                     model.updateProfile { $0.grammaticalGender = gender }
                 }
             }
+    }
+}
+
+/// A conversation with its input field focused, to photograph the keyboard
+/// the way it is used.
+private struct DebugChatHost: View {
+    @State private var text = ""
+    @FocusState private var isFocused: Bool
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Text(verbatim: "Aigerim").font(.headline).padding(.vertical, DS.Spacing.m)
+            Divider()
+            ScrollView {
+                HStack {
+                    Text(verbatim: DebugScreen.value(after: "-AIReplyDebugMessage") ?? "")
+                        .padding(DS.Spacing.m)
+                        .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color(.secondarySystemBackground)))
+                    Spacer(minLength: 60)
+                }
+                .padding(DS.Spacing.l)
+            }
+            HStack(alignment: .bottom, spacing: DS.Spacing.s) {
+                TextField("", text: $text, axis: .vertical)
+                    .textFieldStyle(.roundedBorder)
+                    .focused($isFocused)
+                Image(systemName: "paperplane.fill").foregroundStyle(Color.accentColor).padding(.bottom, 6)
+            }
+            .padding(DS.Spacing.m)
+        }
+        .task {
+            try? await Task.sleep(for: .milliseconds(400))
+            isFocused = true
+        }
     }
 }
 
