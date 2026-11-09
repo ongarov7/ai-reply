@@ -58,8 +58,7 @@ object DebugSamples {
 
     private val catalog = IapCatalogDto(
         products = listOf(
-            IapProductDto("base_monthly", "subscription", 0, 0, "debug.base.monthly", "Base", planId = "base_monthly", billingPeriod = "month", entitlementKind = "monthly", monthlyLimit = 1000),
-            IapProductDto("base_yearly", "subscription", 0, 0, "debug.base.yearly", "Base", planId = "base_yearly", billingPeriod = "year", entitlementKind = "monthly", monthlyLimit = 1000),
+            IapProductDto("base_monthly", "subscription", 0, 0, "debug.base.monthly", "Base", planId = "base_monthly", billingPeriod = "month", entitlementKind = "monthly", monthlyLimit = 1000, creditsNeverExpire = true),
             IapProductDto("pro_monthly", "subscription", 0, 0, "debug.pro.monthly", "Pro", planId = "pro_monthly", billingPeriod = "month", entitlementKind = "unlimited"),
             IapProductDto("pro_yearly", "subscription", 0, 0, "debug.pro.yearly", "Pro", planId = "pro_yearly", billingPeriod = "year", entitlementKind = "unlimited"),
             IapProductDto("pack30", "pack", 30, 0, "debug.pack30", "30 ответов")
@@ -69,9 +68,8 @@ object DebugSamples {
 
     private val prices = mapOf(
         "debug.base.monthly" to "990 ₸",
-        "debug.base.yearly" to "9 990 ₸",
         "debug.pro.monthly" to "3 990 ₸",
-        "debug.pro.yearly" to "39 900 ₸",
+        "debug.pro.yearly" to "39 990 ₸",
         "debug.pack30" to "130 ₸"
     )
 
