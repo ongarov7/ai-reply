@@ -11,7 +11,9 @@ import kz.yerek.aireply.ui.feature.compose.initialRecipient
 import kz.yerek.aireply.ui.feature.compose.recipientGroups
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 /**
  * «Создать ответ»: the recipient is the keyboard's, and Paste either brings the
@@ -96,5 +98,17 @@ class CreateReplyTest {
     @Test
     fun `no clipboard at all is unreadable, not empty`() {
         assertEquals(PasteOutcome.Notice(PasteNotice.UNREADABLE), paste(null))
+    }
+
+    /** The state is the screen's own; what it does on each way of bringing a message is pinned here. */
+    @Test
+    fun `a pasted, example or dictated message takes the old error away`() {
+        val screen = File("src/main/java/kz/yerek/aireply/ui/feature/compose/ComposeScreen.kt").readText()
+        fun clears(after: String) =
+            assertTrue(after, "forgetError()" in screen.substringAfter(after).take(160))
+
+        clears("message = outcome.text")
+        clears("message = context.getString(R.string.compose_example_message)")
+        clears("onDismiss = { dictatingMessage = false },")
     }
 }

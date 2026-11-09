@@ -232,12 +232,19 @@ fun ComposeScreen(onBack: () -> Unit, onOpen: (String) -> Unit = {}) {
         services.settings.lastTemplateId = id
     }
 
+    // A new message: the last failure was about the one before it.
+    fun forgetError() {
+        error = null
+        errorIsLimit = false
+    }
+
     fun paste() {
         scope.launch {
             when (val outcome = ComposePaste.read(context)) {
                 is PasteOutcome.Text -> {
                     message = outcome.text
                     pasteNotice = null
+                    forgetError()
                     services.deviceState.notePaste(System.currentTimeMillis())
                     ProductEvents.track(ProductEvent.PASTE_SUCCEEDED)
                 }
@@ -335,6 +342,7 @@ fun ComposeScreen(onBack: () -> Unit, onOpen: (String) -> Unit = {}) {
                     onClick = {
                         message = context.getString(R.string.compose_example_message)
                         pasteNotice = null
+                        forgetError()
                     },
                     contentPadding = PaddingValues(horizontal = 0.dp)
                 ) {
@@ -457,7 +465,10 @@ fun ComposeScreen(onBack: () -> Unit, onOpen: (String) -> Unit = {}) {
         DictationSheet(
             language = services.settings.effectiveAppLanguage,
             onDismiss = { dictatingMessage = false },
-            onAccept = { transcript -> message = append(message, transcript) }
+            onAccept = { transcript ->
+                if (transcript.isNotBlank()) forgetError()
+                message = append(message, transcript)
+            }
         )
     }
 
