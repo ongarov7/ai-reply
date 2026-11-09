@@ -248,13 +248,22 @@ func (s Subscription) Acknowledged() bool {
 // Started — when the subscription began (zero when Google did not say).
 func (s Subscription) Started() time.Time { return parseTime(s.StartTime) }
 
-// OrderID — the latest paid order of this item.
+// OrderID — the latest paid order of this item ("" when Google did not say).
+//
+// latestOrderId may name a pending or declined renewal, which is what it does
+// during a grace period, so there it does not stand for a payment.
 func (s Subscription) OrderID(item SubscriptionLineItem) string {
 	if item.LatestSuccessfulOrderID != "" {
 		return item.LatestSuccessfulOrderID
 	}
+	if s.SubscriptionState == stateInGrace {
+		return ""
+	}
 	return s.LatestOrderID
 }
+
+// stateInGrace — a renewal payment is failing and access goes on.
+const stateInGrace = "SUBSCRIPTION_STATE_IN_GRACE_PERIOD"
 
 // Expires — when access ends unless the item renews (zero when Google did not say).
 func (i SubscriptionLineItem) Expires() time.Time { return parseTime(i.ExpiryTime) }
