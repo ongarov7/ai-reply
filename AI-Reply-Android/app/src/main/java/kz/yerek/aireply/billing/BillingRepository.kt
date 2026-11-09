@@ -3,6 +3,9 @@ package kz.yerek.aireply.billing
 import android.app.Activity
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -133,8 +136,8 @@ class BillingRepository(
     private var held: List<StorePurchase> = emptyList()
 
     private val lock = Any()
-    /** Tokens on their way to the server: a second callback for one purchase sends nothing. */
-    private val inFlight = HashSet<String>()
+    /** The request for each token on its way to the server: a second caller for one purchase waits for it. */
+    private val inFlight = HashMap<String, Deferred<Delivery>>()
     /** Tokens the server finished in this process (granted, or refused for good). */
     private val finished = HashSet<String>()
 
@@ -386,58 +389,25 @@ class BillingRepository(
     }
 
     /**
-     * One purchase to the server, once at a time. [fromSheet]: the user just
-     * paid, so even a repeat (`already_granted`) is news worth saying.
+     * One purchase to the server, one request at a time: a caller that finds it
+     * already on its way waits for that request and reads the same answer.
+     * [fromSheet]: the user just paid, so even a repeat (`already_granted`) is
+     * news worth saying.
      */
     private suspend fun verify(purchase: StorePurchase, fromSheet: Boolean): Boolean {
         val token = purchase.purchaseToken
         val productId = purchase.productIds.firstOrNull() ?: return false
-        synchronized(lock) {
-            if (token in finished || !inFlight.add(token)) return false
+        val request = synchronized(lock) {
+            if (token in finished) return false
+            inFlight.getOrPut(token) { scope.async(start = CoroutineStart.LAZY) { deliver(purchase, productId) } }
         }
         var notice: PurchaseNotice? = null
         var granted = false
         try {
-            val result = api.verify(productId, token)
-            when {
-                result.isGranted -> {
-                    granted = true
-                    // A running subscription is checked again on the next return: it can renew or end.
-                    if (!purchase.isSubscription) synchronized(lock) { finished += token }
-                    _state.update { it.copy(pendingProductIds = it.pendingProductIds - purchase.productIds.toSet()) }
-                    val usage = result.usage?.takeIf { it.isKnown }
-                    if (usage != null) onUsage(usage) else refreshUsage()
-                    if (fromSheet || result.status == PurchaseResultDto.STATUS_GRANTED) notice = PurchaseNotice.GRANTED
-                }
-                result.status == PurchaseResultDto.STATUS_PENDING -> {
-                    _state.update { it.copy(pendingProductIds = it.pendingProductIds + purchase.productIds) }
-                    notice = PurchaseNotice.PENDING
-                }
-                else -> notice = PurchaseNotice.RETRY_LATER
-            }
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (failure: ApiException) {
-            ReplyLog.warn(failure) { "purchase not granted (HTTP ${failure.httpStatus ?: "none"})" }
-            notice = when (val error = failure.error) {
-                is ApiError.PurchaseInvalid -> {
-                    synchronized(lock) { finished += token }
-                    // Found on return, bound to another account: not this one's to report.
-                    if (!fromSheet && error.reason == REASON_ACCOUNT) null else PurchaseNotice.NOT_CONFIRMED
-                }
-                ApiError.PurchaseOtherAccount -> {
-                    synchronized(lock) { finished += token }
-                    PurchaseNotice.OTHER_ACCOUNT
-                }
-                // Sales closed on the server: hide them; the purchase stays with Play, unconsumed.
-                ApiError.PurchasesUnavailable -> {
-                    closeSales()
-                    PurchaseNotice.RETRY_LATER
-                }
-                else -> PurchaseNotice.RETRY_LATER
-            }
+            val delivery = request.await()
+            granted = delivery == Delivery.GRANTED || delivery == Delivery.ALREADY_GRANTED
+            notice = noticeFor(delivery, fromSheet)
         } finally {
-            synchronized(lock) { inFlight -= token }
             _state.update { state ->
                 state.copy(
                     busyProductId = if (state.busyProductId in purchase.productIds) null else state.busyProductId,
@@ -448,11 +418,79 @@ class BillingRepository(
         return granted
     }
 
+    /** What [delivery] tells this caller. Someone who just paid hears all of it. */
+    private fun noticeFor(delivery: Delivery, fromSheet: Boolean): PurchaseNotice? = when {
+        fromSheet -> delivery.notice
+        // A repeat found on return is not news.
+        delivery == Delivery.ALREADY_GRANTED -> null
+        // Found on return, bound to another account: not this one's to report.
+        delivery == Delivery.ACCOUNT_MISMATCH -> null
+        else -> delivery.notice
+    }
+
+    /** The one request for [purchase]. It finishes even if the caller that started it has gone. */
+    private suspend fun deliver(purchase: StorePurchase, productId: String): Delivery {
+        val token = purchase.purchaseToken
+        try {
+            val result = api.verify(productId, token)
+            return when {
+                result.isGranted -> {
+                    // A running subscription is checked again on the next return: it can renew or end.
+                    if (!purchase.isSubscription) synchronized(lock) { finished += token }
+                    _state.update { it.copy(pendingProductIds = it.pendingProductIds - purchase.productIds.toSet()) }
+                    val usage = result.usage?.takeIf { it.isKnown }
+                    if (usage != null) onUsage(usage) else refreshUsage()
+                    if (result.status == PurchaseResultDto.STATUS_GRANTED) Delivery.GRANTED else Delivery.ALREADY_GRANTED
+                }
+                result.status == PurchaseResultDto.STATUS_PENDING -> {
+                    _state.update { it.copy(pendingProductIds = it.pendingProductIds + purchase.productIds) }
+                    Delivery.PENDING
+                }
+                else -> Delivery.LATER
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: ApiException) {
+            ReplyLog.warn(failure) { "purchase not granted (HTTP ${failure.httpStatus ?: "none"})" }
+            return when (val error = failure.error) {
+                is ApiError.PurchaseInvalid -> {
+                    synchronized(lock) { finished += token }
+                    if (error.reason == REASON_ACCOUNT) Delivery.ACCOUNT_MISMATCH else Delivery.REFUSED
+                }
+                ApiError.PurchaseOtherAccount -> {
+                    synchronized(lock) { finished += token }
+                    Delivery.OTHER_ACCOUNT
+                }
+                // Sales closed on the server: hide them; the purchase stays with Play, unconsumed.
+                ApiError.PurchasesUnavailable -> {
+                    closeSales()
+                    Delivery.LATER
+                }
+                else -> Delivery.LATER
+            }
+        } finally {
+            synchronized(lock) { inFlight -= token }
+        }
+    }
+
     private fun kindOf(product: IapProductDto): OfferedProduct.Kind? = when (product.kind) {
         "pack" -> OfferedProduct.Kind.PACK
         "pass" -> OfferedProduct.Kind.PASS
         "subscription" -> OfferedProduct.Kind.SUBSCRIPTION
         else -> null
+    }
+
+    /** How handing one purchase to the server ended, and what someone who just paid is told. */
+    private enum class Delivery(val notice: PurchaseNotice) {
+        GRANTED(PurchaseNotice.GRANTED),
+        ALREADY_GRANTED(PurchaseNotice.GRANTED),
+        PENDING(PurchaseNotice.PENDING),
+        /** The server could not finish it now; it is sent again on the next return. */
+        LATER(PurchaseNotice.RETRY_LATER),
+        REFUSED(PurchaseNotice.NOT_CONFIRMED),
+        /** Play's obfuscated account id is not this account's token. */
+        ACCOUNT_MISMATCH(PurchaseNotice.NOT_CONFIRMED),
+        OTHER_ACCOUNT(PurchaseNotice.OTHER_ACCOUNT)
     }
 
     private companion object {

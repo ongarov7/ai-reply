@@ -3,8 +3,10 @@ package kz.yerek.aireply
 import android.app.Activity
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -270,6 +272,23 @@ class BillingTest {
         store.held += StorePurchase(listOf("play.pack_20"), "paid-token", StorePurchaseState.PURCHASED, TOKEN, isSubscription = true)
         billing.restore()
         assertTrue(api.verified.any { it.second == "paid-token" })
+        assertEquals(PurchaseNotice.RESTORED, state.notice)
+        assertFalse(state.restoring)
+    }
+
+    @Test
+    fun `restore during a routine re-check shares its answer`() = runBlocking {
+        billing.load()
+        store.held += runningBase()
+        api.answer = { PurchaseResultDto(PurchaseResultDto.STATUS_ALREADY_GRANTED, USAGE) }
+        api.gate = CompletableDeferred()
+
+        billing.resume()
+        val restoring = launch(start = CoroutineStart.UNDISPATCHED) { billing.restore() }
+        api.gate!!.complete(Unit)
+        restoring.join()
+
+        assertEquals("one request for the two callers", 1, api.verified.size)
         assertEquals(PurchaseNotice.RESTORED, state.notice)
         assertFalse(state.restoring)
     }
