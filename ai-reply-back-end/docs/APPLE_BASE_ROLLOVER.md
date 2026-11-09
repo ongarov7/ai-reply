@@ -32,8 +32,9 @@ revokes its remainder. Legacy bank mandates retain their saved daily terms
 and prices. Manually assigned legacy Base access retains its prior daily quota.
 
 These changes require a backend deployment; rebuilding iOS does not deploy them.
-Do not roll back the binary over the migrated database without an explicit
-accounting decision and a consistent backup.
+Do not run an older binary over the migrated database. A rollback stops the
+backend and restores the full saved data directory with its matching image, as
+`docs/PRODUCTION_RELEASE.md` describes.
 
 ## Historical daily rollover (migration 0036)
 
@@ -99,10 +100,10 @@ exists. Accrued units appear in `purchased_credits`, `credits`, and
 clients can use their existing total/purchased balance fields.
 
 Deploy the backend with migration 0036 before distributing clients that promise
-permanent Base reply balances. Keep the server quota timezone stable. The
-migration is additive; reverting the binary re-enables the old daily quota and
-does not reverse accrued ledger grants, so such a rollback requires an explicit
-accounting decision. No production deployment is performed by this code change.
+permanent Base reply balances. Keep the server quota timezone stable. Migration
+0037 sets Base's daily limit to 0, so reverting only the binary no longer restores
+the old daily quota; see the rollback note in the monthly bundle section above.
+No production deployment is performed by this code change.
 
 ## Validation
 
