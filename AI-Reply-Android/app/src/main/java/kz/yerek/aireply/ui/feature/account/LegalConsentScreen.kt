@@ -4,10 +4,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -25,6 +27,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
@@ -32,16 +36,20 @@ import kz.yerek.aireply.R
 import kz.yerek.aireply.ui.LocalServices
 import kz.yerek.aireply.ui.common.Footnote
 import kz.yerek.aireply.ui.common.openWebPage
+import kz.yerek.aireply.ui.design.AppCard
 import kz.yerek.aireply.ui.design.AppMark
 import kz.yerek.aireply.ui.design.AuthColumn
+import kz.yerek.aireply.ui.design.Layout
 import kz.yerek.aireply.ui.design.PrimaryButton
 import kz.yerek.aireply.ui.design.Spacing
 
 /**
  * The terms, the privacy policy and the AI processing, accepted before
- * anything else. Two separate boxes: the documents, and the texts going to
- * OpenAI; Continue needs both. It shows again when the versions change, when
- * the consent is withdrawn in Settings, and after the account is deleted.
+ * anything else. It says who receives what and when, as iOS does. Two separate
+ * boxes: the documents, and the data going to OpenAI; Continue needs both, and
+ * «Не согласен» says what declining means. It shows again when the versions
+ * change, when the consent is withdrawn (in Settings or on another device),
+ * and after the account is deleted.
  *
  * Келісімсіз де шығуға және тіркелгіні жоюға болады.
  * A signed-in user who does not consent is not trapped here: Sign out and
@@ -58,6 +66,7 @@ fun LegalConsentScreen() {
     var acceptedAi by remember { mutableStateOf(false) }
     var confirmingSignOut by remember { mutableStateOf(false) }
     var confirmingDeletion by remember { mutableStateOf(false) }
+    var showingDecline by remember { mutableStateOf(false) }
 
     fun open(rawUrl: String) = context.openWebPage(rawUrl, services.settings.effectiveAppLanguage.code)
 
@@ -78,20 +87,32 @@ fun LegalConsentScreen() {
             Footnote(stringResource(R.string.legal_consent_body))
         }
 
+        AppCard {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.m)) {
+                Disclosure(
+                    stringResource(R.string.legal_consent_recipient_title),
+                    stringResource(R.string.legal_consent_recipient_body)
+                )
+                // Named with the keyboard's own button labels, like the privacy note in Settings.
+                Disclosure(
+                    stringResource(R.string.legal_consent_data_title),
+                    stringResource(
+                        R.string.legal_consent_ai_disclosure,
+                        stringResource(R.string.kb_generate),
+                        stringResource(R.string.kb_compose_write)
+                    )
+                )
+                Disclosure(
+                    stringResource(R.string.legal_consent_processing_title),
+                    stringResource(R.string.legal_consent_processing_body)
+                )
+            }
+        }
+
         Column(modifier = Modifier.fillMaxWidth()) {
             LegalLink(stringResource(R.string.legal_terms)) { open(state.legalConfig.termsUrl) }
             LegalLink(stringResource(R.string.legal_privacy)) { open(state.legalConfig.privacyUrl) }
         }
-
-        // Named with the keyboard's own button labels, like the privacy note in Settings.
-        Text(
-            stringResource(
-                R.string.legal_consent_ai_disclosure,
-                stringResource(R.string.kb_generate),
-                stringResource(R.string.kb_compose_write)
-            ),
-            style = MaterialTheme.typography.bodyMedium
-        )
 
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.s)) {
             ConsentBox(stringResource(R.string.legal_consent_checkbox), accepted) { accepted = it }
@@ -108,6 +129,17 @@ fun LegalConsentScreen() {
             }
         )
 
+        TextButton(
+            onClick = {
+                acceptedAi = false
+                showingDecline = true
+            },
+            enabled = !state.busy,
+            modifier = Modifier.fillMaxWidth().heightIn(min = Layout.minimumTouchTarget)
+        ) {
+            Text(stringResource(R.string.legal_consent_decline))
+        }
+
         Footnote(stringResource(R.string.legal_consent_footer))
 
         if (state.isSignedIn) {
@@ -120,6 +152,17 @@ fun LegalConsentScreen() {
                 }
             )
         }
+    }
+
+    if (showingDecline) {
+        AlertDialog(
+            onDismissRequest = { showingDecline = false },
+            title = { Text(stringResource(R.string.legal_consent_declined_title)) },
+            text = { Text(stringResource(R.string.legal_consent_declined_body)) },
+            confirmButton = {
+                TextButton(onClick = { showingDecline = false }) { Text(stringResource(R.string.common_done)) }
+            }
+        )
     }
 
     if (confirmingSignOut) {
@@ -180,6 +223,15 @@ private fun AccountExits(state: AccountController.State, onSignOut: () -> Unit, 
                 color = MaterialTheme.colorScheme.error
             )
         }
+    }
+}
+
+/** One part of what the consent is for, under a heading a screen reader can find. */
+@Composable
+private fun Disclosure(title: String, body: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+        Text(title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.semantics { heading() })
+        Text(body, style = MaterialTheme.typography.bodyMedium)
     }
 }
 

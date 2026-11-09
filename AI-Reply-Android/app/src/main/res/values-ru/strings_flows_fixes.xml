@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The consent screen: its sections and the way to decline, as on iOS. -->
+    <string name="legal_consent_recipient_title">Кто получает данные</string>
+    <string name="legal_consent_recipient_body">OpenAI (США) через сервер AI Reply — для создания ответов, сообщений, исправления текста и распознавания голосового ввода.</string>
+    <string name="legal_consent_data_title">Что и когда отправляется</string>
+    <string name="legal_consent_processing_title">Обработка и ваш выбор</string>
+    <string name="legal_consent_processing_body">AI Reply не сохраняет тексты этих запросов и записи; профиль хранится в вашем аккаунте, пока вы его не удалите. OpenAI может временно хранить содержимое API-запросов для проверки злоупотреблений по своим правилам; по умолчанию данные API не используются для обучения моделей. Без вашего согласия AI-запросы не отправляются. Отозвать согласие можно в Настройки → Конфиденциальность.</string>
+    <string name="legal_consent_decline">Не согласен</string>
+    <string name="legal_consent_declined_title">Передача в AI отключена</string>
+    <string name="legal_consent_declined_body">AI-запросы не будут отправляться. Для AI-функций нужно разрешение на обработку этих данных. Вы можете вернуться и дать согласие позже.</string>
+</resources>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The consent screen: its sections and the way to decline, as on iOS. -->
+    <string name="legal_consent_recipient_title">Maʼlumotni kim oladi</string>
+    <string name="legal_consent_recipient_body">Javoblar, xabarlar va matn tuzatishlarini yaratish hamda ovozli kiritishni matnga aylantirish uchun AI Reply serveri orqali OpenAI (AQSH).</string>
+    <string name="legal_consent_data_title">Nima va qachon yuboriladi</string>
+    <string name="legal_consent_processing_title">Qayta ishlash va tanlovingiz</string>
+    <string name="legal_consent_processing_body">AI Reply bu soʻrov matnlari va yozuvlarni saqlamaydi; profil hisobingizni oʻchirmaguningizcha unda saqlanadi. OpenAI oʻz qoidalariga koʻra API mazmunini suiisteʼmolni tekshirish uchun vaqtincha saqlashi mumkin; API maʼlumotlari odatda modelni oʻqitish uchun ishlatilmaydi. Roziligingizsiz AI soʻrovlari yuborilmaydi. Rozilikni Sozlamalar → Maxfiylik boʻlimida qaytarib olishingiz mumkin.</string>
+    <string name="legal_consent_decline">Rozi emasman</string>
+    <string name="legal_consent_declined_title">AI’ga yuborish oʻchirilgan</string>
+    <string name="legal_consent_declined_body">AI soʻrovlari yuborilmaydi. AI funksiyalari bu maʼlumotlarni qayta ishlashga ruxsat talab qiladi. Keyin qaytib rozilik berishingiz mumkin.</string>
+</resources>

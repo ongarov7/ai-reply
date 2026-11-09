@@ -289,8 +289,8 @@
     <string name="settings_account_add_email">Add e-mail for sign-in</string>
     <string name="settings_account_add_email_body">Sign-in by phone number is no longer available. Add an e-mail address to keep access to this account, its plan and history.</string>
     <string name="settings_account_add_email_footer">Add an e-mail so you can sign in to this account again after signing out.</string>
-    <string name="legal_consent_title">Before you continue</string>
-    <string name="legal_consent_body">Please review the documents that govern AI Reply and explain how your data is handled.</string>
+    <string name="legal_consent_title">Share data with OpenAI?</string>
+    <string name="legal_consent_body">AI features in the app and keyboard need your permission to send personal data to a third-party AI service.</string>
     <string name="legal_terms">Public offer</string>
     <string name="legal_privacy">Privacy policy</string>
     <string name="legal_consent_checkbox">I have read and accept the public offer and privacy policy.</string>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The consent screen: its sections and the way to decline, as on iOS. -->
+    <string name="legal_consent_recipient_title">Who receives the data</string>
+    <string name="legal_consent_recipient_body">OpenAI (USA), through the AI Reply server, to generate replies, messages and text corrections and to turn voice input into text.</string>
+    <string name="legal_consent_data_title">What is sent and when</string>
+    <string name="legal_consent_processing_title">Processing and your choice</string>
+    <string name="legal_consent_processing_body">AI Reply does not save these request texts or recordings; your profile is kept in your account until you delete it. OpenAI may retain API content for abuse monitoring under its policies; API data is not used for model training by default. No AI request is sent without your agreement. You can withdraw it in Settings → Privacy.</string>
+    <string name="legal_consent_decline">Do not agree</string>
+    <string name="legal_consent_declined_title">AI sharing is disabled</string>
+    <string name="legal_consent_declined_body">No AI request will be sent. AI features require permission to process this data. You can return and agree later.</string>
+</resources>

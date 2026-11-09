@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The consent screen: its sections and the way to decline, as on iOS. -->
+    <string name="legal_consent_recipient_title">Деректі кім алады</string>
+    <string name="legal_consent_recipient_body">Жауап, хабарлама жазу, мәтінді түзету және дауыспен енгізуді мәтінге айналдыру үшін AI Reply сервері арқылы OpenAI (АҚШ) алады.</string>
+    <string name="legal_consent_data_title">Не және қашан жіберіледі</string>
+    <string name="legal_consent_processing_title">Өңдеу және таңдауыңыз</string>
+    <string name="legal_consent_processing_body">AI Reply осы сұраныстардың мәтіндері мен жазбаларын сақтамайды; профиль тіркелгіңізді жойғанша сонда сақталады. OpenAI өз ережелері бойынша API мазмұнын теріс пайдалануды тексеру үшін уақытша сақтауы мүмкін; әдепкіде API деректері модель үйретуге қолданылмайды. Келісіміңізсіз AI сұраныстары жіберілмейді. Келісімді Параметрлер → Құпиялылық бөлімінде қайтара аласыз.</string>
+    <string name="legal_consent_decline">Келіспеймін</string>
+    <string name="legal_consent_declined_title">AI-ға жіберу өшірулі</string>
+    <string name="legal_consent_declined_body">AI сұраныстары жіберілмейді. AI мүмкіндіктеріне осы деректерді өңдеуге рұқсат қажет. Кейін оралып, келісім бере аласыз.</string>
+</resources>

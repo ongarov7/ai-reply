@@ -288,8 +288,8 @@
     <string name="settings_account_add_email">Добавить почту для входа</string>
     <string name="settings_account_add_email_body">Вход по номеру телефона больше недоступен. Добавьте почту, чтобы сохранить доступ к аккаунту, тарифу и истории.</string>
     <string name="settings_account_add_email_footer">Добавьте почту, чтобы снова войти в этот аккаунт после выхода.</string>
-    <string name="legal_consent_title">Перед продолжением</string>
-    <string name="legal_consent_body">Ознакомьтесь с документами, которые регулируют работу AI Reply и объясняют обработку данных.</string>
+    <string name="legal_consent_title">Передача данных в OpenAI</string>
+    <string name="legal_consent_body">Для AI-функций приложения и клавиатуры нужно ваше разрешение на передачу персональных данных стороннему AI-сервису.</string>
     <string name="legal_terms">Публичная оферта</string>
     <string name="legal_privacy">Политика конфиденциальности</string>
     <string name="legal_consent_checkbox">Я прочитал(а) и принимаю публичную оферту и политику конфиденциальности.</string>

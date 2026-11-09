@@ -288,8 +288,8 @@
     <string name="settings_account_add_email">Кіру үшін пошта қосу</string>
     <string name="settings_account_add_email_body">Телефон нөмірімен кіру енді қолжетімсіз. Осы тіркелгіге, оның тарифі мен тарихына кіруді сақтау үшін пошта мекенжайын қосыңыз.</string>
     <string name="settings_account_add_email_footer">Шыққаннан кейін осы тіркелгіге қайта кіру үшін пошта қосыңыз.</string>
-    <string name="legal_consent_title">Жалғастырмас бұрын</string>
-    <string name="legal_consent_body">AI Reply жұмысын реттейтін және деректердің қалай өңделетінін түсіндіретін құжаттармен танысыңыз.</string>
+    <string name="legal_consent_title">OpenAI-ға дерек жіберу</string>
+    <string name="legal_consent_body">Қосымша мен пернетақтаның AI мүмкіндіктері үшін жеке деректерді сыртқы AI қызметіне жіберуге рұқсатыңыз қажет.</string>
     <string name="legal_terms">Жария оферта</string>
     <string name="legal_privacy">Құпиялық саясаты</string>
     <string name="legal_consent_checkbox">Жария оферта мен құпиялық саясатын оқыдым және қабылдаймын.</string>

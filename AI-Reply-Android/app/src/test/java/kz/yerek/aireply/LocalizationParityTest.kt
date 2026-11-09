@@ -216,6 +216,16 @@ class LocalizationParityTest {
         }
     }
 
+    /** On Android the keyboard's voice input goes to OpenAI too, and the consent covers it. */
+    @Test
+    fun `the AI disclosure covers voice input`() {
+        val voice = mapOf("en" to "Voice input", "ru" to "Голосовой ввод", "kk" to "Дауыспен енгізу", "uz" to "Ovozli kiritish")
+        mapOf("en" to english, "ru" to russian, "kk" to kazakh, "uz" to uzbek).forEach { (language, table) ->
+            val text = table.getValue("legal_consent_ai_disclosure")
+            assertTrue("$language: $text", text.contains(voice.getValue(language)))
+        }
+    }
+
     /** Kazakh Settings says «тіркелгі» for the account; the deletion strings sit in the same section. */
     @Test
     fun `kazakh uses one word for the account`() {

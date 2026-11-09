@@ -221,8 +221,8 @@
     <string name="error_offline">Internet aloqasi yoʻq.</string>
     <string name="error_timed_out">Juda uzoq davom etdi. Qayta urinib koʻring.</string>
 
-    <string name="legal_consent_title">Davom etishdan oldin</string>
-    <string name="legal_consent_body">AI Reply ishini tartibga soluvchi va maʼlumotlaringiz qanday qayta ishlanishini tushuntiruvchi hujjatlarni koʻrib chiqing.</string>
+    <string name="legal_consent_title">OpenAI’ga maʼlumot yuborish</string>
+    <string name="legal_consent_body">Ilova va klaviaturadagi AI funksiyalari uchun shaxsiy maʼlumotlarni uchinchi tomon AI xizmatiga yuborishga ruxsatingiz kerak.</string>
     <string name="legal_terms">Ommaviy oferta</string>
     <string name="legal_privacy">Maxfiylik siyosati</string>
     <string name="legal_consent_checkbox">Ommaviy oferta va maxfiylik siyosatini oʻqidim hamda qabul qilaman.</string>
