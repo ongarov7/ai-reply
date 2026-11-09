@@ -16,7 +16,7 @@ func TestLandingPricingWithoutPurchases(t *testing.T) {
 	_, page := fetch(t, h, "/?lang=en")
 	page = html.UnescapeString(page)
 	for _, needle := range []string{
-		"The free plan gives 7 replies a day.", "AI Reply is free. The free plan has a daily reply limit",
+		"The free plan gives 7 replies a day.", "Start free. The app and the keyboard show how many replies you have left.",
 		`href="#download">Get the app</a>`, `data-count="7"`,
 	} {
 		if !strings.Contains(page, needle) {
@@ -49,6 +49,45 @@ func TestLandingPricingWithoutPurchases(t *testing.T) {
 	if page = html.UnescapeString(page); !strings.Contains(page, "Choose in the app") ||
 		!strings.Contains(page, "change the plan any time") {
 		t.Fatal("landing with a purchasable plan lost its pricing copy")
+	}
+}
+
+// Public pages describe Base as sold: replies per paid month that never expire, nothing nightly.
+func TestPublicPagesDescribeBaseAsABundleOfPermanentReplies(t *testing.T) {
+	h := newHarness(t, withEnv("TEST_APPROVED_ENTITLEMENTS", "true"))
+	bundle, err := localization.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for locale, want := range map[string]struct {
+		bundle, inline string
+		stale          []string
+	}{
+		"en": {"1,000 replies each paid month. Unused replies never expire.", "Base: 1,000 replies each paid month. Unused replies never expire.",
+			[]string{"Every night", "renews every night", "resets at midnight", "left today", "the next day", "daily reply limit"}},
+		"ru": {"1 000 ответов каждый оплаченный месяц. Остаток не сгорает.", "Base: 1 000 ответов каждый оплаченный месяц. Остаток не сгорает.",
+			[]string{"Каждую ночь", "каждую ночь", "в полночь", "осталось сегодня", "на следующий день", "дневной лимит"}},
+		"kk": {"Әр төленген айға 1 000 жауап. Қалған жауаптардың мерзімі шектелмейді.", "Base: әр төленген айға 1 000 жауап. Қалған жауаптардың мерзімі шектелмейді.",
+			[]string{"Күн сайын түн ортасында", "әр түні", "түн ортасында", "Бүгін неше", "келесі күні", "күндік"}},
+		"uz": {"Har to‘langan oy uchun 1 000 javob. Qolgan javoblar muddatsiz.", "Base: har to‘langan oy uchun 1 000 javob. Qolgan javoblar muddatsiz.",
+			[]string{"Har kuni yarim tunda", "har kecha", "yarim tunda", "Bugun nechta", "ertasi kuni", "kunlik"}},
+	} {
+		_, landing := fetch(t, h, "/?lang="+locale)
+		_, support := fetch(t, h, "/support?lang="+locale)
+		landing, support = html.UnescapeString(landing), html.UnescapeString(support)
+		// The note under the catalogue's cards; this harness renders the plan cards instead.
+		note := bundle.T(locale, "pricing.catalog_note")
+		if !strings.Contains(landing, want.bundle) {
+			t.Errorf("%s landing is missing %q", locale, want.bundle)
+		}
+		if !strings.Contains(support, want.inline) || !strings.Contains(note, want.inline) {
+			t.Errorf("%s support page or pricing note is missing %q", locale, want.inline)
+		}
+		for _, stale := range want.stale {
+			if strings.Contains(landing, stale) || strings.Contains(support, stale) || strings.Contains(note, stale) {
+				t.Errorf("%s public pages still say %q", locale, stale)
+			}
+		}
 	}
 }
 
