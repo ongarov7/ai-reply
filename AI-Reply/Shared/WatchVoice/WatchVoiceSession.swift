@@ -46,10 +46,12 @@ struct WatchLinkSnapshot: Codable, Equatable, Sendable {
         guard isSupported else { return .unsupported }
         guard isActivated else { return .activating }
         guard isPaired else { return .notPaired }
-        guard isWatchAppInstalled else { return .appNotInstalled }
+        // Before the installed check: a message from the app proves it is
+        // there, and `isWatchAppInstalled` can lag behind a fresh install.
         if let lastWatchContactAt, now.timeIntervalSince(lastWatchContactAt) <= Self.contactFreshness {
             return .connected
         }
+        guard isWatchAppInstalled else { return .appNotInstalled }
         // Fresh from `sessionReachabilityDidChange` while the app is awake.
         if isReachable, now.timeIntervalSince(updatedAt) <= Self.contactFreshness {
             return .connected

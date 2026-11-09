@@ -1599,7 +1599,9 @@ extension KeyboardViewController: WatchVoiceHost {
     }
 
     func watchReadCopiedMessage() -> Result<ReplyContext, AIReplyError> {
-        replyCoordinator.readCopiedMessage(proxy: textDocumentProxy, hasFullAccess: hasFullAccess)
+        // `canReachNetwork` is Full Access, and in the Simulator's mock mode
+        // stands in for it, as everywhere else on this path.
+        replyCoordinator.readCopiedMessage(proxy: textDocumentProxy, hasFullAccess: canReachNetwork)
     }
 
     func watchExistingText() -> String? {

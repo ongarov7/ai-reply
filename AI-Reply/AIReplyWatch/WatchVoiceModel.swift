@@ -32,7 +32,13 @@ final class WatchVoiceModel {
         var text: String?
     }
 
-    private(set) var stage: Stage = .ready
+    private(set) var stage: Stage = .ready {
+        didSet {
+            #if DEBUG
+            NSLog("[WatchVoice] stage %@", String(describing: stage))
+            #endif
+        }
+    }
     /// The instruction being reviewed. Editable before it is sent.
     var draft = ""
     private(set) var listeningSeconds = 0
@@ -88,7 +94,30 @@ final class WatchVoiceModel {
             Task { @MainActor in self?.handle(event) }
         }
         client.start()
+        #if DEBUG
+        runSmokeTestIfRequested()
+        #endif
     }
+
+    #if DEBUG
+    /// `-AIReplyWatchSmokeTest`: the real microphone path with no taps,
+    /// because a Watch simulator cannot be driven from the command line.
+    private func runSmokeTestIfRequested() {
+        guard CommandLine.arguments.contains("-AIReplyWatchSmokeTest") else { return }
+        Task {
+            try? await Task.sleep(for: .seconds(4))
+            startListening()
+            try? await Task.sleep(for: .seconds(3))
+            stopListening()
+            for _ in 0..<40 where stage != .review {
+                try? await Task.sleep(for: .milliseconds(500))
+            }
+            try? await Task.sleep(for: .seconds(1))
+            NSLog("[WatchVoice] smoke: send, session %@", phone?.keyboardSessionID ?? "none")
+            send()
+        }
+    }
+    #endif
 
     private static var systemLanguage: WatchVoiceLanguage {
         for identifier in Locale.preferredLanguages {

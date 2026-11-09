@@ -188,7 +188,9 @@ struct PersonaRowLayout: Equatable, Sendable {
         // Half a gap inside the viewport puts the first pill one full gap
         // after ✨; the last one keeps the row's edge inset.
         let leading = Self.spacing / 2
-        let available = personasFrame.width - leading - (trailingActionWidth > 0 ? Self.spacing : Self.edgeInset)
+        // Beside the watch control, one gap rather than the row's edge.
+        let endInset = trailingActionWidth > 0 ? Self.spacing : Self.edgeInset
+        let available = personasFrame.width - leading - endInset
         guard !textWidths.isEmpty, available > 0 else {
             pillFrames = []
             contentWidth = personasFrame.width
@@ -204,9 +206,12 @@ struct PersonaRowLayout: Equatable, Sendable {
                 total + max(44, item.0 + (withIcons ? item.1 : 0) + padding * 2)
             } + gaps <= available
         }
-        let withIcons = iconTotal > 0 ? Self.paddings.first { fits(padding: $0, withIcons: true) } : nil
-        let withoutIcons = Self.paddings.first { fits(padding: $0, withIcons: false) }
-        let padding = withIcons ?? withoutIcons ?? Self.paddings.last ?? 8
+        // One step tighter with the watch control, so that four personas
+        // still fit whole next to it on a 6.1-inch phone.
+        let paddings = trailingActionWidth > 0 ? Self.paddings + [6] : Self.paddings
+        let withIcons = iconTotal > 0 ? paddings.first { fits(padding: $0, withIcons: true) } : nil
+        let withoutIcons = paddings.first { fits(padding: $0, withIcons: false) }
+        let padding = withIcons ?? withoutIcons ?? paddings.last ?? 8
         showsIcons = withIcons != nil
         var widths = zip(texts, icons).map { text, icon in max(44, text + (withIcons != nil ? icon : 0) + padding * 2) }
         let used = widths.reduce(0, +) + gaps
@@ -221,7 +226,7 @@ struct PersonaRowLayout: Equatable, Sendable {
             x += pillWidth + Self.spacing
         }
         pillFrames = frames
-        contentWidth = max(personasFrame.width, x - Self.spacing + Self.edgeInset)
+        contentWidth = max(personasFrame.width, x - Self.spacing + endInset)
     }
 }
 
