@@ -125,7 +125,9 @@ fun SupportChatScreen(onBack: () -> Unit) {
                     else -> Messages(state, onRetry = chat::retry, onTop = chat::loadOlder)
                 }
             }
-            if (enabled) InputBar(draft = chat.draft, onDraftChange = { chat.draft = it }, onSend = chat::send)
+            if (enabled) {
+                InputBar(draft = chat.draft, loaded = state.loaded, onDraftChange = { chat.draft = it }, onSend = chat::send)
+            }
         }
     }
 }
@@ -284,14 +286,14 @@ private fun Bubble(message: ChatMessage, showsName: Boolean, locale: Locale, onR
  * Android keeps outside the app.
  */
 @Composable
-private fun InputBar(draft: String, onDraftChange: (String) -> Unit, onSend: (String) -> Boolean) {
+private fun InputBar(draft: String, loaded: Boolean, onDraftChange: (String) -> Unit, onSend: (String) -> Boolean) {
     var text by remember { mutableStateOf(draft) }
     fun edit(value: String) {
         text = value
         onDraftChange(value)
     }
     val tooLong = SupportChatController.isTooLong(text)
-    val canSend = SupportChatController.isSendable(text)
+    val canSend = loaded && SupportChatController.isSendable(text)
     Column(
         modifier = Modifier
             .fillMaxWidth()

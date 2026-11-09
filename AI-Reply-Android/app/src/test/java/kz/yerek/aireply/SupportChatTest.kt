@@ -349,6 +349,22 @@ class SupportChatTest {
     }
 
     @Test
+    fun `nothing is sent until the chat has loaded`() = runBlocking {
+        assertFalse("not read yet", chat.send("Привет"))
+
+        server.pageError = ApiError.Offline
+        chat.open()
+        assertFalse("the load failed: the screen shows no messages", chat.send("Привет"))
+        assertTrue(server.sent.isEmpty())
+        assertTrue(texts.isEmpty())
+
+        server.pageError = null
+        chat.retryLoad()
+        assertTrue(chat.send("Привет"))
+        assertEquals(listOf("Привет"), texts)
+    }
+
+    @Test
     fun `the draft stays in memory and goes with the account`() {
         chat.draft = "Не приходит ответ"
         assertEquals("Не приходит ответ", chat.draft)

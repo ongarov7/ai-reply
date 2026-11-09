@@ -188,10 +188,14 @@ class SupportChatController(
         }
     }
 
-    /** «Отправить». False when there is nothing to send or it is too long (the field says so). */
+    /**
+     * «Отправить». False when there is nothing to send, it is too long (the
+     * field says so), or the chat has not loaded: the bubble would have
+     * nowhere to show.
+     */
     fun send(text: String): Boolean {
         val message = text.trim()
-        if (!isSendable(message) || !isEnabled()) return false
+        if (!isSendable(message) || !isEnabled() || !_state.value.loaded) return false
         val clientId = newClientId()
         _state.update { it.sending(clientId, message, clock()) }
         scope.launch { deliver(clientId, message) }
