@@ -216,8 +216,10 @@ private struct ReviewScreen: View {
         @Bindable var model = model
         ScrollView {
             VStack(spacing: 8) {
-                // A tap opens the system's editor with this text.
-                TextField("watch.review.placeholder", text: $model.draft, axis: .vertical)
+                // All of it, to read before it goes anywhere.
+                Text(verbatim: model.draft)
+                    .font(.footnote)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 if model.isDraftTooLong, let limit = model.instructionLimit {
                     Text("watch.tooLong \(limit)")
                         .font(.footnote)
@@ -229,6 +231,13 @@ private struct ReviewScreen: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(model.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.isDraftTooLong)
+
+                // The system's editor, opened on this text.
+                Text("watch.edit")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                TextField("watch.review.placeholder", text: $model.draft)
 
                 Button("watch.clear", action: model.clear)
                 Button("watch.cancel", role: .cancel, action: model.cancel)
