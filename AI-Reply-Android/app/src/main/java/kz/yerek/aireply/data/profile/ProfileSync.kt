@@ -83,9 +83,19 @@ class ProfileSync(
      * had a copy of goes too - see [withoutAccount].
      */
     fun accountDeleted() {
+        accountDeletions++
         configuration.updateProfile { withoutAccount(it) }
         device.accountSignedOut()
     }
+
+    /**
+     * How many times [accountDeleted] ran. An editor holds its own copy of the
+     * profile and saves it on the way out: it compares this with the value from
+     * when it opened, so the copy of an account deleted meanwhile is not saved.
+     */
+    @Volatile
+    var accountDeletions = 0
+        private set
 
     /** After `/me`: a choice made on another device of the same account is taken over. */
     fun adopt(server: AccountProfile) {

@@ -58,6 +58,7 @@ fun ProfileScreen(onBack: () -> Unit) {
     val services = LocalServices.current
     val language = services.settings.effectiveAppLanguage
     val stored = remember { services.configuration.profile }
+    val deletionsAtOpen = remember { services.profileSync.accountDeletions }
 
     var role by remember { mutableStateOf(stored.role) }
     var about by remember { mutableStateOf(stored.descriptionText) }
@@ -73,6 +74,8 @@ fun ProfileScreen(onBack: () -> Unit) {
     val latest = rememberUpdatedState(ProfileDraft(role, about, business, tone, replyLanguage))
     DisposableEffect(Unit) {
         onDispose {
+            // The account was deleted while this was open: its copy must not come back.
+            if (services.profileSync.accountDeletions != deletionsAtOpen) return@onDispose
             val draft = latest.value
             services.configuration.updateProfile { profile ->
                 profile.withRole(draft.role).withDescription(draft.about).copy(

@@ -1,5 +1,7 @@
 package kz.yerek.aireply
 
+import android.content.Context
+import android.content.ContextWrapper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -8,6 +10,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kz.yerek.aireply.ai.AIFeatures
 import kz.yerek.aireply.ai.AILimits
 import kz.yerek.aireply.core.lang.KeyboardLanguage
 import kz.yerek.aireply.data.account.AccountObserver
@@ -19,7 +22,12 @@ import kz.yerek.aireply.data.account.DeviceDescriptor
 import kz.yerek.aireply.data.account.LegalConfigDto
 import kz.yerek.aireply.data.account.UsageDto
 import kz.yerek.aireply.data.legal.LegalConsentStore
+import kz.yerek.aireply.data.profile.ConfigurationRepository
+import kz.yerek.aireply.data.profile.ProfileStore
+import kz.yerek.aireply.data.profile.ProfileSync
+import kz.yerek.aireply.data.settings.DeviceStateStore
 import kz.yerek.aireply.data.settings.SettingsStore
+import kz.yerek.aireply.domain.model.ReplyLanguagePreference
 import kz.yerek.aireply.keyboard.autocorrect.LearnedWords
 import kz.yerek.aireply.support.FakeCredentials
 import kz.yerek.aireply.support.FakeResponse
@@ -30,10 +38,14 @@ import kz.yerek.aireply.ui.feature.account.AccountController
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
+import java.io.File
 import java.io.IOException
 import java.net.ConnectException
 import java.net.SocketTimeoutException
@@ -77,12 +89,13 @@ class AccountDeletionTest {
 
     private val observer = RecordingObserver(legal)
 
-    private fun controller(background: CoroutineScope? = null) = AccountController(
+    private fun controller(background: CoroutineScope? = null, sync: ProfileSync? = null) = AccountController(
         service = service,
         credentials = credentials,
         usageCache = usage,
         legalConsentStore = legal,
         backgroundScope = background,
+        profileSync = sync,
         observer = observer,
         learnedWords = learned
     )
@@ -293,6 +306,94 @@ class AccountDeletionTest {
         listOf(ApiError.Offline, ApiError.Unauthorized, ApiError.RateLimited(null), ApiError.NotFound, null).forEach {
             assertFalse(it.toString(), AccountController.mayHaveReachedServer(it))
         }
+    }
+
+    // ------------------------------------------------ an open profile editor
+
+    @get:Rule
+    val folder = TemporaryFolder()
+
+    /** All the profile file needs from Android. */
+    private class FilesOnly(private val dir: File) : ContextWrapper(null) {
+        override fun getApplicationContext(): Context = this
+        override fun getFilesDir(): File = dir
+    }
+
+    /** A stopped scope: the keyboard's chip summaries need real resources. */
+    private val configuration by lazy {
+        val context = FilesOnly(folder.root)
+        ConfigurationRepository(context, ProfileStore(context), settings, CoroutineScope(Job().apply { cancel() }))
+    }
+
+    private val profileSync by lazy {
+        ProfileSync(
+            service = service,
+            configuration = configuration,
+            device = DeviceStateStore(InMemoryPreferences()),
+            isSignedIn = { credentials.isSignedIn },
+            features = { AIFeatures.NONE },
+            scope = CoroutineScope(Job())
+        )
+    }
+
+    /** The profile as the editor finds it; returns what the editor remembers when it opens. */
+    private fun profileOpened(): Int {
+        configuration.updateProfile { it.copy(role = "Дизайнер", replyLanguage = ReplyLanguagePreference.KAZAKH) }
+        return profileSync.accountDeletions
+    }
+
+    private fun assertProfileWiped() {
+        assertEquals("", configuration.profile.role)
+        assertNull(configuration.profile.replyLanguage)
+    }
+
+    @Test
+    fun `a profile editor open through a deletion knows its copy is of a deleted account`() = runBlocking {
+        signedInWithEverything()
+        answer = { FakeResponse(200, """{"deleted":true}""") }
+        val opened = profileOpened()
+
+        assertTrue(controller(sync = profileSync).deleteAccount())
+
+        assertNotEquals(opened, profileSync.accountDeletions)
+        assertProfileWiped()
+    }
+
+    @Test
+    fun `so does one open when the next refresh finishes a deletion whose answer was lost`() = runBlocking {
+        signedInWithEverything()
+        val account = controller(sync = profileSync)
+        answer = { FakeResponse(502) }
+        assertFalse(account.deleteAccount())
+        val opened = profileOpened()
+        assertEquals("nothing has gone yet", "Дизайнер", configuration.profile.role)
+
+        answer = { refused }
+        account.refresh()
+
+        assertNotEquals(opened, profileSync.accountDeletions)
+        assertProfileWiped()
+    }
+
+    @Test
+    fun `a profile editor open through a sign-out still saves its copy`() = runBlocking {
+        signedInWithEverything()
+        answer = { FakeResponse(200, "{}") }
+        val opened = profileOpened()
+
+        controller(sync = profileSync).signOut()
+
+        assertEquals(opened, profileSync.accountDeletions)
+        assertEquals("the phone keeps it for the next sign-in", "Дизайнер", configuration.profile.role)
+    }
+
+    @Test
+    fun `the profile screen checks for a deletion before it saves on the way out`() {
+        val exit = File("src/main/java/kz/yerek/aireply/ui/feature/profile/ProfileScreen.kt").readText()
+            .substringAfter("onDispose {")
+        val check = exit.indexOf("services.profileSync.accountDeletions != deletionsAtOpen")
+        assertTrue(check >= 0)
+        assertTrue("before anything is written", check < exit.indexOf("updateProfile"))
     }
 
     // ------------------------------------------- signed in, without consent
