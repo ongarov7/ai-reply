@@ -26,6 +26,9 @@ struct ComposeService: Sendable {
         var inputLanguage: KeyboardLanguage? = nil
         /// «Рад» or «рада» when the message speaks for the user in Russian.
         var grammaticalGender: GrammaticalGender? = nil
+        /// The identity of an action that can be run more than once, for the
+        /// server's `Idempotency-Key`. nil: this tap is the action.
+        var actionID: String? = nil
     }
 
     private let configuration: AIConfiguration
@@ -76,7 +79,8 @@ struct ComposeService: Sendable {
             ) {
                 throw refusal
             }
-            transport = AccountComposeTransport(onUsage: { usage in AccountUsageCache.store(usage) })
+            transport = AccountComposeTransport(onUsage: { usage in AccountUsageCache.store(usage) },
+                                                idempotencyKey: IdempotencyKey.forAction(actionID: prepared.actionID))
         }
 
         do {

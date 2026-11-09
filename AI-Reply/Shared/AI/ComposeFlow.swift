@@ -28,6 +28,8 @@ struct ComposeSession: Equatable, Sendable {
     /// here: the reply opens with a card to type the message into.) Kept apart from `flow.error`
     /// because it is not a failure of writing - Write stays Write, not Retry.
     var copiedMessageError: AIReplyError?
+    /// A Watch command's identity, for its first request only.
+    var watchActionID: String?
 
     /// Whether "New" has anything to clear.
     var hasContent: Bool {
@@ -156,6 +158,30 @@ final class ComposeFlowCoordinator {
         ReplyLog.event("ai_compose_opened")
     }
 
+    /// A confirmed instruction from the watch: the panel opens on it and
+    /// the request starts. The user's Send on the watch was the tap.
+    func startFromWatch(instruction: String, inputLanguage: KeyboardLanguage?, actionID: String) {
+        cancelTask()
+        ComposeSessionParking.discard()
+        var next = ComposeSession()
+        next.instruction = instruction
+        next.watchActionID = actionID
+        session = next
+        self.inputLanguage = inputLanguage
+        generate()
+    }
+
+    /// A text the watch flow saved, back on screen with Insert.
+    func showSaved(instruction: String, text: String) {
+        cancelTask()
+        ComposeSessionParking.discard()
+        var next = ComposeSession()
+        next.instruction = instruction
+        next.flow.startGeneration()
+        next.flow.receive(reply: text)
+        session = next
+    }
+
     /// A session parked when the keyboard last went away. It comes back
     /// without any error: the user usually left to copy the message that
     /// "Copy a message first" asked for, so that sentence would now be wrong.
@@ -183,6 +209,8 @@ final class ComposeFlowCoordinator {
         }
         let isRegeneration = !current.flow.drafts.isEmpty
         guard current.flow.startGeneration() else { return }
+        let actionID = current.watchActionID
+        current.watchActionID = nil
         session = current
         delegate?.composeCoordinatorDidChange(self)
         ReplyLog.event(isRegeneration ? "ai_compose_regenerated" : "ai_compose_generate_started")
@@ -191,7 +219,8 @@ final class ComposeFlowCoordinator {
             uiLanguage: uiLanguage,
             isRegeneration: isRegeneration,
             inputLanguage: inputLanguage,
-            grammaticalGender: grammaticalGender
+            grammaticalGender: grammaticalGender,
+            actionID: actionID
         ))
     }
 

@@ -309,6 +309,7 @@
 		BB712E8C1C33B2AE81201A93 /* WatchCompanionCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23124A4DE5B3D2538DB874F /* WatchCompanionCore.swift */; };
 		4E5F5DF064B4EBC7399CACF3 /* WatchCompanion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BBEDA8BBCA449F300B31DE5 /* WatchCompanion.swift */; };
 		7BA3160A34FA67919BC03D51 /* WatchTranscriber.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAE57269C5623BE1D569E421 /* WatchTranscriber.swift */; };
+		8862C7A99A6DFE6D24516169 /* WatchVoiceStripView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D77DCE6F8DCCB8641E0E5ADF /* WatchVoiceStripView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -597,6 +598,7 @@
 		C23124A4DE5B3D2538DB874F /* WatchCompanionCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchCompanionCore.swift; sourceTree = "<group>"; };
 		0BBEDA8BBCA449F300B31DE5 /* WatchCompanion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchCompanion.swift; sourceTree = "<group>"; };
 		DAE57269C5623BE1D569E421 /* WatchTranscriber.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchTranscriber.swift; sourceTree = "<group>"; };
+		D77DCE6F8DCCB8641E0E5ADF /* WatchVoiceStripView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchVoiceStripView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -872,6 +874,7 @@
 				E70C29CDC57B63ECD2812622 /* SuggestionStripView.swift */,
 				1B5B97E2C49D4BC68B094D40 /* TemplateBarView.swift */,
 				3BD07385DFCA7EC94502AEA0 /* Dictionaries */,
+				D77DCE6F8DCCB8641E0E5ADF /* WatchVoiceStripView.swift */,
 			);
 			path = ReplyKeyboard;
 			sourceTree = "<group>";
@@ -1469,6 +1472,7 @@
 				21CF74FCF7D7CBCD8B49E2B0 /* WatchVoiceRouting.swift in Sources */,
 				31FDA11803B9DAFFC4C6BEBF /* WatchVoiceCoordinator.swift in Sources */,
 				F4C32FC8BD19D2DE7711590D /* WatchVoiceStrings.swift in Sources */,
+				8862C7A99A6DFE6D24516169 /* WatchVoiceStripView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

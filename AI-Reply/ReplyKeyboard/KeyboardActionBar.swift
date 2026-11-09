@@ -41,6 +41,13 @@ protocol KeyboardActionBarDelegate: AnyObject {
     func actionBarDidUndoPolish(_ bar: KeyboardActionBar)
     /// The composer's caret moved without typing: a tap, another field.
     func actionBarDidMoveComposerCaret(_ bar: KeyboardActionBar)
+    /// The Apple Watch control in the row.
+    func actionBarDidTapWatch(_ bar: KeyboardActionBar)
+    /// Generate or Insert Response on the Watch Voice strip.
+    func actionBarDidTapWatchPrimary(_ bar: KeyboardActionBar)
+    func actionBarDidDismissWatchStrip(_ bar: KeyboardActionBar)
+    /// The text on the strip: review a saved reply before inserting it.
+    func actionBarDidTapWatchPreview(_ bar: KeyboardActionBar)
 }
 
 /// The area above the keys. Two shapes:
@@ -60,7 +67,10 @@ final class KeyboardActionBar: UIView {
 
     private let templateBar = TemplateBarView()
     private let suggestionStrip = SuggestionStripView()
+    private let watchStrip = WatchVoiceStripView()
     private let composer = ReplyComposerView()
+    private var watchUI = WatchVoiceUI()
+    private var watchStrings = WatchVoiceStrings.forLanguage(.english)
 
     /// Whether the strip is over the persona pills right now.
     private var showsSuggestions = false
@@ -94,6 +104,20 @@ final class KeyboardActionBar: UIView {
             self.delegate?.actionBar(self, didPick: suggestion)
         }
         addSubview(suggestionStrip)
+        watchStrip.isHidden = true
+        watchStrip.onPrimary = { [weak self] in
+            guard let self else { return }
+            self.delegate?.actionBarDidTapWatchPrimary(self)
+        }
+        watchStrip.onDismiss = { [weak self] in
+            guard let self else { return }
+            self.delegate?.actionBarDidDismissWatchStrip(self)
+        }
+        watchStrip.onPreview = { [weak self] in
+            guard let self else { return }
+            self.delegate?.actionBarDidTapWatchPreview(self)
+        }
+        addSubview(watchStrip)
         composer.isHidden = true
         addSubview(composer)
     }
@@ -109,6 +133,7 @@ final class KeyboardActionBar: UIView {
         templateBar.layoutIfNeeded()
         // Exactly the pills' viewport, right of ✨: the strip never covers it.
         suggestionStrip.frame = templateBar.personasFrame.offsetBy(dx: templateBar.frame.minX, dy: templateBar.frame.minY)
+        watchStrip.frame = suggestionStrip.frame.insetBy(dx: 3, dy: 4)
         composer.frame = bounds
     }
 
@@ -118,6 +143,9 @@ final class KeyboardActionBar: UIView {
     func configure(theme: KeyboardTheme, uiLanguage: AppLanguage) {
         templateBar.configure(theme: theme, uiLanguage: uiLanguage)
         suggestionStrip.configure(theme: theme, uiLanguage: uiLanguage)
+        watchStrip.configure(theme: theme, uiLanguage: uiLanguage)
+        watchStrings = WatchVoiceStrings.forLanguage(uiLanguage)
+        setWatchVoice(watchUI)
         composer.configure(theme: theme, uiLanguage: uiLanguage)
     }
 
@@ -153,6 +181,42 @@ final class KeyboardActionBar: UIView {
         composer.reset()
         composer.isHidden = true
         templateBar.isHidden = false
+        refreshWatchStrip()
+    }
+
+    // MARK: Watch Voice
+
+    /// The control in the row and, when there is something to say, the strip
+    /// over the personas. Nothing here changes the keyboard's height.
+    func setWatchVoice(_ ui: WatchVoiceUI) {
+        watchUI = ui
+        templateBar.setWatchIndicator(ui.indicator, name: watchStrings.controlName, status: watchStatus(ui.indicator))
+        if let strip = ui.strip { watchStrip.show(strip) }
+        refreshWatchStrip()
+    }
+
+    private func watchStatus(_ indicator: WatchKeyboardIndicator) -> String? {
+        switch indicator {
+        case .hidden, .ready:        return nil
+        case .installApp:            return watchStrings.installWatchApp
+        case .openWatchApp:          return watchStrings.openWatchApp
+        case .waiting:               return watchStrings.waiting
+        case .instructionReceived:   return watchStrings.instructionReceived
+        case .generating:            return watchStrings.generating
+        case .responseReady:         return watchStrings.responseReady
+        case .connectionLost:        return watchStrings.connectionLost
+        }
+    }
+
+    /// A word being typed has the row to itself; the strip comes back after.
+    private var showsWatchStrip: Bool {
+        watchUI.strip != nil && !isComposing && !showsSuggestions
+    }
+
+    private func refreshWatchStrip() {
+        let visible = showsWatchStrip
+        watchStrip.isHidden = !visible
+        templateBar.setPersonasHidden(visible || showsSuggestions)
     }
 
     // MARK: Text target passthrough
@@ -207,13 +271,14 @@ final class KeyboardActionBar: UIView {
         suggestionStrip.accessibilityElementsHidden = !visible
         let apply = {
             self.suggestionStrip.alpha = visible ? 1 : 0
-            self.templateBar.setPersonasHidden(visible)
+            self.templateBar.setPersonasHidden(visible || self.showsWatchStrip)
         }
         if animated, window != nil {
             UIView.animate(withDuration: 0.16, delay: 0, options: [.beginFromCurrentState, .allowUserInteraction], animations: apply)
         } else {
             apply()
         }
+        refreshWatchStrip()
     }
 }
 
@@ -227,6 +292,10 @@ extension KeyboardActionBar: TemplateBarViewDelegate {
 
     func templateBarDidTapCreate(_ bar: TemplateBarView) {
         delegate?.actionBarDidRequestCompose(self)
+    }
+
+    func templateBarDidTapWatch(_ bar: TemplateBarView) {
+        delegate?.actionBarDidTapWatch(self)
     }
 }
 

@@ -140,6 +140,8 @@ struct PersonaRowLayout: Equatable, Sendable {
     static let actionWidth: CGFloat = 64
     static let spacing: CGFloat = 6
     static let edgeInset: CGFloat = 8
+    /// The Apple Watch control at the trailing edge, when a watch is paired.
+    static let watchActionWidth: CGFloat = 40
     /// Text padding per side: roomy when everything fits, tighter on a narrow
     /// row, and never below the last value.
     static let paddings: [CGFloat] = [14, 11, 8]
@@ -152,6 +154,8 @@ struct PersonaRowLayout: Equatable, Sendable {
     /// The personas' viewport (the scroll view) in the row's coordinates.
     /// The suggestion strip covers exactly this while a word is typed.
     let personasFrame: CGRect
+    /// The Apple Watch control, in the row's coordinates; nil without one.
+    let trailingFrame: CGRect?
     /// Each pill, in the viewport's content coordinates, leading to trailing.
     let pillFrames: [CGRect]
     /// Width of the scrollable content: wider than the viewport only when the
@@ -167,17 +171,24 @@ struct PersonaRowLayout: Equatable, Sendable {
     ///   - textWidths: each persona's measured title width, in order.
     ///   - iconWidths: each persona's icon plus the gap before its title, in
     ///     the same order; empty for a row without icons.
-    init(width: CGFloat, height: CGFloat = PersonaRowLayout.height, textWidths: [CGFloat], iconWidths: [CGFloat] = []) {
+    ///   - trailingActionWidth: the Apple Watch control's width, 0 without
+    ///     one. Nothing else about the row changes when there is none.
+    init(width: CGFloat, height: CGFloat = PersonaRowLayout.height, textWidths: [CGFloat], iconWidths: [CGFloat] = [],
+         trailingActionWidth: CGFloat = 0) {
         let width = max(width, 0)
         let y = ((height - Self.pillHeight) / 2).rounded()
         createFrame = CGRect(x: Self.edgeInset, y: y, width: Self.actionWidth, height: Self.pillHeight)
         let viewportX = createFrame.maxX + Self.spacing / 2
-        personasFrame = CGRect(x: viewportX, y: 0, width: max(0, width - viewportX), height: height)
+        let trailingSpace = trailingActionWidth > 0 ? trailingActionWidth + Self.edgeInset : 0
+        personasFrame = CGRect(x: viewportX, y: 0, width: max(0, width - viewportX - trailingSpace), height: height)
+        trailingFrame = trailingActionWidth > 0
+            ? CGRect(x: width - Self.edgeInset - trailingActionWidth, y: y, width: trailingActionWidth, height: Self.pillHeight)
+            : nil
 
         // Half a gap inside the viewport puts the first pill one full gap
         // after ✨; the last one keeps the row's edge inset.
         let leading = Self.spacing / 2
-        let available = personasFrame.width - leading - Self.edgeInset
+        let available = personasFrame.width - leading - (trailingActionWidth > 0 ? Self.spacing : Self.edgeInset)
         guard !textWidths.isEmpty, available > 0 else {
             pillFrames = []
             contentWidth = personasFrame.width

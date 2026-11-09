@@ -293,6 +293,8 @@ struct ReplySession: Equatable {
     var template: ReplyTemplate
     var instruction: String = ""
     var flow = ReplyComposerFlow()
+    /// What a Watch command asked for beyond the instruction.
+    var watch: WatchRequestOverrides?
 
     var usableSource: String? {
         let trimmed = sourceMessage.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -303,4 +305,13 @@ struct ReplySession: Equatable {
 struct ReplyContext: Equatable {
     let text: String
     let source: ReplyContextSource
+}
+
+/// A Watch command's own settings for the reply it started.
+struct WatchRequestOverrides: Equatable, Sendable {
+    var length: ReplyLength?
+    var responseLanguage: ReplyLanguagePreference?
+    /// The command's identity, for its first request only: Another reply is
+    /// a new action and gets a new key.
+    var actionID: String?
 }

@@ -64,6 +64,13 @@ final class KeyboardViewController: UIInputViewController {
         return controller
     }()
 
+    /// Voice instructions from the Apple Watch.
+    private lazy var watchVoice: WatchVoiceCoordinator = {
+        let coordinator = WatchVoiceCoordinator()
+        coordinator.host = self
+        return coordinator
+    }()
+
     /// The cleaner version of the instruction, offered after a pause.
     private lazy var polisher: InstructionPolisher = {
         let polisher = InstructionPolisher(service: Self.makePolishService())
@@ -189,7 +196,10 @@ final class KeyboardViewController: UIInputViewController {
         refreshAutoShift()
         loadConfigurationIfNeeded()
 
-        if let parked = ReplySessionParking.take() {
+        if watchVoice.hasGenerationInFlight {
+            // A watch command is still being answered: its panel comes back.
+            reopenComposerForWatch()
+        } else if let parked = ReplySessionParking.take() {
             replyCoordinator.restore(parked)
         } else if let parked = ComposeSessionParking.take() {
             composeCoordinator.restore(parked)
@@ -213,6 +223,7 @@ final class KeyboardViewController: UIInputViewController {
         autocorrect.keyboardDidAppear(lexiconSource: self)
         polisher.isEnabled = smartCorrectionEnabled && serverOffersPolish && canReachNetwork
         refreshSuggestions()
+        Task { await watchVoice.keyboardDidAppear() }
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -228,12 +239,17 @@ final class KeyboardViewController: UIInputViewController {
         // so a trip to another chat does not cost the instruction. A running
         // request is stopped: no spinner survives the keyboard going away.
         if replyCoordinator.session != nil || composeCoordinator.isActive {
-            replyCoordinator.park()
-            composeCoordinator.park()
+            // A watch command's panel is not the user's unfinished work: its
+            // request goes on and the answer is saved for "Insert Response".
+            if !watchVoice.ownsComposer {
+                replyCoordinator.park()
+                composeCoordinator.park()
+            }
             actionBar.endComposing()
             setInputDimmed(false)
             updateGeometry(animated: false)
         }
+        watchVoice.keyboardWillDisappear()
     }
 
     override func viewWillLayoutSubviews() {
@@ -700,6 +716,7 @@ final class KeyboardViewController: UIInputViewController {
     /// field wants it (digits for a code). The page is rebuilt only if it
     /// really changed.
     private func hostFieldDidChange() {
+        watchVoice.hostFieldDidChange()
         autocorrect.restart()
         lastSpaceTap = 0
         punctuationReturn.reset()
@@ -951,6 +968,7 @@ final class KeyboardViewController: UIInputViewController {
         refreshHostContext()
         refreshAutoShift()
         restartSuggestions()
+        watchVoice.composerDidClose()
     }
 
     private func insertReply() {
@@ -986,6 +1004,7 @@ final class KeyboardViewController: UIInputViewController {
     private func finishInsert(_ text: String) {
         textDocumentProxy.insertText(text)
         lastHostMutation = Date.timeIntervalSinceReferenceDate
+        watchVoice.composerDidInsert()
         closeComposer()
     }
 
@@ -1283,6 +1302,22 @@ extension KeyboardViewController: KeyboardActionBarDelegate {
         updateGeometry(animated: true)
     }
 
+    func actionBarDidTapWatch(_ bar: KeyboardActionBar) {
+        watchVoice.controlTapped()
+    }
+
+    func actionBarDidTapWatchPrimary(_ bar: KeyboardActionBar) {
+        watchVoice.stripPrimaryTapped()
+    }
+
+    func actionBarDidDismissWatchStrip(_ bar: KeyboardActionBar) {
+        watchVoice.stripDismissTapped()
+    }
+
+    func actionBarDidTapWatchPreview(_ bar: KeyboardActionBar) {
+        watchVoice.stripPreviewTapped()
+    }
+
     /// A word of the strip: it replaces the word being typed, then a space.
     /// The quoted word keeps what was typed and teaches it to the keyboard.
     ///
@@ -1518,6 +1553,7 @@ extension KeyboardViewController: ReplyFlowCoordinatorDelegate {
     func coordinatorDidChange(_ coordinator: ReplyFlowCoordinator) {
         renderComposer()
         refreshAutoShift()
+        noteWatchGeneration(coordinator.flow)
     }
 }
 
@@ -1528,6 +1564,130 @@ extension KeyboardViewController: ComposeFlowCoordinatorDelegate {
     func composeCoordinatorDidChange(_ coordinator: ComposeFlowCoordinator) {
         renderComposer()
         refreshAutoShift()
+        noteWatchGeneration(coordinator.flow)
+    }
+}
+
+// MARK: - Apple Watch
+
+extension KeyboardViewController: WatchVoiceHost {
+
+    var watchHasFullAccess: Bool { canReachNetwork }
+
+    var watchComposerState: WatchComposerState {
+        if let compose = composeCoordinator.session {
+            let isEmpty = compose.flow.stage == .composing && compose.flow.drafts.isEmpty
+                && compose.instruction.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            return isEmpty ? .composeDraft : .busy
+        }
+        if let reply = replyCoordinator.session {
+            let isEmpty = !replyCoordinator.isSuspended && reply.flow.stage == .composing && reply.flow.drafts.isEmpty
+                && reply.instruction.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            guard isEmpty else { return .busy }
+            return .replyDraft(reply.usableSource.map { ReplyContext(text: $0, source: reply.source ?? .typed) })
+        }
+        return .idle
+    }
+
+    func watchInsertContext(sessionID: String) -> WatchInsertContext {
+        WatchInsertContext(
+            sessionID: sessionID,
+            documentID: WatchInsertContext.validDocumentID(textDocumentProxy.documentIdentifier),
+            textBeforeCaret: textDocumentProxy.documentContextBeforeInput ?? "",
+            textAfterCaret: textDocumentProxy.documentContextAfterInput ?? ""
+        )
+    }
+
+    func watchReadCopiedMessage() -> Result<ReplyContext, AIReplyError> {
+        replyCoordinator.readCopiedMessage(proxy: textDocumentProxy, hasFullAccess: hasFullAccess)
+    }
+
+    func watchExistingText() -> String? {
+        if let selected = textDocumentProxy.selectedText, !selected.isEmpty { return selected }
+        let text = (textDocumentProxy.documentContextBeforeInput ?? "") + (textDocumentProxy.documentContextAfterInput ?? "")
+        return text.isEmpty ? nil : text
+    }
+
+    func watchStart(_ plan: WatchGenerationPlan, command: WatchVoiceCommand) {
+        polisher.stop()
+        switch plan {
+        case .reply(let reply):
+            composeCoordinator.clear()
+            let template = command.options.templateID.flatMap { resolveTemplate(id: $0) }
+            replyCoordinator.startFromWatch(reply, template: template, fallbackTemplate: watchFallbackTemplate, actionID: command.id)
+        case .compose(let compose):
+            replyCoordinator.clear()
+            composeCoordinator.startFromWatch(instruction: compose.instruction, inputLanguage: compose.inputLanguage,
+                                              actionID: command.id)
+            // Also when it was refused before any request: the panel says why.
+            if composeCoordinator.isActive { showComposePanel() }
+        case .needsCopiedMessage, .refused:
+            break
+        }
+    }
+
+    func watchOpenReplyForTypedMessage(instruction: String, command: WatchVoiceCommand) {
+        composeCoordinator.clear()
+        let template = command.options.templateID.flatMap { resolveTemplate(id: $0) } ?? watchFallbackTemplate
+        var reply = ReplySession(sourceMessage: "", source: nil, template: template)
+        reply.instruction = instruction
+        reply.flow.fail(.pasteDenied)
+        replyCoordinator.open(handedOff: reply)
+    }
+
+    func watchCancelGeneration() {
+        replyCoordinator.cancelGeneration()
+        composeCoordinator.cancelGeneration()
+    }
+
+    func watchInsert(_ text: String) {
+        finishInsert(text)
+    }
+
+    func watchShow(_ saved: WatchVoiceOutcome) {
+        guard let text = saved.text else { return }
+        let instruction = saved.instruction ?? ""
+        if saved.kind == .compose {
+            replyCoordinator.clear()
+            composeCoordinator.showSaved(instruction: instruction, text: text)
+            showComposePanel()
+        } else {
+            composeCoordinator.clear()
+            replyCoordinator.showSaved(instruction: instruction, text: text, template: watchFallbackTemplate)
+        }
+    }
+
+    func watchDiscardComposer() {
+        replyCoordinator.clear()
+        composeCoordinator.clear()
+    }
+
+    func watchUIDidChange(_ ui: WatchVoiceUI) {
+        actionBar.setWatchVoice(ui)
+    }
+
+    private var watchFallbackTemplate: ReplyTemplate {
+        replyCoordinator.configuration.personaForCopiedReply(lastUsedID: SharedSettings.shared.lastTemplateID)
+    }
+
+    /// A watch command's request ended: tells the coordinator how, whichever
+    /// flow carried it. The composer has already shown it.
+    private func noteWatchGeneration(_ flow: ReplyComposerFlow) {
+        guard watchVoice.hasGenerationInFlight, !flow.isGenerating else { return }
+        if flow.stage == .result {
+            watchVoice.generationDidFinish(.success(flow.draftText))
+        } else {
+            watchVoice.generationDidFinish(.failure(flow.error ?? .cancelled))
+        }
+    }
+
+    /// Back on screen while a command is still being answered.
+    private func reopenComposerForWatch() {
+        if composeCoordinator.isActive {
+            showComposePanel()
+        } else if let session = replyCoordinator.session {
+            coordinator(replyCoordinator, didOpen: session)
+        }
     }
 }
 

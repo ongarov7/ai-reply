@@ -224,6 +224,8 @@ final class WatchVoiceCoordinator {
         let store = self.store
         let post = self.post
         Task.detached(priority: .utility) {
+            // Without a paired watch nobody will ever read this.
+            guard store.readLink()?.isPaired == true else { return }
             store.writeSession(session)
             post(.session)
         }
@@ -264,10 +266,10 @@ final class WatchVoiceCoordinator {
     private func apply(_ state: StoreState) {
         link = state.link
         let stamp = now()
-        if let active, store.has(.cancelled, for: active.command.id) {
+        if let running = active, store.has(.cancelled, for: running.command.id) {
+            active = nil
             host?.watchCancelGeneration()
-            finish(active.command.id, status: .cancelled)
-            self.active = nil
+            finish(running.command.id, status: .cancelled)
         }
         if let current = held, current.isExpired(now: stamp) || store.has(.cancelled, for: current.id) {
             held = nil
@@ -614,7 +616,7 @@ final class WatchVoiceCoordinator {
             result.strip = host?.watchHasFullAccess == true
                 ? .instructionReceived(preview: current.instruction)
                 : .fullAccessRequired
-        } else if let result2 = saved, let text = result2.text {
+        } else if let text = saved?.text {
             result.strip = .responseReady(preview: text)
         } else if isWaiting {
             switch result.indicator {

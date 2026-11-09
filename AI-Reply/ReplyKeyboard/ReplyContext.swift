@@ -219,6 +219,43 @@ final class ReplyFlowCoordinator {
         provider.acquire(proxy: proxy, hasFullAccess: hasFullAccess)
     }
 
+    /// A confirmed instruction from the watch: the composer opens on it, or
+    /// a reply already open with no instruction takes it, and the request
+    /// starts. The user's Send on the watch was the tap on Reply.
+    func startFromWatch(_ plan: WatchReplyPlan, template: ReplyTemplate?, fallbackTemplate: ReplyTemplate, actionID: String) {
+        cancelTask()
+        ReplySessionParking.discard()
+        var next: ReplySession
+        if let open = session, !isSuspended {
+            next = open
+            next.template = template ?? open.template
+        } else {
+            next = ReplySession(sourceMessage: plan.source, source: plan.sourceKind, template: template ?? fallbackTemplate)
+        }
+        next.sourceMessage = plan.source
+        next.source = plan.sourceKind
+        next.instruction = plan.instruction
+        next.watch = WatchRequestOverrides(length: plan.length, responseLanguage: plan.responseLanguage, actionID: actionID)
+        inputLanguage = plan.inputLanguage
+        session = next
+        isSuspended = false
+        delegate?.coordinator(self, didOpen: next)
+        generate()
+    }
+
+    /// A text the watch flow saved, back on screen with Insert.
+    func showSaved(instruction: String, text: String, template: ReplyTemplate) {
+        cancelTask()
+        ReplySessionParking.discard()
+        var next = ReplySession(sourceMessage: "", source: nil, template: template)
+        next.instruction = instruction
+        next.flow.startGeneration()
+        next.flow.receive(reply: text)
+        session = next
+        isSuspended = false
+        delegate?.coordinator(self, didOpen: next)
+    }
+
     /// A session parked when the keyboard last went away.
     func restore(_ parked: ReplySession) {
         cancelTask()
@@ -274,9 +311,12 @@ final class ReplyFlowCoordinator {
             return
         }
         guard current.flow.startGeneration() else { return }
+        let thisRun = current
+        // One key for one action: Another reply is a new one.
+        current.watch?.actionID = nil
         session = current
         delegate?.coordinatorDidChange(self)
-        run(current)
+        run(thisRun)
     }
 
     /// A failure found before any request could start - Full Access off.
@@ -295,13 +335,18 @@ final class ReplyFlowCoordinator {
     }
 
     private func run(_ snapshot: ReplySession) {
+        var template = snapshot.template
+        var configuration = self.configuration
+        if let length = snapshot.watch?.length { template.replyLength = length }
+        if let language = snapshot.watch?.responseLanguage { configuration.profile.replyLanguage = language }
         let request = AIReplyService.Request(
             message: snapshot.sourceMessage,
-            template: snapshot.template,
+            template: template,
             configuration: configuration,
             uiLanguage: uiLanguage,
             instruction: snapshot.instruction,
-            inputLanguage: inputLanguage
+            inputLanguage: inputLanguage,
+            actionID: snapshot.watch?.actionID
         )
         generation += 1
         let ticket = generation

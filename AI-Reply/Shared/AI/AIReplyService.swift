@@ -32,6 +32,9 @@ struct AIReplyService: Sendable {
         /// Injectable so working-hours behaviour is testable without waiting
         /// for 18:30.
         var now: Date = Date()
+        /// The identity of an action that can be run more than once, for the
+        /// server's `Idempotency-Key`. nil: this tap is the action.
+        var actionID: String? = nil
     }
 
     private let configuration: AIConfiguration
@@ -184,7 +187,8 @@ struct AIReplyService: Sendable {
                 business: business,
                 profile: Self.profile(from: request.configuration.profile)
             ),
-            onUsage: { usage in AccountUsageCache.store(usage) }
+            onUsage: { usage in AccountUsageCache.store(usage) },
+            idempotencyKey: IdempotencyKey.forAction(actionID: request.actionID)
         )
     }
 }

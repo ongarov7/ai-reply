@@ -4,6 +4,8 @@ protocol TemplateBarViewDelegate: AnyObject {
     func templateBar(_ bar: TemplateBarView, didSelectTemplateID id: String)
     /// "Create": write a new message with AI, no copied message involved.
     func templateBarDidTapCreate(_ bar: TemplateBarView)
+    /// The Apple Watch control at the trailing edge.
+    func templateBarDidTapWatch(_ bar: TemplateBarView)
 }
 
 /// The only thing the row needs to draw one persona: an identifier to report
@@ -47,6 +49,8 @@ final class TemplateBarView: UIView {
     static let preferredHeight: CGFloat = PersonaRowLayout.height
 
     private let createButton = UIButton(type: .system)
+    private let watchButton = UIButton(type: .system)
+    private var watchIndicator: WatchKeyboardIndicator = .hidden
     private let scrollView = UIScrollView()
     private let hintLabel = UILabel()
     /// Fades the personas out at the trailing edge while the row scrolls, so
@@ -99,6 +103,7 @@ final class TemplateBarView: UIView {
         }
         createButton.addTarget(self, action: #selector(createTapped), for: .touchUpInside)
         addSubview(createButton)
+        buildWatchButton()
 
         scrollView.showsHorizontalScrollIndicator = false
         scrollView.alwaysBounceHorizontal = false
@@ -121,6 +126,45 @@ final class TemplateBarView: UIView {
         updateAccessibilityOrder()
     }
 
+    /// Hidden unless a watch is paired: without one the row is exactly what
+    /// it was, to the point.
+    private func buildWatchButton() {
+        var configuration = UIButton.Configuration.plain()
+        configuration.contentInsets = .zero
+        configuration.background.cornerRadius = 16
+        configuration.image = UIImage(systemName: "applewatch",
+                                      withConfiguration: UIImage.SymbolConfiguration(pointSize: 17, weight: .semibold))
+        watchButton.configuration = configuration
+        watchButton.configurationUpdateHandler = { [weak self] button in
+            guard let self else { return }
+            let busy = self.watchIndicator.isBusy
+            let background = busy ? self.theme.accent : self.theme.letterKey
+            button.configuration?.background.backgroundColor = button.isHighlighted ? background.withAlphaComponent(0.6) : background
+            button.configuration?.baseForegroundColor = busy ? .white
+                : self.watchIndicator.needsSetup ? self.theme.secondaryText : self.theme.accent
+        }
+        watchButton.addTarget(self, action: #selector(watchTapped), for: .touchUpInside)
+        watchButton.isHidden = true
+        addSubview(watchButton)
+    }
+
+    /// `.hidden` takes the control away and gives its width back to the
+    /// personas. Applied only on a change: this is not a typing path, but
+    /// it is no reason to lay the row out for nothing.
+    func setWatchIndicator(_ indicator: WatchKeyboardIndicator, name: String, status: String?) {
+        watchButton.accessibilityLabel = name
+        watchButton.accessibilityValue = status
+        guard indicator != watchIndicator else { return }
+        let visibilityChanged = (indicator == .hidden) != (watchIndicator == .hidden)
+        watchIndicator = indicator
+        watchButton.isHidden = indicator == .hidden
+        watchButton.setNeedsUpdateConfiguration()
+        if visibilityChanged {
+            updateAccessibilityOrder()
+            setNeedsLayout()
+        }
+    }
+
     override func layoutSubviews() {
         super.layoutSubviews()
         // Measures every name; `PersonaRowLayout` picks the roomiest padding
@@ -134,7 +178,9 @@ final class TemplateBarView: UIView {
             guard chips.indices.contains(index), let image = icon(for: chips[index]) else { return 0 }
             return ceil(image.size.width) + iconPadding
         }
-        let layout = PersonaRowLayout(width: bounds.width, height: bounds.height, textWidths: texts, iconWidths: icons)
+        let layout = PersonaRowLayout(width: bounds.width, height: bounds.height, textWidths: texts, iconWidths: icons,
+                                      trailingActionWidth: watchIndicator == .hidden ? 0 : PersonaRowLayout.watchActionWidth)
+        if let trailingFrame = layout.trailingFrame { watchButton.frame = trailingFrame }
         if layout.showsIcons != showsIcons {
             showsIcons = layout.showsIcons
             for (index, pill) in pills.enumerated() where chips.indices.contains(index) {
@@ -194,6 +240,7 @@ final class TemplateBarView: UIView {
         var elements: [Any] = [createButton]
         if !scrollView.accessibilityElementsHidden { elements.append(scrollView) }
         if !hintLabel.isHidden, !hintLabel.accessibilityElementsHidden { elements.append(hintLabel) }
+        if !watchButton.isHidden { elements.append(watchButton) }
         accessibilityElements = elements
     }
 
@@ -302,6 +349,7 @@ final class TemplateBarView: UIView {
             pill.setNeedsUpdateConfiguration()
         }
         createButton.setNeedsUpdateConfiguration()
+        watchButton.setNeedsUpdateConfiguration()
     }
 
     // MARK: Actions
@@ -310,9 +358,32 @@ final class TemplateBarView: UIView {
         delegate?.templateBarDidTapCreate(self)
     }
 
+    @objc private func watchTapped() {
+        delegate?.templateBarDidTapWatch(self)
+    }
+
     @objc private func templateTapped(_ sender: UIButton) {
         guard chips.indices.contains(sender.tag) else { return }
         delegate?.templateBar(self, didSelectTemplateID: chips[sender.tag].id)
+    }
+}
+
+private extension WatchKeyboardIndicator {
+
+    /// Something is under way: the control is filled.
+    var isBusy: Bool {
+        switch self {
+        case .waiting, .instructionReceived, .generating, .responseReady: return true
+        case .hidden, .installApp, .openWatchApp, .ready, .connectionLost: return false
+        }
+    }
+
+    /// The watch side is not ready: the control is muted.
+    var needsSetup: Bool {
+        switch self {
+        case .installApp, .openWatchApp, .connectionLost: return true
+        case .hidden, .ready, .waiting, .instructionReceived, .generating, .responseReady: return false
+        }
     }
 }
 

@@ -25,6 +25,15 @@ struct IdempotencyKey: Equatable, Hashable, Sendable {
     static func forAction(serverSupportsKeys: Bool = AILimits.serverSupportsIdempotentGeneration) -> IdempotencyKey? {
         serverSupportsKeys ? IdempotencyKey() : nil
     }
+
+    /// The key of an action that already has an identity: a Watch command,
+    /// whose every re-delivery and re-run must stay one action for the server.
+    /// nil `actionID` is an ordinary tap.
+    static func forAction(actionID: String?,
+                          serverSupportsKeys: Bool = AILimits.serverSupportsIdempotentGeneration) -> IdempotencyKey? {
+        guard serverSupportsKeys else { return nil }
+        return actionID.map { IdempotencyKey($0) } ?? IdempotencyKey()
+    }
 }
 
 /// Sends one generation, retrying it by itself only where the key makes
