@@ -91,7 +91,7 @@ func (s *Server) handleIAPProducts(w http.ResponseWriter, r *http.Request) {
 			}
 			product.EntitlementKind, product.DailyLimit = plan.EntitlementKind, plan.DailyLimit
 			product.MonthlyLimit = plan.MonthlyLimit
-			product.CreditsNeverExpire = platform == domain.PlatformIOS && (plan.Code == "base_monthly" || plan.Code == "base_yearly")
+			product.CreditsNeverExpire = plan.Code == "base_monthly" || platform == domain.PlatformIOS && plan.Code == "base_yearly"
 			if product.Currency == "" {
 				product.Price, product.Currency = plan.Price, plan.Currency
 			}
@@ -104,15 +104,25 @@ func (s *Server) handleIAPProducts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response := map[string]any{"products": out, "account_token": token}
-	if platform == domain.PlatformIOS {
+	if platform == domain.PlatformIOS || offersSubscription(products) {
 		entitlement, err := s.subs.Entitlement(r.Context(), user.ID)
 		if err == nil && entitlement.Plan.IsFree {
-			if rec := s.iap.PackageRecommendation(r.Context(), user.ID, products); rec != nil {
+			if rec := s.iap.PackageRecommendation(r.Context(), user.ID, platform, products); rec != nil {
 				response["recommendation"] = rec
 			}
 		}
 	}
 	httpx.JSON(w, http.StatusOK, response)
+}
+
+// offersSubscription — Android has nothing to recommend until a subscription is on sale there.
+func offersSubscription(products []domain.IAPProduct) bool {
+	for _, p := range products {
+		if p.Kind == domain.ProductSubscription {
+			return true
+		}
+	}
+	return false
 }
 
 type appleTransactionRequest struct {

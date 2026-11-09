@@ -281,8 +281,10 @@ type Recommendation struct {
 	BaseStoreProductID string `json:"base_store_product_id"`
 }
 
-func (s *Service) PackageRecommendation(ctx context.Context, userID string, products []domain.IAPProduct) *Recommendation {
-	spend, err := s.repo.PackageSpending(ctx, userID)
+// PackageRecommendation — after 4 or 5 packs, Base. products are this platform's;
+// Android counts Play packs as well as Apple's, iOS what Apple signed.
+func (s *Service) PackageRecommendation(ctx context.Context, userID, platform string, products []domain.IAPProduct) *Recommendation {
+	spend, err := s.repo.PackageSpending(ctx, userID, platform == domain.PlatformAndroid)
 	if err != nil || !spend.AllPricesKnown || (spend.Count != 4 && spend.Count != 5) {
 		return nil
 	}
@@ -292,7 +294,7 @@ func (s *Service) PackageRecommendation(ctx context.Context, userID string, prod
 		}
 		plan, err := s.repo.Plan(ctx, product.PlanID)
 		if err == nil && plan.Code == "base_monthly" {
-			return &Recommendation{ID: fmt.Sprintf("base_after_pack_%d", spend.Count), PurchaseCount: spend.Count, SpentMinor: spend.SpentMinor, Currency: "KZT", BasePriceMinor: product.PriceMinor, BaseStoreProductID: product.AppleProductID}
+			return &Recommendation{ID: fmt.Sprintf("base_after_pack_%d", spend.Count), PurchaseCount: spend.Count, SpentMinor: spend.SpentMinor, Currency: "KZT", BasePriceMinor: product.PriceMinor, BaseStoreProductID: product.StoreID(platform)}
 		}
 	}
 	return nil
