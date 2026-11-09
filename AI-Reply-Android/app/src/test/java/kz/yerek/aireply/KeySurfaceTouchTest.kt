@@ -212,6 +212,36 @@ class KeySurfaceTouchTest {
     }
 
     @Test
+    fun `a finger sliding from a key that works onto a dimmed one wakes nothing`() {
+        val layout = page(KeyboardLanguage.RUSSIAN, KeyboardPlane.LETTERS, screens[1])
+        val numbers = layout.key(KeyboardKey.Plane(KeyboardPlane.NUMBERS)).frame
+        val letter = layout.key(KeyboardKey.Character("е")).frame
+        val space = layout.key(KeyboardKey.Space).frame
+        val (surface, recorder) = controller(layout)
+        surface.isDimmed = true
+
+        surface.down(1, numbers.centerX, numbers.centerY, time = 0)
+        surface.move(1, letter.centerX, letter.centerY, time = 100)
+        assertTrue("the key it left lets go", surface.visual.pressed.isEmpty())
+        surface.tick(time = 2_000)
+        assertNull("no alternates", surface.visual.panel)
+        surface.up(1, letter.centerX, letter.centerY, time = 2_100)
+
+        surface.down(2, numbers.centerX, numbers.centerY, time = 3_000)
+        surface.move(2, space.centerX, space.centerY, time = 3_100)
+        surface.move(2, space.centerX + 40f, space.centerY, time = 3_200)
+        assertFalse("no trackpad, no blank captions", surface.visual.trackpad)
+        surface.up(2, space.centerX + 40f, space.centerY, time = 3_300)
+        assertEquals(emptyList<String>(), recorder.events)
+
+        surface.down(3, numbers.centerX, numbers.centerY, time = 4_000)
+        surface.move(3, letter.centerX, letter.centerY, time = 4_100)
+        surface.move(3, numbers.centerX, numbers.centerY, time = 4_200)
+        surface.up(3, numbers.centerX, numbers.centerY, time = 4_300)
+        assertEquals("back on its own key, it works", listOf("commit ${KeyboardKey.Plane(KeyboardPlane.NUMBERS)}"), recorder.events)
+    }
+
+    @Test
     fun `a letter resting when the keys dimmed is still typed by the next finger`() {
         val layout = page(KeyboardLanguage.ENGLISH, KeyboardPlane.LETTERS, screens[1])
         val q = layout.key(KeyboardKey.Character("q")).frame

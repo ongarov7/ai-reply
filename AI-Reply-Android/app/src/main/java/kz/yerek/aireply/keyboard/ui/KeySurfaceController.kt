@@ -101,7 +101,7 @@ class KeySurfaceController(private val listener: KeySurfaceListener) {
         var alternates: List<String> = emptyList(),
         var panel: AlternatesPanel? = null,
         var picker: LayoutPicker? = null,
-        /** Slid off its key into a page panel: lifting here types nothing. */
+        /** Slid off its key into a page panel or onto a dimmed key: lifting here types nothing. */
         var overPanel: Boolean = false
     )
 
@@ -185,9 +185,10 @@ class KeySurfaceController(private val listener: KeySurfaceListener) {
                 }
                 // Slide to correct: the key under the finger is the one that
                 // will be typed. Sliding does not restart the long press.
-                if (page.panelAt(x, y) != null) {
-                    // Into the emoji grid or its bar: no key is under the
-                    // finger, and none is held long either.
+                val under = page.keyIndex(x, y)
+                if (page.panelAt(x, y) != null || (isDimmed && under != null && page.keys[under].key.editsText)) {
+                    // Into the emoji grid or its bar, or onto a dimmed key: no
+                    // key is under the finger, and none is held long either.
                     if (!track.overPanel) {
                         track.overPanel = true
                         track.longPressAt = Long.MAX_VALUE
@@ -195,7 +196,7 @@ class KeySurfaceController(private val listener: KeySurfaceListener) {
                     }
                     return
                 }
-                val index = page.keyIndex(x, y) ?: return
+                val index = under ?: return
                 if (index != track.keyIndex || track.overPanel) {
                     track.overPanel = false
                     track.keyIndex = index
