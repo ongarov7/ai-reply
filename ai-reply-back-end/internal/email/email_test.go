@@ -402,6 +402,26 @@ func TestNotificationTemplatesOptionalLines(t *testing.T) {
 		t.Fatalf("without a date:\n%s", open.Text)
 	}
 
+	// No {limit} to give and no plain text: an error, never a body with the placeholder left in it.
+	if _, err := templates.Render("subscription_activated", "ru", map[string]string{"plan": "Base"}); err == nil {
+		t.Fatal("a body without its value and without body_plain must not render")
+	}
+
+	// A plan with no daily number: body_plain takes the place of the body, the other lines stay.
+	keys["email.subscription_activated.body_plain"] = "Тариф «{plan}» уже действует."
+	plain, err := templates.Render("subscription_activated", "ru", map[string]string{"plan": "Base", "date": "09.04.2026"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(plain.Text, "Тариф «Base» уже действует.") || strings.Contains(plain.Text, "дневной лимит") ||
+		strings.Contains(plain.Text+plain.HTML, "{") || !strings.Contains(plain.Text, "Тариф действует до 09.04.2026.") {
+		t.Fatalf("plain body:\n%s", plain.Text)
+	}
+	// With the value the normal body stays.
+	if daily, err := templates.Render("subscription_activated", "ru", params); err != nil || !strings.Contains(daily.Text, "дневной лимит ответов — 50") {
+		t.Fatalf("daily body: %v\n%s", err, daily.Text)
+	}
+
 	// A value is never read as another placeholder.
 	odd, err := templates.Render("subscription_activated", "ru", map[string]string{"plan": "{limit}", "limit": "7"})
 	if err != nil || !strings.Contains(odd.Subject, "«{limit}»") {

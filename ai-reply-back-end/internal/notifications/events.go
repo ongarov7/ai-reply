@@ -116,7 +116,11 @@ func (e *Events) activated(ctx context.Context, sub domain.Subscription, key str
 	if plan.IsFree {
 		return
 	}
-	params := map[string]string{"limit": strconv.Itoa(plan.DailyLimit)}
+	// Base and Pro carry no daily number: the notice names the plan and states no limit.
+	params, bodyKey := map[string]string{}, "push.subscription_activated.body_plain"
+	if plan.DailyLimit > 0 {
+		params["limit"], bodyKey = strconv.Itoa(plan.DailyLimit), "push.subscription_activated.body"
+	}
 	if sub.ExpiresAt != nil {
 		params["date"] = e.date(*sub.ExpiresAt)
 	}
@@ -127,7 +131,7 @@ func (e *Events) activated(ctx context.Context, sub domain.Subscription, key str
 		Category:       domain.CategorySubscription,
 		Link:           LinkSubscription,
 		TitleKey:       "push.subscription_activated.title",
-		BodyKey:        "push.subscription_activated.body",
+		BodyKey:        bodyKey,
 		Params:         params,
 		ParamsFor:      planName(plan.Name),
 		Email:          true,

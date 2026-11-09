@@ -32,6 +32,7 @@ var ErrTemplateMissing = errors.New("email: no template for this notification ty
 //	email.T.subject   required; also the heading
 //	email.T.greeting  optional
 //	email.T.body      required; paragraphs separated by a blank line
+//	email.T.body_plain  replaces body when a placeholder of body has no value
 //	email.T.expires   optional; e.g. "valid until {date}"
 //	email.T.manage    optional; where to see or change it in the app
 //	email.T.footer    optional; why this e-mail was sent, in small print
@@ -124,7 +125,13 @@ func (n NotificationTemplates) Render(kind, locale string, params map[string]str
 	if err != nil {
 		return Content{}, err
 	}
-	body, err := required("body")
+	bodyPart := "body"
+	if _, ok, missing := text(bodyPart); ok && missing != "" {
+		if _, plain, _ := text("body_plain"); plain {
+			bodyPart = "body_plain"
+		}
+	}
+	body, err := required(bodyPart)
 	if err != nil {
 		return Content{}, err
 	}

@@ -241,6 +241,38 @@ func TestActivationEmailUsesTheLocalizedTemplate(t *testing.T) {
 	}
 }
 
+// A plan without a daily number is announced by name: never "up to 0 replies a day".
+func TestActivationNoticeNamesNoNumberForAPlanWithoutADailyLimit(t *testing.T) {
+	h := newHarness(t, withEnv("TEST_APPROVED_ENTITLEMENTS", "true"))
+	bundle, err := localization.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.notify.WithEmail(h.mail, email.NotificationTemplates{Translate: bundle.T, Brand: "AI Reply"})
+	admin := h.signInAdmin()
+	for i, code := range []string{"base_monthly", "pro_monthly"} {
+		s := h.signIn(code + "@example.com")
+		h.mustRegister(installation(installID(690+i), "android", fcmToken(690+i)), s.access)
+		h.setPreferredLanguage(s.access, "ru")
+		h.assignPlan(admin, s.userID, code, "2026-04-09")
+		h.tick()
+
+		body := h.text(`SELECT body FROM notifications WHERE user_id = ?`, s.userID)
+		if !strings.Contains(body, "«"+h.planName(code, "ru")+"» подключён") || strings.Contains(body, "лимит") || strings.Contains(body, "{") {
+			t.Fatalf("%s push body = %q", code, body)
+		}
+		mails := h.mail.messages()
+		if len(mails) != i+1 {
+			t.Fatalf("%s: mails = %d", code, len(mails))
+		}
+		text := mails[i].Content.Text
+		if !strings.Contains(text, "«"+h.planName(code, "ru")+"» уже действует.") || strings.Contains(text, "лимит") ||
+			strings.Contains(text, "на сегодня") || !strings.Contains(text, "Тариф действует до") {
+			t.Fatalf("%s e-mail:\n%s", code, text)
+		}
+	}
+}
+
 // Автоматты хабарламалар тілі: preferred_language → соңғы құрылғының тілі → тіркелгі тілі.
 func TestAutomaticNotificationsFollowTheRecipientsLanguage(t *testing.T) {
 	h := newHarness(t)
@@ -624,8 +656,8 @@ func TestAutomaticNotificationTextsAreCompleteInEveryLanguage(t *testing.T) {
 	for _, kind := range domain.AutomaticNotificationTypes {
 		keys = append(keys, "push."+kind+".title", "push."+kind+".body")
 	}
-	keys = append(keys, "push.quota_low.body_month", "push.quota_exhausted.body_month")
-	for _, part := range []string{"subject", "greeting", "body", "expires", "manage", "footer"} {
+	keys = append(keys, "push.quota_low.body_month", "push.quota_exhausted.body_month", "push.subscription_activated.body_plain")
+	for _, part := range []string{"subject", "greeting", "body", "body_plain", "expires", "manage", "footer"} {
 		keys = append(keys, "email.subscription_activated."+part)
 	}
 	bundle, err := localization.Load()
