@@ -242,6 +242,12 @@ class LocalizationParityTest {
         assertEquals("Ваше сообщение", russian.getValue("support_your_message"))
     }
 
+    /** One Retry under an unsent message and on a chat that did not load, so it does not say "send". */
+    @Test
+    fun `uzbek chat retry fits a chat that did not load`() {
+        assertEquals(uzbek.getValue("purchase_retry"), uzbek.getValue("support_retry"))
+    }
+
     /**
      * EXTRA_IS_SENSITIVE keeps a clip out of the system's copy preview; it
      * does not hide it from the apps that may read the clipboard. The paste

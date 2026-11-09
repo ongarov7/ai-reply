@@ -62,7 +62,7 @@
     <string name="support_sending">Yuborilmoqda…</string>
     <string name="support_not_sent">Yuborilmadi</string>
     <string name="support_rate_limited">Ketma-ket juda koʻp xabar. Bir daqiqa kuting.</string>
-    <string name="support_retry">Qayta yuborish</string>
+    <string name="support_retry">Qayta urinish</string>
     <string name="support_too_long">Xabar %1$d belgidan uzun.</string>
     <string name="support_load_failed">Chatni yuklab boʻlmadi. Ulanishni tekshiring.</string>
     <string name="support_unavailable">Chat hozir mavjud emas. Bizga yordam sahifasi orqali yozishingiz mumkin.</string>
