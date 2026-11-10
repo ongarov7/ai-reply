@@ -261,3 +261,13 @@ schemes:
         - AIReplyTests
     run:
       config: Debug
+  AIReplyWatchApp:
+    build:
+      targets:
+        AIReplyWatchApp: all
+    run:
+      config: Debug
+    profile:
+      config: Release
+    archive:
+      config: Release

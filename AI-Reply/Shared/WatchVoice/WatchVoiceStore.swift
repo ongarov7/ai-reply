@@ -208,6 +208,13 @@ struct WatchVoiceStore: Sendable {
     /// Gives a claimed command back: the keyboard that took it went away
     /// before the answer came, and the next one may run it again (with the
     /// same key, so it is not paid for twice).
+    /// Whether the instruction is still in the inbox. Asks the file system
+    /// only, so the answer holds while the lock keeps the file closed.
+    func hasCommand(_ id: String) -> Bool {
+        guard let inbox = directory(.inbox) else { return false }
+        return FileManager.default.fileExists(atPath: inbox.appendingPathComponent(id + ".json").path)
+    }
+
     func release(_ id: String) {
         guard let url = markerURL(.claimed, for: id) else { return }
         unlink(url.path)

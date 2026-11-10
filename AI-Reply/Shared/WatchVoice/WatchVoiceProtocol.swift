@@ -127,6 +127,11 @@ enum WatchVoiceMode: String, Codable, CaseIterable, Identifiable, Sendable {
 
     var id: String { rawValue }
 
+    /// What the watch offers. Rewrite, shorten and expand stay in the
+    /// protocol, but Replace in the composer empties the whole field, which
+    /// is more than these commands read, so the watch leaves them out.
+    static let offeredOnWatch: [WatchVoiceMode] = [.reply, .newMessage]
+
     /// Works on text already in the field, or selected.
     var editsExistingText: Bool {
         switch self {

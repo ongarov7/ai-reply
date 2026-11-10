@@ -99,7 +99,8 @@ final class WatchVoiceModel {
 
     init() {
         let defaults = UserDefaults.standard
-        mode = defaults.string(forKey: Key.mode).flatMap(WatchVoiceMode.init(rawValue:)) ?? .reply
+        mode = defaults.string(forKey: Key.mode).flatMap(WatchVoiceMode.init(rawValue:))
+            .flatMap { WatchVoiceMode.offeredOnWatch.contains($0) ? $0 : nil } ?? .reply
         let stored = defaults.string(forKey: Key.language).flatMap(WatchVoiceLanguage.init(rawValue:))
         hasChosenLanguage = stored != nil
         language = stored ?? Self.systemLanguage

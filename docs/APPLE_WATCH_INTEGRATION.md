@@ -69,14 +69,15 @@ file names and the server's `Idempotency-Key`.
 | `cancel` | watch → phone | as above |
 | `statusRequest`, `resultRequest` | watch → phone | `sendMessage` |
 | `statusUpdate` | phone → watch | `sendMessage`, or `transferUserInfo` for final states |
-| `transcribe` | watch → phone | `sendMessageData` up to 58 KB, otherwise `transferFile` |
+| `transcribe` | watch → phone | `sendMessageData`, in parts of up to 56 KB; each part wakes the phone app and is acknowledged (3 attempts, 15 s each) |
 | `transcript` | phone → watch | as `statusUpdate` |
 | `ping` / `pong` | phone → watch | `sendMessage` (Settings ▸ Test connection) |
 
 The phone's state goes in every answer and in `updateApplicationContext`.
 
 `transferUserInfo` is not real time, and the watch screen says so. A queued command that
-arrives after its 5 minutes is refused as `expired`.
+arrives after its 5 minutes is refused as `expired`. One that reaches the phone more than 30 seconds
+after the user confirmed it is bound to no keyboard: it waits in the strip for a tap.
 
 Delivery states: `queued`, `received`, `generating`, `ready`, `inserted`, `dismissed`, `failed`,
 `expired`, `cancelled`.
@@ -104,7 +105,10 @@ Folder `WatchVoice/` in `group.kz.ai-reply.shared`, excluded from backups.
 | `keyboard-session.json` | keyboard | IDs and flags, never field content. Written only with a paired watch. |
 | `watch-link.json` | app | What `WCSession` reports. |
 
-Lifetimes: instruction 5 minutes, result 10 minutes, markers 24 hours. The copied message is
+Lifetimes: instruction 5 minutes, result 10 minutes, markers 24 hours, enforced by `purge`
+whenever the app or a keyboard runs. A file the lock keeps closed is not treated as damaged: an
+instruction is kept up to 7 minutes and a result up to 10 minutes after it was written, then
+deleted unread. A readable file that does not decode is deleted at once. The copied message is
 never written anywhere: it stays in the keyboard's memory.
 
 Signals are Darwin notifications with no payload: `kz.ai-reply.watch.command`, `.link`,
@@ -119,18 +123,22 @@ safety net for a lost notification.
 
 A session is one appearance on one field: another field means another session.
 
-A command starts by itself only when it names the live session, the composer has no user work
-in it, and Full Access is on. Otherwise it waits in the strip for a tap on Generate, which
+A command starts by itself only when it names the live session, was confirmed on the watch less
+than 30 seconds ago, the composer has no user work in it, and Full Access is on. Otherwise it waits in the strip for a tap on Generate, which
 costs nothing until then.
 
 Auto insert (`WatchInsertPolicy`) needs all of: the Auto Insert switch on, a command bound to
 this session, the keyboard on screen, the same session, a known and unchanged document
-identifier, unchanged text around the caret, and an empty field. Anything else is a manual
+identifier, unchanged text around the caret and in the selection, and an empty field with
+nothing selected. Anything else is a manual
 Insert Response. `documentIdentifier` is not trusted to mean the same chat, which is why the
 text is compared too.
 
-If the keyboard goes away during generation, the request continues and the text is saved for
-Insert Response. If the process dies, the command is taken over after 2 minutes and re-run with
+If the keyboard goes away during generation, the request is stopped and the instruction goes
+back to `queued`; the next keyboard offers it in the strip, and Generate re-runs it with the same
+key, so the server does not charge twice. A result waiting in the composer is saved, with the
+user's edits, for Insert Response. The copied message read on the Watch Voice tap is reused only
+while `UIPasteboard.changeCount` is unchanged; after a new copy it is read again. If the process dies, the command is taken over after 2 minutes and re-run with
 the same key, so it is not charged twice.
 
 The control is hidden without a paired watch, and `PersonaRowLayout` is then unchanged.
@@ -145,7 +153,7 @@ The control is hidden without a paired watch, and `PersonaRowLayout` is then unc
 | Reply, nothing copied | `/ai/compose` | Instruction |
 | Reply, paste refused | no request | Reply composer with the instruction and an empty message card |
 | New message | `/ai/compose` | Instruction |
-| Rewrite, shorten, expand | `/ai/compose` | Selection or field text, inside the instruction |
+| Rewrite, shorten, expand | `/ai/compose` | In the protocol, not offered on the watch: Replace in the composer empties the whole field, more than the command read |
 
 Length: `reply_length` has only `short` and `medium`, so `long` is `medium` plus a sentence in
 the instruction. Response language is `profile.reply_language` for a reply and a sentence in

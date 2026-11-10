@@ -18,8 +18,14 @@ final class WatchCompanion: NSObject, WCSessionDelegate, @unchecked Sendable {
 
     static let shared = WatchCompanion()
 
-    /// The link changed; the settings screen listens.
-    var onLinkChange: (@Sendable () -> Void)?
+    /// The link changed; the settings screen listens. Set on the main
+    /// thread and called from the companion's queue, hence the lock.
+    var onLinkChange: (@Sendable () -> Void)? {
+        get { listenerLock.withLock { linkListener } }
+        set { listenerLock.withLock { linkListener = newValue } }
+    }
+    private let listenerLock = NSLock()
+    private var linkListener: (@Sendable () -> Void)?
 
     private let store: WatchVoiceStore
     private let core: WatchCompanionCore

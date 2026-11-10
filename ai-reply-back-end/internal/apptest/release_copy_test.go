@@ -202,6 +202,8 @@ func TestPrivacyPolicyMatchesWhatTheAppsSend(t *testing.T) {
 		"Reply to copied", "Nothing else you type in other apps is sent",
 		"In the iPhone app you can dictate", "Apple speech recognition", "AI Reply receives only the recognised text",
 		"On Apple Watch you can say your instruction", "our server to OpenAI (USA) to be turned into text",
+		"The microphone on the AI Reply keyboard works differently", "counts as tapping Reply in the keyboard",
+		"turns voice recordings from the Android keyboard and Apple Watch into text",
 		"if you enter it or Apple or Google shares it",
 		"A log of administrator actions on an account", "is not removed automatically, including after the account is deleted",
 		"finished notification deliveries — after 7 days", "the notifications themselves — after 40 days",
@@ -214,17 +216,18 @@ func TestPrivacyPolicyMatchesWhatTheAppsSend(t *testing.T) {
 		}
 	}
 	for _, stale := range []string{"only the text of AI Reply's own instruction field", "When you tap Reply or Write",
-		"Everything else is removed", "disconnect Sign in with Apple", "only if paid plans are ever sold"} {
+		"Everything else is removed", "disconnect Sign in with Apple", "only if paid plans are ever sold",
+		"On Android you can dictate the instruction. Speech is recognised"} {
 		if strings.Contains(page, stale) {
 			t.Errorf("en privacy policy still says %q", stale)
 		}
 	}
 	for locale, needles := range map[string][]string{
-		"ru": {"На Apple Watch инструкцию можно сказать голосом", "выделили в текущем поле", "«Ответить на скопированное»", "В приложении для iPhone можно надиктовать",
+		"ru": {"На Apple Watch инструкцию можно сказать голосом", "Микрофон на клавиатуре AI Reply работает иначе", "то же, что нажатие «Ответить» в клавиатуре", "выделили в текущем поле", "«Ответить на скопированное»", "В приложении для iPhone можно надиктовать",
 			"передаст Apple или Google", "Журнал действий администраторов", "сами уведомления — через 40 дней"},
-		"kk": {"Apple Watch-та нұсқауды дауыспен айтуға болады", "өзіңіз белгілеген мәтін", "«Көшірілгенге жауап беру»", "iPhone қосымшасында", "Apple немесе Google берсе",
+		"kk": {"Apple Watch-та нұсқауды дауыспен айтуға болады", "AI Reply пернетақтасындағы микрофон басқаша жұмыс істейді", "«Жауап беру» батырмасын басқанмен бірдей", "өзіңіз белгілеген мәтін", "«Көшірілгенге жауап беру»", "iPhone қосымшасында", "Apple немесе Google берсе",
 			"Параметрлер → Тіркелгі → Тіркелгіні жою", "хабарламалардың өзі — 40 күннен кейін"},
-		"uz": {"Apple Watch’da koʻrsatmani ovoz bilan aytish mumkin", "oʻzingiz belgilagan matn", "«Nusxalanganga javob berish»", "iPhone ilovasida", "Apple yoki Google bersa",
+		"uz": {"Apple Watch’da koʻrsatmani ovoz bilan aytish mumkin", "AI Reply klaviaturasidagi mikrofon boshqacha ishlaydi", "«Javob berish»ni bosish bilan bir xil", "oʻzingiz belgilagan matn", "«Nusxalanganga javob berish»", "iPhone ilovasida", "Apple yoki Google bersa",
 			"Administratorlarning hisob bilan bogʻliq harakatlari jurnali", "bildirishnomalarning oʻzi — 40 kundan keyin"},
 	} {
 		_, body := fetch(t, h, "/privacy?lang="+locale)

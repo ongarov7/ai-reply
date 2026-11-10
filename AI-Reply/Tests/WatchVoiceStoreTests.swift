@@ -149,6 +149,8 @@ final class WatchVoiceStoreTests: XCTestCase {
         XCTAssertEqual(chmod(inboxFile.path, 0), 0)
         XCTAssertEqual(chmod(outcomeFile.path, 0), 0)
 
+        XCTAssertNil(store.command(id: original.id))
+        XCTAssertTrue(store.hasCommand(original.id), "known without opening it")
         store.purge(now: now)
         XCTAssertTrue(FileManager.default.fileExists(atPath: inboxFile.path))
         XCTAssertTrue(FileManager.default.fileExists(atPath: outcomeFile.path))

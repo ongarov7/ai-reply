@@ -64,7 +64,8 @@ struct WatchCompanionCore: Sendable {
 
     private func status(of id: String, now: Date) -> WatchVoiceEnvelope {
         let outcome = store.outcome(for: id)
-        let status = outcome?.status ?? (store.command(id: id) != nil ? .queued : nil)
+        // The inbox file's existence, not its body: the lock can keep it closed.
+        let status = outcome?.status ?? (store.hasCommand(id) ? .queued : nil)
         return .status(requestID: id, status: status, failure: outcome?.failure, failureLimit: outcome?.failureLimit,
                        phone: snapshot(now), createdAt: now)
     }

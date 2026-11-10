@@ -107,7 +107,7 @@ private struct HomeScreen: View {
 
             Section {
                 Picker("watch.mode", selection: $model.mode) {
-                    ForEach(WatchVoiceMode.allCases) { Text($0.titleKey).tag($0) }
+                    ForEach(WatchVoiceMode.offeredOnWatch) { Text($0.titleKey).tag($0) }
                 }
                 Picker("watch.template", selection: $model.templateID) {
                     Text(inheritedTemplateKey).tag(String?.none)
