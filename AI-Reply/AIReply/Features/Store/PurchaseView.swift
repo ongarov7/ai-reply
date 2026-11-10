@@ -14,6 +14,17 @@ struct PurchaseView: View {
                     .frame(maxWidth: DS.Layout.readableWidth)
                     .frame(maxWidth: .infinity)
             }
+            #if DEBUG
+            .onChange(of: store.offers) { _, offers in
+                if let code = DebugScreen.value(after: "-AIReplyDebugOffer"),
+                   let offer = offers.first(where: { $0.code == code }) {
+                    Task { @MainActor in
+                        await Task.yield()
+                        proxy.scrollTo(offer.id, anchor: .top)
+                    }
+                }
+            }
+            #endif
         }
         .background(Color.dsBackground)
         .navigationTitle("purchase.title")
@@ -61,7 +72,7 @@ struct SubscriptionPlanCatalogue {
 
     init(plans: [AccountAPI.Plan], offers: [PurchaseOffer]) {
         freePlan = plans.first(where: \.isFree)
-        let subscriptions = offers.filter { $0.kind == .subscription }
+        let subscriptions = offers.filter { $0.kind == .subscription && $0.isAvailableForNewPurchase }
         var included = Set<String>()
         var result: [Option] = []
         for plan in plans where !plan.isFree {

@@ -71,7 +71,7 @@ func TestWelcomeTwentyMigrationVersionsOnlyDefaultFreeAndPreservesCustomers(t *t
 	if err != nil || draft.ID != 2 || draft.Revision != 5 || draft.BaseVersion != current.ID || !reflect.DeepEqual(draft.Products, draftProducts) {
 		t.Fatalf("draft edits lost or stale revision retained: %+v %v", draft, err)
 	}
-	if _, err := s.SaveDraft(ctx, "owner", 4, draftProducts); !errors.Is(err, ErrConflict) {
+	if _, err := s.SaveDraft(ctx, "owner", 4, append(draftProducts, InitialProducts()[6])); !errors.Is(err, ErrConflict) {
 		t.Fatalf("stale draft save accepted: %v", err)
 	}
 	var historical, sold string

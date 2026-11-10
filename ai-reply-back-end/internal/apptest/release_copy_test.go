@@ -52,24 +52,24 @@ func TestLandingPricingWithoutPurchases(t *testing.T) {
 	}
 }
 
-// Public pages describe Base as sold: replies per paid month that never expire, nothing nightly.
-func TestPublicPagesDescribeBaseAsABundleOfPermanentReplies(t *testing.T) {
+// Website Base retains its terms; shared help distinguishes Apple packs and store prices.
+func TestPublicPagesDistinguishWebsiteBaseFromApplePacks(t *testing.T) {
 	h := newHarness(t, withEnv("TEST_APPROVED_ENTITLEMENTS", "true"))
 	bundle, err := localization.Load()
 	if err != nil {
 		t.Fatal(err)
 	}
 	for locale, want := range map[string]struct {
-		bundle, inline string
-		stale          []string
+		bundle, support, website string
+		stale                    []string
 	}{
-		"en": {"1,000 replies each paid month. Unused replies never expire.", "Base: 1,000 replies each paid month. Unused replies never expire.",
+		"en": {"1,000 replies each paid month. Unused replies never expire.", "Purchased reply packs never expire.", "Website prices are in tenge",
 			[]string{"Every night", "renews every night", "resets at midnight", "left today", "the next day", "daily reply limit"}},
-		"ru": {"1 000 ответов каждый оплаченный месяц. Остаток не сгорает.", "Base: 1 000 ответов каждый оплаченный месяц. Остаток не сгорает.",
+		"ru": {"1 000 ответов каждый оплаченный месяц. Остаток не сгорает.", "Купленные пакеты ответов не сгорают.", "Цены сайта указаны в тенге",
 			[]string{"Каждую ночь", "каждую ночь", "в полночь", "осталось сегодня", "на следующий день", "дневной лимит"}},
-		"kk": {"Әр төленген айға 1 000 жауап. Қалған жауаптардың мерзімі шектелмейді.", "Base: әр төленген айға 1 000 жауап. Қалған жауаптардың мерзімі шектелмейді.",
+		"kk": {"Әр төленген айға 1 000 жауап. Қалған жауаптардың мерзімі шектелмейді.", "Сатып алынған жауап пакеттерінің мерзімі шектелмейді.", "Сайттағы бағалар теңгемен көрсетілген",
 			[]string{"Күн сайын түн ортасында", "әр түні", "түн ортасында", "Бүгін неше", "келесі күні", "күндік"}},
-		"uz": {"Har to‘langan oy uchun 1 000 javob. Qolgan javoblar muddatsiz.", "Base: har to‘langan oy uchun 1 000 javob. Qolgan javoblar muddatsiz.",
+		"uz": {"Har to‘langan oy uchun 1 000 javob. Qolgan javoblar muddatsiz.", "Sotib olingan javob paketlari muddatsiz.", "Saytdagi narxlar tengeda",
 			[]string{"Har kuni yarim tunda", "har kecha", "yarim tunda", "Bugun nechta", "ertasi kuni", "kunlik"}},
 	} {
 		_, landing := fetch(t, h, "/?lang="+locale)
@@ -80,8 +80,11 @@ func TestPublicPagesDescribeBaseAsABundleOfPermanentReplies(t *testing.T) {
 		if !strings.Contains(landing, want.bundle) {
 			t.Errorf("%s landing is missing %q", locale, want.bundle)
 		}
-		if !strings.Contains(support, want.inline) || !strings.Contains(note, want.inline) {
-			t.Errorf("%s support page or pricing note is missing %q", locale, want.inline)
+		if !strings.Contains(support, want.support) || !strings.Contains(support, "Pro") {
+			t.Errorf("%s support does not describe permanent packs below Pro", locale)
+		}
+		if !strings.Contains(note, want.website) || !strings.Contains(note, "iOS") || !strings.Contains(note, "App Store") {
+			t.Errorf("%s pricing note does not distinguish website prices from the Apple storefront", locale)
 		}
 		for _, stale := range want.stale {
 			if strings.Contains(landing, stale) || strings.Contains(support, stale) || strings.Contains(note, stale) {

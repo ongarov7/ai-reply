@@ -425,7 +425,7 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 	// Legacy feature tests deliberately retain their original tariff fixture. New billing
 	// tests opt into the current migrated defaults with TEST_APPROVED_ENTITLEMENTS=true.
 	if env["TEST_APPROVED_ENTITLEMENTS"] != "true" {
-		if _, err := db.Writer().Exec(`UPDATE plans SET daily_message_limit=7, entitlement_kind='daily' WHERE code='free'; DELETE FROM iap_products WHERE code IN ('pack30','base_monthly','base_yearly','pro_monthly','pro_yearly'); DELETE FROM plans WHERE code IN ('base_monthly','base_yearly','pro_monthly','pro_yearly')`); err != nil {
+		if _, err := db.Writer().Exec(`UPDATE plans SET daily_message_limit=7, entitlement_kind='daily' WHERE code='free'; DELETE FROM iap_products WHERE code IN ('pack30','pack500','base_monthly','base_yearly','pro_monthly','pro_yearly'); DELETE FROM plans WHERE code IN ('base_monthly','base_yearly','pro_monthly','pro_yearly')`); err != nil {
 			t.Fatal(err)
 		}
 	}

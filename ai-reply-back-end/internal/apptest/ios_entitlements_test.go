@@ -25,7 +25,9 @@ func approvedEntitlements() harnessOption {
 
 func (h *harness) enableApprovedProducts() {
 	h.t.Helper()
-	h.exec(`UPDATE iap_products SET apple_product_id='test.'||code,is_active=1 WHERE code IN ('pack30','base_monthly','base_yearly','pro_monthly','pro_yearly')`)
+	h.exec(`UPDATE iap_products SET apple_product_id='test.'||code,is_active=1,off_ios=0 WHERE code IN ('pack30','base_monthly','base_yearly','pro_monthly','pro_yearly')`)
+	// Historical-contract regressions explicitly use the pre-retirement lineup.
+	h.exec(`UPDATE iap_products SET is_active=0 WHERE code='pack500'`)
 	mustStatus(h.t, h.adminCall(h.signInAdmin(), http.MethodPost, "/settings/iap", map[string]any{"enabled": true}), http.StatusOK, "")
 }
 

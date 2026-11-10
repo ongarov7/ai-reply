@@ -62,14 +62,17 @@ func InitialProducts() []Product {
 	names := func(ru, en, kk string) map[string]string {
 		return map[string]string{"ru": ru, "en": en, "kk": kk, "uz": en}
 	}
-	return []Product{
+	products := []Product{
 		{Code: "free", Kind: "welcome", Name: names("Бесплатно", "Free", "Тегін"), Currency: "KZT", Units: 20, Active: true, AvailableIOS: true, AvailableWeb: true},
-		{Code: "base_monthly", Kind: "subscription", Name: names("Base · месяц", "Base · monthly", "Base · ай сайын"), Currency: "KZT", PriceMinor: 99000, BillingPeriod: "month", MonthlyLimit: 1000, Active: true, AvailableIOS: true, AvailableWeb: true},
+		{Code: "base_monthly", Kind: "subscription", Name: names("Base · месяц", "Base · monthly", "Base · ай сайын"), Currency: "KZT", PriceMinor: 99000, BillingPeriod: "month", MonthlyLimit: 1000, Active: true, AvailableWeb: true},
 		{Code: "base_yearly", Kind: "subscription", Name: names("Base · год", "Base · yearly", "Base · жыл сайын"), Currency: "KZT", PriceMinor: 790000, BillingPeriod: "year", DailyLimit: 40},
 		{Code: "pro_monthly", Kind: "subscription", Name: names("Pro · месяц", "Pro · monthly", "Pro · ай сайын"), Currency: "KZT", PriceMinor: 399000, BillingPeriod: "month", Unlimited: true, Active: true, AvailableIOS: true, AvailableWeb: true},
 		{Code: "pro_yearly", Kind: "subscription", Name: names("Pro · год", "Pro · yearly", "Pro · жыл сайын"), Currency: "KZT", PriceMinor: 3999000, BillingPeriod: "year", Unlimited: true, Active: true, AvailableIOS: true, AvailableWeb: true},
 		{Code: "pack30", Kind: "pack", Name: names("30 ответов", "30 replies", "30 жауап"), Currency: "KZT", PriceMinor: 13000, Units: 30, Active: true, AvailableIOS: true, AvailableWeb: true},
+		{Code: "pack500", Kind: "pack", Name: names("500 ответов", "500 replies", "500 жауап"), Currency: "KZT", PriceMinor: 99000, Units: 500, AppleProductID: "kz.aireply.pack500", Active: true, AvailableIOS: true},
 	}
+	products[6].Name["uz"] = "500 javob"
+	return products
 }
 
 // EnsureInitial runs once after migrations. It does not enable store or bank payments.
@@ -131,8 +134,8 @@ func (s *Service) History(ctx context.Context) ([]Version, error) {
 	return out, rows.Err()
 }
 func Validate(products []Product) error {
-	if len(products) != 6 {
-		return domain.InvalidField("products", "six_products_required")
+	if len(products) != len(InitialProducts()) {
+		return domain.InvalidField("products", "complete_catalog_required")
 	}
 	expected := map[string]Product{}
 	for _, p := range InitialProducts() {
@@ -371,9 +374,7 @@ func synchronize(ctx context.Context, tx *sql.Tx, p Product, now int64) error {
 	}
 	onIOS := p.AvailableIOS && p.AppleProductID != ""
 	onAndroid := p.AvailableAndroid && p.GoogleProductID != ""
-	// The per-store switches only matter once a product can sell in two stores.
-	twoStores := p.GoogleProductID != ""
-	_, err := tx.ExecContext(ctx, `UPDATE iap_products SET apple_product_id=?,google_product_id=?,units=?,plan_id=?,billing_period=?,price_minor=?,currency=?,is_active=?,off_ios=?,off_android=?,name_ru=?,name_en=?,name_kk=?,updated_at=? WHERE code=? AND archived_at IS NULL`, apple, google, p.Units, planID, p.BillingPeriod, p.PriceMinor, p.Currency, p.Active && (onIOS || onAndroid), twoStores && !p.AvailableIOS, twoStores && !p.AvailableAndroid, p.Name["ru"], p.Name["en"], p.Name["kk"], now, p.Code)
+	_, err := tx.ExecContext(ctx, `UPDATE iap_products SET apple_product_id=?,google_product_id=?,units=?,plan_id=?,billing_period=?,price_minor=?,currency=?,is_active=?,off_ios=?,off_android=?,name_ru=?,name_en=?,name_kk=?,name_uz=?,updated_at=? WHERE code=? AND archived_at IS NULL`, apple, google, p.Units, planID, p.BillingPeriod, p.PriceMinor, p.Currency, p.Active && (onIOS || onAndroid), !p.AvailableIOS, !p.AvailableAndroid, p.Name["ru"], p.Name["en"], p.Name["kk"], p.Name["uz"], now, p.Code)
 	return err
 }
 

@@ -51,8 +51,13 @@ protocol StoreKitClient: Sendable {
     func purchase(productID: String, appAccountToken: UUID) async throws -> StorePurchaseResult
     func unfinishedTransactions() async -> [StoreTransaction]
     func transactionUpdates() -> AsyncStream<StoreTransaction>
+    func storefrontUpdates() -> AsyncStream<Void>
     func sync() async throws
     func currentEntitlements() async -> [StoreTransaction]
+}
+
+extension StoreKitClient {
+    func storefrontUpdates() -> AsyncStream<Void> { AsyncStream { $0.finish() } }
 }
 
 enum StoreKitClientError: Error, Equatable {
@@ -138,6 +143,16 @@ struct AppStoreClient: StoreKitClient {
                 for await verification in Transaction.updates {
                     if let transaction = Self.transaction(from: verification) { continuation.yield(transaction) }
                 }
+                continuation.finish()
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
+    func storefrontUpdates() -> AsyncStream<Void> {
+        AsyncStream { continuation in
+            let task = Task.detached(priority: .utility) {
+                for await _ in Storefront.updates { continuation.yield(()) }
                 continuation.finish()
             }
             continuation.onTermination = { _ in task.cancel() }

@@ -6,6 +6,13 @@ import Observation
 enum IOSProductPolicy {
     static let allowsNewPurchases = true
     static let showsServiceInformationLink = false
+
+    /// Base remains verifiable for existing subscribers, but is no longer sold.
+    /// Check both identifiers so an older server catalogue cannot reintroduce it.
+    static func isRetiredSubscription(code: String, storeProductID: String) -> Bool {
+        ["base_monthly", "base_yearly"].contains(code)
+            || ["kz.aireply.base.monthly", "kz.aireply.base.yearly"].contains(storeProductID)
+    }
 }
 
 /// A product the screen may offer: what the server sells, at the price the
@@ -40,11 +47,17 @@ struct PurchaseOffer: Identifiable, Equatable, Sendable {
 
     var id: String { storeProductID }
 
+    var isAvailableForNewPurchase: Bool {
+        kind != .subscription || !IOSProductPolicy.isRetiredSubscription(code: code, storeProductID: storeProductID)
+    }
+
     /// The server's products that the App Store also knows, in the server's
     /// order. A product either side does not know is not offered.
     static func match(server: [PurchaseAPI.Product], store: [StoreProduct]) -> [PurchaseOffer] {
         let prices = Dictionary(store.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         return server.compactMap { product in
+            if product.kind == "subscription",
+               IOSProductPolicy.isRetiredSubscription(code: product.code, storeProductID: product.storeProductID) { return nil }
             guard let kind = Kind(rawValue: product.kind),
                   !product.storeProductID.isEmpty, let storeProduct = prices[product.storeProductID] else { return nil }
             if kind == .subscription {
@@ -184,6 +197,7 @@ final class PurchaseStore {
     /// the app, only at the next launch (or for another account).
     @ObservationIgnored private var refused: Set<String> = []
     @ObservationIgnored private var updatesTask: Task<Void, Never>?
+    @ObservationIgnored private var storefrontTask: Task<Void, Never>?
     @ObservationIgnored private var pendingProductID: String?
 
     init(storeKit: StoreKitClient = AppStoreClient(), backend: PurchaseBackend = BackendPurchaseService(),
@@ -197,6 +211,11 @@ final class PurchaseStore {
         #else
         self.allowsNewPurchases = IOSProductPolicy.allowsNewPurchases
         #endif
+    }
+
+    deinit {
+        updatesTask?.cancel()
+        storefrontTask?.cancel()
     }
 
     var canMakePayments: Bool { allowsNewPurchases && storeKit.canMakePayments }
@@ -246,7 +265,24 @@ final class PurchaseStore {
                 await self?.received(transaction)
             }
         }
+        let storefrontUpdates = storeKit.storefrontUpdates()
+        storefrontTask = Task { [weak self] in
+            for await _ in storefrontUpdates {
+                await self?.storefrontDidChange()
+            }
+        }
         Task { await processUnfinished() }
+    }
+
+    /// StoreKit prices belong to the Apple Account's storefront. Discard the
+    /// previous storefront's offers before fetching again, including any load
+    /// already in flight, so a country switch cannot leave stale prices on sale.
+    func storefrontDidChange() async {
+        catalogueRevision += 1
+        offers = []
+        recommendation = nil
+        catalogueState = .idle
+        await loadCatalogue()
     }
 
     /// Every transaction the App Store still holds undelivered: at launch
@@ -391,7 +427,8 @@ final class PurchaseStore {
 
     func purchase(_ offer: PurchaseOffer) async {
         guard allowsNewPurchases, isEnabled, !status.isBusy else { return }
-        guard let accountToken, canMakePayments, !offer.hasPriceMismatch else {
+        guard let accountToken, canMakePayments, !offer.hasPriceMismatch,
+              offer.isAvailableForNewPurchase, offers.contains(offer) else {
             status = .failed(.unavailable)
             return
         }

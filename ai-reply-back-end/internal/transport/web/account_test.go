@@ -84,7 +84,11 @@ func TestPublicPaymentPageShowsPublishedPackBeforeSignIn(t *testing.T) {
 		}
 		// Public pricing follows a newly published snapshot without a UI release.
 		products := catalog.InitialProducts()
-		products[len(products)-1].PriceMinor = 20000
+		for i := range products {
+			if products[i].Code == "pack30" {
+				products[i].PriceMinor = 20000
+			}
+		}
 		draft, err := prices.SaveDraft(context.Background(), "fixture-admin", 0, products)
 		if err != nil {
 			t.Fatal(err)

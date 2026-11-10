@@ -111,7 +111,7 @@ func (s *Server) catalogManaged(code string) bool {
 		return false
 	}
 	switch code {
-	case "free", "base_monthly", "base_yearly", "pro_monthly", "pro_yearly", "pack30":
+	case "free", "base_monthly", "base_yearly", "pro_monthly", "pro_yearly", "pack30", "pack500":
 		return true
 	}
 	return false

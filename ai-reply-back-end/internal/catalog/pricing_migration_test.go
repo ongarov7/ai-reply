@@ -170,6 +170,14 @@ func TestUnifiedPricesUpgradePreservesHistoryAndSoldPurchases(t *testing.T) {
 	if _, err := s.Draft(ctx); err == nil {
 		t.Fatal("obsolete draft can restore old prices")
 	}
+	// The current application also requires the later pack500 catalog shape.
+	if _, err := database.Migrate(ctx, db, migrations.FS); err != nil {
+		t.Fatal(err)
+	}
+	current, err = s.Published(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if _, err := s.SaveDraft(ctx, "owner", 0, current.Products); err != nil {
 		t.Fatalf("new draft blocked after migration: %v", err)
 	}

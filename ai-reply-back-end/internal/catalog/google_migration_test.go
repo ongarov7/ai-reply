@@ -106,7 +106,7 @@ func TestGoogleMigrationAppliesOnTopOfTheMonthlyBundle(t *testing.T) {
 		if mapped {
 			exec(`UPDATE iap_products SET google_product_id='pack_30' WHERE code='pack30'`)
 		}
-		if _, err := database.Migrate(ctx, db, migrations.FS); err != nil {
+		if _, err := database.Migrate(ctx, db, catalogMigrationsBefore(t, "0039")); err != nil {
 			t.Fatal(err)
 		}
 		current, err := s.Published(ctx)

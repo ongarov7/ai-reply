@@ -1100,8 +1100,8 @@
                     {{ p.listed ? t('admin.plans.shown') : t('admin.plans.hidden') }}</span>
                     <span v-if="p.purchasable" class="badge badge-brand">{{ t('admin.plans.for_sale') }}</span></td>
                   <td style="text-align:right; white-space:nowrap">
-                    <button class="btn btn-sm" v-if="!['free','base_monthly','base_yearly','pro_monthly','pro_yearly','pack30'].includes(p.code)" @click="edit(p)">{{ t('common.edit') }}</button><a v-else class="btn btn-sm" :href="appPath('/admin/billing')">{{ t('admin.billing.title') }}</a>
-                    <button class="btn btn-sm btn-danger" v-if="!['free','base_monthly','base_yearly','pro_monthly','pro_yearly','pack30'].includes(p.code)" @click="archive(p)">{{ t('common.archive') }}</button>
+                    <button class="btn btn-sm" v-if="!['free','base_monthly','base_yearly','pro_monthly','pro_yearly','pack30','pack500'].includes(p.code)" @click="edit(p)">{{ t('common.edit') }}</button><a v-else class="btn btn-sm" :href="appPath('/admin/billing')">{{ t('admin.billing.title') }}</a>
+                    <button class="btn btn-sm btn-danger" v-if="!['free','base_monthly','base_yearly','pro_monthly','pro_yearly','pack30','pack500'].includes(p.code)" @click="archive(p)">{{ t('common.archive') }}</button>
                   </td>
                 </tr>
                 <tr v-if="!plans.length && !loading"><td colspan="9" class="empty">{{ t('common.empty') }}</td></tr>
@@ -3483,8 +3483,8 @@
                     <span v-if="p.offered_android" class="badge badge-brand">Android</span></td>
                   <td>{{ nf(p.sales) }}</td>
                   <td style="text-align:right; white-space:nowrap"><template v-if="!p.archived">
-                    <button class="btn btn-sm" v-if="!['free','base_monthly','base_yearly','pro_monthly','pro_yearly','pack30'].includes(p.code)" @click="edit(p)">{{ t('common.edit') }}</button><a v-else class="btn btn-sm" :href="appPath('/admin/billing')">{{ t('admin.billing.title') }}</a>
-                    <button class="btn btn-sm btn-danger" v-if="!['free','base_monthly','base_yearly','pro_monthly','pro_yearly','pack30'].includes(p.code)" @click="archive(p)">{{ t('common.archive') }}</button></template></td>
+                    <button class="btn btn-sm" v-if="!['free','base_monthly','base_yearly','pro_monthly','pro_yearly','pack30','pack500'].includes(p.code)" @click="edit(p)">{{ t('common.edit') }}</button><a v-else class="btn btn-sm" :href="appPath('/admin/billing')">{{ t('admin.billing.title') }}</a>
+                    <button class="btn btn-sm btn-danger" v-if="!['free','base_monthly','base_yearly','pro_monthly','pro_yearly','pack30','pack500'].includes(p.code)" @click="archive(p)">{{ t('common.archive') }}</button></template></td>
                 </tr>
                 <tr v-if="!loading && !products.length"><td colspan="9" class="empty">{{ t('admin.iap.no_products') }}</td></tr>
               </tbody>

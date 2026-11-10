@@ -203,20 +203,21 @@ func TestPublishMapsEachStoreAndItsSwitch(t *testing.T) {
 		}
 		return
 	}
-	// Nothing configured: nothing sold, and nothing but what was written before.
+	// Nothing configured: nothing sold; store switches still reflect the catalog.
 	if err := publishProducts(t, s, InitialProducts()); err != nil {
 		t.Fatal(err)
 	}
-	if _, google, active, offIOS, offAndroid := read(); google != "" || active != 0 || offIOS != 0 || offAndroid != 0 {
+	if _, google, active, offIOS, offAndroid := read(); google != "" || active != 0 || offIOS != 1 || offAndroid != 1 {
 		t.Fatalf("unconfigured: %q %d %d %d", google, active, offIOS, offAndroid)
 	}
 
 	p := InitialProducts()
 	p[1].AppleProductID = "test.base"
+	p[1].AvailableIOS = true
 	if err := publishProducts(t, s, p); err != nil {
 		t.Fatal(err)
 	}
-	if apple, google, active, offIOS, offAndroid := read(); apple != "test.base" || google != "" || active != 1 || offIOS != 0 || offAndroid != 0 {
+	if apple, google, active, offIOS, offAndroid := read(); apple != "test.base" || google != "" || active != 1 || offIOS != 0 || offAndroid != 1 {
 		t.Fatalf("Apple only: %q %q %d %d %d", apple, google, active, offIOS, offAndroid)
 	}
 

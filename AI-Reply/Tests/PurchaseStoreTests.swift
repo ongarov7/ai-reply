@@ -158,8 +158,53 @@ final class SubscriptionManagementTests: XCTestCase {
 }
 
 final class SubscriptionDisplayTests: XCTestCase {
+    func testRetiredBaseSubscriptionsDoNotAppearEvenFromAnOlderCatalogue() {
+        let products = ["base_monthly", "base_yearly"].map { code in
+            let period = code == "base_monthly" ? "month" : "year"
+            return PurchaseAPI.Product(code: code, kind: "subscription", units: 0, durationHours: 0,
+                                       storeProductID: "kz.aireply.base.\(period == "month" ? "monthly" : "yearly")",
+                                       name: "Base", planID: code, billingPeriod: period,
+                                       entitlementKind: "monthly", monthlyLimit: 1000, creditsNeverExpire: true)
+        }
+        let apple = products.map {
+            StoreProduct(id: $0.storeProductID, displayName: "Base", displayPrice: "990 ₸",
+                         kind: .subscription, billingPeriod: $0.billingPeriod)
+        }
+        XCTAssertTrue(PurchaseOffer.match(server: products, store: apple).isEmpty)
+        let legacyOffers = products.map {
+            PurchaseOffer(code: $0.code, kind: .subscription, units: 0, durationHours: 0,
+                          storeProductID: $0.storeProductID, name: "Base", displayPrice: "990 ₸",
+                          planID: $0.planID, billingPeriod: $0.billingPeriod,
+                          entitlementKind: "monthly", monthlyLimit: 1000)
+        }
+        XCTAssertTrue(SubscriptionPlanCatalogue(plans: [], offers: legacyOffers).options.isEmpty)
+        XCTAssertTrue(IOSProductPolicy.isRetiredSubscription(code: "base_monthly", storeProductID: "legacy.base"))
+        XCTAssertTrue(IOSProductPolicy.isRetiredSubscription(code: "legacy", storeProductID: "kz.aireply.base.yearly"))
+    }
+
+    func testFiveHundredReplyPackIsConsumableAndDoesNotBecomeASubscription() throws {
+        let product = try JSONDecoder().decode(PurchaseAPI.Product.self, from: Data("""
+        {"code":"pack500","kind":"pack","units":500,"store_product_id":"kz.aireply.pack500",
+         "name":"500 ответов","credits_never_expire":true,"price":99000,"currency":"KZT"}
+        """.utf8))
+        let apple = StoreProduct(id: "kz.aireply.pack500", displayName: "500 ответов", displayPrice: "990 ₸",
+                                 kind: .consumable, price: 990, currency: "KZT")
+        let offer = try XCTUnwrap(PurchaseOffer.match(server: [product], store: [apple]).first)
+        XCTAssertEqual(offer.kind, .pack)
+        XCTAssertEqual(offer.units, 500)
+        XCTAssertEqual(offer.name, "500 ответов")
+        XCTAssertTrue(offer.creditsNeverExpire)
+        XCTAssertNil(offer.billingPeriod)
+        XCTAssertFalse(offer.hasPriceMismatch)
+        XCTAssertTrue(SubscriptionPlanCatalogue(plans: plans, offers: [offer]).options.isEmpty)
+        var autoRenewing = apple
+        autoRenewing.kind = .subscription
+        autoRenewing.billingPeriod = "month"
+        XCTAssertTrue(PurchaseOffer.match(server: [product], store: [autoRenewing]).isEmpty)
+    }
+
     private func plan(_ code: String, days: Int, kind: String, limit: Int = 0, free: Bool = false) -> AccountAPI.Plan {
-        AccountAPI.Plan(id: code, code: code, name: ["en": code.hasPrefix("base") ? "Base" : "Pro"],
+        AccountAPI.Plan(id: code, code: code, name: ["en": code.hasPrefix("limited") ? "Limited" : "Pro"],
                         description: [:], price: 0, priceText: "", currency: "KZT",
                         dailyLimit: limit, monthlyLimit: 0, periodDays: days, isFree: free,
                         entitlementKind: kind)
@@ -167,15 +212,15 @@ final class SubscriptionDisplayTests: XCTestCase {
 
     private var plans: [AccountAPI.Plan] {
         [plan("free", days: 0, kind: "welcome", free: true),
-         plan("base_monthly", days: 30, kind: "daily", limit: 40),
-         plan("base_yearly", days: 365, kind: "daily", limit: 40),
+         plan("limited_monthly", days: 30, kind: "daily", limit: 40),
+         plan("limited_yearly", days: 365, kind: "daily", limit: 40),
          plan("pro_monthly", days: 30, kind: "unlimited"),
          plan("pro_yearly", days: 365, kind: "unlimited")]
     }
 
     private func offer(_ planID: String, period: String, unlimited: Bool = false) -> PurchaseOffer {
         PurchaseOffer(code: planID, kind: .subscription, units: 0, durationHours: 0,
-                      storeProductID: "store.\(planID)", name: unlimited ? "Pro" : "Base", displayPrice: "790 ₸",
+                      storeProductID: "store.\(planID)", name: unlimited ? "Pro" : "Limited", displayPrice: "790 ₸",
                       planID: planID, billingPeriod: period,
                       entitlementKind: unlimited ? "unlimited" : "daily", dailyLimit: unlimited ? 0 : 40)
     }
@@ -192,23 +237,23 @@ final class SubscriptionDisplayTests: XCTestCase {
     func testMissingSelectedPeriodFallsBackToOnePeriod() {
         let yearly = plans.filter { $0.periodDays == 365 }
         let catalogue = SubscriptionPlanCatalogue(plans: yearly,
-                                                   offers: [offer("base_yearly", period: "year"),
+                                                   offers: [offer("limited_yearly", period: "year"),
                                                             offer("pro_yearly", period: "year", unlimited: true)])
-        XCTAssertEqual(catalogue.visible(period: "month").map(\.planID), ["base_yearly", "pro_yearly"])
+        XCTAssertEqual(catalogue.visible(period: "month").map(\.planID), ["limited_yearly", "pro_yearly"])
         XCTAssertTrue(catalogue.visible(period: "month").allSatisfy { $0.billingPeriod == "year" })
     }
 
     func testOnlyMatchedStoreOffersAppearWithoutLegacyCheckoutFlag() throws {
-        let offer = PurchaseOffer(code: "base_monthly", kind: .subscription, units: 0, durationHours: 0,
-                                  storeProductID: "base.monthly", name: "Base", displayPrice: "790 ₸",
-                                  planID: "base_monthly", billingPeriod: "month", entitlementKind: "daily", dailyLimit: 40)
+        let offer = PurchaseOffer(code: "limited_monthly", kind: .subscription, units: 0, durationHours: 0,
+                                  storeProductID: "limited.monthly", name: "Limited", displayPrice: "790 ₸",
+                                  planID: "limited_monthly", billingPeriod: "month", entitlementKind: "daily", dailyLimit: 40)
         XCTAssertFalse(plans[1].purchasable, "the legacy checkout flag does not govern StoreKit")
         let catalogue = SubscriptionPlanCatalogue(plans: plans, offers: [offer])
         XCTAssertEqual(catalogue.options.count, 1)
         XCTAssertEqual(catalogue.periods, ["month"], "unmapped yearly plans must not create a dead-end period")
-        let monthlyBase = try XCTUnwrap(catalogue.visible(period: "month").first)
-        XCTAssertEqual(monthlyBase.id, offer.id)
-        XCTAssertEqual(monthlyBase.offer.displayPrice, "790 ₸")
+        let monthlyBundle = try XCTUnwrap(catalogue.visible(period: "month").first)
+        XCTAssertEqual(monthlyBundle.id, offer.id)
+        XCTAssertEqual(monthlyBundle.offer.displayPrice, "790 ₸")
     }
 
     func testUnmappedPlanWithUnknownAllowanceIsNotOffered() {
@@ -228,12 +273,12 @@ final class SubscriptionDisplayTests: XCTestCase {
 
     func testMonthlyBundleIsOfferedWithItsMonthlyAllowance() throws {
         let product = try JSONDecoder().decode(PurchaseAPI.Product.self, from: Data("""
-        {"code":"base_monthly","kind":"subscription","units":0,
-         "store_product_id":"base.monthly","plan_id":"base_monthly","billing_period":"month",
+        {"code":"limited_monthly","kind":"subscription","units":0,
+         "store_product_id":"limited.monthly","plan_id":"limited_monthly","billing_period":"month",
          "entitlement_kind":"monthly","daily_limit":0,"monthly_limit":1000}
         """.utf8))
         let matched = PurchaseOffer.match(server: [product], store: [
-            StoreProduct(id: "base.monthly", displayName: "Base", displayPrice: "990 ₸",
+            StoreProduct(id: "limited.monthly", displayName: "Limited", displayPrice: "990 ₸",
                          kind: .subscription, billingPeriod: "month")
         ])
         let option = try XCTUnwrap(SubscriptionPlanCatalogue(plans: plans, offers: matched).options.first)
@@ -243,25 +288,25 @@ final class SubscriptionDisplayTests: XCTestCase {
 
     func testMonthlyBundleWithoutACountIsNotOffered() throws {
         let product = try JSONDecoder().decode(PurchaseAPI.Product.self, from: Data("""
-        {"code":"base_monthly","kind":"subscription","units":0,
-         "store_product_id":"base.monthly","plan_id":"base_monthly","billing_period":"month",
+        {"code":"limited_monthly","kind":"subscription","units":0,
+         "store_product_id":"limited.monthly","plan_id":"limited_monthly","billing_period":"month",
          "entitlement_kind":"monthly","daily_limit":0,"monthly_limit":0}
         """.utf8))
         XCTAssertTrue(PurchaseOffer.match(server: [product], store: [
-            StoreProduct(id: "base.monthly", displayName: "Base", displayPrice: "990 ₸",
+            StoreProduct(id: "limited.monthly", displayName: "Limited", displayPrice: "990 ₸",
                          kind: .subscription, billingPeriod: "month")
         ]).isEmpty)
     }
 
-    func testMonthlyBaseShowsPermanentThousandReplyBundleAtStorePrice() throws {
+    func testMonthlyBundlePreservesPermanentCreditsAndStorePrice() throws {
         let product = try JSONDecoder().decode(PurchaseAPI.Product.self, from: Data("""
-        {"code":"base_monthly","kind":"subscription","units":0,
-         "store_product_id":"base.monthly","plan_id":"base_monthly","billing_period":"month",
+        {"code":"limited_monthly","kind":"subscription","units":0,
+         "store_product_id":"limited.monthly","plan_id":"limited_monthly","billing_period":"month",
          "entitlement_kind":"monthly","daily_limit":0,"monthly_limit":1000,
          "credits_never_expire":true,"price":99000,"currency":"KZT"}
         """.utf8))
         let matched = PurchaseOffer.match(server: [product], store: [
-            StoreProduct(id: "base.monthly", displayName: "Base", displayPrice: "990 ₸",
+            StoreProduct(id: "limited.monthly", displayName: "Limited", displayPrice: "990 ₸",
                          kind: .subscription, billingPeriod: "month", price: 990, currency: "KZT")
         ])
         let option = try XCTUnwrap(SubscriptionPlanCatalogue(plans: plans, offers: matched).options.first)
@@ -273,12 +318,12 @@ final class SubscriptionDisplayTests: XCTestCase {
 
     func testPermanentDailyGrantsKeepTheirDisclosureAfterStoreKitMatching() throws {
         let product = try JSONDecoder().decode(PurchaseAPI.Product.self, from: Data("""
-        {"code":"base_monthly","kind":"subscription","units":0,
-         "store_product_id":"base.monthly","plan_id":"base_monthly","billing_period":"month",
+        {"code":"limited_monthly","kind":"subscription","units":0,
+         "store_product_id":"limited.monthly","plan_id":"limited_monthly","billing_period":"month",
          "entitlement_kind":"daily","daily_limit":40,"credits_never_expire":true}
         """.utf8))
         let matched = PurchaseOffer.match(server: [product], store: [
-            StoreProduct(id: "base.monthly", displayName: "Base", displayPrice: "790 ₸",
+            StoreProduct(id: "limited.monthly", displayName: "Limited", displayPrice: "790 ₸",
                          kind: .subscription, billingPeriod: "month")
         ])
         let catalogue = SubscriptionPlanCatalogue(plans: plans, offers: matched)
@@ -307,6 +352,7 @@ final class PurchaseStoreTests: XCTestCase {
         var syncError: Error?
         var suspendFirstProducts = false
         var resumeFirstProducts: CheckedContinuation<Void, Never>?
+        var storefrontContinuation: AsyncStream<Void>.Continuation?
         private(set) var syncCount = 0
         private(set) var tokens: [UUID] = []
         private(set) var requestedProducts: [[String]] = []
@@ -333,6 +379,9 @@ final class PurchaseStoreTests: XCTestCase {
         func unfinishedTransactions() async -> [StoreTransaction] { unfinished }
 
         func transactionUpdates() -> AsyncStream<StoreTransaction> { AsyncStream { $0.finish() } }
+        func storefrontUpdates() -> AsyncStream<Void> {
+            AsyncStream { storefrontContinuation = $0 }
+        }
     }
 
     private final class FakeBackend: PurchaseBackend, @unchecked Sendable {
@@ -920,6 +969,80 @@ final class PurchaseStoreTests: XCTestCase {
         let offer = try XCTUnwrap(PurchaseOffer.match(server: [product], store: [apple]).first)
         XCTAssertEqual(offer.displayPrice, "199 ₸")
         XCTAssertTrue(offer.hasPriceMismatch)
+    }
+
+    func testForeignStorefrontPriceKeepsItsCurrencyInsteadOfUsingKazakhstanCataloguePrice() throws {
+        let product = PurchaseAPI.Product(code: "pack500", kind: "pack", units: 500, durationHours: 0,
+                                          storeProductID: "kz.aireply.pack500", name: "500 ответов",
+                                          price: 99000, currency: "KZT", creditsNeverExpire: true)
+        let apple = StoreProduct(id: "kz.aireply.pack500", displayName: "500 replies", displayPrice: "$1.99",
+                                 kind: .consumable, price: Decimal(string: "1.99"), currency: "USD")
+        let offer = try XCTUnwrap(PurchaseOffer.match(server: [product], store: [apple]).first)
+        XCTAssertEqual(offer.displayPrice, "$1.99")
+        XCTAssertFalse(offer.hasPriceMismatch, "different storefront currencies must not be compared as amounts")
+    }
+
+    func testStorefrontChangeReloadsPricesAndRejectsTheOldOffer() async throws {
+        let (store, apple, _) = makeStore()
+        await store.loadCatalogue()
+        let oldOffer = try XCTUnwrap(store.offers.first)
+        apple.products = [StoreProduct(id: "pack.50", displayName: "50 replies", displayPrice: "$1.99",
+                                       price: Decimal(string: "1.99"), currency: "USD")]
+        await store.storefrontDidChange()
+        XCTAssertEqual(store.offers.map(\.displayPrice), ["$1.99"])
+        await store.purchase(oldOffer)
+        XCTAssertEqual(store.status, .failed(.unavailable))
+        XCTAssertTrue(apple.tokens.isEmpty, "a tap from the old storefront cannot open checkout")
+        await store.purchase(try XCTUnwrap(store.offers.first))
+        XCTAssertEqual(apple.tokens.count, 1)
+    }
+
+    func testStorefrontUpdatesListenerRefreshesTheDisplayedCurrency() async throws {
+        let (store, apple, backend) = makeStore()
+        await store.loadCatalogue()
+        store.start()
+        store.start()
+        apple.products = [StoreProduct(id: "pack.50", displayName: "50 replies", displayPrice: "$1.99")]
+        apple.storefrontContinuation?.yield(())
+        for _ in 0..<100 where store.offers.first?.displayPrice != "$1.99" {
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        XCTAssertEqual(store.offers.map(\.displayPrice), ["$1.99"])
+        XCTAssertEqual(backend.catalogueCalls, 2, "start must install only one storefront listener")
+        apple.storefrontContinuation?.finish()
+    }
+
+    func testStorefrontChangeInvalidatesAnInFlightOldPriceLoad() async throws {
+        let (store, apple, _) = makeStore()
+        apple.suspendFirstProducts = true
+        let oldLoad = Task { await store.loadCatalogue() }
+        for _ in 0..<100 where apple.resumeFirstProducts == nil { try await Task.sleep(for: .milliseconds(5)) }
+        XCTAssertNotNil(apple.resumeFirstProducts)
+        apple.products = [StoreProduct(id: "pack.50", displayName: "50 replies", displayPrice: "$1.99")]
+        await store.storefrontDidChange()
+        XCTAssertEqual(store.offers.map(\.displayPrice), ["$1.99"])
+        apple.resumeFirstProducts?.resume()
+        await oldLoad.value
+        XCTAssertEqual(store.offers.map(\.displayPrice), ["$1.99"], "the previous storefront must not overwrite new prices")
+    }
+
+    func testFailedStorefrontReloadDoesNotKeepThePreviousCurrencyOnSale() async {
+        let (store, _, backend) = makeStore()
+        await store.loadCatalogue()
+        backend.catalogueResult = .failure(.offline)
+        await store.storefrontDidChange()
+        XCTAssertTrue(store.offers.isEmpty)
+        XCTAssertEqual(store.catalogueState, .failed)
+    }
+
+    func testRetiredBaseTransactionStillConfirmsAndFinishes() async {
+        let (store, _, backend) = makeStore()
+        let log = FinishLog()
+        let legacy = StoreTransaction(id: "base-renewal", productID: "kz.aireply.base.monthly",
+                                       signedTransaction: "jws-base-renewal", finish: { log.finish("base-renewal") })
+        await store.received(legacy)
+        XCTAssertEqual(backend.submitted, ["jws-base-renewal"])
+        XCTAssertEqual(log.finished, ["base-renewal"])
     }
 
     func testUnapprovedPriceCannotOpenCheckout() async throws {

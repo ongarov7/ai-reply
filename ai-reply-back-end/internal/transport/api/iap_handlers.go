@@ -83,6 +83,7 @@ func (s *Server) handleIAPProducts(w http.ResponseWriter, r *http.Request) {
 	out := make([]iapProductDTO, 0, len(products))
 	for _, p := range products {
 		product := iapProductDTO{Code: p.Code, Kind: p.Kind, Units: p.Units, DurationHours: p.DurationHours, StoreProductID: p.StoreID(platform), Name: p.LocalizedName(locale), PlanID: p.PlanID, BillingPeriod: p.BillingPeriod, Price: p.PriceMinor, Currency: p.Currency}
+		product.CreditsNeverExpire = p.Kind == domain.ProductPack
 		if p.Kind == domain.ProductSubscription {
 			plan, err := s.plans.Get(r.Context(), p.PlanID)
 			if err != nil {
