@@ -196,10 +196,7 @@ final class KeyboardViewController: UIInputViewController {
         refreshAutoShift()
         loadConfigurationIfNeeded()
 
-        if watchVoice.hasGenerationInFlight {
-            // A watch command is still being answered: its panel comes back.
-            reopenComposerForWatch()
-        } else if let parked = ReplySessionParking.take() {
+        if let parked = ReplySessionParking.take() {
             replyCoordinator.restore(parked)
         } else if let parked = ComposeSessionParking.take() {
             composeCoordinator.restore(parked)
@@ -239,8 +236,9 @@ final class KeyboardViewController: UIInputViewController {
         // so a trip to another chat does not cost the instruction. A running
         // request is stopped: no spinner survives the keyboard going away.
         if replyCoordinator.session != nil || composeCoordinator.isActive {
-            // A watch command's panel is not the user's unfinished work: its
-            // request goes on and the answer is saved for "Insert Response".
+            // A watch command's panel is not the user's unfinished work: the
+            // coordinator puts the instruction back, or keeps the answer for
+            // "Insert Response".
             if !watchVoice.ownsComposer {
                 replyCoordinator.park()
                 composeCoordinator.park()
@@ -1273,6 +1271,7 @@ extension KeyboardViewController: KeyboardActionBarDelegate {
     /// Picking a persona OPENS THE COMPOSER. It is not a network request.
     func actionBar(_ bar: KeyboardActionBar, didSelectTemplateID id: String) {
         guard let template = resolveTemplate(id: id) else { return }
+        watchVoice.composerReplaced()
         composeCoordinator.clear()
         DispatchQueue.global(qos: .utility).async {
             SharedSettings.shared.setLastTemplateID(id)
@@ -1293,6 +1292,7 @@ extension KeyboardViewController: KeyboardActionBarDelegate {
     /// clipboard is not read, and a reply the user had put aside (persona
     /// row over a suspended session) is dropped rather than carried over.
     func actionBarDidRequestCompose(_ bar: KeyboardActionBar) {
+        watchVoice.composerReplaced()
         replyCoordinator.clear()
         composeCoordinator.open()
         showComposePanel()
@@ -1594,8 +1594,23 @@ extension KeyboardViewController: WatchVoiceHost {
             sessionID: sessionID,
             documentID: WatchInsertContext.validDocumentID(textDocumentProxy.documentIdentifier),
             textBeforeCaret: textDocumentProxy.documentContextBeforeInput ?? "",
-            textAfterCaret: textDocumentProxy.documentContextAfterInput ?? ""
+            textAfterCaret: textDocumentProxy.documentContextAfterInput ?? "",
+            selectedText: textDocumentProxy.selectedText ?? ""
         )
+    }
+
+    var watchPasteboardChangeCount: Int {
+        canReachNetwork ? UIPasteboard.general.changeCount : 0
+    }
+
+    func watchCurrentDraft() -> String? {
+        if let compose = composeCoordinator.session {
+            return compose.flow.drafts.isEmpty ? nil : compose.flow.draftText
+        }
+        if let reply = replyCoordinator.session {
+            return reply.flow.drafts.isEmpty ? nil : reply.flow.draftText
+        }
+        return nil
     }
 
     func watchReadCopiedMessage() -> Result<ReplyContext, AIReplyError> {
@@ -1632,7 +1647,14 @@ extension KeyboardViewController: WatchVoiceHost {
         composeCoordinator.clear()
         let template = command.options.templateID.flatMap { resolveTemplate(id: $0) } ?? watchFallbackTemplate
         var reply = ReplySession(sourceMessage: "", source: nil, template: template)
-        reply.instruction = instruction
+        let options = command.options
+        reply.instruction = WatchVoiceInstruction.forReply(instruction, options: options, spokenIn: command.instructionLanguage)
+        // What was chosen on the watch, kept for when the message is typed in.
+        reply.watch = WatchRequestOverrides(
+            length: options.length.map { $0 == .short ? .short : .medium },
+            responseLanguage: options.responseLanguage.flatMap { ReplyLanguagePreference(rawValue: $0.rawValue) },
+            actionID: command.id
+        )
         reply.flow.fail(.pasteDenied)
         replyCoordinator.open(handedOff: reply)
     }
@@ -1683,14 +1705,6 @@ extension KeyboardViewController: WatchVoiceHost {
         }
     }
 
-    /// Back on screen while a command is still being answered.
-    private func reopenComposerForWatch() {
-        if composeCoordinator.isActive {
-            showComposePanel()
-        } else if let session = replyCoordinator.session {
-            coordinator(replyCoordinator, didOpen: session)
-        }
-    }
 }
 
 // MARK: - Smart correction

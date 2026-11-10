@@ -151,10 +151,13 @@ final class TemplateBarView: UIView {
     /// `.hidden` takes the control away and gives its width back to the
     /// personas. Applied only on a change: this is not a typing path, but
     /// it is no reason to lay the row out for nothing.
-    func setWatchIndicator(_ indicator: WatchKeyboardIndicator, name: String, status: String?) {
+    /// Returns whether the row's layout changed: the strips over the
+    /// personas take their frame from it.
+    @discardableResult
+    func setWatchIndicator(_ indicator: WatchKeyboardIndicator, name: String, status: String?) -> Bool {
         watchButton.accessibilityLabel = name
         watchButton.accessibilityValue = status
-        guard indicator != watchIndicator else { return }
+        guard indicator != watchIndicator else { return false }
         let visibilityChanged = (indicator == .hidden) != (watchIndicator == .hidden)
         watchIndicator = indicator
         watchButton.isHidden = indicator == .hidden
@@ -163,6 +166,7 @@ final class TemplateBarView: UIView {
             updateAccessibilityOrder()
             setNeedsLayout()
         }
+        return visibilityChanged
     }
 
     override func layoutSubviews() {

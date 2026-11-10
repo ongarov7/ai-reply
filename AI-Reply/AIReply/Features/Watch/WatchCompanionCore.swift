@@ -42,9 +42,12 @@ struct WatchCompanionCore: Sendable {
     private func receive(_ envelope: WatchVoiceEnvelope, now: Date) -> WatchVoiceEnvelope {
         let live = store.readSession().flatMap { $0.isLive(now: now) ? $0 : nil }
         // Which keyboard this is for: the one the watch saw when the user
-        // confirmed; when it saw none, the one on screen right now.
-        guard let command = WatchVoiceCommand(envelope: envelope,
-                                              targetSessionID: envelope.keyboardSessionID ?? live?.id) else {
+        // confirmed; when it saw none, the one on screen right now. Only for
+        // a command that arrives as it is sent: one delivered later from the
+        // system's queue is for no field in particular.
+        let isLive = now.timeIntervalSince(envelope.createdAt) <= WatchVoice.liveCommandWindow
+        let target = isLive ? (envelope.keyboardSessionID ?? live?.id) : nil
+        guard let command = WatchVoiceCommand(envelope: envelope, targetSessionID: target) else {
             return .refusal(requestID: envelope.requestID, failure: .invalidRequest, createdAt: now)
         }
         switch store.enqueue(command) {

@@ -197,9 +197,20 @@ struct WatchVoiceStore: Sendable {
     /// as its traces last.
     func isKnown(_ id: String) -> Bool {
         if has(.claimed, for: id) || has(.cancelled, for: id) { return true }
-        if outcome(for: id) != nil { return true }
+        // Existence only: a locked phone cannot read these files, but it can
+        // see them.
+        if let outcomes = directory(.outcomes),
+           FileManager.default.fileExists(atPath: outcomes.appendingPathComponent(id + ".json").path) { return true }
         guard let inbox = directory(.inbox) else { return false }
         return FileManager.default.fileExists(atPath: inbox.appendingPathComponent(id + ".json").path)
+    }
+
+    /// Gives a claimed command back: the keyboard that took it went away
+    /// before the answer came, and the next one may run it again (with the
+    /// same key, so it is not paid for twice).
+    func release(_ id: String) {
+        guard let url = markerURL(.claimed, for: id) else { return }
+        unlink(url.path)
     }
 
     private func isOrphaned(_ id: String, now: Date) -> Bool {
@@ -263,6 +274,10 @@ struct WatchVoiceStore: Sendable {
 
     /// Deletes what has outlived its use, and tells the watch about
     /// instructions that did: they count as expired, not as lost.
+    ///
+    /// A file that cannot be OPENED is not junk: while the iPhone is locked
+    /// these files are unreadable by design. Only its age, which can always
+    /// be read, may condemn it then. A file read and not understood is junk.
     func purge(now: Date = Date()) {
         if let inbox = directory(.inbox) {
             for name in fileNames(in: inbox) {
@@ -272,7 +287,14 @@ struct WatchVoiceStore: Sendable {
                     if age(of: url, now: now) > 60 { unlink(url.path) }
                     continue
                 }
-                guard let command = read(WatchVoiceCommand.self, at: url) else {
+                let command: WatchVoiceCommand
+                switch load(WatchVoiceCommand.self, at: url) {
+                case .value(let value):
+                    command = value
+                case .unreadable:
+                    if age(of: url, now: now) > WatchVoice.commandLifetime + WatchVoice.clockTolerance { unlink(url.path) }
+                    continue
+                case .corrupt:
                     unlink(url.path)
                     continue
                 }
@@ -288,9 +310,13 @@ struct WatchVoiceStore: Sendable {
         if let outcomes = directory(.outcomes) {
             for name in fileNames(in: outcomes) {
                 let url = outcomes.appendingPathComponent(name)
-                guard let outcome = read(WatchVoiceOutcome.self, at: url), outcome.expiresAt > now else {
+                switch load(WatchVoiceOutcome.self, at: url) {
+                case .value(let outcome):
+                    if outcome.expiresAt <= now { unlink(url.path) }
+                case .unreadable:
+                    if age(of: url, now: now) > WatchVoice.resultLifetime { unlink(url.path) }
+                case .corrupt:
                     unlink(url.path)
-                    continue
                 }
             }
         }
@@ -341,6 +367,22 @@ struct WatchVoiceStore: Sendable {
         let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
         guard let date = attributes?[.creationDate] as? Date else { return .infinity }
         return now.timeIntervalSince(date)
+    }
+
+    private enum Loaded<Value> {
+        case value(Value)
+        /// Could not be opened: locked, or gone in the meantime.
+        case unreadable
+        /// Opened and not understood, or absurdly large.
+        case corrupt
+    }
+
+    private func load<Value: Decodable>(_ type: Value.Type, at url: URL) -> Loaded<Value> {
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path) else { return .unreadable }
+        guard let size = attributes[.size] as? NSNumber, size.intValue <= 128 * 1024 else { return .corrupt }
+        guard let data = try? Data(contentsOf: url) else { return .unreadable }
+        guard let value = WatchVoiceCodec.value(type, from: data) else { return .corrupt }
+        return .value(value)
     }
 
     private func read<Value: Decodable>(_ type: Value.Type, at url: URL) -> Value? {

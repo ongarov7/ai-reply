@@ -45,6 +45,10 @@ protocol WatchVoiceHost: AnyObject {
     func watchReadCopiedMessage() -> Result<ReplyContext, AIReplyError>
     /// The selection, or the text in the field, for a rewrite.
     func watchExistingText() -> String?
+    /// `UIPasteboard.changeCount`: metadata, read without any prompt.
+    var watchPasteboardChangeCount: Int { get }
+    /// The text on screen in the composer, edits included.
+    func watchCurrentDraft() -> String?
     /// Opens the composer on `plan` and starts the request.
     func watchStart(_ plan: WatchGenerationPlan, command: WatchVoiceCommand)
     /// Opens the reply composer with the instruction and an empty message.
@@ -106,6 +110,8 @@ final class WatchVoiceCoordinator {
     private var waitWasConnected = false
     /// Read when the user tapped Watch Voice: that tap is the gesture.
     private var armedMessage: Result<ReplyContext, AIReplyError>?
+    /// The pasteboard as it was then: something copied since is read anew.
+    private var armedChangeCount = 0
 
     private struct Active {
         let command: WatchVoiceCommand
@@ -152,7 +158,7 @@ final class WatchVoiceCoordinator {
     /// parked like the user's own work when the keyboard goes away.
     var ownsComposer: Bool { active != nil || awaitingInsert != nil }
 
-    /// A generation that went on while the keyboard was off screen.
+    /// A command's request is running.
     var hasGenerationInFlight: Bool { active != nil }
 
     // MARK: Keyboard lifecycle
@@ -169,6 +175,11 @@ final class WatchVoiceCoordinator {
 
     /// Off screen: nothing keeps running for the keyboard's sake, except a
     /// request already on its way, whose answer is saved.
+    ///
+    /// A request on its way is stopped and the command given back: iOS may
+    /// make a new keyboard for the next appearance, and the answer must not
+    /// land in one nobody holds. The next keyboard offers it again, and runs
+    /// it with the same key, so the server does not charge twice.
     func keyboardWillDisappear() {
         guard isVisible else { return }
         isVisible = false
@@ -177,9 +188,22 @@ final class WatchVoiceCoordinator {
         held = nil
         notice = nil
         endSession()
-        if awaitingInsert != nil {
-            // Already saved as `.ready`: it comes back as "Insert Response".
+        if let running = active {
+            active = nil
+            host?.watchCancelGeneration()
+            store.release(running.command.id)
+            write(running.command.id, status: .queued)
+            host?.watchDiscardComposer()
+        }
+        if let id = awaitingInsert {
             awaitingInsert = nil
+            // What is on screen, edits and later versions included.
+            if let draft = host?.watchCurrentDraft()?.trimmingCharacters(in: .whitespacesAndNewlines), !draft.isEmpty,
+               var outcome = store.outcome(for: id) {
+                outcome.text = draft
+                outcome.updatedAt = now()
+                store.write(outcome)
+            }
             host?.watchDiscardComposer()
         }
         publishUI()
@@ -276,8 +300,13 @@ final class WatchVoiceCoordinator {
         }
         // The text in the composer is not also offered in the strip.
         saved = state.saved.first { $0.id != awaitingInsert }
-        if active == nil, awaitingInsert == nil, held == nil, let next = state.pending.first {
-            accept(next)
+        if active == nil, awaitingInsert == nil {
+            // One meant for this keyboard goes first; one held back only
+            // because the composer was busy is tried again.
+            let candidate = state.pending.first { $0.targetSessionID == session?.id }
+                ?? held.flatMap { current in state.pending.first { $0.id == current.id } }
+                ?? state.pending.first
+            if let candidate { accept(candidate) }
         }
         publishUI()
     }
@@ -286,9 +315,11 @@ final class WatchVoiceCoordinator {
 
     private func accept(_ command: WatchVoiceCommand) {
         guard let host, let session else { return }
-        // Meant for this keyboard, and the user is free: start. Otherwise
-        // it waits for their tap - it was never asked for here and now.
-        guard command.targetSessionID == session.id, host.watchComposerState != .busy, host.watchHasFullAccess else {
+        // Meant for this keyboard, just confirmed, and the user is free:
+        // start. Otherwise it waits for their tap - it was never asked for
+        // here and now.
+        let isLive = now().timeIntervalSince(command.createdAt) <= WatchVoice.liveCommandWindow
+        guard isLive, command.targetSessionID == session.id, host.watchComposerState != .busy, host.watchHasFullAccess else {
             held = command
             return
         }
@@ -317,7 +348,7 @@ final class WatchVoiceCoordinator {
         if command.options.mode == .reply {
             if case .replyDraft(let context?) = composer {
                 copied = .success(context)
-            } else if let armedMessage {
+            } else if let armedMessage, host.watchPasteboardChangeCount == armedChangeCount {
                 copied = armedMessage
             } else {
                 // The one read of the clipboard for this command: the user
@@ -367,7 +398,12 @@ final class WatchVoiceCoordinator {
             write(id, status: .failed, failure: WatchVoiceFailure(error), failureLimit: limit(of: error))
             store.removeCommand(id)
         case .success(let text):
-            deliver(text, finished)
+            if store.has(.cancelled, for: id) {
+                // Taken back on the watch while it was being written.
+                finish(id, status: .cancelled)
+            } else {
+                deliver(text, finished)
+            }
         }
         publishUI()
         Task { await reconcile() }
@@ -447,6 +483,7 @@ final class WatchVoiceCoordinator {
             notice = .installWatchApp
         case .appNotOpen, .connected:
             armedMessage = host.watchReadCopiedMessage()
+            armedChangeCount = host.watchPasteboardChangeCount
             startWaiting()
         case .unsupported, .activating, .notPaired, .none:
             break
@@ -457,6 +494,11 @@ final class WatchVoiceCoordinator {
     /// Generate or Insert Response in the strip.
     func stripPrimaryTapped() {
         if let current = held {
+            guard !current.isExpired(now: now()), !store.has(.cancelled, for: current.id) else {
+                held = nil
+                publishUI()
+                return
+            }
             // A deliberate tap, but the field it was asked for is unknown.
             start(current, bindsField: false)
         } else if let result = saved {
@@ -473,11 +515,10 @@ final class WatchVoiceCoordinator {
         publishUI()
     }
 
+    /// The X dismisses what the strip shows, in the order it shows it.
     func stripDismissTapped() {
         if notice != nil {
             notice = nil
-        } else if isWaiting {
-            stopWaiting()
         } else if let current = held {
             held = nil
             store.create(.claimed, for: current.id)
@@ -485,6 +526,24 @@ final class WatchVoiceCoordinator {
         } else if let result = saved {
             saved = nil
             finish(result.id, status: .dismissed)
+        } else if isWaiting {
+            stopWaiting()
+        }
+        publishUI()
+    }
+
+    /// The user opened their own composer (Create, a persona) over a
+    /// command's. Clearing it stops its request without telling anyone, so
+    /// the command is closed here.
+    func composerReplaced() {
+        guard awaitingInsert != nil || active != nil else { return }
+        if let id = awaitingInsert {
+            awaitingInsert = nil
+            finish(id, status: .dismissed)
+        }
+        if let running = active {
+            active = nil
+            finish(running.command.id, status: .cancelled)
         }
         publishUI()
     }
@@ -604,8 +663,10 @@ final class WatchVoiceCoordinator {
             result.indicator = waitWasConnected && connection == .appNotOpen ? .connectionLost : .waiting
         }
 
-        // The composer shows everything while it owns the row.
+        // The composer shows everything while it owns the row; a reply put
+        // aside under the persona row keeps the row for itself.
         if awaitingInsert != nil { return result }
+        if active == nil, host?.watchComposerState == .busy { return result }
         if active != nil {
             result.strip = isVisible && host?.watchComposerState == .busy ? nil : .generating
             return result

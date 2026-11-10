@@ -120,6 +120,15 @@ final class WatchCompanionCoreTests: XCTestCase {
         XCTAssertNil(store.pendingCommands(now: now).first?.targetSessionID)
     }
 
+    /// Delivered later from the system's queue: whatever field is open by
+    /// then is not the one the user was looking at.
+    func testALateDeliveryIsForNoKeyboard() {
+        _ = liveKeyboard()
+        let confirmed = now.addingTimeInterval(-(WatchVoice.liveCommandWindow + 5))
+        _ = core.handle(command(session: UUID().uuidString, createdAt: confirmed), now: now)
+        XCTAssertNil(store.pendingCommands(now: now).first?.targetSessionID)
+    }
+
     func testNoKeyboardMeansNoTarget() {
         _ = core.handle(command(), now: now)
         XCTAssertNil(store.pendingCommands(now: now).first?.targetSessionID)

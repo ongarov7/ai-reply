@@ -14,6 +14,9 @@ final class WatchVoiceCoordinatorTests: XCTestCase {
         var after = ""
         var copied: Result<ReplyContext, AIReplyError> = .failure(.noSourceMessage)
         var existing: String?
+        var selection = ""
+        var pasteboardChanges = 0
+        var draft: String?
 
         private(set) var reads = 0
         private(set) var started: [(plan: WatchGenerationPlan, id: String)] = []
@@ -25,8 +28,11 @@ final class WatchVoiceCoordinatorTests: XCTestCase {
         private(set) var ui = WatchVoiceUI()
 
         func watchInsertContext(sessionID: String) -> WatchInsertContext {
-            WatchInsertContext(sessionID: sessionID, documentID: document, textBeforeCaret: before, textAfterCaret: after)
+            WatchInsertContext(sessionID: sessionID, documentID: document, textBeforeCaret: before, textAfterCaret: after,
+                               selectedText: selection)
         }
+        var watchPasteboardChangeCount: Int { pasteboardChanges }
+        func watchCurrentDraft() -> String? { draft }
         func watchReadCopiedMessage() -> Result<ReplyContext, AIReplyError> {
             reads += 1
             return copied
@@ -151,15 +157,16 @@ final class WatchVoiceCoordinatorTests: XCTestCase {
         XCTAssertEqual(status(id), .ready)
     }
 
-    func testAReplyFinishingOffScreenIsSavedForInsertResponse() async {
+    func testAReplyForAnotherFieldIsSavedForInsertResponse() async {
         host.copied = .success(message)
         await coordinator.keyboardDidAppear()
         let id = send(target: sessionID)
         await coordinator.reconcile()
 
-        coordinator.keyboardWillDisappear()
-        XCTAssertTrue(coordinator.hasGenerationInFlight, "the request carries on")
+        host.document = UUID()
+        coordinator.hostFieldDidChange()
         coordinator.generationDidFinish(.success("Ответ"))
+        coordinator.keyboardWillDisappear()
 
         XCTAssertEqual(host.inserted, [])
         XCTAssertEqual(host.discards, 1)
@@ -175,6 +182,80 @@ final class WatchVoiceCoordinatorTests: XCTestCase {
         XCTAssertEqual(status(id), .inserted)
         XCTAssertNil(store.outcome(for: id)?.text, "gone once it is used")
         XCTAssertNil(host.ui.strip)
+    }
+
+    func testLeavingDuringARequestPutsTheInstructionBack() async {
+        host.copied = .success(message)
+        await coordinator.keyboardDidAppear()
+        let id = send(target: sessionID)
+        await coordinator.reconcile()
+        XCTAssertEqual(host.started.count, 1)
+
+        coordinator.keyboardWillDisappear()
+        XCTAssertFalse(coordinator.hasGenerationInFlight, "no request outlives the keyboard")
+        XCTAssertEqual(host.cancels, 1)
+        XCTAssertEqual(host.discards, 1)
+        XCTAssertEqual(status(id), .queued)
+        XCTAssertNotNil(store.command(id: id), "the instruction is still there")
+
+        // The cancelled request ending late changes nothing.
+        coordinator.generationDidFinish(.success("Ответ"))
+        XCTAssertEqual(host.inserted, [])
+        XCTAssertEqual(status(id), .queued)
+
+        // Back in a new keyboard: offered, not started by itself.
+        await coordinator.keyboardDidAppear()
+        await coordinator.reconcile()
+        XCTAssertEqual(host.started.count, 1)
+        XCTAssertEqual(host.ui.indicator, .instructionReceived)
+
+        coordinator.stripPrimaryTapped()
+        await coordinator.reconcile()
+        XCTAssertEqual(host.started.map(\.id), [id, id], "the same command, and so the same key")
+        XCTAssertEqual(status(id), .generating)
+    }
+
+    func testAnEditedAnswerIsWhatIsKept() async {
+        host.copied = .success(message)
+        host.before = "Уже написано"
+        await coordinator.keyboardDidAppear()
+        let id = send(target: sessionID)
+        await coordinator.reconcile()
+        coordinator.generationDidFinish(.success("Ответ"))
+        XCTAssertEqual(status(id), .ready, "a field with text is not written over")
+
+        host.draft = "Ответ, исправленный вручную"
+        coordinator.keyboardWillDisappear()
+        XCTAssertEqual(store.outcome(for: id)?.text, "Ответ, исправленный вручную")
+    }
+
+    func testAnOtherComposerClosesTheCommand() async {
+        host.copied = .success(message)
+        await coordinator.keyboardDidAppear()
+        let id = send(target: sessionID)
+        await coordinator.reconcile()
+
+        coordinator.composerReplaced()
+        XCTAssertFalse(coordinator.hasGenerationInFlight)
+        XCTAssertEqual(status(id), .cancelled)
+        XCTAssertNil(store.command(id: id))
+        XCTAssertNil(host.ui.strip)
+    }
+
+    func testAnInstructionDeliveredLateWaitsForATap() async {
+        host.copied = .success(message)
+        await coordinator.keyboardDidAppear()
+        let command = WatchVoiceCommand(
+            envelope: .command(requestID: UUID().uuidString, instruction: "Скажи, что занят", language: .russian,
+                               options: WatchVoiceOptions(mode: .reply), keyboardSessionID: nil,
+                               createdAt: now.addingTimeInterval(-(WatchVoice.liveCommandWindow + 5))),
+            targetSessionID: sessionID
+        )!
+        XCTAssertEqual(store.enqueue(command), .queued)
+        await coordinator.reconcile()
+        XCTAssertEqual(host.started.count, 0, "confirmed too long ago for this field")
+        XCTAssertEqual(host.reads, 0)
+        XCTAssertEqual(host.ui.indicator, .instructionReceived)
     }
 
     func testASavedReplyDoesNotGoOverWhatIsInTheField() async {
@@ -419,6 +500,22 @@ final class WatchVoiceCoordinatorTests: XCTestCase {
     }
 
     // MARK: Watch Voice control
+
+    func testANewCopyIsReadAgain() async {
+        host.copied = .success(message)
+        await coordinator.keyboardDidAppear()
+        coordinator.controlTapped()
+        XCTAssertEqual(host.reads, 1)
+
+        let other = ReplyContext(text: "А в пятницу?", source: .clipboard)
+        host.copied = .success(other)
+        host.pasteboardChanges += 1
+        send(target: sessionID)
+        await coordinator.reconcile()
+        XCTAssertEqual(host.reads, 2, "what was read on the tap is not what is copied now")
+        guard case .reply(let plan)? = host.started.first?.plan else { return XCTFail("not a reply") }
+        XCTAssertEqual(plan.source, other.text)
+    }
 
     func testTheControlReadsTheCopiedMessageOnceOnItsTap() async {
         host.copied = .success(message)

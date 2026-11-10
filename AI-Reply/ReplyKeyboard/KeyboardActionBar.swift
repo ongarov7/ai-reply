@@ -190,7 +190,11 @@ final class KeyboardActionBar: UIView {
     /// over the personas. Nothing here changes the keyboard's height.
     func setWatchVoice(_ ui: WatchVoiceUI) {
         watchUI = ui
-        templateBar.setWatchIndicator(ui.indicator, name: watchStrings.controlName, status: watchStatus(ui.indicator))
+        if templateBar.setWatchIndicator(ui.indicator, name: watchStrings.controlName, status: watchStatus(ui.indicator)) {
+            // The personas got narrower or wider: the strips follow at once.
+            setNeedsLayout()
+            layoutIfNeeded()
+        }
         if let strip = ui.strip { watchStrip.show(strip) }
         refreshWatchStrip()
     }

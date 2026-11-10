@@ -100,11 +100,13 @@ struct WatchInsertContext: Equatable, Sendable {
     var documentID: UUID?
     var textBeforeCaret: String
     var textAfterCaret: String
+    /// Selected text is in neither of the above, and typing would replace it.
+    var selectedText: String = ""
 
     /// Whether the field looks empty. A host can report nothing for a field
     /// with text in it, which is what the other checks are for.
     var isFieldEmpty: Bool {
-        (textBeforeCaret + textAfterCaret).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        (textBeforeCaret + selectedText + textAfterCaret).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     static func validDocumentID(_ raw: UUID?) -> UUID? {
@@ -162,7 +164,8 @@ enum WatchInsertPolicy {
         }
         guard boundDocument == currentDocument else { return .manual(.documentChanged) }
         guard current.textBeforeCaret == bound.textBeforeCaret,
-              current.textAfterCaret == bound.textAfterCaret else { return .manual(.textChanged) }
+              current.textAfterCaret == bound.textAfterCaret,
+              current.selectedText == bound.selectedText else { return .manual(.textChanged) }
         guard current.isFieldEmpty else { return .manual(.fieldHasText) }
         return .automatic
     }

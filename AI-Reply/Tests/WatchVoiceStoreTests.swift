@@ -126,6 +126,52 @@ final class WatchVoiceStoreTests: XCTestCase {
         XCTAssertEqual(store.pendingCommands(now: now), [])
     }
 
+    func testAReleasedCommandCanBeStartedAgain() {
+        let original = command()
+        XCTAssertEqual(store.enqueue(original), .queued)
+        XCTAssertTrue(store.claim(original.id, now: now))
+        store.release(original.id)
+        XCTAssertEqual(store.pendingCommands(now: now), [original], "back in the queue")
+        XCTAssertTrue(store.claim(original.id, now: now))
+    }
+
+    // MARK: Files the lock keeps closed
+
+    /// While the phone is locked the files cannot be opened. That is not
+    /// damage: they stay until they could no longer be of any use.
+    func testAFileThatCannotBeOpenedYetIsKept() {
+        let original = command()
+        XCTAssertEqual(store.enqueue(original), .queued)
+        let id = UUID().uuidString
+        store.write(outcome(id, .ready, text: "Ответ"))
+        let inboxFile = root.appendingPathComponent("inbox/\(original.id).json")
+        let outcomeFile = root.appendingPathComponent("outcomes/\(id).json")
+        XCTAssertEqual(chmod(inboxFile.path, 0), 0)
+        XCTAssertEqual(chmod(outcomeFile.path, 0), 0)
+
+        store.purge(now: now)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: inboxFile.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: outcomeFile.path))
+
+        store.purge(now: now.addingTimeInterval(WatchVoice.resultLifetime + WatchVoice.clockTolerance + 5))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: inboxFile.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: outcomeFile.path))
+    }
+
+    func testABrokenFileIsRemoved() throws {
+        XCTAssertEqual(store.enqueue(command()), .queued)
+        store.write(outcome(UUID().uuidString, .ready, text: "Ответ"))
+        let brokenCommand = root.appendingPathComponent("inbox/\(UUID().uuidString).json")
+        let brokenOutcome = root.appendingPathComponent("outcomes/\(UUID().uuidString).json")
+        try Data("not json".utf8).write(to: brokenCommand)
+        try Data("not json".utf8).write(to: brokenOutcome)
+
+        store.purge(now: now)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: brokenCommand.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: brokenOutcome.path))
+        XCTAssertEqual(store.pendingCommands(now: now).count, 1, "the good one stays")
+    }
+
     // MARK: A keyboard that died
 
     func testACommandLeftBehindCanBeTakenOver() {

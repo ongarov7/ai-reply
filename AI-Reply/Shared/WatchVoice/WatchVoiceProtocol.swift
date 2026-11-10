@@ -54,6 +54,11 @@ enum WatchVoice {
     /// Shortest recording the server accepts, in milliseconds.
     static let minimumAudioMilliseconds = 300
 
+    /// How soon after the user confirmed a command it may still start by
+    /// itself. One delivered later, from the system's queue, was not asked
+    /// for in whatever field is open by then.
+    static let liveCommandWindow: TimeInterval = 30
+
     /// The voice disclosure the user agreed to on the watch. A new wording
     /// that changes where a recording goes asks again.
     static let voiceConsentVersion = "2026-11-09"

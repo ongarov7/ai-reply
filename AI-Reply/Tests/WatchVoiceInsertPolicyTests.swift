@@ -62,6 +62,15 @@ final class WatchVoiceInsertPolicyTests: XCTestCase {
         XCTAssertEqual(decide(bound: written, current: written), .manual(.fieldHasText))
     }
 
+    /// A selection replaced by `insertText` is text the user would lose.
+    func testASelectionIsNotAnEmptyField() {
+        let selected = WatchInsertContext(sessionID: "session-1", documentID: document, textBeforeCaret: "",
+                                          textAfterCaret: "", selectedText: "Выделено")
+        XCTAssertFalse(selected.isFieldEmpty)
+        XCTAssertEqual(decide(bound: selected, current: selected), .manual(.fieldHasText))
+        XCTAssertEqual(decide(bound: context(), current: selected), .manual(.textChanged))
+    }
+
     func testOnlySpacesCountAsEmpty() {
         XCTAssertTrue(context(before: "  \n").isFieldEmpty)
         XCTAssertFalse(context(after: "a").isFieldEmpty)
