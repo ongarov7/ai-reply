@@ -18,7 +18,8 @@ struct AIReplyWatchApp: App {
     }
 }
 
-/// One screen per stage: this is an app for a glance at the wrist.
+/// One screen per stage: this is an app for a glance at the wrist. While
+/// nothing is being recorded or sent, the page: home, a persona, a new message.
 struct WatchRootView: View {
 
     @Environment(WatchVoiceModel.self) private var model
@@ -26,8 +27,27 @@ struct WatchRootView: View {
     var body: some View {
         NavigationStack {
             content
-                .navigationTitle(Text(verbatim: "AI Reply"))
+                .navigationTitle(title)
                 .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    if model.stage == .ready, model.page != .home {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button(action: model.goHome) {
+                                Image(systemName: "chevron.backward")
+                            }
+                            .accessibilityLabel(Text("watch.back"))
+                        }
+                    }
+                }
+        }
+    }
+
+    private var title: Text {
+        guard model.stage == .ready else { return Text(verbatim: "AI Reply") }
+        switch model.page {
+        case .home:                return Text(verbatim: "AI Reply")
+        case .persona(let choice): return Text(verbatim: choice.name)
+        case .newMessage:          return Text("watch.mode.new")
         }
     }
 
@@ -35,7 +55,11 @@ struct WatchRootView: View {
     private var content: some View {
         switch model.stage {
         case .ready:
-            HomeScreen()
+            switch model.page {
+            case .home:                HomeScreen()
+            case .persona(let choice): PersonaScreen(persona: choice)
+            case .newMessage:          NewMessageScreen()
+            }
         case .voiceConsent:
             VoiceConsentScreen()
         case .listening:
@@ -64,70 +88,46 @@ struct WatchRootView: View {
 
 // MARK: - Home
 
+/// The personas, as on the keyboard's row, then a new message and settings.
 private struct HomeScreen: View {
 
     @Environment(WatchVoiceModel.self) private var model
 
     var body: some View {
-        @Bindable var model = model
         List {
             Section {
-                Label {
-                    Text(model.isReachable ? "watch.connection.connected" : "watch.connection.unavailable")
-                        .font(.footnote)
-                } icon: {
-                    Image(systemName: model.isReachable ? "iphone" : "iphone.slash")
-                        .foregroundStyle(model.isReachable ? Color.green : Color.orange)
-                }
-                .accessibilityElement(children: .combine)
+                StatusRow()
+            }
 
-                if model.canUseMicrophone {
-                    Button(action: model.speakTapped) {
-                        Label("watch.speak", systemImage: "mic.fill")
-                            .frame(maxWidth: .infinity)
+            Section {
+                ForEach(model.personas) { persona in
+                    Button {
+                        model.openPersona(persona)
+                    } label: {
+                        PersonaRow(persona: persona)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.accentColor)
-                    .listRowBackground(Color.clear)
                 }
-
-                // Typing, or Apple's own dictation: also the way in when the
-                // server's speech recognition cannot be reached.
-                TextFieldLink(prompt: Text("watch.review.placeholder")) {
-                    Label(typeLabel, systemImage: "keyboard")
-                        .font(.footnote)
-                } onSubmit: { text in
-                    model.didProduceInstruction(text)
-                }
+            } header: {
+                Text("watch.home.reply")
             } footer: {
-                if !model.canUseMicrophone, !model.language.hasSystemDictation {
-                    Text("watch.kazakhNeedsServer")
+                if !model.personasAreFromPhone {
+                    Text("watch.home.personasHint")
                 }
             }
 
             Section {
-                Picker("watch.mode", selection: $model.mode) {
-                    ForEach(WatchVoiceMode.offeredOnWatch) { Text($0.titleKey).tag($0) }
-                }
-                Picker("watch.template", selection: $model.templateID) {
-                    Text(inheritedTemplateKey).tag(String?.none)
-                    ForEach(model.phone?.templates ?? []) { Text(verbatim: $0.name).tag(String?.some($0.id)) }
-                }
-                Picker("watch.language", selection: $model.language) {
-                    ForEach(WatchVoiceLanguage.allCases) { Text(verbatim: $0.nativeName).tag($0) }
-                }
-                Picker("watch.responseLanguage", selection: $model.responseLanguage) {
-                    Text("watch.responseLanguage.auto").tag(WatchVoiceLanguage?.none)
-                    ForEach(WatchVoiceLanguage.allCases) { Text(verbatim: $0.nativeName).tag(WatchVoiceLanguage?.some($0)) }
-                }
-                Picker("watch.length", selection: $model.length) {
-                    Text("watch.length.auto").tag(WatchVoiceLength?.none)
-                    ForEach(WatchVoiceLength.allCases) { Text($0.titleKey).tag(WatchVoiceLength?.some($0)) }
+                Button(action: model.openNewMessage) {
+                    Label("watch.mode.new", systemImage: "square.and.pencil")
                 }
             }
 
-            if model.recent != nil {
-                Section {
+            Section {
+                NavigationLink {
+                    SettingsScreen()
+                } label: {
+                    Label("watch.settings", systemImage: "gearshape")
+                }
+                if model.recent != nil {
                     NavigationLink {
                         RecentResultScreen()
                     } label: {
@@ -135,7 +135,258 @@ private struct HomeScreen: View {
                     }
                 }
             }
+        }
+    }
+}
 
+private struct StatusRow: View {
+
+    @Environment(WatchVoiceModel.self) private var model
+
+    var body: some View {
+        Label {
+            Text(text)
+                .font(.footnote)
+        } icon: {
+            Image(systemName: symbol)
+                .foregroundStyle(model.isReachable ? Color.green : Color.orange)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var text: LocalizedStringKey {
+        guard model.isReachable else { return "watch.connection.unavailable" }
+        return model.phone?.keyboardSessionID != nil ? "watch.status.keyboard" : "watch.connection.connected"
+    }
+
+    private var symbol: String {
+        guard model.isReachable else { return "iphone.slash" }
+        return model.phone?.keyboardSessionID != nil ? "keyboard" : "iphone"
+    }
+}
+
+private struct PersonaRow: View {
+
+    let persona: WatchTemplateChoice
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: persona.symbol ?? "person.crop.circle")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.white)
+                .frame(width: 30, height: 30)
+                .background(Circle().fill(persona.tint))
+                .accessibilityHidden(true)
+            Text(verbatim: persona.name)
+                .font(.headline)
+                .lineLimit(2)
+                .minimumScaleFactor(0.8)
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.forward")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+// MARK: - A persona
+
+/// The copied message, the microphone, then quick replies: what to answer,
+/// and the fastest ways to say how.
+private struct PersonaScreen: View {
+
+    let persona: WatchTemplateChoice
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(spacing: 10) {
+                    CopiedMessageCard()
+                    SpeakControls(hint: "watch.speak.reply")
+                    QuickReplies()
+                        .id("quick")
+                }
+            }
+            #if DEBUG
+            // `-AIReplyWatchShowQuick`: the quick replies in view, for screenshots.
+            .task {
+                guard CommandLine.arguments.contains("-AIReplyWatchShowQuick") else { return }
+                try? await Task.sleep(for: .seconds(4))
+                withAnimation { proxy.scrollTo("quick", anchor: .bottom) }
+            }
+            #endif
+        }
+    }
+}
+
+private struct CopiedMessageCard: View {
+
+    @Environment(WatchVoiceModel.self) private var model
+    @State private var isExpanded = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label("watch.preview.title", systemImage: "text.bubble.fill")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            switch model.preview {
+            case .loading:
+                HStack(spacing: 6) {
+                    ProgressView()
+                        .frame(width: 20, height: 20)
+                    Text("watch.preview.loading")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                if model.isPreviewSlow {
+                    // iOS asks before a keyboard reads what another app copied.
+                    Text("watch.preview.allowPaste")
+                        .font(.footnote)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            case .ready(let text, let isTruncated):
+                // Three lines, so the microphone is on the first screen;
+                // a tap shows all of it.
+                Text(verbatim: text)
+                    .font(.body)
+                    .lineLimit(isExpanded ? nil : 3)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .onTapGesture { isExpanded.toggle() }
+                    .accessibilityAddTraits(.isButton)
+                if isTruncated {
+                    Text("watch.preview.truncated")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            case .unavailable(let problem):
+                Text(problem.message)
+                    .font(.footnote)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button(action: model.loadPreview) {
+                    Label("watch.preview.refresh", systemImage: "arrow.clockwise")
+                        .font(.footnote)
+                }
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.white.opacity(0.12)))
+    }
+}
+
+/// The microphone first and biggest; typing for when speaking will not do.
+private struct SpeakControls: View {
+
+    @Environment(WatchVoiceModel.self) private var model
+    let hint: LocalizedStringKey
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Button(action: model.speakTapped) {
+                VStack(spacing: 2) {
+                    Image(systemName: "mic.fill")
+                        .font(.title2)
+                    Text("watch.speak")
+                        .font(.headline)
+                }
+                .frame(maxWidth: .infinity, minHeight: 58)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.accentColor)
+            .disabled(!model.canUseMicrophone)
+            .accessibilityHint(Text(hint))
+
+            Text(model.canUseMicrophone ? hint : microphoneUnavailable)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+
+            // Typing, or Apple's own dictation where the watch has it.
+            TextFieldLink(prompt: Text("watch.review.placeholder")) {
+                Label(typeLabel, systemImage: "keyboard")
+                    .font(.footnote)
+                    .frame(maxWidth: .infinity)
+            } onSubmit: { text in
+                model.didProduceInstruction(text)
+            }
+        }
+    }
+
+    private var microphoneUnavailable: LocalizedStringKey {
+        if !model.isReachable { return "watch.connection.unavailable" }
+        return model.language.hasSystemDictation ? "watch.failure.transcriptionUnavailable" : "watch.kazakhNeedsServer"
+    }
+
+    private var typeLabel: LocalizedStringKey {
+        model.language.hasSystemDictation ? "watch.typeOrDictate" : "watch.type"
+    }
+}
+
+private struct QuickReplies: View {
+
+    @Environment(WatchVoiceModel.self) private var model
+    private let columns = [GridItem(.flexible(), spacing: 6), GridItem(.flexible(), spacing: 6)]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("watch.quick.title")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            LazyVGrid(columns: columns, spacing: 6) {
+                ForEach(WatchQuickReply.allCases) { quick in
+                    Button {
+                        model.useQuickReply(quick)
+                    } label: {
+                        Text(quick.titleKey)
+                            .font(.footnote)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.75)
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: .infinity, minHeight: 34)
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - A new message
+
+private struct NewMessageScreen: View {
+
+    var body: some View {
+        ScrollView {
+            SpeakControls(hint: "watch.newMessage.hint")
+        }
+    }
+}
+
+// MARK: - Settings
+
+private struct SettingsScreen: View {
+
+    @Environment(WatchVoiceModel.self) private var model
+
+    var body: some View {
+        @Bindable var model = model
+        List {
+            Picker("watch.language", selection: $model.language) {
+                ForEach(WatchVoiceLanguage.allCases) { Text(verbatim: $0.nativeName).tag($0) }
+            }
+            Picker("watch.responseLanguage", selection: $model.responseLanguage) {
+                Text("watch.responseLanguage.auto").tag(WatchVoiceLanguage?.none)
+                ForEach(WatchVoiceLanguage.allCases) { Text(verbatim: $0.nativeName).tag(WatchVoiceLanguage?.some($0)) }
+            }
+            Picker("watch.length", selection: $model.length) {
+                Text("watch.length.auto").tag(WatchVoiceLength?.none)
+                ForEach(WatchVoiceLength.allCases) { Text($0.titleKey).tag(WatchVoiceLength?.some($0)) }
+            }
             if model.hasVoiceConsent {
                 Section {
                     Button("watch.consent.withdraw", role: .destructive, action: model.withdrawVoiceConsent)
@@ -143,17 +394,7 @@ private struct HomeScreen: View {
                 }
             }
         }
-    }
-
-    private var typeLabel: LocalizedStringKey {
-        model.language.hasSystemDictation ? "watch.typeOrDictate" : "watch.type"
-    }
-
-    private var inheritedTemplateKey: LocalizedStringKey {
-        if let name = model.currentTemplateName, model.phone?.keyboardSessionID != nil {
-            return "watch.template.keyboard \(name)"
-        }
-        return "watch.template.auto"
+        .navigationTitle("watch.settings")
     }
 }
 
@@ -366,14 +607,43 @@ private struct FailureScreen: View {
 
 // MARK: - Words
 
-private extension WatchVoiceMode {
+private extension WatchTemplateChoice {
+    /// The circle behind a persona's icon: one colour per kind, so the row
+    /// reads at a glance.
+    var tint: Color {
+        switch symbol {
+        case "person.2":                  return .green
+        case "person":                    return .blue
+        case "briefcase":                 return .orange
+        case "person.line.dotted.person": return .purple
+        default:                          return .teal
+        }
+    }
+}
+
+private extension WatchQuickReply {
     var titleKey: LocalizedStringKey {
         switch self {
-        case .reply:      return "watch.mode.reply"
-        case .newMessage: return "watch.mode.new"
-        case .rewrite:    return "watch.mode.rewrite"
-        case .shorten:    return "watch.mode.shorten"
-        case .expand:     return "watch.mode.expand"
+        case .polite:  return "watch.quick.polite"
+        case .short:   return "watch.quick.short"
+        case .agree:   return "watch.quick.agree"
+        case .decline: return "watch.quick.decline"
+        case .clarify: return "watch.quick.clarify"
+        case .thank:   return "watch.quick.thank"
+        }
+    }
+}
+
+private extension WatchVoiceModel.PreviewProblem {
+    var message: LocalizedStringKey {
+        switch self {
+        case .noPhone:            return "watch.connection.unavailable"
+        case .noKeyboard:         return "watch.preview.noKeyboard"
+        case .nothingCopied:      return "watch.preview.nothingCopied"
+        case .pasteDenied:        return "watch.preview.pasteDenied"
+        case .fullAccessRequired: return "watch.preview.fullAccess"
+        case .tooLong:            return "watch.preview.tooLong"
+        case .failed:             return "watch.preview.failed"
         }
     }
 }

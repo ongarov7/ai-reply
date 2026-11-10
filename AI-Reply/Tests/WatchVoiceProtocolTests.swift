@@ -27,6 +27,83 @@ final class WatchVoiceProtocolTests: XCTestCase {
         XCTAssertEqual(WatchVoiceCodec.envelope(from: dictionary), original)
     }
 
+    // MARK: The copied message on the watch
+
+    func testACommandNamesTheMessageTheWatchShowed() throws {
+        let shown = UUID().uuidString
+        let sent = WatchVoiceEnvelope.command(instruction: "Ответь вежливо.", language: .russian,
+                                              options: WatchVoiceOptions(templateID: "friend"),
+                                              keyboardSessionID: nil, previewID: shown, createdAt: now)
+        let received = try XCTUnwrap(WatchVoiceCodec.envelope(from: try WatchVoiceCodec.dictionary(sent)))
+        XCTAssertEqual(received.previewID, shown)
+        XCTAssertNil(WatchVoiceValidator.problem(with: received, now: now))
+        XCTAssertEqual(WatchVoiceCommand(envelope: received, targetSessionID: nil)?.previewID, shown)
+    }
+
+    func testACommandFromBeforePreviewsStillReads() throws {
+        // A command file written by the first builds has no previewID.
+        let old = WatchVoiceCommand(envelope: command(), targetSessionID: nil)!
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: WatchVoiceCodec.data(old)) as? [String: Any])
+        object.removeValue(forKey: "previewID")
+        let data = try JSONSerialization.data(withJSONObject: object)
+        let decoded = try XCTUnwrap(WatchVoiceCodec.value(WatchVoiceCommand.self, from: data))
+        XCTAssertNil(decoded.previewID)
+        XCTAssertEqual(decoded.id, old.id)
+    }
+
+    func testAPreviewIdentifierIsAnIdentifier() {
+        var bad = command()
+        bad.previewID = "../../outcomes/x"
+        XCTAssertEqual(WatchVoiceValidator.problem(with: bad, now: now), .invalidRequest)
+    }
+
+    func testOnlyTheWatchAsksForTheCopiedMessage() {
+        XCTAssertNil(WatchVoiceValidator.problem(with: .request(.previewRequest, createdAt: now), now: now))
+        XCTAssertEqual(WatchVoiceValidator.problem(with: .request(.previewRequest, source: .phone, createdAt: now), now: now),
+                       .invalidRequest)
+    }
+
+    func testTheWatchIsShownTheStartOfALongMessage() throws {
+        let long = String(repeating: "Ә", count: WatchVoice.maximumPreviewScalars + 50)
+        let preview = WatchSourcePreview.ready(long)
+        XCTAssertTrue(preview.isTruncated)
+        XCTAssertEqual(preview.text?.unicodeScalars.count, WatchVoice.maximumPreviewScalars)
+        XCTAssertNil(WatchVoiceValidator.problem(with: .preview(requestID: UUID().uuidString, preview: preview, createdAt: now), now: now))
+
+        let short = WatchSourcePreview.ready("Можем встретиться завтра?")
+        XCTAssertFalse(short.isTruncated)
+        XCTAssertEqual(short.text, "Можем встретиться завтра?")
+    }
+
+    func testTheCutNeverSplitsACharacter() {
+        // A family emoji is several scalars: it is kept whole or left out.
+        let family = "👨‍👩‍👧"
+        let text = String(repeating: "a", count: WatchVoice.maximumPreviewScalars - 2) + family
+        let preview = WatchSourcePreview.ready(text)
+        XCTAssertTrue(preview.isTruncated)
+        XCTAssertFalse(preview.text?.contains("👨") ?? true)
+        XCTAssertLessThanOrEqual(preview.text?.unicodeScalars.count ?? .max, WatchVoice.maximumPreviewScalars)
+    }
+
+    func testAnOversizedPreviewIsRefused() {
+        var envelope = WatchVoiceEnvelope.preview(requestID: UUID().uuidString, preview: .ready("x"), createdAt: now)
+        envelope.preview?.text = String(repeating: "x", count: WatchVoice.maximumPreviewScalars + 1)
+        XCTAssertEqual(WatchVoiceValidator.problem(with: envelope, now: now), .invalidRequest)
+    }
+
+    func testQuickRepliesAreInstructionsInEveryLanguage() {
+        for language in WatchVoiceLanguage.allCases {
+            let texts = WatchQuickReply.allCases.map { $0.instruction(in: language) }
+            XCTAssertEqual(Set(texts).count, texts.count, language.rawValue)
+            for text in texts {
+                XCTAssertFalse(text.trimmingCharacters(in: .whitespaces).isEmpty)
+                XCTAssertLessThan(text.count, 80, "short enough for any limit")
+            }
+        }
+        XCTAssertEqual(WatchQuickReply.polite.instruction(in: .russian), "Ответь вежливо.")
+        XCTAssertEqual(WatchQuickReply.polite.instruction(in: .kazakh), "Сыпайы жауап бер.")
+    }
+
     func testTheEnvelopeCarriesWhatTheProtocolPromises() {
         let envelope = command()
         XCTAssertEqual(envelope.version, WatchVoice.protocolVersion)

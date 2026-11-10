@@ -90,10 +90,11 @@ final class WatchVoiceCoordinatorTests: XCTestCase {
 
     @discardableResult
     private func send(target: String?, mode: WatchVoiceMode = .reply, id: String = UUID().uuidString,
-                      instruction: String = "Скажи, что занят") -> String {
+                      instruction: String = "Скажи, что занят", previewID: String? = nil) -> String {
         let command = WatchVoiceCommand(
             envelope: .command(requestID: id, instruction: instruction, language: .russian,
-                               options: WatchVoiceOptions(mode: mode), keyboardSessionID: nil, createdAt: now),
+                               options: WatchVoiceOptions(mode: mode), keyboardSessionID: nil,
+                               previewID: previewID, createdAt: now),
             targetSessionID: target
         )!
         XCTAssertEqual(store.enqueue(command), .queued)
@@ -497,6 +498,143 @@ final class WatchVoiceCoordinatorTests: XCTestCase {
         XCTAssertEqual(host.reads, 0, "already acquired by the persona tap")
         guard case .reply(let plan)? = host.started.first?.plan else { return XCTFail("not a reply") }
         XCTAssertEqual(plan.source, message.text)
+    }
+
+    // MARK: The copied message on the watch
+
+    @discardableResult
+    private func ask(_ id: String = UUID().uuidString, at time: Date? = nil) -> String {
+        store.writePreviewRequest(WatchPreviewRequest(id: id, sessionID: sessionID, createdAt: time ?? now))
+        return id
+    }
+
+    func testTheWatchIsShownTheCopiedMessage() async {
+        host.copied = .success(message)
+        await coordinator.keyboardDidAppear()
+        let id = ask()
+        await coordinator.reconcile()
+        XCTAssertEqual(host.reads, 1, "the tap on the watch is the gesture")
+        XCTAssertEqual(store.takePreview(id: id, now: now)?.preview, .ready(message.text))
+    }
+
+    func testEachAskIsAnsweredOnceAndACopyIsReadOnce() async {
+        host.copied = .success(message)
+        await coordinator.keyboardDidAppear()
+        let id = ask()
+        await coordinator.reconcile()
+        await coordinator.reconcile()
+        XCTAssertEqual(host.reads, 1)
+        XCTAssertNotNil(store.takePreview(id: id, now: now))
+        await coordinator.reconcile()
+        XCTAssertNil(store.takePreview(id: id, now: now), "an ask already answered is not answered again")
+
+        // The answer was lost and the app asks again: answered from memory.
+        ask(id, at: now.addingTimeInterval(1))
+        await coordinator.reconcile()
+        XCTAssertEqual(host.reads, 1)
+        XCTAssertEqual(store.takePreview(id: id, now: now)?.preview.text, message.text)
+
+        // Another persona's screen, the same copy: still one read.
+        ask(at: now.addingTimeInterval(2))
+        await coordinator.reconcile()
+        XCTAssertEqual(host.reads, 1)
+
+        // Something new copied is read.
+        host.pasteboardChanges += 1
+        ask(at: now.addingTimeInterval(3))
+        await coordinator.reconcile()
+        XCTAssertEqual(host.reads, 2)
+    }
+
+    func testWhatTheWatchShowedIsWhatGetsAnswered() async {
+        host.copied = .success(message)
+        await coordinator.keyboardDidAppear()
+        let shown = ask()
+        await coordinator.reconcile()
+
+        send(target: sessionID, previewID: shown)
+        await coordinator.reconcile()
+        XCTAssertEqual(host.reads, 1, "not read a second time")
+        guard case .reply(let plan)? = host.started.first?.plan else { return XCTFail("not a reply") }
+        XCTAssertEqual(plan.source, message.text)
+    }
+
+    func testACopyMadeAfterThePreviewWaitsForATap() async {
+        host.copied = .success(message)
+        await coordinator.keyboardDidAppear()
+        let shown = ask()
+        await coordinator.reconcile()
+
+        let other = ReplyContext(text: "А в пятницу?", source: .clipboard)
+        host.copied = .success(other)
+        host.pasteboardChanges += 1
+        send(target: sessionID, previewID: shown)
+        await coordinator.reconcile()
+        XCTAssertEqual(host.started.count, 0, "the watch showed another message")
+        XCTAssertEqual(host.ui.indicator, .instructionReceived)
+
+        coordinator.stripPrimaryTapped()
+        guard case .reply(let plan)? = host.started.first?.plan else { return XCTFail("not a reply") }
+        XCTAssertEqual(plan.source, other.text, "the tap reads what is copied now; the composer shows it")
+    }
+
+    func testAPreviewFromAnotherFieldIsNotUsed() async {
+        host.copied = .success(message)
+        await coordinator.keyboardDidAppear()
+        let shown = ask()
+        await coordinator.reconcile()
+
+        host.document = UUID()
+        coordinator.hostFieldDidChange()
+        send(target: sessionID, previewID: shown)
+        await coordinator.reconcile()
+        XCTAssertEqual(host.started.count, 0)
+        XCTAssertEqual(host.ui.indicator, .instructionReceived)
+    }
+
+    func testAnAskForAnotherKeyboardIsNotAnswered() async {
+        host.copied = .success(message)
+        await coordinator.keyboardDidAppear()
+        let id = UUID().uuidString
+        store.writePreviewRequest(WatchPreviewRequest(id: id, sessionID: UUID().uuidString, createdAt: now))
+        await coordinator.reconcile()
+        XCTAssertEqual(host.reads, 0)
+        XCTAssertNil(store.takePreview(id: id, now: now))
+    }
+
+    func testTheWatchIsToldWhyThereIsNoMessage() async {
+        await coordinator.keyboardDidAppear()
+        let nothing = ask()
+        await coordinator.reconcile()
+        XCTAssertEqual(store.takePreview(id: nothing, now: now)?.preview.state, .nothingCopied)
+
+        host.copied = .failure(.pasteDenied)
+        host.pasteboardChanges += 1
+        let denied = ask(at: now.addingTimeInterval(1))
+        await coordinator.reconcile()
+        XCTAssertEqual(store.takePreview(id: denied, now: now)?.preview.state, .pasteDenied)
+    }
+
+    func testTheOpenReplysMessageIsTheOneShown() async {
+        host.watchComposerState = .replyDraft(message)
+        await coordinator.keyboardDidAppear()
+        let id = ask()
+        await coordinator.reconcile()
+        XCTAssertEqual(host.reads, 0, "the persona tap in the keyboard already read it")
+        XCTAssertEqual(store.takePreview(id: id, now: now)?.preview.text, message.text)
+    }
+
+    func testNothingOfThePreviewOutlivesTheKeyboard() async {
+        host.copied = .success(message)
+        await coordinator.keyboardDidAppear()
+        let shown = ask()
+        await coordinator.reconcile()
+        coordinator.keyboardWillDisappear()
+        await coordinator.keyboardDidAppear()
+
+        send(target: sessionID, previewID: shown)
+        await coordinator.reconcile()
+        XCTAssertEqual(host.started.count, 0, "a new keyboard does not hold the old preview")
     }
 
     // MARK: Watch Voice control

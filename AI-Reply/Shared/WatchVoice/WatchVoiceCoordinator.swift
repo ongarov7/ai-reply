@@ -113,6 +113,18 @@ final class WatchVoiceCoordinator {
     /// The pasteboard as it was then: something copied since is read anew.
     private var armedChangeCount = 0
 
+    /// The copied message as read for a persona's screen on the watch, kept
+    /// so a command sent from that screen answers exactly what it showed.
+    private struct Preview {
+        let id: String
+        let sessionID: String
+        let copied: Result<ReplyContext, AIReplyError>
+        let changeCount: Int
+        /// The app's last ask this answered: each ask is answered once.
+        let answered: Date
+    }
+    private var preview: Preview?
+
     private struct Active {
         let command: WatchVoiceCommand
         /// The field at the start; nil for a command that may not auto-insert.
@@ -141,7 +153,7 @@ final class WatchVoiceCoordinator {
         now: @escaping @Sendable () -> Date = { Date() },
         post: @escaping @Sendable (WatchVoiceSignal) -> Void = { $0.post() },
         observe: @escaping (@escaping @Sendable (WatchVoiceSignal) -> Void) -> AnyObject? = {
-            WatchVoiceSignalObserver(signals: [.command, .link], handler: $0)
+            WatchVoiceSignalObserver(signals: [.command, .link, .preview], handler: $0)
         },
         sleep: @escaping @Sendable (TimeInterval) async -> Void = { try? await Task.sleep(for: .seconds($0)) }
     ) {
@@ -187,6 +199,7 @@ final class WatchVoiceCoordinator {
         stopWaiting()
         held = nil
         notice = nil
+        preview = nil
         endSession()
         if let running = active {
             active = nil
@@ -274,7 +287,8 @@ final class WatchVoiceCoordinator {
                 store.purge(now: stamp)
                 return StoreState(link: store.readLink(),
                                   pending: store.pendingCommands(now: stamp),
-                                  saved: store.savedResults(now: stamp))
+                                  saved: store.savedResults(now: stamp),
+                                  previewAsk: store.readPreviewRequest())
             }.value
             guard isVisible else { return }
             apply(state)
@@ -285,10 +299,12 @@ final class WatchVoiceCoordinator {
         let link: WatchLinkSnapshot?
         let pending: [WatchVoiceCommand]
         let saved: [WatchVoiceOutcome]
+        let previewAsk: WatchPreviewRequest?
     }
 
     private func apply(_ state: StoreState) {
         link = state.link
+        answerPreview(state.previewAsk)
         let stamp = now()
         if let running = active, store.has(.cancelled, for: running.command.id) {
             active = nil
@@ -319,7 +335,8 @@ final class WatchVoiceCoordinator {
         // start. Otherwise it waits for their tap - it was never asked for
         // here and now.
         let isLive = now().timeIntervalSince(command.createdAt) <= WatchVoice.liveCommandWindow
-        guard isLive, command.targetSessionID == session.id, host.watchComposerState != .busy, host.watchHasFullAccess else {
+        guard isLive, command.targetSessionID == session.id, answersPreview(command),
+              host.watchComposerState != .busy, host.watchHasFullAccess else {
             held = command
             return
         }
@@ -346,7 +363,10 @@ final class WatchVoiceCoordinator {
         var copied: Result<ReplyContext, AIReplyError>?
         var existing: String?
         if command.options.mode == .reply {
-            if case .replyDraft(let context?) = composer {
+            if let shown = shownPreview(for: command) {
+                // What the watch showed is what gets answered.
+                copied = shown
+            } else if case .replyDraft(let context?) = composer {
                 copied = .success(context)
             } else if let armedMessage, host.watchPasteboardChangeCount == armedChangeCount {
                 copied = armedMessage
@@ -458,6 +478,62 @@ final class WatchVoiceCoordinator {
         }
         publishUI()
         Task { await reconcile() }
+    }
+
+    // MARK: The copied message, for the watch
+
+    /// The watch opened a persona's screen and asks what was copied. The
+    /// keyboard on screen reads it, as a tap on Watch Voice would: the tap
+    /// was on the watch. Each ask is answered once; the same copy is not read
+    /// twice, so iOS asks about pasting at most once per copy.
+    private func answerPreview(_ ask: WatchPreviewRequest?) {
+        guard let ask, let host, let session, ask.sessionID == session.id,
+              now().timeIntervalSince(ask.createdAt) <= WatchVoice.previewLifetime else { return }
+        if let preview, preview.id == ask.id, preview.answered >= ask.createdAt { return }
+        guard host.watchHasFullAccess else { return }
+
+        let changeCount = host.watchPasteboardChangeCount
+        let copied: Result<ReplyContext, AIReplyError>
+        if case .replyDraft(let context?) = host.watchComposerState {
+            // The reply open in the keyboard is the one a command answers.
+            copied = .success(context)
+        } else if let preview, preview.sessionID == session.id, preview.changeCount == changeCount {
+            copied = preview.copied
+        } else if let armedMessage, changeCount == armedChangeCount {
+            copied = armedMessage
+        } else {
+            copied = host.watchReadCopiedMessage()
+        }
+        preview = Preview(id: ask.id, sessionID: session.id, copied: copied, changeCount: changeCount,
+                          answered: ask.createdAt)
+        store.writePreview(WatchPreviewRecord(id: ask.id, sessionID: session.id, createdAt: now(),
+                                              preview: Self.watchPreview(of: copied)))
+    }
+
+    private static func watchPreview(of copied: Result<ReplyContext, AIReplyError>) -> WatchSourcePreview {
+        switch copied {
+        case .success(let context):         return .ready(context.text)
+        case .failure(.noSourceMessage):    return WatchSourcePreview(state: .nothingCopied)
+        case .failure(.pasteDenied):        return WatchSourcePreview(state: .pasteDenied)
+        case .failure(.messageTooLong):     return WatchSourcePreview(state: .tooLong)
+        case .failure:                      return WatchSourcePreview(state: .unavailable)
+        }
+    }
+
+    /// The copied message a command was sent about, while it is still what
+    /// this keyboard holds: the same session, and nothing copied since.
+    private func shownPreview(for command: WatchVoiceCommand) -> Result<ReplyContext, AIReplyError>? {
+        guard let id = command.previewID, let preview, let session, let host,
+              preview.id == id, preview.sessionID == session.id,
+              preview.changeCount == host.watchPasteboardChangeCount else { return nil }
+        return preview.copied
+    }
+
+    /// A command sent from a persona's screen starts by itself only while
+    /// the message that screen showed is still the one here. Otherwise it
+    /// waits for a tap, and the composer shows which message it answers.
+    private func answersPreview(_ command: WatchVoiceCommand) -> Bool {
+        command.previewID == nil || shownPreview(for: command) != nil
     }
 
     // MARK: From the keyboard's row

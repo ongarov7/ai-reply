@@ -135,6 +135,40 @@ final class WatchVoiceStoreTests: XCTestCase {
         XCTAssertTrue(store.claim(original.id, now: now))
     }
 
+    // MARK: The copied message, for the watch
+
+    private func record(_ id: String = UUID().uuidString, createdAt: Date? = nil) -> WatchPreviewRecord {
+        WatchPreviewRecord(id: id, sessionID: UUID().uuidString, createdAt: createdAt ?? now,
+                           preview: .ready("Можем встретиться завтра?"))
+    }
+
+    func testTheCopiedMessageCrossesOnce() {
+        let written = record()
+        store.writePreview(written)
+        XCTAssertEqual(store.takePreview(id: written.id, now: now), written)
+        XCTAssertNil(store.takePreview(id: written.id, now: now), "deleted as it is read")
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: root.appendingPathComponent("previews").path), [])
+    }
+
+    func testAnOldCopiedMessageIsNotRelayedAndIsCleanedUp() {
+        let stale = record(createdAt: now.addingTimeInterval(-(WatchVoice.previewLifetime + 1)))
+        store.writePreview(stale)
+        let left = record()
+        store.writePreview(left)
+        store.purge(now: now.addingTimeInterval(WatchVoice.previewLifetime + 2))
+        XCTAssertNil(store.takePreview(id: stale.id, now: now))
+        XCTAssertNil(store.takePreview(id: left.id, now: now), "nobody took it: gone after a minute")
+    }
+
+    func testTheAskCarriesNoText() throws {
+        let ask = WatchPreviewRequest(id: UUID().uuidString, sessionID: UUID().uuidString, createdAt: now)
+        store.writePreviewRequest(ask)
+        XCTAssertEqual(store.readPreviewRequest(), ask)
+        let data = try Data(contentsOf: root.appendingPathComponent("preview-request.json"))
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(Set(object.keys), ["id", "sessionID", "createdAt"])
+    }
+
     // MARK: Files the lock keeps closed
 
     /// While the phone is locked the files cannot be opened. That is not

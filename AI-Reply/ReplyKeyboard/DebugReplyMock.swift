@@ -34,6 +34,13 @@ struct DebugReplyMock: ReplyTransport {
         if instruction.contains("Сәрсенбі") {
             return GeneratedReply(text: "Сәлеметсіз бе! Бүгін де, ертең де бос емеспін. Сәрсенбі түстен кейін кездесейік пе?", detectedLanguage: nil)
         }
+        // The watch's quick "Politely", for the screenshots.
+        if instruction.contains("Ответь вежливо") {
+            return GeneratedReply(text: "Здравствуйте! Да, давайте завтра в 15:00 — с удовольствием обсудим договор.", detectedLanguage: nil)
+        }
+        if instruction.contains("Сыпайы жауап бер") {
+            return GeneratedReply(text: "Сәлеметсіз бе! Иә, ертең 15:00-де кездесіп, келісімшартты талқылайық.", detectedLanguage: nil)
+        }
         if instruction.contains("среду после обеда") {
             return GeneratedReply(text: "Здравствуйте! Сегодня и завтра я занят. Давайте встретимся в среду после обеда?", detectedLanguage: nil)
         }

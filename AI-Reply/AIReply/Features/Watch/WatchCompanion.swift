@@ -52,7 +52,8 @@ final class WatchCompanion: NSObject, WCSessionDelegate, @unchecked Sendable {
         self.store = store
         self.core = WatchCompanionCore(store: store,
                                        snapshot: { WatchPhoneSnapshot.current(store: store, now: $0) },
-                                       notifyKeyboard: { WatchVoiceSignal.command.post() })
+                                       notifyKeyboard: { WatchVoiceSignal.command.post() },
+                                       notifyPreview: { WatchVoiceSignal.preview.post() })
         super.init()
     }
 
@@ -209,7 +210,7 @@ final class WatchCompanion: NSObject, WCSessionDelegate, @unchecked Sendable {
         switch signal {
         case .outcome: pushOutcomes()
         case .session: publishContext()
-        case .command, .link: break
+        case .command, .link, .preview: break
         }
     }
 

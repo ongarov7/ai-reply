@@ -59,6 +59,15 @@ enum WatchVoice {
     /// for in whatever field is open by then.
     static let liveCommandWindow: TimeInterval = 30
 
+    /// How long the copied message, read for a persona's screen on the
+    /// watch, may wait in the App Group for the app to relay it. The app
+    /// deletes it as it reads it; this is for when nobody does.
+    static let previewLifetime: TimeInterval = 60
+
+    /// The most of the copied message the watch shows. The keyboard answers
+    /// all of it; the watch says when it shows only the start.
+    static let maximumPreviewScalars = 1500
+
     /// The voice disclosure the user agreed to on the watch. A new wording
     /// that changes where a recording goes asks again.
     static let voiceConsentVersion = "2026-11-09"
@@ -114,6 +123,10 @@ enum WatchVoiceMessageType: String, Codable, Sendable {
     /// "Test connection" in the app's settings.
     case ping
     case pong
+    /// Watch to phone: the copied message, for a persona's screen.
+    case previewRequest
+    /// Phone to watch: the answer to `.previewRequest`.
+    case preview
 }
 
 /// What the instruction asks for.
@@ -276,11 +289,98 @@ struct WatchVoiceOptions: Codable, Equatable, Sendable {
     }
 }
 
-/// One persona the watch can offer. Identifier and name only: instructions
-/// and business rules never leave the phone.
-struct WatchTemplateChoice: Codable, Equatable, Identifiable, Sendable {
+/// One persona the watch can offer. Identifier, name and icon only:
+/// instructions and business rules never leave the phone.
+struct WatchTemplateChoice: Codable, Equatable, Hashable, Identifiable, Sendable {
     let id: String
     let name: String
+    /// The SF Symbol the keyboard draws with it; nil from older phones.
+    var symbol: String?
+}
+
+/// The copied message, read by the keyboard for the watch to show before
+/// the user speaks.
+struct WatchSourcePreview: Codable, Equatable, Sendable {
+
+    enum State: String, Codable, Sendable {
+        /// The keyboard has been asked and is reading it.
+        case pending
+        case ready
+        /// No AI Reply keyboard on screen to read it.
+        case noKeyboard
+        case nothingCopied
+        /// iOS asked whether to allow the paste and the answer was no.
+        case pasteDenied
+        case fullAccessRequired
+        case tooLong
+        case unavailable
+    }
+
+    var state: State
+    /// Only with `.ready`, at most `WatchVoice.maximumPreviewScalars`.
+    var text: String?
+    /// Only the start of a longer message is in `text`.
+    var isTruncated = false
+
+    init(state: State, text: String? = nil, isTruncated: Bool = false) {
+        self.state = state
+        self.text = text
+        self.isTruncated = isTruncated
+    }
+
+    /// The start of `text`, whole characters only, within the limit.
+    static func ready(_ text: String) -> WatchSourcePreview {
+        guard text.unicodeScalars.count > WatchVoice.maximumPreviewScalars else {
+            return WatchSourcePreview(state: .ready, text: text)
+        }
+        var cut = ""
+        var count = 0
+        for character in text {
+            count += character.unicodeScalars.count
+            guard count <= WatchVoice.maximumPreviewScalars else { break }
+            cut.append(character)
+        }
+        return WatchSourcePreview(state: .ready, text: cut, isTruncated: true)
+    }
+}
+
+// MARK: - Quick replies
+
+/// One-tap instructions on a persona's screen, for when there is nothing to
+/// add by voice. Each is an instruction like a dictated one, in the language
+/// the user speaks, and goes through the same review and Send.
+enum WatchQuickReply: String, CaseIterable, Identifiable, Sendable {
+    case polite
+    case short
+    case agree
+    case decline
+    case clarify
+    case thank
+
+    var id: String { rawValue }
+
+    func instruction(in language: WatchVoiceLanguage) -> String {
+        switch (self, language) {
+        case (.polite, .russian):  return "Ответь вежливо."
+        case (.polite, .kazakh):   return "Сыпайы жауап бер."
+        case (.polite, .english):  return "Reply politely."
+        case (.short, .russian):   return "Ответь коротко, одним-двумя предложениями."
+        case (.short, .kazakh):    return "Бір-екі сөйлеммен қысқа жауап бер."
+        case (.short, .english):   return "Reply briefly, in one or two sentences."
+        case (.agree, .russian):   return "Ответь, что я согласен."
+        case (.agree, .kazakh):    return "Келісетінімді айтып жауап бер."
+        case (.agree, .english):   return "Reply that I agree."
+        case (.decline, .russian): return "Вежливо откажи."
+        case (.decline, .kazakh):  return "Сыпайы түрде бас тарт."
+        case (.decline, .english): return "Politely say no."
+        case (.clarify, .russian): return "Попроси уточнить детали."
+        case (.clarify, .kazakh):  return "Толығырақ нақтылап беруін сұра."
+        case (.clarify, .english): return "Ask for the details."
+        case (.thank, .russian):   return "Поблагодари."
+        case (.thank, .kazakh):    return "Алғыс айт."
+        case (.thank, .english):   return "Say thank you."
+        }
+    }
 }
 
 /// What the phone knows that the watch shows or needs.
@@ -336,6 +436,11 @@ struct WatchVoiceEnvelope: Codable, Equatable, Sendable {
     /// Which part of the recording this is, from 0, and how many there are.
     var audioPart: Int?
     var audioParts: Int?
+    /// With `.command`: the copied message the watch showed, by the
+    /// `.previewRequest` that fetched it. The reply answers that message.
+    var previewID: String?
+    /// The answer to `.previewRequest`.
+    var preview: WatchSourcePreview?
 }
 
 extension WatchVoiceEnvelope {
@@ -346,11 +451,18 @@ extension WatchVoiceEnvelope {
         language: WatchVoiceLanguage,
         options: WatchVoiceOptions,
         keyboardSessionID: String?,
+        previewID: String? = nil,
         createdAt: Date = Date()
     ) -> WatchVoiceEnvelope {
         WatchVoiceEnvelope(requestID: requestID, type: .command, createdAt: createdAt, source: .watch,
                            keyboardSessionID: keyboardSessionID, language: language, instruction: instruction,
-                           options: options)
+                           options: options, previewID: previewID)
+    }
+
+    static func preview(requestID: String, preview: WatchSourcePreview, phone: WatchPhoneSnapshot? = nil,
+                        createdAt: Date = Date()) -> WatchVoiceEnvelope {
+        WatchVoiceEnvelope(requestID: requestID, type: .preview, createdAt: createdAt, source: .phone,
+                           phone: phone, preview: preview)
     }
 
     static func request(_ type: WatchVoiceMessageType, requestID: String = WatchVoiceIdentifier.make(),
@@ -386,6 +498,7 @@ enum WatchVoiceValidator {
         guard envelope.version == WatchVoice.protocolVersion else { return .unsupportedVersion }
         guard WatchVoiceIdentifier.isValid(envelope.requestID) else { return .invalidRequest }
         if let session = envelope.keyboardSessionID, !WatchVoiceIdentifier.isValid(session) { return .invalidRequest }
+        if let preview = envelope.previewID, !WatchVoiceIdentifier.isValid(preview) { return .invalidRequest }
         if let template = envelope.options?.templateID, template.isEmpty || template.utf8.count > 128 {
             return .invalidRequest
         }
@@ -410,6 +523,12 @@ enum WatchVoiceValidator {
             let part = envelope.audioPart ?? 0
             guard (1...WatchVoice.maximumAudioParts).contains(parts), (0..<parts).contains(part) else { return .audioRejected }
             if isExpired(envelope, now: now) { return .expired }
+        case .previewRequest:
+            guard envelope.source == .watch else { return .invalidRequest }
+        case .preview:
+            if let text = envelope.preview?.text, text.unicodeScalars.count > WatchVoice.maximumPreviewScalars {
+                return .invalidRequest
+            }
         case .cancel, .statusRequest, .statusUpdate, .resultRequest, .transcript, .ping, .pong:
             break
         }
@@ -588,4 +707,9 @@ enum WatchVoiceDelivery {
     /// cannot push: every three seconds and for 45 at most, in the foreground.
     static let statusPollInterval: TimeInterval = 3
     static let statusPollLimit: TimeInterval = 45
+
+    /// The copied message is asked for every second while a persona's
+    /// screen is open and the keyboard has not answered, for 30 at most.
+    static let previewPollInterval: TimeInterval = 1
+    static let previewPollLimit: TimeInterval = 30
 }

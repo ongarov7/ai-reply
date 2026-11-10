@@ -9,6 +9,8 @@ struct WatchVoiceCommand: Codable, Equatable, Identifiable, Sendable {
     let instruction: String
     let instructionLanguage: WatchVoiceLanguage
     let options: WatchVoiceOptions
+    /// The copied message the watch showed, by its `.previewRequest`.
+    let previewID: String?
     /// The keyboard session this was meant for: the one the watch saw when
     /// the user confirmed or, when it saw none, the one live as the phone
     /// received it. nil when no keyboard was on screen.
@@ -24,10 +26,30 @@ struct WatchVoiceCommand: Codable, Equatable, Identifiable, Sendable {
         self.instruction = instruction.trimmingCharacters(in: .whitespacesAndNewlines)
         instructionLanguage = language
         self.options = options
+        previewID = envelope.previewID
         self.targetSessionID = targetSessionID
     }
 
     func isExpired(now: Date = Date()) -> Bool { now >= expiresAt }
+}
+
+/// The app asks the keyboard on screen for the copied message, because the
+/// watch opened a persona's screen. Identifiers only.
+struct WatchPreviewRequest: Codable, Equatable, Sendable {
+    /// The watch's `.previewRequest` identifier.
+    let id: String
+    /// The keyboard session live when the watch asked.
+    let sessionID: String
+    /// Every ask is new: the keyboard answers each once.
+    let createdAt: Date
+}
+
+/// The keyboard's answer, which the app relays to the watch and deletes.
+struct WatchPreviewRecord: Codable, Equatable, Sendable {
+    let id: String
+    let sessionID: String
+    let createdAt: Date
+    var preview: WatchSourcePreview
 }
 
 /// How a command turned out, written by the keyboard.
@@ -70,8 +92,10 @@ struct WatchVoiceOutcome: Codable, Equatable, Identifiable, Sendable {
 /// `.completeFileProtectionUnlessOpen`, so the phone can take a command while
 /// locked and nothing can read it back until the user unlocks; they expire in
 /// minutes (`WatchVoice.commandLifetime`, `resultLifetime`), and the folder
-/// is excluded from backups. The copied message is never written at all: it
-/// stays in the keyboard's memory.
+/// is excluded from backups. The copied message is written only when the
+/// watch asks to show it: one file, protected the same way, which the app
+/// deletes as it reads it, and which is gone after `WatchVoice.previewLifetime`
+/// in any case.
 struct WatchVoiceStore: Sendable {
 
     enum EnqueueResult: Equatable, Sendable {
@@ -96,6 +120,7 @@ struct WatchVoiceStore: Sendable {
         case inbox
         case outcomes
         case markers
+        case previews
     }
 
     /// nil when the App Group is not reachable from this process.
@@ -277,6 +302,37 @@ struct WatchVoiceStore: Sendable {
         readState(WatchLinkSnapshot.self, name: "watch-link.json")
     }
 
+    // MARK: The copied message, for the watch
+
+    /// The app's ask, for the keyboard. Identifiers only.
+    func writePreviewRequest(_ request: WatchPreviewRequest) {
+        writeState(request, name: "preview-request.json")
+    }
+
+    func readPreviewRequest() -> WatchPreviewRequest? {
+        readState(WatchPreviewRequest.self, name: "preview-request.json")
+    }
+
+    /// The keyboard's answer. The copied message is sensitive: protected
+    /// like an instruction, read once by the app and gone in a minute.
+    func writePreview(_ record: WatchPreviewRecord) {
+        guard WatchVoiceIdentifier.isValid(record.id), let previews = directory(.previews),
+              let data = try? WatchVoiceCodec.data(record) else { return }
+        try? data.write(to: previews.appendingPathComponent(record.id + ".json"),
+                        options: [.atomic, .completeFileProtectionUnlessOpen])
+    }
+
+    /// Reads the keyboard's answer and deletes it, so the text is on disk
+    /// only between the keyboard writing it and the app relaying it.
+    func takePreview(id: String, now: Date = Date()) -> WatchPreviewRecord? {
+        guard WatchVoiceIdentifier.isValid(id), let previews = directory(.previews) else { return nil }
+        let url = previews.appendingPathComponent(id + ".json")
+        guard let record = read(WatchPreviewRecord.self, at: url) else { return nil }
+        unlink(url.path)
+        guard now.timeIntervalSince(record.createdAt) <= WatchVoice.previewLifetime else { return nil }
+        return record
+    }
+
     // MARK: Expiry
 
     /// Deletes what has outlived its use, and tells the watch about
@@ -322,6 +378,19 @@ struct WatchVoiceStore: Sendable {
                     if outcome.expiresAt <= now { unlink(url.path) }
                 case .unreadable:
                     if age(of: url, now: now) > WatchVoice.resultLifetime { unlink(url.path) }
+                case .corrupt:
+                    unlink(url.path)
+                }
+            }
+        }
+        if let previews = directory(.previews) {
+            for name in fileNames(in: previews) {
+                let url = previews.appendingPathComponent(name)
+                switch load(WatchPreviewRecord.self, at: url) {
+                case .value(let record):
+                    if now.timeIntervalSince(record.createdAt) > WatchVoice.previewLifetime { unlink(url.path) }
+                case .unreadable:
+                    if age(of: url, now: now) > WatchVoice.previewLifetime { unlink(url.path) }
                 case .corrupt:
                     unlink(url.path)
                 }
@@ -428,6 +497,8 @@ enum WatchVoiceSignal: String, CaseIterable, Sendable {
     case outcome = "kz.ai-reply.watch.outcome"
     /// Keyboard to app: a session began, ended, or started waiting.
     case session = "kz.ai-reply.watch.session"
+    /// App to keyboard: the watch asks for the copied message.
+    case preview = "kz.ai-reply.watch.preview"
 
     func post() {
         CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(),

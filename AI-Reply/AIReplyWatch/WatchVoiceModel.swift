@@ -27,6 +27,32 @@ final class WatchVoiceModel {
         case failed(WatchVoiceFailure, limit: Int?)
     }
 
+    /// Where the user is while nothing is being recorded or sent.
+    enum Page: Equatable {
+        case home
+        /// A persona's screen: the copied message, the microphone and quick
+        /// replies. What is said there is a reply as this persona.
+        case persona(WatchTemplateChoice)
+        case newMessage
+    }
+
+    /// The copied message on a persona's screen.
+    enum Preview: Equatable {
+        case loading
+        case ready(String, isTruncated: Bool)
+        case unavailable(PreviewProblem)
+    }
+
+    enum PreviewProblem: Equatable {
+        case noPhone
+        case noKeyboard
+        case nothingCopied
+        case pasteDenied
+        case fullAccessRequired
+        case tooLong
+        case failed
+    }
+
     struct RecentResult: Equatable {
         let requestID: String
         var inserted: Bool
@@ -48,8 +74,11 @@ final class WatchVoiceModel {
     private(set) var phone: WatchPhoneSnapshot?
     private(set) var recent: RecentResult?
     private(set) var hasVoiceConsent: Bool
+    private(set) var page: Page = .home
+    private(set) var preview: Preview = .loading
+    /// The keyboard has taken a while: iOS may be asking about the paste.
+    private(set) var isPreviewSlow = false
 
-    var mode: WatchVoiceMode { didSet { save(mode.rawValue, Key.mode) } }
     var language: WatchVoiceLanguage {
         didSet {
             // The phone's language is a default, not the user's choice.
@@ -60,8 +89,6 @@ final class WatchVoiceModel {
     }
     var responseLanguage: WatchVoiceLanguage? { didSet { save(responseLanguage?.rawValue, Key.responseLanguage) } }
     var length: WatchVoiceLength? { didSet { save(length?.rawValue, Key.length) } }
-    /// nil: inherit the persona the keyboard uses.
-    var templateID: String? { didSet { save(templateID, Key.template) } }
 
     /// The app's language on the phone, which this app follows.
     var locale: Locale {
@@ -87,26 +114,24 @@ final class WatchVoiceModel {
     /// How far the current request has got, so a late message cannot move
     /// the screen back (a queued "ready" after a live "inserted").
     @ObservationIgnored private var statusRank = -1
+    /// The `.previewRequest` behind what the persona's screen shows.
+    @ObservationIgnored private var previewID: String?
+    @ObservationIgnored private var previewTask: Task<Void, Never>?
 
     private enum Key {
-        static let mode = "watch.mode"
         static let language = "watch.language"
         static let responseLanguage = "watch.responseLanguage"
         static let length = "watch.length"
-        static let template = "watch.template"
         static let voiceConsent = "watch.voiceConsent"
     }
 
     init() {
         let defaults = UserDefaults.standard
-        mode = defaults.string(forKey: Key.mode).flatMap(WatchVoiceMode.init(rawValue:))
-            .flatMap { WatchVoiceMode.offeredOnWatch.contains($0) ? $0 : nil } ?? .reply
         let stored = defaults.string(forKey: Key.language).flatMap(WatchVoiceLanguage.init(rawValue:))
         hasChosenLanguage = stored != nil
         language = stored ?? Self.systemLanguage
         responseLanguage = defaults.string(forKey: Key.responseLanguage).flatMap(WatchVoiceLanguage.init(rawValue:))
         length = defaults.string(forKey: Key.length).flatMap(WatchVoiceLength.init(rawValue:))
-        templateID = defaults.string(forKey: Key.template)
         hasVoiceConsent = defaults.string(forKey: Key.voiceConsent) == WatchVoice.voiceConsentVersion
 
         client.onEvent = { [weak self] event in
@@ -130,8 +155,42 @@ final class WatchVoiceModel {
         // `-AIReplyWatchListen 20`: a longer recording, sent in several parts.
         let listen = CommandLine.arguments.firstIndex(of: "-AIReplyWatchListen")
             .flatMap { CommandLine.arguments.indices.contains($0 + 1) ? TimeInterval(CommandLine.arguments[$0 + 1]) : nil } ?? pause
+        // `-AIReplyWatchPersona 0`: that persona's screen first, as a tap.
+        // `-AIReplyWatchQuick polite`: a quick reply instead of the microphone.
+        let persona = CommandLine.arguments.firstIndex(of: "-AIReplyWatchPersona")
+            .flatMap { CommandLine.arguments.indices.contains($0 + 1) ? Int(CommandLine.arguments[$0 + 1]) : nil }
+        let quick = CommandLine.arguments.firstIndex(of: "-AIReplyWatchQuick")
+            .flatMap { CommandLine.arguments.indices.contains($0 + 1) ? WatchQuickReply(rawValue: CommandLine.arguments[$0 + 1]) : nil }
         Task {
             try? await Task.sleep(for: .seconds(pause + 1))
+            if let persona {
+                for _ in 0..<20 where !personasAreFromPhone {
+                    await refreshStatus()
+                    try? await Task.sleep(for: .milliseconds(500))
+                }
+                guard personas.indices.contains(persona) else {
+                    NSLog("[WatchVoice] smoke: no persona %d", persona)
+                    return
+                }
+                openPersona(personas[persona])
+                for _ in 0..<40 where preview == .loading {
+                    try? await Task.sleep(for: .milliseconds(500))
+                }
+                switch preview {
+                case .ready(let text, _): NSLog("[WatchVoice] smoke: preview ready, %d characters", text.count)
+                default: NSLog("[WatchVoice] smoke: preview %@", String(describing: preview))
+                }
+                // `-AIReplyWatchOnlyOpen`: stays on the persona's screen.
+                if CommandLine.arguments.contains("-AIReplyWatchOnlyOpen") { return }
+                try? await Task.sleep(for: .seconds(pause))
+            }
+            if let quick {
+                useQuickReply(quick)
+                try? await Task.sleep(for: .seconds(pause))
+                NSLog("[WatchVoice] smoke: quick %@, send, session %@", quick.rawValue, phone?.keyboardSessionID ?? "none")
+                send()
+                return
+            }
             startListening()
             try? await Task.sleep(for: .seconds(listen))
             stopListening()
@@ -164,10 +223,133 @@ final class WatchVoiceModel {
         isReachable && phone?.transcriptionAvailable != false
     }
 
-    var currentTemplateName: String? {
-        guard let phone else { return nil }
-        let id = templateID ?? phone.currentTemplateID ?? phone.templates.first?.id
-        return phone.templates.first { $0.id == id }?.name
+    /// The personas on the keyboard's row, in its order, or the four the
+    /// app starts with while the phone has said nothing yet.
+    var personas: [WatchTemplateChoice] {
+        if let templates = phone?.templates, !templates.isEmpty { return templates }
+        return Self.builtInPersonas
+    }
+
+    /// Whether `personas` are the phone's own, custom ones included.
+    var personasAreFromPhone: Bool { phone?.templates.isEmpty == false }
+
+    private static var builtInPersonas: [WatchTemplateChoice] {
+        [
+            WatchTemplateChoice(id: "friend", name: String(localized: "watch.persona.friend"), symbol: "person.2"),
+            WatchTemplateChoice(id: "client", name: String(localized: "watch.persona.client"), symbol: "person"),
+            WatchTemplateChoice(id: "work", name: String(localized: "watch.persona.work"), symbol: "briefcase"),
+            WatchTemplateChoice(id: "business", name: String(localized: "watch.persona.business"),
+                                symbol: "person.line.dotted.person"),
+        ]
+    }
+
+    /// A reply on a persona's screen; a new message on its own screen.
+    private var mode: WatchVoiceMode {
+        page == .newMessage ? .newMessage : .reply
+    }
+
+    private var templateID: String? {
+        if case .persona(let choice) = page { return choice.id }
+        return nil
+    }
+
+    // MARK: Pages
+
+    func openPersona(_ choice: WatchTemplateChoice) {
+        guard stage == .ready else { return }
+        page = .persona(choice)
+        loadPreview()
+    }
+
+    func openNewMessage() {
+        guard stage == .ready else { return }
+        stopPreview()
+        page = .newMessage
+    }
+
+    func goHome() {
+        guard stage == .ready else { return }
+        stopPreview()
+        page = .home
+    }
+
+    // MARK: The copied message
+
+    /// Asks the phone for the copied message, and again every second while
+    /// the keyboard reads it or is not open yet, for half a minute, on
+    /// screen only. "Refresh" starts over.
+    func loadPreview() {
+        guard case .persona = page else { return }
+        previewTask?.cancel()
+        let id = WatchVoiceIdentifier.make()
+        previewID = id
+        preview = .loading
+        isPreviewSlow = false
+        previewTask = Task { [weak self] in
+            var waited: TimeInterval = 0
+            while let self, self.previewID == id, !Task.isCancelled {
+                if self.client.isReachable,
+                   let reply = try? await self.client.request(.request(.previewRequest, requestID: id)) {
+                    guard self.previewID == id, !Task.isCancelled else { return }
+                    if let snapshot = reply.phone { self.apply(snapshot) }
+                    if let answer = reply.preview {
+                        if self.show(answer) { return }
+                    } else {
+                        // An older phone, or a refusal.
+                        self.preview = .unavailable(.failed)
+                        return
+                    }
+                } else {
+                    guard self.previewID == id, !Task.isCancelled else { return }
+                    if !self.client.isReachable { self.preview = .unavailable(.noPhone) }
+                }
+                waited += WatchVoiceDelivery.previewPollInterval
+                if waited >= 3, self.preview == .loading { self.isPreviewSlow = true }
+                guard waited < WatchVoiceDelivery.previewPollLimit, self.isForeground else {
+                    if self.preview == .loading { self.preview = .unavailable(.failed) }
+                    self.previewTask = nil
+                    return
+                }
+                try? await Task.sleep(for: .seconds(WatchVoiceDelivery.previewPollInterval))
+            }
+        }
+    }
+
+    /// Shows the phone's answer; true when there is nothing more to wait for.
+    private func show(_ answer: WatchSourcePreview) -> Bool {
+        switch answer.state {
+        case .pending:
+            return false
+        case .ready:
+            preview = .ready(answer.text ?? "", isTruncated: answer.isTruncated)
+            WKInterfaceDevice.current().play(.click)
+            return true
+        case .noKeyboard:
+            // Asked again: it shows up as soon as the keyboard is opened.
+            preview = .unavailable(.noKeyboard)
+            return false
+        case .nothingCopied:      preview = .unavailable(.nothingCopied)
+        case .pasteDenied:        preview = .unavailable(.pasteDenied)
+        case .fullAccessRequired: preview = .unavailable(.fullAccessRequired)
+        case .tooLong:            preview = .unavailable(.tooLong)
+        case .unavailable:        preview = .unavailable(.failed)
+        }
+        return true
+    }
+
+    private func stopPreview() {
+        previewTask?.cancel()
+        previewTask = nil
+        previewID = nil
+        preview = .loading
+    }
+
+    // MARK: Quick replies
+
+    /// A ready-made instruction, reviewed and sent like a dictated one.
+    func useQuickReply(_ quick: WatchQuickReply) {
+        guard stage == .ready else { return }
+        didProduceInstruction(quick.instruction(in: language))
     }
 
     // MARK: Lifecycle
@@ -177,6 +359,8 @@ final class WatchVoiceModel {
         guard phase == .active else {
             pollTask?.cancel()
             pollTask = nil
+            previewTask?.cancel()
+            previewTask = nil
             // Lowering the wrist is `.inactive` and keeps recording. Only
             // really leaving the app ends it, keeping what was said: it is
             // still reviewed before anything is sent.
@@ -186,6 +370,10 @@ final class WatchVoiceModel {
         isReachable = client.isReachable
         Task { await refreshStatus() }
         resumePollingIfNeeded()
+        // Back on a persona's screen: what is copied may have changed.
+        if stage == .ready, case .persona = page, previewTask == nil {
+            if case .ready = preview {} else { loadPreview() }
+        }
     }
 
     private func handle(_ event: WatchConnectivityClient.Event) {
@@ -433,8 +621,11 @@ final class WatchVoiceModel {
         wasAcknowledged = false
         stage = .sending
         let options = WatchVoiceOptions(mode: mode, templateID: templateID, responseLanguage: responseLanguage, length: length)
+        // The message on screen is the one to answer, by the ask that got it.
+        var shown: String?
+        if case .ready = preview, mode == .reply { shown = previewID }
         let envelope = WatchVoiceEnvelope.command(requestID: id, instruction: text, language: language, options: options,
-                                                  keyboardSessionID: phone?.keyboardSessionID)
+                                                  keyboardSessionID: phone?.keyboardSessionID, previewID: shown)
         Task { await deliver(envelope) }
     }
 
@@ -627,12 +818,14 @@ final class WatchVoiceModel {
         }
     }
 
-    /// Done also lets go of a recording kept for Retry.
+    /// Done also lets go of a recording kept for Retry, and goes home.
     func done() {
         pollTask?.cancel()
         transcriptionTimeout?.cancel()
         discardRecording()
         reset()
+        stopPreview()
+        page = .home
     }
 
     private func reset() {

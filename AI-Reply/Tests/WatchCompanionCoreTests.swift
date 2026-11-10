@@ -8,6 +8,7 @@ final class WatchCompanionCoreTests: XCTestCase {
     private var root: URL!
     private var store: WatchVoiceStore!
     private var notified = 0
+    private var asked = 0
     private var core: WatchCompanionCore!
     private let now = Date()
 
@@ -15,10 +16,13 @@ final class WatchCompanionCoreTests: XCTestCase {
         root = FileManager.default.temporaryDirectory.appendingPathComponent("watch-core-\(UUID().uuidString)", isDirectory: true)
         store = WatchVoiceStore(rootURL: root)
         notified = 0
+        asked = 0
         let bump: @Sendable () -> Void = { [weak self] in self?.notified += 1 }
+        let ask: @Sendable () -> Void = { [weak self] in self?.asked += 1 }
         core = WatchCompanionCore(store: store,
                                   snapshot: { _ in WatchPhoneSnapshot(isSignedIn: true) },
-                                  notifyKeyboard: bump)
+                                  notifyKeyboard: bump,
+                                  notifyPreview: ask)
     }
 
     override func tearDownWithError() throws {
@@ -132,6 +136,42 @@ final class WatchCompanionCoreTests: XCTestCase {
     func testNoKeyboardMeansNoTarget() {
         _ = core.handle(command(), now: now)
         XCTAssertNil(store.pendingCommands(now: now).first?.targetSessionID)
+    }
+
+    // MARK: The copied message
+
+    func testWithNoKeyboardThereIsNothingToShow() {
+        let answer = core.handle(.request(.previewRequest, createdAt: now), now: now)
+        XCTAssertEqual(answer.type, .preview)
+        XCTAssertEqual(answer.preview?.state, .noKeyboard)
+        XCTAssertEqual(asked, 0)
+        XCTAssertNil(store.readPreviewRequest())
+    }
+
+    func testTheKeyboardOnScreenIsAskedAndItsAnswerRelayedOnce() throws {
+        let live = liveKeyboard()
+        let id = UUID().uuidString
+        let first = core.handle(.request(.previewRequest, requestID: id, createdAt: now), now: now)
+        XCTAssertEqual(first.preview?.state, .pending)
+        XCTAssertEqual(asked, 1)
+        XCTAssertEqual(store.readPreviewRequest()?.id, id)
+        XCTAssertEqual(store.readPreviewRequest()?.sessionID, live.id)
+
+        store.writePreview(WatchPreviewRecord(id: id, sessionID: live.id, createdAt: now, preview: .ready("Можем завтра?")))
+        let second = core.handle(.request(.previewRequest, requestID: id, createdAt: now), now: now)
+        XCTAssertEqual(second.preview, .ready("Можем завтра?"))
+        XCTAssertNil(store.takePreview(id: id, now: now), "relayed, then gone from the phone's disk")
+    }
+
+    func testAnAskThatGoesUnansweredIsAskedAgain() {
+        _ = liveKeyboard()
+        let id = UUID().uuidString
+        _ = core.handle(.request(.previewRequest, requestID: id, createdAt: now), now: now)
+        let later = now.addingTimeInterval(1)
+        _ = core.handle(.request(.previewRequest, requestID: id, createdAt: later), now: later)
+        XCTAssertEqual(asked, 2)
+        XCTAssertEqual(store.readPreviewRequest()?.createdAt.timeIntervalSince1970 ?? 0, later.timeIntervalSince1970,
+                       accuracy: 0.002, "a new ask the keyboard answers once")
     }
 
     // MARK: Cancel

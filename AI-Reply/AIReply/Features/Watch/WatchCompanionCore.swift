@@ -9,6 +9,8 @@ struct WatchCompanionCore: Sendable {
     let snapshot: @Sendable (Date) -> WatchPhoneSnapshot
     /// Tells a keyboard on screen to look in the App Group.
     let notifyKeyboard: @Sendable () -> Void
+    /// Tells the keyboard on screen the watch asks for the copied message.
+    var notifyPreview: @Sendable () -> Void = {}
 
     /// Handles one envelope and returns the answer to it. The answer is
     /// ready as soon as the store is, so the watch is never kept waiting
@@ -34,7 +36,9 @@ struct WatchCompanionCore: Sendable {
             return answer
         case .ping:
             return .request(.pong, requestID: envelope.requestID, source: .phone, createdAt: now)
-        case .transcribe, .statusUpdate, .transcript, .pong:
+        case .previewRequest:
+            return preview(envelope.requestID, now: now)
+        case .transcribe, .statusUpdate, .transcript, .pong, .preview:
             return .status(requestID: envelope.requestID, status: nil, phone: snapshot(now), createdAt: now)
         }
     }
@@ -62,6 +66,24 @@ struct WatchCompanionCore: Sendable {
         }
     }
 
+    /// The copied message for a persona's screen on the watch. Only the
+    /// keyboard can read it, and only while it is on screen: this asks it,
+    /// and relays its answer once it is there, deleting it as it goes.
+    private func preview(_ id: String, now: Date) -> WatchVoiceEnvelope {
+        if let record = store.takePreview(id: id, now: now) {
+            return .preview(requestID: id, preview: record.preview, phone: snapshot(now), createdAt: now)
+        }
+        // A session is published only by a keyboard with Full Access.
+        guard let live = store.readSession().flatMap({ $0.isLive(now: now) ? $0 : nil }) else {
+            return .preview(requestID: id, preview: WatchSourcePreview(state: .noKeyboard), phone: snapshot(now), createdAt: now)
+        }
+        // Each ask is answered once. Asked again, because the answer was
+        // lost or is late, the keyboard answers from what it already read.
+        store.writePreviewRequest(WatchPreviewRequest(id: id, sessionID: live.id, createdAt: now))
+        notifyPreview()
+        return .preview(requestID: id, preview: WatchSourcePreview(state: .pending), phone: snapshot(now), createdAt: now)
+    }
+
     private func status(of id: String, now: Date) -> WatchVoiceEnvelope {
         let outcome = store.outcome(for: id)
         // The inbox file's existence, not its body: the lock can keep it closed.
@@ -85,10 +107,13 @@ extension WatchPhoneSnapshot {
         let language = settings.effectiveAppLanguage
         let templates: [WatchTemplateChoice]
         if let summaries = settings.templateSummaries {
-            templates = summaries.map { WatchTemplateChoice(id: $0.id, name: $0.name(for: language)) }
+            templates = summaries.map {
+                WatchTemplateChoice(id: $0.id, name: $0.name(for: language), symbol: $0.relationship.symbolName)
+            }
         } else {
             templates = ReplyConfiguration.initial.visibleTemplates.map {
-                WatchTemplateChoice(id: $0.id, name: $0.displayName(appLanguage: language))
+                WatchTemplateChoice(id: $0.id, name: $0.displayName(appLanguage: language),
+                                    symbol: $0.relationship.symbolName)
             }
         }
         return WatchPhoneSnapshot(
