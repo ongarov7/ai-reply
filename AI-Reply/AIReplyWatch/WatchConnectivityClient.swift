@@ -70,7 +70,7 @@ final class WatchConnectivityClient: NSObject, WCSessionDelegate, @unchecked Sen
         guard isReachable else { throw ClientError.notReachable }
         return try await withCheckedThrowingContinuation { continuation in
             let reply = SingleReply(continuation)
-            DispatchQueue.global().asyncAfter(deadline: .now() + WatchVoiceDelivery.acknowledgementTimeout) {
+            DispatchQueue.global().asyncAfter(deadline: .now() + WatchVoiceDelivery.audioPartTimeout) {
                 reply.resume(throwing: ClientError.timedOut)
             }
             session.sendMessageData(packet, replyHandler: { answer in

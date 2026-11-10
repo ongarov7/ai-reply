@@ -553,6 +553,12 @@ enum WatchVoiceDelivery {
     /// `sendMessage` tries before the instruction goes into the system's queue.
     static let maximumDirectAttempts = 2
 
+    /// A part of a recording may have to wake the phone app first, which
+    /// can take longer than an answer to a running app.
+    static let audioPartTimeout: TimeInterval = 15
+    /// Tries per part. A part sent again is harmless: the phone keeps one copy.
+    static let audioPartAttempts = 3
+
     enum Step: Equatable {
         case retry(after: TimeInterval)
         /// `transferUserInfo`: delivered when the system can, which may be

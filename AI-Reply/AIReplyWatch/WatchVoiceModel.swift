@@ -126,10 +126,13 @@ final class WatchVoiceModel {
         hasVoiceConsent = true
         // Slower with `-AIReplyWatchDemo`, for screenshots of each stage.
         let pause: TimeInterval = CommandLine.arguments.contains("-AIReplyWatchDemo") ? 6 : 3
+        // `-AIReplyWatchListen 20`: a longer recording, sent in several parts.
+        let listen = CommandLine.arguments.firstIndex(of: "-AIReplyWatchListen")
+            .flatMap { CommandLine.arguments.indices.contains($0 + 1) ? TimeInterval(CommandLine.arguments[$0 + 1]) : nil } ?? pause
         Task {
             try? await Task.sleep(for: .seconds(pause + 1))
             startListening()
-            try? await Task.sleep(for: .seconds(pause))
+            try? await Task.sleep(for: .seconds(listen))
             stopListening()
             for _ in 0..<40 where stage != .review {
                 try? await Task.sleep(for: .milliseconds(500))
@@ -342,8 +345,11 @@ final class WatchVoiceModel {
                     }
                     break
                 } catch {
+                    #if DEBUG
+                    NSLog("[WatchVoice] part %d of %d (%d bytes) not delivered: %@", index + 1, parts.count, part.count, String(describing: error))
+                    #endif
                     guard isCurrent() else { return }
-                    guard attempt < 2, client.isReachable else {
+                    guard attempt < WatchVoiceDelivery.audioPartAttempts, client.isReachable else {
                         fail(client.isReachable ? .transcriptionFailed : .phoneUnreachable)
                         return
                     }
