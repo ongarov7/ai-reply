@@ -231,7 +231,7 @@ targets:
         CFBundleShortVersionString: "1.2.0"
         CFBundleVersion: "26"
         ITSAppUsesNonExemptEncryption: false
-        NSMicrophoneUsageDescription: "AI Reply records your voice only while you speak an instruction, after you tap the microphone. Through your iPhone the recording goes to the AI Reply server and OpenAI to be turned into text, and it is not stored."
+        NSMicrophoneUsageDescription: "AI Reply records your voice only while you speak an instruction, after you tap the microphone. Through your iPhone the recording goes to the AI Reply server and OpenAI to be turned into text. AI Reply does not store it."
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationPortraitUpsideDown

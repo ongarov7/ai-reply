@@ -23,7 +23,7 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>AI Reply records your voice only while you speak an instruction, after you tap the microphone. Through your iPhone the recording goes to the AI Reply server and OpenAI to be turned into text, and it is not stored.</string>
+	<string>AI Reply records your voice only while you speak an instruction, after you tap the microphone. Through your iPhone the recording goes to the AI Reply server and OpenAI to be turned into text. AI Reply does not store it.</string>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

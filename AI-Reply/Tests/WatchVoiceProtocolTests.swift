@@ -59,6 +59,69 @@ final class WatchVoiceProtocolTests: XCTestCase {
         XCTAssertNil(WatchVoiceAudioPacket.decode(Data([0xFF, 0xFF, 0xFF, 0xFF, 1, 2, 3, 4])), "an absurd length")
     }
 
+    // MARK: Audio in parts
+
+    func testARecordingIsSplitIntoPartsThatFitTheFastChannel() {
+        let audio = Data((0..<(150 * 1024)).map { UInt8($0 % 251) })
+        let parts = WatchVoiceAudioAssembly.split(audio)
+        XCTAssertEqual(parts.count, 3)
+        XCTAssertTrue(parts.allSatisfy { $0.count <= WatchVoice.maximumAudioPartBytes })
+        XCTAssertEqual(parts.reduce(Data(), +), audio)
+        XCTAssertEqual(WatchVoiceAudioAssembly.split(Data([1, 2, 3])).count, 1)
+        XCTAssertEqual(WatchVoiceAudioAssembly.split(Data()), [])
+    }
+
+    func testPartsComeBackTogetherInAnyOrderAndTwice() {
+        let audio = Data((0..<(120 * 1024)).map { UInt8($0 % 239) })
+        let parts = WatchVoiceAudioAssembly.split(audio)
+        var assembly = WatchVoiceAudioAssembly()
+        XCTAssertEqual(assembly.add(parts[2], part: 2, of: 3, requestID: "voice-request-1", now: now), .waiting)
+        XCTAssertEqual(assembly.add(parts[0], part: 0, of: 3, requestID: "voice-request-1", now: now), .waiting)
+        XCTAssertEqual(assembly.add(parts[0], part: 0, of: 3, requestID: "voice-request-1", now: now), .waiting, "a part sent again")
+        XCTAssertEqual(assembly.add(parts[1], part: 1, of: 3, requestID: "voice-request-1", now: now), .complete(audio))
+        XCTAssertEqual(assembly.pendingCount, 0)
+    }
+
+    func testAOnePartRecordingIsCompleteAtOnce() {
+        var assembly = WatchVoiceAudioAssembly()
+        XCTAssertEqual(assembly.add(Data([7, 8]), part: 0, of: 1, requestID: "voice-request-2", now: now), .complete(Data([7, 8])))
+    }
+
+    func testPartsThatDoNotAddUpAreRefused() {
+        var assembly = WatchVoiceAudioAssembly()
+        XCTAssertEqual(assembly.add(Data([1]), part: 3, of: 3, requestID: "voice-request-3", now: now), .rejected)
+        XCTAssertEqual(assembly.add(Data([1]), part: 0, of: 0, requestID: "voice-request-3", now: now), .rejected)
+        XCTAssertEqual(assembly.add(Data([1]), part: 0, of: WatchVoice.maximumAudioParts + 1, requestID: "voice-request-3", now: now), .rejected)
+        XCTAssertEqual(assembly.add(Data([1]), part: 0, of: 2, requestID: "voice-request-3", now: now), .waiting)
+        XCTAssertEqual(assembly.add(Data([2]), part: 1, of: 3, requestID: "voice-request-3", now: now), .rejected, "another count for the same recording")
+    }
+
+    func testTooMuchAudioIsRefused() {
+        var assembly = WatchVoiceAudioAssembly()
+        let big = Data(count: WatchVoice.maximumAudioBytes / 2 + 1)
+        XCTAssertEqual(assembly.add(big, part: 0, of: 3, requestID: "voice-request-4", now: now), .waiting)
+        XCTAssertEqual(assembly.add(big, part: 1, of: 3, requestID: "voice-request-4", now: now), .rejected)
+    }
+
+    func testPartsThatStopComingAreDropped() {
+        var assembly = WatchVoiceAudioAssembly()
+        XCTAssertEqual(assembly.add(Data([1]), part: 0, of: 2, requestID: "voice-request-5", now: now), .waiting)
+        let later = now.addingTimeInterval(WatchVoiceAudioAssembly.lifetime + 1)
+        XCTAssertEqual(assembly.add(Data([2]), part: 1, of: 2, requestID: "voice-request-5", now: later), .waiting,
+                       "the first part is gone, so this one starts a new recording")
+    }
+
+    func testPartNumbersAreValidated() {
+        var envelope = WatchVoiceEnvelope(requestID: UUID().uuidString, type: .transcribe, createdAt: now, source: .watch,
+                                          language: .kazakh, audioMilliseconds: 12_000, audioPart: 1, audioParts: 3)
+        XCTAssertNil(WatchVoiceValidator.problem(with: envelope, now: now))
+        envelope.audioPart = 3
+        XCTAssertEqual(WatchVoiceValidator.problem(with: envelope, now: now), .audioRejected)
+        envelope.audioPart = nil
+        envelope.audioParts = nil
+        XCTAssertNil(WatchVoiceValidator.problem(with: envelope, now: now), "the first builds sent no part numbers")
+    }
+
     // MARK: Validation
 
     func testAGoodCommandPasses() {

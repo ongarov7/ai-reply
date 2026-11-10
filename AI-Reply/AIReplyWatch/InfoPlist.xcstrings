@@ -8,25 +8,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Reply records your voice only while you speak an instruction, after you tap the microphone. Through your iPhone the recording goes to the AI Reply server and OpenAI to be turned into text, and it is not stored."
+            "value" : "AI Reply records your voice only while you speak an instruction, after you tap the microphone. Through your iPhone the recording goes to the AI Reply server and OpenAI to be turned into text. AI Reply does not store it."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Reply записывает голос только пока вы говорите указание, после нажатия на микрофон. Через iPhone запись идёт на сервер AI Reply и в OpenAI, чтобы превратиться в текст, и не сохраняется."
+            "value" : "AI Reply записывает голос только пока вы говорите указание, после нажатия на микрофон. Через iPhone запись идёт на сервер AI Reply и в OpenAI, чтобы превратиться в текст. AI Reply её не сохраняет."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Reply дауысыңызды тек микрофонды басқаннан кейін, нұсқау айтып тұрғанда жазады. Жазба iPhone арқылы мәтінге айналу үшін AI Reply серверіне және OpenAI-ға жіберіледі, сақталмайды."
+            "value" : "AI Reply дауысыңызды тек микрофонды басқаннан кейін, нұсқау айтып тұрғанда жазады. Жазба iPhone арқылы мәтінге айналу үшін AI Reply серверіне және OpenAI-ға жіберіледі. AI Reply оны сақтамайды."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Reply ovozingizni faqat mikrofonni bosganingizdan keyin, ko‘rsatma aytayotganingizda yozib oladi. Yozuv iPhone orqali matnga aylantirish uchun AI Reply serveriga va OpenAI’ga yuboriladi va saqlanmaydi."
+            "value" : "AI Reply ovozingizni faqat mikrofonni bosganingizdan keyin, ko‘rsatma aytayotganingizda yozib oladi. Yozuv iPhone orqali matnga aylantirish uchun AI Reply serveriga va OpenAI’ga yuboriladi. AI Reply uni saqlamaydi."
           }
         }
       }

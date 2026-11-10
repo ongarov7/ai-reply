@@ -82,6 +82,11 @@ final class WatchVoiceModel {
     @ObservationIgnored private var transcriptionTimeout: Task<Void, Never>?
     @ObservationIgnored private var hasChosenLanguage: Bool
     @ObservationIgnored private var isAdoptingPhoneLanguage = false
+    /// Between the tap on Speak and the recorder running: a second tap waits.
+    @ObservationIgnored private var isStartingListening = false
+    /// How far the current request has got, so a late message cannot move
+    /// the screen back (a queued "ready" after a live "inserted").
+    @ObservationIgnored private var statusRank = -1
 
     private enum Key {
         static let mode = "watch.mode"
@@ -230,19 +235,32 @@ final class WatchVoiceModel {
         stage = .ready
     }
 
+    /// Nothing recorded before this may leave the watch afterwards.
     func withdrawVoiceConsent() {
+        if stage == .listening { cancelListening() }
+        if stage == .processing {
+            transcriptionTimeout?.cancel()
+            reset()
+        }
+        discardRecording()
         defaults.removeObject(forKey: Key.voiceConsent)
         hasVoiceConsent = false
     }
 
     /// The user's tap on the microphone. Nothing listens before or after.
     func startListening() {
-        guard stage == .ready || isFailed else { return }
+        guard stage == .ready || isFailed, !isStartingListening else { return }
         guard client.isReachable else {
             fail(.phoneUnreachable)
             return
         }
+        // A new recording: whatever the last request was, it is over here.
+        discardRecording()
+        currentRequestID = nil
+        statusRank = -1
+        isStartingListening = true
         Task {
+            defer { isStartingListening = false }
             guard await recorder.requestPermission() else {
                 fail(.microphoneDenied)
                 return
@@ -293,33 +311,54 @@ final class WatchVoiceModel {
         stage = .ready
     }
 
+    /// Sends the recording in parts on the channel that wakes the phone app.
+    /// Every await is followed by a check that this recording is still the
+    /// one on screen: Cancel or a new recording ends it.
     private func upload(_ recording: WatchRecording) async {
-        let envelope = WatchVoiceEnvelope(requestID: recording.requestID, type: .transcribe, createdAt: Date(), source: .watch,
-                                          language: language, audioMilliseconds: recording.milliseconds)
+        func isCurrent() -> Bool { currentRecording?.requestID == recording.requestID && stage == .processing }
         guard client.isReachable else {
             fail(.phoneUnreachable)
             return
         }
-        do {
-            if recording.bytes <= WatchVoice.maximumDirectAudioBytes {
-                let audio = try Data(contentsOf: recording.file)
-                let answer = try await client.sendAudio(try WatchVoiceAudioPacket.encode(envelope, audio: audio))
-                if let failure = answer.failure {
-                    fail(failure)
-                    return
-                }
-            } else {
-                try client.transferAudio(recording.file, envelope: envelope)
-            }
-        } catch {
-            fail(.transcriptionFailed)
+        guard let audio = try? Data(contentsOf: recording.file) else {
+            discardRecording()
+            fail(.nothingHeard)
             return
+        }
+        let parts = WatchVoiceAudioAssembly.split(audio)
+        for (index, part) in parts.enumerated() {
+            let envelope = WatchVoiceEnvelope(requestID: recording.requestID, type: .transcribe, createdAt: Date(), source: .watch,
+                                              language: language, audioMilliseconds: recording.milliseconds,
+                                              audioPart: index, audioParts: parts.count)
+            var attempt = 1
+            while true {
+                do {
+                    let answer = try await client.sendAudio(try WatchVoiceAudioPacket.encode(envelope, audio: part))
+                    guard isCurrent() else { return }
+                    if let failure = answer.failure {
+                        if !failure.offersRetry { discardRecording() }
+                        fail(failure)
+                        return
+                    }
+                    break
+                } catch {
+                    guard isCurrent() else { return }
+                    guard attempt < 2, client.isReachable else {
+                        fail(client.isReachable ? .transcriptionFailed : .phoneUnreachable)
+                        return
+                    }
+                    attempt += 1
+                    try? await Task.sleep(for: .seconds(1))
+                    guard isCurrent() else { return }
+                }
+            }
         }
         // Upload and speech recognition for 40 seconds of audio.
         transcriptionTimeout?.cancel()
         transcriptionTimeout = Task { [weak self] in
             try? await Task.sleep(for: .seconds(60))
-            guard !Task.isCancelled, let self, self.stage == .processing else { return }
+            guard !Task.isCancelled, let self, self.currentRecording?.requestID == recording.requestID,
+                  self.stage == .processing else { return }
             self.fail(.transcriptionFailed)
         }
     }
@@ -357,6 +396,7 @@ final class WatchVoiceModel {
         draft = trimmed
         currentRequestID = nil
         wasAcknowledged = false
+        statusRank = -1
         stage = .review
         // So the command names the keyboard on screen now.
         Task { await refreshStatus() }
@@ -364,9 +404,11 @@ final class WatchVoiceModel {
 
     // MARK: Sending
 
-    /// The longest instruction this request can carry, when known.
+    /// The longest instruction this request can carry, when known. "Long"
+    /// adds a sentence of up to 41 characters on the iPhone.
     var instructionLimit: Int? {
-        mode == .reply ? phone?.replyInstructionLimit : nil
+        guard mode == .reply, let limit = phone?.replyInstructionLimit else { return nil }
+        return length == .long ? max(40, limit - 42) : limit
     }
 
     var isDraftTooLong: Bool {
@@ -425,6 +467,15 @@ final class WatchVoiceModel {
         }
         guard envelope.type == .statusUpdate, envelope.requestID == currentRequestID,
               let status = envelope.deliveryStatus else { return }
+        // A new instruction is being recorded or reviewed: the old one's news
+        // must not take its screen away.
+        switch stage {
+        case .voiceConsent, .listening, .processing, .review: return
+        default: break
+        }
+        let rank = Self.rank(status)
+        guard rank >= statusRank else { return }
+        statusRank = rank
         switch status {
         case .queued:
             guard stage == .sending || stage == .queuedForLater || stage == .sentToPhone
@@ -441,13 +492,23 @@ final class WatchVoiceModel {
             finishSuccessfully(requestID: envelope.requestID, inserted: true)
         case .dismissed, .cancelled:
             pollTask?.cancel()
-            stage = .ready
+            reset()
         case .expired:
             wasAcknowledged = true
             fail(.expired)
         case .failed:
             wasAcknowledged = true
             fail(envelope.failure ?? .serviceUnavailable, limit: envelope.failureLimit)
+        }
+    }
+
+    private static func rank(_ status: WatchVoiceDeliveryStatus) -> Int {
+        switch status {
+        case .queued:     return 0
+        case .received:   return 1
+        case .generating: return 2
+        case .ready:      return 3
+        case .inserted, .dismissed, .failed, .expired, .cancelled: return 4
         }
     }
 
@@ -474,25 +535,36 @@ final class WatchVoiceModel {
     // MARK: Status while waiting
 
     /// A suspended phone app cannot push, so the watch asks - every three
-    /// seconds, for 45 at most, and only on screen.
+    /// seconds, and for 45 without any news, only on screen. News starts the
+    /// count again. Running out of patience invents no failure: the phone
+    /// still has the request, and a Retry would pay for it twice.
     private func startPolling() {
         pollTask?.cancel()
         pollTask = Task { [weak self] in
-            var waited: TimeInterval = 0
-            while waited < WatchVoiceDelivery.statusPollLimit {
+            var quiet: TimeInterval = 0
+            var seen = self?.stage
+            while quiet < WatchVoiceDelivery.statusPollLimit {
                 try? await Task.sleep(for: .seconds(WatchVoiceDelivery.statusPollInterval))
-                waited += WatchVoiceDelivery.statusPollInterval
-                guard !Task.isCancelled, let self, self.isForeground else { return }
+                quiet += WatchVoiceDelivery.statusPollInterval
+                guard !Task.isCancelled, let self else { return }
+                guard self.isForeground else {
+                    self.pollTask = nil
+                    return
+                }
                 await self.refreshStatus()
-                guard !Task.isCancelled, self.isAwaitingPhone else { return }
+                guard !Task.isCancelled else { return }
+                guard self.isAwaitingPhone else {
+                    self.pollTask = nil
+                    return
+                }
+                if self.stage != seen {
+                    seen = self.stage
+                    quiet = 0
+                }
             }
             guard !Task.isCancelled, let self else { return }
-            // Asked for long enough. Nothing is known to have failed before this.
-            if self.stage == .generating {
-                self.fail(.timedOut)
-            } else if self.stage == .sentToPhone {
-                self.stage = .waitingForKeyboard
-            }
+            self.pollTask = nil
+            if self.stage == .sentToPhone { self.stage = .waitingForKeyboard }
         }
     }
 
@@ -514,8 +586,12 @@ final class WatchVoiceModel {
         if let id = currentRequestID, stage != .review {
             client.cancelQueued(requestID: id)
             let envelope = WatchVoiceEnvelope.request(.cancel, requestID: id)
+            let client = self.client
             if client.isReachable {
-                Task { _ = try? await client.request(envelope) }
+                // Not answered: queued, so the phone still hears it.
+                Task {
+                    do { _ = try await client.request(envelope) } catch { try? client.enqueue(envelope) }
+                }
             } else {
                 try? client.enqueue(envelope)
             }
@@ -544,8 +620,11 @@ final class WatchVoiceModel {
         }
     }
 
+    /// Done also lets go of a recording kept for Retry.
     func done() {
         pollTask?.cancel()
+        transcriptionTimeout?.cancel()
+        discardRecording()
         reset()
     }
 
@@ -553,6 +632,7 @@ final class WatchVoiceModel {
         draft = ""
         currentRequestID = nil
         wasAcknowledged = false
+        statusRank = -1
         stage = .ready
     }
 

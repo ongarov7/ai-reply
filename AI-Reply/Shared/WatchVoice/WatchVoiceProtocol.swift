@@ -43,11 +43,13 @@ enum WatchVoice {
     static let maximumAudioSeconds = 40
     static let maximumAudioBytes = 4 << 20
 
-    /// A recording up to this size goes in one `sendMessageData`, the fast
-    /// channel, which refuses anything over about 65 KB. With the recorder's
-    /// 24 KB header that is some ten seconds of speech at 24 kbit/s; longer
-    /// ones go as a file transfer.
-    static let maximumDirectAudioBytes = 58 * 1024
+    /// A recording goes in parts of this size, each in its own
+    /// `sendMessageData`, which refuses anything over about 65 KB. That
+    /// channel wakes the iPhone app; a file transfer would not, and would sit
+    /// in the queue until the user opened the app.
+    static let maximumAudioPartBytes = 56 * 1024
+    /// 4 MiB in 56 KB parts.
+    static let maximumAudioParts = 80
 
     /// Shortest recording the server accepts, in milliseconds.
     static let minimumAudioMilliseconds = 300
@@ -319,8 +321,11 @@ struct WatchVoiceEnvelope: Codable, Equatable, Sendable {
     var phone: WatchPhoneSnapshot?
     /// The generated text, only as the answer to `.resultRequest`.
     var result: String?
-    /// Length of the recording in a `.transcribe` file's metadata.
+    /// Length of the recording, with `.transcribe`.
     var audioMilliseconds: Int?
+    /// Which part of the recording this is, from 0, and how many there are.
+    var audioPart: Int?
+    var audioParts: Int?
 }
 
 extension WatchVoiceEnvelope {
@@ -391,6 +396,9 @@ enum WatchVoiceValidator {
                   length <= (WatchVoice.maximumAudioSeconds * 1000) + 500 else {
                 return .audioRejected
             }
+            let parts = envelope.audioParts ?? 1
+            let part = envelope.audioPart ?? 0
+            guard (1...WatchVoice.maximumAudioParts).contains(parts), (0..<parts).contains(part) else { return .audioRejected }
             if isExpired(envelope, now: now) { return .expired }
         case .cancel, .statusRequest, .statusUpdate, .resultRequest, .transcript, .ping, .pong:
             break
@@ -468,6 +476,68 @@ enum WatchVoiceAudioPacket {
             return nil
         }
         return (envelope, packet.subdata(in: end..<packet.endIndex))
+    }
+}
+
+/// Puts a recording sent in parts back together, on the phone. Parts may
+/// arrive twice (an acknowledgement was lost) and in any order.
+struct WatchVoiceAudioAssembly {
+
+    enum Outcome: Equatable {
+        case waiting
+        case complete(Data)
+        case rejected
+    }
+
+    private struct Partial {
+        let count: Int
+        let started: Date
+        var parts: [Int: Data] = [:]
+        var bytes = 0
+    }
+
+    /// A recording whose parts stop coming is dropped after this long.
+    static let lifetime: TimeInterval = 120
+
+    private var partials: [String: Partial] = [:]
+
+    var pendingCount: Int { partials.count }
+
+    mutating func add(_ data: Data, part: Int, of count: Int, requestID: String, now: Date = Date()) -> Outcome {
+        partials = partials.filter { now.timeIntervalSince($0.value.started) < Self.lifetime }
+        guard (1...WatchVoice.maximumAudioParts).contains(count), (0..<count).contains(part), !data.isEmpty else {
+            return .rejected
+        }
+        var partial = partials[requestID] ?? Partial(count: count, started: now)
+        guard partial.count == count else {
+            partials[requestID] = nil
+            return .rejected
+        }
+        if partial.parts[part] == nil { partial.bytes += data.count }
+        partial.parts[part] = data
+        guard partial.bytes <= WatchVoice.maximumAudioBytes else {
+            partials[requestID] = nil
+            return .rejected
+        }
+        guard partial.parts.count == count else {
+            partials[requestID] = partial
+            return .waiting
+        }
+        partials[requestID] = nil
+        var whole = Data(capacity: partial.bytes)
+        for index in 0..<count {
+            guard let piece = partial.parts[index] else { return .rejected }
+            whole.append(piece)
+        }
+        return .complete(whole)
+    }
+
+    /// The parts a recording of `bytes` is sent in.
+    static func split(_ audio: Data, partSize: Int = WatchVoice.maximumAudioPartBytes) -> [Data] {
+        guard !audio.isEmpty, partSize > 0 else { return [] }
+        return stride(from: 0, to: audio.count, by: partSize).map {
+            audio.subdata(in: audio.startIndex.advanced(by: $0)..<audio.startIndex.advanced(by: min($0 + partSize, audio.count)))
+        }
     }
 }
 

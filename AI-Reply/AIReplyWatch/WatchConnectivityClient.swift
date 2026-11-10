@@ -64,8 +64,8 @@ final class WatchConnectivityClient: NSObject, WCSessionDelegate, @unchecked Sen
         }
     }
 
-    /// A short recording, on the fast channel. The phone acknowledges at
-    /// once and the text comes in a later message.
+    /// A recording or one part of it, on the fast channel, which wakes the
+    /// phone app. The phone acknowledges at once and the text comes later.
     func sendAudio(_ packet: Data) async throws -> WatchVoiceEnvelope {
         guard isReachable else { throw ClientError.notReachable }
         return try await withCheckedThrowingContinuation { continuation in
@@ -81,12 +81,6 @@ final class WatchConnectivityClient: NSObject, WCSessionDelegate, @unchecked Sen
                 }
             }, errorHandler: { reply.resume(throwing: $0) })
         }
-    }
-
-    /// A longer recording. Handled by the system in the background, so it
-    /// can take longer than a message.
-    func transferAudio(_ file: URL, envelope: WatchVoiceEnvelope) throws {
-        session.transferFile(file, metadata: try WatchVoiceCodec.dictionary(envelope))
     }
 
     /// Queued delivery. The system sends this when it can, in order, even

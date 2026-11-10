@@ -31,6 +31,8 @@ final class WatchCompanion: NSObject, WCSessionDelegate, @unchecked Sendable {
     private var lastContext: Data?
     /// What the watch has been told about each request.
     private var pushed: [String: WatchVoiceDeliveryStatus] = [:]
+    /// Recordings arriving in parts. Touched on `queue` only.
+    private var assembly = WatchVoiceAudioAssembly()
 
     private var backgroundTask = UIBackgroundTaskIdentifier.invalid
     private var backgroundRelease: DispatchWorkItem?
@@ -268,8 +270,9 @@ final class WatchCompanion: NSObject, WCSessionDelegate, @unchecked Sendable {
         incoming(userInfo, reply: nil)
     }
 
-    /// A short recording on the fast channel. Answered at once: the text
-    /// comes as its own message when the server has it.
+    /// A recording, or one part of it, on the fast channel, which wakes this
+    /// app. Each part is answered at once; the text comes as its own message
+    /// when the server has it.
     func session(_ session: WCSession, didReceiveMessageData messageData: Data, replyHandler: @escaping (Data) -> Void) {
         queue.async { [self] in
             guard let packet = WatchVoiceAudioPacket.decode(messageData) else {
@@ -277,15 +280,30 @@ final class WatchCompanion: NSObject, WCSessionDelegate, @unchecked Sendable {
                 replyHandler((try? WatchVoiceCodec.data(refusal)) ?? Data())
                 return
             }
-            let accepted = WatchVoiceEnvelope.status(requestID: packet.envelope.requestID, status: .received,
+            let envelope = packet.envelope
+            if let problem = WatchVoiceValidator.problem(with: envelope) {
+                replyHandler((try? WatchVoiceCodec.data(WatchVoiceEnvelope.refusal(requestID: envelope.requestID, failure: problem))) ?? Data())
+                return
+            }
+            let accepted = WatchVoiceEnvelope.status(requestID: envelope.requestID, status: .received,
                                                      phone: WatchPhoneSnapshot.current(store: store))
             replyHandler((try? WatchVoiceCodec.data(accepted)) ?? Data())
-            incomingAudio(packet.audio, envelope: packet.envelope)
+            publishLink(contact: true)
+            holdBackgroundTime(Self.relayWindow)
+            switch assembly.add(packet.audio, part: envelope.audioPart ?? 0, of: envelope.audioParts ?? 1,
+                                requestID: envelope.requestID) {
+            case .waiting:
+                break
+            case .complete(let audio):
+                incomingAudio(audio, envelope: envelope)
+            case .rejected:
+                sendTranscript(requestID: envelope.requestID, result: .failure(.audioRejected))
+            }
         }
     }
 
-    /// A longer recording. The system deletes the file when this returns, so
-    /// it is read here, before anything else.
+    /// A recording as a file, from the first watch builds. The system deletes
+    /// the file when this returns, so it is read here, before anything else.
     func session(_ session: WCSession, didReceive file: WCSessionFile) {
         guard let metadata = file.metadata, let envelope = WatchVoiceCodec.envelope(from: metadata) else { return }
         let audio = try? Data(contentsOf: file.fileURL)
