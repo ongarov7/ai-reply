@@ -72,6 +72,7 @@ file names and the server's `Idempotency-Key`.
 | `transcribe` | watch → phone | `sendMessageData`, in parts of up to 56 KB; each part wakes the phone app and is acknowledged (3 attempts, 15 s each) |
 | `transcript` | phone → watch | as `statusUpdate` |
 | `ping` / `pong` | phone → watch | `sendMessage` (Settings ▸ Test connection) |
+| `previewRequest` / `preview` | watch → phone, answered | `sendMessage`, every second while `pending` |
 
 The phone's state goes in every answer and in `updateApplicationContext`.
 
@@ -103,16 +104,19 @@ Folder `WatchVoice/` in `group.kz.ai-reply.shared`, excluded from backups.
 | `outcomes/<id>.json` | keyboard | Status; the generated text only while `ready`. |
 | `markers/<id>.claimed`, `.inserted`, `.cancelled` | both | Empty files. |
 | `keyboard-session.json` | keyboard | IDs and flags, never field content. Written only with a paired watch. |
+| `preview-request.json` | app | The watch's ask: request and session IDs, time. |
+| `previews/<id>.json` | keyboard | The copied message for the watch. `completeFileProtectionUnlessOpen`; the app deletes it as it relays it. |
 | `watch-link.json` | app | What `WCSession` reports. |
 
 Lifetimes: instruction 5 minutes, result 10 minutes, markers 24 hours, enforced by `purge`
 whenever the app or a keyboard runs. A file the lock keeps closed is not treated as damaged: an
 instruction is kept up to 7 minutes and a result up to 10 minutes after it was written, then
 deleted unread. A readable file that does not decode is deleted at once. The copied message is
-never written anywhere: it stays in the keyboard's memory.
+written only for the watch to show it (`previews/`, below), and is otherwise kept in the
+keyboard's memory.
 
 Signals are Darwin notifications with no payload: `kz.ai-reply.watch.command`, `.link`,
-`.outcome`, `.session`. A process hears them only while running, so each side also reads the
+`.outcome`, `.session`, `.preview`. A process hears them only while running, so each side also reads the
 store when it comes to life.
 
 ## Keyboard
@@ -200,18 +204,43 @@ editable on the watch before sending.
   Paste from Other Apps ▸ Allow removes it.
 - A force-quit iPhone app may not be woken. This has to be checked on a device.
 
-## Next update: copied-message preview on Apple Watch
+## Personas and the copied message on the watch
 
-On 9 November 2026, the owner chose to submit 1.2.0 (25) first and defer showing
-the copied source message on the watch to the next update. Build 25 uses that
-message in the iPhone keyboard's reply pipeline; the watch displays the dictated
-instruction, not the copied source message. `WatchPhoneSnapshot` does not carry
-the source text. Do not describe source-message preview as a build 25 feature.
+The watch's home screen lists the personas of the keyboard's row, in its order, custom ones
+included (`WatchPhoneSnapshot.templates`, with the keyboard's SF Symbol for each), then New
+message and Settings. Until the phone has answered once, the four built-ins are shown from
+the watch's own strings.
 
-The planned addition is a readable preview of the message the user selected on
-iPhone, followed by the existing voice instruction, review and generation flow.
-It must preserve explicit clipboard access and prevent an old preview from being
-used after the user switches the source message or keyboard session.
+A persona's screen shows, from the top: the copied message (three lines, a tap shows all of
+it), the microphone, typing, and six quick replies (`WatchQuickReply`: Politely, Briefly,
+Agree, Decline, Ask details, Thank). A quick reply is an instruction in the spoken language,
+reviewed and sent like a dictated one. Whatever is said there is a reply as that persona
+(`options.templateID`).
+
+How the message gets to the watch:
+
+1. The persona's screen sends `previewRequest`, and repeats it every second while there is
+   no answer, for 30 seconds at most, on screen only.
+2. The app answers from the App Group. With no live keyboard session it says `noKeyboard`
+   (the watch asks again, so the message appears once the keyboard is opened). Otherwise it
+   writes `preview-request.json` (identifiers only), posts `kz.ai-reply.watch.preview` and
+   says `pending`.
+3. The keyboard on screen answers each ask once. It uses the reply open in its composer, or
+   what it already read for this copy (`UIPasteboard.changeCount` unchanged), or the message
+   read on the Watch Voice tap, or reads the clipboard now. The tap on the watch is the
+   gesture; iOS may show its own Allow Paste prompt on the iPhone, and the watch says so
+   after three seconds.
+4. The answer goes to `previews/<id>.json` (`completeFileProtectionUnlessOpen`). The app
+   relays it in its answer to the next ask and deletes it; `purge` removes any left after
+   `WatchVoice.previewLifetime` (60 s). On the watch it stays in memory while the screen is
+   open.
+
+A command sent from that screen carries `previewID`. The keyboard then answers exactly the
+message it showed, without reading again, but only while it is still the same session and
+nothing was copied since. Otherwise the command waits for a tap on Generate, which reads what
+is copied now and shows it in the composer. The watch shows at most
+`WatchVoice.maximumPreviewScalars` (1500) scalars, cut on a character boundary, and says when
+it shows only the start; the reply always answers the whole message.
 
 ## Build
 
@@ -254,6 +283,8 @@ taps. Both are compiled out of release builds.
 | 12 iPhone app in the background | Needs a device |
 | 13 Install and onboarding | Screens built; needs a device |
 | 14 No watch paired | Unit test |
+| Personas and the copied message on the watch | Simulator pair, canned AI: RU with the quick reply Politely, KK through the microphone (DEBUG transcript); Allow Paste tapped on the iPhone each time |
+| A copy made after the watch showed the message | Unit test: waits for a tap, then reads the new copy |
 
 Physical tests still required: real microphone capture, Bluetooth loss, locked iPhone,
 suspended and force-quit iPhone app, WhatsApp and Telegram as hosts, battery, and all watch

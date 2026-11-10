@@ -12,6 +12,7 @@ What changes for review, and what still has to be done by hand in App Store Conn
 | Privacy policy | `/privacy` in all four languages has an Apple Watch paragraph (`legal_texts.go`). **Needs a backend deploy.** |
 | Privacy manifest | New `AIReplyWatch/PrivacyInfo.xcprivacy`; `NSPrivacyCollectedDataTypeAudioData` added to the iPhone app's manifest |
 | 4.4.1: keyboards | The keyboard works without a watch and without Full Access as before. It never presses Send |
+| Copied message on the watch | Read only by the AI Reply keyboard on screen, after the user opens a persona on the watch; iOS's own Allow Paste prompt applies. Disclosed in the policy and in Settings ▸ Privacy. Goes to the watch over WatchConnectivity, not to the server |
 
 The privacy policy version was not raised, on purpose. Raising `legal.PrivacyVersion` makes
 every user accept the terms again, and this feature has its own permission screen at the point
@@ -39,12 +40,15 @@ AI Reply includes a watchOS companion that lets the user dictate an instruction 
 How to test
 1. Sign in with the demo account above and enable the AI Reply keyboard with Full Access.
 2. In any messaging app copy a message, focus the text field and switch to the AI Reply keyboard.
-3. Open AI Reply on the paired Apple Watch, tap Speak, say what the reply should contain and tap Stop.
+3. Open AI Reply on the paired Apple Watch and choose a persona (Friend, Client, Colleague, Partner or a custom one). The watch shows the copied message; iOS may ask on the iPhone to allow the paste. Tap Speak, say what the reply should contain and tap Stop, or tap a quick reply such as Politely.
 4. Review the recognised text on the watch and tap Send.
 5. The generated reply appears in the text field. The app never sends a message; the user reviews it and sends it.
 
 Microphone and third-party AI
 The microphone is used only between Speak and Stop, after a user tap. Before the first recording the watch shows a screen stating that the recording is sent through the iPhone and the AI Reply server to OpenAI (USA) to be turned into text, and asks for permission. The user can decline and type instead, and can withdraw permission on the watch. AI Reply does not store the audio or the transcript.
+
+Copied message
+When the user opens a persona on the watch, the AI Reply keyboard open on the iPhone reads the copied message, as it does for a tap on Reply, and shows it on the watch, so the user sees what is being answered. iOS's own paste permission prompt applies. The text goes from the iPhone to the watch over WatchConnectivity and is not sent to the AI Reply server unless the user then sends an instruction.
 
 The Apple Watch app has no account of its own and uses the iPhone app's session.
 
