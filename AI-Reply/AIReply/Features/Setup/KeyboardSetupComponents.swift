@@ -74,6 +74,7 @@ struct KeyboardCheckField: View {
             TextField("keyboardCheck.placeholder", text: $text, axis: .vertical)
                 .lineLimit(1...3)
                 .focused(focus)
+                .accessibilityIdentifier("keyboardCheck.field")
                 .padding(DS.Spacing.s)
                 .frame(minHeight: DS.Layout.minimumTouchTarget)
                 .background(

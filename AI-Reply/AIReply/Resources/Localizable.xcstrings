@@ -17403,6 +17403,760 @@
           }
         }
       }
+    },
+    "tutorial.keyboard.access.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On the same keyboard page, turn on Allow Full Access and confirm Allow. This lets the keyboard connect to the internet for AI replies. Ordinary typing works without it."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пернетақтаның сол бетінде «Толық қол жеткізу рұқсаты» параметрін қосып, «Рұқсат беру» батырмасымен раста. Бұл пернетақтаның интернетке қосылып, AI жауабын дайындауына қажет. Қарапайым мәтін теру онсыз да жұмыс істейді."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "На той же странице клавиатуры включи «Разрешить полный доступ» и подтверди «Разрешить». Это нужно клавиатуре для подключения к интернету и AI-ответов. Обычный набор текста работает и без этого."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Klaviaturaning shu sahifasida Allow Full Access’ni yoqing va Allow’ni tasdiqlang. Bu AI javoblari uchun klaviaturaning internetga ulanishiga kerak. Oddiy matn yozish busiz ham ishlaydi."
+          }
+        }
+      }
+    },
+    "tutorial.keyboard.access.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow Full Access"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Толық рұқсат бер"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Разреши полный доступ"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To‘liq ruxsat bering"
+          }
+        }
+      }
+    },
+    "tutorial.keyboard.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Watch the short silent video, then follow the steps: access, switching keyboards, copying and inserting a reply."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Қысқа дыбыссыз видеоны көріп, қадамдарды орында: рұқсат беру, пернетақтаны ауыстыру, көшіру және жауапты кірістіру."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Посмотри короткое видео без звука, а затем пройди шаги: доступ, переключение клавиатуры, копирование и вставка ответа."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qisqa ovozsiz videoni ko‘rib, bosqichlarni bajaring: ruxsat berish, klaviaturani almashtirish, nusxalash va javobni kiritish."
+          }
+        }
+      }
+    },
+    "tutorial.keyboard.connect" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connect the keyboard"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пернетақтаны қос"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Подключи клавиатуру"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Klaviaturani yoqing"
+          }
+        }
+      }
+    },
+    "tutorial.keyboard.copy.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In your chat, touch and hold the message you want to answer and choose Copy. Then tap the message field and open AI Reply with 🌐."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Чатта жауап бергің келген хабарламаны басып тұрып, «Көшіру» таңда. Содан кейін хабарлама өрісін басып, 🌐 арқылы AI Reply аш."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "В чате зажми сообщение, на которое хочешь ответить, и выбери «Скопировать». Затем нажми на поле сообщения и открой AI Reply через 🌐."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chatda javob bermoqchi bo‘lgan xabarni bosib turing va Copy’ni tanlang. So‘ng xabar maydonini bosib, 🌐 orqali AI Reply’ni oching."
+          }
+        }
+      }
+    },
+    "tutorial.keyboard.copy.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy the incoming message"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Келген хабарламаны көшір"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скопируй входящее сообщение"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kelgan xabardan nusxa oling"
+          }
+        }
+      }
+    },
+    "tutorial.keyboard.enable.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap Open Settings below. Open Keyboards and turn on AI Reply. If needed, add AI Reply in Settings → General → Keyboard → Keyboards → Add New Keyboard."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Төмендегі «Реттеулерді ашу» батырмасын бас. «Пернетақталар» бөлімінде AI Reply қос. Қажет болса: «Реттеулер» → «Жалпы» → «Пернетақта» → «Пернетақталар» → «Жаңа пернетақта қосу» арқылы AI Reply қос."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нажми «Открыть настройки» ниже. Открой «Клавиатуры» и включи AI Reply. Если нужно, добавь AI Reply: «Настройки» → «Основные» → «Клавиатура» → «Клавиатуры» → «Новая клавиатура»."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quyidagi sozlamalarni ochish tugmasini bosing. Keyboards bo‘limida AI Reply’ni yoqing. Kerak bo‘lsa, Settings → General → Keyboard → Keyboards → Add New Keyboard orqali AI Reply’ni qo‘shing."
+          }
+        }
+      }
+    },
+    "tutorial.keyboard.enable.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enable AI Reply"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply қос"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Включи AI Reply"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply’ni yoqing"
+          }
+        }
+      }
+    },
+    "tutorial.keyboard.generate.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap Friend, Client or another recipient above the keys. Review the copied message, add an instruction if you want, then tap Reply. Choose Allow Paste if iOS asks."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Әріптердің үстіндегі «Дос», «Клиент» немесе басқа сұхбаттасты бас. Көшірілген хабарламаны тексеріп, қажет болса нұсқау жаз да, «Жауап беру» бас. iOS сұраса, қоюға рұқсат бер."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нажми «Друг», «Клиент» или другого собеседника над буквами. Проверь скопированное сообщение, при желании добавь пожелание и нажми «Ответить». Если iOS спросит, разреши вставку."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Harflar ustidagi «Doʻst», «Mijoz» yoki boshqa suhbatdoshni bosing. Nusxalangan xabarni tekshiring, xohlasangiz ko‘rsatma yozing va «Javob berish»ni bosing. iOS so‘rasa, joylashtirishga ruxsat bering."
+          }
+        }
+      }
+    },
+    "tutorial.keyboard.generate.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose a recipient and tap Reply"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сұхбаттасты таңдап, «Жауап беру» бас"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Выбери собеседника и нажми «Ответить»"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suhbatdoshni tanlab, «Javob berish»ni bosing"
+          }
+        }
+      }
+    },
+    "tutorial.keyboard.insert.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Read the draft, edit it or request another version, then tap Insert. The text appears in the chat field. Review it there and press Send yourself when ready."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Жауап жобасын оқып, өңде немесе басқа нұсқа сұра, содан кейін «Кірістіру» бас. Мәтін чат өрісінде пайда болады. Тексеріп, дайын болғанда өзің жібер."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Прочитай черновик, отредактируй его или запроси другой вариант, затем нажми «Вставить». Текст появится в поле чата. Проверь его и отправь самостоятельно, когда всё готово."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qoralamani o‘qing, tahrirlang yoki boshqa variant so‘rang, so‘ng «Kiritish»ni bosing. Matn chat maydonida paydo bo‘ladi. Uni tekshirib, tayyor bo‘lganda o‘zingiz yuboring."
+          }
+        }
+      }
+    },
+    "tutorial.keyboard.insert.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Review and insert the reply"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Жауапты тексеріп, кірістір"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Проверь и вставь ответ"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Javobni tekshirib, kiriting"
+          }
+        }
+      }
+    },
+    "tutorial.keyboard.nav" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keyboard guide"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пернетақтаны пайдалану"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Как пользоваться клавиатурой"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Klaviaturadan foydalanish"
+          }
+        }
+      }
+    },
+    "tutorial.keyboard.paste" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pasting needs its own permission"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Қою үшін бөлек рұқсат қажет"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Для вставки нужно отдельное разрешение"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Joylashtirish uchun alohida ruxsat kerak"
+          }
+        }
+      }
+    },
+    "tutorial.keyboard.paste.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Full Access and pasting from other apps are separate settings. When AI Reply requests the copied message, choose Allow Paste in the iOS prompt. If you previously denied it, open AI Reply in Settings and look for Paste from Other Apps → Allow. This row may appear only after the first request. You can also enter the source message manually."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Толық рұқсат пен басқа қолданбалардан қою — бөлек баптаулар. AI Reply көшірілген хабарламаны сұрағанда, iOS терезесінде қоюға рұқсат бер. Бұрын тыйым салсаң, баптаулардағы AI Reply бетінен басқа қолданбалардан қоюды тауып, рұқсат бер. Бұл тармақ алғашқы сұраудан кейін ғана пайда болуы мүмкін. Бастапқы хабарламаны қолмен де енгізуге болады."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Полный доступ и вставка из других приложений — разные настройки. Когда AI Reply запросит скопированное сообщение, разреши вставку в окне iOS. Если раньше отказал, открой AI Reply в настройках и найди «Вставка из других приложений» → «Разрешить». Этот пункт может появиться только после первого запроса. Исходное сообщение можно ввести вручную."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To‘liq ruxsat va boshqa ilovalardan joylashtirish — alohida sozlamalar. AI Reply nusxalangan xabarni so‘raganda, iOS oynasida Allow Paste’ni tanlang. Oldin rad etgan bo‘lsangiz, sozlamalarda AI Reply → Paste from Other Apps → Allow’ni toping. Bu band birinchi so‘rovdan keyingina paydo bo‘lishi mumkin. Asl xabarni qo‘lda ham kiritish mumkin."
+          }
+        }
+      }
+    },
+    "tutorial.keyboard.permissions" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only you can enable the keyboard and permissions in iOS. Watching the video or copying the sample does not grant access."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS ішінде пернетақта мен рұқсаттарды тек өзің қоса аласың. Видеоны көру немесе мысалды көшіру автоматты түрде рұқсат бермейді."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Только ты можешь включить клавиатуру и разрешения в iOS. Просмотр видео и копирование примера не дают доступ автоматически."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS’da klaviatura va ruxsatlarni faqat o‘zingiz yoqa olasiz. Videoni ko‘rish yoki namunadan nusxa olish avtomatik ruxsat bermaydi."
+          }
+        }
+      }
+    },
+    "tutorial.keyboard.player" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Video: keyboard setup, access, copy and insert"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Видео: қосу, рұқсат беру, көшіру және кірістіру"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Видео: подключение, доступ, копирование и вставка"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Video: yoqish, ruxsat berish, nusxalash va kiritish"
+          }
+        }
+      }
+    },
+    "tutorial.keyboard.practice" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Try it here"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Осы жерде байқап көр"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Попробуй здесь"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shu yerda sinab ko‘ring"
+          }
+        }
+      }
+    },
+    "tutorial.keyboard.practice.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy the sample, tap the field below and choose AI Reply with 🌐. The status confirms which keyboard actually appeared. Creating a reply uses your reply balance."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Мысалды көшіріп, төмендегі өрісті бас та, 🌐 арқылы AI Reply таңда. Күй қай пернетақтаның шынымен ашылғанын көрсетеді. Жауап дайындау қолжетімді жауаптар санынан алынады."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скопируй пример, нажми на поле ниже и выбери AI Reply через 🌐. Статус покажет, какая клавиатура действительно открылась. Создание ответа расходует доступные ответы."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Namunadan nusxa oling, quyidagi maydonni bosing va 🌐 orqali AI Reply’ni tanlang. Holat qaysi klaviatura haqiqatan ochilganini ko‘rsatadi. Javob yaratish mavjud javoblar balansidan sarflanadi."
+          }
+        }
+      }
+    },
+    "tutorial.keyboard.reply" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy → reply → insert"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Көшір → жауап бер → кірістір"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скопируй → ответь → вставь"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nusxalang → javob yarating → kiriting"
+          }
+        }
+      }
+    },
+    "tutorial.keyboard.secureFields" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS may show its own keyboard in password fields, phone-number fields or apps that block custom keyboards. Try a regular chat message field."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Құпиясөз, телефон нөмірі өрістерінде және басқа пернетақталарға тыйым салатын қолданбаларда iOS өз пернетақтасын көрсетуі мүмкін. Чаттың кәдімгі хабарлама өрісін байқап көр."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "В полях пароля, номера телефона и приложениях, которые запрещают сторонние клавиатуры, iOS может показать свою клавиатуру. Попробуй обычное поле сообщения в чате."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parol, telefon raqami maydonlarida yoki maxsus klaviaturalarni taqiqlagan ilovalarda iOS o‘z klaviaturasini ko‘rsatishi mumkin. Oddiy chat xabari maydonida sinab ko‘ring."
+          }
+        }
+      }
+    },
+    "tutorial.keyboard.silent" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No sound needed. You can replay this video anytime, even offline."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Дыбыс қажет емес. Видеоны кез келген уақытта, интернетсіз де қайта көруге болады."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Звук не нужен. Видео можно пересматривать в любое время, даже без интернета."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ovoz kerak emas. Videoni istalgan vaqtda, internetsiz ham qayta ko‘rish mumkin."
+          }
+        }
+      }
+    },
+    "tutorial.keyboard.switch.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Return to a chat and tap its message field. Touch and hold the globe 🌐 on the keyboard, then choose AI Reply. Its AI controls appear above the letter keys."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Чатқа оралып, хабарлама өрісін бас. Пернетақтадағы 🌐 глобусты басып тұрып, AI Reply таңда. Әріптердің үстінде AI әрекеттері бар панель пайда болады."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вернись в чат и нажми на поле сообщения. Зажми глобус 🌐 на клавиатуре и выбери AI Reply. Над буквами появится панель с AI-действиями."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chatga qaytib, xabar maydonini bosing. Klaviaturadagi 🌐 globusni bosib turing va AI Reply’ni tanlang. Harflar ustida AI amallari paneli paydo bo‘ladi."
+          }
+        }
+      }
+    },
+    "tutorial.keyboard.switch.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Switch to AI Reply with 🌐"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "🌐 арқылы AI Reply таңда"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Выбери AI Reply через 🌐"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "🌐 orqali AI Reply’ni tanlang"
+          }
+        }
+      }
+    },
+    "tutorial.keyboard.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set up AI Reply and write your first reply"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply қосып, алғашқы жауапты жаз"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Подключи AI Reply и создай первый ответ"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Reply’ni yoqib, birinchi javobni yozing"
+          }
+        }
+      }
+    },
+    "tutorial.keyboard.toolbar" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "These controls belong to the AI Reply keyboard. The ✨ AI button writes a new message; the recipient buttons help you reply. Select AI Reply with 🌐 whenever another keyboard is shown."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Бұл панель AI Reply пернетақтасының ішінде орналасқан. ✨ AI батырмасы жаңа хабарлама жазады, ал сұхбаттас батырмалары жауап беруге көмектеседі. Басқа пернетақта ашылса, 🌐 арқылы AI Reply таңда."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Эта панель находится в клавиатуре AI Reply. Кнопка ✨ AI создаёт новое сообщение, а кнопки собеседников помогают ответить. Если открылась другая клавиатура, выбери AI Reply через 🌐."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu panel AI Reply klaviaturasi ichida joylashgan. ✨ AI tugmasi yangi xabar yozadi, suhbatdosh tugmalari esa javob berishga yordam beradi. Boshqa klaviatura ochilsa, 🌐 orqali AI Reply’ni tanlang."
+          }
+        }
+      }
     }
   },
   "version" : "1.1"

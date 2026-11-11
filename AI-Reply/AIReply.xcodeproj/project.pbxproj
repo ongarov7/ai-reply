@@ -7,6 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B24D501768577AC1F93A915A /* KeyboardTutorialView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F3DF1FD7A00CF1BD5F81DEC /* KeyboardTutorialView.swift */; };
+		02E7C8C243A7C3A54153172F /* KeyboardTutorialTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E65D1D41B66EB18AB0FE6E3 /* KeyboardTutorialTests.swift */; };
+		D656F2CBE9F098B756A0A3C3 /* keyboard-setup-en.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = 9734A3848A95FFC2331AB8B5 /* keyboard-setup-en.mp4 */; };
+		FF95DD37CEF674D3666B27E3 /* keyboard-setup-kk.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = D70420070D1087C05BC5FBD4 /* keyboard-setup-kk.mp4 */; };
+		529FA1CF85BEE4E52F8581B3 /* keyboard-setup-ru.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = DB9DB544A837EBD1E68ACD6A /* keyboard-setup-ru.mp4 */; };
+		DE8363AC21463F5042BE2A4F /* keyboard-setup-uz.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = EA519A1C2FC63088367DCCEA /* keyboard-setup-uz.mp4 */; };
 		01B9F4CDCCDDFD2D4BD97650 /* KeyboardTyping.swift in Sources */ = {isa = PBXBuildFile; fileRef = C09C0AE3852C149085890DC1 /* KeyboardTyping.swift */; };
 		02AB26A769D5C3D8F91A8EF3 /* TypingStringsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C198331F346A582FB275264 /* TypingStringsTests.swift */; };
 		03077EDD258D32F85BDF2215 /* AutocorrectTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7A8DB553F61056D5DD2E658 /* AutocorrectTestSupport.swift */; };
@@ -373,6 +379,12 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		8F3DF1FD7A00CF1BD5F81DEC /* KeyboardTutorialView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardTutorialView.swift; sourceTree = "<group>"; };
+		7E65D1D41B66EB18AB0FE6E3 /* KeyboardTutorialTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardTutorialTests.swift; sourceTree = "<group>"; };
+		9734A3848A95FFC2331AB8B5 /* keyboard-setup-en.mp4 */ = {isa = PBXFileReference; lastKnownFileType = video.mp4; path = "keyboard-setup-en.mp4"; sourceTree = "<group>"; };
+		D70420070D1087C05BC5FBD4 /* keyboard-setup-kk.mp4 */ = {isa = PBXFileReference; lastKnownFileType = video.mp4; path = "keyboard-setup-kk.mp4"; sourceTree = "<group>"; };
+		DB9DB544A837EBD1E68ACD6A /* keyboard-setup-ru.mp4 */ = {isa = PBXFileReference; lastKnownFileType = video.mp4; path = "keyboard-setup-ru.mp4"; sourceTree = "<group>"; };
+		EA519A1C2FC63088367DCCEA /* keyboard-setup-uz.mp4 */ = {isa = PBXFileReference; lastKnownFileType = video.mp4; path = "keyboard-setup-uz.mp4"; sourceTree = "<group>"; };
 		00522FD16FE57B903CFB1BB0 /* ProductEvents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductEvents.swift; sourceTree = "<group>"; };
 		007CAE30B84E19B48967E9DA /* TemplateListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateListView.swift; sourceTree = "<group>"; };
 		01E2326063481AC80000952A /* UserProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfile.swift; sourceTree = "<group>"; };
@@ -726,6 +738,7 @@
 			isa = PBXGroup;
 			children = (
 				E27B419CBC917D3E3975E5EC /* KeyboardSetupComponents.swift */,
+				8F3DF1FD7A00CF1BD5F81DEC /* KeyboardTutorialView.swift */,
 				086F89A39D11A6CDA0F5A24D /* PasteHelpView.swift */,
 				E89A6B01A5A0319D15ED9E10 /* PermissionsView.swift */,
 			);
@@ -826,6 +839,7 @@
 				44038C1892A37CE406FF1FE4 /* LocalizationTests.swift */,
 				2B96896F50FCC24405B4267B /* OnboardingFlowTests.swift */,
 				5C49CC5CC584C7F928C9E014 /* PermissionDiagnosticsTests.swift */,
+				7E65D1D41B66EB18AB0FE6E3 /* KeyboardTutorialTests.swift */,
 				5751EDA12B9631A0C069E4E9 /* PreferredLanguageSyncTests.swift */,
 				405CB5221924BB4B2B92657B /* ProductEventReporterTests.swift */,
 				942F6F6C46774733D2716E0A /* PurchaseStoreTests.swift */,
@@ -1083,6 +1097,10 @@
 			isa = PBXGroup;
 			children = (
 				716625F8B897214E9AE886B7 /* paste-permission-en.mp4 */,
+				9734A3848A95FFC2331AB8B5 /* keyboard-setup-en.mp4 */,
+				D70420070D1087C05BC5FBD4 /* keyboard-setup-kk.mp4 */,
+				DB9DB544A837EBD1E68ACD6A /* keyboard-setup-ru.mp4 */,
+				EA519A1C2FC63088367DCCEA /* keyboard-setup-uz.mp4 */,
 				096EFC76AE944B4AF00B450D /* paste-permission-kk.mp4 */,
 				F068667E8F5C33D720CA1AFE /* paste-permission-ru.mp4 */,
 				63E79A54A8815FA23BA6488B /* paste-permission-uz.mp4 */,
@@ -1320,6 +1338,10 @@
 				39325F9CAB90B0BDF6FBAE0A /* Localizable.xcstrings in Resources */,
 				B541ECC352FEB1E2B151C2A2 /* PrivacyInfo.xcprivacy in Resources */,
 				DA314BB31E6AF55F8B8AB0AE /* paste-permission-en.mp4 in Resources */,
+				D656F2CBE9F098B756A0A3C3 /* keyboard-setup-en.mp4 in Resources */,
+				FF95DD37CEF674D3666B27E3 /* keyboard-setup-kk.mp4 in Resources */,
+				529FA1CF85BEE4E52F8581B3 /* keyboard-setup-ru.mp4 in Resources */,
+				DE8363AC21463F5042BE2A4F /* keyboard-setup-uz.mp4 in Resources */,
 				C353C645EB7991A99596C393 /* paste-permission-kk.mp4 in Resources */,
 				F17D2ED51CD7910CF30B53DE /* paste-permission-ru.mp4 in Resources */,
 				5CEB960AF9D1A704FB7E984A /* paste-permission-uz.mp4 in Resources */,
@@ -1402,6 +1424,7 @@
 				D685A039616BCAF47C05E692 /* LocalizationTests.swift in Sources */,
 				24C384EAF02CEB8C6843B421 /* OnboardingFlowTests.swift in Sources */,
 				89675AEB8C7D764725A7A9FA /* PermissionDiagnosticsTests.swift in Sources */,
+				02E7C8C243A7C3A54153172F /* KeyboardTutorialTests.swift in Sources */,
 				0E5CABE12B6F6BA8509A15A4 /* PreferredLanguageSyncTests.swift in Sources */,
 				C5FA24A454291AEA2ABB877B /* ProductEventReporterTests.swift in Sources */,
 				914DC0E7FC893763C283F6D4 /* PurchaseStoreTests.swift in Sources */,
@@ -1591,6 +1614,7 @@
 				A1DC90C6B2F7EF3FF0CC3064 /* KeyboardLayout.swift in Sources */,
 				0898B2657856B22CBC4C6BC1 /* KeyboardPresence.swift in Sources */,
 				B72042D4E4FBB303EED65496 /* KeyboardSetupComponents.swift in Sources */,
+				B24D501768577AC1F93A915A /* KeyboardTutorialView.swift in Sources */,
 				26CA879268E577E3A27DDCA9 /* KeyboardStatusMonitor.swift in Sources */,
 				34771FFCD1C7BB7C8848EED3 /* KeyboardTyping.swift in Sources */,
 				BF3FA9734B8299FC7F9946AD /* KnownWordsFilter.swift in Sources */,

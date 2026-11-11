@@ -45,9 +45,11 @@ struct OnboardingConnectStep: View {
                 .frame(maxWidth: .infinity)
 
                 Button { isShowingVideo = true } label: {
-                    Label("tutorial.paste.title", systemImage: "play.rectangle")
+                    Label("tutorial.keyboard.title", systemImage: "play.rectangle")
                         .frame(maxWidth: .infinity, minHeight: DS.Layout.minimumTouchTarget)
                 }
+                .buttonStyle(.dsOutline)
+                .accessibilityIdentifier("onboarding.keyboardGuide")
 
                 KeyboardConnectSteps(showsProgress: true)
                     .dsCard()
@@ -106,7 +108,7 @@ struct OnboardingConnectStep: View {
         }
         .sheet(isPresented: $isShowingVideo) {
             NavigationStack {
-                PasteTutorialView()
+                KeyboardTutorialView()
                     .toolbar {
                         ToolbarItem(placement: .confirmationAction) {
                             Button("common.done") { isShowingVideo = false }

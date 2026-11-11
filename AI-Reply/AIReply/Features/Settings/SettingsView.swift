@@ -71,8 +71,12 @@ struct SettingsView: View {
             PermissionStatusSection(onPasteHelp: { isShowingPasteHelp = true },
                                     onCheck: { isShowingCheck = true })
             Section {
+                NavigationLink { KeyboardTutorialView() } label: {
+                    Label("tutorial.keyboard.title", systemImage: "play.rectangle")
+                }
+                .accessibilityIdentifier("settings.keyboardGuide")
                 NavigationLink { PasteTutorialView() } label: {
-                    Label("tutorial.videos", systemImage: "play.rectangle")
+                    Label("tutorial.paste.title", systemImage: "play.rectangle")
                 }
                 NavigationLink { PermissionsView() } label: {
                     Label("permissions.details", systemImage: "keyboard")

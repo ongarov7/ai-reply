@@ -27,6 +27,15 @@ struct PermissionsView: View {
 
     var body: some View {
         Form {
+            Section {
+                NavigationLink { KeyboardTutorialView() } label: {
+                    Label("tutorial.keyboard.title", systemImage: "play.rectangle")
+                }
+                .accessibilityIdentifier("permissions.keyboardGuide")
+            } footer: {
+                Text("tutorial.keyboard.body")
+            }
+
             PermissionStatusSection(onPasteHelp: { isShowingPasteHelp = true },
                                     onCheck: { isChecking = true })
 
