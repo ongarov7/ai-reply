@@ -170,7 +170,7 @@ public final class QuickBarModel {
         Task {
             await account.refreshConfig()
             // A website purchase can complete seconds after the last read.
-            if auth.isSignedIn { try? await account.refreshMe() }
+            if auth.isSignedIn { await account.refreshForForeground() }
             clearLimitIfLifted()
         }
     }
@@ -514,6 +514,7 @@ public final class QuickBarModel {
     private func observeAccount() {
         withObservationTracking {
             _ = account.me?.user.id
+            _ = account.balance
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self else { return }
@@ -522,6 +523,7 @@ public final class QuickBarModel {
                     self.clearContext()
                     self.contextAccountID = accountID
                 }
+                self.clearLimitIfLifted()
                 self.observeAccount()
             }
         }
@@ -625,7 +627,10 @@ public final class QuickBarModel {
 
     /// Plans and payment happen on the website, in the browser.
     public func openPricing(_ url: URL) {
-        openURL(url)
         requestClose()
+        Task {
+            let handoff = auth.isSignedIn ? await account.paymentHandoffURL(locale: APIClient.preferredLanguage()) : nil
+            openURL(handoff ?? url)
+        }
     }
 }

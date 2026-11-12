@@ -253,6 +253,19 @@ struct QuickBarModelTests {
         #expect(env.account.balance?.remainingTotal == 30)
     }
 
+    @Test func anUpdatedWebsiteBalanceClearsAnAlreadyVisibleLimitCard() async throws {
+        let env = try makeEnvironment([.failure(.limitReached(resetsAt: nil))])
+        env.backend.setUsage(#"{"credits":0,"remaining_total":0}"#)
+        env.model.draft = "x"
+        env.model.submit()
+        await waitUntil { env.account.balance != nil }
+        #expect(env.model.issue == .generation(.limitReached(resetsAt: nil)))
+        env.account.apply(usage: UsageDTO(dailyLimit: 0, unlimited: false, usedToday: 0, remainingToday: 0,
+                                         credits: 500, welcome: nil, pass: nil, remainingTotal: 500, resetsAt: nil))
+        await waitUntil { env.model.issue == nil }
+        #expect(env.model.issue == nil)
+    }
+
     @Test func endedSessionSignsOut() async throws {
         let env = try makeEnvironment([.failure(.signedOut)])
         env.model.draft = "x"

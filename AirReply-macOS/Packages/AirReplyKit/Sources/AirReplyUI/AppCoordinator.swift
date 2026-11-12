@@ -26,6 +26,7 @@ public final class AppCoordinator {
     private var settingsWindow: SettingsWindowController?
     private var observers: [NSObjectProtocol] = []
     private var activationObserver: NSObjectProtocol?
+    private var running = false
     /// Shown in Settings when the chosen shortcut could not be registered.
     private(set) var shortcutNote: String?
 
@@ -51,6 +52,7 @@ public final class AppCoordinator {
     }
 
     public func start() {
+        running = true
         // Crashes of earlier runs reach the server's alert channel (MetricKit, anonymous).
         crashDiagnostics.start()
         applyAppearance()
@@ -64,6 +66,7 @@ public final class AppCoordinator {
             settings: { [unowned self] in openSettings() },
             checkForUpdates: { [unowned self] in openURL(configuration.websiteURL("mac")) },
             quit: { NSApp.terminate(nil) }))
+        observeBalance()
         hotKeys.onPress = { [unowned self] in togglePanel() }
         registerShortcut(settings.shortcut)
         clipboard.start()
@@ -82,6 +85,8 @@ public final class AppCoordinator {
     }
 
     public func stop() {
+        running = false
+        account.cancelWebsitePaymentRefresh()
         hotKeys.unregister()
         clipboard.stop()
         voice.cancel()
@@ -170,7 +175,19 @@ public final class AppCoordinator {
 
     func refreshAccount(force: Bool = false) async {
         guard auth.isSignedIn else { return }
-        try? await account.refreshMe(maxAge: force ? 0 : 10)
+        await account.refreshForForeground(maxAge: force ? 0 : 10)
+    }
+
+    private func observeBalance() {
+        withObservationTracking {
+            _ = account.balance
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self, self.running else { return }
+                self.statusItem?.updateBalance(self.account.balance)
+                self.observeBalance()
+            }
+        }
     }
 
     func signOut() {

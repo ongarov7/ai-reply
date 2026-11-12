@@ -43,6 +43,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         let state = snapshot()
         menu.removeAllItems()
+        balanceItem = nil
 
         let open = entry(String(localized: "menu.open"), #selector(openPanel))
         open.toolTip = state.shortcut
@@ -56,7 +57,9 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         if state.signedIn {
             menu.addItem(disabled(state.email ?? String(localized: "menu.account")))
             if let balance = state.balance {
-                menu.addItem(disabled(Self.balanceLine(balance)))
+                let line = disabled(Self.balanceLine(balance))
+                balanceItem = line
+                menu.addItem(line)
             }
         } else {
             menu.addItem(entry(String(localized: "menu.sign_in"), #selector(signIn)))
@@ -74,6 +77,13 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     }
 
     static let logoGlyph = BrandGlyph.image
+
+    private var balanceItem: NSMenuItem?
+
+    func updateBalance(_ balance: BalanceSummary?) {
+        balanceItem?.isHidden = balance == nil
+        if let balance { balanceItem?.title = Self.balanceLine(balance) }
+    }
 
     static func balanceLine(_ balance: BalanceSummary) -> String {
         let plan = balance.planName.isEmpty ? "" : balance.planName + " · "
