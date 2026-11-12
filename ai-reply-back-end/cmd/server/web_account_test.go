@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -367,36 +368,71 @@ func TestWebCheckoutBindsAccountAndTermsAndGrantsOnlyAfterBankNotify(t *testing.
 	}
 }
 
-func TestWebsiteSubscriptionReachesAlreadySignedInIOSAndPreservesPaidAccessOnCancellation(t *testing.T) {
-	for _, code := range []string{"base_monthly", "pro_monthly", "pro_yearly"} {
-		t.Run(code, func(t *testing.T) {
+func TestWebsiteSubscriptionReachesAlreadySignedInNativeAndPreservesPaidAccessOnCancellation(t *testing.T) {
+	for _, tc := range []struct{ platform, code string }{
+		{domain.PlatformIOS, "base_monthly"}, {domain.PlatformIOS, "pro_monthly"}, {domain.PlatformIOS, "pro_yearly"},
+		{domain.PlatformAndroid, "base_monthly"}, {domain.PlatformAndroid, "pro_monthly"}, {domain.PlatformAndroid, "pro_yearly"},
+		{domain.PlatformMacOS, "base_monthly"}, {domain.PlatformMacOS, "pro_monthly"}, {domain.PlatformMacOS, "pro_yearly"},
+	} {
+		platform, code := tc.platform, tc.code
+		t.Run(platform+"/"+code, func(t *testing.T) {
 			cfg := webTestConfig(t)
 			cfg.BCCCheckout.RecurringEnabled = true
+			var providerCalls atomic.Int32
+			provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != "/responses" || r.Header.Get("Authorization") != "Bearer "+cfg.OpenAI.APIKey {
+					t.Errorf("unexpected fixture AI request: %s", r.URL.Path)
+				}
+				providerCalls.Add(1)
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = io.WriteString(w, `{"model":"local-fixture","status":"completed","output_text":"Давай встретимся завтра в 10:00.","usage":{"input_tokens":10,"output_tokens":8}}`)
+			}))
+			t.Cleanup(provider.Close)
+			cfg.OpenAI.BaseURL = provider.URL
 			app := webTestApplication(t, cfg)
 			cookie, snapshot := webTestSignIn(t, app.handler, "", code+"@example.invalid")
 			webTestRequest(app.handler, http.MethodPost, "/api/v1/auth/email/otp/request", map[string]string{"email": snapshot.User.Email, "locale": "ru"}, nil, "https://billing.example.invalid", "")
 			signIn := webTestRequest(app.handler, http.MethodPost, "/api/v1/auth/email/otp/verify", map[string]any{
-				"email": snapshot.User.Email, "code": "1111", "device": map[string]string{"platform": "ios", "device_id": "subscription-test-iphone"},
+				"email": snapshot.User.Email, "code": "1111", "device": map[string]string{"platform": platform, "device_id": "subscription-test-" + platform},
 			}, nil, "https://billing.example.invalid", "")
 			var native struct {
 				AccessToken string `json:"access_token"`
 			}
 			if signIn.Code != http.StatusOK || json.Unmarshal(signIn.Body.Bytes(), &native) != nil || native.AccessToken == "" {
-				t.Fatalf("iOS sign-in: %d %s", signIn.Code, signIn.Body.String())
+				t.Fatalf("%s sign-in: %d %s", platform, signIn.Code, signIn.Body.String())
 			}
-			readIOS := func() webTestSnapshot {
+			nativeRequest := func(method, path string, body any, key string) *httptest.ResponseRecorder {
 				t.Helper()
-				r := httptest.NewRequest(http.MethodGet, "/api/v1/me", nil)
+				var raw io.Reader
+				if body != nil {
+					encoded, err := json.Marshal(body)
+					if err != nil {
+						t.Fatal(err)
+					}
+					raw = strings.NewReader(string(encoded))
+				}
+				r := httptest.NewRequest(method, path, raw)
 				r.Header.Set("Authorization", "Bearer "+native.AccessToken)
+				if body != nil {
+					r.Header.Set("Content-Type", "application/json")
+				}
+				if key != "" {
+					r.Header.Set("Idempotency-Key", key)
+				}
 				w := httptest.NewRecorder()
 				app.handler.ServeHTTP(w, r)
+				return w
+			}
+			readNative := func() webTestSnapshot {
+				t.Helper()
+				w := nativeRequest(http.MethodGet, "/api/v1/me", nil, "")
 				var current webTestSnapshot
 				if w.Code != http.StatusOK || json.Unmarshal(w.Body.Bytes(), &current) != nil || current.User.ID != snapshot.User.ID {
-					t.Fatalf("existing iOS session: %d %s", w.Code, w.Body.String())
+					t.Fatalf("existing %s session: %d %s", platform, w.Code, w.Body.String())
 				}
 				return current
 			}
-			if before := readIOS(); before.Subscription.Plan.Code != "free" {
+			if before := readNative(); before.Subscription.Plan.Code != "free" {
 				t.Fatal("account must start free")
 			}
 			var product catalog.Product
@@ -420,7 +456,7 @@ func TestWebsiteSubscriptionReachesAlreadySignedInIOSAndPreservesPaidAccessOnCan
 			if checkout.Code != http.StatusCreated || json.Unmarshal(checkout.Body.Bytes(), &order) != nil {
 				t.Fatalf("checkout: %d %s", checkout.Code, checkout.Body.String())
 			}
-			if before := readIOS(); before.Subscription.Plan.Code != "free" {
+			if before := readNative(); before.Subscription.Plan.Code != "free" {
 				t.Fatal("unconfirmed subscription granted access")
 			}
 			db := billingOpenFixtureDB(t, cfg.Database.Path)
@@ -446,15 +482,65 @@ func TestWebsiteSubscriptionReachesAlreadySignedInIOSAndPreservesPaidAccessOnCan
 					t.Fatalf("bank callback: %d %s", w.Code, w.Body.String())
 				}
 			}
-			paid := readIOS()
+			paid := readNative()
 			if paid.Subscription.Plan.Code != code || paid.Subscription.Source != "bcc" || paid.Subscription.AutoRenews == nil || !*paid.Subscription.AutoRenews {
-				t.Fatalf("iOS did not receive the bank subscription: %+v", paid.Subscription)
+				t.Fatalf("%s did not receive the bank subscription: %+v", platform, paid.Subscription)
 			}
 			if product.Unlimited != paid.Usage.Unlimited || product.DailyLimit != paid.Usage.DailyLimit || paid.Usage.Purchased != product.MonthlyLimit || paid.Usage.MonthlyLimit != 0 {
 				t.Fatalf("wrong subscription allowance: %+v", paid.Usage)
 			}
 			if product.MonthlyLimit > 0 && !paid.Usage.CreditsNeverExpire {
 				t.Fatal("monthly bundle does not disclose permanent credits")
+			}
+			if platform == domain.PlatformMacOS && code == "base_monthly" {
+				// Only this disposable fixture's welcome balance is exhausted, so
+				// generation must spend the website's paid Base credits.
+				if _, err := db.Writer().Exec(`UPDATE credit_grants SET units_remaining=0 WHERE user_id=? AND kind='welcome'`, snapshot.User.ID); err != nil {
+					t.Fatal(err)
+				}
+				consent := nativeRequest(http.MethodPost, "/api/v1/me/consents", map[string]string{
+					"terms_version": legal.TermsVersion, "privacy_version": legal.PrivacyVersion,
+					"locale": "ru", "platform": platform, "app_version": "1.0.1",
+				}, "")
+				if consent.Code != http.StatusOK {
+					t.Fatalf("Mac consent: %d %s", consent.Code, consent.Body.String())
+				}
+				before := readNative()
+				if before.Usage.Remaining != product.MonthlyLimit || before.Usage.Purchased != product.MonthlyLimit {
+					t.Fatalf("Mac did not start with only the paid Base bundle: %+v", before.Usage)
+				}
+				body := map[string]string{"instruction": "Напиши другу: давай встретимся завтра в 10:00.", "language": "ru", "platform": platform, "app_version": "1.0.1"}
+				for attempt := 0; attempt < 2; attempt++ {
+					generated := nativeRequest(http.MethodPost, "/api/v1/ai/compose", body, "mac-website-base-generation")
+					var result struct {
+						Text  string `json:"text"`
+						Usage struct {
+							Remaining int    `json:"remaining_total"`
+							Purchased int    `json:"purchased_credits"`
+							Bucket    string `json:"bucket"`
+						} `json:"usage"`
+					}
+					if generated.Code != http.StatusOK || json.Unmarshal(generated.Body.Bytes(), &result) != nil || result.Text == "" ||
+						result.Usage.Remaining != product.MonthlyLimit-1 || result.Usage.Purchased != product.MonthlyLimit-1 || result.Usage.Bucket != "pack" {
+						t.Fatalf("Mac generation/retry did not spend exactly one website Base reply: %d %s", generated.Code, generated.Body.String())
+					}
+				}
+				// Replies are not persisted: a retry generates fresh text while
+				// the reservation key prevents a second balance charge.
+				if providerCalls.Load() != 2 {
+					t.Fatalf("generation and retry made %d provider calls", providerCalls.Load())
+				}
+				browser := webTestRequest(app.handler, http.MethodGet, "/account/api/session", nil, cookie, "", "")
+				var website webTestSnapshot
+				paid = readNative()
+				if browser.Code != http.StatusOK || json.Unmarshal(browser.Body.Bytes(), &website) != nil || website.User.ID != snapshot.User.ID ||
+					website.Subscription.Plan.Code != code || website.Usage != paid.Usage || website.Usage.Purchased != product.MonthlyLimit-1 {
+					t.Fatalf("website and existing Mac session disagree after Mac generation: %d %s; Mac=%+v", browser.Code, browser.Body.String(), paid.Usage)
+				}
+				var paidUnits int
+				if err := db.Reader().QueryRow(`SELECT units_remaining FROM credit_grants WHERE user_id=? AND product_code='bcc_base_monthly'`, snapshot.User.ID).Scan(&paidUnits); err != nil || paidUnits != product.MonthlyLimit-1 {
+					t.Fatalf("website Base grant was not decremented exactly once: %d %v", paidUnits, err)
+				}
 			}
 			var periods, receipts int
 			if err := db.Reader().QueryRow(`SELECT (SELECT count(*) FROM bcc_subscription_periods),(SELECT count(*) FROM billing_receipt_outbox)`).Scan(&periods, &receipts); err != nil || periods != 1 || receipts != 1 {
@@ -464,7 +550,7 @@ func TestWebsiteSubscriptionReachesAlreadySignedInIOSAndPreservesPaidAccessOnCan
 			if cancel.Code != http.StatusOK {
 				t.Fatalf("cancel: %d %s", cancel.Code, cancel.Body.String())
 			}
-			canceled := readIOS()
+			canceled := readNative()
 			if canceled.Subscription.Plan.Code != code || canceled.Subscription.AutoRenews == nil || *canceled.Subscription.AutoRenews {
 				t.Fatalf("cancel removed paid access or retained renewal: %+v", canceled.Subscription)
 			}

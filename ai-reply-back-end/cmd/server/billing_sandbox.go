@@ -15,6 +15,10 @@ import (
 
 // The test API shares the HTTPS listener, not the database or account sessions.
 func billingSandboxConfig(primary config.Config) (config.Config, error) {
+	macOSInstaller := primary.BillingSandboxMacOSInstallerURL()
+	if primary.BillingSandboxMacOSDownloadURL != "" && macOSInstaller == "" {
+		return config.Config{}, fmt.Errorf("BILLING_SANDBOX_MACOS_DOWNLOAD_URL must be a valid separately published installer, different from MACOS_DOWNLOAD_URL")
+	}
 	if primary.BillingSandboxPushEnabled && !primary.Push.FCM.Configured() {
 		return config.Config{}, fmt.Errorf("billing sandbox push requires configured Firebase credentials")
 	}
@@ -40,6 +44,7 @@ func billingSandboxConfig(primary config.Config) (config.Config, error) {
 	}
 	base.Path = "/sandbox"
 	sandbox.App.PublicBaseURL = strings.TrimRight(base.String(), "/")
+	sandbox.App.MacOSDownloadURL = macOSInstaller
 	sandbox.App.Env = "staging"
 	sandbox.App.SimulatorEnabled = false
 	sandbox.Auth.AccessSecret = sandboxSecret(primary.Auth.AccessSecret, "access")
@@ -74,6 +79,7 @@ func billingSandboxConfig(primary config.Config) (config.Config, error) {
 	sandbox.BCCCheckout.PublicBaseURL = sandbox.App.PublicBaseURL
 	sandbox.BillingSandboxEnabled, sandbox.BillingSandboxBCCEnabled = false, false
 	sandbox.BillingSandboxPushEnabled, sandbox.BillingSandboxWebTopupOfferEnabled = false, false
+	sandbox.BillingSandboxMacOSDownloadURL = ""
 	if problems := sandbox.Validate(); len(problems) > 0 {
 		return config.Config{}, fmt.Errorf("billing sandbox configuration: %s", strings.Join(problems, "; "))
 	}

@@ -41,3 +41,42 @@ func TestMacOSReleaseURL(t *testing.T) {
 		})
 	}
 }
+
+func TestBillingSandboxMacOSReleaseMustBeSeparateAndValid(t *testing.T) {
+	const primary = "https://example.test/downloads/macos/AI-Reply-1.0.1.dmg"
+	for _, tc := range []struct {
+		url string
+		ok  bool
+	}{
+		{"", true},
+		{"https://example.test/downloads/macos/sandbox/AI-Reply-1.0.1-sandbox.dmg", true},
+		{"https://example.test:443/downloads/macos/AI-Reply-sandbox.dmg", true},
+		{primary, false},
+		{"https://EXAMPLE.TEST:443/downloads/macos/AI-Reply-1.0.1.dmg", false},
+		{"https://other.test/downloads/macos/AI-Reply-sandbox.dmg", false},
+		{"http://example.test/downloads/macos/AI-Reply-sandbox.dmg", false},
+		{"https://user:secret@example.test/downloads/macos/AI-Reply-sandbox.dmg", false},
+		{"https://example.test/downloads/macos/../private/AI-Reply-sandbox.dmg", false},
+		{"https://example.test/downloads/macos/%2e%2e/AI-Reply-sandbox.dmg", false},
+		{"https://example.test/downloads/macos/AI-Reply-sandbox.dmg?token=private", false},
+		{"https://example.test/downloads/macos/AI-Reply-sandbox.dmg#fragment", false},
+		{"https://example.test/downloads/macos/AI-Reply-sandbox.zip", false},
+	} {
+		t.Run(tc.url, func(t *testing.T) {
+			setValidEnv(t)
+			t.Setenv("PUBLIC_BASE_URL", "https://example.test")
+			t.Setenv("MACOS_DOWNLOAD_URL", primary)
+			t.Setenv("BILLING_SANDBOX_MACOS_DOWNLOAD_URL", tc.url)
+			cfg, err := Load("")
+			if !tc.ok {
+				if err == nil || !strings.Contains(err.Error(), "BILLING_SANDBOX_MACOS_DOWNLOAD_URL") {
+					t.Fatalf("unsafe sandbox installer accepted: %v", err)
+				}
+				return
+			}
+			if err != nil || cfg.App.MacOSInstallerURL() != primary || cfg.BillingSandboxMacOSInstallerURL() != tc.url {
+				t.Fatalf("separate installer settings not preserved: %v", err)
+			}
+		})
+	}
+}

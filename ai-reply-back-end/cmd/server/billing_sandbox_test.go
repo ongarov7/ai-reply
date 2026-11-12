@@ -97,6 +97,47 @@ func TestBillingSandboxDerivesIsolatedValidatedConfiguration(t *testing.T) {
 	}
 }
 
+func TestBillingSandboxMacDownloadNeverInheritsPrimaryRelease(t *testing.T) {
+	const primaryDMG = "https://billing.example.invalid/downloads/macos/AI-Reply-1.0.1.dmg"
+	const sandboxDMG = "https://billing.example.invalid/downloads/macos/sandbox/AI-Reply-1.0.1-sandbox.dmg"
+	for _, dedicated := range []string{"", sandboxDMG} {
+		t.Run(dedicated, func(t *testing.T) {
+			cfg := billingPrimaryFixture(t)
+			cfg.App.MacOSDownloadURL = primaryDMG
+			cfg.BillingSandboxMacOSDownloadURL = dedicated
+			child, err := billingSandboxConfig(cfg)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if cfg.App.MacOSInstallerURL() != primaryDMG || child.App.MacOSInstallerURL() != dedicated || child.BillingSandboxMacOSDownloadURL != "" {
+				t.Fatal("sandbox derivation changed the primary release or retained a cross-environment installer")
+			}
+			primary := webTestApplication(t, cfg)
+			sandbox := webTestApplication(t, child)
+			primary.mux.Handle("/sandbox/", http.StripPrefix("/sandbox", sandbox.handler))
+			mainPage := webTestRequest(primary.handler, http.MethodGet, "/mac?lang=en", nil, nil, "", "")
+			testPage := webTestRequest(primary.handler, http.MethodGet, "/sandbox/mac?lang=en", nil, nil, "", "")
+			if mainPage.Code != http.StatusOK || !strings.Contains(mainPage.Body.String(), `href="`+primaryDMG+`"`) || strings.Contains(mainPage.Body.String(), `href="`+sandboxDMG+`"`) {
+				t.Fatal("primary Mac page lost its production installer or advertised the test build")
+			}
+			body := testPage.Body.String()
+			if testPage.Code != http.StatusOK || strings.Contains(body, `href="`+primaryDMG+`"`) ||
+				strings.Contains(body, `href="`+sandboxDMG+`"`) != (dedicated != "") ||
+				!strings.Contains(body, `href="/sandbox/payment?lang=en"`) {
+				t.Fatal("sandbox Mac page paired its account with the wrong installer")
+			}
+		})
+	}
+	for _, invalid := range []string{primaryDMG, "https://BILLING.EXAMPLE.INVALID:443/downloads/macos/AI-Reply-1.0.1.dmg", "https://other.invalid/downloads/macos/test.dmg"} {
+		cfg := billingPrimaryFixture(t)
+		cfg.App.MacOSDownloadURL = primaryDMG
+		cfg.BillingSandboxMacOSDownloadURL = invalid
+		if _, err := billingSandboxConfig(cfg); err == nil || !strings.Contains(err.Error(), "BILLING_SANDBOX_MACOS_DOWNLOAD_URL") {
+			t.Fatalf("sandbox accepted an unsafe dedicated installer: %v", err)
+		}
+	}
+}
+
 func TestBillingSandboxCannotRevokePrimaryAppleCredentials(t *testing.T) {
 	primary := billingPrimaryFixture(t)
 	primary.OAuth = config.OAuth{

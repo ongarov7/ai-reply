@@ -21,3 +21,22 @@ func (a App) MacOSInstallerURL() string {
 	}
 	return a.MacOSDownloadURL
 }
+
+// BillingSandboxMacOSInstallerURL never falls back to the production download.
+// The two clients use separate account databases and must be published separately.
+func (c Config) BillingSandboxMacOSInstallerURL() string {
+	app := c.App
+	app.MacOSDownloadURL = c.BillingSandboxMacOSDownloadURL
+	installer := app.MacOSInstallerURL()
+	if installer == "" {
+		return ""
+	}
+	testURL, _ := url.Parse(installer)
+	mainURL, _ := url.Parse(c.App.MacOSInstallerURL())
+	// Both validated URLs use the same host and HTTPS default port. Comparing
+	// their path also catches case/explicit :443 variants of the same installer.
+	if mainURL != nil && testURL.Path == mainURL.Path {
+		return ""
+	}
+	return installer
+}
