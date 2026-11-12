@@ -1,6 +1,7 @@
 package web
 
 import (
+	"html"
 	"io"
 	"log/slog"
 	"net/http"
@@ -50,6 +51,42 @@ func TestMacInformationDownloadAndAccount(t *testing.T) {
 					if strings.Contains(body, forbidden) {
 						t.Fatalf("Mac page contains %q", forbidden)
 					}
+				}
+			}
+		}
+	}
+}
+
+func TestMacInformationUsesBankCheckoutAvailability(t *testing.T) {
+	bundle, err := localization.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, prefix := range []string{"", "/sandbox"} {
+		for _, enabled := range []bool{false, true} {
+			var cfg config.Config
+			cfg.App.PublicBaseURL = "https://example.test" + prefix
+			cfg.BCCCheckout.Enabled = enabled
+			s, err := New(Deps{Config: cfg, Bundle: bundle, Limiter: middleware.NewLimiter(),
+				Log: slog.New(slog.NewTextHandler(io.Discard, nil))})
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, locale := range []string{"ru", "kk", "en", "uz"} {
+				w := httptest.NewRecorder()
+				s.handleMacInfo(w, httptest.NewRequest(http.MethodGet, "/mac?lang="+locale, nil))
+				body := html.UnescapeString(w.Body.String())
+				if w.Code != http.StatusOK || !strings.Contains(body, `href="`+prefix+`/?lang=`+locale+`#pricing"`) ||
+					!strings.Contains(body, bundle.T(locale, "mac.account_body")) {
+					t.Fatalf("Mac account and current pricing link missing for %s/%s", prefix, locale)
+				}
+				want, absent := "mac.checkout_disabled", "mac.checkout_enabled"
+				if enabled {
+					want, absent = absent, want
+				}
+				if bundle.T(locale, want) == want || !strings.Contains(body, bundle.T(locale, want)) ||
+					strings.Contains(body, bundle.T(locale, absent)) {
+					t.Fatalf("Mac page misrepresents bank checkout for %s/%s: enabled=%t", prefix, locale, enabled)
 				}
 			}
 		}

@@ -18,6 +18,12 @@
     </ol>
     <h2>{{call .T "mac.account_title"}}</h2>
     <p>{{call .T "mac.account_body"}}</p>
+    <p><a href="{{.BasePath}}/?lang={{.Locale}}#pricing">{{call .T "mac.pricing_link"}}</a></p>
+    {{if .CheckoutEnabled}}
+    <p>{{call .T "mac.checkout_enabled"}}</p>
+    {{else}}
+    <p>{{call .T "mac.checkout_disabled"}}</p>
+    {{end}}
     <p><a class="btn btn-ghost" href="{{.BasePath}}/payment?lang={{.Locale}}">{{call .T "account.open"}}</a></p>
     <p>{{call .T "mac.microphone"}}</p>
     <p><a href="{{.BasePath}}/support?lang={{.Locale}}">{{call .T "footer.support"}}</a> · <a href="{{.BasePath}}/privacy?lang={{.Locale}}">{{call .T "footer.privacy"}}</a></p>
