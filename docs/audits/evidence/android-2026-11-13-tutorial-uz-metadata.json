@@ -1,0 +1,202 @@
+{
+  "language": "uz",
+  "output": "/Users/yerekyerkinbekuly/progo/ai-reply/AI-Reply-Android/app/src/main/res/raw/keyboard_setup_uz.mp4",
+  "bytes": 1234402,
+  "sha256": "d959b7dcef65dae8039f5ed675f7737214a82fa524baa193a2a8e27860c043b8",
+  "contact": "/Users/yerekyerkinbekuly/progo/ai-reply/docs/audits/evidence/android-2026-11-13-tutorial-uz-frames.png",
+  "clips": [
+    {
+      "path": "/private/tmp/aireply-android-capture/uz/welcome.mp4",
+      "source_sha256": "d78d891bde21dad6dbb9b6da631aee8a43cf38e227043f298ed23bab82709b37",
+      "start": 0.0,
+      "seconds": 8.0,
+      "capture_wall_seconds": 10.6,
+      "held_static_final_frame": true,
+      "caption": "AI Reply ni oʻrnatgach, ilovani oching va «Klaviaturani sozlash» tugmasini bosing.",
+      "source": {
+        "seconds": 6.96,
+        "width": 720,
+        "height": 1616,
+        "video": "Stream #0:0[0x1](eng): Video: h264 (Constrained Baseline) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 720x1616, 200 kb/s, 1.58 fps, 1.67 tbr, 90k tbn (default)",
+        "audio_streams": 0,
+        "subtitle_streams": 0
+      }
+    },
+    {
+      "path": "/private/tmp/aireply-android-capture/uz/activation.mp4",
+      "source_sha256": "843ab1a2e72f3b1962524b017d18e3c51b33b3e8bef6ca14bf1630d11fec75ed",
+      "start": 1.0,
+      "seconds": 4.0,
+      "capture_wall_seconds": 22.3,
+      "held_static_final_frame": false,
+      "caption": "Tizimning klaviatura sozlamalarini oching va AI Reply ni yoqing.",
+      "source": {
+        "seconds": 19.09,
+        "width": 720,
+        "height": 1616,
+        "video": "Stream #0:0[0x1](eng): Video: h264 (Constrained Baseline) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 720x1616, 202 kb/s, 4.61 fps, 90k tbr, 90k tbn (default)",
+        "audio_streams": 0,
+        "subtitle_streams": 0
+      }
+    },
+    {
+      "path": "/private/tmp/aireply-android-capture/uz/activation.mp4",
+      "source_sha256": "843ab1a2e72f3b1962524b017d18e3c51b33b3e8bef6ca14bf1630d11fec75ed",
+      "start": 5.0,
+      "seconds": 8.0,
+      "capture_wall_seconds": 22.3,
+      "held_static_final_frame": false,
+      "caption": "Android klaviatura kiritilgan matnni koʻra olishini eslatadi. Ogohlantirishni oʻqing va rozi boʻlsangiz, tasdiqlang.",
+      "source": {
+        "seconds": 19.09,
+        "width": 720,
+        "height": 1616,
+        "video": "Stream #0:0[0x1](eng): Video: h264 (Constrained Baseline) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 720x1616, 202 kb/s, 4.61 fps, 90k tbr, 90k tbn (default)",
+        "audio_streams": 0,
+        "subtitle_streams": 0
+      }
+    },
+    {
+      "path": "/private/tmp/aireply-android-capture/uz/select.mp4",
+      "source_sha256": "8ca6adf87d29efa59a01b332a8aaac2a07a3be2cb77dadddc9da7c975c3de846",
+      "start": 1.0,
+      "seconds": 9.0,
+      "capture_wall_seconds": 14.7,
+      "held_static_final_frame": false,
+      "caption": "Ilovaga qayting va klaviaturalar roʻyxatidan AI Reply ni tanlang.",
+      "source": {
+        "seconds": 11.61,
+        "width": 720,
+        "height": 1616,
+        "video": "Stream #0:0[0x1](eng): Video: h264 (Constrained Baseline) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 720x1616, 426 kb/s, 3.44 fps, 90k tbr, 90k tbn (default)",
+        "audio_streams": 0,
+        "subtitle_streams": 0
+      }
+    },
+    {
+      "path": "/private/tmp/aireply-android-capture/uz/copy.mp4",
+      "source_sha256": "2757727ff2da4e448368f16f935de6b16483be40c4b69d3b21242a59ede7fa26",
+      "start": 1.0,
+      "seconds": 8.0,
+      "capture_wall_seconds": 13.3,
+      "held_static_final_frame": false,
+      "caption": "Javob bermoqchi boʻlgan xabarni bosib turing, soʻng «Nusxalash»ni tanlang.",
+      "source": {
+        "seconds": 10.58,
+        "width": 720,
+        "height": 1616,
+        "video": "Stream #0:0[0x1](eng): Video: h264 (Constrained Baseline) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 720x1616, 151 kb/s, 10.97 fps, 90k tbr, 90k tbn (default)",
+        "audio_streams": 0,
+        "subtitle_streams": 0
+      }
+    },
+    {
+      "path": "/private/tmp/aireply-android-capture/uz/paste.mp4",
+      "source_sha256": "0cdfb448f4de66a87e0461662bdfdfd6665fdde6acdf6ac73801b82d37525d98",
+      "start": 0.0,
+      "seconds": 10.0,
+      "capture_wall_seconds": 11.4,
+      "held_static_final_frame": false,
+      "caption": "AI Reply ga oʻting. Qabul qiluvchi yoki «Qoʻyish»ni bosing: matn shunda oʻqiladi. Qoʻyish uchun alohida ruxsat kerak emas.",
+      "source": {
+        "seconds": 11.35,
+        "width": 720,
+        "height": 1616,
+        "video": "Stream #0:0[0x1](eng): Video: h264 (Constrained Baseline) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 720x1616, 146 kb/s, 4.32 fps, 90k tbr, 90k tbn (default)",
+        "audio_streams": 0,
+        "subtitle_streams": 0
+      }
+    },
+    {
+      "path": "/private/tmp/aireply-android-capture/uz/permission_setup.mp4",
+      "source_sha256": "1cc0bb0f6b175bd51a5f3d42768798ad5bffd46f0cbac44f438cc40e3f48ddbf",
+      "start": 4.0,
+      "seconds": 12.0,
+      "capture_wall_seconds": 19.7,
+      "held_static_final_frame": false,
+      "caption": "Ovozli kiritish uchun ilovadan foydalanayotganda mikrofonga ruxsat bering. Mikrofon ixtiyoriy.",
+      "source": {
+        "seconds": 16.15,
+        "width": 720,
+        "height": 1616,
+        "video": "Stream #0:0[0x1](eng): Video: h264 (Constrained Baseline) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 720x1616, 257 kb/s, 3.22 fps, 90k tbr, 90k tbn (default)",
+        "audio_streams": 0,
+        "subtitle_streams": 0
+      }
+    },
+    {
+      "path": "/private/tmp/aireply-android-capture/uz/voice.mp4",
+      "source_sha256": "8417248f57bbb35573c6f7a27665909fb9616bb07acf8131174ff2927737f36d",
+      "start": 0.0,
+      "seconds": 8.0,
+      "capture_wall_seconds": 11.1,
+      "held_static_final_frame": false,
+      "caption": "Koʻrsatmani ayting va yozishni toʻxtating. Tanilgan matnni tekshiring. Koʻrsatmani klaviaturada ham yozish mumkin.",
+      "source": {
+        "seconds": 11.53,
+        "width": 720,
+        "height": 1616,
+        "video": "Stream #0:0[0x1](eng): Video: h264 (Constrained Baseline) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 720x1616, 241 kb/s, 16.13 fps, 90k tbr, 90k tbn (default)",
+        "audio_streams": 0,
+        "subtitle_streams": 0
+      }
+    },
+    {
+      "path": "/private/tmp/aireply-android-capture/uz/generate.mp4",
+      "source_sha256": "28ea66eb6242d51e8331660321831fec2a48e08e487afcbb51bf74b4815792ff",
+      "start": 0.0,
+      "seconds": 5.0,
+      "capture_wall_seconds": 16.1,
+      "held_static_final_frame": false,
+      "caption": "Qabul qiluvchini tanlang. Koʻrsatma yozing yoki tayyor taklifni tanlang.",
+      "source": {
+        "seconds": 16.09,
+        "width": 720,
+        "height": 1616,
+        "video": "Stream #0:0[0x1](eng): Video: h264 (Constrained Baseline) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 720x1616, 147 kb/s, 3.42 fps, 90k tbr, 90k tbn (default)",
+        "audio_streams": 0,
+        "subtitle_streams": 0
+      }
+    },
+    {
+      "path": "/private/tmp/aireply-android-capture/uz/generate.mp4",
+      "source_sha256": "28ea66eb6242d51e8331660321831fec2a48e08e487afcbb51bf74b4815792ff",
+      "start": 10.0,
+      "seconds": 6.0,
+      "capture_wall_seconds": 16.1,
+      "held_static_final_frame": false,
+      "caption": "Javob yarating, tekshiring va kerak boʻlsa tahrirlang, soʻng chatga qoʻying. Xabarni oʻzingiz yuborasiz.",
+      "source": {
+        "seconds": 16.09,
+        "width": 720,
+        "height": 1616,
+        "video": "Stream #0:0[0x1](eng): Video: h264 (Constrained Baseline) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 720x1616, 147 kb/s, 3.42 fps, 90k tbr, 90k tbn (default)",
+        "audio_streams": 0,
+        "subtitle_streams": 0
+      }
+    },
+    {
+      "path": "/private/tmp/aireply-android-capture/uz/insert.mp4",
+      "source_sha256": "895f12f81e421a8ed6b5ba1fc8e043539ce950f5bbfb6c46904a18fd0e3092b4",
+      "start": 0.0,
+      "seconds": 7.0,
+      "capture_wall_seconds": 12.0,
+      "held_static_final_frame": false,
+      "caption": "Javob yarating, tekshiring va kerak boʻlsa tahrirlang, soʻng chatga qoʻying. Xabarni oʻzingiz yuborasiz.",
+      "source": {
+        "seconds": 10.06,
+        "width": 720,
+        "height": 1616,
+        "video": "Stream #0:0[0x1](eng): Video: h264 (Constrained Baseline) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 720x1616, 150 kb/s, 2.78 fps, 90k tbr, 90k tbn (default)",
+        "audio_streams": 0,
+        "subtitle_streams": 0
+      }
+    }
+  ],
+  "seconds": 84.97,
+  "width": 720,
+  "height": 1836,
+  "video": "Stream #0:0[0x1](und): Video: h264 (High) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 720x1836 [SAR 1:1 DAR 20:51], 113 kb/s, 30 fps, 30 tbr, 15360 tbn (default)",
+  "audio_streams": 0,
+  "subtitle_streams": 0
+}

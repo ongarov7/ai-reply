@@ -1,6 +1,5 @@
 package kz.yerek.aireply.core.lang
 
-import android.os.Build
 import androidx.core.os.ConfigurationCompat
 import android.content.res.Resources
 import java.util.Locale
@@ -75,9 +74,13 @@ enum class AppLanguage(val code: String) {
          */
         fun systemDefault(): AppLanguage {
             val locales = ConfigurationCompat.getLocales(Resources.getSystem().configuration)
-            for (index in 0 until locales.size()) {
-                val candidate = locales[index] ?: continue
-                fromCode(candidate.language.lowercase())?.let { return it }
+            return fromPreferredLocales((0 until locales.size()).mapNotNull { locales[it] })
+        }
+
+        /** Preserve the phone's preference order, skipping languages the app does not ship. */
+        fun fromPreferredLocales(locales: Iterable<Locale>): AppLanguage {
+            for (candidate in locales) {
+                fromCode(candidate.language.lowercase(Locale.ROOT))?.let { return it }
             }
             return ENGLISH
         }

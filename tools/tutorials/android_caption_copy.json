@@ -1,0 +1,62 @@
+{
+  "welcome": {
+    "kk": "AI Reply қолданбасын ашып, «Пернетақтаны баптау» түймесін түртіңіз.",
+    "ru": "Откройте AI Reply после установки и нажмите «Настроить клавиатуру».",
+    "en": "After installing AI Reply, open the app and tap “Set up the keyboard”.",
+    "uz": "AI Reply ni oʻrnatgach, ilovani oching va «Klaviaturani sozlash» tugmasini bosing."
+  },
+  "enable": {
+    "kk": "Жүйенің пернетақта баптауларын ашып, AI Reply пернетақтасын қосыңыз.",
+    "ru": "Откройте системные настройки клавиатуры и включите AI Reply.",
+    "en": "Open the system keyboard settings and turn on AI Reply.",
+    "uz": "Tizimning klaviatura sozlamalarini oching va AI Reply ni yoqing."
+  },
+  "warning": {
+    "kk": "Android әр пернетақтаның терілген мәтінді көре алатынын ескертеді. Ескертуді оқып, келіссеңіз, растаңыз.",
+    "ru": "Android предупреждает: клавиатура может видеть вводимый текст. Прочитайте предупреждение и подтвердите, если согласны.",
+    "en": "Android warns that a keyboard can see what you type. Read the warning and confirm if you agree.",
+    "uz": "Android klaviatura kiritilgan matnni koʻra olishini eslatadi. Ogohlantirishni oʻqing va rozi boʻlsangiz, tasdiqlang."
+  },
+  "select": {
+    "kk": "Қолданбаға оралып, пернетақталар тізімінен AI Reply пернетақтасын таңдаңыз.",
+    "ru": "Вернитесь в приложение и выберите AI Reply в списке клавиатур.",
+    "en": "Return to the app and select AI Reply in the keyboard picker.",
+    "uz": "Ilovaga qayting va klaviaturalar roʻyxatidan AI Reply ni tanlang."
+  },
+  "copy": {
+    "kk": "Жауап бергіңіз келген хабарламаны басып тұрып, «Көшіру» пәрменін таңдаңыз.",
+    "ru": "Нажмите и удерживайте сообщение, на которое хотите ответить, затем выберите «Копировать».",
+    "en": "Press and hold the message you want to reply to, then choose “Copy”.",
+    "uz": "Javob bermoqchi boʻlgan xabarni bosib turing, soʻng «Nusxalash»ni tanlang."
+  },
+  "paste": {
+    "kk": "AI Reply ішінен алушыны не «Қою» түймесін түртіңіз. Мәтін сол кезде оқылады. Қоюға бөлек рұқсат қажет емес.",
+    "ru": "В AI Reply нажмите получателя или «Вставить». Текст читается после нажатия. Отдельное разрешение на вставку не нужно.",
+    "en": "Switch to AI Reply. Tap a recipient or “Paste” to read the copied text. No separate paste permission is needed.",
+    "uz": "AI Reply ga oʻting. Qabul qiluvchi yoki «Qoʻyish»ni bosing: matn shunda oʻqiladi. Qoʻyish uchun alohida ruxsat kerak emas."
+  },
+  "instruction": {
+    "kk": "Кімге жауап беретініңізді таңдаңыз. Нұсқауды жазыңыз немесе дайын ұсынысты таңдаңыз.",
+    "ru": "Выберите получателя. Напишите инструкцию или выберите готовую подсказку.",
+    "en": "Choose a recipient. Type an instruction or select a quick suggestion.",
+    "uz": "Qabul qiluvchini tanlang. Koʻrsatma yozing yoki tayyor taklifni tanlang."
+  },
+  "mic_permission": {
+    "kk": "Дауыспен енгізу үшін микрофонға қолданбаны пайдалану кезінде рұқсат беріңіз. Микрофон міндетті емес.",
+    "ru": "Для голосового ввода разрешите микрофон при использовании приложения. Микрофон необязателен.",
+    "en": "For voice input, allow microphone access while using the app. The microphone is optional.",
+    "uz": "Ovozli kiritish uchun ilovadan foydalanayotganda mikrofonga ruxsat bering. Mikrofon ixtiyoriy."
+  },
+  "voice": {
+    "kk": "Нұсқауды айтып, жазбаны тоқтатыңыз. Танылған мәтінді тексеріңіз. Нұсқауды пернетақтамен де теруге болады.",
+    "ru": "Произнесите инструкцию и остановите запись. Проверьте распознанный текст. Инструкцию также можно напечатать.",
+    "en": "Say your instruction, stop recording, then check the recognized text. You can also type your instruction.",
+    "uz": "Koʻrsatmani ayting va yozishni toʻxtating. Tanilgan matnni tekshiring. Koʻrsatmani klaviaturada ham yozish mumkin."
+  },
+  "review": {
+    "kk": "Жауап жасаңыз, оқып, қажет болса түзетіңіз де, чатқа қойыңыз. Жіберу түймесін өзіңіз басасыз.",
+    "ru": "Создайте ответ, проверьте и при необходимости исправьте его, затем вставьте в чат. Отправляете сообщение вы сами.",
+    "en": "Generate a reply, review and edit it, then insert it into the chat. You press Send yourself.",
+    "uz": "Javob yarating, tekshiring va kerak boʻlsa tahrirlang, soʻng chatga qoʻying. Xabarni oʻzingiz yuborasiz."
+  }
+}

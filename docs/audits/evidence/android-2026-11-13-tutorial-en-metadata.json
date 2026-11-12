@@ -1,0 +1,205 @@
+{
+  "language": "en",
+  "output": "/Users/yerekyerkinbekuly/progo/ai-reply/AI-Reply-Android/app/src/main/res/raw/keyboard_setup_en.mp4",
+  "bytes": 1333536,
+  "sha256": "2697de140d3ef7bfe02d404215d6cda700460d5b4f59febe121d20b7af123782",
+  "contact": "/Users/yerekyerkinbekuly/progo/ai-reply/docs/audits/evidence/android-2026-11-13-tutorial-en-frames.png",
+  "clips": [
+    {
+      "path": "/private/tmp/aireply-android-capture/en/welcome.mp4",
+      "source_sha256": "38051b50e5e383d1acaac52082ee8656b82d56b5d4fe47086bf9ed78795f3195",
+      "start": 0.0,
+      "seconds": 6.0,
+      "capture_wall_seconds": 13.79,
+      "held_static_final_frame": false,
+      "caption": "After installing AI Reply, open the app and tap “Set up the keyboard”.",
+      "source": {
+        "seconds": 13.79,
+        "width": 720,
+        "height": 1616,
+        "video": "Stream #0:0[0x1](eng): Video: h264 (Constrained Baseline) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 720x1616, 155 kb/s, 2.39 fps, 1.75 tbr, 90k tbn (default)",
+        "audio_streams": 0,
+        "subtitle_streams": 0
+      }
+    },
+    {
+      "path": "/private/tmp/aireply-android-capture/en/activation.mp4",
+      "source_sha256": "65a6f54c8b8c5fdf87fc28e5e6ee4ce0aebfa6b219e80250fa40dda245b0eca4",
+      "start": 2.0,
+      "seconds": 4.0,
+      "capture_wall_seconds": 19.2,
+      "held_static_final_frame": false,
+      "caption": "Open the system keyboard settings and turn on AI Reply.",
+      "source": {
+        "seconds": 19.2,
+        "width": 720,
+        "height": 1616,
+        "video": "Stream #0:0[0x1](eng): Video: h264 (Constrained Baseline) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 720x1616, 364 kb/s, 6.09 fps, 90k tbr, 90k tbn (default)",
+        "audio_streams": 0,
+        "subtitle_streams": 0
+      }
+    },
+    {
+      "path": "/private/tmp/aireply-android-capture/en/activation.mp4",
+      "source_sha256": "65a6f54c8b8c5fdf87fc28e5e6ee4ce0aebfa6b219e80250fa40dda245b0eca4",
+      "start": 6.0,
+      "seconds": 10.0,
+      "capture_wall_seconds": 19.2,
+      "held_static_final_frame": false,
+      "caption": "Android warns that a keyboard can see what you type. Read the warning and confirm if you agree.",
+      "source": {
+        "seconds": 19.2,
+        "width": 720,
+        "height": 1616,
+        "video": "Stream #0:0[0x1](eng): Video: h264 (Constrained Baseline) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 720x1616, 364 kb/s, 6.09 fps, 90k tbr, 90k tbn (default)",
+        "audio_streams": 0,
+        "subtitle_streams": 0
+      }
+    },
+    {
+      "path": "/private/tmp/aireply-android-capture/en/select.mp4",
+      "source_sha256": "f4017effb7a3a15e67b20528e129f9b04dfaa568b07f0826b2d16918da5e8c79",
+      "start": 1.0,
+      "seconds": 8.0,
+      "capture_wall_seconds": 10.16,
+      "held_static_final_frame": false,
+      "caption": "Return to the app and select AI Reply in the keyboard picker.",
+      "source": {
+        "seconds": 10.16,
+        "width": 720,
+        "height": 1616,
+        "video": "Stream #0:0[0x1](eng): Video: h264 (Constrained Baseline) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 720x1616, 722 kb/s, 5.90 fps, 90k tbr, 90k tbn (default)",
+        "audio_streams": 0,
+        "subtitle_streams": 0
+      }
+    },
+    {
+      "path": "/private/tmp/aireply-android-capture/en/copy.mp4",
+      "source_sha256": "5600f3502056bee27ea6cf93e9f3941b3fb6fc1d92b7149074b747274be9bce1",
+      "start": 1.0,
+      "seconds": 7.0,
+      "capture_wall_seconds": 12.86,
+      "held_static_final_frame": false,
+      "caption": "Press and hold the message you want to reply to, then choose “Copy”.",
+      "source": {
+        "seconds": 12.86,
+        "width": 720,
+        "height": 1616,
+        "video": "Stream #0:0[0x1](eng): Video: h264 (Constrained Baseline) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 720x1616, 112 kb/s, 8.09 fps, 90k tbr, 90k tbn (default)",
+        "audio_streams": 0,
+        "subtitle_streams": 0
+      }
+    },
+    {
+      "path": "/private/tmp/aireply-android-capture/en/paste.mp4",
+      "source_sha256": "875cdd3db4b8a7321e768c89eefeb60f22d0d3cfda8039670ea77813dc7172ac",
+      "start": 0.0,
+      "seconds": 8.0,
+      "capture_wall_seconds": 10.25,
+      "held_static_final_frame": false,
+      "caption": "Switch to AI Reply. Tap a recipient or “Paste” to read the copied text. No separate paste permission is needed.",
+      "source": {
+        "seconds": 10.25,
+        "width": 720,
+        "height": 1616,
+        "video": "Stream #0:0[0x1](eng): Video: h264 (Constrained Baseline) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 720x1616, 427 kb/s, 6.15 fps, 90k tbr, 90k tbn (default)",
+        "audio_streams": 0,
+        "subtitle_streams": 0
+      }
+    },
+    {
+      "path": "/private/tmp/aireply-android-capture/en/permission_setup.mp4",
+      "source_sha256": "e7a57fbb77ae9c440689db559f3f4e1793c5f45bace5544daebba5f89d93da1e",
+      "start": 3.0,
+      "seconds": 10.0,
+      "capture_wall_seconds": 16.85,
+      "held_static_final_frame": false,
+      "caption": "For voice input, allow microphone access while using the app. The microphone is optional.",
+      "source": {
+        "seconds": 16.85,
+        "width": 720,
+        "height": 1616,
+        "video": "Stream #0:0[0x1](eng): Video: h264 (Constrained Baseline) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 720x1616, 412 kb/s, 4.27 fps, 90k tbr, 90k tbn (default)",
+        "audio_streams": 0,
+        "subtitle_streams": 0
+      }
+    },
+    {
+      "path": "/private/tmp/aireply-android-capture/en/voice.mp4",
+      "source_sha256": "020873a4b271eab4986298d4cca9ad6df0d79ee03e1e3a7008cc82325f737fc1",
+      "start": 0.0,
+      "seconds": 7.0,
+      "capture_wall_seconds": 10.98,
+      "held_static_final_frame": false,
+      "caption": "Say your instruction, stop recording, then check the recognized text. You can also type your instruction.",
+      "source": {
+        "seconds": 10.98,
+        "width": 720,
+        "height": 1616,
+        "video": "Stream #0:0[0x1](eng): Video: h264 (Constrained Baseline) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 720x1616, 238 kb/s, 16.40 fps, 90k tbr, 90k tbn (default)",
+        "audio_streams": 0,
+        "subtitle_streams": 0
+      }
+    },
+    {
+      "path": "/private/tmp/aireply-android-capture/en/generate.mp4",
+      "source_sha256": "a9a65d9b6875a2f196f78a5da9a634df7c18f3974b9e6ebdf3e6336a1a31cabd",
+      "start": 0.0,
+      "seconds": 4.0,
+      "capture_wall_seconds": 15.29,
+      "held_static_final_frame": false,
+      "caption": "Choose a recipient. Type an instruction or select a quick suggestion.",
+      "source": {
+        "seconds": 15.29,
+        "width": 720,
+        "height": 1616,
+        "video": "Stream #0:0[0x1](eng): Video: h264 (Constrained Baseline) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 720x1616, 196 kb/s, 8.31 fps, 90k tbr, 90k tbn (default)",
+        "audio_streams": 0,
+        "subtitle_streams": 0
+      }
+    },
+    {
+      "path": "/private/tmp/aireply-android-capture/en/generate.mp4",
+      "source_sha256": "a9a65d9b6875a2f196f78a5da9a634df7c18f3974b9e6ebdf3e6336a1a31cabd",
+      "start": 4.0,
+      "seconds": 7.0,
+      "capture_wall_seconds": 15.29,
+      "held_static_final_frame": false,
+      "caption": "Generate a reply, review and edit it, then insert it into the chat. You press Send yourself.",
+      "source": {
+        "seconds": 15.29,
+        "width": 720,
+        "height": 1616,
+        "video": "Stream #0:0[0x1](eng): Video: h264 (Constrained Baseline) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 720x1616, 196 kb/s, 8.31 fps, 90k tbr, 90k tbn (default)",
+        "audio_streams": 0,
+        "subtitle_streams": 0
+      }
+    },
+    {
+      "path": "/private/tmp/aireply-android-capture/en/insert.mp4",
+      "source_sha256": "6275036329c9f25ab3fc126ea66b293df0910738e937db42e0901c58bcfd909b",
+      "start": 0.0,
+      "seconds": 7.0,
+      "capture_wall_seconds": 9.55,
+      "held_static_final_frame": false,
+      "caption": "Generate a reply, review and edit it, then insert it into the chat. You press Send yourself.",
+      "source": {
+        "seconds": 9.55,
+        "width": 720,
+        "height": 1616,
+        "video": "Stream #0:0[0x1](eng): Video: h264 (Constrained Baseline) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 720x1616, 157 kb/s, 3.04 fps, 90k tbr, 90k tbn (default)",
+        "audio_streams": 0,
+        "subtitle_streams": 0
+      }
+    }
+  ],
+  "seconds": 78.0,
+  "width": 720,
+  "height": 1836,
+  "video": "Stream #0:0[0x1](und): Video: h264 (High) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 720x1836 [SAR 1:1 DAR 20:51], 133 kb/s, 30 fps, 30 tbr, 15360 tbn (default)",
+  "audio_streams": 0,
+  "subtitle_streams": 0,
+  "system_configuration": "config: mcc310-mnc260-en-rUS-ldltr-sw411dp-w411dp-h923dp-normal-long-notround-nowidecg-lowdr-port-notnight-420dpi-finger-keysexposed-nokeys-navhidden-nonav-2424x1080-v36\nabi: arm64-v8a",
+  "appLanguage_override": null,
+  "debug_mock_replies": false
+}

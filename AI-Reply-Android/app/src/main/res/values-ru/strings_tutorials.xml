@@ -1,14 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="tutorial_videos_title">Видеоинструкции</string>
-    <string name="tutorial_keyboard_title">Настройка клавиатуры и скопированный текст</string>
+    <string name="tutorial_keyboard_title">Как пользоваться AI Reply</string>
     <string name="tutorial_watch">Смотреть видео</string>
     <string name="tutorial_play_pause">Воспроизвести / пауза</string>
     <string name="tutorial_replay">Сначала</string>
-    <string name="tutorial_offline_body">Видео хранится на телефоне и работает без интернета. К инструкции можно вернуться в любой момент. Просмотр не выдаёт разрешений Android.</string>
+    <string name="tutorial_offline_body">Видео без звука с пошаговыми подписями. Оно работает без интернета, и его можно пересмотреть в любой момент. Для настройки повторите действия на своём телефоне.</string>
     <string name="tutorial_video_error">Не удалось открыть видео. Текстовая инструкция по-прежнему доступна.</string>
     <string name="tutorial_caption_setup">Откройте настройку клавиатуры в AI Reply.</string>
     <string name="tutorial_caption_settings">В настройках Android найдите AI Reply в списке экранных клавиатур.</string>
     <string name="tutorial_caption_allow">Включите AI Reply и выберите её клавиатурой. Для буфера обмена отдельное разрешение не требуется.</string>
     <string name="tutorial_caption_try">Скопируйте сообщение, переключитесь на AI Reply и нажмите получателя или «Вставить». Текст читается только после нажатия.</string>
+    <string name="tutorial_language_body">Язык видео совпадает с языком приложения. Он выбирается по языку телефона, если вы не выбрали другой в настройках AI Reply.</string>
+    <string name="tutorial_connect_title">Подключите клавиатуру</string>
+    <string name="tutorial_step_enable">Откройте список экранных клавиатур в настройках Android и включите AI Reply. Прочитайте системное предупреждение и подтвердите его, если хотите пользоваться клавиатурой.</string>
+    <string name="tutorial_step_select">Вернитесь в AI Reply и выберите её в списке клавиатур. В чате нажмите поле сообщения и переключитесь на AI Reply кнопкой смены клавиатуры.</string>
+    <string name="tutorial_clipboard_title">Ответьте на скопированное сообщение</string>
+    <string name="tutorial_step_copy">В чате удерживайте сообщение, на которое хотите ответить, и выберите «Копировать».</string>
+    <string name="tutorial_step_paste">Нажмите поле сообщения в чате, переключитесь на AI Reply и нажмите получателя или «%1$s». Убедитесь, что скопированное сообщение появилось в панели ответа.</string>
+    <string name="tutorial_clipboard_body">В Android нет отдельного разрешения на буфер обмена. AI Reply читает скопированный текст, когда вы нажимаете получателя или «Вставить сообщение».</string>
+    <string name="tutorial_reply_title">Создайте, проверьте и вставьте</string>
+    <string name="tutorial_step_instruction">Выберите, кому пишете, и при необходимости добавьте инструкцию, например «Ответь кратко и вежливо». Её можно напечатать или продиктовать.</string>
+    <string name="tutorial_step_generate">Нажмите «%1$s», чтобы создать ответ. Для нового сообщения откройте AI, опишите задачу и нажмите «%2$s». Нужен интернет.</string>
+    <string name="tutorial_step_review">Прочитайте результат. При необходимости отредактируйте его или запросите другой вариант.</string>
+    <string name="tutorial_step_insert">Нажмите «%1$s», чтобы перенести результат в поле сообщения чата.</string>
+    <string name="tutorial_step_send">Проверьте сообщение в чате и отправьте его сами кнопкой отправки в приложении чата.</string>
+    <string name="tutorial_voice_title">Используйте голосовой ввод</string>
+    <string name="tutorial_voice_optional">Микрофон необязателен. Инструкцию всегда можно ввести с клавиатуры.</string>
+    <string name="tutorial_step_mic">Нажмите микрофон в панели инструкции. Если Android запросит доступ, разрешите его, когда хотите диктовать. Если доступ выключен, включите его в настройках Android → Приложения → AI Reply → Разрешения.</string>
+    <string name="tutorial_step_dictate">Продиктуйте инструкцию и нажмите «%1$s», чтобы закончить запись и распознать слова.</string>
+    <string name="tutorial_step_voice_review">Проверьте распознанный текст в инструкции и исправьте его перед генерацией. При диктовке прямо в поле чата нажмите «Вставить», если слова ожидают подтверждения.</string>
+    <string name="tutorial_voice_privacy">Для голосового ввода нужен интернет. Запись передаётся через сервер AI Reply в OpenAI для преобразования в текст.</string>
+    <string name="tutorial_expand_video">Увеличить видео</string>
+    <string name="tutorial_collapse_video">Показать инструкцию</string>
 </resources>

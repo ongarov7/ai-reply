@@ -1,14 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="tutorial_videos_title">Video tutorials</string>
-    <string name="tutorial_keyboard_title">Keyboard setup and copied text</string>
+    <string name="tutorial_keyboard_title">How to use AI Reply</string>
     <string name="tutorial_watch">Watch video</string>
     <string name="tutorial_play_pause">Play / pause</string>
     <string name="tutorial_replay">Replay</string>
-    <string name="tutorial_offline_body">The video is stored on your phone and works offline. You can return to these instructions at any time. Watching does not grant Android permissions.</string>
+    <string name="tutorial_offline_body">A silent video with step-by-step captions. It works offline, and you can replay it at any time. Follow the steps on your own phone to finish setup.</string>
     <string name="tutorial_video_error">The video could not be opened. The written instructions are still available.</string>
     <string name="tutorial_caption_setup">Open Keyboard setup in AI Reply.</string>
     <string name="tutorial_caption_settings">In Android settings, find AI Reply in the on-screen keyboard list.</string>
     <string name="tutorial_caption_allow">Enable AI Reply, then select it as your keyboard. A separate clipboard permission is not required.</string>
     <string name="tutorial_caption_try">Copy a message, switch to AI Reply, then tap a recipient or Paste. Text is read only after your tap.</string>
+    <string name="tutorial_language_body">The video follows the app language. It uses your phone language unless you choose another language in AI Reply settings.</string>
+    <string name="tutorial_connect_title">Connect the keyboard</string>
+    <string name="tutorial_step_enable">Open the Android on-screen keyboard settings and turn on AI Reply. Read and confirm the system warning if you want to use the keyboard.</string>
+    <string name="tutorial_step_select">Return to AI Reply and select it in the keyboard picker. In a chat, tap the message field and switch to AI Reply using the keyboard switcher.</string>
+    <string name="tutorial_clipboard_title">Reply to a copied message</string>
+    <string name="tutorial_step_copy">In your chat, press and hold the message you want to answer, then choose Copy.</string>
+    <string name="tutorial_step_paste">Open the chat message field, switch to AI Reply and tap a recipient or “%1$s”. Check that the copied message appears in the reply panel.</string>
+    <string name="tutorial_clipboard_body">Android has no separate clipboard permission to enable. AI Reply reads copied text when you tap a recipient or Paste message.</string>
+    <string name="tutorial_reply_title">Create, check and insert</string>
+    <string name="tutorial_step_instruction">Choose who you are writing to and add an instruction if needed, such as “Reply briefly and politely”. You can type it or use the microphone.</string>
+    <string name="tutorial_step_generate">Tap “%1$s” to create a reply. To write a new message, open AI, describe what you need and tap “%2$s”. An internet connection is required.</string>
+    <string name="tutorial_step_review">Read the result. Edit it or request another version if needed.</string>
+    <string name="tutorial_step_insert">Tap “%1$s” to place the result in the chat message field.</string>
+    <string name="tutorial_step_send">Check the message in your chat, then send it yourself using the chat app’s Send button.</string>
+    <string name="tutorial_voice_title">Use voice input</string>
+    <string name="tutorial_voice_optional">The microphone is optional. You can always enter the instruction with the keyboard.</string>
+    <string name="tutorial_step_mic">Tap the microphone in the instruction panel. If Android asks, allow microphone access when you want to dictate. If access is off, enable it in Android Settings → Apps → AI Reply → Permissions.</string>
+    <string name="tutorial_step_dictate">Speak your instruction, then tap “%1$s” to finish recording and recognize the words.</string>
+    <string name="tutorial_step_voice_review">Check the recognized text in the instruction and correct it before generating. When dictating directly into a chat field, use Insert if the words are waiting for confirmation.</string>
+    <string name="tutorial_voice_privacy">Voice input needs an internet connection. Your recording goes through the AI Reply server to OpenAI to be turned into text.</string>
+    <string name="tutorial_expand_video">Expand video</string>
+    <string name="tutorial_collapse_video">Show guide</string>
 </resources>

@@ -1,0 +1,1 @@
+Added a silent offline setup video and a step-by-step guide in Kazakh, Russian, English and Uzbek. Learn how to enable and select the keyboard, paste a copied message, use the microphone and insert a reply. The guide follows your app language and is available during setup and in Settings.

@@ -1,0 +1,22 @@
+{
+  "system_locales": "en-US,uz-Latn-UZ,kk-KZ,ru-RU",
+  "restored_settings": {
+    "airplane_mode_on": "0",
+    "wifi_on": "1",
+    "mobile_data": "1",
+    "window_animation_scale": "1",
+    "transition_animation_scale": "1",
+    "animator_duration_scale": "1"
+  },
+  "os_app_locale_overrides": {
+    "kz.yerek.aireply": "Locales for kz.yerek.aireply for user 0 are []",
+    "com.android.settings": "Locales for com.android.settings for user 0 are []"
+  },
+  "saved_positions": {
+    "keyboard.kk.position": 3142,
+    "keyboard.ru.position": 3330,
+    "keyboard.en.position": 15517,
+    "keyboard.uz.position": 3361
+  },
+  "designated_session_retained": true
+}

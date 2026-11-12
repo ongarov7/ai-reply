@@ -1,0 +1,40 @@
+{
+  "language": "ru",
+  "system_configuration": "config: mcc310-mnc260-ru-rRU,en-rUS,kk-rKZ,b+uz+Latn+UZ-ldltr-sw411dp-w411dp-h923dp-normal-long-notround-nowidecg-lowdr-port-notnight-420dpi-finger-keysexposed-nokeys-navhidden-nonav-2424x1080-v36\nabi: arm64-v8a",
+  "native_player_before_pause": {
+    "paused": 0,
+    "decoded_frames": 336
+  },
+  "native_player_paused": {
+    "paused": 1,
+    "decoded_frames": 419
+  },
+  "native_player_still_paused": {
+    "paused": 1,
+    "decoded_frames": 419
+  },
+  "native_player_resumed": {
+    "paused": 0,
+    "decoded_frames": 479
+  },
+  "played_position_ms": 14625,
+  "replayed_ms": 985,
+  "closed_position_ms": 14667,
+  "reopened_ms": 15262,
+  "separate_positions": {
+    "keyboard.ru.position": 3330,
+    "keyboard.en.position": 13281
+  },
+  "expanded_controls_bounds": {
+    "Воспроизвести / пауза": "[74,2243][492,2290]",
+    "Сначала": "[720,2243][875,2290]"
+  },
+  "expanded_back_collapsed": true,
+  "back_returned_to_setup": true,
+  "offline": {
+    "airplane": "1",
+    "wifi": "0",
+    "mobile_data": "0"
+  },
+  "app_language_override": null
+}

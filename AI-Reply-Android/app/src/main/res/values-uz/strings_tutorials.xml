@@ -1,14 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="tutorial_videos_title">Videoqoʻllanmalar</string>
-    <string name="tutorial_keyboard_title">Klaviaturani sozlash va nusxalangan matn</string>
+    <string name="tutorial_keyboard_title">AI Reply dan foydalanish</string>
     <string name="tutorial_watch">Videoni koʻrish</string>
     <string name="tutorial_play_pause">Ijro / pauza</string>
     <string name="tutorial_replay">Qayta koʻrish</string>
-    <string name="tutorial_offline_body">Video telefonda saqlanadi va internetsiz ishlaydi. Yoʻriqnomani istalgan payt qayta ochishingiz mumkin. Videoni koʻrish Android ruxsatlarini bermaydi.</string>
+    <string name="tutorial_offline_body">Qadamlar yozuvlar bilan tushuntirilgan ovozsiz video. Internetsiz ishlaydi va uni istalgan payt qayta koʻrish mumkin. Sozlash uchun qadamlarni oʻz telefoningizda takrorlang.</string>
     <string name="tutorial_video_error">Video ochilmadi. Matnli yoʻriqnoma hali ham mavjud.</string>
     <string name="tutorial_caption_setup">AI Reply ichida klaviatura sozlamalarini oching.</string>
     <string name="tutorial_caption_settings">Android sozlamalaridagi ekran klaviaturalari roʻyxatidan AI Reply ni toping.</string>
     <string name="tutorial_caption_allow">AI Reply klaviaturasini yoqing va uni tanlang. Bufer uchun alohida ruxsat kerak emas.</string>
     <string name="tutorial_caption_try">Xabarni nusxalang, AI Reply klaviaturasiga oʻting va qabul qiluvchi yoki «Qoʻyish» tugmasini bosing. Matn faqat bosganingizdan keyin oʻqiladi.</string>
+    <string name="tutorial_language_body">Video tili ilova tiliga mos keladi. AI Reply sozlamalarida boshqa tilni tanlamasangiz, telefon tili ishlatiladi.</string>
+    <string name="tutorial_connect_title">Klaviaturani ulang</string>
+    <string name="tutorial_step_enable">Android sozlamalarida ekran klaviaturalari roʻyxatini oching va AI Reply ni yoqing. Tizim ogohlantirishini oʻqing va klaviaturadan foydalanmoqchi boʻlsangiz, tasdiqlang.</string>
+    <string name="tutorial_step_select">AI Reply ga qaytib, uni klaviaturalar roʻyxatidan tanlang. Chatda xabar maydonini bosing va klaviaturani almashtirish tugmasi orqali AI Reply ga oʻting.</string>
+    <string name="tutorial_clipboard_title">Nusxalangan xabarga javob bering</string>
+    <string name="tutorial_step_copy">Chatda javob bermoqchi boʻlgan xabarni bosib turing va «Nusxalash»ni tanlang.</string>
+    <string name="tutorial_step_paste">Chatdagi xabar maydonini oching, AI Reply ga oʻting va qabul qiluvchi yoki «%1$s» tugmasini bosing. Nusxalangan xabar javob panelida paydo boʻlganini tekshiring.</string>
+    <string name="tutorial_clipboard_body">Android da bufer uchun alohida ruxsat yoʻq. AI Reply nusxalangan matnni qabul qiluvchi yoki «Xabarni qoʻyish» tugmasini bosganingizda oʻqiydi.</string>
+    <string name="tutorial_reply_title">Yarating, tekshiring va qoʻying</string>
+    <string name="tutorial_step_instruction">Kimga yozayotganingizni tanlang va kerak boʻlsa, «Qisqa va muloyim javob ber» kabi koʻrsatma qoʻshing. Uni yozishingiz yoki ovoz bilan kiritishingiz mumkin.</string>
+    <string name="tutorial_step_generate">Javob yaratish uchun «%1$s» tugmasini bosing. Yangi xabar uchun AI panelini oching, vazifani tasvirlang va «%2$s» tugmasini bosing. Internet kerak.</string>
+    <string name="tutorial_step_review">Natijani oʻqing. Kerak boʻlsa, tahrirlang yoki boshqa variant soʻrang.</string>
+    <string name="tutorial_step_insert">Natijani chatdagi xabar maydoniga joylash uchun «%1$s» tugmasini bosing.</string>
+    <string name="tutorial_step_send">Chatdagi xabarni tekshiring va chat ilovasining yuborish tugmasi bilan oʻzingiz yuboring.</string>
+    <string name="tutorial_voice_title">Ovozli kiritishdan foydalaning</string>
+    <string name="tutorial_voice_optional">Mikrofon ixtiyoriy. Koʻrsatmani har doim klaviatura bilan kiritishingiz mumkin.</string>
+    <string name="tutorial_step_mic">Koʻrsatma panelidagi mikrofonni bosing. Android ruxsat soʻrasa, ovoz bilan kiritmoqchi boʻlganingizda ruxsat bering. Ruxsat oʻchirilgan boʻlsa, Android sozlamalari → Ilovalar → AI Reply → Ruxsatlar boʻlimidan yoqing.</string>
+    <string name="tutorial_step_dictate">Koʻrsatmani ayting, keyin yozishni tugatish va soʻzlarni tanish uchun «%1$s» tugmasini bosing.</string>
+    <string name="tutorial_step_voice_review">Koʻrsatmadagi tanilgan matnni tekshiring va yaratishdan oldin tuzating. Chat maydoniga bevosita ovoz bilan kiritganda, soʻzlar tasdiqlashni kutayotgan boʻlsa, «Qoʻyish» tugmasini bosing.</string>
+    <string name="tutorial_voice_privacy">Ovozli kiritish uchun internet kerak. Yozuv matnga aylantirish uchun AI Reply serveri orqali OpenAI ga yuboriladi.</string>
+    <string name="tutorial_expand_video">Videoni kattalashtirish</string>
+    <string name="tutorial_collapse_video">Qoʻllanmani koʻrsatish</string>
 </resources>

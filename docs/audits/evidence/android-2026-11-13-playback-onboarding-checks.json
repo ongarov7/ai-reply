@@ -1,0 +1,14 @@
+{
+  "opened_video": true,
+  "returned_same_page": true,
+  "state_before": {
+    "onboarding.resumeStep": "permissions",
+    "onboarding.asksGender": "false",
+    "onboarding.path": "setup_first"
+  },
+  "state_after": {
+    "onboarding.resumeStep": "permissions",
+    "onboarding.asksGender": "false",
+    "onboarding.path": "setup_first"
+  }
+}

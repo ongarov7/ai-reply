@@ -1,0 +1,42 @@
+{
+  "language": "uz",
+  "system_configuration": "config: mcc310-mnc260-b+uz+Latn+UZ,kk-rKZ,ru-rRU,en-rUS-ldltr-sw411dp-w411dp-h923dp-normal-long-notround-nowidecg-lowdr-port-notnight-420dpi-finger-keysexposed-nokeys-navhidden-nonav-2424x1080-v36\nabi: arm64-v8a",
+  "native_player_before_pause": {
+    "paused": 0,
+    "decoded_frames": 347
+  },
+  "native_player_paused": {
+    "paused": 1,
+    "decoded_frames": 428
+  },
+  "native_player_still_paused": {
+    "paused": 1,
+    "decoded_frames": 428
+  },
+  "native_player_resumed": {
+    "paused": 0,
+    "decoded_frames": 491
+  },
+  "played_position_ms": 14523,
+  "replayed_ms": 955,
+  "closed_position_ms": 18567,
+  "reopened_ms": 17728,
+  "separate_positions": {
+    "keyboard.kk.position": 3142,
+    "keyboard.ru.position": 3330,
+    "keyboard.en.position": 13281,
+    "keyboard.uz.position": 3361
+  },
+  "expanded_controls_bounds": {
+    "Ijro / pauza": "[184,2243][382,2290]",
+    "Qayta koʻrish": "[683,2243][912,2290]"
+  },
+  "expanded_back_collapsed": true,
+  "back_returned_to_setup": true,
+  "offline": {
+    "airplane": "1",
+    "wifi": "0",
+    "mobile_data": "0"
+  },
+  "app_language_override": null
+}

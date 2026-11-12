@@ -1,0 +1,219 @@
+{
+  "language": "kk",
+  "output": "/Users/yerekyerkinbekuly/progo/ai-reply/AI-Reply-Android/app/src/main/res/raw/keyboard_setup_kk.mp4",
+  "bytes": 1470436,
+  "sha256": "4133d4a7e69af7a66d600acff8ccad8c0d21ce72f8c28e66a8ecbcd870579075",
+  "contact": "/Users/yerekyerkinbekuly/progo/ai-reply/docs/audits/evidence/android-2026-11-13-tutorial-kk-frames.png",
+  "clips": [
+    {
+      "path": "/private/tmp/aireply-android-capture/kk/welcome.mp4",
+      "source_sha256": "8de612f4f185a884138e7d0f74050b86e9b45f8e75fa46cec692a0d3b8be7778",
+      "start": 0.0,
+      "seconds": 8.0,
+      "capture_wall_seconds": 12.0,
+      "held_static_final_frame": false,
+      "caption": "AI Reply қолданбасын ашып, «Пернетақтаны баптау» түймесін түртіңіз.",
+      "source": {
+        "seconds": 8.7,
+        "width": 720,
+        "height": 1616,
+        "video": "Stream #0:0[0x1](eng): Video: h264 (Constrained Baseline) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 720x1616, 168 kb/s, 1.03 fps, 10.08 tbr, 90k tbn (default)",
+        "audio_streams": 0,
+        "subtitle_streams": 0
+      }
+    },
+    {
+      "path": "/private/tmp/aireply-android-capture/kk/activation.mp4",
+      "source_sha256": "eeba55a13fef4aa97281bca466e1fe5b23918f96d913e8140ca2f481902e738b",
+      "start": 2.0,
+      "seconds": 4.0,
+      "capture_wall_seconds": 20.4,
+      "held_static_final_frame": false,
+      "caption": "Жүйенің пернетақта баптауларын ашып, AI Reply пернетақтасын қосыңыз.",
+      "source": {
+        "seconds": 16.96,
+        "width": 720,
+        "height": 1616,
+        "video": "Stream #0:0[0x1](eng): Video: h264 (Constrained Baseline) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 720x1616, 683 kb/s, 8.43 fps, 90k tbr, 90k tbn (default)",
+        "audio_streams": 0,
+        "subtitle_streams": 0
+      }
+    },
+    {
+      "path": "/private/tmp/aireply-android-capture/kk/activation.mp4",
+      "source_sha256": "eeba55a13fef4aa97281bca466e1fe5b23918f96d913e8140ca2f481902e738b",
+      "start": 6.0,
+      "seconds": 8.0,
+      "capture_wall_seconds": 20.4,
+      "held_static_final_frame": false,
+      "caption": "Android әр пернетақтаның терілген мәтінді көре алатынын ескертеді. Ескертуді оқып, келіссеңіз, растаңыз.",
+      "source": {
+        "seconds": 16.96,
+        "width": 720,
+        "height": 1616,
+        "video": "Stream #0:0[0x1](eng): Video: h264 (Constrained Baseline) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 720x1616, 683 kb/s, 8.43 fps, 90k tbr, 90k tbn (default)",
+        "audio_streams": 0,
+        "subtitle_streams": 0
+      }
+    },
+    {
+      "path": "/private/tmp/aireply-android-capture/kk/choose.mp4",
+      "source_sha256": "20f9eac555062ac76054a3c620e9c856dd254a4d5f7a09aa69e0ab53de33a43c",
+      "start": 1.0,
+      "seconds": 9.0,
+      "capture_wall_seconds": 12.3,
+      "held_static_final_frame": true,
+      "caption": "Қолданбаға оралып, пернетақталар тізімінен AI Reply пернетақтасын таңдаңыз.",
+      "source": {
+        "seconds": 8.98,
+        "width": 720,
+        "height": 1616,
+        "video": "Stream #0:0[0x1](eng): Video: h264 (Constrained Baseline) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 720x1616, 373 kb/s, 3.01 fps, 90k tbr, 90k tbn (default)",
+        "audio_streams": 0,
+        "subtitle_streams": 0
+      }
+    },
+    {
+      "path": "/private/tmp/aireply-android-capture/kk/copy.mp4",
+      "source_sha256": "4f299519ba1783b3ba0de64c7851db2d4cf1009224b5c29d83f8b3f6197b768a",
+      "start": 1.0,
+      "seconds": 7.0,
+      "capture_wall_seconds": 15.2,
+      "held_static_final_frame": true,
+      "caption": "Жауап бергіңіз келген хабарламаны басып тұрып, «Көшіру» пәрменін таңдаңыз.",
+      "source": {
+        "seconds": 7.06,
+        "width": 720,
+        "height": 1616,
+        "video": "Stream #0:0[0x1](eng): Video: h264 (Constrained Baseline) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 720x1616, 146 kb/s, 3.26 fps, 90k tbr, 90k tbn (default)",
+        "audio_streams": 0,
+        "subtitle_streams": 0
+      }
+    },
+    {
+      "path": "/private/tmp/aireply-android-capture/kk/paste.mp4",
+      "source_sha256": "ed7ed30e2ca6abc61ac27c583c63b462bde5764b0f48bde08546dd65d0b89fbf",
+      "start": 0.0,
+      "seconds": 10.0,
+      "capture_wall_seconds": 12.3,
+      "held_static_final_frame": false,
+      "caption": "AI Reply ішінен алушыны не «Қою» түймесін түртіңіз. Мәтін сол кезде оқылады. Қоюға бөлек рұқсат қажет емес.",
+      "source": {
+        "seconds": 11.29,
+        "width": 720,
+        "height": 1616,
+        "video": "Stream #0:0[0x1](eng): Video: h264 (Constrained Baseline) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 720x1616, 149 kb/s, 4.43 fps, 90k tbr, 90k tbn (default)",
+        "audio_streams": 0,
+        "subtitle_streams": 0
+      }
+    },
+    {
+      "path": "/private/tmp/aireply-android-capture/kk/permission_setup.mp4",
+      "source_sha256": "fab3c3612d35102ba421570d59f6f836ad3b2b94251847dadbf1e2f0b9c256a9",
+      "start": 5.0,
+      "seconds": 7.0,
+      "capture_wall_seconds": 13.0,
+      "held_static_final_frame": false,
+      "caption": "Дауыспен енгізу үшін микрофонға қолданбаны пайдалану кезінде рұқсат беріңіз. Микрофон міндетті емес.",
+      "source": {
+        "seconds": 12.86,
+        "width": 720,
+        "height": 1616,
+        "video": "Stream #0:0[0x1](eng): Video: h264 (Constrained Baseline) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 720x1616, 220 kb/s, 2.64 fps, 90k tbr, 90k tbn (default)",
+        "audio_streams": 0,
+        "subtitle_streams": 0
+      }
+    },
+    {
+      "path": "/private/tmp/aireply-android-capture/kk/permission_allow.mp4",
+      "source_sha256": "11340bcd3280f12b63126f0651467a4dd9a433a01f9bf9ffe787f680f72c4f1a",
+      "start": 0.0,
+      "seconds": 4.0,
+      "capture_wall_seconds": 10.4,
+      "held_static_final_frame": false,
+      "caption": "Дауыспен енгізу үшін микрофонға қолданбаны пайдалану кезінде рұқсат беріңіз. Микрофон міндетті емес.",
+      "source": {
+        "seconds": 7.07,
+        "width": 720,
+        "height": 1616,
+        "video": "Stream #0:0[0x1](eng): Video: h264 (Constrained Baseline) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 720x1616, 313 kb/s, 2.83 fps, 90k tbr, 90k tbn (default)",
+        "audio_streams": 0,
+        "subtitle_streams": 0
+      }
+    },
+    {
+      "path": "/private/tmp/aireply-android-capture/kk/voice.mp4",
+      "source_sha256": "76df0b4a246b38f7d329742064b5d8699eb961e66b1a95808f136bce9d6d2b1c",
+      "start": 0.0,
+      "seconds": 8.0,
+      "capture_wall_seconds": 12.3,
+      "held_static_final_frame": false,
+      "caption": "Нұсқауды айтып, жазбаны тоқтатыңыз. Танылған мәтінді тексеріңіз. Нұсқауды пернетақтамен де теруге болады.",
+      "source": {
+        "seconds": 10.68,
+        "width": 720,
+        "height": 1616,
+        "video": "Stream #0:0[0x1](eng): Video: h264 (Constrained Baseline) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 720x1616, 222 kb/s, 11.71 fps, 90k tbr, 90k tbn (default)",
+        "audio_streams": 0,
+        "subtitle_streams": 0
+      }
+    },
+    {
+      "path": "/private/tmp/aireply-android-capture/kk/generate.mp4",
+      "source_sha256": "4e337cdcdd1692c30a013a05b94e14516e5db04362c078152abf227772cb619b",
+      "start": 0.0,
+      "seconds": 5.0,
+      "capture_wall_seconds": 17.6,
+      "held_static_final_frame": false,
+      "caption": "Кімге жауап беретініңізді таңдаңыз. Нұсқауды жазыңыз немесе дайын ұсынысты таңдаңыз.",
+      "source": {
+        "seconds": 17.04,
+        "width": 720,
+        "height": 1616,
+        "video": "Stream #0:0[0x1](eng): Video: h264 (Constrained Baseline) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 720x1616, 141 kb/s, 3.35 fps, 90k tbr, 90k tbn (default)",
+        "audio_streams": 0,
+        "subtitle_streams": 0
+      }
+    },
+    {
+      "path": "/private/tmp/aireply-android-capture/kk/generate.mp4",
+      "source_sha256": "4e337cdcdd1692c30a013a05b94e14516e5db04362c078152abf227772cb619b",
+      "start": 11.5,
+      "seconds": 6.0,
+      "capture_wall_seconds": 17.6,
+      "held_static_final_frame": true,
+      "caption": "Жауап жасаңыз, оқып, қажет болса түзетіңіз де, чатқа қойыңыз. Жіберу түймесін өзіңіз басасыз.",
+      "source": {
+        "seconds": 17.04,
+        "width": 720,
+        "height": 1616,
+        "video": "Stream #0:0[0x1](eng): Video: h264 (Constrained Baseline) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 720x1616, 141 kb/s, 3.35 fps, 90k tbr, 90k tbn (default)",
+        "audio_streams": 0,
+        "subtitle_streams": 0
+      }
+    },
+    {
+      "path": "/private/tmp/aireply-android-capture/kk/insert.mp4",
+      "source_sha256": "0ee580ba65ca00b4fa0c246e0429e0b8a71de13ee223e716b6b4353d83535506",
+      "start": 0.0,
+      "seconds": 7.0,
+      "capture_wall_seconds": 9.5,
+      "held_static_final_frame": false,
+      "caption": "Жауап жасаңыз, оқып, қажет болса түзетіңіз де, чатқа қойыңыз. Жіберу түймесін өзіңіз басасыз.",
+      "source": {
+        "seconds": 9.23,
+        "width": 720,
+        "height": 1616,
+        "video": "Stream #0:0[0x1](eng): Video: h264 (Constrained Baseline) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 720x1616, 171 kb/s, 3.14 fps, 90k tbr, 90k tbn (default)",
+        "audio_streams": 0,
+        "subtitle_streams": 0
+      }
+    }
+  ],
+  "seconds": 82.9,
+  "width": 720,
+  "height": 1836,
+  "video": "Stream #0:0[0x1](und): Video: h264 (High) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 720x1836 [SAR 1:1 DAR 20:51], 138 kb/s, 30 fps, 30 tbr, 15360 tbn (default)",
+  "audio_streams": 0,
+  "subtitle_streams": 0
+}

@@ -1,0 +1,14 @@
+{
+  "nine_steps_visible": {
+    "tutorial_step_enable": "[174,495][996,727]",
+    "tutorial_step_select": "[174,310][996,457]",
+    "tutorial_step_copy": "[174,816][996,926]",
+    "tutorial_step_paste": "[174,310][996,425]",
+    "tutorial_step_instruction": "[174,804][996,1036]",
+    "tutorial_step_generate": "[174,339][996,571]",
+    "tutorial_step_review": "[174,613][996,723]",
+    "tutorial_step_insert": "[174,765][996,875]",
+    "tutorial_step_send": "[174,917][996,1027]"
+  },
+  "voice_guidance_reached": true
+}

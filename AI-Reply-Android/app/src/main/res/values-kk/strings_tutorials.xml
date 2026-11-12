@@ -1,14 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="tutorial_videos_title">Бейненұсқаулықтар</string>
-    <string name="tutorial_keyboard_title">Пернетақтаны баптау және көшірілген мәтін</string>
+    <string name="tutorial_keyboard_title">AI Reply қолдану жолы</string>
     <string name="tutorial_watch">Бейнені көру</string>
     <string name="tutorial_play_pause">Ойнату / кідірту</string>
     <string name="tutorial_replay">Қайта ойнату</string>
-    <string name="tutorial_offline_body">Бейне телефонда сақталады және интернетсіз жұмыс істейді. Нұсқаулықты кез келген уақытта қайта аша аласыз. Бейнені көру Android рұқсаттарын бермейді.</string>
+    <string name="tutorial_offline_body">Қадамдары жазумен түсіндірілген дыбыссыз бейне. Интернетсіз жұмыс істейді, оны кез келген уақытта қайта көруге болады. Баптау үшін қадамдарды өз телефоныңызда қайталаңыз.</string>
     <string name="tutorial_video_error">Бейне ашылмады. Мәтіндік нұсқаулық қолжетімді.</string>
     <string name="tutorial_caption_setup">AI Reply ішінен пернетақтаны баптауды ашыңыз.</string>
     <string name="tutorial_caption_settings">Android баптауларынан экрандық пернетақталар тізімінде AI Reply табыңыз.</string>
     <string name="tutorial_caption_allow">AI Reply пернетақтасын қосып, оны таңдаңыз. Алмасу буферіне бөлек рұқсат қажет емес.</string>
     <string name="tutorial_caption_try">Хабарламаны көшіріп, AI Reply пернетақтасына ауысыңыз да, алушыны немесе «Қою» түймесін түртіңіз. Мәтін тек сіз түрткеннен кейін оқылады.</string>
+    <string name="tutorial_language_body">Бейне тілі қолданба тіліне сәйкес келеді. AI Reply баптауларында басқа тіл таңдамасаңыз, телефон тілі қолданылады.</string>
+    <string name="tutorial_connect_title">Пернетақтаны қосыңыз</string>
+    <string name="tutorial_step_enable">Android баптауларындағы экрандық пернетақталар тізімін ашып, AI Reply пернетақтасын қосыңыз. Жүйе ескертуін оқып, пернетақтаны қолданғыңыз келсе, растаңыз.</string>
+    <string name="tutorial_step_select">AI Reply қолданбасына оралып, оны пернетақталар тізімінен таңдаңыз. Чатта хабарлама өрісін түртіп, пернетақтаны ауыстыру түймесі арқылы AI Reply пернетақтасына ауысыңыз.</string>
+    <string name="tutorial_clipboard_title">Көшірілген хабарламаға жауап беріңіз</string>
+    <string name="tutorial_step_copy">Чатта жауап бергіңіз келген хабарламаны басып тұрып, «Көшіру» пәрменін таңдаңыз.</string>
+    <string name="tutorial_step_paste">Чаттағы хабарлама өрісін түртіп, AI Reply пернетақтасына ауысыңыз да, алушыны немесе «%1$s» түймесін түртіңіз. Көшірілген хабарламаның жауап панелінде пайда болғанын тексеріңіз.</string>
+    <string name="tutorial_clipboard_body">Android жүйесінде алмасу буферіне бөлек рұқсат жоқ. AI Reply көшірілген мәтінді алушыны немесе «Хабарламаны қою» түймесін түрткенде оқиды.</string>
+    <string name="tutorial_reply_title">Жасаңыз, тексеріңіз және қойыңыз</string>
+    <string name="tutorial_step_instruction">Кімге жазатыныңызды таңдап, қажет болса, «Қысқа әрі сыпайы жауап бер» сияқты нұсқау қосыңыз. Оны теруге немесе дауыспен енгізуге болады.</string>
+    <string name="tutorial_step_generate">Жауап жасау үшін «%1$s» түймесін түртіңіз. Жаңа хабарлама жазу үшін AI панелін ашып, тапсырманы сипаттаңыз да, «%2$s» түймесін түртіңіз. Интернет қажет.</string>
+    <string name="tutorial_step_review">Нәтижені оқыңыз. Қажет болса, өңдеңіз немесе басқа нұсқа сұраңыз.</string>
+    <string name="tutorial_step_insert">Нәтижені чаттағы хабарлама өрісіне көшіру үшін «%1$s» түймесін түртіңіз.</string>
+    <string name="tutorial_step_send">Чаттағы хабарламаны тексеріп, чат қолданбасындағы жіберу түймесімен өзіңіз жіберіңіз.</string>
+    <string name="tutorial_voice_title">Дауыспен енгізуді қолданыңыз</string>
+    <string name="tutorial_voice_optional">Микрофонды қолдану міндетті емес. Нұсқауды әрқашан пернетақтамен енгізуге болады.</string>
+    <string name="tutorial_step_mic">Нұсқау панеліндегі микрофонды түртіңіз. Android рұқсат сұраса, дауыспен енгізгіңіз келгенде рұқсат беріңіз. Рұқсат өшірулі болса, Android баптаулары → Қолданбалар → AI Reply → Рұқсаттар бөлімінен қосыңыз.</string>
+    <string name="tutorial_step_dictate">Нұсқауды дауыстап айтып, жазбаны аяқтау және сөздерді тану үшін «%1$s» түймесін түртіңіз.</string>
+    <string name="tutorial_step_voice_review">Нұсқаудағы танылған мәтінді тексеріп, жауап жасамас бұрын түзетіңіз. Чат өрісіне тікелей дауыспен енгізгенде, сөздер растауды күтіп тұрса, «Қою» түймесін түртіңіз.</string>
+    <string name="tutorial_voice_privacy">Дауыспен енгізу үшін интернет қажет. Жазба мәтінге айналдыру үшін AI Reply сервері арқылы OpenAI қызметіне жіберіледі.</string>
+    <string name="tutorial_expand_video">Видеоны үлкейту</string>
+    <string name="tutorial_collapse_video">Нұсқаулықты көрсету</string>
 </resources>

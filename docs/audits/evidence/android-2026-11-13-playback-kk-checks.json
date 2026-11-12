@@ -1,0 +1,41 @@
+{
+  "language": "kk",
+  "system_configuration": "config: mcc310-mnc260-kk-rKZ,ru-rRU,en-rUS,b+uz+Latn+UZ-ldltr-sw411dp-w411dp-h923dp-normal-long-notround-nowidecg-lowdr-port-notnight-420dpi-finger-keysexposed-nokeys-navhidden-nonav-2424x1080-v36\nabi: arm64-v8a",
+  "native_player_before_pause": {
+    "paused": 0,
+    "decoded_frames": 347
+  },
+  "native_player_paused": {
+    "paused": 1,
+    "decoded_frames": 459
+  },
+  "native_player_still_paused": {
+    "paused": 1,
+    "decoded_frames": 459
+  },
+  "native_player_resumed": {
+    "paused": 0,
+    "decoded_frames": 521
+  },
+  "played_position_ms": 15328,
+  "replayed_ms": 943,
+  "closed_position_ms": 15329,
+  "reopened_ms": 18519,
+  "separate_positions": {
+    "keyboard.kk.position": 3142,
+    "keyboard.ru.position": 3330,
+    "keyboard.en.position": 13281
+  },
+  "expanded_controls_bounds": {
+    "Ойнату / кідірту": "[137,2243][429,2290]",
+    "Қайта ойнату": "[673,2243][922,2290]"
+  },
+  "expanded_back_collapsed": true,
+  "back_returned_to_setup": true,
+  "offline": {
+    "airplane": "1",
+    "wifi": "0",
+    "mobile_data": "0"
+  },
+  "app_language_override": null
+}
