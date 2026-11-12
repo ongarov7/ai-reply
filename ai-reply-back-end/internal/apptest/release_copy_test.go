@@ -1,13 +1,21 @@
 package apptest
 
 import (
+	"context"
 	"html"
+	"io"
+	"log/slog"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/aireply/ai-reply-back-end/internal/catalog"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
 	"github.com/aireply/ai-reply-back-end/internal/localization"
+	"github.com/aireply/ai-reply-back-end/internal/middleware"
+	"github.com/aireply/ai-reply-back-end/internal/plans"
+	"github.com/aireply/ai-reply-back-end/internal/transport/web"
 )
 
 // Сатып алу жоқ кезде лендинг тариф ауыстыруды уәде етпейді; тегін лимит дерекқордан алынады.
@@ -52,33 +60,64 @@ func TestLandingPricingWithoutPurchases(t *testing.T) {
 	}
 }
 
-// Website Base retains its terms; shared help distinguishes Apple packs and store prices.
-func TestPublicPagesDistinguishWebsiteBaseFromApplePacks(t *testing.T) {
+func releaseCopyPages(t *testing.T, h *harness, bundle *localization.Bundle, prices *catalog.Service) http.Handler {
+	t.Helper()
+	s, err := web.New(web.Deps{Config: h.cfg, Plans: plans.New(h.store), Catalog: prices,
+		Bundle: bundle, Limiter: middleware.NewLimiter(), Log: slog.New(slog.NewTextHandler(io.Discard, nil))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	s.Register(mux)
+	return mux
+}
+
+func releaseCopyPage(t *testing.T, handler http.Handler, path string) string {
+	t.Helper()
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("%s: HTTP %d", path, w.Code)
+	}
+	return html.UnescapeString(w.Body.String())
+}
+
+// Current website packs are one-time purchases; legacy Base balances stay described in help.
+func TestPublicPagesDescribeOneTimeWebsitePacks(t *testing.T) {
 	h := newHarness(t, withEnv("TEST_APPROVED_ENTITLEMENTS", "true"))
 	bundle, err := localization.Load()
 	if err != nil {
 		t.Fatal(err)
 	}
+	prices := catalog.New(h.db)
+	if err := prices.EnsureInitial(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	pages := releaseCopyPages(t, h, bundle, prices)
 	for locale, want := range map[string]struct {
 		bundle, support, website string
 		stale                    []string
 	}{
-		"en": {"1,000 replies each paid month. Unused replies never expire.", "Purchased reply packs never expire.", "Website prices are in tenge",
-			[]string{"Every night", "renews every night", "resets at midnight", "left today", "the next day", "daily reply limit"}},
-		"ru": {"1 000 ответов каждый оплаченный месяц. Остаток не сгорает.", "Купленные пакеты ответов не сгорают.", "Цены сайта указаны в тенге",
-			[]string{"Каждую ночь", "каждую ночь", "в полночь", "осталось сегодня", "на следующий день", "дневной лимит"}},
-		"kk": {"Әр төленген айға 1 000 жауап. Қалған жауаптардың мерзімі шектелмейді.", "Сатып алынған жауап пакеттерінің мерзімі шектелмейді.", "Сайттағы бағалар теңгемен көрсетілген",
-			[]string{"Күн сайын түн ортасында", "әр түні", "түн ортасында", "Бүгін неше", "келесі күні", "күндік"}},
-		"uz": {"Har to‘langan oy uchun 1 000 javob. Qolgan javoblar muddatsiz.", "Sotib olingan javob paketlari muddatsiz.", "Saytdagi narxlar tengeda",
-			[]string{"Har kuni yarim tunda", "har kecha", "yarim tunda", "Bugun nechta", "ertasi kuni", "kunlik"}},
+		"en": {"500 replies", "Purchased reply packs never expire.", "Website prices are in tenge",
+			[]string{"1,000 replies each paid month", "Every night", "renews every night", "resets at midnight", "left today", "the next day", "daily reply limit"}},
+		"ru": {"500 ответов", "Купленные пакеты ответов не сгорают.", "Цены сайта указаны в тенге",
+			[]string{"1 000 ответов каждый оплаченный месяц", "Каждую ночь", "каждую ночь", "в полночь", "осталось сегодня", "на следующий день", "дневной лимит"}},
+		"kk": {"500 жауап", "Сатып алынған жауап пакеттерінің мерзімі шектелмейді.", "Сайттағы бағалар теңгемен көрсетілген",
+			[]string{"Әр төленген айға 1 000 жауап", "Күн сайын түн ортасында", "әр түні", "түн ортасында", "Бүгін неше", "келесі күні", "күндік"}},
+		"uz": {"500 javob", "Sotib olingan javob paketlari muddatsiz.", "Saytdagi narxlar tengeda",
+			[]string{"Har to‘langan oy uchun 1 000 javob", "Har kuni yarim tunda", "har kecha", "yarim tunda", "Bugun nechta", "ertasi kuni", "kunlik"}},
 	} {
-		_, landing := fetch(t, h, "/?lang="+locale)
-		_, support := fetch(t, h, "/support?lang="+locale)
-		landing, support = html.UnescapeString(landing), html.UnescapeString(support)
-		// The note under the catalogue's cards; this harness renders the plan cards instead.
+		landing := releaseCopyPage(t, pages, "/?lang="+locale)
+		support := releaseCopyPage(t, pages, "/support?lang="+locale)
 		note := bundle.T(locale, "pricing.catalog_note")
-		if !strings.Contains(landing, want.bundle) {
-			t.Errorf("%s landing is missing %q", locale, want.bundle)
+		for _, text := range []string{want.bundle, bundle.T(locale, "pricing.pack_description"), bundle.T(locale, "admin.billing.once"),
+			"990 KZT", "130 KZT", "3 990 KZT", "39 990 KZT"} {
+			if !strings.Contains(landing, text) {
+				t.Errorf("%s landing is missing %q", locale, text)
+			}
+		}
+		if strings.Contains(landing, `<div class="plan-name">Base`) {
+			t.Errorf("%s landing still offers a Base subscription", locale)
 		}
 		if !strings.Contains(support, want.support) || !strings.Contains(support, "Pro") {
 			t.Errorf("%s support does not describe permanent packs below Pro", locale)
@@ -91,6 +130,39 @@ func TestPublicPagesDistinguishWebsiteBaseFromApplePacks(t *testing.T) {
 				t.Errorf("%s public pages still say %q", locale, stale)
 			}
 		}
+	}
+}
+
+func TestLandingHidesLegacyBaseWithoutPublishedCatalog(t *testing.T) {
+	for _, broken := range []bool{false, true} {
+		t.Run(map[bool]string{false: "missing catalog", true: "invalid catalog"}[broken], func(t *testing.T) {
+			h := newHarness(t, withEnv("TEST_APPROVED_ENTITLEMENTS", "true"))
+			bundle, err := localization.Load()
+			if err != nil {
+				t.Fatal(err)
+			}
+			var prices *catalog.Service
+			if broken {
+				prices = catalog.New(h.db)
+				if err := prices.EnsureInitial(context.Background()); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := h.db.Writer().Exec(`UPDATE billing_catalog_versions SET products_json='{}' WHERE state='published'`); err != nil {
+					t.Fatal(err)
+				}
+			}
+			pages := releaseCopyPages(t, h, bundle, prices)
+			for _, locale := range domain.Locales {
+				page := releaseCopyPage(t, pages, "/?lang="+locale)
+				if strings.Contains(page, `<div class="plan-name">Base`) || strings.Contains(page, "1 000") || strings.Contains(page, "1,000") {
+					t.Errorf("%s landing advertises legacy Base without a usable catalog", locale)
+				}
+			}
+			// Hiding a public card must not change the existing native subscription.
+			if got := h.scalar(`SELECT monthly_message_limit FROM plans WHERE code='base_monthly'`); got != 1000 {
+				t.Fatalf("legacy Base entitlement changed: %d", got)
+			}
+		})
 	}
 }
 

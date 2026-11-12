@@ -47,12 +47,23 @@ backup merely to revert the installer URL.
 
 ## Payment boundaries
 
+The final website/Mac lineup is a **one-time 500-reply pack for 990 KZT**,
+a one-time 30-reply pack for 130 KZT, and unlimited Pro for 3,990 KZT/month
+or 39,990 KZT/year. Pack replies do not expire and do not create a recurring
+mandate. Migration `0040_web_reply_pack_500.sql` enables the existing 500-reply
+product for web checkout and removes Base from new web offers. Legacy store
+products, Base plan quantities, paid order/mandate snapshots and existing
+balances remain unchanged.
+
 The release app and primary website use the same account backend. Web BCC
 payments update that account only after an authenticated final bank notification.
 Browser return alone does not grant access. Automated integration coverage
-checks shared subscription/credit views for macOS, iOS and Android, duplicate
-bank notification handling, compose debit and idempotency, and preservation of
-permanent Base credits after cancellation.
+checks the one-time 500-reply website purchase reaching an existing Mac session,
+generation leaving 499 replies in both website and Mac views, duplicate bank
+notification handling, and debit idempotency. Separate historical tests retain
+Base contract/cancellation coverage. A mixed-provider regression checks that
+Apple refunds preserve BCC access/credits and BCC cancellation/refunds preserve
+Apple access/credits.
 
 BCC and App Store keep separate notification handlers and provider records.
 Existing Apple purchase configuration and device-limit flags were not changed.

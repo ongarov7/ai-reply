@@ -11,7 +11,6 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/database"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
 	"github.com/aireply/ai-reply-back-end/internal/repository"
-	"github.com/aireply/ai-reply-back-end/migrations"
 )
 
 func TestApplePackMigrationPreservesCustomersOtherStoresAndDraftEdits(t *testing.T) {
@@ -50,14 +49,14 @@ func TestApplePackMigrationPreservesCustomersOtherStoresAndDraftEdits(t *testing
 	exec(`INSERT INTO credit_grants(id,user_id,kind,units_total,units_remaining,starts_at,status,created_at,updated_at) VALUES('paid','buyer','pack',30,17,1000,'active',1000,1000)`)
 	order, _ := json.Marshal(old[1])
 	exec(`INSERT INTO billing_orders(id,user_id,idempotency_key,catalog_version,product_code,snapshot_json,amount_minor,currency,provider,environment,bank_order,status,checkout_token_hash,request_json,created_at,updated_at) VALUES('sold','buyer','old',1,'base_monthly',?,99000,'KZT','bcc','sandbox','old-bank','pending','hash','{}',1000,1000)`, string(order))
-	if applied, err := database.Migrate(ctx, db, migrations.FS); err != nil || len(applied) != 1 || applied[0] != "0039_apple_reply_pack_500.sql" {
+	if applied, err := database.Migrate(ctx, db, catalogMigrationsBefore(t, "0040")); err != nil || len(applied) != 1 || applied[0] != "0039_apple_reply_pack_500.sql" {
 		t.Fatalf("migration: %v %v", applied, err)
 	}
 	s := New(db)
 	current, err := s.Published(ctx)
 	want := append([]Product(nil), old...)
 	want[1].AvailableIOS, want[2].AvailableIOS = false, false
-	want = append(want, InitialProducts()[6])
+	want = append(want, productsBeforeWebPack()[6])
 	if err != nil || current.BaseVersion != 1 || !reflect.DeepEqual(current.Products, want) {
 		t.Fatalf("publication: %+v %v", current, err)
 	}
@@ -93,7 +92,7 @@ func TestApplePackMigrationPreservesCustomersOtherStoresAndDraftEdits(t *testing
 	if base.Offered(domain.PlatformIOS) || !base.Offered(domain.PlatformAndroid) {
 		t.Fatal("publishing a rebased draft reopened Apple Base or closed Android")
 	}
-	if applied, err := database.Migrate(ctx, db, migrations.FS); err != nil || len(applied) != 0 {
+	if applied, err := database.Migrate(ctx, db, catalogMigrationsBefore(t, "0040")); err != nil || len(applied) != 0 {
 		t.Fatalf("reapplied: %v %v", applied, err)
 	}
 }
@@ -111,7 +110,7 @@ func TestApplePackMigrationRollsBackOnConflictingProductIdentity(t *testing.T) {
 	if _, err = db.Writer().Exec(`UPDATE iap_products SET apple_product_id='kz.aireply.pack500' WHERE code='pack30'`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = database.Migrate(ctx, db, migrations.FS); err == nil {
+	if _, err = database.Migrate(ctx, db, catalogMigrationsBefore(t, "0040")); err == nil {
 		t.Fatal("conflicting durable store identity was silently reused")
 	}
 	var count, off int
@@ -136,7 +135,7 @@ func adoptionFixture(t *testing.T) (*database.DB, *repository.Store, domain.IAPP
 		t.Fatal(err)
 	}
 	repo := repository.New(db)
-	p := InitialProducts()[6]
+	p := productsBeforeWebPack()[6]
 	// This is exactly what the existing generic admin API persists. That API
 	// generates a new UUID and has no off_android field (the DB default is 0).
 	created, err := repo.CreateIAPProduct(ctx, domain.IAPProduct{
@@ -171,7 +170,7 @@ func TestApplePackMigrationAdoptsAdminUUIDAndPreservesSoldReplay(t *testing.T) {
 			if err != nil || !first.Granted {
 				t.Fatalf("pre-migration purchase: %+v %v", first, err)
 			}
-			if applied, err := database.Migrate(ctx, db, migrations.FS); err != nil || !reflect.DeepEqual(applied, []string{"0039_apple_reply_pack_500.sql"}) {
+			if applied, err := database.Migrate(ctx, db, catalogMigrationsBefore(t, "0040")); err != nil || !reflect.DeepEqual(applied, []string{"0039_apple_reply_pack_500.sql"}) {
 				t.Fatalf("adoption migration: %v %v", applied, err)
 			}
 			after, err := repo.IAPProductByStoreID(ctx, domain.ProviderAppStore, before.AppleProductID)
@@ -195,7 +194,7 @@ func TestApplePackMigrationAdoptsAdminUUIDAndPreservesSoldReplay(t *testing.T) {
 			if err != nil || current.BaseVersion != 1 || current.CreatedBy != "migration:0039" || len(current.Products) != 7 || current.Products[6].AppleProductID != before.AppleProductID {
 				t.Fatalf("adopted catalog publication: %+v %v", current, err)
 			}
-			if applied, err := database.Migrate(ctx, db, migrations.FS); err != nil || len(applied) != 0 {
+			if applied, err := database.Migrate(ctx, db, catalogMigrationsBefore(t, "0040")); err != nil || len(applied) != 0 {
 				t.Fatalf("adoption reapplied: %v %v", applied, err)
 			}
 		})
@@ -217,7 +216,7 @@ func TestApplePackMigrationRejectsConflictingAdoptionTerms(t *testing.T) {
 				t.Fatal(err)
 			}
 			before, _ := repo.IAPProduct(context.Background(), product.ID)
-			if _, err := database.Migrate(context.Background(), db, migrations.FS); err == nil {
+			if _, err := database.Migrate(context.Background(), db, catalogMigrationsBefore(t, "0040")); err == nil {
 				t.Fatal("conflicting product was adopted")
 			}
 			after, err := repo.IAPProduct(context.Background(), product.ID)
@@ -236,7 +235,7 @@ func TestApplePackMigrationRejectsConflictingCatalogTerms(t *testing.T) {
 	for _, field := range []string{"units", "available_web"} {
 		t.Run(field, func(t *testing.T) {
 			db, _, _ := adoptionFixture(t)
-			products := InitialProducts()
+			products := productsBeforeWebPack()
 			if field == "units" {
 				products[6].Units = 499
 			} else {
@@ -246,7 +245,7 @@ func TestApplePackMigrationRejectsConflictingCatalogTerms(t *testing.T) {
 			if _, err := db.Writer().Exec(`UPDATE billing_catalog_versions SET products_json=? WHERE id=1`, string(raw)); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := database.Migrate(context.Background(), db, migrations.FS); err == nil {
+			if _, err := database.Migrate(context.Background(), db, catalogMigrationsBefore(t, "0040")); err == nil {
 				t.Fatal("conflicting catalog terms were accepted")
 			}
 			var stored string

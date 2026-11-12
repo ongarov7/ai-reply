@@ -168,8 +168,13 @@ func TestWebAccountUsesExistingAccountAndRevokesOnlyBrowserSession(t *testing.T)
 	if snapshot.User.ID != user.ID || snapshot.Usage.Purchased != 7 {
 		t.Fatal("web sign-in did not use the existing account and purchased balance")
 	}
-	if !snapshot.Bank.Enabled || snapshot.Bank.Version == 0 || snapshot.Bank.Terms != legal.WebPurchaseTermsVersion || len(snapshot.Bank.Products) != 1 {
+	if !snapshot.Bank.Enabled || snapshot.Bank.Version == 0 || snapshot.Bank.Terms != legal.WebPurchaseTermsVersion || len(snapshot.Bank.Products) != 2 {
 		t.Fatal("incorrect web offer snapshot")
+	}
+	for _, product := range snapshot.Bank.Products {
+		if product.Kind != "pack" || product.Code != "pack30" && product.Code != "pack500" {
+			t.Fatalf("recurring-disabled account received an unexpected offer: %+v", product)
+		}
 	}
 	forged := *cookie
 	forged.Value = native.RefreshToken
@@ -375,7 +380,11 @@ func TestWebsiteSubscriptionReachesAlreadySignedInNativeAndPreservesPaidAccessOn
 		{domain.PlatformMacOS, "base_monthly"}, {domain.PlatformMacOS, "pro_monthly"}, {domain.PlatformMacOS, "pro_yearly"},
 	} {
 		platform, code := tc.platform, tc.code
-		t.Run(platform+"/"+code, func(t *testing.T) {
+		label := platform + "/" + code
+		if code == "base_monthly" {
+			label = platform + "/legacy_" + code
+		}
+		t.Run(label, func(t *testing.T) {
 			cfg := webTestConfig(t)
 			cfg.BCCCheckout.RecurringEnabled = true
 			var providerCalls atomic.Int32
@@ -390,6 +399,31 @@ func TestWebsiteSubscriptionReachesAlreadySignedInNativeAndPreservesPaidAccessOn
 			t.Cleanup(provider.Close)
 			cfg.OpenAI.BaseURL = provider.URL
 			app := webTestApplication(t, cfg)
+			db := billingOpenFixtureDB(t, cfg.Database.Path)
+			if code == "base_monthly" {
+				// Explicit historical catalogue fixture: Base was sold as a
+				// renewing 1,000-reply bundle before the one-time web pack.
+				// This does not re-enable Base in the current catalogue.
+				prices := catalog.New(db)
+				published, err := prices.Published(context.Background())
+				if err != nil {
+					t.Fatal(err)
+				}
+				for i := range published.Products {
+					if published.Products[i].Code == code {
+						published.Products[i].AvailableWeb = true
+						published.Products[i].Active = true
+						published.Products[i].MonthlyLimit = 1000
+					}
+				}
+				draft, err := prices.SaveDraft(context.Background(), "legacy-fixture", 0, published.Products)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err := prices.Publish(context.Background(), "legacy-fixture", draft.ID, draft.Revision); err != nil {
+					t.Fatal(err)
+				}
+			}
 			cookie, snapshot := webTestSignIn(t, app.handler, "", code+"@example.invalid")
 			webTestRequest(app.handler, http.MethodPost, "/api/v1/auth/email/otp/request", map[string]string{"email": snapshot.User.Email, "locale": "ru"}, nil, "https://billing.example.invalid", "")
 			signIn := webTestRequest(app.handler, http.MethodPost, "/api/v1/auth/email/otp/verify", map[string]any{
@@ -459,7 +493,6 @@ func TestWebsiteSubscriptionReachesAlreadySignedInNativeAndPreservesPaidAccessOn
 			if before := readNative(); before.Subscription.Plan.Code != "free" {
 				t.Fatal("unconfirmed subscription granted access")
 			}
-			db := billingOpenFixtureDB(t, cfg.Database.Path)
 			var raw, subscriptionID string
 			if err := db.Reader().QueryRow(`SELECT request_json,bcc_subscription_id FROM billing_orders WHERE id=?`, order.ID).Scan(&raw, &subscriptionID); err != nil {
 				t.Fatal(err)
@@ -558,6 +591,145 @@ func TestWebsiteSubscriptionReachesAlreadySignedInNativeAndPreservesPaidAccessOn
 				t.Fatal("cancel removed purchased replies")
 			}
 		})
+	}
+}
+
+func TestWebsiteOneTime500PackReachesExistingMacAndSharesItsConsumption(t *testing.T) {
+	cfg := webTestConfig(t)
+	var providerCalls atomic.Int32
+	provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/responses" {
+			t.Errorf("unexpected AI fixture request: %s", r.URL.Path)
+		}
+		providerCalls.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"model":"local-fixture","status":"completed","output_text":"Давай встретимся завтра в 10:00.","usage":{"input_tokens":10,"output_tokens":8}}`)
+	}))
+	t.Cleanup(provider.Close)
+	cfg.OpenAI.BaseURL = provider.URL
+	app := webTestApplication(t, cfg)
+	cookie, initial := webTestSignIn(t, app.handler, "", "mac-one-time-pack@example.invalid")
+	db := billingOpenFixtureDB(t, cfg.Database.Path)
+	// Exhaust only this fixture's welcome grant to prove consumption of the
+	// paid website pack, rather than consumption of an unrelated free bonus.
+	if _, err := db.Writer().Exec(`UPDATE credit_grants SET units_remaining=0 WHERE user_id=? AND kind='welcome'`, initial.User.ID); err != nil {
+		t.Fatal(err)
+	}
+	webTestRequest(app.handler, http.MethodPost, "/api/v1/auth/email/otp/request", map[string]string{"email": initial.User.Email, "locale": "ru"}, nil, "https://billing.example.invalid", "")
+	signIn := webTestRequest(app.handler, http.MethodPost, "/api/v1/auth/email/otp/verify", map[string]any{
+		"email": initial.User.Email, "code": "1111", "device": map[string]string{"platform": domain.PlatformMacOS, "device_id": "one-time-pack-mac"},
+	}, nil, "https://billing.example.invalid", "")
+	var native struct {
+		AccessToken string `json:"access_token"`
+	}
+	if signIn.Code != http.StatusOK || json.Unmarshal(signIn.Body.Bytes(), &native) != nil || native.AccessToken == "" {
+		t.Fatalf("Mac sign-in: %d %s", signIn.Code, signIn.Body.String())
+	}
+	nativeRequest := func(method, path string, body any, key string) *httptest.ResponseRecorder {
+		t.Helper()
+		var raw io.Reader
+		if body != nil {
+			data, err := json.Marshal(body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			raw = strings.NewReader(string(data))
+		}
+		r := httptest.NewRequest(method, path, raw)
+		r.Header.Set("Authorization", "Bearer "+native.AccessToken)
+		if body != nil {
+			r.Header.Set("Content-Type", "application/json")
+		}
+		if key != "" {
+			r.Header.Set("Idempotency-Key", key)
+		}
+		w := httptest.NewRecorder()
+		app.handler.ServeHTTP(w, r)
+		return w
+	}
+	readMac := func() webTestSnapshot {
+		t.Helper()
+		w := nativeRequest(http.MethodGet, "/api/v1/me", nil, "")
+		var account webTestSnapshot
+		if w.Code != http.StatusOK || json.Unmarshal(w.Body.Bytes(), &account) != nil || account.User.ID != initial.User.ID {
+			t.Fatalf("existing Mac session: %d %s", w.Code, w.Body.String())
+		}
+		return account
+	}
+	var product catalog.Product
+	for _, p := range initial.Bank.Products {
+		if p.Code == "base_monthly" || p.Code == "base_yearly" {
+			t.Fatal("retired website Base subscription is offered to a new customer")
+		}
+		if p.Code == "pack500" {
+			product = p
+		}
+	}
+	if product.Kind != "pack" || product.Units != 500 || product.PriceMinor != 99000 || product.Currency != "KZT" || product.BillingPeriod != "" || product.MonthlyLimit != 0 || product.Unlimited {
+		t.Fatalf("website 990 KZT offer is not a one-time 500-reply pack: %+v", product)
+	}
+	quote := webTestQuote(initial)
+	quote["product_code"], quote["expected_price_minor"], quote["expected_units"] = product.Code, product.PriceMinor, product.Units
+	checkout := webTestRequest(app.handler, http.MethodPost, "/account/api/checkout", quote, cookie, "https://billing.example.invalid", "website-one-time-500")
+	var order bcc.BankOrder
+	if checkout.Code != http.StatusCreated || json.Unmarshal(checkout.Body.Bytes(), &order) != nil || order.Units != 500 || order.Kind != "pack" {
+		t.Fatalf("one-time checkout: %d %s", checkout.Code, checkout.Body.String())
+	}
+	if before := readMac(); before.Usage.Purchased != 0 || before.Usage.Remaining != 0 {
+		t.Fatal("unconfirmed website order granted replies")
+	}
+	var raw string
+	if err := db.Reader().QueryRow(`SELECT request_json FROM billing_orders WHERE id=?`, order.ID).Scan(&raw); err != nil {
+		t.Fatal(err)
+	}
+	var fields url.Values
+	if err := json.Unmarshal([]byte(raw), &fields); err != nil {
+		t.Fatal(err)
+	}
+	fields.Set("ACTION", "0")
+	fields.Set("RC", "00")
+	fields.Set("RRN", "123456789012")
+	fields.Set("INT_REF", "ABCDEF0123456789")
+	for attempt := 0; attempt < 2; attempt++ {
+		r := httptest.NewRequest(http.MethodPost, "/api/v1/payments/bcc/notify", strings.NewReader(fields.Encode()))
+		r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		r.SetBasicAuth(cfg.BCCCheckout.NotifyUsername, cfg.BCCCheckout.NotifyPassword)
+		w := httptest.NewRecorder()
+		app.handler.ServeHTTP(w, r)
+		if w.Code != http.StatusOK {
+			t.Fatalf("bank confirmation: %d %s", w.Code, w.Body.String())
+		}
+	}
+	paid := readMac()
+	if paid.Usage.Purchased != 500 || paid.Usage.Remaining != 500 || paid.Usage.Unlimited || paid.Subscription.Plan.Code != "free" {
+		t.Fatalf("one-time pack changed the Mac plan or failed to grant exactly 500: %+v", paid)
+	}
+	consent := nativeRequest(http.MethodPost, "/api/v1/me/consents", map[string]string{
+		"terms_version": legal.TermsVersion, "privacy_version": legal.PrivacyVersion,
+		"locale": "ru", "platform": domain.PlatformMacOS, "app_version": "1.0.1",
+	}, "")
+	if consent.Code != http.StatusOK {
+		t.Fatalf("Mac consent: %d %s", consent.Code, consent.Body.String())
+	}
+	for attempt := 0; attempt < 2; attempt++ {
+		generated := nativeRequest(http.MethodPost, "/api/v1/ai/compose", map[string]string{
+			"instruction": "Напиши другу: давай встретимся завтра в 10:00.", "language": "ru", "platform": domain.PlatformMacOS,
+		}, "one-time-pack-mac-generation")
+		var result webTestSnapshot
+		if generated.Code != http.StatusOK || json.Unmarshal(generated.Body.Bytes(), &result) != nil || result.Usage.Purchased != 499 || result.Usage.Remaining != 499 {
+			t.Fatalf("Mac generation/retry did not spend exactly one paid reply: %d %s", generated.Code, generated.Body.String())
+		}
+	}
+	website := webTestRequest(app.handler, http.MethodGet, "/account/api/session", nil, cookie, "", "")
+	var current webTestSnapshot
+	if website.Code != http.StatusOK || json.Unmarshal(website.Body.Bytes(), &current) != nil || current.User.ID != initial.User.ID || current.Usage != readMac().Usage || current.Usage.Remaining != 499 || providerCalls.Load() != 2 {
+		t.Fatalf("website and existing Mac session disagree after pack consumption: %d %s", website.Code, website.Body.String())
+	}
+	var subscriptions, periods, applePurchases, permanent int
+	if err := db.Reader().QueryRow(`SELECT (SELECT count(*) FROM bcc_subscriptions),(SELECT count(*) FROM bcc_subscription_periods),
+ (SELECT count(*) FROM iap_purchases),(SELECT count(*) FROM credit_grants WHERE billing_order_id=? AND expires_at IS NULL AND units_total=500 AND units_remaining=499)`, order.ID).
+		Scan(&subscriptions, &periods, &applePurchases, &permanent); err != nil || subscriptions != 0 || periods != 0 || applePurchases != 0 || permanent != 1 {
+		t.Fatalf("one-time website pack created renewal/store records or lost its permanent remainder: %d %d %d %d %v", subscriptions, periods, applePurchases, permanent, err)
 	}
 }
 

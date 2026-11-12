@@ -28,8 +28,40 @@ func subscriptionQuote(t *testing.T, s *CheckoutService, code string) ExpectedQu
 	return ExpectedQuote{CatalogVersion: version, PriceMinor: p.PriceMinor, Units: p.Units, Currency: p.Currency, TermsVersion: legal.WebPurchaseTermsVersion, Locale: "ru", RecurringConsent: true, RecurringTermsVersion: RecurringTermsVersion, RecurringUntil: s.now().UTC().AddDate(2, 0, 0).Format("20060102")}
 }
 
+func enableLegacyBaseOffer(t *testing.T, s *CheckoutService) {
+	t.Helper()
+	// Historical orders sold a renewing 1,000-reply Base bundle. Publish that
+	// offer only in this test's database; the current web offer is pack500.
+	ctx := context.Background()
+	published, err := s.catalog.Published(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for i := range published.Products {
+		if published.Products[i].Code == "base_monthly" {
+			published.Products[i].Active = true
+			published.Products[i].AvailableWeb = true
+			published.Products[i].PriceMinor = 99000
+			published.Products[i].MonthlyLimit = 1000
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("historical Base product is missing")
+	}
+	draft, err := s.catalog.SaveDraft(ctx, "legacy-fixture", 0, published.Products)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.catalog.Publish(ctx, "legacy-fixture", draft.ID, draft.Revision); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestBankMandateWaitsForARenewingGoogleSubscription(t *testing.T) {
 	s, _ := testCheckout(t)
+	enableLegacyBaseOffer(t, s)
 	s.cfg.RecurringEnabled = true
 	now := time.Now().UTC().Truncate(time.Millisecond)
 	s.now = func() time.Time { return now }
@@ -55,6 +87,7 @@ func TestBankMandateWaitsForARenewingGoogleSubscription(t *testing.T) {
 
 func TestBankRenewalIsPersistentSingleAttemptAndRequiresFinalNotification(t *testing.T) {
 	s, _ := testCheckout(t)
+	enableLegacyBaseOffer(t, s)
 	s.cfg.RecurringEnabled = true
 	now := time.Now().UTC().Truncate(time.Millisecond)
 	s.now = func() time.Time { return now }
@@ -173,6 +206,7 @@ func TestBankSubscriptionRejectsMissingOrExpiredRenewalConsent(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			s, _ := testCheckout(t)
+			enableLegacyBaseOffer(t, s)
 			s.cfg.RecurringEnabled = true
 			quote := subscriptionQuote(t, s, "base_monthly")
 			test.edit(&quote)
@@ -276,6 +310,7 @@ func TestBankReceiptTemplatesExistInEveryLocale(t *testing.T) {
 // An uncertain refund is bound to its registered request, just like purchases.
 func TestRefundedBankSubscriptionCannotReturnThroughAnOldPaymentNotify(t *testing.T) {
 	s, _ := testCheckout(t)
+	enableLegacyBaseOffer(t, s)
 	s.cfg.RecurringEnabled = true
 	ctx := context.Background()
 	order, err := s.StartExpected(ctx, "bank-user", "base_monthly", "refundable-subscription", subscriptionQuote(t, s, "base_monthly"))

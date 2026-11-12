@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/aireply/ai-reply-back-end/internal/database"
-	"github.com/aireply/ai-reply-back-end/migrations"
 )
 
 func googleMigrationFixture(t *testing.T) (*database.DB, func(string, ...any)) {
@@ -32,13 +31,13 @@ func googleMigrationFixture(t *testing.T) (*database.DB, func(string, ...any)) {
 func TestGoogleMigrationCarriesAnExistingMappingIntoTheCatalog(t *testing.T) {
 	ctx := context.Background()
 	db, exec := googleMigrationFixture(t)
-	products := InitialProducts()
+	products := productsBeforeWebPack()
 	raw, _ := json.Marshal(products)
 	exec(`INSERT INTO billing_catalog_versions(id,state,products_json,created_by,updated_by,published_by,created_at,updated_at,published_at) VALUES(1,'published',?,'owner','owner','owner',1000,1000,1000)`, string(raw))
 	draftRaw, _ := json.Marshal(products)
 	exec(`INSERT INTO billing_catalog_versions(id,state,base_version,revision,products_json,created_by,updated_by,created_at,updated_at) VALUES(2,'draft',1,3,?,'owner','owner',1000,1000)`, string(draftRaw))
 	exec(`UPDATE iap_products SET google_product_id='pack_30',is_active=1 WHERE code='pack30'`)
-	if _, err := database.Migrate(ctx, db, migrations.FS); err != nil {
+	if _, err := database.Migrate(ctx, db, catalogMigrationsBefore(t, "0040")); err != nil {
 		t.Fatal(err)
 	}
 	s := New(db)
@@ -135,9 +134,9 @@ func TestGoogleMigrationAppliesOnTopOfTheMonthlyBundle(t *testing.T) {
 func TestGoogleMigrationDoesNothingWithoutAMapping(t *testing.T) {
 	ctx := context.Background()
 	db, exec := googleMigrationFixture(t)
-	raw, _ := json.Marshal(InitialProducts())
+	raw, _ := json.Marshal(productsBeforeWebPack())
 	exec(`INSERT INTO billing_catalog_versions(id,state,products_json,created_by,updated_by,published_by,created_at,updated_at,published_at) VALUES(1,'published',?,'owner','owner','owner',1000,1000,1000)`, string(raw))
-	if _, err := database.Migrate(ctx, db, migrations.FS); err != nil {
+	if _, err := database.Migrate(ctx, db, catalogMigrationsBefore(t, "0040")); err != nil {
 		t.Fatal(err)
 	}
 	history, err := New(db).History(ctx)

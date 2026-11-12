@@ -52,6 +52,7 @@ func mandateStatus(t *testing.T, s *CheckoutService, rootOrder string) string {
 
 func TestAbandonedFirstSubscriptionPaymentStopsBlockingAndStillCountsWhenPaidLate(t *testing.T) {
 	s, _ := testCheckout(t)
+	enableLegacyBaseOffer(t, s)
 	s.cfg.RecurringEnabled = true
 	now := time.Now().UTC().Truncate(time.Millisecond)
 	s.now = func() time.Time { return now }
@@ -143,8 +144,9 @@ func TestApprovalAfterRecordedDeclineGrantsThePack(t *testing.T) {
 	}
 }
 
-func paidSubscription(t *testing.T, s *CheckoutService, now *time.Time) BankOrder {
+func paidLegacySubscription(t *testing.T, s *CheckoutService, now *time.Time) BankOrder {
 	t.Helper()
+	enableLegacyBaseOffer(t, s)
 	s.cfg.RecurringEnabled = true
 	s.now = func() time.Time { return *now }
 	order, err := s.StartExpected(context.Background(), "bank-user", "base_monthly", "paid-subscription", subscriptionQuote(t, s, "base_monthly"))
@@ -169,7 +171,7 @@ func renewalOrder(t *testing.T, s *CheckoutService) (string, string) {
 func TestRenewalDeclinedInTheDirectAnswerIsRecorded(t *testing.T) {
 	s, _ := testCheckout(t)
 	now := time.Now().UTC().Truncate(time.Millisecond)
-	root := paidSubscription(t, s, &now)
+	root := paidLegacySubscription(t, s, &now)
 	var sent []url.Values
 	bankAnswer(t, s, "2", "51", &sent)
 	now = now.Add(30 * 24 * time.Hour)
@@ -188,7 +190,7 @@ func TestRenewalDeclinedInTheDirectAnswerIsRecorded(t *testing.T) {
 func TestRenewalWithoutOutcomeIsEscalatedOnceAfterTheStatusWindow(t *testing.T) {
 	s, _ := testCheckout(t)
 	now := time.Now().UTC().Truncate(time.Millisecond)
-	root := paidSubscription(t, s, &now)
+	root := paidLegacySubscription(t, s, &now)
 	calls := 0
 	s.client.http = &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 		calls++
@@ -233,7 +235,7 @@ func TestRenewalWithoutOutcomeIsEscalatedOnceAfterTheStatusWindow(t *testing.T) 
 func TestSubscriptionRefundCarriesRecurRefAndCanBeSentAgainAfterARefusal(t *testing.T) {
 	s, _ := testCheckout(t)
 	now := time.Now().UTC().Truncate(time.Millisecond)
-	root := paidSubscription(t, s, &now)
+	root := paidLegacySubscription(t, s, &now)
 	ctx := context.Background()
 	var sent []url.Values
 	bankAnswer(t, s, "2", "05", &sent)
@@ -266,7 +268,7 @@ func TestSubscriptionRefundCarriesRecurRefAndCanBeSentAgainAfterARefusal(t *test
 func TestPendingRefundIsNeverResent(t *testing.T) {
 	s, _ := testCheckout(t)
 	now := time.Now().UTC().Truncate(time.Millisecond)
-	root := paidSubscription(t, s, &now)
+	root := paidLegacySubscription(t, s, &now)
 	calls := 0
 	s.client.http = &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 		calls++
@@ -286,7 +288,7 @@ func TestPendingRefundIsNeverResent(t *testing.T) {
 func TestResubscribingContinuesAfterTheCanceledPaidPeriod(t *testing.T) {
 	s, _ := testCheckout(t)
 	now := time.Now().UTC().Truncate(time.Millisecond)
-	root := paidSubscription(t, s, &now)
+	root := paidLegacySubscription(t, s, &now)
 	ctx := context.Background()
 	var id string
 	if err := s.db.Reader().QueryRow(`SELECT id FROM bcc_subscriptions WHERE root_order_id=?`, root.ID).Scan(&id); err != nil {
@@ -338,7 +340,7 @@ func TestBrowserReturnByGetIsNavigationOnly(t *testing.T) {
 func TestRefundInProgressOrFaultIsNeverResent(t *testing.T) {
 	s, _ := testCheckout(t)
 	now := time.Now().UTC().Truncate(time.Millisecond)
-	root := paidSubscription(t, s, &now)
+	root := paidLegacySubscription(t, s, &now)
 	var sent []url.Values
 	bankAnswer(t, s, "3", "-31", &sent)
 	for i := 0; i < 2; i++ {
@@ -355,7 +357,7 @@ func TestRefundInProgressOrFaultIsNeverResent(t *testing.T) {
 func TestRefundCallbackWithoutTheChainFieldsIsRecorded(t *testing.T) {
 	s, _ := testCheckout(t)
 	now := time.Now().UTC().Truncate(time.Millisecond)
-	root := paidSubscription(t, s, &now)
+	root := paidLegacySubscription(t, s, &now)
 	s.client.http = &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 		return nil, errors.New("timeout")
 	})}
@@ -386,6 +388,7 @@ func TestRefundCallbackWithoutTheChainFieldsIsRecorded(t *testing.T) {
 
 func TestApprovedFirstPaymentAfterADeclineRenewsAgain(t *testing.T) {
 	s, _ := testCheckout(t)
+	enableLegacyBaseOffer(t, s)
 	s.cfg.RecurringEnabled = true
 	first, err := s.StartExpected(context.Background(), "bank-user", "base_monthly", "decline-then-approve-sub", subscriptionQuote(t, s, "base_monthly"))
 	if err != nil {

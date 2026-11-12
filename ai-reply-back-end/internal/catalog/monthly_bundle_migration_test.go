@@ -22,7 +22,7 @@ func legacyDailyProducts() []Product {
 }
 
 func preApplePackProducts() []Product {
-	p := InitialProducts()[:6]
+	p := productsBeforeWebPack()[:6]
 	p[1].AvailableIOS = true
 	return p
 }
@@ -77,7 +77,7 @@ func TestMonthlyBundleMigrationPreservesBalancesHistoryAndDraft(t *testing.T) {
 	}
 	s := New(db)
 	current, err := s.Published(ctx)
-	if err != nil || current.ID == 1 || current.CreatedBy != "migration:0039" {
+	if err != nil || current.ID == 1 || current.CreatedBy != "migration:0040" {
 		t.Fatalf("new publication: %+v %v", current, err)
 	}
 	want := InitialProducts()
@@ -90,7 +90,7 @@ func TestMonthlyBundleMigrationPreservesBalancesHistoryAndDraft(t *testing.T) {
 	updated, err := s.Draft(ctx)
 	want[1].Name = draft[1].Name
 	want[5].PriceMinor = 17777
-	if err != nil || updated.Revision != 6 || updated.BaseVersion != current.ID || !reflect.DeepEqual(updated.Products, want) {
+	if err != nil || updated.Revision != 7 || updated.BaseVersion != current.ID || !reflect.DeepEqual(updated.Products, want) {
 		t.Fatalf("draft lost: %+v %v", updated, err)
 	}
 	var historical, sold string
@@ -130,11 +130,11 @@ func TestMonthlyBundleMigrationAlreadyAlignedDoesNotRepublish(t *testing.T) {
 	if _, err = database.Migrate(ctx, db, catalogMigrationsBefore(t, "0037")); err != nil {
 		t.Fatal(err)
 	}
-	raw, _ := json.Marshal(InitialProducts())
+	raw, _ := json.Marshal(productsBeforeWebPack())
 	if _, err = db.Writer().Exec(`INSERT INTO billing_catalog_versions(id,state,products_json,created_by,updated_by,created_at,updated_at) VALUES(1,'published',?,'owner','owner',1000,1000)`, string(raw)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = database.Migrate(ctx, db, migrations.FS); err != nil {
+	if _, err = database.Migrate(ctx, db, catalogMigrationsBefore(t, "0040")); err != nil {
 		t.Fatal(err)
 	}
 	v, err := New(db).Published(ctx)

@@ -1527,7 +1527,7 @@
  "admin.billing.publish_error": "Could not publish. Reload the catalog and check Product IDs and previously sold entitlements.",
  "admin.billing.managed": "Manage these products under Prices and subscriptions.",
  "admin.iap.kind.subscription": "Subscription",
- "pricing.pack_description": "No subscription required. Purchased replies never expire.",
+ "pricing.pack_description": "One-time purchase without automatic charges. Purchased replies never expire.",
  "pricing.catalog_note": "Website prices are in tenge and apply to website offers. In the iOS app, the App Store provides prices and currencies for your Apple Account country or region. The app offers Pro subscriptions and one-time reply packs.",
  "admin.billing.refund": "Full refund",
  "admin.billing.refund_confirm": "Issue a full BCC sandbox refund? Unused replies from this package will be revoked.",

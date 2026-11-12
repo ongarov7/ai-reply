@@ -110,6 +110,11 @@ func (s *Server) handleLanding(w http.ResponseWriter, r *http.Request) {
 		view.PricingSubtitle, view.PricingCTA = s.bundle.T(locale, "pricing.subtitle"), s.bundle.T(locale, "pricing.cta")
 	}
 	for i, p := range list {
+		// Base rows retain existing subscription entitlements, but are no longer
+		// website offers. A missing catalog must not advertise those legacy terms.
+		if p.Code == "base_monthly" || p.Code == "base_yearly" {
+			continue
+		}
 		view.Plans = append(view.Plans, planView{
 			Name:        p.LocalizedName(locale),
 			Description: p.LocalizedDescription(locale),

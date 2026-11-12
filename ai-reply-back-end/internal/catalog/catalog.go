@@ -64,12 +64,12 @@ func InitialProducts() []Product {
 	}
 	products := []Product{
 		{Code: "free", Kind: "welcome", Name: names("Бесплатно", "Free", "Тегін"), Currency: "KZT", Units: 20, Active: true, AvailableIOS: true, AvailableWeb: true},
-		{Code: "base_monthly", Kind: "subscription", Name: names("Base · месяц", "Base · monthly", "Base · ай сайын"), Currency: "KZT", PriceMinor: 99000, BillingPeriod: "month", MonthlyLimit: 1000, Active: true, AvailableWeb: true},
+		{Code: "base_monthly", Kind: "subscription", Name: names("Base · месяц", "Base · monthly", "Base · ай сайын"), Currency: "KZT", PriceMinor: 99000, BillingPeriod: "month", MonthlyLimit: 1000, Active: true},
 		{Code: "base_yearly", Kind: "subscription", Name: names("Base · год", "Base · yearly", "Base · жыл сайын"), Currency: "KZT", PriceMinor: 790000, BillingPeriod: "year", DailyLimit: 40},
 		{Code: "pro_monthly", Kind: "subscription", Name: names("Pro · месяц", "Pro · monthly", "Pro · ай сайын"), Currency: "KZT", PriceMinor: 399000, BillingPeriod: "month", Unlimited: true, Active: true, AvailableIOS: true, AvailableWeb: true},
 		{Code: "pro_yearly", Kind: "subscription", Name: names("Pro · год", "Pro · yearly", "Pro · жыл сайын"), Currency: "KZT", PriceMinor: 3999000, BillingPeriod: "year", Unlimited: true, Active: true, AvailableIOS: true, AvailableWeb: true},
 		{Code: "pack30", Kind: "pack", Name: names("30 ответов", "30 replies", "30 жауап"), Currency: "KZT", PriceMinor: 13000, Units: 30, Active: true, AvailableIOS: true, AvailableWeb: true},
-		{Code: "pack500", Kind: "pack", Name: names("500 ответов", "500 replies", "500 жауап"), Currency: "KZT", PriceMinor: 99000, Units: 500, AppleProductID: "kz.aireply.pack500", Active: true, AvailableIOS: true},
+		{Code: "pack500", Kind: "pack", Name: names("500 ответов", "500 replies", "500 жауап"), Currency: "KZT", PriceMinor: 99000, Units: 500, AppleProductID: "kz.aireply.pack500", Active: true, AvailableIOS: true, AvailableWeb: true},
 	}
 	products[6].Name["uz"] = "500 javob"
 	return products
