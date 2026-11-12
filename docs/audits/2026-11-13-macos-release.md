@@ -1,6 +1,59 @@
-# macOS 1.0.1 (2) publication — 13 November 2026
+# macOS publication — 13 November 2026
 
-## Published installer
+## Current installer: 1.0.2 (3)
+
+- URL: <https://ai-reply.kz/downloads/macos/AI-Reply-1.0.2.dmg>.
+- Size: 3,461,472 bytes.
+- SHA-256: `14ae8bfe725cf600d3f6441af8bc1a7e661789be869a9305fdc38a02e659553f`.
+- App notary submission: `8d91f80d-ad54-4156-be7b-b1e50cf0fcec`, accepted.
+- DMG notary submission: `4d9ac75f-1612-4550-8816-20d656a7b487`, accepted.
+
+This update refreshes the same account immediately when the user returns from
+website payment. A bounded retry window catches a delayed bank notification;
+logout, account changes and app shutdown cancel it. Stale responses cannot
+overwrite a newer account or balance. The panel and open menu update their
+displayed balance. All payment entry points use the signed account handoff.
+
+The full Swift suite passed 170 tests across 27 suites. Archive, export,
+universal architecture, Developer ID signature, both stapled tickets and
+Gatekeeper checks passed. Read-only mounting verified the real application,
+Applications shortcut, release API and exported binary. Generated proof is in
+the ignored `outputs/macos-release-1.0.2-3/` directory.
+
+The accompanying backend update refuses a new Pro payment when the account
+already has usable unlimited access from Apple, Google, BCC or a manual grant,
+including a canceled subscription's remaining paid period. Unpaid checkout
+retries and reopening the bank form also check access. The website disables
+both Pro purchase buttons and distinguishes active access from an unresolved
+payment. Existing pending-order guards, recurring renewals and authenticated
+payment fulfillment remain in place. A bank form already delivered to a
+browser cannot be recalled; an independently confirmed payment is still honored.
+
+The full Go suite, BCC race tests, shared-account/provider refund regressions
+and 37 browser scenarios passed. Production acquiring remains disabled by the
+owner's decision until the bank credentials and callback are checked separately.
+
+Update backups:
+
+- Source: `/home/ai-reply-backups/mac-1.0.2-source-20261112T205336Z`.
+- Previous environment:
+  `/home/ai-reply-backups/mac-1.0.2-installer-20261112T205336Z`.
+- Runtime, current environment and both databases:
+  `/home/ai-reply-backups/20261112T205337Z`.
+
+The only environment key changed for this publication is `MACOS_DOWNLOAD_URL`.
+The previous 1.0.1 installer remains available.
+
+Post-deployment checks passed for both API health endpoints and all four Mac
+page languages. A complete public download returned HTTP 200 and the expected
+disk-image content type, size and SHA-256 above. The published web catalogs
+offer 500/990 and 30/130 as one-time packs and keep Base unavailable for new web
+checkout. Comparison with the stopped-service backup confirmed unchanged plan,
+IAP-product and credit-grant rows in both databases; account, subscription and
+purchase counts were preserved. All ten deployed source hashes match the
+reviewed delta. Public and preservation proofs are retained with the release.
+
+## Previous installer: 1.0.1 (2)
 
 - URL: <https://ai-reply.kz/downloads/macos/AI-Reply-1.0.1.dmg>
 - Size: 3,415,146 bytes.
