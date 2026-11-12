@@ -255,6 +255,9 @@ func (s *CheckoutService) start(ctx context.Context, userID, code, idempotency s
 		if previous.ProductCode != code {
 			return BankOrder{}, domain.ConflictField("Idempotency-Key", "different_product")
 		}
+		if err := s.checkExistingUnlimitedPurchase(ctx, previous); err != nil {
+			return BankOrder{}, err
+		}
 		return s.redirect(previous), nil
 	}
 	if !errors.Is(lookupErr, domain.ErrNotFound) {
@@ -269,6 +272,15 @@ func (s *CheckoutService) start(ctx context.Context, userID, code, idempotency s
 			}
 			if previous.ProductCode != code {
 				return domain.ConflictField("Idempotency-Key", "different_product")
+			}
+			if previous.Status == "created" {
+				var product catalog.Product
+				if err := json.Unmarshal([]byte(previous.snapshot), &product); err != nil {
+					return err
+				}
+				if err := s.checkUnlimitedPurchaseTx(ctx, tx, userID, product); err != nil {
+					return err
+				}
 			}
 			o = previous
 			return nil
@@ -287,6 +299,9 @@ func (s *CheckoutService) start(ctx context.Context, userID, code, idempotency s
 		}
 		if p.Kind == "subscription" {
 			if err := s.validateMandate(ctx, tx, userID, p, expected); err != nil {
+				return err
+			}
+			if err := s.checkUnlimitedPurchaseTx(ctx, tx, userID, p); err != nil {
 				return err
 			}
 		}
@@ -481,6 +496,14 @@ func (s *CheckoutService) CheckoutPageWithClientIP(w http.ResponseWriter, r *htt
 	}
 	if s.now().Sub(time.UnixMilli(o.createdAt)) > 15*time.Minute || o.Status != "created" {
 		http.Error(w, "Checkout expired. Check the existing order status before starting another payment.", http.StatusGone)
+		return
+	}
+	if err := s.checkExistingUnlimitedPurchase(r.Context(), o); err != nil {
+		if errors.Is(err, domain.ErrConflict) {
+			http.Error(w, "Pro is already active. Check your account before starting another payment.", http.StatusConflict)
+		} else {
+			http.Error(w, "Unavailable", http.StatusServiceUnavailable)
+		}
 		return
 	}
 	ip := net.ParseIP(clientIP)

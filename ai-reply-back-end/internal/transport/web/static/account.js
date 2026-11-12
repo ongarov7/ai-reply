@@ -86,7 +86,7 @@
       nodes['check-order'].disabled = state.busy || state.checking || browser.now() < state.nextCheckAt;
       nodes['retry-checkout'].disabled = state.busy;
       nodes.products.querySelectorAll('button').forEach(function (node) {
-        node.disabled = state.busy || !!state.pending || !nodes['purchase-terms'].checked || state.acceptedQuote !== quoteFingerprint(state.session) || node.recurring && !recurringConsent();
+        node.disabled = state.busy || !!state.pending || activeProPurchase(state.session, node.productCode) || !nodes['purchase-terms'].checked || state.acceptedQuote !== quoteFingerprint(state.session) || node.recurring && !recurringConsent();
       });
       if (state.cooldownTimer) browser.clearTimeout(state.cooldownTimer);
       var wait = state.nextCheckAt - browser.now();
@@ -155,7 +155,9 @@
         return;
       }
       var code = error && error.message || '';
-      if (error && error.details && error.details.field === 'subscription') code = 'SUBSCRIPTION_CONFLICT';
+      if (error && error.details && error.details.field === 'subscription') {
+        code = error.details.reason === 'already_active' ? 'ACTIVE_SUBSCRIPTION' : 'SUBSCRIPTION_CONFLICT';
+      }
       notice(words['error.' + code] || t('error.generic'));
     }
     function clearHandoff() {
@@ -242,6 +244,12 @@
       try { return new Intl.NumberFormat(locale === 'kk' ? 'kk-KZ' : locale, { style: 'currency', currency: currency, maximumFractionDigits: amount % 100 ? 2 : 0 }).format(amount / 100); }
       catch (_) { return String(amount / 100) + ' ' + currency; }
     }
+    function activeProPurchase(payload, productCode) {
+      if (!payload || !payload.usage || payload.usage.unlimited !== true || !payload.bank || !Array.isArray(payload.bank.products)) return false;
+      return payload.bank.products.some(function (product) {
+        return product.code === productCode && product.kind === 'subscription' && product.unlimited === true;
+      });
+    }
     function purchaseQuote(payload, productCode) {
       if (!payload || !payload.bank || !payload.user) return null;
       var bank = payload.bank;
@@ -313,7 +321,9 @@
         units.className = 'account-product-units';
         units.textContent = product.kind === 'subscription' ? (product.unlimited ? t('unlimited') : product.monthly_limit > 0 ? t('monthly_units', { count: product.monthly_limit }) : t('daily_units', { count: product.daily_limit })) : t('pack_units', { count: product.units });
         var button = document.createElement('button');
-        button.type = 'button'; button.className = 'btn btn-primary'; button.textContent = t('buy');
+        button.type = 'button'; button.className = 'btn btn-primary';
+        button.textContent = t(activeProPurchase(state.session, product.code) ? 'error.ACTIVE_SUBSCRIPTION' : 'buy');
+        button.productCode = product.code;
         button.recurring = product.kind === 'subscription';
         button.addEventListener('click', function () { checkout(product.code); });
         card.append(name, price, units, button);
@@ -529,6 +539,9 @@
     }
     function checkout(productCode) {
       if (state.busy || !state.session || state.pending) return Promise.resolve();
+      if (activeProPurchase(state.session, productCode)) {
+        notice(t('error.ACTIVE_SUBSCRIPTION')); return Promise.resolve();
+      }
       var displayed = purchaseQuote(state.session, productCode);
       if (!displayed || displayed.accept_recurring && !recurringConsent() || !nodes['purchase-terms'].checked || state.acceptedQuote !== quoteFingerprint(state.session)) {
         notice(t('error.TERMS_REQUIRED')); return Promise.resolve();
@@ -541,6 +554,10 @@
         if (!payload.user || payload.user.id !== owner) {
           renderSession(payload, true);
           throw new Error('ACCOUNT_CHANGED');
+        }
+        if (activeProPurchase(payload, productCode)) {
+          renderSession(payload, false);
+          throw new Error('ACTIVE_SUBSCRIPTION');
         }
         if (JSON.stringify(displayed) !== JSON.stringify(purchaseQuote(payload, productCode))) {
           renderSession(payload, false);

@@ -28,6 +28,17 @@ function session(user = 'fixture-user-A', price = 13000, version = 1) {
     bank: { enabled: true, environment: 'sandbox', catalog_version: version, terms_version: '2026-10-30-web-purchase-v1',
       products: [{ code: 'pack30', kind: 'pack', units: 30, price_minor: price, currency: 'KZT', active: true, available_web: true, name: { en: 'Reply pack' } }] } };
 }
+function proSession(unlimited = false) {
+  const payload = session();
+  payload.usage.unlimited = unlimited;
+  payload.bank.recurring_enabled = true;
+  payload.bank.recurring_terms_version = '2026-11-01';
+  for (const period of ['month', 'year']) {
+    payload.bank.products.push({ code: 'pro_' + period, kind: 'subscription', units: 0, price_minor: 799000,
+      currency: 'KZT', billing_period: period, unlimited: true, active: true, available_web: true, name: { en: 'Pro' } });
+  }
+  return payload;
+}
 function fixture(handler, options = {}) {
   const nodes = new Map(), timers = new Map(), stored = options.stored || new Map(), requests = [], redirects = [], historyCalls = [], events = [];
   let now = 100000, timerID = 0, random = 0;
@@ -121,6 +132,104 @@ test('a subscription requires separate renewal consent and preserves its exact m
   assert.equal(quote.expected_price_minor, 79000);
 });
 
+test('active Pro disables both Pro offers without a bank subscription and keeps packs available', async () => {
+  const f = fixture(url => url.endsWith('/checkout') ? response(created()) : response(proSession(true)));
+  await f.app.init();
+  const proButtons = () => f.nodes.get('account-products').children.slice(1).map(card => card.children[3]);
+  for (const button of proButtons()) {
+    assert.equal(button.disabled, true);
+    assert.equal(button.textContent, f.words['error.ACTIVE_SUBSCRIPTION']);
+  }
+  f.accept();
+  const expiry = f.nodes.get('account-card-expiry');
+  expiry.value = '2028-02'; expiry.listeners.change();
+  const consent = f.nodes.get('account-recurring-terms');
+  consent.checked = true; consent.listeners.change();
+  await f.app.refresh();
+  assert.equal(proButtons().every(button => button.disabled), true);
+  const requestCount = f.requests.length;
+  await f.app.checkout('pro_month'); await f.app.checkout('pro_year');
+  assert.equal(f.requests.length, requestCount);
+  assert.equal(f.app.state.pending, null);
+  assert.equal(f.stored.size, 0);
+  assert.equal(f.nodes.get('account-error').textContent, f.words['error.ACTIVE_SUBSCRIPTION']);
+  assert.equal(f.nodes.get('account-products').children[0].children[3].disabled, false);
+  await f.app.checkout('pack30');
+  assert.equal(JSON.parse(f.requests.find(x => x.url.endsWith('/checkout')).opts.body).product_code, 'pack30');
+  assert.equal(f.redirects.length, 1);
+});
+
+for (const productCode of ['pro_month', 'pro_year']) {
+  test('Pro becoming active during ' + productCode + ' preflight prevents a new order', async () => {
+    let sessions = 0;
+    const f = fixture(url => url.endsWith('/checkout') ? response(created()) : response(proSession(++sessions > 1)));
+    await f.app.init(); f.accept();
+    const expiry = f.nodes.get('account-card-expiry');
+    expiry.value = '2028-02'; expiry.listeners.change();
+    const consent = f.nodes.get('account-recurring-terms');
+    consent.checked = true; consent.listeners.change();
+    await f.app.checkout(productCode);
+    assert.equal(f.requests.some(x => x.url.endsWith('/checkout')), false);
+    assert.equal(f.app.state.pending, null);
+    assert.equal(f.stored.size, 0);
+    assert.equal(f.redirects.length, 0);
+    assert.equal(f.nodes.get('account-error').textContent, f.words['error.ACTIVE_SUBSCRIPTION']);
+    assert.equal(f.nodes.get('account-products').children.slice(1).every(card => card.children[3].disabled), true);
+  });
+}
+
+test('server refusal after preflight shows active Pro for cancelled renewal with paid access', async () => {
+  let refused = false;
+  const f = fixture(url => {
+    if (url.endsWith('/checkout')) {
+      refused = true;
+      return response({ error: { code: 'CONFLICT', details: { field: 'subscription', reason: 'already_active' } } }, 409);
+    }
+    const payload = proSession(refused);
+    if (refused) payload.bank.subscriptions = [{ id: 'fixture-subscription', product_code: 'pro_month',
+      name: { en: 'Pro' }, status: 'canceled', auto_renew: false, paid_until: '2027-11-14T00:00:00Z' }];
+    return response(payload);
+  });
+  await f.app.init(); f.accept();
+  const expiry = f.nodes.get('account-card-expiry');
+  expiry.value = '2028-02'; expiry.listeners.change();
+  const consent = f.nodes.get('account-recurring-terms');
+  consent.checked = true; consent.listeners.change();
+  await f.app.checkout('pro_month');
+  assert.equal(f.requests.filter(x => x.url.endsWith('/checkout')).length, 1);
+  assert.equal(f.requests.filter(x => x.url.endsWith('/session')).length, 3);
+  assert.equal(f.app.state.session.usage.unlimited, true);
+  assert.equal(f.app.state.session.bank.subscriptions[0].auto_renew, false);
+  assert.equal(f.nodes.get('account-error').textContent, f.words['error.ACTIVE_SUBSCRIPTION']);
+  assert.equal(f.nodes.get('account-products').children.slice(1).every(card => card.children[3].disabled), true);
+  assert.equal(f.nodes.get('account-purchase-terms').checked, false);
+  assert.equal(f.app.state.pending, null);
+  assert.equal(f.stored.size, 0);
+  assert.equal(f.redirects.length, 0);
+});
+
+test('active Pro still permits recovery of the original unresolved request with its idempotency key', async () => {
+  const first = fixture(url => url.endsWith('/checkout') ? Promise.reject(new Error('lost')) : response(proSession()));
+  await first.app.init(); first.accept();
+  const expiry = first.nodes.get('account-card-expiry');
+  expiry.value = '2028-02'; expiry.listeners.change();
+  const consent = first.nodes.get('account-recurring-terms');
+  consent.checked = true; consent.listeners.change();
+  await first.app.checkout('pro_month');
+  const previous = first.requests.find(x => x.url.endsWith('/checkout'));
+  assert.ok(previous);
+  const resumed = fixture(url => url.endsWith('/checkout')
+    ? response({ error: { code: 'CONFLICT', details: { field: 'subscription', reason: 'already_active' } } }, 409)
+    : response(proSession(true)), { stored: first.stored });
+  await resumed.app.init(); await resumed.app.retryCheckout();
+  const replay = resumed.requests.find(x => x.url.endsWith('/checkout'));
+  assert.equal(replay.opts.body, previous.opts.body);
+  assert.equal(replay.opts.headers['Idempotency-Key'], previous.opts.headers['Idempotency-Key']);
+  assert.equal(resumed.app.state.pending, null);
+  assert.equal(resumed.redirects.length, 0);
+  assert.equal(resumed.nodes.get('account-error').textContent, resumed.words['error.ACTIVE_SUBSCRIPTION']);
+});
+
 test('changing card expiry clears renewal consent without starting payment', async () => {
   const f = fixture(() => response(session()));
   await f.app.init();
@@ -207,7 +316,7 @@ for (const reason of ['manage_existing_store_subscription', 'already_active', 'p
     assert.equal(f.app.state.pending, null);
     assert.equal(f.stored.has(pendingKey('/sandbox', 'sandbox', 'fixture-user-A')), false);
     assert.equal(f.nodes.get('account-purchase-terms').checked, false);
-    assert.equal(f.nodes.get('account-error').textContent, f.words['error.SUBSCRIPTION_CONFLICT']);
+    assert.equal(f.nodes.get('account-error').textContent, f.words[reason === 'already_active' ? 'error.ACTIVE_SUBSCRIPTION' : 'error.SUBSCRIPTION_CONFLICT']);
 
     const reloaded = fixture(() => response(payload), { stored: f.stored });
     await reloaded.app.init();
