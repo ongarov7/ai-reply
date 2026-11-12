@@ -19,7 +19,7 @@ func (s *CheckoutService) checkUnlimitedPurchaseTx(ctx context.Context, tx *sql.
 		return err
 	}
 	if hasAccess {
-		return domain.ConflictField("subscription", "already_active")
+		return domain.ConflictField("subscription", "unlimited_active")
 	}
 	return nil
 }

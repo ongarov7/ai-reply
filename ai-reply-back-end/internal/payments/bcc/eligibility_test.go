@@ -125,7 +125,7 @@ func TestNewProCheckoutRejectsStillUsableUnlimitedFromEveryProvider(t *testing.T
 			for _, code := range []string{"pro_monthly", "pro_yearly"} {
 				_, err := s.StartExpected(context.Background(), "bank-user", code, "duplicate-"+code, subscriptionQuote(t, s, code))
 				var conflict *domain.ConflictError
-				if !errors.As(err, &conflict) || conflict.Field != "subscription" {
+				if !errors.As(err, &conflict) || conflict.Field != "subscription" || conflict.Reason != "unlimited_active" {
 					t.Fatalf("%s should refuse another paid Pro checkout: %v", code, err)
 				}
 				if after := checkoutRecordCounts(t, s); after != before {

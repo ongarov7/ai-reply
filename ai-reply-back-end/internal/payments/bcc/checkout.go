@@ -298,10 +298,10 @@ func (s *CheckoutService) start(ctx context.Context, userID, code, idempotency s
 			return domain.ErrPlanUnavailable
 		}
 		if p.Kind == "subscription" {
-			if err := s.validateMandate(ctx, tx, userID, p, expected); err != nil {
+			if err := s.checkUnlimitedPurchaseTx(ctx, tx, userID, p); err != nil {
 				return err
 			}
-			if err := s.checkUnlimitedPurchaseTx(ctx, tx, userID, p); err != nil {
+			if err := s.validateMandate(ctx, tx, userID, p, expected); err != nil {
 				return err
 			}
 		}

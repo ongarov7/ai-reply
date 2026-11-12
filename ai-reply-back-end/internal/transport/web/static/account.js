@@ -156,7 +156,7 @@
       }
       var code = error && error.message || '';
       if (error && error.details && error.details.field === 'subscription') {
-        code = error.details.reason === 'already_active' ? 'ACTIVE_SUBSCRIPTION' : 'SUBSCRIPTION_CONFLICT';
+        code = error.details.reason === 'unlimited_active' ? 'ACTIVE_SUBSCRIPTION' : 'SUBSCRIPTION_CONFLICT';
       }
       notice(words['error.' + code] || t('error.generic'));
     }

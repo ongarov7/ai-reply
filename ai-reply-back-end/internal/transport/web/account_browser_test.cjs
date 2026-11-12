@@ -183,7 +183,7 @@ test('server refusal after preflight shows active Pro for cancelled renewal with
   const f = fixture(url => {
     if (url.endsWith('/checkout')) {
       refused = true;
-      return response({ error: { code: 'CONFLICT', details: { field: 'subscription', reason: 'already_active' } } }, 409);
+      return response({ error: { code: 'CONFLICT', details: { field: 'subscription', reason: 'unlimited_active' } } }, 409);
     }
     const payload = proSession(refused);
     if (refused) payload.bank.subscriptions = [{ id: 'fixture-subscription', product_code: 'pro_month',
@@ -219,7 +219,7 @@ test('active Pro still permits recovery of the original unresolved request with 
   const previous = first.requests.find(x => x.url.endsWith('/checkout'));
   assert.ok(previous);
   const resumed = fixture(url => url.endsWith('/checkout')
-    ? response({ error: { code: 'CONFLICT', details: { field: 'subscription', reason: 'already_active' } } }, 409)
+    ? response({ error: { code: 'CONFLICT', details: { field: 'subscription', reason: 'unlimited_active' } } }, 409)
     : response(proSession(true)), { stored: first.stored });
   await resumed.app.init(); await resumed.app.retryCheckout();
   const replay = resumed.requests.find(x => x.url.endsWith('/checkout'));
@@ -316,7 +316,7 @@ for (const reason of ['manage_existing_store_subscription', 'already_active', 'p
     assert.equal(f.app.state.pending, null);
     assert.equal(f.stored.has(pendingKey('/sandbox', 'sandbox', 'fixture-user-A')), false);
     assert.equal(f.nodes.get('account-purchase-terms').checked, false);
-    assert.equal(f.nodes.get('account-error').textContent, f.words[reason === 'already_active' ? 'error.ACTIVE_SUBSCRIPTION' : 'error.SUBSCRIPTION_CONFLICT']);
+    assert.equal(f.nodes.get('account-error').textContent, f.words['error.SUBSCRIPTION_CONFLICT']);
 
     const reloaded = fixture(() => response(payload), { stored: f.stored });
     await reloaded.app.init();
