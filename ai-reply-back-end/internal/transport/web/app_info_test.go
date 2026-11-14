@@ -58,7 +58,7 @@ func TestAppInformationRouteInAllLocalesAndPrefixes(t *testing.T) {
 				for _, want := range []string{`<html lang="` + locale + `">`, "<h1>" + title + "</h1>",
 					`href="` + prefix + `/support?lang=` + locale + `"`, `href="` + prefix + `/privacy?lang=` + locale + `"`,
 					`href="` + prefix + `/offer?lang=` + locale + `"`, `href="mailto:help@example.test"`,
-					`href="` + storeURL + `"`, `src="` + prefix + `/static/landing.js"`} {
+					`href="` + storeURL + `"`, `src="` + prefix + `/static/landing.js?v=`} {
 					if !strings.Contains(body, want) {
 						t.Errorf("page missing %q", want)
 					}
@@ -72,7 +72,7 @@ func TestAppInformationRouteInAllLocalesAndPrefixes(t *testing.T) {
 				for _, match := range regexp.MustCompile(`href="([^"]+)"`).FindAllStringSubmatch(body, -1) {
 					link := html.UnescapeString(match[1])
 					allowed := link == storeURL || link == "mailto:help@example.test" ||
-						link == prefix+"/static/landing.css" || link == prefix+"/static/favicon.svg" ||
+						strings.HasPrefix(link, prefix+"/static/landing.css?v=") || link == prefix+"/static/favicon.svg" ||
 						strings.HasPrefix(link, "?lang=")
 					for _, page := range []string{"support", "privacy", "offer"} {
 						allowed = allowed || link == prefix+"/"+page+"?lang="+locale

@@ -40,6 +40,7 @@ type Server struct {
 	// adminVersion — әкімші скрипті мен стилінің хэші (?v=…): жаңа нұсқа кэштен алынбайды.
 	adminVersion   string
 	accountVersion string
+	landingVersion string
 }
 
 // Deps — тәуелділіктер.
@@ -91,6 +92,10 @@ func New(d Deps) (*Server, error) {
 	}
 	s.adminVersion = version
 	s.accountVersion, err = assetVersion("static/account.js", "static/account.css")
+	if err != nil {
+		return nil, err
+	}
+	s.landingVersion, err = assetVersion("static/landing.js", "static/landing.css")
 	if err != nil {
 		return nil, err
 	}
@@ -165,6 +170,7 @@ type baseView struct {
 	AppInfoPage    bool
 	CommercialPage bool
 	AccountVersion string
+	LandingVersion string
 }
 
 func (s *Server) base(locale string) baseView {
@@ -176,6 +182,7 @@ func (s *Server) base(locale string) baseView {
 		ContactEmail:   s.cfg.App.ContactEmail(),
 		BasePath:       s.basePath(),
 		AccountVersion: s.accountVersion,
+		LandingVersion: s.landingVersion,
 	}
 }
 

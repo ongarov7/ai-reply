@@ -82,7 +82,7 @@ func (c CheckoutConfig) Validate() error {
 	if c.Environment == Production && u.Path == "/sandbox" {
 		return ErrInvalidConfig
 	}
-	if !digits(c.Merchant) || c.Terminal == "" || len(c.Merchant) > 32 || len(c.Terminal) > 32 || !printableASCII(c.Merchant) || !printableASCII(c.Terminal) || strings.ContainsAny(c.Merchant+c.Terminal, " \t\n\r") {
+	if !regexp.MustCompile(`^[A-Za-z0-9]{1,32}$`).MatchString(c.Merchant) || c.Terminal == "" || len(c.Merchant) > 32 || len(c.Terminal) > 32 || !printableASCII(c.Merchant) || !printableASCII(c.Terminal) || strings.ContainsAny(c.Merchant+c.Terminal, " \t\n\r") {
 		return ErrInvalidConfig
 	}
 	if !regexp.MustCompile(`^[A-Z0-9][A-Z0-9 .&'()-]{0,20}$`).MatchString(c.MerchantName) || strings.TrimSpace(c.MerchantName) != c.MerchantName {
@@ -94,7 +94,9 @@ func (c CheckoutConfig) Validate() error {
 	if c.Environment == Production && (c.Terminal == "88888881" || c.Terminal == "88888888" || strings.EqualFold(c.MACKeyHex, publicTestKey)) {
 		return ErrInvalidConfig
 	}
-	if c.NotifyUsername == "" || len(c.NotifyUsername) > 128 || strings.ContainsAny(c.NotifyUsername, ":\r\n\x00") || len(c.NotifyPassword) < 32 || len(c.NotifyPassword) > 256 || strings.ContainsAny(c.NotifyPassword, "\r\n\x00") || len(c.StateSecret) < 32 || c.StateSecret == c.NotifyPassword {
+	// The bank may issue a short Basic Auth password. Keep it opaque, while
+	// requiring a nonblank value and retaining strong, separate checkout state.
+	if c.NotifyUsername == "" || len(c.NotifyUsername) > 128 || strings.ContainsAny(c.NotifyUsername, ":\r\n\x00") || len(c.NotifyPassword) < 12 || strings.TrimSpace(c.NotifyPassword) == "" || len(c.NotifyPassword) > 256 || strings.ContainsAny(c.NotifyPassword, "\r\n\x00") || len(c.StateSecret) < 32 || c.StateSecret == c.NotifyPassword {
 		return ErrInvalidConfig
 	}
 	return nil

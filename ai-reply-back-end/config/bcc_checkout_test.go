@@ -79,3 +79,41 @@ func TestBCCProductionRejectsMissingApprovalAndReusedSandboxCredentials(t *testi
 		})
 	}
 }
+
+func TestBCCCheckoutLoadsBankIssuedNotifyPasswordVerbatim(t *testing.T) {
+	for _, environment := range []string{"production", "sandbox"} {
+		t.Run(environment, func(t *testing.T) {
+			password := " bank%:secret& "
+			var key string
+			if environment == "production" {
+				productionCheckoutEnvFixture(t)
+				key = "BCC_PRODUCTION_NOTIFY_PASSWORD"
+			} else {
+				checkoutEnvFixture(t)
+				t.Setenv("BCC_CHECKOUT_ENABLED", "true")
+				key = "BCC_CHECKOUT_NOTIFY_PASSWORD"
+			}
+			t.Setenv(key, password)
+			cfg, err := Load("")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if cfg.BCCCheckout.NotifyPassword != password {
+				t.Fatal("bank-issued notification password changed while loading environment")
+			}
+		})
+	}
+}
+
+func TestBCCProductionLoadsBankIssuedAlphanumericMerchant(t *testing.T) {
+	productionCheckoutEnvFixture(t)
+	merchant := "000B21POST9004"
+	t.Setenv("BCC_PRODUCTION_MERCHANT_ID", merchant)
+	cfg, err := Load("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.BCCCheckout.Merchant != merchant {
+		t.Fatal("bank-issued merchant ID changed while loading production configuration")
+	}
+}

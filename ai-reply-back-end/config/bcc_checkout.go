@@ -1,6 +1,10 @@
 package config
 
-import "github.com/aireply/ai-reply-back-end/internal/payments/bcc"
+import (
+	"os"
+
+	"github.com/aireply/ai-reply-back-end/internal/payments/bcc"
+)
 
 type BCCCheckout = bcc.CheckoutConfig
 
@@ -16,7 +20,7 @@ func bccCheckoutFromEnv(appEnv, publicBaseURL string) BCCCheckout {
 		cfg.Terminal = str("BCC_PRODUCTION_TERMINAL_ID", "")
 		cfg.MACKeyHex = str("BCC_PRODUCTION_MAC_KEY", "")
 		cfg.NotifyUsername = str("BCC_PRODUCTION_NOTIFY_USERNAME", "")
-		cfg.NotifyPassword = str("BCC_PRODUCTION_NOTIFY_PASSWORD", "")
+		cfg.NotifyPassword = bccNotifyPasswordFromEnv("BCC_PRODUCTION_NOTIFY_PASSWORD")
 		cfg.StateSecret = str("BCC_PRODUCTION_STATE_SECRET", "")
 	}
 	return cfg
@@ -34,8 +38,12 @@ func bccSandboxCheckoutFromEnv(appEnv, publicBaseURL string) BCCCheckout {
 		Terminal:         str("BCC_SANDBOX_TERMINAL_ID", ""),
 		MACKeyHex:        str("BCC_SANDBOX_MAC_KEY", ""),
 		NotifyUsername:   str("BCC_CHECKOUT_NOTIFY_USERNAME", ""),
-		NotifyPassword:   str("BCC_CHECKOUT_NOTIFY_PASSWORD", ""),
+		NotifyPassword:   bccNotifyPasswordFromEnv("BCC_CHECKOUT_NOTIFY_PASSWORD"),
 		StateSecret:      str("BCC_CHECKOUT_STATE_SECRET", ""),
 		RecurringEnabled: boolean("BILLING_SANDBOX_BCC_RECURRING_ENABLED", false),
 	}
 }
+
+// Basic Auth passwords are bank-issued opaque values. Unlike ordinary config
+// strings, surrounding spaces and URL-significant characters must be preserved.
+func bccNotifyPasswordFromEnv(key string) string { return os.Getenv(key) }

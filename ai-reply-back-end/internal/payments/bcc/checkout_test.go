@@ -375,6 +375,121 @@ func TestMerchantNameContractMatchesPublishedBankFormat(t *testing.T) {
 	cfg := s.cfg
 	cfg.Merchant = "non-numeric"
 	if cfg.Validate() == nil {
-		t.Fatal("non-numeric merchant accepted")
+		t.Fatal("merchant with punctuation accepted")
+	}
+}
+
+func TestBankIssuedMerchantIDValidation(t *testing.T) {
+	s, _ := testCheckout(t)
+	for _, merchant := range []string{"00000001", "B21POST90040000", "000B21POST9004", "a123B"} {
+		cfg := productionCheckoutFixture(s)
+		cfg.Merchant = merchant
+		if cfg.Validate() != nil {
+			t.Fatal("bank-issued ASCII alphanumeric merchant rejected")
+		}
+	}
+	for name, merchant := range map[string]string{
+		"empty": "", "space": "B21 POST90040000", "punctuation": "B21-POST90040000",
+		"unicode": "B21POST\u041090040000", "newline": "B21POST\n90040000", "nul": "B21POST\x0090040000",
+		"too long": strings.Repeat("A", 33),
+	} {
+		t.Run(name, func(t *testing.T) {
+			cfg := productionCheckoutFixture(s)
+			cfg.Merchant = merchant
+			if cfg.Validate() == nil {
+				t.Fatal("invalid merchant ID accepted")
+			}
+		})
+	}
+}
+
+func TestBankIssuedMerchantIDRemainsBoundToSignedOrder(t *testing.T) {
+	for _, merchant := range []string{"B21POST90040000", "000B21POST9004"} {
+		t.Run(merchant, func(t *testing.T) {
+			base, _ := testCheckout(t)
+			cfg := productionCheckoutFixture(base)
+			cfg.Merchant = merchant
+			s, err := NewCheckout(cfg, base.db, base.catalog)
+			if err != nil {
+				t.Fatal(err)
+			}
+			order, err := s.Start(context.Background(), "bank-user", "pack30", "bank-issued-merchant")
+			if err != nil {
+				t.Fatal(err)
+			}
+			fields := originalFields(t, s, order.ID)
+			signature, err := SignRequest(Purchase, fields, cfg.MACKeyHex)
+			if err != nil || fields.Get("MERCHANT") != merchant || fields.Get("P_SIGN") != signature {
+				t.Fatal("bank-issued merchant changed in the signed checkout request")
+			}
+			fields.Set("MERCHANT", strings.ToLower(merchant))
+			if notifyRequest(s, fields, true).Code != http.StatusBadRequest || bankBalance(t, s) != 0 {
+				t.Fatal("mismatched merchant notification changed the balance")
+			}
+			fields.Set("MERCHANT", merchant)
+			if notifyRequest(s, fields, true).Code != http.StatusOK || bankBalance(t, s) != 30 {
+				t.Fatal("exact bank-issued merchant notification did not fulfill its order")
+			}
+		})
+	}
+}
+
+func TestBankIssuedNotifyPasswordValidation(t *testing.T) {
+	s, _ := testCheckout(t)
+	for _, password := range []string{strings.Repeat("p", 12), "bank%:secret&", " bank%:secret& ", strings.Repeat("p", 256)} {
+		cfg := productionCheckoutFixture(s)
+		cfg.NotifyPassword = password
+		if err := cfg.Validate(); err != nil {
+			t.Fatal("valid bank-issued Basic Auth password rejected")
+		}
+	}
+	for name, password := range map[string]string{
+		"empty": "", "blank": strings.Repeat(" ", 12), "too short": strings.Repeat("x", 11), "carriage return": "bank\rsecret-more",
+		"newline": "bank\nsecret-more", "nul": "bank\x00secret-more", "too long": strings.Repeat("x", 257),
+	} {
+		t.Run(name, func(t *testing.T) {
+			cfg := productionCheckoutFixture(s)
+			cfg.NotifyPassword = password
+			if cfg.Validate() == nil {
+				t.Fatal("invalid notification password accepted")
+			}
+		})
+	}
+	for name, state := range map[string]string{
+		"short state": "short-state", "reused password": strings.Repeat("p", 40),
+	} {
+		t.Run(name, func(t *testing.T) {
+			cfg := productionCheckoutFixture(s)
+			cfg.StateSecret = state
+			if cfg.Validate() == nil {
+				t.Fatal("notification password relaxation weakened checkout state protection")
+			}
+		})
+	}
+}
+
+func TestBankIssuedNotifyPasswordAuthenticatesVerbatim(t *testing.T) {
+	base, _ := testCheckout(t)
+	cfg := productionCheckoutFixture(base)
+	cfg.NotifyPassword = "bank%:secret& "
+	s, err := NewCheckout(cfg, base.db, base.catalog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	order, err := s.Start(context.Background(), "bank-user", "pack30", "bank-issued-password")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fields := originalFields(t, s, order.ID)
+	r := httptest.NewRequest(http.MethodPost, "/api/v1/payments/bcc/notify", strings.NewReader(fields.Encode()))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	r.SetBasicAuth(cfg.NotifyUsername, strings.TrimSpace(cfg.NotifyPassword))
+	w := httptest.NewRecorder()
+	s.Notify(w, r)
+	if w.Code != http.StatusUnauthorized || bankBalance(t, s) != 0 {
+		t.Fatal("trimmed bank password authenticated or changed the balance")
+	}
+	if notifyRequest(s, fields, true).Code != http.StatusOK || bankBalance(t, s) != 30 {
+		t.Fatal("exact bank-issued password did not authenticate and fulfill the order")
 	}
 }

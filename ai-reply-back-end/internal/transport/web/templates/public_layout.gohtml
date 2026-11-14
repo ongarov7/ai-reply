@@ -8,10 +8,10 @@
 <meta property="og:title" content="AI Reply — {{call .T "app.tagline"}}">
 <meta property="og:description" content="{{call .T "hero.subtitle"}}">
 <meta property="og:type" content="website">
-<link rel="stylesheet" href="{{.BasePath}}/static/landing.css">
+<link rel="stylesheet" href="{{.BasePath}}/static/landing.css?v={{.LandingVersion}}">
 <link rel="icon" href="{{.BasePath}}/static/favicon.svg" type="image/svg+xml">
 <script id="landing-data" type="application/json">{{.Boot}}</script>
-<script src="{{.BasePath}}/static/landing.js" defer></script>
+<script src="{{.BasePath}}/static/landing.js?v={{.LandingVersion}}" defer></script>
 {{if .AccountPage}}<link rel="stylesheet" href="{{.BasePath}}/static/account.css?v={{.AccountVersion}}"><script src="{{.BasePath}}/static/account.js?v={{.AccountVersion}}" defer></script>{{end}}
 </head>
 <body>

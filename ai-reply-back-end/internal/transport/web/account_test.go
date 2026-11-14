@@ -121,7 +121,7 @@ func TestPublicInformationPagesKeepNavigationAwayFromCheckout(t *testing.T) {
 					t.Fatalf("informational page links to purchasing surface: %s", forbidden)
 				}
 			}
-			if !strings.Contains(body, `href="/sandbox/privacy?lang=en"`) || !strings.Contains(body, `src="/sandbox/static/landing.js"`) {
+			if !strings.Contains(body, `href="/sandbox/privacy?lang=en"`) || !strings.Contains(body, `src="/sandbox/static/landing.js?v=`) {
 				t.Fatal("informational page lost its isolated prefix")
 			}
 			if name == "account/delete" && !strings.Contains(body, `"base_path":"/sandbox"`) {

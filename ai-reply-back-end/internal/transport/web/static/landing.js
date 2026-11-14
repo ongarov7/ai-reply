@@ -16,6 +16,7 @@
 
   var data = readJSON("landing-data");
   var basePath = data && data.base_path === "/sandbox" ? "/sandbox" : "";
+  var motionPreference = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)");
 
   function readJSON(id) {
     var node = document.getElementById(id);
@@ -42,10 +43,55 @@
     };
     var dotsHost = root.querySelector("[data-dots]");
     var index = 0, timer = null, runId = 0;
+    var fieldNames = Object.keys(fields), measuredWidths = "";
 
     // Motion is an enhancement, never a requirement: a visitor who asked the
     // system not to animate still sees the whole conversation, just at rest.
-    var reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var reduced = motionPreference && motionPreference.matches;
+
+    // Reserve the tallest scene in each bubble before typing changes its text.
+    // Measure a hidden copy at the real width: character counts cannot predict
+    // wrapping across languages, device fonts, zoom levels or narrow screens.
+    function reserveSpace(force) {
+      var widths = fieldNames.map(function (key) { return fields[key].getBoundingClientRect().width; });
+      if (widths.some(function (width) { return width <= 0; })) return;
+      var signature = widths.join(",");
+      if (!force && signature === measuredWidths) return;
+      measuredWidths = signature;
+      var heights = fieldNames.map(function (key, i) {
+        var probe = fields[key].cloneNode(false);
+        probe.removeAttribute("data-field");
+        probe.classList.remove("is-thinking");
+        // Include the typing cursor so its last character cannot add a line.
+        probe.classList.add("demo-measure", "is-typing");
+        probe.style.width = widths[i] + "px";
+        probe.style.minHeight = "0";
+        fields[key].parentNode.appendChild(probe);
+        var height = 0;
+        scenes.forEach(function (scene) {
+          probe.textContent = scene[key];
+          height = Math.max(height, probe.getBoundingClientRect().height);
+        });
+        probe.remove();
+        return Math.ceil(height);
+      });
+      fieldNames.forEach(function (key, i) { fields[key].style.minHeight = heights[i] + "px"; });
+    }
+
+    reserveSpace(false);
+    if ("ResizeObserver" in window) {
+      // Height changes from typing must never restart a scene or create a
+      // resize loop. reserveSpace only remeasures after a field width changes.
+      new ResizeObserver(function () { reserveSpace(false); }).observe(root.querySelector(".phone-screen") || root);
+    } else {
+      window.addEventListener("resize", function () { reserveSpace(false); });
+    }
+    if (document.fonts) {
+      document.fonts.ready.then(function () { reserveSpace(true); });
+      if (document.fonts.addEventListener) {
+        document.fonts.addEventListener("loadingdone", function () { reserveSpace(true); });
+      }
+    }
 
     var dots = scenes.map(function (_, i) {
       var button = document.createElement("button");
@@ -85,9 +131,21 @@
     }
 
     function reset() {
-      Object.keys(rows).forEach(function (key) { rows[key].classList.remove("is-on"); });
+      fieldNames.forEach(function (key) {
+        rows[key].classList.remove("is-on");
+        fields[key].classList.remove("is-typing");
+      });
       fields.reply.classList.remove("is-thinking");
       fields.reply.textContent = "";
+    }
+
+    function showScene() {
+      fieldNames.forEach(function (key) {
+        rows[key].classList.add("is-on");
+        fields[key].classList.remove("is-typing", "is-thinking");
+        fields[key].textContent = scenes[index][key];
+      });
+      markDots();
     }
 
     // Every run carries an id. A dot tapped mid-animation bumps it, and the
@@ -104,10 +162,7 @@
 
       if (reduced) {
         // Still show the finished conversation, just without the typing.
-        Object.keys(rows).forEach(function (key) { rows[key].classList.add("is-on"); });
-        fields.incoming.textContent = scene.incoming;
-        fields.instruction.textContent = scene.instruction;
-        fields.reply.textContent = scene.reply;
+        showScene();
         return;
       }
 
@@ -140,12 +195,27 @@
       play(index, false);
     }
 
-    play(0, false);
+    // Keep the server-rendered conversation visible on first paint instead of
+    // immediately replacing it with an empty phone while the script starts.
+    showScene();
+    function scheduleNext() {
+      if (!reduced) timer = setTimeout(function () { play((index + 1) % scenes.length, false); }, 2800);
+    }
+    scheduleNext();
+    if (motionPreference && motionPreference.addEventListener) {
+      motionPreference.addEventListener("change", function (event) {
+        reduced = event.matches;
+        clearTimeout(timer);
+        runId += 1;
+        showScene();
+        scheduleNext();
+      });
+    }
   }
 
   /* ------------------------------------------------- counters */
   var counters = document.querySelectorAll("[data-count]");
-  if (counters.length && "IntersectionObserver" in window) {
+  if (counters.length && !(motionPreference && motionPreference.matches) && "IntersectionObserver" in window) {
     var observer = new IntersectionObserver(function (entries) {
       entries.forEach(function (entry) {
         if (!entry.isIntersecting) return;
@@ -171,7 +241,7 @@
 
   /* ------------------------------------------------- reveal on scroll */
   var sections = document.querySelectorAll(".reveal");
-  if (sections.length && "IntersectionObserver" in window) {
+  if (sections.length && !(motionPreference && motionPreference.matches) && "IntersectionObserver" in window) {
     var reveal = new IntersectionObserver(function (entries) {
       entries.forEach(function (entry) {
         if (!entry.isIntersecting) return;

@@ -554,18 +554,22 @@ BCC_PRODUCTION_STATE_SECRET=
 
 | Что нужно | Переменная |
 | --- | --- |
-| Боевой merchantID от BCC | `BCC_PRODUCTION_MERCHANT_ID` |
+| Боевой merchantID от BCC, точно с буквами и ведущими нулями | `BCC_PRODUCTION_MERCHANT_ID` |
 | Название мерчанта от BCC | `BCC_PRODUCTION_MERCHANT_NAME` |
 | Боевой terminalID от BCC | `BCC_PRODUCTION_TERMINAL_ID` |
 | Результат побайтового XOR hex-компонент key1 и key2 | `BCC_PRODUCTION_MAC_KEY` |
 | Отдельный согласованный с банком логин callback | `BCC_PRODUCTION_NOTIFY_USERNAME` |
-| Новый случайный пароль callback, от 32 символов | `BCC_PRODUCTION_NOTIFY_PASSWORD` |
+| Точный пароль callback, выданный или согласованный с банком (12–256 символов) | `BCC_PRODUCTION_NOTIFY_PASSWORD` |
 | Другой случайный серверный секрет, от 32 символов | `BCC_PRODUCTION_STATE_SECRET` |
 
 `key1` и `key2` по отдельности backend не читает. Вычислять итоговый MAC локально,
-не передавая компоненты сторонним сайтам. Пароль callback и state secret можно
-создать двумя отдельными запусками `openssl rand -hex 32`. Значения production
-должны отличаться от sandbox; state secret банку не передаётся.
+не передавая компоненты сторонним сайтам. Если банк уже выдал пароль callback,
+использовать его точно, без HTML-кодирования и самовольной замены. Если пароль
+нужно согласовать, сгенерировать его через `openssl rand -hex 32` и передать банку.
+State secret сгенерировать отдельным запуском той же команды. Значения production
+должны отличаться от sandbox; state secret банку не передаётся. Пароль с пробелами
+или специальными символами записывать в `.env` в одинарных кавычках; пробелы
+внутри кавычек являются частью пароля.
 
 На стороне банка настроить POST form-urlencoded, TLS 1.2 и тот же Basic Auth:
 `https://ai-reply.kz:443/api/v1/payments/bcc/notify`.
