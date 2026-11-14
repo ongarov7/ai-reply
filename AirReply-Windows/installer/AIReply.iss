@@ -7,7 +7,7 @@
   #define PayloadRoot SourceRoot + "\out"
 #endif
 #ifndef BuildVersion
-  #define BuildVersion "1.0.0"
+  #define BuildVersion "1.0.1"
 #endif
 
 [Setup]
@@ -40,6 +40,8 @@ Uninstallable=yes
 UninstallDisplayName=AI Reply
 UninstallDisplayIcon={app}\AIReply.exe
 SetupIconFile={#SourceRoot}\src\AirReply.App\Assets\AIReply.ico
+WizardSmallImageFile={#SourceRoot}\src\AirReply.App\Assets\AIReply-512.png
+WizardImageFile={#SourceRoot}\installer\Assets\WizardLogo.png
 OutputDir={#PayloadRoot}
 OutputBaseFilename=AIReply-Setup
 Compression=lzma2

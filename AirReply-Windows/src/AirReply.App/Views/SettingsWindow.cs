@@ -155,7 +155,7 @@ internal sealed class SettingsWindow : Window
     private StackPanel Account()
     {
         var panel = Stack(); panel.Children.Add(accountText);
-        panel.Children.Add(Button("settings.account.refresh", () => model.OpenAsync(CopiedTextResult.None)));
+        panel.Children.Add(Button("settings.account.refresh", () => model.RefreshAccountAsync()));
         panel.Children.Add(Button("settings.account.plans", () => { open("plans"); return Task.CompletedTask; }));
         panel.Children.Add(Button("settings.account.sign_out", () => model.SignOutAsync()));
         panel.Children.Add(Button("settings.account.delete", () => { open("delete"); return Task.CompletedTask; }));

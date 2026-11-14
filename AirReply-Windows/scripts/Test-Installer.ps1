@@ -23,6 +23,10 @@ $ownsTestState = $false
 $appProcess = $null
 $preservedFiles = @()
 $outcome = @{ success = $false; architecture = [Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString() }
+$brandIcon = Join-Path $sourceRoot 'src\AirReply.App\Assets\AIReply.ico'
+if (!('AirReply.InstallerValidation.EmbeddedIconVerifier' -as [type])) {
+    Add-Type -Path (Join-Path $sourceRoot 'installer\EmbeddedIconVerifier.cs')
+}
 
 function Assert-Installer([bool]$Condition, [string]$Message) {
     if (!$Condition) { throw $Message }
@@ -57,6 +61,27 @@ function Test-AppMutex {
     try { $mutex = [Threading.Mutex]::OpenExisting('Local\AIReply-production'); $mutex.Dispose(); return $true }
     catch [Threading.WaitHandleCannotBeOpenedException] { return $false }
 }
+function Assert-BrandIcon([string]$Path) {
+    $description = [AirReply.InstallerValidation.EmbeddedIconVerifier]::AssertBrandIcon($Path, $brandIcon)
+    $script:assertions++
+    return $description
+}
+function Assert-ShortcutIcon($Shortcut, [string]$ExpectedExecutable) {
+    $iconLocation = [string]$Shortcut.IconLocation
+    if ([string]::IsNullOrWhiteSpace($iconLocation)) {
+        # An empty IconLocation tells Windows to use the target's primary embedded icon.
+        $iconPath = $Shortcut.TargetPath
+        $iconIndex = 0
+    }
+    else {
+        $separator = $iconLocation.LastIndexOf(',')
+        $iconPath = if ($separator -ge 0) { $iconLocation.Substring(0, $separator) } else { $iconLocation }
+        $iconIndex = if ($separator -ge 0) { [int]$iconLocation.Substring($separator + 1) } else { 0 }
+        $iconPath = [Environment]::ExpandEnvironmentVariables($iconPath.Trim().Trim([char]34))
+        if ([string]::IsNullOrWhiteSpace($iconPath)) { $iconPath = $Shortcut.TargetPath }
+    }
+    Assert-Installer ($iconPath -eq $ExpectedExecutable -and $iconIndex -eq 0) 'Shortcut does not resolve the installed AI Reply brand icon.'
+}
 function Install-App([string]$LogName) {
     Invoke-InstallerProcess $installer @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', '/TASKS=desktopicon', "/DIR=`"$installDirectory`"", "/LOG=`"$(Join-Path $OutputRoot $LogName)`"")
 }
@@ -66,6 +91,27 @@ function Uninstall-App([string]$LogName) {
 
 try {
     Assert-Installer (Test-Path $installer) 'AIReply-Setup.exe is missing.'
+    # Verify actual encoded frame bytes in the primary PE icon group, including 16px and 256px frames.
+    # This also checks ARM64 on x64 without loading it as executable code.
+    $outcome.brand_icons = @{
+        installer = (Assert-BrandIcon $installer)
+        x64 = (Assert-BrandIcon (Join-Path $OutputRoot 'win-x64\AIReply.exe'))
+        arm64 = (Assert-BrandIcon (Join-Path $OutputRoot 'win-arm64\AIReply.exe'))
+    }
+    $changedReference = Join-Path $env:RUNNER_TEMP ('AIReply-changed-icon-' + [Guid]::NewGuid().ToString('N') + '.ico')
+    try {
+        $changedBytes = [IO.File]::ReadAllBytes($brandIcon)
+        $changedBytes[$changedBytes.Length - 1] = $changedBytes[$changedBytes.Length - 1] -bxor 0x10
+        [IO.File]::WriteAllBytes($changedReference, $changedBytes)
+        $rejected = $false
+        try { [AirReply.InstallerValidation.EmbeddedIconVerifier]::AssertBrandIcon($installer, $changedReference) | Out-Null }
+        catch {
+            if ($_.Exception -is [IO.InvalidDataException] -or $_.Exception.InnerException -is [IO.InvalidDataException]) { $rejected = $true }
+            else { throw }
+        }
+        Assert-Installer $rejected 'The icon verifier accepted changed logo image bytes.'
+    }
+    finally { Remove-Item $changedReference -Force -ErrorAction SilentlyContinue }
     Assert-Installer (!(Test-AppMutex)) 'An existing AI Reply instance would contaminate installer checks.'
     $existing = $registry.OpenSubKey($uninstallKey)
     try { Assert-Installer ($null -eq $existing) 'An existing AI Reply installation would contaminate installer checks.' }
@@ -80,6 +126,7 @@ try {
 
     Assert-Installer ((Install-App 'installer-install.log') -eq 0) 'Silent install failed.'
     Assert-Installer ((Get-FileHash $executable -Algorithm SHA256).Hash -eq $expectedHash) 'Installer selected the wrong native payload.'
+    $outcome.brand_icons.installed = Assert-BrandIcon $executable
     Assert-Installer (Test-Path $uninstaller) 'Automatic uninstaller is missing.'
     Assert-Installer (Test-Path (Join-Path $installDirectory 'README-Windows.txt')) 'Installed instructions are missing.'
     [xml]$properties = Get-Content (Join-Path $sourceRoot 'Directory.Build.props') -Raw
@@ -94,6 +141,10 @@ try {
     $shortcut = $shell.CreateShortcut($startShortcut)
     Assert-Installer ($shortcut.TargetPath -eq $executable) 'Start menu shortcut targets the wrong file.'
     Assert-Installer ($shortcut.WorkingDirectory -eq $installDirectory) 'Start menu shortcut working directory is incorrect.'
+    Assert-ShortcutIcon $shortcut $executable
+    $desktopLink = $shell.CreateShortcut($desktopShortcut)
+    Assert-Installer ($desktopLink.TargetPath -eq $executable) 'Desktop shortcut targets the wrong file.'
+    Assert-ShortcutIcon $desktopLink $executable
 
     # Preview starts the real installed Avalonia executable and single-instance guard without any production HTTP.
     $appProcess = Start-Process $executable -ArgumentList '--preview', '--background' -PassThru

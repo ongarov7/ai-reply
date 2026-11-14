@@ -179,6 +179,11 @@
       "ru": "AI Reply для Windows · сведения не содержат токены или текст сообщений.",
       "kk": "Windows үшін AI Reply · мәліметтерде токендер мен хабарлама мәтіндері жоқ.",
       "en": "AI Reply for Windows · diagnostics exclude tokens and message text."
+    },
+    "issue.payment_unavailable": {
+      "ru": "Не удалось безопасно открыть оплату для этого аккаунта. Попробуйте ещё раз.",
+      "kk": "Осы аккаунт үшін төлемді қауіпсіз ашу мүмкін болмады. Қайталап көріңіз.",
+      "en": "Could not securely open payment for this account. Please try again."
     }
   }
 }

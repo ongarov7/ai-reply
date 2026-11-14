@@ -182,8 +182,8 @@ public sealed class AccountAndGenerationTests
         using var fixture = new Fixture();
         fixture.Api.Install(ApiClientTests.Payload());
         fixture.Handler.Reply = (_, _) => Task.FromResult(RecordingHandler.Json("{\"url\":\"https://evil.example/payment#handoff=secret\"}"));
-        var uri = await fixture.Account.PlansUriAsync(TestContext.Current.CancellationToken);
-        Assert.Equal("https://ai-reply.kz/payment", uri.AbsoluteUri);
+        var failure = await Assert.ThrowsAsync<PaymentHandoffException>(() => fixture.Account.PlansUriAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(PaymentHandoffFailure.InvalidResponse, failure.Failure);
         using var body = JsonDocument.Parse(Assert.Single(fixture.Handler.Requests).Body!);
         Assert.Equal("user-1", body.RootElement.GetProperty("expected_user_id").GetString());
     }

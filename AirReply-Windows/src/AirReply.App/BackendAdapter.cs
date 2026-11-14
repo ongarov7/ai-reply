@@ -9,7 +9,7 @@ using AirReply.Presentation.Models;
 
 namespace AirReply.App;
 
-internal sealed class BackendAdapter : IQuickBarBackend
+internal sealed class BackendAdapter : IQuickBarBackend, IDisposable
 {
     private readonly ApiClient api;
     private readonly AccountStore account;
@@ -29,7 +29,11 @@ internal sealed class BackendAdapter : IQuickBarBackend
         auth = new AuthSession(api, account, registrar);
         generator = new Generator(api, account, registrar);
         transcriber = new Transcriber(api, registrar);
+        account.Changed += AccountChanged;
     }
+    public event EventHandler? Changed;
+    private void AccountChanged(object? sender, EventArgs e) => Changed?.Invoke(this, EventArgs.Empty);
+    public void Dispose() => account.Changed -= AccountChanged;
 
     public AccountSnapshot Snapshot
     {
@@ -42,7 +46,7 @@ internal sealed class BackendAdapter : IQuickBarBackend
             return new(api.Session is not null, account.Me is not null, account.HasConsent == true,
                 api.Session?.UserId, account.Me?.User.Email, balanceText, account.Config.Feature("voice_transcription"),
                 !contextUnavailable && account.Config.Feature("desktop_context_generation"), account.Config.Feature("sender_profile"),
-                account.Config.MaxSourceCharacters, account.Config.MaxInstructionLength, account.Config.Legal?.AiProvider ?? "OpenAI");
+                account.Config.MaxSourceCharacters, account.Config.MaxInstructionLength, account.Config.Legal?.AiProvider ?? "OpenAI", api.SessionGeneration);
         }
     }
 
@@ -58,14 +62,20 @@ internal sealed class BackendAdapter : IQuickBarBackend
     public Task RefreshAsync(CancellationToken cancellationToken = default) => Wrap(async () =>
     {
         await account.RefreshConfigAsync(ct: cancellationToken);
-        await account.RefreshMeAsync(TimeSpan.FromSeconds(10), cancellationToken);
+        await account.RefreshForForegroundAsync(TimeSpan.Zero, cancellationToken);
     });
     public Task RequestCodeAsync(string email, CancellationToken cancellationToken = default) => Wrap(async () => { await auth.RequestCodeAsync(email, cancellationToken); });
     public Task VerifyAsync(string code, CancellationToken cancellationToken = default) => Wrap(async () => { await auth.VerifyAsync(code, cancellationToken); });
+    public void UseAnotherEmail() => auth.UseAnotherEmail();
     public Task ResendAsync(CancellationToken cancellationToken = default) => Wrap(async () => { await auth.ResendCodeAsync(cancellationToken); });
     public Task SignOutAsync(CancellationToken cancellationToken = default) => Wrap(() => auth.SignOutAsync(cancellationToken));
     public Task AcceptConsentAsync(CancellationToken cancellationToken = default) => Wrap(() => account.AcceptConsentAsync(cancellationToken));
-    public Task<Uri> PlansUriAsync(CancellationToken cancellationToken = default) => account.PlansUriAsync(cancellationToken);
+    public async Task<Uri> PlansUriAsync(CancellationToken cancellationToken = default)
+    {
+        try { return await account.PlansUriAsync(cancellationToken); }
+        catch (PaymentHandoffException ex) { throw new QuickBarException("issue.payment_unavailable", inner: ex); }
+        catch (ApiException ex) { throw Map(ex); }
+    }
 
     public async Task<string> GenerateAsync(GenerationRequest request, CancellationToken cancellationToken = default)
     {

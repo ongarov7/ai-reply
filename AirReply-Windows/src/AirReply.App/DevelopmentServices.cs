@@ -16,6 +16,7 @@ internal sealed class UiDispatcher : IUiDispatcher
 internal sealed class PreviewServices : IClipboardService, IVoiceRecorder, IFocusTracker, IPasteService,
     IStartupService, IShell, IKeyboardLanguage, ISecretStore, IQuickBarBackend
 {
+    public event EventHandler? Changed { add { } remove { } }
     private readonly Dictionary<string, string> secrets = new(StringComparer.Ordinal);
     public event EventHandler<float>? Level { add { } remove { } }
     public event EventHandler<VoiceCaptureException?>? Stopped { add { } remove { } }
@@ -46,6 +47,7 @@ internal sealed class PreviewServices : IClipboardService, IVoiceRecorder, IFocu
     private static Task Unavailable() => Task.FromException(new QuickBarException("app.platform_preview"));
     public Task RequestCodeAsync(string email, CancellationToken cancellationToken = default) => Unavailable();
     public Task VerifyAsync(string code, CancellationToken cancellationToken = default) => Unavailable();
+    public void UseAnotherEmail() { }
     public Task ResendAsync(CancellationToken cancellationToken = default) => Unavailable();
     public Task SignOutAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     public Task AcceptConsentAsync(CancellationToken cancellationToken = default) => Unavailable();

@@ -92,6 +92,7 @@ internal sealed class DesktopHost : IDisposable
             keyboard = preview; startup = preview; shell = preview; backend = preview;
         }
         model = new QuickBarViewModel(backend, clipboard, voice, settings, localizer, dispatcher);
+        bar.Activated += (_, _) => { if (!showing && !disposing) _ = model.RefreshAccountAsync(); };
         context = new ContextWorkspace(Path.Combine(Path.GetDirectoryName(JsonSettingsStore.DefaultPath())!, "context"),
             user => OperatingSystem.IsWindows() ? new WindowsDataProtector(ContextProfileStore.Entropy(user)) : new EphemeralDataProtector());
         model.ReadInputLanguage = () => keyboard.CurrentInputLanguage(0);
@@ -152,7 +153,8 @@ internal sealed class DesktopHost : IDisposable
         api = new ApiClient(http, AppInfo.Current(), new WindowsSecretStore(), () => localizer.LanguageCode); owned.Add(api);
         account = new AccountStore(api); owned.Add(account);
         var registrar = new InstallationRegistrar(api, account); owned.Add(registrar);
-        backend = new BackendAdapter(api, account, registrar, () => localizer);
+        var adapter = new BackendAdapter(api, account, registrar, () => localizer);
+        backend = adapter; owned.Add(adapter);
         crash = new CrashReporter(api, Path.Combine(Path.GetDirectoryName(JsonSettingsStore.DefaultPath())!, "pending-crashes.json"));
         AppDomain.CurrentDomain.UnhandledException += OnFatal;
     }
@@ -241,16 +243,29 @@ internal sealed class DesktopHost : IDisposable
         if (action == "hide") { Hide(true); return; }
         if (action == "settings") { ShowSettings(); return; }
         if (action == "signin-again") { await model.SignOutAsync(); if (!bar.IsVisible) await ShowAsync(); return; }
-        var uri = action switch
+        var generation = api?.SessionGeneration;
+        try
         {
-            "plans" => await backend.PlansUriAsync(),
+            var uri = action switch
+            {
+                "plans" => await backend.PlansUriAsync(),
             "privacy" => AccountStore.SafeWebUri(account?.Config.Legal?.PrivacyUrl) ?? Website("privacy"),
             "terms" => AccountStore.SafeWebUri(account?.Config.Legal?.TermsUrl) ?? Website("terms"),
             "support" => AccountStore.SafeWebUri(account?.Config.Legal?.SupportUrl) ?? Website("support"),
             "delete" => account?.AccountDeletionUri ?? Website("account/delete"),
             _ => Website(WebsitePaths.Windows),
-        };
-        try { shell.OpenUri(uri); Hide(false); }
+            };
+            if (action == "plans" && generation != api?.SessionGeneration)
+                throw new QuickBarException("issue.payment_unavailable");
+            if (disposing) return;
+            shell.OpenUri(uri); Hide(false);
+        }
+        catch (QuickBarException ex)
+        {
+            if (!bar.IsVisible) await ShowAsync();
+            model.ReportIssue(ex.Key);
+        }
+        catch (OperationCanceledException) { }
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
         { model.ReportIssue("issue.server"); }
     }
@@ -264,6 +279,7 @@ internal sealed class DesktopHost : IDisposable
         {
             settingsWindow = new SettingsWindow(settings, model, context!, startup, hotkey,
                 SaveSettings, ApplyAppearance, action => _ = HandleActionAsync(action));
+            settingsWindow.Activated += (_, _) => { if (!disposing) _ = model.RefreshAccountAsync(); };
             settingsWindow.Closed += (_, _) =>
             {
                 settingsWindow = null; anchor = null;
@@ -272,7 +288,7 @@ internal sealed class DesktopHost : IDisposable
         }
         settingsWindow.Show(); settingsWindow.Activate();
         if (OperatingSystem.IsWindows() && focus is WindowsFocusTracker tracker) tracker.SettingsWindow = settingsWindow.TryGetPlatformHandle()?.Handle ?? 0;
-        _ = model.OpenAsync(CopiedTextResult.None);
+        _ = model.RefreshAccountAsync();
     }
 
     private void UpdateContextPicker()

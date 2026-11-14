@@ -1,4 +1,4 @@
-AI Reply for Windows — 1.0.0 preview
+AI Reply for Windows — 1.0.1 preview
 
 Для установки запустите AIReply-Setup.exe и следуйте шагам мастера.
 Он сам выберет x64 или ARM64 и добавит AI Reply в меню «Пуск».

@@ -5,7 +5,7 @@ namespace AirReply.Presentation.Models;
 public sealed record AccountSnapshot(bool SignedIn = false, bool Ready = false, bool HasConsent = false,
     string? UserId = null, string? Email = null, string Balance = "", bool VoiceAvailable = false,
     bool ContextAvailable = false, bool SenderProfile = false, int SourceLimit = 400, int InstructionLimit = 400,
-    string Provider = "OpenAI");
+    string Provider = "OpenAI", long SessionGeneration = 0);
 
 /// <summary>An immutable snapshot: retry must use exactly the original request and idempotency key.</summary>
 public sealed record GenerationRequest(string Source, string Instruction, Recipient Recipient, bool IsReply,
@@ -21,11 +21,13 @@ public sealed class QuickBarException(string key, bool retryable = false, Except
 
 public interface IQuickBarBackend
 {
+    event EventHandler? Changed;
     AccountSnapshot Snapshot { get; }
     Task InitializeAsync(CancellationToken cancellationToken = default);
     Task RefreshAsync(CancellationToken cancellationToken = default);
     Task RequestCodeAsync(string email, CancellationToken cancellationToken = default);
     Task VerifyAsync(string code, CancellationToken cancellationToken = default);
+    void UseAnotherEmail();
     Task ResendAsync(CancellationToken cancellationToken = default);
     Task SignOutAsync(CancellationToken cancellationToken = default);
     Task AcceptConsentAsync(CancellationToken cancellationToken = default);

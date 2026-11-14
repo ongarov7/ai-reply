@@ -32,6 +32,17 @@ No release certificate is configured. The generated installer is unsigned and re
 download/reputation warnings. Native payload selection on actual Windows ARM64 and interactive installation
 still require manual Windows QA in addition to the automated silent install/upgrade/uninstall smoke checks.
 
+Branding uses the existing AI Reply assets: `SetupIconFile` and the app's `ApplicationIcon` use the same
+multi-resolution ICO; the wizard header uses the existing 512px PNG. The welcome/completion panel uses
+`Assets/WizardLogo.png`, a centered copy of that logo on a white 492×942 canvas (the native 164:314 panel
+aspect ratio at 3× resolution). No new logo is introduced.
+
+The lifecycle checks parse PE icon resources as data and verify that the *primary* icon group of Setup,
+both published native executables and the installed executable contains all eight exact reference image
+frames. A generic icon count would not catch the default Inno/.NET icon. Shortcut icon sources and the
+Installed Apps icon are checked against the validated installed executable. This does not replace manual
+visual checks of interactive wizard scaling and Windows theme/DPI behavior.
+
 Compiler licensing: Inno Setup's [official license](https://jrsoftware.org/files/is/license.txt) permits use
 for any purpose, including commercial applications. The upstream purchase page requests financial support;
 this project does not remove Inno Setup's embedded copyright or website information.

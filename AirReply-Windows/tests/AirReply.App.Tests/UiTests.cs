@@ -1,6 +1,9 @@
 using AirReply.App.Views;
 using AirReply.Context;
 using AirReply.Core.Infrastructure;
+using AirReply.Core.Accounts;
+using AirReply.Core.Installations;
+using AirReply.Core.Networking;
 using AirReply.Core.Localization;
 using AirReply.Core.Settings;
 using AirReply.Presentation.Models;
@@ -108,8 +111,91 @@ public sealed class UiTests
 
     private static readonly AccountSnapshot SignedIn = new(true, true, true, "user-a", "person@example.kz", "Осталось ответов: 27", true, true, true);
 
+    [AvaloniaFact]
+    public async Task Confirmed_website_balance_reaches_visible_bar_without_manual_refresh()
+    {
+        Localizer.Include(typeof(QuickBarViewModel).Assembly, "AirReply.Presentation.Localization.strings.json");
+        var handler = new PaymentHandler();
+        using var http = new HttpClient(handler);
+        using var api = new ApiClient(http, AppInfo.Current(), new MemorySecrets());
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var account = new AccountStore(api, paymentDelay: (_, ct) => release.Task.WaitAsync(ct));
+        using var registrar = new InstallationRegistrar(api, account);
+        api.Install(new SessionPayload
+        {
+            AccessToken = "test-access", RefreshToken = "test-refresh", DeviceId = "test-device",
+            User = new UserDto { Id = "payment-user", Email = "test@example.com" },
+            Usage = new UsageDto { Credits = 1, RemainingTotal = 1 }, LegalConsent = new LegalConsentDto(),
+        });
+        using var backend = new BackendAdapter(api, account, registrar, () => new Localizer(UiLanguage.En));
+        var services = new TestServices();
+        using var model = new QuickBarViewModel(backend, services, services, new AppSettings(), new(UiLanguage.En), new UiDispatcher());
+        model.Draft = "Keep this draft while a payment is confirmed";
+        var view = new QuickBarView { DataContext = model };
+        var window = new Window { Width = 680, Content = view };
+        window.Show(); Dispatcher.UIThread.RunJobs();
+        var payment = await backend.PlansUriAsync(TestContext.Current.CancellationToken);
+        Assert.Equal("ai-reply.kz", payment.Host);
+        await model.RefreshAccountAsync();
+        var catchup = account.PaymentRefreshTask;
+        Assert.NotNull(catchup);
+        handler.Credits = 501;
+        release.TrySetResult();
+        await catchup.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        Dispatcher.UIThread.RunJobs();
+        var balance = model.L.Format("balance.remaining", 501);
+        Assert.Equal(balance, model.Account.Balance);
+        Assert.Contains(view.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == balance);
+        Assert.Equal("Keep this draft while a payment is confirmed", model.Draft);
+        Assert.False(account.IsWebsitePaymentPending);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task Invalid_signed_in_payment_handoff_becomes_a_localized_issue()
+    {
+        var handler = new PaymentHandler { InvalidHandoff = true };
+        using var http = new HttpClient(handler);
+        using var api = new ApiClient(http, AppInfo.Current(), new MemorySecrets());
+        using var account = new AccountStore(api);
+        using var registrar = new InstallationRegistrar(api, account);
+        api.Install(new SessionPayload { AccessToken = "test-access", RefreshToken = "test-refresh", DeviceId = "test-device", User = new UserDto { Id = "payment-user" } });
+        using var backend = new BackendAdapter(api, account, registrar, () => new Localizer(UiLanguage.En));
+        var error = await Assert.ThrowsAsync<QuickBarException>(() => backend.PlansUriAsync(TestContext.Current.CancellationToken));
+        Assert.Equal("issue.payment_unavailable", error.Key);
+        Assert.NotNull(api.Session);
+        Assert.False(account.IsWebsitePaymentPending);
+    }
+
+    private sealed class PaymentHandler : HttpMessageHandler
+    {
+        public int Credits { get; set; } = 1;
+        public bool InvalidHandoff { get; init; }
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var body = request.RequestUri!.AbsolutePath switch
+            {
+                "/api/v1/config" => "{}",
+                "/api/v1/web/payment-handoff" => System.Text.Json.JsonSerializer.Serialize(new { url = InvalidHandoff ? "https://other.example/payment#handoff=" + new string('A', 43) : "https://ai-reply.kz/payment#handoff=" + new string('A', 43) }),
+                "/api/v1/me" => System.Text.Json.JsonSerializer.Serialize(new { user = new { id = "payment-user", email = "test@example.com" }, usage = new { credits = Credits, remaining_total = Credits }, legal_consent = new { terms_version = "1", privacy_version = "1" } }),
+                _ => throw new InvalidOperationException("Unexpected test request."),
+            };
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json") });
+        }
+    }
+
+    private sealed class MemorySecrets : ISecretStore
+    {
+        private readonly Dictionary<string, string> values = new(StringComparer.Ordinal);
+        public string? Read(string key) => values.GetValueOrDefault(key);
+        public void Write(string key, string value) => values[key] = value;
+        public void Delete(string key) => values.Remove(key);
+    }
+
     private sealed class TestBackend : IQuickBarBackend
     {
+        public event EventHandler? Changed;
+        public void RaiseChanged() => Changed?.Invoke(this, EventArgs.Empty);
         public AccountSnapshot Snapshot { get; set; } = SignedIn;
         public string Reply => "Спасибо! Мы получили документы и скоро сообщим о следующих шагах.";
         public QuickBarException? Failure { get; set; }
@@ -119,6 +205,7 @@ public sealed class UiTests
         public Task RefreshAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task RequestCodeAsync(string email, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task VerifyAsync(string code, CancellationToken cancellationToken = default) { Snapshot = SignedIn; return Task.CompletedTask; }
+        public void UseAnotherEmail() { }
         public Task ResendAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task SignOutAsync(CancellationToken cancellationToken = default) { Snapshot = new(); return Task.CompletedTask; }
         public Task AcceptConsentAsync(CancellationToken cancellationToken = default) { Snapshot = Snapshot with { HasConsent = true }; return Task.CompletedTask; }

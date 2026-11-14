@@ -9,6 +9,8 @@ services:
     build: .
     env_file: .env
     environment:
+      # Public Android listing; an explicit deployment URL can still override it.
+      PLAY_STORE_URL: "${PLAY_STORE_URL:-https://play.google.com/store/apps/details?id=kz.yerek.aireply}"
       # Порт картасымен бірдей мән контейнерге де беріледі.
       APP_PORT: ${APP_PORT:?APP_PORT must be set in .env}
       # Контейнер ішінде барлық интерфейсті тыңдау керек, әйтпесе Docker трафикті

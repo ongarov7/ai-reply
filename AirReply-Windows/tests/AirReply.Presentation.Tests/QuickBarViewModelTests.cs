@@ -495,6 +495,83 @@ public sealed class QuickBarViewModelTests
         Assert.Equal(fixture.Vm.L["voice.issue.no_device"], fixture.Vm.Issue);
     }
 
+    [Fact]
+    public void Background_balance_push_notifies_on_dispatcher_and_preserves_the_draft()
+    {
+        var backend = new FakeBackend(); var voice = new FakeVoice(); var clipboard = new FakeClipboard();
+        var dispatcher = new QueuedDispatcher();
+        using var model = new QuickBarViewModel(backend, clipboard, voice, new AppSettings(), new(UiLanguage.En), dispatcher);
+        model.Draft = "keep this conversation";
+        var changes = 0;
+        model.AccountChanged += (_, _) => changes++;
+        backend.Snapshot = backend.Snapshot with { Balance = "500 replies remaining" };
+        backend.RaiseChanged();
+        Assert.Equal(0, changes);
+        dispatcher.Drain();
+        Assert.Equal(1, changes);
+        Assert.Equal("500 replies remaining", model.Account.Balance);
+        Assert.Equal("keep this conversation", model.Draft);
+    }
+
+    [Fact]
+    public async Task Same_user_new_session_push_clears_previous_private_result()
+    {
+        using var fixture = new Fixture();
+        fixture.Vm.Draft = "private";
+        await fixture.Vm.SubmitAsync();
+        Assert.NotEmpty(fixture.Vm.Result);
+        fixture.Backend.Snapshot = fixture.Backend.Snapshot with { SessionGeneration = 2 };
+        fixture.Backend.RaiseChanged();
+        Assert.Empty(fixture.Vm.Result);
+        Assert.Empty(fixture.Vm.Draft);
+        Assert.False(fixture.Vm.RegenerateCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task Authentication_push_does_not_cancel_its_own_logout_request()
+    {
+        using var fixture = new Fixture();
+        fixture.Backend.RaiseAuthChanges = true;
+        await fixture.Vm.SignOutAsync();
+        Assert.False(fixture.Backend.AuthCancellationObserved);
+        Assert.True(fixture.Vm.SignedOut);
+    }
+
+    [Fact]
+    public async Task Authentication_push_does_not_cancel_its_own_code_verification()
+    {
+        using var fixture = new Fixture(signedIn: false);
+        fixture.Backend.RaiseAuthChanges = true;
+        fixture.Vm.Email = "person@example.com";
+        await fixture.Vm.SubmitAsync();
+        fixture.Vm.Code = "1234";
+        await fixture.Vm.SubmitAsync();
+        Assert.False(fixture.Backend.AuthCancellationObserved);
+        Assert.True(fixture.Vm.Account.SignedIn);
+    }
+
+    [Fact]
+    public void Queued_backend_push_is_ignored_after_disposal()
+    {
+        var backend = new FakeBackend(); var dispatcher = new QueuedDispatcher();
+        var model = new QuickBarViewModel(backend, new FakeClipboard(), new FakeVoice(), new AppSettings(), new(UiLanguage.En), dispatcher);
+        var changes = 0; model.AccountChanged += (_, _) => changes++;
+        backend.RaiseChanged();
+        model.Dispose();
+        dispatcher.Drain();
+        backend.RaiseChanged(); dispatcher.Drain();
+        Assert.Equal(0, changes);
+    }
+
+    private sealed class QueuedDispatcher : IUiDispatcher
+    {
+        private readonly Queue<Action> pending = [];
+        public bool CheckAccess() => true;
+        public void Post(Action action) => pending.Enqueue(action);
+        public Task InvokeAsync(Func<Task> action) => action();
+        public void Drain() { while (pending.TryDequeue(out var action)) action(); }
+    }
+
     private sealed class Fixture : IDisposable
     {
         public FakeBackend Backend { get; } = new();
@@ -562,6 +639,8 @@ public sealed class QuickBarViewModelTests
     }
     private sealed class FakeBackend : IQuickBarBackend
     {
+        public event EventHandler? Changed;
+        public void RaiseChanged() => Changed?.Invoke(this, EventArgs.Empty);
         public AccountSnapshot Snapshot { get; set; } = new(true, true, true, "account-one", "user@example.com",
             VoiceAvailable: true, ContextAvailable: true, SenderProfile: true);
         public Func<GenerationRequest, CancellationToken, Task<string>> Generate { get; set; } = (_, _) => Task.FromResult("готовый ответ");
@@ -573,13 +652,27 @@ public sealed class QuickBarViewModelTests
         public IReadOnlyList<string> Languages { get; private set; } = [];
         public int Signouts { get; private set; }
         public int Uploads { get; private set; }
+        public bool RaiseAuthChanges { get; set; }
+        public bool AuthCancellationObserved { get; private set; }
         public Task InitializeAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task RefreshAsync(CancellationToken cancellationToken = default) => Refresh(cancellationToken);
         public Task RequestCodeAsync(string email, CancellationToken cancellationToken = default) { Emails.Add(email); return Task.CompletedTask; }
         public Task VerifyAsync(string code, CancellationToken cancellationToken = default)
-        { Codes.Add(code); Snapshot = new(true, true, false, "account-one", "user@example.com"); return Task.CompletedTask; }
+        {
+            Codes.Add(code); Snapshot = new(true, true, false, "account-one", "user@example.com", SessionGeneration: 1);
+            if (RaiseAuthChanges) RaiseChanged();
+            AuthCancellationObserved = cancellationToken.IsCancellationRequested;
+            return Task.CompletedTask;
+        }
+        public void UseAnotherEmail() { }
         public Task ResendAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task SignOutAsync(CancellationToken cancellationToken = default) { Signouts++; Snapshot = new(); return Task.CompletedTask; }
+        public Task SignOutAsync(CancellationToken cancellationToken = default)
+        {
+            Signouts++; Snapshot = new(SessionGeneration: 2);
+            if (RaiseAuthChanges) RaiseChanged();
+            AuthCancellationObserved = cancellationToken.IsCancellationRequested;
+            return Task.CompletedTask;
+        }
         public Task AcceptConsentAsync(CancellationToken cancellationToken = default) { Snapshot = Snapshot with { HasConsent = true }; return Task.CompletedTask; }
         public Task<string> GenerateAsync(GenerationRequest request, CancellationToken cancellationToken = default)
         { Requests.Add(request); return Generate(request, cancellationToken); }

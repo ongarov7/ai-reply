@@ -46,7 +46,7 @@ public sealed record ApiRequest(HttpMethod Method, string Path)
 }
 
 public enum SignOutReason { User, RefreshRefused, TokenRejected }
-public sealed record SessionEvent(SessionPayload? Payload = null, SignOutReason? SignOutReason = null);
+public sealed record SessionEvent(SessionPayload? Payload = null, SignOutReason? SignOutReason = null, long? Generation = null);
 
 public sealed record SessionTokens(string AccessToken, string RefreshToken, DateTimeOffset AccessExpiresAt,
     DateTimeOffset? RefreshExpiresAt, string DeviceId, string UserId, string? Email, string InstallationId)

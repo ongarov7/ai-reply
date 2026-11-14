@@ -101,3 +101,26 @@ macOS paths above are under `AirReply-macOS/Packages/AirReplyKit/Sources`; Windo
 DPI/multiple monitors and actual Windows ARM64 hardware remain unverified. The unsigned installer may
 trigger Windows reputation warnings. This publication makes no claim of identical behavior or complete
 production readiness.
+
+
+## Follow-up: Windows 1.0.1 candidate
+
+The payment-return gap identified above is addressed in the 1.0.1 candidate. Foreground activation
+forces an account refresh and a validated website handoff starts a bounded 120-second catch-up window.
+Account changes propagate to the visible bar and tray. Signed-in payment handoffs fail closed if the
+server response cannot be tied to the current session; a failure is shown in the selected UI language.
+Late OTP, generation and account responses cannot restore an older session or overwrite its balance.
+Session changes also clear private conversation state, including reauthentication to the same user.
+
+The installer uses the existing brand logo in its wizard. Its Windows lifecycle check now compares
+all eight embedded icon frames in Setup, both native payloads and the installed executable, checks
+shortcut icon resolution, and proves a changed reference icon is rejected.
+
+Local solution validation: 290 tests discovered, 284 passed and six native Windows tests skipped on
+macOS; no failed tests. Windows CI and publication results are recorded below after completion.
+Other macOS parity gaps and manual Windows checks listed above remain open.
+
+The deployment Compose configuration also supplies the verified public Google Play listing as the
+default `PLAY_STORE_URL`, while retaining an explicit deployment override:
+<https://play.google.com/store/apps/details?id=kz.yerek.aireply>.
+This uses the existing landing-page setting and does not change payment or database configuration.

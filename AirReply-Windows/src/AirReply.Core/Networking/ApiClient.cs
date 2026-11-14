@@ -67,6 +67,8 @@ public sealed class ApiClient : IDisposable
     public string Language => NormalizeLanguage(language()) ?? "ru";
     public DeviceMetadata Device => device;
     public SessionTokens? Session { get { lock (gate) { return session; } } }
+    /// <summary>Changes for sign-in/sign-out, including returning to the same user; token rotation keeps it.</summary>
+    public long SessionGeneration { get { lock (gate) { return generation; } } }
     public event EventHandler<SessionEvent>? SessionChanged;
     public static HttpClient CreateHttpClient() => new(new SocketsHttpHandler
     {
@@ -116,29 +118,40 @@ public sealed class ApiClient : IDisposable
         }
     }
 
-    public void Install(SessionPayload payload, string? fallbackEmail = null)
+    public void Install(SessionPayload payload, string? fallbackEmail = null) =>
+        InstallCore(payload, null, fallbackEmail, CancellationToken.None);
+
+    /// <summary>Atomically refuses a late sign-in response after another session transition or cancellation.</summary>
+    public bool TryInstall(SessionPayload payload, long expectedGeneration, string? fallbackEmail = null,
+        CancellationToken cancellationToken = default) => InstallCore(payload, expectedGeneration, fallbackEmail, cancellationToken);
+
+    private bool InstallCore(SessionPayload payload, long? expectedGeneration, string? fallbackEmail, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(payload);
         ValidateSessionPayload(payload);
+        long installedGeneration;
         lock (gate)
         {
+            if (cancellationToken.IsCancellationRequested || expectedGeneration is { } expected && generation != expected) return false;
             var tokens = Tokens(payload, fallbackEmail, InstallationId);
             Persist(tokens);
             sessionCancellation.Cancel();
             sessionCancellation.Dispose();
             sessionCancellation = new();
-            generation++;
+            installedGeneration = ++generation;
             refreshTask = null;
             session = tokens;
         }
-        SessionChanged?.Invoke(this, new(payload));
+        SessionChanged?.Invoke(this, new(payload, Generation: installedGeneration));
+        return true;
     }
 
     public void ClearSession(SignOutReason reason = SignOutReason.User)
     {
+        long clearedGeneration;
         lock (gate)
         {
-            generation++;
+            clearedGeneration = ++generation;
             session = null;
             refreshTask = null;
             sessionCancellation.Cancel();
@@ -146,7 +159,7 @@ public sealed class ApiClient : IDisposable
             sessionCancellation = new();
             secrets.Delete(Key("session"));
         }
-        SessionChanged?.Invoke(this, new(SignOutReason: reason));
+        SessionChanged?.Invoke(this, new(SignOutReason: reason, Generation: clearedGeneration));
     }
 
     public async Task SignOutAsync(CancellationToken ct = default)
@@ -270,7 +283,7 @@ public sealed class ApiClient : IDisposable
                 }
                 session = result;
             }
-            SessionChanged?.Invoke(this, new(payload));
+            SessionChanged?.Invoke(this, new(payload, Generation: sessionGeneration));
             return result;
         }
     }

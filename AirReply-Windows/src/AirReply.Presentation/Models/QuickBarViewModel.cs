@@ -25,10 +25,13 @@ public sealed class QuickBarViewModel : ObservableObject, IDisposable
     private DateTimeOffset? lastCopy;
     private CopiedText? copied;
     private string? accountId;
+    private long accountSessionGeneration;
+    private CancellationTokenSource? sessionTransitionOperation;
     private string draft = "", source = "", email = "", code = "", result = "", issue = "", customInstructions = "";
     private bool reply, codeSent, busy, retryable, extended, contextEnabled, copying, requestingVoice;
     private BarPhase phase;
     private Recipient recipient;
+    private bool disposed;
 
     public QuickBarViewModel(IQuickBarBackend backend, IClipboardService clipboard, IVoiceRecorder voice,
         AppSettings settings, Localizer localizer, IUiDispatcher dispatcher, IClock? clock = null)
@@ -39,6 +42,7 @@ public sealed class QuickBarViewModel : ObservableObject, IDisposable
         this.dispatcher = dispatcher;
         this.clock = clock ?? new SystemClock();
         accountId = backend.Snapshot.SignedIn ? backend.Snapshot.UserId : null;
+        accountSessionGeneration = backend.Snapshot.SessionGeneration;
         Settings = settings;
         L = localizer;
         recipient = RecipientWire.FromWire(settings.LastRecipient) ?? Recipient.Client;
@@ -50,6 +54,7 @@ public sealed class QuickBarViewModel : ObservableObject, IDisposable
         ResendCommand = new AsyncRelayCommand(() => RunAsync(ct => backend.ResendAsync(ct)));
         VoiceCommand = new AsyncRelayCommand(ToggleVoiceAsync, () => CanRecord || Phase == BarPhase.Recording);
         voice.Stopped += VoiceStopped;
+        backend.Changed += BackendChanged;
     }
 
     public AppSettings Settings { get; }
@@ -103,6 +108,16 @@ public sealed class QuickBarViewModel : ObservableObject, IDisposable
     public IAsyncRelayCommand VoiceCommand { get; }
 
     public Task InitializeAsync() => RunAsync(ct => backend.InitializeAsync(ct));
+    public Task RefreshAccountAsync() => RunAsync(ct => backend.RefreshAsync(ct), clearIssue: false);
+
+    private void BackendChanged(object? sender, EventArgs e) => dispatcher.Post(() =>
+    {
+        if (disposed) return;
+        SynchronizeAccount(cancelOperation: !ReferenceEquals(operation, sessionTransitionOperation));
+        if (!Account.ContextAvailable) { ContextEnabled = false; Extended = false; }
+        Notify();
+        AccountChanged?.Invoke(this, EventArgs.Empty);
+    });
 
     public async Task OpenAsync(CopiedTextResult fresh)
     {
@@ -126,9 +141,9 @@ public sealed class QuickBarViewModel : ObservableObject, IDisposable
         if (IsRecording) { voice.Cancel(); Phase = BarPhase.Editing; }
     }
 
-    public void ResetConversation()
+    public void ResetConversation(bool cancelOperation = true)
     {
-        operation?.Cancel();
+        if (cancelOperation) operation?.Cancel();
         voice.Cancel();
         requestingVoice = false;
         Draft = Source = Result = CustomInstructions = "";
@@ -161,12 +176,12 @@ public sealed class QuickBarViewModel : ObservableObject, IDisposable
         if (requestingVoice || IsRecording) Cancel();
     }
 
-    public void AnotherEmail() { CodeSent = false; Code = ""; Issue = ""; }
+    public void AnotherEmail() { operation?.Cancel(); backend.UseAnotherEmail(); CodeSent = false; Code = ""; Issue = ""; }
 
     public async Task SignOutAsync()
     {
         Cancel();
-        await RunAsync(ct => backend.SignOutAsync(ct), replaceRunning: true);
+        await RunAsync(ct => backend.SignOutAsync(ct), replaceRunning: true, allowsSessionChange: true);
         ResetConversation();
         CodeSent = false;
         Code = "";
@@ -192,7 +207,7 @@ public sealed class QuickBarViewModel : ObservableObject, IDisposable
             {
                 if (CodeSent) { await backend.VerifyAsync(Code.Trim(), ct); ct.ThrowIfCancellationRequested(); Code = ""; CodeSent = false; ResetConversation(); }
                 else { await backend.RequestCodeAsync(Email.Trim(), ct); ct.ThrowIfCancellationRequested(); CodeSent = true; }
-            });
+            }, allowsSessionChange: true);
             return;
         }
         if (!CanEdit) return;
@@ -235,6 +250,7 @@ public sealed class QuickBarViewModel : ObservableObject, IDisposable
     {
         if (IsBusy) return;
         var user = Account.UserId;
+        var sessionGeneration = Account.SessionGeneration;
         CancellationToken generationToken = default;
         Phase = BarPhase.Generating;
         await RunAsync(async ct =>
@@ -242,7 +258,7 @@ public sealed class QuickBarViewModel : ObservableObject, IDisposable
             generationToken = ct;
             var text = await backend.GenerateAsync(request, ct);
             ct.ThrowIfCancellationRequested();
-            if (!Account.SignedIn || Account.UserId != user) return;
+            if (!Account.SignedIn || Account.UserId != user || Account.SessionGeneration != sessionGeneration) return;
             Result = text;
             lastCopy = null;
             lastClosed = clock.Now;
@@ -260,10 +276,11 @@ public sealed class QuickBarViewModel : ObservableObject, IDisposable
         CopyCommand.NotifyCanExecuteChanged();
         var text = Result;
         var user = Account.UserId;
+        var sessionGeneration = Account.SessionGeneration;
         try
         {
             if (!await clipboard.CopyAsync(text)) { Issue = L["clipboard.failed"]; return; }
-            if (!Account.SignedIn || Account.UserId != user || text != Result) return;
+            if (!Account.SignedIn || Account.UserId != user || Account.SessionGeneration != sessionGeneration || text != Result) return;
             lastCopy = lastClosed = clock.Now;
             CustomInstructions = "";
             Extended = false;
@@ -309,6 +326,7 @@ public sealed class QuickBarViewModel : ObservableObject, IDisposable
     {
         if (IsBusy || Phase != BarPhase.Recording) return;
         var user = Account.UserId;
+        var sessionGeneration = Account.SessionGeneration;
         CancellationToken transcriptionToken = default;
         Phase = BarPhase.Transcribing;
         await RunAsync(async ct =>
@@ -326,7 +344,7 @@ public sealed class QuickBarViewModel : ObservableObject, IDisposable
                     .Where(value => value is "ru" or "kk" or "en").OfType<string>().Distinct(StringComparer.Ordinal).Take(3).ToArray();
                 var text = await backend.TranscribeAsync(await File.ReadAllBytesAsync(audio.FilePath, ct), audio.Duration, languages, ct);
                 ct.ThrowIfCancellationRequested();
-                if (!Account.SignedIn || Account.UserId != user) return;
+                if (!Account.SignedIn || Account.UserId != user || Account.SessionGeneration != sessionGeneration) return;
                 Draft = string.Join(' ', new[] { Draft.Trim(), text.Trim() }.Where(s => s.Length > 0));
             }
             finally { File.Delete(audio.FilePath); }
@@ -335,12 +353,13 @@ public sealed class QuickBarViewModel : ObservableObject, IDisposable
     }
 
     private async Task RunAsync(Func<CancellationToken, Task> action, bool clearIssue = true, bool replaceRunning = false,
-        bool retryAllowed = false)
+        bool retryAllowed = false, bool allowsSessionChange = false)
     {
         if (IsBusy && !replaceRunning) return;
         operation?.Cancel();
         var current = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);
         operation = current;
+        sessionTransitionOperation = allowsSessionChange ? current : null;
         IsBusy = true;
         if (clearIssue) { Issue = ""; retryable = false; }
         try { await action(current.Token); }
@@ -358,6 +377,7 @@ public sealed class QuickBarViewModel : ObservableObject, IDisposable
             if (ReferenceEquals(operation, current))
             {
                 operation = null;
+                sessionTransitionOperation = null;
                 SynchronizeAccount();
                 if (!Account.ContextAvailable) { ContextEnabled = false; Extended = false; }
                 if (!Account.SignedIn && Phase != BarPhase.Editing) { Result = ""; Phase = BarPhase.Editing; }
@@ -369,12 +389,13 @@ public sealed class QuickBarViewModel : ObservableObject, IDisposable
         }
     }
 
-    private void SynchronizeAccount()
+    private void SynchronizeAccount(bool cancelOperation = true)
     {
         var user = Account.SignedIn ? Account.UserId : null;
-        if (accountId == user) return;
+        if (accountId == user && accountSessionGeneration == Account.SessionGeneration) return;
         accountId = user;
-        ResetConversation();
+        accountSessionGeneration = Account.SessionGeneration;
+        ResetConversation(cancelOperation);
         Code = "";
         CodeSent = false;
     }
@@ -402,6 +423,9 @@ public sealed class QuickBarViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        if (disposed) return;
+        disposed = true;
+        backend.Changed -= BackendChanged;
         lifetime.Cancel();
         operation?.Cancel(); operation?.Dispose();
         lifetime.Dispose();

@@ -87,39 +87,70 @@ public sealed class Generator(ApiClient api, AccountStore account, InstallationR
     private async Task<GenerationResult> GenerateAsync(string mode, Dictionary<string, object> body, string key, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(key)) { throw new ArgumentException("An idempotency key is required.", nameof(key)); }
+        var sessionGeneration = api.SessionGeneration;
+        var userId = api.Session?.UserId ?? throw new GenerationException(GenerationErrorKind.SignedOut);
+        RequireCurrentSession(sessionGeneration, userId, ct);
         await registrar.WaitForSessionAsync(ct: ct).ConfigureAwait(false);
+        RequireCurrentSession(sessionGeneration, userId, ct);
         var healed = false;
         for (var conflicts = 0; ;)
         {
+            RequireCurrentSession(sessionGeneration, userId, ct);
+            var stateRevision = account.StateRevision;
             try
             {
                 var result = await api.SendAsync<Response>(new(HttpMethod.Post, "/api/v1/ai/" + mode)
                 { Body = body, IdempotencyKey = key, Timeout = TimeSpan.FromSeconds(45) }, ct).ConfigureAwait(false);
+                RequireCurrentSession(sessionGeneration, userId, ct);
                 var text = mode == "reply" ? result.Reply : result.Text;
                 if (string.IsNullOrWhiteSpace(text)) { throw new ApiException(ApiFailure.InvalidResponse, 200); }
-                if (result.Usage is not null) { account.Apply(result.Usage); }
+                if (result.Usage is not null && !account.TryApplyUsage(result.Usage, sessionGeneration, userId, stateRevision))
+                {
+                    RequireCurrentSession(sessionGeneration, userId, ct);
+                    // A newer account snapshot won: obtain authoritative usage instead of overwriting it.
+                    try { await account.RefreshMeAsync(TimeSpan.Zero, ct).ConfigureAwait(false); }
+                    catch (ApiException ex) when (ex.Failure != ApiFailure.Cancelled) { }
+                    RequireCurrentSession(sessionGeneration, userId, ct);
+                }
                 return new(text, result.DetectedLanguage, result.Usage);
             }
             catch (ApiException ex) when (ex.Code == "CONFLICT" && ex.DetailString("field") == "idempotency_key" &&
                 ex.DetailString("reason") == "in_progress" && conflicts++ < 2)
-            { await delay(TimeSpan.FromSeconds(2), ct).ConfigureAwait(false); }
+            {
+                RequireCurrentSession(sessionGeneration, userId, ct);
+                await delay(TimeSpan.FromSeconds(2), ct).ConfigureAwait(false);
+            }
             catch (ApiException ex) when (ex.Code == "PRO_DEVICE_IDENTITY_REQUIRED" && !healed &&
                 api.Session?.InstallationId == api.InstallationId && !registrar.IsConfirmedForCurrentSession)
             {
+                RequireCurrentSession(sessionGeneration, userId, ct);
                 healed = true;
                 var synced = await registrar.SyncAsync(force: true, ct).ConfigureAwait(false);
                 if (synced is not (InstallationOutcome.Registered or InstallationOutcome.Unchanged)) { throw Map(ex); }
             }
+            catch (ApiException ex) when (ex.Failure == ApiFailure.Cancelled)
+            {
+                RequireCurrentSession(sessionGeneration, userId, ct);
+                throw;
+            }
             catch (ApiException ex) when (ex.Failure != ApiFailure.Cancelled)
             {
+                RequireCurrentSession(sessionGeneration, userId, ct);
                 if (ex.Code is "CONSENT_REQUIRED" or "DAILY_LIMIT_REACHED" or "MONTHLY_LIMIT_REACHED" or "PAYMENT_REQUIRED" or "SUBSCRIPTION_EXPIRED")
                 {
                     try { await account.RefreshMeAsync(ct: ct).ConfigureAwait(false); }
                     catch (ApiException) { }
                 }
+                RequireCurrentSession(sessionGeneration, userId, ct);
                 throw Map(ex);
             }
         }
+    }
+    private void RequireCurrentSession(long generation, string userId, CancellationToken ct)
+    {
+        if (ct.IsCancellationRequested) throw new ApiException(ApiFailure.Cancelled);
+        if (api.SessionGeneration != generation || api.Session?.UserId != userId)
+            throw new GenerationException(GenerationErrorKind.SignedOut);
     }
     public static GenerationException Map(ApiException ex)
     {
