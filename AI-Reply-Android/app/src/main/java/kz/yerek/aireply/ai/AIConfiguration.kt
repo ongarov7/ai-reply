@@ -1,7 +1,9 @@
 package kz.yerek.aireply.ai
 
+import kz.yerek.aireply.data.BackendEnvironment
+
 /**
- * Fixed production configuration shared by the app and input method.
+ * Fixed build configuration shared by the app and input method.
  *
  * A request needs an account AND the current legal versions accepted on this
  * phone: the consent screen is where the user agrees to the text going to the
@@ -15,7 +17,7 @@ class AIConfiguration(
     private val isAccountSignedIn: () -> Boolean
 ) {
 
-    val backendBaseUrl: String = DEFAULT_BACKEND_BASE_URL
+    val backendBaseUrl: String = BackendEnvironment.current.baseUrl
     val requiresAccount: Boolean = true
     val isReady: Boolean get() = notReadyReason == null
 

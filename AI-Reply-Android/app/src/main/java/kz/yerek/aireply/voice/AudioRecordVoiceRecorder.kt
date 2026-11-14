@@ -20,6 +20,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kz.yerek.aireply.platform.ReplyLog
+import kz.yerek.aireply.data.BackendEnvironment
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -75,7 +76,7 @@ import java.io.IOException
  */
 class AudioRecordVoiceRecorder(
     context: Context,
-    private val directory: File = File(context.cacheDir, "voice")
+    private val directory: File = File(context.cacheDir, BackendEnvironment.current.storageName("voice"))
 ) : VoiceRecorder {
 
     private val appContext = context.applicationContext

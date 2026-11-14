@@ -609,6 +609,7 @@ type UnconsumedPurchase struct {
 	StoreProductID string
 	TransactionID  string
 	SealedToken    string
+	Environment    string
 	// GrantedAt — қашан берілді (created_at: pending жол төленгенде жаңарады).
 	GrantedAt time.Time
 }
@@ -620,7 +621,7 @@ type UnconsumedPurchase struct {
 // not mistaken for one the store has already refunded.
 func (s *Store) UnconsumedPurchases(ctx context.Context, provider string, before time.Time, limit int) ([]UnconsumedPurchase, error) {
 	rows, err := s.db.Reader().QueryContext(ctx, `
-		SELECT id, store_product_id, transaction_id, COALESCE(purchase_token_sealed, ''), created_at FROM iap_purchases
+		SELECT id, store_product_id, transaction_id, COALESCE(purchase_token_sealed, ''), created_at, environment FROM iap_purchases
 		WHERE provider = ? AND status = 'granted' AND consumed_at IS NULL AND created_at < ?
 		  AND purchase_token_sealed IS NOT NULL
 		ORDER BY created_at LIMIT ?`, provider, ms(before), limit)
@@ -634,7 +635,7 @@ func (s *Store) UnconsumedPurchases(ctx context.Context, provider string, before
 			u       UnconsumedPurchase
 			created int64
 		)
-		if err := rows.Scan(&u.ID, &u.StoreProductID, &u.TransactionID, &u.SealedToken, &created); err != nil {
+		if err := rows.Scan(&u.ID, &u.StoreProductID, &u.TransactionID, &u.SealedToken, &created, &u.Environment); err != nil {
 			return nil, err
 		}
 		u.GrantedAt = timeFrom(created)

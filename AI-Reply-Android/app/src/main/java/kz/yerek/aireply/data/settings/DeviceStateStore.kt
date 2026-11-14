@@ -2,6 +2,7 @@ package kz.yerek.aireply.data.settings
 
 import android.content.Context
 import android.content.SharedPreferences
+import kz.yerek.aireply.data.BackendEnvironment
 import kz.yerek.aireply.billing.RecommendationStore
 import kz.yerek.aireply.update.UpdateStore
 
@@ -21,8 +22,8 @@ import kz.yerek.aireply.update.UpdateStore
  */
 class DeviceStateStore internal constructor(private val prefs: SharedPreferences) : UpdateStore, RecommendationStore {
 
-    constructor(context: Context) : this(
-        context.applicationContext.getSharedPreferences(NAME, Context.MODE_PRIVATE)
+    constructor(context: Context, environment: BackendEnvironment = BackendEnvironment.current) : this(
+        context.applicationContext.getSharedPreferences(environment.storageName(NAME), Context.MODE_PRIVATE)
     )
 
     override var updateLastCheck: Long?

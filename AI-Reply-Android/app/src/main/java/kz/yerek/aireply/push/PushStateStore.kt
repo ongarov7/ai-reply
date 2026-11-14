@@ -2,6 +2,7 @@ package kz.yerek.aireply.push
 
 import android.content.Context
 import android.content.SharedPreferences
+import kz.yerek.aireply.data.BackendEnvironment
 
 /**
  * Push and installation state that belongs to THIS device only.
@@ -17,8 +18,8 @@ import android.content.SharedPreferences
  */
 class PushStateStore internal constructor(private val prefs: SharedPreferences) {
 
-    constructor(context: Context) : this(
-        context.applicationContext.getSharedPreferences(NAME, Context.MODE_PRIVATE)
+    constructor(context: Context, environment: BackendEnvironment = BackendEnvironment.current) : this(
+        context.applicationContext.getSharedPreferences(environment.storageName(NAME), Context.MODE_PRIVATE)
     )
 
     /** The current FCM registration token, as Firebase last reported it. */

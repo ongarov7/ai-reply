@@ -2,6 +2,7 @@ package kz.yerek.aireply.data.settings
 
 import android.content.Context
 import android.content.SharedPreferences
+import kz.yerek.aireply.data.BackendEnvironment
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -45,9 +46,9 @@ class SettingsStore internal constructor(
     private val accountPrefs: SharedPreferences = prefs
 ) {
 
-    constructor(context: Context) : this(
-        context.applicationContext.getSharedPreferences(NAME, Context.MODE_PRIVATE),
-        context.applicationContext.getSharedPreferences(ACCOUNT_NAME, Context.MODE_PRIVATE)
+    constructor(context: Context, environment: BackendEnvironment = BackendEnvironment.current) : this(
+        context.applicationContext.getSharedPreferences(environment.storageName(NAME), Context.MODE_PRIVATE),
+        context.applicationContext.getSharedPreferences(environment.storageName(ACCOUNT_NAME), Context.MODE_PRIVATE)
     )
 
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }

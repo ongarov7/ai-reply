@@ -33,6 +33,8 @@ type Config struct {
 	BCCSandboxCheckout                 BCCCheckout
 	BillingSandboxEnabled              bool
 	BillingSandboxBCCEnabled           bool
+	BillingSandboxGoogleEnabled        bool
+	BillingSandboxGoogle               IAP
 	BillingSandboxPushEnabled          bool
 	BillingSandboxWebTopupOfferEnabled bool
 	BillingSandboxMacOSDownloadURL     string
@@ -380,6 +382,8 @@ type IAP struct {
 	// GoogleAcceptTest — Google Play лицензия тестерлерінің тегін сатып алулары (purchaseType 0) қабылдана ма.
 	// Әдепкі: production-да false, басқа ортада true. Тестер шын кредит алады, әр жауап OpenAI-ға төленеді.
 	GoogleAcceptTest bool
+	// GoogleTestOnly is set by the isolated billing sandbox, never by primary environment flags.
+	GoogleTestOnly bool
 	// GoogleServiceAccountFile — the JSON file the two values came from ("" — from the variables).
 	GoogleServiceAccountFile string
 	// GoogleTokenSecret — seals stored Play subscription tokens. Unlike the JWT secrets it
@@ -498,6 +502,8 @@ func Load(envFile string) (Config, error) {
 		BCCSandboxCheckout:                 bccSandboxCheckoutFromEnv(appEnv, publicBaseURL),
 		BillingSandboxEnabled:              boolean("BILLING_SANDBOX_ENABLED", false),
 		BillingSandboxBCCEnabled:           boolean("BILLING_SANDBOX_BCC_ENABLED", false),
+		BillingSandboxGoogleEnabled:        boolean("BILLING_SANDBOX_GOOGLE_ENABLED", false),
+		BillingSandboxGoogle:               billingSandboxGoogleFromEnv(),
 		BillingSandboxPushEnabled:          boolean("BILLING_SANDBOX_PUSH_ENABLED", false),
 		BillingSandboxWebTopupOfferEnabled: boolean("BILLING_SANDBOX_WEB_TOPUP_OFFER_ENABLED", false),
 		BillingSandboxMacOSDownloadURL:     str("BILLING_SANDBOX_MACOS_DOWNLOAD_URL", ""),
@@ -692,6 +698,7 @@ func (c Config) Validate() []string {
 	if c.BillingSandboxBCCEnabled && !c.BillingSandboxEnabled {
 		problems = append(problems, "BILLING_SANDBOX_BCC_ENABLED requires BILLING_SANDBOX_ENABLED=true")
 	}
+	problems = append(problems, c.validateBillingSandboxGoogle()...)
 	if c.BillingSandboxPushEnabled && (!c.BillingSandboxEnabled || !c.Push.FCM.Configured()) {
 		problems = append(problems, "BILLING_SANDBOX_PUSH_ENABLED requires BILLING_SANDBOX_ENABLED=true and configured Firebase credentials")
 	}

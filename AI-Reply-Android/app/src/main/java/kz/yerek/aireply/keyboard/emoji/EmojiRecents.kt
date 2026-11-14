@@ -2,6 +2,7 @@ package kz.yerek.aireply.keyboard.emoji
 
 import android.content.Context
 import android.content.SharedPreferences
+import kz.yerek.aireply.data.BackendEnvironment
 
 /** Where the recent emoji are kept: one string. */
 interface EmojiRecentsStore {
@@ -20,8 +21,8 @@ interface EmojiRecentsStore {
  */
 class PrefsEmojiRecentsStore internal constructor(private val prefs: SharedPreferences) : EmojiRecentsStore {
 
-    constructor(context: Context) : this(
-        context.applicationContext.getSharedPreferences(NAME, Context.MODE_PRIVATE)
+    constructor(context: Context, environment: BackendEnvironment = BackendEnvironment.current) : this(
+        context.applicationContext.getSharedPreferences(environment.storageName(NAME), Context.MODE_PRIVATE)
     )
 
     override fun read(): String? = prefs.getString(KEY, null)

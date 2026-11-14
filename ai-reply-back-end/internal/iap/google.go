@@ -25,7 +25,24 @@ const (
 	voidedPages   = 20
 	// WorkerInterval — тұтынуды қайталау жиілігі.
 	WorkerInterval = 15 * time.Minute
+	// License tests auto-refund unacknowledged purchases after about three
+	// minutes and renew monthly subscriptions about every five minutes.
+	googleSandboxInterval = 30 * time.Second
 )
+
+func (s *Service) googleWorkerInterval() time.Duration {
+	if s.cfg.GoogleTestOnly {
+		return googleSandboxInterval
+	}
+	return WorkerInterval
+}
+
+func (s *Service) googleConsumeGrace() time.Duration {
+	if s.cfg.GoogleTestOnly {
+		return 0
+	}
+	return consumeGrace
+}
 
 // playUnavailable — Google жауап бермеді: клиент кейін қайта жібереді (503 STORE_UNAVAILABLE).
 func (s *Service) playUnavailable(err error, userID string) error {
@@ -88,7 +105,7 @@ func (s *Service) VerifyGoogle(ctx context.Context, user domain.User, productID,
 		return refuse(domain.PurchaseReasonPurchaseType)
 	}
 	environment := googleEnvironment(p)
-	if environment == domain.EnvironmentTest && !s.cfg.GoogleAcceptTest {
+	if !s.googleEnvironmentAllowed(environment) {
 		return refuse(domain.PurchaseReasonEnvironment)
 	}
 	txn := tokenHash(token)
@@ -169,6 +186,13 @@ func googleEnvironment(p googleplay.ProductPurchase) string {
 	return domain.EnvironmentProduction
 }
 
+func (s *Service) googleEnvironmentAllowed(environment string) bool {
+	if s.cfg.GoogleTestOnly {
+		return s.cfg.GoogleAcceptTest && environment == domain.EnvironmentTest
+	}
+	return environment != domain.EnvironmentTest || s.cfg.GoogleAcceptTest
+}
+
 // consume — берілгеннен кейін бірден тұтыну; сәтсіз болса жұмысшы қайталайды.
 func (s *Service) consume(ctx context.Context, purchaseID, productID, token string) {
 	callCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
@@ -194,7 +218,7 @@ func (s *Service) RetryConsumes(ctx context.Context) (int, error) {
 		return 0, nil
 	}
 	now := s.clock.Now()
-	rows, err := s.repo.UnconsumedPurchases(ctx, domain.ProviderGooglePlay, now.Add(-consumeGrace), consumeBatch)
+	rows, err := s.repo.UnconsumedPurchases(ctx, domain.ProviderGooglePlay, now.Add(-s.googleConsumeGrace()), consumeBatch)
 	if err != nil {
 		return 0, err
 	}
@@ -202,6 +226,10 @@ func (s *Service) RetryConsumes(ctx context.Context) (int, error) {
 	for _, row := range rows {
 		if ctx.Err() != nil {
 			return consumed, ctx.Err()
+		}
+		if s.cfg.GoogleTestOnly && row.Environment != domain.EnvironmentTest {
+			s.log.Warn("google play sandbox skipped a non-test consume")
+			continue
 		}
 		if now.Sub(row.GrantedAt) > consumeGiveUp {
 			s.log.Warn("google play purchase was never consumed; giving up", "purchase_id", row.ID)
@@ -217,6 +245,16 @@ func (s *Service) RetryConsumes(ctx context.Context) (int, error) {
 				return consumed, err
 			}
 			continue
+		}
+		if s.cfg.GoogleTestOnly {
+			purchase, err := s.google.GetProductPurchase(ctx, row.StoreProductID, token)
+			if err != nil {
+				return consumed, s.playUnavailable(err, "")
+			}
+			if !s.googleEnvironmentAllowed(googleEnvironment(purchase)) {
+				s.log.Warn("google play sandbox refused a non-test consume")
+				continue
+			}
 		}
 		err = s.google.Consume(ctx, row.StoreProductID, token)
 		if err == nil {
@@ -286,6 +324,20 @@ func (s *Service) PollVoided(ctx context.Context) (int, error) {
 			if v.PurchaseToken == "" {
 				continue
 			}
+			if s.cfg.GoogleTestOnly {
+				// Google's voided feed includes real purchases of this package too.
+				// Only receipts already verified as tests in this database belong here.
+				known, err := s.repo.IAPPurchaseByTransaction(ctx, domain.ProviderGooglePlay, tokenHash(v.PurchaseToken))
+				if errors.Is(err, domain.ErrNotFound) {
+					continue
+				}
+				if err != nil {
+					return revoked, err
+				}
+				if known.Environment != domain.EnvironmentTest {
+					continue
+				}
+			}
 			sub, err := s.repo.VoidGoogleSubscription(ctx, repository.GoogleVoid{TokenHash: tokenHash(v.PurchaseToken), OrderID: v.OrderID,
 				Reason: "voided:" + strconv.Itoa(v.VoidedReason), At: v.VoidedAt(), Now: now})
 			if err != nil {
@@ -327,7 +379,7 @@ func (s *Service) Run(ctx context.Context) {
 	if s.google == nil {
 		return
 	}
-	ticker := time.NewTicker(WorkerInterval)
+	ticker := time.NewTicker(s.googleWorkerInterval())
 	defer ticker.Stop()
 	for {
 		s.Tick(ctx)

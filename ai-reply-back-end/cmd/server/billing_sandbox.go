@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/aireply/ai-reply-back-end/config"
 )
@@ -24,6 +25,11 @@ func billingSandboxConfig(primary config.Config) (config.Config, error) {
 	}
 	if primary.BillingSandboxWebTopupOfferEnabled && !primary.BillingSandboxPushEnabled {
 		return config.Config{}, fmt.Errorf("billing sandbox web offer requires explicitly enabled sandbox push")
+	}
+	if google := primary.BillingSandboxGoogle; primary.BillingSandboxGoogleEnabled &&
+		(!google.Google() || google.GoogleServiceAccountFile == "" || len(google.GoogleTokenSecret) < 32 ||
+			google.GoogleVoidedPoll < 15*time.Minute || google.GoogleVoidedPoll > 24*time.Hour) {
+		return config.Config{}, fmt.Errorf("billing sandbox Google Play requires its explicit service-account FILE, stable token secret and voided polling")
 	}
 	base, err := url.Parse(primary.App.PublicBaseURL)
 	if err != nil || base.Host == "" || base.User != nil || base.RawQuery != "" || base.Fragment != "" ||
@@ -69,6 +75,16 @@ func billingSandboxConfig(primary config.Config) (config.Config, error) {
 	sandbox.IAP.AppleEnabled, sandbox.IAP.AppleAcceptSandbox = true, true
 	sandbox.IAP.GoogleClientEmail, sandbox.IAP.GooglePrivateKey, sandbox.IAP.GoogleServiceAccountFile = "", "", ""
 	sandbox.IAP.GoogleVoidedPoll = 0
+	sandbox.IAP.GoogleTokenSecret = ""
+	sandbox.IAP.GoogleAcceptTest, sandbox.IAP.GoogleTestOnly = false, false
+	if primary.BillingSandboxGoogleEnabled {
+		google := primary.BillingSandboxGoogle
+		sandbox.IAP.GooglePackageName = google.GooglePackageName
+		sandbox.IAP.GoogleClientEmail, sandbox.IAP.GooglePrivateKey = google.GoogleClientEmail, google.GooglePrivateKey
+		sandbox.IAP.GoogleServiceAccountFile, sandbox.IAP.GoogleTokenSecret = google.GoogleServiceAccountFile, google.GoogleTokenSecret
+		sandbox.IAP.GoogleVoidedPoll = google.GoogleVoidedPoll
+		sandbox.IAP.GoogleAcceptTest, sandbox.IAP.GoogleTestOnly = true, true
+	}
 	sandbox.BCCSandboxNotify.Enabled = false
 	// Never inherit primary production merchant, signing or notification secrets.
 	sandbox.BCCCheckout = primary.BCCSandboxCheckout
@@ -78,6 +94,7 @@ func billingSandboxConfig(primary config.Config) (config.Config, error) {
 	sandbox.BCCCheckout.AppEnv = "staging"
 	sandbox.BCCCheckout.PublicBaseURL = sandbox.App.PublicBaseURL
 	sandbox.BillingSandboxEnabled, sandbox.BillingSandboxBCCEnabled = false, false
+	sandbox.BillingSandboxGoogleEnabled, sandbox.BillingSandboxGoogle = false, config.IAP{}
 	sandbox.BillingSandboxPushEnabled, sandbox.BillingSandboxWebTopupOfferEnabled = false, false
 	sandbox.BillingSandboxMacOSDownloadURL = ""
 	if problems := sandbox.Validate(); len(problems) > 0 {

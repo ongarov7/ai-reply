@@ -1,5 +1,6 @@
 package kz.yerek.aireply.push
 
+import kz.yerek.aireply.data.BackendEnvironment
 import kz.yerek.aireply.platform.ReplyLog
 import java.io.File
 import java.util.TimeZone
@@ -65,7 +66,10 @@ class ClientContext(
  * phones restored from one backup must never share an id, or one account's
  * notifications could reach the other.
  */
-class InstallationIdStore(private val directory: () -> File) {
+class InstallationIdStore(
+    private val environment: BackendEnvironment = BackendEnvironment.current,
+    private val directory: () -> File
+) {
 
     @Volatile
     private var cached: String? = null
@@ -78,7 +82,7 @@ class InstallationIdStore(private val directory: () -> File) {
     }
 
     private fun loadOrCreate(): String {
-        val file = File(directory(), FILE_NAME)
+        val file = File(directory(), environment.storageName(FILE_NAME))
         val existing = if (file.isFile) runCatching { file.readText(Charsets.UTF_8).trim() }.getOrNull() else null
         if (existing != null && isValid(existing)) return existing
 
@@ -87,7 +91,7 @@ class InstallationIdStore(private val directory: () -> File) {
         // never leaves a truncated id that would be replaced next launch.
         try {
             file.parentFile?.mkdirs()
-            val temporary = File(file.parentFile, "$FILE_NAME.tmp")
+            val temporary = File(file.parentFile, "${file.name}.tmp")
             temporary.writeText(fresh, Charsets.UTF_8)
             if (!temporary.renameTo(file)) {
                 file.writeText(fresh, Charsets.UTF_8)

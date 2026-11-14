@@ -98,6 +98,36 @@ A release build without `app/google-services.json` (no push) or without a
 Google web client id (no "Continue with Google") still builds, but prints a
 warning, since a store upload without them is almost always a mistake.
 
+### Google Play sandbox build
+
+The default backend is production. To build the isolated billing sandbox:
+
+```bash
+./gradlew assembleDebug testDebugUnitTest -Paireply.backend=sandbox
+```
+
+`aireply.backend` accepts only `production` or `sandbox`. Sandbox uses
+`https://ai-reply.kz/sandbox`, displays **AI Reply Sandbox**, and keeps its
+credentials, account/profile cache, consent, installation and push binding in
+separate local storage. Production storage names remain compatible with released
+apps. The package stays `kz.yerek.aireply` so existing Play product IDs work.
+Both builds occupy the same Android package; they cannot be installed together.
+There is no runtime URL switch. Mock replies and sample account data must stay
+off when checking real Play Billing.
+
+For a first check, a registered **license tester** can sideload the debug APK;
+Google explicitly permits debug signatures for this path. The Play account on
+the device must be a license tester, and the purchase dialog must show a test
+purchase/payment method. Test-track membership alone does not prevent real
+charges. See [Google's testing guide](https://developer.android.com/google/play/billing/test).
+
+Sign in to a dedicated sandbox AI Reply account. The sandbox server must already
+have Google verification credentials, enabled test purchases and an active test
+catalog; a client build does not enable any of these. Verify purchase, grant,
+acknowledgement, restore and account switching against sandbox records before
+enabling production. The production backend must continue to reject test tokens.
+Do not upload the sandbox bundle as the public production release.
+
 If `local.properties` is missing:
 
 ```bash

@@ -46,6 +46,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kz.yerek.aireply.AIReplyApplication
 import kz.yerek.aireply.BuildConfig
+import kz.yerek.aireply.data.BackendEnvironment
 import kz.yerek.aireply.R
 import kz.yerek.aireply.ServiceLocator
 import kz.yerek.aireply.ai.AILimits
@@ -1739,7 +1740,7 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         view.announceForAccessibility(text)
     }
 
-    private val voiceDirectory: File get() = File(cacheDir, "voice")
+    private val voiceDirectory: File get() = File(cacheDir, BackendEnvironment.current.storageName("voice"))
 
     // ----------------------------------------------------------- configuration
 

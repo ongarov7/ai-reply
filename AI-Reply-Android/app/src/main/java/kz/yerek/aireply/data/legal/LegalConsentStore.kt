@@ -2,6 +2,7 @@ package kz.yerek.aireply.data.legal
 
 import android.content.Context
 import android.content.SharedPreferences
+import kz.yerek.aireply.data.BackendEnvironment
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.Serializable
@@ -32,8 +33,8 @@ data class StoredLegalConsent(
  */
 class LegalConsentStore internal constructor(private val prefs: SharedPreferences) {
 
-    constructor(context: Context) : this(
-        context.applicationContext.getSharedPreferences(NAME, Context.MODE_PRIVATE)
+    constructor(context: Context, environment: BackendEnvironment = BackendEnvironment.current) : this(
+        context.applicationContext.getSharedPreferences(environment.storageName(NAME), Context.MODE_PRIVATE)
     )
 
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }

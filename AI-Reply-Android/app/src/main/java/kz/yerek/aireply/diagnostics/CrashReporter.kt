@@ -2,6 +2,7 @@ package kz.yerek.aireply.diagnostics
 
 import android.content.Context
 import android.content.SharedPreferences
+import kz.yerek.aireply.data.BackendEnvironment
 import android.os.Build
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -96,9 +97,9 @@ object CrashReporter {
         if (sent) store.clear()
     }
 
-    class PreferencesStore(context: Context) : Store {
+    class PreferencesStore(context: Context, environment: BackendEnvironment = BackendEnvironment.current) : Store {
         private val prefs: SharedPreferences =
-            context.applicationContext.getSharedPreferences("aireply_crash_report", Context.MODE_PRIVATE)
+            context.applicationContext.getSharedPreferences(environment.storageName("aireply_crash_report"), Context.MODE_PRIVATE)
 
         override fun load(): Pending? {
             val code = prefs.getString("code", null) ?: return null

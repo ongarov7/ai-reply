@@ -37,6 +37,19 @@
         <exclude domain="sharedpref" path="aireply_emoji.xml" />
         <exclude domain="sharedpref" path="aireply_push.xml" />
         <exclude domain="sharedpref" path="aireply_account.xml" />
+        <!-- Sandbox sessions and test data are not backed up or transferred. -->
+        <exclude domain="sharedpref" path="sandbox_aireply_secure.xml" />
+        <exclude domain="sharedpref" path="sandbox_aireply_settings.xml" />
+        <exclude domain="sharedpref" path="sandbox_aireply_account.xml" />
+        <exclude domain="sharedpref" path="sandbox_aireply_device.xml" />
+        <exclude domain="sharedpref" path="sandbox_aireply_legal.xml" />
+        <exclude domain="sharedpref" path="sandbox_aireply_push.xml" />
+        <exclude domain="sharedpref" path="sandbox_aireply_crash_report.xml" />
+        <exclude domain="sharedpref" path="sandbox_aireply_autocorrect.xml" />
+        <exclude domain="sharedpref" path="sandbox_aireply_emoji.xml" />
+        <exclude domain="sharedpref" path="sandbox_tutorial_playback.xml" />
+        <exclude domain="file" path="sandbox_reply-configuration.json" />
+        <exclude domain="file" path="sandbox_reply-configuration.json.tmp" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="sharedpref" path="aireply_secure.xml" />
@@ -45,5 +58,18 @@
         <exclude domain="sharedpref" path="aireply_emoji.xml" />
         <exclude domain="sharedpref" path="aireply_push.xml" />
         <exclude domain="sharedpref" path="aireply_account.xml" />
+        <!-- Sandbox sessions and test data are not backed up or transferred. -->
+        <exclude domain="sharedpref" path="sandbox_aireply_secure.xml" />
+        <exclude domain="sharedpref" path="sandbox_aireply_settings.xml" />
+        <exclude domain="sharedpref" path="sandbox_aireply_account.xml" />
+        <exclude domain="sharedpref" path="sandbox_aireply_device.xml" />
+        <exclude domain="sharedpref" path="sandbox_aireply_legal.xml" />
+        <exclude domain="sharedpref" path="sandbox_aireply_push.xml" />
+        <exclude domain="sharedpref" path="sandbox_aireply_crash_report.xml" />
+        <exclude domain="sharedpref" path="sandbox_aireply_autocorrect.xml" />
+        <exclude domain="sharedpref" path="sandbox_aireply_emoji.xml" />
+        <exclude domain="sharedpref" path="sandbox_tutorial_playback.xml" />
+        <exclude domain="file" path="sandbox_reply-configuration.json" />
+        <exclude domain="file" path="sandbox_reply-configuration.json.tmp" />
     </device-transfer>
 </data-extraction-rules>

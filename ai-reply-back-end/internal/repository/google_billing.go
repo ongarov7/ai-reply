@@ -301,11 +301,12 @@ type GoogleUnacknowledged struct {
 	ProductID   string
 	SealedToken string
 	GrantedAt   time.Time
+	Environment string
 }
 
 // UnacknowledgedGoogleSubscriptions — granted before the cutoff and still waiting, oldest first.
 func (s *Store) UnacknowledgedGoogleSubscriptions(ctx context.Context, before time.Time, limit int) ([]GoogleUnacknowledged, error) {
-	rows, err := s.db.Reader().QueryContext(ctx, `SELECT token_hash,product_id,purchase_token_sealed,granted_at FROM google_subscriptions
+	rows, err := s.db.Reader().QueryContext(ctx, `SELECT token_hash,product_id,purchase_token_sealed,granted_at,environment FROM google_subscriptions
 		WHERE acknowledged_at IS NULL AND ack_abandoned_at IS NULL AND granted_at<? AND purchase_token_sealed IS NOT NULL AND superseded_by=''
 		ORDER BY granted_at LIMIT ?`, ms(before), limit)
 	if err != nil {
@@ -316,7 +317,7 @@ func (s *Store) UnacknowledgedGoogleSubscriptions(ctx context.Context, before ti
 	for rows.Next() {
 		var u GoogleUnacknowledged
 		var granted int64
-		if err := rows.Scan(&u.TokenHash, &u.ProductID, &u.SealedToken, &granted); err != nil {
+		if err := rows.Scan(&u.TokenHash, &u.ProductID, &u.SealedToken, &granted, &u.Environment); err != nil {
 			return nil, err
 		}
 		u.GrantedAt = timeFrom(granted)

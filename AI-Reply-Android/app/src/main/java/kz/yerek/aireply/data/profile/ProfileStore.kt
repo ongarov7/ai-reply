@@ -1,6 +1,7 @@
 package kz.yerek.aireply.data.profile
 
 import android.content.Context
+import kz.yerek.aireply.data.BackendEnvironment
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kz.yerek.aireply.domain.model.ReplyConfiguration
@@ -25,9 +26,9 @@ import java.io.File
  * invalidated by the file's own modification time rather than by trusting that
  * this process is the only writer.
  */
-class ProfileStore(context: Context) {
+class ProfileStore(context: Context, environment: BackendEnvironment = BackendEnvironment.current) {
 
-    private val file = File(context.applicationContext.filesDir, FILE_NAME)
+    private val file = File(context.applicationContext.filesDir, environment.storageName(FILE_NAME))
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -81,7 +82,7 @@ class ProfileStore(context: Context) {
 
         return runCatching {
             val encoded = json.encodeToString(normalized)
-            val temp = File(file.parentFile, "$FILE_NAME.tmp")
+            val temp = File(file.parentFile, "${file.name}.tmp")
             temp.writeText(encoded)
             if (!temp.renameTo(file)) {
                 // renameTo can refuse when the destination exists on some

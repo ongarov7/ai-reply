@@ -54,12 +54,20 @@ func nextSubscriptionRead(state string, expires, now time.Time) *time.Time {
 	return &at
 }
 
+func (s *Service) nextGoogleSubscriptionRead(state string, expires, now time.Time) *time.Time {
+	if s.cfg.GoogleTestOnly && state != domain.GoogleSubExpired {
+		at := now.Add(googleSandboxInterval)
+		return &at
+	}
+	return nextSubscriptionRead(state, expires, now)
+}
+
 // readBackoff — after n failed reads in a row.
-func readBackoff(n int) time.Duration {
+func (s *Service) readBackoff(n int) time.Duration {
 	if n > 16 {
 		n = 16
 	}
-	return min(WorkerInterval<<n, maxReadBackoff)
+	return min(s.googleWorkerInterval()<<n, maxReadBackoff)
 }
 
 // verifyGoogleSubscription — purchases.subscriptionsv2.get; the same order of
@@ -96,9 +104,9 @@ func (s *Service) verifyGoogleSubscription(ctx context.Context, user domain.User
 	environment := domain.EnvironmentProduction
 	if p.TestPurchase != nil {
 		environment = domain.EnvironmentTest
-		if !s.cfg.GoogleAcceptTest {
-			return refuse(domain.PurchaseReasonEnvironment)
-		}
+	}
+	if !s.googleEnvironmentAllowed(environment) {
+		return refuse(domain.PurchaseReasonEnvironment)
 	}
 	plan, err := s.repo.Plan(ctx, product.PlanID)
 	if err != nil {
@@ -162,7 +170,7 @@ func (s *Service) verifyGoogleSubscription(ctx context.Context, user domain.User
 	}
 	in := repository.GoogleSubscription{TokenHash: txn, SealedToken: sealed, UserID: user.ID, ProductID: productID, ProductCode: product.Code,
 		PlanID: product.PlanID, Environment: environment, OrderID: p.OrderID(item), State: state, ExpiresAt: expires, StartedAt: p.Started(),
-		AutoRenew: item.AutoRenews(), Acknowledged: p.Acknowledged(), NextCheckAt: nextSubscriptionRead(state, expires, now)}
+		AutoRenew: item.AutoRenews(), Acknowledged: p.Acknowledged(), NextCheckAt: s.nextGoogleSubscriptionRead(state, expires, now)}
 	if in.StartedAt.IsZero() {
 		in.StartedAt = now
 	}
@@ -227,7 +235,7 @@ func (s *Service) storeGoogleState(ctx context.Context, txn string, p googleplay
 	}
 	state := p.SubscriptionState
 	return s.repo.UpdateGoogleSubscriptionState(ctx, repository.GoogleSubscriptionState{TokenHash: txn, State: state, ExpiresAt: item.Expires(),
-		AutoRenew: item.AutoRenews(), NextCheckAt: nextSubscriptionRead(state, item.Expires(), now), DropToken: state == domain.GoogleSubExpired}, now)
+		AutoRenew: item.AutoRenews(), NextCheckAt: s.nextGoogleSubscriptionRead(state, item.Expires(), now), DropToken: state == domain.GoogleSubExpired}, now)
 }
 
 // acknowledgeSubscription — right after the grant; on failure the worker retries.
@@ -254,7 +262,7 @@ func (s *Service) RetryAcknowledges(ctx context.Context) (int, error) {
 		return 0, nil
 	}
 	now := s.clock.Now()
-	rows, err := s.repo.UnacknowledgedGoogleSubscriptions(ctx, now.Add(-consumeGrace), consumeBatch)
+	rows, err := s.repo.UnacknowledgedGoogleSubscriptions(ctx, now.Add(-s.googleConsumeGrace()), consumeBatch)
 	if err != nil {
 		return 0, err
 	}
@@ -262,6 +270,10 @@ func (s *Service) RetryAcknowledges(ctx context.Context) (int, error) {
 	for _, row := range rows {
 		if ctx.Err() != nil {
 			return done, ctx.Err()
+		}
+		if s.cfg.GoogleTestOnly && row.Environment != domain.EnvironmentTest {
+			s.log.Warn("google play sandbox skipped a non-test acknowledgement")
+			continue
 		}
 		if now.Sub(row.GrantedAt) > consumeGiveUp {
 			s.log.Warn("google play subscription was never acknowledged; giving up")
@@ -275,6 +287,16 @@ func (s *Service) RetryAcknowledges(ctx context.Context) (int, error) {
 			// The app's next post seals it again: the time limit above ends the wait.
 			s.log.Error("google play subscription token cannot be opened")
 			continue
+		}
+		if s.cfg.GoogleTestOnly {
+			purchase, err := s.google.GetSubscription(ctx, token)
+			if err != nil {
+				return done, s.playUnavailable(err, "")
+			}
+			if purchase.TestPurchase == nil {
+				s.log.Warn("google play sandbox refused a non-test acknowledgement")
+				continue
+			}
 		}
 		err = s.google.AcknowledgeSubscription(ctx, row.ProductID, token)
 		if err == nil {
@@ -338,6 +360,10 @@ func (s *Service) RefreshSubscriptions(ctx context.Context) (int, error) {
 		if ctx.Err() != nil {
 			return updated, ctx.Err()
 		}
+		if s.cfg.GoogleTestOnly && row.Environment != domain.EnvironmentTest {
+			s.log.Warn("google play sandbox skipped a non-test subscription")
+			continue
+		}
 		token, err := s.sealer.open(row.SealedToken)
 		if err != nil {
 			s.log.Error("google play subscription token cannot be opened")
@@ -368,6 +394,10 @@ func (s *Service) RefreshSubscriptions(ctx context.Context) (int, error) {
 			}
 			break
 		}
+		if s.cfg.GoogleTestOnly && p.TestPurchase == nil {
+			s.log.Warn("google play sandbox refused a non-test subscription read")
+			continue
+		}
 		item, ok := p.LineItem(row.ProductID)
 		if !ok || item.Expires().IsZero() {
 			s.log.Warn("google play subscription has no line item for its product", "product_id", row.ProductID)
@@ -386,7 +416,7 @@ func (s *Service) RefreshSubscriptions(ctx context.Context) (int, error) {
 
 func (s *Service) deferRead(ctx context.Context, row repository.GoogleDue, now time.Time) error {
 	failures := row.Failures + 1
-	return s.repo.DeferGoogleSubscription(ctx, row.TokenHash, failures, now.Add(readBackoff(failures)), now)
+	return s.repo.DeferGoogleSubscription(ctx, row.TokenHash, failures, now.Add(s.readBackoff(failures)), now)
 }
 
 // applyRefreshedSubscription — the worker's side of what a post from the app does.
@@ -400,7 +430,7 @@ func (s *Service) applyRefreshedSubscription(ctx context.Context, row repository
 	}
 	in := repository.GoogleSubscription{TokenHash: row.TokenHash, UserID: row.UserID, ProductID: row.ProductID, ProductCode: row.ProductCode,
 		PlanID: row.PlanID, Environment: row.Environment, OrderID: p.OrderID(item), State: state, ExpiresAt: expires, StartedAt: p.Started(),
-		AutoRenew: item.AutoRenews(), Acknowledged: p.Acknowledged(), NextCheckAt: nextSubscriptionRead(state, expires, now)}
+		AutoRenew: item.AutoRenews(), Acknowledged: p.Acknowledged(), NextCheckAt: s.nextGoogleSubscriptionRead(state, expires, now)}
 	if in.StartedAt.IsZero() {
 		in.StartedAt = row.StartedAt
 	}

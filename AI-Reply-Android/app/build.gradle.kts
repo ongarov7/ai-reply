@@ -62,6 +62,15 @@ val appVersionName: String = (findProperty("aireply.versionName") as String?)?.t
     require(name.isNotEmpty()) { "aireply.versionName must not be empty" }
 } ?: "1.2.1"
 
+// An explicit build choice, shared by every transport and local store. Keep the
+// package unchanged so license testers can use the existing Google Play products.
+val backendEnvironment = (findProperty("aireply.backend") as String?)?.trim() ?: "production"
+val backendBaseUrl = when (backendEnvironment) {
+    "production" -> "https://ai-reply.kz"
+    "sandbox" -> "https://ai-reply.kz/sandbox"
+    else -> error("aireply.backend must be production or sandbox")
+}
+
 android {
     namespace = "kz.yerek.aireply"
     compileSdk = 36
@@ -81,6 +90,9 @@ android {
         resourceConfigurations += listOf("en", "ru", "kk", "uz")
 
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
+        buildConfigField("String", "BACKEND_ENVIRONMENT", "\"$backendEnvironment\"")
+        buildConfigField("String", "BACKEND_BASE_URL", "\"$backendBaseUrl\"")
+        manifestPlaceholders["appLabel"] = if (backendEnvironment == "sandbox") "AI Reply Sandbox" else "@string/app_name"
     }
 
     buildTypes {

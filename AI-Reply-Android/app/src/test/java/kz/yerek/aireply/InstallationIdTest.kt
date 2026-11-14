@@ -2,6 +2,7 @@ package kz.yerek.aireply
 
 import kz.yerek.aireply.push.ClientContext
 import kz.yerek.aireply.push.InstallationIdStore
+import kz.yerek.aireply.data.BackendEnvironment
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
@@ -26,7 +27,7 @@ class InstallationIdTest {
         assertTrue(first, Regex("^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$").matches(first))
         assertTrue(InstallationIdStore.isValid(first))
         assertEquals("the same process", first, InstallationIdStore { folder.root }.id())
-        assertEquals("the file is the source", first, File(folder.root, InstallationIdStore.FILE_NAME).readText())
+        assertEquals("the file is the source", first, File(folder.root, BackendEnvironment.current.storageName(InstallationIdStore.FILE_NAME)).readText())
     }
 
     @Test
@@ -39,7 +40,7 @@ class InstallationIdTest {
     @Test
     fun `a damaged id file is replaced by a valid id`() {
         val directory = folder.newFolder("damaged")
-        File(directory, InstallationIdStore.FILE_NAME).writeText("not an id; rm -rf")
+        File(directory, BackendEnvironment.current.storageName(InstallationIdStore.FILE_NAME)).writeText("not an id; rm -rf")
         val id = InstallationIdStore { directory }.id()
         assertTrue(InstallationIdStore.isValid(id))
         assertEquals(id, InstallationIdStore { directory }.id())

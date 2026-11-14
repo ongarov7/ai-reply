@@ -49,6 +49,7 @@ import androidx.core.net.toUri
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kz.yerek.aireply.R
+import kz.yerek.aireply.data.BackendEnvironment
 import kz.yerek.aireply.core.lang.AppLanguage
 import kz.yerek.aireply.ui.LocalServices
 import kz.yerek.aireply.ui.common.AppScreen
@@ -99,7 +100,9 @@ fun KeyboardTutorialScreen(onBack: () -> Unit) {
     val language = LocalServices.current.settings.effectiveAppLanguage
     val resource = KeyboardTutorialAssets.resource(language)
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    val progress = remember(context) { context.getSharedPreferences("tutorial_playback", Context.MODE_PRIVATE) }
+    val progress = remember(context) {
+        context.getSharedPreferences(BackendEnvironment.current.storageName("tutorial_playback"), Context.MODE_PRIVATE)
+    }
     val progressKey = "keyboard.${language.code}.position"
     var video by remember(language) { mutableStateOf<VideoView?>(null) }
     var failed by remember(language) { mutableStateOf(false) }

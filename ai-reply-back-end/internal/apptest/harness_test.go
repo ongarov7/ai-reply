@@ -413,6 +413,11 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 	if err != nil {
 		t.Fatalf("config: %v", err)
 	}
+	// Only this fixture sets the derived /sandbox policy directly. It is not
+	// an application environment variable and cannot enable primary test mode.
+	if env["TEST_GOOGLE_TEST_ONLY"] == "true" {
+		cfg.IAP.GoogleAcceptTest, cfg.IAP.GoogleTestOnly = true, true
+	}
 
 	db, err := database.Open(database.Options{Path: cfg.Database.Path, MaxReadConns: 4})
 	if err != nil {

@@ -2,6 +2,7 @@ package kz.yerek.aireply.data.secure
 
 import android.content.Context
 import android.content.SharedPreferences
+import kz.yerek.aireply.data.BackendEnvironment
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
@@ -35,10 +36,12 @@ import javax.crypto.spec.GCMParameterSpec
  * The credential is never logged, never put in an error message, never written
  * to settings, and never held in a field — it is read at call time and dropped.
  */
-class SecureCredentialStore(context: Context) {
+class SecureCredentialStore(context: Context, environment: BackendEnvironment = BackendEnvironment.current) {
 
     private val prefs: SharedPreferences =
-        context.applicationContext.getSharedPreferences(NAME, Context.MODE_PRIVATE)
+        context.applicationContext.getSharedPreferences(environment.storageName(NAME), Context.MODE_PRIVATE)
+
+    internal val keyAlias: String = environment.storageName(KEY_ALIAS)
 
     fun removeLegacySecrets() {
         delete(KEY_API)
@@ -115,12 +118,12 @@ class SecureCredentialStore(context: Context) {
      */
     private fun secretKey(): SecretKey {
         val keyStore = KeyStore.getInstance(PROVIDER).apply { load(null) }
-        (keyStore.getEntry(KEY_ALIAS, null) as? KeyStore.SecretKeyEntry)?.let { return it.secretKey }
+        (keyStore.getEntry(keyAlias, null) as? KeyStore.SecretKeyEntry)?.let { return it.secretKey }
 
         val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, PROVIDER)
         generator.init(
             KeyGenParameterSpec.Builder(
-                KEY_ALIAS,
+                keyAlias,
                 KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
             )
                 .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
