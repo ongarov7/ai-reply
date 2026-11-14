@@ -59,12 +59,21 @@ jobs:
       - name: Publish
         run: ./scripts/Publish-Windows.ps1
 
+      - name: Build standalone installer
+        run: |
+          $compiler = ./scripts/Get-InnoSetup.ps1 -DestinationRoot "${{ runner.temp }}/AIReply-InnoSetup"
+          ./scripts/Build-Installer.ps1 -IsccPath $compiler
+
+      - name: Test installer lifecycle
+        run: ./scripts/Test-Installer.ps1
+
       - uses: actions/upload-artifact@v5
         with:
           name: AIReply-windows
           path: |
             AirReply-Windows/out/AIReply-win-x64.zip
             AirReply-Windows/out/AIReply-win-arm64.zip
+            AirReply-Windows/out/AIReply-Setup.exe
             AirReply-Windows/out/*.sha256
           if-no-files-found: error
 
@@ -75,4 +84,6 @@ jobs:
           path: |
             ${{ github.workspace }}/test-results
             AirReply-Windows/tests/AirReply.App.Tests/bin/Release/net10.0/renders
+            AirReply-Windows/out/installer-*.log
+            AirReply-Windows/out/installer-test-results.json
           if-no-files-found: ignore

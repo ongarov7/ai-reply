@@ -1,6 +1,6 @@
 # AI Reply for Windows
 
-Avalonia 12.1.5 / .NET 10 portable desktop client. The production endpoint is `https://ai-reply.kz`;
+Avalonia 12.1.5 / .NET 10 desktop client with a standalone Windows installer and portable ZIPs. The production endpoint is `https://ai-reply.kz`;
 the application never deploys or changes the backend. macOS, mobile and website sources are unchanged.
 
 Implemented: email OTP, DPAPI sessions and single-flight refresh, installation registration, consent,
@@ -27,12 +27,28 @@ Package on Windows with PowerShell:
 
 ```powershell
 ./scripts/Publish-Windows.ps1
+$compiler = ./scripts/Get-InnoSetup.ps1
+./scripts/Build-Installer.ps1 -IsccPath $compiler
 ```
 
 The script builds self-contained single-file executables, checks exit codes and `AIReply.exe`, then
 creates `out/AIReply-win-x64.zip`, `out/AIReply-win-arm64.zip` and SHA-256 sidecars. GitHub Actions uses
 the same script. Cross-publishing is supported from macOS/Linux with the `dotnet publish` commands
 inside that script; creating ZIPs does not require a Windows runtime.
+
+`out/AIReply-Setup.exe` is one installer for Windows 10/11 x64 and ARM64. It selects the native
+payload, installs per user without requesting elevation, creates a Start-menu entry and an optional desktop
+shortcut, and registers normal removal in Windows Settings. It preserves account data when uninstalled.
+The installer asks the user to quit AI Reply from the tray before upgrade/removal. No automatic update
+service or release signing is configured. A downloaded unsigned EXE may show a Windows reputation warning.
+See [installer details](installer/README.md).
+
+The pinned Inno Setup 6.7.4 compiler is downloaded from its official GitHub release, checked against its
+SHA-256 digest and Authenticode publisher, and installed only in a temporary build-tool directory. Windows
+CI compiles the EXE and runs `scripts/Test-Installer.ps1` on a disposable runner: native payload, shortcuts,
+uninstall metadata, real preview launch, single instance/running-app guards, reinstall repair, autostart
+cleanup and preservation of account data and a separate portable copy's startup preference. All launched
+app processes use `--preview --background` and do not contact production.
 
 Run `AIReply.exe` interactively to open the bar; `--background` starts in the tray.
 `--preview` uses development stand-ins without production networking or persistent credentials.

@@ -39,7 +39,11 @@ dotnet build AirReply.Windows.slnx -c Release
 dotnet test --solution AirReply.Windows.slnx -c Release --no-build --report-xunit-trx --results-directory out/test-results --results-directory-layout per-module
 ```
 
-PowerShell packaging: `./scripts/Publish-Windows.ps1`. See README.md and README-Windows.txt.
+PowerShell packaging: `./scripts/Publish-Windows.ps1`, then `Get-InnoSetup.ps1` and
+`Build-Installer.ps1 -IsccPath <compiler>`. The new `AIReply-Setup.exe` contains both architectures and
+supports per-user installation, shortcuts, upgrade guard, removal and preservation of account data.
+CI runs real silent install/preview launch/reinstall/uninstall checks using `Test-Installer.ps1`.
+See README.md and README-Windows.txt.
 
 ## Release gate / remaining limits
 

@@ -6,6 +6,8 @@ messenger compatibility, microphone privacy UX, visual fidelity or ARM64 runtime
 
 Record OS/build, architecture, app commit, DPI, monitor setup, target app/version and outcome for each case.
 
+- [ ] Installer: download through a browser, run unsigned Setup on a standard Windows user, icon/publisher,
+  install/uninstall UI, optional desktop shortcut, reinstall and running-app message; real ARM64 selection.
 - [ ] Clean install: first interactive launch opens sign-in; email OTP, invalid/expired code, resend/cooldown,
   same account as macOS, consent accept/failure, shared balance; restart restores the session.
 - [ ] Generation: compose, manual reply, fresh clipboard reply, four recipients, limits/unicode, cancellation,
