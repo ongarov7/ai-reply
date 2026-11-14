@@ -1,35 +1,194 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{.Locale}}">
+<head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>AI Reply - BCC</title>
-<body><main>
-<h1>{{if .Sandbox}}Test payment{{else}}Payment{{end}}</h1>
-<p>{{.Amount}} &#8376; - {{if eq .Kind "subscription"}}{{.ProductName}} ({{.PeriodDays}} days){{else}}{{.Units}} replies{{end}}</p>
-<p>{{if .Sandbox}}BCC sandbox. {{end}}Access is updated only after the bank confirms payment.</p>
-<form id="bank-checkout" method="post" action="{{.Endpoint}}">
-{{range $name,$values := .Fields}}{{range $values}}<input type="hidden" name="{{$name}}" value="{{.}}">{{end}}{{end}}
-<input type="hidden" name="CLIENT_IP" value="{{.ClientIP}}">
-<input type="hidden" name="M_INFO" id="m-info" value="">
-<p>3-D Secure requires the cardholder's phone number and billing address. These details are sent directly to the bank.</p>
-<label for="phone-cc">Phone country calling code</label>
-<input id="phone-cc" type="tel" inputmode="numeric" pattern="[1-9][0-9]{0,2}" maxlength="3" autocomplete="tel-country-code" placeholder="7" required>
-<label for="phone-subscriber">Phone number without country code</label>
-<input id="phone-subscriber" type="tel" inputmode="numeric" pattern="[0-9]{1,15}" maxlength="15" autocomplete="tel-national" required>
-<label for="billing-address">Cardholder billing address</label>
-<input id="billing-address" type="text" maxlength="50" autocomplete="billing address-line1" required>
-<p id="checkout-error" role="alert"></p>
-<noscript>JavaScript is required for 3-D Secure. Payment cannot be submitted without the required browser details.</noscript>
-<button id="bank-submit" type="submit" disabled>Continue to bank</button>
-</form></main>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{call .T "checkout.title"}} — AI Reply</title>
+<style nonce="{{.CSPNonce}}">
+  :root {
+    color-scheme: light;
+    --ink: #0b1020;
+    --muted: #5b6577;
+    --line: #e7e9f0;
+    --soft: #f7f8fc;
+    --brand: #3b5bfd;
+    --brand-soft: #eef2ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--soft);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    overflow-wrap: anywhere;
+  }
+  a { color: inherit; text-decoration: none; }
+  a:focus-visible, button:focus-visible { outline: 3px solid rgba(59, 91, 253, .45); outline-offset: 4px; }
+  .site-header { background: #fff; border-bottom: 1px solid var(--line); }
+  .header-inner { max-width: 1112px; min-height: 76px; margin: 0 auto; padding: 16px 28px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+  .logo { display: inline-flex; flex: none; align-items: center; gap: 10px; font-size: 18px; font-weight: 650; }
+  .logo-mark { width: 32px; height: 32px; border-radius: 9px; background: linear-gradient(135deg, var(--brand), #00b8d9); color: #fff; display: grid; place-items: center; font-size: 15px; font-weight: 700; box-shadow: 0 5px 14px rgba(59, 91, 253, .2); }
+  .back-link { display: inline-flex; align-items: center; gap: 9px; color: var(--muted); font-size: 14px; font-weight: 500; text-align: right; }
+  .back-link:hover, .support-link:hover { color: var(--brand); }
+  .checkout-layout { width: min(100%, 1112px); margin: 0 auto; padding: 64px 28px 32px; display: grid; grid-template-columns: minmax(250px, .8fr) minmax(0, 1.25fr); gap: 40px; align-items: start; }
+  .order-summary { padding: 8px 0 0; }
+  .eyebrow { margin: 0 0 18px; color: var(--muted); font-size: 13px; font-weight: 650; letter-spacing: .07em; text-transform: uppercase; }
+  .product-icon { width: 54px; height: 54px; margin: 0 0 22px; border: 1px solid rgba(59, 91, 253, .12); border-radius: 15px; background: var(--brand-soft); color: var(--brand); display: grid; place-items: center; }
+  .product-icon svg { width: 27px; height: 27px; }
+  .product-name { margin: 0 0 8px; font-size: 28px; font-weight: 650; line-height: 1.25; }
+  .period { margin: 0; color: var(--muted); font-size: 14px; }
+  .total-row { margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--line); }
+  .total-label { margin: 0 0 4px; color: var(--muted); font-size: 14px; }
+  .amount { margin: 0; font-size: 38px; font-weight: 700; line-height: 1.25; font-variant-numeric: tabular-nums; }
+  .currency { color: var(--muted); font-size: 25px; font-weight: 500; }
+  .activation-note { margin: 24px 0 0; color: var(--muted); font-size: 13px; line-height: 1.65; }
+  .sandbox { display: inline-flex; margin: 20px 0 0; padding: 5px 10px; border: 1px solid #f0d5b5; border-radius: 6px; background: #fff8ee; color: #925a13; font-size: 12px; font-weight: 600; }
+  .payment-panel { padding: 32px; background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 28px rgba(11, 16, 32, .04); }
+  .bank-label { display: inline-flex; align-items: center; gap: 7px; margin: 0 0 16px; color: var(--brand); font-size: 12px; font-weight: 650; }
+  .bank-label::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  h1 { margin: 0 0 10px; font-size: 29px; font-weight: 680; line-height: 1.25; }
+  .subtitle { margin: 0 0 26px; color: var(--muted); font-size: 14px; line-height: 1.7; }
+  .form-heading { margin: 0 0 18px; font-size: 15px; font-weight: 650; }
+  .phone-row { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 12px; align-items: end; }
+  .field { min-width: 0; }
+  .address-field { margin-top: 22px; }
+  label { display: block; margin: 0 0 7px; font-size: 13px; font-weight: 600; line-height: 1.5; }
+  input[type="tel"], input[type="text"] { display: block; width: 100%; min-height: 48px; padding: 11px 13px; border: 1px solid #dce0e9; border-radius: 8px; background: #fff; color: var(--ink); font: inherit; font-size: 16px; line-height: 1.5; transition: border-color .15s ease, box-shadow .15s ease; }
+  input::placeholder { color: #8b93a5; opacity: 1; }
+  input:focus { border-color: var(--brand); outline: none; box-shadow: 0 0 0 3px rgba(59, 91, 253, .12); }
+  .country-input { position: relative; }
+  .country-input input { padding-left: 29px; }
+  .country-prefix { position: absolute; top: 50%; left: 13px; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+  .field-hint { margin: 7px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+  .privacy-note { margin: 22px 0 0; padding: 13px 14px; border: 1px solid #edf0f7; border-radius: 8px; background: var(--soft); color: var(--muted); font-size: 12px; line-height: 1.65; }
+  .checkout-error { margin: 18px 0 0; padding: 11px 13px; border: 1px solid #f1d0cd; border-radius: 8px; background: #fff6f5; color: #aa2923; font-size: 13px; line-height: 1.6; }
+  .checkout-error:empty { display: none; }
+  .no-js { margin: 18px 0 0; color: #aa2923; font-size: 13px; }
+  .submit-button { width: 100%; min-height: 50px; margin-top: 24px; padding: 12px 18px; border: 1px solid transparent; border-radius: 8px; background: var(--ink); color: #fff; display: flex; align-items: center; justify-content: center; gap: 12px; font: inherit; font-size: 15px; font-weight: 600; line-height: 1.5; cursor: pointer; transition: background .15s ease, box-shadow .15s ease; }
+  .submit-button:hover:not(:disabled) { background: #1c2438; box-shadow: 0 4px 12px rgba(11, 16, 32, .12); }
+  .submit-button:disabled { cursor: default; opacity: .6; }
+  .card-notice { margin: 11px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; text-align: center; }
+  .checkout-footer { max-width: 1112px; margin: 0 auto; padding: 0 28px 36px; display: flex; justify-content: space-between; gap: 20px; color: var(--muted); font-size: 12px; }
+  .support-link { text-underline-offset: 3px; text-decoration: underline; }
+  @media (max-width: 760px) {
+    .header-inner { min-height: 68px; padding: 16px 20px; }
+    .checkout-layout { padding: 30px 20px 24px; grid-template-columns: minmax(0, 1fr); gap: 26px; }
+    .order-summary { padding: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 20px; }
+    .eyebrow { grid-column: 1 / -1; margin-bottom: 14px; }
+    .product-icon { display: none; }
+    .product-name { font-size: 23px; }
+    .product-details { align-self: center; }
+    .period { font-size: 12px; }
+    .total-row { margin: 0; padding: 0; border: 0; text-align: right; align-self: center; }
+    .total-label { font-size: 12px; }
+    .amount { font-size: 28px; }
+    .currency { font-size: 20px; }
+    .activation-note { grid-column: 1 / -1; margin-top: 14px; font-size: 12px; }
+    .sandbox { grid-column: 1 / -1; justify-self: start; margin-top: 12px; }
+    .payment-panel { padding: 25px; }
+    h1 { font-size: 26px; }
+    .checkout-footer { padding: 0 20px 28px; }
+  }
+  @media (max-width: 380px) {
+    .header-inner { padding-right: 16px; padding-left: 16px; gap: 16px; }
+    .logo { font-size: 16px; gap: 8px; }
+    .back-link { font-size: 12px; gap: 6px; }
+    .checkout-layout { padding-right: 12px; padding-left: 12px; }
+    .payment-panel { padding: 20px; }
+    .order-summary { column-gap: 12px; padding: 0 4px; }
+    .phone-row { grid-template-columns: 94px minmax(0, 1fr); gap: 10px; }
+    .product-name { font-size: 21px; }
+    .amount { font-size: 25px; }
+  }
+  @media (prefers-reduced-motion: reduce) { input, .submit-button { transition: none; } }
+</style>
+</head>
+<body>
+<header class="site-header">
+  <div class="header-inner">
+    <a class="logo" href="{{.AccountURL}}"><span class="logo-mark" aria-hidden="true">AI</span><span>AI Reply</span></a>
+    <a class="back-link" href="{{.AccountURL}}"><span aria-hidden="true">←</span>{{call .T "checkout.back"}}</a>
+  </div>
+</header>
+<main class="checkout-layout">
+  <aside class="order-summary" aria-labelledby="summary-title">
+    <p class="eyebrow" id="summary-title">{{call .T "checkout.summary"}}</p>
+    <div class="product-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4.5h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-5 3v-3a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2Z"/><path d="M7 9h10M7 13h6"/></svg></div>
+    <div class="product-details">
+      <h2 class="product-name">{{.ProductName}}</h2>
+      {{if eq .Kind "subscription"}}<p class="period">{{call .T "checkout.period"}} {{.PeriodDays}} {{call .T "checkout.days"}}</p>{{end}}
+    </div>
+    <div class="total-row"><p class="total-label">{{call .T "checkout.total"}}</p><p class="amount">{{.Amount}} <span class="currency">₸</span></p></div>
+    <p class="activation-note">{{call .T "checkout.activation"}}</p>
+    {{if .Sandbox}}<p class="sandbox">{{call .T "checkout.sandbox"}}</p>{{end}}
+  </aside>
+  <section class="payment-panel" aria-labelledby="checkout-title">
+    <p class="bank-label">{{call .T "checkout.bank"}}</p>
+    <h1 id="checkout-title">{{call .T "checkout.title"}}</h1>
+    <p class="subtitle">{{call .T "checkout.subtitle"}}</p>
+    <form id="bank-checkout" method="post" action="{{.Endpoint}}" data-order-id="{{.OrderID}}" data-account-url="{{.AccountURL}}" data-invalid-details="{{call .T "checkout.invalid_details"}}" data-preparation-error="{{call .T "checkout.preparation_error"}}" data-submitting="{{call .T "checkout.submitting"}}">
+      {{range $name,$values := .Fields}}{{range $values}}<input type="hidden" name="{{$name}}" value="{{.}}">{{end}}{{end}}
+      <input type="hidden" name="CLIENT_IP" value="{{.ClientIP}}">
+      <input type="hidden" name="M_INFO" id="m-info" value="">
+      <h2 class="form-heading">{{call .T "checkout.details"}}</h2>
+      <div class="phone-row">
+        <div class="field">
+          <label for="phone-cc">{{call .T "checkout.country_code"}}</label>
+          <div class="country-input"><span class="country-prefix" aria-hidden="true">+</span><input id="phone-cc" type="tel" inputmode="numeric" pattern="[1-9][0-9]{0,2}" maxlength="3" autocomplete="tel-country-code" value="7" aria-describedby="phone-hint" required></div>
+        </div>
+        <div class="field">
+          <label for="phone-subscriber">{{call .T "checkout.phone"}}</label>
+          <input id="phone-subscriber" type="tel" inputmode="numeric" pattern="[0-9]{1,15}" maxlength="15" autocomplete="tel-national" aria-describedby="phone-hint" required>
+        </div>
+      </div>
+      <p class="field-hint" id="phone-hint">{{call .T "checkout.phone_hint"}}</p>
+      <div class="field address-field">
+        <label for="billing-address">{{call .T "checkout.address"}}</label>
+        <input id="billing-address" type="text" maxlength="50" autocomplete="billing address-line1" placeholder="{{call .T "checkout.address_placeholder"}}" aria-describedby="address-hint" required>
+        <p class="field-hint" id="address-hint">{{call .T "checkout.address_hint"}}</p>
+      </div>
+      <p class="privacy-note">{{call .T "checkout.privacy"}}</p>
+      <p id="checkout-error" class="checkout-error" role="alert" aria-live="assertive"></p>
+      <noscript><p class="no-js">{{call .T "checkout.no_js"}}</p></noscript>
+      <button id="bank-submit" class="submit-button" type="submit" disabled>{{call .T "checkout.submit"}}<span aria-hidden="true">→</span></button>
+      <p class="card-notice">{{call .T "checkout.card_notice"}}</p>
+    </form>
+  </section>
+</main>
+<footer class="checkout-footer"><span>AI Reply</span><a class="support-link" href="{{.SupportURL}}">{{call .T "checkout.support"}}</a></footer>
 <script nonce="{{.CSPNonce}}">
 (function () {
   'use strict';
   var form = document.getElementById('bank-checkout');
   var button = document.getElementById('bank-submit');
   var error = document.getElementById('checkout-error');
-  button.disabled = false;
+  var submitted = false;
+  var storageKey = 'bcc-checkout-submitted:' + form.dataset.orderId;
+  function previouslySubmitted() {
+    try {
+      return window.sessionStorage.getItem(storageKey) === '1';
+    } catch (e) {
+      return false;
+    }
+  }
+  if (previouslySubmitted()) {
+    window.location.replace(form.dataset.accountUrl);
+    return;
+  }
+  window.addEventListener('pageshow', function (event) {
+    if (event.persisted && (submitted || previouslySubmitted())) {
+      window.location.replace(form.dataset.accountUrl);
+    }
+  });
   form.addEventListener('submit', function (event) {
+    if (submitted) {
+      event.preventDefault();
+      return;
+    }
+    error.textContent = '';
     var cc = document.getElementById('phone-cc').value.trim();
     var subscriber = document.getElementById('phone-subscriber').value.trim();
     var address = document.getElementById('billing-address').value.trim();
@@ -38,7 +197,7 @@
     if (!/^[1-9][0-9]{0,2}$/.test(cc) || !/^[0-9]{1,15}$/.test(subscriber) || cc.length + subscriber.length > 15 ||
         !address || Array.from(address).length > 50 || !/^[1-9][0-9]{0,5}$/.test(height) || !/^[1-9][0-9]{0,5}$/.test(width)) {
       event.preventDefault();
-      error.textContent = 'Check your phone number, billing address and browser screen details.';
+      error.textContent = form.dataset.invalidDetails;
       return;
     }
     var info = {
@@ -52,12 +211,20 @@
       var binary = '';
       bytes.forEach(function (value) { binary += String.fromCharCode(value); });
       document.getElementById('m-info').value = btoa(binary);
-      button.disabled = true;
     } catch (e) {
       event.preventDefault();
-      error.textContent = 'Could not prepare 3-D Secure details.';
+      error.textContent = form.dataset.preparationError;
+      return;
     }
+    submitted = true;
+    try { window.sessionStorage.setItem(storageKey, '1'); } catch (e) {}
+    try { window.history.replaceState(null, '', form.dataset.accountUrl); } catch (e) {}
+    button.disabled = true;
+    button.textContent = form.dataset.submitting;
+    form.setAttribute('aria-busy', 'true');
   });
+  button.disabled = false;
 })();
 </script>
-</body></html>
+</body>
+</html>

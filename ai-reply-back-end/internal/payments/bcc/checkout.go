@@ -31,6 +31,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/domain"
 	"github.com/aireply/ai-reply-back-end/internal/email"
 	"github.com/aireply/ai-reply-back-end/internal/legal"
+	"github.com/aireply/ai-reply-back-end/internal/localization"
 	"github.com/aireply/ai-reply-back-end/internal/traits"
 )
 
@@ -108,6 +109,7 @@ type CheckoutService struct {
 	receiptSender    ReceiptSender
 	receiptTemplates email.NotificationTemplates
 	log              *slog.Logger
+	translations     *localization.Bundle
 }
 
 // WithLogger — operator visibility for payment paths that used to fail silently
@@ -139,6 +141,11 @@ func NewCheckout(cfg CheckoutConfig, db *database.DB, prices *catalog.Service) (
 	if db == nil || prices == nil {
 		return nil, ErrInvalidConfig
 	}
+	translations, err := localization.Load()
+	if err != nil {
+		return nil, err
+	}
+	s.translations = translations
 	client, err := New(Config{Environment: cfg.Environment, Terminal: cfg.Terminal, MACKeyHex: cfg.MACKeyHex})
 	if err != nil {
 		return nil, err
@@ -524,15 +531,34 @@ func (s *CheckoutService) CheckoutPageWithClientIP(w http.ResponseWriter, r *htt
 	cspNonce := base64.StdEncoding.EncodeToString(nonce[:])
 	endpoint, _ := s.Environment().Endpoint()
 	bankURL, _ := url.Parse(endpoint)
-	w.Header().Set("Content-Security-Policy", "default-src 'none'; script-src 'nonce-"+cspNonce+"'; form-action "+bankURL.Scheme+"://"+bankURL.Host+"; frame-ancestors 'none'; base-uri 'none'")
+	w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'nonce-"+cspNonce+"'; script-src 'nonce-"+cspNonce+"'; form-action "+bankURL.Scheme+"://"+bankURL.Host+"; frame-ancestors 'none'; base-uri 'none'")
 	amount, _ := FormatKZT(o.AmountMinor)
 	var product catalog.Product
 	if err := json.Unmarshal([]byte(o.snapshot), &product); err != nil {
 		http.Error(w, "Unavailable", http.StatusServiceUnavailable)
 		return
 	}
+	var savedLocale string
+	if err := s.db.Reader().QueryRowContext(r.Context(), `SELECT locale FROM billing_order_context WHERE order_id=?`, o.ID).Scan(&savedLocale); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		http.Error(w, "Unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	locale := localization.Detect(r, savedLocale)
+	productName := product.Name[locale]
+	if productName == "" {
+		productName = product.Name["en"]
+	}
+	accountURL := s.baseURL() + "/payment?order=" + url.QueryEscape(o.ID) + "&lang=" + locale
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = bankForm.Execute(w, map[string]any{"Amount": amount, "Units": o.Units, "Kind": product.Kind, "ProductName": product.Name["en"], "PeriodDays": periodDays(product), "Sandbox": s.Environment() == Sandbox, "Endpoint": template.URL(endpoint), "Fields": fields, "ClientIP": ip.String(), "CSPNonce": cspNonce})
+	_ = bankForm.Execute(w, map[string]any{
+		"Amount": amount, "Units": o.Units, "Kind": product.Kind,
+		"ProductName": productName, "PeriodDays": periodDays(product),
+		"Sandbox": s.Environment() == Sandbox, "Endpoint": template.URL(endpoint),
+		"Fields": fields, "ClientIP": ip.String(), "CSPNonce": cspNonce,
+		"Locale": locale, "T": s.translations.Translator(locale),
+		"OrderID": o.ID, "AccountURL": accountURL,
+		"SupportURL": s.baseURL() + "/support?lang=" + locale,
+	})
 }
 
 func secureHeaders(w http.ResponseWriter) {
