@@ -88,22 +88,35 @@ as long as the Compose BOM and the Compose compiler plugin move with Kotlin.
 ```
 
 Each Play upload needs a higher `versionCode`. The current release defaults are
-5 / "1.2.1". A subsequent upload can override them:
+6 / "1.2.2". A subsequent upload can override them:
 
 ```bash
-./gradlew bundleRelease -Paireply.versionCode=6 -Paireply.versionName=1.2.2
+./gradlew bundleRelease -Paireply.versionCode=7 -Paireply.versionName=1.2.3
 ```
 
 A release build without `app/google-services.json` (no push) or without a
 Google web client id (no "Continue with Google") still builds, but prints a
 warning, since a store upload without them is almost always a mistake.
 
+For the public 1.2.2 release, the guarded helper forces production/code 6,
+preserves older bundles and checks the existing upload certificate:
+
+```bash
+./scripts/build-play-production.sh --unsigned-only
+# On the Mac holding the EXISTING Play upload key (passwords are prompted):
+./scripts/build-play-production.sh /absolute/path/existing-upload.jks EXISTING_ALIAS
+```
+
+Outputs are under `app/build/play-production/`. The helper never uploads or
+publishes a release. See [the 1.2.2 production handoff](docs/release/1.2.2/RELEASE.md).
+
 ### Google Play sandbox build
 
 The default backend is production. To build the isolated billing sandbox:
 
 ```bash
-./gradlew assembleDebug testDebugUnitTest -Paireply.backend=sandbox
+./gradlew assembleDebug testDebugUnitTest -Paireply.backend=sandbox \
+  -Paireply.versionCode=5 -Paireply.versionName=1.2.1
 ```
 
 `aireply.backend` accepts only `production` or `sandbox`. Sandbox uses
