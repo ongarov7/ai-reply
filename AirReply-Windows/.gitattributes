@@ -1,0 +1,6 @@
+# Import fixtures deliberately contain CRLF, BOMs and legacy encodings. Preserve exact bytes on Windows checkout.
+tests/AirReply.Context.Tests/Fixtures/**/*.csv binary
+tests/AirReply.Context.Tests/Fixtures/**/*.txt binary
+tests/AirReply.Context.Tests/Fixtures/**/*.xlsx binary
+tests/AirReply.Context.Tests/Fixtures/**/*.docx binary
+tests/AirReply.Context.Tests/Fixtures/**/*.pdf binary
