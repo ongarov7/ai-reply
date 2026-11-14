@@ -71,6 +71,7 @@ try {
     try { Assert-Installer ($null -eq $existing) 'An existing AI Reply installation would contaminate installer checks.' }
     finally { if ($existing) { $existing.Dispose() } }
     Assert-Installer ($null -eq (Read-RegistryValue $runKey 'AI Reply')) 'An existing autostart setting would contaminate installer checks.'
+    Assert-Installer ($null -eq (Read-RegistryValue $approvedKey 'AI Reply')) 'An existing startup approval would contaminate installer checks.'
     Assert-Installer (!(Test-Path $startShortcut) -and !(Test-Path $desktopShortcut)) 'Existing shortcuts would contaminate installer checks.'
     $ownsTestState = $true
     New-Item $testDirectory -ItemType Directory -Force | Out-Null
@@ -138,7 +139,7 @@ try {
     Write-RegistryValue $runKey 'AI Reply' $portableCommand String
     Write-RegistryValue $approvedKey 'AI Reply' ([byte[]](3,0,0,0,0,0,0,0,0,0,0,0)) Binary
     Assert-Installer ((Uninstall-App 'installer-portable-preservation.log') -eq 0) 'Final uninstall failed.'
-    Assert-Installer (Wait-InstallerCondition { !(Test-Path $executable) }) 'Final uninstall left application binaries.'
+    Assert-Installer (Wait-InstallerCondition { !(Test-Path $executable) -and !(Test-Path $uninstaller) -and $null -eq (Read-RegistryValue $uninstallKey 'DisplayName') -and !(Test-Path $startShortcut) -and !(Test-Path $desktopShortcut) }) 'Final uninstall left binaries, shortcuts or registration.'
     Assert-Installer ((Read-RegistryValue $runKey 'AI Reply') -eq $portableCommand) 'Uninstall removed a different portable copy startup setting.'
     Assert-Installer ($null -ne (Read-RegistryValue $approvedKey 'AI Reply')) 'Uninstall removed a different portable copy startup approval.'
     $outcome.success = $true

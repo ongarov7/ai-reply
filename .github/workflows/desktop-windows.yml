@@ -73,9 +73,18 @@ jobs:
           path: |
             AirReply-Windows/out/AIReply-win-x64.zip
             AirReply-Windows/out/AIReply-win-arm64.zip
-            AirReply-Windows/out/AIReply-Setup.exe
-            AirReply-Windows/out/*.sha256
+            AirReply-Windows/out/AIReply-win-x64.zip.sha256
+            AirReply-Windows/out/AIReply-win-arm64.zip.sha256
           if-no-files-found: error
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: AIReply-installer
+          path: |
+            AirReply-Windows/out/AIReply-Setup.exe
+            AirReply-Windows/out/AIReply-Setup.exe.sha256
+          if-no-files-found: error
+          compression-level: 0
 
       - uses: actions/upload-artifact@v5
         if: always()

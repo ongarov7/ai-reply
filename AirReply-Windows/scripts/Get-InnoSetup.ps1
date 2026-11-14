@@ -22,7 +22,7 @@ if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notm
     throw "Unexpected Inno Setup publisher/signature: $($signature.Status)"
 }
 $compilerDirectory = Join-Path $DestinationRoot 'compiler'
-$process = Start-Process $download -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', '/NOICONS', "/DIR=`"$compilerDirectory`"") -Wait -PassThru
+$process = Start-Process $download -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', '/NOICONS', '/CURRENTUSER', '/PORTABLE=1', "/DIR=`"$compilerDirectory`"") -Wait -PassThru
 if ($process.ExitCode -ne 0) { throw "Inno Setup installation exited with $($process.ExitCode)." }
 $compiler = Join-Path $compilerDirectory 'ISCC.exe'
 if (!(Test-Path $compiler)) { throw 'Inno Setup compiler was not installed.' }
