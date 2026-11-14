@@ -26,8 +26,8 @@ macOS 1.0.2, iOS, Android, backend, website and production are unchanged.
 
 ## Verification on macOS
 
-Release build: 0 warnings / 0 errors. Full solution: **229 tests, 223 passed, 6 explicitly skipped**
-(native Win32 tests run only on Windows). Core 42, Context 90, Presentation 43, Platform 40, App 14.
+Release build: 0 warnings / 0 errors. Full solution: **231 tests, 225 passed, 6 explicitly skipped**
+(native Win32 tests run only on Windows). Core 42, Context 90, Presentation 43, Platform 40, App 16.
 66 screenshots (11 states × ru/kk/en × light/dark) are generated headlessly; representative images reviewed.
 No test sends real OTP/AI/payment requests. Corpus deviations are documented in
 `tests/AirReply.Context.Tests/README.md`; passing 62 does not mean semantic translation/OCR is implemented.
