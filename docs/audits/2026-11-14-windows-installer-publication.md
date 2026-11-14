@@ -116,7 +116,7 @@ The installer uses the existing brand logo in its wizard. Its Windows lifecycle 
 all eight embedded icon frames in Setup, both native payloads and the installed executable, checks
 shortcut icon resolution, and proves a changed reference icon is rejected.
 
-Local solution validation: 290 tests discovered, 284 passed and six native Windows tests skipped on
+Local solution validation before the final race regressions: 290 tests discovered, 284 passed and six native Windows tests skipped on
 macOS; no failed tests. Windows CI and publication results are recorded below after completion.
 Other macOS parity gaps and manual Windows checks listed above remain open.
 
@@ -124,3 +124,16 @@ The deployment Compose configuration also supplies the verified public Google Pl
 default `PLAY_STORE_URL`, while retaining an explicit deployment override:
 <https://play.google.com/store/apps/details?id=kz.yerek.aireply>.
 This uses the existing landing-page setting and does not change payment or database configuration.
+
+
+Final security review added eight regression cases for delayed retry-401 responses and consent actions
+crossing an account change. Core validation now passes 102/102. A late failed request only clears its
+own session; consent POSTs atomically require the original session generation.
+
+The Google Play listing was activated on the existing production image
+`ed82a5ebfe242a9ea6f5b45e5ec1aeb30d9c730202f28e9bad5c364efa2565ed` and existing
+`ai-reply-back-end_aireply-data` volume. Three consistent SQLite backups passed `quick_check` before
+recreation, under `/home/ai-reply-backups/play-store-20261114T143748Z`. The backend returned healthy,
+production and sandbox health passed, and all four landing languages exposed the exact listing URL.
+Caddy, the macOS download and existing financial state were preserved. This link activation does not
+activate native Google Play Billing.

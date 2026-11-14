@@ -146,11 +146,15 @@ public sealed class ApiClient : IDisposable
         return true;
     }
 
-    public void ClearSession(SignOutReason reason = SignOutReason.User)
+    public void ClearSession(SignOutReason reason = SignOutReason.User) => ClearSessionIfCurrent(reason);
+
+    private bool ClearSessionIfCurrent(SignOutReason reason, long? expectedGeneration = null, string? expectedAccessToken = null)
     {
         long clearedGeneration;
         lock (gate)
         {
+            if (expectedGeneration is { } expected && (generation != expected ||
+                expectedAccessToken is not null && session?.AccessToken != expectedAccessToken)) return false;
             clearedGeneration = ++generation;
             session = null;
             refreshTask = null;
@@ -160,6 +164,7 @@ public sealed class ApiClient : IDisposable
             secrets.Delete(Key("session"));
         }
         SessionChanged?.Invoke(this, new(SignOutReason: reason, Generation: clearedGeneration));
+        return true;
     }
 
     public async Task SignOutAsync(CancellationToken ct = default)
@@ -181,7 +186,13 @@ public sealed class ApiClient : IDisposable
         catch (ApiException) { /* Local sign-out succeeds even if the server is unreachable. */ }
     }
 
-    public async Task<T> SendAsync<T>(ApiRequest request, CancellationToken ct = default)
+    public Task<T> SendAsync<T>(ApiRequest request, CancellationToken ct = default) => SendCoreAsync<T>(request, null, ct);
+
+    /// <summary>Submit an authenticated action only for the session in which the user initiated it.</summary>
+    public Task SendAsync(ApiRequest request, long expectedSessionGeneration, CancellationToken ct = default) =>
+        SendCoreAsync<JsonElement>(request, expectedSessionGeneration, ct);
+
+    private async Task<T> SendCoreAsync<T>(ApiRequest request, long? expectedSessionGeneration, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(request);
         if (!request.Authenticated)
@@ -190,9 +201,12 @@ public sealed class ApiClient : IDisposable
         }
         SessionTokens tokens;
         CancellationToken sessionToken;
+        long requestGeneration;
         lock (gate)
         {
+            if (expectedSessionGeneration is { } expected && generation != expected) throw new ApiException(ApiFailure.SignedOut);
             tokens = session ?? throw new ApiException(ApiFailure.SignedOut);
+            requestGeneration = generation;
             sessionToken = sessionCancellation.Token;
         }
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, sessionToken);
@@ -213,7 +227,7 @@ public sealed class ApiClient : IDisposable
             }
             catch (ApiException retry) when (retry.IsExpiredSession)
             {
-                ClearSession(SignOutReason.TokenRejected);
+                ClearSessionIfCurrent(SignOutReason.TokenRejected, requestGeneration, tokens.AccessToken);
                 throw new ApiException(ApiFailure.SignedOut);
             }
         }
@@ -256,10 +270,7 @@ public sealed class ApiClient : IDisposable
             }
             catch (ApiException ex) when (ex.Failure == ApiFailure.Server && ex.Status is 401 or 403)
             {
-                lock (gate)
-                {
-                    if (generation == sessionGeneration) { ClearSession(SignOutReason.RefreshRefused); }
-                }
+                ClearSessionIfCurrent(SignOutReason.RefreshRefused, sessionGeneration);
                 throw new ApiException(ApiFailure.SignedOut);
             }
             catch (ApiException ex) when (attempt == 0 && IsAmbiguous(ex) && clock.Now - started < TimeSpan.FromSeconds(48))

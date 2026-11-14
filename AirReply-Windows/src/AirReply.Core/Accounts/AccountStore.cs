@@ -320,6 +320,8 @@ public sealed class AccountStore : IDisposable
 
     public async Task AcceptConsentAsync(CancellationToken ct = default)
     {
+        var sessionGeneration = api.SessionGeneration;
+        var userId = api.Session?.UserId ?? throw new ApiException(ApiFailure.SignedOut);
         lock (stateGate) { consentSaving = true; }
         Changed?.Invoke(this, EventArgs.Empty);
         try
@@ -327,6 +329,7 @@ public sealed class AccountStore : IDisposable
             for (var attempt = 0; ; attempt++)
             {
                 await RefreshConfigAsync(attempt == 0 ? TimeSpan.FromSeconds(60) : TimeSpan.Zero, ct).ConfigureAwait(false);
+                RequireConsentSession(sessionGeneration, userId, ct);
                 var legal = Config.Legal;
                 if (string.IsNullOrEmpty(legal?.TermsVersion) || string.IsNullOrEmpty(legal.PrivacyVersion))
                     throw new ApiException(ApiFailure.InvalidResponse);
@@ -335,14 +338,23 @@ public sealed class AccountStore : IDisposable
                     await api.SendAsync(new(HttpMethod.Post, "/api/v1/me/consents")
                     {
                         Body = new { legal.TermsVersion, legal.PrivacyVersion, locale = api.Language, platform = AppInfo.Platform, app_version = api.Info.Version },
-                    }, ct).ConfigureAwait(false);
+                    }, sessionGeneration, ct).ConfigureAwait(false);
+                    RequireConsentSession(sessionGeneration, userId, ct);
                     await RefreshMeAsync(ct: ct).ConfigureAwait(false);
+                    RequireConsentSession(sessionGeneration, userId, ct);
                     return;
                 }
                 catch (ApiException ex) when (attempt == 0 && ex.Status == 400) { /* Legal versions changed: fetch and retry once. */ }
             }
         }
         finally { lock (stateGate) { consentSaving = false; } Changed?.Invoke(this, EventArgs.Empty); }
+    }
+
+    private void RequireConsentSession(long expectedGeneration, string expectedUserId, CancellationToken ct)
+    {
+        if (ct.IsCancellationRequested) throw new ApiException(ApiFailure.Cancelled);
+        if (api.SessionGeneration != expectedGeneration || api.Session?.UserId != expectedUserId)
+            throw new ApiException(ApiFailure.SignedOut);
     }
 
     public async Task<Uri> PlansUriAsync(CancellationToken ct = default)
