@@ -3,7 +3,7 @@
 The owner authorized uploading the Windows installer to the existing website. This publishes the
 tested Windows preview; it does not establish complete macOS parity or a completed manual Windows release gate.
 
-## Published file
+## Initial 1.0.0 publication
 
 - Direct download: <https://ai-reply.kz/downloads/windows/AIReply-Setup.exe>.
 - Immutable version: <https://ai-reply.kz/downloads/windows/AIReply-Setup-1.0.0.exe>.
@@ -103,9 +103,9 @@ trigger Windows reputation warnings. This publication makes no claim of identica
 production readiness.
 
 
-## Follow-up: Windows 1.0.1 candidate
+## Follow-up: Windows 1.0.1 publication
 
-The payment-return gap identified above is addressed in the 1.0.1 candidate. Foreground activation
+The payment-return gap identified above is addressed in 1.0.1. Foreground activation
 forces an account refresh and a validated website handoff starts a bounded 120-second catch-up window.
 Account changes propagate to the visible bar and tray. Signed-in payment handoffs fail closed if the
 server response cannot be tied to the current session; a failure is shown in the selected UI language.
@@ -137,3 +137,26 @@ recreation, under `/home/ai-reply-backups/play-store-20261114T143748Z`. The back
 production and sandbox health passed, and all four landing languages exposed the exact listing URL.
 Caddy, the macOS download and existing financial state were preserved. This link activation does not
 activate native Google Play Billing.
+
+
+Windows 1.0.1 was published after [successful Windows CI](https://github.com/ongarov7/ai-reply/actions/runs/43606168929)
+for source commit `2c77d0e3f0e982b97a3cc641c356844f4503cfcb`. All **298/298 tests** passed on
+Windows, with no native skips, and the actual installer lifecycle passed **50 assertions**. The
+server independently validated the five TRX reports and installer JSON from the test artifact before
+publication. Final local validation passed 292 tests, with the six Windows-only tests explicitly skipped.
+
+- Stable download: <https://ai-reply.kz/downloads/windows/AIReply-Setup.exe>.
+- Immutable version: <https://ai-reply.kz/downloads/windows/AIReply-Setup-1.0.1.exe>.
+- Manifest: <https://ai-reply.kz/downloads/windows/windows-1.0.1.json>.
+- Size: `95,743,825` bytes.
+- SHA-256: `4a630ce3300119985e29d0a722b5b950a7457389d0b7505c26eeb182185f8623`.
+- Installer artifact: `14117854980`; outer ZIP digest:
+  `e1b689b01a2e111eef30a0f9ab0d3d656201b37a4a3324c13f9ea4005194dfb3`.
+- Server backup/evidence: `/home/ai-reply-backups/windows-installer-1.0.1-20261114T144701Z`.
+
+The server downloaded both artifacts directly, checked their digests and published the versioned
+installer before atomically advancing the stable symlink. Both public executable URLs passed full
+HTTPS size/hash verification performed on the server, plus two-byte range checks. The 1.0.0 immutable
+file remains available. No Caddy change/reload or backend restart was needed for this update. The
+backend process, Caddy configuration, macOS 1.0.2 and both API health endpoints were preserved.
+The file remains unsigned/preview and the Windows 10/11 manual gate remains incomplete.

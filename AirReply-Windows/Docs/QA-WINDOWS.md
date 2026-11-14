@@ -12,7 +12,8 @@ Record OS/build, architecture, app commit, DPI, monitor setup, target app/versio
   same account as macOS, consent accept/failure, shared balance; restart restores the session.
 - [ ] Generation: compose, manual reply, fresh clipboard reply, four recipients, limits/unicode, cancellation,
   retry reuses the request, regenerate makes a new request, refunded output failure, offline/reconnect.
-- [ ] Plans: browser handoff selects the expected account; after website purchase refresh updates balance.
+- [ ] Plans: browser handoff selects the expected account; foreground return and delayed bank notification
+  update the visible balance within the bounded catch-up window; failures never open another browser account.
 - [ ] Tray/single instance: launch twice; autostart `--background` stays hidden; tray Open/Dictate/Settings/Quit;
   no taskbar bar-window; actual fallback gesture displayed and saved gesture retained after restart.
 - [ ] Hotkeys: all three startup candidates occupied; custom/reserved combinations; shortcut capture cancelled
@@ -31,8 +32,8 @@ Record OS/build, architecture, app commit, DPI, monitor setup, target app/versio
   screen reader names; Windows accent; DPI 100/125/150/200%, negative monitor origin, taskbar edges, monitor removal,
   drag across monitor/midline, grow result upward/downward, reopen at dragged position.
 - [ ] ARM64: run the actual `win-arm64` ZIP on Windows ARM hardware; repeat native integration scenarios.
-- [ ] Signing/distribution: owner chooses signing certificate and public Windows download page; no release or
-  production deployment is performed by this change.
+- [ ] Signing/distribution: preview EXE is available through the public download URL; verify browser reputation
+  warnings. A signing certificate, dedicated download page and completion of this manual gate remain open.
 
 Known limits: lexical retrieval does not translate synonyms or languages; scanned PDFs need a text layer;
 200,000-segment retrieval performance is not benchmarked and there is no LRU index cache. PDF parsing is

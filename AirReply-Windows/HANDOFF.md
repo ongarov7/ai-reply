@@ -1,7 +1,9 @@
 # AI Reply for Windows — handoff (2026-11-14)
 
 Base: origin/main `819936a`. Work branch: `codex/windows-client`.
-macOS 1.0.2, iOS, Android, backend, website and production are unchanged.
+macOS 1.0.2, iOS and Android application sources are unchanged. Backend payment code is unchanged.
+Windows preview publication and the public Google Play landing link are recorded in
+`../docs/audits/2026-11-14-windows-installer-publication.md`.
 `Docs/spec/DECISIONS.md` remains authoritative.
 
 ## Implemented
@@ -10,6 +12,8 @@ macOS 1.0.2, iOS, Android, backend, website and production are unchanged.
   device/installation IDs and environment isolation, single-flight refresh and 60 s lost-answer replay,
   registration before consent/AI, consent/balance/config, reply/compose, optional context/600 fields,
   multipart WAV transcription, safe payment handoff, anonymous managed crash reporting.
+  Windows 1.0.1 adds activation refresh, a bounded 120-second payment catch-up window, live balance
+  updates, session-bound handoffs/consent and protection against late OTP/401/generation responses.
 - Context: encrypted per-account atomic profile/document store; safe XLSX/CSV/PDF/DOCX/TXT import,
   encoding/ZIP/XML/content limits, cached formula values/internal-column filtering, SKU/RU/KK lexical
   retrieval, wide-row projection/stock joins and exact escaped UTF-8 budget. ContextWorkspace serializes
@@ -26,8 +30,8 @@ macOS 1.0.2, iOS, Android, backend, website and production are unchanged.
 
 ## Verification on macOS
 
-Release build: 0 warnings / 0 errors. Full solution: **231 tests, 225 passed, 6 explicitly skipped**
-(native Win32 tests run only on Windows). Core 42, Context 90, Presentation 43, Platform 40, App 16.
+Release build: 0 warnings / 0 errors. Full solution: **298 tests, 292 passed, 6 explicitly skipped**
+(native Win32 tests run only on Windows). Core 102, Context 90, Presentation 48, Platform 40, App 18.
 66 screenshots (11 states × ru/kk/en × light/dark) are generated headlessly; representative images reviewed.
 No test sends real OTP/AI/payment requests. Corpus deviations are documented in
 `tests/AirReply.Context.Tests/README.md`; passing 62 does not mean semantic translation/OCR is implemented.
@@ -43,13 +47,17 @@ PowerShell packaging: `./scripts/Publish-Windows.ps1`, then `Get-InnoSetup.ps1` 
 `Build-Installer.ps1 -IsccPath <compiler>`. The new `AIReply-Setup.exe` contains both architectures and
 supports per-user installation, shortcuts, upgrade guard, removal and preservation of account data.
 CI runs real silent install/preview launch/reinstall/uninstall checks using `Test-Installer.ps1`.
+Windows 1.0.1 source `2c77d0e`: 298/298 Windows tests and 50 installer lifecycle assertions passed
+in workflow run `43606168929`; server publication/metadata are recorded in the audit above.
 See README.md and README-Windows.txt.
 
 ## Release gate / remaining limits
 
 Do not infer working messenger/mic/DPI behavior merely from cross-publishing or headless tests.
 Execute `Docs/QA-WINDOWS.md` on Windows 10/11 and actual ARM64 hardware. Check CI artifacts for the
-final branch commit. Code signing/public Windows download page and production deployment remain the owner's call.
+release source commit. The universal EXE is served at
+`https://ai-reply.kz/downloads/windows/AIReply-Setup.exe`; its manifest marks it preview/unsigned.
+Code signing and a dedicated public Windows download page remain open.
 
 Known limits: unbenchmarked 200k-segment retrieval, no LRU cache/translation/OCR; PDF cancellation is
 cooperative between pages, not hard process isolation. Kazakh additions need native review. Native Windows
