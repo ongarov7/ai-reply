@@ -1,0 +1,36 @@
+<Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Styles.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Light">
+          <SolidColorBrush x:Key="CardSurface" Color="#F9F9F9"/>
+          <SolidColorBrush x:Key="CardStroke" Color="#22000000"/>
+          <SolidColorBrush x:Key="SecondaryText" Color="#99000000"/>
+          <SolidColorBrush x:Key="IssueSurface" Color="#FFFFF4CE"/>
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Dark">
+          <SolidColorBrush x:Key="CardSurface" Color="#2C2C2C"/>
+          <SolidColorBrush x:Key="CardStroke" Color="#33FFFFFF"/>
+          <SolidColorBrush x:Key="SecondaryText" Color="#C5FFFFFF"/>
+          <SolidColorBrush x:Key="IssueSurface" Color="#FF433519"/>
+        </ResourceDictionary>
+      </ResourceDictionary.ThemeDictionaries>
+    </ResourceDictionary>
+  </Styles.Resources>
+  <Style Selector="Window">
+    <Setter Property="FontFamily" Value="Segoe UI Variable Text, Segoe UI, Inter"/>
+    <Setter Property="FontSize" Value="14"/>
+  </Style>
+  <Style Selector="Border.card">
+    <Setter Property="Background" Value="{DynamicResource CardSurface}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource CardStroke}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="BoxShadow" Value="0 4 12 0 #30000000"/>
+  </Style>
+  <Style Selector="Border.issue"><Setter Property="Background" Value="{DynamicResource IssueSurface}"/></Style>
+  <Style Selector="Button"><Setter Property="CornerRadius" Value="6"/><Setter Property="MinHeight" Value="32"/></Style>
+  <Style Selector="Button.subtle"><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/></Style>
+  <Style Selector="TextBox"><Setter Property="CornerRadius" Value="6"/></Style>
+  <Style Selector="TextBlock.secondary"><Setter Property="Foreground" Value="{DynamicResource SecondaryText}"/></Style>
+  <Style Selector="TextBlock.caption"><Setter Property="Foreground" Value="{DynamicResource SecondaryText}"/><Setter Property="FontSize" Value="12"/></Style>
+</Styles>

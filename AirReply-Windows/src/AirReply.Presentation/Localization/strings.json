@@ -1,0 +1,184 @@
+{
+  "strings": {
+    "bar.generating": {
+      "ru": "Пишу ответ…",
+      "kk": "Жауап жазып жатырмын…",
+      "en": "Writing a reply…"
+    },
+    "clipboard.failed": {
+      "ru": "Не удалось скопировать. Попробуйте снова.",
+      "kk": "Көшіру мүмкін болмады. Қайталап көріңіз.",
+      "en": "Could not copy. Try again."
+    },
+    "bar.new": {
+      "ru": "Новое сообщение",
+      "kk": "Жаңа хабарлама",
+      "en": "New message"
+    },
+    "bar.close": {
+      "ru": "Скрыть AI Reply",
+      "kk": "AI Reply-ды жасыру",
+      "en": "Hide AI Reply"
+    },
+    "bar.instructions": {
+      "ru": "Инструкции для этого разговора · до 500 символов",
+      "kk": "Осы әңгімеге нұсқаулар · 500 таңбаға дейін",
+      "en": "Conversation instructions · up to 500 characters"
+    },
+    "profiles.title": {
+      "ru": "Профили",
+      "kk": "Профильдер",
+      "en": "Profiles"
+    },
+    "profiles.confirm_delete": {
+      "ru": "Удалить профиль и все его документы?",
+      "kk": "Профильді және оның барлық құжаттарын өшіресіз бе?",
+      "en": "Delete this profile and all its documents?"
+    },
+    "profiles.confirm_document": {
+      "ru": "Удалить документ и извлечённые данные?",
+      "kk": "Құжат пен алынған деректерді өшіресіз бе?",
+      "en": "Delete this document and its extracted data?"
+    },
+    "profiles.confirm_all": {
+      "ru": "Удалить все профили этого аккаунта с компьютера?",
+      "kk": "Осы аккаунттың барлық профилін компьютерден өшіресіз бе?",
+      "en": "Delete all profiles for this account from this computer?"
+    },
+    "profiles.delete_all": {
+      "ru": "Удалить профили этого аккаунта с компьютера",
+      "kk": "Осы аккаунт профильдерін компьютерден өшіру",
+      "en": "Delete this account’s profiles from this computer"
+    },
+    "profiles.discard": {
+      "ru": "Не сохранять изменения?",
+      "kk": "Өзгерістер сақталмасын ба?",
+      "en": "Discard unsaved changes?"
+    },
+    "profiles.saved": {
+      "ru": "Сохранено",
+      "kk": "Сақталды",
+      "en": "Saved"
+    },
+    "signin.submit": {
+      "ru": "Продолжить",
+      "kk": "Жалғастыру",
+      "en": "Continue"
+    },
+    "signin.verify": {
+      "ru": "Войти",
+      "kk": "Кіру",
+      "en": "Sign in"
+    },
+    "shortcut.record": {
+      "ru": "Изменить сочетание",
+      "kk": "Пернелер тіркесімін өзгерту",
+      "en": "Change shortcut"
+    },
+    "shortcut.invalid": {
+      "ru": "Это сочетание недоступно. Используйте Ctrl или Alt с другой клавишей.",
+      "kk": "Бұл тіркесім қолжетімсіз. Ctrl немесе Alt пен басқа пернені пайдаланыңыз.",
+      "en": "This shortcut is unavailable. Use Ctrl or Alt with another key."
+    },
+    "app.platform_preview": {
+      "ru": "Предпросмотр: системные функции доступны в Windows.",
+      "kk": "Алдын ала қарау: жүйелік функциялар Windows-та қолжетімді.",
+      "en": "Preview: system integration is available on Windows."
+    },
+    "bar.mic": {
+      "ru": "Диктовка (Ctrl+D)",
+      "kk": "Диктовка (Ctrl+D)",
+      "en": "Dictation (Ctrl+D)"
+    },
+    "bar.context.importing": {
+      "ru": "Обрабатываю на компьютере…",
+      "kk": "Компьютерде өңделуде…",
+      "en": "Processing on this computer…"
+    },
+    "bar.context.load_failed": {
+      "ru": "Не удалось открыть сохранённые профили. Перезапустите AI Reply.",
+      "kk": "Сақталған профильдер ашылмады. AI Reply-ды қайта іске қосыңыз.",
+      "en": "Could not open saved profiles. Restart AI Reply."
+    },
+    "bar.context.privacy": {
+      "ru": "Документы обрабатываются на компьютере. При генерации отправляются подходящие фрагменты и выбранный профиль. Проверяйте важные сведения перед отправкой.",
+      "kk": "Құжаттар компьютерде өңделеді. Жауап жасау кезінде сәйкес үзінділер мен таңдалған профиль жіберіледі. Маңызды мәліметтерді тексеріңіз.",
+      "en": "Documents are processed on this computer. Generation sends matching excerpts and the selected profile. Check important details before sending."
+    },
+    "settings.login_item": {
+      "ru": "Запускать вместе с Windows",
+      "kk": "Windows-пен бірге іске қосу",
+      "en": "Start with Windows"
+    },
+    "settings.open_system_settings": {
+      "ru": "Открыть параметры Windows",
+      "kk": "Windows параметрлерін ашу",
+      "en": "Open Windows Settings"
+    },
+    "settings.login_item.approval": {
+      "ru": "Отключено в параметрах Windows → Приложения → Автозагрузка",
+      "kk": "Windows параметрлерінде → Қолданбалар → Іске қосу өшірілген",
+      "en": "Disabled in Windows Settings → Apps → Startup"
+    },
+    "settings.paste_after_copy.footer": {
+      "ru": "AI Reply нажмёт Ctrl+V в предыдущем окне. Для программ с правами администратора используйте ручную вставку.",
+      "kk": "AI Reply алдыңғы терезеде Ctrl+V басады. Әкімші бағдарламаларында қолмен қойыңыз.",
+      "en": "AI Reply presses Ctrl+V in the previous window. Paste manually in elevated apps."
+    },
+    "settings.placement.bottom": {
+      "ru": "Снизу, над панелью задач",
+      "kk": "Төменде, тапсырмалар тақтасының үстінде",
+      "en": "Bottom, above the taskbar"
+    },
+    "settings.voice.footer": {
+      "ru": "Запись отправляется на сервер AI Reply и распознаётся OpenAI. Локальная запись удаляется после распознавания или отмены.",
+      "kk": "Жазба AI Reply серверіне жіберіліп, OpenAI арқылы танылады. Жергілікті жазба танылған соң не бас тартқанда өшіріледі.",
+      "en": "Audio is sent to AI Reply and transcribed by OpenAI. The local recording is deleted after transcription or cancellation."
+    },
+    "voice.issue.permission": {
+      "ru": "Нет доступа к микрофону. Разрешите его в параметрах Windows",
+      "kk": "Микрофонға рұқсат жоқ. Windows параметрлерінде рұқсат беріңіз",
+      "en": "No microphone access. Allow it in Windows Settings"
+    },
+    "recipient.help": {
+      "ru": "Написать ответ сразу (Ctrl+1–Ctrl+4)",
+      "kk": "Бірден жауап жазу (Ctrl+1–Ctrl+4)",
+      "en": "Reply immediately (Ctrl+1–Ctrl+4)"
+    },
+    "result.copy.help": {
+      "ru": "Копировать (Ctrl+Enter), затем вставьте Ctrl+V",
+      "kk": "Көшіру (Ctrl+Enter), содан кейін Ctrl+V",
+      "en": "Copy (Ctrl+Enter), then paste with Ctrl+V"
+    },
+    "bar.send.help": {
+      "ru": "Написать (Enter)",
+      "kk": "Жазу (Enter)",
+      "en": "Write (Enter)"
+    },
+    "issue.context_too_large": {
+      "ru": "Слишком длинный запрос. Сократите сообщение или инструкции.",
+      "kk": "Сұрау тым ұзын. Хабарлама не нұсқауларды қысқартыңыз.",
+      "en": "The request is too long. Shorten the message or instructions."
+    },
+    "issue.context_unavailable": {
+      "ru": "Контекст сейчас недоступен. Обычная генерация остаётся доступной.",
+      "kk": "Контекст қазір қолжетімсіз. Кәдімгі жауап жасау қолжетімді.",
+      "en": "Context is unavailable. You can still generate without context."
+    },
+    "issue.output_too_long": {
+      "ru": "Ответ получился слишком длинным. Сократите запрос или выберите расширенную длину.",
+      "kk": "Жауап тым ұзын. Сұрауды қысқартыңыз немесе кеңейтілген ұзындықты таңдаңыз.",
+      "en": "The reply was too long. Shorten your request or choose extended length."
+    },
+    "issue.action.sign_in_again": {
+      "ru": "Войти снова",
+      "kk": "Қайта кіру",
+      "en": "Sign in again"
+    },
+    "settings.about.diagnostics": {
+      "ru": "AI Reply для Windows · сведения не содержат токены или текст сообщений.",
+      "kk": "Windows үшін AI Reply · мәліметтерде токендер мен хабарлама мәтіндері жоқ.",
+      "en": "AI Reply for Windows · diagnostics exclude tokens and message text."
+    }
+  }
+}

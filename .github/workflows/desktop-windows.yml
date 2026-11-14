@@ -2,7 +2,7 @@ name: desktop-windows
 
 on:
   push:
-    branches: [windows-app, main]
+    branches: [windows-app, main, "codex/windows-**"]
     paths: ["AirReply-Windows/**", ".github/workflows/desktop-windows.yml"]
   pull_request:
     paths: ["AirReply-Windows/**", ".github/workflows/desktop-windows.yml"]
@@ -40,12 +40,13 @@ jobs:
         run: dotnet build AirReply.Windows.slnx -c Release --no-restore
 
       - name: Test
-        run: dotnet test --solution AirReply.Windows.slnx -c Release --no-build --report-trx --results-directory "${{ github.workspace }}/test-results"
+        run: dotnet test --solution AirReply.Windows.slnx -c Release --no-build --report-xunit-trx --results-directory "${{ github.workspace }}/test-results" --results-directory-layout per-module
 
       # Failed tests become annotations, readable from the public checks API without a log download.
       - name: Annotate failed tests
         if: failure()
         run: |
+          if (!(Test-Path "${{ github.workspace }}/test-results")) { exit 0 }
           Get-ChildItem "${{ github.workspace }}/test-results" -Filter *.trx -Recurse | ForEach-Object {
             [xml]$trx = Get-Content $_.FullName
             $trx.TestRun.Results.UnitTestResult | Where-Object { $_.outcome -eq 'Failed' } | ForEach-Object {
@@ -56,13 +57,7 @@ jobs:
           }
 
       - name: Publish
-        run: |
-          foreach ($rid in 'win-x64', 'win-arm64') {
-            dotnet publish src/AirReply.App/AirReply.App.csproj -c Release -r $rid --self-contained `
-              -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
-              -p:EnableCompressionInSingleFile=true -p:DebugType=none -o "out/$rid"
-            Compress-Archive -Path "out/$rid/*" -DestinationPath "out/AIReply-$rid.zip" -Force
-          }
+        run: ./scripts/Publish-Windows.ps1
 
       - uses: actions/upload-artifact@v5
         with:
@@ -70,6 +65,7 @@ jobs:
           path: |
             AirReply-Windows/out/AIReply-win-x64.zip
             AirReply-Windows/out/AIReply-win-arm64.zip
+            AirReply-Windows/out/*.sha256
           if-no-files-found: error
 
       - uses: actions/upload-artifact@v5

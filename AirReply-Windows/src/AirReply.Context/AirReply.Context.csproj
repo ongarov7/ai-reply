@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- AI Context: profiles, local document import and retrieval. Runs on any OS. -->
   <ItemGroup>
+    <EmbeddedResource Include="Localization/strings.json" />
     <PackageReference Include="DocumentFormat.OpenXml" />
     <PackageReference Include="PdfPig" />
     <ProjectReference Include="../AirReply.Core/AirReply.Core.csproj" />

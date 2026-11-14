@@ -1,0 +1,410 @@
+{
+  "_comment": "Windows AI Context strings from Docs/spec/context.md Appendix A. Kazakh text requires native review.",
+  "strings": {
+    "bar.context.title": {
+      "ru": "Контекст",
+      "kk": "Контекст",
+      "en": "AI Context"
+    },
+    "bar.context.instructions": {
+      "ru": "Инструкции к этому сообщению — до 500 символов",
+      "kk": "Осы хабарламаға арналған нұсқаулар — 500 таңбаға дейін",
+      "en": "Instructions for this message — up to 500 characters"
+    },
+    "bar.context.importing": {
+      "ru": "Обрабатываю на компьютере…",
+      "kk": "Компьютерде өңделуде…",
+      "en": "Processing on this computer…"
+    },
+    "bar.context.privacy": {
+      "ru": "Документы обрабатываются на этом компьютере. При генерации отправляются только подходящие фрагменты с именами файлов и выбранный профиль. Проверяйте цены и другие важные сведения перед отправкой.",
+      "kk": "Құжаттар осы компьютерде өңделеді. Генерация кезінде тек сәйкес үзінділер файл атауларымен бірге және таңдалған профиль жіберіледі. Жібермес бұрын бағалар мен басқа маңызды деректерді тексеріңіз.",
+      "en": "Documents are processed on this computer. Generation sends only matching excerpts with their file names and the selected profile. Review prices and other important details before sending."
+    },
+    "bar.context.no_room": {
+      "ru": "Сообщение слишком длинное, чтобы добавить контекст. Сократите его или уберите контекст.",
+      "kk": "Хабарлама контекст қосу үшін тым ұзын. Оны қысқартыңыз немесе контексті алып тастаңыз.",
+      "en": "This message is too long to add AI Context. Shorten it or clear the context."
+    },
+    "bar.context.instructions_no_room": {
+      "ru": "Инструкции не помещаются вместе с этим сообщением. Сократите их.",
+      "kk": "Бұл нұсқаулар осы хабарламамен бірге сыймайды. Оларды қысқартыңыз.",
+      "en": "These instructions don't fit with this message. Shorten them."
+    },
+    "context.attachment.saved": {
+      "ru": "В профиле",
+      "kk": "Профильде",
+      "en": "In profile"
+    },
+    "context.attachment.temporary": {
+      "ru": "Только сейчас",
+      "kk": "Тек қазір",
+      "en": "This time only"
+    },
+    "context.attachment.unavailable": {
+      "ru": "Не открывается",
+      "kk": "Ашылмайды",
+      "en": "Can't be opened"
+    },
+    "context.attachment.remove_named": {
+      "ru": "Удалить «{0}» и извлечённые данные",
+      "kk": "«{0}» құжатын және алынған деректерді жою",
+      "en": "Remove “{0}” and its extracted data"
+    },
+    "context.import.cancel": {
+      "ru": "Отменить",
+      "kk": "Болдырмау",
+      "en": "Cancel"
+    },
+    "context.profile.fit": {
+      "ru": "AI получает до 1500 символов профиля. Сейчас: {0}.",
+      "kk": "AI профильдің 1500 таңбасына дейін алады. Қазір: {0}.",
+      "en": "The AI receives up to 1,500 characters of this profile. Now: {0}."
+    },
+    "context.profile.name_required": {
+      "ru": "Введите название профиля",
+      "kk": "Профиль атауын енгізіңіз",
+      "en": "Enter a profile name"
+    },
+    "context.profile.name_too_long": {
+      "ru": "До 80 символов",
+      "kk": "80 таңбаға дейін",
+      "en": "Up to 80 characters"
+    },
+    "context.profile.field_too_long": {
+      "ru": "До {0} символов",
+      "kk": "{0} таңбаға дейін",
+      "en": "Up to {0} characters"
+    },
+    "context.storage.unreadable": {
+      "ru": "Не удалось открыть сохранённые профили на этом компьютере. Возможно, Windows сбросила ключ защиты данных. Сбросьте, чтобы начать заново, — сохранённые профили и документы будут удалены.",
+      "kk": "Осы компьютердегі сақталған профильдерді ашу мүмкін болмады. Windows деректерді қорғау кілтін қалпына келтірген болуы мүмкін. Қайта бастау үшін тазалаңыз — сақталған профильдер мен құжаттар жойылады.",
+      "en": "Saved profiles on this computer can't be opened. Windows may have reset its data protection key. Reset to start again — saved profiles and documents will be deleted."
+    },
+    "context.storage.newer_version": {
+      "ru": "Сохранённые профили созданы более новой версией AI Reply. Обновите приложение, чтобы открыть их.",
+      "kk": "Сақталған профильдер AI Reply-дің жаңарақ нұсқасында жасалған. Оларды ашу үшін қолданбаны жаңартыңыз.",
+      "en": "Saved profiles were created by a newer version of AI Reply. Update the app to open them."
+    },
+    "context.storage.reset": {
+      "ru": "Сбросить",
+      "kk": "Тазалау",
+      "en": "Reset"
+    },
+    "context.storage.too_many_profiles": {
+      "ru": "Можно сохранить до 24 профилей. Сначала удалите один.",
+      "kk": "24 профильге дейін сақтауға болады. Алдымен біреуін жойыңыз.",
+      "en": "Up to 24 profiles can be saved. Delete one first."
+    },
+    "context.signout.delete": {
+      "ru": "Также удалить сохранённые профили и документы контекста с этого компьютера",
+      "kk": "Контекст профильдері мен құжаттарын осы компьютерден де жою",
+      "en": "Also delete saved AI Context profiles and documents from this computer"
+    },
+    "context.settings.delete_all": {
+      "ru": "Удалить сохранённые данные контекста…",
+      "kk": "Сақталған контекст деректерін жою…",
+      "en": "Delete saved AI Context data…"
+    },
+    "context.confirm.delete_all.title": {
+      "ru": "Удалить все сохранённые данные контекста на этом компьютере?",
+      "kk": "Осы компьютердегі барлық сақталған контекст деректерін жою керек пе?",
+      "en": "Delete all saved AI Context data on this computer?"
+    },
+    "context.confirm.delete_profile.title": {
+      "ru": "Удалить профиль «{0}»?",
+      "kk": "«{0}» профилін жою керек пе?",
+      "en": "Delete profile “{0}”?"
+    },
+    "context.confirm.delete_profile.body": {
+      "ru": "Сохранённые в нём документы тоже будут удалены с этого компьютера.",
+      "kk": "Ондағы сақталған құжаттар да осы компьютерден жойылады.",
+      "en": "Its saved documents will be deleted from this computer too."
+    },
+    "context.confirm.delete_attachment.title": {
+      "ru": "Удалить «{0}»?",
+      "kk": "«{0}» жою керек пе?",
+      "en": "Remove “{0}”?"
+    },
+    "context.confirm.delete_attachment.body": {
+      "ru": "Извлечённые данные будут удалены с этого компьютера.",
+      "kk": "Алынған деректер осы компьютерден жойылады.",
+      "en": "The extracted data will be deleted from this computer."
+    },
+    "context.confirm.replace.title": {
+      "ru": "Заменить «{0}»?",
+      "kk": "«{0}» ауыстыру керек пе?",
+      "en": "Replace “{0}”?"
+    },
+    "context.confirm.replace.body": {
+      "ru": "Документ с таким именем загружен {0}.",
+      "kk": "Осындай атаулы құжат {0} жүктелген.",
+      "en": "A document with this name was imported on {0}."
+    },
+    "context.confirm.unsaved.title": {
+      "ru": "Сохранить изменения профиля?",
+      "kk": "Профильдегі өзгерістерді сақтау керек пе?",
+      "en": "Save changes to the profile?"
+    },
+    "context.import.error.unsupported_format": {
+      "ru": "Этот тип файла не поддерживается. Подойдут Excel (.xlsx), CSV, PDF, Word (.docx) и TXT.",
+      "kk": "Бұл файл түріне қолдау көрсетілмейді. Excel (.xlsx), CSV, PDF, Word (.docx) немесе TXT файлын таңдаңыз.",
+      "en": "This file type isn't supported. Use Excel (.xlsx), CSV, PDF, Word (.docx) or TXT."
+    },
+    "context.import.error.legacy_excel": {
+      "ru": "Старый формат Excel (.xls). Откройте файл в Excel и сохраните как .xlsx.",
+      "kk": "Excel-дің ескі пішімі (.xls). Файлды Excel-де ашып, .xlsx ретінде сақтаңыз.",
+      "en": "Old Excel format (.xls). Open it in Excel and save as .xlsx."
+    },
+    "context.import.error.legacy_word": {
+      "ru": "Старый формат Word (.doc). Откройте файл в Word и сохраните как .docx.",
+      "kk": "Word-тың ескі пішімі (.doc). Файлды Word-та ашып, .docx ретінде сақтаңыз.",
+      "en": "Old Word format (.doc). Open it in Word and save as .docx."
+    },
+    "context.import.error.macro_format": {
+      "ru": "Файлы с макросами не поддерживаются. Сохраните копию как .xlsx или .docx без макросов.",
+      "kk": "Макросы бар файлдарға қолдау көрсетілмейді. Көшірмесін макроссыз .xlsx немесе .docx ретінде сақтаңыз.",
+      "en": "Files with macros aren't supported. Save a copy as .xlsx or .docx without macros."
+    },
+    "context.import.error.file_too_large": {
+      "ru": "Файл больше 8 МБ. Удалите лишние листы или страницы либо разделите файл.",
+      "kk": "Файл 8 МБ-тан үлкен. Артық парақтарды не беттерді өшіріңіз немесе файлды бөліңіз.",
+      "en": "The file is larger than 8 MB. Remove unneeded sheets or pages, or split the file."
+    },
+    "context.import.error.file_unreadable": {
+      "ru": "Не удалось открыть файл. Проверьте, что он существует и к нему есть доступ.",
+      "kk": "Файлды ашу мүмкін болмады. Файлдың бар екенін және оған рұқсатыңыз барын тексеріңіз.",
+      "en": "The file couldn't be opened. Check that it still exists and you have access to it."
+    },
+    "context.import.error.file_locked": {
+      "ru": "Файл занят другой программой. Закройте его там и попробуйте снова.",
+      "kk": "Файлды басқа бағдарлама пайдаланып жатыр. Сол жерде жауып, қайталап көріңіз.",
+      "en": "The file is in use by another program. Close it there and try again."
+    },
+    "context.import.error.office_protected_or_legacy": {
+      "ru": "Файл защищён паролем или сохранён в старом формате. Снимите пароль и сохраните его как .xlsx или .docx.",
+      "kk": "Файл құпиясөзбен қорғалған немесе ескі пішімде сақталған. Құпиясөзді алып тастап, .xlsx не .docx ретінде сақтаңыз.",
+      "en": "The file is password-protected or saved in an old format. Remove the password and save it as .xlsx or .docx."
+    },
+    "context.import.error.pdf_protected": {
+      "ru": "PDF открывается только с паролем. Сохраните копию без пароля.",
+      "kk": "PDF тек құпиясөзбен ашылады. Құпиясөзсіз көшірмесін сақтаңыз.",
+      "en": "The PDF opens only with a password. Save a copy without a password."
+    },
+    "context.import.error.pdf_no_text": {
+      "ru": "В PDF нет текста — похоже, это скан. Нужен PDF с выделяемым текстом или исходный файл Excel/Word.",
+      "kk": "PDF-те мәтін жоқ, бұл скан болуы мүмкін. Мәтінін белгілеуге болатын PDF немесе бастапқы Excel/Word файлын қолданыңыз.",
+      "en": "No text found in this PDF — it may be a scan. Use a PDF with selectable text or the original Excel/Word file."
+    },
+    "context.import.error.pdf_too_many_pages": {
+      "ru": "В PDF больше 1000 страниц. Разделите его на файлы поменьше.",
+      "kk": "PDF-те 1000-нан астам бет бар. Оны кішірек файлдарға бөліңіз.",
+      "en": "The PDF has more than 1,000 pages. Split it into smaller files."
+    },
+    "context.import.error.malformed": {
+      "ru": "Файл повреждён или имеет неожиданный формат. Пересохраните его в исходной программе и попробуйте снова.",
+      "kk": "Файл бүлінген немесе пішімі күтілгендей емес. Оны бастапқы бағдарламада қайта сақтап, қайталап көріңіз.",
+      "en": "The file is damaged or not in the expected format. Re-save it in the original program and try again."
+    },
+    "context.import.error.csv_quote": {
+      "ru": "В CSV не закрыта кавычка. Исправьте кавычки или выгрузите файл заново.",
+      "kk": "CSV файлында тырнақша жабылмаған. Тырнақшаларды түзетіңіз немесе файлды қайта экспорттаңыз.",
+      "en": "A quoted CSV value isn't closed. Fix the quotes or export the file again."
+    },
+    "context.import.error.unsafe_content": {
+      "ru": "Файл содержит небезопасные элементы, например макросы или необычные записи архива, и не был открыт.",
+      "kk": "Файлда макростар немесе архивтің әдеттен тыс жазбалары сияқты қауіпті элементтер бар, сондықтан ол ашылмады.",
+      "en": "The file contains unsafe elements, such as macros or unusual archive entries, and wasn't opened."
+    },
+    "context.import.error.archive_too_large": {
+      "ru": "Документ слишком большой в распакованном виде (больше 16 МБ или 2048 частей). Удалите изображения или разделите его.",
+      "kk": "Құжат ашылған күйінде тым үлкен (16 МБ-тан немесе 2048 бөліктен көп). Суреттерді өшіріңіз немесе құжатты бөліңіз.",
+      "en": "The document is too large when unpacked (over 16 MB or 2,048 parts). Remove images or split it."
+    },
+    "context.import.error.too_much_text": {
+      "ru": "В файле больше 2 000 000 символов текста. Разделите его на файлы поменьше.",
+      "kk": "Файлда 2 000 000-нан астам таңба бар. Оны кішірек файлдарға бөліңіз.",
+      "en": "The file has more than 2,000,000 characters of text. Split it into smaller files."
+    },
+    "context.import.error.too_many_rows": {
+      "ru": "В файле больше 50 000 строк или абзацев. Оставьте нужные строки или разделите файл.",
+      "kk": "Файлда 50 000-нан астам жол не азат жол бар. Қажетті жолдарды ғана қалдырыңыз немесе файлды бөліңіз.",
+      "en": "The file has more than 50,000 rows or paragraphs. Keep only the rows you need or split the file."
+    },
+    "context.import.error.too_many_sheets": {
+      "ru": "В книге больше 128 листов. Оставьте только нужные листы.",
+      "kk": "Кітапта 128-ден астам парақ бар. Тек қажетті парақтарды қалдырыңыз.",
+      "en": "The workbook has more than 128 sheets. Keep only the sheets you need."
+    },
+    "context.import.error.no_readable_text": {
+      "ru": "В файле не найден текст.",
+      "kk": "Файлдан мәтін табылмады.",
+      "en": "No text was found in the file."
+    },
+    "context.import.error.no_readable_text_hidden": {
+      "ru": "Все листы с данными скрыты. Покажите нужные листы и сохраните файл.",
+      "kk": "Деректері бар парақтардың бәрі жасырылған. Қажетті парақтарды көрсетіп, файлды сақтаңыз.",
+      "en": "All sheets with data are hidden. Unhide the sheets you want to use and save the file."
+    },
+    "context.import.error.no_readable_text_formulas": {
+      "ru": "На листах формулы без сохранённых значений. Откройте файл в Excel, сохраните и попробуйте снова.",
+      "kk": "Парақтарда сақталған мәні жоқ формулалар бар. Файлды Excel-де ашып, сақтаңыз да, қайталап көріңіз.",
+      "en": "The sheets contain formulas without saved results. Open the file in Excel, save it and try again."
+    },
+    "context.import.error.binary_or_unknown_encoding": {
+      "ru": "Не удалось прочитать текст. Сохраните файл в кодировке UTF-8 и попробуйте снова.",
+      "kk": "Мәтінді оқу мүмкін болмады. Файлды UTF-8 кодтауында сақтап, қайталап көріңіз.",
+      "en": "The text couldn't be read. Save the file as UTF-8 text and try again."
+    },
+    "context.import.error.too_many_attachments": {
+      "ru": "Одновременно можно использовать до 4 документов. Удалите один, чтобы добавить новый.",
+      "kk": "Бір уақытта 4 құжатқа дейін қолдануға болады. Жаңасын қосу үшін біреуін өшіріңіз.",
+      "en": "Up to 4 documents can be used at once. Remove one to add another."
+    },
+    "context.import.error.profile_attachments_full": {
+      "ru": "В профиле можно хранить до 8 документов. Сначала удалите один.",
+      "kk": "Профильде 8 құжатқа дейін сақтауға болады. Алдымен біреуін өшіріңіз.",
+      "en": "A profile can store up to 8 documents. Remove one first."
+    },
+    "context.import.error.storage_full": {
+      "ru": "Сохранённые документы на этом компьютере занимают больше 32 МБ. Удалите ненужные.",
+      "kk": "Осы компьютердегі сақталған құжаттар 32 МБ-тан асады. Қажет еместерін өшіріңіз.",
+      "en": "Saved documents on this computer exceed 32 MB. Remove documents you no longer need."
+    },
+    "context.import.error.storage_failed": {
+      "ru": "Не удалось сохранить документ на этом компьютере. Проверьте свободное место на диске и попробуйте снова.",
+      "kk": "Құжатты осы компьютерге сақтау мүмкін болмады. Дискідегі бос орынды тексеріп, қайталап көріңіз.",
+      "en": "The document couldn't be saved on this computer. Check free disk space and try again."
+    },
+    "context.import.error.timed_out": {
+      "ru": "Обработка заняла слишком много времени и была остановлена. Попробуйте файл поменьше.",
+      "kk": "Өңдеу тым ұзаққа созылып, тоқтатылды. Кішірек файлды қолданып көріңіз.",
+      "en": "Processing took too long and was stopped. Try a smaller file."
+    },
+    "context.import.summary.saved_to_profile": {
+      "ru": "Сохранено в профиле «{0}»",
+      "kk": "«{0}» профиліне сақталды",
+      "en": "Saved in profile “{0}”"
+    },
+    "context.import.summary.temporary": {
+      "ru": "Только для этого разговора",
+      "kk": "Тек осы әңгімеге",
+      "en": "For this conversation only"
+    },
+    "context.import.summary.formula_values": {
+      "ru": "Значения формул: {0}",
+      "kk": "Формула мәндері: {0}",
+      "en": "Formula values: {0}"
+    },
+    "context.import.summary.formulas_skipped": {
+      "ru": "Пропущено формул без значения: {0}",
+      "kk": "Мәні жоқ формулалар өткізілді: {0}",
+      "en": "Formulas without a saved value skipped: {0}"
+    },
+    "context.import.summary.hidden_skipped": {
+      "ru": "Пропущено скрытых листов или столбцов: {0}",
+      "kk": "Өткізілген жасырын парақтар не бағандар: {0}",
+      "en": "Hidden sheets or columns skipped: {0}"
+    },
+    "context.import.summary.internal_skipped": {
+      "ru": "Служебные столбцы не загружены: {0}",
+      "kk": "Ішкі бағандар жүктелмеді: {0}",
+      "en": "Internal columns not imported: {0}"
+    },
+    "context.import.summary.shortened": {
+      "ru": "Сокращено длинных ячеек: {0}",
+      "kk": "Қысқартылған ұзын ұяшықтар: {0}",
+      "en": "Long cells shortened: {0}"
+    },
+    "context.import.summary.encoding": {
+      "ru": "Кодировка: Windows-1251",
+      "kk": "Кодтау: Windows-1251",
+      "en": "Encoding: Windows-1251"
+    },
+    "context.import.summary.stale_formulas": {
+      "ru": "Значения формул могут быть устаревшими — откройте и сохраните файл в Excel",
+      "kk": "Формула мәндері ескірген болуы мүмкін — файлды Excel-де ашып, сақтаңыз",
+      "en": "Formula values may be outdated — open and save the file in Excel"
+    },
+    "context.evidence.title": {
+      "ru": "Источники",
+      "kk": "Дереккөздер",
+      "en": "Sources"
+    },
+    "context.evidence.profile": {
+      "ru": "Профиль «{0}»",
+      "kk": "«{0}» профилі",
+      "en": "Profile “{0}”"
+    },
+    "context.evidence.instructions": {
+      "ru": "Инструкции к этому сообщению",
+      "kk": "Осы хабарламаға арналған нұсқаулар",
+      "en": "Instructions for this message"
+    },
+    "context.evidence.locator.table_row": {
+      "ru": "таблица {0}, строка {1}",
+      "kk": "{0}-кесте, {1}-жол",
+      "en": "table {0}, row {1}"
+    },
+    "context.evidence.partial": {
+      "ru": "строка не полностью",
+      "kk": "жол толық емес",
+      "en": "partial row"
+    },
+    "context.evidence.formula": {
+      "ru": "Значения формул взяты из результатов, сохранённых в файле",
+      "kk": "Формула мәндері файлда сақталған нәтижелерден алынды",
+      "en": "Formula values are taken from the results saved in the file"
+    },
+    "context.evidence.not_found": {
+      "ru": "Не найдено в документах: {0}",
+      "kk": "Құжаттардан табылмады: {0}",
+      "en": "Not found in documents: {0}"
+    },
+    "context.evidence.nothing_matched": {
+      "ru": "В документах ничего не найдено — проверьте факты перед отправкой",
+      "kk": "Құжаттардан сәйкес ештеңе табылмады — жібермес бұрын деректерді тексеріңіз",
+      "en": "Nothing in the documents matched — check the facts before sending"
+    },
+    "context.evidence.omitted": {
+      "ru": "Не поместилось совпадений: {0}",
+      "kk": "Сыймаған сәйкестіктер: {0}",
+      "en": "Matches that didn't fit: {0}"
+    },
+    "context.evidence.profile_left_out": {
+      "ru": "Из профиля не поместилось: {0}",
+      "kk": "Профильден сыймағаны: {0}",
+      "en": "Left out of the profile: {0}"
+    },
+    "issue.context_too_large": {
+      "ru": "Контекст не поместился в запрос. Сократите сообщение, инструкции или профиль.",
+      "kk": "Контекст сұрауға сыймады. Хабарламаны, нұсқауларды немесе профильді қысқартыңыз.",
+      "en": "The context didn't fit into the request. Shorten the message, the instructions or the profile."
+    },
+    "issue.context_unavailable": {
+      "ru": "Контекст сейчас недоступен на сервере. Уберите контекст, чтобы продолжить.",
+      "kk": "Контекст қазір серверде қолжетімсіз. Жалғастыру үшін контексті алып тастаңыз.",
+      "en": "AI Context isn't available on the server right now. Clear the context to continue."
+    },
+    "issue.output_limit": {
+      "ru": "Ответ не уместился в выбранную длину. Попробуйте ещё раз или выберите «Расширенный».",
+      "kk": "Жауап таңдалған ұзындыққа сыймады. Қайталап көріңіз немесе «Кеңейтілген» опциясын таңдаңыз.",
+      "en": "The reply didn't fit the selected length. Try again or choose Extended."
+    },
+    "context.import.error.too_many_profiles": {
+      "ru": "Можно сохранить до 24 профилей. Сначала удалите один.",
+      "kk": "24 профильге дейін сақтауға болады. Алдымен біреуін жойыңыз.",
+      "en": "Up to 24 profiles can be saved. Delete one first."
+    },
+    "context.limits": {
+      "ru": "До 24 профилей; до 8 документов в профиле; до 4 документов в одном запросе. Файл — до 8 МБ.",
+      "kk": "24 профильге дейін; профильде 8 құжатқа дейін; бір сұрауда 4 құжатқа дейін. Файл — 8 МБ-қа дейін.",
+      "en": "Up to 24 profiles; 8 documents per profile; 4 documents per request. Files up to 8 MB."
+    },
+    "context.profile.limits": {
+      "ru": "Название — до 80 символов; имя, профессия, компания и сфера — до 120; стиль — до 300; остальные поля — до 4000.",
+      "kk": "Атауы — 80 таңбаға дейін; аты, мамандығы, компаниясы және саласы — 120-ға дейін; стилі — 300-ге дейін; қалған өрістер — 4000-ға дейін.",
+      "en": "Name: up to 80 characters; person, occupation, company and industry: 120; style: 300; other fields: 4000."
+    }
+  }
+}

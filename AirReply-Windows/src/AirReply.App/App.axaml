@@ -2,5 +2,6 @@
              x:Class="AirReply.App.App" RequestedThemeVariant="Default">
   <Application.Styles>
     <FluentTheme />
+    <StyleInclude Source="avares://AIReply/Styles/Theme.axaml"/>
   </Application.Styles>
 </Application>

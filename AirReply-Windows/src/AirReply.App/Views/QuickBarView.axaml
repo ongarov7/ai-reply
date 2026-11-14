@@ -1,0 +1,108 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="AirReply.App.Views.QuickBarView" x:CompileBindings="False">
+  <Border Classes="card" Margin="16" Padding="20" CornerRadius="12">
+    <StackPanel Spacing="14">
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto" Name="DragHandle">
+        <Image Source="avares://AIReply/Assets/AIReply-256.png" Width="24" Height="24" Margin="0,0,10,0"/>
+        <TextBlock Grid.Column="1" Text="AI Reply" FontWeight="SemiBold" VerticalAlignment="Center"/>
+        <Button Grid.Column="2" Content="⚙" Classes="subtle" Click="OpenSettings" AutomationProperties.Name="{Binding [menu.settings]}" ToolTip.Tip="{Binding [menu.settings]}"/>
+        <Button Grid.Column="3" Content="✕" Classes="subtle" Click="HideBar" AutomationProperties.Name="{Binding [bar.close]}" ToolTip.Tip="{Binding [bar.close]}"/>
+      </Grid>
+      <StackPanel Spacing="10" IsVisible="{Binding SignedOut}">
+        <TextBlock Text="{Binding [signin.hint]}" TextWrapping="Wrap" Classes="secondary"/>
+        <TextBox Name="EmailField" Text="{Binding Email, Mode=TwoWay}" PlaceholderText="{Binding [signin.email.placeholder]}" IsVisible="{Binding !CodeSent}" IsEnabled="{Binding !IsBusy}" AutomationProperties.Name="{Binding [signin.email.placeholder]}"/>
+        <TextBlock Text="{Binding Email}" IsVisible="{Binding CodeSent}" Classes="secondary"/>
+        <TextBox Name="CodeField" Text="{Binding Code, Mode=TwoWay}" PlaceholderText="{Binding [signin.code.hint]}" IsVisible="{Binding CodeSent}" MaxLength="8" IsEnabled="{Binding !IsBusy}" AutomationProperties.Name="{Binding [signin.code.hint]}"/>
+        <Button Content="{Binding [signin.submit]}" Classes="accent" Command="{Binding SubmitCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+        <WrapPanel IsVisible="{Binding CodeSent}" Orientation="Horizontal">
+          <Button Content="{Binding [signin.resend]}" Classes="subtle" Command="{Binding ResendCommand}"/>
+          <Button Content="{Binding [signin.another_email]}" Classes="subtle" Click="AnotherEmail"/>
+        </WrapPanel>
+      </StackPanel>
+      <StackPanel Spacing="10" IsVisible="{Binding NeedsConsent}">
+        <TextBlock Text="{Binding [consent.title]}" FontSize="17" FontWeight="SemiBold"/>
+        <TextBlock Text="{Binding ConsentBody}" TextWrapping="Wrap"/>
+        <WrapPanel>
+          <Button Content="{Binding [consent.privacy]}" Classes="subtle" Click="OpenPrivacy"/>
+          <Button Content="{Binding [consent.terms]}" Classes="subtle" Click="OpenTerms"/>
+          <Button Content="{Binding [consent.accept]}" Classes="accent" Command="{Binding ConsentCommand}"/>
+        </WrapPanel>
+      </StackPanel>
+      <StackPanel Spacing="10" IsVisible="{Binding ShowEditor}">
+        <WrapPanel IsEnabled="{Binding CanEdit}">
+          <RadioButton Content="{Binding [bar.mode.message]}" IsChecked="{Binding !IsReply, Mode=TwoWay}" GroupName="mode" Margin="0,0,20,0"/>
+          <RadioButton Content="{Binding [bar.mode.reply]}" IsChecked="{Binding IsReply, Mode=TwoWay}" GroupName="mode"/>
+        </WrapPanel>
+        <StackPanel Spacing="8" IsVisible="{Binding IsReply}" IsEnabled="{Binding CanEdit}">
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Text="{Binding [bar.reply.source]}" Classes="secondary" VerticalAlignment="Center"/>
+            <Button Grid.Column="1" Content="✕" Classes="subtle" Click="DismissSource" AutomationProperties.Name="{Binding [copied.dismiss]}"/>
+          </Grid>
+          <TextBox Name="SourceField" Text="{Binding Source, Mode=TwoWay}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64" MaxHeight="140" AutomationProperties.Name="{Binding [bar.reply.source]}"/>
+          <WrapPanel>
+            <Button Content="{Binding [recipient.friend]}" Tag="Friend" Click="ReplyTo"/>
+            <Button Content="{Binding [recipient.client]}" Tag="Client" Click="ReplyTo"/>
+            <Button Content="{Binding [recipient.colleague]}" Tag="Work" Click="ReplyTo"/>
+            <Button Content="{Binding [recipient.partner]}" Tag="Business" Click="ReplyTo"/>
+          </WrapPanel>
+        </StackPanel>
+        <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding !ShowResult}">
+          <TextBox Name="DraftField" Text="{Binding Draft, Mode=TwoWay}" PlaceholderText="{Binding Placeholder}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64" MaxHeight="160" FontSize="17" IsEnabled="{Binding CanEdit}" AutomationProperties.Name="{Binding [bar.field.accessibility]}"/>
+          <StackPanel Grid.Column="1" Margin="8,0,0,0" Spacing="6">
+            <Button Content="↑" Classes="accent" Command="{Binding SubmitCommand}" ToolTip.Tip="{Binding [bar.send.help]}" AutomationProperties.Name="{Binding [bar.send]}"/>
+            <Button Content="●" Command="{Binding VoiceCommand}" IsEnabled="{Binding CanRecord}" ToolTip.Tip="{Binding [bar.mic]}" AutomationProperties.Name="{Binding [bar.mic]}"/>
+          </StackPanel>
+        </Grid>
+        <TextBlock Text="{Binding Counter}" Classes="caption" HorizontalAlignment="Right" IsVisible="{Binding !ShowResult}"/>
+        <Expander Header="{Binding [bar.context.title]}" IsVisible="{Binding Account.ContextAvailable}" IsEnabled="{Binding CanEdit}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+          <StackPanel Spacing="8" Margin="0,8,0,0">
+            <CheckBox Content="{Binding [bar.context.title]}" IsChecked="{Binding ContextEnabled, Mode=TwoWay}"/>
+            <ContentControl Name="ContextHost"/>
+            <TextBox Text="{Binding CustomInstructions, Mode=TwoWay}" PlaceholderText="{Binding [bar.instructions]}" AcceptsReturn="True" TextWrapping="Wrap" MaxHeight="100" AutomationProperties.Name="{Binding [bar.instructions]}"/>
+            <CheckBox Content="{Binding [bar.context.extended]}" IsChecked="{Binding Extended, Mode=TwoWay}"/>
+            <TextBlock Text="{Binding [bar.context.privacy]}" TextWrapping="Wrap" Classes="caption"/>
+          </StackPanel>
+        </Expander>
+      </StackPanel>
+      <StackPanel Spacing="10" IsVisible="{Binding ShowProgress}">
+        <ProgressBar IsIndeterminate="True" Height="3"/>
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock Text="{Binding ProgressText}" VerticalAlignment="Center"/>
+          <Button Grid.Column="1" Content="{Binding [voice.cancel]}" Classes="subtle" Click="CancelOperation"/>
+        </Grid>
+      </StackPanel>
+      <StackPanel Spacing="10" IsVisible="{Binding IsRecording}">
+        <TextBlock Text="{Binding [voice.recording]}" FontWeight="SemiBold"/>
+        <ProgressBar Name="VoiceLevel" Minimum="0" Maximum="1" Height="8"/>
+        <WrapPanel>
+          <Button Content="{Binding [voice.stop]}" Classes="accent" Command="{Binding VoiceCommand}"/>
+          <Button Content="{Binding [voice.cancel]}" Classes="subtle" Click="CancelOperation"/>
+        </WrapPanel>
+      </StackPanel>
+      <StackPanel Spacing="12" IsVisible="{Binding ShowResult}">
+        <ScrollViewer MaxHeight="260" HorizontalScrollBarVisibility="Disabled">
+          <SelectableTextBlock Name="ResultText" Text="{Binding Result}" TextWrapping="Wrap" FontSize="16"/>
+        </ScrollViewer>
+        <WrapPanel>
+          <Button Content="{Binding CopyLabel}" Classes="accent" Command="{Binding CopyCommand}" ToolTip.Tip="{Binding [result.copy.help]}"/>
+          <Button Content="{Binding [result.regenerate]}" Classes="subtle" Command="{Binding RegenerateCommand}"/>
+          <Button Content="{Binding [bar.new]}" Classes="subtle" Click="NewConversation"/>
+        </WrapPanel>
+      </StackPanel>
+      <Border Classes="issue" IsVisible="{Binding HasIssue}" Padding="12" CornerRadius="8">
+        <StackPanel Spacing="8">
+          <TextBlock Text="{Binding Issue}" TextWrapping="Wrap"/>
+          <WrapPanel>
+            <Button Content="{Binding [issue.action.retry]}" Command="{Binding RetryCommand}" IsVisible="{Binding CanRetry}"/>
+            <Button Name="SignInAgainButton" Content="{Binding [issue.action.sign_in_again]}" Classes="subtle" Click="SignInAgain" IsVisible="False"/>
+            <Button Content="{Binding [issue.action.plans]}" Classes="subtle" Click="OpenPlans" IsVisible="{Binding Account.SignedIn}"/>
+          </WrapPanel>
+        </StackPanel>
+      </Border>
+      <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding Account.SignedIn}">
+        <TextBlock Text="{Binding Account.Balance}" Classes="caption" VerticalAlignment="Center"/>
+        <Button Grid.Column="1" Content="{Binding Account.Email}" Classes="subtle" Click="OpenSettings"/>
+      </Grid>
+    </StackPanel>
+  </Border>
+</UserControl>
