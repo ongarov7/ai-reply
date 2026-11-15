@@ -96,16 +96,37 @@ The helper forces production, version 1.2.3 and code 7, preserves older AABs,
 and verifies the existing upload certificate. It does not upload or publish.
 The expected output is:
 `app/build/play-production/AIReply-1.2.3-code7-production-signed.aab`.
-Confirm that code 7 is still unused in Play Console before uploading.
-The upload keystore was not found in this Mac's Downloads, Documents, Desktop
-or workspace. The existing key remains on the owner's other Mac; no signing
-key reset or replacement was performed.
+Code 7 has now been submitted to Play; do not upload it again. Future releases
+need a higher version code.
+The original upload key is present on this Mac at the ignored path
+`outputs/store-release-2026-10-10/signing/ai-reply-upload.p12`, alias
+`ai-reply-upload`, with the existing password file beside it. The earlier
+statement that the key was unavailable was incorrect: the `.p12` file had been
+overlooked. Its certificate was verified against the existing Play upload
+certificate (`55:D8:6D:5B:8C:5F:DE:F2:53:F5:B7:B2:A1:16:49:95:3D:25:8C:CD:93:4E:F1:DA:B9:97:88:72:70:F9:87:DC`).
+An unnecessary replacement request was submitted and then cancelled in Play
+Console; the pending replacement banner disappeared. Use the original key.
+A protected local copy is kept outside the repository under
+`~/Library/Application Support/AI Reply/Android Signing/existing-play-upload/`.
+Never commit the keystore or password file.
 
 ## Play Console inspection
 
-The production release is still 1.2.2 (6), rolled out to 100%. Pro Monthly and
-Pro Yearly each have one active base plan; legacy Base Monthly has none. No
-subscription or pricing configuration was changed during this inspection.
+Production 1.2.3 (7), release 3, was submitted through the owner's Play Console
+on 15 November 2026. Console shows "Изменения на проверке" for one production
+change, with 100% rollout after approval and managed publishing off. At
+submission the automatic common-problem checks were running (up to 14 minutes);
+Google will send the change onward automatically if those checks pass.
+Production 1.2.2 (6) remains the published release while review is pending.
+Countries remain Kazakhstan, Kyrgyzstan and Uzbekistan. Device support is
+unchanged. There were no blocking errors; the one warning recommends native
+debug symbols. ReTrace mapping is attached.
+
+Pro Monthly and Pro Yearly each have one active base plan; legacy Base Monthly
+has none. No subscription or pricing configuration was changed. The attempted
+service-account API submission uploaded and staged code 7 but validation
+returned 403; it was not committed. The actual submission used the owner's
+Console account instead. Existing closed testing tracks were not changed.
 
 The dashboard notification says to confirm trader status by 1 February 2027.
 Under Account settings > Developer account > About you, the current status is
@@ -134,18 +155,23 @@ from whether a subscription exists.
   Continue. QA did not request an email or create an account.
 - Independent code review found no P1/P2 regression in the hotfix.
 
-Local debug APK and screenshots are under the ignored directory
-`outputs/android-auth-hotfix-2026-11-15/`. The APK is for UI review, not Play
-upload. The final production AAB passed the guarded build, R8 and release
-checks. The actual bundled manifest is `kz.yerek.aireply`, version 1.2.3/code 7,
-not debuggable; its DEX includes the real production Web Client ID. The AAB is
-unsigned, 14,425,271 bytes, with SHA-256:
+The fresh production AAB passed the guarded build, R8, release Google setup
+gate, bundletool validation and signature verification. Its bundled manifest
+is `kz.yerek.aireply`, version 1.2.3/code 7, not debuggable, SDK 26/36; the DEX
+includes the production Web Client ID. Fresh targeted Android authentication
+tests passed (22 tests), as did the backend Google authentication and billing
+tests. The Pro Monthly and Pro Yearly plans were confirmed active through Play.
+
+The AAB signed with the original upload key is
+`AI-Reply-Android/app/build/play-production/AIReply-1.2.3-code7-production-signed.aab`,
+14,442,549 bytes, with SHA-256:
 
 ```text
-cac6b865b88ef78586654fc47bcfc8f7294a70e9edaa7a5358593fc1aa9c5751
+61825b9f9593270d8203b47f37d77c1d6afaf146d182a8bcecf383a91ae33960
 ```
 
-Artifact metadata and the decoded bundled manifest are saved in the local
-output directory. The owner will sign and upload from the existing signing
-Mac. No upload-key reset is needed. No release has been signed, uploaded or
-published here. End-to-end Google sign-in remains unverified.
+Current artifact metadata and release evidence are saved under the ignored
+directory `outputs/android-release-2026-11-15/`. A separate AAB signed with
+the cancelled replacement key must not be uploaded. End-to-end Google sign-in
+and an actual purchase remain unverified: no Android device was available,
+and the owner requested release without that physical-device check.
