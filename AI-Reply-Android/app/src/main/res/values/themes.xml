@@ -3,16 +3,16 @@
 
     <!--
         The Activity theme exists to paint the launch window, nothing else.
-        Every pixel after the first frame is Compose's. Matching the window
-        background to the Compose page background is what stops the white flash
-        a dark-mode user would otherwise see on every launch.
+        The app and its keyboard always use the same light palette, including
+        the launch window when Android's system theme is dark.
     -->
-    <style name="Theme.AIReply" parent="android:Theme.Material.Light.NoActionBar">
+    <style name="Theme.AIReply.Base" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">@color/window_background</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">true</item>
     </style>
+    <style name="Theme.AIReply" parent="Theme.AIReply.Base" />
 
     <!--
         VoicePermissionActivity. It shows the system permission dialog and

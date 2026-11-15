@@ -110,6 +110,7 @@ fun VerifyCodeScreen(
                 code = digits
                 if (digits.length == OtpCode.LENGTH) submit(digits)
             },
+            enabled = !state.busy,
             singleLine = true,
             isError = state.errorMessage != null,
             textStyle = TextStyle(fontSize = 28.sp, letterSpacing = 8.sp, textAlign = TextAlign.Center),
@@ -137,6 +138,7 @@ fun VerifyCodeScreen(
         PrimaryButton(
             text = stringResource(R.string.account_code_confirm),
             enabled = code.length == OtpCode.LENGTH && !state.busy,
+            loading = state.busy,
             onClick = { submit(code) }
         )
 

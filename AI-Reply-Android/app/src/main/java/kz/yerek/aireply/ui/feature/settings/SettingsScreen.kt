@@ -25,9 +25,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -54,7 +51,6 @@ import kz.yerek.aireply.analytics.ProductEvents
 import kz.yerek.aireply.core.lang.KeyboardLanguage
 import kz.yerek.aireply.ui.feature.account.AccountSection
 import kz.yerek.aireply.core.lang.AppLanguage
-import kz.yerek.aireply.data.settings.AppearancePreference
 import kz.yerek.aireply.ui.LocalServices
 import kz.yerek.aireply.ui.common.AppScreen
 import kz.yerek.aireply.ui.common.Footnote
@@ -95,7 +91,6 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit, focusSection: S
         }
     }
 
-    var appearance by remember { mutableStateOf(services.settings.appearance) }
     var language by remember { mutableStateOf(services.settings.appLanguage) }
     var layouts by remember { mutableStateOf(services.settings.enabledKeyboardLanguages) }
     var haptics by remember { mutableStateOf(services.settings.keyboardHaptics) }
@@ -180,34 +175,6 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit, focusSection: S
                 }
                 Footnote(stringResource(R.string.settings_smart_correction_footer))
                 Footnote(stringResource(R.string.settings_smart_correction_attribution))
-            }
-
-            AppSection(stringResource(R.string.settings_appearance)) {
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                    AppearancePreference.entries.forEachIndexed { index, option ->
-                        SegmentedButton(
-                            selected = appearance == option,
-                            onClick = {
-                                appearance = option
-                                services.settings.appearance = option
-                            },
-                            shape = SegmentedButtonDefaults.itemShape(
-                                index = index,
-                                count = AppearancePreference.entries.size
-                            )
-                        ) {
-                            Text(
-                                stringResource(
-                                    when (option) {
-                                        AppearancePreference.SYSTEM -> R.string.settings_appearance_system
-                                        AppearancePreference.LIGHT -> R.string.settings_appearance_light
-                                        AppearancePreference.DARK -> R.string.settings_appearance_dark
-                                    }
-                                )
-                            )
-                        }
-                    }
-                }
             }
 
             AppSection(stringResource(R.string.settings_language)) {

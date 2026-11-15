@@ -27,8 +27,8 @@ signing_jdk="${JAVA_HOME:-/Applications/Android Studio.app/Contents/jbr/Contents
 cd "$android_root"
 output_dir="$android_root/app/build/play-production"
 mkdir -p "$output_dir"
-unsigned_output="$output_dir/AIReply-1.2.2-code6-production-unsigned.aab"
-signed_output="$output_dir/AIReply-1.2.2-code6-production-signed.aab"
+unsigned_output="$output_dir/AIReply-1.2.3-code7-production-unsigned.aab"
+signed_output="$output_dir/AIReply-1.2.3-code7-production-signed.aab"
 if [[ "$unsigned_only" == false && -e "$signed_output" ]]; then
   echo 'The signed production output already exists. Review it before building again.' >&2
   exit 2
@@ -42,20 +42,20 @@ gradle.projectsEvaluated {
     def appProject = gradle.rootProject.findProject(":app")
     appProject.tasks.named("signReleaseBundle").configure {
         finalBundleFile.set(new File(appProject.layout.buildDirectory.get().asFile,
-                "play-production/AIReply-1.2.2-code6-production-unsigned.aab"))
+                "play-production/AIReply-1.2.3-code7-production-unsigned.aab"))
     }
 }
 GRADLE
 
 # Explicit properties override local settings. No signing passwords are command arguments.
 JAVA_HOME="$signing_jdk" ./gradlew --offline --no-daemon --no-configuration-cache bundleRelease \
-  -Paireply.backend=production -Paireply.versionCode=6 -Paireply.versionName=1.2.2 \
+  -Paireply.backend=production -Paireply.versionCode=7 -Paireply.versionName=1.2.3 \
   --init-script "$init_script"
 build_config='app/build/generated/source/buildConfig/release/kz/yerek/aireply/BuildConfig.java'
 grep -Fq 'BACKEND_ENVIRONMENT = "production"' "$build_config"
 grep -Fq 'BACKEND_BASE_URL = "https://ai-reply.kz"' "$build_config"
-grep -Fq 'VERSION_CODE = 6;' "$build_config"
-grep -Fq 'VERSION_NAME = "1.2.2"' "$build_config"
+grep -Fq 'VERSION_CODE = 7;' "$build_config"
+grep -Fq 'VERSION_NAME = "1.2.3"' "$build_config"
 [[ -f "$unsigned_output" ]] || { echo 'Production AAB was not produced.' >&2; exit 1; }
 shasum -a 256 "$unsigned_output" > "$unsigned_output.sha256"
 if [[ "$unsigned_only" == true ]]; then

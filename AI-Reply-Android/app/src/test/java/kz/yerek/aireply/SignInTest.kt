@@ -83,6 +83,8 @@ class SignInTest {
         assertFalse(GoogleSignInClient.isValidClientId(".apps.googleusercontent.com"))
         assertFalse(GoogleSignInClient.isValidClientId("1234-abc"))
         assertFalse(GoogleSignInClient.isValidClientId("1234 abc.apps.googleusercontent.com"))
+        assertFalse(GoogleSignInClient.isValidClientId("1234@abc.apps.googleusercontent.com"))
+        assertFalse(GoogleSignInClient.isValidClientId("1234-abc.apps.googleusercontent.com\n"))
     }
 
     // ---------------------------------------------------------- messages

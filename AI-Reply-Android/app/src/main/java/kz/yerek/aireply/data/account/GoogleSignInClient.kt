@@ -99,7 +99,7 @@ class GoogleSignInClient(
     }
 
     companion object {
-        private const val SUFFIX = ".apps.googleusercontent.com"
+        private val CLIENT_ID = Regex("[0-9A-Za-z._-]+\\.apps\\.googleusercontent\\.com")
 
         /** The button flow may mark its credential with the "Sign in with Google" subtype. */
         private val GOOGLE_ID_TOKEN_TYPES = setOf(
@@ -107,7 +107,6 @@ class GoogleSignInClient(
             GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_SIWG_CREDENTIAL
         )
 
-        fun isValidClientId(value: String): Boolean =
-            value.length > SUFFIX.length && value.endsWith(SUFFIX) && value.none(Char::isWhitespace)
+        fun isValidClientId(value: String): Boolean = CLIENT_ID.matches(value)
     }
 }

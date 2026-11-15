@@ -1,0 +1,1 @@
+The app and keyboard now always use a light theme, even when your phone uses dark mode. Consent text is easier to read; tap its label to toggle a checkbox. Restored the Google sign-in button. Email code requests and verification show a loading indicator.

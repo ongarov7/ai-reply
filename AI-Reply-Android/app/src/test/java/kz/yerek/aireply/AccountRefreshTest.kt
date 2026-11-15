@@ -1,5 +1,6 @@
 package kz.yerek.aireply
 
+import android.app.Application
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -12,6 +13,7 @@ import kz.yerek.aireply.data.account.AccountService
 import kz.yerek.aireply.data.account.AccountUsageCache
 import kz.yerek.aireply.data.account.ApiClient
 import kz.yerek.aireply.data.account.DeviceDescriptor
+import kz.yerek.aireply.data.account.GoogleSignInClient
 import kz.yerek.aireply.data.account.LegalConfigDto
 import kz.yerek.aireply.data.account.LegalConsentDto
 import kz.yerek.aireply.data.legal.LegalConsentStore
@@ -58,11 +60,12 @@ class AccountRefreshTest {
     private val loadedUsers = mutableListOf<String>()
     private val signedOut = mutableListOf<Boolean>()
 
-    private fun controller() = AccountController(
+    private fun controller(google: GoogleSignInClient? = null) = AccountController(
         service = service,
         credentials = credentials,
         usageCache = AccountUsageCache(settings),
         legalConsentStore = legal,
+        google = google,
         observer = object : AccountObserver {
             override fun onAccountLoaded(userId: String) {
                 loadedUsers += userId
@@ -116,6 +119,28 @@ class AccountRefreshTest {
     }
 
     // ------------------------------------------------------- a late answer
+
+    @Test
+    fun `google stays hidden without a configured client even in debug`() {
+        assertFalse(controller().offersGoogle)
+        val google = GoogleSignInClient(Application(), "")
+        assertFalse(controller(google).offersGoogle)
+    }
+
+    @Test
+    fun `google requires a configured client and an enabled server feature`() = runBlocking {
+        val google = GoogleSignInClient(Application(), "123-web.apps.googleusercontent.com")
+        val account = controller(google)
+        assertTrue(account.offersGoogle)
+
+        answer = { FakeResponse(200, """{"features":{"google_sign_in":false}}""") }
+        account.loadServerConfig()
+        assertFalse("the server can disable Google", account.offersGoogle)
+
+        answer = { FakeResponse(200, """{"features":{"google_sign_in":true}}""") }
+        account.loadServerConfig()
+        assertTrue(account.offersGoogle)
+    }
 
     @Test
     fun `an account answer that arrives after sign-out changes nothing`() = runBlocking {

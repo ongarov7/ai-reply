@@ -148,13 +148,12 @@ class AccountController(
 
     /**
      * "Continue with Google" needs this build's OAuth client id and a server
-     * that verifies Google tokens. Debug builds show it regardless so the
-     * screen can be reviewed before the client id exists; tapping it then says
-     * the option is unavailable.
+     * that verifies Google tokens. Debug uses the same rule as release so
+     * testing the sign-in screen exposes missing build configuration.
      */
     val offersGoogle: Boolean
         get() {
-            val configured = BuildConfig.DEBUG || google?.isConfigured == true
+            val configured = google?.isConfigured == true
             return configured && (_state.value.features?.googleSignIn ?: true)
         }
 

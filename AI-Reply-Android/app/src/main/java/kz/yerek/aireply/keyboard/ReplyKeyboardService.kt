@@ -30,6 +30,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -62,7 +63,6 @@ import kz.yerek.aireply.core.lang.KeyboardLanguage
 import kz.yerek.aireply.core.lang.KeyboardPlane
 import kz.yerek.aireply.core.lang.TemplateNaming
 import kz.yerek.aireply.data.account.LegalConfigDto
-import kz.yerek.aireply.data.settings.AppearancePreference
 import kz.yerek.aireply.data.settings.DeviceStateStore
 import kz.yerek.aireply.domain.model.ReplyConfiguration
 import kz.yerek.aireply.domain.model.ReplyTemplate
@@ -219,7 +219,6 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
     private val shift = ShiftState()
     private var shiftMode by mutableStateOf(ShiftState.Mode.OFF)
     private var uiLanguage by mutableStateOf(AppLanguage.ENGLISH)
-    private var appearance by mutableStateOf(AppearancePreference.SYSTEM)
     private var chips by mutableStateOf<List<TemplateSummary>>(emptyList())
     private var selectedTemplateId by mutableStateOf<String?>(null)
     private var focus by mutableStateOf(PanelFocus.INSTRUCTION)
@@ -308,7 +307,6 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         enabledLanguages = services.settings.enabledKeyboardLanguages
         language = services.settings.keyboardLanguage
         uiLanguage = services.settings.effectiveAppLanguage
-        appearance = services.settings.appearance
         // Chip names cached by a build before the recipients were renamed are
         // rebuilt before the first frame draws them - a file read once per
         // install, never on a key press.
@@ -336,18 +334,26 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
             return existing
         }
         val view = ComposeView(this).apply {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) isForceDarkAllowed = false
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
             setContent { KeyboardContent() }
         }
         viewHost.attachTo(view)
         // Compose also looks the owners up from the window's decor view.
-        window?.window?.decorView?.let { viewHost.attachTo(it) }
+        window?.window?.decorView?.let {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) it.isForceDarkAllowed = false
+            viewHost.attachTo(it)
+        }
         inputView = view
         return view
     }
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
+        window?.window?.let { imeWindow ->
+            WindowCompat.getInsetsController(imeWindow, imeWindow.decorView)
+                .isAppearanceLightNavigationBars = true
+        }
         // Shown again over the same field, the app passes the same EditorInfo.
         if (restarting || info == null || info !== hostField.editorInfo) hostInput++
         hostField.startInput(info, restarting)
@@ -503,15 +509,8 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         val density = LocalDensity.current.density
         val fontScale = LocalDensity.current.fontScale
 
-        val theme = KeyboardTheme.resolve(
-            systemIsDark = (configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
-                android.content.res.Configuration.UI_MODE_NIGHT_YES,
-            override = when (appearance) {
-                AppearancePreference.SYSTEM -> null
-                AppearancePreference.LIGHT -> false
-                AppearancePreference.DARK -> true
-            }
-        )
+        // Keep the app and its keyboard in the same fixed light appearance.
+        val theme = KeyboardTheme(isDark = false)
 
         val screenHeight = configuration.screenHeightDp.toFloat()
         // The tallest the window can be and what lies under the keys: what
@@ -571,7 +570,7 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
             languages = enabledLanguages
         )
 
-        AIReplyTheme(appearance = appearance) {
+        AIReplyTheme {
             KeyboardRoot(
                 theme = theme,
                 keys = keys,
@@ -1804,7 +1803,6 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
             compose.uiLanguage = language
             chips = cachedChips()
         }
-        appearance = services.settings.appearance
         reportsEnabled = AILimits.features.aiReports
         voiceOffered = services.voiceTranscriber.isOffered
         feedback.hapticsEnabled = services.settings.keyboardHaptics

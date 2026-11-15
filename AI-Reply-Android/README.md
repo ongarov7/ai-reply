@@ -51,6 +51,14 @@ finger, and this project contains no accessibility service that could press it.
 Everything else in the reply flow is the same on both, down to the state
 machine. `docs/IOS_ANDROID_PARITY.md` records every difference, with reasons.
 
+### Appearance
+
+The Android app and keyboard always use the light palette, including when
+Android or the host app uses dark mode. A saved Dark preference from an older
+version has no effect, and Settings no longer offers an appearance selector.
+The launch window and system bars use light styles; automatic Force Dark is
+disabled on supported API levels.
+
 ---
 
 ## Build
@@ -88,17 +96,19 @@ as long as the Compose BOM and the Compose compiler plugin move with Kotlin.
 ```
 
 Each Play upload needs a higher `versionCode`. The current release defaults are
-6 / "1.2.2". A subsequent upload can override them:
+7 / "1.2.3". A subsequent upload can override them:
 
 ```bash
-./gradlew bundleRelease -Paireply.versionCode=7 -Paireply.versionName=1.2.3
+./gradlew bundleRelease -Paireply.versionCode=8 -Paireply.versionName=1.2.4
 ```
 
-A release build without `app/google-services.json` (no push) or without a
-Google web client id (no "Continue with Google") still builds, but prints a
-warning, since a store upload without them is almost always a mistake.
+A release build without `app/google-services.json` warns that push is absent.
+Release APK/AAB packaging requires a Google Web client ID; a missing ID or
+the repository's known iOS ID stops packaging. Debug, lint and unit tests can
+run without one. The public production Web client ID is the checked-in
+default, so a clean checkout does not need local OAuth configuration.
 
-For the public 1.2.2 release, the guarded helper forces production/code 6,
+For the public 1.2.3 hotfix, the guarded helper forces production/code 7,
 preserves older bundles and checks the existing upload certificate:
 
 ```bash
@@ -108,7 +118,7 @@ preserves older bundles and checks the existing upload certificate:
 ```
 
 Outputs are under `app/build/play-production/`. The helper never uploads or
-publishes a release. See [the 1.2.2 production handoff](docs/release/1.2.2/RELEASE.md).
+publishes a release. See [the 1.2.3 hotfix handoff](docs/release/1.2.3/RELEASE.md).
 
 ### Google Play sandbox build
 
@@ -162,8 +172,17 @@ The account screen offers **Continue with Google** (Credential Manager,
 removed. The server verifies the Google ID token and the code; the app only
 forwards them. Setup, in full: `../ai-reply-back-end/docs/AUTH.md`.
 
-Google needs the OAuth client of type *Web application* at build time (it is
-not a secret, but it differs per environment, so it is not checked in):
+Google uses this public **Web application** OAuth client in project
+`ai-reply-4bf8f` (`307300959376`) by default:
+
+```text
+307300959376-50l6atnfem2hsi62uguhm9hisrncnlh8.apps.googleusercontent.com
+```
+
+The ID is included in the source and every APK. A signing Mac needs no local
+override for production. For another environment, the first configured value
+wins: Gradle property (`-P` or `~/.gradle/gradle.properties`), `local.properties`,
+`GOOGLE_WEB_CLIENT_ID`, then the checked-in default:
 
 ```bash
 # local.properties (git-ignored) or ~/.gradle/gradle.properties
@@ -172,9 +191,30 @@ aireply.googleWebClientId=1234-abc.apps.googleusercontent.com
 # or: GOOGLE_WEB_CLIENT_ID=… ./gradlew assembleRelease
 ```
 
-Google Cloud also needs an *Android* OAuth client for `kz.yerek.aireply` with
-the SHA-1 of every signing key (debug, upload, Play App Signing). Without a web
-client id, release builds hide the Google button.
+The production server now uses the same Web ID. Three Android OAuth clients
+for `kz.yerek.aireply` were created using the certificate SHA-1 values in Play
+Console. A local debug signature needs its own matching Android OAuth client
+if used to test real sign-in. An explicit empty override hides the Google
+button in debug and stops release packaging. Debug
+uses the same availability rule as release; it cannot mask missing setup by
+showing a nonfunctional Google button.
+
+Before packaging, check configuration with:
+
+```bash
+./gradlew :app:checkReleaseGoogleSignIn
+```
+
+The resulting ID must match `GOOGLE_CLIENT_ID_WEB` on the backend. Passing
+the build check does not verify the Android client's Play app-signing
+certificate or complete an actual sign-in. Confirm the full flow with the
+application downloaded from Play; this physical-device check is pending.
+
+Google Cloud's audience remains External/Testing. For the current Sign in
+with Google flow, which requests only a basic identity ID token, Google
+explicitly exempts users from the Testing allowlist; publishing is not required
+specifically to remove that restriction. This does not extend to additional
+OAuth scopes. See [Manage App Audience](https://support.google.com/cloud/answer/15549945?hl=en).
 
 Keyboard vibration: Settings ▸ Keyboard ▸ *Vibration on key press* (on by
 default). The system's own keypress-vibration setting still applies on top.
@@ -443,8 +483,9 @@ failure that is otherwise silent until a Kazakh user sees an English sentence.
 `testDebugUnitTest` pass on macOS, and the keyboard was used on a Pixel 6
 emulator (API 34) with the debug mock transport: Kazakh typing, the `?123` page,
 long press, and the whole Reply → edit → Regenerate → Insert flow. Not tried
-yet: multi-touch rollover, delete repeat, the space-bar trackpad, TalkBack, the
-dark theme and landscape.
+yet: multi-touch rollover, delete repeat, the space-bar trackpad, TalkBack and
+landscape. The app and keyboard now always use light appearance; system night
+mode and a legacy saved Dark preference were checked during the 1.2.3 hotfix.
 
 **Debug builds can answer without the network.** Settings ▸ Developer ▸ Mock AI
 replies (debug builds only) returns canned Kazakh, Russian and English replies;

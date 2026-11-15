@@ -53,7 +53,7 @@ object AppColors {
 
     val SeparatorLight = Color(0xFFC6C6C8)
     val TextPrimaryLight = Color(0xFF000000)
-    val TextSecondaryLight = Color(0xFF8A8A8E)
+    val TextSecondaryLight = Color(0xFF636366)
     val TextTertiaryLight = Color(0xFFC0C0C4)
 
     // Dark -------------------------------------------------------------------

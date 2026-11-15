@@ -76,6 +76,7 @@ fun EmailSignInScreen() {
             value = email,
             onValueChange = { email = it.trimStart() },
             label = { Text(stringResource(R.string.account_email_placeholder)) },
+            enabled = !state.busy,
             singleLine = true,
             isError = state.errorMessage != null,
             keyboardOptions = KeyboardOptions(
@@ -102,6 +103,7 @@ fun EmailSignInScreen() {
             PrimaryButton(
                 text = stringResource(R.string.account_continue),
                 enabled = plausible && !state.busy,
+                loading = state.busy,
                 onClick = ::submit
             )
             SecondaryButton(

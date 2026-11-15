@@ -3,24 +3,21 @@ package kz.yerek.aireply
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kz.yerek.aireply.core.lang.AppLanguage
 import kz.yerek.aireply.core.lang.LocalizedContext
-import kz.yerek.aireply.data.settings.AppearancePreference
 import kz.yerek.aireply.platform.ReplyLog
 import kz.yerek.aireply.push.AppLink
 import kz.yerek.aireply.push.PushPayload
@@ -58,7 +55,15 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        // auto() would still choose a dark navigation scrim on API 26–28
+        // from Android's night mode. These bars belong to our light UI.
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.BLACK),
+            navigationBarStyle = SystemBarStyle.light(getColor(R.color.window_background), Color.BLACK)
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.decorView.isForceDarkAllowed = false
+        }
 
         val services = AIReplyApplication.services(this)
         // The keyboard may have run since this screen was last open, and it
@@ -77,28 +82,15 @@ class MainActivity : ComponentActivity() {
         val debugScreen = if (BuildConfig.DEBUG) intent?.getStringExtra(EXTRA_DEBUG_SCREEN) else null
 
         setContent {
-            // Built once: a Flow made during composition would be rebuilt, and
-            // re-subscribed, on every recomposition.
-            val appearanceChanges = remember {
-                services.settings.changes().map { services.settings.appearance }
-            }
-            val appearance by appearanceChanges.collectAsState(initial = services.settings.appearance)
-            val systemDark = isSystemInDarkTheme()
-            val dark = when (appearance) {
-                AppearancePreference.SYSTEM -> systemDark
-                AppearancePreference.LIGHT -> false
-                AppearancePreference.DARK -> true
-            }
-
             SideEffect {
                 WindowCompat.getInsetsController(window, window.decorView).apply {
-                    isAppearanceLightStatusBars = !dark
-                    isAppearanceLightNavigationBars = !dark
+                    isAppearanceLightStatusBars = true
+                    isAppearanceLightNavigationBars = true
                 }
             }
 
             CompositionLocalProvider(LocalServices provides services) {
-                AIReplyTheme(appearance = appearance) {
+                AIReplyTheme {
                     AppNavHost(debugScreen = debugScreen)
                 }
             }
