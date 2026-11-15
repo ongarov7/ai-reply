@@ -101,6 +101,7 @@
     if (options.headers) {
       for (var name in options.headers) init.headers[name] = options.headers[name];
     }
+    if (options.signal) init.signal = options.signal;
     var response = await fetch(appPath("/api/v1/admin") + path, init);
     if (response.status === 401) { location.href = appPath("/admin/login"); throw new Error("unauthorized"); }
     var payload = null;
@@ -470,40 +471,192 @@
   var Dashboard = {
     components: { LineChart: LineChart, BarChart: BarChart, DonutChart: DonutChart },
     data: function () {
-      return { loading: true, data: null, range: "30d", from: "", to: "", error: "" };
+      return { loading: true, data: null, range: "30d", from: "", to: "", appliedFrom: "", appliedTo: "",
+        dateDraftEdited: false, dateError: "", error: "", refreshing: false, autoRefresh: true,
+        lastUpdated: "", refreshTimer: null, batchTimer: null, batchController: null, visibilityHandler: null, stopped: false,
+        requestVersion: 0, pendingRefresh: false, product: "", purchasePage: 1, purchaseLimit: 10,
+        purchaseRows: [], purchaseTotal: 0, historyLoaded: false };
     },
-    mounted: function () { this.load(); },
+    computed: {
+      breakdown: function () { return (this.data && this.data.purchase_breakdown) || []; },
+      productOptions: function () {
+        var rows = this.breakdown.slice();
+        if (this.product && !rows.some(row => row.product_code === this.product)) {
+          rows.push({ product_code: this.product, name: this.product });
+        }
+        return rows;
+      },
+      purchasePages: function () { return Math.max(1, Math.ceil(this.purchaseTotal / this.purchaseLimit)); },
+      receivedAmounts: function () {
+        var totals = {};
+        this.breakdown.forEach(function (row) {
+          (row.amounts || []).forEach(function (amount) {
+            totals[amount.currency] = (totals[amount.currency] || 0) + amount.amount_milliunits;
+          });
+        });
+        return Object.keys(totals).sort().map(currency => ({ currency: currency, amount_milliunits: totals[currency] }));
+      },
+      unknownPrices: function () {
+        return this.breakdown.reduce((sum, row) => sum + (row.unknown_price_purchases || 0), 0);
+      }
+    },
+    mounted: function () {
+      this.visibilityHandler = () => {
+        this.clearRefreshTimer();
+        if (!document.hidden && this.autoRefresh) this.load();
+      };
+      document.addEventListener("visibilitychange", this.visibilityHandler);
+      this.load();
+    },
+    beforeUnmount: function () {
+      this.stopped = true;
+      this.requestVersion++;
+      this.pendingRefresh = false;
+      this.clearRefreshTimer();
+      if (this.batchController) this.batchController.abort();
+      if (this.batchTimer !== null) clearTimeout(this.batchTimer);
+      document.removeEventListener("visibilitychange", this.visibilityHandler);
+    },
     methods: {
-      t: t, nf: nf, money: money,
+      t: t, tf: tf, nf: nf, money: money, appPath: appPath, shortID: shortID,
+      amount: function (value, currency, divisor) {
+        if (!currency || value === null || value === undefined) return t("admin.dashboard.price_unknown");
+        try {
+          return new Intl.NumberFormat(state.locale === "kk" ? "kk-KZ" : state.locale,
+            { style: "currency", currency: currency, minimumFractionDigits: 0, maximumFractionDigits: 3 }).format(value / divisor);
+        } catch (e) { return nf(value / divisor) + " " + currency; }
+      },
+      productKind: function (kind) {
+        return ["pack", "pass", "subscription"].indexOf(kind) >= 0 ? t("admin.iap.kind." + kind) : kind;
+      },
+      providerName: function (provider) {
+        if (provider === "bcc") return "BCC";
+        return ["app_store", "google_play"].indexOf(provider) >= 0 ? t("admin.iap.provider." + provider) : provider;
+      },
+      userPath: function (userID) { return "/admin/users/" + encodeURIComponent(userID); },
+      clearRefreshTimer: function () {
+        if (this.refreshTimer !== null) clearTimeout(this.refreshTimer);
+        this.refreshTimer = null;
+      },
+      scheduleRefresh: function () {
+        this.clearRefreshTimer();
+        if (!this.stopped && this.autoRefresh && !document.hidden) {
+          this.refreshTimer = setTimeout(() => { this.refreshTimer = null; this.load(); }, 30000);
+        }
+      },
+      toggleRefresh: function () { this.scheduleRefresh(); },
       async load() {
-        this.loading = true;
+        this.clearRefreshTimer();
+        this.requestVersion++;
+        // Keep one request batch in flight. Range/product/page changes replace
+        // the pending batch; an older response cannot overwrite that choice.
+        if (this.refreshing) {
+          this.pendingRefresh = true;
+          if (this.batchController) this.batchController.abort();
+          return;
+        }
+        if (this.stopped) return;
+        this.refreshing = true;
+        this.loading = !this.data;
+        var version = this.requestVersion;
+        var requestedPage = this.purchasePage;
+        var controller = new AbortController();
+        this.batchController = controller;
+        this.batchTimer = setTimeout(() => { controller.abort(); }, 15000);
         try {
           var query = "?range=" + encodeURIComponent(this.range);
-          if (this.range === "custom") query += "&from=" + this.from + "&to=" + this.to;
-          this.data = await api("/dashboard" + query);
-          this.from = this.data.range.from;
-          this.to = this.data.range.to;
-        } catch (e) { this.error = e.message; toast("danger", t("common.error")); }
-        this.loading = false;
+          if (this.range === "custom") query += "&from=" + encodeURIComponent(this.appliedFrom) + "&to=" + encodeURIComponent(this.appliedTo);
+          var historyQuery = query + "&product=" + encodeURIComponent(this.product) + "&page=" + requestedPage + "&limit=" + this.purchaseLimit;
+          // Wait for both requests even if one fails, before starting a queued
+          // batch. One failed endpoint must not leave its sibling overlapping.
+          var responses = await Promise.allSettled([
+            api("/dashboard" + query, { signal: controller.signal }),
+            api("/dashboard/purchases" + historyQuery, { signal: controller.signal })
+          ]);
+          var failed = responses.find(result => result.status === "rejected");
+          if (failed) throw failed.reason;
+          var results = responses.map(result => result.value);
+          if (this.stopped || version !== this.requestVersion) return;
+          this.data = results[0];
+          this.purchaseRows = results[1].purchases || [];
+          this.purchaseTotal = results[1].total;
+          this.historyLoaded = true;
+          this.error = "";
+          this.lastUpdated = clock(new Date());
+          if (!this.dateDraftEdited) {
+            this.from = this.data.range.from;
+            this.to = this.data.range.to;
+          }
+          this.appliedFrom = this.data.range.from;
+          this.appliedTo = this.data.range.to;
+          // A refund or a changed filter can remove the last page.
+          if (requestedPage > this.purchasePages) {
+            this.purchasePage = this.purchasePages;
+            this.pendingRefresh = true;
+          }
+        } catch (e) {
+          if (!this.stopped && version === this.requestVersion) this.error = t("admin.dashboard.refresh_error");
+        } finally {
+          if (this.batchTimer !== null) clearTimeout(this.batchTimer);
+          this.batchTimer = null;
+          this.batchController = null;
+          if (this.stopped) return;
+          this.refreshing = false;
+          this.loading = false;
+          if (!this.stopped && this.pendingRefresh) {
+            this.pendingRefresh = false;
+            this.load();
+          } else this.scheduleRefresh();
+        }
       },
-      setRange(key) { this.range = key; this.load(); },
-      applyCustom() { this.range = "custom"; this.load(); }
+      clearRangeView: function () {
+        this.data = null; this.loading = true; this.lastUpdated = "";
+        this.purchaseRows = []; this.purchaseTotal = 0; this.historyLoaded = false;
+      },
+      setRange(key) {
+        this.range = key; this.purchasePage = 1; this.dateDraftEdited = false; this.dateError = "";
+        this.clearRangeView(); this.load();
+      },
+      applyCustom() {
+        if (!this.from || !this.to || this.from > this.to) { this.dateError = t("admin.dashboard.invalid_dates"); return; }
+        this.appliedFrom = this.from; this.appliedTo = this.to;
+        this.range = "custom"; this.purchasePage = 1; this.dateDraftEdited = false; this.dateError = "";
+        this.clearRangeView(); this.load();
+      },
+      selectProduct(code) {
+        if (this.product !== code || this.purchasePage !== 1) {
+          this.purchaseRows = []; this.purchaseTotal = 0; this.historyLoaded = false;
+        }
+        this.product = code; this.purchasePage = 1; this.load();
+      },
+      movePurchases(delta) {
+        this.purchasePage = Math.max(1, Math.min(this.purchasePages, this.purchasePage + delta));
+        this.purchaseRows = []; this.historyLoaded = false; this.load();
+      }
     },
     template: `
-      <div>
+      <div class="dashboard">
         <div class="toolbar">
           <div class="segmented">
             <button v-for="key in ['today','7d','30d','month','prev_month']" :key="key"
                     :class="{ 'is-active': range === key }" @click="setRange(key)">{{ t('common.' + key) }}</button>
           </div>
           <div class="toolbar-right">
-            <input type="date" v-model="from"><span class="dash">—</span><input type="date" v-model="to">
+            <input type="date" v-model="from" :aria-label="t('common.from')" @input="dateDraftEdited = true"><span class="dash">—</span>
+            <input type="date" v-model="to" :aria-label="t('common.to')" @input="dateDraftEdited = true">
             <button class="btn btn-sm" @click="applyCustom">{{ t('common.apply') }}</button>
           </div>
         </div>
+        <p v-if="dateError" class="dashboard-error" role="alert">{{ dateError }}</p>
+        <div class="dashboard-live">
+          <label class="checkline"><input type="checkbox" v-model="autoRefresh" @change="toggleRefresh"> {{ t('admin.dashboard.auto_refresh') }}</label>
+          <span class="muted small" role="status" aria-live="polite">{{ refreshing ? t('admin.dashboard.refreshing') : (lastUpdated ? tf('admin.dashboard.updated_at', {time: lastUpdated}) : '') }}</span>
+          <button type="button" class="btn btn-sm" :disabled="refreshing" @click="load">{{ t('common.refresh') }}</button>
+        </div>
+        <p v-if="error" class="dashboard-error" role="alert">{{ error }}</p>
 
-        <div v-if="loading" class="kpis">
-          <div class="kpi skeleton" v-for="n in 8" :key="n"></div>
+        <div v-if="loading && !data" class="kpis">
+          <div class="kpi skeleton" v-for="n in 9" :key="n"></div>
         </div>
 
         <template v-else-if="data">
@@ -516,7 +669,7 @@
               <div class="sub">{{ t('admin.metric.new_month') }}: {{ nf(data.stats.new_month) }}</div></div>
             <div class="kpi"><div class="label">{{ t('admin.metric.paid') }}</div>
               <div class="value">{{ nf(data.stats.paid_users) }}</div>
-              <div class="sub">{{ t('admin.metric.free') }}: {{ nf(data.stats.free_users) }}</div></div>
+              <div class="sub">{{ t('admin.dashboard.current_access') }} · {{ t('admin.metric.free') }}: {{ nf(data.stats.free_users) }}</div></div>
             <div class="kpi"><div class="label">{{ t('admin.metric.purchases') }}</div>
               <div class="value">{{ nf(data.stats.purchases_range) }}</div>
               <div class="sub">{{ t('admin.metric.buyers') }}: {{ nf(data.stats.buyers_range) }}</div></div>
@@ -536,6 +689,75 @@
               <div class="value">{{ nf(data.stats.avg_latency_ms) }} ms</div>
               <div class="sub">iOS {{ nf(data.stats.ios_users) }} · Android {{ nf(data.stats.android_users) }}</div></div>
           </div>
+
+          <section class="card dashboard-commerce" :aria-busy="refreshing ? 'true' : 'false'">
+            <div class="card-head dashboard-section-head">
+              <div><h2>{{ t('admin.dashboard.products_title') }}</h2>
+                <p class="muted small">{{ t('admin.dashboard.products_hint') }}</p></div>
+              <div class="dashboard-received" v-if="receivedAmounts.length">
+                <span class="muted small">{{ t('admin.dashboard.received') }}</span>
+                <b v-for="a in receivedAmounts" :key="a.currency">{{ amount(a.amount_milliunits, a.currency, 1000) }}</b>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table class="dashboard-products">
+                <thead><tr><th>{{ t('admin.iap.product') }}</th><th>{{ t('admin.dashboard.catalog_price') }}</th>
+                  <th>{{ t('admin.dashboard.purchase_count') }}</th><th>{{ t('admin.dashboard.buyer_count') }}</th>
+                  <th>{{ t('admin.dashboard.reply_units') }}</th><th>{{ t('admin.dashboard.received') }}</th><th></th></tr></thead>
+                <tbody>
+                  <tr v-for="p in breakdown" :key="p.product_code" :class="{'dashboard-selected': product === p.product_code}">
+                    <td><b>{{ p.name }}</b><div class="dashboard-product-meta"><span v-if="p.kind" class="badge badge-muted">{{ productKind(p.kind) }}</span><span class="mono small">{{ p.product_code }}</span></div></td>
+                    <td class="nowrap">{{ p.catalog_price_minor > 0 ? amount(p.catalog_price_minor, p.catalog_currency, 100) : '—' }}</td>
+                    <td><b class="dashboard-sales-count">{{ nf(p.purchases) }}</b></td><td>{{ nf(p.buyers) }}</td>
+                    <td>{{ p.units > 0 ? nf(p.units) : '—' }}</td>
+                    <td class="nowrap"><div v-for="a in (p.amounts || [])" :key="a.currency">{{ amount(a.amount_milliunits, a.currency, 1000) }}</div>
+                      <span v-if="!(p.amounts || []).length">—</span>
+                      <div class="muted small" v-if="p.unknown_price_purchases">{{ tf('admin.dashboard.unknown_prices', {count: nf(p.unknown_price_purchases)}) }}</div></td>
+                    <td><button type="button" class="btn btn-sm" :aria-pressed="product === p.product_code ? 'true' : 'false'" @click="selectProduct(p.product_code)">{{ t('admin.dashboard.show_buyers') }}</button></td>
+                  </tr>
+                  <tr v-if="!breakdown.length"><td colspan="7" class="empty">{{ t('admin.dashboard.no_purchases') }}</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="dashboard-commerce-note muted small">{{ t('admin.dashboard.amount_hint') }}
+              <span v-if="unknownPrices"> {{ tf('admin.dashboard.unknown_prices', {count: nf(unknownPrices)}) }}</span></div>
+          </section>
+
+          <section class="card dashboard-commerce" :aria-busy="refreshing ? 'true' : 'false'">
+            <div class="card-head dashboard-section-head">
+              <div><h2>{{ t('admin.dashboard.history_title') }}</h2><p class="muted small">{{ t('admin.dashboard.history_hint') }}</p></div>
+              <label class="dashboard-product-filter"><span class="small muted">{{ t('admin.iap.product') }}</span>
+                <select :value="product" @change="selectProduct($event.target.value)">
+                  <option value="">{{ t('admin.dashboard.all_products') }}</option>
+                  <option v-for="p in productOptions" :key="p.product_code" :value="p.product_code">{{ p.name }}</option>
+                </select></label>
+            </div>
+            <div class="table-wrap">
+              <table class="dashboard-history">
+                <thead><tr><th>{{ t('admin.dashboard.purchase_date') }}</th><th>{{ t('admin.dashboard.buyer') }}</th>
+                  <th>{{ t('admin.iap.product') }}</th><th>{{ t('admin.iap.provider') }}</th>
+                  <th>{{ t('admin.dashboard.quantity') }}</th><th>{{ t('admin.dashboard.paid_amount') }}</th></tr></thead>
+                <tbody>
+                  <tr v-for="p in purchaseRows" :key="p.id">
+                    <td class="mono nowrap">{{ p.purchased_at }}</td>
+                    <td><template v-if="p.user_id"><a class="dashboard-buyer-link" :href="appPath(userPath(p.user_id))" @click.prevent="$root.go(userPath(p.user_id))">{{ p.identifier || shortID(p.user_id) }}</a>
+                        <div class="mono muted small">{{ shortID(p.user_id) }}</div></template>
+                      <span v-else class="muted">{{ t('admin.dashboard.deleted_buyer') }}</span></td>
+                    <td><b>{{ p.name }}</b><div class="muted small">{{ productKind(p.kind) }}<span v-if="p.units > 0"> · {{ tf('admin.dashboard.units_count', {count: nf(p.units)}) }}</span></div></td>
+                    <td class="nowrap">{{ providerName(p.provider) }}</td><td>{{ nf(p.quantity) }}</td>
+                    <td class="nowrap">{{ p.price_known ? amount(p.amount_milliunits, p.currency, 1000) : t('admin.dashboard.price_unknown') }}</td>
+                  </tr>
+                  <tr v-if="!purchaseRows.length"><td colspan="6" class="empty">{{ historyLoaded ? t('admin.dashboard.no_purchases') : (refreshing ? t('admin.dashboard.refreshing') : t('admin.dashboard.refresh_error')) }}</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <nav class="pagination" :aria-label="t('admin.dashboard.history_title')">
+              <span class="pagination-total">{{ t('common.total') }}: {{ nf(purchaseTotal) }}</span>
+              <button type="button" class="btn btn-sm" :disabled="refreshing || purchasePage <= 1" @click="movePurchases(-1)">{{ t('common.prev') }}</button>
+              <span>{{ t('common.page') }} {{ purchasePage }} / {{ purchasePages }}</span>
+              <button type="button" class="btn btn-sm" :disabled="refreshing || purchasePage >= purchasePages" @click="movePurchases(1)">{{ t('common.next') }}</button>
+            </nav>
+          </section>
 
           <div class="charts">
             <div class="chart-card"><h3>{{ t('admin.chart.generations') }}</h3>

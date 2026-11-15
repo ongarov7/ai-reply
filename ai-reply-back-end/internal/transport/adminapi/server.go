@@ -90,6 +90,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /api/v1/admin/session", s.guard(s.handleSession))
 	mux.Handle("POST /api/v1/admin/locale", s.guard(s.handleSetLocale))
 	mux.Handle("GET /api/v1/admin/dashboard", s.guard(s.handleDashboard))
+	mux.Handle("GET /api/v1/admin/dashboard/purchases", s.guard(s.handleDashboardPurchases))
 	mux.Handle("GET /api/v1/admin/users", s.guard(s.handleUsers))
 	mux.Handle("GET /api/v1/admin/users/{id}", s.guard(s.handleUserDetail))
 	mux.Handle("POST /api/v1/admin/users/{id}/status", s.guard(s.handleUserStatus))
@@ -188,6 +189,7 @@ func (s *Server) handleSetLocale(w http.ResponseWriter, r *http.Request) {
 // ---------------------------------------------------------------- dashboard
 
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
 	query := r.URL.Query()
 	rng := admin.ParseRange(query.Get("range"), query.Get("from"), query.Get("to"),
 		s.cfg.App.Location(), s.admin.Now())
@@ -203,6 +205,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 			"from": dashboard.Range.From.In(s.cfg.App.Location()).Format("2006-01-02"),
 			"to":   dashboard.Range.To.In(s.cfg.App.Location()).Format("2006-01-02"),
 		},
+		"purchase_breakdown": purchaseBreakdownDTO(dashboard.PurchaseBreakdown, adminFrom(r.Context()).Locale),
 		"stats": map[string]any{
 			"total_users": dashboard.Stats.TotalUsers, "new_today": dashboard.Stats.NewUsersToday,
 			"new_month": dashboard.Stats.NewUsersMonth, "active_30d": dashboard.Stats.ActiveUsers30d,

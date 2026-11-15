@@ -451,3 +451,41 @@ a.link:hover { text-decoration: underline; }
 .support-reply textarea { width: 100%; }
 .support-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
 @media (max-width: 1080px) { .support-grid { grid-template-columns: 1fr; } }
+
+
+/* Dashboard: a stable grid and readable purchase reporting on every width. */
+.dashboard .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.dashboard .kpi { min-width: 0; }
+.dashboard .kpi .label { min-height: 2.9em; }
+.dashboard .kpi .value { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.dashboard-live { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: -4px 0 18px; }
+.dashboard-live .checkline { margin: 0; font-size: 13px; }
+.dashboard-live .btn { margin-left: auto; }
+.dashboard-error { padding: 10px 14px; margin: 0 0 16px; border: 1px solid #f5d5d5; border-radius: 10px; color: var(--danger); background: var(--danger-soft); }
+.dashboard-section-head { flex-wrap: wrap; justify-content: space-between; align-items: flex-start; }
+.dashboard-section-head p { margin: 4px 0 0; max-width: 690px; }
+.dashboard-received { display: flex; flex-direction: column; align-items: flex-end; }
+.dashboard-received b { font-size: 20px; font-variant-numeric: tabular-nums; }
+.dashboard-products, .dashboard-history { min-width: 820px; }
+.dashboard-product-meta { display: flex; align-items: center; gap: 8px; margin-top: 5px; }
+.dashboard-products tr.dashboard-selected td { background: var(--brand-soft); }
+.dashboard-sales-count { font-size: 19px; font-variant-numeric: tabular-nums; }
+.dashboard-commerce-note { padding: 12px 20px; border-top: 1px solid var(--line-2); }
+.dashboard-commerce + .charts { margin-top: 18px; }
+.dashboard-product-filter { display: flex; align-items: center; gap: 9px; }
+.dashboard-product-filter select { max-width: 320px; }
+.dashboard-buyer-link { color: var(--brand-ink); text-decoration: underline; text-underline-offset: 3px; }
+.dashboard .pagination { flex-wrap: wrap; }
+.dashboard button:focus-visible, .dashboard a:focus-visible, .dashboard select:focus-visible, .dashboard input:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+@media (min-width: 1700px) { .dashboard .kpis { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+@media (max-width: 1080px) { .dashboard .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 580px) {
+  .dashboard .kpis { grid-template-columns: minmax(0, 1fr); }
+  .dashboard .kpi .label { min-height: 0; }
+  .dashboard .segmented { display: flex; flex-wrap: wrap; width: 100%; }
+  .dashboard .segmented button { flex: 1 0 auto; }
+  .dashboard-live { gap: 10px; }
+  .dashboard-received { align-items: flex-start; }
+  .dashboard-product-filter { flex-wrap: wrap; width: 100%; }
+  .dashboard-product-filter select { width: 100%; max-width: none; }
+}

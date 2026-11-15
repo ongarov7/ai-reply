@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/aireply/ai-reply-back-end/internal/repository"
+	"github.com/aireply/ai-reply-back-end/internal/traits"
 )
 
 // Range — есеп беру кезеңі.
@@ -28,12 +29,12 @@ func ParseRange(key, fromRaw, toRaw string, loc *time.Location, now time.Time) R
 		return Range{Key: key, From: time.Date(local.Year(), local.Month(), 1, 0, 0, 0, 0, loc).UTC(), To: now}
 	case "prev_month":
 		first := time.Date(local.Year(), local.Month(), 1, 0, 0, 0, 0, loc)
-		return Range{Key: key, From: first.AddDate(0, -1, 0).UTC(), To: first.Add(-time.Second).UTC()}
+		return Range{Key: key, From: first.AddDate(0, -1, 0).UTC(), To: first.Add(-time.Millisecond).UTC()}
 	case "custom":
 		from, errFrom := time.ParseInLocation("2006-01-02", fromRaw, loc)
 		to, errTo := time.ParseInLocation("2006-01-02", toRaw, loc)
 		if errFrom == nil && errTo == nil && !to.Before(from) {
-			return Range{Key: key, From: from.UTC(), To: to.AddDate(0, 0, 1).Add(-time.Second).UTC()}
+			return Range{Key: key, From: from.UTC(), To: to.AddDate(0, 0, 1).Add(-time.Millisecond).UTC()}
 		}
 	}
 	return Range{Key: "30d", From: startOfDay.AddDate(0, 0, -29).UTC(), To: now}
@@ -41,19 +42,20 @@ func ParseRange(key, fromRaw, toRaw string, loc *time.Location, now time.Time) R
 
 // Dashboard — басқару тақтасының деректері (тек метадерек).
 type Dashboard struct {
-	Range         Range
-	Stats         repository.Stats
-	Purchases     repository.PurchaseTotals
-	Registrations []repository.Point
-	Generations   []repository.Point
-	Tokens        []repository.Point
-	Cost          []repository.Point
-	ActiveUsers   []repository.Point
-	PlanMix       []repository.Point
-	PlatformMix   []repository.Point
-	Errors        []repository.Point
-	TopCost       []repository.Point
-	AppVersions   []repository.Point
+	Range             Range
+	Stats             repository.Stats
+	Purchases         repository.PurchaseTotals
+	PurchaseBreakdown []repository.PurchaseBreakdown
+	Registrations     []repository.Point
+	Generations       []repository.Point
+	Tokens            []repository.Point
+	Cost              []repository.Point
+	ActiveUsers       []repository.Point
+	PlanMix           []repository.Point
+	PlatformMix       []repository.Point
+	Errors            []repository.Point
+	TopCost           []repository.Point
+	AppVersions       []repository.Point
 	// ProductEvents — қолданба оқиғаларының саны атауы бойынша.
 	ProductEvents []repository.Point
 	CostUSD       float64
@@ -71,6 +73,9 @@ func (s *Service) Dashboard(ctx context.Context, rng Range) (Dashboard, error) {
 	}
 	d := Dashboard{Range: rng, Stats: stats, CostUSD: float64(stats.CostMicros) / 1_000_000}
 	if d.Purchases, err = s.repo.PurchaseTotals(ctx, rng.From, rng.To); err != nil {
+		return Dashboard{}, err
+	}
+	if d.PurchaseBreakdown, err = s.repo.PurchaseBreakdown(ctx, rng.From, rng.To); err != nil {
 		return Dashboard{}, err
 	}
 
@@ -108,4 +113,8 @@ func (s *Service) Dashboard(ctx context.Context, rng Range) (Dashboard, error) {
 		return Dashboard{}, err
 	}
 	return d, nil
+}
+
+func (s *Service) PurchaseHistory(ctx context.Context, rng Range, product string, page traits.Page) ([]repository.PurchaseHistoryRow, int, error) {
+	return s.repo.PurchaseHistory(ctx, rng.From, rng.To, product, page)
 }
