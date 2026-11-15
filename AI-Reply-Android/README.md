@@ -67,17 +67,19 @@ disabled on supported API levels.
 
 | | |
 |---|---|
-| Android Studio | Ladybug (2024.2) or newer |
+| Android Studio | Narwhal (2025.1.1) or newer, compatible with AGP 8.11.1 |
 | JDK | 17 (Android Studio's bundled JBR is fine) |
-| Android SDK | API 35 platform, build-tools 35.0.0 |
-| Gradle | 8.11.1, via the checked-in wrapper |
-| AGP / Kotlin | 8.7.3 / 2.0.21 |
+| Android SDK | API 36 platform, build-tools 35.0.0 (AGP default) |
+| Gradle | 8.14.5, via the checked-in wrapper |
+| AGP / Kotlin | 8.11.1 / 2.0.21 |
 | Minimum device | Android 8.0 (API 26) |
 
-Versions are pinned in `gradle/libs.versions.toml`. They are a combination known
-to work together rather than the newest of each — see *Known limitations*.
-Android Studio will offer to upgrade AGP and Kotlin; taking that offer is safe
-as long as the Compose BOM and the Compose compiler plugin move with Kotlin.
+Plugin versions are pinned in `gradle/libs.versions.toml`, Gradle in
+`gradle/wrapper/gradle-wrapper.properties`, and SDK levels in
+`app/build.gradle.kts`. Use these checked-in versions for release builds.
+See the [Android Studio compatibility table](https://developer.android.com/studio/releases#android_gradle_plugin_and_android_studio_compatibility)
+and [AGP 8.11 requirements](https://developer.android.com/build/releases/agp-8-11-0-release-notes#compatibility)
+for IDE, JDK and default build-tools compatibility.
 
 ### Android Studio
 

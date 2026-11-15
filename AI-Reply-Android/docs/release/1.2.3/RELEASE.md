@@ -77,12 +77,20 @@ replace that check.
 
 ## Build and sign
 
-On the Mac with the existing upload key:
+On the Mac with the existing upload key, from its existing repository:
 
 ```sh
+git switch main
+git pull --ff-only origin main
 cd AI-Reply-Android
 ./scripts/build-play-production.sh /absolute/path/existing-upload.jks EXISTING_ALIAS
 ```
+
+The helper uses Android Studio's bundled JDK by default and asks for signing
+passwords interactively. SDK 36 and the pinned Gradle dependencies must already
+be installed: the helper builds offline. If dependencies are missing, sync the
+project online in Android Studio first. Check any existing Google Client ID
+overrides against the production ID above before building.
 
 The helper forces production, version 1.2.3 and code 7, preserves older AABs,
 and verifies the existing upload certificate. It does not upload or publish.
@@ -92,6 +100,24 @@ Confirm that code 7 is still unused in Play Console before uploading.
 The upload keystore was not found in this Mac's Downloads, Documents, Desktop
 or workspace. The existing key remains on the owner's other Mac; no signing
 key reset or replacement was performed.
+
+## Play Console inspection
+
+The production release is still 1.2.2 (6), rolled out to 100%. Pro Monthly and
+Pro Yearly each have one active base plan; legacy Base Monthly has none. No
+subscription or pricing configuration was changed during this inspection.
+
+The dashboard notification says to confirm trader status by 1 February 2027.
+Under Account settings > Developer account > About you, the current status is
+non-trader. The declaration dialog offers trader or non-trader; no declaration
+was submitted. This is a separate account declaration, while the two Pro base
+plans are already active.
+
+The owner must review the correct status for the business and its distribution
+regions. Google's [trader declaration guidance](https://support.google.com/googleplay/android-developer/answer/17594752?hl=en)
+describes the criteria, account and app-level declarations, public contact
+details, and the trader's legal commitment. Do not infer the declaration solely
+from whether a subscription exists.
 
 ## Verification
 
