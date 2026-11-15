@@ -133,10 +133,11 @@ func (s *Store) ArchivePlan(ctx context.Context, id string) error {
 }
 
 // PlanUsageCount — тарифті пайдаланушылар саны.
-func (s *Store) PlanUsageCount(ctx context.Context, planID string) (int, error) {
+func (s *Store) PlanUsageCount(ctx context.Context, planID string, at ...time.Time) (int, error) {
 	var n int
-	err := s.db.Reader().QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM subscriptions WHERE plan_id = ? AND status IN ('active','trial')`, planID).Scan(&n)
+	args := append(adminEntitlementArgs(adminReportingTime(at)), planID)
+	err := s.db.Reader().QueryRowContext(ctx, adminEntitlementsCTE+
+		`SELECT COUNT(*) FROM admin_effective WHERE plan_id = ?`, args...).Scan(&n)
 	return n, err
 }
 

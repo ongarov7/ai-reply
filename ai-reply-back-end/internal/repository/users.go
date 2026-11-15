@@ -254,10 +254,11 @@ type UserRow struct {
 	PlanCode  string
 	PlanName  string
 	SubStatus string
-	// DailyLimit, MonthlyLimit — жолдағы жазылымның тарифі (мерзімі өтсе де).
-	// admin.Users replaces them with what the person gets now, as Entitlement does.
+	// DailyLimit, MonthlyLimit use the effective plan, including store and bank
+	// subscriptions and the free fallback, as Entitlement does.
 	DailyLimit   int
 	MonthlyLimit int
+	Unlimited    bool
 	UsedToday    int
 	UsedMonth    int
 	TokensMonth  int
@@ -306,27 +307,21 @@ func (s *Store) ListUsers(ctx context.Context, f UserFilter, today, month string
 
 	base := `
 		FROM users u
-		LEFT JOIN (
-			SELECT s1.* FROM subscriptions s1
-			WHERE s1.id = (SELECT s2.id FROM subscriptions s2
-			               WHERE s2.user_id = s1.user_id
-			               ORDER BY CASE s2.status WHEN 'active' THEN 0 WHEN 'trial' THEN 1 ELSE 2 END,
-			                        s2.created_at DESC LIMIT 1)
-		) sub ON sub.user_id = u.id
-		LEFT JOIN plans p ON p.id = sub.plan_id
+		JOIN admin_effective sub ON sub.user_id = u.id
 		LEFT JOIN usage_daily ud ON ud.user_id = u.id AND ud.usage_date = ?
 		LEFT JOIN usage_monthly um ON um.user_id = u.id AND um.usage_month = ?
 		WHERE ` + strings.Join(where, " AND ")
 
-	countArgs := append([]any{today, month}, args...)
+	countArgs := append(adminEntitlementArgs(now), today, month)
+	countArgs = append(countArgs, args...)
 	var total int
-	if err := s.db.Reader().QueryRowContext(ctx, `SELECT COUNT(*) `+base, countArgs...).Scan(&total); err != nil {
+	if err := s.db.Reader().QueryRowContext(ctx, adminEntitlementsCTE+`SELECT COUNT(*) `+base, countArgs...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
 	query := `SELECT ` + userColumns + `,
-		COALESCE(p.code, ''), COALESCE(p.name_en, ''), COALESCE(sub.status, ''),
-		COALESCE(p.daily_message_limit, 0), COALESCE(p.monthly_message_limit, 0),
+		sub.code, sub.name_en, sub.status,
+		sub.daily_limit, sub.monthly_limit, sub.unlimited,
 		COALESCE(ud.used, 0) AS used_today, COALESCE(um.used, 0),
 		COALESCE(um.input_tokens, 0) + COALESCE(um.output_tokens, 0), sub.expires_at,
 		COALESCE((SELECT SUM(g.units_remaining) FROM credit_grants g
@@ -335,8 +330,10 @@ func (s *Store) ListUsers(ctx context.Context, f UserFilter, today, month string
 		base + fmt.Sprintf(" ORDER BY %s %s LIMIT ? OFFSET ?", sortColumn, direction)
 	// userColumns u. префиксімен жазылуы керек
 	query = strings.Replace(query, "SELECT "+userColumns, "SELECT "+prefixColumns(userColumns, "u."), 1)
+	query = adminEntitlementsCTE + query
 
-	rowsArgs := append(append([]any{ms(now), ms(now), today, month}, args...), f.Page.Limit, f.Page.Offset)
+	rowsArgs := append(adminEntitlementArgs(now), ms(now), ms(now), today, month)
+	rowsArgs = append(append(rowsArgs, args...), f.Page.Limit, f.Page.Offset)
 	rows, err := s.db.Reader().QueryContext(ctx, query, rowsArgs...)
 	if err != nil {
 		return nil, 0, err
@@ -358,7 +355,7 @@ func (s *Store) ListUsers(ctx context.Context, f UserFilter, today, month string
 		if err := rows.Scan(&r.User.ID, &phone, &email, &r.User.Status, &r.User.Locale, &r.User.Timezone,
 			&r.User.Platform, &r.User.AppVersion, &r.User.OSVersion, &r.User.Kind, &legacy,
 			&created, &updated, &lastActive, &r.User.PreferredLanguage,
-			&r.PlanCode, &r.PlanName, &r.SubStatus, &r.DailyLimit, &r.MonthlyLimit, &r.UsedToday, &r.UsedMonth,
+			&r.PlanCode, &r.PlanName, &r.SubStatus, &r.DailyLimit, &r.MonthlyLimit, &r.Unlimited, &r.UsedToday, &r.UsedMonth,
 			&r.TokensMonth, &expires, &r.ExtraRemaining); err != nil {
 			return nil, 0, err
 		}

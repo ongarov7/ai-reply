@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/aireply/ai-reply-back-end/internal/domain"
 	"github.com/aireply/ai-reply-back-end/internal/repository"
@@ -125,8 +126,8 @@ func (s *Service) isDefault(ctx context.Context, id string) (bool, error) {
 }
 
 // UsageCount — тарифтегі белсенді жазылым саны.
-func (s *Service) UsageCount(ctx context.Context, id string) (int, error) {
-	return s.repo.PlanUsageCount(ctx, id)
+func (s *Service) UsageCount(ctx context.Context, id string, at ...time.Time) (int, error) {
+	return s.repo.PlanUsageCount(ctx, id, at...)
 }
 
 func validate(p *domain.Plan) error {

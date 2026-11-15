@@ -517,6 +517,9 @@
             <div class="kpi"><div class="label">{{ t('admin.metric.paid') }}</div>
               <div class="value">{{ nf(data.stats.paid_users) }}</div>
               <div class="sub">{{ t('admin.metric.free') }}: {{ nf(data.stats.free_users) }}</div></div>
+            <div class="kpi"><div class="label">{{ t('admin.metric.purchases') }}</div>
+              <div class="value">{{ nf(data.stats.purchases_range) }}</div>
+              <div class="sub">{{ t('admin.metric.buyers') }}: {{ nf(data.stats.buyers_range) }}</div></div>
             <div class="kpi"><div class="label">{{ t('admin.metric.requests_today') }}</div>
               <div class="value">{{ nf(data.stats.requests_today) }}</div>
               <div class="sub">{{ t('admin.metric.requests_range') }}: {{ nf(data.stats.requests_range) }}</div></div>
@@ -638,9 +641,9 @@
                 <td><span class="badge badge-brand" v-if="row.plan_code">{{ row.plan_code }}</span>
                     <span v-else class="badge badge-muted">—</span></td>
                 <td>
-                  <div class="usage"><b>{{ row.used_today }}</b> / {{ row.daily_limit }}</div>
-                  <div class="meter"><span :style="{ width: usageWidth(row) + '%' }"></span></div>
-                  <small class="muted">{{ t('admin.credits.remaining_total') }}: {{ nf(row.remaining_total) }}</small>
+                  <div class="usage"><b>{{ row.used_today }}</b> / {{ row.unlimited ? '∞' : row.daily_limit }}</div>
+                  <div class="meter" v-if="!row.unlimited"><span :style="{ width: usageWidth(row) + '%' }"></span></div>
+                  <small class="muted">{{ t('admin.credits.remaining_total') }}: {{ row.unlimited ? '∞' : nf(row.remaining_total) }}</small>
                 </td>
                 <td>{{ nf(row.tokens_month) }}</td>
                 <td>{{ row.platform || '—' }} <span class="mono" v-if="row.app_version">{{ row.app_version }}</span></td>
@@ -783,7 +786,7 @@
                 <div class="quota-box">
                   <div class="quota-head">
                     <span>{{ t('admin.users.col_today') }}</span>
-                    <b>{{ data.entitlement.used_today }} / {{ data.entitlement.daily_limit }}</b>
+                    <b>{{ data.entitlement.used_today }} / {{ data.balances.unlimited ? '∞' : data.entitlement.daily_limit }}</b>
                   </div>
                   <div class="meter meter-lg"><span :style="{ width: usagePercent() + '%' }"></span></div>
                   <small>{{ t('common.today') }} · {{ data.entitlement.resets_at }}</small>

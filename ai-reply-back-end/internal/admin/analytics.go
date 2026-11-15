@@ -43,6 +43,7 @@ func ParseRange(key, fromRaw, toRaw string, loc *time.Location, now time.Time) R
 type Dashboard struct {
 	Range         Range
 	Stats         repository.Stats
+	Purchases     repository.PurchaseTotals
 	Registrations []repository.Point
 	Generations   []repository.Point
 	Tokens        []repository.Point
@@ -64,11 +65,14 @@ func (s *Service) Dashboard(ctx context.Context, rng Range) (Dashboard, error) {
 	// The quota's local midnight: "new users today" counts the same day as the requests tile.
 	local := s.Now().In(s.subs.Location())
 	dayStart := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, s.subs.Location())
-	stats, err := s.repo.Stats(ctx, rng.From, rng.To, today, dayStart)
+	stats, err := s.repo.Stats(ctx, rng.From, rng.To, today, dayStart, s.Now())
 	if err != nil {
 		return Dashboard{}, err
 	}
 	d := Dashboard{Range: rng, Stats: stats, CostUSD: float64(stats.CostMicros) / 1_000_000}
+	if d.Purchases, err = s.repo.PurchaseTotals(ctx, rng.From, rng.To); err != nil {
+		return Dashboard{}, err
+	}
 
 	if d.Registrations, err = s.repo.SeriesRegistrations(ctx, rng.From, rng.To); err != nil {
 		return Dashboard{}, err
@@ -85,7 +89,7 @@ func (s *Service) Dashboard(ctx context.Context, rng Range) (Dashboard, error) {
 	if d.ActiveUsers, err = s.repo.SeriesActiveUsers(ctx, rng.From, rng.To); err != nil {
 		return Dashboard{}, err
 	}
-	if d.PlanMix, err = s.repo.DistributionPlans(ctx); err != nil {
+	if d.PlanMix, err = s.repo.DistributionPlans(ctx, s.Now()); err != nil {
 		return Dashboard{}, err
 	}
 	if d.PlatformMix, err = s.repo.DistributionPlatforms(ctx); err != nil {

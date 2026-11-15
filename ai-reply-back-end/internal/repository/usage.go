@@ -120,9 +120,10 @@ type Stats struct {
 // today is the usage_daily key and dayStart the same day's local midnight,
 // both in the app timezone, so every "today" tile counts the same day the
 // quota does.
-func (s *Store) Stats(ctx context.Context, from, to time.Time, today string, dayStart time.Time) (Stats, error) {
+func (s *Store) Stats(ctx context.Context, from, to time.Time, today string, dayStart time.Time, at ...time.Time) (Stats, error) {
 	var st Stats
 	r := s.db.Reader()
+	now := adminReportingTime(at)
 
 	if err := r.QueryRowContext(ctx, `SELECT COUNT(*) FROM users WHERE deleted_at IS NULL`).Scan(&st.TotalUsers); err != nil {
 		return st, err
@@ -133,18 +134,16 @@ func (s *Store) Stats(ctx context.Context, from, to time.Time, today string, day
 	}
 	if err := r.QueryRowContext(ctx,
 		`SELECT COUNT(*) FROM users WHERE created_at >= ? AND deleted_at IS NULL`,
-		ms(time.Now().UTC().AddDate(0, 0, -30))).Scan(&st.NewUsersMonth); err != nil {
+		ms(now.AddDate(0, 0, -30))).Scan(&st.NewUsersMonth); err != nil {
 		return st, err
 	}
 	if err := r.QueryRowContext(ctx,
 		`SELECT COUNT(*) FROM users WHERE last_active_at >= ? AND deleted_at IS NULL`,
-		ms(time.Now().UTC().AddDate(0, 0, -30))).Scan(&st.ActiveUsers30d); err != nil {
+		ms(now.AddDate(0, 0, -30))).Scan(&st.ActiveUsers30d); err != nil {
 		return st, err
 	}
-	if err := r.QueryRowContext(ctx, `
-		SELECT COUNT(DISTINCT s.user_id) FROM subscriptions s
-		JOIN plans p ON p.id = s.plan_id
-		WHERE s.status IN ('active','trial') AND p.is_free = 0`).Scan(&st.PaidUsers); err != nil {
+	if err := r.QueryRowContext(ctx, adminEntitlementsCTE+`
+		SELECT COUNT(*) FROM admin_effective WHERE is_free=0`, adminEntitlementArgs(now)...).Scan(&st.PaidUsers); err != nil {
 		return st, err
 	}
 	st.FreeUsers = st.TotalUsers - st.PaidUsers
@@ -234,12 +233,10 @@ func (s *Store) SeriesActiveUsers(ctx context.Context, from, to time.Time) ([]Po
 }
 
 // DistributionPlans — тарифтер бойынша үлес.
-func (s *Store) DistributionPlans(ctx context.Context) ([]Point, error) {
-	rows, err := s.db.Reader().QueryContext(ctx, `
-		SELECT p.code, COUNT(*) FROM subscriptions s
-		JOIN plans p ON p.id = s.plan_id
-		WHERE s.status IN ('active','trial')
-		GROUP BY p.code ORDER BY 2 DESC`)
+func (s *Store) DistributionPlans(ctx context.Context, at ...time.Time) ([]Point, error) {
+	rows, err := s.db.Reader().QueryContext(ctx, adminEntitlementsCTE+`
+		SELECT code, COUNT(*) FROM admin_effective
+		GROUP BY code ORDER BY 2 DESC, code`, adminEntitlementArgs(adminReportingTime(at))...)
 	return collectPoints(rows, err)
 }
 

@@ -40,20 +40,8 @@ func (s *Service) Users(ctx context.Context, f repository.UserFilter) ([]reposit
 	if err != nil {
 		return nil, 0, err
 	}
-	var fallback *domain.Plan
 	for i := range rows {
 		row := &rows[i]
-		sub := domain.Subscription{Status: row.SubStatus, ExpiresAt: row.SubExpiresAt}
-		if row.PlanCode == "" || !sub.IsUsable(now) {
-			if fallback == nil {
-				plan, err := s.plans.Default(ctx)
-				if err != nil {
-					return nil, 0, err
-				}
-				fallback = &plan
-			}
-			row.DailyLimit, row.MonthlyLimit = fallback.DailyLimit, fallback.MonthlyLimit
-		}
 		allowance := domain.Entitlement{DailyLimit: row.DailyLimit, MonthlyLimit: row.MonthlyLimit,
 			UsedToday: row.UsedToday, UsedMonth: row.UsedMonth}
 		row.RemainingTotal = allowance.Remaining() + row.ExtraRemaining
@@ -235,7 +223,7 @@ func (s *Service) Plan(ctx context.Context, id string) (domain.Plan, error) {
 
 // PlanUsage — тарифті пайдаланушылар саны.
 func (s *Service) PlanUsage(ctx context.Context, id string) (int, error) {
-	return s.plans.UsageCount(ctx, id)
+	return s.plans.UsageCount(ctx, id, s.Now())
 }
 
 // Pricing — модель бағалары.

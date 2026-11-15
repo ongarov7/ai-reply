@@ -67,7 +67,11 @@ func (s *Server) handlePlans(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]map[string]any, 0, len(list))
 	for _, p := range list {
-		count, _ := s.admin.PlanUsage(r.Context(), p.ID)
+		count, err := s.admin.PlanUsage(r.Context(), p.ID)
+		if err != nil {
+			s.fail(w, err)
+			return
+		}
 		isDefault, _ := s.admin.IsDefaultPlan(r.Context(), p.ID)
 		out = append(out, map[string]any{
 			"id": p.ID, "code": p.Code, "name": p.Name, "description": p.Description,
