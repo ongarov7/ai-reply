@@ -164,9 +164,7 @@ func (s *Server) writeSession(w http.ResponseWriter, r *http.Request, session au
 		httpx.Fail(w, err)
 		return
 	}
-	if s.proDevices != nil {
-		_ = s.proDevices.Authorize(prodevices.WithSessionIdentity(ctx, session.InstallationIdentity), session.User, session.DeviceID, entitlement)
-	}
+	usage := s.usageForDevice(prodevices.WithSessionIdentity(ctx, session.InstallationIdentity), session.User, session.DeviceID, entitlement)
 	consent, err := s.currentLegalConsent(r, session.User.ID)
 	if err != nil {
 		httpx.Fail(w, err)
@@ -183,7 +181,7 @@ func (s *Server) writeSession(w http.ResponseWriter, r *http.Request, session au
 		User:             s.userDTO(ctx, session.User, profile),
 		Profile:          toProfileDTO(profile),
 		Subscription:     s.subscriptionDTO(entitlement),
-		Usage:            s.usage(entitlement),
+		Usage:            usage,
 		LegalConsent:     consent,
 	})
 }

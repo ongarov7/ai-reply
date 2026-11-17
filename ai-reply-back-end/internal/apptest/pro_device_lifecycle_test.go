@@ -30,9 +30,10 @@ func TestProDeviceLifecyclePreservesSlotsAndPurchasedCredits(t *testing.T) {
 			original := h.proDeviceAuthorization(first.access, "mobile")
 			pack := h.addGrant(first.userID, domain.GrantPack, 5, h.clock.Now(), nil, h.clock.Now())
 			second, _ := h.signInProDevice("pro-lifecycle@example.com", "lifecycle-device-2", "android", installID(911))
-			mustStatus(t, h.generate(second.access, "Сәлем"), http.StatusForbidden, "PRO_DEVICE_LIMIT_REACHED")
-			if n := h.scalar(`SELECT units_remaining FROM credit_grants WHERE id=?`, pack.ID); n != 5 {
-				t.Fatal("blocked Pro consumed package")
+			paid := h.generate(second.access, "Сәлем")
+			mustStatus(t, paid, http.StatusOK, "")
+			if paid.body["usage"].(map[string]any)["unlimited"] != false || paid.str("usage", "bucket") != domain.GrantPack || h.scalar(`SELECT units_remaining FROM credit_grants WHERE id=?`, pack.ID) != 4 {
+				t.Fatal("additional device did not spend exactly one pack unit")
 			}
 			svc := subscriptions.New(h.store, plans.New(h.store), h.cfg.App.Location()).WithClock(h.clock)
 			sub, err := svc.Current(context.Background(), first.userID)
@@ -53,12 +54,15 @@ func TestProDeviceLifecyclePreservesSlotsAndPurchasedCredits(t *testing.T) {
 			// Expiry follows existing entitlement accounting, including purchased
 			// credits, even on a device which previously could not use Pro.
 			mustStatus(t, h.generate(second.access, "Сәлем"), http.StatusOK, "")
-			if n := h.scalar(`SELECT units_remaining FROM credit_grants WHERE id=?`, pack.ID); n != 4 {
+			if n := h.scalar(`SELECT units_remaining FROM credit_grants WHERE id=?`, pack.ID); n != 3 {
 				t.Fatal("expired plan did not use exactly one purchased message")
 			}
 			h.assignPlan(admin, first.userID, "pro_monthly", "")
-			mustStatus(t, h.generate(second.access, "Сәлем"), http.StatusForbidden, "PRO_DEVICE_LIMIT_REACHED")
+			mustStatus(t, h.generate(second.access, "Сәлем"), http.StatusOK, "")
 			mustStatus(t, h.generate(first.access, "Сәлем"), http.StatusOK, "")
+			if h.scalar(`SELECT units_remaining FROM credit_grants WHERE id=?`, pack.ID) != 2 {
+				t.Fatal("restored Pro changed purchased-only fallback accounting")
+			}
 			if h.proDeviceAuthorization(first.access, "mobile") != original {
 				t.Fatal("restoration replaced authorization")
 			}
@@ -122,6 +126,10 @@ func TestProAppleGraceCancellationAndRestoreKeepAuthorization(t *testing.T) {
 	}
 	tx = h.subscriptionTx(first.userID, "pro-grace-restored", "pro-grace-original", "pro_monthly", h.clock.Now(), h.clock.Now().Add(30*24*time.Hour), nil)
 	mustStatus(t, h.postApple(first.access, tx), http.StatusOK, "")
+	mustStatus(t, h.generate(second.access, "Сәлем"), http.StatusOK, "")
+	if h.scalar(`SELECT units_remaining FROM credit_grants WHERE id=?`, pack.ID) != 0 {
+		t.Fatal("restored Apple Pro did not charge the extra device's last pack unit")
+	}
 	mustStatus(t, h.generate(second.access, "Сәлем"), http.StatusForbidden, "PRO_DEVICE_LIMIT_REACHED")
 	mustStatus(t, h.generate(first.access, "Сәлем"), http.StatusOK, "")
 	if h.proDeviceAuthorization(first.access, "mobile") != id {

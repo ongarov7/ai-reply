@@ -12,7 +12,6 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/database"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
 	"github.com/aireply/ai-reply-back-end/internal/repository"
-	"github.com/aireply/ai-reply-back-end/migrations"
 )
 
 // Keep historical migration fixtures independent of today's web lineup.
@@ -36,7 +35,7 @@ func TestWebPackMigrationAlreadyAlignedDoesNotRepublish(t *testing.T) {
 	if _, err = db.Writer().Exec(`INSERT INTO billing_catalog_versions(id,state,products_json,created_by,updated_by,created_at,updated_at) VALUES(1,'published',?,'owner','owner',1000,1000)`, string(raw)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = database.Migrate(ctx, db, migrations.FS); err != nil {
+	if _, err = database.Migrate(ctx, db, catalogMigrationsBefore(t, "0041")); err != nil {
 		t.Fatal(err)
 	}
 	v, err := New(db).Published(ctx)
@@ -90,7 +89,7 @@ func TestWebPackMigrationPreservesPaidContractsStoresAndDrafts(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if applied, err := database.Migrate(ctx, db, migrations.FS); err != nil || !reflect.DeepEqual(applied, []string{"0040_web_reply_pack_500.sql"}) {
+			if applied, err := database.Migrate(ctx, db, catalogMigrationsBefore(t, "0041")); err != nil || !reflect.DeepEqual(applied, []string{"0040_web_reply_pack_500.sql"}) {
 				t.Fatalf("migration: %v %v", applied, err)
 			}
 			s := New(db)
@@ -149,7 +148,7 @@ func TestWebPackMigrationPreservesPaidContractsStoresAndDrafts(t *testing.T) {
 			} else if _, err := s.Publish(ctx, "owner", pending.ID, pending.Revision); err != nil {
 				t.Fatalf("aligned draft cannot publish: %v", err)
 			}
-			if applied, err := database.Migrate(ctx, db, migrations.FS); err != nil || len(applied) != 0 {
+			if applied, err := database.Migrate(ctx, db, catalogMigrationsBefore(t, "0041")); err != nil || len(applied) != 0 {
 				t.Fatalf("reapplied: %v %v", applied, err)
 			}
 		})

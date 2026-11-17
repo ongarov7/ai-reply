@@ -241,9 +241,16 @@ func (s *Service) generate(ctx context.Context, c call, prompt Prompt, started t
 	if err != nil {
 		return Result{}, err
 	}
+	var deviceLimit error
 	if s.proDevices != nil {
 		if err := s.proDevices.Authorize(ctx, c.User, c.DeviceID, entitlement); err != nil {
-			return Result{}, err
+			if !purchasedDeviceFallback(entitlement, err) {
+				return Result{}, err
+			}
+			// An occupied Pro slot restricts only unlimited benefits. Explicitly
+			// purchased replies stay shared across the account's devices.
+			deviceLimit = err
+			entitlement = purchasedOnlyEntitlement(entitlement)
 		}
 	}
 	date, month := s.subs.Keys(started)
@@ -251,12 +258,19 @@ func (s *Service) generate(ctx context.Context, c call, prompt Prompt, started t
 	res, err := s.repo.ReserveGeneration(ctx, repository.ReserveInput{
 		UserID: c.User.ID, Key: c.Key, Mode: c.Mode, Date: date, Month: month,
 		DailyLimit: entitlement.DailyLimit, MonthlyLimit: entitlement.MonthlyLimit, Unlimited: entitlement.Unlimited, Now: started,
+		PurchasedOnly: deviceLimit != nil,
 	})
 	if err != nil {
 		if !isQuotaRefusal(err) {
 			// A duplicate key or a database error: nothing was charged and
 			// nothing reached the provider.
 			return Result{}, err
+		}
+		if deviceLimit != nil {
+			// Preserve the device denial when no purchased reply (or bounded
+			// retry of an already paid pack reply) is available. This is not an
+			// exhausted Pro subscription and must not send quota notices.
+			return Result{}, deviceLimit
 		}
 		// Every bucket was empty at that moment; only the pass window remains.
 		entitlement.Balance = entitlement.Balance.Spent()
@@ -322,7 +336,7 @@ func (s *Service) generate(ctx context.Context, c call, prompt Prompt, started t
 
 	usage := entitlement
 	usage.UsedToday, usage.UsedMonth, usage.Balance = res.UsedToday, res.UsedMonth, res.Balance
-	if s.quota != nil && !res.Replay && !entitlement.Unlimited {
+	if s.quota != nil && !res.Replay && !entitlement.Unlimited && deviceLimit == nil {
 		s.quota.QuotaUsed(ctx, c.User, usage, date, month)
 	}
 

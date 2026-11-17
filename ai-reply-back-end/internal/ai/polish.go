@@ -72,9 +72,6 @@ func (s *Service) Polish(ctx context.Context, req PolishRequest) (PolishResult, 
 	if traits.RuneLen(text) > lim.InstructionChars {
 		return PolishResult{TextLimit: lim.InstructionChars}, domain.ErrInstructionTooLong
 	}
-	if s.polishCapReached(ctx, req.User.ID, started) {
-		return PolishResult{Text: text}, nil
-	}
 	entitlement, err := s.subs.Entitlement(ctx, req.User.ID)
 	if err != nil {
 		return PolishResult{}, err
@@ -82,8 +79,13 @@ func (s *Service) Polish(ctx context.Context, req PolishRequest) (PolishResult, 
 
 	if s.proDevices != nil {
 		if err := s.proDevices.Authorize(ctx, req.User, req.DeviceID, entitlement); err != nil {
-			return PolishResult{}, err
+			if !purchasedDeviceFallback(entitlement, err) || entitlement.Balance.Packs <= 0 {
+				return PolishResult{}, err
+			}
 		}
+	}
+	if s.polishCapReached(ctx, req.User.ID, started) {
+		return PolishResult{Text: text}, nil
 	}
 	c := call{
 		Mode:       ModePolish,

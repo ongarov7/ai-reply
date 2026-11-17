@@ -48,11 +48,12 @@ func (s *Server) writeMe(w http.ResponseWriter, r *http.Request, user domain.Use
 		httpx.Fail(w, err)
 		return
 	}
+	usage := s.usageForDevice(r.Context(), user, DeviceFrom(r.Context()), entitlement)
 	httpx.JSON(w, http.StatusOK, meResponse{
 		User:         s.userDTO(r.Context(), user, profile),
 		Profile:      toProfileDTO(profile),
 		Subscription: s.subscriptionDTO(entitlement),
-		Usage:        s.usage(entitlement),
+		Usage:        usage,
 		LegalConsent: consent,
 	})
 }
@@ -211,7 +212,7 @@ func (s *Server) handleUsage(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, err)
 		return
 	}
-	httpx.JSON(w, http.StatusOK, s.usage(entitlement))
+	httpx.JSON(w, http.StatusOK, s.usageForDevice(r.Context(), user, DeviceFrom(r.Context()), entitlement))
 }
 
 // handleSubscription — ағымдағы тариф.

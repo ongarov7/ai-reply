@@ -51,6 +51,9 @@ func billingSandboxConfig(primary config.Config) (config.Config, error) {
 	base.Path = "/sandbox"
 	sandbox.App.PublicBaseURL = strings.TrimRight(base.String(), "/")
 	sandbox.App.MacOSDownloadURL = macOSInstaller
+	// The published Windows preview uses production accounts. There is no
+	// separate sandbox build, so the test site must not advertise that binary.
+	sandbox.App.WindowsDownloadURL = ""
 	sandbox.App.Env = "staging"
 	sandbox.App.SimulatorEnabled = false
 	sandbox.Auth.AccessSecret = sandboxSecret(primary.Auth.AccessSecret, "access")

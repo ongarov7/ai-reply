@@ -43,9 +43,10 @@ type landingView struct {
 	PricingCTA      string
 	PricingNote     string
 	// AppStoreURL, PlayStoreURL — дүкендегі бет (APP_STORE_URL, PLAY_STORE_URL); бос — «жақында».
-	AppStoreURL      string
-	PlayStoreURL     string
-	MacOSDownloadURL string
+	AppStoreURL        string
+	PlayStoreURL       string
+	MacOSDownloadURL   string
+	WindowsDownloadURL string
 }
 
 // demoScene — лендингтегі анимацияланған мысал.
@@ -89,7 +90,7 @@ func (s *Server) handleLanding(w http.ResponseWriter, r *http.Request) {
 	}
 	view := landingView{baseView: s.base(locale), Boot: template.JS(boot),
 		AppStoreURL: s.cfg.App.AppStoreURL, PlayStoreURL: s.cfg.App.PlayStoreURL,
-		MacOSDownloadURL: s.cfg.App.MacOSInstallerURL()}
+		MacOSDownloadURL: s.cfg.App.MacOSInstallerURL(), WindowsDownloadURL: s.cfg.App.WindowsInstallerURL()}
 	view.CommercialPage = true
 	purchasable := false
 	for _, p := range list {

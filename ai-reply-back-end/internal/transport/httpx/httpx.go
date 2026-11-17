@@ -119,13 +119,20 @@ func Translate(err error) (int, string, string) {
 		}
 		return fallback
 	}
+	proStatus := func() int {
+		var e interface{ HTTPStatus() int }
+		if errors.As(err, &e) && e.HTTPStatus() == http.StatusConflict {
+			return http.StatusConflict
+		}
+		return http.StatusForbidden
+	}
 	switch {
 	case errors.Is(err, domain.ErrProDeviceLimit):
-		return http.StatusForbidden, "PRO_DEVICE_LIMIT_REACHED", public("Your Pro subscription already has an authorized device in this category.")
+		return proStatus(), "PRO_DEVICE_LIMIT_REACHED", public("Your Pro subscription already has an authorized device in this category.")
 	case errors.Is(err, domain.ErrProDeviceRevoked):
-		return http.StatusForbidden, "PRO_DEVICE_REVOKED", public("Pro access for this device has been revoked.")
+		return proStatus(), "PRO_DEVICE_REVOKED", public("Pro access for this device has been revoked.")
 	case errors.Is(err, domain.ErrProDeviceIdentity):
-		return http.StatusForbidden, "PRO_DEVICE_IDENTITY_REQUIRED", public("Pro requires a verified app installation. Contact support.")
+		return proStatus(), "PRO_DEVICE_IDENTITY_REQUIRED", public("Pro requires a verified app installation. Contact support.")
 	case errors.Is(err, domain.ErrProDeviceManagementForbidden):
 		return http.StatusForbidden, "PRO_DEVICE_MANAGEMENT_FORBIDDEN", "Use an authorized device or contact support to release this slot."
 	case errors.Is(err, domain.ErrInvalidEmail):

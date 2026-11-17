@@ -160,7 +160,9 @@ func (s *Service) Transcribe(ctx context.Context, req TranscribeRequest) (Transc
 			return TranscribeResult{}, err
 		}
 		if err := s.proDevices.Authorize(ctx, req.User, req.DeviceID, ent); err != nil {
-			return TranscribeResult{}, err
+			if !purchasedDeviceFallback(ent, err) || ent.Balance.Packs <= 0 {
+				return TranscribeResult{}, err
+			}
 		}
 	}
 	result, reused, err := s.voice.do(ctx, req.User.ID+"\x00"+req.RequestID, func() (TranscribeResult, error) {

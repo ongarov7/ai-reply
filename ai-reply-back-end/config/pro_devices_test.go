@@ -16,6 +16,9 @@ func TestProDeviceRolloutGates(t *testing.T) {
 	}{
 		{"unreviewed clients", func(p *ProDevices) { p.Enabled = true; p.ShadowMode = false }},
 		{"shadow notifications", func(p *ProDevices) { p.NotificationsEnabled = true }},
+		{"legacy sessions without enforcement", func(p *ProDevices) { p.LegacySessions = true }},
+		{"legacy sessions in shadow", func(p *ProDevices) { p.Enabled = true; p.ClientsReady = true; p.LegacySessions = true }},
+		{"legacy sessions without readiness", func(p *ProDevices) { p.Enabled = true; p.ShadowMode = false; p.LegacySessions = true }},
 		{"relaxed mobile policy", func(p *ProDevices) { p.MaxMobileDevices = 2 }},
 		{"relaxed desktop policy", func(p *ProDevices) { p.MaxDesktopDevices = 2 }},
 		{"notification spam", func(p *ProDevices) {
@@ -41,14 +44,18 @@ func TestProDeviceRolloutGates(t *testing.T) {
 	if p := base.validate(); len(p) != 0 {
 		t.Fatal(p)
 	}
+	base.LegacySessions = true
+	if p := base.validate(); len(p) != 0 {
+		t.Fatal(p)
+	}
 }
 
 func TestProDeviceSafeEnvironmentDefaults(t *testing.T) {
-	for _, key := range []string{"PRO_DEVICE_LIMIT_ENABLED", "PRO_DEVICE_LIMIT_SHADOW_MODE", "PRO_DEVICE_LIMIT_CLIENTS_READY", "PRO_DEVICE_LIMIT_NOTIFICATIONS_ENABLED", "PRO_MAX_MOBILE_DEVICES", "PRO_MAX_DESKTOP_DEVICES", "PRO_DEVICE_LIMIT_NOTIFICATION_COOLDOWN"} {
+	for _, key := range []string{"PRO_DEVICE_LIMIT_ENABLED", "PRO_DEVICE_LIMIT_SHADOW_MODE", "PRO_DEVICE_LIMIT_CLIENTS_READY", "PRO_DEVICE_LIMIT_LEGACY_SESSIONS", "PRO_DEVICE_LIMIT_NOTIFICATIONS_ENABLED", "PRO_MAX_MOBILE_DEVICES", "PRO_MAX_DESKTOP_DEVICES", "PRO_DEVICE_LIMIT_NOTIFICATION_COOLDOWN"} {
 		t.Setenv(key, "")
 	}
 	p := proDevicesFromEnv()
-	if p.Enabled || !p.ShadowMode || p.ClientsReady || p.NotificationsEnabled || p.MaxMobileDevices != 1 || p.MaxDesktopDevices != 1 {
+	if p.Enabled || !p.ShadowMode || p.ClientsReady || p.LegacySessions || p.NotificationsEnabled || p.MaxMobileDevices != 1 || p.MaxDesktopDevices != 1 {
 		t.Fatalf("unsafe defaults: %+v", p)
 	}
 }

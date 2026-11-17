@@ -9,6 +9,7 @@ type ProDevices struct {
 	Enabled              bool
 	ShadowMode           bool
 	ClientsReady         bool
+	LegacySessions       bool
 	NotificationsEnabled bool
 	MaxMobileDevices     int
 	MaxDesktopDevices    int
@@ -20,6 +21,7 @@ func proDevicesFromEnv() ProDevices {
 		Enabled:              boolean("PRO_DEVICE_LIMIT_ENABLED", false),
 		ShadowMode:           boolean("PRO_DEVICE_LIMIT_SHADOW_MODE", true),
 		ClientsReady:         boolean("PRO_DEVICE_LIMIT_CLIENTS_READY", false),
+		LegacySessions:       boolean("PRO_DEVICE_LIMIT_LEGACY_SESSIONS", false),
 		NotificationsEnabled: boolean("PRO_DEVICE_LIMIT_NOTIFICATIONS_ENABLED", false),
 		MaxMobileDevices:     num("PRO_MAX_MOBILE_DEVICES", 1),
 		MaxDesktopDevices:    num("PRO_MAX_DESKTOP_DEVICES", 1),
@@ -36,6 +38,9 @@ func (p ProDevices) validate() []string {
 	}
 	if p.Enabled && !p.ShadowMode && !p.ClientsReady {
 		problems = append(problems, "strict PRO_DEVICE_LIMIT_ENABLED requires PRO_DEVICE_LIMIT_CLIENTS_READY=true after client compatibility and existing-account migration review")
+	}
+	if p.LegacySessions && (!p.Enabled || p.ShadowMode || !p.ClientsReady) {
+		problems = append(problems, "PRO_DEVICE_LIMIT_LEGACY_SESSIONS requires ready strict enforcement")
 	}
 	if p.NotificationsEnabled && (!p.Enabled || p.ShadowMode || !p.ClientsReady) {
 		problems = append(problems, "PRO_DEVICE_LIMIT_NOTIFICATIONS_ENABLED requires ready strict enforcement; shadow mode never sends blocked-device notifications")

@@ -138,6 +138,19 @@ func TestBillingSandboxMacDownloadNeverInheritsPrimaryRelease(t *testing.T) {
 	}
 }
 
+func TestBillingSandboxWindowsDownloadNeverInheritsPrimaryRelease(t *testing.T) {
+	const installer = "https://billing.example.invalid/downloads/windows/AIReply-Setup-1.0.1.exe"
+	primary := billingPrimaryFixture(t)
+	primary.App.WindowsDownloadURL = installer
+	child, err := billingSandboxConfig(primary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if primary.App.WindowsInstallerURL() != installer || child.App.WindowsDownloadURL != "" || child.App.WindowsInstallerURL() != "" {
+		t.Fatal("sandbox derivation changed the primary release or retained the production Windows installer")
+	}
+}
+
 func TestBillingSandboxCannotRevokePrimaryAppleCredentials(t *testing.T) {
 	primary := billingPrimaryFixture(t)
 	primary.OAuth = config.OAuth{

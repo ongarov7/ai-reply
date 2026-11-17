@@ -59,9 +59,12 @@ func (s *Store) ClaimProDevice(ctx context.Context, userID, deviceID, category, 
 	err := s.db.Tx(ctx, func(tx *sql.Tx) error {
 		var storedPlatform string
 		var revoked sql.NullInt64
-		err := tx.QueryRowContext(ctx, `SELECT platform,revoked_at FROM devices WHERE id=? AND user_id=?`,
-			deviceID, userID).Scan(&storedPlatform, &revoked)
-		if errors.Is(err, sql.ErrNoRows) || (err == nil && (revoked.Valid || strings.ToLower(strings.TrimSpace(storedPlatform)) != platform)) {
+		var aliases int
+		err := tx.QueryRowContext(ctx, `SELECT platform,revoked_at,
+ (SELECT COUNT(*) FROM pro_device_session_aliases WHERE device_id=devices.id)
+ FROM devices WHERE id=? AND user_id=?`,
+			deviceID, userID).Scan(&storedPlatform, &revoked, &aliases)
+		if errors.Is(err, sql.ErrNoRows) || (err == nil && (revoked.Valid || aliases != 0 || strings.ToLower(strings.TrimSpace(storedPlatform)) != platform)) {
 			return domain.ErrProDeviceIdentity
 		}
 		if err != nil {
@@ -223,8 +226,19 @@ func (s *Store) RevokeProDevice(ctx context.Context, userID, authorizationID, ac
 		if _, err := tx.ExecContext(ctx, `UPDATE devices SET revoked_at=?,push_token=NULL,push_enabled=0 WHERE id=? AND user_id=?`, ms(now), a.DeviceID, userID); err != nil {
 			return err
 		}
+		if _, err := tx.ExecContext(ctx, `UPDATE pro_device_session_aliases SET revoked_at=?,revoked_reason=?
+ WHERE user_id=? AND canonical_device_id=? AND revoked_at IS NULL`, ms(now), reason, userID, a.DeviceID); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE devices SET revoked_at=?,push_token=NULL,push_enabled=0
+ WHERE user_id=? AND id IN (SELECT device_id FROM pro_device_session_aliases WHERE user_id=? AND canonical_device_id=?)`,
+			ms(now), userID, userID, a.DeviceID); err != nil {
+			return err
+		}
 		if _, err := tx.ExecContext(ctx, `UPDATE refresh_tokens SET revoked_at=?,revoked_reason='pro_device_revoked'
- WHERE user_id=? AND device_id=? AND revoked_at IS NULL`, ms(now), userID, a.DeviceID); err != nil {
+ WHERE user_id=? AND (device_id=? OR device_id IN
+ (SELECT device_id FROM pro_device_session_aliases WHERE user_id=? AND canonical_device_id=?)) AND revoked_at IS NULL`,
+			ms(now), userID, a.DeviceID, userID, a.DeviceID); err != nil {
 			return err
 		}
 		// A released device must no longer receive future security pushes.
@@ -253,27 +267,31 @@ func (s *Store) RevokeProDevice(ctx context.Context, userID, authorizationID, ac
 // link is evidence of cloned/restored identifiers and must be resolved manually.
 func (s *Store) BindProDeviceInstallation(ctx context.Context, userID, deviceID, installationID string) error {
 	return s.db.Tx(ctx, func(tx *sql.Tx) error {
-		var internalID string
-		err := tx.QueryRowContext(ctx, `SELECT i.id FROM app_installations i JOIN devices d ON d.id=?
+		return bindProDeviceInstallation(ctx, tx, userID, deviceID, installationID)
+	})
+}
+
+func bindProDeviceInstallation(ctx context.Context, tx *sql.Tx, userID, deviceID, installationID string) error {
+	var internalID string
+	err := tx.QueryRowContext(ctx, `SELECT i.id FROM app_installations i JOIN devices d ON d.id=?
  WHERE i.installation_id=? AND i.user_id=? AND d.user_id=? AND d.revoked_at IS NULL
  AND lower(trim(d.platform))=i.platform`, deviceID, installationID, userID, userID).Scan(&internalID)
-		if errors.Is(err, sql.ErrNoRows) {
-			return domain.ErrProDeviceIdentity
-		}
-		if err != nil {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO pro_device_installations(device_id,user_id,installation_id) VALUES(?,?,?)
- ON CONFLICT DO NOTHING`, deviceID, userID, internalID); err != nil {
-			return err
-		}
-		var linked string
-		err = tx.QueryRowContext(ctx, `SELECT installation_id FROM pro_device_installations WHERE device_id=?`, deviceID).Scan(&linked)
-		if errors.Is(err, sql.ErrNoRows) || (err == nil && linked != internalID) {
-			return domain.ErrProDeviceIdentity
-		}
+	if errors.Is(err, sql.ErrNoRows) {
+		return domain.ErrProDeviceIdentity
+	}
+	if err != nil {
 		return err
-	})
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO pro_device_installations(device_id,user_id,installation_id) VALUES(?,?,?)
+ ON CONFLICT DO NOTHING`, deviceID, userID, internalID); err != nil {
+		return err
+	}
+	var linked string
+	err = tx.QueryRowContext(ctx, `SELECT installation_id FROM pro_device_installations WHERE device_id=?`, deviceID).Scan(&linked)
+	if errors.Is(err, sql.ErrNoRows) || (err == nil && linked != internalID) {
+		return domain.ErrProDeviceIdentity
+	}
+	return err
 }
 
 func (s *Store) ProDevicePushTargets(ctx context.Context, userID, deviceID string) ([]string, error) {

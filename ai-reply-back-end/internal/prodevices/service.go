@@ -6,6 +6,7 @@ import (
 	"crypto/hmac"
 	"errors"
 	"log/slog"
+	"net/http"
 	"strings"
 	"time"
 
@@ -59,6 +60,13 @@ func Category(platform string) string {
 
 func (s *Service) strict() bool { return s.cfg.Enabled && !s.cfg.ShadowMode && s.cfg.ClientsReady }
 
+// Released clients bind their signed device ID without an installation claim.
+// This explicit compatibility policy never downgrades a nonempty signed claim.
+func (s *Service) legacySession(ctx context.Context) bool {
+	identity, _ := ctx.Value(identityKey{}).(string)
+	return s.strict() && s.cfg.LegacySessions && identity == ""
+}
+
 // Authorize uses only the entitlement already resolved by the subscription
 // engine. It runs before provider work, reservations, or cached voice results.
 func (s *Service) Authorize(ctx context.Context, user domain.User, deviceID string, ent domain.Entitlement) error {
@@ -68,6 +76,20 @@ func (s *Service) Authorize(ctx context.Context, user domain.User, deviceID stri
 	mode := "shadow"
 	if s.strict() {
 		mode = "enforce"
+	}
+	legacy := s.legacySession(ctx)
+	if legacy {
+		canonicalID, err := s.repo.CanonicalProDeviceID(ctx, user.ID, deviceID)
+		if err != nil {
+			if errors.Is(err, domain.ErrNotFound) || errors.Is(err, domain.ErrProDeviceIdentity) {
+				return s.reject(ctx, user, deviceID, "", "", domain.ErrProDeviceIdentity, mode)
+			}
+			if errors.Is(err, domain.ErrProDeviceRevoked) {
+				return s.reject(ctx, user, deviceID, "", "", domain.ErrProDeviceRevoked, mode)
+			}
+			return s.failure(err, mode)
+		}
+		deviceID = canonicalID
 	}
 	device, err := s.repo.Device(ctx, deviceID)
 	if err != nil && !errors.Is(err, domain.ErrNotFound) {
@@ -80,19 +102,21 @@ func (s *Service) Authorize(ctx context.Context, user domain.User, deviceID stri
 	if device.RevokedAt != nil {
 		return s.reject(ctx, user, deviceID, category, device.Platform, domain.ErrProDeviceRevoked, mode)
 	}
-	// Existing released clients may be observed, but cannot be certified from
-	// mutable device metadata alone. Strict mode requires both a signed iid and
-	// an explicit link to the existing installation registry.
-	identity, _ := ctx.Value(identityKey{}).(string)
-	raw, bindErr := s.repo.ProDeviceRawInstallationID(ctx, user.ID, deviceID)
-	if bindErr != nil && !errors.Is(bindErr, domain.ErrNotFound) {
-		return s.failure(bindErr, mode)
-	}
-	bound := bindErr == nil && s.identitySecret != "" && identity != "" &&
-		hmac.Equal([]byte(identity), []byte(auth.InstallationIdentity(s.identitySecret, raw)))
-	if !bound {
-		if err := s.reject(ctx, user, deviceID, category, device.Platform, domain.ErrProDeviceIdentity, mode); err != nil {
-			return err
+	// Full strict sessions require both their signed installation identity and
+	// current registration ownership. Legacy compatibility instead relies on
+	// the existing signed device and explicitly registered recovery aliases.
+	if !legacy {
+		identity, _ := ctx.Value(identityKey{}).(string)
+		raw, bindErr := s.repo.ProDeviceRawInstallationID(ctx, user.ID, deviceID)
+		if bindErr != nil && !errors.Is(bindErr, domain.ErrNotFound) {
+			return s.failure(bindErr, mode)
+		}
+		bound := bindErr == nil && s.identitySecret != "" && identity != "" &&
+			hmac.Equal([]byte(identity), []byte(auth.InstallationIdentity(s.identitySecret, raw)))
+		if !bound {
+			if err := s.reject(ctx, user, deviceID, category, device.Platform, domain.ErrProDeviceIdentity, mode); err != nil {
+				return err
+			}
 		}
 	}
 	if !s.strict() {
@@ -170,14 +194,20 @@ func (s *Service) reject(ctx context.Context, user domain.User, deviceID, catego
 			s.log.Error("pro device notification queue failed", "user_id", user.ID, "error", err)
 		}
 	}
-	return &Error{Cause: reason, Category: category, Locale: user.Locale}
+	return &Error{Cause: reason, Category: category, Locale: user.Locale, LegacySession: s.legacySession(ctx)}
 }
 
 func (s *Service) BindInstallation(ctx context.Context, userID, deviceID, installationID string) {
 	if !s.cfg.Enabled && !s.cfg.ShadowMode {
 		return
 	}
-	if err := s.repo.BindProDeviceInstallation(ctx, userID, deviceID, installationID); err != nil {
+	var bindErr error
+	if s.legacySession(ctx) {
+		bindErr = s.repo.BindLegacyProDeviceInstallation(ctx, userID, deviceID, installationID)
+	} else {
+		bindErr = s.repo.BindProDeviceInstallation(ctx, userID, deviceID, installationID)
+	}
+	if bindErr != nil {
 		s.log.Info("pro installation binding unavailable", "user_id", userID, "reason", "missing_or_conflicting_registration")
 		return
 	}
@@ -209,11 +239,18 @@ func (s *Service) Revoke(ctx context.Context, userID, authorizationID, callerDev
 			return nil
 		}
 	}
-	// A copied legacy did without a signed installation cannot release a slot.
-	identity, _ := ctx.Value(identityKey{}).(string)
-	raw, err := s.repo.ProDeviceRawInstallationID(ctx, userID, callerDeviceID)
-	if err != nil || identity == "" || !hmac.Equal([]byte(identity), []byte(auth.InstallationIdentity(s.identitySecret, raw))) {
-		return domain.ErrProDeviceManagementForbidden
+	if s.legacySession(ctx) {
+		canonicalID, err := s.repo.CanonicalProDeviceID(ctx, userID, callerDeviceID)
+		if err != nil {
+			return domain.ErrProDeviceManagementForbidden
+		}
+		callerDeviceID = canonicalID
+	} else {
+		identity, _ := ctx.Value(identityKey{}).(string)
+		raw, err := s.repo.ProDeviceRawInstallationID(ctx, userID, callerDeviceID)
+		if err != nil || identity == "" || !hmac.Equal([]byte(identity), []byte(auth.InstallationIdentity(s.identitySecret, raw))) {
+			return domain.ErrProDeviceManagementForbidden
+		}
 	}
 	return s.repo.RevokeProDevice(ctx, userID, authorizationID, callerDeviceID, traits.Clamp(reason, 200), false, s.clock.Now())
 }
@@ -221,6 +258,14 @@ func (s *Service) Revoke(ctx context.Context, userID, authorizationID, callerDev
 // RevokeRegisteredDevice closes the older management route as a way around
 // trusted-device release. Unrelated legacy devices keep their previous API.
 func (s *Service) RevokeRegisteredDevice(ctx context.Context, userID, targetDeviceID, callerDeviceID string) (bool, error) {
+	if s.legacySession(ctx) {
+		canonicalID, err := s.repo.CanonicalProDeviceID(ctx, userID, targetDeviceID)
+		if err == nil {
+			targetDeviceID = canonicalID
+		} else if !errors.Is(err, domain.ErrNotFound) && !errors.Is(err, domain.ErrProDeviceIdentity) && !errors.Is(err, domain.ErrProDeviceRevoked) {
+			return true, err
+		}
+	}
 	a, err := s.repo.ProDeviceAuthorization(ctx, userID, targetDeviceID)
 	if errors.Is(err, domain.ErrNotFound) {
 		return false, nil
@@ -235,10 +280,19 @@ func (s *Service) RevokeRegisteredDevice(ctx context.Context, userID, targetDevi
 type Error struct {
 	Cause            error
 	Category, Locale string
+	LegacySession    bool
 }
 
 func (e *Error) Error() string { return e.Cause.Error() }
 func (e *Error) Unwrap() error { return e.Cause }
+func (e *Error) HTTPStatus() int {
+	if e.LegacySession {
+		// Released apps interpret unknown 403 responses as an expired session.
+		// A conflict refuses AI access without refreshing or clearing credentials.
+		return http.StatusConflict
+	}
+	return http.StatusForbidden
+}
 func (e *Error) Details() map[string]any {
 	return map[string]any{"device_category": e.Category, "allowed_devices": 1}
 }

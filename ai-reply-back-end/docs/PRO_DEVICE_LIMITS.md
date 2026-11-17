@@ -1,6 +1,68 @@
 # Pro device limits: audit, compatibility and operations
 
-Strict enforcement is **disabled by default**. This change is a compatible backend foundation, not authorization to deploy or enable it in production. Pro remains unlimited while the existing entitlement service grants unlimited Pro benefits. Free, Base, purchased balances, billing, renewal and refund rules remain owned by the existing services.
+Strict enforcement is **disabled by default**. The original signed-installation policy and its historical rollout findings are documented below. The released-client compatibility policy added on 16 November 2026 is described in the next section. Pro remains unlimited on its authorized device while the existing entitlement service grants unlimited Pro benefits. Free, Base, purchased balances, billing, renewal and refund rules remain owned by the existing services.
+
+## Released-client compatibility policy — 16 November 2026
+
+The owner requested backend-only enforcement for published iOS and Android apps. These apps already send a stable session device ID, but do not send the independent installation ID during sign-in. `PRO_DEVICE_LIMIT_LEGACY_SESSIONS=true` explicitly permits verified legacy sessions with an empty signed installation claim to use their existing device ID. It requires enabled, non-shadow enforcement and the readiness gate. Defaults remain unchanged. Sessions with a nonempty installation claim retain all original strict checks; an inconsistent signed claim never downgrades to compatibility access.
+
+The policy uses the existing atomic authorizations: one mobile slot shared by iOS/Android/iPadOS and one desktop slot shared by macOS/Windows. Monthly and yearly unlimited entitlements use the same guard. An additional device cannot use unlimited benefits, including through an already-open or refreshed session. Separately purchased replies remain usable under the purchased-pack policy below. Account, subscription and purchase verification remain available, and a denied request does not spend credits. Successful native purchase verification attempts to claim an empty slot for the buyer before their first AI request; replaying/restoring a purchase cannot replace an occupied slot and still finishes normally.
+
+Authenticated installation registration can recover a historical per-account device after A → B → A. Additive migration `0041_pro_device_session_aliases.sql` records an immutable session alias to the existing same-user, same-platform device. Registration cannot merge authorizations, change a binding, bypass a revocation or alias a different registered installation. Revoking the canonical authorization also revokes its alias devices and refresh families atomically. Existing signed-installation behavior remains independent of aliases.
+
+Published apps map an unfamiliar HTTP 403 to an authentication failure. Compatibility AI denials therefore use **HTTP 409** with the existing `PRO_DEVICE_LIMIT_REACHED`, `PRO_DEVICE_REVOKED` or `PRO_DEVICE_IDENTITY_REQUIRED` code and safe details. This avoids an unnecessary authentication retry. Current apps display their generic conflict message; they cannot show the server's dedicated explanation without a client update. Subscription data continues to report the actual paid Pro plan. On a valid additional device, usage is projected to its finite purchased-pack allowance, so a profile or token refresh does not incorrectly restore the cached unlimited indicator.
+
+This prevents ordinary account sharing across separately signed-in phones. The existing API cannot prove physical hardware identity against deliberate copying of a device ID or bearer credentials; compatibility mode does not claim hardware attestation. Reinstallation or a genuinely replaced phone requires explicit owner/support slot recovery, while account switching on the same registered installation can recover automatically. No IP, model, push token or User-Agent is used as an identity.
+
+Activation configuration for this policy:
+
+```dotenv
+PRO_DEVICE_LIMIT_ENABLED=true
+PRO_DEVICE_LIMIT_SHADOW_MODE=false
+PRO_DEVICE_LIMIT_CLIENTS_READY=true
+PRO_DEVICE_LIMIT_LEGACY_SESSIONS=true
+PRO_MAX_MOBILE_DEVICES=1
+PRO_MAX_DESKTOP_DEVICES=1
+PRO_DEVICE_LIMIT_NOTIFICATIONS_ENABLED=false
+```
+
+Before activation, preserve the old image, source, private environment and consistent SQLite backups. Inventory unlimited subscribers across `subscriptions`, `apple_subscriptions`, `google_subscriptions` and bank periods; manual subscriptions alone do not include App Store purchases. Preserve a reviewed existing owner with a seeded authorization and audit event. Do not select a winner from shadow observations or let a new request displace an existing customer. Abort automatic seeding if more than one plausible existing device/installation remains. Migration 0041 creates no authorizations or aliases automatically.
+
+To disable this policy, set **all** of `PRO_DEVICE_LIMIT_LEGACY_SESSIONS=false`, `PRO_DEVICE_LIMIT_ENABLED=false`, `PRO_DEVICE_LIMIT_SHADOW_MODE=false` and `PRO_DEVICE_LIMIT_NOTIFICATIONS_ENABLED=false`, then recreate the backend. Disabling only enforcement while leaving legacy compatibility enabled fails configuration validation; leaving shadow mode enabled continues observation. Preserve additive schema, authorizations, aliases and billing data. A binary rollback may use the prior image with this additive schema retained; do not restore an older payment database over newer transactions.
+
+Focused API coverage is in `pro_device_legacy_test.go` and `pro_device_legacy_identity_test.go`: published request shape, every mobile combination, independent desktop slot, existing/rotated sessions, account switching, purchase verification, monthly/yearly Apple entitlement, denied provider calls, unchanged balances, support revocation, signed-identity downgrade refusal and unaffected Free/Base usage. Repository tests exercise alias ownership, binding immutability, platform pinning and revocation.
+
+### Purchased packs on additional devices
+
+The owner explicitly selected this rule on 16 November: an account with active Pro and retained purchased replies may use those purchased replies on an additional phone or computer. Unlimited Pro remains restricted to the existing one-mobile/one-desktop pair. Only an occupied-slot denial permits this fallback; revoked devices, invalid installation identity and storage errors stay denied.
+
+Reply and compose use a request-scoped finite entitlement and `ReserveInput.PurchasedOnly`. The original subscription and slot ownership stay unchanged. The writer transaction can debit only `credit_grants.kind='pack'` for the same account; unlimited/daily/monthly allowance, passes, welcome bonuses and admin credits cannot fund an additional-device request. The successful response reports `unlimited=false`, `bucket=pack` and the remaining purchased balance. An authorized device still uses unlimited benefits without reducing packs. Zero packs preserve the Pro-device denial.
+
+Sign-in/refresh, purchase responses, `/me` and `/me/usage` apply the same finite usage projection only when device authorization returns the occupied-slot error. The actual subscription/plan stays Pro and account management still returns success. Authorized devices continue to receive unlimited usage, and Free/limited-pack accounts retain their existing balances. Identity, revocation and storage errors are never treated as evidence of eligibility for paid fallback. Another app's cached screen still needs its normal next refresh to receive the new counters.
+
+The shared pack debit, ledger and reservation commit atomically before provider work. Distinct simultaneous requests cannot spend the same last unit. Provider failure refunds that same pack reservation once. Existing bounded retry of a paid pack action remains available even after its final unit; a key previously funded by unlimited Pro or another excluded bucket cannot be replayed for free on an extra device. This retains retry behavior without making Pro transferable through request keys.
+
+Polish and dictation remain auxiliary operations under their existing per-account caps. An additional device needs a currently positive purchased balance for these operations; they do not debit an answer unit. Authentication and revocation checks occur before cached voice results or polish-cap shortcuts. Derived finite access does not send an exhausted-Pro quota notification.
+
+Accounts without active unlimited Pro keep the existing shared pack behavior on every device. Server accounting is immediate and authoritative, while another app's cached balance refreshes on its next account/usage/generation request; there is no continuous balance push. API regressions include pack30/pack500 across all four platforms and eight distinct concurrent actions competing for one last reply. Dedicated fallback coverage is in `pro_device_pack_fallback_test.go`; repository policy/replay/SQLite race checks are in `purchased_only_credits_test.go`. No new schema migration is required.
+
+### Production activation evidence
+
+Activated on 16 November 2026 at the owner's request. The existing production subscriber had one native device, one currently owned installation, a live refresh session and successful AI history; this reviewed device was seeded with an `authorized` audit event before enforcement. No historical multi-device account was assigned an arbitrary winner. Inspection also found an account with two Android registrations and an iPhone whose legacy Pro expired on 3 November; it currently uses purchased packs, so the unlimited-device policy does not block those balances.
+
+Backup directory: `/home/ai-reply-backups/pro-devices-20261116T133139Z`. It contains the original source/private environment, verified online backups of both SQLite databases, the prior image reference and activation metadata. Prior image tag: `ai-reply-backend:before-pro-devices-20261116T133139Z`; deployed image also tagged `ai-reply-backend:pro-devices-20261116`. Source upload SHA-256: `d02936491203283f775c466c5c0414e7670e6440b39054e5f51cc394a0f65de9`. All original non-policy environment assignments were preserved verbatim.
+
+Validation completed: full `go test ./...`, `go vet ./...`, repository race suite and targeted API race suite; image build and production configuration check; migration against both production-database copies with all 61 existing tables unchanged; live health checks; actual HTTP sandbox checks using old-style signed sessions with no installation claim. A pre-existing synthetic reservation stopped permitted AI requests before provider calls: iPhone and desktop reached the reservation conflict, second Android received `409 PRO_DEVICE_LIMIT_REACHED`, and the blocked phone retained account access. No AI usage event or notification was created, and the synthetic account and dependent rows were removed.
+
+After deployment each database has migration 0041 exactly once, `quick_check=ok` and no foreign-key violations. Existing purchases, Apple/Google/bank subscriptions, bank orders, credit grants and manual subscriptions compare identically to the pre-activation backup in both databases. Production has one seeded active mobile authorization; sandbox has no retained test authorization. Physical-device UI verification was not performed; the published apps retain the generic-conflict-message limitation described above.
+
+### Purchased-pack follow-up deployment
+
+The owner-approved purchased-only fallback and device-scoped usage projection were deployed on 16 November 2026. Backup: `/home/ai-reply-backups/pro-pack-fallback-20261116`; rollback image tag: `ai-reply-backend:before-pro-pack-fallback-20261116`. Final uploaded source SHA-256: `5a454ae4fda274f7c58d0003ec7df98e40432fefc6db09a079a39ebf9e61296a`; running image: `sha256:154406a91dcb63fb6ccf111ef77f0585c244c6c1d30bbaceb247cdaa8c4f88b1`, also tagged `ai-reply-backend:pro-pack-fallback-20261116`.
+
+Full backend tests, `go vet` and focused race tests passed. New coverage proves pack30/pack500 sharing across four platforms, exactly one success from eight distinct concurrent requests for the final unit, purchased-only selection, same-pack refunds, replay restrictions, and finite usage after extra-device sign-in/refresh/status reload. A live sandbox HTTP check retained the authorized phone/desktop, refused unlimited access on an extra phone with no pack, allowed a positive pack balance to reach a safety reservation, and confirmed finite extra-device usage while the owners retained unlimited usage. Safety reservations prevented provider calls; zero AI usage events were created and all synthetic rows were removed.
+
+Final read-only checks report healthy production/sandbox, zero restarts/errors, no new migrations, no duplicate active category slots and preserved authorization owners. Every existing financial row in both databases matches the follow-up backup. Private environment, Caddy and the Windows executable are unchanged. Recovery disables the feature or uses the saved recent image without restoring a payment database. The already-published Windows preview page remains available.
 
 ## Repository audit
 

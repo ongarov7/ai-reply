@@ -198,7 +198,10 @@ func (s *Server) writePurchase(w http.ResponseWriter, r *http.Request, user doma
 		httpx.JSON(w, http.StatusOK, purchaseResponse{Status: res.Status})
 		return
 	}
-	usage := s.usage(entitlement)
+	// Reserve an empty Pro slot for the purchasing session before another
+	// phone signs in. Verification/restore must still succeed on a blocked
+	// device so StoreKit/Play can finish an already granted transaction.
+	usage := s.usageForDevice(r.Context(), user, DeviceFrom(r.Context()), entitlement)
 	httpx.JSON(w, http.StatusOK, purchaseResponse{Status: res.Status, Usage: &usage})
 }
 

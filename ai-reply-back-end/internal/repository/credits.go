@@ -28,7 +28,10 @@ type ReserveInput struct {
 	DailyLimit   int
 	MonthlyLimit int
 	Unlimited    bool
-	Now          time.Time
+	// PurchasedOnly restricts an extra Pro device to the shared paid packs.
+	// Plan quota, unlimited access, pass, welcome and admin grants are excluded.
+	PurchasedOnly bool
+	Now           time.Time
 }
 
 // Reservation — брон нәтижесі.
@@ -97,6 +100,8 @@ func (s *Store) ReserveGeneration(ctx context.Context, in ReserveInput) (Reserva
 
 		var closed error
 		switch {
+		case in.PurchasedOnly:
+			closed = domain.ErrDailyLimit
 		case !in.Unlimited && (in.DailyLimit <= 0 || day >= in.DailyLimit):
 			closed = domain.ErrDailyLimit
 		case !in.Unlimited && in.MonthlyLimit > 0 && mon >= in.MonthlyLimit:
@@ -140,10 +145,11 @@ func (s *Store) ReserveGeneration(ctx context.Context, in ReserveInput) (Reserva
 				WHERE id = (SELECT id FROM credit_grants
 				            WHERE user_id = ? AND status = 'active' AND units_remaining > 0
 				              AND kind IN ('pass','welcome','admin','pack')
+				              AND (? = 0 OR kind = 'pack')
 				              AND starts_at <= ? AND (expires_at IS NULL OR expires_at > ?)
 				            ORDER BY `+grantOrder+` LIMIT 1)
 				  AND units_remaining > 0
-				RETURNING id, kind, units_remaining`, now, in.UserID, now, now).Scan(&out.GrantID, &kind, &left)
+				RETURNING id, kind, units_remaining`, now, in.UserID, in.PurchasedOnly, now, now).Scan(&out.GrantID, &kind, &left)
 			if errors.Is(err, sql.ErrNoRows) {
 				return closed
 			}
@@ -183,7 +189,7 @@ func (s *Store) ReserveGeneration(ctx context.Context, in ReserveInput) (Reserva
 			return err
 		}
 		out.UsedToday, out.UsedMonth = day, mon
-		out.Balance, err = creditBalance(ctx, tx, in.UserID, in.Now)
+		out.Balance, err = reservationCreditBalance(ctx, tx, in)
 		return err
 	})
 	if err != nil {
@@ -218,6 +224,11 @@ func claimKey(ctx context.Context, tx *sql.Tx, in ReserveInput, out *Reservation
 		_, err := tx.ExecContext(ctx, `DELETE FROM usage_reservations WHERE id = ?`, id)
 		return false, err
 	}
+	// An extra device cannot replay a request that the authorized device paid
+	// for using its unlimited subscription or another excluded allowance.
+	if in.PurchasedOnly && bucket != domain.GrantPack {
+		return true, domain.ConflictField("idempotency_key", "used")
+	}
 	if mode != in.Mode {
 		return true, domain.ConflictField("idempotency_key", "used")
 	}
@@ -239,13 +250,21 @@ func claimKey(ctx context.Context, tx *sql.Tx, in ReserveInput, out *Reservation
 	if err != nil {
 		return true, err
 	}
-	balance, err := creditBalance(ctx, tx, in.UserID, in.Now)
+	balance, err := reservationCreditBalance(ctx, tx, in)
 	if err != nil {
 		return true, err
 	}
 	*out = Reservation{ID: id, Bucket: bucket, GrantID: grant.String, Replay: true,
 		UsedToday: day, UsedMonth: mon, Balance: balance}
 	return true, nil
+}
+
+func reservationCreditBalance(ctx context.Context, q querier, in ReserveInput) (domain.CreditBalance, error) {
+	balance, err := creditBalance(ctx, q, in.UserID, in.Now)
+	if in.PurchasedOnly {
+		return domain.CreditBalance{Packs: balance.Packs}, err
+	}
+	return balance, err
 }
 
 // counters — тарифтің бүгінгі және айлық санағышы (транзакция ішінде).

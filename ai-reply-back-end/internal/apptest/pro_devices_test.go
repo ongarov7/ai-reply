@@ -102,7 +102,7 @@ func TestProDeviceDeniedBeforeEveryAIProviderAndCreditReservation(t *testing.T) 
 	h := newHarness(t, approvedEntitlements(), strictProDevices(), withWelcomeBonus(10))
 	first, _ := h.signInProDevice("pro-endpoints@example.com", "endpoint-device-0001", "ios", installID(811))
 	h.assignPlan(h.signInAdmin(), first.userID, "pro_monthly", "")
-	h.addGrant(first.userID, domain.GrantPack, 30, h.clock.Now(), nil, h.clock.Now())
+	h.addGrant(first.userID, domain.GrantAdmin, 30, h.clock.Now(), nil, h.clock.Now())
 	allowed := h.generate(first.access, "Сәлем")
 	mustStatus(t, allowed, http.StatusOK, "")
 	if allowed.str("usage", "bucket") != "unlimited" {
@@ -118,8 +118,12 @@ func TestProDeviceDeniedBeforeEveryAIProviderAndCreditReservation(t *testing.T) 
 		t.Fatal("a denied installation reached an AI provider")
 	}
 	usage := h.do(http.MethodGet, "/api/v1/me/usage", nil, h.auth(second.access))
-	if usage.num("purchased_credits") != 30 || usage.num("welcome", "remaining") != 10 || usage.body["unlimited"] != true {
-		t.Fatalf("denial changed entitlement or consumed balances: %s", usage.raw)
+	if usage.num("admin_credits") != 0 || usage.num("purchased_credits") != 0 || usage.num("welcome", "remaining") != 0 || usage.body["unlimited"] != false {
+		t.Fatalf("additional device advertises unusable benefits: %s", usage.raw)
+	}
+	ownerUsage := h.do(http.MethodGet, "/api/v1/me/usage", nil, h.auth(first.access))
+	if ownerUsage.num("admin_credits") != 30 || ownerUsage.num("welcome", "remaining") != 10 || ownerUsage.body["unlimited"] != true {
+		t.Fatalf("denial changed the paid account or consumed balances: %s", ownerUsage.raw)
 	}
 	if len(h.push.messages()) != 0 || len(h.mail.messages()) != 0 {
 		t.Fatal("authorization performed synchronous notification delivery")

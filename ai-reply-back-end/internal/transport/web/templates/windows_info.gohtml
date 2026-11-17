@@ -1,0 +1,35 @@
+{{define "title"}}{{call .T "windows.title"}}{{end}}
+{{define "content"}}
+<main class="wrap">
+  <article class="legal">
+    <h1>{{call .T "windows.title"}}</h1>
+    <p>{{call .T "windows.intro"}}</p>
+    <p>{{call .T "windows.requirements"}}</p>
+    {{if .WindowsDownloadURL}}
+    <h2>{{call .T "windows.preview"}}</h2>
+    <p>{{call .T "windows.preview_body"}}</p>
+    <p>{{call .T "windows.signature"}}</p>
+    <p><a class="btn btn-primary" href="{{.WindowsDownloadURL}}">{{call .T "windows.download"}}</a></p>
+    <h2>{{call .T "windows.install_title"}}</h2>
+    <ol>
+      <li>{{call .T "windows.install_step1"}}</li>
+      <li>{{call .T "windows.install_step2"}}</li>
+      <li>{{call .T "windows.install_step3"}}</li>
+    </ol>
+    {{else}}
+    <p>{{call .T "windows.soon"}}</p>
+    {{end}}
+    <h2>{{call .T "windows.account_title"}}</h2>
+    <p>{{call .T "windows.account_body"}}</p>
+    <p><a href="{{.BasePath}}/?lang={{.Locale}}#pricing">{{call .T "windows.pricing_link"}}</a></p>
+    {{if .CheckoutEnabled}}
+    <p>{{call .T "mac.checkout_enabled"}}</p>
+    {{else}}
+    <p>{{call .T "mac.checkout_disabled"}}</p>
+    {{end}}
+    <p><a class="btn btn-ghost" href="{{.BasePath}}/payment?lang={{.Locale}}">{{call .T "account.open"}}</a></p>
+    <p>{{call .T "windows.microphone"}}</p>
+    <p><a href="{{.BasePath}}/support?lang={{.Locale}}">{{call .T "footer.support"}}</a> · <a href="{{.BasePath}}/privacy?lang={{.Locale}}">{{call .T "footer.privacy"}}</a></p>
+  </article>
+</main>
+{{end}}

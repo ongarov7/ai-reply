@@ -163,7 +163,7 @@
 <section class="reveal" id="download">
   <div class="wrap">
     <div class="cta-box">
-      {{if or .AppStoreURL .PlayStoreURL .MacOSDownloadURL}}
+      {{if or .AppStoreURL .PlayStoreURL .MacOSDownloadURL .WindowsDownloadURL}}
       <h2>{{call .T "download.title_available"}}</h2>
       <p>{{call .T "download.body_available"}}</p>
       {{else}}
@@ -176,6 +176,7 @@
         {{if .PlayStoreURL}}<a class="store" href="{{.PlayStoreURL}}" rel="noopener"><small>{{call .T "download.available"}}</small><b>Google Play</b></a>
         {{else}}<span class="store"><small>{{call .T "download.soon"}}</small><b>Google Play</b></span>{{end}}
         <a class="store" href="{{.BasePath}}/mac?lang={{.Locale}}"><small>{{if .MacOSDownloadURL}}{{call .T "download.available"}}{{else}}{{call .T "download.soon"}}{{end}}</small><b>macOS</b></a>
+        {{if .WindowsDownloadURL}}<a class="store" href="{{.BasePath}}/windows?lang={{.Locale}}"><small>{{call .T "windows.preview"}}</small><b>Windows</b></a>{{end}}
       </div>
     </div>
   </div>

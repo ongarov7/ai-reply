@@ -39,6 +39,7 @@ func (s *Store) UpsertDevice(ctx context.Context, d domain.Device) (domain.Devic
 				platform = CASE WHEN
                     EXISTS (SELECT 1 FROM pro_device_authorizations WHERE device_id = devices.id)
                     OR EXISTS (SELECT 1 FROM pro_device_installations WHERE device_id = devices.id)
+                    OR EXISTS (SELECT 1 FROM pro_device_session_aliases WHERE device_id = devices.id OR canonical_device_id = devices.id)
                     THEN devices.platform ELSE excluded.platform END,
 				app_version = excluded.app_version,
 				os_version = excluded.os_version,
@@ -121,7 +122,10 @@ func (s *Store) RevokeDevice(ctx context.Context, userID, id string) error {
 	res, err := s.db.Writer().ExecContext(ctx,
 		`UPDATE devices SET revoked_at = ?, push_token = NULL, push_enabled = 0
 		 WHERE id = ? AND user_id = ? AND revoked_at IS NULL
-		 AND NOT EXISTS (SELECT 1 FROM pro_device_authorizations WHERE device_id = devices.id)`, ms(time.Now()), id, userID)
+		 AND NOT EXISTS (SELECT 1 FROM pro_device_authorizations WHERE device_id = devices.id)
+		 AND NOT EXISTS (SELECT 1 FROM pro_device_session_aliases a
+ JOIN pro_device_authorizations p ON p.device_id=a.canonical_device_id AND p.user_id=a.user_id
+ WHERE a.device_id=devices.id AND a.user_id=devices.user_id)`, ms(time.Now()), id, userID)
 	if err != nil {
 		return err
 	}
@@ -130,7 +134,11 @@ func (s *Store) RevokeDevice(ctx context.Context, userID, id string) error {
 	}
 	var protected int
 	if err := s.db.Reader().QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM pro_device_authorizations WHERE device_id=? AND user_id=?`, id, userID).Scan(&protected); err != nil {
+		`SELECT (SELECT COUNT(*) FROM pro_device_authorizations WHERE device_id=? AND user_id=?) +
+ (SELECT COUNT(*) FROM pro_device_session_aliases a
+ JOIN pro_device_authorizations p ON p.device_id=a.canonical_device_id AND p.user_id=a.user_id
+ WHERE a.user_id=? AND a.device_id=?)`,
+		id, userID, userID, id).Scan(&protected); err != nil {
 		return err
 	}
 	if protected != 0 {

@@ -62,9 +62,10 @@ type App struct {
 	// SimulatorEnabled — /simulator өнім демонстрациясы (SIMULATOR_ENABLED; әдепкі тек development/test).
 	SimulatorEnabled bool
 	// AppStoreURL, PlayStoreURL — лендингтегі дүкен сілтемелері; бос болса «жақында» белгісі қалады.
-	AppStoreURL      string
-	PlayStoreURL     string
-	MacOSDownloadURL string
+	AppStoreURL        string
+	PlayStoreURL       string
+	MacOSDownloadURL   string
+	WindowsDownloadURL string
 }
 
 // ContactEmail — қолдау мен заң беттеріндегі байланыс мекенжайы (CONTACT_EMAIL).
@@ -427,10 +428,11 @@ func Load(envFile string) (Config, error) {
 			Contact:       strings.ToLower(str("CONTACT_EMAIL", "")),
 			// The product demo signs in with the admin account and drives a
 			// real AI account: on a public server it is opt-in.
-			SimulatorEnabled: boolean("SIMULATOR_ENABLED", appEnv == "development" || appEnv == "test"),
-			AppStoreURL:      str("APP_STORE_URL", ""),
-			PlayStoreURL:     str("PLAY_STORE_URL", ""),
-			MacOSDownloadURL: str("MACOS_DOWNLOAD_URL", ""),
+			SimulatorEnabled:   boolean("SIMULATOR_ENABLED", appEnv == "development" || appEnv == "test"),
+			AppStoreURL:        str("APP_STORE_URL", ""),
+			PlayStoreURL:       str("PLAY_STORE_URL", ""),
+			MacOSDownloadURL:   str("MACOS_DOWNLOAD_URL", ""),
+			WindowsDownloadURL: str("WINDOWS_DOWNLOAD_URL", ""),
 		},
 		Database: Database{
 			Path:           str("SQLITE_PATH", "data/aireply.db"),
@@ -683,6 +685,9 @@ func (c Config) Validate() []string {
 	problems = append(problems, c.MacContext.validate()...)
 	if c.App.MacOSDownloadURL != "" && c.App.MacOSInstallerURL() == "" {
 		problems = append(problems, "MACOS_DOWNLOAD_URL must be an HTTPS .dmg URL under /downloads/macos/ on the PUBLIC_BASE_URL host, without credentials, query or fragment")
+	}
+	if c.App.WindowsDownloadURL != "" && c.App.WindowsInstallerURL() == "" {
+		problems = append(problems, "WINDOWS_DOWNLOAD_URL must be an HTTPS .exe URL under /downloads/windows/ on the PUBLIC_BASE_URL host, without credentials, query, fragment or encoded path")
 	}
 	if c.BillingSandboxMacOSDownloadURL != "" && c.BillingSandboxMacOSInstallerURL() == "" {
 		problems = append(problems, "BILLING_SANDBOX_MACOS_DOWNLOAD_URL must be a separate HTTPS .dmg URL under /downloads/macos/ on the PUBLIC_BASE_URL host, without credentials, query or fragment; it must differ from MACOS_DOWNLOAD_URL")
