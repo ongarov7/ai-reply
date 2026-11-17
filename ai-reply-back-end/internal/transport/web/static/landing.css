@@ -255,9 +255,14 @@ a.store:hover { background: rgba(255, 255, 255, .14); }
   h1 { font-size: 48px; }
   h2 { font-size: 34px; }
 }
-@media (max-width: 720px) {
-  .site-header .btn-sm { display: none; }
+@media (max-width: 760px) {
+  /* The sign-in button stays on phones; the download link lives on the page. */
+  .site-header .header-download { display: none; }
+  .site-header .header-sign-in { padding: 0 12px; }
   .site-header .wrap { gap: 12px; }
+}
+@media (max-width: 359px) {
+  .site-header .header-sign-in { display: none; }
 }
 @media (max-width: 520px) {
   body { font-size: 16px; }
@@ -339,7 +344,8 @@ a.store:hover { background: rgba(255, 255, 255, .14); }
   .bubble.is-typing::after, .typing i { animation: none; }
 }
 
-@media (max-width: 1100px) {
+/* With «Sign in» next to «Download», ru/kk menus need about 1160px in one line. */
+@media (max-width: 1180px) {
   .nav { display: none; }
   .nav-toggle { display: block; }
   .site-header.is-open .nav {

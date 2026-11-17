@@ -92,7 +92,8 @@ func New(d Deps) (*Server, error) {
 		return nil, err
 	}
 	s.adminVersion = version
-	s.accountVersion, err = assetVersion("static/account.js", "static/account.css")
+	// The cabinet's scripts and stylesheet ship together: one version for all.
+	s.accountVersion, err = assetVersion("static/account.js", "static/account.css", "static/cabinet.js", "static/cabinet-capture.js")
 	if err != nil {
 		return nil, err
 	}

@@ -1,71 +1,236 @@
 {{define "title"}}{{if .PaymentPage}}{{call .T "account.payment_title"}}{{else}}{{call .T "account.title"}}{{end}} — AI Reply{{end}}
 {{define "content"}}
-<main class="account-page wrap" id="account-app" aria-busy="true">
+<main class="account-page" id="account-app" aria-busy="true" data-state="loading"{{if .PaymentPage}} data-page="payment"{{end}}>
   <script id="account-data" type="application/json">{{.AccountBoot}}</script>
+  <div class="account-wrap">
   <div class="account-heading"><span class="badge">AI Reply</span><h1>{{if .PaymentPage}}{{call .T "account.payment_title"}}{{else}}{{call .T "account.title"}}{{end}}</h1><p class="lede">{{if .PaymentPage}}{{call .T "account.payment_intro"}}{{else}}{{call .T "account.intro"}}{{end}}</p></div>
   {{if .PaymentPage}}<section class="account-public-offers" aria-label="{{call .T "account.top_up"}}">{{range .Offers}}<article class="account-card account-public-offer" data-public-product="{{.Code}}"><h2 data-offer-name>{{.Name}}</h2><p class="account-public-price" data-offer-price>{{.PriceText}}</p><p><strong data-offer-units>{{.Units}}</strong> {{call $.T "account.public_units"}}</p><p class="account-muted">{{call $.T "account.pack_hint"}}</p><a class="btn btn-primary" data-public-offer="{{.Code}}" href="#account-login">{{call $.T "account.choose_pack"}}</a></article>{{else}}<p class="account-muted">{{call .T "account.bank_unavailable"}}</p>{{end}}</section>{{end}}
-  <p id="account-loading" role="status">{{call .T "account.loading"}}</p>
+  <p id="account-loading" class="account-loading" role="status">{{call .T "account.loading"}}</p>
   <p id="account-error" class="account-error" role="alert" hidden></p>
-  <button id="account-reload" class="btn btn-ghost" type="button" hidden>{{call .T "account.retry"}}</button>
-  <section id="account-switch" class="account-card account-login" hidden aria-labelledby="account-switch-title">
+  <button id="account-reload" class="btn btn-ghost account-reload" type="button" hidden>{{call .T "account.retry"}}</button>
+  <section id="account-switch" class="account-card account-login account-switch" hidden aria-labelledby="account-switch-title">
     <h2 id="account-switch-title">{{call .T "account.switch_title"}}</h2>
     <p id="account-switch-message"></p>
     <p class="account-muted">{{call .T "account.switch_hint"}}</p>
     <div class="account-order-actions"><button id="account-switch-confirm" class="btn btn-primary" type="button">{{call .T "account.switch_confirm"}}</button><button id="account-switch-cancel" class="btn btn-ghost" type="button">{{call .T "account.switch_cancel"}}</button></div>
   </section>
   <section id="account-login" class="account-card account-login" hidden aria-labelledby="account-login-title">
-    <h2 id="account-login-title">{{call .T "account.sign_in"}}</h2>
-    <p>{{call .T "account.email_hint"}}</p>
-    <p class="account-muted">{{call .T "account.apple_hint"}}</p>
-    <div class="account-form">
-      <form id="account-email-form">
-        <label for="account-email">{{call .T "account.email"}}</label>
-        <input id="account-email" name="email" type="email" autocomplete="email" inputmode="email" maxlength="254" required>
-        <button class="btn btn-primary" type="submit">{{call .T "account.send_code"}}</button>
-      </form>
-      <form id="account-code-form" hidden>
-        <p id="account-code-hint" class="form-status" role="status"></p>
-        <label for="account-code">{{call .T "account.code"}}</label>
-        <input id="account-code" name="code" type="text" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required>
-        <div class="form-actions"><button class="btn btn-primary" type="submit">{{call .T "account.sign_in"}}</button><button id="account-change-email" class="btn btn-ghost" type="button">{{call .T "account.change_email"}}</button><button id="account-resend" class="btn btn-ghost" type="button" disabled>{{call .T "account.resend"}}</button></div>
-        <p id="account-resend-hint" class="form-hint" role="status"></p>
-      </form>
+    <div class="account-login-main">
+      <h2 id="account-login-title">{{call .T "account.sign_in_title"}}</h2>
+      <p>{{call .T "account.email_hint"}}</p>
+      <p class="account-muted">{{call .T "account.apple_hint"}}</p>
+      <div class="account-form">
+        <form id="account-email-form">
+          <label for="account-email">{{call .T "account.email"}}</label>
+          <input id="account-email" name="email" type="email" autocomplete="email" inputmode="email" maxlength="254" required>
+          <button class="btn btn-primary" type="submit">{{call .T "account.send_code"}}</button>
+        </form>
+        <form id="account-code-form" hidden>
+          <p id="account-code-hint" class="form-status" role="status"></p>
+          <label for="account-code">{{call .T "account.code"}}</label>
+          <input id="account-code" name="code" type="text" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required>
+          <div class="form-actions"><button class="btn btn-primary" type="submit">{{call .T "account.sign_in"}}</button><button id="account-change-email" class="btn btn-ghost" type="button">{{call .T "account.change_email"}}</button><button id="account-resend" class="btn btn-ghost" type="button" disabled>{{call .T "account.resend"}}</button></div>
+          <p id="account-resend-hint" class="form-hint" role="status"></p>
+        </form>
+      </div>
+      <p class="account-muted account-terms">{{call .T "account.terms_hint"}} <a href="{{.BasePath}}/offer?lang={{.Locale}}">{{call .T "footer.terms"}}</a> · <a href="{{.BasePath}}/privacy?lang={{.Locale}}">{{call .T "footer.privacy"}}</a></p>
     </div>
-    <p class="account-muted account-terms">{{call .T "account.terms_hint"}} <a href="{{.BasePath}}/offer?lang={{.Locale}}">{{call .T "footer.terms"}}</a> · <a href="{{.BasePath}}/privacy?lang={{.Locale}}">{{call .T "footer.privacy"}}</a></p>
+    <div class="account-benefits">
+      <h3>{{call .T "account.benefits.title"}}</h3>
+      <ul>
+        <li>{{template "cabinet_icon_check"}}<span>{{call .T "account.benefits.balance"}}</span></li>
+        <li>{{template "cabinet_icon_check"}}<span>{{call .T "account.benefits.profile"}}</span></li>
+        <li>{{template "cabinet_icon_check"}}<span>{{call .T "account.benefits.recipients"}}</span></li>
+        <li>{{template "cabinet_icon_check"}}<span>{{call .T "account.benefits.top_up"}}</span></li>
+        <li>{{template "cabinet_icon_check"}}<span>{{call .T "account.benefits.apps"}}</span></li>
+      </ul>
+    </div>
   </section>
-  <div id="account-content" hidden>
-    <div class="account-grid">
-      <section class="account-card" aria-labelledby="account-identity-title">
-        <div class="account-card-heading"><h2 id="account-identity-title">{{call .T "account.your_account"}}</h2><button id="account-logout" class="account-link" type="button">{{call .T "account.logout"}}</button></div>
+  <div id="account-content" class="cabinet" hidden>
+    <div class="cabinet-side">
+      <nav class="cabinet-nav" aria-label="{{call .T "account.nav.label"}}">
+        <ul>
+          <li><a href="#overview" data-section-link="overview">{{template "cabinet_icon_overview"}}<span>{{call .T "account.section.overview"}}</span></a></li>
+          <li data-feature="ai_context" hidden><a href="#profile" data-section-link="profile">{{template "cabinet_icon_profile"}}<span>{{call .T "account.section.profile"}}</span></a></li>
+          <li data-feature="ai_context" hidden><a href="#recipients" data-section-link="recipients">{{template "cabinet_icon_recipients"}}<span>{{call .T "account.section.recipients"}}</span></a></li>
+          <li><a href="#billing" data-section-link="billing">{{template "cabinet_icon_billing"}}<span>{{call .T "account.section.billing"}}</span></a></li>
+          <li><a href="#apps" data-section-link="apps">{{template "cabinet_icon_apps"}}<span>{{call .T "account.section.apps"}}</span></a></li>
+        </ul>
+      </nav>
+      <section class="cabinet-account" aria-labelledby="account-identity-title">
+        <h2 id="account-identity-title">{{call .T "account.your_account"}}</h2>
         <p id="account-confirmed-email" class="account-email"></p>
-        <p class="account-muted account-id">{{call .T "account.account_id"}} <span id="account-user-id"></span></p>
-        <p class="account-muted">{{call .T "account.recipient_hint"}}</p>
-        <dl class="account-balances"><div><dt>{{call .T "account.available"}}</dt><dd id="account-remaining"></dd></div><div><dt>{{call .T "account.purchased"}}</dt><dd id="account-purchased"></dd></div><div id="account-welcome-row" hidden><dt>{{call .T "account.welcome"}}</dt><dd id="account-welcome"></dd></div></dl>
-        <p class="account-muted" id="account-current-plan"></p>
-        <div id="account-subscriptions"></div>
-        <button id="account-refresh" class="account-link" type="button">{{call .T "account.refresh"}}</button>
-      </section>
-      <section class="account-card" aria-labelledby="account-pack-title">
-        <div class="account-card-heading"><h2 id="account-pack-title">{{call .T "account.top_up"}}</h2><span id="account-sandbox" class="badge" hidden>{{call .T "account.test_payment"}}</span></div>
-        <p>{{call .T "account.pack_hint"}}</p>
-        <p id="account-bank-unavailable" class="account-muted" hidden>{{call .T "account.bank_unavailable"}}</p>
-        <div id="account-terms-box" class="account-check" hidden><input id="account-purchase-terms" type="checkbox"><label for="account-purchase-terms">{{call .T "account.purchase_terms"}} <a href="{{.BasePath}}/offer?lang={{.Locale}}#web-purchases" target="_blank" rel="noopener">{{call .T "footer.terms"}}</a></label></div>
-        <div id="account-renewal-box" hidden>
-          <label for="account-card-expiry">{{call .T "account.card_expiry"}}</label>
-          <input id="account-card-expiry" type="month" autocomplete="off">
-          <p class="account-muted">{{call .T "account.card_expiry_hint"}}</p>
-          <div class="account-check"><input id="account-recurring-terms" type="checkbox"><label for="account-recurring-terms">{{call .T "account.recurring_terms"}}</label></div>
-        </div>
-        <div id="account-products"></div>
-        <p class="account-muted">{{call .T "account.card_hint"}}</p>
-        <a class="account-link" href="{{.BasePath}}/?lang={{.Locale}}#pricing">{{call .T "account.all_plans"}}</a>
+        <p class="account-id">{{call .T "account.account_id"}} <span id="account-user-id"></span></p>
+        <div class="cabinet-account-actions"><button id="account-logout" class="account-link" type="button">{{call .T "account.logout"}}</button><a class="account-link account-link-quiet" href="{{.BasePath}}/account/delete?lang={{.Locale}}">{{call .T "footer.delete_account"}}</a></div>
       </section>
     </div>
-    <section id="account-order" class="account-card account-order" hidden aria-labelledby="account-order-title" aria-live="polite">
-      <h2 id="account-order-title">{{call .T "account.order_title"}}</h2><p class="account-muted account-id">{{call .T "account.order_number"}} <span id="account-order-id"></span></p><p id="account-order-status"></p><p id="account-order-hint" class="account-muted"></p>
-      <div class="account-order-actions"><button id="account-check-order" class="btn btn-ghost" type="button">{{call .T "account.check_status"}}</button><button id="account-retry-checkout" class="btn btn-ghost" type="button" hidden>{{call .T "account.retry_checkout"}}</button><a id="account-continue-order" class="btn btn-primary" hidden>{{call .T "account.continue_payment"}}</a></div>
-    </section>
+    <div class="cabinet-main">
+      <section id="cabinet-overview" class="cabinet-panel" data-section="overview" aria-labelledby="cabinet-overview-title">
+        <div class="cabinet-panel-head">
+          <div><h2 id="cabinet-overview-title" tabindex="-1">{{call .T "account.overview.greeting"}}</h2><p id="cabinet-greeting" class="cabinet-lede"></p></div>
+          <nav class="cabinet-actions" aria-label="{{call .T "account.actions.title"}}"><a class="btn btn-primary btn-sm" href="#billing">{{call .T "account.top_up"}}</a><a class="btn btn-ghost btn-sm" href="#profile" data-feature="ai_context" hidden>{{call .T "account.actions.profile"}}</a><a class="btn btn-ghost btn-sm" href="#apps">{{call .T "account.actions.apps"}}</a></nav>
+        </div>
+        <dl class="cabinet-tiles">
+          <div class="cabinet-card cabinet-tile"><dt>{{call .T "account.available"}}</dt><dd><span id="cabinet-tile-available" class="cabinet-tile-value">—</span><span id="cabinet-tile-available-note" class="cabinet-tile-note"></span></dd></div>
+          <div class="cabinet-card cabinet-tile"><dt>{{call .T "account.overview.plan"}}</dt><dd><span id="cabinet-tile-plan" class="cabinet-tile-value cabinet-tile-text">—</span><span id="cabinet-tile-plan-note" class="cabinet-tile-note"></span></dd></div>
+          <div class="cabinet-card cabinet-tile"><dt>{{call .T "account.overview.used"}}</dt><dd><span id="cabinet-tile-used" class="cabinet-tile-value">—</span><span id="cabinet-tile-used-note" class="cabinet-tile-note"></span></dd></div>
+        </dl>
+        <section class="cabinet-card cabinet-chart-card" aria-labelledby="cabinet-chart-title">
+          <div class="cabinet-card-head"><h3 id="cabinet-chart-title">{{call .T "account.chart.title"}}</h3><p class="cabinet-muted">{{call .T "account.chart.subtitle"}}</p></div>
+          <p id="cabinet-chart-status" class="cabinet-muted cabinet-chart-status" role="status"></p>
+          <button id="cabinet-chart-retry" class="account-link" type="button" hidden>{{call .T "account.retry"}}</button>
+          <div id="cabinet-chart" class="cabinet-chart"></div>
+          <table id="cabinet-chart-table" class="visually-hidden"></table>
+        </section>
+        <div class="cabinet-row">
+          <section class="cabinet-card" aria-labelledby="cabinet-platforms-title">
+            <div class="cabinet-card-head"><h3 id="cabinet-platforms-title">{{call .T "account.platforms.title"}}</h3><p class="cabinet-muted">{{call .T "account.platforms.subtitle"}}</p></div>
+            <ul id="cabinet-platforms" class="cabinet-meters"></ul>
+            <p id="cabinet-platforms-empty" class="cabinet-muted" hidden>{{call .T "account.platforms.empty"}}</p>
+          </section>
+          <section id="cabinet-cost-card" class="cabinet-card cabinet-cost-card" aria-labelledby="cabinet-cost-title" hidden>
+            <div class="cabinet-card-head"><h3 id="cabinet-cost-title">{{call .T "account.cost.title"}}</h3></div>
+            <p id="cabinet-cost-value" class="cabinet-cost-value"></p>
+            <p id="cabinet-cost-note" class="cabinet-muted"></p>
+            <a class="account-link" href="#profile">{{call .T "account.cost.link"}}</a>
+          </section>
+        </div>
+      </section>
+
+      <section id="cabinet-profile" class="cabinet-panel" data-section="profile" aria-labelledby="cabinet-profile-title">
+        <div class="cabinet-panel-head"><div><h2 id="cabinet-profile-title" tabindex="-1">{{call .T "account.profile.title"}}</h2><p class="cabinet-lede">{{call .T "account.profile.intro"}}</p></div></div>
+        <p id="cabinet-profile-status" class="cabinet-muted cabinet-panel-status" role="status"></p>
+        <button id="cabinet-profile-retry" class="btn btn-ghost" type="button" hidden>{{call .T "account.retry"}}</button>
+        <div id="cabinet-profile-editor" class="cabinet-editor" hidden>
+          <div class="cabinet-card cabinet-switch-card">
+            <div class="cabinet-switch">
+              <label for="cabinet-ai-enabled"><strong>{{call .T "account.profile.enabled"}}</strong><span id="cabinet-ai-enabled-hint" class="cabinet-muted">{{call .T "account.profile.enabled_hint"}}</span></label>
+              <input id="cabinet-ai-enabled" type="checkbox" role="switch" aria-describedby="cabinet-ai-enabled-hint">
+            </div>
+            <p id="cabinet-cost-line" class="cabinet-cost-line"></p>
+            <p id="cabinet-saved-at" class="cabinet-muted cabinet-saved-at"></p>
+          </div>
+          <div class="cabinet-card cabinet-form-card">
+            <fieldset id="cabinet-roles" class="cabinet-fieldset" aria-describedby="cabinet-roles-count cabinet-roles-error">
+              <legend>{{call .T "account.profile.roles"}}</legend>
+              <div id="cabinet-roles-list" class="cabinet-chips"></div>
+              <p id="cabinet-roles-count" class="cabinet-hint"></p>
+              <p id="cabinet-roles-error" class="cabinet-field-error" hidden></p>
+            </fieldset>
+            <div class="cabinet-field">
+              <label for="cabinet-occupation">{{call .T "account.profile.occupation"}}</label>
+              <input id="cabinet-occupation" class="cabinet-input" type="text" autocomplete="off" placeholder="{{call .T "account.profile.occupation_placeholder"}}" aria-describedby="cabinet-occupation-count cabinet-occupation-error" data-field="occupation">
+              <div class="cabinet-field-foot"><span id="cabinet-occupation-count" class="cabinet-counter"></span></div>
+              <p id="cabinet-occupation-error" class="cabinet-field-error" hidden></p>
+            </div>
+            <fieldset id="cabinet-traits" class="cabinet-fieldset" aria-describedby="cabinet-traits-count cabinet-traits-error">
+              <legend>{{call .T "account.profile.traits"}}</legend>
+              <div id="cabinet-traits-list" class="cabinet-chips"></div>
+              <p id="cabinet-traits-count" class="cabinet-hint"></p>
+              <p id="cabinet-traits-error" class="cabinet-field-error" hidden></p>
+            </fieldset>
+          </div>
+          <div class="cabinet-card cabinet-form-card">
+            <div class="cabinet-field">
+              <label for="cabinet-about">{{call .T "account.profile.about"}}</label>
+              <p id="cabinet-about-hint" class="cabinet-hint">{{call .T "account.profile.about_hint"}}</p>
+              <textarea id="cabinet-about" class="cabinet-textarea" rows="6" placeholder="{{call .T "account.profile.about_placeholder"}}" aria-describedby="cabinet-about-hint cabinet-about-count cabinet-about-error" data-field="about"></textarea>
+              <div class="cabinet-field-foot">{{template "cabinet_mic" "cabinet-about"}}<span id="cabinet-about-count" class="cabinet-counter"></span></div>
+              <p id="cabinet-about-error" class="cabinet-field-error" hidden></p>
+            </div>
+            <div class="cabinet-field">
+              <label for="cabinet-audience">{{call .T "account.profile.audience"}}</label>
+              <textarea id="cabinet-audience" class="cabinet-textarea cabinet-textarea-short" rows="2" placeholder="{{call .T "account.profile.audience_placeholder"}}" aria-describedby="cabinet-audience-count cabinet-audience-error" data-field="audience"></textarea>
+              <div class="cabinet-field-foot">{{template "cabinet_mic" "cabinet-audience"}}<span id="cabinet-audience-count" class="cabinet-counter"></span></div>
+              <p id="cabinet-audience-error" class="cabinet-field-error" hidden></p>
+            </div>
+            <p class="cabinet-muted">{{call .T "account.profile.free_note"}}</p>
+            <p class="cabinet-muted">{{call .T "account.profile.privacy"}}</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="cabinet-recipients" class="cabinet-panel" data-section="recipients" aria-labelledby="cabinet-recipients-title">
+        <div class="cabinet-panel-head"><div><h2 id="cabinet-recipients-title" tabindex="-1">{{call .T "account.recipients.title"}}</h2><p class="cabinet-lede">{{call .T "account.recipients.intro"}}</p></div></div>
+        <p id="cabinet-recipients-status" class="cabinet-muted cabinet-panel-status" role="status"></p>
+        <button id="cabinet-recipients-retry" class="btn btn-ghost" type="button" hidden>{{call .T "account.retry"}}</button>
+        <div id="cabinet-recipients-editor" class="cabinet-recipients" hidden>
+          {{range .Recipients}}<article class="cabinet-card cabinet-recipient" aria-labelledby="cabinet-recipient-{{.}}-title">
+            <div class="cabinet-recipient-head"><h3 id="cabinet-recipient-{{.}}-title">{{call $.T (printf "account.recipient.%s" .)}}</h3><span id="cabinet-notes-{{.}}-cost" class="cabinet-cost-pill"></span></div>
+            <label for="cabinet-notes-{{.}}"><span class="visually-hidden">{{call $.T (printf "account.recipient.%s" .)}}. </span>{{call $.T "account.recipients.notes"}}</label>
+            <textarea id="cabinet-notes-{{.}}" class="cabinet-textarea" rows="4" placeholder="{{call $.T (printf "account.recipient.%s_placeholder" .)}}" aria-describedby="cabinet-notes-{{.}}-count cabinet-notes-{{.}}-error" data-field="notes" data-recipient="{{.}}"></textarea>
+            <div class="cabinet-field-foot">{{template "cabinet_mic" (printf "cabinet-notes-%s" .)}}<span id="cabinet-notes-{{.}}-count" class="cabinet-counter"></span></div>
+            <p id="cabinet-notes-{{.}}-error" class="cabinet-field-error" hidden></p>
+          </article>{{end}}
+        </div>
+      </section>
+
+      <section id="cabinet-billing" class="cabinet-panel" data-section="billing" aria-labelledby="cabinet-billing-title">
+        <div class="cabinet-panel-head"><div><h2 id="cabinet-billing-title" tabindex="-1">{{call .T "account.billing.title"}}</h2><p class="cabinet-lede">{{call .T "account.intro"}}</p></div></div>
+        <section class="cabinet-card" aria-labelledby="account-balance-title">
+          <div class="account-card-heading"><h3 id="account-balance-title">{{call .T "account.billing.balance"}}</h3><button id="account-refresh" class="account-link" type="button">{{call .T "account.refresh"}}</button></div>
+          <dl class="account-balances"><div><dt>{{call .T "account.available"}}</dt><dd id="account-remaining"></dd></div><div><dt>{{call .T "account.purchased"}}</dt><dd id="account-purchased"></dd></div><div id="account-welcome-row" hidden><dt>{{call .T "account.welcome"}}</dt><dd id="account-welcome"></dd></div></dl>
+          <p class="account-muted" id="account-current-plan"></p>
+          <div id="account-subscriptions" class="account-subscriptions"></div>
+        </section>
+        <section class="cabinet-card" aria-labelledby="account-pack-title">
+          <div class="account-card-heading"><h3 id="account-pack-title">{{call .T "account.top_up"}}</h3><span id="account-sandbox" class="badge" hidden>{{call .T "account.test_payment"}}</span></div>
+          <p class="account-recipient">{{call .T "account.billing.recipient"}} <strong data-cabinet-email></strong></p>
+          <p class="account-muted">{{call .T "account.recipient_hint"}}</p>
+          <p class="account-muted">{{call .T "account.pack_hint"}}</p>
+          <p id="account-bank-unavailable" class="account-muted" hidden>{{call .T "account.bank_unavailable"}}</p>
+          <div id="account-terms-box" class="account-check" hidden><input id="account-purchase-terms" type="checkbox"><label for="account-purchase-terms">{{call .T "account.purchase_terms"}} <a href="{{.BasePath}}/offer?lang={{.Locale}}#web-purchases" target="_blank" rel="noopener">{{call .T "footer.terms"}}</a></label></div>
+          <div id="account-renewal-box" class="account-renewal" hidden>
+            <label for="account-card-expiry">{{call .T "account.card_expiry"}}</label>
+            <input id="account-card-expiry" type="month" autocomplete="off">
+            <p class="account-muted">{{call .T "account.card_expiry_hint"}}</p>
+            <div class="account-check"><input id="account-recurring-terms" type="checkbox"><label for="account-recurring-terms">{{call .T "account.recurring_terms"}}</label></div>
+          </div>
+          <div id="account-products" class="account-products"></div>
+          <p class="account-muted">{{call .T "account.card_hint"}}</p>
+          <a class="account-link" href="{{.BasePath}}/?lang={{.Locale}}#pricing">{{call .T "account.all_plans"}}</a>
+        </section>
+        <section id="account-order" class="account-card account-order" hidden aria-labelledby="account-order-title" aria-live="polite">
+          <h3 id="account-order-title">{{call .T "account.order_title"}}</h3><p class="account-muted account-id">{{call .T "account.order_number"}} <span id="account-order-id"></span></p><p id="account-order-status"></p><p id="account-order-hint" class="account-muted"></p>
+          <div class="account-order-actions"><button id="account-check-order" class="btn btn-ghost" type="button">{{call .T "account.check_status"}}</button><button id="account-retry-checkout" class="btn btn-ghost" type="button" hidden>{{call .T "account.retry_checkout"}}</button><a id="account-continue-order" class="btn btn-primary" hidden>{{call .T "account.continue_payment"}}</a></div>
+        </section>
+      </section>
+
+      <section id="cabinet-apps" class="cabinet-panel" data-section="apps" aria-labelledby="cabinet-apps-title">
+        <div class="cabinet-panel-head"><div><h2 id="cabinet-apps-title" tabindex="-1">{{call .T "account.apps.title"}}</h2><p class="cabinet-lede">{{call .T "account.apps.intro"}}</p></div></div>
+        {{if or .AppStoreURL .PlayStoreURL .MacOSAvailable .WindowsAvailable}}<ul class="cabinet-apps">
+          {{if .AppStoreURL}}<li class="cabinet-card cabinet-app" data-app="ios"><span class="cabinet-app-icon">{{template "cabinet_icon_phone"}}</span><h3>{{call .T "account.apps.ios"}}</h3><p class="cabinet-muted">{{call .T "account.apps.ios_body"}}</p><a class="btn btn-ghost" href="{{.AppStoreURL}}" rel="noopener">{{call .T "account.apps.app_store"}}</a></li>{{end}}
+          {{if .PlayStoreURL}}<li class="cabinet-card cabinet-app" data-app="android"><span class="cabinet-app-icon">{{template "cabinet_icon_phone"}}</span><h3>{{call .T "account.apps.android"}}</h3><p class="cabinet-muted">{{call .T "account.apps.android_body"}}</p><a class="btn btn-ghost" href="{{.PlayStoreURL}}" rel="noopener">{{call .T "account.apps.google_play"}}</a></li>{{end}}
+          {{if .MacOSAvailable}}<li class="cabinet-card cabinet-app" data-app="macos"><span class="cabinet-app-icon">{{template "cabinet_icon_laptop"}}</span><h3>{{call .T "account.apps.mac"}}</h3><p class="cabinet-muted">{{call .T "account.apps.mac_body"}}</p><a class="btn btn-ghost" href="{{.BasePath}}/mac?lang={{.Locale}}">{{call .T "account.apps.download"}}</a></li>{{end}}
+          {{if .WindowsAvailable}}<li class="cabinet-card cabinet-app" data-app="windows"><span class="cabinet-app-icon">{{template "cabinet_icon_laptop"}}</span><h3>{{call .T "account.apps.windows"}} <span class="badge">{{call .T "windows.preview"}}</span></h3><p class="cabinet-muted">{{call .T "account.apps.windows_body"}}</p><a class="btn btn-ghost" href="{{.BasePath}}/windows?lang={{.Locale}}">{{call .T "account.apps.download"}}</a></li>{{end}}
+        </ul>{{else}}<div class="cabinet-card cabinet-empty"><p>{{call .T "account.apps.empty"}}</p></div>{{end}}
+      </section>
+
+      <div id="cabinet-savebar" class="cabinet-savebar" hidden>
+        <p id="cabinet-save-message" class="cabinet-save-message"></p>
+        <div class="cabinet-save-actions"><button id="cabinet-discard" class="btn btn-ghost" type="button">{{call .T "account.save.discard"}}</button><button id="cabinet-reload-context" class="btn btn-ghost" type="button" hidden>{{call .T "account.save.reload"}}</button><button id="cabinet-relogin" class="btn btn-ghost" type="button" hidden>{{call .T "account.save.relogin"}}</button><button id="cabinet-save" class="btn btn-primary" type="button">{{call .T "account.save.save"}}</button></div>
+      </div>
+    </div>
   </div>
+  <p id="cabinet-live" class="visually-hidden" role="status" aria-live="polite"></p>
+  <dialog id="cabinet-consent" class="cabinet-dialog" aria-labelledby="cabinet-consent-title" aria-describedby="cabinet-consent-body">
+    <h2 id="cabinet-consent-title">{{call .T "account.consent.title"}}</h2>
+    <p id="cabinet-consent-body">{{call .T "account.consent.body"}}</p>
+    <p class="cabinet-dialog-links"><a id="cabinet-consent-terms" href="{{.BasePath}}/offer?lang={{.Locale}}" target="_blank" rel="noopener">{{call .T "footer.terms"}}</a> · <a id="cabinet-consent-privacy" href="{{.BasePath}}/privacy?lang={{.Locale}}" target="_blank" rel="noopener">{{call .T "footer.privacy"}}</a></p>
+    <p id="cabinet-consent-error" class="cabinet-field-error" role="alert" hidden></p>
+    <div class="cabinet-dialog-actions"><button id="cabinet-consent-cancel" class="btn btn-ghost" type="button">{{call .T "account.consent.cancel"}}</button><button id="cabinet-consent-accept" class="btn btn-primary" type="button">{{call .T "account.consent.accept"}}</button></div>
+  </dialog>
   <noscript><p class="account-error">{{call .T "account.javascript"}}</p></noscript>
+  </div>
 </main>
 {{end}}
+
+{{define "cabinet_mic"}}<button class="cabinet-mic" type="button" data-mic-for="{{.}}" aria-describedby="{{.}}-voice" hidden><svg class="cabinet-mic-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg><svg class="cabinet-stop-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="7" y="7" width="10" height="10" rx="2"/></svg><span class="cabinet-mic-label"></span><span class="cabinet-mic-timer" hidden></span></button><span id="{{.}}-voice" class="cabinet-voice-status" role="status"></span>{{end}}
+{{define "cabinet_icon_check"}}<svg class="account-benefit-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 6 9 17l-5-5"/></svg>{{end}}
+{{define "cabinet_icon_overview"}}<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="3.5" width="7" height="8" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="5" rx="1.5"/><rect x="13.5" y="11.5" width="7" height="9" rx="1.5"/><rect x="3.5" y="14.5" width="7" height="6" rx="1.5"/></svg>{{end}}
+{{define "cabinet_icon_profile"}}<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/></svg>{{end}}
+{{define "cabinet_icon_recipients"}}<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 14a6.5 6.5 0 0 1 3 6"/></svg>{{end}}
+{{define "cabinet_icon_billing"}}<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4"/></svg>{{end}}
+{{define "cabinet_icon_apps"}}<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="2.5" y="4" width="13" height="10" rx="1.5"/><path d="M1.5 17.5h15"/><rect x="17" y="8" width="5.5" height="11" rx="1.5"/></svg>{{end}}
+{{define "cabinet_icon_phone"}}<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10.5 18.5h3"/></svg>{{end}}
+{{define "cabinet_icon_laptop"}}<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4" y="4.5" width="16" height="11" rx="1.5"/><path d="M2 19.5h20"/></svg>{{end}}
