@@ -44,6 +44,12 @@ function fixture(handler, options = {}) {
   let now = 100000, timerID = 0, random = 0;
   const document = { hidden: false, getElementById(id) { if (!nodes.has(id)) nodes.set(id, new Element()); return nodes.get(id); },
     createElement(tag) { return new Element(tag); }, querySelectorAll(selector) { return selector === '[data-public-offer]' ? options.publicLinks || [] : []; } };
+  // Only the cabinet tests below give the document events; every other test keeps the event-less fake.
+  const announced = [], listeners = {};
+  if (options.events) {
+    document.addEventListener = (type, fn) => { (listeners[type] = listeners[type] || []).push(fn); };
+    document.dispatchEvent = event => { announced.push(event); (listeners[event.type] || []).forEach(fn => fn(event)); return true; };
+  }
   const prefix = options.prefix === undefined ? '/sandbox' : options.prefix;
   const location = { origin: 'https://example.test', href: 'https://example.test' + prefix + '/payment' + (options.search || '') + (options.fragment ? '#' + options.fragment : ''),
     search: options.search || '', assign(url) { redirects.push(url); } };
@@ -67,7 +73,7 @@ function fixture(handler, options = {}) {
     }
     now = end; await flush();
   }
-  return { app, nodes, stored, requests, redirects, timers, accept, advance, words, location, historyCalls, events };
+  return { app, nodes, stored, requests, redirects, timers, accept, advance, words, location, historyCalls, events, document, announced };
 }
 function created(id = 'fixture-order-1') {
   return { payment_id: id, status: 'created', redirect_url: 'https://example.test/sandbox/api/v1/payments/bcc/orders/' + id + '/checkout?state=fixture' };
@@ -539,4 +545,30 @@ test('sandbox account deletion sends both steps only to sandbox endpoints', asyn
   emailForm.listeners.submit({ preventDefault() {} }); await flush();
   codeForm.listeners.submit({ preventDefault() {} }); await flush();
   assert.deepEqual(calls, ['/sandbox/api/v1/account/delete/request', '/sandbox/api/v1/account/delete/confirm']);
+});
+
+test('the account announces the session and sign-out to the cabinet', async () => {
+  const f = fixture(url => url.endsWith('/logout') ? response({ ok: true }) : response(session()), { events: true });
+  await f.app.init();
+  assert.deepEqual(f.announced.map(event => event.type), ['aireply:session']);
+  assert.equal(f.announced[0].detail.user.id, 'fixture-user-A');
+  assert.equal(f.announced[0].detail, f.app.state.session);
+  await f.app.refresh();
+  assert.deepEqual(f.announced.map(event => event.type), ['aireply:session', 'aireply:session']);
+  await f.app.logout();
+  assert.deepEqual(f.announced.map(event => event.type), ['aireply:session', 'aireply:session', 'aireply:signedout']);
+});
+
+test('the cabinet can end an expired session through the existing sign-out path', async () => {
+  const f = fixture(() => response(session()), { events: true });
+  await f.app.init();
+  f.document.dispatchEvent(new CustomEvent('aireply:unauthorized'));
+  assert.equal(f.app.state.session, null);
+  assert.equal(f.nodes.get('account-login').hidden, false);
+  assert.equal(f.nodes.get('account-content').hidden, true);
+  assert.equal(f.nodes.get('account-error').textContent, f.words['error.session']);
+  assert.equal(f.announced.at(-1).type, 'aireply:signedout');
+  const before = f.announced.length;
+  f.document.dispatchEvent(new CustomEvent('aireply:unauthorized'));
+  assert.equal(f.announced.length, before + 1, 'a second signal while signed out changes nothing');
 });

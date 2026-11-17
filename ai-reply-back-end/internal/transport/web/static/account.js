@@ -64,6 +64,12 @@
     }
     function text(id, value) { nodes[id].textContent = String(value == null ? '' : value); }
     function hidden(id, value) { nodes[id].hidden = value; }
+    // The cabinet (cabinet.js) follows the session through these events. A
+    // document without events (the Node tests' fake) simply has no listeners.
+    function announce(name, detail) {
+      if (typeof document.dispatchEvent !== 'function' || typeof CustomEvent !== 'function') return;
+      try { document.dispatchEvent(new CustomEvent(name, { detail: detail })); } catch (_) { /* A listener never breaks the account flow. */ }
+    }
     function notice(message) { text('error', message || ''); hidden('error', !message); }
     function setBusy(value) {
       state.busy = value;
@@ -147,6 +153,7 @@
       hidden('loading', true);
       hidden('switch', true);
       setBusy(false);
+      announce('aireply:signedout');
     }
     function fail(error) {
       if (error && error.status === 401) {
@@ -363,6 +370,7 @@
       renderProducts();
       renderSubscriptions();
       renderPending();
+      announce('aireply:session', payload);
       return payload;
     }
     function renderSubscriptions() {
@@ -661,6 +669,10 @@
     });
     nodes.reload.addEventListener('click', init);
     nodes['check-order'].addEventListener('click', function () { stopPolling(); checkOrder(); });
+    // The cabinet's own requests can find the session ended: sign out here, once.
+    if (typeof document.addEventListener === 'function') {
+      document.addEventListener('aireply:unauthorized', function () { if (state.session) fail({ status: 401 }); });
+    }
     function init() {
       notice(''); hidden('reload', true); hidden('loading', false); setBusy(true);
       if (handoff.present) return redeemHandoff(false);
