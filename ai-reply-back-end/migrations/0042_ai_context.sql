@@ -31,3 +31,6 @@ ALTER TABLE ai_usage_events ADD COLUMN context_chars INTEGER NOT NULL DEFAULT 0;
 -- rows, no key) it paid, so a free replay of its Idempotency-Key uses the
 -- account context only when the first generation paid for it.
 ALTER TABLE usage_reservations ADD COLUMN context_units INTEGER NOT NULL DEFAULT 0;
+
+-- The admin dashboard counts today's generations from the reservations.
+CREATE INDEX idx_usage_reservations_date ON usage_reservations (usage_date, mode, status);

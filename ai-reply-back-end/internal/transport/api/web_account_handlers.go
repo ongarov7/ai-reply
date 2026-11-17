@@ -240,7 +240,11 @@ func (a *webAccount) verify(w http.ResponseWriter, r *http.Request) {
 	// Changing accounts ends the previous browser session without touching the
 	// user's app sessions. A replayed OTP cannot manufacture a session.
 	if old, err := r.Cookie(a.cookieName()); err == nil {
-		_, _ = a.s.auth.LogoutSession(r.Context(), old.Value)
+		// Only a real website session: a native refresh token someone put in
+		// the cookie must not sign an app out.
+		if _, err := a.s.auth.AuthenticateWebSession(r.Context(), old.Value); err == nil {
+			_, _ = a.s.auth.LogoutSession(r.Context(), old.Value)
+		}
 	}
 	http.SetCookie(w, a.cookie(session.RefreshToken, session.RefreshExpiresAt))
 	a.session(w, r.WithContext(WithUser(r.Context(), session.User)))
@@ -248,9 +252,12 @@ func (a *webAccount) verify(w http.ResponseWriter, r *http.Request) {
 
 func (a *webAccount) logout(w http.ResponseWriter, r *http.Request) {
 	if cookie, err := r.Cookie(a.cookieName()); err == nil {
-		if _, err := a.s.auth.LogoutSession(r.Context(), cookie.Value); err != nil {
-			httpx.Fail(w, err)
-			return
+		// Only a real website session is ended here (never an app's token).
+		if _, err := a.s.auth.AuthenticateWebSession(r.Context(), cookie.Value); err == nil {
+			if _, err := a.s.auth.LogoutSession(r.Context(), cookie.Value); err != nil {
+				httpx.Fail(w, err)
+				return
+			}
 		}
 	}
 	http.SetCookie(w, a.cookie("", time.Unix(1, 0)))

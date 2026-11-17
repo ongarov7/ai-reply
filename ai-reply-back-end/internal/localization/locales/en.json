@@ -297,6 +297,7 @@
  "account.voice.failed": "The recording could not be recognised. Try again.",
  "account.voice.unavailable": "Voice input is not available right now.",
  "account.voice.consent_needed": "Accept the terms of service to use voice input.",
+ "account.voice.privacy_hint": "Dictated speech is transcribed by OpenAI; the recording is not stored.",
  "account.consent.title": "Accept the terms",
  "account.consent.body": "To turn speech into text, the recording is sent to the AI Reply server and to OpenAI. The server stores neither the recording nor the recognised text. To continue, accept the terms of service and the privacy policy.",
  "account.consent.accept": "Accept and continue",

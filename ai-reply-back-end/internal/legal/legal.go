@@ -5,7 +5,10 @@ package legal
 const (
 	TermsVersion   = "2026-10-08"
 	PrivacyVersion = "2026-10-14"
-	UpdatedDate    = "2026-10-14"
+	// The edition dates shown on the pages. A wording change that needs no
+	// new acceptance moves only these.
+	TermsUpdatedDate   = "2026-10-14"
+	PrivacyUpdatedDate = "2026-11-17"
 )
 
 // AIProvider — жауаптарды жазатын AI провайдері (келісім экраны мен құпиялық саясаты оны атайды).

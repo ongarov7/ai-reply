@@ -56,6 +56,7 @@ body.is-account { background: var(--bg-soft); }
 .account-card h2 { font-size: 22px; line-height: 1.3; margin: 0; }
 .account-card p { margin: 14px 0; }
 .account-muted, .cabinet-muted { color: var(--muted); font-size: 14px; }
+.cabinet-voice-note { margin: 8px 0 0; font-size: 13.5px; }
 .account-link {
   display: inline; padding: 0; border: 0; background: transparent; cursor: pointer;
   color: var(--brand-ink); font-size: 14px; text-decoration: underline; text-underline-offset: 3px;

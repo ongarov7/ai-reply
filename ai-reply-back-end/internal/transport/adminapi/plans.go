@@ -248,13 +248,22 @@ func (s *Server) handleSaveAIContextPricing(w http.ResponseWriter, r *http.Reque
 		httpx.Fail(w, domain.ErrNotFound)
 		return
 	}
-	var body aicontext.Pricing
+	var body struct {
+		CharsPerReply   *int `json:"chars_per_reply"`
+		FreeChars       *int `json:"free_chars"`
+		MaxExtraReplies *int `json:"max_extra_replies"`
+	}
 	if err := httpx.Decode(w, r, 1024, &body); err != nil {
 		httpx.Fail(w, err)
 		return
 	}
+	if body.CharsPerReply == nil || body.FreeChars == nil || body.MaxExtraReplies == nil {
+		httpx.Fail(w, domain.InvalidField("ai_context", "chars_per_reply, free_chars and max_extra_replies are required"))
+		return
+	}
 	before := s.context.Pricing(r.Context())
-	saved, err := s.context.UpdatePricing(r.Context(), body)
+	saved, err := s.context.UpdatePricing(r.Context(), aicontext.Pricing{
+		CharsPerReply: *body.CharsPerReply, FreeChars: *body.FreeChars, MaxExtraReplies: *body.MaxExtraReplies})
 	if err != nil {
 		var rangeErr *aicontext.PricingError
 		if errors.As(err, &rangeErr) {

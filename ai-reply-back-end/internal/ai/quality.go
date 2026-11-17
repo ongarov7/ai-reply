@@ -60,7 +60,7 @@ var (
 	// count: «Вариант 2 подходит» and "Option 2 works for me" are answers.
 	alternatives = regexp.MustCompile(`(?im)^\s*(?:вариант|option|нұсқа)\s*\d+\s*[:.)—–-]`)
 	// promptTags — промпт блоктарының аттары жауапқа түспеуі керек.
-	promptTags = regexp.MustCompile(`</?(?:incoming_message|user_instruction|user_profile|request|note|message)>`)
+	promptTags = regexp.MustCompile(`</?(?:incoming_message|user_instruction|user_profile|request|note|message|account_context|recipient_notes)>`)
 
 	markdownBold     = regexp.MustCompile(`\*\*([^*\n]+)\*\*`)
 	markdownUnder    = regexp.MustCompile(`__([^_\n]+)__`)

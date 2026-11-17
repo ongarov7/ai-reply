@@ -160,6 +160,9 @@ func TestWebCabinetAIContextUsageAndConsent(t *testing.T) {
 		t.Fatalf("upload without X-Requested-With: %d", w.Code)
 	}
 	if session.Features.VoiceTranscription {
+		if w := upload(origin, "AIReplyAccount", "another-account"); w.Code != http.StatusConflict {
+			t.Fatalf("a stale tab hears 409 before the consent check: %d %s", w.Code, w.Body.String())
+		}
 		if w := upload(origin, "AIReplyAccount"); w.Code != http.StatusForbidden || !strings.Contains(w.Body.String(), "CONSENT_REQUIRED") {
 			t.Fatalf("upload before consent: %d %s", w.Code, w.Body.String())
 		}
@@ -220,5 +223,27 @@ func TestWebHandoffCanOpenTheCabinet(t *testing.T) {
 	}
 	if w := request("admin"); w.Code != http.StatusBadRequest {
 		t.Fatalf("unknown target: %d %s", w.Code, w.Body.String())
+	}
+}
+
+func TestWebCookieIsNeverAnAppSession(t *testing.T) {
+	app := webTestApplication(t, webTestConfig(t))
+	origin := "https://billing.example.invalid"
+	cookie, _ := webTestSignIn(t, app.handler, "", "cookie-only@example.invalid")
+	w := webTestRequest(app.handler, http.MethodPost, "/api/v1/auth/refresh", map[string]any{"refresh_token": cookie.Value}, nil, origin, "")
+	if w.Code != http.StatusUnauthorized || strings.Contains(w.Body.String(), "access_token") {
+		t.Fatalf("the website cookie became an app session: %d %s", w.Code, w.Body.String())
+	}
+	if w := webTestRequest(app.handler, http.MethodGet, "/account/api/session", nil, cookie, "", ""); w.Code != http.StatusOK {
+		t.Fatalf("the refusal must not end the browser session: %d", w.Code)
+	}
+	// A native token put into the website cookie is not ended by a website sign-out.
+	native := handoffNativeSignIn(t, app, "native-in-cookie@example.invalid")
+	forged := &http.Cookie{Name: cookie.Name, Value: native.Refresh}
+	if w := webTestRequest(app.handler, http.MethodPost, "/account/api/logout", map[string]any{}, forged, origin, ""); w.Code != http.StatusOK {
+		t.Fatalf("logout: %d", w.Code)
+	}
+	if w := webTestRequest(app.handler, http.MethodPost, "/api/v1/auth/refresh", map[string]any{"refresh_token": native.Refresh, "device": map[string]string{"platform": "ios"}}, nil, origin, ""); w.Code != http.StatusOK {
+		t.Fatalf("a website sign-out ended the app session: %d %s", w.Code, w.Body.String())
 	}
 }

@@ -297,6 +297,7 @@
  "account.voice.failed": "Yozuvni aniqlab bo‘lmadi. Qayta urinib ko‘ring.",
  "account.voice.unavailable": "Ovozli kiritish hozir mavjud emas.",
  "account.voice.consent_needed": "Ovozli kiritishdan foydalanish uchun xizmat shartlarini qabul qiling.",
+ "account.voice.privacy_hint": "Aytilgan nutqni OpenAI matnga aylantiradi, yozuv saqlanmaydi.",
  "account.consent.title": "Shartlarga rozilik",
  "account.consent.body": "Nutqni matnga aylantirish uchun yozuv AI Reply serveriga va OpenAI’ga yuboriladi. Server na yozuvni, na aniqlangan matnni saqlaydi. Davom etish uchun xizmat shartlari va maxfiylik siyosatini qabul qiling.",
  "account.consent.accept": "Qabul qilish va davom etish",

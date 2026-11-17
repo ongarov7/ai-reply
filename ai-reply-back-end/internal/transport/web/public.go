@@ -201,7 +201,7 @@ func (s *Server) handleTerms(w http.ResponseWriter, r *http.Request) {
 	s.render(w, "legal", "public_layout", legalView{
 		baseView: s.base(locale),
 		Title:    s.bundle.T(locale, "legal.terms.title"),
-		Updated:  legal.UpdatedDate,
+		Updated:  legal.TermsUpdatedDate,
 		Body:     template.HTML(termsBody(locale, s.legalInfo())),
 		Boot:     template.JS("{}"),
 	})
@@ -213,7 +213,7 @@ func (s *Server) handlePrivacy(w http.ResponseWriter, r *http.Request) {
 	s.render(w, "legal", "public_layout", legalView{
 		baseView: s.base(locale),
 		Title:    s.bundle.T(locale, "legal.privacy.title"),
-		Updated:  legal.UpdatedDate,
+		Updated:  legal.PrivacyUpdatedDate,
 		Body:     template.HTML(privacyBody(locale, s.legalInfo())),
 		Boot:     template.JS("{}"),
 	})

@@ -1122,6 +1122,9 @@
     }
     function renderMics() {
       var available = !!state.session && state.features.voice && !state.voiceUnavailable && state.contextStatus === 'ready' && voiceSupported();
+      // Where speech goes, next to the microphones (people who accepted the
+      // terms in an app never see the consent dialog).
+      Array.prototype.forEach.call(document.querySelectorAll('[data-voice-note]'), function (note) { note.hidden = !available; });
       mics.forEach(function (mic) {
         var active = voice.mic === mic;
         var recording = active && voice.phase === 'recording';

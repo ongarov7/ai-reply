@@ -183,17 +183,18 @@ func (a *webAccount) transcribe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	user, _ := UserFrom(r.Context())
-	if err := a.s.users.RequireConsent(r.Context(), user.ID); err != nil {
-		httpx.Fail(w, err)
-		return
-	}
 	form, err := readVoiceForm(w, r)
 	if err != nil {
 		httpx.Fail(w, err)
 		return
 	}
+	// A tab showing another account hears that first, whatever else is wrong.
 	if form.expectedUserID != user.ID {
 		accountChanged(w)
+		return
+	}
+	if err := a.s.users.RequireConsent(r.Context(), user.ID); err != nil {
+		httpx.Fail(w, err)
 		return
 	}
 	result, err := a.s.ai.Transcribe(r.Context(), ai.TranscribeRequest{

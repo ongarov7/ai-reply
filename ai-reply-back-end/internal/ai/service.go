@@ -354,7 +354,7 @@ func (s *Service) generate(ctx context.Context, c call, prompt Prompt, started t
 	switch {
 	case !applied || c.Extra == 0 || unlimitedAccount:
 	case res.Replay:
-		if res.ContextUnits == 0 {
+		if res.ContextUnits < c.Extra {
 			prompt, applied = *c.Fallback, false
 		}
 	default:

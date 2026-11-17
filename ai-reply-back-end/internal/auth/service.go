@@ -453,6 +453,12 @@ func (s *Service) Refresh(ctx context.Context, rawToken string, info DeviceInfo)
 	if err != nil || device.UserID != user.ID || device.RevokedAt != nil {
 		return Session{}, domain.ErrUnauthorized
 	}
+	// A website session lives only in its HttpOnly cookie and is never
+	// rotated (websession.go): its token must not mint an app session, which
+	// could then do what the website asks an e-mail code for.
+	if device.Platform == domain.PlatformWeb {
+		return Session{}, domain.ErrUnauthorized
+	}
 
 	raw := traits.RandomToken(32)
 	next := repository.RefreshToken{

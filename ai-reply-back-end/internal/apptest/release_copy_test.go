@@ -12,6 +12,7 @@ import (
 
 	"github.com/aireply/ai-reply-back-end/internal/catalog"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
+	"github.com/aireply/ai-reply-back-end/internal/legal"
 	"github.com/aireply/ai-reply-back-end/internal/localization"
 	"github.com/aireply/ai-reply-back-end/internal/middleware"
 	"github.com/aireply/ai-reply-back-end/internal/plans"
@@ -289,6 +290,12 @@ func TestPrivacyPolicyMatchesWhatTheAppsSend(t *testing.T) {
 		if !strings.Contains(page, needle) {
 			t.Errorf("en privacy policy is missing %q", needle)
 		}
+	}
+	if !strings.Contains(page, legal.PrivacyUpdatedDate) {
+		t.Errorf("the privacy policy does not show its edition date %s", legal.PrivacyUpdatedDate)
+	}
+	if _, offer := fetch(t, h, "/offer?lang=en"); !strings.Contains(offer, legal.TermsUpdatedDate) {
+		t.Errorf("the offer does not show its own edition date %s", legal.TermsUpdatedDate)
 	}
 	for _, stale := range []string{"only the text of AI Reply's own instruction field", "When you tap Reply or Write",
 		"Everything else is removed", "disconnect Sign in with Apple", "only if paid plans are ever sold",

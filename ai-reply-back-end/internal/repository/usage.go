@@ -148,11 +148,11 @@ func (s *Store) Stats(ctx context.Context, from, to time.Time, today string, day
 	}
 	st.FreeUsers = st.TotalUsers - st.PaidUsers
 	// Generations, not units: the AI-context surcharge charges extra units
-	// ('context' reservations) that are not requests of their own.
+	// ('context' reservations) that are not requests of their own, and an
+	// admin quota reset rewrites usage_daily, so count the reservations.
 	if err := r.QueryRowContext(ctx,
-		`SELECT COALESCE((SELECT SUM(used + extra_used) FROM usage_daily WHERE usage_date = ?),0) -
-		        (SELECT COUNT(*) FROM usage_reservations WHERE usage_date = ? AND mode = 'context' AND status IN ('reserved','committed'))`,
-		today, today).Scan(&st.RequestsToday); err != nil {
+		`SELECT COUNT(*) FROM usage_reservations WHERE usage_date = ? AND mode <> 'context' AND status IN ('reserved','committed')`,
+		today).Scan(&st.RequestsToday); err != nil {
 		return st, err
 	}
 	// Polish (нұсқауды түзету) пен transcribe (дауыс → мәтін) — генерация емес:
