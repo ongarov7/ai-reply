@@ -98,7 +98,17 @@ func TestWebHandoffAuthenticatesSameAccountWithoutExposingNativeCredentials(t *t
 		t.Fatal("handoff changed recipient")
 	}
 	var payload map[string]json.RawMessage
-	if json.Unmarshal(w.Body.Bytes(), &payload) != nil || len(payload) != 4 || payload["user"] == nil || payload["usage"] == nil || payload["subscription"] == nil || payload["bank"] == nil {
+	if json.Unmarshal(w.Body.Bytes(), &payload) != nil || len(payload) != 6 || payload["user"] == nil || payload["usage"] == nil || payload["subscription"] == nil || payload["bank"] == nil {
+		t.Fatal("website snapshot exposed unrelated profile/consent data")
+	}
+	// The cabinet's switches: feature flags and whether the public terms still
+	// need accepting — never the consent record or the profile itself.
+	var extras struct {
+		Features map[string]json.RawMessage `json:"features"`
+		Legal    map[string]json.RawMessage `json:"legal"`
+	}
+	if json.Unmarshal(w.Body.Bytes(), &extras) != nil || len(extras.Features) != 2 || len(extras.Legal) != 5 ||
+		extras.Legal["consent_required"] == nil || extras.Legal["accepted_at"] != nil || extras.Features["ai_context"] == nil {
 		t.Fatal("website snapshot exposed unrelated profile/consent data")
 	}
 	if strings.Contains(w.Body.String(), native.Access) || strings.Contains(w.Body.String(), native.Refresh) || strings.Contains(w.Body.String(), code) || cookie.Value == native.Refresh {
