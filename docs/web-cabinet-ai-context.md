@@ -182,6 +182,7 @@ Errors use the existing envelope `{"error": {"code", "message", "details"}}`.
 
 ```json
 {
+  "user_id": "u_123",
   "context": { ...document from §2 },
   "revision": 3,
   "updated_at": "2026-11-17T10:00:00Z",
@@ -196,6 +197,8 @@ Errors use the existing envelope `{"error": {"code", "message", "details"}}`.
 }
 ```
 
+`user_id` names the account the document belongs to: the cabinet never adopts a read answered
+for another account than the page shows (it reloads, or keeps unsaved text and blocks saving).
 `revision` is 0 and `updated_at` is `""` before the first save (then `context` is the
 default document: enabled, everything empty). `cost.general` = units for a request with no
 recipient (custom personas, compose without recipient); the other keys = units per recipient.
@@ -261,6 +264,7 @@ Session additions:
 
 ```json
 {
+  "user_id": "u_123",
   "days": [ { "date": "2026-10-19", "replies": 3, "units": 4 } ],
   "platforms": [ { "platform": "ios", "replies": 12 }, { "platform": "macos", "replies": 3 } ],
   "total_replies": 15,
