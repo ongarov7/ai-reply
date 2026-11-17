@@ -307,3 +307,15 @@ func (s *Service) TodayKeys() (string, string) { return s.Keys(s.clock.Now()) }
 
 // Location — квота белдеуі.
 func (s *Service) Location() *time.Location { return s.loc }
+
+// UsageUnitsByDay — replies charged per usage_date (from..to inclusive), the
+// AI-context surcharge included: the cabinet's usage chart.
+func (s *Service) UsageUnitsByDay(ctx context.Context, userID, from, to string) (map[string]int, error) {
+	return s.repo.UsageUnitsByDay(ctx, userID, from, to)
+}
+
+// SuccessfulGenerations — when and where the account's delivered replies and
+// composed messages were made since a moment (metadata only).
+func (s *Service) SuccessfulGenerations(ctx context.Context, userID string, since time.Time) ([]repository.GenerationStamp, error) {
+	return s.repo.SuccessfulGenerations(ctx, userID, since)
+}

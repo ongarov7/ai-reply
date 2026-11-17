@@ -62,15 +62,40 @@ func (s *Server) RegisterWebAccount(mux *http.ServeMux, bank *bcc.CheckoutServic
 	mux.Handle("POST /account/api/checkout", post(a.requireSession(checkoutLimit(http.HandlerFunc(a.checkout)))))
 	mux.Handle("GET /account/api/orders/{id}", a.headers(a.requireSession(statusLimit(http.HandlerFunc(a.order)))))
 	mux.Handle("POST /account/api/subscriptions/{id}/cancel", post(a.requireSession(checkoutLimit(http.HandlerFunc(a.cancelSubscription)))))
+
+	// The cabinet: AI context, usage history, consent and profile dictation
+	// (docs/web-cabinet-ai-context.md §5.4).
+	readLimit := middleware.RateLimit(s.limiter, "web_account_read", 60, time.Minute, userKey)
+	saveLimit := middleware.RateLimit(s.limiter, "web_ai_context_save", 30, time.Minute, userKey)
+	if s.aiContext != nil {
+		mux.Handle("GET /account/api/ai-context", a.headers(a.requireSession(readLimit(http.HandlerFunc(a.getAIContext)))))
+		mux.Handle("POST /account/api/ai-context", post(a.requireSession(saveLimit(http.HandlerFunc(a.saveAIContext)))))
+	}
+	mux.Handle("GET /account/api/usage", a.headers(a.requireSession(readLimit(http.HandlerFunc(a.usageHistory)))))
+	mux.Handle("POST /account/api/consent", post(a.requireSession(saveLimit(http.HandlerFunc(a.saveConsent)))))
+	transcribeLimit := middleware.RateLimit(s.limiter, "transcribe", s.cfg.Limits.TranscribePerMinute, time.Minute, userKey)
+	mux.Handle("POST /account/api/transcribe", a.headers(a.sameOriginUpload(a.requireSession(transcribeLimit(http.HandlerFunc(a.transcribe))))))
 }
 
 func (a *webAccount) createHandoff(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		ExpectedUserID string `json:"expected_user_id"`
 		Locale         string `json:"locale"`
+		// Target — the page the link opens: "payment" (default) or "account"
+		// (the cabinet). Apps send it only with features.ai_context.
+		Target string `json:"target"`
 	}
 	if err := httpx.Decode(w, r, 2048, &body); err != nil {
 		httpx.Fail(w, err)
+		return
+	}
+	page := "/payment"
+	switch body.Target {
+	case "", "payment":
+	case "account":
+		page = "/account"
+	default:
+		httpx.Fail(w, domain.InvalidField("target", "payment or account"))
 		return
 	}
 	user, _ := UserFrom(r.Context())
@@ -87,7 +112,7 @@ func (a *webAccount) createHandoff(w http.ResponseWriter, r *http.Request) {
 		a.handoffError(w, err)
 		return
 	}
-	httpx.JSON(w, http.StatusOK, map[string]any{"url": a.origin + a.prefix + "/payment#handoff=" + handoff.Code, "expires_in": handoff.ExpiresIn})
+	httpx.JSON(w, http.StatusOK, map[string]any{"url": a.origin + a.prefix + page + "#handoff=" + handoff.Code, "expires_in": handoff.ExpiresIn})
 }
 
 func (a *webAccount) handoffError(w http.ResponseWriter, err error) {
@@ -251,6 +276,23 @@ type webSessionView struct {
 	Subscription subscriptionDTO `json:"subscription"`
 	Usage        usageDTO        `json:"usage"`
 	Bank         webBankView     `json:"bank"`
+	// Features — what the cabinet may show; Legal — whether AI processing
+	// (the microphone) needs the current terms accepted first.
+	Features webFeaturesView `json:"features"`
+	Legal    webLegalView    `json:"legal"`
+}
+
+type webFeaturesView struct {
+	AIContext          bool `json:"ai_context"`
+	VoiceTranscription bool `json:"voice_transcription"`
+}
+
+type webLegalView struct {
+	ConsentRequired bool   `json:"consent_required"`
+	TermsVersion    string `json:"terms_version"`
+	PrivacyVersion  string `json:"privacy_version"`
+	TermsURL        string `json:"terms_url"`
+	PrivacyURL      string `json:"privacy_url"`
 }
 
 func (a *webAccount) session(w http.ResponseWriter, r *http.Request) {
@@ -282,6 +324,14 @@ func (a *webAccount) session(w http.ResponseWriter, r *http.Request) {
 	}
 	view := webSessionView{Subscription: a.s.subscriptionDTO(entitlement), Usage: a.s.usage(entitlement), Bank: bank}
 	view.User.ID, view.User.Email = user.ID, user.Email
+	view.Features = webFeaturesView{AIContext: a.s.aiContext != nil, VoiceTranscription: a.s.voiceEnabled()}
+	consentErr := a.s.users.RequireConsent(r.Context(), user.ID)
+	if consentErr != nil && !errors.Is(consentErr, domain.ErrConsentRequired) {
+		httpx.Fail(w, consentErr)
+		return
+	}
+	view.Legal = webLegalView{ConsentRequired: consentErr != nil, TermsVersion: legal.TermsVersion, PrivacyVersion: legal.PrivacyVersion,
+		TermsURL: a.s.cfg.App.PublicBaseURL + "/offer", PrivacyURL: a.s.cfg.App.PublicBaseURL + "/privacy"}
 	httpx.JSON(w, http.StatusOK, view)
 }
 
