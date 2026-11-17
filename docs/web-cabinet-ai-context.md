@@ -22,9 +22,10 @@ backend, the website cabinet and the apps. Change it only together with the code
    `1 + min(max_extra, ceil(max(0, context_chars − free_chars) / chars_per_reply))` units.
    Defaults: `chars_per_reply = 400`, `free_chars = 0`, `max_extra = 2` (admin-configurable).
    Pro/unlimited pays no surcharge. Role/style chips are free; only typed text counts.
-4. **Apps (iOS, Android, macOS)**: an «AI profile» screen that reads/writes the same server
-   document (sync), gated on `features.ai_context`. Windows is covered by the server-side
-   injection only (its real client lives on the unmerged `codex/windows-client` branch).
+4. **Scope (owner, 2026-11-17): backend and website only. iOS, Android, macOS and Windows
+   code is not touched.** The apps get the feature through the server-side injection (§4) and
+   show the new balance from the server's `usage` as they do today. The app endpoints in §5.3
+   and the handoff `target` exist for future app versions; nothing calls them yet.
 
 ## 2. The AI context document
 
@@ -309,22 +310,13 @@ keys, all four locales: ru, kk, en, uz). Header: add a «Войти» link/butto
 next to «Скачать» on commercial pages, pointing to `/account?lang=…`; the nav item «Личный
 кабинет» points to `/account`.
 
-## 7. Apps
+## 7. Apps (not in this release)
 
-Common rules: gate everything on `features.ai_context`; GET on screen open; save with
-`expected_revision`; on 409 reload and tell the user; show the cost per reply from `cost`
-(update live with the formula while editing); never store the document in a place shared
-between accounts (clear on sign-out); keep the existing local profile and personas untouched
-(they keep working, the account context is additional). Add the strings in every language the
-app ships, using the labels in §2.1/§2.2.
-
-- **iOS** (`AI-Reply/`): a screen «AI-профиль аккаунта» reachable from Settings/Profile.
-  Dictation: reuse the existing `DictationSheet` (Apple Speech). No links to the website
-  (App Store rules) — the screen is fully native.
-- **Android** (`AI-Reply-Android/`): the same screen in Compose (Settings/Profile), POST alias
-  for saving, reuse `DictationSheet`.
-- **macOS** (`AirReply-macOS/`): Settings → new tab «AI-профиль» with the same editor, plus
-  «Открыть личный кабинет» which uses the web handoff with `target: "account"`.
+No app code changes now (owner's decision). When an app adds an editor later: gate on
+`features.ai_context`; GET on open; save with `expected_revision`; on 409 reload and tell the
+user; show the cost per reply from `cost`; never keep the document across accounts; keep the
+existing local profile and personas untouched. iOS must stay fully native (no website links,
+App Store rules); macOS may open the cabinet with the handoff `target: "account"`.
 
 ## 8. Privacy
 
@@ -336,4 +328,4 @@ logged. The privacy policy gains one sentence about the account AI profile.
 
 1. Backend (migration `0042_ai_context.sql`, new settings, endpoints) — the owner deploys.
 2. Website ships with the backend (same binary).
-3. Apps after the backend: they only show the screen when `features.ai_context` is true.
+3. Apps: no release needed — the server applies the context to every generation.
