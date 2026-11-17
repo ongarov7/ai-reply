@@ -291,7 +291,7 @@ test('helpers: section routing, spoken languages, request ids and axis ticks', (
   assert.equal(sectionFromHash('#handoff=AAAA', SECTIONS, 'overview'), 'overview');
   assert.equal(sectionFromHash('', SECTIONS, 'billing'), 'billing');
   assert.equal(sectionFromHash('#profile', ['overview', 'billing', 'apps'], 'overview'), 'overview');
-  assert.deepEqual(['ru', 'kk', 'en', 'uz'].map(voiceLanguages), ['ru,kk,en', 'kk,ru,en', 'en,ru,kk', 'ru,en,kk']);
+  assert.deepEqual(['ru', 'kk', 'en', 'uz'].map(voiceLanguages), ['ru,kk,en', 'kk,ru,en', 'en,ru,kk', 'uz,ru,en']);
   const id = requestID({ getRandomValues(bytes) { bytes.fill(171); return bytes; } });
   assert.match(id, /^[0-9a-f]{32}$/);
   assert.throws(() => requestID(undefined));
@@ -461,6 +461,7 @@ test('editing shows a live cost and saves the whole document with the expected r
   assert.equal(post.opts.headers['Content-Type'], 'application/json');
   assert.equal(post.opts.credentials, 'same-origin');
   assert.equal(saved.expected_revision, 3);
+  assert.equal(saved.expected_user_id, 'fixture-user-A', 'the save names the account the page shows');
   assert.deepEqual(Object.keys(saved.context), ['enabled', 'roles', 'occupation', 'traits', 'about', 'audience', 'recipients']);
   assert.deepEqual(saved.context.roles, ['seller', 'blogger']);
   assert.equal(saved.context.about.length, 420);
@@ -672,6 +673,7 @@ test('dictation records, shows a timer, stops at 40 seconds and sends a 16 kHz W
   assert.match(form.get('request_id'), /^[0-9a-f]{32}$/);
   assert.equal(form.get('languages'), 'ru,kk,en');
   assert.equal(form.get('purpose'), 'dictation');
+  assert.equal(form.get('expected_user_id'), 'fixture-user-A');
   assert.equal(f.node('cabinet-about').value, 'Магазин. Доставка по Алматы');
   assert.equal(f.cabinet.state.draft.about, 'Магазин. Доставка по Алматы');
   assert.equal(f.node('cabinet-savebar').hidden, false);
@@ -711,7 +713,7 @@ test('consent is asked once on CONSENT_REQUIRED and the same recording is retrie
   f.node('cabinet-consent-accept').click(); await settle();
   const consent = f.posts('/consent');
   assert.equal(consent.length, 1);
-  assert.deepEqual(JSON.parse(consent[0].opts.body), { terms_version: '2026-10-08', privacy_version: '2026-10-14', locale: 'ru' });
+  assert.deepEqual(JSON.parse(consent[0].opts.body), { terms_version: '2026-10-08', privacy_version: '2026-10-14', locale: 'ru', expected_user_id: 'fixture-user-A' });
   assert.equal(consent[0].opts.headers['X-Requested-With'], 'AIReplyAccount');
   const sent = f.posts('/transcribe');
   assert.equal(sent.length, 2);
@@ -777,4 +779,37 @@ test('voice turned off on the server hides the microphones', async () => {
   f.mic('cabinet-about').click(); await settle();
   assert.equal(f.document.querySelectorAll('[data-mic-for]').every(button => button.hidden), true);
   assert.equal(f.node('cabinet-about-voice').textContent, f.words['voice.unavailable']);
+});
+
+test('opposite style chips replace each other instead of being sent together', async () => {
+  const f = fixture({ handler: standard() });
+  await f.signIn();
+  const chips = f.node('cabinet-traits-list').children.map(chip => chip.children[0]);
+  const detailed = chips.find(input => input.value === 'detailed');
+  assert.deepEqual(f.cabinet.state.draft.traits, ['brief']);
+  detailed.checked = true; detailed.dispatchEvent(makeEvent('change'));
+  assert.deepEqual(f.cabinet.state.draft.traits, ['detailed'], '«detailed» unselects «brief»');
+  assert.equal(chips.find(input => input.value === 'brief').checked, false);
+});
+
+test('a page left on another account saves nothing and says why', async () => {
+  const f = fixture({ handler: standard({
+    'POST /account/api/ai-context': () => respond({ error: { code: 'WEB_ACCOUNT_CHANGED' } }, 409)
+  }) });
+  await f.signIn();
+  f.type('cabinet-about', 'Новый текст');
+  f.node('cabinet-save').click(); await settle();
+  assert.equal(f.cabinet.state.conflict, false, 'an account change is not a revision conflict');
+  assert.equal(f.node('cabinet-save-message').textContent, f.words['account_changed']);
+  assert.equal(f.node('cabinet-about').value, 'Новый текст', 'the typed text is kept');
+});
+
+test('the daily voice cap and an account change are explained', async () => {
+  for (const [status, code, key] of [[429, 'VOICE_LIMIT_REACHED', 'voice.daily_limit'], [429, 'RATE_LIMITED', 'error.RATE_LIMITED'], [409, 'WEB_ACCOUNT_CHANGED', 'account_changed']]) {
+    const f = fixture({ handler: standard({ 'POST /account/api/transcribe': () => respond({ error: { code } }, status) }) });
+    await f.signIn();
+    f.mic('cabinet-about').click(); await settle();
+    f.mic('cabinet-about').click(); await settle();
+    assert.equal(f.node('cabinet-about-voice').textContent, f.words[key], code);
+  }
 });

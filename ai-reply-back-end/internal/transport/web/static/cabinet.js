@@ -17,7 +17,17 @@
   var TEXT_FIELDS = ['occupation', 'about', 'audience'];
   var DEFAULT_LIMITS = { roles: 5, traits: 6, occupation: 120, about: 2000, audience: 300, notes: 1000 };
   // Spoken-language hints, the most likely first (≤ 3, see §5.4).
-  var VOICE_LANGUAGES = { ru: 'ru,kk,en', kk: 'kk,ru,en', en: 'en,ru,kk', uz: 'ru,en,kk' };
+  var VOICE_LANGUAGES = { ru: 'ru,kk,en', kk: 'kk,ru,en', en: 'en,ru,kk', uz: 'uz,ru,en' };
+  // Style chips that contradict each other: choosing one unselects the other
+  // (the server refuses both together, docs/web-cabinet-ai-context.md §2.2).
+  var EXCLUSIVE_TRAITS = [['introvert', 'extrovert'], ['brief', 'detailed'], ['formal', 'casual'], ['emoji', 'no_emoji']];
+  function oppositeTrait(code) {
+    for (var i = 0; i < EXCLUSIVE_TRAITS.length; i++) {
+      if (EXCLUSIVE_TRAITS[i][0] === code) return EXCLUSIVE_TRAITS[i][1];
+      if (EXCLUSIVE_TRAITS[i][1] === code) return EXCLUSIVE_TRAITS[i][0];
+    }
+    return '';
+  }
   var PLATFORM_NAMES = { ios: 'iOS', android: 'Android', macos: 'macOS', windows: 'Windows', watchos: 'Apple Watch' };
   var VOICE_RATE = 16000;
   var MAX_RECORDING_MS = 40000;
@@ -885,6 +895,8 @@
       var list = state.draft[kind];
       var index = list.indexOf(code);
       if (input.checked && index === -1) {
+        var opposite = kind === 'traits' ? oppositeTrait(code) : '';
+        if (opposite && list.indexOf(opposite) !== -1) list.splice(list.indexOf(opposite), 1);
         if (list.length >= limit(kind)) {
           input.checked = false;
           say(t('field.too_many', { max: limit(kind) }));
@@ -982,13 +994,17 @@
       state.saveError = '';
       state.fieldErrors = {};
       refreshEditor();
-      return api('/ai-context', { json: { context: body, expected_revision: state.context.revision } }).then(function (response) {
+      return api('/ai-context', { json: { context: body, expected_revision: state.context.revision, expected_user_id: user } }).then(function (response) {
         if (user !== state.userId || epoch !== state.contextEpoch) return;
         if (!acceptContext(response, body)) throw httpError('INVALID_RESPONSE', 0);
         say(t('save.saved'));
       }).catch(function (error) {
         if (user !== state.userId || epoch !== state.contextEpoch) return;
-        if (error.status === 409) {
+        if (error.status === 409 && error.message === 'WEB_ACCOUNT_CHANGED') {
+          // This page shows another account than the browser's session now.
+          state.saveError = t('account_changed');
+          say(state.saveError);
+        } else if (error.status === 409) {
           // Another device saved first: nothing was saved here.
           state.conflict = true;
           say(t('save.conflict'));
@@ -1022,7 +1038,8 @@
       var message = details.reason === 'too_long' ? t('field.too_long', { max: formatNumber(max || limit(recipient ? 'notes' : name)) })
         : details.reason === 'too_many' ? t('field.too_many', { max: max || limit(name) })
         : details.reason === 'unknown' ? t('field.unknown')
-        : details.reason === 'invalid_text' ? t('field.invalid_text') : t('field.invalid');
+        : details.reason === 'invalid_text' ? t('field.invalid_text')
+        : details.reason === 'conflict' ? t('field.conflict') : t('field.invalid');
       state.fieldErrors[name] = message;
       var target = fields.filter(function (item) { return item.name === name; })[0];
       var section = target ? target.section : 'profile';
@@ -1158,6 +1175,7 @@
       form.append('request_id', job.requestId);
       form.append('languages', voiceLanguages(locale));
       form.append('purpose', 'dictation');
+      form.append('expected_user_id', job.user);
       return api('/transcribe', { form: form, timeout: VOICE_TIMEOUT }).then(function (payload) {
         if (!current(job)) return;
         var text = typeof payload.text === 'string' ? payload.text.trim() : '';
@@ -1181,7 +1199,9 @@
           return;
         }
         if (error.status === 401) { finishVoice(job.mic, ''); unauthorized(); return; }
-        finishVoice(job.mic, t(error.status === 429 ? 'error.RATE_LIMITED' : error.status === 403 ? 'voice.consent_needed' : 'voice.failed'));
+        if (error.status === 409) { finishVoice(job.mic, t('account_changed')); return; }
+        finishVoice(job.mic, t(error.message === 'VOICE_LIMIT_REACHED' ? 'voice.daily_limit' : error.status === 429 ? 'error.RATE_LIMITED'
+          : error.status === 403 ? 'voice.consent_needed' : 'voice.failed'));
       });
     }
     // Inserts at the caret (or replaces the selection), with a space between words.
@@ -1255,7 +1275,7 @@
       consent.busy = true;
       if (n['consent-accept']) n['consent-accept'].disabled = true;
       var user = state.userId;
-      return api('/consent', { json: { terms_version: legal.terms_version, privacy_version: legal.privacy_version, locale: locale } }).then(function () {
+      return api('/consent', { json: { terms_version: legal.terms_version, privacy_version: legal.privacy_version, locale: locale, expected_user_id: user } }).then(function () {
         if (user !== state.userId) return;
         state.consentGiven = true;
         closeConsent(true);
@@ -1263,7 +1283,7 @@
         if (error.status === 401) { closeConsent(false); unauthorized(); return; }
         consent.busy = false;
         if (n['consent-accept']) n['consent-accept'].disabled = false;
-        setText(n['consent-error'], t('consent.error'));
+        setText(n['consent-error'], t(error.status === 409 ? 'account_changed' : 'consent.error'));
         show(n['consent-error'], true);
       });
     }
