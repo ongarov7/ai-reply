@@ -111,6 +111,7 @@ body.is-account { background: var(--bg-soft); }
 .cabinet-account { padding: 16px; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; }
 .cabinet-account h2 { margin: 0 0 8px; color: var(--muted); font-size: 12.5px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; }
 .account-email { margin: 0; font-size: 14px; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
+.cabinet-account .account-email { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; overflow-wrap: normal; }
 .account-id { margin: 6px 0 0; color: var(--muted); font-size: 12.5px; overflow-wrap: anywhere; }
 .cabinet-account-actions { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 14px; }
 
@@ -327,8 +328,10 @@ body.is-account { background: var(--bg-soft); }
 /* ------------------------------------------------------------ phones */
 @media (max-width: 960px) {
   .cabinet { grid-template-columns: 200px minmax(0, 1fr); gap: 24px; }
-  .cabinet-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .cabinet-tile:last-child { grid-column: 1 / -1; }
+  .cabinet-tiles { gap: 12px; }
+  .cabinet-tile { padding: 16px; }
+  .cabinet-tile-value { font-size: 28px; }
+  .cabinet-tile-text { font-size: 19px; }
   .cabinet-recipients { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 760px) {
@@ -365,11 +368,17 @@ body.is-account { background: var(--bg-soft); }
   .account-balances { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
   .account-balances dd { font-size: 22px; }
   .cabinet-switch { align-items: flex-start; }
-  .cabinet-savebar { bottom: 8px; padding: 12px; }
-  .cabinet-save-actions { width: 100%; }
-  .cabinet-save-actions .btn { flex: 1 1 auto; }
+  .cabinet-account .account-email { white-space: normal; overflow-wrap: anywhere; }
+  .cabinet-savebar { bottom: 8px; gap: 8px; padding: 10px 12px; }
+  .cabinet-save-message { flex: 1 1 100%; font-size: 14px; }
+  .cabinet-save-actions { width: 100%; flex-wrap: nowrap; }
+  .cabinet-save-actions .btn { flex: 1 1 0; min-width: 0; height: auto; min-height: 44px; padding: 8px 10px; line-height: 1.2; white-space: normal; }
   .cabinet-dialog { padding: 22px; }
   .cabinet-dialog-actions .btn { flex: 1 1 auto; }
+}
+@media (max-width: 560px) {
+  .cabinet-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cabinet-tile:last-child { grid-column: 1 / -1; }
 }
 @media (max-width: 520px) {
   .cabinet-nav { top: 62px; }
