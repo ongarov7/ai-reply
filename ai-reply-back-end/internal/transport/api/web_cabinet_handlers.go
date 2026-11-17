@@ -47,6 +47,8 @@ type usagePlatformDTO struct {
 }
 
 type usageHistoryResponse struct {
+	// UserID — whose history this is (the page checks it against the account it shows).
+	UserID       string             `json:"user_id"`
 	Days         []usageDayDTO      `json:"days"`
 	Platforms    []usagePlatformDTO `json:"platforms"`
 	TotalReplies int                `json:"total_replies"`
@@ -71,7 +73,7 @@ func (a *webAccount) usageHistory(w http.ResponseWriter, r *http.Request) {
 	loc := a.s.subs.Location()
 	today := a.s.subs.Now().In(loc)
 	first := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, loc).AddDate(0, 0, -(days - 1))
-	out := usageHistoryResponse{Days: make([]usageDayDTO, 0, days), Platforms: []usagePlatformDTO{}, Timezone: a.s.cfg.App.Timezone}
+	out := usageHistoryResponse{UserID: user.ID, Days: make([]usageDayDTO, 0, days), Platforms: []usagePlatformDTO{}, Timezone: a.s.cfg.App.Timezone}
 	index := make(map[string]int, days)
 	for i := range days {
 		date := first.AddDate(0, 0, i).Format("2006-01-02")

@@ -40,6 +40,9 @@ type aiContextPricingDTO struct {
 
 // aiContextResponse — AIContextResponse of docs/web-cabinet-ai-context.md §5.1.
 type aiContextResponse struct {
+	// UserID — whose document this is: a page that shows another account
+	// (signed in elsewhere in the same browser) must not adopt it.
+	UserID    string              `json:"user_id"`
 	Context   aicontext.Document  `json:"context"`
 	Revision  int64               `json:"revision"`
 	UpdatedAt string              `json:"updated_at"`
@@ -145,6 +148,7 @@ func (s *Server) writeAIContext(w http.ResponseWriter, ctx context.Context, user
 	}
 	pricing := s.aiContext.Pricing(ctx)
 	out := aiContextResponse{
+		UserID:   user.ID,
 		Context:  record.Document.Complete(),
 		Revision: record.Revision,
 		Limits: aiContextLimitsDTO{Roles: aicontext.MaxRoles, Traits: aicontext.MaxTraits,

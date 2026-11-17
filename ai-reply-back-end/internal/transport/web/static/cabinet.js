@@ -403,6 +403,17 @@
     // account (another tab), so the write named the wrong one and nothing was
     // saved. Saving and dictation stop and the save bar offers a reload;
     // unsaved text stays on screen until then.
+    // A read answered for another account than the page shows: the browser was
+    // signed in elsewhere since this page loaded. Its data is never adopted.
+    function otherAccount(payload, user) {
+      return !!payload && typeof payload === 'object' && typeof payload.user_id === 'string' && payload.user_id !== '' && payload.user_id !== user;
+    }
+    // Nothing typed here: reload to show the account that is signed in now.
+    // Unsaved text: keep it on screen, block saving and offer the reload.
+    function anotherAccountSignedIn() {
+      if (isDirty()) { accountChanged(true); return; }
+      browser.location.reload();
+    }
     function isAccountChanged(error) { return !!error && error.status === 409 && error.message === 'WEB_ACCOUNT_CHANGED'; }
     function accountChanged(announce) {
       state.accountChanged = true;
@@ -596,6 +607,7 @@
       renderUsage();
       return api('/usage?days=30').then(function (payload) {
         if (user !== state.userId || epoch !== state.usageEpoch) return;
+        if (otherAccount(payload, user)) { state.usageStatus = 'error'; anotherAccountSignedIn(); return; }
         var usage = acceptUsage(payload);
         if (!usage) throw httpError('INVALID_RESPONSE', 0);
         state.usage = usage;
@@ -857,6 +869,7 @@
       renderContextStatus();
       return api('/ai-context').then(function (response) {
         if (user !== state.userId || epoch !== state.contextEpoch) return;
+        if (otherAccount(response, user)) { state.contextStatus = state.saved ? 'ready' : 'error'; anotherAccountSignedIn(); return; }
         state.draft = null;
         if (!acceptContext(response)) throw httpError('INVALID_RESPONSE', 0);
         state.contextStatus = 'ready';
@@ -1278,11 +1291,19 @@
       } catch (_) { /* fall back */ }
       return fallback;
     }
+    // The legal pages in the page's language (the server's URLs carry none).
+    function withLanguage(raw) {
+      try {
+        var url = new URL(String(raw || ''), browser.location.href);
+        if (!url.searchParams.has('lang')) url.searchParams.set('lang', locale);
+        return url.href;
+      } catch (_) { return raw; }
+    }
     function askConsent(mic) {
       if (consent.pending) return consent.pending;
       var legal = state.session && state.session.legal || {};
-      if (n['consent-terms']) n['consent-terms'].href = safeLink(legal.terms_url, n['consent-terms'].href);
-      if (n['consent-privacy']) n['consent-privacy'].href = safeLink(legal.privacy_url, n['consent-privacy'].href);
+      if (n['consent-terms']) n['consent-terms'].href = safeLink(withLanguage(legal.terms_url), n['consent-terms'].href);
+      if (n['consent-privacy']) n['consent-privacy'].href = safeLink(withLanguage(legal.privacy_url), n['consent-privacy'].href);
       setText(n['consent-error'], '');
       show(n['consent-error'], false);
       consent.opener = mic ? mic.button : null;

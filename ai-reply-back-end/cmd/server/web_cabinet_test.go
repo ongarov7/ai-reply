@@ -65,7 +65,7 @@ func TestWebCabinetAIContextUsageAndConsent(t *testing.T) {
 	}
 	w = webTestRequest(app.handler, http.MethodGet, "/account/api/ai-context", nil, cookie, "", "")
 	cabinetJSON(t, w, &doc)
-	if w.Code != http.StatusOK || doc.Revision != 0 || doc.Cost.General != 1 {
+	if w.Code != http.StatusOK || doc.Revision != 0 || doc.Cost.General != 1 || !strings.Contains(w.Body.String(), `"user_id":"`+me+`"`) {
 		t.Fatalf("empty document: %d %s", w.Code, w.Body.String())
 	}
 	body := map[string]any{"expected_revision": 0, "expected_user_id": me, "context": map[string]any{
@@ -109,6 +109,9 @@ func TestWebCabinetAIContextUsageAndConsent(t *testing.T) {
 	}
 	w = webTestRequest(app.handler, http.MethodGet, "/account/api/usage", nil, cookie, "", "")
 	cabinetJSON(t, w, &history)
+	if !strings.Contains(w.Body.String(), `"user_id":"`+me+`"`) {
+		t.Fatalf("usage history does not name its account: %s", w.Body.String())
+	}
 	today := time.Now().In(cfg.App.Location()).Format("2006-01-02")
 	if w.Code != http.StatusOK || len(history.Days) != 30 || history.Days[29].Date != today || history.Platforms == nil || history.Timezone == "" {
 		t.Fatalf("usage: %d %s", w.Code, w.Body.String())

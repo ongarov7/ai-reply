@@ -132,14 +132,14 @@
           </div>
           <div class="cabinet-card cabinet-form-card">
             <div class="cabinet-field">
-              <label for="cabinet-about">{{call .T "account.profile.about"}}</label>
+              <label for="cabinet-about" id="cabinet-about-label">{{call .T "account.profile.about"}}</label>
               <p id="cabinet-about-hint" class="cabinet-hint">{{call .T "account.profile.about_hint"}}</p>
               <textarea id="cabinet-about" class="cabinet-textarea" rows="6" placeholder="{{call .T "account.profile.about_placeholder"}}" aria-describedby="cabinet-about-hint cabinet-about-count cabinet-about-error" data-field="about"></textarea>
               <div class="cabinet-field-foot">{{template "cabinet_mic" "cabinet-about"}}<span id="cabinet-about-count" class="cabinet-counter"></span></div>
               <p id="cabinet-about-error" class="cabinet-field-error" hidden></p>
             </div>
             <div class="cabinet-field">
-              <label for="cabinet-audience">{{call .T "account.profile.audience"}}</label>
+              <label for="cabinet-audience" id="cabinet-audience-label">{{call .T "account.profile.audience"}}</label>
               <textarea id="cabinet-audience" class="cabinet-textarea cabinet-textarea-short" rows="2" placeholder="{{call .T "account.profile.audience_placeholder"}}" aria-describedby="cabinet-audience-count cabinet-audience-error" data-field="audience"></textarea>
               <div class="cabinet-field-foot">{{template "cabinet_mic" "cabinet-audience"}}<span id="cabinet-audience-count" class="cabinet-counter"></span></div>
               <p id="cabinet-audience-error" class="cabinet-field-error" hidden></p>
@@ -157,7 +157,7 @@
         <div id="cabinet-recipients-editor" class="cabinet-recipients" hidden>
           {{range .Recipients}}<article class="cabinet-card cabinet-recipient" aria-labelledby="cabinet-recipient-{{.}}-title">
             <div class="cabinet-recipient-head"><h3 id="cabinet-recipient-{{.}}-title">{{call $.T (printf "account.recipient.%s" .)}}</h3><span id="cabinet-notes-{{.}}-cost" class="cabinet-cost-pill"></span></div>
-            <label for="cabinet-notes-{{.}}"><span class="visually-hidden">{{call $.T (printf "account.recipient.%s" .)}}. </span>{{call $.T "account.recipients.notes"}}</label>
+            <label for="cabinet-notes-{{.}}" id="cabinet-notes-{{.}}-label"><span class="visually-hidden">{{call $.T (printf "account.recipient.%s" .)}}. </span>{{call $.T "account.recipients.notes"}}</label>
             <textarea id="cabinet-notes-{{.}}" class="cabinet-textarea" rows="4" placeholder="{{call $.T (printf "account.recipient.%s_placeholder" .)}}" aria-describedby="cabinet-notes-{{.}}-count cabinet-notes-{{.}}-error" data-field="notes" data-recipient="{{.}}"></textarea>
             <div class="cabinet-field-foot">{{template "cabinet_mic" (printf "cabinet-notes-%s" .)}}<span id="cabinet-notes-{{.}}-count" class="cabinet-counter"></span></div>
             <p id="cabinet-notes-{{.}}-error" class="cabinet-field-error" hidden></p>
@@ -225,7 +225,7 @@
 </main>
 {{end}}
 
-{{define "cabinet_mic"}}<button class="cabinet-mic" type="button" data-mic-for="{{.}}" aria-describedby="{{.}}-voice" hidden><svg class="cabinet-mic-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg><svg class="cabinet-stop-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="7" y="7" width="10" height="10" rx="2"/></svg><span class="cabinet-mic-label"></span><span class="cabinet-mic-timer" hidden></span></button><span id="{{.}}-voice" class="cabinet-voice-status"></span>{{end}}
+{{define "cabinet_mic"}}<button class="cabinet-mic" type="button" data-mic-for="{{.}}" aria-labelledby="{{.}}-mic-text {{.}}-label" aria-describedby="{{.}}-voice" hidden><svg class="cabinet-mic-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg><svg class="cabinet-stop-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="7" y="7" width="10" height="10" rx="2"/></svg><span id="{{.}}-mic-text" class="cabinet-mic-label"></span><span class="cabinet-mic-timer" hidden></span></button><span id="{{.}}-voice" class="cabinet-voice-status"></span>{{end}}
 {{define "cabinet_icon_check"}}<svg class="account-benefit-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 6 9 17l-5-5"/></svg>{{end}}
 {{define "cabinet_icon_overview"}}<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="3.5" width="7" height="8" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="5" rx="1.5"/><rect x="13.5" y="11.5" width="7" height="9" rx="1.5"/><rect x="3.5" y="14.5" width="7" height="6" rx="1.5"/></svg>{{end}}
 {{define "cabinet_icon_profile"}}<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/></svg>{{end}}

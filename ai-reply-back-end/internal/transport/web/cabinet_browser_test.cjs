@@ -939,3 +939,39 @@ test('the usage table is out of the accessibility tree until it has data, and th
   assert.equal(f.node('cabinet-chart-table').hidden, true);
   assert.equal(f.node('cabinet-chart').getAttribute('tabindex'), null);
 });
+
+test('a read answered for another account is never shown: reload, or keep unsaved text and block', async () => {
+  const f = fixture({ handler: standard({ 'GET /account/api/ai-context': () => respond(Object.assign(contextResponse(), { user_id: 'fixture-user-B' })) }) });
+  await f.signIn();
+  assert.equal(f.browser.location.reloads, 1, 'nothing typed yet: the page reloads to the account signed in now');
+  assert.notEqual(f.node('cabinet-occupation').value, 'Продаю детскую одежду', 'the other account\'s profile is not filled in');
+  let answerFor = 'fixture-user-A';
+  const g = fixture({ handler: standard({
+    'GET /account/api/ai-context': () => respond(Object.assign(contextResponse(), { user_id: answerFor })),
+    'POST /account/api/ai-context': () => respond({ error: { code: 'AI_CONTEXT_CHANGED', details: { revision: 4 } } }, 409)
+  }) });
+  await g.signIn();
+  g.type('cabinet-about', 'Мой несохранённый текст');
+  g.node('cabinet-save').click(); await settle();
+  answerFor = 'fixture-user-B';
+  g.node('cabinet-reload-context').click(); await settle();
+  assert.equal(g.browser.location.reloads, 0, 'unsaved text is never thrown away by an automatic reload');
+  assert.equal(g.node('cabinet-about').value, 'Мой несохранённый текст');
+  assert.equal(g.node('cabinet-save-message').textContent, g.words['account_changed']);
+  assert.equal(g.node('cabinet-reload-page').hidden, false);
+  const h = fixture({ handler: standard({ 'GET /account/api/usage': () => respond(Object.assign(usageResponse(), { user_id: 'fixture-user-B' })) }) });
+  await h.signIn();
+  assert.equal(h.browser.location.reloads, 1, 'usage of another account is not drawn either');
+});
+
+test('the consent dialog links to the legal pages in the page language', async () => {
+  const plain = session({ consentRequired: true });
+  plain.legal.terms_url = 'https://example.test/offer';
+  plain.legal.privacy_url = 'https://example.test/privacy';
+  const f = fixture({ handler: standard() });
+  await f.signIn(plain);
+  f.mic('cabinet-about').click(); await settle();
+  assert.equal(f.node('cabinet-consent').open, true);
+  assert.equal(f.node('cabinet-consent-terms').href, 'https://example.test/offer?lang=ru');
+  assert.equal(f.node('cabinet-consent-privacy').href, 'https://example.test/privacy?lang=ru');
+});
