@@ -18,7 +18,7 @@ func TestMacContextValidationAndPromptSeparation(t *testing.T) {
 	if enabled, err := s.validateMacGeneration("macos", valid, 600, "client"); err != nil || !enabled {
 		t.Fatalf("valid: %v %v", enabled, err)
 	}
-	prompt, err := s.addMacGeneration(BuildComposePrompt(ComposeInput{Instruction: "Write a polite message", TemplateID: "client"}), valid, 600)
+	prompt, err := s.addMacGeneration(BuildComposePrompt(ComposeInput{Instruction: "Write a polite message", TemplateID: "client"}), valid, 600, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,11 +66,11 @@ func TestMacContextValidationAndPromptSeparation(t *testing.T) {
 func TestMacContextConservativeBudgetIncludesEscapingAndDefaultCap(t *testing.T) {
 	s := (&Service{}).WithMacContext(config.MacContext{Enabled: true, InputTokenBudget: 256})
 	p := BuildComposePrompt(ComposeInput{Instruction: "Write a message"})
-	if _, err := s.addMacGeneration(p, &GenerationContext{References: []string{strings.Repeat("&", 100)}}, 400); err == nil {
+	if _, err := s.addMacGeneration(p, &GenerationContext{References: []string{strings.Repeat("&", 100)}}, 400, 0); err == nil {
 		t.Fatal("escaping expansion bypassed input budget")
 	}
 	s.WithMacContext(config.MacContext{Enabled: true, InputTokenBudget: 4096})
-	bounded, err := s.addMacGeneration(p, nil, 0)
+	bounded, err := s.addMacGeneration(p, nil, 0, 0)
 	if err != nil || bounded.Quality.OutputCharLimit != 400 {
 		t.Fatalf("default output cap: %+v %v", bounded, err)
 	}

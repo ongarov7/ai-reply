@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/aireply/ai-reply-back-end/internal/aicontext"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
 	"github.com/aireply/ai-reply-back-end/internal/limits"
 	"github.com/aireply/ai-reply-back-end/internal/traits"
@@ -38,6 +39,8 @@ type ComposeInput struct {
 	GrammaticalGender string
 	// Regenerate — пайдаланушы бір нұсқаны көріп, басқасын сұрады.
 	Regenerate bool
+	// Account — the AI context saved in the user's account; empty when none.
+	Account aicontext.Rendered
 }
 
 // BuildComposePrompt — compose ережелері developer хабарында, пайдаланушы
@@ -65,10 +68,17 @@ func BuildComposePrompt(in ComposeInput) Prompt {
 
 	user := "Write the message described below. The block is the user's request.\n\n" +
 		block("request", instruction) + "\n\nWrite only the message."
+	version := PromptVersionCompose
+	if account := accountBlocks(in.Account); len(account) > 0 {
+		user = "Write the message described below. The <request> block is the user's request; " +
+			"the blocks before it are background data about the user.\n\n" +
+			strings.Join(account, "\n\n") + "\n\n" + block("request", instruction) + "\n\nWrite only the message."
+		version += PromptSuffixAccountContext
+	}
 	return Prompt{
 		Developer: strings.Join(sections, "\n\n"),
 		User:      user,
-		Version:   PromptVersionCompose,
+		Version:   version,
 		Quality: Quality{
 			Target:         target,
 			Gender:         gender,
@@ -97,6 +107,10 @@ type ComposeRequest struct {
 	AppVersion        string
 	// IdempotencyKey — Idempotency-Key тақырыбы ("" — кілтсіз): бір әрекетке бір төлем.
 	IdempotencyKey string
+	// Account and AccountExtra — the account AI context for this request and
+	// the extra replies it costs on a limited plan (docs/web-cabinet-ai-context.md §3).
+	Account      aicontext.Rendered
+	AccountExtra int
 }
 
 // Compose — нұсқау бойынша жаңа хабарлама.
@@ -122,31 +136,39 @@ func (s *Service) Compose(ctx context.Context, req ComposeRequest) (Result, erro
 		return Result{InstructionLimit: lim.InstructionChars}, domain.ErrInstructionTooLong
 	}
 
-	prompt := BuildComposePrompt(ComposeInput{
+	input := ComposeInput{
 		Instruction:       instruction,
 		AppLanguage:       req.Language,
 		InputLanguage:     req.InputLanguage,
 		GrammaticalGender: req.GrammaticalGender,
 		Regenerate:        req.Regenerate,
 		TemplateID:        req.TemplateID,
-	})
-	prompt.MaxOutputTokens = ComposeTokens(lim.MaxOutputTokens)
-	if mac {
-		prompt, err = s.addMacGeneration(prompt, req.Context, req.OutputCharLimit)
-		if err != nil {
-			return Result{}, err
-		}
+	}
+	base := BuildComposePrompt(input)
+	base.MaxOutputTokens = ComposeTokens(lim.MaxOutputTokens)
+	var full Prompt
+	if req.Account.Present() {
+		input.Account = req.Account
+		full = BuildComposePrompt(input)
+		full.MaxOutputTokens = base.MaxOutputTokens
+	}
+	prompt, fallback, err := s.withAccount(base, full, req.Account.Present(), mac, req.Context, req.OutputCharLimit)
+	if err != nil {
+		return Result{}, err
 	}
 
 	return s.generate(ctx, call{
-		Mode:       ModeCompose,
-		User:       req.User,
-		DeviceID:   req.DeviceID,
-		Language:   req.Language,
-		Platform:   req.Platform,
-		AppVersion: req.AppVersion,
-		Chars:      traits.RuneLen(instruction),
-		Key:        req.IdempotencyKey,
+		Mode:         ModeCompose,
+		User:         req.User,
+		DeviceID:     req.DeviceID,
+		Language:     req.Language,
+		Platform:     req.Platform,
+		AppVersion:   req.AppVersion,
+		Chars:        traits.RuneLen(instruction),
+		Key:          req.IdempotencyKey,
+		Fallback:     fallback,
+		Extra:        req.AccountExtra,
+		ContextChars: req.Account.Chars,
 	}, prompt, started)
 }
 

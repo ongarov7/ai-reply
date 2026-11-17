@@ -22,6 +22,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/config"
 	"github.com/aireply/ai-reply-back-end/internal/admin"
 	"github.com/aireply/ai-reply-back-end/internal/ai"
+	"github.com/aireply/ai-reply-back-end/internal/aicontext"
 	"github.com/aireply/ai-reply-back-end/internal/auth"
 	"github.com/aireply/ai-reply-back-end/internal/credits"
 	"github.com/aireply/ai-reply-back-end/internal/database"
@@ -536,15 +537,17 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 
 	limiter := middleware.NewLimiter()
 
+	aiContextSvc := aicontext.New(store).WithTTL(0)
+
 	mux := http.NewServeMux()
 	api.New(api.Deps{Config: cfg, Auth: authSvc, Users: userSvc, Plans: planSvc, Subs: subSvc,
 		AI: aiSvc, Limits: limitSvc, Payments: paymentSvc, Events: eventSvc, Installations: installSvc,
 		Notifications: notifySvc, Reports: reportSvc, Support: supportSvc, Limiter: limiter, Log: log,
 		Ping:    func(ctx context.Context) error { return db.Reader().PingContext(ctx) },
-		Credits: creditSvc, IAP: iapSvc, ProDevices: proDeviceSvc}).Register(mux)
+		Credits: creditSvc, IAP: iapSvc, ProDevices: proDeviceSvc, AIContext: aiContextSvc}).Register(mux)
 	adminapi.New(adminapi.Deps{Config: cfg, Admin: adminSvc, Limits: limitSvc, Notifications: notifySvc,
 		Payments: paymentSvc, Reports: reportSvc, Credits: creditSvc, Support: supportSvc, IAP: iapSvc,
-		Limiter: limiter, Log: log}).Register(mux)
+		AIContext: aiContextSvc, Limiter: limiter, Log: log}).Register(mux)
 	simulatorapi.New(simulatorapi.Deps{Config: cfg, Admin: adminSvc, Simulator: simulatorSvc,
 		Limiter: limiter, Log: log}).Register(mux)
 	webServer, err := web.New(web.Deps{Config: cfg, Admin: adminSvc, Plans: planSvc, Payments: paymentSvc,

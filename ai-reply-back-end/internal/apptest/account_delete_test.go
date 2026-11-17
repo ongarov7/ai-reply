@@ -86,6 +86,10 @@ func (h *harness) fullAccount(phone, address string) session {
 	h.buy(s, "standard", 1)
 	mustStatus(h.t, h.report(s.access, map[string]any{"mode": "reply", "reason": "other", "text": "Жауап мәтіні"}),
 		http.StatusCreated, "")
+	// The account AI context (switched off, so it does not change what the
+	// replies below cost).
+	mustStatus(h.t, h.saveAIContext(s.access, map[string]any{"enabled": false, "about": "Гүл дүкенім бар"}, 0),
+		http.StatusOK, "")
 	return s
 }
 
@@ -116,7 +120,7 @@ func TestAccountDeletionRemovesEveryUserRow(t *testing.T) {
 		"subscriptions", "usage_daily", "usage_monthly", "ai_usage_events", "payments", "legal_consents",
 		"product_events", "app_installations", "notification_preferences", "notifications",
 		"notification_deliveries", "ai_reports", "credit_grants", "credit_ledger", "usage_reservations",
-		"iap_purchases"} {
+		"iap_purchases", "ai_contexts"} {
 		if before[table] == 0 {
 			t.Fatalf("%s has no row for the account before deletion — the test would prove nothing (%v)", table, before)
 		}

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/aireply/ai-reply-back-end/internal/ai"
+	"github.com/aireply/ai-reply-back-end/internal/aicontext"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
 	"github.com/aireply/ai-reply-back-end/internal/traits"
 	"github.com/aireply/ai-reply-back-end/internal/transport/httpx"
@@ -50,6 +51,11 @@ type replyResponse struct {
 	Reply            string   `json:"reply"`
 	DetectedLanguage string   `json:"detected_language,omitempty"`
 	Usage            usageDTO `json:"usage"`
+	// Units — replies this request charged (1 + the account AI-context
+	// surcharge; 0 for a free replay). ContextApplied — the account AI
+	// context was used. Older apps ignore both.
+	Units          int  `json:"units"`
+	ContextApplied bool `json:"context_applied"`
 }
 
 // idempotencyKeyPattern — Idempotency-Key пішіні (transcribe request_id-мен бірдей).
@@ -130,6 +136,8 @@ func (s *Server) handleReply(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	account, accountExtra := s.accountContext(r.Context(), user, aicontext.RecipientFor(body.TemplateID, templateRelationship(body.Template)))
+
 	result, err := s.ai.Reply(r.Context(), ai.Request{
 		User:            user,
 		DeviceID:        DeviceFrom(r.Context()),
@@ -147,6 +155,8 @@ func (s *Server) handleReply(w http.ResponseWriter, r *http.Request) {
 		Platform:        traits.Clamp(body.Platform, 16),
 		AppVersion:      traits.Clamp(body.AppVersion, 32),
 		IdempotencyKey:  key,
+		Account:         account,
+		AccountExtra:    accountExtra,
 	})
 	if err != nil {
 		status, code, message := httpx.Translate(err)
@@ -169,7 +179,17 @@ func (s *Server) handleReply(w http.ResponseWriter, r *http.Request) {
 		Reply:            result.Text,
 		DetectedLanguage: result.DetectedLanguage,
 		Usage:            s.resultUsage(result),
+		Units:            result.Units,
+		ContextApplied:   result.ContextApplied,
 	})
+}
+
+// templateRelationship — the persona's relationship, when the app sent one.
+func templateRelationship(t *templateDTO) string {
+	if t == nil {
+		return ""
+	}
+	return t.Relationship
 }
 
 // composeRequest — «Create» режимі: пайдаланушы не жазу керегін сипаттайды.
@@ -200,6 +220,9 @@ type composeResponse struct {
 	Text             string   `json:"text"`
 	DetectedLanguage string   `json:"detected_language,omitempty"`
 	Usage            usageDTO `json:"usage"`
+	// Units and ContextApplied — as on replyResponse.
+	Units          int  `json:"units"`
+	ContextApplied bool `json:"context_applied"`
 }
 
 // handleCompose — нұсқау бойынша жаңа хабарлама. Квота, токен есебі және
@@ -228,6 +251,8 @@ func (s *Server) handleCompose(w http.ResponseWriter, r *http.Request) {
 		gender = body.Profile.GrammaticalGender
 	}
 
+	account, accountExtra := s.accountContext(r.Context(), user, aicontext.RecipientFor(body.TemplateID))
+
 	result, err := s.ai.Compose(r.Context(), ai.ComposeRequest{
 		User:              user,
 		DeviceID:          DeviceFrom(r.Context()),
@@ -243,6 +268,8 @@ func (s *Server) handleCompose(w http.ResponseWriter, r *http.Request) {
 		Platform:          traits.Clamp(body.Platform, 16),
 		AppVersion:        traits.Clamp(body.AppVersion, 32),
 		IdempotencyKey:    key,
+		Account:           account,
+		AccountExtra:      accountExtra,
 	})
 	if err != nil {
 		status, code, message := httpx.Translate(err)
@@ -266,6 +293,8 @@ func (s *Server) handleCompose(w http.ResponseWriter, r *http.Request) {
 		Text:             result.Text,
 		DetectedLanguage: result.DetectedLanguage,
 		Usage:            s.resultUsage(result),
+		Units:            result.Units,
+		ContextApplied:   result.ContextApplied,
 	})
 }
 

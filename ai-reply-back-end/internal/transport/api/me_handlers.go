@@ -338,10 +338,15 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 			// and at least one active product has units and this store's id.
 			"iap_ios":     s.iapAvailable(r.Context(), domain.PlatformIOS),
 			"iap_android": s.iapAvailable(r.Context(), domain.PlatformAndroid),
+			// GET|PUT|POST /api/v1/me/ai-context; every reply and compose uses the
+			// account AI context saved in the website cabinet; units and
+			// context_applied on their responses (docs/web-cabinet-ai-context.md).
+			"ai_context": s.aiContext != nil,
 		},
-		"demo_mode":    s.cfg.Auth.DemoMode,
-		"payment_mode": s.payments.Mode(),
-		"countries":    countries,
+		"ai_context_pricing": s.aiContextPricing(r),
+		"demo_mode":          s.cfg.Auth.DemoMode,
+		"payment_mode":       s.payments.Mode(),
+		"countries":          countries,
 		"legal": map[string]string{
 			"terms_version":   legal.TermsVersion,
 			"privacy_version": legal.PrivacyVersion,
@@ -428,4 +433,12 @@ func (s *Server) handleDeleteDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// aiContextPricing — the context surcharge in effect (null without the feature).
+func (s *Server) aiContextPricing(r *http.Request) any {
+	if s.aiContext == nil {
+		return nil
+	}
+	return s.aiContext.Pricing(r.Context())
 }

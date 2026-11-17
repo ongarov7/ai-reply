@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/aireply/ai-reply-back-end/config"
+	"github.com/aireply/ai-reply-back-end/internal/aicontext"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
 	"github.com/aireply/ai-reply-back-end/internal/limits"
 	"github.com/aireply/ai-reply-back-end/internal/repository"
@@ -102,6 +103,10 @@ type Request struct {
 	AppVersion    string
 	// IdempotencyKey — Idempotency-Key тақырыбы ("" — кілтсіз): бір әрекетке бір төлем.
 	IdempotencyKey string
+	// Account and AccountExtra — the account AI context for this request and
+	// the extra replies it costs on a limited plan (docs/web-cabinet-ai-context.md §3).
+	Account      aicontext.Rendered
+	AccountExtra int
 }
 
 // Result — клиентке қайтатын нәтиже.
@@ -131,6 +136,11 @@ type Result struct {
 	// Bucket — генерацияны не төледі: daily | pass | welcome | admin | pack
 	// (кілт қайталанғанда — алғашқы төлемнің бөлігі).
 	Bucket string
+	// Units — replies this request charged: 1 + the AI-context surcharge, 0 for
+	// a free replay of a paid Idempotency-Key.
+	Units int
+	// ContextApplied — the account AI context was in the prompt.
+	ContextApplied bool
 }
 
 // Сұраныс режимдері. Usage оқиғасында сақталады; reply мен compose бір
@@ -140,6 +150,9 @@ const (
 	ModeCompose    = "compose"
 	ModePolish     = "polish"
 	ModeTranscribe = "transcribe"
+	// ModeContext — an extra reservation paying the account AI-context
+	// surcharge of a reply or compose (usage_reservations.mode only).
+	ModeContext = "context"
 )
 
 // bookkeepingTimeout — провайдерден кейінгі есепке (квотаны қайтару, токендер, оқиға) берілетін уақыт.
@@ -168,6 +181,15 @@ type call struct {
 	Chars int
 	// Key — Idempotency-Key ("" — кілтсіз).
 	Key string
+	// Fallback — the same request without the account AI context, used when the
+	// balance cannot pay the context surcharge; nil when there is no context.
+	Fallback *Prompt
+	// Extra — extra replies the account context costs on a limited plan.
+	Extra int
+	// ContextChars — characters of the account context in the prompt.
+	ContextChars int
+	// Units — what the usage event records as charged (set by generate).
+	Units int
 }
 
 // Reply — негізгі сценарий.
@@ -197,7 +219,7 @@ func (s *Service) Reply(ctx context.Context, req Request) (Result, error) {
 	}
 	req.Instruction = traits.Clamp(req.Instruction, lim.InstructionChars)
 
-	prompt := BuildPrompt(PromptInput{
+	input := PromptInput{
 		Message:       source,
 		Instruction:   req.Instruction,
 		TemplateID:    req.TemplateID,
@@ -206,25 +228,57 @@ func (s *Service) Reply(ctx context.Context, req Request) (Result, error) {
 		Profile:       req.Profile,
 		Template:      req.Template,
 		WorkingHours:  req.Business,
-	})
-	prompt.MaxOutputTokens = lim.MaxOutputTokens
-	if mac {
-		prompt, err = s.addMacGeneration(prompt, req.Context, req.OutputCharLimit)
-		if err != nil {
-			return Result{}, err
-		}
+	}
+	base := BuildPrompt(input)
+	base.MaxOutputTokens = lim.MaxOutputTokens
+	var full Prompt
+	if req.Account.Present() {
+		input.Account = req.Account
+		full = BuildPrompt(input)
+		full.MaxOutputTokens = lim.MaxOutputTokens
+	}
+	prompt, fallback, err := s.withAccount(base, full, req.Account.Present(), mac, req.Context, req.OutputCharLimit)
+	if err != nil {
+		return Result{}, err
 	}
 
 	return s.generate(ctx, call{
-		Mode:       ModeReply,
-		User:       req.User,
-		DeviceID:   req.DeviceID,
-		Language:   req.Language,
-		Platform:   req.Platform,
-		AppVersion: req.AppVersion,
-		Chars:      traits.RuneLen(source),
-		Key:        req.IdempotencyKey,
+		Mode:         ModeReply,
+		User:         req.User,
+		DeviceID:     req.DeviceID,
+		Language:     req.Language,
+		Platform:     req.Platform,
+		AppVersion:   req.AppVersion,
+		Chars:        traits.RuneLen(source),
+		Key:          req.IdempotencyKey,
+		Fallback:     fallback,
+		Extra:        req.AccountExtra,
+		ContextChars: req.Account.Chars,
 	}, prompt, started)
+}
+
+// withAccount — the prompt to send and, when it carries the account AI
+// context, the fallback without it. base is the request's prompt without the
+// account context, full the same with it (only when present). A desktop's own
+// context is added to both; its byte budget counts the desktop's text only.
+func (s *Service) withAccount(base, full Prompt, present, mac bool, c *GenerationContext, output int) (Prompt, *Prompt, error) {
+	var err error
+	if !present {
+		if mac {
+			base, err = s.addMacGeneration(base, c, output, 0)
+		}
+		return base, nil, err
+	}
+	if mac {
+		accountBytes := len(full.User) - len(base.User)
+		if base, err = s.addMacGeneration(base, c, output, 0); err != nil {
+			return Prompt{}, nil, err
+		}
+		if full, err = s.addMacGeneration(full, c, output, accountBytes); err != nil {
+			return Prompt{}, nil, err
+		}
+	}
+	return full, &base, nil
 }
 
 // generate — reply мен compose-қа ортақ жол: квота брондау → провайдер, тазарту,
@@ -286,6 +340,42 @@ func (s *Service) generate(ctx context.Context, c call, prompt Prompt, started t
 		}, err
 	}
 
+	// The account AI-context surcharge: one more reservation per extra reply,
+	// each paid by the normal bucket order. Unlimited plans and free replays
+	// pay none. When the balance cannot pay it, the reply is written without
+	// the account context for the one reply already reserved.
+	applied := c.Fallback != nil
+	last := res
+	var extras []repository.Reservation
+	if applied && c.Extra > 0 && !res.Replay && res.Bucket != domain.BucketUnlimited {
+		for range c.Extra {
+			extra, err := s.repo.ReserveGeneration(ctx, repository.ReserveInput{
+				UserID: c.User.ID, Mode: ModeContext, Date: date, Month: month,
+				DailyLimit: entitlement.DailyLimit, MonthlyLimit: entitlement.MonthlyLimit, Unlimited: entitlement.Unlimited,
+				Now: started, PurchasedOnly: deviceLimit != nil,
+			})
+			if err != nil {
+				s.refundExtras(ctx, c, extras)
+				extras = nil
+				if !isQuotaRefusal(err) {
+					s.release(ctx, c, res)
+					return Result{}, err
+				}
+				prompt, applied, last = *c.Fallback, false, res
+				break
+			}
+			extras = append(extras, extra)
+			last = extra
+		}
+	}
+	c.Units = 1 + len(extras)
+	if res.Replay {
+		c.Units = 0
+	}
+	if !applied {
+		c.ContextChars = 0
+	}
+
 	outcome, providerErr := Complete(ctx, s.provider, prompt, s.repair)
 	latency := int(s.clock.Now().Sub(started).Milliseconds())
 
@@ -297,6 +387,8 @@ func (s *Service) generate(ctx context.Context, c call, prompt Prompt, started t
 	if providerErr != nil {
 		// Жауап алынбады — бронды қайтарамыз (қайталау кезінде екі рет есептелмейді).
 		s.release(ctx, c, res)
+		s.refundExtras(ctx, c, extras)
+		c.Units = 0
 		completion := Completion{Model: outcome.Model, InputTokens: outcome.InputTokens, OutputTokens: outcome.OutputTokens, ProviderMS: outcome.ProviderMS}
 		if completion.InputTokens > 0 || completion.OutputTokens > 0 {
 			if err := s.repo.AddTokens(ctx, c.User.ID, date, month, completion.InputTokens, completion.OutputTokens, s.estimateCostMicros(ctx, completion)); err != nil {
@@ -308,11 +400,13 @@ func (s *Service) generate(ctx context.Context, c call, prompt Prompt, started t
 		return Result{}, providerErr
 	}
 	if !res.Replay {
-		if ok, err := s.repo.CommitGeneration(ctx, res.ID, s.clock.Now()); err != nil {
-			s.log.Error("generation commit failed", "user_id", c.User.ID, "error", err.Error())
-		} else if !ok {
-			// The stale sweep gave it back already: the person got this one for free.
-			s.log.Warn("generation commit found no reservation", "user_id", c.User.ID, "bucket", res.Bucket)
+		for _, reservation := range append([]repository.Reservation{res}, extras...) {
+			if ok, err := s.repo.CommitGeneration(ctx, reservation.ID, s.clock.Now()); err != nil {
+				s.log.Error("generation commit failed", "user_id", c.User.ID, "error", err.Error())
+			} else if !ok {
+				// The stale sweep gave it back already: the person got this one for free.
+				s.log.Warn("generation commit found no reservation", "user_id", c.User.ID, "bucket", reservation.Bucket)
+			}
 		}
 	}
 	if outcome.RepairAttempted {
@@ -335,7 +429,7 @@ func (s *Service) generate(ctx context.Context, c call, prompt Prompt, started t
 		"bucket", res.Bucket, "replay", res.Replay)
 
 	usage := entitlement
-	usage.UsedToday, usage.UsedMonth, usage.Balance = res.UsedToday, res.UsedMonth, res.Balance
+	usage.UsedToday, usage.UsedMonth, usage.Balance = last.UsedToday, last.UsedMonth, last.Balance
 	if s.quota != nil && !res.Replay && !entitlement.Unlimited && deviceLimit == nil {
 		s.quota.QuotaUsed(ctx, c.User, usage, date, month)
 	}
@@ -358,7 +452,19 @@ func (s *Service) generate(ctx context.Context, c call, prompt Prompt, started t
 		LatencyMS:          latency,
 		Balance:            usage.Balance,
 		Bucket:             res.Bucket,
+		Units:              c.Units,
+		ContextApplied:     applied,
 	}, nil
+}
+
+// refundExtras — gives back the context-surcharge reservations of a request
+// that delivered nothing (or could not pay the whole surcharge).
+func (s *Service) refundExtras(ctx context.Context, c call, extras []repository.Reservation) {
+	for _, extra := range extras {
+		if _, err := s.repo.RefundGeneration(ctx, extra.ID, s.clock.Now()); err != nil {
+			s.log.Error("context surcharge refund failed", "user_id", c.User.ID, "bucket", extra.Bucket, "error", err.Error())
+		}
+	}
 }
 
 // release — жауап жоқ: брон төлеген бөлікке қайтады, тегін қайталау кілтке қайтарылады.
@@ -442,6 +548,9 @@ func (s *Service) record(ctx context.Context, c call, ent domain.Entitlement,
 		Mode:          c.Mode,
 		PromptVersion: version,
 		CreatedAt:     s.clock.Now(),
+	}
+	if status == "success" {
+		event.Units, event.ContextChars = c.Units, c.ContextChars
 	}
 	if err := s.repo.InsertUsageEvent(ctx, event); err != nil {
 		s.log.Error("usage event insert failed", "error", err.Error())

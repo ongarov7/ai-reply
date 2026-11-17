@@ -8,6 +8,7 @@ import (
 
 	"github.com/aireply/ai-reply-back-end/config"
 	"github.com/aireply/ai-reply-back-end/internal/ai"
+	"github.com/aireply/ai-reply-back-end/internal/aicontext"
 	"github.com/aireply/ai-reply-back-end/internal/auth"
 	"github.com/aireply/ai-reply-back-end/internal/credits"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
@@ -58,6 +59,7 @@ type Server struct {
 	iap           *iap.Service
 	purchases     PurchaseOptions
 	support       *support.Service
+	aiContext     *aicontext.Service
 	limiter       *middleware.Limiter
 	ping          Pinger
 	log           *slog.Logger
@@ -90,6 +92,9 @@ type Deps struct {
 	IAP *iap.Service
 	// Purchases — лимит қатесіндегі can_buy (nil — IAP-тан, ол да жоқ болса сатып алу жоқ).
 	Purchases PurchaseOptions
+	// AIContext — the account AI context (website cabinet) added to every
+	// generation, /api/v1/me/ai-context and features.ai_context (nil — off).
+	AIContext *aicontext.Service
 }
 
 // New — API сервері.
@@ -102,7 +107,8 @@ func New(d Deps) *Server {
 		cfg: d.Config, auth: d.Auth, users: d.Users, plans: d.Plans, subs: d.Subs,
 		ai: d.AI, limits: d.Limits, payments: d.Payments, events: d.Events,
 		installations: d.Installations, notifications: d.Notifications, reports: d.Reports,
-		proDevices: d.ProDevices, credits: d.Credits, iap: d.IAP, purchases: purchases, support: d.Support, limiter: d.Limiter, ping: d.Ping,
+		proDevices: d.ProDevices, credits: d.Credits, iap: d.IAP, purchases: purchases, support: d.Support, aiContext: d.AIContext,
+		limiter: d.Limiter, ping: d.Ping,
 		log: d.Log,
 	}
 }
@@ -193,6 +199,14 @@ func (s *Server) Register(mux *http.ServeMux) {
 	// Поштасы жоқ тіркелгіге (телефонмен ашылған) пошта қосу — кейін сол поштамен кіру үшін.
 	mux.Handle("POST /api/v1/me/email/otp/request", s.requireUser(otpRequest(http.HandlerFunc(s.handleLinkEmailRequest))))
 	mux.Handle("POST /api/v1/me/email/otp/verify", s.requireUser(otpVerify(http.HandlerFunc(s.handleLinkEmailVerify))))
+
+	// The account AI context (docs/web-cabinet-ai-context.md §5.3). POST is the
+	// same as PUT for clients whose HTTP stack cannot send PUT bodies.
+	if s.aiContext != nil {
+		mux.Handle("GET /api/v1/me/ai-context", s.requireUser(http.HandlerFunc(s.handleGetAIContext)))
+		mux.Handle("PUT /api/v1/me/ai-context", s.requireUser(generic(http.HandlerFunc(s.handleSaveAIContext))))
+		mux.Handle("POST /api/v1/me/ai-context", s.requireUser(generic(http.HandlerFunc(s.handleSaveAIContext))))
+	}
 
 	mux.Handle("GET /api/v1/me/pro-devices", s.requireUser(http.HandlerFunc(s.handleProDevices)))
 	mux.Handle("DELETE /api/v1/me/pro-devices/{authorization_id}", s.requireUser(generic(http.HandlerFunc(s.handleRevokeProDevice))))

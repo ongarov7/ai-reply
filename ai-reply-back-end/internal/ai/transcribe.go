@@ -41,6 +41,9 @@ const (
 	PurposeDictation = "dictation"
 	// PurposeInstruction — ассистентке нұсқау: хабарламаға қалай жауап беру керек.
 	PurposeInstruction = "instruction"
+	// PurposeProfile — the user tells about themselves for their account AI
+	// profile (website cabinet microphone).
+	PurposeProfile = "profile"
 )
 
 // TranscribeRequest — бір дауыс жазбасы. Аудио тек жадта, тек осы шақыру ішінде.
@@ -55,6 +58,10 @@ type TranscribeRequest struct {
 	// Languages — VoiceLanguages арқылы тексерілген болжамдар, ең ықтималы бірінші.
 	Languages []string
 	Purpose   string
+	// Website — dictation into the account AI profile in the website cabinet.
+	// It writes no reply, so the Pro device slots (which guard replies) do not
+	// apply; the day's voice cap still does.
+	Website bool
 }
 
 // TranscribeResult — клиентке қайтатын нәтиже.
@@ -112,6 +119,12 @@ var voicePrompts = map[string]map[string]string{
 		"en": "A short spoken note for an AI assistant on how to reply to a message, in English.",
 		"uz": "AI yordamchi uchun qisqa ovozli koʻrsatma: xabarga qanday javob berish kerak. Nutq oʻzbek tilida, baʼzan ruscha soʻzlar aralashadi.",
 	},
+	PurposeProfile: {
+		"kk": "Адам өзі туралы айтады: кім, немен айналысады, клиенттерімен және таныстарымен қалай сөйлеседі. Сөйлеу қазақша, кейде орысша сөздер араласады. Қазақ әріптері: ә, ғ, қ, ң, ө, ұ, ү, һ, і.",
+		"ru": "Человек рассказывает о себе: кто он, чем занимается, как общается с клиентами и знакомыми. Речь на русском, иногда с казахскими словами.",
+		"en": "A person describes themselves: who they are, what they do and how they talk to clients and friends, in English.",
+		"uz": "Inson oʻzi haqida gapiradi: kimligi, nima bilan shugʻullanishi, mijozlar va tanishlar bilan qanday muloqot qilishi. Nutq oʻzbek tilida, baʼzan ruscha soʻzlar aralashadi.",
+	},
 }
 
 // VoicePrompt — бірінші болжамның тіліндегі контекст ("" — болжам жоқ: модель өзі анықтайды).
@@ -119,7 +132,7 @@ func VoicePrompt(purpose string, languages []string) string {
 	if len(languages) == 0 {
 		return ""
 	}
-	if purpose != PurposeInstruction {
+	if purpose != PurposeInstruction && purpose != PurposeProfile {
 		purpose = PurposeDictation
 	}
 	return voicePrompts[purpose][languages[0]]
@@ -154,7 +167,7 @@ func (s *Service) Transcribe(ctx context.Context, req TranscribeRequest) (Transc
 		return TranscribeResult{}, InvalidAudio(reason)
 	}
 
-	if s.proDevices != nil {
+	if s.proDevices != nil && !req.Website {
 		ent, err := s.subs.Entitlement(ctx, req.User.ID)
 		if err != nil {
 			return TranscribeResult{}, err
