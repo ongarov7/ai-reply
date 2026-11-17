@@ -357,6 +357,8 @@
       }
       var usage = payload.usage || {};
       text('confirmed-email', payload.user.email || t('email_unavailable'));
+      // The sidebar may cut a long address with an ellipsis: the full one is its title.
+      if (nodes['confirmed-email']) nodes['confirmed-email'].title = payload.user.email || '';
       text('user-id', payload.user.id);
       text('remaining', usage.unlimited ? '∞' : Math.max(0, Number(usage.remaining_total) || 0));
       text('purchased', Math.max(0, Number(usage.purchased_credits) || 0));
