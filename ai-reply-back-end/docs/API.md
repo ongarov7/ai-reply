@@ -841,7 +841,9 @@ markdown, приписка модели «Примечание: …» о сам�
 Каждое событие `ai_usage_events` хранит `prompt_version`: `reply_v3`,
 `reply_v3+repair_v1` (принят исправленный ответ; в событиях до регистра по получателю —
 `reply_v2`, `reply_v2+repair_v1`), `compose_v2`, `compose_v2+repair_v1`,
-`polish_v1`, `transcribe_v1`. В admin JSON это поле не выводится. Структурные логи без текста и без рода:
+`polish_v1`, `transcribe_v1`; суффикс `+account_context_v1` — в промпте был AI-профиль аккаунта.
+С миграции `0042` событие хранит и `units` (сколько ответов списано) и `context_chars`
+(сколько символов AI-профиля было в запросе). В admin JSON это поле не выводится. Структурные логи без текста и без рода:
 `ai_reply_generated` (mode, prompt_version, target_language, language_source,
 latency_ms, токены, repaired, truncated; у polish — changed), `ai_reply_failed`
 (mode, prompt_version, code, latency_ms), `ai_reply_repaired` (коды проблем, accepted);
@@ -937,6 +939,45 @@ Pro стоит 3 990 ₸ в месяц или 39 990 ₸ в год. Новые �
 того же аккаунта из основного API; тестовая сборка и сайт `/sandbox` используют отдельный контур.
 Сохранённые заказы и банковские подписки исполняются по исходным снимкам предложения;
 новый каталог не меняет ранее оплаченные условия, остатки или магазинные Product ID.
+
+## AI-профиль аккаунта и личный кабинет
+
+Полный контракт — [docs/web-cabinet-ai-context.md](../../docs/web-cabinet-ai-context.md).
+Пользователь заполняет AI-профиль в кабинете сайта (`/account`): роли и стиль общения
+(коды из каталога), род занятий, «о себе», аудиторию и заметку для каждого получателя
+(`friend`, `client`, `colleague`, `partner`). Сервер сам добавляет его в каждый
+`/ai/reply` и `/ai/compose` любого приложения (блоки `<account_context>` и
+`<recipient_notes>` в user-сообщении, версия промпта `…+account_context_v1`); обновлять
+приложения не нужно. Получатель берётся из `template_id` (`work` → `colleague`,
+`business` → `partner`), иначе из `template.relationship`; у своих персон — только общая часть.
+
+Списание (решение владельца): ответ стоит `1 + min(потолок, ⌈(символы − бесплатные) / 400⌉)`.
+Считаются символы «о себе», рода занятий, аудитории и заметки выбранного получателя;
+роли и стиль бесплатны. Pro (безлимит) — без доплаты. Если на доплату не хватает
+ответов, ответ пишется без AI-профиля за 1 ответ. Доплата — отдельные брони
+`usage_reservations.mode = 'context'`; при ошибке провайдера возвращается всё.
+Настройки — `ai_context_chars_per_reply` (400), `ai_context_free_chars` (0),
+`ai_context_max_extra_replies` (2) в админке «Настройки».
+
+| Метод | Путь | Вход |
+|---|---|---|
+| GET | `/api/v1/me/ai-context` | Bearer |
+| PUT, POST | `/api/v1/me/ai-context` | Bearer; `{"context": {...}, "expected_revision": N}` |
+| GET | `/account/api/ai-context` | cookie сайта |
+| POST | `/account/api/ai-context` | cookie + same-origin |
+| GET | `/account/api/usage?days=30` | cookie; график: ответы и списания по дням, платформы |
+| POST | `/account/api/consent` | cookie + same-origin; согласие с платформой `web` |
+| POST | `/account/api/transcribe` | cookie + Origin + `X-Requested-With: AIReplyAccount`, multipart (WAV/M4A) |
+| POST | `/api/v1/admin/settings/ai-context` | админ; `{"chars_per_reply","free_chars","max_extra_replies"}` |
+
+Сохранение заменяет документ целиком; устаревший `expected_revision` → `409 AI_CONTEXT_CHANGED`
+(`details.revision`), ошибка поля → `400 INVALID_REQUEST` (`details.field`, `reason`
+`too_long|too_many|unknown|invalid_text|required`, `max`). `GET /api/v1/config` отдаёт
+`features.ai_context` и `ai_context_pricing`; `/account/api/session` — `features` и
+`legal.consent_required`. Ответы `/ai/reply` и `/ai/compose` получили `units` (сколько
+ответов списано; 0 у бесплатного повтора) и `context_applied`. `POST /api/v1/web/payment-handoff`
+принимает `"target": "account"` (ссылка на `/account`). Документ — личные данные: не
+пишется в лог, удаляется вместе с аккаунтом (таблица `ai_contexts`, миграция `0042`).
 
 ## Покупки в приложении
 
