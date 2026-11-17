@@ -404,7 +404,12 @@ type UsageEvent struct {
 	Mode string
 	// PromptVersion — reply_v3, reply_v3+repair_v1, compose_v2, polish_v1, transcribe_v1 …
 	PromptVersion string
-	CreatedAt     time.Time
+	// Units — replies this generation charged (1 + the AI-context surcharge;
+	// 0 when nothing was charged: an error, a free replay, polish, voice).
+	Units int
+	// ContextChars — characters of the account AI context it carried (a number only).
+	ContextChars int
+	CreatedAt    time.Time
 }
 
 // AdminUser — әкімші тіркелгісі (мобильді қолданушыдан бөлек).

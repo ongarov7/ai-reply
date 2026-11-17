@@ -272,7 +272,8 @@ func TestProLegacyAliasMigrationFrom0040PreservesExistingOwner(t *testing.T) {
  VALUES('existing-owner','existing','existing-device','mobile','ios',1,1)`); err != nil {
 		t.Fatal(err)
 	}
-	if applied, err := database.Migrate(ctx, db, migrations.FS); err != nil || len(applied) != 1 || applied[0] != "0041_pro_device_session_aliases.sql" {
+	// 0041 runs first; later migrations may follow it in the same upgrade.
+	if applied, err := database.Migrate(ctx, db, migrations.FS); err != nil || len(applied) == 0 || applied[0] != "0041_pro_device_session_aliases.sql" {
 		t.Fatalf("0040 upgrade=%v err=%v", applied, err)
 	}
 	if applied, err := database.Migrate(ctx, db, migrations.FS); err != nil || len(applied) != 0 {

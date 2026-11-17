@@ -73,11 +73,11 @@ func (s *Store) InsertUsageEvent(ctx context.Context, e domain.UsageEvent) error
 	_, err := s.db.Writer().ExecContext(ctx, `
 		INSERT INTO ai_usage_events (id, user_id, device_id, plan_id, model, status, error_code,
 			input_tokens, output_tokens, total_tokens, cost_micros, latency_ms, provider_ms,
-			platform, app_version, language, source_chars, mode, prompt_version, created_at)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			platform, app_version, language, source_chars, mode, prompt_version, units, context_chars, created_at)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		e.ID, e.UserID, e.DeviceID, e.PlanID, e.Model, e.Status, e.ErrorCode,
 		e.InputTokens, e.OutputTokens, e.TotalTokens, e.CostMicros, e.LatencyMS, e.ProviderMS,
-		e.Platform, e.AppVersion, e.Language, e.SourceChars, e.Mode, e.PromptVersion, ms(e.CreatedAt))
+		e.Platform, e.AppVersion, e.Language, e.SourceChars, e.Mode, e.PromptVersion, e.Units, e.ContextChars, ms(e.CreatedAt))
 	return err
 }
 
