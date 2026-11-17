@@ -36,15 +36,19 @@
   var VOICE_TIMEOUT = 60000;
   var USAGE_TTL = 60000;
   var SVG_NS = 'http://www.w3.org/2000/svg';
-  // C0/C1 control characters other than tab and newline (\r included): the
-  // server removes \r and refuses the rest, and none of them is visible.
+  // Like the server (aicontext cleanText): pasted CR, VT, NEL, LS and PS line
+  // breaks become "\n" and bidirectional controls are dropped. The remaining
+  // C0/C1 control characters other than tab and newline are refused by the
+  // server; none of them is visible, so they are dropped here too.
+  var LINE_BREAKS = /\r\n|[\r\u000B\u0085\u2028\u2029]/g;
+  var BIDI_CONTROLS = /[\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/g;
   var CONTROL = /[\u0000-\u0008\u000B-\u001F\u007F-\u009F]/g;
 
   /* ------------------------------------------------------------ pure helpers */
 
   // The text exactly as it is sent: what is counted is what the server stores.
   function normalizeText(value) {
-    return String(value == null ? '' : value).replace(CONTROL, '').trim();
+    return String(value == null ? '' : value).replace(LINE_BREAKS, '\n').replace(BIDI_CONTROLS, '').replace(CONTROL, '').trim();
   }
   // "chars" are Unicode code points (§2): an emoji counts as one.
   function chars(value) { return Array.from(normalizeText(value)).length; }
@@ -255,7 +259,7 @@
       userId: '', session: null, section: '', features: { aiContext: false, voice: false },
       usage: null, usageStatus: 'idle', usageAt: 0, usageUser: '', usageEpoch: 0,
       context: null, saved: null, draft: null, contextStatus: 'idle', contextEpoch: 0,
-      saving: false, saveError: '', conflict: false, unauthorized: false, fieldErrors: {},
+      saving: false, saveError: '', conflict: false, unauthorized: false, accountChanged: false, fieldErrors: {},
       consentGiven: false, voiceUnavailable: false, chartIndex: -1, chartWidth: 0
     };
     var voice = { phase: 'idle', mic: null, recorder: null, job: null, startedAt: 0, tick: null, limit: null };
@@ -266,7 +270,7 @@
       'cost-value', 'cost-note', 'profile-status', 'profile-retry', 'profile-editor', 'recipients-status', 'recipients-retry',
       'recipients-editor', 'ai-enabled', 'cost-line', 'saved-at', 'roles-list', 'roles-count', 'roles-error', 'traits-list',
       'traits-count', 'traits-error', 'occupation', 'occupation-count', 'occupation-error', 'about', 'about-count', 'about-error',
-      'audience', 'audience-count', 'audience-error', 'savebar', 'save-message', 'discard', 'reload-context', 'relogin', 'save',
+      'audience', 'audience-count', 'audience-error', 'savebar', 'save-message', 'discard', 'reload-context', 'relogin', 'reload-page', 'save',
       'live', 'consent', 'consent-terms', 'consent-privacy', 'consent-error', 'consent-cancel', 'consent-accept'].forEach(function (id) {
       n[id] = document.getElementById('cabinet-' + id);
     });
@@ -395,6 +399,17 @@
       }
       signalSignOut();
     }
+    // 409 WEB_ACCOUNT_CHANGED: this browser is now signed in to another
+    // account (another tab), so the write named the wrong one and nothing was
+    // saved. Saving and dictation stop and the save bar offers a reload;
+    // unsaved text stays on screen until then.
+    function isAccountChanged(error) { return !!error && error.status === 409 && error.message === 'WEB_ACCOUNT_CHANGED'; }
+    function accountChanged(announce) {
+      state.accountChanged = true;
+      refreshEditor();
+      renderMics();
+      if (announce !== false) say(t('account_changed'));
+    }
 
     /* ---------------------------------------------------------- navigation */
 
@@ -464,10 +479,12 @@
       cancelVoice('');
       // A transcription still on its way belongs to the previous account.
       if (voice.phase === 'processing') resetVoice();
+      // So does an open consent dialog.
+      if (consent.pending) closeConsent(false);
       state.contextEpoch += 1;
       state.usageEpoch += 1;
       state.context = null; state.saved = null; state.draft = null; state.contextStatus = 'idle';
-      state.saving = false; state.saveError = ''; state.conflict = false; state.unauthorized = false; state.fieldErrors = {};
+      state.saving = false; state.saveError = ''; state.conflict = false; state.unauthorized = false; state.accountChanged = false; state.fieldErrors = {};
       state.usage = null; state.usageStatus = 'idle'; state.usageAt = 0; state.usageUser = '';
       state.consentGiven = false; state.voiceUnavailable = false; state.chartIndex = -1;
       fields.forEach(function (field) { if (field.node) field.node.value = ''; });
@@ -616,7 +633,8 @@
         var name = document.createElement('span');
         name.className = 'cabinet-meter-name';
         var code = item.platform.toLowerCase();
-        name.textContent = code === 'web' ? t('platform.web') : PLATFORM_NAMES[code] || item.platform;
+        // The server reports any platform it does not know as "other".
+        name.textContent = code === 'web' ? t('platform.web') : code === 'other' ? t('platform.other') : PLATFORM_NAMES[code] || item.platform;
         var track = document.createElement('span');
         track.className = 'cabinet-meter-track';
         track.setAttribute('aria-hidden', 'true');
@@ -655,7 +673,9 @@
         host.replaceChildren();
         host.hidden = true;
         host.removeAttribute('tabindex');
-        if (n['chart-table']) n['chart-table'].replaceChildren();
+        host.removeAttribute('role');
+        host.removeAttribute('aria-label');
+        if (n['chart-table']) { n['chart-table'].replaceChildren(); n['chart-table'].hidden = true; }
         state.chartWidth = 0;
         return;
       }
@@ -714,7 +734,9 @@
       tip.setAttribute('role', 'status');
       tip.hidden = true;
       host.append(root, tip);
+      // Focusable for the arrow keys: a named group, so its label is read.
       host.setAttribute('tabindex', '0');
+      host.setAttribute('role', 'group');
       host.setAttribute('aria-label', t('chart.title') + '. ' + t('chart.keyboard_hint'));
       function showTip(index) {
         if (index < 0 || index >= days.length) { hideTip(); return; }
@@ -767,6 +789,7 @@
       var table = n['chart-table'];
       if (!table) return;
       table.replaceChildren();
+      table.hidden = false;
       var caption = document.createElement('caption');
       caption.textContent = t('chart.title');
       var head = document.createElement('thead');
@@ -884,25 +907,33 @@
         input.checked = state.draft[kind].indexOf(code) !== -1;
         input.addEventListener('change', function () { toggleCode(kind, code, input); });
         var text = document.createElement('span');
-        text.textContent = words[group.prefix + code] || code.replace(/_/g, ' ');
+        text.textContent = chipLabel(kind, code);
         label.append(input, text);
         group.list.append(label);
         group.inputs.push(input);
       });
     }
+    // The selected opposite of a style chip ("" — none), which choosing it replaces.
+    function selectedOpposite(kind, code) {
+      var opposite = kind === 'traits' ? oppositeTrait(code) : '';
+      return opposite && state.draft && state.draft.traits.indexOf(opposite) !== -1 ? opposite : '';
+    }
+    function chipLabel(kind, code) { return words[chips[kind].prefix + code] || code.replace(/_/g, ' '); }
     function toggleCode(kind, code, input) {
       if (!state.draft) return;
       var list = state.draft[kind];
       var index = list.indexOf(code);
       if (input.checked && index === -1) {
-        var opposite = kind === 'traits' ? oppositeTrait(code) : '';
-        if (opposite && list.indexOf(opposite) !== -1) list.splice(list.indexOf(opposite), 1);
-        if (list.length >= limit(kind)) {
+        var opposite = selectedOpposite(kind, code);
+        if (!opposite && list.length >= limit(kind)) {
           input.checked = false;
           say(t('field.too_many', { max: limit(kind) }));
           return;
         }
+        if (opposite) list.splice(list.indexOf(opposite), 1);
         list.push(code);
+        // The other chip unchecks itself: say so.
+        if (opposite) say(t('profile.trait_replaced', { previous: chipLabel(kind, opposite), current: chipLabel(kind, code) }));
       } else if (!input.checked && index !== -1) {
         list.splice(index, 1);
       }
@@ -943,7 +974,8 @@
         var selected = state.draft[kind].length, max = limit(kind);
         group.inputs.forEach(function (input) {
           input.checked = state.draft[kind].indexOf(input.value) !== -1;
-          input.disabled = !input.checked && selected >= max;
+          // At the limit a chip stays available when it only swaps its opposite.
+          input.disabled = !input.checked && selected >= max && !selectedOpposite(kind, input.value);
         });
         setText(group.count, t('profile.selected', { count: selected, max: max }));
         setFieldError(null, group.error, selected > max ? t('field.too_many', { max: max }) : state.fieldErrors[kind] || '');
@@ -972,22 +1004,25 @@
       if (!n.savebar) return;
       var dirty = isDirty();
       var invalid = hasLocalErrors() || Object.keys(state.fieldErrors).length > 0;
-      var visible = state.contextStatus === 'ready' && (dirty || state.saving || state.conflict || state.unauthorized || !!state.saveError);
+      var visible = state.contextStatus === 'ready' && (dirty || state.saving || state.conflict || state.unauthorized || state.accountChanged || !!state.saveError);
       show(n.savebar, visible);
-      var message = state.saving ? t('save.saving') : state.conflict ? t('save.conflict') + ' ' + t('save.conflict_hint')
+      var blocked = state.conflict || state.unauthorized || state.accountChanged;
+      var message = state.saving ? t('save.saving') : state.accountChanged ? t('account_changed')
+        : state.conflict ? t('save.conflict') + ' ' + t('save.conflict_hint')
         : state.unauthorized ? t('save.session') : state.saveError ? state.saveError : invalid ? t('save.invalid') : dirty ? t('save.unsaved') : '';
       setText(n['save-message'], message);
-      if (n.savebar.classList) n.savebar.classList.toggle('is-error', state.conflict || state.unauthorized || !!state.saveError || invalid);
+      if (n.savebar.classList) n.savebar.classList.toggle('is-error', blocked || !!state.saveError || invalid);
       if (n.save) {
-        n.save.hidden = state.conflict || state.unauthorized;
+        n.save.hidden = blocked;
         n.save.disabled = state.saving || !dirty || invalid;
       }
-      show(n.discard, dirty && !state.saving && !state.unauthorized && !state.conflict);
-      show(n['reload-context'], state.conflict);
-      show(n.relogin, state.unauthorized);
+      show(n.discard, dirty && !state.saving && !blocked);
+      show(n['reload-context'], state.conflict && !state.accountChanged);
+      show(n.relogin, state.unauthorized && !state.accountChanged);
+      show(n['reload-page'], state.accountChanged);
     }
     function save() {
-      if (!state.draft || state.saving || state.conflict || state.unauthorized || !isDirty() || hasLocalErrors()) return Promise.resolve();
+      if (!state.draft || state.saving || state.conflict || state.unauthorized || state.accountChanged || !isDirty() || hasLocalErrors()) return Promise.resolve();
       var user = state.userId, epoch = state.contextEpoch;
       var body = normalizeDocument(state.draft);
       state.saving = true;
@@ -1000,10 +1035,9 @@
         say(t('save.saved'));
       }).catch(function (error) {
         if (user !== state.userId || epoch !== state.contextEpoch) return;
-        if (error.status === 409 && error.message === 'WEB_ACCOUNT_CHANGED') {
+        if (isAccountChanged(error)) {
           // This page shows another account than the browser's session now.
-          state.saveError = t('account_changed');
-          say(state.saveError);
+          accountChanged();
         } else if (error.status === 409) {
           // Another device saved first: nothing was saved here.
           state.conflict = true;
@@ -1079,7 +1113,8 @@
         var active = voice.mic === mic;
         var recording = active && voice.phase === 'recording';
         mic.button.hidden = !available;
-        mic.button.disabled = !!voice.mic && !recording;
+        // One recording at a time, and none for a page that shows another account.
+        mic.button.disabled = !!voice.mic && !recording || state.accountChanged;
         if (mic.button.classList) mic.button.classList.toggle('is-recording', recording);
         setText(mic.label, t(recording ? 'voice.stop' : 'voice.start'));
         show(mic.timer, recording);
@@ -1095,7 +1130,12 @@
       setText(voice.mic.timer, t('voice.timer', { elapsed: clock(elapsed), limit: clock(MAX_RECORDING_MS) }));
       voice.tick = browser.setTimeout(tick, 250);
     }
-    function voiceStatus(mic, message) { if (mic) setText(mic.status, message); }
+    // The text under the microphone, announced once through the page's live
+    // region (which stays in place when a section is hidden).
+    function voiceStatus(mic, message) {
+      if (mic) setText(mic.status, message);
+      if (message) say(message);
+    }
     function resetVoice() {
       if (voice.tick) browser.clearTimeout(voice.tick);
       if (voice.limit) browser.clearTimeout(voice.limit);
@@ -1104,7 +1144,6 @@
     function finishVoice(mic, message) {
       resetVoice();
       voiceStatus(mic, message);
-      if (message) say(message);
       renderMics();
     }
     // Stops a recording without sending anything (tab hidden, section changed, sign-out).
@@ -1116,7 +1155,7 @@
     }
     function toggleVoice(mic) {
       if (voice.mic === mic && voice.phase === 'recording') { stopVoice(false); return; }
-      if (voice.mic || !state.session) return;
+      if (voice.mic || !state.session || state.accountChanged) return;
       var legal = state.session.legal || {};
       if (legal.consent_required === true && !state.consentGiven) {
         // The recording starts on the next press: browsers open the microphone
@@ -1137,7 +1176,6 @@
         voice.startedAt = browser.now();
         voice.limit = browser.setTimeout(function () { stopVoice(true); }, MAX_RECORDING_MS);
         voiceStatus(mic, t('voice.recording'));
-        say(t('voice.recording'));
         renderMics();
         tick();
       }, function (error) {
@@ -1161,7 +1199,6 @@
         if (pcm.length > maxSamples) pcm = pcm.subarray(0, maxSamples);
         var duration = Math.round(pcm.length * 1000 / VOICE_RATE);
         if (duration < MIN_RECORDING_MS) { finishVoice(mic, t('voice.too_short')); return; }
-        voiceStatus(mic, t('voice.processing'));
         voice.job = { wav: encodeWAV(pcm, VOICE_RATE), durationMs: duration, requestId: requestID(browser.crypto), mic: mic, user: user };
         return transcribe(voice.job, true);
       }).catch(function () { if (voice.mic === mic) finishVoice(mic, t('voice.failed')); });
@@ -1199,10 +1236,18 @@
           return;
         }
         if (error.status === 401) { finishVoice(job.mic, ''); unauthorized(); return; }
-        if (error.status === 409) { finishVoice(job.mic, t('account_changed')); return; }
-        finishVoice(job.mic, t(error.message === 'VOICE_LIMIT_REACHED' ? 'voice.daily_limit' : error.status === 429 ? 'error.RATE_LIMITED'
-          : error.status === 403 ? 'voice.consent_needed' : 'voice.failed'));
+        if (isAccountChanged(error)) { finishVoice(job.mic, t('account_changed')); accountChanged(false); return; }
+        finishVoice(job.mic, t(voiceErrorKey(error)));
       });
+    }
+    // 429 VOICE_LIMIT_REACHED is the day's voice cap, RATE_LIMITED the
+    // per-minute bucket; a 400 about the audio says why it was refused.
+    function voiceErrorKey(error) {
+      var details = error.details || {};
+      if (error.status === 429) return error.message === 'VOICE_LIMIT_REACHED' ? 'voice.daily_limit' : 'error.RATE_LIMITED';
+      if (error.status === 403 && error.message === 'CONSENT_REQUIRED') return 'voice.consent_needed';
+      if (error.status === 400 && details.field === 'audio' && details.reason === 'too_short') return 'voice.too_short';
+      return 'voice.failed';
     }
     // Inserts at the caret (or replaces the selection), with a space between words.
     function insertText(field, text) {
@@ -1280,10 +1325,12 @@
         state.consentGiven = true;
         closeConsent(true);
       }, function (error) {
+        if (user !== state.userId) return;
         if (error.status === 401) { closeConsent(false); unauthorized(); return; }
+        if (isAccountChanged(error)) { closeConsent(false); accountChanged(); return; }
         consent.busy = false;
         if (n['consent-accept']) n['consent-accept'].disabled = false;
-        setText(n['consent-error'], t(error.status === 409 ? 'account_changed' : 'consent.error'));
+        setText(n['consent-error'], t('consent.error'));
         show(n['consent-error'], true);
       });
     }
@@ -1342,6 +1389,9 @@
       if (n.discard) n.discard.addEventListener('click', discard);
       if (n['reload-context']) n['reload-context'].addEventListener('click', loadContext);
       if (n.relogin) n.relogin.addEventListener('click', signalSignOut);
+      // After a reload the page shows the account this browser is signed in to
+      // (the browser asks first while unsaved text is on screen).
+      if (n['reload-page']) n['reload-page'].addEventListener('click', function () { browser.location.reload(); });
       ['profile-retry', 'recipients-retry'].forEach(function (id) { if (n[id]) n[id].addEventListener('click', loadContext); });
       if (n['chart-retry']) n['chart-retry'].addEventListener('click', loadUsage);
       if (n['consent-accept']) n['consent-accept'].addEventListener('click', acceptConsent);

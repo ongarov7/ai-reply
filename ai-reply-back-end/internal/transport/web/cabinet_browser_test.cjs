@@ -209,8 +209,9 @@ function fixture({ locale = 'ru', handler = routes({}), hash = '', payment = fal
   build(document);
   const requests = [], timers = new Map(), windowListeners = {}, signals = [];
   let now = 1000000, timerID = 0;
-  const location = { origin: 'https://example.test', href: 'https://example.test/account', value: hash,
-    get hash() { return this.value; }, set hash(next) { next = String(next); this.value = next && next[0] !== '#' ? '#' + next : next; } };
+  const location = { origin: 'https://example.test', href: 'https://example.test/account', value: hash, reloads: 0,
+    get hash() { return this.value; }, set hash(next) { next = String(next); this.value = next && next[0] !== '#' ? '#' + next : next; },
+    reload() { this.reloads++; } };
   const browser = {
     fetch(url, opts) { requests.push({ url, opts }); return handler(url, opts); },
     location, navigator: media ? { mediaDevices: { getUserMedia() {} } } : {}, AudioContext: media ? function AudioContext() {} : undefined,
@@ -270,6 +271,11 @@ test('cost follows the contract formula: unlimited, disabled, zero rate, cap, fr
   assert.equal(chars('😀'), 1);
   assert.equal(chars('  привет\r\n '), 6, 'text is trimmed and \\r removed before counting');
   assert.equal(normalizeText('a\u0000b\r\nc\td\u0007'), 'ab\nc\td');
+  // Pasted line breaks become "\n" and bidirectional controls are dropped, as the server stores them.
+  const [CR, VT, NEL, LS, PS, RLM, LRI, PDI] = [0x0D, 0x0B, 0x85, 0x2028, 0x2029, 0x200F, 0x2066, 0x2069].map(code => String.fromCharCode(code));
+  assert.equal(normalizeText('a' + CR + 'b' + VT + 'c' + NEL + 'd' + LS + 'e' + PS + 'f'), 'a\nb\nc\nd\ne\nf');
+  assert.equal(normalizeText(LRI + 'שלום' + PDI + RLM + ' ok'), 'שלום ok');
+  assert.equal(chars(RLM + 'x'.repeat(5) + RLM), 5, 'invisible direction marks are not counted');
   // Recipient notes add to the base text; the roles and traits never count.
   const shared = { enabled: true, occupation: 'o'.repeat(100), about: 'a'.repeat(250), audience: 'u'.repeat(50), roles: ['seller'], traits: ['warm'],
     recipients: { client: { notes: 'n'.repeat(200) } } };
@@ -678,6 +684,7 @@ test('dictation records, shows a timer, stops at 40 seconds and sends a 16 kHz W
   assert.equal(f.cabinet.state.draft.about, 'Магазин. Доставка по Алматы');
   assert.equal(f.node('cabinet-savebar').hidden, false);
   assert.equal(f.node('cabinet-about-voice').textContent, f.words['voice.done']);
+  assert.equal(f.node('cabinet-live').textContent, f.words['voice.done'], 'announced once, through the page live region');
 });
 
 test('dictation inserts at the caret and ignores recordings under 0.3 seconds', async () => {
@@ -812,4 +819,123 @@ test('the daily voice cap and an account change are explained', async () => {
     f.mic('cabinet-about').click(); await settle();
     assert.equal(f.node('cabinet-about-voice').textContent, f.words[key], code);
   }
+});
+
+test('after an account change the page stops saving and dictating and offers a reload', async () => {
+  const f = fixture({ handler: standard({
+    'POST /account/api/ai-context': () => respond({ error: { code: 'WEB_ACCOUNT_CHANGED' } }, 409)
+  }) });
+  await f.signIn();
+  f.type('cabinet-about', 'Текст для аккаунта A');
+  f.node('cabinet-save').click(); await settle();
+  assert.equal(f.node('cabinet-save-message').textContent, f.words['account_changed']);
+  assert.equal(f.node('cabinet-live').textContent, f.words['account_changed']);
+  assert.equal(f.node('cabinet-reload-page').hidden, false);
+  assert.equal(f.node('cabinet-reload-context').hidden, true, 'not a revision conflict: reloading the profile would not help');
+  assert.equal(f.node('cabinet-save').hidden, true, 'saving again would only repeat the refusal');
+  assert.equal(f.node('cabinet-discard').hidden, true);
+  assert.equal(f.node('cabinet-about').value, 'Текст для аккаунта A', 'the text stays until the page is reloaded');
+  await f.cabinet.save();
+  assert.equal(f.posts('/ai-context').length, 1);
+  assert.equal(f.mic('cabinet-about').disabled, true);
+  f.mic('cabinet-about').click(); await settle();
+  assert.equal(f.posts('/transcribe').length, 0, 'no recording for a page that shows another account');
+  f.node('cabinet-reload-page').click();
+  assert.equal(f.browser.location.reloads, 1);
+});
+
+test('consent for an account no longer signed in here closes the dialog without retrying', async () => {
+  const f = fixture({ handler: standard({
+    'POST /account/api/transcribe': () => respond({ error: { code: 'CONSENT_REQUIRED' } }, 403),
+    'POST /account/api/consent': () => respond({ error: { code: 'WEB_ACCOUNT_CHANGED' } }, 409)
+  }) });
+  await f.signIn();
+  f.mic('cabinet-about').click(); await settle();
+  f.mic('cabinet-about').click(); await settle();
+  f.node('cabinet-consent-accept').click(); await settle();
+  assert.equal(f.node('cabinet-consent').open, false);
+  assert.equal(f.posts('/transcribe').length, 1, 'the recording is not sent again');
+  assert.equal(f.node('cabinet-save-message').textContent, f.words['account_changed']);
+  assert.equal(f.node('cabinet-reload-page').hidden, false);
+  const g = fixture({ handler: standard({ 'POST /account/api/transcribe': () => respond({ error: { code: 'WEB_ACCOUNT_CHANGED' } }, 409) }) });
+  await g.signIn();
+  g.mic('cabinet-about').click(); await settle();
+  g.mic('cabinet-about').click(); await settle();
+  assert.equal(g.node('cabinet-about-voice').textContent, g.words['account_changed']);
+  assert.equal(g.node('cabinet-reload-page').hidden, false);
+  assert.equal(g.mic('cabinet-audience').disabled, true);
+});
+
+test('switching accounts closes a consent dialog opened for the previous one', async () => {
+  const f = fixture({ handler: standard({ 'POST /account/api/consent': () => respond({ legal_consent: {} }) }) });
+  await f.signIn(session({ consentRequired: true }));
+  f.mic('cabinet-about').click(); await settle();
+  assert.equal(f.node('cabinet-consent').open, true);
+  await f.signIn(session({ id: 'fixture-user-B', consentRequired: true }));
+  assert.equal(f.node('cabinet-consent').open, false);
+  f.node('cabinet-consent-accept').click(); await settle();
+  assert.equal(f.posts('/consent').length, 0, 'nothing is accepted for an account that was not asked');
+});
+
+test('at the limit an opposite style chip still swaps, and the swap is announced', async () => {
+  let saved;
+  const f = fixture({ handler: standard({
+    'GET /account/api/ai-context': () => {
+      const response = contextResponse({ doc: { traits: ['brief', 'emoji'] } });
+      response.limits.traits = 2;
+      response.catalog.traits = ['brief', 'detailed', 'emoji', 'no_emoji', 'warm'];
+      return respond(response);
+    },
+    'POST /account/api/ai-context': (url, opts) => { saved = JSON.parse(opts.body); return respond(contextResponse({ revision: 4, doc: saved.context })); }
+  }) });
+  await f.signIn();
+  const chip = code => f.node('cabinet-traits-list').children.map(label => label.children[0]).find(input => input.value === code);
+  assert.equal(chip('warm').disabled, true, 'the limit is reached');
+  assert.equal(chip('detailed').disabled, false, 'choosing an opposite only swaps it');
+  assert.equal(chip('no_emoji').disabled, false);
+  chip('detailed').checked = true; chip('detailed').dispatchEvent(makeEvent('change'));
+  assert.deepEqual(f.cabinet.state.draft.traits, ['emoji', 'detailed']);
+  assert.equal(chip('brief').checked, false);
+  assert.equal(f.node('cabinet-live').textContent,
+    f.words['profile.trait_replaced'].replace('{previous}', f.words['trait.brief']).replace('{current}', f.words['trait.detailed']));
+  chip('no_emoji').checked = true; chip('no_emoji').dispatchEvent(makeEvent('change'));
+  assert.deepEqual(f.cabinet.state.draft.traits, ['detailed', 'no_emoji']);
+  f.node('cabinet-save').click(); await settle();
+  assert.deepEqual(saved.context.traits, ['detailed', 'no_emoji'], 'the server never receives both of a pair');
+});
+
+test('a too short or unreadable recording and other refusals are explained', async () => {
+  const cases = [
+    [400, { error: { code: 'INVALID_REQUEST', details: { field: 'audio', reason: 'too_short' } } }, 'voice.too_short'],
+    [400, { error: { code: 'INVALID_REQUEST', details: { field: 'audio', reason: 'format' } } }, 'voice.failed'],
+    [403, { error: { code: 'WEB_ORIGIN_REQUIRED' } }, 'voice.failed']
+  ];
+  for (const [status, payload, key] of cases) {
+    const f = fixture({ handler: standard({ 'POST /account/api/transcribe': () => respond(payload, status) }) });
+    await f.signIn();
+    f.mic('cabinet-audience').click(); await settle();
+    f.mic('cabinet-audience').click(); await settle();
+    assert.equal(f.node('cabinet-audience-voice').textContent, f.words[key], payload.error.code);
+    assert.equal(f.node('cabinet-consent').open, false);
+  }
+});
+
+test('platforms the server does not know are shown as «Other» in the page language', async () => {
+  const usage = usageResponse();
+  usage.platforms = [{ platform: 'ios', replies: 4 }, { platform: 'other', replies: 2 }];
+  const f = fixture({ locale: 'kk', handler: standard({ 'GET /account/api/usage': () => respond(usage) }) });
+  await f.signIn();
+  assert.deepEqual(f.node('cabinet-platforms').children.map(row => row.children[0].textContent), ['iOS', f.words['platform.other']]);
+  assert.notEqual(f.words['platform.other'], 'other');
+});
+
+test('the usage table is out of the accessibility tree until it has data, and the focusable chart is a named group', async () => {
+  const f = fixture({ handler: standard() });
+  assert.equal(f.node('cabinet-chart-table').hidden, true);
+  await f.signIn();
+  assert.equal(f.node('cabinet-chart-table').hidden, false);
+  assert.equal(f.node('cabinet-chart').getAttribute('role'), 'group');
+  await f.signOut();
+  assert.equal(f.node('cabinet-chart-table').hidden, true);
+  assert.equal(f.node('cabinet-chart').getAttribute('tabindex'), null);
 });
