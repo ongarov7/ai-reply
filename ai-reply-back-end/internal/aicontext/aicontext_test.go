@@ -60,7 +60,7 @@ func TestNormalizeTrimsDeduplicatesAndRefuses(t *testing.T) {
 		"unknown":   {Document{Traits: []string{"angry"}}, "traits", ReasonUnknown},
 		"recipient": {Document{Recipients: map[string]Notes{"boss": {}}}, "recipients", ReasonUnknown},
 		"control":   {Document{Audience: "a\x00b"}, "audience", ReasonInvalidText},
-		"bidi":      {Document{Occupation: "a b"}, "occupation", ReasonInvalidText},
+		"opposite":  {Document{Traits: []string{"formal", "casual"}}, "traits", ReasonConflict},
 	}
 	for name, tc := range cases {
 		_, err := Normalize(tc.doc)
@@ -68,6 +68,10 @@ func TestNormalizeTrimsDeduplicatesAndRefuses(t *testing.T) {
 		if !errors.As(err, &e) || e.Field != tc.field || e.Reason != tc.reason || !errors.Is(err, domain.ErrInvalidRequest) {
 			t.Errorf("%s: %v", name, err)
 		}
+	}
+	pasted, err := Normalize(Document{About: "a\u2028b\u2029c\u0085d\ve\r\nf", Audience: "\u202eabc\u202c\u200e"})
+	if err != nil || pasted.About != "a\nb\nc\nd\ne\nf" || pasted.Audience != "abc" {
+		t.Fatalf("pasted %q %q %v", pasted.About, pasted.Audience, err)
 	}
 	// Exactly at the limit, counted in code points: 2000 emoji are 2000 characters.
 	if _, err := Normalize(Document{About: strings.Repeat("😀", MaxAbout)}); err != nil {

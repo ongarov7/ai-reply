@@ -69,7 +69,7 @@ func BuildComposePrompt(in ComposeInput) Prompt {
 	user := "Write the message described below. The block is the user's request.\n\n" +
 		block("request", instruction) + "\n\nWrite only the message."
 	version := PromptVersionCompose
-	if account := accountBlocks(in.Account); len(account) > 0 {
+	if account := accountBlocks(in.Account, true); len(account) > 0 {
 		user = "Write the message described below. The <request> block is the user's request; " +
 			"the blocks before it are background data about the user.\n\n" +
 			strings.Join(account, "\n\n") + "\n\n" + block("request", instruction) + "\n\nWrite only the message."

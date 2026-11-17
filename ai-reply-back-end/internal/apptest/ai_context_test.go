@@ -117,6 +117,14 @@ func TestAIContextRoundTripValidationAndConflicts(t *testing.T) {
 	if alias.num("revision") != 2 || mapAt(alias, "context")["about"] != "Строка 1\nСтрока 2" {
 		t.Fatalf("POST alias / normalisation: %s", alias.raw)
 	}
+	// Pasted line/paragraph separators become "\n"; invisible bidi controls are dropped.
+	pasted := h.do(http.MethodPut, "/api/v1/me/ai-context", map[string]any{"context": map[string]any{
+		"enabled": true, "audience": "a\u2028b\u2029c", "about": "цена \u202e0005\u202c тг\u200f"}, "expected_revision": 2}, h.auth(s.access))
+	mustStatus(t, pasted, http.StatusOK, "")
+	if mapAt(pasted, "context")["audience"] != "a\nb\nc" || mapAt(pasted, "context")["about"] != "цена 0005 тг" {
+		t.Fatalf("pasted text: %s", pasted.raw)
+	}
+	h.exec(`UPDATE ai_contexts SET revision = 2 WHERE user_id = ?`, s.userID)
 
 	for name, tc := range map[string]struct {
 		body             map[string]any
@@ -131,8 +139,7 @@ func TestAIContextRoundTripValidationAndConflicts(t *testing.T) {
 		"too many traits":    {body: map[string]any{"traits": []string{"introvert", "extrovert", "brief", "detailed", "formal", "casual", "humor"}}, field: "traits", reason: "too_many", max: 6},
 		"unknown recipient":  {body: map[string]any{"recipients": map[string]any{"boss": map[string]any{"notes": "x"}}}, field: "recipients", reason: "unknown"},
 		"control character":  {body: map[string]any{"occupation": "Флорист\u0007"}, field: "occupation", reason: "invalid_text"},
-		"line separator":     {body: map[string]any{"audience": "a\u2028b"}, field: "audience", reason: "invalid_text"},
-		"bidi override":      {body: map[string]any{"about": "цена \u202e0005 тг"}, field: "about", reason: "invalid_text"},
+		"start of heading":   {body: map[string]any{"audience": "a\u0001b"}, field: "audience", reason: "invalid_text"},
 		"opposite chips":     {body: map[string]any{"traits": []string{"brief", "warm", "detailed"}}, field: "traits", reason: "conflict"},
 		"missing revision":   {body: map[string]any{}, field: "expected_revision", reason: "required", withoutRevision: true},
 		"emoji are one char": {body: map[string]any{"about": strings.Repeat("😀", 2000)}, withoutEnabledOK: true},
@@ -433,5 +440,21 @@ func TestAIContextCabinetPagesMayUseTheMicrophone(t *testing.T) {
 		if got := res.header.Get("Permissions-Policy"); !strings.Contains(got, want) || !strings.Contains(got, "camera=()") {
 			t.Errorf("%s: Permissions-Policy %q, want %s", path, got, want)
 		}
+	}
+}
+
+func TestAIContextProExtraDevicePaysNoSurcharge(t *testing.T) {
+	h, owner, _ := proPackFallbackAccount(t, "pro_monthly")
+	now := h.clock.Now()
+	pack := h.addGrant(owner.userID, domain.GrantPack, 5, now, nil, now)
+	mustStatus(t, h.saveAIContext(owner.access, florist(), 0), http.StatusOK, "")
+	extra, _ := h.signInProDevice("pro-pack-fallback@example.com", "pro-ctx-extra-device", "android", "")
+	res := h.generate(extra.access, "Сәлем, гүл бар ма?")
+	mustStatus(t, res, http.StatusOK, "")
+	if res.str("usage", "bucket") != domain.BucketPack || res.num("units") != 1 || res.body["context_applied"] != true {
+		t.Fatalf("Pro extra device: %s", res.raw)
+	}
+	if left := h.scalar(`SELECT units_remaining FROM credit_grants WHERE id = ?`, pack.ID); left != 4 {
+		t.Fatalf("the pack lost %d replies for one reply; Pro pays no surcharge", 5-left)
 	}
 }

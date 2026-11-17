@@ -252,17 +252,26 @@ func normalizeCodes(field string, in []string, catalog []label, max int) ([]stri
 	return out, nil
 }
 
-// cleanText — trimmed text without "\r". Other control characters except
-// "\n" and "\t", the Unicode line/paragraph separators and the bidirectional
-// controls (overrides, isolates, marks) are refused: they only come from a
-// broken client or an attempt to hide or reorder text inside the prompt.
+// lineBreaks — line breaks pasted text may carry; they all become "\n".
+var lineBreaks = strings.NewReplacer("\r\n", "\n", "\r", "\n", "\u2028", "\n", "\u2029", "\n", "\u0085", "\n", "\v", "\n")
+
+// cleanText — trimmed text with plain "\n" line breaks (pasted CR, LS, PS, NEL
+// and VT become "\n") and without bidirectional controls (marks, overrides,
+// isolates), which are removed: invisible, and only good for hiding or
+// reordering text inside the prompt. Any other control character except "\t"
+// is refused — it only comes from a broken client.
 func cleanText(field, value string, max int) (string, error) {
 	if !utf8.ValidString(value) {
 		return "", &FieldError{Field: field, Reason: ReasonInvalidText}
 	}
-	value = strings.ReplaceAll(value, "\r", "")
+	value = strings.Map(func(r rune) rune {
+		if unicode.Is(unicode.Bidi_Control, r) {
+			return -1
+		}
+		return r
+	}, lineBreaks.Replace(value))
 	for _, r := range value {
-		if r != '\n' && r != '\t' && (unicode.IsControl(r) || r == '\u2028' || r == '\u2029' || unicode.Is(unicode.Bidi_Control, r)) {
+		if r != '\n' && r != '\t' && unicode.IsControl(r) {
 			return "", &FieldError{Field: field, Reason: ReasonInvalidText}
 		}
 	}
