@@ -332,10 +332,10 @@ func (a *webAccount) session(w http.ResponseWriter, r *http.Request) {
 	view := webSessionView{Subscription: a.s.subscriptionDTO(entitlement), Usage: a.s.usage(entitlement), Bank: bank}
 	view.User.ID, view.User.Email = user.ID, user.Email
 	view.Features = webFeaturesView{AIContext: a.s.aiContext != nil, VoiceTranscription: a.s.voiceEnabled()}
+	// Purchases need this response, so a failed consent lookup only means "ask again".
 	consentErr := a.s.users.RequireConsent(r.Context(), user.ID)
-	if consentErr != nil && !errors.Is(consentErr, domain.ErrConsentRequired) {
-		httpx.Fail(w, consentErr)
-		return
+	if consentErr != nil && !errors.Is(consentErr, domain.ErrConsentRequired) && r.Context().Err() == nil {
+		a.s.log.Warn("web session consent lookup failed", "user_id", user.ID, "error", consentErr.Error())
 	}
 	view.Legal = webLegalView{ConsentRequired: consentErr != nil, TermsVersion: legal.TermsVersion, PrivacyVersion: legal.PrivacyVersion,
 		TermsURL: a.s.cfg.App.PublicBaseURL + "/offer", PrivacyURL: a.s.cfg.App.PublicBaseURL + "/privacy"}

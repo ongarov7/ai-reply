@@ -400,6 +400,23 @@ test('choosing a public offer and completing email sign-in never starts checkout
   assert.equal(f.redirects.length, 0);
 });
 
+test('a refused code puts focus back in the code field', async () => {
+  const f = fixture(url => {
+    if (url.endsWith('/email/request')) return response({ masked_email: 'f***@example.test', resend_after: 32 });
+    if (url.endsWith('/email/verify')) return response({ error: { code: 'INVALID_OTP' } }, 400);
+    return response({ error: { code: 'UNAUTHORIZED' } }, 401);
+  });
+  await f.app.init();
+  f.nodes.get('account-email').value = 'fixture@example.test';
+  await f.nodes.get('account-email-form').listeners.submit({ preventDefault() {} });
+  let focused = 0;
+  f.nodes.get('account-code').focus = () => { focused++; };
+  f.nodes.get('account-code').value = '1234';
+  await f.nodes.get('account-code-form').listeners.submit({ preventDefault() {} });
+  assert.ok(!f.app.state.session);
+  assert.equal(focused, 1);
+});
+
 test('bank success remains truthful when the balance refresh fails', async () => {
   let sessions = 0;
   const f = fixture(url => url.includes('/orders/') ? response({ payment_id: 'fixture-order-1', status: 'succeeded' }) : ++sessions === 1 ? response(session()) : response({ error: { code: 'INTERNAL_ERROR' } }, 500), { search: '?order=fixture-order-1' });

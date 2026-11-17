@@ -146,6 +146,12 @@ function build(document) {
     el('span', { id: id + '-voice' }, panel);
   });
   el('input', { id: 'cabinet-occupation' }, document.getElementById('cabinet-profile'));
+  // The save bar and its actions, as in account.gohtml.
+  const savebar = el('div', { id: 'cabinet-savebar', hidden: '' }, app);
+  el('p', { id: 'cabinet-save-message' }, savebar);
+  el('button', { id: 'cabinet-discard' }, savebar);
+  ['cabinet-reload-context', 'cabinet-relogin', 'cabinet-reload-page'].forEach(id => el('button', { id, hidden: '' }, savebar));
+  el('button', { id: 'cabinet-save' }, savebar);
   const dialog = el('dialog', { id: 'cabinet-consent' }, app);
   el('a', { id: 'cabinet-consent-terms' }, dialog).href = 'https://example.test/offer?lang=ru';
   el('a', { id: 'cabinet-consent-privacy' }, dialog).href = 'https://example.test/privacy?lang=ru';
@@ -341,7 +347,7 @@ test('downsampling to 16 kHz averages blocks and keeps the duration', () => {
 });
 
 test('the script never writes HTML from strings', () => {
-  for (const file of ['static/cabinet.js', 'static/cabinet-capture.js']) {
+  for (const file of ['static/cabinet.js', 'static/cabinet-capture.js', 'static/account.js', 'static/landing.js']) {
     const source = fs.readFileSync(path.join(__dirname, file), 'utf8');
     assert.doesNotMatch(source, /innerHTML|outerHTML|insertAdjacentHTML|document\.write|\beval\(|new Function/, file);
   }
@@ -508,6 +514,45 @@ test('over-limit text is never sent and never cut', async () => {
   f.type('cabinet-occupation', 'я'.repeat(120));
   assert.equal(f.node('cabinet-occupation-error').hidden, true);
   assert.equal(f.node('cabinet-save').disabled, false);
+});
+
+test('a field going over its limit is announced once, and again after a fix', async () => {
+  const f = fixture({ handler: standard() });
+  await f.signIn();
+  f.type('cabinet-occupation', 'я'.repeat(121));
+  const message = f.node('cabinet-occupation-error').textContent;
+  assert.ok(message);
+  assert.equal(f.node('cabinet-live').textContent, message);
+  f.node('cabinet-live').textContent = '';
+  f.type('cabinet-occupation', 'я'.repeat(122));
+  assert.equal(f.node('cabinet-live').textContent, '', 'not repeated on every key');
+  f.type('cabinet-occupation', 'я'.repeat(10));
+  f.type('cabinet-occupation', 'я'.repeat(121));
+  assert.equal(f.node('cabinet-live').textContent, message);
+});
+
+test('keyboard focus survives Save and Discard', async () => {
+  const f = fixture({ hash: '#profile', handler: standard({
+    'POST /account/api/ai-context': (url, opts) => respond(contextResponse({ revision: 4, doc: JSON.parse(opts.body).context }))
+  }) });
+  await f.signIn();
+  f.type('cabinet-about', 'Новый текст');
+  const save = f.node('cabinet-save');
+  save.focus();
+  save.click();
+  assert.equal(save.disabled, false, 'a disabled button would drop focus');
+  assert.equal(save.getAttribute('aria-disabled'), 'true');
+  save.click();
+  await settle();
+  assert.equal(f.posts('/ai-context').length, 1, 'a press while saving sends nothing');
+  assert.equal(save.getAttribute('aria-disabled'), null);
+  assert.equal(f.node('cabinet-savebar').hidden, true);
+  assert.equal(f.document.activeElement, f.node('cabinet-profile-title'));
+  f.type('cabinet-about', 'Черновик');
+  f.node('cabinet-discard').focus();
+  f.node('cabinet-discard').click();
+  assert.equal(f.node('cabinet-savebar').hidden, true);
+  assert.equal(f.document.activeElement, f.node('cabinet-profile-title'));
 });
 
 test('a revision conflict saves nothing, explains it and reloads only on request', async () => {
@@ -844,6 +889,54 @@ test('after an account change the page stops saving and dictating and offers a r
   assert.equal(f.browser.location.reloads, 1);
 });
 
+test('the pressed microphone keeps keyboard focus while it starts and sends', async () => {
+  let begin, answer;
+  const recorder = { calls: [], create: () => ({
+    start() { recorder.calls.push('start'); return new Promise(resolve => { begin = resolve; }); },
+    stop() { recorder.calls.push('stop'); return Promise.resolve({ samples: new Float32Array(48000).fill(0.25), sampleRate: 48000 }); },
+    cancel() { recorder.calls.push('cancel'); }
+  }) };
+  const f = fixture({ handler: standard({ 'POST /account/api/transcribe': () => new Promise(resolve => { answer = resolve; }) }), recorder });
+  await f.signIn();
+  const mic = f.mic('cabinet-about');
+  mic.focus();
+  mic.click(); await settle();
+  assert.equal(mic.disabled, false, 'starting');
+  assert.equal(mic.getAttribute('aria-disabled'), 'true');
+  assert.equal(f.mic('cabinet-audience').disabled, true, 'one recording at a time');
+  mic.click(); await settle();
+  assert.deepEqual(recorder.calls, ['start'], 'a press while starting does nothing');
+  begin(); await settle();
+  assert.equal(mic.getAttribute('aria-disabled'), null, 'recording: a press stops it');
+  mic.click(); await settle();
+  assert.deepEqual(recorder.calls, ['start', 'stop']);
+  assert.equal(mic.disabled, false, 'sending');
+  assert.equal(mic.getAttribute('aria-disabled'), 'true');
+  assert.equal(f.document.activeElement, mic);
+  answer(respond({ text: 'Доставка по Алматы', languages: ['ru'], duration_ms: 1000 })); await settle();
+  assert.equal(mic.getAttribute('aria-disabled'), null);
+  assert.equal(f.mic('cabinet-audience').disabled, false);
+});
+
+test('Accept keeps focus while the consent is saved, then focus returns to the microphone', async () => {
+  let done;
+  const f = fixture({ handler: standard({ 'POST /account/api/consent': () => new Promise(resolve => { done = () => resolve(respond({ legal_consent: {} })); }) }) });
+  await f.signIn(session({ consentRequired: true }));
+  f.mic('cabinet-about').focus();
+  f.mic('cabinet-about').click(); await settle();
+  const accept = f.node('cabinet-consent-accept');
+  accept.focus();
+  accept.click(); await settle();
+  assert.equal(accept.disabled, false);
+  assert.equal(accept.getAttribute('aria-disabled'), 'true');
+  accept.click(); await settle();
+  assert.equal(f.posts('/consent').length, 1, 'a second press sends nothing');
+  done(); await settle();
+  assert.equal(f.node('cabinet-consent').open, false);
+  assert.equal(accept.getAttribute('aria-disabled'), null);
+  assert.equal(f.document.activeElement, f.mic('cabinet-about'));
+});
+
 test('consent for an account no longer signed in here closes the dialog without retrying', async () => {
   const f = fixture({ handler: standard({
     'POST /account/api/transcribe': () => respond({ error: { code: 'CONSENT_REQUIRED' } }, 403),
@@ -929,6 +1022,41 @@ test('platforms the server does not know are shown as «Other» in the page lang
   assert.notEqual(f.words['platform.other'], 'other');
 });
 
+test('kk and uz put a numeric date before their case endings', async () => {
+  for (const locale of ['kk', 'uz']) {
+    const f = fixture({ locale, handler: standard() });
+    await f.signIn();
+    assert.match(f.node('cabinet-tile-plan-note').textContent, /^17\.12\.2026 /, locale);
+  }
+});
+
+test('moving the pointer within one day does not repeat the chart tooltip', async () => {
+  const f = fixture({ handler: standard() });
+  await f.signIn();
+  const svg = f.node('cabinet-chart').children[0];
+  const tip = f.node('cabinet-chart-tip');
+  let writes = 0;
+  const replace = tip.replaceChildren.bind(tip);
+  tip.replaceChildren = (...nodes) => { writes++; return replace(...nodes); };
+  for (let i = 0; i < 5; i++) svg.dispatchEvent(makeEvent('pointermove', { clientX: 600 + i / 10 }));
+  assert.equal(writes, 1);
+  assert.equal(tip.hidden, false);
+  svg.dispatchEvent(makeEvent('pointermove', { clientX: 120 }));
+  assert.equal(writes, 2, 'another day is shown');
+});
+
+test('signing in moves focus from the closed sign-in card to the section heading, but not on page load', async () => {
+  const f = fixture({ handler: standard() });
+  await f.signIn();
+  assert.equal(f.document.activeElement, null, 'a page that opens signed in leaves focus alone');
+  await f.signOut();
+  await f.signIn();
+  assert.equal(f.document.activeElement, f.node('cabinet-overview-title'));
+  f.node('cabinet-chart').focus();
+  await f.signIn();
+  assert.equal(f.document.activeElement, f.node('cabinet-chart'), 'a later session refresh leaves focus alone');
+});
+
 test('the usage table is out of the accessibility tree until it has data, and the focusable chart is a named group', async () => {
   const f = fixture({ handler: standard() });
   assert.equal(f.node('cabinet-chart-table').hidden, true);
@@ -974,4 +1102,18 @@ test('the consent dialog links to the legal pages in the page language', async (
   assert.equal(f.node('cabinet-consent').open, true);
   assert.equal(f.node('cabinet-consent-terms').href, 'https://example.test/offer?lang=ru');
   assert.equal(f.node('cabinet-consent-privacy').href, 'https://example.test/privacy?lang=ru');
+});
+
+test('the consent dialog keeps its own links when the server sends none or a bad one', async () => {
+  for (const [terms, privacy] of [['', undefined], ['javascript:alert(1)', 'https://user:pw@example.test/privacy'], [42, null]]) {
+    const odd = session({ consentRequired: true });
+    odd.legal.terms_url = terms;
+    odd.legal.privacy_url = privacy;
+    const f = fixture({ handler: standard() });
+    await f.signIn(odd);
+    f.mic('cabinet-about').click(); await settle();
+    assert.equal(f.node('cabinet-consent').open, true);
+    assert.equal(f.node('cabinet-consent-terms').href, 'https://example.test/offer?lang=ru', String(terms));
+    assert.equal(f.node('cabinet-consent-privacy').href, 'https://example.test/privacy?lang=ru', String(privacy));
+  }
 });

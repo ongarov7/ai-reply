@@ -106,6 +106,13 @@
       return new Promise(function (resolve) { timer = setTimeout(resolve, ms); });
     }
 
+    function typingDots() {
+      var dots = document.createElement("span");
+      dots.className = "typing";
+      for (var i = 0; i < 3; i += 1) dots.appendChild(document.createElement("i"));
+      return dots;
+    }
+
     function type(node, text, speed, run) {
       node.textContent = "";
       node.classList.add("is-typing");
@@ -182,7 +189,8 @@
 
       rows.reply.classList.add("is-on");
       fields.reply.classList.add("is-thinking");
-      fields.reply.innerHTML = '<span class="typing"><i></i><i></i><i></i></span>';
+      fields.reply.textContent = "";
+      fields.reply.appendChild(typingDots());
       await wait(900);
       if (run !== runId) return;
       fields.reply.classList.remove("is-thinking");
@@ -258,9 +266,18 @@
   var toggle = document.querySelector(".nav-toggle");
   if (toggle) {
     var header = document.querySelector(".site-header");
-    toggle.addEventListener("click", function () {
+    toggle.addEventListener("click", function (event) {
       var open = header.classList.toggle("is-open");
       toggle.setAttribute("aria-expanded", open ? "true" : "false");
+      // From the keyboard, go into the menu (it comes before the button).
+      var first = open && event.detail === 0 ? header.querySelector(".nav a") : null;
+      if (first) first.focus();
+    });
+    document.addEventListener("keydown", function (event) {
+      if (event.key !== "Escape" || !header.classList.contains("is-open")) return;
+      header.classList.remove("is-open");
+      toggle.setAttribute("aria-expanded", "false");
+      toggle.focus();
     });
     document.querySelectorAll(".nav a").forEach(function (link) {
       link.addEventListener("click", function () {

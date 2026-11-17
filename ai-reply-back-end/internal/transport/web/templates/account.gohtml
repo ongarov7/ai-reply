@@ -30,7 +30,7 @@
           <label for="account-code">{{call .T "account.code"}}</label>
           <input id="account-code" name="code" type="text" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required>
           <div class="form-actions"><button class="btn btn-primary" type="submit">{{call .T "account.sign_in"}}</button><button id="account-change-email" class="btn btn-ghost" type="button">{{call .T "account.change_email"}}</button><button id="account-resend" class="btn btn-ghost" type="button" disabled>{{call .T "account.resend"}}</button></div>
-          <p id="account-resend-hint" class="form-hint" role="status"></p>
+          <p id="account-resend-hint" class="form-hint"></p>
         </form>
       </div>
       <p class="account-muted account-terms">{{call .T "account.terms_hint"}} <a href="{{.BasePath}}/offer?lang={{.Locale}}">{{call .T "footer.terms"}}</a> · <a href="{{.BasePath}}/privacy?lang={{.Locale}}">{{call .T "footer.privacy"}}</a></p>
@@ -104,8 +104,8 @@
         <div id="cabinet-profile-editor" class="cabinet-editor" hidden>
           <div class="cabinet-card cabinet-switch-card">
             <div class="cabinet-switch">
-              <label for="cabinet-ai-enabled"><strong>{{call .T "account.profile.enabled"}}</strong><span id="cabinet-ai-enabled-hint" class="cabinet-muted">{{call .T "account.profile.enabled_hint"}}</span></label>
-              <input id="cabinet-ai-enabled" type="checkbox" role="switch" aria-describedby="cabinet-ai-enabled-hint">
+              <label for="cabinet-ai-enabled"><strong id="cabinet-ai-enabled-name">{{call .T "account.profile.enabled"}}</strong><span id="cabinet-ai-enabled-hint" class="cabinet-muted">{{call .T "account.profile.enabled_hint"}}</span></label>
+              <input id="cabinet-ai-enabled" type="checkbox" role="switch" aria-labelledby="cabinet-ai-enabled-name" aria-describedby="cabinet-ai-enabled-hint">
             </div>
             <p id="cabinet-cost-line" class="cabinet-cost-line"></p>
             <p id="cabinet-saved-at" class="cabinet-muted cabinet-saved-at"></p>

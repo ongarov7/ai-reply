@@ -81,7 +81,7 @@ func New(d Deps) (*Server, error) {
 		"simulator_app":   {"templates/simulator_app.gohtml"},
 	}
 	for name, files := range pages {
-		tpl, err := template.New(name).Funcs(funcs()).ParseFS(assets, files...)
+		tpl, err := template.New(name).ParseFS(assets, files...)
 		if err != nil {
 			return nil, err
 		}
@@ -102,12 +102,6 @@ func New(d Deps) (*Server, error) {
 		return nil, err
 	}
 	return s, nil
-}
-
-func funcs() template.FuncMap {
-	return template.FuncMap{
-		"raw": func(v string) template.HTML { return template.HTML(v) },
-	}
 }
 
 // Register — веб маршруттары.

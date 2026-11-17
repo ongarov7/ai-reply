@@ -275,6 +275,7 @@
       n[id] = document.getElementById('cabinet-' + id);
     });
     var links = toArray(document.querySelectorAll('[data-section-link]'));
+    links.forEach(function (link) { link.addEventListener('focus', function () { showTab(link); }); });
     var featureNodes = toArray(document.querySelectorAll('[data-feature]'));
     var headerSignIn = toArray(document.querySelectorAll('[data-header-sign-in]'));
     var emailNodes = toArray(document.querySelectorAll('[data-cabinet-email]'));
@@ -330,12 +331,16 @@
     function formatDate(value, withTime) {
       var date = new Date(value);
       if (!value || isNaN(date.getTime())) return '';
-      var options = { day: 'numeric', month: 'long', year: 'numeric' };
-      if (withTime) { options.hour = '2-digit'; options.minute = '2-digit'; }
-      return formatWith(date, options, function () {
+      var numeric = function () {
         var day = pad(date.getDate()) + '.' + pad(date.getMonth() + 1) + '.' + date.getFullYear();
         return withTime ? day + ' ' + pad(date.getHours()) + ':' + pad(date.getMinutes()) : day;
-      });
+      };
+      // In kk and uz the date is followed by a case ending («… дейін», «… gacha»),
+      // which a month name would need to agree with.
+      if (locale === 'kk' || locale === 'uz') return numeric();
+      var options = { day: 'numeric', month: 'long', year: 'numeric' };
+      if (withTime) { options.hour = '2-digit'; options.minute = '2-digit'; }
+      return formatWith(date, options, numeric);
     }
     function motion() {
       try { return browser.matchMedia && browser.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'; } catch (_) { return 'auto'; }
@@ -434,23 +439,35 @@
       state.section = next;
       SECTIONS.forEach(function (name) { show(n[name], name === next); });
       links.forEach(function (link) {
-        if (link.getAttribute('data-section-link') === next) link.setAttribute('aria-current', 'page');
+        if (link.getAttribute('data-section-link') === next) { link.setAttribute('aria-current', 'page'); showTab(link); }
         else link.removeAttribute('aria-current');
       });
       if (state.session) document.title = t('section.' + next) + ' — ' + baseTitle;
       if (next === 'overview') renderChart(false);
       if (fromUser && changed) reveal(next);
     }
+    // On phones the sections are a scrolling strip: keep a tab fully inside it,
+    // moving only the strip (instantly), never the page.
+    function showTab(link) {
+      var strip = link && link.parentNode && link.parentNode.parentNode;
+      if (!strip || !(strip.scrollWidth > strip.clientWidth) || !strip.getBoundingClientRect || !link.getBoundingClientRect) return;
+      var box = strip.getBoundingClientRect(), item = link.getBoundingClientRect(), room = 16;
+      if (item.left < box.left + room) strip.scrollLeft -= box.left + room - item.left;
+      else if (item.right > box.right - room) strip.scrollLeft += item.right - (box.right - room);
+    }
     function reveal(name) {
-      var link = links.filter(function (item) { return item.getAttribute('data-section-link') === name; })[0];
-      try { if (link && link.scrollIntoView) link.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: motion() }); } catch (_) { /* old browsers */ }
       var panel = n[name];
       var heading = document.getElementById('cabinet-' + name + '-title');
       try {
         // Its top may be hidden under the sticky header (and the phone's tab strip).
-        var margin = browser.getComputedStyle ? parseFloat(browser.getComputedStyle(panel).scrollMarginTop) || 0 : 0;
+        var margin = browser.getComputedStyle ? (parseFloat(browser.getComputedStyle(document.documentElement).scrollPaddingTop) || 0) +
+          (parseFloat(browser.getComputedStyle(panel).scrollMarginTop) || 0) : 0;
         if (panel && panel.getBoundingClientRect && panel.getBoundingClientRect().top < margin) panel.scrollIntoView({ block: 'start', behavior: motion() });
       } catch (_) { /* old browsers */ }
+      if (heading && heading.focus) heading.focus({ preventScroll: true });
+    }
+    function focusHeading(name) {
+      var heading = document.getElementById('cabinet-' + name + '-title');
       if (heading && heading.focus) heading.focus({ preventScroll: true });
     }
 
@@ -459,15 +476,20 @@
     function onSession(payload) {
       if (!payload || !payload.user || typeof payload.user.id !== 'string' || !payload.user.id) return;
       if (state.userId && state.userId !== payload.user.id) resetAccountData();
+      var fromSignIn = !!app && app.getAttribute('data-state') === 'signed-out';
       state.userId = payload.user.id;
       state.session = payload;
       var features = payload.features || {};
       state.features = { aiContext: features.ai_context === true, voice: features.voice_transcription === true };
       if (app) app.setAttribute('data-state', 'signed-in');
       headerSignIn.forEach(function (node) { node.hidden = true; });
-      emailNodes.forEach(function (node) { node.textContent = payload.user.email || t('email_unavailable'); });
+      // The sidebar may cut a long address with an ellipsis: the full one is its title.
+      emailNodes.forEach(function (node) { node.textContent = payload.user.email || t('email_unavailable'); node.title = payload.user.email || ''; });
       featureNodes.forEach(function (node) { node.hidden = node.getAttribute('data-feature') === 'ai_context' && !state.features.aiContext; });
       route(false);
+      // Not on page load or a later refresh: only when the sign-in card just closed.
+      var focused = document.activeElement;
+      if (fromSignIn && (!focused || focused === document.body || focused.closest && focused.closest('[hidden]'))) focusHeading(state.section);
       if (state.features.aiContext && state.contextStatus === 'idle') loadContext();
       if (state.usageUser !== state.userId || state.usageStatus === 'idle' || state.usageStatus === 'ready' && browser.now() - state.usageAt > USAGE_TTL) loadUsage();
       renderAll();
@@ -481,7 +503,7 @@
       resetAccountData();
       if (app) app.setAttribute('data-state', 'signed-out');
       headerSignIn.forEach(function (node) { node.hidden = false; });
-      emailNodes.forEach(function (node) { node.textContent = ''; });
+      emailNodes.forEach(function (node) { node.textContent = ''; node.title = ''; });
       featureNodes.forEach(function (node) { node.hidden = node.getAttribute('data-feature') === 'ai_context'; });
       document.title = baseTitle;
     }
@@ -752,6 +774,7 @@
       host.setAttribute('aria-label', t('chart.title') + '. ' + t('chart.keyboard_hint'));
       function showTip(index) {
         if (index < 0 || index >= days.length) { hideTip(); return; }
+        if (index === state.chartIndex && !tip.hidden) return;
         if (state.chartIndex >= 0 && bars[state.chartIndex]) bars[state.chartIndex].setAttribute('class', 'cabinet-bar' + (state.chartIndex === today ? ' is-today' : ''));
         state.chartIndex = index;
         bars[index].setAttribute('class', 'cabinet-bar is-active' + (index === today ? ' is-today' : ''));
@@ -766,8 +789,14 @@
         tip.replaceChildren(date, units, replies);
         var center = (pad.left + (index + 0.5) * slot) / width * 100;
         tip.style.left = fixed(center) + '%';
-        tip.setAttribute('data-align', index < 3 ? 'start' : index > days.length - 4 ? 'end' : 'middle');
         tip.hidden = false;
+        var align = index < 3 ? 'start' : index > days.length - 4 ? 'end' : 'middle';
+        var boxWidth = host.clientWidth, tipWidth = tip.offsetWidth;
+        if (boxWidth > 0 && tipWidth > 0) {
+          var x = center / 100 * boxWidth;
+          align = x - tipWidth / 2 >= 0 && x + tipWidth / 2 <= boxWidth ? 'middle' : x - tipWidth / 2 < 0 ? 'start' : 'end';
+        }
+        tip.setAttribute('data-align', align);
       }
       function hideTip() {
         if (state.chartIndex >= 0 && bars[state.chartIndex]) bars[state.chartIndex].setAttribute('class', 'cabinet-bar' + (state.chartIndex === today ? ' is-today' : ''));
@@ -953,6 +982,7 @@
       delete state.fieldErrors[kind];
       refreshEditor();
     }
+    var announcedErrors = {};
     function localError(field) {
       if (!state.draft || !field.node) return '';
       var count = chars(field.read(state.draft));
@@ -964,9 +994,13 @@
         state.draft.roles.length > limit('roles') || state.draft.traits.length > limit('traits');
     }
     function isDirty() { return !!(state.draft && state.saved) && !sameDocument(state.draft, state.saved); }
-    function setFieldError(node, errorNode, message) {
+    function setFieldError(node, errorNode, message, key) {
       setText(errorNode, message);
       show(errorNode, !!message);
+      if (key) {
+        if (message && announcedErrors[key] !== message) say(message);
+        announcedErrors[key] = message;
+      }
       if (!node) return;
       if (message) node.setAttribute('aria-invalid', 'true');
       else node.removeAttribute('aria-invalid');
@@ -975,15 +1009,15 @@
     function refreshEditor() {
       var ready = !!(state.draft && state.context);
       fields.forEach(function (field) {
-        if (!ready) { setText(field.count, ''); setFieldError(field.node, field.error, ''); setText(field.cost, ''); return; }
+        if (!ready) { setText(field.count, ''); setFieldError(field.node, field.error, '', field.name); setText(field.cost, ''); return; }
         var count = chars(field.read(state.draft)), max = limit(field.limit);
         setText(field.count, t('field.counter', { count: formatNumber(count), max: formatNumber(max) }));
         if (field.count && field.count.classList) field.count.classList.toggle('is-over', count > max);
-        setFieldError(field.node, field.error, localError(field) || state.fieldErrors[field.name] || '');
+        setFieldError(field.node, field.error, localError(field) || state.fieldErrors[field.name] || '', field.name);
       });
       Object.keys(chips).forEach(function (kind) {
         var group = chips[kind];
-        if (!ready) { setText(group.count, ''); setFieldError(null, group.error, ''); return; }
+        if (!ready) { setText(group.count, ''); setFieldError(null, group.error, '', kind); return; }
         var selected = state.draft[kind].length, max = limit(kind);
         group.inputs.forEach(function (input) {
           input.checked = state.draft[kind].indexOf(input.value) !== -1;
@@ -991,7 +1025,7 @@
           input.disabled = !input.checked && selected >= max && !selectedOpposite(kind, input.value);
         });
         setText(group.count, t('profile.selected', { count: selected, max: max }));
-        setFieldError(null, group.error, selected > max ? t('field.too_many', { max: max }) : state.fieldErrors[kind] || '');
+        setFieldError(null, group.error, selected > max ? t('field.too_many', { max: max }) : state.fieldErrors[kind] || '', kind);
       });
       renderCosts();
       renderSaveBar();
@@ -1027,12 +1061,24 @@
       if (n.savebar.classList) n.savebar.classList.toggle('is-error', blocked || !!state.saveError || invalid);
       if (n.save) {
         n.save.hidden = blocked;
-        n.save.disabled = state.saving || !dirty || invalid;
+        // While saving it is only marked busy (save() ignores presses): a
+        // disabled button would drop keyboard focus.
+        n.save.disabled = !state.saving && (!dirty || invalid);
+        if (state.saving) n.save.setAttribute('aria-disabled', 'true');
+        else n.save.removeAttribute('aria-disabled');
       }
       show(n.discard, dirty && !state.saving && !blocked);
       show(n['reload-context'], state.conflict && !state.accountChanged);
       show(n.relogin, state.unauthorized && !state.accountChanged);
       show(n['reload-page'], state.accountChanged);
+      // Focus on a button that just went away moves to the bar's next action, or
+      // to the section heading when the bar closes (after Save or Discard).
+      var focused = document.activeElement;
+      if (focused && n.savebar.contains && n.savebar.contains(focused) && (n.savebar.hidden || focused.hidden)) {
+        var next = n.savebar.hidden ? null : toArray(n.savebar.querySelectorAll('button')).filter(function (button) { return !button.hidden && !button.disabled; })[0];
+        if (next && next.focus) next.focus();
+        else focusHeading(state.section);
+      }
     }
     function save() {
       if (!state.draft || state.saving || state.conflict || state.unauthorized || state.accountChanged || !isDirty() || hasLocalErrors()) return Promise.resolve();
@@ -1130,7 +1176,11 @@
         var recording = active && voice.phase === 'recording';
         mic.button.hidden = !available;
         // One recording at a time, and none for a page that shows another account.
-        mic.button.disabled = !!voice.mic && !recording || state.accountChanged;
+        // The pressed button is only marked busy while it starts or sends: a
+        // disabled button would drop keyboard focus (toggleVoice ignores presses).
+        mic.button.disabled = !!voice.mic && !active || state.accountChanged;
+        if (active && !recording) mic.button.setAttribute('aria-disabled', 'true');
+        else mic.button.removeAttribute('aria-disabled');
         if (mic.button.classList) mic.button.classList.toggle('is-recording', recording);
         setText(mic.label, t(recording ? 'voice.stop' : 'voice.start'));
         show(mic.timer, recording);
@@ -1305,8 +1355,8 @@
     function askConsent(mic) {
       if (consent.pending) return consent.pending;
       var legal = state.session && state.session.legal || {};
-      if (n['consent-terms']) n['consent-terms'].href = safeLink(withLanguage(legal.terms_url), n['consent-terms'].href);
-      if (n['consent-privacy']) n['consent-privacy'].href = safeLink(withLanguage(legal.privacy_url), n['consent-privacy'].href);
+      if (n['consent-terms'] && typeof legal.terms_url === 'string' && legal.terms_url) n['consent-terms'].href = safeLink(withLanguage(legal.terms_url), n['consent-terms'].href);
+      if (n['consent-privacy'] && typeof legal.privacy_url === 'string' && legal.privacy_url) n['consent-privacy'].href = safeLink(withLanguage(legal.privacy_url), n['consent-privacy'].href);
       setText(n['consent-error'], '');
       show(n['consent-error'], false);
       consent.opener = mic ? mic.button : null;
@@ -1324,7 +1374,7 @@
     function closeConsent(accepted) {
       var resolve = consent.resolve, opener = consent.opener;
       consent.pending = null; consent.resolve = null; consent.opener = null; consent.busy = false;
-      if (n['consent-accept']) n['consent-accept'].disabled = false;
+      if (n['consent-accept']) n['consent-accept'].removeAttribute('aria-disabled');
       var dialog = n.consent;
       if (dialog) {
         if (typeof dialog.close === 'function' && dialog.open) dialog.close();
@@ -1342,7 +1392,7 @@
         return Promise.resolve();
       }
       consent.busy = true;
-      if (n['consent-accept']) n['consent-accept'].disabled = true;
+      if (n['consent-accept']) n['consent-accept'].setAttribute('aria-disabled', 'true');
       var user = state.userId;
       return api('/consent', { json: { terms_version: legal.terms_version, privacy_version: legal.privacy_version, locale: locale, expected_user_id: user } }).then(function () {
         if (user !== state.userId) return;
@@ -1353,7 +1403,7 @@
         if (error.status === 401) { closeConsent(false); unauthorized(); return; }
         if (isAccountChanged(error)) { closeConsent(false); accountChanged(); return; }
         consent.busy = false;
-        if (n['consent-accept']) n['consent-accept'].disabled = false;
+        if (n['consent-accept']) n['consent-accept'].removeAttribute('aria-disabled');
         setText(n['consent-error'], t('consent.error'));
         show(n['consent-error'], true);
       });

@@ -18,7 +18,7 @@
 <header class="site-header">
   <div class="wrap">
     {{if .CommercialPage}}<a class="logo" href="{{.BasePath}}/"><span class="logo-mark">AI</span><span class="logo-name">AI&nbsp;Reply</span></a>{{else}}<span class="logo"><span class="logo-mark">AI</span><span class="logo-name">AI&nbsp;Reply</span></span>{{end}}
-    <nav class="nav">
+    <nav class="nav" id="site-nav">
       {{if .CommercialPage}}
       <a href="{{.BasePath}}/#how">{{call .T "nav.how"}}</a>
       <a href="{{.BasePath}}/#features">{{call .T "nav.features"}}</a>
@@ -35,11 +35,11 @@
       <div class="lang lang-links">
         {{range .Locales}}<a href="?lang={{.}}" class="{{if eq . $.Locale}}is-active{{end}}">{{.}}</a>{{end}}
       </div>
-      <select class="lang-select" aria-label="Language">
+      <select class="lang-select" aria-label="{{call .T "common.language"}}">
         {{range .Locales}}<option value="{{.}}" {{if eq . $.Locale}}selected{{end}}>{{.}}</option>{{end}}
       </select>
       {{if .CommercialPage}}<a class="btn btn-ghost btn-sm header-sign-in" href="{{.BasePath}}/account?lang={{.Locale}}" data-header-sign-in>{{call .T "nav.sign_in"}}</a><a class="btn btn-primary btn-sm header-download" href="{{.BasePath}}/#download">{{call .T "nav.download"}}</a>{{end}}
-      <button class="nav-toggle" type="button" aria-label="menu" aria-expanded="false"><span></span><span></span><span></span></button>
+      <button class="nav-toggle" type="button" aria-label="{{call .T "nav.menu"}}" aria-controls="site-nav" aria-expanded="false"><span></span><span></span><span></span></button>
     </div>
   </div>
 </header>

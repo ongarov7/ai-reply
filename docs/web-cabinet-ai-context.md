@@ -84,7 +84,7 @@ contain all four recipient keys.
 | blogger | Блогер | Blogger | Блогер | Bloger |
 | influencer | Инфлюенсер | Influencer | Инфлюенсер | Influenser |
 | student | Студент | Student | Студент | Talaba |
-| teacher | Преподаватель | Teacher | Оқытушы | O‘qituvchi |
+| teacher | Преподаватель | Teacher | Оқытушы | Oʻqituvchi |
 | doctor | Врач | Doctor | Дәрігер | Shifokor |
 | lawyer | Юрист | Lawyer | Заңгер | Yurist |
 | realtor | Риэлтор | Realtor | Риэлтор | Rieltor |
@@ -107,7 +107,7 @@ the cabinet unselects the opposite chip when one is chosen.
 | emoji | Люблю смайлики | Likes emoji | Смайлик қолданамын | Smayliklarni yoqtiraman |
 | no_emoji | Без смайликов | No emoji | Смайликсіз | Smayliksiz |
 | diplomatic | Дипломатично | Diplomatic | Дипломатиялық | Diplomatik |
-| direct | Прямо и по делу | Direct | Тура әрі нақты | Aniq va lo‘nda |
+| direct | Прямо и по делу | Direct | Тура әрі нақты | Aniq va loʻnda |
 | warm | Тепло и заботливо | Warm | Жылы әрі қамқор | Samimiy |
 
 Recipients use the apps' existing names: Друг / Клиент / Коллега / Партнёр (ru),

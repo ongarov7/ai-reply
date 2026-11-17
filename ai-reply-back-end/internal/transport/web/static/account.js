@@ -421,6 +421,9 @@
     function loadSession(restore) {
       return api('/session').then(function (payload) { return renderSession(payload, restore); });
     }
+    function scrollMotion() {
+      try { return browser.matchMedia && browser.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'; } catch (_) { return 'auto'; }
+    }
     function updateResend() {
       var remaining = Math.max(0, Math.ceil((resendAt - browser.now()) / 1000));
       nodes.resend.disabled = state.busy || remaining > 0;
@@ -453,7 +456,12 @@
         nodes.code.value = '';
         if (payload.user && payload.bank) return renderSession(payload, true);
         return loadSession(true);
-      }).then(function () { if (state.pending && state.pending.order_id) beginPolling(); }).catch(fail).then(function () { setBusy(false); });
+      }).then(function () { if (state.pending && state.pending.order_id) beginPolling(); }).catch(fail).then(function () {
+        setBusy(false);
+        // A refused code: back to its field (it lost focus while it was disabled).
+        var focused = document.activeElement;
+        if (!state.session && nodes.code && typeof nodes.code.focus === 'function' && (!focused || focused === document.body)) nodes.code.focus();
+      });
     }
     function clearOrderQuery() {
       try {
@@ -658,12 +666,12 @@
       link.addEventListener('click', function (event) {
         event.preventDefault();
         if (handoff.present) {
-          (nodes['switch'].hidden ? nodes.error : nodes['switch']).scrollIntoView({ behavior: 'smooth', block: 'start' });
+          (nodes['switch'].hidden ? nodes.error : nodes['switch']).scrollIntoView({ behavior: scrollMotion(), block: 'start' });
           return;
         }
         if (!state.session) hidden('login', false);
         var target = state.session ? nodes.products : nodes.login;
-        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        target.scrollIntoView({ behavior: scrollMotion(), block: 'start' });
         if (!state.session && !state.busy) nodes.email.focus();
       });
     });
@@ -690,7 +698,7 @@
     try { boot = JSON.parse(document.getElementById('account-data').textContent); } catch (_) { return; }
     var storage;
     try { storage = window.sessionStorage; } catch (_) { storage = { getItem: function () { return null; }, setItem: function () {}, removeItem: function () {} }; }
-    var account = createAccount(document, boot, { fetch: window.fetch.bind(window), location: window.location, history: window.history, storage: storage, crypto: window.crypto, AbortController: window.AbortController, now: Date.now, setTimeout: window.setTimeout.bind(window), clearTimeout: window.clearTimeout.bind(window) });
+    var account = createAccount(document, boot, { fetch: window.fetch.bind(window), location: window.location, history: window.history, storage: storage, crypto: window.crypto, AbortController: window.AbortController, now: Date.now, setTimeout: window.setTimeout.bind(window), clearTimeout: window.clearTimeout.bind(window), matchMedia: window.matchMedia ? window.matchMedia.bind(window) : null });
     account.init();
   }
 })();
