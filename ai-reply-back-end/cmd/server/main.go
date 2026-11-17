@@ -19,6 +19,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/config"
 	"github.com/aireply/ai-reply-back-end/internal/admin"
 	"github.com/aireply/ai-reply-back-end/internal/ai"
+	"github.com/aireply/ai-reply-back-end/internal/aicontext"
 	"github.com/aireply/ai-reply-back-end/internal/alerts"
 	"github.com/aireply/ai-reply-back-end/internal/auth"
 	"github.com/aireply/ai-reply-back-end/internal/auth/appleid"
@@ -339,6 +340,9 @@ func buildApplication(ctx context.Context, cfg config.Config, log *slog.Logger, 
 		WithDemoPayments(cfg.Payments.DemoCheckout && !cfg.App.IsProduction())
 	proDeviceSvc := prodevices.New(store, subSvc, cfg.ProDevices, log).WithIdentityKey(cfg.Auth.AccessSecret).WithNotifications(notifySvc)
 	provider := ai.NewOpenAI(cfg.OpenAI)
+	// The account AI context (website cabinet): added to every generation,
+	// priced by the admin surcharge settings (docs/web-cabinet-ai-context.md).
+	aiContextSvc := aicontext.New(store)
 	limitSvc := limits.New(store, limits.Limits{
 		SourceChars:      cfg.Limits.SourceTextChars,
 		InstructionChars: cfg.Limits.InstructionChars,
@@ -391,7 +395,7 @@ func buildApplication(ctx context.Context, cfg config.Config, log *slog.Logger, 
 		Installations: installSvc, Notifications: notifySvc, Reports: reportSvc, Support: supportSvc,
 		Limiter: limiter, Log: log,
 		Ping:       func(ctx context.Context) error { return db.Reader().PingContext(ctx) },
-		ProDevices: proDeviceSvc, Credits: creditSvc, IAP: iapSvc,
+		ProDevices: proDeviceSvc, Credits: creditSvc, IAP: iapSvc, AIContext: aiContextSvc,
 	})
 	apiServer.Register(mux)
 	apiServer.RegisterBCC(mux, bccCheckout)
@@ -401,7 +405,8 @@ func buildApplication(ctx context.Context, cfg config.Config, log *slog.Logger, 
 		Catalog: catalogSvc,
 		Bank:    bccCheckout,
 		Config:  cfg, Admin: adminSvc, Limits: limitSvc, Notifications: notifySvc, Payments: paymentSvc,
-		Reports: reportSvc, Credits: creditSvc, Support: supportSvc, IAP: iapSvc, Limiter: limiter, Log: log,
+		Reports: reportSvc, Credits: creditSvc, Support: supportSvc, IAP: iapSvc, AIContext: aiContextSvc,
+		Limiter: limiter, Log: log,
 	}).Register(mux)
 
 	simulatorapi.New(simulatorapi.Deps{

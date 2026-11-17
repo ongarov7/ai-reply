@@ -1520,13 +1520,21 @@
     { key: "max_output_tokens", label: "admin.settings.output_tokens" }
   ];
 
+  // The account AI-context surcharge (docs/web-cabinet-ai-context.md §3).
+  var CONTEXT_FIELDS = [
+    { key: "chars_per_reply", setting: "ai_context_chars_per_reply", label: "admin.settings.ai_context_chars_per_reply" },
+    { key: "free_chars", setting: "ai_context_free_chars", label: "admin.settings.ai_context_free_chars" },
+    { key: "max_extra_replies", setting: "ai_context_max_extra_replies", label: "admin.settings.ai_context_max_extra" }
+  ];
+
   var Settings = {
     data: function () {
       return {
         data: null,
         form: { model: "", input_per_1m: 0.15, output_per_1m: 0.6, effective_from: "" },
         limits: {}, limitFields: LIMIT_FIELDS, savingLimits: false,
-        welcomeUnits: 0, savingWelcome: false
+        welcomeUnits: 0, savingWelcome: false,
+        contextPricing: {}, contextFields: CONTEXT_FIELDS, savingContext: false
       };
     },
     mounted: function () { this.load(); },
@@ -1537,6 +1545,7 @@
           this.data = await api("/settings");
           this.form.model = this.data.model;
           this.fillLimits(this.data.ai_limits);
+          this.fillContext(this.data.ai_context);
           if (this.data.welcome_bonus) this.welcomeUnits = this.data.welcome_bonus.units;
         }
         catch (e) { toast("danger", t("common.error")); }
@@ -1546,6 +1555,35 @@
         var form = {};
         LIMIT_FIELDS.forEach(function (f) { form[f.key] = ai.current[f.key]; });
         this.limits = form;
+      },
+      fillContext(pricing) {
+        if (!pricing) return;
+        var form = {};
+        CONTEXT_FIELDS.forEach(function (f) { form[f.key] = pricing.current[f.key]; });
+        this.contextPricing = form;
+      },
+      contextRange(f) { return this.data.ai_context.ranges[f.setting]; },
+      contextInvalid(f) {
+        var value = this.contextPricing[f.key], r = this.contextRange(f);
+        return !(Number.isInteger(value) && value >= r.min && value <= r.max);
+      },
+      async saveContext() {
+        var self = this;
+        if (CONTEXT_FIELDS.some(function (f) { return self.contextInvalid(f); })) {
+          toast("danger", t("admin.settings.limit_invalid"));
+          return;
+        }
+        this.savingContext = true;
+        try {
+          var fresh = await api("/settings/ai-context", { method: "POST", body: this.contextPricing });
+          this.data.ai_context = fresh;
+          this.fillContext(fresh);
+          toast("ok", t("common.saved"));
+        } catch (e) {
+          toast("danger", e.message === "INVALID_REQUEST" ? t("admin.settings.limit_invalid") : t("common.error"));
+        } finally {
+          this.savingContext = false;
+        }
       },
       range(key) { return this.data.ai_limits.ranges[key]; },
       outOfRange(key) {
@@ -1713,6 +1751,22 @@
             </div>
             <p class="muted">{{ t('admin.settings.limits_plans_note') }}</p>
             <button class="btn btn-primary" :disabled="savingLimits" @click="saveLimits">{{ t('common.save') }}</button>
+          </div>
+        </div>
+        <div class="card" v-if="data.ai_context">
+          <div class="card-head"><h2>{{ t('admin.settings.ai_context') }}</h2></div>
+          <div class="card-body">
+            <p class="muted" style="margin-top:0">{{ t('admin.settings.ai_context_hint') }}</p>
+            <div class="form-grid">
+              <label class="field" v-for="f in contextFields" :key="f.key">
+                <span>{{ t(f.label) }}</span>
+                <input type="number" step="1" :min="contextRange(f).min" :max="contextRange(f).max"
+                  v-model.number="contextPricing[f.key]" :aria-invalid="contextInvalid(f)">
+                <small class="muted">{{ t('admin.settings.limit_default') }}: {{ data.ai_context.defaults[f.key] }} ·
+                  {{ t('admin.settings.limit_range') }}: {{ contextRange(f).min }}–{{ contextRange(f).max }}</small>
+              </label>
+            </div>
+            <button class="btn btn-primary" :disabled="savingContext" @click="saveContext">{{ t('common.save') }}</button>
           </div>
         </div>
         <reminder-settings/>

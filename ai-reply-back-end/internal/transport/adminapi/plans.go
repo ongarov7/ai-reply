@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aireply/ai-reply-back-end/internal/aicontext"
 	"github.com/aireply/ai-reply-back-end/internal/domain"
 	"github.com/aireply/ai-reply-back-end/internal/limits"
 	"github.com/aireply/ai-reply-back-end/internal/plans"
@@ -214,7 +215,58 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		"welcome_bonus": s.welcomeBonusPayload(r),
 		// In-app purchases: store integrations, the iap_enabled switch, the notification URL.
 		"iap": s.iapPayload(r),
+		// The account AI-context surcharge (null without the feature).
+		"ai_context": s.aiContextPayload(r),
 	})
+}
+
+type aiContextPricingPayload struct {
+	Current  aicontext.Pricing          `json:"current"`
+	Defaults aicontext.Pricing          `json:"defaults"`
+	Ranges   map[string]aicontext.Range `json:"ranges"`
+}
+
+func (s *Server) aiContextPayload(r *http.Request) *aiContextPricingPayload {
+	if s.context == nil {
+		return nil
+	}
+	return &aiContextPricingPayload{
+		Current:  s.context.Pricing(r.Context()),
+		Defaults: aicontext.DefaultPricing(),
+		Ranges: map[string]aicontext.Range{
+			aicontext.SettingCharsPerReply:   aicontext.CharsPerReplyRange,
+			aicontext.SettingFreeChars:       aicontext.FreeCharsRange,
+			aicontext.SettingMaxExtraReplies: aicontext.MaxExtraRepliesRange,
+		},
+	}
+}
+
+// handleSaveAIContextPricing — how many replies the account AI context costs
+// (audited with the old and new values). Applies to the next generation.
+func (s *Server) handleSaveAIContextPricing(w http.ResponseWriter, r *http.Request) {
+	if s.context == nil {
+		httpx.Fail(w, domain.ErrNotFound)
+		return
+	}
+	var body aicontext.Pricing
+	if err := httpx.Decode(w, r, 1024, &body); err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	before := s.context.Pricing(r.Context())
+	saved, err := s.context.UpdatePricing(r.Context(), body)
+	if err != nil {
+		var rangeErr *aicontext.PricingError
+		if errors.As(err, &rangeErr) {
+			httpx.Error(w, http.StatusBadRequest, httpx.CodeInvalidRequest, rangeErr.Error(), rangeErr.Details())
+			return
+		}
+		s.fail(w, err)
+		return
+	}
+	s.admin.Audit(r.Context(), adminFrom(r.Context()), s.ip(r), "settings.ai_context_pricing.update", "system_settings", "ai_context_pricing",
+		map[string]any{"before": before, "after": saved})
+	httpx.JSON(w, http.StatusOK, s.aiContextPayload(r))
 }
 
 // purchasesPayload — сатып алу күйі: интеграция бар ма және әкімші қосқан ба.
