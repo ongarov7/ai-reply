@@ -41,6 +41,9 @@ type voiceForm struct {
 	languages  []string
 	requestID  string
 	purpose    string
+	// expectedUserID — the website cabinet names the account it shows
+	// (expected_user_id); the apps do not send it.
+	expectedUserID string
 }
 
 // voiceEnabled — features.voice_transcription: баптау қосулы және провайдер бар.
@@ -128,7 +131,7 @@ func readVoiceForm(w http.ResponseWriter, r *http.Request) (voiceForm, error) {
 				return voiceForm{}, ai.InvalidAudio("too_large")
 			}
 			form.audio = data
-		case "duration_ms", "languages", "request_id", "purpose":
+		case "duration_ms", "languages", "request_id", "purpose", "expected_user_id":
 			value, err := io.ReadAll(io.LimitReader(part, voiceFieldBytes+1))
 			if err != nil {
 				return voiceForm{}, bodyError(err)
@@ -142,6 +145,7 @@ func readVoiceForm(w http.ResponseWriter, r *http.Request) (voiceForm, error) {
 	}
 
 	form.requestID = fields["request_id"]
+	form.expectedUserID = fields["expected_user_id"]
 	switch {
 	case form.requestID == "":
 		return voiceForm{}, domain.InvalidField("request_id", "required")

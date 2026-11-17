@@ -25,7 +25,7 @@ func (a *webAccount) getAIContext(w http.ResponseWriter, r *http.Request) {
 
 func (a *webAccount) saveAIContext(w http.ResponseWriter, r *http.Request) {
 	user, _ := UserFrom(r.Context())
-	a.s.saveAIContext(w, r, user)
+	a.s.saveAIContext(w, r, user, true)
 }
 
 // Usage-history window: the chart's days, today included.
@@ -134,12 +134,17 @@ func (a *webAccount) saveConsent(w http.ResponseWriter, r *http.Request) {
 		TermsVersion   string `json:"terms_version"`
 		PrivacyVersion string `json:"privacy_version"`
 		Locale         string `json:"locale"`
+		ExpectedUserID string `json:"expected_user_id"`
 	}
 	if err := httpx.Decode(w, r, 2048, &body); err != nil {
 		httpx.Fail(w, err)
 		return
 	}
 	user, _ := UserFrom(r.Context())
+	if body.ExpectedUserID != user.ID {
+		accountChanged(w)
+		return
+	}
 	consent, err := a.s.users.SaveLegalConsent(r.Context(), user.ID, users.LegalConsentInput{
 		TermsVersion: body.TermsVersion, PrivacyVersion: body.PrivacyVersion, Locale: body.Locale,
 		Platform: domain.PlatformWeb,
@@ -183,6 +188,10 @@ func (a *webAccount) transcribe(w http.ResponseWriter, r *http.Request) {
 	form, err := readVoiceForm(w, r)
 	if err != nil {
 		httpx.Fail(w, err)
+		return
+	}
+	if form.expectedUserID != user.ID {
+		accountChanged(w)
 		return
 	}
 	result, err := a.s.ai.Transcribe(r.Context(), ai.TranscribeRequest{

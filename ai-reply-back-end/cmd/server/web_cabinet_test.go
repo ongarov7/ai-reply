@@ -29,7 +29,8 @@ func TestWebCabinetAIContextUsageAndConsent(t *testing.T) {
 	cfg := webTestConfig(t)
 	app := webTestApplication(t, cfg)
 	origin := "https://billing.example.invalid"
-	cookie, _ := webTestSignIn(t, app.handler, "", "cabinet@example.invalid")
+	cookie, signedIn := webTestSignIn(t, app.handler, "", "cabinet@example.invalid")
+	me := signedIn.User.ID
 
 	var session struct {
 		Features struct {
@@ -67,13 +68,24 @@ func TestWebCabinetAIContextUsageAndConsent(t *testing.T) {
 	if w.Code != http.StatusOK || doc.Revision != 0 || doc.Cost.General != 1 {
 		t.Fatalf("empty document: %d %s", w.Code, w.Body.String())
 	}
-	body := map[string]any{"expected_revision": 0, "context": map[string]any{
+	body := map[string]any{"expected_revision": 0, "expected_user_id": me, "context": map[string]any{
 		"enabled": true, "roles": []string{"blogger"}, "occupation": "Блогер", "traits": []string{"humor"},
 		"about": strings.Repeat("Пишу о путешествиях. ", 20), "audience": "Instagram 40 тыс.",
 		"recipients": map[string]any{"client": map[string]any{"notes": "Рекламодателям — официально"}},
 	}}
 	if w := webTestRequest(app.handler, http.MethodPost, "/account/api/ai-context", body, cookie, "https://evil.example", ""); w.Code != http.StatusForbidden {
 		t.Fatalf("cross-site write: %d %s", w.Code, w.Body.String())
+	}
+	// A tab still showing another account must not write into this one.
+	for _, expected := range []any{"another-account", nil} {
+		stale := map[string]any{"expected_revision": 0, "context": body["context"]}
+		if expected != nil {
+			stale["expected_user_id"] = expected
+		}
+		if w := webTestRequest(app.handler, http.MethodPost, "/account/api/ai-context", stale, cookie, origin, ""); w.Code != http.StatusConflict ||
+			!strings.Contains(w.Body.String(), "WEB_ACCOUNT_CHANGED") {
+			t.Fatalf("save for %v: %d %s", expected, w.Code, w.Body.String())
+		}
 	}
 	w = webTestRequest(app.handler, http.MethodPost, "/account/api/ai-context", body, cookie, origin, "")
 	cabinetJSON(t, w, &doc)
@@ -114,9 +126,14 @@ func TestWebCabinetAIContextUsageAndConsent(t *testing.T) {
 	}
 
 	// Dictation: multipart with the cabinet's headers only, after consent.
-	upload := func(origin, requestedWith string) *httptest.ResponseRecorder {
+	upload := func(origin, requestedWith string, expected ...string) *httptest.ResponseRecorder {
 		var buf bytes.Buffer
 		form := multipart.NewWriter(&buf)
+		account := me
+		if len(expected) > 0 {
+			account = expected[0]
+		}
+		_ = form.WriteField("expected_user_id", account)
 		_ = form.WriteField("request_id", "web-voice-0001")
 		_ = form.WriteField("duration_ms", "1200")
 		_ = form.WriteField("languages", "ru,kk,en")
@@ -148,10 +165,13 @@ func TestWebCabinetAIContextUsageAndConsent(t *testing.T) {
 	}
 
 	// Consent from the cabinet (platform web).
-	if w := webTestRequest(app.handler, http.MethodPost, "/account/api/consent", map[string]string{"terms_version": "old", "privacy_version": legal.PrivacyVersion, "locale": "ru"}, cookie, origin, ""); w.Code != http.StatusBadRequest {
+	if w := webTestRequest(app.handler, http.MethodPost, "/account/api/consent", map[string]string{"terms_version": "old", "privacy_version": legal.PrivacyVersion, "locale": "ru", "expected_user_id": me}, cookie, origin, ""); w.Code != http.StatusBadRequest {
 		t.Fatalf("outdated terms accepted: %d", w.Code)
 	}
-	w = webTestRequest(app.handler, http.MethodPost, "/account/api/consent", map[string]string{"terms_version": legal.TermsVersion, "privacy_version": legal.PrivacyVersion, "locale": "ru"}, cookie, origin, "")
+	if w := webTestRequest(app.handler, http.MethodPost, "/account/api/consent", map[string]string{"terms_version": legal.TermsVersion, "privacy_version": legal.PrivacyVersion, "locale": "ru", "expected_user_id": "another-account"}, cookie, origin, ""); w.Code != http.StatusConflict {
+		t.Fatalf("consent for another account: %d", w.Code)
+	}
+	w = webTestRequest(app.handler, http.MethodPost, "/account/api/consent", map[string]string{"terms_version": legal.TermsVersion, "privacy_version": legal.PrivacyVersion, "locale": "ru", "expected_user_id": me}, cookie, origin, "")
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"platform":"web"`) {
 		t.Fatalf("consent: %d %s", w.Code, w.Body.String())
 	}
@@ -164,6 +184,9 @@ func TestWebCabinetAIContextUsageAndConsent(t *testing.T) {
 		// Past the consent check: the four bytes are not a recording.
 		if w := upload(origin, "AIReplyAccount"); w.Code != http.StatusBadRequest {
 			t.Fatalf("invalid audio after consent: %d %s", w.Code, w.Body.String())
+		}
+		if w := upload(origin, "AIReplyAccount", "another-account"); w.Code != http.StatusConflict {
+			t.Fatalf("dictation for another account: %d %s", w.Code, w.Body.String())
 		}
 	}
 }

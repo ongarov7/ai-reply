@@ -120,6 +120,14 @@ func Recover(log *slog.Logger) func(http.Handler) http.Handler {
 	}
 }
 
+// microphonePage — pages that may ask for the microphone: the product
+// simulator and the website account cabinet (AI-profile dictation, on the
+// site and its /sandbox copy). Every other page keeps it closed.
+func microphonePage(path string) bool {
+	path = strings.TrimPrefix(path, "/sandbox")
+	return strings.HasPrefix(path, "/simulator") || path == "/account" || path == "/payment"
+}
+
 // SecurityHeaders — базалық қорғаныс тақырыптары. hsts — Strict-Transport-Security
 // жіберіледі ме (production не https PUBLIC_BASE_URL: config.App.HSTS).
 func SecurityHeaders(hsts bool) func(http.Handler) http.Handler {
@@ -133,7 +141,7 @@ func SecurityHeaders(hsts bool) func(http.Handler) http.Handler {
 			// дауыспен нұсқау беру браузердің өз танушысын пайдаланады, дәл
 			// қосымшадағыдай — құрылғының өзінде. Қалған беттерде жабық.
 			permissions := "camera=(), microphone=(), geolocation=()"
-			if strings.HasPrefix(r.URL.Path, "/simulator") {
+			if microphonePage(r.URL.Path) {
 				permissions = "camera=(), microphone=(self), geolocation=()"
 			}
 			h.Set("Permissions-Policy", permissions)

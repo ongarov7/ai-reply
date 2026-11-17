@@ -47,6 +47,9 @@ type Reservation struct {
 	UsedMonth int
 	// Balance — тарифтен тыс қалдық осы броннан кейін (сол транзакцияда оқылған).
 	Balance domain.CreditBalance
+	// ContextUnits — on a replay: the AI-context surcharge the key's first
+	// generation paid (0: it had none or could not pay it).
+	ContextUnits int
 }
 
 // grantOrder — кредиттерді тұтыну реті: pass (ертерек бітетіні), бонус, әкімші, пакет (ескісі).
@@ -72,7 +75,6 @@ const grantOrder = `CASE kind WHEN 'pass' THEN 0 WHEN 'welcome' THEN 1 WHEN 'adm
 // used); a refunded key is charged again as a new reservation.
 func (s *Store) ReserveGeneration(ctx context.Context, in ReserveInput) (Reservation, error) {
 	var out Reservation
-	now := ms(in.Now)
 	err := s.db.Tx(ctx, func(tx *sql.Tx) error {
 		if in.Key != "" {
 			replay, err := claimKey(ctx, tx, in, &out)
@@ -80,7 +82,49 @@ func (s *Store) ReserveGeneration(ctx context.Context, in ReserveInput) (Reserva
 				return err
 			}
 		}
+		var err error
+		out, err = reserveOne(ctx, tx, in)
+		return err
+	})
+	if err != nil {
+		return Reservation{}, err
+	}
+	return out, nil
+}
 
+// ReserveContextUnits — the account AI-context surcharge of one generation:
+// n more units, each paid by the normal bucket order, all or none in one
+// transaction (a refusal rolls every one of them back, so no other request
+// ever sees a balance taken by a surcharge that was not charged). The rows
+// carry mode 'context' and no key; the generation's own reservation records
+// how many it paid (context_units), which decides whether a free replay of its
+// key may use the context again.
+func (s *Store) ReserveContextUnits(ctx context.Context, generationID string, in ReserveInput, n int) ([]Reservation, error) {
+	var out []Reservation
+	err := s.db.Tx(ctx, func(tx *sql.Tx) error {
+		out = out[:0]
+		in.Key = ""
+		for range n {
+			r, err := reserveOne(ctx, tx, in)
+			if err != nil {
+				return err
+			}
+			out = append(out, r)
+		}
+		_, err := tx.ExecContext(ctx, `UPDATE usage_reservations SET context_units = ? WHERE id = ?`, n, generationID)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// reserveOne — one unit inside the caller's transaction (ReserveGeneration).
+func reserveOne(ctx context.Context, tx *sql.Tx, in ReserveInput) (Reservation, error) {
+	var out Reservation
+	now := ms(in.Now)
+	err := func() error {
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO usage_daily (user_id, usage_date, used, updated_at)
 			VALUES (?, ?, 0, ?) ON CONFLICT (user_id, usage_date) DO NOTHING`,
@@ -191,7 +235,7 @@ func (s *Store) ReserveGeneration(ctx context.Context, in ReserveInput) (Reserva
 		out.UsedToday, out.UsedMonth = day, mon
 		out.Balance, err = reservationCreditBalance(ctx, tx, in)
 		return err
-	})
+	}()
 	if err != nil {
 		return Reservation{}, err
 	}
@@ -204,11 +248,12 @@ func claimKey(ctx context.Context, tx *sql.Tx, in ReserveInput, out *Reservation
 		id, status, mode, bucket string
 		grant                    sql.NullString
 		created                  int64
+		contextUnits             int
 	)
 	err := tx.QueryRowContext(ctx, `
-		SELECT id, status, mode, bucket, grant_id, created_at FROM usage_reservations
+		SELECT id, status, mode, bucket, grant_id, created_at, context_units FROM usage_reservations
 		WHERE user_id = ? AND idempotency_key = ?`, in.UserID, in.Key).
-		Scan(&id, &status, &mode, &bucket, &grant, &created)
+		Scan(&id, &status, &mode, &bucket, &grant, &created, &contextUnits)
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil
 	}
@@ -255,7 +300,7 @@ func claimKey(ctx context.Context, tx *sql.Tx, in ReserveInput, out *Reservation
 		return true, err
 	}
 	*out = Reservation{ID: id, Bucket: bucket, GrantID: grant.String, Replay: true,
-		UsedToday: day, UsedMonth: mon, Balance: balance}
+		UsedToday: day, UsedMonth: mon, Balance: balance, ContextUnits: contextUnits}
 	return true, nil
 }
 

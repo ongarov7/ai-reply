@@ -60,8 +60,10 @@ One document per account, stored on the server.
 
 "chars" = Unicode code points (`utf8.RuneCountInString` in Go, `Array.from(s).length` in JS,
 `unicodeScalars.count` in Swift, `codePointCount` in Kotlin). Text is trimmed by the server;
-`\r` is removed; other control characters except `\n` and `\t` are rejected. Over-limit text
-is **rejected** (400), never silently cut. Responses always contain all four recipient keys.
+`\r` is removed; other control characters except `\n` and `\t`, the separators U+2028/U+2029
+and bidirectional controls (U+061C, U+200E, U+200F, U+202A–U+202E, U+2066–U+2069) are rejected
+(`invalid_text`). Over-limit text is **rejected** (400), never silently cut. Responses always
+contain all four recipient keys.
 
 ### 2.1 Role codes (labels)
 
@@ -88,6 +90,10 @@ is **rejected** (400), never silently cut. Responses always contain all four rec
 | realtor | Риэлтор | Realtor | Риэлтор | Rieltor |
 
 ### 2.2 Communication-style codes (labels)
+
+Opposite pairs are exclusive — `introvert`/`extrovert`, `brief`/`detailed`, `formal`/`casual`,
+`emoji`/`no_emoji`: the server refuses both together (`400`, field `traits`, reason `conflict`);
+the cabinet unselects the opposite chip when one is chosen.
 
 | code | ru | en | kk | uz |
 |---|---|---|---|---|
@@ -143,7 +149,11 @@ compute them live while the user types with the same formula and the `pricing` o
    refunded and the reply is generated **without** the account context and recipient notes,
    for 1 unit (`context_applied = false`).
 4. Provider failure → every reservation of the request is refunded. Success → all committed.
-5. A replay of a paid Idempotency-Key is free and uses the context if it is enabled.
+5. A replay of a paid Idempotency-Key is free. It uses the context only if the key's first
+   generation paid its surcharge (or needed none); a key first served by the fallback replays
+   without the context.
+6. The extra units are reserved all or none in one transaction. Pro pays no surcharge even on
+   an extra device that falls back to the account's purchased packs.
 
 ## 4. Generation behaviour
 
@@ -193,15 +203,19 @@ recipient (custom personas, compose without recipient); the other keys = units p
 ### 5.2 Save body
 
 ```json
-{ "context": { ...document from §2 }, "expected_revision": 3 }
+{ "context": { ...document from §2 }, "expected_revision": 3, "expected_user_id": "u_123" }
 ```
+
+`expected_user_id` is the account the page/app shows: **required from the website**
+(`/account/api/ai-context`), optional with an app token. A mismatch → `409
+WEB_ACCOUNT_CHANGED`, nothing saved (a tab left open after switching accounts).
 
 - `expected_revision` is required. If it differs from the stored revision → `409
   AI_CONTEXT_CHANGED`, `details: {"revision": <current>}`; nothing is saved. Clients reload
   and show «Профиль изменился на другом устройстве».
 - Validation → `400 INVALID_REQUEST`, `details: {"field": "about", "reason": "too_long",
   "max": 2000}`; reasons: `too_long`, `too_many` (+`max`), `unknown` (roles/traits/recipient
-  key), `invalid_text`.
+  key), `invalid_text`, `conflict` (opposite style chips), `required`.
 - Success → 200 `AIContextResponse` with `revision + 1`.
 - The whole document is replaced (send every field).
 
@@ -229,8 +243,11 @@ which is `multipart/form-data` with the same `Origin` and `X-Requested-With` hea
 | GET | `/account/api/ai-context` | — | `AIContextResponse` |
 | POST | `/account/api/ai-context` | §5.2 | `AIContextResponse` |
 | GET | `/account/api/usage?days=30` | — | `UsageHistory` (days 7–90, default 30) |
-| POST | `/account/api/consent` | `{"terms_version","privacy_version","locale"}` | `{"legal_consent": {...}}` |
-| POST | `/account/api/transcribe` | multipart: `audio` (WAV 16 kHz mono 16-bit or M4A, ≤ 40 s, ≤ 4 MiB), `duration_ms`, `request_id` (`[A-Za-z0-9-]{8,64}`), `languages` (`ru,kk,en`, ≤3), `purpose` (`dictation`) | `{"text","languages","duration_ms"}` |
+| POST | `/account/api/consent` | `{"terms_version","privacy_version","locale","expected_user_id"}` | `{"legal_consent": {...}}` |
+| POST | `/account/api/transcribe` | multipart: `audio` (WAV 16 kHz mono 16-bit or M4A, ≤ 40 s, ≤ 4 MiB), `duration_ms`, `request_id` (`[A-Za-z0-9-]{8,64}`), `languages` (`ru,kk,en`, ≤3), `purpose` (`dictation`), `expected_user_id` | `{"text","languages","duration_ms"}` |
+
+Every cabinet write (`ai-context`, `consent`, `transcribe`) carries `expected_user_id` = the
+`user.id` of the session the page shows; a mismatch is `409 WEB_ACCOUNT_CHANGED` (reload).
 
 Session additions:
 
@@ -258,8 +275,11 @@ Session additions:
 replies, values as sent by the clients (`ios`, `android`, `macos`, `windows`, `web`, …).
 
 Transcribe errors: `404 NOT_FOUND` (voice disabled — hide the mic), `403 CONSENT_REQUIRED`
-(show the consent dialog, `POST /account/api/consent`, retry), `400 INVALID_AUDIO`/
-`INVALID_REQUEST`, `429 RATE_LIMITED`. Voice uses the existing daily cap and spends no replies.
+(show the consent dialog, `POST /account/api/consent`, retry), `400 INVALID_REQUEST` (bad
+audio: `details.field = "audio"`, `reason` `format|unreadable|too_short|too_long|too_large`),
+`409 WEB_ACCOUNT_CHANGED`, `429 RATE_LIMITED` (per minute) and `429 VOICE_LIMIT_REACHED` (the
+day's voice cap). Voice spends no replies. The cabinet pages send
+`Permissions-Policy: microphone=(self)`; every other page keeps the microphone closed.
 
 Web handoff (apps → website): `POST /api/v1/web/payment-handoff` accepts an optional
 `"target": "account" | "payment"` (default `payment`). With `account` the returned URL is

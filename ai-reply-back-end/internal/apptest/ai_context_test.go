@@ -132,6 +132,8 @@ func TestAIContextRoundTripValidationAndConflicts(t *testing.T) {
 		"unknown recipient":  {body: map[string]any{"recipients": map[string]any{"boss": map[string]any{"notes": "x"}}}, field: "recipients", reason: "unknown"},
 		"control character":  {body: map[string]any{"occupation": "Флорист\u0007"}, field: "occupation", reason: "invalid_text"},
 		"line separator":     {body: map[string]any{"audience": "a\u2028b"}, field: "audience", reason: "invalid_text"},
+		"bidi override":      {body: map[string]any{"about": "цена \u202e0005 тг"}, field: "about", reason: "invalid_text"},
+		"opposite chips":     {body: map[string]any{"traits": []string{"brief", "warm", "detailed"}}, field: "traits", reason: "conflict"},
 		"missing revision":   {body: map[string]any{}, field: "expected_revision", reason: "required", withoutRevision: true},
 		"emoji are one char": {body: map[string]any{"about": strings.Repeat("😀", 2000)}, withoutEnabledOK: true},
 	} {
@@ -160,6 +162,9 @@ func TestAIContextRoundTripValidationAndConflicts(t *testing.T) {
 			}
 		})
 	}
+	other := h.do(http.MethodPut, "/api/v1/me/ai-context", map[string]any{"context": map[string]any{"enabled": true},
+		"expected_revision": 2, "expected_user_id": "someone-else"}, h.auth(s.access))
+	mustStatus(t, other, http.StatusConflict, "WEB_ACCOUNT_CHANGED")
 	noEnabled := h.do(http.MethodPut, "/api/v1/me/ai-context", map[string]any{"context": map[string]any{"about": "x"}, "expected_revision": 2}, h.auth(s.access))
 	mustStatus(t, noEnabled, http.StatusBadRequest, "INVALID_REQUEST")
 	unknownField := h.do(http.MethodPut, "/api/v1/me/ai-context", map[string]any{"context": map[string]any{"enabled": true, "secret": "x"}, "expected_revision": 2}, h.auth(s.access))
@@ -201,6 +206,11 @@ func TestAIContextIsAddedToEveryReplyAndChargedPerCharacters(t *testing.T) {
 	}
 	if strings.Index(user, "<account_context>") > strings.Index(user, "<incoming_message>") {
 		t.Fatal("the account context must come before the incoming message")
+	}
+
+	dashboard := h.adminCall(h.signInAdmin(), http.MethodGet, "/dashboard", nil)
+	if requests := dashboard.num("stats", "requests_today"); requests != 1 {
+		t.Fatalf("requests_today = %v after one reply that cost 3 (the surcharge is not a request)", requests)
 	}
 
 	friend := h.replyTo(s.access, map[string]any{"template_id": "friend"})
@@ -257,13 +267,26 @@ func TestAIContextSurchargeFallsBackToThePlainReplyWhenTheBalanceIsShort(t *test
 	if user, version := h.lastPrompt(); strings.Contains(user, "<account_context>") || strings.Contains(version, "account_context") {
 		t.Fatalf("fallback still carries the context:\n%s", user)
 	}
-	if n := h.scalar(`SELECT COUNT(*) FROM usage_reservations WHERE user_id = ? AND mode = 'context' AND status = 'committed'`, s.userID); n != 0 {
-		t.Fatalf("a refunded surcharge stayed charged: %d", n)
+	if n := h.scalar(`SELECT COUNT(*) FROM usage_reservations WHERE user_id = ? AND mode = 'context'`, s.userID); n != 0 {
+		t.Fatalf("an unpaid surcharge left %d reservation rows (it must be all or nothing)", n)
 	}
+	// A free replay of a key whose first reply could not pay the context stays without it.
+	key := map[string]string{"Idempotency-Key": "ctx-short-replay-1"}
+	h.useQuota(s.userID, 6)
+	first := h.replyTo(s.access, map[string]any{"template_id": "client"}, key)
+	again := h.replyTo(s.access, map[string]any{"template_id": "client"}, key)
+	if first.body["context_applied"] != false || again.status != http.StatusOK || again.num("units") != 0 || again.body["context_applied"] != false {
+		t.Fatalf("replay of an unpaid context: %s / %s", first.raw, again.raw)
+	}
+	if user, _ := h.lastPrompt(); strings.Contains(user, "<account_context>") {
+		t.Fatal("a free replay used a context nobody paid for")
+	}
+	h.useQuota(s.userID, 6)
 	last := h.replyTo(s.access, map[string]any{"template_id": "client"})
 	if last.num("units") != 1 || last.num("usage", "used_today") != 7 {
 		t.Fatalf("last reply of the day: %s", last.raw)
 	}
+	_ = first
 	mustStatus(t, h.replyTo(s.access, map[string]any{"template_id": "client"}), http.StatusTooManyRequests, "DAILY_LIMIT_REACHED")
 	if used := h.entitlement(s.userID).UsedToday; used != 7 {
 		t.Fatalf("used today %d", used)
@@ -399,5 +422,16 @@ func TestAIContextDesktopBudgetCountsOnlyTheDesktopText(t *testing.T) {
 	if user, _ := h.lastPrompt(); !strings.Contains(user, "<account_context>") || !strings.Contains(user, "<context_reference>") ||
 		!strings.Contains(user, "<recipient_notes>") || res.num("units") != 3 {
 		t.Fatalf("desktop compose: %s\n%s", res.raw, user)
+	}
+}
+
+func TestAIContextCabinetPagesMayUseTheMicrophone(t *testing.T) {
+	h := newHarness(t)
+	for path, want := range map[string]string{"/account": "microphone=(self)", "/payment": "microphone=(self)",
+		"/": "microphone=()", "/privacy": "microphone=()", "/account/delete": "microphone=()"} {
+		res := h.do(http.MethodGet, path, nil, nil)
+		if got := res.header.Get("Permissions-Policy"); !strings.Contains(got, want) || !strings.Contains(got, "camera=()") {
+			t.Errorf("%s: Permissions-Policy %q, want %s", path, got, want)
+		}
 	}
 }

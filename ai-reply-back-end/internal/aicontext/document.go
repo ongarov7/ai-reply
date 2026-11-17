@@ -175,7 +175,18 @@ const (
 	ReasonTooMany     = "too_many"
 	ReasonUnknown     = "unknown"
 	ReasonInvalidText = "invalid_text"
+	// ReasonConflict — two style chips that cannot both be true.
+	ReasonConflict = "conflict"
 )
+
+// exclusiveTraits — style chips that contradict each other; a document holds
+// at most one of each pair (the cabinet swaps them, the server refuses both).
+var exclusiveTraits = [][2]string{
+	{"introvert", "extrovert"},
+	{"brief", "detailed"},
+	{"formal", "casual"},
+	{"emoji", "no_emoji"},
+}
 
 // Normalize — the document as it is stored: trimmed text, no carriage returns,
 // codes de-duplicated in their order, all four recipients. Anything over a
@@ -189,6 +200,11 @@ func Normalize(in Document) (Document, error) {
 	}
 	if out.Traits, err = normalizeCodes("traits", in.Traits, traits, MaxTraits); err != nil {
 		return Document{}, err
+	}
+	for _, pair := range exclusiveTraits {
+		if contains(out.Traits, pair[0]) && contains(out.Traits, pair[1]) {
+			return Document{}, &FieldError{Field: "traits", Reason: ReasonConflict}
+		}
 	}
 	if out.Occupation, err = cleanText("occupation", in.Occupation, MaxOccupation); err != nil {
 		return Document{}, err
@@ -236,16 +252,17 @@ func normalizeCodes(field string, in []string, catalog []label, max int) ([]stri
 	return out, nil
 }
 
-// cleanText — trimmed text without "\r"; other control characters except "\n"
-// and "\t" are refused (they only ever come from a broken client or an attempt
-// to smuggle formatting into the prompt).
+// cleanText — trimmed text without "\r". Other control characters except
+// "\n" and "\t", the Unicode line/paragraph separators and the bidirectional
+// controls (overrides, isolates, marks) are refused: they only come from a
+// broken client or an attempt to hide or reorder text inside the prompt.
 func cleanText(field, value string, max int) (string, error) {
 	if !utf8.ValidString(value) {
 		return "", &FieldError{Field: field, Reason: ReasonInvalidText}
 	}
 	value = strings.ReplaceAll(value, "\r", "")
 	for _, r := range value {
-		if r != '\n' && r != '\t' && (unicode.IsControl(r) || r == ' ' || r == ' ') {
+		if r != '\n' && r != '\t' && (unicode.IsControl(r) || r == '\u2028' || r == '\u2029' || unicode.Is(unicode.Bidi_Control, r)) {
 			return "", &FieldError{Field: field, Reason: ReasonInvalidText}
 		}
 	}
@@ -254,6 +271,15 @@ func cleanText(field, value string, max int) (string, error) {
 		return "", &FieldError{Field: field, Reason: ReasonTooLong, Max: max}
 	}
 	return value, nil
+}
+
+func contains(list []string, value string) bool {
+	for _, v := range list {
+		if v == value {
+			return true
+		}
+	}
+	return false
 }
 
 func isRecipient(key string) bool {

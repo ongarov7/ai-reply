@@ -64,6 +64,10 @@ type aiContextDocument struct {
 type aiContextSaveRequest struct {
 	Context          *aiContextDocument `json:"context"`
 	ExpectedRevision *int64             `json:"expected_revision"`
+	// ExpectedUserID — the account the page or app shows. Required from the
+	// website (a tab left open after switching accounts must not write into the
+	// new one), optional with an app token.
+	ExpectedUserID string `json:"expected_user_id"`
 }
 
 func (s *Server) handleGetAIContext(w http.ResponseWriter, r *http.Request) {
@@ -73,14 +77,19 @@ func (s *Server) handleGetAIContext(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleSaveAIContext(w http.ResponseWriter, r *http.Request) {
 	user, _ := UserFrom(r.Context())
-	s.saveAIContext(w, r, user)
+	s.saveAIContext(w, r, user, false)
 }
 
-// saveAIContext — the save of both the app API and the website cabinet.
-func (s *Server) saveAIContext(w http.ResponseWriter, r *http.Request, user domain.User) {
+// saveAIContext — the save of both the app API and the website cabinet
+// (website: expected_user_id required).
+func (s *Server) saveAIContext(w http.ResponseWriter, r *http.Request, user domain.User, website bool) {
 	var body aiContextSaveRequest
 	if err := httpx.Decode(w, r, aiContextBodyBytes, &body); err != nil {
 		httpx.Fail(w, err)
+		return
+	}
+	if (website || body.ExpectedUserID != "") && body.ExpectedUserID != user.ID {
+		accountChanged(w)
 		return
 	}
 	switch {
@@ -165,4 +174,10 @@ func (s *Server) accountContext(ctx context.Context, user domain.User, recipient
 		return aicontext.Rendered{}, 0
 	}
 	return rendered, extra
+}
+
+// accountChanged — the request names another account than the session's
+// (a tab left open after switching accounts); nothing was changed.
+func accountChanged(w http.ResponseWriter) {
+	httpx.Error(w, http.StatusConflict, "WEB_ACCOUNT_CHANGED", "The account changed. Reload the page before continuing.", nil)
 }

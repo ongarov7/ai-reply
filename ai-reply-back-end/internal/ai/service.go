@@ -295,6 +295,9 @@ func (s *Service) generate(ctx context.Context, c call, prompt Prompt, started t
 	if err != nil {
 		return Result{}, err
 	}
+	// Pro pays no AI-context surcharge, also on an extra device that falls
+	// back to the account's purchased packs (the cabinet promises 1 a reply).
+	unlimitedAccount := entitlement.Unlimited
 	var deviceLimit error
 	if s.proDevices != nil {
 		if err := s.proDevices.Authorize(ctx, c.User, c.DeviceID, entitlement); err != nil {
@@ -340,32 +343,38 @@ func (s *Service) generate(ctx context.Context, c call, prompt Prompt, started t
 		}, err
 	}
 
-	// The account AI-context surcharge: one more reservation per extra reply,
-	// each paid by the normal bucket order. Unlimited plans and free replays
+	// The account AI-context surcharge: c.Extra more units, reserved all or
+	// none in one transaction by the normal bucket order. Pro and free replays
 	// pay none. When the balance cannot pay it, the reply is written without
-	// the account context for the one reply already reserved.
+	// the account context for the one reply already reserved. A replay uses
+	// the context only if its key's first generation paid for it.
 	applied := c.Fallback != nil
 	last := res
 	var extras []repository.Reservation
-	if applied && c.Extra > 0 && !res.Replay && res.Bucket != domain.BucketUnlimited {
-		for range c.Extra {
-			extra, err := s.repo.ReserveGeneration(ctx, repository.ReserveInput{
-				UserID: c.User.ID, Mode: ModeContext, Date: date, Month: month,
-				DailyLimit: entitlement.DailyLimit, MonthlyLimit: entitlement.MonthlyLimit, Unlimited: entitlement.Unlimited,
-				Now: started, PurchasedOnly: deviceLimit != nil,
-			})
-			if err != nil {
-				s.refundExtras(ctx, c, extras)
-				extras = nil
-				if !isQuotaRefusal(err) {
-					s.release(ctx, c, res)
-					return Result{}, err
-				}
-				prompt, applied, last = *c.Fallback, false, res
-				break
-			}
-			extras = append(extras, extra)
-			last = extra
+	switch {
+	case !applied || c.Extra == 0 || unlimitedAccount:
+	case res.Replay:
+		if res.ContextUnits == 0 {
+			prompt, applied = *c.Fallback, false
+		}
+	default:
+		extras, err = s.repo.ReserveContextUnits(ctx, res.ID, repository.ReserveInput{
+			UserID: c.User.ID, Mode: ModeContext, Date: date, Month: month,
+			DailyLimit: entitlement.DailyLimit, MonthlyLimit: entitlement.MonthlyLimit, Unlimited: entitlement.Unlimited,
+			Now: started, PurchasedOnly: deviceLimit != nil,
+		}, c.Extra)
+		switch {
+		case err == nil:
+			last = extras[len(extras)-1]
+		case isQuotaRefusal(err):
+			prompt, applied = *c.Fallback, false
+		default:
+			// A database error or a client that went away: give the one
+			// reserved reply back on a context that outlives the request.
+			bctx, cancel := bookkeeping(ctx)
+			s.release(bctx, c, res)
+			cancel()
+			return Result{}, err
 		}
 	}
 	c.Units = 1 + len(extras)

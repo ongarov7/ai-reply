@@ -26,3 +26,8 @@ CREATE TABLE ai_contexts (
 
 ALTER TABLE ai_usage_events ADD COLUMN units INTEGER NOT NULL DEFAULT 1;
 ALTER TABLE ai_usage_events ADD COLUMN context_chars INTEGER NOT NULL DEFAULT 0;
+
+-- A generation's reservation records how many surcharge units ('context'
+-- rows, no key) it paid, so a free replay of its Idempotency-Key uses the
+-- account context only when the first generation paid for it.
+ALTER TABLE usage_reservations ADD COLUMN context_units INTEGER NOT NULL DEFAULT 0;
