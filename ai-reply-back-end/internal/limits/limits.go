@@ -41,6 +41,23 @@ const (
 	DefaultMaxOutputTokens  = 180
 )
 
+// VoiceInstructionChars — the instruction an iPhone voice turn may carry
+// (instruction_source "voice"). A turn is capped at 40 seconds; fast speech
+// is about 200 words a minute (≈133 words in 40 s) and a Kazakh or Russian
+// word with its space averages up to 7.5 characters, so 40 seconds of speech
+// fits in 1 000 characters. It is a floor, not a cap: a typed-instruction
+// limit set higher in the admin panel applies to voice as well.
+const VoiceInstructionChars = 1000
+
+// InstructionLimit — the instruction limit for one request: typed text gets
+// the admin value, a dictated voice turn at least VoiceInstructionChars.
+func (l Limits) InstructionLimit(voice bool) int {
+	if voice && l.InstructionChars < VoiceInstructionChars {
+		return VoiceInstructionChars
+	}
+	return l.InstructionChars
+}
+
 // Range — an inclusive range an administrator may choose from.
 type Range struct {
 	Min int `json:"min"`

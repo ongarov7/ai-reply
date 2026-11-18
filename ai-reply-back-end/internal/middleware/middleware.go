@@ -50,6 +50,10 @@ type statusWriter struct {
 	bytes  int
 }
 
+// Unwrap preserves optional net/http interfaces through ResponseController,
+// including the WebSocket upgrade used by live transcription.
+func (w *statusWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
+
 func (w *statusWriter) WriteHeader(code int) {
 	w.status = code
 	w.ResponseWriter.WriteHeader(code)

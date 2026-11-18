@@ -6,6 +6,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/logging"
 	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/aireply/ai-reply-back-end/config"
@@ -57,6 +58,8 @@ type Service struct {
 	transcribePerDay int
 	// voice — request_id бойынша қайталанбайтын дауыс шақырулары (жадта).
 	voice *voiceCache
+	// A bounded live turn per account; never hold a mutex during network I/O.
+	liveUsers sync.Map
 }
 
 // New — шлюз. Тексеруден өтпеген жауапты түзету әдепкіде қосулы.
@@ -92,7 +95,10 @@ type Request struct {
 	OutputCharLimit int
 	SourceText      string
 	Instruction     string
-	Language        string
+	// Voice — the instruction was dictated in AI Reply Voice: it may use the
+	// room of a 40-second turn (limits.VoiceInstructionChars).
+	Voice    bool
+	Language string
 	// InputLanguage — тексерілген пернетақта коды не бос.
 	InputLanguage string
 	TemplateID    string
@@ -217,7 +223,7 @@ func (s *Service) Reply(ctx context.Context, req Request) (Result, error) {
 	if traits.RuneLen(source) > lim.SourceChars {
 		return Result{SourceLimit: lim.SourceChars}, domain.ErrSourceTooLong
 	}
-	req.Instruction = traits.Clamp(req.Instruction, lim.InstructionChars)
+	req.Instruction = traits.Clamp(req.Instruction, lim.InstructionLimit(req.Voice))
 
 	input := PromptInput{
 		Message:       source,

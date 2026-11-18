@@ -15,12 +15,19 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/transport/httpx"
 )
 
+// instructionSourceVoice — the one instruction_source value with a meaning:
+// the instruction was dictated in AI Reply Voice. Anything else is typed text.
+const instructionSourceVoice = "voice"
+
 type replyRequest struct {
 	Context         *ai.GenerationContext `json:"context"`
 	OutputCharLimit int                   `json:"output_char_limit"`
 	SourceText      string                `json:"source_text"`
 	Instruction     string                `json:"instruction"`
-	Language        string                `json:"language"`
+	// InstructionSource — "voice" for an instruction dictated in AI Reply
+	// Voice (features.voice_instruction); absent for typed text.
+	InstructionSource string `json:"instruction_source"`
+	Language          string `json:"language"`
 	// InputLanguage — Reply басылғандағы пернетақта (kk | ru | en). Жаңа
 	// клиенттер тек features.sender_profile=true болса жібереді; белгісіз мән
 	// елеусіз қалады.
@@ -146,6 +153,7 @@ func (s *Server) handleReply(w http.ResponseWriter, r *http.Request) {
 		OutputCharLimit: body.OutputCharLimit,
 		SourceText:      body.SourceText,
 		Instruction:     body.Instruction,
+		Voice:           body.InstructionSource == instructionSourceVoice,
 		Language:        body.Language,
 		InputLanguage:   ai.InputLanguage(body.InputLanguage),
 		TemplateID:      body.TemplateID,
@@ -199,6 +207,8 @@ type composeRequest struct {
 	OutputCharLimit int                   `json:"output_char_limit"`
 	TemplateID      string                `json:"template_id"`
 	Instruction     string                `json:"instruction"`
+	// InstructionSource — as on replyRequest.
+	InstructionSource string `json:"instruction_source"`
 	// Language — қолданбаның интерфейс тілі (метадерек және тілі анық емес
 	// нұсқауға арналған шешім). Хабарлама тілі нұсқаудың өз тілінен анықталады.
 	Language string `json:"language"`
@@ -261,6 +271,7 @@ func (s *Server) handleCompose(w http.ResponseWriter, r *http.Request) {
 		OutputCharLimit:   body.OutputCharLimit,
 		TemplateID:        body.TemplateID,
 		Instruction:       body.Instruction,
+		Voice:             body.InstructionSource == instructionSourceVoice,
 		Language:          traits.Clamp(body.Language, 16),
 		InputLanguage:     ai.InputLanguage(body.InputLanguage),
 		GrammaticalGender: gender,

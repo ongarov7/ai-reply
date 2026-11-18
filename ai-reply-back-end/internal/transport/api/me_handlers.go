@@ -278,6 +278,8 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 		// The server enforces the same values; the admin panel changes them.
 		"max_source_characters":  current.SourceChars,
 		"max_instruction_length": current.InstructionChars,
+		// A dictated instruction (instruction_source "voice") may be this long.
+		"max_voice_instruction_length": current.InstructionLimit(true),
 		"mac_context_limits": map[string]any{
 			"profile_characters": ai.MacProfileCharacters, "reference_characters": ai.MacReferenceCharacters,
 			"references": ai.MacReferenceCount, "context_bytes": ai.MacContextBytes,
@@ -300,7 +302,11 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 			"instruction_polish": s.cfg.AI.PolishEnabled,
 			// POST /api/v1/ai/transcribe — the keyboard's voice input (an OpenAI
 			// key is set and TRANSCRIBE_ENABLED is not false).
-			"voice_transcription": s.voiceEnabled(),
+			"voice_transcription":          s.voiceEnabled(),
+			"voice_realtime_transcription": s.realtimeVoiceEnabled(),
+			// instruction_source "voice" on /ai/reply and /ai/compose: a dictated
+			// instruction gets max_voice_instruction_length characters.
+			"voice_instruction": true,
 			// POST /api/v1/analytics/events — onboarding and settings events.
 			"product_events": s.cfg.Analytics.ProductEventsEnabled,
 			// Sign-in methods this server accepts right now.

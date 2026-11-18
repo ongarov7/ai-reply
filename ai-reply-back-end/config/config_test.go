@@ -987,3 +987,18 @@ func TestAppReviewAccountMayBuyInSandboxOnProduction(t *testing.T) {
 		t.Fatalf("explicit list: %v %v", cfg.IAP.AppleSandboxAccounts, err)
 	}
 }
+
+func TestRealtimeVoiceConfiguration(t *testing.T) {
+	setValidEnv(t)
+	unset(t, "REALTIME_TRANSCRIBE_ENABLED", "OPENAI_REALTIME_TRANSCRIBE_MODEL")
+	cfg, err := Load("")
+	if err != nil || !cfg.AI.RealtimeTranscribeEnabled || cfg.OpenAI.RealtimeTranscribeModel != "gpt-live-transcribe" {
+		t.Fatalf("realtime defaults: %+v %v", cfg.AI, err)
+	}
+	t.Setenv("REALTIME_TRANSCRIBE_ENABLED", "false")
+	t.Setenv("OPENAI_REALTIME_TRANSCRIBE_MODEL", "gpt-live-transcribe-versioned")
+	cfg, err = Load("")
+	if err != nil || cfg.AI.RealtimeTranscribeEnabled || cfg.OpenAI.RealtimeTranscribeModel != "gpt-live-transcribe-versioned" {
+		t.Fatal("realtime overrides were ignored")
+	}
+}

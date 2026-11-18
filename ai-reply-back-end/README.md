@@ -519,6 +519,11 @@ production; `true` в production запрещён), `APPLE_IAP_SANDBOX_ACCOUNTS`
 ключа или файл вместе с переменными — отказ при старте), `IAP_GOOGLE_VOIDED_POLL=1h`
 (15m…24h или `off`), `RATE_IAP_PER_MINUTE=20`.
 
+iPhone Voice также использует `GET /api/v1/ai/transcribe/realtime` (WebSocket),
+`REALTIME_TRANSCRIBE_ENABLED=true`, `OPENAI_REALTIME_TRANSCRIBE_MODEL=gpt-live-transcribe`.
+Авторизация, согласие, ограничения устройства и лимиты голосового ввода общие с загрузкой файла.
+Контракт и проверка reverse proxy: [docs/IOS_VOICE_REALTIME.md](docs/IOS_VOICE_REALTIME.md).
+
 Предупреждения при старте (`configuration warning: …`, сервер работает): пустой
 `LEGAL_OPERATOR_NAME` в production; Apple-вход без ключа отзыва; `APPLE_CLIENT_ID` не похож
 на bundle id. Для App Review/TestFlight через production API настройте исключение

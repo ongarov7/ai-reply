@@ -176,6 +176,8 @@ type OpenAI struct {
 	Temperature *float64
 	// TranscribeModel — дауысты мәтінге айналдыратын модель (OPENAI_TRANSCRIBE_MODEL).
 	TranscribeModel string
+	// RealtimeTranscribeModel is never selected by a client.
+	RealtimeTranscribeModel string
 }
 
 // AI — генерация сапасы мен қосымша AI мүмкіндіктері.
@@ -185,7 +187,8 @@ type AI struct {
 	// PolishEnabled — POST /api/v1/ai/polish (нұсқауды түзету ұсынысы).
 	PolishEnabled bool
 	// TranscribeEnabled — POST /api/v1/ai/transcribe (пернетақтадағы дауыс → мәтін).
-	TranscribeEnabled bool
+	TranscribeEnabled         bool
+	RealtimeTranscribeEnabled bool
 }
 
 // VoiceTranscription — POST /api/v1/ai/transcribe жұмыс істей ме: OpenAI кілті
@@ -477,7 +480,8 @@ func Load(envFile string) (Config, error) {
 			RepairEnabled: boolean("AI_REPAIR_ENABLED", true),
 			PolishEnabled: boolean("AI_POLISH_ENABLED", true),
 			// OpenAI кілті бар кезде әдепкі қосулы; false — 404 және features.voice_transcription=false.
-			TranscribeEnabled: boolean("TRANSCRIBE_ENABLED", true),
+			TranscribeEnabled:         boolean("TRANSCRIBE_ENABLED", true),
+			RealtimeTranscribeEnabled: boolean("REALTIME_TRANSCRIBE_ENABLED", true),
 		},
 		Analytics: Analytics{ProductEventsEnabled: boolean("PRODUCT_EVENTS_ENABLED", true)},
 		Admin: Admin{
@@ -567,13 +571,14 @@ func Load(envFile string) (Config, error) {
 // (internal/ai/eval) осыны оқиды: әдепкі мәндердің бір ғана көзі бар.
 func OpenAIFromEnv() OpenAI {
 	return OpenAI{
-		APIKey:          str("OPENAI_API_KEY", ""),
-		Model:           str("OPENAI_MODEL", "gpt-4o-mini"),
-		BaseURL:         strings.TrimRight(str("OPENAI_BASE_URL", "https://api.openai.com/v1"), "/"),
-		MaxOutputTokens: num("OPENAI_MAX_OUTPUT_TOKENS", 180),
-		Timeout:         dur("OPENAI_TIMEOUT", 20*time.Second),
-		Temperature:     temperature("OPENAI_TEMPERATURE", 0.7),
-		TranscribeModel: str("OPENAI_TRANSCRIBE_MODEL", "gpt-transcribe"),
+		APIKey:                  str("OPENAI_API_KEY", ""),
+		Model:                   str("OPENAI_MODEL", "gpt-4o-mini"),
+		BaseURL:                 strings.TrimRight(str("OPENAI_BASE_URL", "https://api.openai.com/v1"), "/"),
+		MaxOutputTokens:         num("OPENAI_MAX_OUTPUT_TOKENS", 180),
+		Timeout:                 dur("OPENAI_TIMEOUT", 20*time.Second),
+		Temperature:             temperature("OPENAI_TEMPERATURE", 0.7),
+		TranscribeModel:         str("OPENAI_TRANSCRIBE_MODEL", "gpt-transcribe"),
+		RealtimeTranscribeModel: str("OPENAI_REALTIME_TRANSCRIBE_MODEL", "gpt-live-transcribe"),
 	}
 }
 

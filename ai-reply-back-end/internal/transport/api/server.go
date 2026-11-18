@@ -240,6 +240,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /api/v1/ai/polish", s.requireUser(s.requireConsent(polishLimit(http.HandlerFunc(s.handlePolish)))))
 	// Пернетақтадағы дауыс → мәтін (multipart). Квотасыз; күндік шегі өзінікі; өшірулі болса 404.
 	mux.Handle("POST /api/v1/ai/transcribe", s.requireUser(s.requireConsent(transcribeLimit(http.HandlerFunc(s.handleTranscribe)))))
+	mux.Handle("GET /api/v1/ai/transcribe/realtime", s.requireUser(s.requireConsent(transcribeLimit(http.HandlerFunc(s.handleRealtimeTranscribe)))))
 	// AI жауабына шағым. Келісімсіз де қабылданады: шағым OpenAI-ға кетпейді.
 	mux.Handle("POST /api/v1/ai/reports", s.requireUser(reportsLimit(http.HandlerFunc(s.handleAIReport))))
 

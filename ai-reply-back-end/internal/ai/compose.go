@@ -97,7 +97,9 @@ type ComposeRequest struct {
 	OutputCharLimit int
 	TemplateID      string
 	Instruction     string
-	Language        string
+	// Voice — a dictated instruction (see Request.Voice).
+	Voice    bool
+	Language string
 	// InputLanguage — тексерілген пернетақта коды не бос.
 	InputLanguage string
 	// GrammaticalGender — сұраныстағы мән, әйтпесе сақталған профильдегі.
@@ -132,8 +134,9 @@ func (s *Service) Compose(ctx context.Context, req ComposeRequest) (Result, erro
 	}
 	// Rejected, not clamped: the instruction is the whole request here, and
 	// cutting it would write a message about something the user did not say.
-	if traits.RuneLen(instruction) > lim.InstructionChars {
-		return Result{InstructionLimit: lim.InstructionChars}, domain.ErrInstructionTooLong
+	// A dictated voice turn has the room of its 40 seconds of speech.
+	if limit := lim.InstructionLimit(req.Voice); traits.RuneLen(instruction) > limit {
+		return Result{InstructionLimit: limit}, domain.ErrInstructionTooLong
 	}
 
 	input := ComposeInput{

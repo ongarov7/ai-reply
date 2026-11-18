@@ -140,3 +140,22 @@ func TestOverriddenReportsWhereEachValueComesFrom(t *testing.T) {
 		t.Fatalf("overridden = %v", got)
 	}
 }
+
+func TestVoiceInstructionGetsTheRoomOfAFortySecondTurn(t *testing.T) {
+	typed := Limits{SourceChars: 400, InstructionChars: 400, MaxOutputTokens: 180}
+	if got := typed.InstructionLimit(false); got != 400 {
+		t.Fatalf("typed limit = %d, want 400", got)
+	}
+	if got := typed.InstructionLimit(true); got != VoiceInstructionChars {
+		t.Fatalf("voice limit = %d, want %d", got, VoiceInstructionChars)
+	}
+	// A typed limit raised in the admin panel above the voice floor applies to voice too.
+	wide := Limits{SourceChars: 400, InstructionChars: 1000, MaxOutputTokens: 180}
+	if got := wide.InstructionLimit(true); got != 1000 {
+		t.Fatalf("voice limit with wide typed limit = %d, want 1000", got)
+	}
+	// The floor stays inside what the admin panel itself may choose.
+	if VoiceInstructionChars > InstructionRange.Max || VoiceInstructionChars < InstructionRange.Min {
+		t.Fatalf("VoiceInstructionChars %d outside %v", VoiceInstructionChars, InstructionRange)
+	}
+}

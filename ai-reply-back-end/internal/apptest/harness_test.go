@@ -145,6 +145,10 @@ const speechTranscript = "Сәлем! Ертең кездесейік."
 func newFakeSpeech(t *testing.T) *fakeSpeech {
 	f := &fakeSpeech{}
 	f.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/realtime" {
+			serveFakeRealtime(t, w, r)
+			return
+		}
 		req := speechRequest{}
 		if r.URL.Path != "/audio/transcriptions" || r.Header.Get("Authorization") != "Bearer sk-test-key" {
 			t.Errorf("speech request: %s %q", r.URL.Path, r.Header.Get("Authorization"))
@@ -310,7 +314,7 @@ type harness struct {
 	provider      *fakeProvider
 	speech        *fakeSpeech // дауыс → мәтін провайдерінің жалған сервері
 	clock         *traits.FixedClock
-	logs          *bytes.Buffer
+	logs          *synchronizedLogBuffer
 	dbPath        string
 	admin         *admin.Service
 	limits        *limits.Service
@@ -454,7 +458,7 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 		t.Fatalf("pricing: %v", err)
 	}
 
-	logs := &bytes.Buffer{}
+	logs := &synchronizedLogBuffer{}
 	log := slog.New(slog.NewJSONHandler(io.MultiWriter(logs, io.Discard), &slog.HandlerOptions{Level: slog.LevelDebug}))
 	clock := &traits.FixedClock{T: time.Date(2026, 3, 10, 9, 0, 0, 0, time.UTC)}
 
