@@ -1,6 +1,180 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Preparing microphone…" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preparing microphone…"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Подготовка микрофона…"
+          }
+        },
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Микрофон дайындалуда…"
+          }
+        },
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mikrofon tayyorlanmoqda…"
+          }
+        }
+      }
+    },
+    "Finish" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finish"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Готово"
+          }
+        },
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Дайын"
+          }
+        },
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tayyor"
+          }
+        }
+      }
+    },
+    "Finish and generate response" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finish and generate response"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Завершить и создать ответ"
+          }
+        },
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Аяқтап, жауап жасау"
+          }
+        },
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tugatib, javob yaratish"
+          }
+        }
+      }
+    },
+    "Cancel voice session" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel voice session"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Отменить голосовой запрос"
+          }
+        },
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Дауыстық сұрауды болдырмау"
+          }
+        },
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ovozli so‘rovni bekor qilish"
+          }
+        }
+      }
+    },
+    "Response in keyboard" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Response in keyboard"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ответ в клавиатуре"
+          }
+        },
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Жауап пернетақтада"
+          }
+        },
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Javob klaviaturada"
+          }
+        }
+      }
+    },
+    "Next instruction" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next instruction"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Следующая инструкция"
+          }
+        },
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Келесі нұсқау"
+          }
+        },
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keyingi ko‘rsatma"
+          }
+        }
+      }
+    },
     "account.code.changeEmail" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9813,6 +9987,209 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "«Javob berish»ni bosganingizda nusxalangan yoki belgilangan xabar va koʻrsatmangiz (agar boʻlsa) AI Reply serveri orqali OpenAI’ga yuboriladi, «Yozish»ni bosganingizda esa faqat koʻrsatma. Aqlli tuzatish yoqilgan boʻlsa, AI Replyning oʻz maydonida yozayotgan koʻrsatmangiz tuzatish taklif qilish uchun tugmani bosishingizdan oldin ham yuborilishi mumkin. Bu matnlar ham, javoblar ham bazada saqlanmaydi va jurnallarga yozilmaydi; faqat shikoyat bilan birga yuborgan tayyor matningiz saqlanadi. Boshqa ilovalarda yozganlaringizni oʻzingiz belgilab, «Javob berish»ni bosmaguningizcha ular yuborilmaydi. Apple Watch’dan koʻrsatma yuborish «Javob berish»ni bosish bilan bir xil: shu paytda ochiq turgan AI Reply klaviaturasi nusxalangan xabarni oʻqiydi. Soatda personani ochish ham uni u yerda koʻrsatish uchun oʻqiydi; u serverimizga emas, iPhone va soat orasidagi shifrlangan aloqa orqali soatga uzatiladi. Apple Watch mikrofonidan foydalansangiz, soatda roziligingizdan keyin yozuv matnga aylantirish uchun iPhone va AI Reply serveri orqali OpenAI’ga yuboriladi; AI Reply uni saqlamaydi."
+          }
+        }
+      }
+    },
+    "settings.privacy.voice.body" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI Reply Voice on iPhone starts only after your permission. Microphone audio streams through AI Reply to OpenAI (USA) for transcription; the instruction, any message you explicitly paste, profile and selected template are used to generate the response. Recording can continue when you switch apps and can be stopped in AI Reply or Dynamic Island. AI Reply does not save audio. OpenAI may retain Realtime content for abuse monitoring under its API data policy. Private text is held briefly in protected shared storage for the keyboard and is never shown on the Lock Screen."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI Reply Voice на iPhone запускается только с вашего разрешения. Звук с микрофона передаётся через AI Reply в OpenAI (США) для распознавания; инструкция, явно вставленное вами сообщение, профиль и выбранный шаблон используются для создания ответа. Запись может продолжаться при переходе в другое приложение; остановить её можно в AI Reply или Dynamic Island. AI Reply не сохраняет аудио. OpenAI может временно хранить данные Realtime для выявления злоупотреблений по своим правилам API. Текст временно находится в защищённом общем хранилище для клавиатуры и не показывается на экране блокировки."
+          }
+        },
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone-дағы AI Reply Voice тек рұқсатыңыздан кейін іске қосылады. Микрофон дыбысы тану үшін AI Reply арқылы OpenAI-ға (АҚШ) жіберіледі; нұсқау, өзіңіз қойған хабарлама, профиль және таңдалған үлгі жауап жасауға қолданылады. Жазу басқа қолданбаға ауысқанда жалғасуы мүмкін; оны AI Reply не Dynamic Island арқылы тоқтатуға болады. AI Reply аудионы сақтамайды. OpenAI API ережелеріне сай теріс пайдалануды бақылау үшін Realtime деректерін уақытша сақтауы мүмкін. Мәтін пернетақта үшін қорғалған ортақ қоймада қысқа уақыт ұсталады және құлыптау экранында көрсетілмейді."
+          }
+        },
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone’dagi AI Reply Voice faqat ruxsatingizdan keyin boshlanadi. Mikrofon audiosi tanish uchun AI Reply orqali OpenAI’ga (AQSH) uzatiladi; ko‘rsatma, o‘zingiz qo‘ygan xabar, profil va tanlangan andoza javob yaratishda ishlatiladi. Boshqa ilovaga o‘tganda yozuv davom etishi mumkin; uni AI Reply yoki Dynamic Island orqali to‘xtatish mumkin. AI Reply audioni saqlamaydi. OpenAI API qoidalariga ko‘ra suiiste’molni nazorat qilish uchun Realtime ma’lumotlarini vaqtincha saqlashi mumkin. Matn klaviatura uchun himoyalangan umumiy xotirada qisqa vaqt turadi va qulflangan ekranda ko‘rsatilmaydi."
+          }
+        }
+      }
+    },
+    "settings.privacy.voice.withdraw" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Withdraw voice audio consent"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Отозвать согласие на обработку голоса"
+          }
+        },
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Дауысты өңдеуге келісімді кері қайтару"
+          }
+        },
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ovozni qayta ishlashga rozilikni qaytarib olish"
+          }
+        }
+      }
+    },
+    "Start AI Reply Voice" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start AI Reply Voice"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Запустить AI Reply Voice"
+          }
+        },
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI Reply Voice іске қосу"
+          }
+        },
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI Reply Voice’ni boshlash"
+          }
+        }
+      }
+    },
+    "Open AI Reply Voice" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open AI Reply Voice"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Открыть AI Reply Voice"
+          }
+        },
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI Reply Voice ашу"
+          }
+        },
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI Reply Voice’ni ochish"
+          }
+        }
+      }
+    },
+    "Start a voice instruction without opening AI Reply after first-time setup." : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start a voice instruction without opening AI Reply after first-time setup."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Начните голосовую инструкцию без открытия AI Reply после первой настройки."
+          }
+        },
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Бірінші баптаудан кейін AI Reply қолданбасын ашпай, дауыстық нұсқауды бастаңыз."
+          }
+        },
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Birinchi sozlashdan keyin AI Reply’ni ochmasdan ovozli ko‘rsatmani boshlang."
+          }
+        }
+      }
+    },
+    "Open AI Reply once to allow microphone access and voice processing." : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open AI Reply once to allow microphone access and voice processing."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Один раз откройте AI Reply, чтобы разрешить микрофон и обработку голоса."
+          }
+        },
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Микрофон мен дауысты өңдеуге рұқсат беру үшін AI Reply қолданбасын бір рет ашыңыз."
+          }
+        },
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mikrofon va ovozni qayta ishlashga ruxsat berish uchun AI Reply’ni bir marta oching."
+          }
+        }
+      }
+    },
+    "Set up AI Reply Voice" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set up AI Reply Voice"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Настроить AI Reply Voice"
+          }
+        },
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI Reply Voice баптау"
+          }
+        },
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI Reply Voice’ni sozlash"
           }
         }
       }

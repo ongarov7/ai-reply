@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="3300" height="2200" viewBox="0 0 3300 2200">
+  <g id="Notes">
+    <rect id="artboard" x="0" y="0" width="3300" height="2200" fill="white"/>
+    <text id="template-version" x="100" y="150" font-size="20">Template v.2.0</text>
+  </g>
+  <g id="Guides">
+    <line id="Baseline-S" x1="0" x2="3300" y1="696" y2="696"/>
+    <line id="Capline-S" x1="0" x2="3300" y1="641" y2="641"/>
+    <line id="Baseline-L" x1="0" x2="3300" y1="2000" y2="2000"/>
+    <line id="Capline-L" x1="0" x2="3300" y1="1910" y2="1910"/>
+    <line id="Baseline-M" x1="0" x2="3300" y1="1556" y2="1556"/>
+    <line id="Capline-M" x1="0" x2="3300" y1="1486" y2="1486"/>
+    <line id="left-margin-Regular-M" x1="1600" x2="1600" y1="1400" y2="1600"/>
+    <line id="right-margin-Regular-M" x1="1681" x2="1681" y1="1400" y2="1600"/>
+  </g>
+  <g id="Symbols">
+    <g id="Regular-M" transform="translate(1600 1475) scale(3)">
+      <!-- Monochrome reduction of AI Reply's overlapping conversation bubbles. -->
+      <path fill="black" d="M22.4 6.6C25.2 7.3 27 9.8 27 12.5V18.5C27 20.7 25.7 22.7 23.7 23.7V25.7C23.7 26.7 22.6 27.3 21.7 26.6L18.1 24H13C11 24 9.1 23.1 8 21.6L10.1 20.2C10.8 21.1 11.8 21.6 13 21.6H18.9L21.3 23.3V21.9L22.2 21.5C23.7 20.8 24.6 19.5 24.6 17.9V12.1C24.6 10.7 23.8 9.4 22.6 8.8Z"/>
+      <path fill="black" d="M6 2H16C19.3 2 22 4.7 22 8V13C22 16.3 19.3 19 16 19H10L5 22.4C4.2 23 3 22.5 3 21.5V18C1.2 16.9 0 15 0 13V8C0 4.7 2.7 2 6 2ZM6 4.4C4 4.4 2.4 6 2.4 8V13C2.4 14.5 3.3 15.8 4.6 16.4L5.4 16.7V19.1L9.2 16.6H16C18 16.6 19.6 15 19.6 13V8C19.6 6 18 4.4 16 4.4Z"/>
+      <path fill="black" d="M7.85 10.5A1.35 1.35 0 1 1 5.15 10.5A1.35 1.35 0 1 1 7.85 10.5ZM12.35 10.5A1.35 1.35 0 1 1 9.65 10.5A1.35 1.35 0 1 1 12.35 10.5ZM16.85 10.5A1.35 1.35 0 1 1 14.15 10.5A1.35 1.35 0 1 1 16.85 10.5Z"/>
+    </g>
+  </g>
+</svg>

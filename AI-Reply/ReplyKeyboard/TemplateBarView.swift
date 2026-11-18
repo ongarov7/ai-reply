@@ -6,6 +6,7 @@ protocol TemplateBarViewDelegate: AnyObject {
     func templateBarDidTapCreate(_ bar: TemplateBarView)
     /// The Apple Watch control at the trailing edge.
     func templateBarDidTapWatch(_ bar: TemplateBarView)
+    func templateBarDidTapVoiceAssistant(_ bar: TemplateBarView)
 }
 
 /// The only thing the row needs to draw one persona: an identifier to report
@@ -50,6 +51,9 @@ final class TemplateBarView: UIView {
 
     private let createButton = UIButton(type: .system)
     private let watchButton = UIButton(type: .system)
+    private let microphoneButton = UIButton(type: .system)
+    private var microphoneActive = false
+    private var microphoneVisible = false
     private var watchIndicator: WatchKeyboardIndicator = .hidden
     private let scrollView = UIScrollView()
     private let hintLabel = UILabel()
@@ -104,6 +108,7 @@ final class TemplateBarView: UIView {
         createButton.addTarget(self, action: #selector(createTapped), for: .touchUpInside)
         addSubview(createButton)
         buildWatchButton()
+        buildMicrophoneButton()
 
         scrollView.showsHorizontalScrollIndicator = false
         scrollView.alwaysBounceHorizontal = false
@@ -148,6 +153,42 @@ final class TemplateBarView: UIView {
         addSubview(watchButton)
     }
 
+    private func buildMicrophoneButton() {
+        var configuration = UIButton.Configuration.plain()
+        configuration.contentInsets = .zero
+        configuration.background.cornerRadius = 16
+        configuration.image = UIImage(systemName: "mic.fill",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 17, weight: .semibold))
+        microphoneButton.configuration = configuration
+        microphoneButton.configurationUpdateHandler = { [weak self] button in
+            guard let self else { return }
+            let color = self.microphoneActive ? self.theme.accent.withAlphaComponent(0.14) : self.theme.letterKey
+            button.configuration?.background.backgroundColor = button.isHighlighted ? color.withAlphaComponent(0.6) : color
+            button.configuration?.baseForegroundColor = self.theme.accent
+        }
+        microphoneButton.addTarget(self, action: #selector(microphoneTapped), for: .touchUpInside)
+        microphoneButton.accessibilityLabel = "AI Reply Voice"
+        microphoneButton.isHidden = true
+        addSubview(microphoneButton)
+    }
+
+    @discardableResult
+    func setMicrophone(visible: Bool, active: Bool, status: String?) -> Bool {
+        let visibilityChanged = microphoneVisible != visible
+        microphoneVisible = visible
+        microphoneActive = active
+        microphoneButton.isHidden = !visible
+        microphoneButton.configuration?.image = UIImage(systemName: active ? "waveform" : "mic.fill",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 17, weight: .semibold))
+        microphoneButton.accessibilityValue = status
+        microphoneButton.setNeedsUpdateConfiguration()
+        if visibilityChanged {
+            updateAccessibilityOrder()
+            setNeedsLayout()
+        }
+        return visibilityChanged
+    }
+
     /// `.hidden` takes the control away and gives its width back to the
     /// personas. Applied only on a change: this is not a typing path, but
     /// it is no reason to lay the row out for nothing.
@@ -183,8 +224,16 @@ final class TemplateBarView: UIView {
             return ceil(image.size.width) + iconPadding
         }
         let layout = PersonaRowLayout(width: bounds.width, height: bounds.height, textWidths: texts, iconWidths: icons,
-                                      trailingActionWidth: watchIndicator == .hidden ? 0 : PersonaRowLayout.watchActionWidth)
-        if let trailingFrame = layout.trailingFrame { watchButton.frame = trailingFrame }
+                                      trailingActionWidth: PersonaRowLayout.watchActionWidth *
+                                        ((watchIndicator == .hidden ? 0 : 1) + (microphoneVisible ? 1 : 0)))
+        if let trailingFrame = layout.trailingFrame {
+            if microphoneVisible {
+                microphoneButton.frame = CGRect(x: trailingFrame.maxX - PersonaRowLayout.watchActionWidth,
+                    y: trailingFrame.minY, width: PersonaRowLayout.watchActionWidth, height: trailingFrame.height)
+            }
+            watchButton.frame = CGRect(x: trailingFrame.minX, y: trailingFrame.minY,
+                width: PersonaRowLayout.watchActionWidth, height: trailingFrame.height)
+        }
         if layout.showsIcons != showsIcons {
             showsIcons = layout.showsIcons
             for (index, pill) in pills.enumerated() where chips.indices.contains(index) {
@@ -245,6 +294,7 @@ final class TemplateBarView: UIView {
         if !scrollView.accessibilityElementsHidden { elements.append(scrollView) }
         if !hintLabel.isHidden, !hintLabel.accessibilityElementsHidden { elements.append(hintLabel) }
         if !watchButton.isHidden { elements.append(watchButton) }
+        if !microphoneButton.isHidden { elements.append(microphoneButton) }
         accessibilityElements = elements
     }
 
@@ -354,6 +404,7 @@ final class TemplateBarView: UIView {
         }
         createButton.setNeedsUpdateConfiguration()
         watchButton.setNeedsUpdateConfiguration()
+        microphoneButton.setNeedsUpdateConfiguration()
     }
 
     // MARK: Actions
@@ -364,6 +415,10 @@ final class TemplateBarView: UIView {
 
     @objc private func watchTapped() {
         delegate?.templateBarDidTapWatch(self)
+    }
+
+    @objc private func microphoneTapped() {
+        delegate?.templateBarDidTapVoiceAssistant(self)
     }
 
     @objc private func templateTapped(_ sender: UIButton) {

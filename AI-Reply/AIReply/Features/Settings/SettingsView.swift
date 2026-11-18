@@ -22,6 +22,7 @@ struct SettingsView: View {
     @State private var isShowingPasteHelp = false
     @State private var isShowingCheck = false
     @State private var isConfirmingWithdrawal = false
+    @AppStorage("voiceAssistant.audioConsent.v1") private var hasVoiceConsent = false
     /// Why the withdrawal did not reach the server, shown in an alert.
     @State private var withdrawalFailureKey: String?
 
@@ -136,6 +137,16 @@ struct SettingsView: View {
                 Text("settings.privacy.body")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+                Text("settings.privacy.voice.body")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                if hasVoiceConsent {
+                    Button("settings.privacy.voice.withdraw", role: .destructive) {
+                        hasVoiceConsent = false
+                        NotificationCenter.default.post(name: .voiceAssistantConsentWithdrawn, object: nil)
+                    }
+                    .accessibilityIdentifier("settings.privacy.withdrawVoice")
+                }
                 Button("legal.terms") { openLegal(account.legalConfig.termsURL) }
                 Button("legal.privacy") { openLegal(account.legalConfig.privacyURL) }
                 // The AI consent can be taken back as easily as it was given;

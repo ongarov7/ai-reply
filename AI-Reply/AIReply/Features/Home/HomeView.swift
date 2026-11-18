@@ -9,6 +9,7 @@ struct HomeView: View {
     @Environment(SupportInbox.self) private var support
     @Environment(AppUpdateModel.self) private var updates
     @Environment(AppRouter.self) private var router
+    @Environment(VoiceAssistantController.self) private var voice
 
     /// Re-read on appearance and on every return to the foreground -
     /// typically from iOS Settings, or from another app where the keyboard
@@ -50,6 +51,13 @@ struct HomeView: View {
         // same screens the same way (see AppRouter).
         .navigationDestination(for: AppRoute.self) { route in route.destination }
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { voice.open() } label: {
+                    Image(systemName: voice.isCapturing ? "waveform" : "mic.fill")
+                }
+                .accessibilityLabel("AI Reply Voice")
+                .accessibilityIdentifier("home.voice")
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 NavigationLink(value: AppRoute.settings) {
                     Image(systemName: "gearshape")

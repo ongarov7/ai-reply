@@ -48,6 +48,11 @@ protocol KeyboardActionBarDelegate: AnyObject {
     func actionBarDidDismissWatchStrip(_ bar: KeyboardActionBar)
     /// The text on the strip: review a saved reply before inserting it.
     func actionBarDidTapWatchPreview(_ bar: KeyboardActionBar)
+    func actionBarDidTapVoiceAssistant(_ bar: KeyboardActionBar)
+    func actionBarDidReviewVoiceAssistant(_ bar: KeyboardActionBar)
+    func actionBarDidInsertVoiceAssistant(_ bar: KeyboardActionBar)
+    func actionBarDidDismissVoiceAssistant(_ bar: KeyboardActionBar)
+    func actionBar(_ bar: KeyboardActionBar, didChooseVoiceAction action: KeyboardVoiceAssistantAction)
 }
 
 /// The area above the keys. Two shapes:
@@ -68,6 +73,13 @@ final class KeyboardActionBar: UIView {
     private let templateBar = TemplateBarView()
     private let suggestionStrip = SuggestionStripView()
     private let watchStrip = WatchVoiceStripView()
+    private let voiceStrip = VoiceAssistantStripView()
+    private var voiceSnapshot: VoiceAssistantSnapshot?
+    private var voiceTheme = KeyboardTheme(isDark: true)
+    private var voiceLanguage = AppLanguage.english
+    private var voiceControlsVisible = false
+    private var voiceNotice: String?
+    private var voiceNoticeReset: DispatchWorkItem?
     private let composer = ReplyComposerView()
     private var watchUI = WatchVoiceUI()
     private var watchStrings = WatchVoiceStrings.forLanguage(.english)
@@ -118,6 +130,26 @@ final class KeyboardActionBar: UIView {
             self.delegate?.actionBarDidTapWatchPreview(self)
         }
         addSubview(watchStrip)
+        voiceStrip.isHidden = true
+        voiceStrip.onReview = { [weak self] in
+            guard let self else { return }
+            self.delegate?.actionBarDidReviewVoiceAssistant(self)
+        }
+        voiceStrip.onInsert = { [weak self] in
+            guard let self else { return }
+            self.delegate?.actionBarDidInsertVoiceAssistant(self)
+        }
+        voiceStrip.onDismiss = { [weak self] in
+            guard let self else { return }
+            if self.dismissVoiceControls() { return }
+            self.delegate?.actionBarDidDismissVoiceAssistant(self)
+        }
+        voiceStrip.onAction = { [weak self] action in
+            guard let self else { return }
+            _ = self.dismissVoiceControls()
+            self.delegate?.actionBar(self, didChooseVoiceAction: action)
+        }
+        addSubview(voiceStrip)
         composer.isHidden = true
         addSubview(composer)
     }
@@ -134,6 +166,7 @@ final class KeyboardActionBar: UIView {
         // Exactly the pills' viewport, right of ✨: the strip never covers it.
         suggestionStrip.frame = templateBar.personasFrame.offsetBy(dx: templateBar.frame.minX, dy: templateBar.frame.minY)
         watchStrip.frame = suggestionStrip.frame.insetBy(dx: 3, dy: 4)
+        voiceStrip.frame = watchStrip.frame
         composer.frame = bounds
     }
 
@@ -145,7 +178,10 @@ final class KeyboardActionBar: UIView {
         suggestionStrip.configure(theme: theme, uiLanguage: uiLanguage)
         watchStrip.configure(theme: theme, uiLanguage: uiLanguage)
         watchStrings = WatchVoiceStrings.forLanguage(uiLanguage)
+        voiceTheme = theme
+        voiceLanguage = uiLanguage
         setWatchVoice(watchUI)
+        setVoiceAssistant(voiceSnapshot)
         composer.configure(theme: theme, uiLanguage: uiLanguage)
     }
 
@@ -218,9 +254,79 @@ final class KeyboardActionBar: UIView {
     }
 
     private func refreshWatchStrip() {
-        let visible = showsWatchStrip
+        let showsVoice = (voiceSnapshot != nil || voiceNotice != nil || voiceControlsVisible) && !isComposing && !showsSuggestions
+        let visible = showsWatchStrip && !showsVoice
         watchStrip.isHidden = !visible
-        templateBar.setPersonasHidden(visible || showsSuggestions)
+        voiceStrip.isHidden = !showsVoice
+        templateBar.setPersonasHidden(visible || showsVoice || showsSuggestions)
+    }
+
+    func setVoiceAssistant(_ snapshot: VoiceAssistantSnapshot?) {
+        // Defensive gating also covers a snapshot delivered just as it
+        // expires. A meaningful failure notice lasts at most ten seconds;
+        // inactive sessions never replace persona controls.
+        let snapshot = snapshot?.isVisibleInKeyboard() == true ? snapshot : nil
+        if snapshot?.sessionID != voiceSnapshot?.sessionID || snapshot?.phase != voiceSnapshot?.phase {
+            voiceControlsVisible = false
+        }
+        voiceSnapshot = snapshot
+        let strings = KeyboardVoiceStrings(voiceLanguage)
+        if templateBar.setMicrophone(visible: snapshot?.showsMicrophoneInKeyboard() == true,
+                                    active: snapshot?.phase.isRecording == true,
+                                    status: snapshot.map { strings.status($0.phase) }) {
+            setNeedsLayout()
+            layoutIfNeeded()
+        }
+        renderVoiceStrip()
+        refreshWatchStrip()
+    }
+
+    func showVoiceControls(_ snapshot: VoiceAssistantSnapshot) {
+        guard snapshot.showsMicrophoneInKeyboard(), !isComposing else { return }
+        voiceNoticeReset?.cancel()
+        voiceNotice = nil
+        voiceControlsVisible = true
+        renderVoiceStrip()
+        refreshWatchStrip()
+    }
+
+    func showVoiceNotice(_ message: String) {
+        voiceNoticeReset?.cancel()
+        voiceControlsVisible = false
+        voiceNotice = message
+        renderVoiceStrip()
+        refreshWatchStrip()
+        let reset = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.voiceNotice = nil
+            self.renderVoiceStrip()
+            self.refreshWatchStrip()
+        }
+        voiceNoticeReset = reset
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10, execute: reset)
+    }
+
+    @discardableResult
+    func dismissVoiceControls() -> Bool {
+        guard voiceControlsVisible || voiceNotice != nil else { return false }
+        voiceNoticeReset?.cancel()
+        voiceControlsVisible = false
+        voiceNotice = nil
+        renderVoiceStrip()
+        refreshWatchStrip()
+        return true
+    }
+
+    private func renderVoiceStrip() {
+        if let voiceNotice {
+            voiceStrip.showNotice(voiceNotice, theme: voiceTheme, language: voiceLanguage)
+        } else if let voiceSnapshot {
+            if voiceControlsVisible {
+                voiceStrip.showControls(snapshot: voiceSnapshot, theme: voiceTheme, language: voiceLanguage)
+            } else {
+                voiceStrip.configure(snapshot: voiceSnapshot, theme: voiceTheme, language: voiceLanguage)
+            }
+        }
     }
 
     // MARK: Text target passthrough
@@ -300,6 +406,10 @@ extension KeyboardActionBar: TemplateBarViewDelegate {
 
     func templateBarDidTapWatch(_ bar: TemplateBarView) {
         delegate?.actionBarDidTapWatch(self)
+    }
+
+    func templateBarDidTapVoiceAssistant(_ bar: TemplateBarView) {
+        delegate?.actionBarDidTapVoiceAssistant(self)
     }
 }
 

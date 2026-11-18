@@ -10,17 +10,24 @@ import UIKit
 struct RootNavigationView: View {
 
     @Environment(AppRouter.self) private var router
+    @Environment(VoiceAssistantController.self) private var voice
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         @Bindable var router = router
+        @Bindable var voice = voice
         NavigationStack(path: $router.path) {
             HomeView()
         }
         .onAppear {
             router.scenePhaseDidChange(UIApplication.shared.applicationState == .active ? .active : .inactive)
             router.mainInterfaceDidAppear()
+            consumeVoiceLaunch()
         }
         .onDisappear { router.mainInterfaceDidDisappear() }
+        .onReceive(NotificationCenter.default.publisher(for: .voiceAssistantOpenRequested)) { _ in consumeVoiceLaunch() }
+        .onChange(of: scenePhase) { _, phase in if phase == .active { consumeVoiceLaunch() } }
+        .sheet(isPresented: $voice.isPresented) { VoiceAssistantView() }
         .sheet(item: $router.webPage) { page in
             SafariView(url: page.url).ignoresSafeArea()
         }
@@ -29,6 +36,11 @@ struct RootNavigationView: View {
         .fullScreenCover(isPresented: $router.isShowingTutorial) {
             OnboardingView(flow: OnboardingFlow(mode: .tutorial, asksGender: false))
         }
+    }
+
+    private func consumeVoiceLaunch() {
+        guard UIApplication.shared.applicationState == .active, VoiceAssistantLaunchRequest.consume() else { return }
+        voice.open(startWhenPossible: true)
     }
 }
 

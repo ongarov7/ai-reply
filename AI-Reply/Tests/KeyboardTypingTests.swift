@@ -167,12 +167,12 @@ final class KeyboardTypingTests: XCTestCase {
         tracker.reset(to: message)
 
         XCTAssertFalse(tracker.update(message), "the same field")
-        XCTAssertTrue(HostFieldTracker.trustsMirror(sinceOwnMutation: 0.1, fieldChanged: false))
-        XCTAssertFalse(HostFieldTracker.trustsMirror(sinceOwnMutation: 0.5, fieldChanged: false))
+        XCTAssertTrue(HostFieldTracker.trustsMirror(sinceOwnMutation: 0.1, fieldChanged: false, documentKnown: true))
+        XCTAssertFalse(HostFieldTracker.trustsMirror(sinceOwnMutation: 0.5, fieldChanged: false, documentKnown: true))
 
         let email = HostFieldIdentity(documentIdentifier: UUID(), keyboardType: .emailAddress)
         XCTAssertTrue(tracker.update(email), "Next moved to the e-mail field")
-        XCTAssertFalse(HostFieldTracker.trustsMirror(sinceOwnMutation: 0.1, fieldChanged: true))
+        XCTAssertFalse(HostFieldTracker.trustsMirror(sinceOwnMutation: 0.1, fieldChanged: true, documentKnown: true))
         XCTAssertFalse(tracker.update(email), "and stays there")
     }
 
@@ -190,5 +190,26 @@ final class KeyboardTypingTests: XCTestCase {
         var tracker = HostFieldTracker()
         XCTAssertFalse(tracker.update(HostFieldIdentity(documentIdentifier: UUID(), keyboardType: nil)))
         XCTAssertNotNil(tracker.current)
+    }
+
+    func testUnknownDocumentRefreshesContextWithoutRepeatedFieldResets() {
+        let unknown = HostFieldIdentity(documentIdentifier: nil, keyboardType: .default)
+        var tracker = HostFieldTracker()
+        tracker.reset(to: unknown)
+
+        XCTAssertFalse(tracker.update(unknown), "unknown identity alone does not reset typing on every keystroke")
+        XCTAssertFalse(HostFieldTracker.trustsMirror(sinceOwnMutation: 0.1, fieldChanged: false, documentKnown: false),
+                       "two unknown identifiers do not prove field continuity")
+    }
+
+    func testLosingAndRecoveringDocumentIdentityResetsTheField() {
+        let known = HostFieldIdentity(documentIdentifier: UUID(), keyboardType: .default)
+        let unknown = HostFieldIdentity(documentIdentifier: nil, keyboardType: .default)
+        var tracker = HostFieldTracker()
+        tracker.reset(to: known)
+
+        XCTAssertTrue(tracker.update(unknown))
+        XCTAssertTrue(tracker.update(known))
+        XCTAssertFalse(tracker.update(known))
     }
 }

@@ -71,6 +71,34 @@ final class KeyboardViewController: UIInputViewController {
         return coordinator
     }()
 
+    /// iPhone voice session; microphone access belongs to the containing app.
+    private lazy var voiceAssistant: KeyboardVoiceAssistant = {
+        let coordinator = KeyboardVoiceAssistant()
+        coordinator.onChange = { [weak self] in self?.actionBar.setVoiceAssistant($0) }
+        coordinator.onControls = { [weak self] in self?.actionBar.showVoiceControls($0) }
+        coordinator.onNotice = { [weak self] in self?.actionBar.showVoiceNotice($0) }
+        coordinator.language = { [weak self] in self?.uiLanguage ?? .english }
+        coordinator.hasFullAccess = { [weak self] in self?.hasFullAccess ?? false }
+        coordinator.selectedTemplateID = { [weak self] in
+            self?.replyCoordinator.session?.template.id ?? SharedSettings.shared.lastTemplateID
+        }
+        coordinator.readSource = { [weak self] in
+            guard let self else { return .failure(.noSourceMessage) }
+            return self.replyCoordinator.readCopiedMessage(proxy: self.textDocumentProxy, hasFullAccess: self.hasFullAccess)
+        }
+        coordinator.onReview = { [weak self] in self?.reviewVoiceAssistantResponse($0) }
+        coordinator.onRegenerate = { [weak self] in self?.reviewVoiceAssistantResponse($0, regenerate: true) }
+        coordinator.onInsert = { [weak self] snapshot in
+            guard let self else { return }
+            self.textDocumentProxy.insertText(snapshot.response)
+            self.lastHostMutation = Date.timeIntervalSinceReferenceDate
+            self.refreshHostContext()
+            self.refreshAutoShift()
+        }
+        return coordinator
+    }()
+    private var reviewedVoiceRequestID: String?
+
     /// The cleaner version of the instruction, offered after a pause.
     private lazy var polisher: InstructionPolisher = {
         let polisher = InstructionPolisher(service: Self.makePolishService())
@@ -221,6 +249,7 @@ final class KeyboardViewController: UIInputViewController {
         polisher.isEnabled = smartCorrectionEnabled && serverOffersPolish && canReachNetwork
         refreshSuggestions()
         Task { await watchVoice.keyboardDidAppear() }
+        voiceAssistant.appear()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -248,6 +277,7 @@ final class KeyboardViewController: UIInputViewController {
             updateGeometry(animated: false)
         }
         watchVoice.keyboardWillDisappear()
+        voiceAssistant.disappear()
     }
 
     override func viewWillLayoutSubviews() {
@@ -271,9 +301,11 @@ final class KeyboardViewController: UIInputViewController {
         // the user moved the caret, the host cleared the field after sending
         // - is re-read once. So is another field: Return or Next moves the
         // caret there right after the keyboard's own keystroke.
-        let fieldChanged = hostField.update(currentHostField)
+        let field = currentHostField
+        let fieldChanged = hostField.update(field)
         let ownMutation = HostFieldTracker.trustsMirror(sinceOwnMutation: now - lastHostMutation,
-                                                        fieldChanged: fieldChanged)
+                                                        fieldChanged: fieldChanged,
+                                                        documentKnown: field.documentIdentifier != nil)
         if fieldChanged { hostFieldDidChange() }
         if !ownMutation {
             punctuationReturn.reset()
@@ -703,7 +735,7 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private var currentHostField: HostFieldIdentity {
-        HostFieldIdentity(documentIdentifier: textDocumentProxy.documentIdentifier,
+        HostFieldIdentity(documentIdentifier: HostDocumentIdentity.identifier(for: textDocumentProxy),
                           keyboardType: textDocumentProxy.keyboardType)
     }
 
@@ -715,6 +747,7 @@ final class KeyboardViewController: UIInputViewController {
     /// really changed.
     private func hostFieldDidChange() {
         watchVoice.hostFieldDidChange()
+        voiceAssistant.fieldChanged()
         autocorrect.restart()
         lastSpaceTap = 0
         punctuationReturn.reset()
@@ -967,6 +1000,7 @@ final class KeyboardViewController: UIInputViewController {
         refreshAutoShift()
         restartSuggestions()
         watchVoice.composerDidClose()
+        reviewedVoiceRequestID = nil
     }
 
     private func insertReply() {
@@ -1003,6 +1037,7 @@ final class KeyboardViewController: UIInputViewController {
         textDocumentProxy.insertText(text)
         lastHostMutation = Date.timeIntervalSinceReferenceDate
         watchVoice.composerDidInsert()
+        voiceAssistant.didInsert(requestID: reviewedVoiceRequestID)
         closeComposer()
     }
 
@@ -1318,6 +1353,67 @@ extension KeyboardViewController: KeyboardActionBarDelegate {
         watchVoice.stripPreviewTapped()
     }
 
+    func actionBarDidTapVoiceAssistant(_ bar: KeyboardActionBar) {
+        voiceAssistant.menu()
+    }
+
+    func actionBarDidReviewVoiceAssistant(_ bar: KeyboardActionBar) {
+        voiceAssistant.review()
+    }
+
+    func actionBarDidInsertVoiceAssistant(_ bar: KeyboardActionBar) {
+        voiceAssistant.insert()
+    }
+
+    func actionBarDidDismissVoiceAssistant(_ bar: KeyboardActionBar) {
+        voiceAssistant.dismiss()
+    }
+
+    func actionBar(_ bar: KeyboardActionBar, didChooseVoiceAction action: KeyboardVoiceAssistantAction) {
+        voiceAssistant.perform(action)
+    }
+
+    private func reviewVoiceAssistantResponse(_ snapshot: VoiceAssistantSnapshot, regenerate: Bool = false) {
+        guard snapshot.readyResponse() != nil else { return }
+        let open = { [weak self] in
+            guard let self else { return }
+            self.watchVoice.composerReplaced()
+            self.polisher.stop()
+            self.reviewedVoiceRequestID = snapshot.requestID
+            if snapshot.sourceMessage.isEmpty {
+                self.replyCoordinator.clear()
+                self.composeCoordinator.showSaved(instruction: snapshot.transcript, text: snapshot.response)
+                self.showComposePanel()
+            } else {
+                self.composeCoordinator.clear()
+                let template = snapshot.templateID.flatMap { self.resolveTemplate(id: $0) } ?? self.watchFallbackTemplate
+                var session = ReplySession(sourceMessage: snapshot.sourceMessage, source: .clipboard, template: template)
+                session.instruction = snapshot.transcript
+                session.flow.startGeneration()
+                session.flow.receive(reply: snapshot.response)
+                self.replyCoordinator.open(handedOff: session)
+            }
+            if regenerate {
+                // Each normal composer generation gets a fresh idempotency
+                // key. It works while the containing app is suspended.
+                self.voiceAssistant.discardOriginalResult(requestID: snapshot.requestID)
+                if self.activeFlow == .compose {
+                    self.composeCoordinator.inputLanguage = self.language
+                    self.composeCoordinator.generate()
+                } else {
+                    self.replyCoordinator.inputLanguage = self.language
+                    self.replyCoordinator.generate()
+                }
+            }
+        }
+        guard activeFlow == .none else {
+            // An arriving response never takes away an unfinished draft.
+            actionBar.showVoiceNotice(KeyboardVoiceStrings(uiLanguage).finishDraftFirst)
+            return
+        }
+        open()
+    }
+
     /// A word of the strip: it replaces the word being typed, then a space.
     /// The quoted word keeps what was typed and teaches it to the keyboard.
     ///
@@ -1592,7 +1688,7 @@ extension KeyboardViewController: WatchVoiceHost {
     func watchInsertContext(sessionID: String) -> WatchInsertContext {
         WatchInsertContext(
             sessionID: sessionID,
-            documentID: WatchInsertContext.validDocumentID(textDocumentProxy.documentIdentifier),
+            documentID: WatchInsertContext.validDocumentID(HostDocumentIdentity.identifier(for: textDocumentProxy)),
             textBeforeCaret: textDocumentProxy.documentContextBeforeInput ?? "",
             textAfterCaret: textDocumentProxy.documentContextAfterInput ?? "",
             selectedText: textDocumentProxy.selectedText ?? ""

@@ -55,6 +55,7 @@ extension AILimits {
         static let aiReports = "ai.features.aiReports"
         static let idempotentGeneration = "ai.features.idempotentGeneration"
         static let voiceTranscription = "ai.features.voiceTranscription"
+        static let voiceRealtimeTranscription = "ai.features.voiceRealtimeTranscription"
     }
 
     private static let lock = NSLock()
@@ -156,6 +157,10 @@ extension AILimits {
         AppGroup.defaults.bool(forKey: Key.voiceTranscription)
     }
 
+    static var serverSupportsVoiceRealtimeTranscription: Bool {
+        AppGroup.defaults.bool(forKey: Key.voiceRealtimeTranscription)
+    }
+
     /// Stores the request-shaping flags. Anything the server did not publish
     /// is false: a field is only ever sent to a server that asked for it.
     static func storeFeatures(_ features: AccountAPI.Features?, defaults: UserDefaults = AppGroup.defaults) {
@@ -165,6 +170,7 @@ extension AILimits {
         defaults.set(features?.aiReports ?? false, forKey: Key.aiReports)
         defaults.set(features?.idempotentGeneration ?? false, forKey: Key.idempotentGeneration)
         defaults.set(features?.voiceTranscription ?? false, forKey: Key.voiceTranscription)
+        defaults.set(features?.voiceRealtimeTranscription ?? false, forKey: Key.voiceRealtimeTranscription)
     }
 
     /// Everything `/api/v1/config` publishes that the reply flow uses,

@@ -250,7 +250,9 @@ struct HostFieldTracker {
 
     /// Whether a text change is the keyboard's own keystroke echoing back,
     /// so the host need not be re-read. Never for another field.
-    static func trustsMirror(sinceOwnMutation elapsed: TimeInterval, fieldChanged: Bool) -> Bool {
-        !fieldChanged && elapsed < ownMutationWindow
+    static func trustsMirror(sinceOwnMutation elapsed: TimeInterval, fieldChanged: Bool, documentKnown: Bool) -> Bool {
+        // An absent identifier cannot prove that an echo still belongs to
+        // the same host field. Read its live context instead of cached text.
+        documentKnown && !fieldChanged && elapsed < ownMutationWindow
     }
 }

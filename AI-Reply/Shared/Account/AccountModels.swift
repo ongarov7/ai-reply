@@ -423,6 +423,7 @@ extension AccountAPI {
         /// `POST /api/v1/ai/transcribe` exists: the server turns a recording
         /// into text.
         var voiceTranscription: Bool? = nil
+        var voiceRealtimeTranscription: Bool? = nil
 
         enum CodingKeys: String, CodingKey {
             case replyPreferences = "reply_preferences"
@@ -447,6 +448,7 @@ extension AccountAPI {
             case supportChat = "support_chat"
             case iapIOS = "iap_ios"
             case voiceTranscription = "voice_transcription"
+            case voiceRealtimeTranscription = "voice_realtime_transcription"
         }
     }
 

@@ -47,8 +47,8 @@ targets:
       path: AIReply/Info.plist
       properties:
         CFBundleDisplayName: AI Reply
-        CFBundleShortVersionString: "1.2.1"
-        CFBundleVersion: "27"
+        CFBundleShortVersionString: "1.3.0"
+        CFBundleVersion: "32"
         AIReplySignInWithApple: $(AIREPLY_SIGN_IN_WITH_APPLE)
         AIReplyBackendBaseURL: $(AIREPLY_BACKEND_BASE_URL)
         AIReplyPushNotifications: $(AIREPLY_PUSH_NOTIFICATIONS)
@@ -72,8 +72,15 @@ targets:
             CFBundleURLName: google-sign-in
             CFBundleURLSchemes:
               - $(GOOGLE_IOS_REVERSED_CLIENT_ID)
-        NSMicrophoneUsageDescription: "AI Reply uses the microphone only while you dictate in the app: a message to reply to, your profile or a template. Recording starts when you tap the microphone button."
+          - CFBundleTypeRole: Editor
+            CFBundleURLName: ai-reply
+            CFBundleURLSchemes:
+              - aireply
+        NSMicrophoneUsageDescription: "AI Reply records only after you start dictation. An active voice session can continue while you use another app. Voice instructions are sent through AI Reply to OpenAI for transcription. You can stop recording in the app or Dynamic Island."
         NSSpeechRecognitionUsageDescription: "AI Reply turns your dictation into text with Apple speech recognition. When on-device recognition is unavailable for your language, Apple's speech service processes the audio, and AI Reply receives only the text."
+        NSSupportsLiveActivities: true
+        UIBackgroundModes:
+          - audio
         UILaunchScreen: {}
         UIRequiresFullScreen: true
         UISupportedInterfaceOrientations:
@@ -94,6 +101,8 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: kz.ai-reply.reply.keyboard.keyboard
         PRODUCT_NAME: AIReply
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) AIREPLY_MAIN_APP"
+        SWIFT_OBJC_BRIDGING_HEADER: Config/AIReply-Bridging-Header.h
         ENABLE_USER_SCRIPT_SANDBOXING: "NO"
         DEVELOPMENT_TEAM: 2PK6339Q47
         CODE_SIGN_STYLE: Automatic
@@ -151,6 +160,8 @@ targets:
     dependencies:
       - target: ReplyKeyboard
         embed: true
+      - target: AIReplyVoiceWidgets
+        embed: true
       # The Apple Watch companion, where iOS looks for one.
       - target: AIReplyWatchApp
         embed: true
@@ -177,20 +188,23 @@ targets:
       GENERATE_INFOPLIST_FILE: true
       TEST_HOST: "$(BUILT_PRODUCTS_DIR)/AIReply.app/AIReply"
       BUNDLE_LOADER: "$(TEST_HOST)"
+      SWIFT_OBJC_BRIDGING_HEADER: Config/AIReplyTests-Bridging-Header.h
 
   ReplyKeyboard:
     type: app-extension
     platform: iOS
     sources:
       - ReplyKeyboard
-      - Shared
+      - path: Shared
+        excludes:
+          - VoiceAssistantSystem
     info:
       path: ReplyKeyboard/Info.plist
       properties:
         AIReplyBackendBaseURL: $(AIREPLY_BACKEND_BASE_URL)
         CFBundleDisplayName: AI Reply
-        CFBundleShortVersionString: "1.2.1"
-        CFBundleVersion: "27"
+        CFBundleShortVersionString: "1.3.0"
+        CFBundleVersion: "32"
         NSExtension:
           NSExtensionAttributes:
             IsASCIICapable: true
@@ -209,6 +223,38 @@ targets:
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: kz.ai-reply.reply.keyboard.keyboard.extension
       PRODUCT_NAME: ReplyKeyboardExtension
+      SWIFT_OBJC_BRIDGING_HEADER: Config/AIReply-Bridging-Header.h
+      DEVELOPMENT_TEAM: 2PK6339Q47
+      CODE_SIGN_STYLE: Automatic
+      TARGETED_DEVICE_FAMILY: "1"
+      APPLICATION_EXTENSION_API_ONLY: true
+      SKIP_INSTALL: true
+
+  AIReplyVoiceWidgets:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - VoiceWidgets
+      - Shared/AppGroup.swift
+      - Shared/VoiceAssistant
+      - Shared/VoiceAssistantSystem
+    info:
+      path: VoiceWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: AI Reply Voice
+        CFBundleShortVersionString: "1.3.0"
+        CFBundleVersion: "32"
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: Config/VoiceWidgets.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.kz.ai-reply.shared
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: kz.ai-reply.reply.keyboard.keyboard.voicewidgets
+      PRODUCT_NAME: AIReplyVoiceWidgets
       DEVELOPMENT_TEAM: 2PK6339Q47
       CODE_SIGN_STYLE: Automatic
       TARGETED_DEVICE_FAMILY: "1"
@@ -228,8 +274,8 @@ targets:
       path: AIReplyWatch/Info.plist
       properties:
         CFBundleDisplayName: AI Reply
-        CFBundleShortVersionString: "1.2.1"
-        CFBundleVersion: "27"
+        CFBundleShortVersionString: "1.3.0"
+        CFBundleVersion: "32"
         ITSAppUsesNonExemptEncryption: false
         NSMicrophoneUsageDescription: "AI Reply records your voice only while you speak an instruction, after you tap the microphone. Through your iPhone the recording goes to the AI Reply server and OpenAI to be turned into text. AI Reply does not store it."
         UISupportedInterfaceOrientations:

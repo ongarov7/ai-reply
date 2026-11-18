@@ -12,6 +12,7 @@ struct AIReplyApp: App {
     @State private var account: AccountModel
     @State private var keyboardStatus: KeyboardStatusMonitor
     @State private var updates: AppUpdateModel
+    @State private var voice: VoiceAssistantController
     @Environment(\.scenePhase) private var scenePhase
 
     private let services = AppServices.shared
@@ -31,6 +32,7 @@ struct AIReplyApp: App {
 
         let settings = AppSettings()
         let configuration = ReplyConfigurationModel()
+        let voice = VoiceAssistantController.shared
         // The keyboard draws its first frame from a summary with the names
         // resolved; one written before the built-ins were renamed is
         // rewritten once, so the row does not show the old names.
@@ -44,7 +46,10 @@ struct AIReplyApp: App {
             ProfileSync(configuration: configuration, account: account).adoptServerChoice(profile?.gender)
         }
         account.installationIDForSignOut = { AppServices.shared.installationIDForSignOut }
-        account.willEndSession = { AppServices.shared.accountWillSignOut() }
+        account.willEndSession = {
+            voice.stop(clearPrivateContext: true)
+            AppServices.shared.accountWillSignOut()
+        }
         account.didDeleteAccount = { [weak configuration] in
             configuration?.forgetAccountProfile()
             ProductEventReporter.shared.discardWaiting()
@@ -76,6 +81,7 @@ struct AIReplyApp: App {
         _settings = State(initialValue: settings)
         _configuration = State(initialValue: configuration)
         _account = State(initialValue: account)
+        _voice = State(initialValue: voice)
         _keyboardStatus = State(initialValue: keyboardStatus)
         #if DEBUG
         _updates = State(initialValue: AppUpdateModel.debugPreviewIfRequested() ?? AppUpdateModel())
@@ -104,7 +110,14 @@ struct AIReplyApp: App {
                 #endif
             }
             // Google Sign-In's redirect back into the app.
-            .onOpenURL { url in GoogleSignInProvider.handle(url) }
+            .onOpenURL { url in
+                if url.scheme == "aireply", url.host == "voice" {
+                    VoiceAssistantLaunchRequest.request()
+                    NotificationCenter.default.post(name: .voiceAssistantOpenRequested, object: nil)
+                } else {
+                    GoogleSignInProvider.handle(url)
+                }
+            }
             .environment(settings)
             .environment(configuration)
             .environment(account)
@@ -114,6 +127,7 @@ struct AIReplyApp: App {
             .environment(services.purchases)
             .environment(services.support)
             .environment(updates)
+            .environment(voice)
             // A gender picked on another device arrives with /me; one picked
             // here and not yet confirmed is retried on every return.
             .onChange(of: account.profile) {
@@ -125,8 +139,12 @@ struct AIReplyApp: App {
             }
             // Sign-in, sign-out and the server's features decide whether and
             // how this install is registered for notifications.
-            .onChange(of: accountState, initial: true) { _, state in
+            .onChange(of: accountState, initial: true) { previous, state in
                 services.accountDidChange(state)
+                if state.isBootstrapComplete && (!state.isSignedIn || !state.hasAcceptedLegal
+                    || (previous.userID != nil && previous.userID != state.userID)) {
+                    voice.stop(clearPrivateContext: true)
+                }
             }
             // The installation carries the app's language.
             .onChange(of: settings.effectiveLanguage) {
@@ -136,6 +154,7 @@ struct AIReplyApp: App {
                 services.scenePhaseDidChange(phase)
                 switch phase {
                 case .active:
+                    voice.refreshPublishedState()
                     keyboardStatus.refresh()
                     // A website payment can change the shared balance while
                     // the app is away. Read /me when the user returns.
@@ -219,7 +238,7 @@ enum DebugScreen: String {
     /// shows a chat with none yet.
     case support
     /// Settings ▸ Apple Watch.
-    case watch
+    case watch, voice
     /// A chat with the keyboard up, for the Apple Watch screenshots;
     /// `-AIReplyDebugMessage` is the message on screen.
     case chat
@@ -270,6 +289,7 @@ private struct DebugScreenHost: View {
         case .home:      RootNavigationView()
         case .settings:  NavigationStack { SettingsView() }
         case .watch:     NavigationStack { AppleWatchSettingsView() }
+        case .voice:     VoiceAssistantView()
         case .chat:      DebugChatHost()
         case .notifications: NavigationStack { SettingsView(focus: .notifications) }
         case .profile:   NavigationStack { ProfileEditorView() }
