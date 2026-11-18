@@ -74,9 +74,13 @@ final class KeyboardViewController: UIInputViewController {
     /// iPhone voice session; microphone access belongs to the containing app.
     private lazy var voiceAssistant: KeyboardVoiceAssistant = {
         let coordinator = KeyboardVoiceAssistant()
-        coordinator.onChange = { [weak self] in self?.actionBar.setVoiceAssistant($0) }
+        coordinator.onChange = { [weak self] snapshot, bound in
+            self?.actionBar.setVoiceAssistant(snapshot, insertsDirectly: bound)
+        }
         coordinator.onControls = { [weak self] in self?.actionBar.showVoiceControls($0) }
-        coordinator.onNotice = { [weak self] in self?.actionBar.showVoiceNotice($0) }
+        coordinator.onNotice = { [weak self] message, duration in
+            self?.actionBar.showVoiceNotice(message, duration: duration)
+        }
         coordinator.language = { [weak self] in self?.uiLanguage ?? .english }
         coordinator.hasFullAccess = { [weak self] in self?.hasFullAccess ?? false }
         coordinator.selectedTemplateID = { [weak self] in
@@ -89,11 +93,15 @@ final class KeyboardViewController: UIInputViewController {
         coordinator.onReview = { [weak self] in self?.reviewVoiceAssistantResponse($0) }
         coordinator.onRegenerate = { [weak self] in self?.reviewVoiceAssistantResponse($0, regenerate: true) }
         coordinator.onInsert = { [weak self] snapshot in
-            guard let self else { return }
+            // One tap types the response only into an empty field with no
+            // open draft. Anything else opens the composer, whose Insert
+            // asks to replace or append, so nothing is mixed or doubled.
+            guard let self, self.activeFlow == .none, !self.hostFieldHasText() else { return false }
             self.textDocumentProxy.insertText(snapshot.response)
             self.lastHostMutation = Date.timeIntervalSinceReferenceDate
             self.refreshHostContext()
             self.refreshAutoShift()
+            return true
         }
         return coordinator
     }()
@@ -1037,7 +1045,9 @@ final class KeyboardViewController: UIInputViewController {
         textDocumentProxy.insertText(text)
         lastHostMutation = Date.timeIntervalSinceReferenceDate
         watchVoice.composerDidInsert()
-        voiceAssistant.didInsert(requestID: reviewedVoiceRequestID)
+        if reviewedVoiceRequestID != nil {
+            voiceAssistant.didInsert(requestID: reviewedVoiceRequestID, text: text)
+        }
         closeComposer()
     }
 
@@ -1382,13 +1392,14 @@ extension KeyboardViewController: KeyboardActionBarDelegate {
             self.reviewedVoiceRequestID = snapshot.requestID
             if snapshot.sourceMessage.isEmpty {
                 self.replyCoordinator.clear()
-                self.composeCoordinator.showSaved(instruction: snapshot.transcript, text: snapshot.response)
+                self.composeCoordinator.showSaved(instruction: snapshot.transcript, text: snapshot.response, isVoice: true)
                 self.showComposePanel()
             } else {
                 self.composeCoordinator.clear()
                 let template = snapshot.templateID.flatMap { self.resolveTemplate(id: $0) } ?? self.watchFallbackTemplate
                 var session = ReplySession(sourceMessage: snapshot.sourceMessage, source: .clipboard, template: template)
                 session.instruction = snapshot.transcript
+                session.isVoice = true
                 session.flow.startGeneration()
                 session.flow.receive(reply: snapshot.response)
                 self.replyCoordinator.open(handedOff: session)

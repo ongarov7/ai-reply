@@ -1,159 +1,527 @@
 import SwiftUI
 
+/// AI Reply Voice in the app: say an instruction, and the reply waits in the
+/// AI Reply keyboard. The status, live text and capture buttons come first,
+/// so they stay visible at the sheet's medium height; context and setup
+/// follow. Built from the app's design system, so light and dark match the
+/// rest of AI Reply.
 struct VoiceAssistantView: View {
     @Environment(VoiceAssistantController.self) private var voice
     @Environment(ReplyConfigurationModel.self) private var configuration
     @Environment(\.dismiss) private var dismiss
     @State private var showsAudioConsent = false
+    @State private var showsSetup = false
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @ScaledMetric(relativeTo: .headline) private var badgeSize: CGFloat = 40
+
+    private static let privacyURL = URL(string: "https://ai-reply.kz/privacy")
 
     var body: some View {
         @Bindable var voice = voice
         let copy = voice.copy
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack(spacing: 12) {
-                        Image(systemName: voice.isCapturing ? "waveform" : "mic.fill")
-                            .font(.system(size: 24, weight: .medium))
-                            .foregroundStyle(Color.accentColor)
-                            .frame(width: 40, height: 40)
-                            .background(Color.accentColor.opacity(0.1), in: Circle())
-                            .symbolEffect(.variableColor, isActive: voice.isCapturing)
-                        Text(voice.isStarting ? copy.connecting : copy.status(voice.snapshot.phase))
-                            .font(.headline)
-                        Spacer(minLength: 0)
-                        if voice.isCapturing {
-                            Text("\(Int(voice.elapsed)) / 40 s")
-                                .font(.subheadline.monospacedDigit())
-                                .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: DS.Spacing.l) {
+                    VStack(alignment: .leading, spacing: DS.Spacing.s) {
+                        captureCard(copy)
+                        if showsResponse {
+                            responseCard(copy)
+                        } else {
+                            captureControls(copy)
                         }
                     }
-                    if let error = voice.snapshot.error {
-                        Text(error).font(.subheadline).foregroundStyle(.orange)
-                    }
-                    if voice.isCapturing || voice.isStarting || !voice.snapshot.transcript.isEmpty {
-                        liveTranscriptCard(title: copy.instruction, placeholder: copy.speakPrompt)
-                    }
-                    if voice.isCapturing {
-                        HStack(spacing: 12) {
-                            Button(copy.stop, systemImage: "xmark") { voice.stop() }
-                                .buttonStyle(.bordered)
-                                .frame(minHeight: 44)
-                            Button { voice.finish() } label: {
-                                Label(copy.generate, systemImage: "checkmark")
-                                    .font(.subheadline.weight(.semibold))
-                                    .frame(maxWidth: .infinity, minHeight: 44)
-                            }
-                            .buttonStyle(.borderedProminent)
-                        }
-                        Text(copy.returnToChat).font(.footnote).foregroundStyle(.secondary)
-                    } else if voice.isBusy {
-                        HStack {
-                            ProgressView()
-                            Spacer()
-                            Button(copy.stop, systemImage: "xmark") { voice.stop() }.buttonStyle(.bordered)
-                        }
-                    } else {
-                        Button {
-                            if voice.hasVoiceConsent { voice.start() } else { showsAudioConsent = true }
-                        } label: {
-                            Label(copy.start, systemImage: "mic.fill").frame(maxWidth: .infinity).padding(.vertical, 6)
-                        }
-                        .buttonStyle(.borderedProminent)
-                    }
-                    if !voice.snapshot.response.isEmpty {
-                        textCard(title: copy.response, text: voice.snapshot.response)
-                        Text(copy.keyboardResult).font(.footnote).foregroundStyle(.secondary)
-                        HStack {
-                            ShareLink(item: voice.snapshot.response) { Label(copy.share, systemImage: "square.and.arrow.up") }
-                            Spacer()
-                            Button(copy.again, systemImage: "arrow.clockwise") { voice.regenerate() }.disabled(voice.isBusy)
-                        }.buttonStyle(.bordered)
-                    }
-                    GroupBox {
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack {
-                                Text(copy.message).font(.subheadline.bold())
-                                Spacer()
-                                // System paste control: no clipboard reads on appearance.
-                                PasteButton(payloadType: String.self) { values in
-                                    voice.sourceMessage = values.joined(separator: "\n")
-                                }.labelStyle(.iconOnly)
-                            }
-                            TextField(copy.optionalMessage, text: $voice.sourceMessage, axis: .vertical)
-                                .lineLimit(2...5)
-                            Picker(copy.template, selection: $voice.templateID) {
-                                ForEach(configuration.visibleTemplates) { template in
-                                    Text(template.displayName(appLanguage: SharedSettings.shared.effectiveAppLanguage))
-                                        .tag(Optional(template.id))
-                                }
-                            }
-                            Picker(copy.speechLanguage, selection: $voice.languageCode) {
-                                Text(copy.automatic).tag("auto")
-                                Text("Русский").tag("ru")
-                                Text("Қазақша").tag("kk")
-                                Text("English").tag("en")
-                            }
-                        }
-                    }.disabled(voice.isBusy)
-                    Text(copy.privacy).font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                    Link(copy.privacyLink, destination: URL(string: "https://ai-reply.kz/privacy")!).font(.footnote)
-                    VStack(alignment: .leading, spacing: 8) {
-                        Label(copy.quickAccess, systemImage: "switch.2").font(.headline)
-                        Text(copy.onboarding).font(.footnote).foregroundStyle(.secondary)
-                    }.frame(maxWidth: .infinity, alignment: .leading)
-                }.padding(.horizontal, 20).padding(.vertical, 16)
+                    messageSection(copy, message: $voice.sourceMessage)
+                    optionsSection(copy, templateID: $voice.templateID, language: $voice.languageCode)
+                    setupSection(copy)
+                    privacySection(copy)
+                }
+                .padding(.horizontal, DS.Spacing.m)
+                .padding(.top, DS.Spacing.xs)
+                .padding(.bottom, DS.Spacing.xl)
+                .frame(maxWidth: DS.Layout.readableWidth)
+                .frame(maxWidth: .infinity)
+                .animation(.default, value: voice.snapshot.phase)
+                .animation(.default, value: voice.isStarting)
             }
-            .navigationTitle("AI Reply Voice")
+            .scrollDismissesKeyboard(.interactively)
+            .background(Color.dsBackground.ignoresSafeArea())
+            .navigationTitle(Text(verbatim: "AI Reply Voice"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button(copy.close) { dismiss() } } }
+            .toolbar {
+                // «Готово» belongs to dictation; the sheet itself just closes.
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(copy.close) { dismiss() }
+                        .accessibilityIdentifier("voice.close")
+                }
+            }
         }
-        .onAppear {
-            if voice.templateID == nil { voice.templateID = configuration.visibleTemplates.first?.id }
-        }
+        .onAppear(perform: keepTemplateVisible)
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
-        .alert("AI Reply Voice", isPresented: $showsAudioConsent) {
+        .alert(Text(verbatim: "AI Reply Voice"), isPresented: $showsAudioConsent) {
             Button(copy.allowAndStart) { voice.start(consent: true) }
             Button(copy.notNow, role: .cancel) {}
         } message: { Text(copy.privacy) }
     }
 
-    private func textCard(title: String, text: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-            Text(text).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
-        }.padding(16).background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 18))
+    // MARK: Capture
+
+    private var showsResponse: Bool {
+        voice.snapshot.phase == .responseReady && !voice.snapshot.response.isEmpty
     }
 
-    private func liveTranscriptCard(title: String, placeholder: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+    private var showsTranscript: Bool {
+        voice.isCapturing || voice.hasTranscript
+    }
+
+    private func captureCard(_ copy: VoiceAssistantCopy) -> some View {
+        VStack(alignment: .leading, spacing: DS.Spacing.m) {
+            HStack(alignment: .center, spacing: DS.Spacing.s) {
+                statusBadge
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(voice.isStarting ? copy.connecting : copy.status(voice.snapshot.phase))
+                        .font(.headline)
+                        .accessibilityIdentifier("voice.status")
+                    if let detail = statusDetail(copy) {
+                        Text(detail)
+                            .font(.subheadline)
+                            .foregroundStyle(voice.snapshot.phase == .error ? Color.primary : Color.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityElement(children: .combine)
+                if voice.isCapturing {
+                    Text(verbatim: Self.clock(voice.elapsed) + " / " + Self.clock(VoiceAssistantRecordingPolicy.maximumDuration))
+                        .font(.subheadline.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel(copy.recordedSeconds(Int(voice.elapsed)))
+                }
+            }
+            if showsTranscript {
+                VStack(alignment: .leading, spacing: DS.Spacing.xxs) {
+                    Text(copy.instruction)
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    LiveTranscript(text: voice.snapshot.transcript, placeholder: copy.speakPrompt)
+                }
+            }
+        }
+        .dsCard()
+    }
+
+    private var statusBadge: some View {
+        let phase = voice.snapshot.phase
+        let symbol: String
+        let foreground: Color
+        let fill: Color
+        switch phase {
+        case .listening, .speechDetected:
+            symbol = "waveform"; foreground = .white; fill = .accentColor
+        case .responseReady:
+            symbol = "checkmark"; foreground = .green; fill = Color.green.opacity(0.15)
+        case .error:
+            symbol = "exclamationmark.triangle.fill"; foreground = .orange; fill = Color.orange.opacity(0.15)
+        case .paused:
+            symbol = "pause.fill"; foreground = .secondary; fill = Color(.tertiarySystemFill)
+        default:
+            symbol = "mic.fill"; foreground = .accentColor; fill = Color.accentColor.opacity(0.12)
+        }
+        return ZStack {
+            Circle().fill(fill)
+            if voice.isStarting || voice.isProcessing {
+                ProgressView().tint(.accentColor)
+            } else {
+                Image(systemName: symbol)
+                    .font(.system(size: badgeSize * 0.42, weight: .semibold))
+                    .foregroundStyle(foreground)
+                    .symbolEffect(.variableColor.iterative, isActive: voice.isCapturing)
+            }
+        }
+        .frame(width: badgeSize, height: badgeSize)
+        .accessibilityHidden(true)
+    }
+
+    private func statusDetail(_ copy: VoiceAssistantCopy) -> String? {
+        if voice.isStarting { return nil }
+        switch voice.snapshot.phase {
+        case .ready, .stopped: return voice.hasTranscript ? nil : copy.idleHint
+        case .transcribing, .generating: return copy.processingHint
+        case .paused: return voice.canContinuePausedTurn ? copy.pausedHint : voice.snapshot.error
+        case .error: return voice.snapshot.error
+        case .listening, .speechDetected, .responseReady: return nil
+        }
+    }
+
+    @ViewBuilder
+    private func captureControls(_ copy: VoiceAssistantCopy) -> some View {
+        if voice.isCapturing {
+            buttonPair {
+                Button { voice.cancel() } label: { pairLabel(copy.stop) }
+                    .buttonStyle(VoiceSecondaryButtonStyle(expands: typeSize.isAccessibilitySize))
+                    .accessibilityIdentifier("voice.cancel")
+                Button { voice.finish() } label: { pairLabel(copy.generate, symbol: "checkmark") }
+                    .buttonStyle(.dsPrimary)
+                    .accessibilityIdentifier("voice.finish")
+            }
+            note(copy.returnToChat)
+        } else if voice.isStarting || voice.isProcessing {
+            Button(copy.stop) { voice.cancel() }
+                .buttonStyle(VoiceSecondaryButtonStyle())
+                .accessibilityIdentifier("voice.cancel")
+        } else if voice.canContinuePausedTurn {
+            buttonPair {
+                Button { voice.continuePausedTurn() } label: { pairLabel(copy.resume, symbol: "mic.fill") }
+                    .buttonStyle(VoiceSecondaryButtonStyle())
+                Button { voice.createReplyFromPausedTurn() } label: { pairLabel(copy.createReply) }
+                    .buttonStyle(.dsPrimary)
+            }
+            Button(copy.startOver) { voice.cancel() }
+                .buttonStyle(.dsText)
+        } else {
+            Button(action: startDictation) {
+                Label(copy.start, systemImage: "mic.fill")
+            }
+            .buttonStyle(.dsPrimary)
+            .accessibilityIdentifier("voice.start")
+        }
+    }
+
+    private func startDictation() {
+        if voice.hasVoiceConsent { voice.start() } else { showsAudioConsent = true }
+    }
+
+    /// Two buttons side by side, stacked at accessibility text sizes.
+    private func buttonPair<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        let layout = typeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(spacing: DS.Spacing.s))
+            : AnyLayout(HStackLayout(spacing: DS.Spacing.s))
+        return layout(content)
+    }
+
+    /// One line beside another button (slightly smaller before it would
+    /// wrap); stacked buttons have the width to wrap instead.
+    private func pairLabel(_ title: String, symbol: String? = nil) -> some View {
+        Group {
+            if let symbol {
+                Label(title, systemImage: symbol)
+            } else {
+                Text(title)
+            }
+        }
+        .lineLimit(typeSize.isAccessibilitySize ? 3 : 1)
+        .minimumScaleFactor(0.8)
+    }
+
+    // MARK: Response
+
+    private func responseCard(_ copy: VoiceAssistantCopy) -> some View {
+        VStack(alignment: .leading, spacing: DS.Spacing.s) {
+            VStack(alignment: .leading, spacing: DS.Spacing.s) {
+                Text(copy.response)
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Text(voice.snapshot.response)
+                    .font(.body)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("voice.response")
+                Divider()
+                HStack(spacing: DS.Spacing.m) {
+                    ShareLink(item: voice.snapshot.response) {
+                        Label(copy.share, systemImage: "square.and.arrow.up")
+                    }
+                    Spacer(minLength: 0)
+                    Button { voice.regenerate() } label: {
+                        Label(copy.again, systemImage: "arrow.clockwise")
+                    }
+                    .disabled(voice.isBusy)
+                }
+                .font(.subheadline.weight(.semibold))
+                .buttonStyle(.borderless)
+            }
+            .dsCard()
+            note(copy.keyboardResult)
+            Button(action: startDictation) {
+                Label(copy.newInstruction, systemImage: "mic.fill")
+            }
+            .buttonStyle(VoiceSecondaryButtonStyle())
+            .accessibilityIdentifier("voice.start")
+        }
+    }
+
+    // MARK: Context
+
+    private func messageSection(_ copy: VoiceAssistantCopy, message: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: DS.Spacing.xs) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(copy.message)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer(minLength: DS.Spacing.s)
+                Text(copy.optional)
+                    .font(.footnote)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, DS.Spacing.xxs)
+            VStack(alignment: .leading, spacing: DS.Spacing.s) {
+                TextField(copy.optionalMessage, text: message, axis: .vertical)
+                    .lineLimit(2...6)
+                    .accessibilityIdentifier("voice.message")
+                HStack(spacing: DS.Spacing.s) {
+                    // The system Paste control: the clipboard is read only
+                    // when the user taps it, never on appearance.
+                    PasteButton(payloadType: String.self) { values in
+                        message.wrappedValue = values.joined(separator: "\n")
+                            .trimmingCharacters(in: .whitespacesAndNewlines)
+                    }
+                    .buttonBorderShape(.capsule)
+                    .labelStyle(.titleAndIcon)
+                    .controlSize(.small)
+                    .tint(.accentColor)
+                    Spacer(minLength: 0)
+                    if !message.wrappedValue.isEmpty {
+                        Button(copy.clear) { message.wrappedValue = "" }
+                            .font(.subheadline)
+                            .buttonStyle(.borderless)
+                    }
+                }
+            }
+            .dsCard()
+            Text(copy.messageFooter)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, DS.Spacing.xxs)
+        }
+        .disabled(voice.isBusy)
+    }
+
+    private func optionsSection(_ copy: VoiceAssistantCopy, templateID: Binding<String?>,
+                                language: Binding<String>) -> some View {
+        let hasMessage = !voice.sourceMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let visible = configuration.visibleTemplates
+        // No choice, or one now hidden, shows (and generates with) the first
+        // visible template, exactly as the reply request falls back.
+        let template = Binding<String?>(
+            get: { visible.contains(where: { $0.id == templateID.wrappedValue }) ? templateID.wrappedValue : visible.first?.id },
+            set: { templateID.wrappedValue = $0 })
+        return VStack(alignment: .leading, spacing: DS.Spacing.xs) {
+            VStack(spacing: 0) {
+                // A template shapes a reply to a message; standalone text
+                // has none, so the row appears once there is a message.
+                if hasMessage {
+                    optionRow(copy.template) {
+                        Picker(copy.template, selection: template) {
+                            ForEach(configuration.visibleTemplates) { template in
+                                Text(template.displayName(appLanguage: SharedSettings.shared.effectiveAppLanguage))
+                                    .tag(Optional(template.id))
+                            }
+                        }
+                    }
+                    Divider().padding(.leading, DS.Spacing.m)
+                }
+                optionRow(copy.speechLanguage) {
+                    Picker(copy.speechLanguage, selection: language) {
+                        Text(copy.automatic).tag("auto")
+                        Text(verbatim: "Русский").tag("ru")
+                        Text(verbatim: "Қазақша").tag("kk")
+                        Text(verbatim: "English").tag("en")
+                    }
+                }
+            }
+            .background(RoundedRectangle(cornerRadius: DS.Radius.large, style: .continuous).fill(Color.dsSurface))
+            Text(copy.languageFooter)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, DS.Spacing.xxs)
+        }
+        .disabled(voice.isBusy)
+    }
+
+    private func optionRow<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        HStack(spacing: DS.Spacing.s) {
+            Text(title)
+                .lineLimit(2)
+            Spacer(minLength: DS.Spacing.s)
+            // The chosen value keeps one line; the title gives way first.
+            content()
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .fixedSize()
+                .layoutPriority(1)
+        }
+        .padding(.leading, DS.Spacing.m)
+        .padding(.trailing, DS.Spacing.xxs)
+        .frame(minHeight: DS.Layout.minimumTouchTarget + 4)
+    }
+
+    /// A saved template that is now hidden would leave the picker blank.
+    private func keepTemplateVisible() {
+        let visible = configuration.visibleTemplates
+        if !visible.contains(where: { $0.id == voice.templateID }) {
+            voice.templateID = visible.first?.id
+        }
+    }
+
+    // MARK: Setup and privacy
+
+    private func setupSection(_ copy: VoiceAssistantCopy) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // A settings-style row rather than a tinted link: primary title,
+            // grey chevron that turns when the steps open.
+            Button {
+                withAnimation(.snappy) { showsSetup.toggle() }
+            } label: {
+                HStack(spacing: DS.Spacing.s) {
+                    Image(systemName: "switch.2")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(Color.accentColor)
+                        .accessibilityHidden(true)
+                    Text(copy.quickAccess)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Image(systemName: "chevron.right")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                        .rotationEffect(.degrees(showsSetup ? 90 : 0))
+                        .accessibilityHidden(true)
+                }
+                .frame(minHeight: DS.Layout.minimumTouchTarget - 8)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityValue(showsSetup ? copy.expanded : copy.collapsed)
+            if showsSetup {
+            VStack(alignment: .leading, spacing: DS.Spacing.s) {
+                ForEach(Array(copy.setupSteps.enumerated()), id: \.offset) { index, step in
+                    HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.s) {
+                        Text(verbatim: "\(index + 1)")
+                            .font(.footnote.weight(.semibold))
+                            .monospacedDigit()
+                            .foregroundStyle(.white)
+                            .frame(width: 22, height: 22)
+                            .background(Circle().fill(Color.accentColor))
+                            .accessibilityHidden(true)
+                        Text(step)
+                            .font(.subheadline)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+                Text(copy.setupNote)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.top, DS.Spacing.s)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .transition(.opacity)
+            }
+        }
+        .dsCard()
+    }
+
+    private func privacySection(_ copy: VoiceAssistantCopy) -> some View {
+        VStack(alignment: .leading, spacing: DS.Spacing.xs) {
+            Text(copy.privacy)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if let url = Self.privacyURL {
+                Link(copy.privacyLink, destination: url)
+                    .font(.footnote.weight(.semibold))
+            }
+        }
+        .padding(.horizontal, DS.Spacing.xxs)
+    }
+
+    private func note(_ text: String) -> some View {
+        Text(text)
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, DS.Spacing.xxs)
+    }
+
+    /// 0:07, 0:40: the same in every language, unlike "7 s".
+    static func clock(_ seconds: TimeInterval) -> String {
+        let whole = max(0, Int(seconds.rounded(.down)))
+        return String(format: "%d:%02d", whole / 60, whole % 60)
+    }
+}
+
+/// The recognized words as they arrive. Short text takes its own height;
+/// longer text scrolls inside a bounded area that follows the newest words.
+private struct LiveTranscript: View {
+    let text: String
+    let placeholder: String
+    private let maximumHeight: CGFloat = 150
+
+    var body: some View {
+        ViewThatFits(in: .vertical) {
+            label
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
-                        Text(voice.snapshot.transcript.isEmpty ? placeholder : voice.snapshot.transcript)
-                            .font(.body)
-                            .foregroundStyle(voice.snapshot.transcript.isEmpty ? .secondary : .primary)
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .accessibilityIdentifier("voice.liveTranscript")
+                        label
                         Color.clear.frame(height: 1).id("voice-transcript-end")
                     }
                 }
-                .frame(height: 72)
-                .onChange(of: voice.snapshot.transcript) {
+                .scrollBounceBehavior(.basedOnSize)
+                .onAppear { proxy.scrollTo("voice-transcript-end", anchor: .bottom) }
+                .onChange(of: text) {
                     withAnimation(.easeOut(duration: 0.15)) {
                         proxy.scrollTo("voice-transcript-end", anchor: .bottom)
                     }
                 }
             }
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.accentColor.opacity(0.07), in: RoundedRectangle(cornerRadius: 16))
+        .frame(maxHeight: maximumHeight, alignment: .top)
     }
 
+    private var label: some View {
+        Text(text.isEmpty ? placeholder : text)
+            .font(.body)
+            .foregroundStyle(text.isEmpty ? .secondary : .primary)
+            .textSelection(.enabled)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("voice.liveTranscript")
+    }
+}
+
+/// The quiet button next to the primary one: the same 50 pt height, so a
+/// pair reads as one row.
+private struct VoiceSecondaryButtonStyle: ButtonStyle {
+    var expands = true
+
+    func makeBody(configuration: Configuration) -> some View {
+        StyleBody(configuration: configuration, expands: expands)
+    }
+
+    private struct StyleBody: View {
+        let configuration: ButtonStyleConfiguration
+        let expands: Bool
+        @Environment(\.isEnabled) private var isEnabled
+
+        var body: some View {
+            configuration.label
+                .font(.body.weight(.semibold))
+                .foregroundStyle(Color.accentColor)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, DS.Spacing.m)
+                .frame(maxWidth: expands ? .infinity : nil, minHeight: DS.Layout.primaryButtonHeight)
+                .background(
+                    RoundedRectangle(cornerRadius: DS.Radius.medium, style: .continuous)
+                        .fill(Color.dsSurface)
+                )
+                .contentShape(RoundedRectangle(cornerRadius: DS.Radius.medium, style: .continuous))
+                .opacity(isEnabled ? (configuration.isPressed ? 0.7 : 1) : 0.4)
+        }
+    }
 }
 
 /// Explicit app-language copy, like the existing keyboard's string tables.
@@ -164,27 +532,50 @@ struct VoiceAssistantCopy {
     }
     var start: String { text("Start dictation", "Начать диктовку", "Айтып жазуды бастау", "Aytib yozishni boshlash") }
     var stop: String { text("Cancel", "Отмена", "Болдырмау", "Bekor qilish") }
-    var close: String { text("Done", "Готово", "Дайын", "Tayyor") }
+    var close: String { text("Close", "Закрыть", "Жабу", "Yopish") }
     var generate: String { text("Done · generate reply", "Готово · создать ответ", "Дайын · жауап жасау", "Tayyor · javob yaratish") }
+    var resume: String { text("Continue", "Продолжить", "Жалғастыру", "Davom etish") }
+    var createReply: String { text("Create reply", "Создать ответ", "Жауап жасау", "Javob yaratish") }
+    var startOver: String { text("Start over", "Начать заново", "Қайта бастау", "Qaytadan boshlash") }
+    var newInstruction: String { text("New instruction", "Новая инструкция", "Жаңа нұсқау", "Yangi koʻrsatma") }
     var speakPrompt: String { text("Speak… your words will appear here.", "Говорите… здесь появятся ваши слова.", "Сөйлеңіз… сөзіңіз осында көрсетіледі.", "Gapiring… so‘zlaringiz shu yerda ko‘rinadi.") }
+    var idleHint: String { text("Say what to reply or write, for example: “Tell her I’ll be there at seven.”", "Скажите, что ответить или написать, например: «Напиши, что буду в семь».", "Не жауап беру не жазу керегін айтыңыз, мысалы: «Жетіде келемін деп жаз».", "Nima deb javob berish yoki yozishni ayting, masalan: «Yettida boraman deb yoz».") }
+    var processingHint: String { text("You can return to your chat — the response will appear in the AI Reply keyboard.", "Можно вернуться в чат — ответ появится в клавиатуре AI Reply.", "Чатқа орала беріңіз — жауап AI Reply пернетақтасында шығады.", "Chatga qaytishingiz mumkin — javob AI Reply klaviaturasida chiqadi.") }
+    var pausedHint: String { text("Continue recording, or create a reply from what you said.", "Продолжите запись или создайте ответ из сказанного.", "Жазуды жалғастырыңыз немесе айтылғаннан жауап жасаңыз.", "Yozishni davom ettiring yoki aytilganlardan javob yarating.") }
     var again: String { text("Regenerate", "Другой вариант", "Басқа нұсқа", "Boshqa variant") }
     var share: String { text("Share", "Поделиться", "Бөлісу", "Ulashish") }
     var instruction: String { text("Your instruction", "Ваша инструкция", "Сіздің нұсқауыңыз", "Koʻrsatmangiz") }
     var response: String { text("Response", "Ответ", "Жауап", "Javob") }
-    var message: String { text("Message context", "Сообщение для ответа", "Жауап беретін хабарлама", "Javob uchun xabar") }
-    var optionalMessage: String { text("Paste a message, or leave empty to create new text", "Вставьте сообщение или оставьте пустым для нового текста", "Хабарламаны қойыңыз немесе жаңа мәтін үшін бос қалдырыңыз", "Xabar qoʻying yoki yangi matn uchun boʻsh qoldiring") }
+    var message: String { text("Message to reply to", "Сообщение для ответа", "Жауап беретін хабарлама", "Javob uchun xabar") }
+    var optional: String { text("Optional", "Необязательно", "Міндетті емес", "Ixtiyoriy") }
+    var optionalMessage: String { text("Paste the message you’re replying to", "Вставьте сообщение, на которое отвечаете", "Жауап беретін хабарламаны қойыңыз", "Javob beradigan xabarni qoʻying") }
+    var messageFooter: String { text("Leave it empty and AI Reply writes new text from your instruction.", "Оставьте пустым — AI Reply напишет новый текст по вашей инструкции.", "Бос қалдырсаңыз, AI Reply нұсқауыңыз бойынша жаңа мәтін жазады.", "Boʻsh qoldirsangiz, AI Reply koʻrsatmangiz boʻyicha yangi matn yozadi.") }
+    var clear: String { text("Clear", "Очистить", "Тазалау", "Tozalash") }
     var template: String { text("Template", "Шаблон", "Үлгі", "Andoza") }
     var speechLanguage: String { text("Speech language", "Язык речи", "Сөйлеу тілі", "Nutq tili") }
-    var automatic: String { text("Automatic · RU / KK / EN", "Автоматически · RU / KK / EN", "Автоматты · RU / KK / EN", "Avtomatik · RU / KK / EN") }
+    var automatic: String { text("Automatic", "Автоматически", "Автоматты", "Avtomatik") }
+    var languageFooter: String { text("Automatic recognizes Russian, Kazakh and English.", "«Автоматически» распознаёт русский, казахский и английский.", "«Автоматты» орыс, қазақ және ағылшын тілдерін таниды.", "«Avtomatik» rus, qozoq va ingliz tillarini taniydi.") }
     var connecting: String { text("Preparing microphone…", "Подключаем микрофон…", "Микрофон дайындалуда…", "Mikrofon tayyorlanmoqda…") }
-    var returnToChat: String { text("You can return to your chat. Speak at your pace, then tap Done here, in the keyboard or Dynamic Island. Maximum 40 seconds.", "Можно вернуться в чат. Говорите в своём темпе, затем нажмите «Готово» здесь, в клавиатуре или Dynamic Island. Не дольше 40 секунд.", "Чатқа оралуға болады. Асықпай сөйлеп, соңында осында, пернетақтада немесе Dynamic Island ішінде «Дайын» түймесін басыңыз. Ең көбі 40 секунд.", "Chatga qaytishingiz mumkin. Shoshilmay gapiring, so‘ng shu yerda, klaviatura yoki Dynamic Island’da «Tayyor»ni bosing. Eng ko‘pi 40 soniya.") }
-    var keyboardResult: String { text("Open the AI Reply keyboard and tap the response to review and insert it.", "Откройте клавиатуру AI Reply и нажмите на ответ, чтобы проверить и вставить его.", "AI Reply пернетақтасын ашып, жауапты қарап, қою үшін оны басыңыз.", "AI Reply klaviaturasini ochib, javobni tekshirish va qoʻyish uchun ustiga bosing.") }
+    var returnToChat: String { text("You can switch to your chat and keep talking. Tap Done here, in the AI Reply keyboard or in the Dynamic Island. Up to 40 seconds.", "Можно перейти в чат и продолжать говорить. Нажмите «Готово» здесь, в клавиатуре AI Reply или в Dynamic Island. До 40 секунд.", "Чатқа өтіп, сөйлей беруге болады. «Дайын» түймесін осында, AI Reply пернетақтасында немесе Dynamic Island ішінде басыңыз. 40 секундқа дейін.", "Chatga o‘tib, gapirishda davom etishingiz mumkin. «Tayyor»ni shu yerda, AI Reply klaviaturasida yoki Dynamic Island’da bosing. 40 soniyagacha.") }
+    var keyboardResult: String { text("The response is waiting in the AI Reply keyboard: open your chat and tap Insert.", "Ответ уже ждёт в клавиатуре AI Reply: откройте чат и нажмите «Вставить».", "Жауап AI Reply пернетақтасында күтіп тұр: чатты ашып, «Кірістіру» түймесін басыңыз.", "Javob AI Reply klaviaturasida kutmoqda: chatni ochib, «Kiritish»ni bosing.") }
+    func recordedSeconds(_ seconds: Int) -> String {
+        text("\(seconds) of 40 seconds recorded", "Записано \(seconds) из 40 секунд", "40 секундтың \(seconds) секунды жазылды", "40 soniyadan \(seconds) soniya yozildi")
+    }
     var privacy: String { text("Your speech is sent through AI Reply to OpenAI (USA) for transcription. Your message and instruction use your usual AI Reply plan. AI Reply does not save audio. OpenAI processes data under its API data policy; temporary retention may apply. You can withdraw voice consent in Settings → Privacy.", "Ваша речь передаётся через AI Reply в OpenAI (США) для распознавания. Сообщение и инструкция обрабатываются по вашему тарифу AI Reply. AI Reply не сохраняет аудио. OpenAI обрабатывает данные по своей политике API; возможно временное хранение. Согласие на голос можно отозвать: Настройки → Конфиденциальность.", "Сөзіңіз AI Reply арқылы OpenAI-ға (АҚШ) тану үшін жіберіледі. Хабарлама мен нұсқау AI Reply тарифіңіз бойынша өңделеді. AI Reply аудионы сақтамайды. OpenAI деректерді API саясаты бойынша өңдейді; уақытша сақтау болуы мүмкін. Дауысқа келісімді Баптаулар → Құпиялық бөлімінде қайтаруға болады.", "Nutqingiz AI Reply orqali OpenAIʼga (AQSh) tanish uchun yuboriladi. Xabar va koʻrsatma AI Reply tarifingiz boʻyicha ishlanadi. AI Reply audioni saqlamaydi. OpenAI API siyosatiga koʻra maʼlumotlarni qayta ishlaydi; vaqtinchalik saqlash mumkin. Ovoz roziligini Sozlamalar → Maxfiylikda bekor qilish mumkin.") }
     var allowAndStart: String { text("Allow and start", "Разрешить и начать", "Рұқсат беріп, бастау", "Ruxsat berib boshlash") }
     var notNow: String { text("Not now", "Не сейчас", "Қазір емес", "Hozir emas") }
     var privacyLink: String { text("Privacy policy", "Политика конфиденциальности", "Құпиялық саясаты", "Maxfiylik siyosati") }
-    var quickAccess: String { text("Quick access", "Быстрый запуск", "Жылдам іске қосу", "Tez ishga tushirish") }
-    var onboarding: String { text("Set up voice once in AI Reply: allow microphone access and voice processing, then enable Live Activities in iPhone Settings. On iOS 18+, open Control Center → hold an empty area → Add a Control → AI Reply Voice. After setup, this control starts recording without opening the app. iOS may ask you to unlock the phone. You can also choose the AI Reply Voice shortcut for the Action Button. On iOS 17, start here or use the Open AI Reply Voice action in Shortcuts.", "Один раз настройте голос в AI Reply: разрешите микрофон и обработку голоса, затем включите Live Activities в настройках iPhone. На iOS 18+ откройте Пункт управления → удерживайте свободное место → Добавить элемент управления → AI Reply Voice. После настройки элемент запускает запись без открытия приложения. iOS может попросить разблокировать телефон. Команду AI Reply Voice можно назначить кнопке действия. На iOS 17 запускайте здесь или через действие «Открыть AI Reply Voice» в «Командах».", "AI Reply ішінде дауысты бір рет баптаңыз: микрофон мен дауысты өңдеуге рұқсат беріп, iPhone баптауларында Live Activities қосыңыз. iOS 18+ нұсқасында Басқару орталығын ашыңыз → бос жерді ұстап тұрыңыз → басқару элементін қосу → AI Reply Voice. Баптаудан кейін ол қолданбаны ашпай жазуды бастайды. iOS телефонды ашуды сұрауы мүмкін. AI Reply Voice пәрменін әрекет түймесіне тағайындауға болады. iOS 17-де осы жерден немесе «Пәрмендердегі» AI Reply Voice ашу әрекеті арқылы бастаңыз.", "AI Reply’da ovozni bir marta sozlang: mikrofon va ovozni qayta ishlashga ruxsat bering, so‘ng iPhone sozlamalarida Live Activities’ni yoqing. iOS 18+ versiyasida Boshqaruv markazini oching → bo‘sh joyni bosib turing → boshqaruv qo‘shish → AI Reply Voice. Sozlangach, element ilovani ochmasdan yozishni boshlaydi. iOS telefonni qulfdan chiqarishni so‘rashi mumkin. AI Reply Voice buyrug‘ini harakat tugmasiga ham biriktirish mumkin. iOS 17’da shu yerdan yoki Buyruqlardagi AI Reply Voice’ni ochish amali orqali boshlang.") }
+    var quickAccess: String { text("Start from Control Center", "Запуск из Пункта управления", "Басқару орталығынан іске қосу", "Boshqaruv markazidan ishga tushirish") }
+    var expanded: String { text("Expanded", "Развёрнуто", "Ашық", "Ochiq") }
+    var collapsed: String { text("Collapsed", "Свёрнуто", "Жабық", "Yopiq") }
+    var setupSteps: [String] {
+        [
+            text("Start dictation here once and allow the microphone and voice processing.", "Один раз начните диктовку здесь и разрешите микрофон и обработку голоса.", "Осы жерде бір рет айтып жазуды бастап, микрофон мен дауысты өңдеуге рұқсат беріңіз.", "Shu yerda bir marta aytib yozishni boshlang va mikrofon hamda ovozni qayta ishlashga ruxsat bering."),
+            text("Keep Live Activities on for AI Reply in iPhone Settings.", "Оставьте Live Activities включёнными для AI Reply в настройках iPhone.", "iPhone баптауларында AI Reply үшін Live Activities қосулы болсын.", "iPhone sozlamalarida AI Reply uchun Live Activities yoqilgan bo‘lsin."),
+            text("On iOS 18 or later, open Control Center, hold an empty area, tap Add a Control and choose AI Reply Voice.", "На iOS 18 и новее откройте Пункт управления, удерживайте свободное место, нажмите «Добавить элемент управления» и выберите AI Reply Voice.", "iOS 18 және жаңасында Басқару орталығын ашып, бос жерді ұстап тұрыңыз, «Басқару элементін қосу» түймесін басып, AI Reply Voice таңдаңыз.", "iOS 18 va undan yangisida Boshqaruv markazini oching, bo‘sh joyni bosib turing, «Boshqaruv qo‘shish»ni bosing va AI Reply Voice’ni tanlang.")
+        ]
+    }
+    var setupNote: String { text("The control then starts recording without opening the app; iOS may ask you to unlock. You can also assign the AI Reply Voice shortcut to the Action button. On iOS 17, start dictation here or with the Open AI Reply Voice action in Shortcuts.", "Дальше элемент запускает запись без открытия приложения; iOS может попросить разблокировать iPhone. Команду AI Reply Voice можно назначить кнопке действия. На iOS 17 начинайте диктовку здесь или через действие «Открыть AI Reply Voice» в «Командах».", "Кейін элемент қолданбаны ашпай жазуды бастайды; iOS телефонды ашуды сұрауы мүмкін. AI Reply Voice пәрменін әрекет түймесіне тағайындауға болады. iOS 17-де осы жерден немесе «Пәрмендердегі» AI Reply Voice ашу әрекеті арқылы бастаңыз.", "Keyin element ilovani ochmasdan yozishni boshlaydi; iOS telefonni qulfdan chiqarishni so‘rashi mumkin. AI Reply Voice buyrug‘ini harakat tugmasiga biriktirish mumkin. iOS 17’da shu yerdan yoki Buyruqlardagi AI Reply Voice’ni ochish amali orqali boshlang.") }
     var interrupted: String { text("Recording interrupted. Start a new voice session.", "Запись прервана. Запустите новый голосовой сеанс.", "Жазу үзілді. Жаңа дауыс сеансын бастаңыз.", "Yozish toʻxtatildi. Yangi ovoz seansini boshlang.") }
     var signIn: String { text("Sign in and accept the current terms in AI Reply.", "Войдите и примите актуальные условия AI Reply.", "AI Reply-ға кіріп, қолданыстағы шарттарды қабылдаңыз.", "AI Replyʼga kirib, amaldagi shartlarni qabul qiling.") }
     var permission: String { text("Allow microphone access in iPhone Settings → AI Reply.", "Разрешите микрофон: Настройки iPhone → AI Reply.", "iPhone баптауларында → AI Reply → микрофонға рұқсат беріңіз.", "iPhone sozlamalari → AI Reply orqali mikrofonga ruxsat bering.") }

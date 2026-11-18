@@ -37,9 +37,11 @@ enum ReplyInstruction {
         )
     }
 
-    static func maximumCharacters(serverLimit: Int, reservesLanguageRule: Bool = true) -> Int {
+    static func maximumCharacters(serverLimit: Int, reservesLanguageRule: Bool = true, voice: Bool = false) -> Int {
         let rule = reservesLanguageRule ? languageRule.unicodeScalars.count + 1 : 0
-        return max(40, min(280, serverLimit - rule))
+        // A typed note stays short; a dictated 40-second turn keeps all of
+        // the room the server gives it.
+        return voice ? max(40, serverLimit - rule) : max(40, min(280, serverLimit - rule))
     }
 
     /// Appended to every non-empty instruction sent to a server that does not
@@ -69,12 +71,14 @@ enum ReplyInstruction {
     /// Trims, clamps and, for an older server, attaches the language rule.
     /// Returns "" for an empty instruction, which every caller reads as "the
     /// user asked for nothing in particular".
-    static func prepare(_ raw: String, appendsLanguageRule: Bool = ReplyInstruction.appendsLanguageRule) -> String {
+    static func prepare(_ raw: String, appendsLanguageRule: Bool = ReplyInstruction.appendsLanguageRule,
+                        voice: Bool = false) -> String {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return "" }
         let limit = maximumCharacters(
-            serverLimit: AILimits.current.instructionCharacters,
-            reservesLanguageRule: appendsLanguageRule
+            serverLimit: voice ? AILimits.voiceInstructionCharacters() : AILimits.current.instructionCharacters,
+            reservesLanguageRule: appendsLanguageRule,
+            voice: voice
         )
         let clamped = clamp(trimmed, limit: limit)
         return appendsLanguageRule ? clamped + "\n" + languageRule : clamped

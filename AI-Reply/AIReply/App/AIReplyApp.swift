@@ -289,7 +289,7 @@ private struct DebugScreenHost: View {
         case .home:      RootNavigationView()
         case .settings:  NavigationStack { SettingsView() }
         case .watch:     NavigationStack { AppleWatchSettingsView() }
-        case .voice:     VoiceAssistantView()
+        case .voice:     DebugVoiceHost()
         case .chat:      DebugChatHost()
         case .notifications: NavigationStack { SettingsView(focus: .notifications) }
         case .profile:   NavigationStack { ProfileEditorView() }
@@ -306,6 +306,24 @@ private struct DebugScreenHost: View {
         case .support:   DebugSupportHost(isEmpty: DebugScreen.value(after: "-AIReplyDebugChat") == "empty")
         case .exhausted: DebugExhaustedHost(offersPurchase: DebugScreen.value(after: "-AIReplyDebugOffer") != "plans")
         }
+    }
+}
+
+/// AI Reply Voice in the state `-AIReplyDebugVoice <phase>` names, with
+/// sample text and no microphone (see `showDebugState`).
+private struct DebugVoiceHost: View {
+    @Environment(VoiceAssistantController.self) private var voice
+
+    var body: some View {
+        VoiceAssistantView()
+            .task {
+                // After the signed-out bootstrap, which clears voice context.
+                try? await Task.sleep(for: .seconds(1))
+                if let message = DebugScreen.value(after: "-AIReplyDebugVoiceMessage") { voice.sourceMessage = message }
+                guard let raw = DebugScreen.value(after: "-AIReplyDebugVoice"),
+                      let phase = VoiceAssistantPhase(rawValue: raw) else { return }
+                voice.showDebugState(phase, activity: CommandLine.arguments.contains("-AIReplyDebugVoiceActivity"))
+            }
     }
 }
 

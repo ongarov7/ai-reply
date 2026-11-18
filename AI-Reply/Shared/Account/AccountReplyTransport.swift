@@ -14,6 +14,8 @@ struct AccountReplyTransport: ReplyTransport {
         var message: String
         /// What the user asked for in this particular reply, if anything.
         var instruction: String = ""
+        /// Dictated in AI Reply Voice (`instruction_source: "voice"`).
+        var instructionIsVoice: Bool = false
         var templateID: String
         var templateName: String
         var templateRelationship: String
@@ -122,6 +124,8 @@ struct AccountReplyTransport: ReplyTransport {
     struct Body: Encodable {
         let source_text: String
         let instruction: String?
+        /// "voice" only to a server that publishes features.voice_instruction.
+        var instruction_source: String? = nil
         let language: String
         let input_language: String?
         let template_id: String
@@ -169,7 +173,8 @@ struct AccountReplyTransport: ReplyTransport {
         for context: RequestContext,
         descriptor: DeviceDescriptor = .current,
         serverSupportsPreferences: Bool = AILimits.serverSupportsReplyPreferences,
-        serverSupportsSenderProfile: Bool = AILimits.serverSupportsSenderProfile
+        serverSupportsSenderProfile: Bool = AILimits.serverSupportsSenderProfile,
+        serverSupportsVoiceInstruction: Bool = AILimits.serverSupportsVoiceInstruction
     ) -> Body {
         let instruction = context.instruction.trimmingCharacters(in: .whitespacesAndNewlines)
         let profile = profileBlock(
@@ -180,6 +185,7 @@ struct AccountReplyTransport: ReplyTransport {
         return Body(
             source_text: context.message,
             instruction: instruction.isEmpty ? nil : instruction,
+            instruction_source: !instruction.isEmpty && context.instructionIsVoice && serverSupportsVoiceInstruction ? "voice" : nil,
             language: context.appLanguage,
             input_language: serverSupportsSenderProfile ? context.inputLanguage : nil,
             template_id: context.templateID,

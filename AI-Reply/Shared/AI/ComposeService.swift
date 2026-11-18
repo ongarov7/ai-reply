@@ -29,6 +29,9 @@ struct ComposeService: Sendable {
         /// The identity of an action that can be run more than once, for the
         /// server's `Idempotency-Key`. nil: this tap is the action.
         var actionID: String? = nil
+        /// Dictated in AI Reply Voice: up to the server's voice limit, sent
+        /// as `instruction_source: "voice"` where the server publishes it.
+        var isVoice: Bool = false
     }
 
     private let configuration: AIConfiguration
@@ -64,7 +67,8 @@ struct ComposeService: Sendable {
 
     func compose(_ request: Request) async throws -> GeneratedReply {
         var prepared = request
-        switch Self.validate(instruction: request.instruction) {
+        let limit = request.isVoice ? AILimits.voiceInstructionCharacters() : AILimits.current.instructionCharacters
+        switch Self.validate(instruction: request.instruction, limit: limit) {
         case .success(let value): prepared.instruction = value
         case .failure(let error): throw error
         }

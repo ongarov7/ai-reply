@@ -138,4 +138,68 @@ final class VoiceAssistantTransportTests: XCTestCase {
     private func littleEndian32(_ data: Data, offset: Int) -> UInt32 {
         (0..<4).reduce(UInt32(0)) { $0 | UInt32(data[offset + $1]) << ($1 * 8) }
     }
+
+    // MARK: Dictated instruction length
+
+    /// A 40-second voice turn is longer than a typed note. The field that says
+    /// so only goes to a server that publishes it: bodies reject unknown fields.
+    func testDictatedComposeIsMarkedOnlyForAServerThatKnowsVoiceInstructions() throws {
+        let request = ComposeService.Request(instruction: String(repeating: "сөз ", count: 200), uiLanguage: .kazakh,
+                                             isVoice: true)
+        let newer = try json(AccountComposeTransport.body(for: request, serverSupportsSenderProfile: true,
+                                                         serverSupportsVoiceInstruction: true))
+        XCTAssertEqual(newer["instruction_source"] as? String, "voice")
+        let older = try json(AccountComposeTransport.body(for: request, serverSupportsSenderProfile: true,
+                                                         serverSupportsVoiceInstruction: false))
+        XCTAssertNil(older["instruction_source"])
+        var typed = request
+        typed.isVoice = false
+        let typedBody = try json(AccountComposeTransport.body(for: typed, serverSupportsVoiceInstruction: true))
+        XCTAssertNil(typedBody["instruction_source"], "typed text never claims the voice allowance")
+    }
+
+    func testDictatedReplyInstructionIsMarkedAndKeepsItsRoom() throws {
+        var context = AccountReplyTransport.RequestContext(
+            message: "Ертең кездесеміз бе?", instruction: "Иә деп жауап бер", instructionIsVoice: true,
+            templateID: "friend", templateName: "Дос", templateRelationship: "friend", templateTone: .friendly,
+            templateInstructions: "", templateReplyLength: .short, templateEmojiPolicy: .allowed,
+            templateWorkingHoursBehaviour: .ignore, templateBusiness: nil, appLanguage: "kk", business: nil, profile: nil)
+        let newer = try json(AccountReplyTransport.body(for: context, serverSupportsVoiceInstruction: true))
+        XCTAssertEqual(newer["instruction_source"] as? String, "voice")
+        XCTAssertNil(try json(AccountReplyTransport.body(for: context, serverSupportsVoiceInstruction: false))["instruction_source"])
+        context.instruction = ""
+        XCTAssertNil(try json(AccountReplyTransport.body(for: context, serverSupportsVoiceInstruction: true))["instruction_source"],
+                     "no instruction, nothing to mark")
+
+        // A typed note stays capped at 280; a dictated turn keeps the server's room.
+        XCTAssertEqual(ReplyInstruction.maximumCharacters(serverLimit: 1000, reservesLanguageRule: false), 280)
+        XCTAssertEqual(ReplyInstruction.maximumCharacters(serverLimit: 1000, reservesLanguageRule: false, voice: true), 1000)
+        XCTAssertEqual(ReplyInstruction.maximumCharacters(serverLimit: 400, reservesLanguageRule: false, voice: true), 400)
+    }
+
+    func testDictatedInstructionIsCutAfterTheLastWholeWordOnlyWhenItMustBe() {
+        let words = String(repeating: "Ответь Айдане ", count: 60)
+        XCTAssertEqual(VoiceAssistantController.fitted("  Скажи, что опоздаю.  ", limit: 400), "Скажи, что опоздаю.")
+        let cut = VoiceAssistantController.fitted(words, limit: 400)
+        XCTAssertLessThanOrEqual(cut.unicodeScalars.count, 400)
+        XCTAssertTrue(cut.hasSuffix("Ответь") || cut.hasSuffix("Айдане"), "no word is cut in half: \(cut.suffix(20))")
+        XCTAssertEqual(VoiceAssistantController.fitted(words, limit: 2000), words.trimmingCharacters(in: .whitespaces))
+    }
+
+    func testVoiceLimitComesFromAServerThatPublishesIt() throws {
+        let suite = "voice-limit-" + UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let typed = AILimits.current.instructionCharacters
+        XCTAssertEqual(AILimits.voiceInstructionCharacters(defaults: defaults), typed, "an older server: the typed limit")
+        defaults.set(true, forKey: "ai.features.voiceInstruction")
+        defaults.set(1000, forKey: "ai.limits.voiceInstructionCharacters")
+        XCTAssertEqual(AILimits.voiceInstructionCharacters(defaults: defaults), max(typed, 1000))
+        defaults.set(5, forKey: "ai.limits.voiceInstructionCharacters")
+        XCTAssertEqual(AILimits.voiceInstructionCharacters(defaults: defaults), typed, "a broken value is not believed")
+    }
+
+    private func json<T: Encodable>(_ body: T) throws -> [String: Any] {
+        try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(body)) as? [String: Any])
+    }
 }

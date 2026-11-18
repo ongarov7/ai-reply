@@ -358,6 +358,8 @@ extension AccountAPI {
         /// Set by the administrator; the server enforces it on every request.
         let maxSourceCharacters: Int
         let maxInstructionLength: Int
+        /// The room of a dictated (40-second) instruction; absent on older servers.
+        var maxVoiceInstructionLength: Int? = nil
         let paymentMode: String
         let legal: LegalConfig?
         /// What this server version understands. Absent on older servers.
@@ -367,6 +369,7 @@ extension AccountAPI {
             case locales, timezone, legal, features
             case maxSourceCharacters = "max_source_characters"
             case maxInstructionLength = "max_instruction_length"
+            case maxVoiceInstructionLength = "max_voice_instruction_length"
             case paymentMode = "payment_mode"
         }
     }
@@ -424,6 +427,8 @@ extension AccountAPI {
         /// into text.
         var voiceTranscription: Bool? = nil
         var voiceRealtimeTranscription: Bool? = nil
+        /// `instruction_source: "voice"` on /ai/reply and /ai/compose.
+        var voiceInstruction: Bool? = nil
 
         enum CodingKeys: String, CodingKey {
             case replyPreferences = "reply_preferences"
@@ -449,6 +454,7 @@ extension AccountAPI {
             case iapIOS = "iap_ios"
             case voiceTranscription = "voice_transcription"
             case voiceRealtimeTranscription = "voice_realtime_transcription"
+            case voiceInstruction = "voice_instruction"
         }
     }
 

@@ -237,4 +237,83 @@ final class VoiceAssistantControllerTests: XCTestCase {
         XCTAssertTrue(voice.sourceMessage.isEmpty)
         XCTAssertEqual(store.readSnapshot(), voice.snapshot)
     }
+
+    @MainActor
+    func testDoneFromTheKeyboardBindsTheResultToThatFieldForOneTapInsert() throws {
+        try withController { voice, store in
+            voice.snapshot = VoiceAssistantSnapshot(sessionID: "authorized-session", phase: .listening, requestID: "request")
+            XCTAssertTrue(store.send(VoiceAssistantCommand(kind: .finish, sessionID: "authorized-session",
+                                                           keyboardSessionID: "chat-field")))
+            voice.refreshPublishedState()
+            XCTAssertEqual(voice.snapshot.keyboardSessionID, "chat-field")
+            XCTAssertNotEqual(voice.snapshot.phase, .listening)
+        }
+    }
+
+    @MainActor
+    func testDoneInAnotherChatCannotTakeAReplyToAMessageCopiedElsewhere() throws {
+        try withController { voice, store in
+            voice.snapshot = VoiceAssistantSnapshot(sessionID: "authorized-session", phase: .listening, requestID: "request",
+                keyboardSessionID: "chat-with-aidana", sourceMessage: "Встретимся сегодня?")
+            XCTAssertTrue(store.send(VoiceAssistantCommand(kind: .finish, sessionID: "authorized-session",
+                                                           keyboardSessionID: "other-chat")))
+            voice.refreshPublishedState()
+            XCTAssertEqual(voice.snapshot.keyboardSessionID, "chat-with-aidana")
+        }
+    }
+
+    @MainActor
+    func testLatePauseCannotInterruptAReplyBeingGenerated() throws {
+        try withController { voice, store in
+            voice.snapshot = VoiceAssistantSnapshot(sessionID: "authorized-session", phase: .generating,
+                transcript: "Instruction", requestID: "request")
+            XCTAssertTrue(store.send(VoiceAssistantCommand(kind: .pause, sessionID: "authorized-session")))
+            voice.refreshPublishedState()
+            XCTAssertEqual(voice.snapshot.phase, .generating)
+            XCTAssertTrue(store.pendingCommands(sessionID: "authorized-session").isEmpty)
+        }
+    }
+
+    @MainActor
+    func testCancelDiscardsTheTurnButKeepsTheMessageForAnotherTry() throws {
+        try withController { voice, store in
+            voice.sourceMessage = "Explicitly pasted message"
+            voice.snapshot = VoiceAssistantSnapshot(sessionID: "authorized-session", phase: .responseReady,
+                transcript: "Instruction", response: "Response", requestID: "request",
+                sourceMessage: "Explicitly pasted message")
+            voice.cancel()
+            XCTAssertEqual(voice.snapshot.phase, .stopped)
+            XCTAssertTrue(voice.snapshot.transcript.isEmpty)
+            XCTAssertTrue(voice.snapshot.response.isEmpty)
+            XCTAssertEqual(voice.sourceMessage, "Explicitly pasted message")
+            XCTAssertNil(store.readSnapshot()?.readyResponse())
+        }
+    }
+
+    @MainActor
+    func testStopFromIslandOrKeyboardDiscardsWhatWasHeard() throws {
+        try withController { voice, store in
+            voice.snapshot = VoiceAssistantSnapshot(sessionID: "authorized-session", phase: .transcribing,
+                transcript: "Half an instruction", requestID: "request")
+            XCTAssertTrue(store.send(VoiceAssistantCommand(kind: .stop, sessionID: "authorized-session")))
+            voice.refreshPublishedState()
+            XCTAssertEqual(voice.snapshot.phase, .stopped)
+            XCTAssertTrue(voice.snapshot.transcript.isEmpty)
+        }
+    }
+
+    @MainActor
+    func testPausedWordsCanBeContinuedOrTurnedIntoAReply() throws {
+        try withController { voice, _ in
+            voice.snapshot = VoiceAssistantSnapshot(sessionID: "authorized-session", phase: .paused,
+                transcript: "Скажи, что я опоздаю", requestID: "request")
+            XCTAssertTrue(voice.canContinuePausedTurn)
+            voice.snapshot.transcript = "   "
+            XCTAssertFalse(voice.canContinuePausedTurn)
+        }
+        XCTAssertEqual(VoiceAssistantController.joined("Скажи, что я опоздаю ", " на десять минут"),
+                       "Скажи, что я опоздаю на десять минут")
+        XCTAssertEqual(VoiceAssistantController.joined("", "Only new words"), "Only new words")
+        XCTAssertEqual(VoiceAssistantController.joined("Only earlier words", "  "), "Only earlier words")
+    }
 }

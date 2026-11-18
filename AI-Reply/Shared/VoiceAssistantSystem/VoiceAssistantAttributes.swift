@@ -8,8 +8,12 @@ struct VoiceAssistantAttributes: ActivityAttributes {
         var phase: String
         var level: Double = 0
         var deadline: Date
+        /// When audio capture began, for the system-drawn recording timer.
+        var recordingStartedAt: Date?
     }
 
     var sessionID: String
     var startedAt: Date
+    /// The app's language code: the activity speaks it, like the keyboard.
+    var language: String?
 }

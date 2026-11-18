@@ -25,6 +25,9 @@ struct AccountComposeTransport: ComposeTransport {
     /// The wire format, exposed so tests can pin it without a server.
     struct Body: Encodable, Equatable {
         let instruction: String
+        /// "voice" for a dictated instruction, only to a server that publishes
+        /// features.voice_instruction (bodies reject unknown fields).
+        var instruction_source: String? = nil
         let language: String
         let regenerate: Bool
         let input_language: String?
@@ -42,11 +45,13 @@ struct AccountComposeTransport: ComposeTransport {
     static func body(
         for request: ComposeService.Request,
         descriptor: DeviceDescriptor = .current,
-        serverSupportsSenderProfile: Bool = AILimits.serverSupportsSenderProfile
+        serverSupportsSenderProfile: Bool = AILimits.serverSupportsSenderProfile,
+        serverSupportsVoiceInstruction: Bool = AILimits.serverSupportsVoiceInstruction
     ) -> Body {
         let gender = serverSupportsSenderProfile ? request.grammaticalGender : nil
         return Body(
             instruction: request.instruction,
+            instruction_source: request.isVoice && serverSupportsVoiceInstruction ? "voice" : nil,
             language: request.uiLanguage.rawValue,
             regenerate: request.isRegeneration,
             input_language: serverSupportsSenderProfile ? request.inputLanguage?.rawValue : nil,

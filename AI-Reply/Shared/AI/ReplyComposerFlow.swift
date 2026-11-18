@@ -292,6 +292,8 @@ struct ReplySession: Equatable {
     var source: ReplyContextSource?
     var template: ReplyTemplate
     var instruction: String = ""
+    /// The instruction came from AI Reply Voice: it keeps a 40-second turn's room.
+    var isVoice = false
     var flow = ReplyComposerFlow()
     /// What a Watch command asked for beyond the instruction.
     var watch: WatchRequestOverrides?

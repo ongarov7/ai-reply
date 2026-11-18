@@ -22,6 +22,8 @@ import Foundation
 ///         stays.
 struct ComposeSession: Equatable, Sendable {
     var instruction: String = ""
+    /// The instruction came from AI Reply Voice: it keeps a 40-second turn's room.
+    var isVoice = false
     var flow = ReplyComposerFlow()
     /// "Reply to copied" could not start: nothing copied, no Full Access, or
     /// an instruction too long for a reply. (A refused paste is not kept
@@ -172,11 +174,12 @@ final class ComposeFlowCoordinator {
     }
 
     /// A text the watch flow saved, back on screen with Insert.
-    func showSaved(instruction: String, text: String) {
+    func showSaved(instruction: String, text: String, isVoice: Bool = false) {
         cancelTask()
         ComposeSessionParking.discard()
         var next = ComposeSession()
         next.instruction = instruction
+        next.isVoice = isVoice
         next.flow.startGeneration()
         next.flow.receive(reply: text)
         session = next
@@ -201,7 +204,8 @@ final class ComposeFlowCoordinator {
         guard var current = session, !current.flow.isGenerating, task == nil else { return }
         current.copiedMessageError = nil
 
-        if case .failure(let error) = ComposeService.validate(instruction: current.instruction) {
+        let limit = current.isVoice ? AILimits.voiceInstructionCharacters() : AILimits.current.instructionCharacters
+        if case .failure(let error) = ComposeService.validate(instruction: current.instruction, limit: limit) {
             current.flow.fail(error)
             session = current
             delegate?.composeCoordinatorDidChange(self)
@@ -220,7 +224,8 @@ final class ComposeFlowCoordinator {
             isRegeneration: isRegeneration,
             inputLanguage: inputLanguage,
             grammaticalGender: grammaticalGender,
-            actionID: actionID
+            actionID: actionID,
+            isVoice: current.isVoice
         ))
     }
 

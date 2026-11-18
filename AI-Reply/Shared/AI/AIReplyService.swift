@@ -35,6 +35,9 @@ struct AIReplyService: Sendable {
         /// The identity of an action that can be run more than once, for the
         /// server's `Idempotency-Key`. nil: this tap is the action.
         var actionID: String? = nil
+        /// The instruction was dictated in AI Reply Voice: it keeps the room
+        /// of a 40-second turn instead of a typed note's.
+        var isVoice: Bool = false
     }
 
     private let configuration: AIConfiguration
@@ -112,7 +115,7 @@ struct AIReplyService: Sendable {
 
         // Prepared ONCE, here, and then used for both the local prompt and the
         // backend request. Preparing it twice is how the two would drift.
-        let instruction = ReplyInstruction.prepare(request.instruction)
+        let instruction = ReplyInstruction.prepare(request.instruction, voice: request.isVoice)
 
         // The template's own schedule wins when it has one; otherwise the
         // profile's applies. Resolved HERE, deterministically, so the model is
@@ -173,6 +176,7 @@ struct AIReplyService: Sendable {
             context: AccountReplyTransport.RequestContext(
                 message: message,
                 instruction: instruction,
+                instructionIsVoice: request.isVoice,
                 templateID: template.id,
                 templateName: templateName,
                 templateRelationship: template.relationship.rawValue,

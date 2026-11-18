@@ -56,6 +56,8 @@ extension AILimits {
         static let idempotentGeneration = "ai.features.idempotentGeneration"
         static let voiceTranscription = "ai.features.voiceTranscription"
         static let voiceRealtimeTranscription = "ai.features.voiceRealtimeTranscription"
+        static let voiceInstruction = "ai.features.voiceInstruction"
+        static let voiceInstructionCharacters = "ai.limits.voiceInstructionCharacters"
     }
 
     private static let lock = NSLock()
@@ -161,6 +163,25 @@ extension AILimits {
         AppGroup.defaults.bool(forKey: Key.voiceRealtimeTranscription)
     }
 
+    /// The server takes `instruction_source: "voice"` and gives a dictated
+    /// instruction the room of a 40-second turn.
+    static var serverSupportsVoiceInstruction: Bool {
+        AppGroup.defaults.bool(forKey: Key.voiceInstruction)
+    }
+
+    /// The longest dictated instruction this server accepts: its published
+    /// voice limit, never below the typed one; the typed limit on a server
+    /// that does not know voice instructions.
+    static func voiceInstructionCharacters(defaults: UserDefaults = AppGroup.defaults) -> Int {
+        let typed = current.instructionCharacters
+        guard defaults.bool(forKey: Key.voiceInstruction) else { return typed }
+        let voice = defaults.integer(forKey: Key.voiceInstructionCharacters)
+        return voiceInstructionRange.contains(voice) ? max(typed, voice) : typed
+    }
+
+    /// What a published voice limit has to fall inside to be believed.
+    static let voiceInstructionRange: ClosedRange<Int> = 50...4000
+
     /// Stores the request-shaping flags. Anything the server did not publish
     /// is false: a field is only ever sent to a server that asked for it.
     static func storeFeatures(_ features: AccountAPI.Features?, defaults: UserDefaults = AppGroup.defaults) {
@@ -171,6 +192,7 @@ extension AILimits {
         defaults.set(features?.idempotentGeneration ?? false, forKey: Key.idempotentGeneration)
         defaults.set(features?.voiceTranscription ?? false, forKey: Key.voiceTranscription)
         defaults.set(features?.voiceRealtimeTranscription ?? false, forKey: Key.voiceRealtimeTranscription)
+        defaults.set(features?.voiceInstruction ?? false, forKey: Key.voiceInstruction)
     }
 
     /// Everything `/api/v1/config` publishes that the reply flow uses,
@@ -182,6 +204,7 @@ extension AILimits {
             defaults: defaults
         )
         storeFeatures(config.features, defaults: defaults)
+        defaults.set(config.maxVoiceInstructionLength ?? 0, forKey: Key.voiceInstructionCharacters)
         LegalConsentStore.storeCurrentVersions(config.legal ?? .production, defaults: defaults)
     }
 }

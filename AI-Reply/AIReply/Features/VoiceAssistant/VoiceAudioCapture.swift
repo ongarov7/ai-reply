@@ -46,7 +46,11 @@ final class VoiceAudioCapture {
             let source = UnsafeMutableAudioBufferListPointer(buffer.mutableAudioBufferList)
             let target = UnsafeMutableAudioBufferListPointer(copy.mutableAudioBufferList)
             for (from, to) in zip(source, target) {
-                if let src = from.mData, let dst = to.mData { memcpy(dst, src, Int(from.mDataByteSize)) }
+                // Never copy more than the destination holds, whatever size
+                // a route change reports for the source buffer.
+                if let src = from.mData, let dst = to.mData {
+                    memcpy(dst, src, Int(min(from.mDataByteSize, to.mDataByteSize)))
+                }
             }
             queue.async {
                 let capacity = AVAudioFrameCount(ceil(Double(copy.frameLength) * 24_000 / format.sampleRate)) + 64

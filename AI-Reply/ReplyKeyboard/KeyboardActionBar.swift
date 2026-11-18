@@ -75,6 +75,7 @@ final class KeyboardActionBar: UIView {
     private let watchStrip = WatchVoiceStripView()
     private let voiceStrip = VoiceAssistantStripView()
     private var voiceSnapshot: VoiceAssistantSnapshot?
+    private var voiceInsertsDirectly = false
     private var voiceTheme = KeyboardTheme(isDark: true)
     private var voiceLanguage = AppLanguage.english
     private var voiceControlsVisible = false
@@ -256,21 +257,34 @@ final class KeyboardActionBar: UIView {
     private func refreshWatchStrip() {
         let showsVoice = (voiceSnapshot != nil || voiceNotice != nil || voiceControlsVisible) && !isComposing && !showsSuggestions
         let visible = showsWatchStrip && !showsVoice
+        // While the phone's voice session owns the row, the watch control
+        // gives its width to the live caption and comes back afterwards.
+        if templateBar.setWatchSuppressed(showsVoice) {
+            setNeedsLayout()
+            layoutIfNeeded()
+        }
         watchStrip.isHidden = !visible
         voiceStrip.isHidden = !showsVoice
         templateBar.setPersonasHidden(visible || showsVoice || showsSuggestions)
     }
 
-    func setVoiceAssistant(_ snapshot: VoiceAssistantSnapshot?) {
+    /// - Parameter insertsDirectly: the result was requested from the field
+    ///   on screen; any other result opens for review before insertion.
+    func setVoiceAssistant(_ snapshot: VoiceAssistantSnapshot?, insertsDirectly: Bool = false) {
         // Defensive gating also covers a snapshot delivered just as it
         // expires. A meaningful failure notice lasts at most ten seconds;
         // inactive sessions never replace persona controls.
         let snapshot = snapshot?.isVisibleInKeyboard() == true ? snapshot : nil
-        if snapshot?.sessionID != voiceSnapshot?.sessionID || snapshot?.phase != voiceSnapshot?.phase {
+        // The microphone menu stays open while the user speaks (listening →
+        // speech detected); it closes when recording ends or the session changes.
+        if snapshot?.sessionID != voiceSnapshot?.sessionID
+            || snapshot?.phase.isRecording != voiceSnapshot?.phase.isRecording {
             voiceControlsVisible = false
         }
         voiceSnapshot = snapshot
+        voiceInsertsDirectly = insertsDirectly
         let strings = KeyboardVoiceStrings(voiceLanguage)
+        templateBar.setMicrophoneLabel(strings.menu, hint: strings.menuHint)
         if templateBar.setMicrophone(visible: snapshot?.showsMicrophoneInKeyboard() == true,
                                     active: snapshot?.phase.isRecording == true,
                                     status: snapshot.map { strings.status($0.phase) }) {
@@ -285,12 +299,14 @@ final class KeyboardActionBar: UIView {
         guard snapshot.showsMicrophoneInKeyboard(), !isComposing else { return }
         voiceNoticeReset?.cancel()
         voiceNotice = nil
-        voiceControlsVisible = true
+        // The microphone button toggles its menu.
+        voiceControlsVisible.toggle()
         renderVoiceStrip()
         refreshWatchStrip()
     }
 
-    func showVoiceNotice(_ message: String) {
+    /// A short inline message in place of the strip; ✕ closes it sooner.
+    func showVoiceNotice(_ message: String, duration: TimeInterval = 6) {
         voiceNoticeReset?.cancel()
         voiceControlsVisible = false
         voiceNotice = message
@@ -303,7 +319,7 @@ final class KeyboardActionBar: UIView {
             self.refreshWatchStrip()
         }
         voiceNoticeReset = reset
-        DispatchQueue.main.asyncAfter(deadline: .now() + 10, execute: reset)
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration, execute: reset)
     }
 
     @discardableResult
@@ -324,7 +340,8 @@ final class KeyboardActionBar: UIView {
             if voiceControlsVisible {
                 voiceStrip.showControls(snapshot: voiceSnapshot, theme: voiceTheme, language: voiceLanguage)
             } else {
-                voiceStrip.configure(snapshot: voiceSnapshot, theme: voiceTheme, language: voiceLanguage)
+                voiceStrip.configure(snapshot: voiceSnapshot, theme: voiceTheme, language: voiceLanguage,
+                                     insertsDirectly: voiceInsertsDirectly)
             }
         }
     }

@@ -346,7 +346,8 @@ final class ReplyFlowCoordinator {
             uiLanguage: uiLanguage,
             instruction: snapshot.instruction,
             inputLanguage: inputLanguage,
-            actionID: snapshot.watch?.actionID
+            actionID: snapshot.watch?.actionID,
+            isVoice: snapshot.isVoice
         )
         generation += 1
         let ticket = generation

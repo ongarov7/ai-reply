@@ -54,6 +54,7 @@ final class TemplateBarView: UIView {
     private let microphoneButton = UIButton(type: .system)
     private var microphoneActive = false
     private var microphoneVisible = false
+    private var watchSuppressed = false
     private var watchIndicator: WatchKeyboardIndicator = .hidden
     private let scrollView = UIScrollView()
     private let hintLabel = UILabel()
@@ -178,15 +179,19 @@ final class TemplateBarView: UIView {
         microphoneVisible = visible
         microphoneActive = active
         microphoneButton.isHidden = !visible
-        microphoneButton.configuration?.image = UIImage(systemName: active ? "waveform" : "mic.fill",
+        // The strip already shows the live waveform; this is the session's
+        // microphone menu (copied message, pause, cancel), so it keeps 🎙.
+        microphoneButton.configuration?.image = UIImage(systemName: "mic.fill",
             withConfiguration: UIImage.SymbolConfiguration(pointSize: 17, weight: .semibold))
         microphoneButton.accessibilityValue = status
         microphoneButton.setNeedsUpdateConfiguration()
-        if visibilityChanged {
-            updateAccessibilityOrder()
-            setNeedsLayout()
-        }
-        return visibilityChanged
+        return applyTrailingChange(visibilityChanged)
+    }
+
+    /// Names the microphone menu in the app's language.
+    func setMicrophoneLabel(_ label: String, hint: String) {
+        microphoneButton.accessibilityLabel = label
+        microphoneButton.accessibilityHint = hint
     }
 
     /// `.hidden` takes the control away and gives its width back to the
@@ -199,15 +204,32 @@ final class TemplateBarView: UIView {
         watchButton.accessibilityLabel = name
         watchButton.accessibilityValue = status
         guard indicator != watchIndicator else { return false }
-        let visibilityChanged = (indicator == .hidden) != (watchIndicator == .hidden)
+        let wasVisible = watchVisible
         watchIndicator = indicator
-        watchButton.isHidden = indicator == .hidden
+        watchButton.isHidden = !watchVisible
         watchButton.setNeedsUpdateConfiguration()
-        if visibilityChanged {
+        return applyTrailingChange(wasVisible != watchVisible)
+    }
+
+    /// An iPhone voice session owns the row: the watch control steps aside
+    /// so the live caption and Done get its width, then comes back.
+    @discardableResult
+    func setWatchSuppressed(_ suppressed: Bool) -> Bool {
+        guard suppressed != watchSuppressed else { return false }
+        let wasVisible = watchVisible
+        watchSuppressed = suppressed
+        watchButton.isHidden = !watchVisible
+        return applyTrailingChange(wasVisible != watchVisible)
+    }
+
+    private var watchVisible: Bool { watchIndicator != .hidden && !watchSuppressed }
+
+    private func applyTrailingChange(_ changed: Bool) -> Bool {
+        if changed {
             updateAccessibilityOrder()
             setNeedsLayout()
         }
-        return visibilityChanged
+        return changed
     }
 
     override func layoutSubviews() {
@@ -223,16 +245,23 @@ final class TemplateBarView: UIView {
             guard chips.indices.contains(index), let image = icon(for: chips[index]) else { return 0 }
             return ceil(image.size.width) + iconPadding
         }
+        // Trailing controls, edge first: the voice microphone, then the
+        // watch, one ordinary gap apart (never touching).
+        let trailingCount = (watchVisible ? 1 : 0) + (microphoneVisible ? 1 : 0)
+        let actionWidth = PersonaRowLayout.watchActionWidth
         let layout = PersonaRowLayout(width: bounds.width, height: bounds.height, textWidths: texts, iconWidths: icons,
-                                      trailingActionWidth: PersonaRowLayout.watchActionWidth *
-                                        ((watchIndicator == .hidden ? 0 : 1) + (microphoneVisible ? 1 : 0)))
+                                      trailingActionWidth: trailingCount == 0 ? 0
+                                        : actionWidth * CGFloat(trailingCount) + PersonaRowLayout.spacing * CGFloat(trailingCount - 1))
         if let trailingFrame = layout.trailingFrame {
+            var x = trailingFrame.maxX
             if microphoneVisible {
-                microphoneButton.frame = CGRect(x: trailingFrame.maxX - PersonaRowLayout.watchActionWidth,
-                    y: trailingFrame.minY, width: PersonaRowLayout.watchActionWidth, height: trailingFrame.height)
+                x -= actionWidth
+                microphoneButton.frame = CGRect(x: x, y: trailingFrame.minY, width: actionWidth, height: trailingFrame.height)
+                x -= PersonaRowLayout.spacing
             }
-            watchButton.frame = CGRect(x: trailingFrame.minX, y: trailingFrame.minY,
-                width: PersonaRowLayout.watchActionWidth, height: trailingFrame.height)
+            if watchVisible {
+                watchButton.frame = CGRect(x: x - actionWidth, y: trailingFrame.minY, width: actionWidth, height: trailingFrame.height)
+            }
         }
         if layout.showsIcons != showsIcons {
             showsIcons = layout.showsIcons

@@ -1,3 +1,4 @@
+import UIKit
 import XCTest
 @testable import AIReply
 
@@ -222,5 +223,58 @@ final class VoiceAssistantStoreTests: XCTestCase {
             throw XCTSkip("This runtime does not expose Data Protection metadata; physical lock behavior is not tested here.")
         }
         XCTAssertEqual(protection, FileProtectionType.completeUnlessOpen.rawValue)
+    }
+
+    func testHandledResultsAreSharedByEveryKeyboardInstanceAndExpire() throws {
+        let suite = "voice-ledger-" + UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let ledger = VoiceAssistantResultLedger(defaults: defaults)
+        XCTAssertFalse(ledger.contains(requestID: "request", now: now))
+        ledger.record(requestID: "request", insertedText: "Привет!  Завтра  буду.", now: now)
+        // iOS may build a new keyboard for each appearance: it reads the same record.
+        let nextKeyboard = VoiceAssistantResultLedger(defaults: defaults)
+        XCTAssertTrue(nextKeyboard.contains(requestID: "request", now: now.addingTimeInterval(60)))
+        XCTAssertTrue(nextKeyboard.containsInsertedText("привет! завтра буду.", now: now),
+                      "case and spacing do not make an inserted response another person's message")
+        XCTAssertFalse(nextKeyboard.containsInsertedText("Привет! Встретимся сегодня?", now: now))
+        XCTAssertFalse(nextKeyboard.contains(requestID: "request",
+                                             now: now.addingTimeInterval(VoiceAssistantResultLedger.lifetime + 1)))
+    }
+
+    func testHandledResultLedgerStaysBoundedAndStoresNoText() throws {
+        let suite = "voice-ledger-" + UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let ledger = VoiceAssistantResultLedger(defaults: defaults)
+        for index in 0..<100 {
+            ledger.record(requestID: "request-\(index)", insertedText: "Private response \(index)",
+                          now: now.addingTimeInterval(Double(index)))
+        }
+        let stored = defaults.dictionary(forKey: "voiceAssistant.handledResults.v1") ?? [:]
+        XCTAssertLessThanOrEqual(stored.count, 40)
+        XCTAssertTrue(ledger.contains(requestID: "request-99", now: now.addingTimeInterval(100)))
+        XCTAssertFalse(stored.keys.contains { $0.contains("Private response") })
+    }
+
+    func testKeyboardRedrawsWhenACopiedMessageIsAttachedToTheRecording() {
+        var snapshot = VoiceAssistantSnapshot(sessionID: "session", phase: .listening,
+            requestID: "request", updatedAt: now, expiresAt: now.addingTimeInterval(180))
+        let before = snapshot.keyboardRenderRevision(now: now)
+        snapshot.sourceMessage = "Привет! Встретимся сегодня?"
+        XCTAssertNotEqual(snapshot.keyboardRenderRevision(now: now), before)
+    }
+
+    func testLiveCaptionShowsTheNewestWordsInsteadOfCuttingTheMiddle() {
+        let font = UIFont.systemFont(ofSize: 13)
+        let text = "Ответь Айдане, что сегодня я занят, но завтра после обеда смогу встретиться"
+        let fitted = VoiceCaption.newestWords(of: text, fitting: 110, lines: 2, font: font)
+        XCTAssertTrue(fitted.hasPrefix("…"))
+        XCTAssertTrue(text.hasSuffix(String(fitted.dropFirst())), "the caption is the end of the speech, not its start")
+        XCTAssertTrue(fitted.hasSuffix("встретиться"))
+        let rect = (fitted as NSString).boundingRect(with: CGSize(width: 110, height: CGFloat.greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: [.font: font], context: nil)
+        XCTAssertLessThanOrEqual(ceil(rect.height), ceil(font.lineHeight * 2) + 1)
+        XCTAssertEqual(VoiceCaption.newestWords(of: "Ответь", fitting: 110, lines: 2, font: font), "Ответь")
     }
 }
