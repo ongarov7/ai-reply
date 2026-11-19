@@ -31,6 +31,9 @@ struct VoiceAssistantSnapshot: Codable, Equatable, Sendable {
     var error: String?
     var sourceMessage: String = ""
     var templateID: String?
+    /// The screenshot this turn answers (`ScreenshotContext.id`): the reply
+    /// is written from its whole conversation, `sourceMessage` is its target.
+    var screenshotID: String?
 
     func isFresh(now: Date = Date()) -> Bool {
         now < expiresAt && updatedAt <= now.addingTimeInterval(10)

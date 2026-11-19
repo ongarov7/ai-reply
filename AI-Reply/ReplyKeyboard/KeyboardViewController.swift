@@ -1441,6 +1441,11 @@ extension KeyboardViewController: KeyboardActionBarDelegate {
                 var session = ReplySession(sourceMessage: snapshot.sourceMessage, source: .clipboard, template: template)
                 session.instruction = snapshot.transcript
                 session.isVoice = true
+                // A reply to a screenshot regenerates from its whole chat.
+                if let id = snapshot.screenshotID, let context = self.screenshot.context, context.id == id {
+                    session.screenshot = context.conversation
+                    session.source = .screenshot
+                }
                 session.flow.startGeneration()
                 session.flow.receive(reply: snapshot.response)
                 self.replyCoordinator.open(handedOff: session)

@@ -176,6 +176,9 @@ struct ScreenshotContext: Codable, Equatable, Sendable {
     /// An instruction that came with it (the shortcut's own dictation).
     var instruction: String?
     var draft: ScreenshotDraft?
+    /// AI Reply Voice is answering this screenshot right now (the shortcut
+    /// that stays in the chat): the keyboard shows the voice strip instead.
+    var voiceSessionID: String?
 
     /// How long a screenshot and its text stay on the iPhone (the privacy
     /// policy says "at most one hour").

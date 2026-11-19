@@ -59,6 +59,8 @@ final class KeyboardScreenshot {
     }
 
     private func strip(for context: ScreenshotContext) -> KeyboardScreenshotStrip? {
+        // AI Reply Voice is answering it: the voice strip shows that turn.
+        if context.voiceSessionID != nil { return nil }
         if let draft = context.draft, !isHandled("draft:" + draft.requestID) {
             let flat = draft.text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
             return .draft(preview: flat.count > 60 ? String(flat.prefix(60)) + "…" : flat)

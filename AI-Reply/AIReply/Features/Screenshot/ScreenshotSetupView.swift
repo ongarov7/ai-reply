@@ -35,6 +35,10 @@ struct ScreenshotSetupView: View {
                     } label: {
                         Label("screenshot.setup.openShortcuts", systemImage: "square.on.square")
                     }
+                    Label("screenshot.setup.voice.note", systemImage: "mic.circle")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 } header: {
                     Text("screenshot.setup.shortcut.header")
                 } footer: {
@@ -55,6 +59,7 @@ struct ScreenshotSetupView: View {
                     Label("screenshot.setup.backTap", systemImage: "hand.tap")
                     Label("screenshot.setup.actionButton", systemImage: "button.horizontal.top.press")
                     Label("screenshot.setup.keyboard", systemImage: "keyboard")
+                    Label("screenshot.setup.openApp", systemImage: "crop")
                 } header: {
                     Text("screenshot.setup.more.header")
                 }

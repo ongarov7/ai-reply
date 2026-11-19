@@ -46,6 +46,44 @@ struct ReplyToScreenshotIntent: AppIntent {
     }
 }
 
+/// The shortcut that stays in the chat: it reads the screenshot on the
+/// iPhone and turns AI Reply Voice on at once (Dynamic Island, 40 seconds),
+/// with the conversation as the turn's context. The person says how to
+/// reply; the reply waits in the AI Reply keyboard. The app is not opened.
+@available(iOS 18.0, *)
+struct ReplyToScreenshotByVoiceIntent: AudioRecordingIntent, LiveActivityIntent {
+    static var title: LocalizedStringResource = "Reply to Screenshot by Voice"
+    static var description = IntentDescription(
+        "Reads the conversation in a screenshot on your iPhone and starts AI Reply Voice without leaving the chat: say how to reply, and the reply waits in the AI Reply keyboard.")
+    static var openAppWhenRun: Bool { false }
+    static var authenticationPolicy: IntentAuthenticationPolicy { .requiresLocalDeviceAuthentication }
+
+    @available(iOS 26.0, *)
+    static var supportedModes: IntentModes { .background }
+
+    @Parameter(title: "Screenshot", supportedTypeIdentifiers: ["public.image"])
+    var screenshot: IntentFile
+
+    static var parameterSummary: some ParameterSummary {
+        Summary("Reply to \(\.$screenshot) by voice")
+    }
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        let context: ScreenshotContext
+        do {
+            context = try await ScreenshotIntake.ingest(screenshot.data, source: .shortcut,
+                                                        language: SharedSettings.shared.effectiveAppLanguage)
+        } catch {
+            throw ScreenshotIntentError.unreadable
+        }
+        // Capture and its Live Activity begin before perform returns, as
+        // AudioRecordingIntent requires.
+        try await VoiceAssistantController.shared.startFromScreenshot(context)
+        return .result()
+    }
+}
+
 /// Reads the screenshot and leaves it for the AI Reply keyboard, without
 /// leaving the chat.
 struct PrepareScreenshotForKeyboardIntent: AppIntent {

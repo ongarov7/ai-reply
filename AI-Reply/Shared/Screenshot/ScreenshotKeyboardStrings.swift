@@ -50,6 +50,15 @@ struct ScreenshotKeyboardStrings {
              "Bu skrinshot javobi \(maxUnits) tagacha javob sarflashi mumkin (narx — AI’ning haqiqiy ishlovi boʻyicha). Tasdiqlash uchun «Qayta urinish»ni bosing.")
     }
 
+    /// AI Reply Voice heard the instruction, but the reply may cost more
+    /// than one: the screenshot strip asks before anything is charged.
+    func voiceNeedsConfirmation(maxUnits: Int) -> String {
+        text("This reply may use up to \(maxUnits) replies. Tap Reply on the screenshot strip to confirm; your instruction is kept.",
+             "Этот ответ может списать до \(maxUnits) ответов. Нажмите «Ответить» на полоске скриншота, чтобы подтвердить; инструкция сохранена.",
+             "Бұл жауап \(maxUnits) жауапқа дейін жұмсауы мүмкін. Растау үшін скриншот жолағында «Жауап беру» басыңыз; нұсқау сақталды.",
+             "Bu javob \(maxUnits) tagacha javob sarflashi mumkin. Tasdiqlash uchun skrinshot qatorida «Javob berish»ni bosing; koʻrsatma saqlandi.")
+    }
+
     func costTooHigh(maxUnits: Int, available: Int) -> String {
         text("This screenshot reply may need up to \(maxUnits) replies, and \(available) are left. Shorten the instruction or open AI Reply to buy more.",
              "Этому ответу по скриншоту может понадобиться до \(maxUnits) ответов, а осталось \(available). Сократите инструкцию или откройте AI Reply, чтобы докупить.",

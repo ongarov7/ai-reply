@@ -1,6 +1,151 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Reply to Screenshot by Voice" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reply to Screenshot by Voice"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ответить на скриншот голосом"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скриншотқа дауыспен жауап беру"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skrinshotga ovoz bilan javob berish"
+          }
+        }
+      }
+    },
+    "Reads the conversation in a screenshot on your iPhone and starts AI Reply Voice without leaving the chat: say how to reply, and the reply waits in the AI Reply keyboard." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reads the conversation in a screenshot on your iPhone and starts AI Reply Voice without leaving the chat: say how to reply, and the reply waits in the AI Reply keyboard."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Читает переписку на скриншоте прямо на iPhone и сразу включает AI Reply Voice, не уходя из чата: скажите, как ответить, — ответ будет ждать в клавиатуре AI Reply."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скриншоттағы хат алмасуды iPhone-да оқып, чаттан шықпай AI Reply Voice қосады: қалай жауап беру керегін айтыңыз — жауап AI Reply пернетақтасында күтеді."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skrinshotdagi yozishmani iPhone’da oʻqiydi va chatdan chiqmasdan AI Reply Voice’ni yoqadi: qanday javob berishni ayting — javob AI Reply klaviaturasida kutadi."
+          }
+        }
+      }
+    },
+    "Reply to ${screenshot} by voice" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reply to ${screenshot} by voice"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ответить на ${screenshot} голосом"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "${screenshot} — дауыспен жауап беру"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "${screenshot} ga ovoz bilan javob berish"
+          }
+        }
+      }
+    },
+    "screenshot.setup.voice.note" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The first time, open AI Reply Voice in the app once (the microphone on the Home screen) and allow the microphone, voice processing and Live Activities. After that the shortcut works from any chat without opening AI Reply: it takes the screenshot, the microphone turns on in the Dynamic Island, you say how to reply, and the reply waits in the AI Reply keyboard."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "В первый раз откройте AI Reply Voice в приложении (микрофон на главном экране) и разрешите микрофон, обработку голоса и «Эфир активности». Дальше команда работает из любого чата, не открывая AI Reply: делает скриншот, включает микрофон в Dynamic Island, вы говорите, как ответить, — ответ ждёт в клавиатуре AI Reply."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Алғаш рет қолданбада AI Reply Voice ашып (басты экрандағы микрофон), микрофонға, дауысты өңдеуге және «Эфир активности» мүмкіндігіне рұқсат беріңіз. Содан кейін команда AI Reply ашпай-ақ кез келген чаттан жұмыс істейді: скриншот түсіреді, Dynamic Island-та микрофон қосылады, қалай жауап беру керегін айтасыз — жауап AI Reply пернетақтасында күтеді."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Birinchi marta ilovada AI Reply Voice’ni oching (bosh ekrandagi mikrofon) va mikrofon, ovozni qayta ishlash hamda Live Activities («Эфир активности»)ga ruxsat bering. Shundan keyin buyruq AI Reply’ni ochmasdan istalgan chatdan ishlaydi: skrinshot oladi, Dynamic Island’da mikrofon yoqiladi, qanday javob berishni aytasiz — javob AI Reply klaviaturasida kutadi."
+          }
+        }
+      }
+    },
+    "screenshot.setup.openApp" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To crop the screenshot or send the picture itself, use Reply to Screenshot instead: it opens AI Reply."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Чтобы обрезать скриншот или отправить саму картинку, используйте вместо этого «Ответить на скриншот»: оно открывает AI Reply."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скриншотты кесу не суреттің өзін жіберу үшін оның орнына «Скриншотқа жауап беру» әрекетін пайдаланыңыз: ол AI Reply ашады."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skrinshotni qirqish yoki rasmning oʻzini yuborish uchun buning oʻrniga «Skrinshotga javob berish» amalidan foydalaning: u AI Reply’ni ochadi."
+          }
+        }
+      }
+    },
     "home.screenshot" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2849,25 +2994,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Add Reply to Screenshot from AI Reply after it."
+            "value" : "Add Reply to Screenshot by Voice from AI Reply after it."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "После него добавьте «Ответить на скриншот» из AI Reply."
+            "value" : "После него добавьте «Ответить на скриншот голосом» из AI Reply."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Одан кейін AI Reply-дан «Скриншотқа жауап беру» әрекетін қосыңыз."
+            "value" : "Одан кейін AI Reply-дан «Скриншотқа дауыспен жауап беру» әрекетін қосыңыз."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Undan keyin AI Reply’dan «Skrinshotga javob berish» amalini qoʻshing."
+            "value" : "Undan keyin AI Reply’dan «Skrinshotga ovoz bilan javob berish» amalini qoʻshing."
           }
         }
       }
@@ -3052,25 +3197,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "You can also add the AI Reply Screenshot control from AI Reply: it opens this screen to choose a screenshot you already took."
+            "value" : "Tap it in any chat: the screenshot is taken, AI Reply stays closed and the microphone turns on in the Dynamic Island."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Можно добавить и элемент «AI Reply Screenshot» из AI Reply: он открывает этот экран, чтобы выбрать уже сделанный скриншот."
+            "value" : "Нажмите её в любом чате: снимок делается, AI Reply не открывается, микрофон включается в Dynamic Island."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Reply-дан «AI Reply Screenshot» элементін де қосуға болады: ол бұрын түсірілген скриншотты таңдау үшін осы экранды ашады."
+            "value" : "Оны кез келген чатта басыңыз: скриншот түсіріледі, AI Reply ашылмайды, микрофон Dynamic Island-та қосылады."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Reply’dan «AI Reply Screenshot» elementini ham qoʻshish mumkin: u oldin olingan skrinshotni tanlash uchun shu ekranni ochadi."
+            "value" : "Uni istalgan chatda bosing: skrinshot olinadi, AI Reply ochilmaydi, mikrofon Dynamic Island’da yoqiladi."
           }
         }
       }
@@ -3197,25 +3342,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "To stay in the chat, build the shortcut with Use Screenshot in Keyboard instead, then tap Reply on the screenshot strip of the AI Reply keyboard."
+            "value" : "Without the microphone: use Use Screenshot in Keyboard instead, then tap Reply on the screenshot strip of the AI Reply keyboard and type the instruction."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Чтобы не уходить из чата, соберите команду с действием «Скриншот в клавиатуру», затем нажмите «Ответить» на полоске скриншота в клавиатуре AI Reply."
+            "value" : "Без микрофона: используйте вместо этого «Скриншот в клавиатуру», затем нажмите «Ответить» на полоске скриншота в клавиатуре AI Reply и напишите инструкцию."
           }
         },
         "kk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Чаттан шықпау үшін команданы «Скриншотты пернетақтада пайдалану» әрекетімен жинап, содан кейін AI Reply пернетақтасындағы скриншот жолағында «Жауап беру» басыңыз."
+            "value" : "Микрофонсыз: оның орнына «Скриншотты пернетақтада пайдалану» әрекетін қолданыңыз, содан кейін AI Reply пернетақтасындағы скриншот жолағында «Жауап беру» басып, нұсқауды жазыңыз."
           }
         },
         "uz" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Chatdan chiqmaslik uchun buyruqni «Skrinshotni klaviaturada ishlatish» amali bilan yigʻing, keyin AI Reply klaviaturasidagi skrinshot qatorida «Javob berish»ni bosing."
+            "value" : "Mikrofonsiz: buning oʻrniga «Skrinshotni klaviaturada ishlatish» amalidan foydalaning, keyin AI Reply klaviaturasidagi skrinshot qatorida «Javob berish»ni bosing va koʻrsatmani yozing."
           }
         }
       }

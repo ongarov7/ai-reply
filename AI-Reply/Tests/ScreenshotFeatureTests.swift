@@ -167,3 +167,50 @@ final class ScreenshotFeatureTests: XCTestCase {
         XCTAssertEqual(VoiceReplyViewModel().maximumDuration, 60, "other dictation keeps its minute")
     }
 }
+
+/// The in-chat shortcut: screenshot, then AI Reply Voice at once.
+final class ScreenshotVoiceTests: XCTestCase {
+
+    func testAnOlderVoiceSnapshotStillDecodes() throws {
+        let old = #"{"sessionID":"s1","phase":"responseReady","transcript":"ok","response":"Hi","updatedAt":0,"expiresAt":0,"sourceMessage":"","keyboardSessionID":null}"#
+        let snapshot = try JSONDecoder().decode(VoiceAssistantSnapshot.self, from: Data(old.utf8))
+        XCTAssertNil(snapshot.screenshotID)
+        var next = snapshot
+        next.screenshotID = "shot-1"
+        let round = try JSONDecoder().decode(VoiceAssistantSnapshot.self, from: JSONEncoder().encode(next))
+        XCTAssertEqual(round.screenshotID, "shot-1")
+    }
+
+    func testTheScreenshotRemembersTheVoiceTurnAnsweringIt() throws {
+        var context = ScreenshotContext(id: "shot-1", createdAt: Date(), source: .shortcut, imageWidth: 10, imageHeight: 10,
+                                        conversation: ScreenshotConversation(messages: [ScreenshotMessage(id: "m1", role: .other, text: "Hi")]))
+        context.voiceSessionID = "voice-1"
+        let round = try JSONDecoder().decode(ScreenshotContext.self, from: JSONEncoder().encode(context))
+        XCTAssertEqual(round.voiceSessionID, "voice-1")
+    }
+
+    @MainActor
+    func testWithoutTheVoiceSetupTheShortcutSaysWhatToDo() async {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("voice-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let controller = VoiceAssistantController(store: VoiceAssistantStore(rootURL: root), protectedDataAvailable: { true })
+        let context = ScreenshotContext(id: "shot-1", createdAt: Date(), source: .shortcut, imageWidth: 10, imageHeight: 10,
+                                        conversation: ScreenshotConversation(messages: [ScreenshotMessage(id: "m1", role: .other, text: "Hi")]))
+        do {
+            try await controller.startFromScreenshot(context)
+            XCTFail("no microphone or voice consent was given in tests")
+        } catch let error as VoiceAssistantControlStartError {
+            XCTAssertFalse(error.message.isEmpty)
+        } catch {
+            XCTFail("unexpected \(error)")
+        }
+        XCTAssertFalse(controller.isCapturing)
+    }
+
+    func testVoiceConfirmationWordsExistInEveryLanguage() {
+        for language in AppLanguage.allCases {
+            let text = ScreenshotKeyboardStrings(language).voiceNeedsConfirmation(maxUnits: 3)
+            XCTAssertTrue(text.contains("3"), "\(language): \(text)")
+        }
+    }
+}

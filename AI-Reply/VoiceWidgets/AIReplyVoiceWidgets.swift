@@ -9,7 +9,6 @@ struct AIReplyVoiceWidgetBundle: WidgetBundle {
         AIReplyVoiceLiveActivity()
         if #available(iOS 18.0, *) {
             AIReplyVoiceControl()
-            AIReplyScreenshotControl()
         }
     }
 }
@@ -30,24 +29,6 @@ struct AIReplyVoiceControl: ControlWidget {
         }
         .displayName("AI Reply Voice")
         .description("Start a voice instruction without opening AI Reply after first-time setup.")
-    }
-}
-
-/// Opens AI Reply's screenshot screen: the latest screenshot or one chosen
-/// from Photos. Control Center gives a control no screen capture, so this
-/// button never captures anything itself; capturing a chat is the person's
-/// own shortcut (Take Screenshot → Reply to Screenshot), which they can add to
-/// Control Center next to it.
-@available(iOS 18.0, *)
-struct AIReplyScreenshotControl: ControlWidget {
-    var body: some ControlWidgetConfiguration {
-        StaticControlConfiguration(kind: "kz.ai-reply.screenshot.open") {
-            ControlWidgetButton(action: OpenScreenshotReplyIntent()) {
-                Label("AI Reply Screenshot", systemImage: "camera.viewfinder")
-            }
-        }
-        .displayName("AI Reply Screenshot")
-        .description("Open AI Reply to answer a screenshot of a chat.")
     }
 }
 

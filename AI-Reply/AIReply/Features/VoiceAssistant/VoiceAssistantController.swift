@@ -16,6 +16,8 @@ final class VoiceAssistantController {
     var elapsed = 0.0
     var sourceMessage = ""
     var templateID: String?
+    /// The screenshot the next turn answers (the in-chat screenshot shortcut).
+    var screenshotID: String?
     var languageCode = "auto"
     private(set) var isStarting = false
     var copy: VoiceAssistantCopy { .init(language: SharedSettings.shared.effectiveAppLanguage) }
@@ -111,6 +113,7 @@ final class VoiceAssistantController {
             // A system shortcut is a new conversation context. Never reuse a
             // message pasted for a preceding turn without another paste.
             sourceMessage = ""
+            screenshotID = nil
             templateID = SharedSettings.shared.lastTemplateID
         }
         if startWhenPossible && hasVoiceConsent && !isBusy { start() }
@@ -156,10 +159,38 @@ final class VoiceAssistantController {
         if isCapturing { finish(); return }
         guard !isBusy else { return }
         sourceMessage = ""
+        screenshotID = nil
         templateID = SharedSettings.shared.lastTemplateID
         let id = prepareSession()
         await begin(id: id, systemControl: true)
         guard snapshot.sessionID == id, isCapturing else {
+            throw VoiceAssistantControlStartError(message: snapshot.error ?? copy.interrupted)
+        }
+    }
+
+    /// The in-chat screenshot shortcut: the screenshot was just read on the
+    /// iPhone, and the person says how to answer it without leaving the chat.
+    /// Awaited by its AudioRecordingIntent, like `startFromControl`; the
+    /// reply is written from the whole recognised conversation.
+    func startFromScreenshot(_ context: ScreenshotContext) async throws {
+        guard hasVoiceConsent, AVAudioApplication.shared.recordPermission == .granted,
+              AIReplyService.preflight(isSignedIn: AccountCredentials.isSignedIn,
+                                       hasConsent: LegalConsentStore.hasAcceptedCurrentVersions()) == nil else {
+            throw VoiceAssistantControlStartError(message: String(localized: "Open AI Reply once to allow microphone access and voice processing."))
+        }
+        guard let target = context.conversation.target else {
+            throw VoiceAssistantControlStartError(message: ScreenshotKeyboardStrings(SharedSettings.shared.effectiveAppLanguage).noText)
+        }
+        // A running turn gives way: a new screenshot is a new conversation.
+        if isBusy { stop(discardTurn: true) }
+        sourceMessage = target.text
+        screenshotID = context.id
+        templateID = SharedSettings.shared.lastTemplateID
+        let id = prepareSession()
+        ScreenshotContextStore.shared.update { $0.voiceSessionID = id }
+        await begin(id: id, systemControl: true)
+        guard snapshot.sessionID == id, isCapturing else {
+            ScreenshotContextStore.shared.update { $0.voiceSessionID = nil }
             throw VoiceAssistantControlStartError(message: snapshot.error ?? copy.interrupted)
         }
     }
@@ -172,7 +203,8 @@ final class VoiceAssistantController {
         liveTranscript = ""
         snapshot = VoiceAssistantSnapshot(sessionID: id, phase: .ready, transcript: transcriptPrefix,
                                           requestID: UUID().uuidString,
-                                          sourceMessage: sourceMessage, templateID: templateID)
+                                          sourceMessage: sourceMessage, templateID: templateID,
+                                          screenshotID: screenshotID)
         isStarting = true
         startedAt = Date()
         publish(.ready)
@@ -381,7 +413,10 @@ final class VoiceAssistantController {
         // A 40-second turn fits a voice-aware server whole; an older server's
         // typed limit cuts it after the last whole word instead of refusing it.
         let instruction = Self.fitted(snapshot.transcript, limit: AILimits.voiceInstructionCharacters())
-        if snapshot.sourceMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if let screenshotID = snapshot.screenshotID {
+            reply = try await screenshotReply(screenshotID, instruction: instruction, configuration: configuration,
+                                              language: language)
+        } else if snapshot.sourceMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             reply = try await ComposeService().compose(.init(instruction: instruction, uiLanguage: language,
                 isRegeneration: regeneration, inputLanguage: language.keyboardLanguage,
                 grammaticalGender: configuration.profile.grammaticalGender, actionID: snapshot.requestID, isVoice: true))
@@ -409,6 +444,46 @@ final class VoiceAssistantController {
         endActivity()
     }
 
+    /// A reply to the screenshot this turn answers: its whole conversation,
+    /// the spoken instruction, one key per request, at the price of an
+    /// ordinary reply. A higher price is never taken from here: the
+    /// screenshot comes back to the keyboard's strip with the instruction, and
+    /// its composer asks before charging.
+    private func screenshotReply(_ screenshotID: String, instruction: String, configuration: ReplyConfiguration,
+                                 language: AppLanguage) async throws -> GeneratedReply {
+        let store = ScreenshotContextStore.shared
+        let strings = ScreenshotKeyboardStrings(language)
+        guard let context = store.read(), context.id == screenshotID else {
+            throw VoiceAssistantControlStartError(message: strings.noText)
+        }
+        let template = configuration.templates.first(where: { $0.id == snapshot.templateID })
+            ?? configuration.visibleTemplates.first ?? ReplyTemplate.builtIn(.friend, sortIndex: 0)
+        let request = ScreenshotReplyRequest(mode: .text, conversation: context.conversation, instruction: instruction,
+                                             instructionIsVoice: true, template: template, configuration: configuration,
+                                             uiLanguage: language, inputLanguage: language.keyboardLanguage, approvedUnits: 1)
+        let handBack = { (spoken: String) in
+            store.update { $0.voiceSessionID = nil; $0.instruction = spoken }
+        }
+        do {
+            let result = try await ScreenshotReplyClient.reply(
+                request, key: IdempotencyKey.forAction(actionID: snapshot.requestID))
+            return GeneratedReply(text: result.reply, detectedLanguage: result.detectedLanguage)
+        } catch ScreenshotReplyFailure.confirmationRequired(let quote) {
+            handBack(instruction)
+            throw VoiceAssistantControlStartError(message: strings.voiceNeedsConfirmation(maxUnits: quote.maxUnits))
+        } catch ScreenshotReplyFailure.insufficientCredits(let quote, _) {
+            handBack(instruction)
+            throw VoiceAssistantControlStartError(message: strings.costTooHigh(maxUnits: quote.maxUnits,
+                                                                                available: quote.availableUnits ?? 0))
+        } catch ScreenshotReplyFailure.failed(let error) {
+            handBack(instruction)
+            throw error
+        } catch {
+            handBack(instruction)
+            throw AIReplyError.serviceUnavailable
+        }
+    }
+
     func stop(phase: VoiceAssistantPhase = .stopped, message: String? = nil, clearPrivateContext: Bool = false,
               discardTurn: Bool = false) {
         startTask?.cancel(); startTask = nil; isStarting = false
@@ -421,9 +496,21 @@ final class VoiceAssistantController {
         pcm.removeAll(keepingCapacity: false)
         level = 0
         elapsed = 0
+        if let screenshotID = snapshot.screenshotID, phase != .responseReady {
+            // A turn that ends without a reply (cancelled, nothing heard, an
+            // error) gives the screenshot back to the keyboard's strip, with
+            // whatever was said as its instruction.
+            let spoken = discardTurn ? "" : snapshot.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+            ScreenshotContextStore.shared.update { context in
+                guard context.id == screenshotID else { return }
+                context.voiceSessionID = nil
+                if !spoken.isEmpty { context.instruction = spoken }
+            }
+        }
         if clearPrivateContext {
             needsRestore = false
             sourceMessage = ""
+            screenshotID = nil
             templateID = nil
             snapshot = VoiceAssistantSnapshot(sessionID: UUID().uuidString, phase: phase)
         } else if discardTurn {
@@ -606,6 +693,7 @@ final class VoiceAssistantController {
         if let error = error as? AIReplyError {
             return AIReplyStrings.forLanguage(SharedSettings.shared.effectiveAppLanguage).message(for: error)
         }
+        if let error = error as? VoiceAssistantControlStartError { return error.message }
         if let error = error as? APIError {
             return WatchVoiceStrings.forLanguage(SharedSettings.shared.effectiveAppLanguage).message(for: WatchTranscriber.failure(for: error))
         }
