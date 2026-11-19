@@ -12,6 +12,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/limits"
 	"github.com/aireply/ai-reply-back-end/internal/plans"
 	"github.com/aireply/ai-reply-back-end/internal/repository"
+	"github.com/aireply/ai-reply-back-end/internal/screenshot"
 	"github.com/aireply/ai-reply-back-end/internal/traits"
 	"github.com/aireply/ai-reply-back-end/internal/transport/httpx"
 )
@@ -217,6 +218,8 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		"iap": s.iapPayload(r),
 		// The account AI-context surcharge (null without the feature).
 		"ai_context": s.aiContextPayload(r),
+		// Screenshot replies: the credit policy and what replies really use.
+		"screenshot": s.screenshotPayload(r),
 	})
 }
 
@@ -407,4 +410,55 @@ func (s *Server) handleSavePricing(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// screenshotPolicyPayload — the screenshot credit policy for the Settings
+// page, with what standard replies and screenshot replies really used in the
+// last 30 days, so the reference can be calibrated from real numbers.
+type screenshotPolicyPayload struct {
+	Current       screenshot.Policy                  `json:"current"`
+	Defaults      screenshot.Policy                  `json:"defaults"`
+	Ranges        map[string]screenshot.Range        `json:"ranges"`
+	PolicyVersion string                             `json:"policy_version"`
+	Measured      map[string]repository.UsageAverage `json:"measured_30d"`
+}
+
+func (s *Server) screenshotPayload(r *http.Request) *screenshotPolicyPayload {
+	out := &screenshotPolicyPayload{
+		Current: s.shots.Policy(r.Context()), Defaults: screenshot.DefaultPolicy(), Ranges: screenshot.Ranges(),
+		PolicyVersion: screenshot.PolicyVersion, Measured: map[string]repository.UsageAverage{},
+	}
+	since := time.Now().AddDate(0, 0, -30)
+	for key, modes := range map[string][]string{
+		"reply": {"reply"}, "screenshot_text": {"screenshot"}, "screenshot_image": {"screenshot_image"},
+	} {
+		if avg, err := s.admin.UsageAverages(r.Context(), since, modes...); err == nil {
+			out.Measured[key] = avg
+		}
+	}
+	return out
+}
+
+// handleSaveScreenshotPolicy — what screenshot replies cost (audited with the
+// old and new values). Applies to the next estimate and reply.
+func (s *Server) handleSaveScreenshotPolicy(w http.ResponseWriter, r *http.Request) {
+	var body screenshot.Policy
+	if err := httpx.Decode(w, r, 4096, &body); err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	before := s.shots.Policy(r.Context())
+	saved, err := s.shots.Update(r.Context(), body)
+	if err != nil {
+		var rangeErr *screenshot.PolicyError
+		if errors.As(err, &rangeErr) {
+			httpx.Error(w, http.StatusBadRequest, httpx.CodeInvalidRequest, rangeErr.Error(), rangeErr.Details())
+			return
+		}
+		s.fail(w, err)
+		return
+	}
+	s.admin.Audit(r.Context(), adminFrom(r.Context()), s.ip(r), "settings.screenshot_policy.update", "system_settings",
+		"screenshot_policy", map[string]any{"before": before, "after": saved})
+	httpx.JSON(w, http.StatusOK, s.screenshotPayload(r))
 }

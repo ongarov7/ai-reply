@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/aireply/ai-reply-back-end/config"
@@ -60,6 +61,11 @@ type Service struct {
 	voice *voiceCache
 	// A bounded live turn per account; never hold a mutex during network I/O.
 	liveUsers sync.Map
+	// screenshots — the screenshot credit policy (nil — code defaults).
+	screenshots ScreenshotPolicies
+	// countRetryAt — unix nanoseconds before which the provider's input-token
+	// count is not asked again after a failure.
+	countRetryAt atomic.Int64
 }
 
 // New — шлюз. Тексеруден өтпеген жауапты түзету әдепкіде қосулы.
@@ -196,6 +202,10 @@ type call struct {
 	ContextChars int
 	// Units — what the usage event records as charged (set by generate).
 	Units int
+	// MaxUnits and Policy — a screenshot reply's approved maximum and the
+	// credit policy that priced it.
+	MaxUnits int
+	Policy   string
 }
 
 // Reply — негізгі сценарий.
@@ -564,6 +574,8 @@ func (s *Service) record(ctx context.Context, c call, ent domain.Entitlement,
 		PromptVersion: version,
 		CreatedAt:     s.clock.Now(),
 	}
+	event.CachedTokens, event.ReasoningTokens = completion.CachedTokens, completion.ReasoningTokens
+	event.MaxUnits, event.CreditPolicy = c.MaxUnits, c.Policy
 	if status == "success" {
 		event.Units, event.ContextChars = c.Units, c.ContextChars
 	}

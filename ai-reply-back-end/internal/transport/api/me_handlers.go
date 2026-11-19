@@ -348,8 +348,15 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 			// account AI context saved in the website cabinet; units and
 			// context_applied on their responses (docs/web-cabinet-ai-context.md).
 			"ai_context": s.aiContext != nil,
+			// POST /api/v1/ai/screenshot/estimate and /reply: a reply to the
+			// conversation in a screenshot, priced by its tokens with the
+			// approved maximum (screenshot below, docs/SCREENSHOT_REPLIES.md).
+			"screenshot_reply": true,
+			// The same with the screenshot itself analysed (admin switch).
+			"screenshot_image": s.screenshots.Policy(r.Context()).ImageEnabled,
 		},
 		"ai_context_pricing": s.aiContextPricing(r),
+		"screenshot":         s.screenshotConfig(r),
 		"demo_mode":          s.cfg.Auth.DemoMode,
 		"payment_mode":       s.payments.Mode(),
 		"countries":          countries,
@@ -364,6 +371,9 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 			"account_deletion_url": s.cfg.App.PublicBaseURL + "/account/delete",
 			// Who writes the replies; the consent screen names it.
 			"ai_provider": legal.AIProvider,
+			// The disclosure accepted in the app before a screenshot itself is
+			// sent for analysis (image_consent on /ai/screenshot/reply).
+			"screenshot_consent_version": legal.ScreenshotConsentVersion,
 		},
 	})
 }

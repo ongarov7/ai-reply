@@ -57,6 +57,14 @@ const (
 	// Дауысты мәтінге айналдырудың тәуліктік шегі толды (жауап квотасынан бөлек).
 	CodeVoiceLimit = "VOICE_LIMIT_REACHED"
 
+	// Screenshot replies: the price needs approval, the balance cannot pay it,
+	// image analysis is off, not consented to or used up for today.
+	CodeCreditConfirmation   = "CREDIT_CONFIRMATION_REQUIRED"
+	CodeInsufficientCredits  = "INSUFFICIENT_CREDITS"
+	CodeScreenshotImageOff   = "SCREENSHOT_IMAGE_UNAVAILABLE"
+	CodeScreenshotConsent    = "SCREENSHOT_CONSENT_REQUIRED"
+	CodeScreenshotImageLimit = "SCREENSHOT_IMAGE_LIMIT_REACHED"
+
 	// Қосымша ішіндегі сатып алулар (App Store, Google Play).
 	CodeIAPUnavailable         = "IAP_UNAVAILABLE"
 	CodePurchaseInvalid        = "PURCHASE_INVALID"
@@ -167,6 +175,16 @@ func Translate(err error) (int, string, string) {
 		return http.StatusTooManyRequests, CodeMonthlyLimit, "Monthly generation limit reached."
 	case errors.Is(err, domain.ErrVoiceLimit):
 		return http.StatusTooManyRequests, CodeVoiceLimit, "Daily voice transcription limit reached."
+	case errors.Is(err, domain.ErrCreditConfirmation):
+		return http.StatusConflict, CodeCreditConfirmation, "This reply may use more replies than you approved."
+	case errors.Is(err, domain.ErrInsufficientCredits):
+		return http.StatusPaymentRequired, CodeInsufficientCredits, "Not enough replies left for this request."
+	case errors.Is(err, domain.ErrScreenshotImageOff):
+		return http.StatusForbidden, CodeScreenshotImageOff, "Screenshot image analysis is not available right now."
+	case errors.Is(err, domain.ErrScreenshotConsent):
+		return http.StatusForbidden, CodeScreenshotConsent, "Agree to send the screenshot for analysis first."
+	case errors.Is(err, domain.ErrScreenshotImageLimit):
+		return http.StatusTooManyRequests, CodeScreenshotImageLimit, "Daily screenshot image analysis limit reached."
 	case errors.Is(err, domain.ErrSubscriptionGone):
 		return http.StatusPaymentRequired, CodeSubExpired, "The subscription has expired."
 	case errors.Is(err, domain.ErrPaymentRequired):

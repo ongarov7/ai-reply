@@ -99,48 +99,11 @@ func (s *Server) handleReply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	profile, err := s.users.Profile(r.Context(), user.ID)
+	promptProfile, err := s.replyProfile(r.Context(), user, body.Profile,
+		ai.DesktopSessionPlatform(PlatformFrom(r.Context())) && body.Context != nil)
 	if err != nil {
 		httpx.Fail(w, err)
 		return
-	}
-	promptProfile := ai.Profile{
-		Description:   profile.Description,
-		Role:          profile.Role,
-		PreferredTone: profile.PreferredTone,
-		Business: ai.Business{
-			Offering: profile.BusinessOffering,
-			Summary:  profile.BusinessSummary,
-			Rules:    profile.BusinessRules,
-		},
-		GrammaticalGender: profile.GrammaticalGender,
-	}
-	if ai.DesktopSessionPlatform(PlatformFrom(r.Context())) && body.Context != nil {
-		// A selected local desktop profile supplies this request's facts. Do
-		// not silently mix in an unrelated saved mobile/business profile.
-		promptProfile = ai.Profile{GrammaticalGender: profile.GrammaticalGender}
-	}
-	if body.Profile != nil {
-		if body.Profile.Description != "" {
-			promptProfile.Description = traits.Clamp(body.Profile.Description, 1000)
-		}
-		if body.Profile.Role != "" {
-			promptProfile.Role = traits.Clamp(body.Profile.Role, 120)
-		}
-		if traits.OneOf(body.Profile.PreferredTone, "natural", "friendly", "professional", "formal", "short") {
-			promptProfile.PreferredTone = body.Profile.PreferredTone
-		}
-		if business := body.Profile.Business.toDomain(); !business.IsEmpty() {
-			promptProfile.Business = business
-		}
-		// Only a known language code gets through; anything else means "follow
-		// the incoming message", which is also what an old client gets.
-		if _, known := ai.ReplyLanguages[body.Profile.ReplyLanguage]; known {
-			promptProfile.ReplyLanguage = body.Profile.ReplyLanguage
-		}
-		if domain.IsGrammaticalGender(body.Profile.GrammaticalGender) {
-			promptProfile.GrammaticalGender = body.Profile.GrammaticalGender
-		}
 	}
 
 	account, accountExtra := s.accountContext(r.Context(), user, aicontext.RecipientFor(body.TemplateID, templateRelationship(body.Template)))
@@ -190,6 +153,55 @@ func (s *Server) handleReply(w http.ResponseWriter, r *http.Request) {
 		Units:            result.Units,
 		ContextApplied:   result.ContextApplied,
 	})
+}
+
+// replyProfile — the profile a reply is written with: the saved profile, the
+// app's own values over it (only known values), and for a desktop request with
+// its own context only the grammatical gender.
+func (s *Server) replyProfile(ctx context.Context, user domain.User, override *profileOverride, desktop bool) (ai.Profile, error) {
+	profile, err := s.users.Profile(ctx, user.ID)
+	if err != nil {
+		return ai.Profile{}, err
+	}
+	promptProfile := ai.Profile{
+		Description:   profile.Description,
+		Role:          profile.Role,
+		PreferredTone: profile.PreferredTone,
+		Business: ai.Business{
+			Offering: profile.BusinessOffering,
+			Summary:  profile.BusinessSummary,
+			Rules:    profile.BusinessRules,
+		},
+		GrammaticalGender: profile.GrammaticalGender,
+	}
+	if desktop {
+		// A selected local desktop profile supplies this request's facts. Do
+		// not silently mix in an unrelated saved mobile/business profile.
+		promptProfile = ai.Profile{GrammaticalGender: profile.GrammaticalGender}
+	}
+	if override != nil {
+		if override.Description != "" {
+			promptProfile.Description = traits.Clamp(override.Description, 1000)
+		}
+		if override.Role != "" {
+			promptProfile.Role = traits.Clamp(override.Role, 120)
+		}
+		if traits.OneOf(override.PreferredTone, "natural", "friendly", "professional", "formal", "short") {
+			promptProfile.PreferredTone = override.PreferredTone
+		}
+		if business := override.Business.toDomain(); !business.IsEmpty() {
+			promptProfile.Business = business
+		}
+		// Only a known language code gets through; anything else means "follow
+		// the incoming message", which is also what an old client gets.
+		if _, known := ai.ReplyLanguages[override.ReplyLanguage]; known {
+			promptProfile.ReplyLanguage = override.ReplyLanguage
+		}
+		if domain.IsGrammaticalGender(override.GrammaticalGender) {
+			promptProfile.GrammaticalGender = override.GrammaticalGender
+		}
+	}
+	return promptProfile, nil
 }
 
 // templateRelationship — the persona's relationship, when the app sent one.

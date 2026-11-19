@@ -409,6 +409,14 @@ type UsageEvent struct {
 	Units int
 	// ContextChars — characters of the account AI context it carried (a number only).
 	ContextChars int
+	// CachedTokens and ReasoningTokens — the parts of InputTokens and
+	// OutputTokens the provider reported as cached input and reasoning.
+	CachedTokens    int
+	ReasoningTokens int
+	// MaxUnits — the most a screenshot reply could cost, as approved by the
+	// person (0 for every other mode); CreditPolicy — what priced it.
+	MaxUnits     int
+	CreditPolicy string
 	CreatedAt    time.Time
 }
 
@@ -504,7 +512,34 @@ var (
 	// ErrVoiceLimit — дауысты мәтінге айналдырудың бір қолданушыға тәуліктік
 	// шегі толды (LIMIT_TRANSCRIBE_PER_DAY). Жауап квотасына қатысы жоқ.
 	ErrVoiceLimit = errors.New("voice transcription daily limit reached")
+
+	// Screenshot replies (internal/screenshot). ErrCreditConfirmation — the
+	// request may cost more replies than the person approved: nothing was
+	// charged or sent, the app shows the price and asks again.
+	// ErrInsufficientCredits — the balance cannot pay the most it may cost.
+	ErrCreditConfirmation  = errors.New("credit confirmation required")
+	ErrInsufficientCredits = errors.New("insufficient credits")
+	// ErrScreenshotImageOff — image analysis is switched off (admin).
+	// ErrScreenshotConsent — image analysis without the current consent.
+	// ErrScreenshotImageLimit — an unlimited plan used today's image analyses.
+	ErrScreenshotImageOff   = errors.New("screenshot image analysis is off")
+	ErrScreenshotConsent    = errors.New("screenshot image consent required")
+	ErrScreenshotImageLimit = errors.New("daily screenshot image limit reached")
 )
+
+// ScreenshotLimitError — today's image analyses of an unlimited plan are used.
+type ScreenshotLimitError struct {
+	Limit    int
+	ResetsAt time.Time
+}
+
+func (e *ScreenshotLimitError) Error() string { return ErrScreenshotImageLimit.Error() }
+func (e *ScreenshotLimitError) Unwrap() error { return ErrScreenshotImageLimit }
+
+// Details — the cap and when it resets.
+func (e *ScreenshotLimitError) Details() map[string]any {
+	return map[string]any{"daily_limit": e.Limit, "resets_at": e.ResetsAt.Format(time.RFC3339)}
+}
 
 // VoiceLimitError — дауыс шегі: қанша және қашан жаңарады (429 VOICE_LIMIT_REACHED).
 type VoiceLimitError struct {

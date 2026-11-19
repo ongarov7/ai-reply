@@ -231,6 +231,12 @@ func (s *Service) Pricing(ctx context.Context) ([]repository.Pricing, error) {
 	return s.repo.ListPricing(ctx)
 }
 
+// UsageAverages — what successful generations of these modes used on average
+// since a moment (numbers only; Settings calibrates the screenshot policy).
+func (s *Service) UsageAverages(ctx context.Context, since time.Time, modes ...string) (repository.UsageAverage, error) {
+	return s.repo.UsageAverages(ctx, since, modes...)
+}
+
 // SavePricing — жаңа баға кезеңі.
 func (s *Service) SavePricing(ctx context.Context, admin domain.AdminUser, ip string, p repository.Pricing) error {
 	if err := s.repo.SavePricing(ctx, p); err != nil {

@@ -330,7 +330,10 @@ type Outcome struct {
 	Model        string
 	InputTokens  int
 	OutputTokens int
-	ProviderMS   int
+	// CachedTokens and ReasoningTokens — summed over both calls.
+	CachedTokens    int
+	ReasoningTokens int
+	ProviderMS      int
 	// Version — промпт нұсқасы; түзету қабылданса "+repair_v1" қосылады.
 	Version string
 	// Issues — бірінші жауапта табылған мәселелер (түзетуге дейін).
@@ -354,13 +357,15 @@ func Complete(ctx context.Context, provider Provider, prompt Prompt, repair bool
 		return Outcome{}, err
 	}
 	out := Outcome{
-		Text:         CleanOutput(first.Text, prompt.Quality.Compose),
-		Model:        first.Model,
-		InputTokens:  first.InputTokens,
-		OutputTokens: first.OutputTokens,
-		ProviderMS:   first.ProviderMS,
-		Version:      prompt.Version,
-		Truncated:    first.Truncated,
+		Text:            CleanOutput(first.Text, prompt.Quality.Compose),
+		Model:           first.Model,
+		InputTokens:     first.InputTokens,
+		OutputTokens:    first.OutputTokens,
+		CachedTokens:    first.CachedTokens,
+		ReasoningTokens: first.ReasoningTokens,
+		ProviderMS:      first.ProviderMS,
+		Version:         prompt.Version,
+		Truncated:       first.Truncated,
 	}
 	target, gender := prompt.Quality.verifiedLanguage(), prompt.Quality.Gender
 	out.Issues = Check(out.Text, target, gender)
@@ -394,6 +399,8 @@ func Complete(ctx context.Context, provider Provider, prompt Prompt, repair bool
 	}
 	out.InputTokens += second.InputTokens
 	out.OutputTokens += second.OutputTokens
+	out.CachedTokens += second.CachedTokens
+	out.ReasoningTokens += second.ReasoningTokens
 	out.ProviderMS += second.ProviderMS
 	if fixed := CleanOutput(second.Text, prompt.Quality.Compose); !second.Truncated && len(Check(fixed, target, gender)) == 0 && (limit == 0 || utf8.RuneCountInString(fixed) <= limit) {
 		out.Text = fixed

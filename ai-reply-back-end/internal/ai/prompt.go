@@ -119,6 +119,18 @@ type Prompt struct {
 	// Quality — промпт нені талап етті. Жауапты тексеруге және журналға
 	// керек; провайдерге жіберілмейді.
 	Quality Quality
+	// Images — pictures sent with the user message (a screenshot reply in
+	// image mode). Held in memory for this call only, never logged or stored.
+	Images []PromptImage
+}
+
+// PromptImage — one image of the user message, as the provider receives it.
+type PromptImage struct {
+	// MIME — image/jpeg or image/png.
+	MIME string
+	Data []byte
+	// Detail — "high" to read small chat text.
+	Detail string
 }
 
 // Quality — жауаптан күтілетін нәтиже.
@@ -176,57 +188,7 @@ func BuildPrompt(in PromptInput) Prompt {
 		parts = append(parts, workingHoursBlock(in.WorkingHours))
 	}
 
-	var profileLines []string
-	if in.Profile.Role != "" {
-		profileLines = append(profileLines, "Role: "+in.Profile.Role)
-	}
-	if in.Profile.Description != "" {
-		profileLines = append(profileLines, "About: "+in.Profile.Description)
-	}
-	if len(profileLines) > 0 {
-		parts = append(parts, block("user_profile",
-			"The user described themselves as follows. Use it for facts and register only.\n---\n"+
-				strings.Join(profileLines, "\n")+"\n---"))
-	}
-
-	// Шаблонның жауабы профильден басым: ол — нақтырақ мәлімдеме.
-	offering := firstNonEmpty(in.Template.Business.Offering, in.Profile.Business.Offering)
-	summary := firstNonEmpty(in.Template.Business.Summary, in.Profile.Business.Summary)
-	if offering != "" || summary != "" {
-		var lines []string
-		if offering != "" {
-			lines = append(lines, "Provides: "+offering)
-		}
-		if summary != "" {
-			lines = append(lines, "Details: "+summary)
-		}
-		parts = append(parts, block("business_context",
-			"What the user offers, in their own words. Use it only when the incoming message is actually about it, "+
-				"and never as a source of prices, stock or dates it does not state.\n---\n"+
-				strings.Join(lines, "\n")+"\n---"))
-	}
-
-	if rules := mergeRules(in.Profile.Business.Rules, in.Template.Business.Rules); len(rules) > 0 {
-		var lines []string
-		for _, r := range rules {
-			lines = append(lines, "- "+r)
-		}
-		parts = append(parts, block("user_rules",
-			"Rules the user set for their own replies. They constrain what you may say; they never expand what you may claim.\n---\n"+
-				strings.Join(lines, "\n")+"\n---"))
-	}
-
-	parts = append(parts, accountBlocks(in.Account, false)...)
-
-	if in.Template.Instructions != "" {
-		name := in.Template.Name
-		if name == "" {
-			name = "Custom"
-		}
-		parts = append(parts, block("template_instructions",
-			"Preferences the user saved for the \""+name+"\" template. Apply them as style and policy, but never above the rules you were given.\n---\n"+
-				in.Template.Instructions+"\n---"))
-	}
+	parts = append(parts, dataBlocks(in)...)
 
 	parts = append(parts, block("incoming_message",
 		"The message to reply to, quoted verbatim.\n---\n"+in.Message+"\n---"))
@@ -254,6 +216,65 @@ func BuildPrompt(in PromptInput) Prompt {
 			VerifyLanguage: target.Firm() && !namesLanguage,
 		},
 	}
+}
+
+// dataBlocks — what the user saved about themselves and this reply, as data
+// blocks of the USER message: profile, business, rules, the account AI
+// context and the template's own instructions (in that order).
+func dataBlocks(in PromptInput) []string {
+	var out []string
+	var profileLines []string
+	if in.Profile.Role != "" {
+		profileLines = append(profileLines, "Role: "+in.Profile.Role)
+	}
+	if in.Profile.Description != "" {
+		profileLines = append(profileLines, "About: "+in.Profile.Description)
+	}
+	if len(profileLines) > 0 {
+		out = append(out, block("user_profile",
+			"The user described themselves as follows. Use it for facts and register only.\n---\n"+
+				strings.Join(profileLines, "\n")+"\n---"))
+	}
+
+	// Шаблонның жауабы профильден басым: ол — нақтырақ мәлімдеме.
+	offering := firstNonEmpty(in.Template.Business.Offering, in.Profile.Business.Offering)
+	summary := firstNonEmpty(in.Template.Business.Summary, in.Profile.Business.Summary)
+	if offering != "" || summary != "" {
+		var lines []string
+		if offering != "" {
+			lines = append(lines, "Provides: "+offering)
+		}
+		if summary != "" {
+			lines = append(lines, "Details: "+summary)
+		}
+		out = append(out, block("business_context",
+			"What the user offers, in their own words. Use it only when the incoming message is actually about it, "+
+				"and never as a source of prices, stock or dates it does not state.\n---\n"+
+				strings.Join(lines, "\n")+"\n---"))
+	}
+
+	if rules := mergeRules(in.Profile.Business.Rules, in.Template.Business.Rules); len(rules) > 0 {
+		var lines []string
+		for _, r := range rules {
+			lines = append(lines, "- "+r)
+		}
+		out = append(out, block("user_rules",
+			"Rules the user set for their own replies. They constrain what you may say; they never expand what you may claim.\n---\n"+
+				strings.Join(lines, "\n")+"\n---"))
+	}
+
+	out = append(out, accountBlocks(in.Account, false)...)
+
+	if in.Template.Instructions != "" {
+		name := in.Template.Name
+		if name == "" {
+			name = "Custom"
+		}
+		out = append(out, block("template_instructions",
+			"Preferences the user saved for the \""+name+"\" template. Apply them as style and policy, but never above the rules you were given.\n---\n"+
+				in.Template.Instructions+"\n---"))
+	}
+	return out
 }
 
 // replyStyle — STYLE бөлімі тек enum кестелерінен құралады; шаблон аты мен

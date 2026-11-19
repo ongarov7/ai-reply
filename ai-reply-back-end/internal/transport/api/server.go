@@ -22,6 +22,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/prodevices"
 	"github.com/aireply/ai-reply-back-end/internal/productevents"
 	"github.com/aireply/ai-reply-back-end/internal/reports"
+	"github.com/aireply/ai-reply-back-end/internal/screenshot"
 	"github.com/aireply/ai-reply-back-end/internal/subscriptions"
 	"github.com/aireply/ai-reply-back-end/internal/support"
 	"github.com/aireply/ai-reply-back-end/internal/transport/httpx"
@@ -60,6 +61,7 @@ type Server struct {
 	purchases     PurchaseOptions
 	support       *support.Service
 	aiContext     *aicontext.Service
+	screenshots   *screenshot.Service
 	limiter       *middleware.Limiter
 	ping          Pinger
 	log           *slog.Logger
@@ -95,6 +97,8 @@ type Deps struct {
 	// AIContext — the account AI context (website cabinet) added to every
 	// generation, /api/v1/me/ai-context and features.ai_context (nil — off).
 	AIContext *aicontext.Service
+	// Screenshots — the screenshot reply credit policy (nil — code defaults).
+	Screenshots *screenshot.Service
 }
 
 // New — API сервері.
@@ -108,7 +112,8 @@ func New(d Deps) *Server {
 		ai: d.AI, limits: d.Limits, payments: d.Payments, events: d.Events,
 		installations: d.Installations, notifications: d.Notifications, reports: d.Reports,
 		proDevices: d.ProDevices, credits: d.Credits, iap: d.IAP, purchases: purchases, support: d.Support, aiContext: d.AIContext,
-		limiter: d.Limiter, ping: d.Ping,
+		screenshots: d.Screenshots,
+		limiter:     d.Limiter, ping: d.Ping,
 		log: d.Log,
 	}
 }
@@ -236,6 +241,11 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /api/v1/ai/reply", s.requireUser(s.requireConsent(aiLimit(http.HandlerFunc(s.handleReply)))))
 	// Нұсқау бойынша жаңа хабарлама («Create»). Сол квота, сол rate limit.
 	mux.Handle("POST /api/v1/ai/compose", s.requireUser(s.requireConsent(aiLimit(http.HandlerFunc(s.handleCompose)))))
+	// Скриншоттағы чатқа жауап: алдымен баға (провайдерге ештеңе кетпейді),
+	// содан кейін жауап — нақты токендер бойынша, max_units-тан аспай.
+	screenshotEstimateLimit := middleware.RateLimit(s.limiter, "screenshot_estimate", limits.AIPerMinute*3, time.Minute, perUser)
+	mux.Handle("POST /api/v1/ai/screenshot/estimate", s.requireUser(s.requireConsent(screenshotEstimateLimit(http.HandlerFunc(s.handleScreenshotEstimate)))))
+	mux.Handle("POST /api/v1/ai/screenshot/reply", s.requireUser(s.requireConsent(aiLimit(http.HandlerFunc(s.handleScreenshotReply)))))
 	// Нұсқауды түзету ұсынысы. Квотасыз; өшірулі болса 404 NOT_FOUND.
 	mux.Handle("POST /api/v1/ai/polish", s.requireUser(s.requireConsent(polishLimit(http.HandlerFunc(s.handlePolish)))))
 	// Пернетақтадағы дауыс → мәтін (multipart). Квотасыз; күндік шегі өзінікі; өшірулі болса 404.

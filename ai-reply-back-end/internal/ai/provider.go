@@ -3,6 +3,7 @@ package ai
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -21,7 +22,11 @@ type Completion struct {
 	Model        string
 	InputTokens  int
 	OutputTokens int
-	ProviderMS   int
+	// CachedTokens and ReasoningTokens — the parts of InputTokens and
+	// OutputTokens the provider reported as cached input and reasoning.
+	CachedTokens    int
+	ReasoningTokens int
+	ProviderMS      int
 	// Truncated — жауап шекке жетіп үзілді (status "incomplete"); мәтін
 	// соңғы толық сөйлемге дейін қысқартылған.
 	Truncated bool
@@ -65,9 +70,38 @@ type responsesRequest struct {
 	Input       []responsesInput `json:"input"`
 }
 
+// responsesInput — Content is a string, or content parts when the user
+// message carries images.
 type responsesInput struct {
 	Role    string `json:"role"`
-	Content string `json:"content"`
+	Content any    `json:"content"`
+}
+
+// contentPart — input_text or input_image of a user message.
+type contentPart struct {
+	Type     string `json:"type"`
+	Text     string `json:"text,omitempty"`
+	ImageURL string `json:"image_url,omitempty"`
+	Detail   string `json:"detail,omitempty"`
+}
+
+// responsesInputs — the developer and user messages of a prompt. Images go as
+// data URLs after the user text; they are never written anywhere else.
+func responsesInputs(prompt Prompt) []responsesInput {
+	var user any = prompt.User
+	if len(prompt.Images) > 0 {
+		parts := []contentPart{{Type: "input_text", Text: prompt.User}}
+		for _, image := range prompt.Images {
+			detail := image.Detail
+			if detail == "" {
+				detail = "high"
+			}
+			parts = append(parts, contentPart{Type: "input_image", Detail: detail,
+				ImageURL: "data:" + image.MIME + ";base64," + base64.StdEncoding.EncodeToString(image.Data)})
+		}
+		user = parts
+	}
+	return []responsesInput{{Role: "developer", Content: prompt.Developer}, {Role: "user", Content: user}}
 }
 
 type responsesReply struct {
@@ -82,10 +116,20 @@ type responsesReply struct {
 	} `json:"output"`
 	OutputText string `json:"output_text"`
 	Usage      struct {
-		InputTokens  int `json:"input_tokens"`
-		OutputTokens int `json:"output_tokens"`
+		InputTokens        int `json:"input_tokens"`
+		OutputTokens       int `json:"output_tokens"`
+		InputTokensDetails struct {
+			CachedTokens int `json:"cached_tokens"`
+		} `json:"input_tokens_details"`
+		OutputTokensDetails struct {
+			ReasoningTokens int `json:"reasoning_tokens"`
+		} `json:"output_tokens_details"`
 	} `json:"usage"`
 }
+
+// visionTimeout — a request with a screenshot: the upload and reading the
+// image take longer than a text reply (OPENAI_TIMEOUT stays the floor).
+const visionTimeout = 45 * time.Second
 
 // Generate — бір жауап. store=false: мәтін провайдерде де сақталмайды.
 func (o *OpenAI) Generate(ctx context.Context, prompt Prompt) (Completion, error) {
@@ -98,16 +142,17 @@ func (o *OpenAI) Generate(ctx context.Context, prompt Prompt) (Completion, error
 		MaxOutputTokens: maxTokens,
 		Temperature:     o.cfg.Temperature,
 		Store:           false,
-		Input: []responsesInput{
-			{Role: "developer", Content: prompt.Developer},
-			{Role: "user", Content: prompt.User},
-		},
+		Input:           responsesInputs(prompt),
 	})
 	if err != nil {
 		return Completion{}, err
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, o.cfg.Timeout)
+	timeout, client := o.cfg.Timeout, o.client
+	if len(prompt.Images) > 0 {
+		timeout, client = max(o.cfg.Timeout, visionTimeout), o.audio
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, o.cfg.BaseURL+"/responses", bytes.NewReader(payload))
@@ -118,7 +163,7 @@ func (o *OpenAI) Generate(ctx context.Context, prompt Prompt) (Completion, error
 	req.Header.Set("Authorization", "Bearer "+o.cfg.APIKey)
 
 	started := time.Now()
-	res, err := o.client.Do(req)
+	res, err := client.Do(req)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			return Completion{}, domain.ErrProviderTimeout
@@ -162,13 +207,59 @@ func (o *OpenAI) Generate(ctx context.Context, prompt Prompt) (Completion, error
 		model = o.cfg.Model
 	}
 	return Completion{
-		Text:         text,
-		Model:        model,
-		InputTokens:  parsed.Usage.InputTokens,
-		OutputTokens: parsed.Usage.OutputTokens,
-		ProviderMS:   elapsed,
-		Truncated:    truncated,
+		Text:            text,
+		Model:           model,
+		InputTokens:     parsed.Usage.InputTokens,
+		OutputTokens:    parsed.Usage.OutputTokens,
+		CachedTokens:    parsed.Usage.InputTokensDetails.CachedTokens,
+		ReasoningTokens: parsed.Usage.OutputTokensDetails.ReasoningTokens,
+		ProviderMS:      elapsed,
+		Truncated:       truncated,
 	}, nil
+}
+
+// TokenCounter — a provider that can count a prompt's input tokens exactly
+// without generating anything (the OpenAI input-token endpoint).
+type TokenCounter interface {
+	CountInputTokens(ctx context.Context, prompt Prompt) (int, error)
+}
+
+// countTimeout — counting must not hold up a reply: past it the server falls
+// back to its own generous estimate.
+const countTimeout = 4 * time.Second
+
+// CountInputTokens — POST /responses/input_tokens with the same model and
+// input a generation would send (store is irrelevant: nothing is generated).
+// The prompt, image included, goes only to OpenAI and only for this count.
+func (o *OpenAI) CountInputTokens(ctx context.Context, prompt Prompt) (int, error) {
+	payload, err := json.Marshal(map[string]any{"model": o.cfg.Model, "input": responsesInputs(prompt)})
+	if err != nil {
+		return 0, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, countTimeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, o.cfg.BaseURL+"/responses/input_tokens", bytes.NewReader(payload))
+	if err != nil {
+		return 0, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+o.cfg.APIKey)
+	res, err := o.audio.Do(req)
+	if err != nil {
+		return 0, domain.ErrProviderDown
+	}
+	defer res.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(res.Body, 64<<10))
+	if err != nil || res.StatusCode != http.StatusOK {
+		return 0, fmt.Errorf("%w: input token count status %d", domain.ErrProviderDown, res.StatusCode)
+	}
+	var parsed struct {
+		InputTokens int `json:"input_tokens"`
+	}
+	if err := json.Unmarshal(body, &parsed); err != nil || parsed.InputTokens <= 0 {
+		return 0, domain.ErrProviderDown
+	}
+	return parsed.InputTokens, nil
 }
 
 func extractText(r responsesReply) string {

@@ -1527,9 +1527,24 @@
     { key: "max_extra_replies", setting: "ai_context_max_extra_replies", label: "admin.settings.ai_context_max_extra" }
   ];
 
+  // Screenshot replies: priced by their real tokens in standard replies
+  // (docs/SCREENSHOT_REPLIES.md).
+  var SHOT_FIELDS = [
+    { key: "ref_input_tokens", setting: "screenshot_ref_input_tokens", label: "admin.settings.shot_ref_input" },
+    { key: "ref_output_tokens", setting: "screenshot_ref_output_tokens", label: "admin.settings.shot_ref_output" },
+    { key: "output_weight_x100", setting: "screenshot_output_weight_x100", label: "admin.settings.shot_output_weight" },
+    { key: "rounding_grace_percent", setting: "screenshot_rounding_grace_percent", label: "admin.settings.shot_grace" },
+    { key: "max_units", setting: "screenshot_max_units", label: "admin.settings.shot_max_units" },
+    { key: "typical_output_percent", setting: "screenshot_typical_output_percent", label: "admin.settings.shot_typical_output" },
+    { key: "image_base_tokens", setting: "screenshot_image_base_tokens", label: "admin.settings.shot_image_base" },
+    { key: "image_tile_tokens", setting: "screenshot_image_tile_tokens", label: "admin.settings.shot_image_tile" },
+    { key: "unlimited_images_per_day", setting: "screenshot_unlimited_images_per_day", label: "admin.settings.shot_unlimited_images" }
+  ];
+
   var Settings = {
     data: function () {
       return {
+        shotPolicy: {}, shotFields: SHOT_FIELDS, savingShot: false,
         data: null,
         form: { model: "", input_per_1m: 0.15, output_per_1m: 0.6, effective_from: "" },
         limits: {}, limitFields: LIMIT_FIELDS, savingLimits: false,
@@ -1546,6 +1561,7 @@
           this.form.model = this.data.model;
           this.fillLimits(this.data.ai_limits);
           this.fillContext(this.data.ai_context);
+          this.fillShot(this.data.screenshot);
           if (this.data.welcome_bonus) this.welcomeUnits = this.data.welcome_bonus.units;
         }
         catch (e) { toast("danger", t("common.error")); }
@@ -1561,6 +1577,39 @@
         var form = {};
         CONTEXT_FIELDS.forEach(function (f) { form[f.key] = pricing.current[f.key]; });
         this.contextPricing = form;
+      },
+      fillShot(payload) {
+        if (!payload) return;
+        this.shotPolicy = Object.assign({}, payload.current);
+      },
+      shotRange(f) { return this.data.screenshot.ranges[f.setting]; },
+      shotInvalid(f) {
+        var value = this.shotPolicy[f.key], r = this.shotRange(f);
+        return !(Number.isInteger(value) && value >= r.min && value <= r.max);
+      },
+      shotMeasured(kind) {
+        var m = this.data.screenshot.measured_30d && this.data.screenshot.measured_30d[kind];
+        if (!m || !m.count) return t("admin.settings.shot_measured_none");
+        return tf("admin.settings.shot_measured_row", { count: m.count, input: Math.round(m.input_tokens),
+          output: Math.round(m.output_tokens), units: (Math.round(m.units * 100) / 100).toString() });
+      },
+      async saveShot() {
+        var self = this;
+        if (SHOT_FIELDS.some(function (f) { return self.shotInvalid(f); })) {
+          toast("danger", t("admin.settings.limit_invalid"));
+          return;
+        }
+        this.savingShot = true;
+        try {
+          var fresh = await api("/settings/screenshot", { method: "POST", body: this.shotPolicy });
+          this.data.screenshot = fresh;
+          this.fillShot(fresh);
+          toast("ok", t("common.saved"));
+        } catch (e) {
+          toast("danger", e.message === "INVALID_REQUEST" ? t("admin.settings.limit_invalid") : t("common.error"));
+        } finally {
+          this.savingShot = false;
+        }
       },
       contextRange(f) { return this.data.ai_context.ranges[f.setting]; },
       contextInvalid(f) {
@@ -1767,6 +1816,35 @@
               </label>
             </div>
             <button class="btn btn-primary" :disabled="savingContext" @click="saveContext">{{ t('common.save') }}</button>
+          </div>
+        </div>
+        <div class="card" v-if="data.screenshot">
+          <div class="card-head"><h2>{{ t('admin.settings.shot') }}</h2></div>
+          <div class="card-body">
+            <p class="muted" style="margin-top:0">{{ t('admin.settings.shot_hint') }}</p>
+            <p class="muted mono">{{ data.screenshot.policy_version }}</p>
+            <div class="form-grid">
+              <label class="field" v-for="f in shotFields" :key="f.key">
+                <span>{{ t(f.label) }}</span>
+                <input type="number" step="1" :min="shotRange(f).min" :max="shotRange(f).max"
+                  v-model.number="shotPolicy[f.key]" :aria-invalid="shotInvalid(f)">
+                <small class="muted">{{ t('admin.settings.limit_default') }}: {{ data.screenshot.defaults[f.key] }} ·
+                  {{ t('admin.settings.limit_range') }}: {{ shotRange(f).min }}–{{ shotRange(f).max }}</small>
+              </label>
+              <label class="field"><span>{{ t('admin.settings.shot_shortcut_url') }}</span>
+                <input type="url" v-model.trim="shotPolicy.shortcut_url" placeholder="https://www.icloud.com/shortcuts/…">
+                <small class="muted">{{ t('admin.settings.shot_shortcut_hint') }}</small>
+              </label>
+              <label class="field"><span>{{ t('admin.settings.shot_image_enabled') }}</span>
+                <input type="checkbox" v-model="shotPolicy.image_enabled"></label>
+            </div>
+            <p class="muted">{{ t('admin.settings.shot_measured') }}</p>
+            <ul class="muted">
+              <li>{{ t('admin.settings.shot_measured_reply') }}: {{ shotMeasured('reply') }}</li>
+              <li>{{ t('admin.settings.shot_measured_text') }}: {{ shotMeasured('screenshot_text') }}</li>
+              <li>{{ t('admin.settings.shot_measured_image') }}: {{ shotMeasured('screenshot_image') }}</li>
+            </ul>
+            <button class="btn btn-primary" :disabled="savingShot" @click="saveShot">{{ t('common.save') }}</button>
           </div>
         </div>
         <reminder-settings/>

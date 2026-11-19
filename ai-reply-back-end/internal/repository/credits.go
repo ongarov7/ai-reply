@@ -120,6 +120,35 @@ func (s *Store) ReserveContextUnits(ctx context.Context, generationID string, in
 	return out, nil
 }
 
+// ReserveExtraUnits — n more units of one generation beyond its first (the
+// price of a screenshot reply above one reply), each paid by the normal bucket
+// order, all or none in one transaction: a refusal rolls every one of them
+// back, so no other request ever sees a balance taken by a price that was not
+// charged. The rows carry the given mode and no key; the generation commits
+// the ones its real usage needs and refunds the rest.
+func (s *Store) ReserveExtraUnits(ctx context.Context, in ReserveInput, n int) ([]Reservation, error) {
+	if n <= 0 {
+		return nil, nil
+	}
+	var out []Reservation
+	err := s.db.Tx(ctx, func(tx *sql.Tx) error {
+		out = out[:0]
+		in.Key = ""
+		for range n {
+			r, err := reserveOne(ctx, tx, in)
+			if err != nil {
+				return err
+			}
+			out = append(out, r)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // reserveOne — one unit inside the caller's transaction (ReserveGeneration).
 func reserveOne(ctx context.Context, tx *sql.Tx, in ReserveInput) (Reservation, error) {
 	var out Reservation

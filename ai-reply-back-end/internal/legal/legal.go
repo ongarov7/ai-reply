@@ -14,6 +14,13 @@ const (
 // AIProvider — жауаптарды жазатын AI провайдері (келісім экраны мен құпиялық саясаты оны атайды).
 const AIProvider = "OpenAI"
 
+// ScreenshotConsentVersion — the in-app disclosure a person accepts before a
+// screenshot itself (not only its recognised text) is sent for analysis. A
+// screenshot reply in image mode must carry it; changing what image analysis
+// does changes this version and asks again, without touching the general AI
+// consent.
+const ScreenshotConsentVersion = "2026-11-19-screenshot-v1"
+
 // WebPurchaseTermsVersion is accepted separately for a website purchase. It
 // does not change the app's consent to AI processing or reset existing consent.
 const WebPurchaseTermsVersion = "2026-10-30-web-purchase-v1"

@@ -104,15 +104,17 @@ type GenerationStamp struct {
 	Platform string
 }
 
-// SuccessfulGenerations — the account's delivered replies and composed
-// messages since a moment, oldest first (idx_ai_events_user).
+// SuccessfulGenerations — the account's delivered replies (screenshot replies
+// included) and composed messages since a moment, oldest first
+// (idx_ai_events_user).
 func (s *Store) SuccessfulGenerations(ctx context.Context, userID string, since time.Time) ([]GenerationStamp, error) {
 	// created_at is when the reply was delivered; minus its latency it is when
 	// the request started and its units were charged (the usage_daily day), so
 	// a reply that finishes after midnight stays on the day of its charge.
 	rows, err := s.db.Reader().QueryContext(ctx, `
 		SELECT created_at - latency_ms, platform FROM ai_usage_events
-		WHERE user_id = ? AND created_at >= ? AND status = 'success' AND mode IN ('reply', 'compose')
+		WHERE user_id = ? AND created_at >= ? AND status = 'success'
+		  AND mode IN ('reply', 'compose', 'screenshot', 'screenshot_image')
 		ORDER BY created_at`, userID, ms(since))
 	if err != nil {
 		return nil, err

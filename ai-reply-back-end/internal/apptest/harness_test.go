@@ -46,6 +46,7 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/push"
 	"github.com/aireply/ai-reply-back-end/internal/reports"
 	"github.com/aireply/ai-reply-back-end/internal/repository"
+	"github.com/aireply/ai-reply-back-end/internal/screenshot"
 	"github.com/aireply/ai-reply-back-end/internal/simulator"
 	"github.com/aireply/ai-reply-back-end/internal/subscriptions"
 	"github.com/aireply/ai-reply-back-end/internal/support"
@@ -72,6 +73,29 @@ type fakeProvider struct {
 	lastMaxTokens int
 	// hold — келесі шақыру клиент кеткенше күтеді; арна шақыру басталғанда жабылады.
 	hold chan struct{}
+	// inputTokens and outputTokens — the usage the next generations report
+	// (0 — 120 and 40). countTokens — what CountInputTokens answers (0 — the
+	// count is unavailable, as on a provider without the endpoint).
+	inputTokens, outputTokens, countTokens int
+	counts                                 int
+}
+
+// CountInputTokens — the provider's input-token count (image requests only).
+func (f *fakeProvider) CountInputTokens(_ context.Context, prompt ai.Prompt) (int, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.counts++
+	if f.countTokens <= 0 {
+		return 0, domain.ErrProviderDown
+	}
+	return f.countTokens, nil
+}
+
+// usage — sets the token usage the next generations report.
+func (f *fakeProvider) usage(input, output int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.inputTokens, f.outputTokens = input, output
 }
 
 func (f *fakeProvider) Name() string  { return "fake" }
@@ -109,8 +133,15 @@ func (f *fakeProvider) Generate(ctx context.Context, prompt ai.Prompt) (ai.Compl
 	if len(f.replies) > 0 {
 		text, f.replies = f.replies[0], f.replies[1:]
 	}
+	input, output := 120, 40
+	if f.inputTokens > 0 {
+		input = f.inputTokens
+	}
+	if f.outputTokens > 0 {
+		output = f.outputTokens
+	}
 	return ai.Completion{
-		Text: text, Model: "test-model", InputTokens: 120, OutputTokens: 40, ProviderMS: 12,
+		Text: text, Model: "test-model", InputTokens: input, OutputTokens: output, ProviderMS: 12,
 	}, nil
 }
 
@@ -499,6 +530,8 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 		WithQuotaEvents(events).WithPolishDailyLimit(cfg.Limits.PolishPerDay).
 		WithTranscriber(ai.NewOpenAI(speechConfig)).WithTranscribeDailyLimit(cfg.Limits.TranscribePerDay).
 		WithProDevices(proDeviceSvc).WithMacContext(cfg.MacContext)
+	screenshotSvc := screenshot.New(store).WithTTL(0)
+	aiSvc.WithScreenshotPolicy(screenshotSvc)
 	paymentSvc := payments.New(store, subSvc, payments.DemoProvider{}, cfg.Payments.Mode).WithEvents(events).
 		WithDemoCheckout(cfg.Payments.DemoCheckout).WithProduction(cfg.App.IsProduction())
 	eventSvc := productevents.New(store, log).WithClock(clock)
@@ -548,10 +581,11 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 		AI: aiSvc, Limits: limitSvc, Payments: paymentSvc, Events: eventSvc, Installations: installSvc,
 		Notifications: notifySvc, Reports: reportSvc, Support: supportSvc, Limiter: limiter, Log: log,
 		Ping:    func(ctx context.Context) error { return db.Reader().PingContext(ctx) },
-		Credits: creditSvc, IAP: iapSvc, ProDevices: proDeviceSvc, AIContext: aiContextSvc}).Register(mux)
+		Credits: creditSvc, IAP: iapSvc, ProDevices: proDeviceSvc, AIContext: aiContextSvc,
+		Screenshots: screenshotSvc}).Register(mux)
 	adminapi.New(adminapi.Deps{Config: cfg, Admin: adminSvc, Limits: limitSvc, Notifications: notifySvc,
 		Payments: paymentSvc, Reports: reportSvc, Credits: creditSvc, Support: supportSvc, IAP: iapSvc,
-		AIContext: aiContextSvc, Limiter: limiter, Log: log}).Register(mux)
+		AIContext: aiContextSvc, Screenshots: screenshotSvc, Limiter: limiter, Log: log}).Register(mux)
 	simulatorapi.New(simulatorapi.Deps{Config: cfg, Admin: adminSvc, Simulator: simulatorSvc,
 		Limiter: limiter, Log: log}).Register(mux)
 	webServer, err := web.New(web.Deps{Config: cfg, Admin: adminSvc, Plans: planSvc, Payments: paymentSvc,

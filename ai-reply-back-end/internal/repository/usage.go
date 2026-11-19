@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"time"
 
 	"github.com/aireply/ai-reply-back-end/internal/domain"
@@ -73,11 +74,13 @@ func (s *Store) InsertUsageEvent(ctx context.Context, e domain.UsageEvent) error
 	_, err := s.db.Writer().ExecContext(ctx, `
 		INSERT INTO ai_usage_events (id, user_id, device_id, plan_id, model, status, error_code,
 			input_tokens, output_tokens, total_tokens, cost_micros, latency_ms, provider_ms,
-			platform, app_version, language, source_chars, mode, prompt_version, units, context_chars, created_at)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			platform, app_version, language, source_chars, mode, prompt_version, units, context_chars,
+			cached_tokens, reasoning_tokens, max_units, credit_policy, created_at)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		e.ID, e.UserID, e.DeviceID, e.PlanID, e.Model, e.Status, e.ErrorCode,
 		e.InputTokens, e.OutputTokens, e.TotalTokens, e.CostMicros, e.LatencyMS, e.ProviderMS,
-		e.Platform, e.AppVersion, e.Language, e.SourceChars, e.Mode, e.PromptVersion, e.Units, e.ContextChars, ms(e.CreatedAt))
+		e.Platform, e.AppVersion, e.Language, e.SourceChars, e.Mode, e.PromptVersion, e.Units, e.ContextChars,
+		e.CachedTokens, e.ReasoningTokens, e.MaxUnits, e.CreditPolicy, ms(e.CreatedAt))
 	return err
 }
 
@@ -88,6 +91,35 @@ func (s *Store) UsageEventsSince(ctx context.Context, userID, mode string, since
 		SELECT COUNT(*) FROM ai_usage_events WHERE user_id = ? AND created_at >= ? AND mode = ?`,
 		userID, ms(since), mode).Scan(&n)
 	return n, err
+}
+
+// UsageAverage — what successful generations of some modes used on average
+// (numbers only), for calibrating the screenshot credit policy.
+type UsageAverage struct {
+	Count        int     `json:"count"`
+	InputTokens  float64 `json:"input_tokens"`
+	OutputTokens float64 `json:"output_tokens"`
+	CachedTokens float64 `json:"cached_tokens"`
+	Units        float64 `json:"units"`
+}
+
+// UsageAverages — successful generations of these modes since a moment.
+func (s *Store) UsageAverages(ctx context.Context, since time.Time, modes ...string) (UsageAverage, error) {
+	var out UsageAverage
+	if len(modes) == 0 {
+		return out, nil
+	}
+	query := `SELECT COUNT(*), COALESCE(AVG(input_tokens),0), COALESCE(AVG(output_tokens),0),
+		COALESCE(AVG(cached_tokens),0), COALESCE(AVG(units),0)
+		FROM ai_usage_events WHERE created_at >= ? AND status = 'success' AND mode IN (?` +
+		strings.Repeat(",?", len(modes)-1) + `)`
+	args := []any{ms(since)}
+	for _, m := range modes {
+		args = append(args, m)
+	}
+	err := s.db.Reader().QueryRowContext(ctx, query, args...).
+		Scan(&out.Count, &out.InputTokens, &out.OutputTokens, &out.CachedTokens, &out.Units)
+	return out, err
 }
 
 // ---------------------------------------------------------------- analytics
@@ -147,11 +179,12 @@ func (s *Store) Stats(ctx context.Context, from, to time.Time, today string, day
 		return st, err
 	}
 	st.FreeUsers = st.TotalUsers - st.PaidUsers
-	// Generations, not units: the AI-context surcharge charges extra units
-	// ('context' reservations) that are not requests of their own, and an
-	// admin quota reset rewrites usage_daily, so count the reservations.
+	// Generations, not units: the AI-context surcharge and the price of a
+	// screenshot reply charge extra units ('context' and 'screenshot_extra'
+	// reservations) that are not requests of their own, and an admin quota
+	// reset rewrites usage_daily, so count the reservations.
 	if err := r.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM usage_reservations WHERE usage_date = ? AND mode <> 'context' AND status IN ('reserved','committed')`,
+		`SELECT COUNT(*) FROM usage_reservations WHERE usage_date = ? AND mode NOT IN ('context','screenshot_extra') AND status IN ('reserved','committed')`,
 		today).Scan(&st.RequestsToday); err != nil {
 		return st, err
 	}
