@@ -12,6 +12,7 @@ struct RootNavigationView: View {
     @Environment(AppRouter.self) private var router
     @Environment(VoiceAssistantController.self) private var voice
     @Environment(\.scenePhase) private var scenePhase
+    @State private var showsScreenshot = false
 
     var body: some View {
         @Bindable var router = router
@@ -23,11 +24,19 @@ struct RootNavigationView: View {
             router.scenePhaseDidChange(UIApplication.shared.applicationState == .active ? .active : .inactive)
             router.mainInterfaceDidAppear()
             consumeVoiceLaunch()
+            consumeScreenshotLaunch()
         }
         .onDisappear { router.mainInterfaceDidDisappear() }
         .onReceive(NotificationCenter.default.publisher(for: .voiceAssistantOpenRequested)) { _ in consumeVoiceLaunch() }
-        .onChange(of: scenePhase) { _, phase in if phase == .active { consumeVoiceLaunch() } }
+        .onReceive(NotificationCenter.default.publisher(for: .screenshotReplyOpenRequested)) { _ in consumeScreenshotLaunch() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                consumeVoiceLaunch()
+                consumeScreenshotLaunch()
+            }
+        }
         .sheet(isPresented: $voice.isPresented) { VoiceAssistantView() }
+        .sheet(isPresented: $showsScreenshot) { ScreenshotReplyView() }
         .sheet(item: $router.webPage) { page in
             SafariView(url: page.url).ignoresSafeArea()
         }
@@ -41,6 +50,14 @@ struct RootNavigationView: View {
     private func consumeVoiceLaunch() {
         guard UIApplication.shared.applicationState == .active, VoiceAssistantLaunchRequest.consume() else { return }
         voice.open(startWhenPossible: true)
+    }
+
+    /// The screenshot screen, asked for by the shortcut, Control Center or
+    /// Home. Not over AI Reply Voice while it is open.
+    private func consumeScreenshotLaunch() {
+        guard UIApplication.shared.applicationState == .active, !voice.isPresented,
+              ScreenshotLaunchRequest.consume() else { return }
+        showsScreenshot = true
     }
 }
 

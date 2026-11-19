@@ -57,6 +57,9 @@ struct AIReplyStrings: Sendable {
     /// Shown on the primary button after a failure, so one tap retries with
     /// everything the user typed still there.
     let retry: String
+    /// The table's own language (set by `forLanguage`), for the sentences
+    /// built in code.
+    var language: AppLanguage = .english
     /// Title of the overflow menu that holds the quick intents which did not
     /// fit the row at this width in this language.
     let moreActions: String
@@ -149,12 +152,15 @@ struct AIReplyStrings: Sendable {
     var report: ReportStrings { ReportStrings.forLanguage(appLanguage) }
 
     static func forLanguage(_ language: AppLanguage) -> AIReplyStrings {
+        var strings: AIReplyStrings
         switch language {
-        case .english: return .english
-        case .russian: return .russian
-        case .kazakh:  return .kazakh
-        case .uzbek:   return .uzbek
+        case .english: strings = .english
+        case .russian: strings = .russian
+        case .kazakh:  strings = .kazakh
+        case .uzbek:   strings = .uzbek
         }
+        strings.language = language
+        return strings
     }
 
     /// Maps an error onto the sentence the user actually sees. Short, plain,
@@ -178,6 +184,10 @@ struct AIReplyStrings: Sendable {
         case .serviceUnavailable:         return serviceUnavailable
         case .noInstruction:              return compose.noInstruction
         case .instructionTooLong(let limit): return compose.instructionTooLong(limit: limit)
+        case .screenshotCostConfirmation(let units):
+            return ScreenshotKeyboardStrings(language).costConfirmation(maxUnits: units)
+        case .screenshotCostTooHigh(let units, let available):
+            return ScreenshotKeyboardStrings(language).costTooHigh(maxUnits: units, available: available)
         }
     }
 

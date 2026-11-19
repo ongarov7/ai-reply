@@ -204,6 +204,7 @@ extension AILimits {
             defaults: defaults
         )
         storeFeatures(config.features, defaults: defaults)
+        ScreenshotFeature.store(features: config.features, config: config.screenshot, defaults: defaults)
         defaults.set(config.maxVoiceInstructionLength ?? 0, forKey: Key.voiceInstructionCharacters)
         LegalConsentStore.storeCurrentVersions(config.legal ?? .production, defaults: defaults)
     }

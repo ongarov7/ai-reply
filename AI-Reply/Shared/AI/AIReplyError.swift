@@ -46,6 +46,11 @@ enum AIReplyError: Error, Equatable, Sendable {
     case noInstruction
     /// Compose mode: the description is longer than the server's limit.
     case instructionTooLong(limit: Int)
+    /// A screenshot reply may cost more than one reply: trying again
+    /// approves that price. Nothing was charged.
+    case screenshotCostConfirmation(maxUnits: Int)
+    /// The balance cannot pay the most a screenshot reply may cost.
+    case screenshotCostTooHigh(maxUnits: Int, available: Int)
 
     /// Whether doing the same thing again can work, so the composer offers
     /// Retry. Not when the keyboard itself is in the way (no Full Access),
@@ -55,10 +60,10 @@ enum AIReplyError: Error, Equatable, Sendable {
     var offersRetry: Bool {
         switch self {
         case .noSourceMessage, .pasteDenied, .fullAccessRequired, .quotaExhausted, .monthlyQuotaExhausted,
-             .messageTooLong, .noInstruction, .instructionTooLong:
+             .messageTooLong, .noInstruction, .instructionTooLong, .screenshotCostTooHigh:
             return false
         case .notConfigured, .offline, .timedOut, .cancelled, .authenticationFailed, .rateLimited,
-             .consentRequired, .emptyResponse, .serviceUnavailable:
+             .consentRequired, .emptyResponse, .serviceUnavailable, .screenshotCostConfirmation:
             return true
         }
     }

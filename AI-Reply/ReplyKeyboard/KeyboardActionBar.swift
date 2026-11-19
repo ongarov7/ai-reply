@@ -53,6 +53,9 @@ protocol KeyboardActionBarDelegate: AnyObject {
     func actionBarDidInsertVoiceAssistant(_ bar: KeyboardActionBar)
     func actionBarDidDismissVoiceAssistant(_ bar: KeyboardActionBar)
     func actionBar(_ bar: KeyboardActionBar, didChooseVoiceAction action: KeyboardVoiceAssistantAction)
+    /// The screenshot strip's Reply or Insert, and its ✕.
+    func actionBarDidTapScreenshotPrimary(_ bar: KeyboardActionBar)
+    func actionBarDidDismissScreenshot(_ bar: KeyboardActionBar)
 }
 
 /// The area above the keys. Two shapes:
@@ -74,6 +77,8 @@ final class KeyboardActionBar: UIView {
     private let suggestionStrip = SuggestionStripView()
     private let watchStrip = WatchVoiceStripView()
     private let voiceStrip = VoiceAssistantStripView()
+    private let screenshotStrip = ScreenshotStripView()
+    private var screenshotState: KeyboardScreenshotStrip?
     private var voiceSnapshot: VoiceAssistantSnapshot?
     private var voiceInsertsDirectly = false
     private var voiceTheme = KeyboardTheme(isDark: true)
@@ -151,6 +156,16 @@ final class KeyboardActionBar: UIView {
             self.delegate?.actionBar(self, didChooseVoiceAction: action)
         }
         addSubview(voiceStrip)
+        screenshotStrip.isHidden = true
+        screenshotStrip.onPrimary = { [weak self] in
+            guard let self else { return }
+            self.delegate?.actionBarDidTapScreenshotPrimary(self)
+        }
+        screenshotStrip.onDismiss = { [weak self] in
+            guard let self else { return }
+            self.delegate?.actionBarDidDismissScreenshot(self)
+        }
+        addSubview(screenshotStrip)
         composer.isHidden = true
         addSubview(composer)
     }
@@ -168,6 +183,7 @@ final class KeyboardActionBar: UIView {
         suggestionStrip.frame = templateBar.personasFrame.offsetBy(dx: templateBar.frame.minX, dy: templateBar.frame.minY)
         watchStrip.frame = suggestionStrip.frame.insetBy(dx: 3, dy: 4)
         voiceStrip.frame = watchStrip.frame
+        screenshotStrip.frame = watchStrip.frame
         composer.frame = bounds
     }
 
@@ -178,6 +194,7 @@ final class KeyboardActionBar: UIView {
         templateBar.configure(theme: theme, uiLanguage: uiLanguage)
         suggestionStrip.configure(theme: theme, uiLanguage: uiLanguage)
         watchStrip.configure(theme: theme, uiLanguage: uiLanguage)
+        screenshotStrip.configure(theme: theme, uiLanguage: uiLanguage)
         watchStrings = WatchVoiceStrings.forLanguage(uiLanguage)
         voiceTheme = theme
         voiceLanguage = uiLanguage
@@ -265,7 +282,17 @@ final class KeyboardActionBar: UIView {
         }
         watchStrip.isHidden = !visible
         voiceStrip.isHidden = !showsVoice
-        templateBar.setPersonasHidden(visible || showsVoice || showsSuggestions)
+        // A waiting screenshot gives way to a live voice or watch session.
+        let showsScreenshot = screenshotState != nil && !isComposing && !showsSuggestions && !visible && !showsVoice
+        screenshotStrip.isHidden = !showsScreenshot
+        templateBar.setPersonasHidden(visible || showsVoice || showsSuggestions || showsScreenshot)
+    }
+
+    /// The latest screenshot's strip (nil hides it).
+    func setScreenshot(_ state: KeyboardScreenshotStrip?) {
+        screenshotState = state
+        if let state { screenshotStrip.show(state) }
+        refreshWatchStrip()
     }
 
     /// - Parameter insertsDirectly: the result was requested from the field

@@ -114,6 +114,10 @@ final class VoiceReplyViewModel {
 
     static let maximumDuration: TimeInterval = 60
 
+    /// This recorder's limit: a minute for dictating a message or a profile,
+    /// 40 seconds for a screenshot reply's instruction.
+    let maximumDuration: TimeInterval
+
     var transcript: String = ""
     private(set) var isRecording = false
     private(set) var elapsed: TimeInterval = 0
@@ -145,7 +149,9 @@ final class VoiceReplyViewModel {
     init(recordingSession: DictationAudioSession? = nil,
          microphonePermission: (() async -> Bool)? = nil,
          speechPermission: (() async -> SFSpeechRecognizerAuthorizationStatus)? = nil,
-         notificationCenter: NotificationCenter = .default) {
+         notificationCenter: NotificationCenter = .default,
+         maximumDuration: TimeInterval = VoiceReplyViewModel.maximumDuration) {
+        self.maximumDuration = maximumDuration
         self.recordingSession = recordingSession ?? DictationAudioSession()
         self.microphonePermission = microphonePermission ?? Self.requestMicrophonePermission
         self.speechPermission = speechPermission ?? Self.requestSpeechPermission
@@ -171,13 +177,13 @@ final class VoiceReplyViewModel {
 
     var statusMessage: String { status.message(language: language) }
 
-    var elapsedLabel: String { Self.format(elapsed) }
+    var elapsedLabel: String { Self.format(elapsed, limit: maximumDuration) }
 
     var recordingLabel: String {
         String(
             format: AppSettings.localized("voice.recording", language: language),
             elapsedLabel,
-            Self.format(Self.maximumDuration)
+            Self.format(maximumDuration, limit: maximumDuration)
         )
     }
 
@@ -371,7 +377,7 @@ final class VoiceReplyViewModel {
             }
         }
         stopWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.maximumDuration, execute: workItem)
+        DispatchQueue.main.asyncAfter(deadline: .now() + maximumDuration, execute: workItem)
     }
 
     private func stopCapture(reason: StopReason) {
@@ -408,7 +414,7 @@ final class VoiceReplyViewModel {
         case .user:
             status = canCopyOrClear ? .stopped : .stoppedNoSpeech
         case .limit:
-            elapsed = Self.maximumDuration
+            elapsed = maximumDuration
             status = canCopyOrClear ? .stoppedAtLimit : .stoppedAtLimitNoSpeech
         case .failure(let error):
             status = .recognitionFailed(
@@ -428,7 +434,7 @@ final class VoiceReplyViewModel {
 
     private func updateElapsed() {
         guard let startedAt else { return }
-        elapsed = min(Self.maximumDuration, Date().timeIntervalSince(startedAt))
+        elapsed = min(maximumDuration, Date().timeIntervalSince(startedAt))
     }
 
     // MARK: Permissions
@@ -485,8 +491,8 @@ final class VoiceReplyViewModel {
         }
     }
 
-    private static func format(_ time: TimeInterval) -> String {
-        let seconds = min(Int(time.rounded(.down)), Int(maximumDuration))
+    private static func format(_ time: TimeInterval, limit: TimeInterval) -> String {
+        let seconds = min(Int(time.rounded(.down)), Int(limit))
         return String(format: "%02d:%02d", seconds / 60, seconds % 60)
     }
 }

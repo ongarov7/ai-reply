@@ -48,6 +48,8 @@ struct AIReplyApp: App {
         account.installationIDForSignOut = { AppServices.shared.installationIDForSignOut }
         account.willEndSession = {
             voice.stop(clearPrivateContext: true)
+            // A screenshot belongs to the person who took it.
+            ScreenshotContextStore.shared.delete()
             AppServices.shared.accountWillSignOut()
         }
         account.didDeleteAccount = { [weak configuration] in
@@ -114,6 +116,9 @@ struct AIReplyApp: App {
                 if url.scheme == "aireply", url.host == "voice" {
                     VoiceAssistantLaunchRequest.request()
                     NotificationCenter.default.post(name: .voiceAssistantOpenRequested, object: nil)
+                } else if url.scheme == "aireply", url.host == "screenshot" {
+                    ScreenshotLaunchRequest.request()
+                    NotificationCenter.default.post(name: .screenshotReplyOpenRequested, object: nil)
                 } else {
                     GoogleSignInProvider.handle(url)
                 }
@@ -155,6 +160,8 @@ struct AIReplyApp: App {
                 switch phase {
                 case .active:
                     voice.refreshPublishedState()
+                    // A screenshot past its hour goes, even unopened.
+                    ScreenshotContextStore.shared.purge()
                     keyboardStatus.refresh()
                     // A website payment can change the shared balance while
                     // the app is away. Read /me when the user returns.
@@ -239,6 +246,9 @@ enum DebugScreen: String {
     case support
     /// Settings ▸ Apple Watch.
     case watch, voice
+    /// «Ответ по скриншоту» over a drawn sample chat, read on the device
+    /// (`-AIReplyDebugScreenshotChat ru|kk|en|uz|dark`).
+    case screenshot
     /// A chat with the keyboard up, for the Apple Watch screenshots;
     /// `-AIReplyDebugMessage` is the message on screen.
     case chat
@@ -290,6 +300,12 @@ private struct DebugScreenHost: View {
         case .settings:  NavigationStack { SettingsView() }
         case .watch:     NavigationStack { AppleWatchSettingsView() }
         case .voice:     DebugVoiceHost()
+        case .screenshot:
+            ScreenshotReplyView()
+                .task {
+                    ScreenshotConsent.markIntroSeen()
+                    await DebugScreenshotSample.ingest(DebugScreen.value(after: "-AIReplyDebugScreenshotChat") ?? "ru")
+                }
         case .chat:      DebugChatHost()
         case .notifications: NavigationStack { SettingsView(focus: .notifications) }
         case .profile:   NavigationStack { ProfileEditorView() }

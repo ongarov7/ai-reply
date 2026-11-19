@@ -243,6 +243,25 @@ final class ReplyFlowCoordinator {
         generate()
     }
 
+    /// «Ответить» on the keyboard's screenshot strip: the composer opens on
+    /// the message the screenshot reply answers. It does NOT generate.
+    func open(screenshot context: ScreenshotContext, template: ReplyTemplate) {
+        cancelTask()
+        ReplySessionParking.discard()
+        let conversation = context.conversation
+        var next = ReplySession(sourceMessage: conversation.target?.text ?? "", source: .screenshot, template: template)
+        next.screenshot = conversation
+        next.instruction = context.instruction ?? ""
+        session = next
+        isSuspended = false
+        delegate?.coordinator(self, didOpen: next)
+    }
+
+    /// A reply the app wrote for the latest screenshot, on screen with Insert.
+    func showScreenshotDraft(_ text: String, template: ReplyTemplate) {
+        showSaved(instruction: "", text: text, template: template)
+    }
+
     /// A text the watch flow saved, back on screen with Insert.
     func showSaved(instruction: String, text: String, template: ReplyTemplate) {
         cancelTask()
@@ -274,6 +293,8 @@ final class ReplyFlowCoordinator {
         case .success(let context):
             session?.sourceMessage = context.text
             session?.source = context.source
+            // A pasted message is an ordinary reply, not the screenshot's.
+            session?.screenshot = nil
             session?.flow.clearError()
         case .failure(let error):
             session?.flow.fail(error)
@@ -303,8 +324,9 @@ final class ReplyFlowCoordinator {
             return
         }
         // The length rule is checked BEFORE the request, so an over-long
-        // paste costs nothing and reports immediately.
-        if case .failure(let error) = AIReplyService.validate(message: source) {
+        // paste costs nothing and reports immediately. A screenshot's message
+        // has the screenshot's own limits, checked by the server.
+        if current.screenshot == nil, case .failure(let error) = AIReplyService.validate(message: source) {
             current.flow.fail(error)
             session = current
             delegate?.coordinatorDidChange(self)
@@ -335,6 +357,10 @@ final class ReplyFlowCoordinator {
     }
 
     private func run(_ snapshot: ReplySession) {
+        if let conversation = snapshot.screenshot {
+            runScreenshot(snapshot, conversation: conversation)
+            return
+        }
         var template = snapshot.template
         var configuration = self.configuration
         if let length = snapshot.watch?.length { template.replyLength = length }
@@ -372,6 +398,53 @@ final class ReplyFlowCoordinator {
                 self.session?.flow.receive(reply: self.normalizer.normalize(reply.text))
             case .failure(let error):
                 self.session?.flow.fail(error)
+            }
+            self.delegate?.coordinatorDidChange(self)
+        }
+    }
+
+    /// A screenshot reply: the conversation (with the message as the person
+    /// left it in the composer) and the approved price, through the screenshot
+    /// endpoint. A higher price than approved comes back as a question; the
+    /// next Try again approves it.
+    private func runScreenshot(_ snapshot: ReplySession, conversation: ScreenshotConversation) {
+        var conversation = conversation
+        if let target = conversation.target, let index = conversation.messages.firstIndex(where: { $0.id == target.id }),
+           let edited = snapshot.usableSource, edited != target.text {
+            conversation.messages[index].text = edited
+            conversation.messages[index].isEdited = true
+        }
+        let request = ScreenshotReplyRequest(
+            mode: .text, conversation: conversation, instruction: snapshot.instruction,
+            instructionIsVoice: snapshot.isVoice, template: snapshot.template, configuration: configuration,
+            uiLanguage: uiLanguage, inputLanguage: inputLanguage, approvedUnits: snapshot.screenshotApprovedUnits)
+        generation += 1
+        let ticket = generation
+        task = Task { [weak self] in
+            let outcome: Result<ScreenshotReplyResult, ScreenshotReplyFailure>
+            do {
+                outcome = .success(try await ScreenshotReplyClient.reply(request))
+            } catch let failure as ScreenshotReplyFailure {
+                outcome = .failure(failure)
+            } catch {
+                outcome = .failure(.failed(.serviceUnavailable))
+            }
+            guard let self, !Task.isCancelled, ticket == self.generation else { return }
+            self.task = nil
+            guard self.session != nil else { return }
+            switch outcome {
+            case .success(let result):
+                self.session?.screenshotApprovedUnits = 1
+                self.session?.flow.receive(reply: self.normalizer.normalize(result.reply))
+            case .failure(.confirmationRequired(let quote)):
+                self.session?.screenshotApprovedUnits = quote.maxUnits
+                self.session?.flow.fail(.screenshotCostConfirmation(maxUnits: quote.maxUnits))
+            case .failure(.insufficientCredits(let quote, _)):
+                self.session?.flow.fail(.screenshotCostTooHigh(maxUnits: quote.maxUnits, available: quote.availableUnits ?? 0))
+            case .failure(.failed(let error)):
+                self.session?.flow.fail(error)
+            case .failure:
+                self.session?.flow.fail(.serviceUnavailable)
             }
             self.delegate?.coordinatorDidChange(self)
         }
