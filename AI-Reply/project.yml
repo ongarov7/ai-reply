@@ -48,7 +48,7 @@ targets:
       properties:
         CFBundleDisplayName: AI Reply
         CFBundleShortVersionString: "1.3.0"
-        CFBundleVersion: "32"
+        CFBundleVersion: "36"
         AIReplySignInWithApple: $(AIREPLY_SIGN_IN_WITH_APPLE)
         AIReplyBackendBaseURL: $(AIREPLY_BACKEND_BASE_URL)
         AIReplyPushNotifications: $(AIREPLY_PUSH_NOTIFICATIONS)
@@ -204,7 +204,7 @@ targets:
         AIReplyBackendBaseURL: $(AIREPLY_BACKEND_BASE_URL)
         CFBundleDisplayName: AI Reply
         CFBundleShortVersionString: "1.3.0"
-        CFBundleVersion: "32"
+        CFBundleVersion: "36"
         NSExtension:
           NSExtensionAttributes:
             IsASCIICapable: true
@@ -244,7 +244,7 @@ targets:
       properties:
         CFBundleDisplayName: AI Reply Voice
         CFBundleShortVersionString: "1.3.0"
-        CFBundleVersion: "32"
+        CFBundleVersion: "36"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     entitlements:
@@ -275,7 +275,7 @@ targets:
       properties:
         CFBundleDisplayName: AI Reply
         CFBundleShortVersionString: "1.3.0"
-        CFBundleVersion: "32"
+        CFBundleVersion: "36"
         ITSAppUsesNonExemptEncryption: false
         NSMicrophoneUsageDescription: "AI Reply records your voice only while you speak an instruction, after you tap the microphone. Through your iPhone the recording goes to the AI Reply server and OpenAI to be turned into text. AI Reply does not store it."
         UISupportedInterfaceOrientations:
