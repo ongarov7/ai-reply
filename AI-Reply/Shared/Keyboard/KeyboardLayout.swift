@@ -140,10 +140,11 @@ struct KeyboardPageOptions: Hashable, Sendable {
     /// The ҚАЗ / РУС / ENG key. Hidden when only one layout is switched on.
     var showsLanguageKey: Bool = true
     var field: KeyboardFieldKind = .text
-    /// The emoji key on the letters page, right after 123. The keyboard
-    /// decides it from the field and the width
-    /// (`KeyboardGeometry.fitsEmojiKey`); it is never drawn in an e-mail,
-    /// URL or handle field whatever this says.
+    /// The emoji key on the letters page, right after 123. The keyboard has
+    /// not asked for it since 20.11.2026 (owner's decision: the space bar
+    /// takes its room); `KeyboardGeometry.fitsEmojiKey` says where it would
+    /// fit. It is never drawn in an e-mail, URL or handle field whatever
+    /// this says.
     var showsEmojiKey: Bool = false
 }
 

@@ -494,20 +494,17 @@ final class KeyboardViewController: UIInputViewController {
         return sizing.keyAreaHeight(maximumRows: KeyboardLayout.maximumRowCount(languages: enabledLanguages))
     }
 
-    private func pageOptions(for sizing: KeyboardSizing) -> KeyboardPageOptions {
+    private func pageOptions() -> KeyboardPageOptions {
         let type = textDocumentProxy.keyboardType ?? .default
-        var options = KeyboardPageOptions(
+        // No emoji key (owner's decision, 20.11.2026, after user complaints
+        // about the crowded bottom row): the space bar takes its room. Apple's
+        // emoji keyboard is still reachable from the globe.
+        return KeyboardPageOptions(
             showsNextKeyboardKey: showsGlobe,
             showsLanguageKey: enabledLanguages.count > 1,
             // The composer's fields are plain text whatever the host field is.
             field: actionBar.isComposing ? .text : KeyboardFieldKind(type)
         )
-        // The emoji key: in plain text fields and in the composer; where the
-        // keyboard draws its own globe, only while the space bar keeps room.
-        let offersEmoji = actionBar.isComposing
-            || KeyboardFieldKind.offersEmoji(type, isSecure: textDocumentProxy.isSecureTextEntry ?? false)
-        options.showsEmojiKey = offersEmoji && KeyboardGeometry.fitsEmojiKey(options: options, sizing: sizing)
-        return options
     }
 
     private func layoutKeyboard(force: Bool) {
@@ -515,7 +512,7 @@ final class KeyboardViewController: UIInputViewController {
         let identity = PageIdentity(
             language: language,
             plane: plane,
-            options: pageOptions(for: sizing),
+            options: pageOptions(),
             sizing: sizing,
             areaHeight: keyAreaHeight
         )
