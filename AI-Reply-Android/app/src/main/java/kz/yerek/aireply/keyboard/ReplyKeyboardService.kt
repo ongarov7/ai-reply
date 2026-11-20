@@ -524,7 +524,9 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         // ONE height for every page of every enabled layout.
         val areaHeight = sizing.keyAreaHeight(KeyboardLayout.maximumRowCount(enabledLanguages), screenHeight)
         val composing = isComposing
-        val baseOptions = PageOptions(
+        // No emoji key (owner's decision, 20.11.2026, after user complaints
+        // about the crowded bottom row): the space bar takes its room.
+        val options = PageOptions(
             showsGlobeKey = showsGlobeKey,
             showsLanguageKey = enabledLanguages.size > 1,
             // The composer's fields are plain text whatever the host field is.
@@ -534,11 +536,6 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
             // A row of digits over the letters in a password field, where the
             // keyboard's one height has room for them.
             numberRow = !composing && fieldKeys.password && KeyboardLayout.numberRowFits(language, enabledLanguages)
-        )
-        val options = baseOptions.copy(
-            // Emoji where text goes: the panels' fields, or a plain text field,
-            // and only while the space bar keeps room beside a drawn globe.
-            showsEmojiKey = takesEmoji(composing) && KeyboardGeometry.fitsEmojiKey(baseOptions, sizing)
         )
         val page = remember(language, plane, options, sizing, areaHeight) {
             KeyboardGeometry.layout(KeyboardLayout.page(language, plane, options), sizing, areaHeight)
@@ -1037,9 +1034,8 @@ class ReplyKeyboardService : InputMethodService(), KeySurfaceListener {
         }
     }
 
-    /** The emoji key is offered, and the emoji page may stay up: never in a password, an address or a number. */
-    private fun takesEmoji(composing: Boolean = isComposing): Boolean =
-        !isSecureField && (composing || fieldKeys.takesEmoji)
+    /** The emoji page may stay up: never in a password, an address or a number. */
+    private fun takesEmoji(): Boolean = !isSecureField && (isComposing || fieldKeys.takesEmoji)
 
     /** Back to the letters from the emoji page where emoji no longer belong. */
     private fun leaveEmojiIfRefused() {

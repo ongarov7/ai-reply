@@ -126,7 +126,8 @@ data class PageOptions(
     /**
      * The emoji key right after ?123 on the letters. Off by default and off
      * where emoji do not belong: e-mail, URL and password fields; pads have
-     * no bottom row to put it in.
+     * no bottom row to put it in. The keyboard has not asked for it since
+     * 20.11.2026 (owner's decision: the space bar takes its room).
      */
     val showsEmojiKey: Boolean = false
 )
@@ -145,7 +146,7 @@ data class PageOptions(
  *    standard order `ә і ң ғ ү ұ қ ө һ`, centred on the same grid with keys
  *    the same size as every other row.
  *
- * The bottom row is 123, the emoji key, the layout key, space and return. A
+ * The bottom row is 123, the layout key, space and return. A
  * key's face shows its letter and nothing else: a long press on the top row
  * still types its digit, with no caption in the corner.
  *
@@ -153,8 +154,9 @@ data class PageOptions(
  * Kazakh and Russian layouts and `$` on the English one; the other currencies
  * are a long press away.
  *
- * The emoji key sits right after 123 on the letters ([PageOptions.showsEmojiKey]);
- * its page ([emojiPage]) is the emoji grid over a bottom row of ABC, the
+ * The emoji key, when asked for, sits right after 123 on the letters
+ * ([PageOptions.showsEmojiKey], off in the keyboard since 20.11.2026); its
+ * page ([emojiPage]) is the emoji grid over a bottom row of ABC, the
  * categories and delete, at the letters' own height.
  *
  * A field that only takes numbers opens on a pad instead ([padPage]): a
