@@ -73,7 +73,8 @@ server shows the previous behaviour.
 
 ## 2. Owner decisions (20.10.2026)
 - Recipients: Друг / Клиент / Коллега / Партнёр, with icons, in this order.
-- Emoji key in the letters page bottom row right after 123, on both keyboards.
+- Emoji key in the letters page bottom row right after 123, on both keyboards. Superseded on
+  20.11.2026: no emoji key on either keyboard, the space bar takes its room (§3.10).
 - Strict native look for the whole app (system blue, plain grouped backgrounds, no gradients or red
   accents, no decorative motion). The keyboard key look stays as it is.
 - Android: native Material in the same restrained style.
@@ -235,7 +236,12 @@ When a generation fails with a limit code: title «Лимит ответов и�
 purchase screen.
 
 ### 3.10 Emoji page
-- Entry: an emoji key right after 123 in the letters page bottom row, keyboard key style unchanged.
+- 20.11.2026 (owner, after user complaints about the crowded bottom row): neither keyboard shows
+  the emoji key any more. The letters page bottom row is 123, the layout key (ҚАЗ / РУС / ENG),
+  space and return; the space bar takes the emoji key's width. On iPhone Apple's emoji keyboard is
+  still reachable from the globe. The page below stays in the code with no way in; showing it
+  again means asking for `showsEmojiKey` in the keyboard controller / service.
+- Entry (until 20.11.2026): an emoji key right after 123 in the letters page bottom row, keyboard key style unchanged.
   Not shown in email, URL, password/secure fields or pads.
 - iOS with the in-keyboard globe (home-button phones): the emoji key is dropped when the space bar
   would get narrower than 2.5 grid units; the system globe still reaches the system emoji keyboard.
