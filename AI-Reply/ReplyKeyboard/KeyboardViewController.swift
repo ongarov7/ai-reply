@@ -75,11 +75,19 @@ final class KeyboardViewController: UIInputViewController {
     private lazy var voiceAssistant: KeyboardVoiceAssistant = {
         let coordinator = KeyboardVoiceAssistant()
         coordinator.onChange = { [weak self] snapshot, bound in
-            self?.actionBar.setVoiceAssistant(snapshot, insertsDirectly: bound)
+            guard let self else { return }
+            self.actionBar.setVoiceAssistant(snapshot, insertsDirectly: bound)
+            self.dictationSnapshot = snapshot
+            self.refreshDictationPanel(animated: true)
         }
         coordinator.onControls = { [weak self] in self?.actionBar.showVoiceControls($0) }
         coordinator.onNotice = { [weak self] message, duration in
-            self?.actionBar.showVoiceNotice(message, duration: duration)
+            guard let self else { return }
+            if self.showsDictationPanel {
+                self.dictationPanel.showNotice(message, duration: duration)
+            } else {
+                self.actionBar.showVoiceNotice(message, duration: duration)
+            }
         }
         coordinator.language = { [weak self] in self?.uiLanguage ?? .english }
         coordinator.hasFullAccess = { [weak self] in self?.hasFullAccess ?? false }
@@ -114,6 +122,13 @@ final class KeyboardViewController: UIInputViewController {
         coordinator.hasFullAccess = { [weak self] in self?.hasFullAccess ?? false }
         return coordinator
     }()
+    /// AI Reply Voice over the whole keyboard while a turn is recorded and
+    /// answered (see `refreshDictationPanel`).
+    private let dictationPanel = VoiceDictationPanelView()
+    private var dictationSnapshot: VoiceAssistantSnapshot?
+    private var showsDictationPanel = false
+    /// The session whose panel was put away for the keys.
+    private var dictationKeysSessionID: String?
 
     /// The cleaner version of the instruction, offered after a pause.
     private lazy var polisher: InstructionPolisher = {
@@ -293,6 +308,10 @@ final class KeyboardViewController: UIInputViewController {
             setInputDimmed(false)
             updateGeometry(animated: false)
         }
+        // The next appearance asks the voice session again; a panel left
+        // from this one must not cover the keys of a session that ended.
+        dictationSnapshot = nil
+        refreshDictationPanel(animated: false)
         watchVoice.keyboardWillDisappear()
         voiceAssistant.disappear()
         screenshot.disappear()
@@ -363,6 +382,21 @@ final class KeyboardViewController: UIInputViewController {
             keysView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             keysView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             keys
+        ])
+
+        // Over the row and the keys, in exactly their space: the keyboard
+        // keeps its height and the chat above it does not move.
+        dictationPanel.translatesAutoresizingMaskIntoConstraints = false
+        dictationPanel.alpha = 0
+        dictationPanel.isHidden = true
+        dictationPanel.onAction = { [weak self] in self?.dictationPanelDidChoose($0) }
+        dictationPanel.onShowKeyboard = { [weak self] in self?.showKeysDuringDictation() }
+        view.addSubview(dictationPanel)
+        NSLayoutConstraint.activate([
+            dictationPanel.topAnchor.constraint(equalTo: view.topAnchor),
+            dictationPanel.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            dictationPanel.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            dictationPanel.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
     }
 
@@ -477,6 +511,7 @@ final class KeyboardViewController: UIInputViewController {
         actionBar.configure(theme: theme, uiLanguage: uiLanguage)
         keysView.configure(theme: theme)
         emojiView?.configure(theme: theme)
+        refreshDictationPanel(animated: false)
     }
 
     // MARK: Layout
@@ -996,6 +1031,7 @@ final class KeyboardViewController: UIInputViewController {
     private func showComposePanel() {
         punctuationReturn.reset()
         actionBar.beginComposing()
+        refreshDictationPanel(animated: true)
         shift.reset()
         layoutKeyboard(force: false)
         renderComposer()
@@ -1008,6 +1044,7 @@ final class KeyboardViewController: UIInputViewController {
         replyCoordinator.clear()
         composeCoordinator.clear()
         actionBar.endComposing()
+        refreshDictationPanel(animated: true)
         setInputDimmed(false)
         layoutKeyboard(force: false)
         updateGeometry(animated: true)
@@ -1371,7 +1408,85 @@ extension KeyboardViewController: KeyboardActionBarDelegate {
     }
 
     func actionBarDidTapVoiceAssistant(_ bar: KeyboardActionBar) {
+        // After the keys were asked for, the microphone brings the
+        // dictation panel back; otherwise it opens the session's menu.
+        if let snapshot = dictationSnapshot, snapshot.sessionID == dictationKeysSessionID,
+           VoiceDictationPanelView.shows(snapshot), !actionBar.isComposing {
+            dictationKeysSessionID = nil
+            refreshDictationPanel(animated: true)
+            return
+        }
         voiceAssistant.menu()
+    }
+
+    // MARK: Dictation panel
+
+    /// While AI Reply Voice prepares, listens and answers, its panel takes
+    /// the whole keyboard and the keys step away, as with iOS's own
+    /// dictation. They come back with the response, which waits in the row
+    /// for Insert, and on an error or Cancel. An open composer keeps the
+    /// keyboard, as it keeps the row's voice strip away.
+    private func refreshDictationPanel(animated: Bool) {
+        var shown: VoiceAssistantSnapshot?
+        if let snapshot = dictationSnapshot, VoiceDictationPanelView.shows(snapshot),
+           snapshot.sessionID != dictationKeysSessionID, !actionBar.isComposing {
+            shown = snapshot
+        }
+        if let shown { dictationPanel.configure(snapshot: shown, theme: theme, language: uiLanguage) }
+        setDictationPanelVisible(shown != nil, animated: animated)
+    }
+
+    private func setDictationPanelVisible(_ visible: Bool, animated: Bool) {
+        guard visible != showsDictationPanel else { return }
+        showsDictationPanel = visible
+        let covered: [UIView] = [actionBar, keysView] + (emojiView.map { [$0] } ?? [])
+        if visible {
+            // A held key must not go on repeating under the panel.
+            keysView.cancelPendingTouches()
+            emojiView?.barKeys.cancelPendingTouches()
+            view.bringSubviewToFront(dictationPanel)
+            dictationPanel.isHidden = false
+        }
+        covered.forEach {
+            $0.isUserInteractionEnabled = !visible
+            $0.accessibilityElementsHidden = visible
+        }
+        dictationPanel.isUserInteractionEnabled = visible
+        let apply = {
+            self.dictationPanel.alpha = visible ? 1 : 0
+            covered.forEach { $0.alpha = visible ? 0 : 1 }
+        }
+        let finish = { (_: Bool) in
+            // A newer change may have turned this one around mid-fade.
+            guard self.showsDictationPanel == visible else { return }
+            self.dictationPanel.isHidden = !visible
+        }
+        if animated, view.window != nil {
+            UIView.animate(withDuration: 0.25, delay: 0, options: [.beginFromCurrentState, .allowUserInteraction],
+                           animations: apply, completion: finish)
+        } else {
+            apply()
+            finish(true)
+        }
+        UIAccessibility.post(notification: .screenChanged, argument: visible ? dictationPanel : nil)
+    }
+
+    private func dictationPanelDidChoose(_ action: KeyboardVoiceAssistantAction) {
+        voiceAssistant.perform(action)
+        guard action == .stop, let session = dictationSnapshot?.sessionID else { return }
+        // The app ends the session in a moment and the keys come back with
+        // it. Should it not answer, Cancel still gives the keys back.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            guard let self, self.showsDictationPanel, self.dictationSnapshot?.sessionID == session else { return }
+            self.dictationKeysSessionID = session
+            self.refreshDictationPanel(animated: true)
+        }
+    }
+
+    /// The keyboard key: typing while the session goes on in the row.
+    private func showKeysDuringDictation() {
+        dictationKeysSessionID = dictationSnapshot?.sessionID
+        refreshDictationPanel(animated: true)
     }
 
     func actionBarDidReviewVoiceAssistant(_ bar: KeyboardActionBar) {
@@ -1553,6 +1668,7 @@ extension KeyboardViewController: KeyboardActionBarDelegate {
             polisher.stop()
             replyCoordinator.suspend()
             actionBar.endComposing()
+            refreshDictationPanel(animated: true)
             setInputDimmed(false)
             applyChips(from: replyCoordinator.configuration)
             updateGeometry(animated: true)
@@ -1694,6 +1810,7 @@ extension KeyboardViewController: ReplyFlowCoordinatorDelegate {
     func coordinator(_ coordinator: ReplyFlowCoordinator, didOpen session: ReplySession) {
         punctuationReturn.reset()
         actionBar.beginComposing()
+        refreshDictationPanel(animated: true)
         shift.reset()
         layoutKeyboard(force: false)
         renderComposer()

@@ -98,6 +98,7 @@
 		3D42A9786527A6FC99C4A2E7 /* VoiceAssistantController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3652A046B90F7291290921 /* VoiceAssistantController.swift */; };
 		3E053A8EC48DFAD177834F98 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E72E94BFF1802E4ECBD823B /* HomeView.swift */; };
 		3E9608F5570E5363D2ADDB7D /* VoiceAssistantStripView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB7FF85591BC2AE19134FA26 /* VoiceAssistantStripView.swift */; };
+		37198D5A7D79668FED01E241 /* VoiceDictationPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0072DE5EFBB5AFE47264DE3F /* VoiceDictationPanelView.swift */; };
 		3E9622C9B447C65AFC017B67 /* AppleSignIn.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E657CDCD4760C991C0C52C2 /* AppleSignIn.swift */; };
 		3EE450020D9BB191990E52B9 /* DocumentIdentifierBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = 7CB330016484E78B185CE537 /* DocumentIdentifierBridge.m */; };
 		3F4B98458DAD32A82359F01C /* AutocorrectDistanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC2B497C0588CE17BB277DBB /* AutocorrectDistanceTests.swift */; };
@@ -673,6 +674,7 @@
 		CB2E16D6A1129010EF1A3532 /* SupportAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportAPI.swift; sourceTree = "<group>"; };
 		CB4B6E3AB5BE3769989EBF99 /* AutocorrectPerformanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutocorrectPerformanceTests.swift; sourceTree = "<group>"; };
 		CB7FF85591BC2AE19134FA26 /* VoiceAssistantStripView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VoiceAssistantStripView.swift; sourceTree = "<group>"; };
+		0072DE5EFBB5AFE47264DE3F /* VoiceDictationPanelView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VoiceDictationPanelView.swift; sourceTree = "<group>"; };
 		CB8F930ABEFF927D11119986 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		CE035B78524E57B6874258CF /* RecipientKindTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipientKindTests.swift; sourceTree = "<group>"; };
 		D15ED35BD92E5A70A2AA9538 /* QuickActionRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickActionRow.swift; sourceTree = "<group>"; };
@@ -1099,6 +1101,7 @@
 				3BD07385DFCA7EC94502AEA0 /* Dictionaries */,
 				D77DCE6F8DCCB8641E0E5ADF /* WatchVoiceStripView.swift */,
 				CB7FF85591BC2AE19134FA26 /* VoiceAssistantStripView.swift */,
+				0072DE5EFBB5AFE47264DE3F /* VoiceDictationPanelView.swift */,
 				9423E61A10E88AA561125657 /* KeyboardVoiceAssistant.swift */,
 				7854CB13A86031DA97351102 /* KeyboardScreenshot.swift */,
 			);
@@ -1853,6 +1856,7 @@
 				E6772753806EB91B99C390CD /* VoiceAssistantState.swift in Sources */,
 				D5E1D4F852AC1EB08B1D2F8F /* VoiceAssistantStore.swift in Sources */,
 				3E9608F5570E5363D2ADDB7D /* VoiceAssistantStripView.swift in Sources */,
+				37198D5A7D79668FED01E241 /* VoiceDictationPanelView.swift in Sources */,
 				484FA37FD776BD7E8731AAF1 /* KeyboardVoiceAssistant.swift in Sources */,
 				9A40FAE38BB0ED8049059B3D /* ScreenshotModels.swift in Sources */,
 				FDBEA7ADCFFD802A711231B7 /* ScreenshotContextStore.swift in Sources */,
