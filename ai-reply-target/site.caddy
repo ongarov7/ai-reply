@@ -1,0 +1,77 @@
+{$CAMPAIGN_ADDRESS:target.ai-reply.kz} {
+	log {
+		output file {$CAMPAIGN_LOG:/var/log/caddy/ai-reply-target.json} {
+			roll_size 10MiB
+			roll_keep 7
+			roll_keep_for 336h
+		}
+		format filter {
+			wrap json
+			fields {
+				request>remote_ip delete
+				request>remote_port delete
+				request>client_ip delete
+				request>headers delete
+				request>uri delete
+			}
+		}
+	}
+
+	# Match iOS first because iOS in-app user agents can contain additional platform tokens.
+	map {http.request.header.User-Agent} {campaign_platform} {
+		`~(?i)facebookexternalhit|facebot|meta-external(hit|agent|ads)|googlebot|bingbot|adsbot-google|twitterbot|linkedinbot|telegrambot|discordbot|slackbot|^whatsapp/[0-9.]+\s*$` preview
+		`~(?i)\b(iphone|ipod|ipad|fbios)\b|macintosh.*\bmobile\b` ios
+		`~(?i)\bandroid\b|\bfb4a\b` android
+		default web
+	}
+
+	@preview expression `{campaign_platform} == "preview"`
+	@otherMethod not method GET
+	@otherPath not path /
+	@purpose header_regexp Purpose `(?i)\bprefetch\b`
+	@secPurpose header_regexp Sec-Purpose `(?i)\b(prefetch|prerender)\b`
+	skip_log @preview
+	skip_log @otherMethod
+	skip_log @otherPath
+	skip_log @purpose
+	skip_log @secPurpose
+
+	header {
+		Cache-Control "private, no-store, max-age=0"
+		Referrer-Policy no-referrer
+		X-Content-Type-Options nosniff
+	}
+
+	@visit {
+		path /
+		method GET HEAD
+	}
+	handle @visit {
+		header {
+			Content-Type "text/plain; charset=utf-8"
+			Vary "User-Agent, Sec-CH-UA-Platform"
+		}
+		templates {
+			root {$CAMPAIGN_TEMPLATE_ROOT:/etc/caddy/ai-reply-target}
+			between [[ ]]
+		}
+		respond "[[ include \"redirect.tmpl\" ]]" 302
+	}
+
+	@robots {
+		path /robots.txt
+		method GET HEAD
+	}
+	handle @robots {
+		respond "User-agent: *
+Disallow:
+" 200
+	}
+
+	handle / {
+		header Allow "GET, HEAD"
+		respond 405
+	}
+
+	respond 404
+}
