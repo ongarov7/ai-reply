@@ -50,6 +50,14 @@ could not be operated to completion: native scrolling returned
 also encountered a ScreenCaptureKit error. No store price or purchase-option
 change and no production submission were confirmed.
 
+Because the final store check still returned 3,990/month and 39,990/year,
+live expected-price overrides were temporarily restored to **399000** and
+**3999000** minor KZT. This keeps existing purchases available during the
+unfinished rollout. Free 10 and the hidden Android pack500 remain deployed.
+The code defaults retain the requested 990/11,880 targets. After saving those
+store prices, switch the backend overrides to **99000** and **1188000**, then
+verify the authenticated Android catalogue against Google Play before release.
+
 To complete in the owner Console:
 
 1. Open [monthly pricing](https://play.google.com/console/u/0/developers/4669560719422191406/app/4974342352292703805/subscriptions/s/kz.aireply.pro.monthly/base-plans/b/monthly),
