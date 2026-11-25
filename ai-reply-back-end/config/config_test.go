@@ -871,34 +871,41 @@ func TestIAPIsOffUntilConfigured(t *testing.T) {
 	}
 }
 
-func TestAppleProMonthlyKZTPriceOverrideConfig(t *testing.T) {
-	for _, tc := range []struct {
-		name    string
-		value   string
-		price   int64
-		invalid bool
+func TestStoreProMonthlyKZTPriceOverrideConfig(t *testing.T) {
+	for _, store := range []struct {
+		key   string
+		price func(IAP) int64
 	}{
-		{name: "unset"},
-		{name: "disabled", value: "0"},
-		{name: "positive tiyn", value: "123456", price: 123456},
-		{name: "negative", value: "-1", invalid: true},
-		{name: "fractional", value: "1.5", invalid: true},
+		{"IAP_APPLE_PRO_MONTHLY_KZT_PRICE_MINOR", func(i IAP) int64 { return i.AppleProMonthlyKZTPriceMinor }},
+		{"IAP_GOOGLE_PRO_MONTHLY_KZT_PRICE_MINOR", func(i IAP) int64 { return i.GoogleProMonthlyKZTPriceMinor }},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
-			setValidEnv(t)
-			const key = "IAP_APPLE_PRO_MONTHLY_KZT_PRICE_MINOR"
-			t.Setenv(key, tc.value)
-			cfg, err := Load("")
-			if tc.invalid {
-				if err == nil || !strings.Contains(err.Error(), key) {
-					t.Fatalf("expected invalid %s, got %v", key, err)
+		for _, tc := range []struct {
+			name    string
+			value   string
+			price   int64
+			invalid bool
+		}{
+			{name: "unset"},
+			{name: "disabled", value: "0"},
+			{name: "positive tiyn", value: "123456", price: 123456},
+			{name: "negative", value: "-1", invalid: true},
+			{name: "fractional", value: "1.5", invalid: true},
+		} {
+			t.Run(store.key+"/"+tc.name, func(t *testing.T) {
+				setValidEnv(t)
+				t.Setenv(store.key, tc.value)
+				cfg, err := Load("")
+				if tc.invalid {
+					if err == nil || !strings.Contains(err.Error(), store.key) {
+						t.Fatalf("expected invalid %s, got %v", store.key, err)
+					}
+					return
 				}
-				return
-			}
-			if err != nil || cfg.IAP.AppleProMonthlyKZTPriceMinor != tc.price {
-				t.Fatalf("override = %d, err = %v; want %d", cfg.IAP.AppleProMonthlyKZTPriceMinor, err, tc.price)
-			}
-		})
+				if got := store.price(cfg.IAP); err != nil || got != tc.price {
+					t.Fatalf("override = %d, err = %v; want %d", got, err, tc.price)
+				}
+			})
+		}
 	}
 }
 

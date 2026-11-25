@@ -197,6 +197,75 @@ func TestAppleProMonthlyKZTPriceOverrideOnlyChangesIOSCatalogue(t *testing.T) {
 	}
 }
 
+func TestGoogleProMonthlyKZTPriceOverrideOnlyChangesAndroidCatalogue(t *testing.T) {
+	const sharedPrice = 399000
+	const applePrice = 123456
+	const googlePrice = 99900
+
+	for _, tc := range []struct {
+		name        string
+		override    string
+		googleSKU   string
+		currency    string
+		entitlement string
+		price       int
+	}{
+		{name: "default", googleSKU: googlePro, currency: "KZT", entitlement: "unlimited", price: sharedPrice},
+		{name: "override", override: "99900", googleSKU: googlePro, currency: "KZT", entitlement: "unlimited", price: googlePrice},
+		{name: "plan fallback", override: "99900", googleSKU: googlePro, entitlement: "unlimited", price: googlePrice},
+		{name: "other currency", override: "99900", googleSKU: googlePro, currency: "USD", entitlement: "unlimited", price: sharedPrice},
+		{name: "other sku", override: "99900", googleSKU: "another.pro.monthly", currency: "KZT", entitlement: "unlimited", price: sharedPrice},
+		{name: "limited plan", override: "99900", googleSKU: googlePro, currency: "KZT", entitlement: "monthly", price: sharedPrice},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := googleHarness(t, withEnv("IAP_GOOGLE_PRO_MONTHLY_KZT_PRICE_MINOR", tc.override),
+				withEnv("IAP_APPLE_PRO_MONTHLY_KZT_PRICE_MINOR", "123456"))
+			h.exec(`UPDATE iap_products SET apple_product_id=?,google_product_id=?,currency=?,off_ios=0 WHERE code='pro_monthly'`,
+				googlePro, tc.googleSKU, tc.currency)
+			h.exec(`UPDATE plans SET entitlement_kind=? WHERE code='pro_monthly'`, tc.entitlement)
+			h.exec(`UPDATE iap_products SET google_product_id='kz.aireply.pro.yearly',is_active=1,off_android=0 WHERE code='pro_yearly'`)
+			h.exec(`UPDATE iap_products SET google_product_id=?,is_active=1,off_android=0 WHERE code='pack30'`, googlePack)
+			s := h.signIn("android-price-scope@example.com")
+
+			android := h.products(s.access, "android")
+			mustStatus(t, android, http.StatusOK, "")
+			prices := map[string]float64{}
+			for _, entry := range android.body["products"].([]any) {
+				product := entry.(map[string]any)
+				prices[product["code"].(string)] = product["price"].(float64)
+				if product["code"] == "pro_monthly" &&
+					(product["store_product_id"] != tc.googleSKU || product["billing_period"] != "month" ||
+						product["entitlement_kind"] != tc.entitlement) {
+					t.Fatalf("monthly Play offer changed: %v", product)
+				}
+			}
+			if prices["pro_monthly"] != float64(tc.price) || prices["pro_yearly"] != 3999000 || prices["pack30"] != 13000 {
+				t.Fatalf("Play prices: %v", prices)
+			}
+			ios := h.products(s.access, "ios")
+			mustStatus(t, ios, http.StatusOK, "")
+			wantApple := applePrice
+			if tc.currency == "USD" {
+				wantApple = sharedPrice
+			}
+			var iosMonthly map[string]any
+			for _, entry := range ios.body["products"].([]any) {
+				product := entry.(map[string]any)
+				if product["code"] == "pro_monthly" {
+					iosMonthly = product
+					break
+				}
+			}
+			if iosMonthly["price"] != float64(wantApple) {
+				t.Fatalf("iOS monthly offer: %v", iosMonthly)
+			}
+			if price := h.scalar(`SELECT price FROM plans WHERE code='pro_monthly'`); price != sharedPrice {
+				t.Fatalf("shared Pro Monthly plan price = %d; want %d", price, sharedPrice)
+			}
+		})
+	}
+}
+
 // limitDetails — күндік лимит біткендегі қатенің details-і.
 func (h *harness) limitDetails(access string) map[string]any {
 	h.t.Helper()

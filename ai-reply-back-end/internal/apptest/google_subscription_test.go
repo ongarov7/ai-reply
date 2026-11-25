@@ -1411,6 +1411,50 @@ func TestAndroidRecommendsBaseWithItsPlayID(t *testing.T) {
 	}
 }
 
+func TestAndroidRetires500ReplyPackButGrantsDelayedPayment(t *testing.T) {
+	h := monthlyBaseHarness(t)
+	h.enableGoogleSubscriptions()
+	h.exec(`UPDATE iap_products SET google_product_id=?,is_active=1,off_android=0 WHERE code='pack500'`, domain.GooglePack500ProductID)
+	h.exec(`UPDATE iap_products SET google_product_id=?,is_active=1,off_android=0 WHERE code='pack30'`, googlePack)
+	s := h.signIn("google-retired-pack@example.com")
+
+	offers := h.products(s.access, "android")
+	mustStatus(t, offers, http.StatusOK, "")
+	var hasPack30 bool
+	for _, item := range offers.body["products"].([]any) {
+		product := item.(map[string]any)
+		if product["store_product_id"] == domain.GooglePack500ProductID || product["code"] == "pack500" {
+			t.Fatalf("retired pack listed on Android: %s", offers.raw)
+		}
+		if product["store_product_id"] == googlePack && product["units"] == float64(30) && product["price"] == float64(13000) {
+			hasPack30 = true
+		}
+	}
+	if !hasPack30 {
+		t.Fatalf("the 30-reply pack is missing or changed: %s", offers.raw)
+	}
+
+	legacy := playToken(291)
+	h.playPurchase(s.userID, domain.GooglePack500ProductID, legacy, func(p *googleplay.ProductPurchase) {
+		p.PurchaseTimeMillis = itoa(h.clock.Now().Add(-24 * time.Hour).UnixMilli())
+	})
+	mustStatus(t, h.postGoogle(s.access, domain.GooglePack500ProductID, legacy), http.StatusOK, "")
+	mustStatus(t, h.postGoogle(s.access, domain.GooglePack500ProductID, legacy), http.StatusOK, "")
+	if got := h.creditsLeft(s.access); got != 500 {
+		t.Fatalf("paid 500-reply pack credits = %v; want 500 once", got)
+	}
+
+	for i := 0; i < 4; i++ {
+		token := playToken(292 + i)
+		h.playPurchase(s.userID, googlePack, token, nil)
+		mustStatus(t, h.postGoogle(s.access, googlePack, token), http.StatusOK, "")
+	}
+	rec := h.products(s.access, "android")
+	if rec.num("recommendation", "purchase_count") != 4 || rec.num("recommendation", "spent_minor") != 52000 {
+		t.Fatalf("retired Play pack counted in recommendation: %s", rec.raw)
+	}
+}
+
 func TestAndroidGetsNoRecommendationWhileOnlyPacksAreOnSale(t *testing.T) {
 	h := newHarness(t, withEnv("TEST_APPROVED_ENTITLEMENTS", "true"), withIAP(t))
 	h.exec(`UPDATE iap_products SET google_product_id=?,is_active=1 WHERE code='pack30'`, googlePack)

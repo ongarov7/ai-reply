@@ -222,7 +222,7 @@ func TestPackageRecommendationUsesVerifiedSpendingAndStopsForSubscriber(t *testi
 		mustStatus(t, h.postApple(s.access, signed), http.StatusOK, "")
 	}
 	// A delayed receipt for a retired Apple pack still adds credits. Its
-	// historical spending does not inform the iOS sales recommendation.
+	// historical spending does not inform native sales recommendations.
 	delayed := h.appleTx(s.userID, "recommend-retired-pack", domain.ApplePack500ProductID, func(tx *appstoretest.Transaction) {
 		tx.PurchaseDate = h.clock.Now().Add(-24 * time.Hour).UnixMilli()
 	})
@@ -236,7 +236,7 @@ func TestPackageRecommendationUsesVerifiedSpendingAndStopsForSubscriber(t *testi
 	}
 	h.enableGoogleSubscriptions()
 	android := h.products(s.access, "android")
-	if android.num("recommendation", "purchase_count") != 5 || android.num("recommendation", "spent_minor") != 139000 {
+	if android.num("recommendation", "purchase_count") != 4 || android.num("recommendation", "spent_minor") != 40000 {
 		t.Fatalf("Android recommendation: %s", android.raw)
 	}
 	start := h.clock.Now()

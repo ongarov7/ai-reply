@@ -173,8 +173,8 @@ type PackageSpending struct {
 
 // PackageSpending is for contextual recommendations, not accounting reconciliation.
 // Apple's signed price already includes quantity and uses milliunits (1 KZT = 1000).
-// Android also counts Play packs at the catalogue price. The retired Apple
-// pack does not inform iOS recommendations.
+// Android also counts Play packs at the catalogue price. Exclude the retired
+// 500-reply SKUs from recommendations while preserving the purchases.
 func (s *Store) PackageSpending(ctx context.Context, userID, platform string) (PackageSpending, error) {
 	var out PackageSpending
 	var unknown int
@@ -189,7 +189,8 @@ func (s *Store) PackageSpending(ctx context.Context, userID, platform string) (P
 	   WHEN p.currency<>'KZT' OR p.price_milliunits<=0 OR p.price_milliunits%10<>0 THEN 1 ELSE 0 END),0)
 	 FROM iap_purchases p JOIN iap_products product ON product.code=p.product_code
 	 WHERE p.user_id=? AND p.provider IN ('app_store',?) AND p.environment='Production' AND p.status='granted' AND product.kind='pack'
-	 AND (? OR p.store_product_id<>?)`, userID, provider, platform != domain.PlatformIOS, domain.ApplePack500ProductID).Scan(&out.Count, &milli, &unknown)
+	 AND NOT (p.provider='app_store' AND p.store_product_id=? OR p.provider='google_play' AND p.store_product_id=?)`,
+		userID, provider, domain.ApplePack500ProductID, domain.GooglePack500ProductID).Scan(&out.Count, &milli, &unknown)
 	out.SpentMinor, out.AllPricesKnown = milli/10, unknown == 0
 	return out, err
 }

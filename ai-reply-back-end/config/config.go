@@ -385,6 +385,8 @@ type IAP struct {
 	GooglePackageName    string
 	GoogleClientEmail    string
 	GooglePrivateKey     string // PEM; "\n" escapes and base64 are turned into a normal key
+	// GoogleProMonthlyKZTPriceMinor is an optional Android catalogue price in tiyn.
+	GoogleProMonthlyKZTPriceMinor int64
 	// GoogleAcceptTest — Google Play лицензия тестерлерінің тегін сатып алулары (purchaseType 0) қабылдана ма.
 	// Әдепкі: production-да false, басқа ортада true. Тестер шын кредит алады, әр жауап OpenAI-ға төленеді.
 	GoogleAcceptTest bool
@@ -960,12 +962,22 @@ func iapFromEnv(appEnv string) IAP {
 		GoogleAcceptTest: boolean("GOOGLE_PLAY_ACCEPT_TEST", appEnv != "production"),
 		GoogleVoidedPoll: time.Hour,
 	}
-	if raw := str("IAP_APPLE_PRO_MONTHLY_KZT_PRICE_MINOR", ""); raw != "" {
+	for _, override := range []struct {
+		key   string
+		price *int64
+	}{
+		{"IAP_APPLE_PRO_MONTHLY_KZT_PRICE_MINOR", &i.AppleProMonthlyKZTPriceMinor},
+		{"IAP_GOOGLE_PRO_MONTHLY_KZT_PRICE_MINOR", &i.GoogleProMonthlyKZTPriceMinor},
+	} {
+		raw := str(override.key, "")
+		if raw == "" {
+			continue
+		}
 		price, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil || price < 0 {
-			i.problems = append(i.problems, "IAP_APPLE_PRO_MONTHLY_KZT_PRICE_MINOR must be a non-negative integer in tiyn (0 disables the override)")
+			i.problems = append(i.problems, override.key+" must be a non-negative integer in tiyn (0 disables the override)")
 		} else {
-			i.AppleProMonthlyKZTPriceMinor = price
+			*override.price = price
 		}
 	}
 	// App Review buys in the Sandbox against the production API: only these

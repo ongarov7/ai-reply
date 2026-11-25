@@ -236,7 +236,8 @@ func (s *Service) Enabled(ctx context.Context) bool {
 
 func offeredForPurchase(product domain.IAPProduct, platform string) bool {
 	return product.Offered(platform) &&
-		(platform != domain.PlatformIOS || product.AppleProductID != domain.ApplePack500ProductID)
+		(platform != domain.PlatformIOS || product.AppleProductID != domain.ApplePack500ProductID) &&
+		(platform != domain.PlatformAndroid || product.GoogleProductID != domain.GooglePack500ProductID)
 }
 
 // Available — бұл платформада сатып алуға бола ма: интеграция, ауыстырғыш және кемінде бір өнім.
