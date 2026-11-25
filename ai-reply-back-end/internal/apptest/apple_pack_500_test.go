@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/aireply/ai-reply-back-end/internal/catalog"
+	"github.com/aireply/ai-reply-back-end/internal/domain"
 )
 
 func replyPack500Harness(t *testing.T) *harness {
@@ -16,7 +17,7 @@ func replyPack500Harness(t *testing.T) *harness {
 	return h
 }
 
-func TestAppleCatalogRetiresBaseAndOffers500PermanentReplies(t *testing.T) {
+func TestAppleCatalogRetiresBaseAnd500ReplyPackOnlyOnIOS(t *testing.T) {
 	h := replyPack500Harness(t)
 	// Also exercise a later admin publication: without another store mapped,
 	// the retired Base IAP row becomes inactive but remains a valid contract.
@@ -33,8 +34,18 @@ func TestAppleCatalogRetiresBaseAndOffers500PermanentReplies(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := prices.Publish(ctx, "owner", draft.ID, draft.Revision); err != nil {
+	published, err := prices.Publish(ctx, "owner", draft.ID, draft.Revision)
+	if err != nil {
 		t.Fatal(err)
+	}
+	webPackAvailable := false
+	for _, product := range published.Products {
+		if product.Code == "pack500" {
+			webPackAvailable = product.AvailableWeb && product.Units == 500
+		}
+	}
+	if !webPackAvailable {
+		t.Fatal("retiring the Apple offer changed the web pack")
 	}
 	if h.scalar(`SELECT is_active FROM iap_products WHERE code='base_monthly'`) != 0 {
 		t.Fatal("fixture did not exercise inactive legacy Base")
@@ -51,11 +62,15 @@ func TestAppleCatalogRetiresBaseAndOffers500PermanentReplies(t *testing.T) {
 		if code == "base_monthly" || code == "base_yearly" {
 			t.Fatalf("retired subscription offered: %s", res.raw)
 		}
-		if code == "pack500" && (product["units"] != float64(500) || product["price"] != float64(99000) || product["currency"] != "KZT" || product["store_product_id"] != "kz.aireply.pack500" || product["credits_never_expire"] != true || product["kind"] != "pack") {
-			t.Fatalf("wrong pack contract: %s", res.raw)
+		if code == "pack500" || product["store_product_id"] == domain.ApplePack500ProductID {
+			t.Fatalf("retired Apple pack offered: %s", res.raw)
+		}
+		if code == "pack30" && (product["units"] != float64(30) || product["price"] != float64(13000) ||
+			product["currency"] != "KZT" || product["credits_never_expire"] != true || product["kind"] != "pack") {
+			t.Fatalf("the remaining pack contract changed: %s", res.raw)
 		}
 	}
-	for _, code := range []string{"pack500", "pack30", "pro_monthly", "pro_yearly"} {
+	for _, code := range []string{"pack30", "pro_monthly", "pro_yearly"} {
 		if !seen[code] {
 			t.Fatalf("missing %s: %s", code, res.raw)
 		}
@@ -75,16 +90,15 @@ func TestAppleCatalogRetiresBaseAndOffers500PermanentReplies(t *testing.T) {
 	if h.creditsLeft(s.access) != 2000 {
 		t.Fatal("retiring new sales rejected an existing Base renewal")
 	}
-	// Android keeps its separately configured Base/pack30 lineup and never
-	// advertises the new Apple-only SKU.
-	h.exec(`UPDATE iap_products SET google_product_id='google.'||code,is_active=1,off_android=0 WHERE code IN ('base_monthly','pack30')`)
+	// Android still offers any of these products mapped to Play.
+	h.exec(`UPDATE iap_products SET google_product_id='google.'||code,is_active=1,off_android=0 WHERE code IN ('base_monthly','pack30','pack500')`)
 	android := h.do(http.MethodGet, "/api/v1/iap/products?platform=android", nil, h.auth(s.access))
 	mustStatus(t, android, http.StatusOK, "")
 	androidSeen := map[string]bool{}
 	for _, item := range android.body["products"].([]any) {
 		androidSeen[item.(map[string]any)["code"].(string)] = true
 	}
-	if !androidSeen["base_monthly"] || !androidSeen["pack30"] || androidSeen["pack500"] {
+	if !androidSeen["base_monthly"] || !androidSeen["pack30"] || !androidSeen["pack500"] {
 		t.Fatalf("Apple change altered Android offers: %s", android.raw)
 	}
 }

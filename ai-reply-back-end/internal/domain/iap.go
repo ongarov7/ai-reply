@@ -24,6 +24,10 @@ const (
 // IAPProductKinds — рұқсат етілген түрлер.
 var IAPProductKinds = []string{ProductPack, ProductPass, ProductSubscription}
 
+// ApplePack500ProductID identifies the retired App Store offer. Paid
+// transactions still use this identifier to claim their credits.
+const ApplePack500ProductID = "kz.aireply.pack500"
+
 // Сатып алу күйлері (iap_purchases.status).
 //
 // pending: Google says the payment is still pending (cash, bank transfer);

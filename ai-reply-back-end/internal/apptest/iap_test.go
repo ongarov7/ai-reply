@@ -145,6 +145,58 @@ func (h *harness) products(access, platform string) response {
 	return h.do(http.MethodGet, path, nil, h.auth(access))
 }
 
+func TestAppleProMonthlyKZTPriceOverrideOnlyChangesIOSCatalogue(t *testing.T) {
+	const sharedMonthlyPrice = 399000
+	const appleOverride = 123456
+	const appleSKU = "kz.aireply.pro.monthly"
+
+	for _, tc := range []struct {
+		name           string
+		value          string
+		storedCurrency string
+		iosPrice       int
+	}{
+		{name: "default", storedCurrency: "KZT", iosPrice: sharedMonthlyPrice},
+		{name: "override", value: "123456", storedCurrency: "KZT", iosPrice: appleOverride},
+		{name: "plan fallback", value: "123456", iosPrice: appleOverride},
+		{name: "other currency", value: "123456", storedCurrency: "USD", iosPrice: sharedMonthlyPrice},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := googleHarness(t, withEnv("IAP_APPLE_PRO_MONTHLY_KZT_PRICE_MINOR", tc.value))
+			h.exec(`UPDATE iap_products SET apple_product_id=?,currency=?,off_ios=0 WHERE code='pro_monthly'`, appleSKU, tc.storedCurrency)
+			s := h.signIn("store-price-scope@example.com")
+
+			for _, offer := range []struct {
+				platform string
+				sku      string
+				price    int
+			}{
+				{platform: "ios", sku: appleSKU, price: tc.iosPrice},
+				{platform: "android", sku: googlePro, price: sharedMonthlyPrice},
+			} {
+				res := h.products(s.access, offer.platform)
+				mustStatus(t, res, http.StatusOK, "")
+				var monthly map[string]any
+				for _, entry := range res.body["products"].([]any) {
+					product := entry.(map[string]any)
+					if product["code"] == "pro_monthly" {
+						monthly = product
+						break
+					}
+				}
+				if monthly["price"] != float64(offer.price) || monthly["store_product_id"] != offer.sku ||
+					monthly["billing_period"] != "month" || monthly["entitlement_kind"] != "unlimited" {
+					t.Fatalf("%s: got %v; want monthly unlimited %s at %d", offer.platform, monthly, offer.sku, offer.price)
+				}
+			}
+
+			if price := h.scalar(`SELECT price FROM plans WHERE code='pro_monthly'`); price != sharedMonthlyPrice {
+				t.Fatalf("shared Pro Monthly plan price = %d; want %d", price, sharedMonthlyPrice)
+			}
+		})
+	}
+}
+
 // limitDetails — күндік лимит біткендегі қатенің details-і.
 func (h *harness) limitDetails(access string) map[string]any {
 	h.t.Helper()

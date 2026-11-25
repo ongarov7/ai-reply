@@ -221,9 +221,23 @@ func TestPackageRecommendationUsesVerifiedSpendingAndStopsForSubscriber(t *testi
 		signed := h.appleTx(s.userID, fmt.Sprintf("recommend-%d", i), "test.pack30", func(tx *appstoretest.Transaction) { tx.Price = 100000; tx.Currency = "KZT" })
 		mustStatus(t, h.postApple(s.access, signed), http.StatusOK, "")
 	}
+	// A delayed receipt for a retired Apple pack still adds credits. Its
+	// historical spending does not inform the iOS sales recommendation.
+	delayed := h.appleTx(s.userID, "recommend-retired-pack", domain.ApplePack500ProductID, func(tx *appstoretest.Transaction) {
+		tx.PurchaseDate = h.clock.Now().Add(-24 * time.Hour).UnixMilli()
+	})
+	mustStatus(t, h.postApple(s.access, delayed), http.StatusOK, "")
+	if got := h.creditsLeft(s.access); got != 620 {
+		t.Fatalf("retired pack credits = %v; want 620 total", got)
+	}
 	catalogue := h.products(s.access, "ios")
 	if catalogue.num("recommendation", "purchase_count") != 4 || catalogue.num("recommendation", "spent_minor") != 40000 || catalogue.num("recommendation", "base_price_minor") != 79000 {
 		t.Fatalf("recommendation: %s", catalogue.raw)
+	}
+	h.enableGoogleSubscriptions()
+	android := h.products(s.access, "android")
+	if android.num("recommendation", "purchase_count") != 5 || android.num("recommendation", "spent_minor") != 139000 {
+		t.Fatalf("Android recommendation: %s", android.raw)
 	}
 	start := h.clock.Now()
 	mustStatus(t, h.postApple(s.access, h.subscriptionTx(s.userID, "recommend-base", "recommend-original", "base_monthly", start, start.Add(30*24*time.Hour), nil)), http.StatusOK, "")

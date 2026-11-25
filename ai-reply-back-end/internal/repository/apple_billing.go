@@ -173,14 +173,14 @@ type PackageSpending struct {
 
 // PackageSpending is for contextual recommendations, not accounting reconciliation.
 // Apple's signed price already includes quantity and uses milliunits (1 KZT = 1000).
-// withGoogle also counts Play packs. Google does not say what a one-time purchase
-// cost, so those count at the catalogue price.
-func (s *Store) PackageSpending(ctx context.Context, userID string, withGoogle bool) (PackageSpending, error) {
+// Android also counts Play packs at the catalogue price. The retired Apple
+// pack does not inform iOS recommendations.
+func (s *Store) PackageSpending(ctx context.Context, userID, platform string) (PackageSpending, error) {
 	var out PackageSpending
 	var unknown int
 	var milli int64
 	provider := domain.ProviderAppStore
-	if withGoogle {
+	if platform == domain.PlatformAndroid {
 		provider = domain.ProviderGooglePlay
 	}
 	err := s.db.Reader().QueryRowContext(ctx, `SELECT COUNT(*),
@@ -188,7 +188,8 @@ func (s *Store) PackageSpending(ctx context.Context, userID string, withGoogle b
 	 COALESCE(SUM(CASE WHEN p.provider='google_play' THEN product.currency<>'KZT' OR product.price_minor<=0
 	   WHEN p.currency<>'KZT' OR p.price_milliunits<=0 OR p.price_milliunits%10<>0 THEN 1 ELSE 0 END),0)
 	 FROM iap_purchases p JOIN iap_products product ON product.code=p.product_code
-	 WHERE p.user_id=? AND p.provider IN ('app_store',?) AND p.environment='Production' AND p.status='granted' AND product.kind='pack'`, userID, provider).Scan(&out.Count, &milli, &unknown)
+	 WHERE p.user_id=? AND p.provider IN ('app_store',?) AND p.environment='Production' AND p.status='granted' AND product.kind='pack'
+	 AND (? OR p.store_product_id<>?)`, userID, provider, platform != domain.PlatformIOS, domain.ApplePack500ProductID).Scan(&out.Count, &milli, &unknown)
 	out.SpentMinor, out.AllPricesKnown = milli/10, unknown == 0
 	return out, err
 }

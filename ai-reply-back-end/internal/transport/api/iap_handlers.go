@@ -96,6 +96,11 @@ func (s *Server) handleIAPProducts(w http.ResponseWriter, r *http.Request) {
 			if product.Currency == "" {
 				product.Price, product.Currency = plan.Price, plan.Currency
 			}
+			if price := s.cfg.IAP.AppleProMonthlyKZTPriceMinor; price > 0 && platform == domain.PlatformIOS &&
+				product.Code == "pro_monthly" && product.StoreProductID == "kz.aireply.pro.monthly" &&
+				product.BillingPeriod == "month" && product.Currency == "KZT" {
+				product.Price = price
+			}
 		}
 		out = append(out, product)
 	}

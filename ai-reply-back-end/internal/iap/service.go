@@ -234,6 +234,11 @@ func (s *Service) Enabled(ctx context.Context) bool {
 	return enabled
 }
 
+func offeredForPurchase(product domain.IAPProduct, platform string) bool {
+	return product.Offered(platform) &&
+		(platform != domain.PlatformIOS || product.AppleProductID != domain.ApplePack500ProductID)
+}
+
 // Available — бұл платформада сатып алуға бола ма: интеграция, ауыстырғыш және кемінде бір өнім.
 func (s *Service) Available(ctx context.Context, platform string) bool {
 	if !s.Configured(platform) {
@@ -244,7 +249,7 @@ func (s *Service) Available(ctx context.Context, platform string) bool {
 		return false
 	}
 	for _, p := range products {
-		if p.Offered(platform) {
+		if offeredForPurchase(p, platform) {
 			return true
 		}
 	}
@@ -264,7 +269,7 @@ func (s *Service) Products(ctx context.Context, platform string) ([]domain.IAPPr
 	_, all := s.state(ctx)
 	out := make([]domain.IAPProduct, 0, len(all))
 	for _, p := range all {
-		if p.Offered(platform) {
+		if offeredForPurchase(p, platform) {
 			if p.Kind == domain.ProductSubscription {
 				plan, err := s.repo.Plan(ctx, p.PlanID)
 				if err != nil || plan.IsFree || !plan.IsActive || plan.ArchivedAt != nil {
@@ -286,10 +291,10 @@ type Recommendation struct {
 	BaseStoreProductID string `json:"base_store_product_id"`
 }
 
-// PackageRecommendation — after 4 or 5 packs, Base. products are this platform's;
-// Android counts Play packs as well as Apple's, iOS what Apple signed.
+// PackageRecommendation — after 4 or 5 eligible packs, Base. products are
+// the offers available on this platform.
 func (s *Service) PackageRecommendation(ctx context.Context, userID, platform string, products []domain.IAPProduct) *Recommendation {
-	spend, err := s.repo.PackageSpending(ctx, userID, platform == domain.PlatformAndroid)
+	spend, err := s.repo.PackageSpending(ctx, userID, platform)
 	if err != nil || !spend.AllPricesKnown || (spend.Count != 4 && spend.Count != 5) {
 		return nil
 	}

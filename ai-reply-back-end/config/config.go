@@ -368,10 +368,12 @@ func (f FCM) partial() bool {
 // APPLE_IAP_ENABLED=true (the signed transactions verify against the embedded
 // Apple root, no key is needed), Google needs a service account with access to
 // the app in Play Console. Even then nothing is sold until an administrator
-// creates products and switches iap_enabled on. Prices never live here.
+// creates products and switches iap_enabled on. Each store sets its own checkout prices.
 type IAP struct {
 	AppleEnabled  bool
 	AppleBundleID string
+	// AppleProMonthlyKZTPriceMinor is an optional iOS catalogue price in tiyn.
+	AppleProMonthlyKZTPriceMinor int64
 	// AppleAcceptSandbox — Sandbox транзакциялары (TestFlight, App Review) қабылдана ма.
 	// Әр сервер тек бір ортаны қабылдайды: production-да false, тест ортасында true.
 	// TestFlight / App Review Sandbox бөлек API мен дерекқорға бағытталуы керек.
@@ -957,6 +959,14 @@ func iapFromEnv(appEnv string) IAP {
 		// License testers pay nothing: production refuses their purchases unless the owner says so.
 		GoogleAcceptTest: boolean("GOOGLE_PLAY_ACCEPT_TEST", appEnv != "production"),
 		GoogleVoidedPoll: time.Hour,
+	}
+	if raw := str("IAP_APPLE_PRO_MONTHLY_KZT_PRICE_MINOR", ""); raw != "" {
+		price, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || price < 0 {
+			i.problems = append(i.problems, "IAP_APPLE_PRO_MONTHLY_KZT_PRICE_MINOR must be a non-negative integer in tiyn (0 disables the override)")
+		} else {
+			i.AppleProMonthlyKZTPriceMinor = price
+		}
 	}
 	// App Review buys in the Sandbox against the production API: only these
 	// accounts may do that, and only where Sandbox is not accepted anyway.
