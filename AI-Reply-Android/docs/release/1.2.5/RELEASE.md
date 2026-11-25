@@ -43,3 +43,25 @@ The service account accepted the bundle into a temporary Publisher API edit,
 but validation returned HTTP 403. The edit was deleted without committing;
 uploading or staging in that edit did not publish a release. Final Play Console
 submission and saved regional prices must be verified separately.
+
+Backend deployment is complete and independently verified. The owner Console
+could not be operated to completion: native scrolling returned
+`noWindowsAvailable`, the page renderer stopped updating, and restarting Chrome
+also encountered a ScreenCaptureKit error. No store price or purchase-option
+change and no production submission were confirmed.
+
+To complete in the owner Console:
+
+1. Open [monthly pricing](https://play.google.com/console/u/0/developers/4669560719422191406/app/4974342352292703805/subscriptions/s/kz.aireply.pro.monthly/base-plans/b/monthly),
+   filter Kazakhstan, change 3,990 to **990 KZT**, and save.
+2. Open [yearly pricing](https://play.google.com/console/u/0/developers/4669560719422191406/app/4974342352292703805/subscriptions/s/kz.aireply.pro.yearly/base-plans/b/yearly),
+   change Kazakhstan to **11,880 KZT**, and save. Keep automatic renewal.
+3. In [one-time products](https://play.google.com/console/u/0/developers/4669560719422191406/app/4974342352292703805/one-time-products),
+   deactivate the `kz.aireply.pack500` purchase option without deleting the
+   product or changing `pack30`.
+4. Create a production release, upload the signed AAB above, add the localized
+   release notes from the output directory, review it, then send for review from
+   [Publishing overview](https://play.google.com/console/u/0/developers/4669560719422191406/app/4974342352292703805/publishing).
+
+Changing new-purchase base-plan prices does not by itself migrate existing
+subscribers from their legacy price cohorts. No cohort migration was performed.
