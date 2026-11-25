@@ -3,7 +3,6 @@ package catalog
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -133,28 +132,21 @@ func TestCatalogGoogleIDsAreValidatedAndUnique(t *testing.T) {
 	}
 }
 
-// Older Android builds list only packs: with subscriptions alone on sale they
-// would be told purchases are open and show an empty screen.
-func TestAndroidSubscriptionsNeedThePackOnAndroid(t *testing.T) {
+// Subscription-only Android catalogs are valid for current Play builds.
+func TestAndroidSubscriptionsCanBePublishedWithoutAPack(t *testing.T) {
 	p := InitialProducts()
-	p[1].GoogleProductID, p[1].AvailableAndroid = "kz.aireply.base.monthly", true
-	err := Validate(p)
-	if !errors.Is(err, domain.ErrInvalidRequest) || !strings.Contains(fmt.Sprint(err), "available_android") {
-		t.Fatalf("subscriptions alone: %v", err)
-	}
-	p[5].GoogleProductID = "kz.aireply.pack30"
-	if err := Validate(p); err == nil {
-		t.Fatal("the pack is mapped but its switch is off")
-	}
-	p[5].AvailableAndroid = true
+	p[3].GoogleProductID, p[3].AvailableAndroid = "kz.aireply.pro.monthly", true
 	if err := Validate(p); err != nil {
-		t.Fatalf("together: %v", err)
+		t.Fatalf("monthly subscription alone: %v", err)
 	}
-	// An id alone does not put a subscription on sale.
-	p = InitialProducts()
-	p[1].GoogleProductID = "kz.aireply.base.monthly"
-	if err := Validate(p); err != nil {
-		t.Fatalf("mapped, switch off: %v", err)
+	s, db := testCatalog(t)
+	if err := publishProducts(t, s, p); err != nil {
+		t.Fatal(err)
+	}
+	var price int64
+	var off int
+	if err := db.Reader().QueryRow(`SELECT price_minor,off_android FROM iap_products WHERE code='pro_monthly'`).Scan(&price, &off); err != nil || off != 0 {
+		t.Fatalf("subscription was not enabled: %d %d %v", price, off, err)
 	}
 }
 

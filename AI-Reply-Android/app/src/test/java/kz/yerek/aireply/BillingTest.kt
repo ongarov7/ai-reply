@@ -251,17 +251,58 @@ class BillingTest {
     }
 
     @Test
-    fun `monthly Pro is purchasable at Play's matching 999 tenge price`() = runBlocking {
+    fun `monthly Pro is unlimited and purchasable at Play's matching 990 tenge price`() = runBlocking {
         val id = "kz.aireply.pro.monthly"
-        sells(subscription(id = id, kind = "unlimited", monthly = 0, price = 99_900)
+        sells(subscription(id = id, kind = "unlimited", monthly = 0, price = 99_000)
             .copy(code = "pro_monthly", name = "Pro", planId = "pro_monthly"))
-        store.prices[id] = "999 ₸"
+        store.prices[id] = "990 ₸"
         store.periods[id] = "month"
-        store.micros[id] = 999_000_000L
+        store.micros[id] = 990_000_000L
         billing.load()
         val offer = state.subscriptions.single()
-        assertEquals("999 ₸", offer.price)
+        assertEquals("990 ₸", offer.price)
         assertEquals("unlimited", offer.entitlementKind)
+        assertEquals(0, offer.dailyLimit)
+        assertEquals(0, offer.monthlyLimit)
+        assertFalse(offer.hasPriceMismatch)
+        billing.buy(activity, offer)
+        assertEquals(listOf(id to TOKEN), store.launched)
+    }
+
+    @Test
+    fun `monthly Pro cannot be bought at the old higher Play price during rollout`() = runBlocking {
+        val id = "kz.aireply.pro.monthly"
+        sells(subscription(id = id, kind = "unlimited", monthly = 0, price = 99_000)
+            .copy(code = "pro_monthly", name = "Pro", planId = "pro_monthly"))
+        store.prices[id] = "3 990 ₸"
+        store.periods[id] = "month"
+        store.micros[id] = 3_990_000_000L
+
+        billing.load()
+
+        val offer = state.subscriptions.single()
+        assertTrue(offer.hasPriceMismatch)
+        billing.buy(activity, offer)
+        assertTrue(store.launched.isEmpty())
+    }
+
+    @Test
+    fun `yearly Pro is unlimited and purchasable at twelve times the monthly price`() = runBlocking {
+        val id = "kz.aireply.pro.yearly"
+        sells(subscription(id = id, period = "year", kind = "unlimited", monthly = 0, price = 1_188_000)
+            .copy(code = "pro_yearly", name = "Pro", planId = "pro_yearly"))
+        store.prices[id] = "11 880 ₸"
+        store.periods[id] = "year"
+        store.micros[id] = 11_880_000_000L
+
+        billing.load()
+
+        val offer = state.subscriptions.single()
+        assertEquals("11 880 ₸", offer.price)
+        assertEquals("year", offer.billingPeriod)
+        assertEquals("unlimited", offer.entitlementKind)
+        assertEquals(0, offer.dailyLimit)
+        assertEquals(0, offer.monthlyLimit)
         assertFalse(offer.hasPriceMismatch)
         billing.buy(activity, offer)
         assertEquals(listOf(id to TOKEN), store.launched)

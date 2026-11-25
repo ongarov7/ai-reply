@@ -1361,7 +1361,7 @@ func TestAndroidProductsListSubscriptionsLikeIOS(t *testing.T) {
 		t.Fatalf("base: %v", base)
 	}
 	if pro["code"] != "pro_monthly" || pro["store_product_id"] != googlePro || pro["entitlement_kind"] != "unlimited" || pro["daily_limit"] != float64(0) ||
-		pro["monthly_limit"] != nil || pro["price"] != float64(399000) || pro["credits_never_expire"] != nil {
+		pro["monthly_limit"] != nil || pro["price"] != float64(99000) || pro["credits_never_expire"] != nil {
 		t.Fatalf("pro: %v", pro)
 	}
 	if res.str("account_token") != h.iap.AccountToken(s.userID) || res.body["recommendation"] != nil {

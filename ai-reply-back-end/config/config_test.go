@@ -871,13 +871,14 @@ func TestIAPIsOffUntilConfigured(t *testing.T) {
 	}
 }
 
-func TestStoreProMonthlyKZTPriceOverrideConfig(t *testing.T) {
+func TestStoreProKZTPriceOverrideConfig(t *testing.T) {
 	for _, store := range []struct {
 		key   string
 		price func(IAP) int64
 	}{
 		{"IAP_APPLE_PRO_MONTHLY_KZT_PRICE_MINOR", func(i IAP) int64 { return i.AppleProMonthlyKZTPriceMinor }},
 		{"IAP_GOOGLE_PRO_MONTHLY_KZT_PRICE_MINOR", func(i IAP) int64 { return i.GoogleProMonthlyKZTPriceMinor }},
+		{"IAP_GOOGLE_PRO_YEARLY_KZT_PRICE_MINOR", func(i IAP) int64 { return i.GoogleProYearlyKZTPriceMinor }},
 	} {
 		for _, tc := range []struct {
 			name    string
@@ -901,8 +902,15 @@ func TestStoreProMonthlyKZTPriceOverrideConfig(t *testing.T) {
 					}
 					return
 				}
-				if got := store.price(cfg.IAP); err != nil || got != tc.price {
-					t.Fatalf("override = %d, err = %v; want %d", got, err, tc.price)
+				want := tc.price
+				if tc.name == "unset" && store.key == "IAP_GOOGLE_PRO_MONTHLY_KZT_PRICE_MINOR" {
+					want = 99000
+				}
+				if tc.name == "unset" && store.key == "IAP_GOOGLE_PRO_YEARLY_KZT_PRICE_MINOR" {
+					want = 1188000
+				}
+				if got := store.price(cfg.IAP); err != nil || got != want {
+					t.Fatalf("override = %d, err = %v; want %d", got, err, want)
 				}
 			})
 		}

@@ -385,8 +385,12 @@ type IAP struct {
 	GooglePackageName    string
 	GoogleClientEmail    string
 	GooglePrivateKey     string // PEM; "\n" escapes and base64 are turned into a normal key
-	// GoogleProMonthlyKZTPriceMinor is an optional Android catalogue price in tiyn.
+	// GoogleProMonthlyKZTPriceMinor is the Android catalogue price in tiyn (default 99000).
+	// An explicit 0 uses the shared catalogue price.
 	GoogleProMonthlyKZTPriceMinor int64
+	// GoogleProYearlyKZTPriceMinor is the Android annual catalogue price in tiyn (default 1188000).
+	// An explicit 0 uses the shared catalogue price.
+	GoogleProYearlyKZTPriceMinor int64
 	// GoogleAcceptTest — Google Play лицензия тестерлерінің тегін сатып алулары (purchaseType 0) қабылдана ма.
 	// Әдепкі: production-да false, басқа ортада true. Тестер шын кредит алады, әр жауап OpenAI-ға төленеді.
 	GoogleAcceptTest bool
@@ -953,11 +957,13 @@ func iapFromEnv(appEnv string) IAP {
 		AppleEnabled:  boolean("APPLE_IAP_ENABLED", false),
 		AppleBundleID: str("APPLE_IAP_BUNDLE_ID", "kz.ai-reply.reply.keyboard.keyboard"),
 		// Each backend accepts exactly one Apple environment; sandbox uses its own database.
-		AppleAcceptSandbox: boolean("APPLE_IAP_ACCEPT_SANDBOX", appEnv != "production"),
-		GooglePackageName:  str("GOOGLE_PLAY_PACKAGE_NAME", "kz.yerek.aireply"),
-		GoogleClientEmail:  str("GOOGLE_PLAY_CLIENT_EMAIL", ""),
-		GooglePrivateKey:   PEM(str("GOOGLE_PLAY_PRIVATE_KEY", "")),
-		GoogleTokenSecret:  str("GOOGLE_PLAY_TOKEN_SECRET", ""),
+		AppleAcceptSandbox:            boolean("APPLE_IAP_ACCEPT_SANDBOX", appEnv != "production"),
+		GooglePackageName:             str("GOOGLE_PLAY_PACKAGE_NAME", "kz.yerek.aireply"),
+		GoogleProMonthlyKZTPriceMinor: 99000,
+		GoogleProYearlyKZTPriceMinor:  1188000,
+		GoogleClientEmail:             str("GOOGLE_PLAY_CLIENT_EMAIL", ""),
+		GooglePrivateKey:              PEM(str("GOOGLE_PLAY_PRIVATE_KEY", "")),
+		GoogleTokenSecret:             str("GOOGLE_PLAY_TOKEN_SECRET", ""),
 		// License testers pay nothing: production refuses their purchases unless the owner says so.
 		GoogleAcceptTest: boolean("GOOGLE_PLAY_ACCEPT_TEST", appEnv != "production"),
 		GoogleVoidedPoll: time.Hour,
@@ -968,6 +974,7 @@ func iapFromEnv(appEnv string) IAP {
 	}{
 		{"IAP_APPLE_PRO_MONTHLY_KZT_PRICE_MINOR", &i.AppleProMonthlyKZTPriceMinor},
 		{"IAP_GOOGLE_PRO_MONTHLY_KZT_PRICE_MINOR", &i.GoogleProMonthlyKZTPriceMinor},
+		{"IAP_GOOGLE_PRO_YEARLY_KZT_PRICE_MINOR", &i.GoogleProYearlyKZTPriceMinor},
 	} {
 		raw := str(override.key, "")
 		if raw == "" {

@@ -15,6 +15,7 @@ import (
 // Historical migrations must be tested against the catalog they actually sold.
 func legacyDailyProducts() []Product {
 	p := preApplePackProducts()
+	p[0].Units = 20
 	p[1].PriceMinor, p[1].DailyLimit, p[1].MonthlyLimit = 79000, 40, 0
 	p[2].Active, p[2].AvailableIOS, p[2].AvailableWeb = true, true, true
 	p[3].PriceMinor, p[4].PriceMinor = 345000, 3490000
@@ -77,7 +78,7 @@ func TestMonthlyBundleMigrationPreservesBalancesHistoryAndDraft(t *testing.T) {
 	}
 	s := New(db)
 	current, err := s.Published(ctx)
-	if err != nil || current.ID == 1 || current.CreatedBy != "migration:0040" {
+	if err != nil || current.ID == 1 || current.CreatedBy != "migration:0044" {
 		t.Fatalf("new publication: %+v %v", current, err)
 	}
 	want := InitialProducts()
@@ -90,7 +91,7 @@ func TestMonthlyBundleMigrationPreservesBalancesHistoryAndDraft(t *testing.T) {
 	updated, err := s.Draft(ctx)
 	want[1].Name = draft[1].Name
 	want[5].PriceMinor = 17777
-	if err != nil || updated.Revision != 7 || updated.BaseVersion != current.ID || !reflect.DeepEqual(updated.Products, want) {
+	if err != nil || updated.Revision != 8 || updated.BaseVersion != current.ID || !reflect.DeepEqual(updated.Products, want) {
 		t.Fatalf("draft lost: %+v %v", updated, err)
 	}
 	var historical, sold string

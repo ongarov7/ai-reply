@@ -113,7 +113,7 @@ class PlayStoreClient(context: Context) : StoreClient {
             productId = product.productId,
             formattedPrice = phase.formattedPrice,
             billingPeriod = when (phase.billingPeriod) {
-                "P1M", "P4W" -> "month"
+                "P1M" -> "month"
                 "P1Y" -> "year"
                 else -> null
             },
@@ -123,7 +123,15 @@ class PlayStoreClient(context: Context) : StoreClient {
     }
 
     private fun basePlanOffer(product: ProductDetails): ProductDetails.SubscriptionOfferDetails? =
-        product.subscriptionOfferDetails?.firstOrNull { it.offerId == null }
+        product.subscriptionOfferDetails?.firstOrNull { offer ->
+            // The plan screen promises automatic renewal. A prepaid base plan
+            // also has no offerId, so it must not be selected for that screen
+            // or passed to launchBillingFlow.
+            offer.offerId == null && offer.pricingPhases.pricingPhaseList.lastOrNull()?.let { phase ->
+                phase.recurrenceMode == ProductDetails.RecurrenceMode.INFINITE_RECURRING &&
+                    phase.billingPeriod in setOf("P1M", "P1Y")
+            } == true
+        }
 
     override suspend fun purchases(): List<StorePurchase>? {
         val inApp = held(BillingClient.ProductType.INAPP) ?: return null

@@ -30,7 +30,7 @@ const (
 )
 
 // DefaultWelcomeUnits — жаңа тіркелгінің бонусы, әкімші өзгертпесе.
-const DefaultWelcomeUnits = 20
+const DefaultWelcomeUnits = 10
 
 // Range — рұқсат етілген ауқым (шеттерімен қоса).
 type Range struct {

@@ -63,7 +63,7 @@ func InitialProducts() []Product {
 		return map[string]string{"ru": ru, "en": en, "kk": kk, "uz": en}
 	}
 	products := []Product{
-		{Code: "free", Kind: "welcome", Name: names("Бесплатно", "Free", "Тегін"), Currency: "KZT", Units: 20, Active: true, AvailableIOS: true, AvailableWeb: true},
+		{Code: "free", Kind: "welcome", Name: names("Бесплатно", "Free", "Тегін"), Currency: "KZT", Units: 10, Active: true, AvailableIOS: true, AvailableWeb: true},
 		{Code: "base_monthly", Kind: "subscription", Name: names("Base · месяц", "Base · monthly", "Base · ай сайын"), Currency: "KZT", PriceMinor: 99000, BillingPeriod: "month", MonthlyLimit: 1000, Active: true},
 		{Code: "base_yearly", Kind: "subscription", Name: names("Base · год", "Base · yearly", "Base · жыл сайын"), Currency: "KZT", PriceMinor: 790000, BillingPeriod: "year", DailyLimit: 40},
 		{Code: "pro_monthly", Kind: "subscription", Name: names("Pro · месяц", "Pro · monthly", "Pro · ай сайын"), Currency: "KZT", PriceMinor: 399000, BillingPeriod: "month", Unlimited: true, Active: true, AvailableIOS: true, AvailableWeb: true},
@@ -189,25 +189,9 @@ func Validate(products []Product) error {
 			googleIDs[p.GoogleProductID] = true
 		}
 	}
-	return validateAndroidLineup(products)
-}
-
-// validateAndroidLineup keeps a pack on sale next to Android subscriptions.
-// Builds from before subscriptions list only packs: told that purchases are
-// open with nothing else on sale, they would show an empty purchase screen.
-func validateAndroidLineup(products []Product) error {
-	subscription, pack := false, false
-	for _, p := range products {
-		if p.Active && p.AvailableAndroid && p.GoogleProductID != "" {
-			subscription = subscription || p.Kind == "subscription"
-			pack = pack || p.Kind == "pack"
-		}
-	}
-	if subscription && !pack {
-		return domain.InvalidField("available_android", "pack_required")
-	}
 	return nil
 }
+
 func (s *Service) SaveDraft(ctx context.Context, actor string, expectedRevision int, products []Product) (Version, error) {
 	if actor == "" {
 		return Version{}, domain.ErrUnauthorized

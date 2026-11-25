@@ -153,6 +153,25 @@ acknowledgement, restore and account switching against sandbox records before
 enabling production. The production backend must continue to reject test tokens.
 Do not upload the sandbox bundle as the public production release.
 
+The Google Play monthly offer is `pro_monthly` / `kz.aireply.pro.monthly`:
+unlimited replies at **990 ₸ per month**, with automatic renewal. Configure
+the Play Console monthly auto-renewing base plan and the backend's
+`IAP_GOOGLE_PRO_MONTHLY_KZT_PRICE_MINOR=99000` together. The app displays
+Google Play's actual price and blocks purchase while the KZT prices disagree;
+changing the backend alone does not change the price charged by Google Play.
+The yearly unlimited offer is `pro_yearly` / `kz.aireply.pro.yearly` at
+**11 880 ₸ per year** (990 × 12), configured with
+`IAP_GOOGLE_PRO_YEARLY_KZT_PRICE_MINOR=1188000` and its yearly auto-renewing
+Google Play base plan.
+Only auto-renewing calendar-month/year base plans are offered; prepaid and
+four-week plans cannot be sold with the screen's automatic-renewal/monthly text.
+
+The retired 500-reply pack (`pack500` / `kz.aireply.pack500`, previously
+990 ₸) stays hidden even if an older server lists it. Already paid purchases
+are still verified and restored. The 10 free welcome replies are granted
+once by the backend; the app uses the account's returned balance, including
+any earlier grant, instead of replacing it with a hardcoded total.
+
 If `local.properties` is missing:
 
 ```bash

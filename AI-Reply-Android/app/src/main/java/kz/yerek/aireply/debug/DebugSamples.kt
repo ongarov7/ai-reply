@@ -68,8 +68,8 @@ object DebugSamples {
 
     private val prices = mapOf(
         "debug.base.monthly" to "990 ₸",
-        "debug.pro.monthly" to "999 ₸",
-        "debug.pro.yearly" to "39 990 ₸",
+        "debug.pro.monthly" to "990 ₸",
+        "debug.pro.yearly" to "11 880 ₸",
         "debug.pack30" to "130 ₸"
     )
 

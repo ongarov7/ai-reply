@@ -1,20 +1,16 @@
-# Free: 20 replies once at registration
+# Free: 10 replies once at registration
 
-The default Free allowance is **20 replies once per eligible account**. It is a welcome grant, not a daily or monthly plan quota. The existing registration/provisioning flow creates it; database uniqueness permits only one welcome grant for that user. Existing authentication, idempotency, reservation/refund and credit consumption rules are reused.
+The default Free allowance is **10 replies once per eligible account**. It is a welcome grant, not a daily or monthly plan quota. The existing registration/provisioning flow creates it; database uniqueness permits only one welcome grant for that user. Existing authentication, idempotency, reservation/refund and credit consumption rules are reused.
 
 `usage.daily_limit` and `usage.remaining_today` remain zero for the Free plan because there is no recurring allowance. The usable welcome amount appears in `usage.welcome.total`, `usage.welcome.remaining` and `usage.remaining_total`. Purchased packages contribute separately to the latter. A client showing only the daily field can display zero while a welcome balance remains.
 
-## Migration 0035
+## Migration 0044
 
-`0035_free_welcome_twenty.sql` changes the old stored default of `10` to `20`. It preserves an administrator's `0` (disabled) or other custom quantity. The fallback constant and fresh-install catalog also become 20.
+`0044_google_monthly_free_ten.sql` changes the prior default of `20` to `10`, matching the runtime fallback and fresh-install catalog. Explicit `0` (disabled) and custom quantities remain authoritative. This welcome grant is account-wide and shared across platforms.
 
-The migration preserves `welcome_bonus_since`. Accounts created before that existing cutoff, legacy install accounts and simulator accounts remain ineligible. Existing eligible accounts whose registration grant failed can still use the established `/me` or sign-in repair path and receive the current default once. The migration itself creates no user grants and performs no blanket credit allocation.
+The migration preserves `welcome_bonus_since`, existing grants and their remaining balances, usage, purchases, subscriptions and checkout snapshots. An existing 20-reply grant remains exactly as issued; spent grants are never replenished. Eligible accounts whose registration grant failed still receive the current default once through the existing repair flow. Login, token refresh and a new day do not add replies.
 
-Previously delivered grants remain exactly as issued. In particular, a ten-reply grant with zero remaining stays at zero; it is not topped up to twenty. Login, logout, provider linking, token refresh and a new calendar day do not replenish an existing welcome grant. Purchased units and expiration rules are unchanged. Base remains 40/day; valid Pro remains unlimited. Prices are unchanged.
-
-The published catalog is versioned safely: when its Free quantity is still the old default, a new publication changes only that Free quantity. The prior JSON is retained for history and sold checkout snapshots. Other product prices, mapped store IDs, names, visibility and purchased entitlements are copied unchanged. A draft based on the replaced publication is rebased and its revision increases; unrelated owner edits and custom Free quantities remain. A previously stale draft remains stale.
-
-Default plan descriptions are changed only when their text exactly matches the old ten-reply description. An administrator's custom text is retained. A disabled or custom runtime welcome setting is not automatically rewritten merely to match catalog marketing; review such an existing override explicitly before changing it.
+It versions the published Free catalog quantity, preserves its historical JSON and unrelated owner edits, and rebases only drafts of the replaced publication. A stale draft stays stale. Default plan descriptions change only when they exactly match the previous 20-reply text; custom text is retained. Separately, Android `pack500` is retired from new sales without deleting its durable store identity or already purchased credits.
 
 ## Investigating a displayed zero
 
@@ -45,10 +41,10 @@ Account creation/cutoff timestamps are Unix milliseconds. Do not repair a suspec
 
 ## Deployment and rollback
 
-This is a repository change until the approved backend deployment runs migration 0035. Back up SQLite using the existing WAL-safe process and run migrations against a copy first. After deployment, verify the stored welcome setting, the new published Free quantity, preserved cutoff and a sandbox new-registration response. Do not use a real paid transaction for verification.
+This is a repository change until the approved backend deployment runs migration 0044. Back up SQLite using the existing WAL-safe process and run migrations against a copy first. After deployment, verify the stored welcome setting, the new published Free quantity, preserved cutoff and a sandbox new-registration response. Do not use a real paid transaction for verification.
 
 Rollback the future welcome setting using the existing administrator control; existing delivered grants remain as issued. Do not delete migration history or alter existing credit rows to reverse this default. Retain the catalog history and use a new reviewed publication for any catalog rollback. Returning to an earlier binary does not undo the stored setting, and an old binary's fallback remains its old value only if a setting is missing or invalid.
 
 ## Verification
 
-Coverage is in `internal/catalog/welcome_twenty_migration_test.go` and `internal/apptest/welcome_twenty_test.go`. Tests exercise fresh defaults, guarded migration, immutable history/balances/prices, preserved custom/disabled settings, draft revisions, migration failure/rollback/retry, once-only registration and missing-grant repair, no daily replenishment, idempotent generation, packages, Base and Pro. Tests use local fake providers; no real payment or notification delivery is performed.
+Coverage is in `internal/catalog/google_monthly_migration_test.go` and `internal/apptest/welcome_ten_test.go`. Tests exercise fresh defaults, guarded migration, immutable history/balances/prices, preserved custom/disabled settings, draft revisions, migration failure/rollback/retry, once-only registration and missing-grant repair, no daily replenishment, idempotent generation, packages, Base and Pro. Tests use local fake providers; no real payment or notification delivery is performed.
