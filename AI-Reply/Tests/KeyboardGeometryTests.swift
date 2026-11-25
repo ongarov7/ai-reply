@@ -255,6 +255,21 @@ final class KeyboardGeometryTests: XCTestCase {
     /// Roughly their icons at 12pt, each with the 4pt gap before the name.
     private let fourIcons: [CGFloat] = [20, 14, 17, 25]
 
+    func testVoiceCaptionReclaimsCreateButtonSpaceDuringRecording() {
+        for width in portraitWidths {
+            let mic = PersonaRowLayout.watchActionWidth
+            let ordinary = PersonaRowLayout(width: width, textWidths: fourPersonas, trailingActionWidth: mic)
+            let dictation = PersonaRowLayout(width: width, textWidths: fourPersonas, trailingActionWidth: mic,
+                                             showsCreateAction: false)
+
+            XCTAssertTrue(dictation.createFrame.isEmpty)
+            XCTAssertEqual(dictation.personasFrame.minX, PersonaRowLayout.edgeInset)
+            XCTAssertGreaterThanOrEqual(dictation.personasFrame.width - ordinary.personasFrame.width,
+                                        PersonaRowLayout.actionWidth)
+            XCTAssertEqual(dictation.trailingFrame, ordinary.trailingFrame)
+        }
+    }
+
     /// ✨ comes first, at the leading edge; the personas follow it, in order,
     /// and fill the rest of the row. There is no other action on the row.
     /// (Below 375pt four Russian names scroll; see the crowded-row test.)

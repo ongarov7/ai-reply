@@ -222,6 +222,14 @@ final class TemplateBarView: UIView {
         return applyTrailingChange(wasVisible != watchVisible)
     }
 
+    func setCreateHidden(_ hidden: Bool) -> Bool {
+        guard hidden != createButton.isHidden else { return false }
+        createButton.isHidden = hidden
+        updateAccessibilityOrder()
+        setNeedsLayout()
+        return true
+    }
+
     private var watchVisible: Bool { watchIndicator != .hidden && !watchSuppressed }
 
     private func applyTrailingChange(_ changed: Bool) -> Bool {
@@ -251,7 +259,8 @@ final class TemplateBarView: UIView {
         let actionWidth = PersonaRowLayout.watchActionWidth
         let layout = PersonaRowLayout(width: bounds.width, height: bounds.height, textWidths: texts, iconWidths: icons,
                                       trailingActionWidth: trailingCount == 0 ? 0
-                                        : actionWidth * CGFloat(trailingCount) + PersonaRowLayout.spacing * CGFloat(trailingCount - 1))
+                                        : actionWidth * CGFloat(trailingCount) + PersonaRowLayout.spacing * CGFloat(trailingCount - 1),
+                                      showsCreateAction: !createButton.isHidden)
         if let trailingFrame = layout.trailingFrame {
             var x = trailingFrame.maxX
             if microphoneVisible {
@@ -319,7 +328,7 @@ final class TemplateBarView: UIView {
     /// ✨ first, then the personas (or the hint when there are none), so
     /// VoiceOver reads the row in the order it is drawn.
     private func updateAccessibilityOrder() {
-        var elements: [Any] = [createButton]
+        var elements: [Any] = createButton.isHidden ? [] : [createButton]
         if !scrollView.accessibilityElementsHidden { elements.append(scrollView) }
         if !hintLabel.isHidden, !hintLabel.accessibilityElementsHidden { elements.append(hintLabel) }
         if !watchButton.isHidden { elements.append(watchButton) }

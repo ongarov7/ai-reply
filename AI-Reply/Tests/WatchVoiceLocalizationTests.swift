@@ -95,7 +95,7 @@ final class WatchVoiceLocalizationTests: XCTestCase {
             let text = ((value as? [String: Any])?["stringUnit"] as? [String: Any])?["value"] as? String ?? ""
             XCTAssertTrue(text.contains("OpenAI"), language)
         }
-        XCTAssertNotNil(strings["watch.consent.allow"])
+        XCTAssertNotNil(strings["watch.consent.continue"])
         XCTAssertNotNil(strings["watch.consent.decline"])
         XCTAssertNotNil(strings["watch.consent.withdraw"])
     }

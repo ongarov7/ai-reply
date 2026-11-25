@@ -10,7 +10,6 @@ struct VoiceAssistantView: View {
     @Environment(ReplyConfigurationModel.self) private var configuration
     @Environment(\.dismiss) private var dismiss
     @State private var showsAudioConsent = false
-    @State private var showsSetup = false
     @Environment(\.dynamicTypeSize) private var typeSize
     @ScaledMetric(relativeTo: .headline) private var badgeSize: CGFloat = 40
 
@@ -29,10 +28,17 @@ struct VoiceAssistantView: View {
                         } else {
                             captureControls(copy)
                         }
+                        if !voice.isBusy {
+                            if #available(iOS 18, *) {
+                                VoiceControlCenterHelp()
+                                    .padding(.horizontal, DS.Spacing.xs)
+                                    .accessibilityIdentifier("voice.controlCenterHelp")
+                            }
+                            setupLink
+                        }
                     }
                     messageSection(copy, message: $voice.sourceMessage)
                     optionsSection(copy, templateID: $voice.templateID, language: $voice.languageCode)
-                    setupSection(copy)
                     privacySection(copy)
                 }
                 .padding(.horizontal, DS.Spacing.m)
@@ -58,9 +64,9 @@ struct VoiceAssistantView: View {
         .onAppear(perform: keepTemplateVisible)
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
-        .alert(Text(verbatim: "AI Reply Voice"), isPresented: $showsAudioConsent) {
-            Button(copy.allowAndStart) { voice.start(consent: true) }
-            Button(copy.notNow, role: .cancel) {}
+        .alert(copy.voiceConsentTitle, isPresented: $showsAudioConsent) {
+            Button(copy.agreeToVoiceProcessing) { voice.acceptVoiceConsentAndStart() }
+            Button("common.cancel", role: .cancel) {}
         } message: { Text(copy.privacy) }
     }
 
@@ -145,7 +151,9 @@ struct VoiceAssistantView: View {
     private func statusDetail(_ copy: VoiceAssistantCopy) -> String? {
         if voice.isStarting { return nil }
         switch voice.snapshot.phase {
-        case .ready, .stopped: return voice.hasTranscript ? nil : copy.idleHint
+        case .ready, .stopped:
+            guard !voice.hasTranscript else { return nil }
+            return voice.hasVoiceConsent ? copy.idleHint : copy.firstUseHint
         case .transcribing, .generating: return copy.processingHint
         case .paused: return voice.canContinuePausedTurn ? copy.pausedHint : voice.snapshot.error
         case .error: return voice.snapshot.error
@@ -184,11 +192,19 @@ struct VoiceAssistantView: View {
             }
             .buttonStyle(.dsPrimary)
             .accessibilityIdentifier("voice.start")
+
+            if voice.microphoneAccessDenied, let url = URL(string: UIApplication.openSettingsURLString) {
+                Link(destination: url) {
+                    Label("permissions.openSettings", systemImage: "gearshape")
+                }
+                .buttonStyle(.dsText)
+                .accessibilityIdentifier("voice.microphoneSettings")
+            }
         }
     }
 
     private func startDictation() {
-        if voice.hasVoiceConsent { voice.start() } else { showsAudioConsent = true }
+        voice.start { showsAudioConsent = true }
     }
 
     /// Two buttons side by side, stacked at accessibility text sizes.
@@ -367,61 +383,25 @@ struct VoiceAssistantView: View {
 
     // MARK: Setup and privacy
 
-    private func setupSection(_ copy: VoiceAssistantCopy) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // A settings-style row rather than a tinted link: primary title,
-            // grey chevron that turns when the steps open.
-            Button {
-                withAnimation(.snappy) { showsSetup.toggle() }
-            } label: {
-                HStack(spacing: DS.Spacing.s) {
-                    Image(systemName: "switch.2")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(Color.accentColor)
-                        .accessibilityHidden(true)
-                    Text(copy.quickAccess)
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(.primary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    Image(systemName: "chevron.right")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(.tertiary)
-                        .rotationEffect(.degrees(showsSetup ? 90 : 0))
-                        .accessibilityHidden(true)
-                }
-                .frame(minHeight: DS.Layout.minimumTouchTarget - 8)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityValue(showsSetup ? copy.expanded : copy.collapsed)
-            if showsSetup {
-            VStack(alignment: .leading, spacing: DS.Spacing.s) {
-                ForEach(Array(copy.setupSteps.enumerated()), id: \.offset) { index, step in
-                    HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.s) {
-                        Text(verbatim: "\(index + 1)")
-                            .font(.footnote.weight(.semibold))
-                            .monospacedDigit()
-                            .foregroundStyle(.white)
-                            .frame(width: 22, height: 22)
-                            .background(Circle().fill(Color.accentColor))
-                            .accessibilityHidden(true)
-                        Text(step)
-                            .font(.subheadline)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .accessibilityElement(children: .combine)
-                }
-                Text(copy.setupNote)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+    private var setupLink: some View {
+        NavigationLink { VoiceTutorialView(isInVoiceScreen: true) } label: {
+            HStack(spacing: DS.Spacing.s) {
+                Label("tutorial.voice.title", systemImage: "play.rectangle")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color.accentColor)
                     .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: DS.Spacing.s)
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
             }
-            .padding(.top, DS.Spacing.s)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .transition(.opacity)
-            }
+            .frame(minHeight: DS.Layout.minimumTouchTarget)
+            .contentShape(Rectangle())
+            .padding(.horizontal, DS.Spacing.xs)
         }
-        .dsCard()
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("voice.setupGuide")
     }
 
     private func privacySection(_ copy: VoiceAssistantCopy) -> some View {
@@ -539,6 +519,7 @@ struct VoiceAssistantCopy {
     var startOver: String { text("Start over", "Начать заново", "Қайта бастау", "Qaytadan boshlash") }
     var newInstruction: String { text("New instruction", "Новая инструкция", "Жаңа нұсқау", "Yangi koʻrsatma") }
     var speakPrompt: String { text("Speak… your words will appear here.", "Говорите… здесь появятся ваши слова.", "Сөйлеңіз… сөзіңіз осында көрсетіледі.", "Gapiring… so‘zlaringiz shu yerda ko‘rinadi.") }
+    var firstUseHint: String { text("Tap Start dictation to set up the microphone for AI Reply Voice.", "Нажмите «Начать диктовку», чтобы настроить микрофон для AI Reply Voice.", "AI Reply Voice микрофонын баптау үшін «Айтып жазуды бастау» түймесін басыңыз.", "AI Reply Voice mikrofonini sozlash uchun «Aytib yozishni boshlash» tugmasini bosing.") }
     var idleHint: String { text("Say what to reply or write, for example: “Tell her I’ll be there at seven.”", "Скажите, что ответить или написать, например: «Напиши, что буду в семь».", "Не жауап беру не жазу керегін айтыңыз, мысалы: «Жетіде келемін деп жаз».", "Nima deb javob berish yoki yozishni ayting, masalan: «Yettida boraman deb yoz».") }
     var processingHint: String { text("You can return to your chat — the response will appear in the AI Reply keyboard.", "Можно вернуться в чат — ответ появится в клавиатуре AI Reply.", "Чатқа орала беріңіз — жауап AI Reply пернетақтасында шығады.", "Chatga qaytishingiz mumkin — javob AI Reply klaviaturasida chiqadi.") }
     var pausedHint: String { text("Continue recording, or create a reply from what you said.", "Продолжите запись или создайте ответ из сказанного.", "Жазуды жалғастырыңыз немесе айтылғаннан жауап жасаңыз.", "Yozishni davom ettiring yoki aytilganlardan javob yarating.") }
@@ -562,25 +543,20 @@ struct VoiceAssistantCopy {
         text("\(seconds) of 40 seconds recorded", "Записано \(seconds) из 40 секунд", "40 секундтың \(seconds) секунды жазылды", "40 soniyadan \(seconds) soniya yozildi")
     }
     var privacy: String { text("Your speech is sent through AI Reply to OpenAI (USA) for transcription. Your message and instruction use your usual AI Reply plan. AI Reply does not save audio. OpenAI processes data under its API data policy; temporary retention may apply. You can withdraw voice consent in Settings → Privacy.", "Ваша речь передаётся через AI Reply в OpenAI (США) для распознавания. Сообщение и инструкция обрабатываются по вашему тарифу AI Reply. AI Reply не сохраняет аудио. OpenAI обрабатывает данные по своей политике API; возможно временное хранение. Согласие на голос можно отозвать: Настройки → Конфиденциальность.", "Сөзіңіз AI Reply арқылы OpenAI-ға (АҚШ) тану үшін жіберіледі. Хабарлама мен нұсқау AI Reply тарифіңіз бойынша өңделеді. AI Reply аудионы сақтамайды. OpenAI деректерді API саясаты бойынша өңдейді; уақытша сақтау болуы мүмкін. Дауысқа келісімді Баптаулар → Құпиялық бөлімінде қайтаруға болады.", "Nutqingiz AI Reply orqali OpenAIʼga (AQSh) tanish uchun yuboriladi. Xabar va koʻrsatma AI Reply tarifingiz boʻyicha ishlanadi. AI Reply audioni saqlamaydi. OpenAI API siyosatiga koʻra maʼlumotlarni qayta ishlaydi; vaqtinchalik saqlash mumkin. Ovoz roziligini Sozlamalar → Maxfiylikda bekor qilish mumkin.") }
-    var allowAndStart: String { text("Allow and start", "Разрешить и начать", "Рұқсат беріп, бастау", "Ruxsat berib boshlash") }
-    var notNow: String { text("Not now", "Не сейчас", "Қазір емес", "Hozir emas") }
+    var voiceConsentTitle: String { text("Voice processing", "Обработка голоса", "Дауысты өңдеу", "Ovozni qayta ishlash") }
+    var agreeToVoiceProcessing: String { text("Agree", "Согласен", "Келісемін", "Roziman") }
     var privacyLink: String { text("Privacy policy", "Политика конфиденциальности", "Құпиялық саясаты", "Maxfiylik siyosati") }
-    var quickAccess: String { text("Start from Control Center", "Запуск из Пункта управления", "Басқару орталығынан іске қосу", "Boshqaruv markazidan ishga tushirish") }
-    var expanded: String { text("Expanded", "Развёрнуто", "Ашық", "Ochiq") }
-    var collapsed: String { text("Collapsed", "Свёрнуто", "Жабық", "Yopiq") }
-    var setupSteps: [String] {
-        [
-            text("Start dictation here once and allow the microphone and voice processing.", "Один раз начните диктовку здесь и разрешите микрофон и обработку голоса.", "Осы жерде бір рет айтып жазуды бастап, микрофон мен дауысты өңдеуге рұқсат беріңіз.", "Shu yerda bir marta aytib yozishni boshlang va mikrofon hamda ovozni qayta ishlashga ruxsat bering."),
-            text("Keep Live Activities on for AI Reply in iPhone Settings.", "Оставьте Live Activities включёнными для AI Reply в настройках iPhone.", "iPhone баптауларында AI Reply үшін Live Activities қосулы болсын.", "iPhone sozlamalarida AI Reply uchun Live Activities yoqilgan bo‘lsin."),
-            text("On iOS 18 or later, open Control Center, hold an empty area, tap Add a Control and choose AI Reply Voice.", "На iOS 18 и новее откройте Пункт управления, удерживайте свободное место, нажмите «Добавить элемент управления» и выберите AI Reply Voice.", "iOS 18 және жаңасында Басқару орталығын ашып, бос жерді ұстап тұрыңыз, «Басқару элементін қосу» түймесін басып, AI Reply Voice таңдаңыз.", "iOS 18 va undan yangisida Boshqaruv markazini oching, bo‘sh joyni bosib turing, «Boshqaruv qo‘shish»ni bosing va AI Reply Voice’ni tanlang.")
-        ]
+    var controlSetupRequired: String {
+        text("Open AI Reply, tap the microphone on Home, then tap Start dictation to finish setup.",
+             "Откройте AI Reply, нажмите микрофон на главном экране, затем «Начать диктовку», чтобы завершить настройку.",
+             "AI Reply қолданбасын ашыңыз. Баптауды аяқтау үшін басты экрандағы микрофонды, содан кейін «Айтып жазуды бастау» түймесін басыңыз.",
+             "AI Reply’ni oching. Sozlashni yakunlash uchun bosh ekrandagi mikrofonni, soʻng «Aytib yozishni boshlash» tugmasini bosing.")
     }
-    var setupNote: String { text("The control then starts recording without opening the app; iOS may ask you to unlock. You can also assign the AI Reply Voice shortcut to the Action button. On iOS 17, start dictation here or with the Open AI Reply Voice action in Shortcuts.", "Дальше элемент запускает запись без открытия приложения; iOS может попросить разблокировать iPhone. Команду AI Reply Voice можно назначить кнопке действия. На iOS 17 начинайте диктовку здесь или через действие «Открыть AI Reply Voice» в «Командах».", "Кейін элемент қолданбаны ашпай жазуды бастайды; iOS телефонды ашуды сұрауы мүмкін. AI Reply Voice пәрменін әрекет түймесіне тағайындауға болады. iOS 17-де осы жерден немесе «Пәрмендердегі» AI Reply Voice ашу әрекеті арқылы бастаңыз.", "Keyin element ilovani ochmasdan yozishni boshlaydi; iOS telefonni qulfdan chiqarishni so‘rashi mumkin. AI Reply Voice buyrug‘ini harakat tugmasiga biriktirish mumkin. iOS 17’da shu yerdan yoki Buyruqlardagi AI Reply Voice’ni ochish amali orqali boshlang.") }
     var interrupted: String { text("Recording interrupted. Start a new voice session.", "Запись прервана. Запустите новый голосовой сеанс.", "Жазу үзілді. Жаңа дауыс сеансын бастаңыз.", "Yozish toʻxtatildi. Yangi ovoz seansini boshlang.") }
     var signIn: String { text("Sign in and accept the current terms in AI Reply.", "Войдите и примите актуальные условия AI Reply.", "AI Reply-ға кіріп, қолданыстағы шарттарды қабылдаңыз.", "AI Replyʼga kirib, amaldagi shartlarni qabul qiling.") }
-    var permission: String { text("Allow microphone access in iPhone Settings → AI Reply.", "Разрешите микрофон: Настройки iPhone → AI Reply.", "iPhone баптауларында → AI Reply → микрофонға рұқсат беріңіз.", "iPhone sozlamalari → AI Reply orqali mikrofonga ruxsat bering.") }
+    var permission: String { text("Dictation needs microphone access. You can change access in Settings.", "Для диктовки нужен доступ к микрофону. Его можно изменить в Настройках.", "Айтып жазу үшін микрофонға рұқсат қажет. Оны Баптауларда өзгертуге болады.", "Aytib yozish uchun mikrofonga ruxsat kerak. Ruxsatni Sozlamalarda oʻzgartirishingiz mumkin.") }
     var unavailable: String { text("Voice transcription is unavailable on this server.", "На сервере пока недоступно распознавание голоса.", "Бұл серверде дауысты тану әзірге қолжетімсіз.", "Bu serverda nutqni tanish hozircha mavjud emas.") }
-    var liveActivityRequired: String { text("Enable Live Activities for AI Reply in iPhone Settings to record from Control Center.", "Включите Live Activities для AI Reply в настройках iPhone, чтобы записывать из Пункта управления.", "Басқару орталығынан жазу үшін iPhone баптауларында AI Reply Live Activities мүмкіндігін қосыңыз.", "Boshqaruv markazidan yozish uchun iPhone sozlamalarida AI Reply Live Activities imkoniyatini yoqing.") }
+    var liveActivityRequired: String { text("Enable Live Activities for AI Reply in iPhone Settings to record from Control Center.", "Включите «Эфир активности» (Live Activities) для AI Reply в настройках iPhone, чтобы записывать из Пункта управления.", "Басқару орталығынан жазу үшін iPhone баптауларында AI Reply Live Activities мүмкіндігін қосыңыз.", "Boshqaruv markazidan yozish uchun iPhone sozlamalarida AI Reply Live Activities imkoniyatini yoqing.") }
     var recordingFailed: String { text("Could not complete dictation. Check the connection and try again.", "Не удалось завершить диктовку. Проверьте связь и попробуйте снова.", "Айтып жазу аяқталмады. Байланысты тексеріп, қайталаңыз.", "Aytib yozish tugamadi. Aloqani tekshirib, qayta urinib koʻring.") }
     var nothingHeard: String { text("No speech detected. Try again closer to the microphone.", "Речь не распознана. Попробуйте ближе к микрофону.", "Сөйлеу анықталмады. Микрофонға жақындап, қайталаңыз.", "Nutq aniqlanmadi. Mikrofonga yaqinroq qayta urinib koʻring.") }
     var voiceLimit: String { text("Today's dictation limit is reached. You can still type.", "Лимит диктовки на сегодня исчерпан. Можно ввести текст вручную.", "Бүгінгі айтып жазу шегі таусылды. Мәтінді қолмен енгізуге болады.", "Bugungi aytib yozish limiti tugadi. Matnni qoʻlda yozish mumkin.") }

@@ -17,7 +17,8 @@ struct VoiceAssistantStore: Sendable {
 
     func readSnapshot(now: Date = Date()) -> VoiceAssistantSnapshot? {
         guard let rootURL,
-              let value: VoiceAssistantSnapshot = read(rootURL.appendingPathComponent("session.json")),
+              let record: SnapshotRecord = read(rootURL.appendingPathComponent("session.json")),
+              let value = record.snapshot,
               value.isFresh(now: now) else { return nil }
         return value
     }
@@ -70,7 +71,7 @@ struct VoiceAssistantStore: Sendable {
     func purge(now: Date = Date()) {
         for url in files() {
             if url.lastPathComponent == "session.json" {
-                if let value: VoiceAssistantSnapshot = read(url), !value.isFresh(now: now) {
+                if let record: SnapshotRecord = read(url), record.snapshot?.isFresh(now: now) != true {
                     try? FileManager.default.removeItem(at: url)
                 }
             } else if url.pathExtension == "command" {
@@ -111,6 +112,22 @@ struct VoiceAssistantStore: Sendable {
     private func validID(_ value: String) -> Bool {
         !value.isEmpty && value.count <= 100 && value.unicodeScalars.allSatisfy {
             CharacterSet.alphanumerics.contains($0) || $0 == "-" || $0 == "_"
+        }
+    }
+
+    private struct SnapshotRecord: Decodable {
+        let snapshot: VoiceAssistantSnapshot?
+
+        private enum CodingKeys: String, CodingKey { case screenshotID }
+
+        init(from decoder: Decoder) throws {
+            let fields = try decoder.container(keyedBy: CodingKeys.self)
+            // Older builds could leave a screenshot reply in the voice handoff.
+            if try fields.decodeIfPresent(String.self, forKey: .screenshotID) != nil {
+                snapshot = nil
+            } else {
+                snapshot = try VoiceAssistantSnapshot(from: decoder)
+            }
         }
     }
 }

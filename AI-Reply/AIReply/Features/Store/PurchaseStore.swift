@@ -48,7 +48,18 @@ struct PurchaseOffer: Identifiable, Equatable, Sendable {
     var id: String { storeProductID }
 
     var isAvailableForNewPurchase: Bool {
-        kind != .subscription || !IOSProductPolicy.isRetiredSubscription(code: code, storeProductID: storeProductID)
+        Self.canOffer(kind: kind, code: code, storeProductID: storeProductID)
+    }
+
+    private static func canOffer(kind: Kind, code: String, storeProductID: String) -> Bool {
+        switch kind {
+        case .subscription:
+            return !IOSProductPolicy.isRetiredSubscription(code: code, storeProductID: storeProductID)
+        case .pack:
+            return code != "pack500" && storeProductID != "kz.aireply.pack500"
+        case .pass:
+            return true
+        }
     }
 
     /// The server's products that the App Store also knows, in the server's
@@ -56,9 +67,8 @@ struct PurchaseOffer: Identifiable, Equatable, Sendable {
     static func match(server: [PurchaseAPI.Product], store: [StoreProduct]) -> [PurchaseOffer] {
         let prices = Dictionary(store.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         return server.compactMap { product in
-            if product.kind == "subscription",
-               IOSProductPolicy.isRetiredSubscription(code: product.code, storeProductID: product.storeProductID) { return nil }
             guard let kind = Kind(rawValue: product.kind),
+                  canOffer(kind: kind, code: product.code, storeProductID: product.storeProductID),
                   !product.storeProductID.isEmpty, let storeProduct = prices[product.storeProductID] else { return nil }
             if kind == .subscription {
                 guard storeProduct.kind == .subscription, product.planID != nil,

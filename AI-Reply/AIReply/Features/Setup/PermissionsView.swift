@@ -66,6 +66,10 @@ struct PermissionsView: View {
             }
 
             Section("tutorial.videos") {
+                NavigationLink { VoiceTutorialView() } label: {
+                    Label("tutorial.voice.title", systemImage: "play.rectangle")
+                }
+                .accessibilityIdentifier("permissions.voiceGuide")
                 NavigationLink { PasteTutorialView() } label: {
                     Label("tutorial.paste.title", systemImage: "play.rectangle")
                 }

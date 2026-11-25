@@ -17,9 +17,9 @@ final class VoiceAudioCapture {
     private let conversionQueue = DispatchQueue(label: "kz.aireply.voice.convert", qos: .userInitiated)
     private var continuation: AsyncThrowingStream<VoiceAudioChunk, Error>.Continuation?
 
-    func start() throws -> AsyncThrowingStream<VoiceAudioChunk, Error> {
+    func start(mixingWithOtherAudio: Bool) throws -> AsyncThrowingStream<VoiceAudioChunk, Error> {
         stop()
-        try session.begin()
+        try session.begin(mixingWithOtherAudio: mixingWithOtherAudio)
         let engine = AVAudioEngine()
         self.engine = engine
         let input = engine.inputNode

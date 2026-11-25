@@ -1,3 +1,4 @@
+import AVFAudio
 import SwiftUI
 
 /// «Твой личный ассистент в переписке»: what AI Reply does in one example
@@ -27,6 +28,10 @@ struct OnboardingWelcomeStep: View {
                     Text("onboarding.welcome.subtitle")
                         .font(.body)
                         .foregroundStyle(.secondary)
+                }
+
+                if !isTutorial {
+                    OnboardingMicrophoneSetupCard()
                 }
 
                 example
@@ -110,5 +115,71 @@ struct OnboardingWelcomeStep: View {
             }
             .accessibilityElement(children: .combine)
         }
+    }
+}
+
+private struct OnboardingMicrophoneSetupCard: View {
+    private enum Status {
+        case ready, requesting, granted, denied
+    }
+
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var status: Status? = AVAudioApplication.shared.recordPermission == .undetermined ? .ready : nil
+
+    var body: some View {
+        if let status {
+            VStack(alignment: .leading, spacing: DS.Spacing.s) {
+                switch status {
+                case .ready, .requesting:
+                    heading("onboarding.voice.microphone.title", "onboarding.voice.microphone.body", symbol: "mic")
+                    Button("onboarding.voice.microphone.setup") {
+                        Task { await requestPermission() }
+                    }
+                    .buttonStyle(.dsPrimary)
+                    .disabled(status == .requesting)
+                    .accessibilityIdentifier("onboarding.voice.microphone.setup")
+                case .granted:
+                    heading("onboarding.voice.microphone.granted.title", "onboarding.voice.microphone.granted.body",
+                            symbol: "checkmark.circle")
+                    if #available(iOS 18, *) {
+                        VoiceControlCenterHelp()
+                            .accessibilityIdentifier("onboarding.voice.controlCenterHelp")
+                    }
+                case .denied:
+                    heading("onboarding.voice.microphone.denied.title", "onboarding.voice.microphone.denied.body",
+                            symbol: "mic.slash")
+                }
+            }
+            .dsCard()
+            .accessibilityIdentifier("onboarding.voice.microphone")
+            .onChange(of: scenePhase) { _, phase in
+                guard phase == .active, status == .granted || status == .denied else { return }
+                switch AVAudioApplication.shared.recordPermission {
+                case .granted: self.status = .granted
+                case .denied: self.status = .denied
+                default: self.status = .ready
+                }
+            }
+        }
+    }
+
+    private func heading(_ title: LocalizedStringKey, _ text: LocalizedStringKey, symbol: String) -> some View {
+        VStack(alignment: .leading, spacing: DS.Spacing.xs) {
+            Label(title, systemImage: symbol)
+                .font(.headline)
+                .accessibilityAddTraits(.isHeader)
+            Text(text)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    @MainActor
+    private func requestPermission() async {
+        guard status == .ready else { return }
+        status = .requesting
+        let granted = await AVAudioApplication.requestRecordPermission()
+        status = granted ? .granted : .denied
     }
 }

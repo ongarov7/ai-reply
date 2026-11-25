@@ -14,6 +14,7 @@ actor VoiceTranscriptionClient {
         components.scheme = components.scheme == "https" ? "wss" : "ws"
         guard let url = components.url else { throw Failure.unavailable }
         let token = try await AccountSession.shared.accessToken()
+        try Task.checkCancellation()
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         let session = ReplyNetworking.makeSession(timeout: 75)

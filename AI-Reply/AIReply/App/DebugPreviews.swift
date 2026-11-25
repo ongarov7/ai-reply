@@ -49,17 +49,13 @@ extension DebugSamples {
                             storeProductID: "preview.pro.yearly", name: localizedProductName("pro_yearly"), planID: "pro_yearly",
                             billingPeriod: "year", entitlementKind: "unlimited"),
         PurchaseAPI.Product(code: "pack30", kind: "pack", units: 30, durationHours: 0,
-                            storeProductID: "preview.pack30", name: localizedPackName),
-        PurchaseAPI.Product(code: "pack500", kind: "pack", units: 500, durationHours: 0,
-                            storeProductID: "preview.pack500", name: localizedProductName("pack500"),
-                            price: 99000, currency: "KZT", creditsNeverExpire: true)
+                            storeProductID: "preview.pack30", name: localizedPackName, creditsNeverExpire: true)
     ] }
 
     private static func localizedProductName(_ code: String) -> String {
         let names = [
             "pro_monthly": ["en": "Pro · monthly", "ru": "Pro · месяц", "kk": "Pro · ай сайын", "uz": "Pro · oy"],
-            "pro_yearly": ["en": "Pro · yearly", "ru": "Pro · год", "kk": "Pro · жыл сайын", "uz": "Pro · yil"],
-            "pack500": ["en": "500 replies", "ru": "500 ответов", "kk": "500 жауап", "uz": "500 javob"]
+            "pro_yearly": ["en": "Pro · yearly", "ru": "Pro · год", "kk": "Pro · жыл сайын", "uz": "Pro · yil"]
         ]
         return names[code]?[SharedSettings.shared.effectiveAppLanguage.rawValue] ?? names[code]?["en"] ?? code
     }
@@ -74,8 +70,8 @@ struct DebugStoreKitClient: StoreKitClient {
     var canMakePayments: Bool { true }
 
     func products(for ids: [String]) async throws -> [StoreProduct] {
-        let prices = ["preview.pro.monthly": "3 990 ₸", "preview.pro.yearly": "39 990 ₸",
-                      "preview.pack30": "130 ₸", "preview.pack500": "990 ₸"]
+        let prices = ["preview.pro.monthly": "990 ₸", "preview.pro.yearly": "39 990 ₸",
+                      "preview.pack30": "130 ₸"]
         return ids.compactMap { id in
             prices[id].map { StoreProduct(id: id, displayName: id, displayPrice: $0,
                                          kind: id.hasPrefix("preview.pack") ? .consumable : .subscription,

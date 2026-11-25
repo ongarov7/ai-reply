@@ -76,6 +76,10 @@ struct SettingsView: View {
                     Label("tutorial.keyboard.title", systemImage: "play.rectangle")
                 }
                 .accessibilityIdentifier("settings.keyboardGuide")
+                NavigationLink { VoiceTutorialView() } label: {
+                    Label("tutorial.voice.title", systemImage: "play.rectangle")
+                }
+                .accessibilityIdentifier("settings.voiceGuide")
                 NavigationLink { PasteTutorialView() } label: {
                     Label("tutorial.paste.title", systemImage: "play.rectangle")
                 }

@@ -149,6 +149,20 @@ final class DictationAudioLifecycleTests: XCTestCase {
         XCTAssertEqual(probe.current.category, .ambient)
     }
 
+    func testSystemControlUsesMixableCaptureAndRestoresThePreviousSession() throws {
+        let probe = SessionProbe()
+        try probe.session.begin(mixingWithOtherAudio: true)
+        XCTAssertEqual(probe.current.category, .playAndRecord)
+        XCTAssertEqual(probe.current.mode, .measurement)
+        XCTAssertEqual(probe.current.options, .mixWithOthers)
+        XCTAssertEqual(probe.activationOptions, [])
+
+        try probe.session.end()
+        XCTAssertEqual(probe.current.category, .ambient)
+        XCTAssertEqual(probe.current.mode, .default)
+        XCTAssertEqual(probe.current.options, .mixWithOthers)
+    }
+
     func testFailedDeactivationKeepsOwnershipForRetry() throws {
         let probe = SessionProbe()
         try probe.session.begin()

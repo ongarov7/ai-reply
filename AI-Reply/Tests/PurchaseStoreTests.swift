@@ -182,25 +182,30 @@ final class SubscriptionDisplayTests: XCTestCase {
         XCTAssertTrue(IOSProductPolicy.isRetiredSubscription(code: "legacy", storeProductID: "kz.aireply.base.yearly"))
     }
 
-    func testFiveHundredReplyPackIsConsumableAndDoesNotBecomeASubscription() throws {
-        let product = try JSONDecoder().decode(PurchaseAPI.Product.self, from: Data("""
-        {"code":"pack500","kind":"pack","units":500,"store_product_id":"kz.aireply.pack500",
-         "name":"500 ответов","credits_never_expire":true,"price":99000,"currency":"KZT"}
+    func testRetiredPackIsHiddenAndThirtyReplyPackRemainsAvailable() throws {
+        let products = try JSONDecoder().decode([PurchaseAPI.Product].self, from: Data("""
+        [{"code":"pack500","kind":"pack","units":500,"store_product_id":"kz.aireply.pack500",
+          "name":"500 ответов","credits_never_expire":true,"price":99000,"currency":"KZT"},
+         {"code":"pack30","kind":"pack","units":30,"store_product_id":"kz.aireply.pack30",
+          "name":"30 ответов","credits_never_expire":true,"price":13000,"currency":"KZT"}]
         """.utf8))
-        let apple = StoreProduct(id: "kz.aireply.pack500", displayName: "500 ответов", displayPrice: "990 ₸",
+        let retired = StoreProduct(id: "kz.aireply.pack500", displayName: "500 ответов", displayPrice: "990 ₸",
                                  kind: .consumable, price: 990, currency: "KZT")
-        let offer = try XCTUnwrap(PurchaseOffer.match(server: [product], store: [apple]).first)
+        let available = StoreProduct(id: "kz.aireply.pack30", displayName: "30 ответов", displayPrice: "130 ₸",
+                                    kind: .consumable, price: 130, currency: "KZT")
+        let offers = PurchaseOffer.match(server: products, store: [retired, available])
+        XCTAssertEqual(offers.map(\.id), [available.id])
+        let offer = try XCTUnwrap(offers.first)
         XCTAssertEqual(offer.kind, .pack)
-        XCTAssertEqual(offer.units, 500)
-        XCTAssertEqual(offer.name, "500 ответов")
+        XCTAssertEqual(offer.units, 30)
+        XCTAssertEqual(offer.displayPrice, "130 ₸")
         XCTAssertTrue(offer.creditsNeverExpire)
         XCTAssertNil(offer.billingPeriod)
         XCTAssertFalse(offer.hasPriceMismatch)
         XCTAssertTrue(SubscriptionPlanCatalogue(plans: plans, offers: [offer]).options.isEmpty)
-        var autoRenewing = apple
-        autoRenewing.kind = .subscription
-        autoRenewing.billingPeriod = "month"
-        XCTAssertTrue(PurchaseOffer.match(server: [product], store: [autoRenewing]).isEmpty)
+        XCTAssertFalse(PurchaseOffer(code: "pack500", kind: .pack, units: 500, durationHours: 0,
+                                     storeProductID: retired.id, name: "500 ответов",
+                                     displayPrice: retired.displayPrice).isAvailableForNewPurchase)
     }
 
     private func plan(_ code: String, days: Int, kind: String, limit: Int = 0, free: Bool = false) -> AccountAPI.Plan {
@@ -950,10 +955,14 @@ final class PurchaseStoreTests: XCTestCase {
     func testSubscriptionsRequireMatchingStoreTypeAndPeriod() {
         let product = PurchaseAPI.Product(code: "pro_monthly", kind: "subscription", units: 0, durationHours: 0,
                                           storeProductID: "pro.month", name: "Pro", planID: "pro",
-                                          billingPeriod: "month", entitlementKind: "unlimited")
-        let subscription = StoreProduct(id: "pro.month", displayName: "Pro", displayPrice: "3 450 ₸",
-                                        kind: .subscription, billingPeriod: "month")
-        XCTAssertEqual(PurchaseOffer.match(server: [product], store: [subscription]).count, 1)
+                                          billingPeriod: "month", entitlementKind: "unlimited",
+                                          price: 99000, currency: "KZT")
+        let subscription = StoreProduct(id: "pro.month", displayName: "Pro", displayPrice: "990 ₸",
+                                        kind: .subscription, billingPeriod: "month", price: 990, currency: "KZT")
+        let offers = PurchaseOffer.match(server: [product], store: [subscription])
+        XCTAssertEqual(offers.count, 1)
+        XCTAssertEqual(offers.first?.displayPrice, "990 ₸")
+        XCTAssertEqual(offers.first?.hasPriceMismatch, false)
         var wrong = subscription
         wrong.kind = .consumable
         XCTAssertTrue(PurchaseOffer.match(server: [product], store: [wrong]).isEmpty)
@@ -972,10 +981,10 @@ final class PurchaseStoreTests: XCTestCase {
     }
 
     func testForeignStorefrontPriceKeepsItsCurrencyInsteadOfUsingKazakhstanCataloguePrice() throws {
-        let product = PurchaseAPI.Product(code: "pack500", kind: "pack", units: 500, durationHours: 0,
-                                          storeProductID: "kz.aireply.pack500", name: "500 ответов",
-                                          price: 99000, currency: "KZT", creditsNeverExpire: true)
-        let apple = StoreProduct(id: "kz.aireply.pack500", displayName: "500 replies", displayPrice: "$1.99",
+        let product = PurchaseAPI.Product(code: "pack30", kind: "pack", units: 30, durationHours: 0,
+                                          storeProductID: "kz.aireply.pack30", name: "30 ответов",
+                                          price: 13000, currency: "KZT", creditsNeverExpire: true)
+        let apple = StoreProduct(id: "kz.aireply.pack30", displayName: "30 replies", displayPrice: "$1.99",
                                  kind: .consumable, price: Decimal(string: "1.99"), currency: "USD")
         let offer = try XCTUnwrap(PurchaseOffer.match(server: [product], store: [apple]).first)
         XCTAssertEqual(offer.displayPrice, "$1.99")
@@ -1043,6 +1052,16 @@ final class PurchaseStoreTests: XCTestCase {
         await store.received(legacy)
         XCTAssertEqual(backend.submitted, ["jws-base-renewal"])
         XCTAssertEqual(log.finished, ["base-renewal"])
+    }
+
+    func testPaidRetiredPackTransactionStillConfirmsAndFinishes() async {
+        let (store, _, backend) = makeStore()
+        let log = FinishLog()
+        let legacy = StoreTransaction(id: "previous-pack", productID: "kz.aireply.pack500",
+                                      signedTransaction: "jws-previous-pack", finish: { log.finish("previous-pack") })
+        await store.received(legacy)
+        XCTAssertEqual(backend.submitted, ["jws-previous-pack"])
+        XCTAssertEqual(log.finished, ["previous-pack"])
     }
 
     func testUnapprovedPriceCannotOpenCheckout() async throws {

@@ -16,20 +16,20 @@ final class VoiceAssistantController {
     var elapsed = 0.0
     var sourceMessage = ""
     var templateID: String?
-    /// The screenshot the next turn answers (the in-chat screenshot shortcut).
-    var screenshotID: String?
     var languageCode = "auto"
     private(set) var isStarting = false
     var copy: VoiceAssistantCopy { .init(language: SharedSettings.shared.effectiveAppLanguage) }
     var isCapturing: Bool { snapshot.phase == .listening || snapshot.phase == .speechDetected }
     var isBusy: Bool { isStarting || isCapturing || snapshot.phase == .transcribing || snapshot.phase == .generating }
     var hasVoiceConsent: Bool { UserDefaults.standard.bool(forKey: "voiceAssistant.audioConsent.v1") }
+    private(set) var microphoneAccessDenied = false
 
     @ObservationIgnored private let capture = VoiceAudioCapture()
     @ObservationIgnored private let store: VoiceAssistantStore
     @ObservationIgnored private let protectedDataAvailable: @MainActor () -> Bool
     @ObservationIgnored private var needsRestore = false
     @ObservationIgnored private var client: VoiceTranscriptionClient?
+    @ObservationIgnored private var connectionTask: Task<Void, Never>?
     @ObservationIgnored private var startTask: Task<Void, Never>?
     @ObservationIgnored private var captureTask: Task<Void, Never>?
     @ObservationIgnored private var recognitionTask: Task<String, Error>?
@@ -46,6 +46,7 @@ final class VoiceAssistantController {
     @ObservationIgnored private var lastSpeechAt: Date?
     @ObservationIgnored private var processingDeadline: Date?
     @ObservationIgnored private var pcm = Data()
+    @ObservationIgnored private var streamedPCMBytes = 0
     @ObservationIgnored private var backgroundTask = UIBackgroundTaskIdentifier.invalid
     /// Words recognized before a pause. A continued turn shows and sends
     /// them in front of the new speech.
@@ -113,18 +114,22 @@ final class VoiceAssistantController {
             // A system shortcut is a new conversation context. Never reuse a
             // message pasted for a preceding turn without another paste.
             sourceMessage = ""
-            screenshotID = nil
             templateID = SharedSettings.shared.lastTemplateID
         }
         if startWhenPossible && hasVoiceConsent && !isBusy { start() }
     }
 
-    func start(consent: Bool = false) {
+    func start(onVoiceConsentRequired: (() -> Void)? = nil) {
         guard !isBusy, UIApplication.shared.applicationState == .active else { return }
-        if consent { UserDefaults.standard.set(true, forKey: "voiceAssistant.audioConsent.v1") }
-        guard hasVoiceConsent else { return }
         let id = prepareSession()
-        startTask = Task { [weak self] in await self?.begin(id: id) }
+        startTask = Task { [weak self] in
+            await self?.begin(id: id, onVoiceConsentRequired: onVoiceConsentRequired)
+        }
+    }
+
+    func acceptVoiceConsentAndStart() {
+        UserDefaults.standard.set(true, forKey: "voiceAssistant.audioConsent.v1")
+        start()
     }
 
     /// Continues a paused turn as a new user-started recording: the words
@@ -151,46 +156,20 @@ final class VoiceAssistantController {
     /// authorization context. No keyboard mailbox or generic background task
     /// can call this path or grant permission on the user's behalf.
     func startFromControl() async throws {
-        guard hasVoiceConsent, AVAudioApplication.shared.recordPermission == .granted,
-              AIReplyService.preflight(isSignedIn: AccountCredentials.isSignedIn,
+        guard hasVoiceConsent, AVAudioApplication.shared.recordPermission == .granted else {
+            throw VoiceAssistantControlStartError(message: copy.controlSetupRequired)
+        }
+        guard AIReplyService.preflight(isSignedIn: AccountCredentials.isSignedIn,
                                        hasConsent: LegalConsentStore.hasAcceptedCurrentVersions()) == nil else {
-            throw VoiceAssistantControlStartError(message: String(localized: "Open AI Reply once to allow microphone access and voice processing."))
+            throw VoiceAssistantControlStartError(message: copy.signIn)
         }
         if isCapturing { finish(); return }
         guard !isBusy else { return }
         sourceMessage = ""
-        screenshotID = nil
         templateID = SharedSettings.shared.lastTemplateID
         let id = prepareSession()
         await begin(id: id, systemControl: true)
         guard snapshot.sessionID == id, isCapturing else {
-            throw VoiceAssistantControlStartError(message: snapshot.error ?? copy.interrupted)
-        }
-    }
-
-    /// The in-chat screenshot shortcut: the screenshot was just read on the
-    /// iPhone, and the person says how to answer it without leaving the chat.
-    /// Awaited by its AudioRecordingIntent, like `startFromControl`; the
-    /// reply is written from the whole recognised conversation.
-    func startFromScreenshot(_ context: ScreenshotContext) async throws {
-        guard hasVoiceConsent, AVAudioApplication.shared.recordPermission == .granted,
-              AIReplyService.preflight(isSignedIn: AccountCredentials.isSignedIn,
-                                       hasConsent: LegalConsentStore.hasAcceptedCurrentVersions()) == nil else {
-            throw VoiceAssistantControlStartError(message: String(localized: "Open AI Reply once to allow microphone access and voice processing."))
-        }
-        guard let target = context.conversation.target else {
-            throw VoiceAssistantControlStartError(message: ScreenshotKeyboardStrings(SharedSettings.shared.effectiveAppLanguage).noText)
-        }
-        // A running turn gives way: a new screenshot is a new conversation.
-        if isBusy { stop(discardTurn: true) }
-        sourceMessage = target.text
-        screenshotID = context.id
-        templateID = SharedSettings.shared.lastTemplateID
-        let id = prepareSession()
-        ScreenshotContextStore.shared.update { $0.voiceSessionID = id }
-        await begin(id: id, systemControl: true)
-        guard snapshot.sessionID == id, isCapturing else {
-            ScreenshotContextStore.shared.update { $0.voiceSessionID = nil }
             throw VoiceAssistantControlStartError(message: snapshot.error ?? copy.interrupted)
         }
     }
@@ -203,15 +182,14 @@ final class VoiceAssistantController {
         liveTranscript = ""
         snapshot = VoiceAssistantSnapshot(sessionID: id, phase: .ready, transcript: transcriptPrefix,
                                           requestID: UUID().uuidString,
-                                          sourceMessage: sourceMessage, templateID: templateID,
-                                          screenshotID: screenshotID)
+                                          sourceMessage: sourceMessage, templateID: templateID)
         isStarting = true
         startedAt = Date()
         publish(.ready)
         return id
     }
 
-    private func begin(id: String, systemControl: Bool = false) async {
+    private func begin(id: String, systemControl: Bool = false, onVoiceConsentRequired: (() -> Void)? = nil) async {
         defer {
             if snapshot.sessionID == id {
                 isStarting = false
@@ -226,51 +204,46 @@ final class VoiceAssistantController {
                                        hasConsent: LegalConsentStore.hasAcceptedCurrentVersions()) == nil else {
             fail(copy.signIn, id: id); return
         }
-        guard AILimits.serverSupportsVoiceTranscription || AILimits.serverSupportsVoiceRealtimeTranscription else {
+        let needsVoiceConfiguration = !AILimits.hasCachedVoiceConfiguration
+        let supportsRealtime = AILimits.serverSupportsVoiceRealtimeTranscription
+        guard needsVoiceConfiguration || supportsRealtime || AILimits.serverSupportsVoiceTranscription else {
             fail(copy.unavailable, id: id); return
         }
-        let permitted: Bool
-        if systemControl { permitted = AVAudioApplication.shared.recordPermission == .granted }
-        else { permitted = await AVAudioApplication.requestRecordPermission() }
-        guard !Task.isCancelled, snapshot.sessionID == id, isStarting else { return }
-        guard permitted else { fail(copy.permission, id: id); return }
-        // A permission dialog may outlive foreground activation.
-        guard systemControl || UIApplication.shared.applicationState == .active else { stop(); return }
-        // AudioRecordingIntent requires a Live Activity throughout capture.
-        // Request it BEFORE audio activation and before perform() returns.
-        if !beginActivity() && systemControl { fail(copy.liveActivityRequired, id: id); return }
-        if AILimits.serverSupportsVoiceRealtimeTranscription {
-            let connection = VoiceTranscriptionClient()
-            client = connection
-            do {
-                try await connection.connect(requestID: snapshot.requestID ?? UUID().uuidString, languages: languages)
-                guard !Task.isCancelled, snapshot.sessionID == id, isStarting else { await connection.close(); return }
-                recognitionTask = Task {
-                    do {
-                        return try await connection.events { [weak self] delta in
-                            await self?.received(delta: delta, id: id)
-                        }
-                    } catch {
-                        if !Task.isCancelled { self.fail(self.message(for: error), id: id) }
-                        throw error
-                    }
-                }
-            } catch {
-                await connection.close()
-                client = nil
-                // Streaming failures are not retried as paid batch work. Only
-                // an older server without the advertised feature uses WAV.
-                if isStarting { fail(message(for: error), id: id) }
-                return
+        var permission = AVAudioApplication.shared.recordPermission
+        if !systemControl, permission == .undetermined {
+            let granted = await AVAudioApplication.requestRecordPermission()
+            permission = granted ? .granted : .denied
+            if granted {
+                guard await returnedToForegroundAfterPermissionPrompt() else { return }
             }
         }
         guard !Task.isCancelled, snapshot.sessionID == id, isStarting else { return }
+        guard permission == .granted else {
+            fail(copy.permission, id: id)
+            microphoneAccessDenied = permission == .denied
+            return
+        }
+        // A permission dialog may outlive foreground activation.
         guard systemControl || UIApplication.shared.applicationState == .active else { stop(); return }
+        // Device access and consent to send audio to OpenAI are separate choices.
+        guard hasVoiceConsent else {
+            onVoiceConsentRequired?()
+            return
+        }
+        // AudioRecordingIntent requires a Live Activity throughout capture.
+        // Request it BEFORE audio activation and before perform() returns.
+        if !beginActivity() && systemControl { fail(copy.liveActivityRequired, id: id); return }
         do {
-            let stream = try capture.start()
+            // Activate while the recording intent is handling the system tap.
+            // Token refresh and provider setup can take several seconds on mobile data.
+            let stream = try capture.start(mixingWithOtherAudio: systemControl)
             pcm = Data(); elapsed = 0; startedAt = Date(); lastSpeechAt = nil
+            streamedPCMBytes = 0
             publish(.listening)
             startTimer()
+            if needsVoiceConfiguration || supportsRealtime {
+                connectForRecognition(id: id, needsVoiceConfiguration: needsVoiceConfiguration)
+            }
             captureTask = Task { [weak self] in
                 guard let self else { return }
                 do {
@@ -285,7 +258,7 @@ final class VoiceAssistantController {
                             lastSpeechAt = Date()
                             if isCapturing { publish(.speechDetected, write: false) }
                         }
-                        if let client { try await client.append(audio) }
+                        if connectionTask == nil, let client { try await sendPendingAudio(to: client, id: id) }
                     }
                 } catch {
                     if !Task.isCancelled { fail(message(for: error), id: id) }
@@ -294,7 +267,91 @@ final class VoiceAssistantController {
             // The Control Center action must not return with the old
             // Preparing state still displayed while capture is already live.
             await activityUpdateTask?.value
-        } catch { fail(copy.recordingFailed, id: id) }
+        } catch {
+            let failure = error as NSError
+            logger.error("voice microphone start failed domain=\(failure.domain, privacy: .public) code=\(failure.code)")
+            fail(copy.interrupted, id: id)
+        }
+    }
+
+    private func returnedToForegroundAfterPermissionPrompt() async -> Bool {
+        let application = UIApplication.shared
+        // The system can return permission before dismissing its alert.
+        guard application.applicationState == .inactive else { return application.applicationState == .active }
+
+        let (events, continuation) = AsyncStream<Bool>.makeStream()
+        let center = NotificationCenter.default
+        let activation = center.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
+            continuation.yield(true)
+            continuation.finish()
+        }
+        let background = center.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { _ in
+            continuation.yield(false)
+            continuation.finish()
+        }
+        defer {
+            center.removeObserver(activation)
+            center.removeObserver(background)
+        }
+        var iterator = events.makeAsyncIterator()
+        return await iterator.next() == true
+    }
+
+    private func connectForRecognition(id: String, needsVoiceConfiguration: Bool) {
+        let requestID = snapshot.requestID ?? UUID().uuidString
+        let languages = self.languages
+        connectionTask = Task { [weak self] in
+            guard let self else { return }
+            defer {
+                if !Task.isCancelled, snapshot.sessionID == id { connectionTask = nil }
+            }
+            do {
+                // A fresh install can have no feature cache if bootstrap's
+                // public config request was interrupted. Retry during capture.
+                if needsVoiceConfiguration {
+                    let config = try await AccountService().serverConfig()
+                    guard !Task.isCancelled, snapshot.sessionID == id else { return }
+                    AILimits.apply(config)
+                    guard LegalConsentStore.hasAcceptedCurrentVersions() else { fail(copy.signIn, id: id); return }
+                    guard AILimits.serverSupportsVoiceRealtimeTranscription else {
+                        if !AILimits.serverSupportsVoiceTranscription { fail(copy.unavailable, id: id) }
+                        return
+                    }
+                }
+                let connection = VoiceTranscriptionClient()
+                client = connection
+                try await connection.connect(requestID: requestID, languages: languages)
+                guard !Task.isCancelled, snapshot.sessionID == id, client === connection else {
+                    await connection.close()
+                    return
+                }
+                recognitionTask = Task {
+                    do {
+                        return try await connection.events { [weak self] delta in
+                            await self?.received(delta: delta, id: id)
+                        }
+                    } catch {
+                        if !Task.isCancelled { self.fail(self.message(for: error), id: id) }
+                        throw error
+                    }
+                }
+            } catch {
+                // Only servers without the realtime feature use WAV. Do not
+                // turn a streaming failure into a second transcription request.
+                guard !Task.isCancelled, snapshot.sessionID == id else { return }
+                fail(message(for: error), id: id)
+            }
+        }
+    }
+
+    private func sendPendingAudio(to connection: VoiceTranscriptionClient, id: String) async throws {
+        while !Task.isCancelled, snapshot.sessionID == id, client === connection, streamedPCMBytes < pcm.count {
+            // The backend accepts up to 64 KiB of decoded audio in one frame.
+            let end = min(streamedPCMBytes + 64 * 1024, pcm.count)
+            try await connection.append(pcm.subdata(in: streamedPCMBytes..<end))
+            guard !Task.isCancelled, snapshot.sessionID == id, client === connection else { return }
+            streamedPCMBytes = end
+        }
     }
 
     private var languages: [String] {
@@ -335,21 +392,34 @@ final class VoiceAssistantController {
                     // Nothing new after a pause: the words already recognized
                     // are the instruction. Close the unused turn uncommitted.
                     guard !transcriptPrefix.isEmpty else { throw VoiceTranscriptionClient.Failure.empty }
+                    connectionTask?.cancel()
+                    connectionTask = nil
                     recognitionTask?.cancel()
                     recognitionTask = nil
-                    if let client { await client.close() }
-                    client = nil
+                    if let client {
+                        self.client = nil
+                        await client.close()
+                    }
                     text = ""
-                } else if let client, let recognitionTask {
-                    try await client.commit()
-                    text = try await recognitionTask.value
-                    await client.close()
                 } else {
-                    text = try await VoiceTranscriptionClient.transcribe(pcm: pcm,
-                        requestID: snapshot.requestID ?? UUID().uuidString, languages: languages)
+                    // Done can arrive before the socket is ready or before
+                    // the next audio chunk gets a chance to flush the buffer.
+                    await connectionTask?.value
+                    guard !Task.isCancelled, snapshot.sessionID == id, snapshot.phase == .transcribing else { return }
+                    if let client {
+                        guard let recognitionTask else { throw VoiceTranscriptionClient.Failure.unavailable }
+                        try await sendPendingAudio(to: client, id: id)
+                        try Task.checkCancellation()
+                        try await client.commit()
+                        text = try await recognitionTask.value
+                        await client.close()
+                    } else {
+                        text = try await VoiceTranscriptionClient.transcribe(pcm: pcm,
+                            requestID: snapshot.requestID ?? UUID().uuidString, languages: languages)
+                    }
                 }
-                pcm.removeAll(keepingCapacity: false)
                 guard !Task.isCancelled, snapshot.sessionID == id else { return }
+                pcm.removeAll(keepingCapacity: false)
                 snapshot.transcript = Self.joined(transcriptPrefix, text)
                 try await generate(id: id, regeneration: false)
             } catch {
@@ -413,10 +483,7 @@ final class VoiceAssistantController {
         // A 40-second turn fits a voice-aware server whole; an older server's
         // typed limit cuts it after the last whole word instead of refusing it.
         let instruction = Self.fitted(snapshot.transcript, limit: AILimits.voiceInstructionCharacters())
-        if let screenshotID = snapshot.screenshotID {
-            reply = try await screenshotReply(screenshotID, instruction: instruction, configuration: configuration,
-                                              language: language)
-        } else if snapshot.sourceMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if snapshot.sourceMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             reply = try await ComposeService().compose(.init(instruction: instruction, uiLanguage: language,
                 isRegeneration: regeneration, inputLanguage: language.keyboardLanguage,
                 grammaticalGender: configuration.profile.grammaticalGender, actionID: snapshot.requestID, isVoice: true))
@@ -444,51 +511,13 @@ final class VoiceAssistantController {
         endActivity()
     }
 
-    /// A reply to the screenshot this turn answers: its whole conversation,
-    /// the spoken instruction, one key per request, at the price of an
-    /// ordinary reply. A higher price is never taken from here: the
-    /// screenshot comes back to the keyboard's strip with the instruction, and
-    /// its composer asks before charging.
-    private func screenshotReply(_ screenshotID: String, instruction: String, configuration: ReplyConfiguration,
-                                 language: AppLanguage) async throws -> GeneratedReply {
-        let store = ScreenshotContextStore.shared
-        let strings = ScreenshotKeyboardStrings(language)
-        guard let context = store.read(), context.id == screenshotID else {
-            throw VoiceAssistantControlStartError(message: strings.noText)
-        }
-        let template = configuration.templates.first(where: { $0.id == snapshot.templateID })
-            ?? configuration.visibleTemplates.first ?? ReplyTemplate.builtIn(.friend, sortIndex: 0)
-        let request = ScreenshotReplyRequest(mode: .text, conversation: context.conversation, instruction: instruction,
-                                             instructionIsVoice: true, template: template, configuration: configuration,
-                                             uiLanguage: language, inputLanguage: language.keyboardLanguage, approvedUnits: 1)
-        let handBack = { (spoken: String) in
-            store.update { $0.voiceSessionID = nil; $0.instruction = spoken }
-        }
-        do {
-            let result = try await ScreenshotReplyClient.reply(
-                request, key: IdempotencyKey.forAction(actionID: snapshot.requestID))
-            return GeneratedReply(text: result.reply, detectedLanguage: result.detectedLanguage)
-        } catch ScreenshotReplyFailure.confirmationRequired(let quote) {
-            handBack(instruction)
-            throw VoiceAssistantControlStartError(message: strings.voiceNeedsConfirmation(maxUnits: quote.maxUnits))
-        } catch ScreenshotReplyFailure.insufficientCredits(let quote, _) {
-            handBack(instruction)
-            throw VoiceAssistantControlStartError(message: strings.costTooHigh(maxUnits: quote.maxUnits,
-                                                                                available: quote.availableUnits ?? 0))
-        } catch ScreenshotReplyFailure.failed(let error) {
-            handBack(instruction)
-            throw error
-        } catch {
-            handBack(instruction)
-            throw AIReplyError.serviceUnavailable
-        }
-    }
-
     func stop(phase: VoiceAssistantPhase = .stopped, message: String? = nil, clearPrivateContext: Bool = false,
               discardTurn: Bool = false) {
         startTask?.cancel(); startTask = nil; isStarting = false
+        microphoneAccessDenied = false
         capture.stop()
         captureTask?.cancel(); captureTask = nil
+        connectionTask?.cancel(); connectionTask = nil
         recognitionTask?.cancel(); recognitionTask = nil
         processingTask?.cancel(); processingTask = nil
         if let client { Task { await client.close() } }
@@ -496,21 +525,9 @@ final class VoiceAssistantController {
         pcm.removeAll(keepingCapacity: false)
         level = 0
         elapsed = 0
-        if let screenshotID = snapshot.screenshotID, phase != .responseReady {
-            // A turn that ends without a reply (cancelled, nothing heard, an
-            // error) gives the screenshot back to the keyboard's strip, with
-            // whatever was said as its instruction.
-            let spoken = discardTurn ? "" : snapshot.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
-            ScreenshotContextStore.shared.update { context in
-                guard context.id == screenshotID else { return }
-                context.voiceSessionID = nil
-                if !spoken.isEmpty { context.instruction = spoken }
-            }
-        }
         if clearPrivateContext {
             needsRestore = false
             sourceMessage = ""
-            screenshotID = nil
             templateID = nil
             snapshot = VoiceAssistantSnapshot(sessionID: UUID().uuidString, phase: phase)
         } else if discardTurn {
@@ -617,6 +634,9 @@ final class VoiceAssistantController {
 
     func refreshPublishedState() {
         guard protectedDataAvailable() else { return }
+        if microphoneAccessDenied, AVAudioApplication.shared.recordPermission == .granted {
+            stop()
+        }
         if needsRestore {
             needsRestore = false
             if let saved = store.readSnapshot(), saved.phase == .responseReady {
@@ -693,7 +713,6 @@ final class VoiceAssistantController {
         if let error = error as? AIReplyError {
             return AIReplyStrings.forLanguage(SharedSettings.shared.effectiveAppLanguage).message(for: error)
         }
-        if let error = error as? VoiceAssistantControlStartError { return error.message }
         if let error = error as? APIError {
             return WatchVoiceStrings.forLanguage(SharedSettings.shared.effectiveAppLanguage).message(for: WatchTranscriber.failure(for: error))
         }

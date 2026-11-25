@@ -34,7 +34,6 @@ struct HomeView: View {
                         .transition(.opacity)
                 }
                 tryItCard
-                screenshotCard
                 setupCard
                 keyboardCard
                 howItWorks
@@ -165,24 +164,6 @@ struct HomeView: View {
             }
         }
         .buttonStyle(.dsPrimary)
-    }
-
-    /// «Ответ по скриншоту»: the same screen the shortcut and Control
-    /// Center open.
-    private var screenshotCard: some View {
-        Button {
-            ScreenshotLaunchRequest.request()
-            NotificationCenter.default.post(name: .screenshotReplyOpenRequested, object: nil)
-        } label: {
-            HStack {
-                Label("home.screenshot", systemImage: "camera.viewfinder")
-                    .font(.body.weight(.semibold))
-                Spacer()
-                Image(systemName: "chevron.right").font(.footnote.weight(.semibold))
-            }
-        }
-        .buttonStyle(.dsSecondary)
-        .accessibilityIdentifier("home.screenshot")
     }
 
     private var setupCard: some View {

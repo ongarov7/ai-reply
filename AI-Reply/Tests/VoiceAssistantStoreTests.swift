@@ -24,6 +24,20 @@ final class VoiceAssistantStoreTests: XCTestCase {
         XCTAssertNil(store.readSnapshot(now: now.addingTimeInterval(30)))
     }
 
+    func testUpgradeDiscardsScreenshotReplyFromVoiceHandoff() throws {
+        let snapshot = VoiceAssistantSnapshot(sessionID: "session-1", phase: .responseReady,
+            response: "Reply to an older screenshot", updatedAt: now, expiresAt: now.addingTimeInterval(180))
+        XCTAssertTrue(store.writeSnapshot(snapshot))
+        let file = root.appendingPathComponent("session.json")
+        var record = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any])
+        record["screenshotID"] = "older-screenshot"
+        try JSONSerialization.data(withJSONObject: record).write(to: file)
+
+        XCTAssertNil(store.readSnapshot(now: now))
+        store.purge(now: now)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: file.path))
+    }
+
     func testCommandsAreImmutableBoundAndConsumedExplicitly() {
         let command = VoiceAssistantCommand(id: "command-1", kind: .request, sessionID: "session-1",
             keyboardSessionID: "keyboard-1", sourceMessage: "Message", templateID: "client", createdAt: now)
@@ -88,12 +102,13 @@ final class VoiceAssistantStoreTests: XCTestCase {
     }
 
     func testInactiveSessionsNeverOccupyTheKeyboardRow() {
-        for phase in [VoiceAssistantPhase.ready, .paused, .stopped] {
+        for phase in [VoiceAssistantPhase.paused, .stopped] {
             let snapshot = VoiceAssistantSnapshot(sessionID: "session", phase: phase,
                 response: "Retained response", updatedAt: now, expiresAt: now.addingTimeInterval(180),
                 error: "Recording failed")
             XCTAssertFalse(snapshot.isVisibleInKeyboard(now: now), "inactive phase: \(phase)")
             XCTAssertFalse(snapshot.showsMicrophoneInKeyboard(now: now))
+            XCTAssertFalse(snapshot.phase.isInProgress)
         }
     }
 
@@ -101,6 +116,7 @@ final class VoiceAssistantStoreTests: XCTestCase {
         var snapshot = VoiceAssistantSnapshot(sessionID: "session", phase: .error,
             updatedAt: now, expiresAt: now.addingTimeInterval(180), error: "No speech detected. Please try again.")
         XCTAssertFalse(snapshot.phase.isRecording)
+        XCTAssertFalse(snapshot.phase.isInProgress)
         XCTAssertFalse(snapshot.showsMicrophoneInKeyboard(now: now))
         XCTAssertTrue(snapshot.isVisibleInKeyboard(now: now))
         XCTAssertTrue(snapshot.isVisibleInKeyboard(now: now.addingTimeInterval(9)))
@@ -113,23 +129,28 @@ final class VoiceAssistantStoreTests: XCTestCase {
     }
 
     func testKeyboardShowsOnlyLiveWorkOrACompletedNonemptyResponse() {
-        for phase in [VoiceAssistantPhase.listening, .speechDetected, .transcribing, .generating] {
+        for phase in [VoiceAssistantPhase.ready, .listening, .speechDetected, .transcribing, .generating] {
             let snapshot = VoiceAssistantSnapshot(sessionID: "session", phase: phase,
                 updatedAt: now, expiresAt: now.addingTimeInterval(180))
             XCTAssertTrue(snapshot.isVisibleInKeyboard(now: now), "active phase: \(phase)")
             XCTAssertEqual(snapshot.showsMicrophoneInKeyboard(now: now), phase.isRecording)
+            XCTAssertTrue(snapshot.phase.isInProgress)
         }
         var ready = VoiceAssistantSnapshot(sessionID: "session", phase: .responseReady,
             updatedAt: now, expiresAt: now.addingTimeInterval(180))
         XCTAssertFalse(ready.isVisibleInKeyboard(now: now))
         ready.response = "Ready to insert"
         XCTAssertTrue(ready.isVisibleInKeyboard(now: now))
+        XCTAssertFalse(ready.phase.isInProgress)
         XCTAssertFalse(ready.showsMicrophoneInKeyboard(now: now), "the keyboard cannot start another recording")
     }
 
     func testOrphanedRecordingAndProcessingIndicatorsDisappearWithoutAnOwnerHeartbeat() {
-        var snapshot = VoiceAssistantSnapshot(sessionID: "session", phase: .listening,
+        var snapshot = VoiceAssistantSnapshot(sessionID: "session", phase: .ready,
             updatedAt: now, expiresAt: now.addingTimeInterval(180))
+        XCTAssertTrue(snapshot.isVisibleInKeyboard(now: now.addingTimeInterval(10)))
+        XCTAssertFalse(snapshot.isVisibleInKeyboard(now: now.addingTimeInterval(11)))
+        snapshot.phase = .listening
         XCTAssertTrue(snapshot.isVisibleInKeyboard(now: now.addingTimeInterval(10)))
         XCTAssertFalse(snapshot.isVisibleInKeyboard(now: now.addingTimeInterval(11)))
         snapshot.phase = .speechDetected

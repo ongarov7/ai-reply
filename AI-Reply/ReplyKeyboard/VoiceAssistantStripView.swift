@@ -1,11 +1,10 @@
 import UIKit
 
-/// The iPhone voice session inside the persona row, right of ✨. It uses the
-/// personas' viewport and never takes space from the keys.
+/// The iPhone voice session in the row above the keys.
 ///
 /// * Recording: a live waveform, the newest recognized words (two lines),
 ///   the copied-message toggle when there is room, Done and Cancel.
-/// * Processing: progress and Cancel.
+/// * Preparation and processing: progress and Cancel.
 /// * Result: a two-line preview (tap to review and edit), Insert when the
 ///   result belongs to this field or Review when it may belong to another
 ///   chat, and Close. Nothing is ever inserted or sent on its own.
@@ -84,17 +83,18 @@ final class VoiceAssistantStripView: UIView {
         self.theme = theme
         let strings = KeyboardVoiceStrings(language)
         let ready = snapshot.readyResponse() != nil
-        let processing = snapshot.phase == .transcribing || snapshot.phase == .generating
+        let inProgress = snapshot.phase.isInProgress
         let failed = snapshot.phase == .error
         recording = snapshot.phase.isRecording
+        let showsProgress = inProgress && !recording
         contextAttached = recording && !snapshot.sourceMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        closeStopsSession = recording || processing
+        closeStopsSession = inProgress
         primaryAction = recording ? .finish : nil
         showLiveViews()
         backgroundColor = theme.letterKey
 
         // Leading status.
-        if processing { progress.color = theme.accent; progress.startAnimating() } else { progress.stopAnimating() }
+        if showsProgress { progress.color = theme.accent; progress.startAnimating() } else { progress.stopAnimating() }
         statusImage.removeAllSymbolEffects()
         if recording {
             setStatusSymbol("waveform", color: theme.accent)
@@ -106,7 +106,7 @@ final class VoiceAssistantStripView: UIView {
         } else {
             statusImage.image = nil
         }
-        statusImage.isHidden = processing || statusImage.image == nil
+        statusImage.isHidden = showsProgress || statusImage.image == nil
 
         // Caption.
         let message: String

@@ -364,11 +364,9 @@ extension AccountAPI {
         let legal: LegalConfig?
         /// What this server version understands. Absent on older servers.
         let features: Features?
-        /// Screenshot replies (`features.screenshot_reply`).
-        var screenshot: ScreenshotConfig? = nil
 
         enum CodingKeys: String, CodingKey {
-            case locales, timezone, legal, features, screenshot
+            case locales, timezone, legal, features
             case maxSourceCharacters = "max_source_characters"
             case maxInstructionLength = "max_instruction_length"
             case maxVoiceInstructionLength = "max_voice_instruction_length"
@@ -431,10 +429,6 @@ extension AccountAPI {
         var voiceRealtimeTranscription: Bool? = nil
         /// `instruction_source: "voice"` on /ai/reply and /ai/compose.
         var voiceInstruction: Bool? = nil
-        /// `/api/v1/ai/screenshot/estimate` and `/reply` exist.
-        var screenshotReply: Bool? = nil
-        /// The same with the screenshot itself analysed (admin switch).
-        var screenshotImage: Bool? = nil
 
         enum CodingKeys: String, CodingKey {
             case replyPreferences = "reply_preferences"
@@ -461,26 +455,6 @@ extension AccountAPI {
             case voiceTranscription = "voice_transcription"
             case voiceRealtimeTranscription = "voice_realtime_transcription"
             case voiceInstruction = "voice_instruction"
-            case screenshotReply = "screenshot_reply"
-            case screenshotImage = "screenshot_image"
-        }
-    }
-
-    /// `config.screenshot`: limits, the image consent version and the
-    /// ready-made capture shortcut. Absent on older servers.
-    struct ScreenshotConfig: Decodable, Sendable, Equatable {
-        var imageEnabled: Bool? = nil
-        var imageConsentVersion: String? = nil
-        var shortcutURL: String? = nil
-        var maxUnits: Int? = nil
-        var unlimitedImagesPerDay: Int? = nil
-
-        enum CodingKeys: String, CodingKey {
-            case imageEnabled = "image_enabled"
-            case imageConsentVersion = "image_consent_version"
-            case shortcutURL = "shortcut_url"
-            case maxUnits = "max_units"
-            case unlimitedImagesPerDay = "unlimited_images_per_day"
         }
     }
 

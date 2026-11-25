@@ -115,13 +115,6 @@ final class KeyboardViewController: UIInputViewController {
     }()
     private var reviewedVoiceRequestID: String?
 
-    /// The latest screenshot, waiting to be answered or its reply inserted.
-    private lazy var screenshot: KeyboardScreenshot = {
-        let coordinator = KeyboardScreenshot()
-        coordinator.onChange = { [weak self] state in self?.actionBar.setScreenshot(state) }
-        coordinator.hasFullAccess = { [weak self] in self?.hasFullAccess ?? false }
-        return coordinator
-    }()
     /// AI Reply Voice over the whole keyboard while a turn is recorded and
     /// answered (see `refreshDictationPanel`).
     private let dictationPanel = VoiceDictationPanelView()
@@ -281,7 +274,6 @@ final class KeyboardViewController: UIInputViewController {
         refreshSuggestions()
         Task { await watchVoice.keyboardDidAppear() }
         voiceAssistant.appear()
-        screenshot.appear()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -314,7 +306,6 @@ final class KeyboardViewController: UIInputViewController {
         refreshDictationPanel(animated: false)
         watchVoice.keyboardWillDisappear()
         voiceAssistant.disappear()
-        screenshot.disappear()
     }
 
     override func viewWillLayoutSubviews() {
@@ -1505,37 +1496,6 @@ extension KeyboardViewController: KeyboardActionBarDelegate {
         voiceAssistant.perform(action)
     }
 
-    /// Reply: the composer opens on the screenshot's message (nothing is
-    /// generated yet). Insert: the app's reply goes into an empty field, or
-    /// opens for review when the field or the composer is busy.
-    func actionBarDidTapScreenshotPrimary(_ bar: KeyboardActionBar) {
-        guard let context = screenshot.context else { return }
-        let template = resolveTemplate(id: SharedSettings.shared.lastTemplateID ?? "")
-            ?? replyCoordinator.configuration.templates.first { $0.isVisible }
-            ?? ReplyTemplate.builtIn(.friend, sortIndex: 0)
-        watchVoice.composerReplaced()
-        if let draft = context.draft {
-            if activeFlow == .none, !hostFieldHasText() {
-                textDocumentProxy.insertText(draft.text)
-                lastHostMutation = Date.timeIntervalSinceReferenceDate
-                refreshHostContext()
-                refreshAutoShift()
-            } else {
-                replyCoordinator.showScreenshotDraft(draft.text, template: template)
-            }
-            screenshot.draftHandled()
-            return
-        }
-        guard context.conversation.target != nil else { return }
-        replyCoordinator.inputLanguage = language
-        replyCoordinator.open(screenshot: context, template: template)
-        screenshot.contextOpened()
-    }
-
-    func actionBarDidDismissScreenshot(_ bar: KeyboardActionBar) {
-        screenshot.dismiss()
-    }
-
     private func reviewVoiceAssistantResponse(_ snapshot: VoiceAssistantSnapshot, regenerate: Bool = false) {
         guard snapshot.readyResponse() != nil else { return }
         let open = { [weak self] in
@@ -1553,11 +1513,6 @@ extension KeyboardViewController: KeyboardActionBarDelegate {
                 var session = ReplySession(sourceMessage: snapshot.sourceMessage, source: .clipboard, template: template)
                 session.instruction = snapshot.transcript
                 session.isVoice = true
-                // A reply to a screenshot regenerates from its whole chat.
-                if let id = snapshot.screenshotID, let context = self.screenshot.context, context.id == id {
-                    session.screenshot = context.conversation
-                    session.source = .screenshot
-                }
                 session.flow.startGeneration()
                 session.flow.receive(reply: snapshot.response)
                 self.replyCoordinator.open(handedOff: session)

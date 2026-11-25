@@ -48,8 +48,6 @@ struct AIReplyApp: App {
         account.installationIDForSignOut = { AppServices.shared.installationIDForSignOut }
         account.willEndSession = {
             voice.stop(clearPrivateContext: true)
-            // A screenshot belongs to the person who took it.
-            ScreenshotContextStore.shared.delete()
             AppServices.shared.accountWillSignOut()
         }
         account.didDeleteAccount = { [weak configuration] in
@@ -116,9 +114,6 @@ struct AIReplyApp: App {
                 if url.scheme == "aireply", url.host == "voice" {
                     VoiceAssistantLaunchRequest.request()
                     NotificationCenter.default.post(name: .voiceAssistantOpenRequested, object: nil)
-                } else if url.scheme == "aireply", url.host == "screenshot" {
-                    ScreenshotLaunchRequest.request()
-                    NotificationCenter.default.post(name: .screenshotReplyOpenRequested, object: nil)
                 } else {
                     GoogleSignInProvider.handle(url)
                 }
@@ -155,13 +150,14 @@ struct AIReplyApp: App {
             .onChange(of: settings.effectiveLanguage) {
                 services.requestInstallationSync()
             }
+            .onChange(of: scenePhase, initial: true) { _, phase in
+                if phase == .active { Self.removeLegacyScreenshotData() }
+            }
             .onChange(of: scenePhase) { _, phase in
                 services.scenePhaseDidChange(phase)
                 switch phase {
                 case .active:
                     voice.refreshPublishedState()
-                    // A screenshot past its hour goes, even unopened.
-                    ScreenshotContextStore.shared.purge()
                     keyboardStatus.refresh()
                     // A website payment can change the shared balance while
                     // the app is away. Read /me when the user returns.
@@ -183,6 +179,19 @@ struct AIReplyApp: App {
             .environment(\.locale, settings.locale)
             .preferredColorScheme(settings.colorScheme)
             .tint(.accentColor)
+        }
+    }
+
+    private static func removeLegacyScreenshotData() {
+        let files = FileManager.default
+        guard UIApplication.shared.isProtectedDataAvailable,
+              let container = files.containerURL(forSecurityApplicationGroupIdentifier: AppGroup.identifier) else { return }
+        try? files.removeItem(at: container.appendingPathComponent("Screenshot", isDirectory: true))
+        try? files.removeItem(at: container.appendingPathComponent("screenshot-open.json"))
+        for key in ["screenshot.consent.introSeen", "screenshot.consent.imageVersion", "screenshot.feature.enabled",
+                    "screenshot.feature.image", "screenshot.feature.consentVersion", "screenshot.feature.shortcutURL",
+                    "screenshot.feature.unlimitedImagesPerDay"] {
+            AppGroup.defaults.removeObject(forKey: key)
         }
     }
 
@@ -246,9 +255,6 @@ enum DebugScreen: String {
     case support
     /// Settings ▸ Apple Watch.
     case watch, voice
-    /// «Ответ по скриншоту» over a drawn sample chat, read on the device
-    /// (`-AIReplyDebugScreenshotChat ru|kk|en|uz|dark`).
-    case screenshot
     /// A chat with the keyboard up, for the Apple Watch screenshots;
     /// `-AIReplyDebugMessage` is the message on screen.
     case chat
@@ -300,12 +306,6 @@ private struct DebugScreenHost: View {
         case .settings:  NavigationStack { SettingsView() }
         case .watch:     NavigationStack { AppleWatchSettingsView() }
         case .voice:     DebugVoiceHost()
-        case .screenshot:
-            ScreenshotReplyView()
-                .task {
-                    ScreenshotConsent.markIntroSeen()
-                    await DebugScreenshotSample.ingest(DebugScreen.value(after: "-AIReplyDebugScreenshotChat") ?? "ru")
-                }
         case .chat:      DebugChatHost()
         case .notifications: NavigationStack { SettingsView(focus: .notifications) }
         case .profile:   NavigationStack { ProfileEditorView() }

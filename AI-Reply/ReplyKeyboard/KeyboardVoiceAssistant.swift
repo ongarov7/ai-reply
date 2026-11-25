@@ -47,12 +47,11 @@ final class KeyboardVoiceAssistant {
         // A reused controller can reappear in another chat without a field
         // change callback. Each appearance needs a fresh insertion binding.
         sessionID = UUID().uuidString
-        renderedRevision = nil
         visible = true
         observer = VoiceAssistantSignalObserver(signals: [.snapshot]) { [weak self] _ in
             Task { @MainActor in self?.refresh() }
         }
-        refresh()
+        refresh(forceRender: true)
     }
 
     func disappear() {
@@ -69,7 +68,7 @@ final class KeyboardVoiceAssistant {
         refresh()
     }
 
-    func refresh() {
+    func refresh(forceRender: Bool = false) {
         guard visible else { return }
         let stored = hasFullAccess?() == true ? store.readSnapshot() : nil
         let value = stored?.isVisibleInKeyboard() == true ? stored : nil
@@ -77,7 +76,7 @@ final class KeyboardVoiceAssistant {
         let shown = value.flatMap { isHandled($0) ? nil : $0 }
         let bound = shown.map(isBound) ?? false
         let nextRevision = shown?.keyboardRenderRevision().map { $0 + (bound ? "\u{1f}bound" : "") }
-        if nextRevision != renderedRevision {
+        if forceRender || nextRevision != renderedRevision {
             renderedRevision = nextRevision
             onChange?(shown, bound)
         }
@@ -261,7 +260,7 @@ struct KeyboardVoiceStrings {
     var confirmReplaceDraft: String { text("Replace the draft currently open in the keyboard with the voice response?", "Заменить текущий черновик в клавиатуре голосовым ответом?", "Пернетақтадағы ағымдағы нобайды дауыс жауабымен ауыстыру керек пе?", "Klaviaturada ochiq qoralama ovozli javob bilan almashtirilsinmi?") }
     func status(_ phase: VoiceAssistantPhase) -> String {
         switch phase {
-        case .ready: return text("Microphone ready", "Микрофон готов", "Микрофон дайын", "Mikrofon tayyor")
+        case .ready: return text("Preparing microphone…", "Подготовка микрофона…", "Микрофон дайындалуда…", "Mikrofon tayyorlanmoqda…")
         case .listening: return text("Listening…", "Слушаю…", "Тыңдап тұрмын…", "Tinglayapman…")
         case .speechDetected: return text("Speech detected", "Речь обнаружена", "Сөйлеу анықталды", "Nutq aniqlandi")
         case .transcribing: return text("Transcribing…", "Распознаю речь…", "Сөз танылуда…", "Nutq tanilmoqda…")

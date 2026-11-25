@@ -1,3888 +1,1133 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "Reply to Screenshot by Voice" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reply to Screenshot by Voice"
+    "tutorial.voice.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Microphone and Control Center"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ответить на скриншот голосом"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Микрофон и Пункт управления"
           }
         },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Скриншотқа дауыспен жауап беру"
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Микрофон және Басқару орталығы"
           }
         },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Skrinshotga ovoz bilan javob berish"
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mikrofon va Boshqaruv markazi"
           }
         }
       }
     },
-    "Reads the conversation in a screenshot on your iPhone and starts AI Reply Voice without leaving the chat: say how to reply, and the reply waits in the AI Reply keyboard." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reads the conversation in a screenshot on your iPhone and starts AI Reply Voice without leaving the chat: say how to reply, and the reply waits in the AI Reply keyboard."
+    "tutorial.voice.controlCenter.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add to Control Center"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Читает переписку на скриншоте прямо на iPhone и сразу включает AI Reply Voice, не уходя из чата: скажите, как ответить, — ответ будет ждать в клавиатуре AI Reply."
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Добавить в Пункт управления"
           }
         },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Скриншоттағы хат алмасуды iPhone-да оқып, чаттан шықпай AI Reply Voice қосады: қалай жауап беру керегін айтыңыз — жауап AI Reply пернетақтасында күтеді."
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Басқару орталығына қосу"
           }
         },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Skrinshotdagi yozishmani iPhone’da oʻqiydi va chatdan chiqmasdan AI Reply Voice’ni yoqadi: qanday javob berishni ayting — javob AI Reply klaviaturasida kutadi."
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Boshqaruv markaziga qoʻshish"
           }
         }
       }
     },
-    "Reply to ${screenshot} by voice" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reply to ${screenshot} by voice"
+    "tutorial.voice.nav": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set up voice"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ответить на ${screenshot} голосом"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Настройка голоса"
           }
         },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "${screenshot} — дауыспен жауап беру"
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Дауысты баптау"
           }
         },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "${screenshot} ga ovoz bilan javob berish"
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ovozni sozlash"
           }
         }
       }
     },
-    "screenshot.setup.voice.note" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The first time, open AI Reply Voice in the app once (the microphone on the Home screen) and allow the microphone, voice processing and Live Activities. After that the shortcut works from any chat without opening AI Reply: it takes the screenshot, the microphone turns on in the Dynamic Island, you say how to reply, and the reply waits in the AI Reply keyboard."
+    "tutorial.voice.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set up dictation in AI Reply first. On iOS 18 or later, you can add the voice shortcut to Control Center."
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "В первый раз откройте AI Reply Voice в приложении (микрофон на главном экране) и разрешите микрофон, обработку голоса и «Эфир активности». Дальше команда работает из любого чата, не открывая AI Reply: делает скриншот, включает микрофон в Dynamic Island, вы говорите, как ответить, — ответ ждёт в клавиатуре AI Reply."
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сначала настройте диктовку в AI Reply. На iOS 18 и новее можно добавить голосовую кнопку в Пункт управления."
           }
         },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Алғаш рет қолданбада AI Reply Voice ашып (басты экрандағы микрофон), микрофонға, дауысты өңдеуге және «Эфир активности» мүмкіндігіне рұқсат беріңіз. Содан кейін команда AI Reply ашпай-ақ кез келген чаттан жұмыс істейді: скриншот түсіреді, Dynamic Island-та микрофон қосылады, қалай жауап беру керегін айтасыз — жауап AI Reply пернетақтасында күтеді."
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Алдымен AI Reply ішінде айтып жазуды баптаңыз. iOS 18 және одан кейінгі нұсқаларда дауыс түймесін Басқару орталығына қоса аласыз."
           }
         },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Birinchi marta ilovada AI Reply Voice’ni oching (bosh ekrandagi mikrofon) va mikrofon, ovozni qayta ishlash hamda Live Activities («Эфир активности»)ga ruxsat bering. Shundan keyin buyruq AI Reply’ni ochmasdan istalgan chatdan ishlaydi: skrinshot oladi, Dynamic Island’da mikrofon yoqiladi, qanday javob berishni aytasiz — javob AI Reply klaviaturasida kutadi."
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avval AI Reply’da aytib yozishni sozlang. iOS 18 va undan keyingi versiyalarda ovoz tugmasini Boshqaruv markaziga qoʻshish mumkin."
           }
         }
       }
     },
-    "screenshot.setup.openApp" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "To crop the screenshot or send the picture itself, use Reply to Screenshot instead: it opens AI Reply."
+    "tutorial.voice.settings": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open AI Reply settings"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Чтобы обрезать скриншот или отправить саму картинку, используйте вместо этого «Ответить на скриншот»: оно открывает AI Reply."
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Открыть настройки AI Reply"
           }
         },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Скриншотты кесу не суреттің өзін жіберу үшін оның орнына «Скриншотқа жауап беру» әрекетін пайдаланыңыз: ол AI Reply ашады."
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI Reply баптауларын ашу"
           }
         },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Skrinshotni qirqish yoki rasmning oʻzini yuborish uchun buning oʻrniga «Skrinshotga javob berish» amalidan foydalaning: u AI Reply’ni ochadi."
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI Reply sozlamalarini ochish"
           }
         }
       }
     },
-    "home.screenshot" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reply from a screenshot"
+    "tutorial.voice.denied": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If you denied access and want to use dictation, open Settings and turn on Microphone for AI Reply. If the switch is missing, tap Start dictation in AI Reply first."
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ответить по скриншоту"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Если вы отказали в доступе и хотите пользоваться диктовкой, откройте настройки и включите «Микрофон» для AI Reply. Если переключателя нет, сначала нажмите «Начать диктовку» в AI Reply."
           }
         },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Скриншот бойынша жауап беру"
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Рұқсат бермеген болсаңыз және айтып жазғыңыз келсе, баптауларды ашып, AI Reply үшін «Микрофонды» қосыңыз. Ауыстырғыш болмаса, AI Reply ішіндегі «Айтып жазуды бастау» түймесін басыңыз."
           }
         },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Skrinshot boʻyicha javob berish"
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ruxsat bermagan boʻlsangiz va aytib yozmoqchi boʻlsangiz, Sozlamalarni ochib, AI Reply uchun mikrofonni yoqing. Tugma koʻrinmasa, AI Reply ichida «Aytib yozishni boshlash» tugmasini bosing."
           }
         }
       }
     },
-    "screenshot.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reply from screenshot"
+    "tutorial.voice.permission.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set up the microphone in AI Reply"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ответ по скриншоту"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Настройте микрофон в AI Reply"
           }
         },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Скриншотқа жауап"
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI Reply ішінде микрофонды баптаңыз"
           }
         },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Skrinshotga javob"
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mikrofonni AI Reply’da sozlang"
           }
         }
       }
     },
-    "screenshot.intro.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reply to a chat from its screenshot"
+    "tutorial.voice.permission.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap the microphone on Home, then tap Start dictation. If iOS didn’t ask for microphone access during setup, choose whether to allow it when prompted. Once access is on, read the separate OpenAI voice-processing notice and tap Agree to start recording. Tap Cancel to stop the test recording."
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ответ на переписку по скриншоту"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "На главном экране нажмите микрофон, затем «Начать диктовку». Если при настройке iOS ещё не спрашивала о доступе к микрофону, выберите, разрешать ли его. Когда доступ включён, прочитайте отдельное уведомление о том, как OpenAI обрабатывает голос и нажмите «Согласен», чтобы начать запись. Пробную запись можно остановить кнопкой «Отмена»."
           }
         },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Хат алмасуға скриншот арқылы жауап"
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Басты экрандағы микрофонды, содан кейін «Айтып жазуды бастау» түймесін басыңыз. Баптау кезінде iOS микрофонға рұқсат сұрамаған болса, жүйелік терезеде рұқсат беру не бермеуді таңдаңыз. Рұқсат берілгеннен кейін OpenAI дауысты қалай өңдейтіні туралы бөлек хабарламаны оқып, жазуды бастау үшін «Келісемін» түймесін басыңыз. Сынақ жазбасын «Болдырмау» түймесімен тоқтата аласыз."
           }
         },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Yozishmaga skrinshot orqali javob"
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bosh ekrandagi mikrofonni, soʻng «Aytib yozishni boshlash» tugmasini bosing. Sozlash vaqtida iOS mikrofon uchun ruxsat soʻramagan boʻlsa, tizim oynasida ruxsat berish yoki bermaslikni tanlang. Ruxsat berilgach, OpenAI ovozni qanday qayta ishlashi haqidagi alohida xabarni oʻqing va yozuvni boshlash uchun «Roziman»ni bosing. Sinov yozuvini «Bekor qilish» tugmasi bilan toʻxtatishingiz mumkin."
           }
         }
       }
     },
-    "screenshot.intro.body" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Take a screenshot of a chat, and AI Reply works out who wrote what and prepares a reply to the latest message. You choose the message, type or say what to reply, see the price and insert the reply from the AI Reply keyboard."
+    "tutorial.voice.openDictation": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Go to dictation"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Сделайте скриншот переписки — AI Reply поймёт, кто что написал, и подготовит ответ на последнее сообщение. Вы выбираете сообщение, пишете или говорите, что ответить, видите цену и вставляете ответ с клавиатуры AI Reply."
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Перейти к диктовке"
           }
         },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Хат алмасудың скриншотын түсіріңіз — AI Reply кім не жазғанын түсініп, соңғы хабарламаға жауап дайындайды. Хабарламаны сіз таңдайсыз, не жауап беру керегін жазасыз не айтасыз, бағасын көресіз және жауапты AI Reply пернетақтасынан кірістіресіз."
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Айтып жазуға өту"
           }
         },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Yozishmaning skrinshotini oling — AI Reply kim nima yozganini tushunib, oxirgi xabarga javob tayyorlaydi. Xabarni siz tanlaysiz, nima deb javob berishni yozasiz yoki aytasiz, narxini koʻrasiz va javobni AI Reply klaviaturasidan kiritasiz."
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aytib yozishga oʻtish"
           }
         }
       }
     },
-    "screenshot.intro.privacy" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Only a screenshot you choose is read, on this iPhone. Its text goes to AI Reply and OpenAI only when you create a reply; the picture itself only if you allow it separately. The screenshot is deleted from the iPhone within an hour."
+    "tutorial.voice.openControlCenter.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Control Center"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Читается только выбранный вами скриншот — на этом iPhone. Его текст уходит в AI Reply и OpenAI, только когда вы создаёте ответ, а сама картинка — только если вы отдельно это разрешите. Скриншот удаляется с iPhone в течение часа."
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Откройте Пункт управления"
           }
         },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Тек сіз таңдаған скриншот осы iPhone-да оқылады. Оның мәтіні AI Reply мен OpenAI-ға тек жауап жасағанда кетеді, ал суреттің өзі — тек бөлек рұқсат берсеңіз. Скриншот iPhone-нан бір сағат ішінде жойылады."
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Басқару орталығын ашыңыз"
           }
         },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Faqat siz tanlagan skrinshot shu iPhone’da oʻqiladi. Uning matni AI Reply va OpenAI’ga faqat javob yaratganingizda yuboriladi, rasmning oʻzi esa — faqat alohida ruxsat bersangiz. Skrinshot iPhone’dan bir soat ichida oʻchiriladi."
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Boshqaruv markazini oching"
           }
         }
       }
     },
-    "screenshot.intro.continue" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Continue"
+    "tutorial.voice.openControlCenter.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Swipe down from the top-right corner, near the battery icon. On an iPhone with a Home button, swipe up from the bottom edge."
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Продолжить"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Смахните вниз от правого верхнего угла, где значок батареи. На iPhone с кнопкой «Домой» смахните вверх от нижнего края."
           }
         },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Жалғастыру"
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Батарея белгішесі тұрған жоғарғы оң жақ бұрыштан төмен сырғытыңыз. «Үйге» түймесі бар iPhone-да төменгі жиектен жоғары сырғытыңыз."
           }
         },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Davom etish"
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Batareya belgisi yonidagi yuqori oʻng burchakdan pastga suring. «Uy» tugmasi bor iPhone’da pastki chetdan yuqoriga suring."
           }
         }
       }
     },
-    "screenshot.reading" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reading the conversation…"
+    "tutorial.voice.openControlGallery.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open the controls gallery"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Читаю переписку…"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Откройте список элементов"
           }
         },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Хат алмасу оқылуда…"
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Басқару элементтерінің тізімін ашыңыз"
           }
         },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Yozishma oʻqilmoqda…"
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Boshqaruv elementlari roʻyxatini oching"
           }
         }
       }
     },
-    "screenshot.empty.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No screenshot yet"
+    "tutorial.voice.openControlGallery.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap + in the top-left corner, then tap “Add a Control” at the bottom."
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Скриншота пока нет"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Нажмите «+» в левом верхнем углу, затем «Добавить элемент управления» внизу экрана."
           }
         },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Әзірге скриншот жоқ"
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Жоғарғы сол жақ бұрыштағы «+» белгісін, содан кейін төмендегі «Басқару элементін қосу» түймесін басыңыз."
           }
         },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hozircha skrinshot yoʻq"
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yuqori chap burchakdagi «+» belgisini, soʻng pastdagi «Boshqaruv elementini qoʻshish» tugmasini bosing."
           }
         }
       }
     },
-    "screenshot.empty.body" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Run the AI Reply Screenshot shortcut in a chat, or choose a screenshot you already took."
+    "tutorial.voice.searchControl.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Find AI Reply"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Запустите команду «AI Reply Скриншот» в переписке или выберите уже сделанный скриншот."
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Найдите AI Reply"
           }
         },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Хат алмасуда «AI Reply Скриншот» командасын іске қосыңыз немесе бұрын түсірілген скриншотты таңдаңыз."
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI Reply қолданбасын табыңыз"
           }
         },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Yozishmada «AI Reply Skrinshot» buyrugʻini ishga tushiring yoki oldin olingan skrinshotni tanlang."
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI Reply’ni toping"
           }
         }
       }
     },
-    "screenshot.choose" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Choose a screenshot"
+    "tutorial.voice.searchControl.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Type AI Reply in the search field."
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Выбрать скриншот"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Введите AI Reply в строке поиска."
           }
         },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Скриншот таңдау"
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Іздеу жолағына AI Reply деп жазыңыз."
           }
         },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Skrinshot tanlash"
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Qidiruv maydoniga AI Reply deb yozing."
           }
         }
       }
     },
-    "screenshot.setup.button" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Set up quick capture"
+    "tutorial.voice.control.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose AI Reply Voice"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Настроить быстрый снимок"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Выберите AI Reply Voice"
           }
         },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Жылдам түсіруді баптау"
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI Reply Voice элементін таңдаңыз"
           }
         },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tez suratga olishni sozlash"
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI Reply Voice’ni tanlang"
           }
         }
       }
     },
-    "screenshot.preview" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Screenshot"
+    "tutorial.voice.control.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap the control with the microphone icon."
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Скриншот"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Нажмите на элемент со значком микрофона."
           }
         },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Скриншот"
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Микрофон белгішесі бар элементті басыңыз."
           }
         },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Skrinshot"
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mikrofon belgisi bor elementni bosing."
           }
         }
       }
     },
-    "screenshot.header.messages %lld" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Messages: %lld"
+    "tutorial.voice.finishControl.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finish editing"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Сообщений: %lld"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Завершите редактирование"
           }
         },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Хабарлама: %lld"
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Өңдеуді аяқтаңыз"
           }
         },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Xabarlar: %lld"
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tahrirlashni yakunlang"
           }
         }
       }
     },
-    "screenshot.header.expires %@" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Deleted from this iPhone at %@"
+    "tutorial.voice.finishControl.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap an empty area in Control Center."
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Удалится с iPhone в %@"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Коснитесь свободного места в Пункте управления."
           }
         },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iPhone-нан %@ кезінде жойылады"
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Басқару орталығындағы бос жерді түртіңіз."
           }
         },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iPhone’dan %@ da oʻchiriladi"
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Boshqaruv markazidagi boʻsh joyga teging."
           }
         }
       }
     },
-    "screenshot.header.untitled" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Chat"
+    "tutorial.voice.activity.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check Live Activities"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Переписка"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Проверьте «Эфир активности»"
           }
         },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Хат алмасу"
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live Activities күйін тексеріңіз"
           }
         },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Yozishma"
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live Activities’ni tekshiring"
           }
         }
       }
     },
-    "screenshot.crop" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Crop"
+    "tutorial.voice.activity.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The Control Center microphone needs Live Activities. If they are disabled, open iOS Settings → Apps → AI Reply → Live Activities and allow them. The location and wording may differ by iOS version."
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Обрезать"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Для микрофона в Пункте управления нужен «Эфир активности» (Live Activities). Откройте Настройки iOS → Приложения → AI Reply и убедитесь, что «Эфир активности» включён. Названия и расположение могут отличаться в разных версиях iOS."
           }
         },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Кесу"
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Басқару орталығындағы микрофонға Live Activities қажет. Өшірулі болса, iOS Баптаулары → Қолданбалар → AI Reply → Live Activities бөлімінде рұқсат беріңіз. Атаулар мен орналасуы iOS нұсқасына қарай өзгеруі мүмкін."
           }
         },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Qirqish"
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Boshqaruv markazidagi mikrofon uchun Live Activities kerak. Oʻchirilgan boʻlsa, iOS Sozlamalari → Ilovalar → AI Reply → Live Activities boʻlimida ruxsat bering. Joylashuvi va nomi iOS versiyasiga qarab farq qilishi mumkin."
           }
         }
       }
     },
-    "screenshot.replace" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Choose another"
+    "tutorial.voice.try.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try the control"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Выбрать другой"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Попробуйте запуск"
           }
         },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Басқасын таңдау"
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Іске қосып көріңіз"
           }
         },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Boshqasini tanlash"
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ishga tushirib koʻring"
           }
         }
       }
     },
-    "screenshot.delete" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Delete screenshot"
+    "tutorial.voice.try.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap AI Reply Voice in Control Center to dictate without opening the app. Your device may ask you to unlock it. Tap Done to create a reply or Cancel to stop."
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Удалить скриншот"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Нажмите AI Reply Voice в Пункте управления, чтобы диктовать из любого приложения. Устройство может попросить разблокировку. Нажмите «Готово», чтобы создать ответ, или «Отмена», чтобы остановить запись."
           }
         },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Скриншотты жою"
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Қолданбаны ашпай айтып жазу үшін Басқару орталығындағы AI Reply Voice элементін басыңыз. Құрылғы құлпын ашуды сұрауы мүмкін. Жауап жасау үшін «Дайын», жазуды тоқтату үшін «Болдырмау» түймесін басыңыз."
           }
         },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Skrinshotni oʻchirish"
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ilovani ochmasdan aytib yozish uchun Boshqaruv markazidagi AI Reply Voice elementini bosing. Qurilma qulfni ochishni soʻrashi mumkin. Javob yaratish uchun «Tayyor»ni, yozuvni toʻxtatish uchun «Bekor qilish»ni bosing."
           }
         }
       }
     },
-    "screenshot.actions" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Screenshot actions"
+    "tutorial.voice.ios17": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On iOS 17, use the microphone inside AI Reply or the Open AI Reply Voice action in Shortcuts."
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Действия со скриншотом"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "На iOS 17 используйте микрофон в приложении или действие «Открыть AI Reply Voice» в «Командах»."
           }
         },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Скриншот әрекеттері"
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iOS 17-де қолданба ішіндегі микрофонды немесе «Пәрмендер» ішіндегі AI Reply Voice ашу әрекетін пайдаланыңыз."
           }
         },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Skrinshot amallari"
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iOS 17’da ilova ichidagi mikrofondan yoki Buyruqlar ilovasidagi AI Reply Voice’ni ochish amalidan foydalaning."
           }
         }
       }
     },
-    "screenshot.conversation.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Conversation"
+    "tutorial.voice.privacy": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Watching the video does not grant access or start recording. Voice is sent through AI Reply to OpenAI only after your consent and an explicit start. Withdraw voice consent in AI Reply → Settings → Privacy."
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Переписка"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Просмотр видео не даёт доступ и не включает запись. Голос передаётся через AI Reply в OpenAI только после вашего согласия и явного запуска. Отозвать согласие можно в AI Reply → Настройки → Конфиденциальность."
           }
         },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Хат алмасу"
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Видеоны көру рұқсат бермейді және жазуды бастамайды. Дауыс келісіміңізден және өзіңіз іске қосқаннан кейін ғана AI Reply арқылы OpenAI-ға жіберіледі. Келісімді AI Reply → Баптаулар → Құпиялық бөлімінде қайтаруға болады."
           }
         },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Yozishma"
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Videoni koʻrish ruxsat bermaydi va yozishni boshlamaydi. Ovoz faqat roziligingiz va aniq ishga tushirishingizdan keyin AI Reply orqali OpenAI’ga yuboriladi. Rozilikni AI Reply → Sozlamalar → Maxfiylikda bekor qilishingiz mumkin."
           }
         }
       }
     },
-    "screenshot.conversation.none" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No chat text was found. Crop to the messages or choose another screenshot."
+    "tutorial.voice.silent": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Silent screen recording from iOS Simulator. iOS screens may look different on your iPhone."
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Текст чата не найден. Обрежьте до сообщений или выберите другой скриншот."
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Запись экрана симулятора iOS без звука. Вид экранов на вашем iPhone может отличаться."
           }
         },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Чат мәтіні табылмады. Хабарламаларға дейін кесіңіз немесе басқа скриншот таңдаңыз."
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iOS симуляторынан дыбыссыз экран жазбасы. iPhone телефоныңыздағы экрандар өзгеше болуы мүмкін."
           }
         },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Chat matni topilmadi. Xabarlargacha qirqing yoki boshqa skrinshot tanlang."
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iOS simulyatoridan ovozsiz ekran yozuvi. iPhone’ingizdagi ekranlar boshqacha koʻrinishi mumkin."
           }
         }
       }
     },
-    "screenshot.conversation.review" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Check the highlighted messages: AI Reply is not sure who wrote them. Touch and hold to correct."
+    "tutorial.voice.player": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Video: microphone and Control Center setup"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Проверьте отмеченные сообщения: AI Reply не уверен, кто их написал. Нажмите и удерживайте, чтобы исправить."
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Видео: настройка микрофона и Пункта управления"
           }
         },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Белгіленген хабарламаларды тексеріңіз: AI Reply оларды кім жазғанына сенімді емес. Түзету үшін басып тұрыңыз."
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Бейне: микрофон мен Басқару орталығын баптау"
           }
         },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Belgilangan xabarlarni tekshiring: AI Reply ularni kim yozganiga ishonchi komil emas. Tuzatish uchun bosib turing."
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Video: mikrofon va Boshqaruv markazini sozlash"
           }
         }
       }
     },
-    "screenshot.conversation.hint" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tap a message to reply to it. Touch and hold to change who wrote it, edit or remove it."
+    "tutorial.voice.russianFallback": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The video shows iOS in Russian. The written steps above use your selected app language."
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Нажмите на сообщение, чтобы ответить на него. Нажмите и удерживайте, чтобы сменить автора, исправить или убрать."
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Видео показывает русский интерфейс iOS. Шаги выше доступны на выбранном языке приложения."
           }
         },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Жауап беру үшін хабарламаны басыңыз. Авторын ауыстыру, түзету не алып тастау үшін басып тұрыңыз."
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Видеода iOS орыс тілінде көрсетілген. Жоғарыдағы қадамдар қолданбада таңдаған тіліңізде жазылған."
           }
         },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Javob berish uchun xabarni bosing. Muallifini almashtirish, tuzatish yoki olib tashlash uchun bosib turing."
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Videoda iOS rus tilida koʻrsatilgan. Yuqoridagi qadamlar ilovada tanlagan tilingizda yozilgan."
           }
         }
       }
     },
-    "screenshot.message.check" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "check"
+    "tutorial.voice.practice.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Control Center practice"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "проверьте"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Тренировка с Пунктом управления"
           }
         },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "тексеріңіз"
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Басқару орталығымен жаттығу"
           }
         },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "tekshiring"
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Boshqaruv markazi boʻyicha mashq"
           }
         }
       }
     },
-    "screenshot.message.target" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reply to this"
+    "tutorial.voice.practice.launch": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Practice"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ответ на это"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Потренироваться"
           }
         },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Осыған жауап"
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Жаттығып көру"
           }
         },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bunga javob"
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mashq qilish"
           }
         }
       }
     },
-    "screenshot.message.replyToThis" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reply to this message"
+    "tutorial.voice.practice.open": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open practice panel"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ответить на это сообщение"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Открыть учебную панель"
           }
         },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Осы хабарламаға жауап беру"
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Жаттығу тақтасын ашу"
           }
         },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Shu xabarga javob berish"
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mashq panelini ochish"
           }
         }
       }
     },
-    "screenshot.message.fromThem" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Written by them"
+    "tutorial.voice.practice.add": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a Control"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Написал собеседник"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Добавить элемент управления"
           }
         },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Әңгімелесуші жазған"
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Басқару элементін қосу"
           }
         },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Suhbatdosh yozgan"
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Boshqaruv elementini qoʻshish"
           }
         }
       }
     },
-    "screenshot.message.fromMe" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Written by me"
+    "tutorial.voice.practice.search": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search Controls"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Написал я"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Поиск элементов управления"
           }
         },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Мен жаздым"
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Басқару элементтерін іздеу"
           }
         },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Men yozganman"
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Boshqaruv elementlarini qidirish"
           }
         }
       }
     },
-    "screenshot.message.edit" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Edit text"
+    "tutorial.voice.practice.typeName": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter AI Reply"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Исправить текст"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ввести AI Reply"
           }
         },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Мәтінді түзету"
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI Reply деп жазу"
           }
         },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Matnni tuzatish"
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI Reply deb yozish"
           }
         }
       }
     },
-    "screenshot.message.remove" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Remove"
+    "tutorial.voice.practice.finish": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finish editing"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Убрать"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Завершить редактирование"
           }
         },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Алып тастау"
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Өңдеуді аяқтау"
           }
         },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Olib tashlash"
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tahrirlashni yakunlash"
           }
         }
       }
     },
-    "screenshot.message.accessibilityHint" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Double-tap to reply to this message."
+    "tutorial.voice.practice.recording.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Practice dictation"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Дважды коснитесь, чтобы ответить на это сообщение."
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Учебная диктовка"
           }
         },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Осы хабарламаға жауап беру үшін екі рет түртіңіз."
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Айтып жазу жаттығуы"
           }
         },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Shu xabarga javob berish uchun ikki marta bosing."
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aytib yozish mashqi"
           }
         }
       }
     },
-    "screenshot.role.me" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Me"
+    "tutorial.voice.practice.recording.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When dictating for real, say what you want to write, then tap Done."
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Я"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "При настоящей диктовке скажите, что хотите написать, затем нажмите «Готово»."
           }
         },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Мен"
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Нақты айтып жазу кезінде не жазу керегін айтыңыз, содан кейін «Дайын» түймесін басыңыз."
           }
         },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Men"
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Haqiqiy aytib yozishda nima yozmoqchi ekaningizni ayting, soʻng «Tayyor» tugmasini bosing."
           }
         }
       }
     },
-    "screenshot.role.other" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Them"
+    "tutorial.voice.practice.done.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Practice complete"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Собеседник"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Тренировка завершена"
           }
         },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Әңгімелесуші"
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Жаттығу аяқталды"
           }
         },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Suhbatdosh"
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mashq yakunlandi"
           }
         }
       }
     },
-    "screenshot.role.unknown" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sender unclear"
+    "tutorial.voice.practice.done.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In a chat, open the AI Reply keyboard, review the draft, then tap Insert."
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Автор неясен"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "В чате откройте клавиатуру AI Reply, проверьте черновик и нажмите «Вставить»."
           }
         },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Авторы белгісіз"
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Чатта AI Reply пернетақтасын ашыңыз, жауап жобасын тексеріп, «Кірістіру» түймесін басыңыз."
           }
         },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Muallif nomaʼlum"
-          }
-        }
-      }
-    },
-    "screenshot.instruction.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "What to reply"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Что ответить"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Не жауап беру керек"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nima deb javob berish"
-          }
-        }
-      }
-    },
-    "screenshot.instruction.placeholder" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "For example: say yes, I can after 7 PM (optional)"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Например: согласись, могу после 19:00 (необязательно)"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Мысалы: келіс, 19:00-ден кейін бола аламын (міндетті емес)"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Masalan: rozi boʻl, 19:00 dan keyin boʻla olaman (ixtiyoriy)"
-          }
-        }
-      }
-    },
-    "screenshot.voice.start" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Speak the instruction"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Сказать голосом"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Дауыспен айту"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ovoz bilan aytish"
-          }
-        }
-      }
-    },
-    "screenshot.quick.agree" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Agree"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Согласиться"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Келісу"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rozi boʻlish"
-          }
-        }
-      }
-    },
-    "screenshot.quick.refuse" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Politely refuse"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Вежливо отказать"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Сыпайы бас тарту"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Xushmuomalalik bilan rad etish"
-          }
-        }
-      }
-    },
-    "screenshot.quick.details" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ask for details"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Уточнить детали"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Нақтылау"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tafsilotlarni soʻrash"
-          }
-        }
-      }
-    },
-    "screenshot.quick.thanks" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Thank them"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Поблагодарить"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Алғыс айту"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Minnatdorchilik bildirish"
-          }
-        }
-      }
-    },
-    "screenshot.option.persona" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Who it is"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Кому"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Кімге"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kimga"
-          }
-        }
-      }
-    },
-    "screenshot.option.language" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reply language"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Язык ответа"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Жауап тілі"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Javob tili"
-          }
-        }
-      }
-    },
-    "screenshot.option.language.auto" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Like the chat"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Как в переписке"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Хат алмасудағыдай"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Yozishmadagidek"
-          }
-        }
-      }
-    },
-    "screenshot.option.image" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Send the screenshot itself"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Отправить сам скриншот"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Скриншоттың өзін жіберу"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Skrinshotning oʻzini yuborish"
-          }
-        }
-      }
-    },
-    "screenshot.option.image.footer" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "For complicated chats: the AI reads the picture. More accurate, uses more replies."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Для сложных переписок: ИИ читает саму картинку. Точнее, но расходует больше ответов."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Күрделі хат алмасуларға: AI суреттің өзін оқиды. Дәлірек, бірақ көбірек жауап жұмсайды."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Murakkab yozishmalar uchun: AI rasmning oʻzini oʻqiydi. Aniqroq, lekin koʻproq javob sarflaydi."
-          }
-        }
-      }
-    },
-    "screenshot.cost.explain" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "How the price is calculated"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Как считается цена"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Баға қалай есептеледі"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Narx qanday hisoblanadi"
-          }
-        }
-      }
-    },
-    "screenshot.cost.policy" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A screenshot reply costs as many replies as the AI processing it really needs: one reply is the processing of an ordinary reply of up to 400 characters. Text read on the iPhone usually costs 1, the screenshot itself usually 2–3. You approve the maximum first and are never charged more; what is not used goes back to your balance."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ответ по скриншоту стоит столько ответов, сколько обработки ИИ ему действительно нужно: один ответ — это обработка обычного ответа до 400 символов. Текст, распознанный на iPhone, обычно стоит 1, сам скриншот — обычно 2–3. Вы заранее подтверждаете максимум и никогда не платите больше; неиспользованное возвращается на баланс."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Скриншот бойынша жауап AI өңдеуіне нақты қанша қажет болса, сонша жауап тұрады: бір жауап — 400 таңбаға дейінгі әдеттегі жауапты өңдеу. iPhone-да танылған мәтін әдетте 1, скриншоттың өзі әдетте 2–3 тұрады. Ең жоғары бағаны алдын ала растайсыз және одан артық төлемейсіз; пайдаланылмағаны балансқа қайтады."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Skrinshot boʻyicha javob AI qayta ishlashiga haqiqatda qancha kerak boʻlsa, shuncha javob turadi: bitta javob — 400 belgigacha boʻlgan odatiy javobni qayta ishlash. iPhone’da tanilgan matn odatda 1, skrinshotning oʻzi odatda 2–3 turadi. Eng yuqori narxni oldindan tasdiqlaysiz va undan ortiq toʻlamaysiz; ishlatilmagani balansga qaytadi."
-          }
-        }
-      }
-    },
-    "screenshot.generating" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Writing a reply…"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Пишу ответ…"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Жауап жазылуда…"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Javob yozilmoqda…"
-          }
-        }
-      }
-    },
-    "screenshot.generate" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Create reply"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Создать ответ"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Жауап жасау"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Javob yaratish"
-          }
-        }
-      }
-    },
-    "screenshot.regenerate" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Another reply"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Другой вариант"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Басқа нұсқа"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Boshqa variant"
-          }
-        }
-      }
-    },
-    "screenshot.noTarget" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Choose the message to reply to."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Выберите сообщение, на которое ответить."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Жауап берілетін хабарламаны таңдаңыз."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Javob beriladigan xabarni tanlang."
-          }
-        }
-      }
-    },
-    "screenshot.cost.loading" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Calculating the price…"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Считаю цену…"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Баға есептелуде…"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Narx hisoblanmoqda…"
-          }
-        }
-      }
-    },
-    "screenshot.cost.unavailable" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The price will be shown before anything is charged"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Цена будет показана до списания"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Баға есептен шығарар алдында көрсетіледі"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Narx yechib olishdan oldin koʻrsatiladi"
-          }
-        }
-      }
-    },
-    "screenshot.cost.balance %lld" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Balance: %lld"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Баланс: %lld"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Баланс: %lld"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Balans: %lld"
-          }
-        }
-      }
-    },
-    "screenshot.cost.unlimited" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pro: 1 reply"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pro: 1 ответ"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pro: 1 жауап"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pro: 1 javob"
-          }
-        }
-      }
-    },
-    "screenshot.cost.exact %lld" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Replies used: %lld"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ответов спишется: %lld"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Жұмсалатын жауап: %lld"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sarflanadigan javob: %lld"
-          }
-        }
-      }
-    },
-    "screenshot.cost.range %lld %lld" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Replies used: about %lld, at most %lld"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ответов спишется: около %lld, не больше %lld"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Жұмсалатын жауап: шамамен %lld, ең көбі %lld"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sarflanadigan javob: taxminan %lld, koʻpi bilan %lld"
-          }
-        }
-      }
-    },
-    "screenshot.confirm.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Confirm the price"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Подтвердите цену"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Бағаны растаңыз"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Narxni tasdiqlang"
-          }
-        }
-      }
-    },
-    "screenshot.confirm.body %lld %lld" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This screenshot reply needs more processing than an ordinary one: about %lld, at most %lld replies. Only what it really uses is charged."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Этому ответу по скриншоту нужно больше обработки, чем обычному: около %lld, не больше %lld ответов. Спишется только фактический расход."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Бұл скриншот жауабына әдеттегіден көп өңдеу керек: шамамен %lld, ең көбі %lld жауап. Тек нақты шығын алынады."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bu skrinshot javobiga oddiysidan koʻproq ishlov kerak: taxminan %lld, koʻpi bilan %lld javob. Faqat haqiqiy sarf yechib olinadi."
-          }
-        }
-      }
-    },
-    "screenshot.confirm.balance %lld %lld" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Balance: %lld, after: at least %lld."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Баланс: %lld, после — не меньше %lld."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Баланс: %lld, кейін — кемінде %lld."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Balans: %lld, keyin — kamida %lld."
-          }
-        }
-      }
-    },
-    "screenshot.confirm.generate %lld" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Create (up to %lld)"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Создать (до %lld)"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Жасау (%lld дейін)"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Yaratish (%lld gacha)"
-          }
-        }
-      }
-    },
-    "screenshot.confirm.useText" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Use the text instead (cheaper)"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Использовать текст (дешевле)"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Мәтінді пайдалану (арзанырақ)"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Matndan foydalanish (arzonroq)"
-          }
-        }
-      }
-    },
-    "screenshot.insufficient.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Not enough replies"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Не хватает ответов"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Жауап жетпейді"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Javoblar yetarli emas"
-          }
-        }
-      }
-    },
-    "screenshot.insufficient.body %lld %lld" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This reply may need up to %lld replies, and %lld are left. Shorten the instruction, use the text instead of the picture, or buy more replies."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Этому ответу может понадобиться до %lld ответов, а осталось %lld. Сократите инструкцию, используйте текст вместо картинки или докупите ответы."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Бұл жауапқа %lld жауапқа дейін қажет болуы мүмкін, ал %lld қалды. Нұсқауды қысқартыңыз, сурет орнына мәтінді пайдаланыңыз немесе жауап сатып алыңыз."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bu javobga %lld tagacha javob kerak boʻlishi mumkin, qolgani esa %lld. Koʻrsatmani qisqartiring, rasm oʻrniga matndan foydalaning yoki javob sotib oling."
-          }
-        }
-      }
-    },
-    "screenshot.result.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reply"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ответ"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Жауап"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Javob"
-          }
-        }
-      }
-    },
-    "screenshot.result.copy" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Copy"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Копировать"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Көшіру"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nusxalash"
-          }
-        }
-      }
-    },
-    "screenshot.result.backTo %@" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Back to %@"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Вернуться в %@"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ қолданбасына оралу"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ ga qaytish"
-          }
-        }
-      }
-    },
-    "screenshot.result.keyboard" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The reply waits in the AI Reply keyboard: open the chat, tap the message field and tap Insert. Nothing is sent without you."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ответ ждёт в клавиатуре AI Reply: откройте переписку, коснитесь поля сообщения и нажмите «Вставить». Без вас ничего не отправляется."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Жауап AI Reply пернетақтасында күтіп тұр: хат алмасуды ашып, хабарлама өрісін түртіп, «Кірістіру» басыңыз. Сізсіз ештеңе жіберілмейді."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Javob AI Reply klaviaturasida kutmoqda: yozishmani oching, xabar maydoniga teging va «Kiritish»ni bosing. Sizsiz hech narsa yuborilmaydi."
-          }
-        }
-      }
-    },
-    "screenshot.result.free" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Not charged: a repeat of the same request."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Без списания: повтор того же запроса."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Есептен шығарылмады: сол сұраныстың қайталануы."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Yechib olinmadi: oʻsha soʻrovning takrori."
-          }
-        }
-      }
-    },
-    "screenshot.result.charged %lld" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Replies charged: %lld."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Списано ответов: %lld."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Алынған жауап: %lld."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Yechib olingan javob: %lld."
-          }
-        }
-      }
-    },
-    "screenshot.result.refunded %lld" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Returned to your balance: %lld."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Возвращено на баланс: %lld."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Балансқа қайтарылды: %lld."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Balansga qaytarildi: %lld."
-          }
-        }
-      }
-    },
-    "screenshot.voice.recording" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Listening…"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Слушаю…"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Тыңдап тұрмын…"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tinglayapman…"
-          }
-        }
-      }
-    },
-    "screenshot.voice.paused" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Paused"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Пауза"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Кідіртілді"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pauza"
-          }
-        }
-      }
-    },
-    "screenshot.voice.ready" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Recording finished"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Запись окончена"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Жазу аяқталды"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Yozish tugadi"
-          }
-        }
-      }
-    },
-    "screenshot.voice.remaining %lld" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld seconds left"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Осталось секунд: %lld"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Қалған секунд: %lld"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Qolgan soniya: %lld"
-          }
-        }
-      }
-    },
-    "screenshot.voice.pause" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pause"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Пауза"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Кідірту"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pauza"
-          }
-        }
-      }
-    },
-    "screenshot.voice.resume" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Continue"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Продолжить"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Жалғастыру"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Davom etish"
-          }
-        }
-      }
-    },
-    "screenshot.voice.done" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Done"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Готово"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Дайын"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tayyor"
-          }
-        }
-      }
-    },
-    "screenshot.imageConsent.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Send the screenshot itself?"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Отправлять сам скриншот?"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Скриншоттың өзін жіберу керек пе?"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Skrinshotning oʻzini yuborishmi?"
-          }
-        }
-      }
-    },
-    "screenshot.imageConsent.body" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Usually AI Reply sends only the text it read on this iPhone. With this option the screenshot itself (cropped, if you cropped it) goes through the AI Reply server to OpenAI (USA) to be read by the AI, for this request only. The server does not store or log it. Crop away anything private before sending."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Обычно AI Reply отправляет только текст, распознанный на этом iPhone. С этой настройкой сам скриншот (обрезанный, если вы его обрезали) уходит через сервер AI Reply в OpenAI (США), чтобы ИИ его прочитал, — только для этого запроса. Сервер не хранит его и не пишет в журналы. Обрежьте всё личное перед отправкой."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Әдетте AI Reply осы iPhone-да танылған мәтінді ғана жібереді. Бұл баптаумен скриншоттың өзі (кессеңіз — кесілген түрі) AI оқуы үшін AI Reply сервері арқылы OpenAI-ға (АҚШ) тек осы сұраныс үшін жіберіледі. Сервер оны сақтамайды және журналға жазбайды. Жібермес бұрын жеке ақпаратты кесіп тастаңыз."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Odatda AI Reply faqat shu iPhone’da tanilgan matnni yuboradi. Bu sozlama bilan skrinshotning oʻzi (qirqqan boʻlsangiz — qirqilgan holi) AI oʻqishi uchun AI Reply serveri orqali OpenAI’ga (AQSH) faqat shu soʻrov uchun yuboriladi. Server uni saqlamaydi va jurnalga yozmaydi. Yuborishdan oldin shaxsiy maʼlumotlarni qirqib tashlang."
-          }
-        }
-      }
-    },
-    "screenshot.imageConsent.cost" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reading a picture takes more processing: such a reply usually costs 2–3 replies. The price is shown before each request."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Чтение картинки требует больше обработки: такой ответ обычно стоит 2–3 ответа. Цена показывается перед каждым запросом."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Суретті оқу көбірек өңдеуді қажет етеді: мұндай жауап әдетте 2–3 жауап тұрады. Баға әр сұраныс алдында көрсетіледі."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rasmni oʻqish koʻproq ishlov talab qiladi: bunday javob odatda 2–3 javob turadi. Narx har bir soʻrovdan oldin koʻrsatiladi."
-          }
-        }
-      }
-    },
-    "screenshot.imageConsent.allow" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Allow"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Разрешить"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Рұқсат беру"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ruxsat berish"
-          }
-        }
-      }
-    },
-    "screenshot.imageConsent.decline" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Text only"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Только текст"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Тек мәтін"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Faqat matn"
-          }
-        }
-      }
-    },
-    "screenshot.error.unreadable" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI Reply could not read this screenshot. Crop it to the messages or choose another one."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI Reply не смог прочитать этот скриншот. Обрежьте его до сообщений или выберите другой."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI Reply бұл скриншотты оқи алмады. Оны хабарламаларға дейін кесіңіз немесе басқасын таңдаңыз."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI Reply bu skrinshotni oʻqiy olmadi. Uni xabarlargacha qirqing yoki boshqasini tanlang."
-          }
-        }
-      }
-    },
-    "screenshot.error.consent" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Allow sending the screenshot again to use it."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Чтобы отправлять скриншот, разрешите это снова."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Скриншотты жіберу үшін қайта рұқсат беріңіз."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Skrinshotni yuborish uchun yana ruxsat bering."
-          }
-        }
-      }
-    },
-    "screenshot.error.imageOff" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sending the screenshot itself is not available right now; the text is used instead."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Отправка самого скриншота сейчас недоступна — используется текст."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Скриншоттың өзін жіберу қазір қолжетімсіз — мәтін пайдаланылады."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Skrinshotning oʻzini yuborish hozir mavjud emas — matn ishlatiladi."
-          }
-        }
-      }
-    },
-    "screenshot.error.imageLimit %lld" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Today's %lld picture analyses are used; the text is used instead."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Сегодняшние %lld анализов картинки израсходованы — используется текст."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Бүгінгі %lld сурет талдауы жұмсалды — мәтін пайдаланылады."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bugungi %lld ta rasm tahlili ishlatildi — matn ishlatiladi."
-          }
-        }
-      }
-    },
-    "screenshot.copied" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Copied"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Скопировано"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Көшірілді"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nusxalandi"
-          }
-        }
-      }
-    },
-    "screenshot.crop.area" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Area to keep"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Оставляемая область"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Қалатын аймақ"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Qoladigan hudud"
-          }
-        }
-      }
-    },
-    "screenshot.crop.apply" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Crop"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Обрезать"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Кесу"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Qirqish"
-          }
-        }
-      }
-    },
-    "screenshot.crop.reset" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Whole screenshot"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Весь скриншот"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Бүкіл скриншот"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Butun skrinshot"
-          }
-        }
-      }
-    },
-    "screenshot.setup.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Quick capture"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Быстрый снимок"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Жылдам түсіру"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tez suratga olish"
-          }
-        }
-      }
-    },
-    "screenshot.setup.intro" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iOS does not let apps capture other apps' screens, and AI Reply never does. You capture a chat yourself with a shortcut that takes a screenshot and passes it to AI Reply, and put that shortcut where you like: Control Center, Back Tap or the Action button."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iOS не даёт приложениям снимать экран других приложений, и AI Reply этого не делает. Вы снимаете переписку сами — быстрой командой, которая делает скриншот и передаёт его в AI Reply, — и ставите эту команду куда удобно: в Пункт управления, на касание задней панели или на кнопку действия."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iOS қолданбаларға басқа қолданбалардың экранын түсіруге рұқсат бермейді, AI Reply мұны істемейді. Хат алмасуды өзіңіз түсіресіз — скриншот жасап, оны AI Reply-ға беретін жылдам командамен — және бұл команданы ыңғайлы жерге қоясыз: Басқару орталығына, артқы панельді түртуге не әрекет түймесіне."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iOS ilovalarga boshqa ilovalar ekranini suratga olishga ruxsat bermaydi va AI Reply buni qilmaydi. Yozishmani oʻzingiz suratga olasiz — skrinshot olib, uni AI Reply’ga beradigan tezkor buyruq bilan — va bu buyruqni qulay joyga qoʻyasiz: Boshqaruv markaziga, orqa panelga teginishga yoki Harakat tugmasiga."
-          }
-        }
-      }
-    },
-    "screenshot.setup.getShortcut" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Get the ready shortcut"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Получить готовую команду"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Дайын команданы алу"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tayyor buyruqni olish"
-          }
-        }
-      }
-    },
-    "screenshot.setup.shortcut.header" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "1. The AI Reply Screenshot shortcut"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "1. Команда «AI Reply Скриншот»"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "1. «AI Reply Скриншот» командасы"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "1. «AI Reply Skrinshot» buyrugʻi"
-          }
-        }
-      }
-    },
-    "screenshot.setup.step.open" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open the Shortcuts app and tap +."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Откройте приложение «Команды» и нажмите +."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "«Командалар» қолданбасын ашып, + басыңыз."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "«Buyruqlar» ilovasini oching va + ni bosing."
-          }
-        }
-      }
-    },
-    "screenshot.setup.step.take" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Add the action Take Screenshot."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Добавьте действие «Сделать снимок экрана»."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Take Screenshot («Сделать снимок экрана») әрекетін қосыңыз."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Take Screenshot («Сделать снимок экрана») amalini qoʻshing."
-          }
-        }
-      }
-    },
-    "screenshot.setup.step.reply" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Add Reply to Screenshot by Voice from AI Reply after it."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "После него добавьте «Ответить на скриншот голосом» из AI Reply."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Одан кейін AI Reply-дан «Скриншотқа дауыспен жауап беру» әрекетін қосыңыз."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Undan keyin AI Reply’dan «Skrinshotga ovoz bilan javob berish» amalini qoʻshing."
-          }
-        }
-      }
-    },
-    "screenshot.setup.step.name" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Name it AI Reply Screenshot and tap Done. Tip: add Wait 1 second before Take Screenshot, so Control Center closes first."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Назовите её «AI Reply Скриншот» и нажмите «Готово». Совет: перед «Сделать снимок экрана» добавьте «Подождать 1 секунду», чтобы Пункт управления успел закрыться."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Оны «AI Reply Скриншот» деп атап, «Дайын» басыңыз. Кеңес: Басқару орталығы жабылып үлгеруі үшін скриншот әрекетінің алдына Wait 1 second («Подождать 1 секунду») қосыңыз."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Unga «AI Reply Skrinshot» deb nom bering va «Tayyor»ni bosing. Maslahat: Boshqaruv markazi yopilishga ulgurishi uchun skrinshot amalidan oldin Wait 1 second («Подождать 1 секунду») qoʻshing."
-          }
-        }
-      }
-    },
-    "screenshot.setup.openShortcuts" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open Shortcuts"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Открыть «Команды»"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "«Командалар» ашу"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "«Buyruqlar»ni ochish"
-          }
-        }
-      }
-    },
-    "screenshot.setup.shortcut.footer" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The shortcut runs only when you start it. The screenshot is read on this iPhone; nothing is sent until you create a reply."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Команда работает, только когда вы её запускаете. Скриншот читается на этом iPhone; ничего не отправляется, пока вы не создадите ответ."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Команда тек сіз іске қосқанда жұмыс істейді. Скриншот осы iPhone-да оқылады; жауап жасамайынша ештеңе жіберілмейді."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Buyruq faqat siz ishga tushirganingizda ishlaydi. Skrinshot shu iPhone’da oʻqiladi; javob yaratmaguningizcha hech narsa yuborilmaydi."
-          }
-        }
-      }
-    },
-    "screenshot.setup.cc.header" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "2. Control Center"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "2. Пункт управления"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "2. Басқару орталығы"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "2. Boshqaruv markazi"
-          }
-        }
-      }
-    },
-    "screenshot.setup.cc.open" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open Control Center, tap + at the top left, then Add a Control."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Откройте Пункт управления, нажмите + слева вверху, затем «Добавить элемент управления»."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Басқару орталығын ашып, сол жақ жоғарыдағы + басыңыз, содан кейін «Басқару элементін қосу»."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Boshqaruv markazini oching, chap yuqoridagi + ni bosing, keyin «Boshqaruv elementini qoʻshish»."
-          }
-        }
-      }
-    },
-    "screenshot.setup.cc.add" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Choose Shortcut (under Shortcuts) and pick AI Reply Screenshot: one tap captures the chat."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Выберите «Быстрая команда» (раздел «Команды») и укажите «AI Reply Скриншот»: одно касание снимает переписку."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "«Жылдам команда» элементін («Командалар» бөлімі) таңдап, «AI Reply Скриншот» көрсетіңіз: бір түрту хат алмасуды түсіреді."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "«Tezkor buyruq» elementini («Buyruqlar» boʻlimi) tanlang va «AI Reply Skrinshot»ni koʻrsating: bitta teginish yozishmani suratga oladi."
-          }
-        }
-      }
-    },
-    "screenshot.setup.cc.choose" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tap it in any chat: the screenshot is taken, AI Reply stays closed and the microphone turns on in the Dynamic Island."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Нажмите её в любом чате: снимок делается, AI Reply не открывается, микрофон включается в Dynamic Island."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Оны кез келген чатта басыңыз: скриншот түсіріледі, AI Reply ашылмайды, микрофон Dynamic Island-та қосылады."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Uni istalgan chatda bosing: skrinshot olinadi, AI Reply ochilmaydi, mikrofon Dynamic Island’da yoqiladi."
-          }
-        }
-      }
-    },
-    "screenshot.setup.cc.footer" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Controls in Control Center need iOS 18 or later."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Элементы Пункта управления — iOS 18 и новее."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Басқару орталығының элементтері — iOS 18 және жаңарақ."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Boshqaruv markazi elementlari — iOS 18 va yangiroq."
-          }
-        }
-      }
-    },
-    "screenshot.setup.more.header" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Other ways"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Другие способы"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Басқа тәсілдер"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Boshqa usullar"
-          }
-        }
-      }
-    },
-    "screenshot.setup.backTap" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Back Tap: Settings → Accessibility → Touch → Back Tap → Double Tap → AI Reply Screenshot."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Касание задней панели: Настройки → Универсальный доступ → Касание → Касание задней панели → Двойное касание → «AI Reply Скриншот»."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Артқы панельді түрту: Параметрлер → Арнайы мүмкіндіктер → Түрту → Back Tap → Екі рет түрту → «AI Reply Скриншот»."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Orqa panelga teginish: Sozlamalar → Maxsus imkoniyatlar → Teginish → Back Tap → Ikki marta teginish → «AI Reply Skrinshot»."
-          }
-        }
-      }
-    },
-    "screenshot.setup.actionButton" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Action button (iPhone 15 Pro and later): Settings → Action Button → Shortcut → AI Reply Screenshot."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Кнопка действия (iPhone 15 Pro и новее): Настройки → Кнопка действия → Быстрая команда → «AI Reply Скриншот»."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Әрекет түймесі (iPhone 15 Pro және жаңарақ): Параметрлер → Action Button → Жылдам команда → «AI Reply Скриншот»."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Harakat tugmasi (iPhone 15 Pro va yangiroq): Sozlamalar → Action Button → Tezkor buyruq → «AI Reply Skrinshot»."
-          }
-        }
-      }
-    },
-    "screenshot.setup.keyboard" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Without the microphone: use Use Screenshot in Keyboard instead, then tap Reply on the screenshot strip of the AI Reply keyboard and type the instruction."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Без микрофона: используйте вместо этого «Скриншот в клавиатуру», затем нажмите «Ответить» на полоске скриншота в клавиатуре AI Reply и напишите инструкцию."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Микрофонсыз: оның орнына «Скриншотты пернетақтада пайдалану» әрекетін қолданыңыз, содан кейін AI Reply пернетақтасындағы скриншот жолағында «Жауап беру» басып, нұсқауды жазыңыз."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mikrofonsiz: buning oʻrniga «Skrinshotni klaviaturada ishlatish» amalidan foydalaning, keyin AI Reply klaviaturasidagi skrinshot qatorida «Javob berish»ni bosing va koʻrsatmani yozing."
-          }
-        }
-      }
-    },
-    "screenshot.setup.privacy.header" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Privacy"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Конфиденциальность"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Құпиялық"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Maxfiylik"
-          }
-        }
-      }
-    },
-    "screenshot.setup.privacy" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Only a screenshot you choose is read, on this iPhone. Its text goes to AI Reply and OpenAI only when you create a reply; the picture itself only if you allow it separately. The screenshot is deleted from the iPhone within an hour."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Читается только выбранный вами скриншот — на этом iPhone. Его текст уходит в AI Reply и OpenAI, только когда вы создаёте ответ, а сама картинка — только если вы отдельно это разрешите. Скриншот удаляется с iPhone в течение часа."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Тек сіз таңдаған скриншот осы iPhone-да оқылады. Оның мәтіні AI Reply мен OpenAI-ға тек жауап жасағанда кетеді, ал суреттің өзі — тек бөлек рұқсат берсеңіз. Скриншот iPhone-нан бір сағат ішінде жойылады."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Faqat siz tanlagan skrinshot shu iPhone’da oʻqiladi. Uning matni AI Reply va OpenAI’ga faqat javob yaratganingizda yuboriladi, rasmning oʻzi esa — faqat alohida ruxsat bersangiz. Skrinshot iPhone’dan bir soat ichida oʻchiriladi."
-          }
-        }
-      }
-    },
-    "Reply to Screenshot" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reply to Screenshot"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ответить на скриншот"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Скриншотқа жауап беру"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Skrinshotga javob berish"
-          }
-        }
-      }
-    },
-    "Reads the conversation in a screenshot on your iPhone and opens AI Reply to answer it. Add it after Take Screenshot in a shortcut." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reads the conversation in a screenshot on your iPhone and opens AI Reply to answer it. Add it after Take Screenshot in a shortcut."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Читает переписку на скриншоте прямо на iPhone и открывает AI Reply, чтобы ответить. Добавьте после «Сделать снимок экрана» в быстрой команде."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Скриншоттағы хат алмасуды iPhone-да оқып, жауап беру үшін AI Reply ашады. Жылдам командада скриншот әрекетінен кейін қосыңыз."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Skrinshotdagi yozishmani iPhone’da oʻqiydi va javob berish uchun AI Reply’ni ochadi. Tezkor buyruqda skrinshot amalidan keyin qoʻshing."
-          }
-        }
-      }
-    },
-    "Screenshot" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Screenshot"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Скриншот"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Скриншот"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Skrinshot"
-          }
-        }
-      }
-    },
-    "Instruction" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Instruction"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Инструкция"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Нұсқау"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Koʻrsatma"
-          }
-        }
-      }
-    },
-    "Reply to ${screenshot}" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reply to ${screenshot}"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ответить на ${screenshot}"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "${screenshot} — жауап беру"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "${screenshot} ga javob berish"
-          }
-        }
-      }
-    },
-    "Use Screenshot in Keyboard" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Use Screenshot in Keyboard"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Скриншот в клавиатуру"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Скриншотты пернетақтада пайдалану"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Skrinshotni klaviaturada ishlatish"
-          }
-        }
-      }
-    },
-    "Reads the conversation in a screenshot on your iPhone so the AI Reply keyboard can answer it in the chat. Nothing is sent until you generate a reply." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reads the conversation in a screenshot on your iPhone so the AI Reply keyboard can answer it in the chat. Nothing is sent until you generate a reply."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Читает переписку на скриншоте прямо на iPhone, чтобы клавиатура AI Reply ответила в чате. Ничего не отправляется, пока вы не создадите ответ."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Скриншоттағы хат алмасуды iPhone-да оқиды, AI Reply пернетақтасы чатта жауап бере алуы үшін. Жауап жасамайынша ештеңе жіберілмейді."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Skrinshotdagi yozishmani iPhone’da oʻqiydi, AI Reply klaviaturasi chatda javob bera olishi uchun. Javob yaratmaguningizcha hech narsa yuborilmaydi."
-          }
-        }
-      }
-    },
-    "Use ${screenshot} in the keyboard" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Use ${screenshot} in the keyboard"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "${screenshot} в клавиатуру"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "${screenshot} — пернетақтада пайдалану"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "${screenshot} ni klaviaturada ishlatish"
-          }
-        }
-      }
-    },
-    "No chat text was found in this screenshot. Open the chat and try again." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No chat text was found in this screenshot. Open the chat and try again."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "На этом скриншоте не найден текст чата. Откройте переписку и попробуйте снова."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Бұл скриншоттан чат мәтіні табылмады. Хат алмасуды ашып, қайталап көріңіз."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bu skrinshotda chat matni topilmadi. Yozishmani oching va qayta urinib koʻring."
-          }
-        }
-      }
-    },
-    "Ready: %lld messages. Tap the message field and tap Reply on the screenshot strip of the AI Reply keyboard." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ready: %lld messages. Tap the message field and tap Reply on the screenshot strip of the AI Reply keyboard."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Готово, сообщений: %lld. Коснитесь поля сообщения и нажмите «Ответить» на полоске скриншота в клавиатуре AI Reply."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Дайын, хабарлама: %lld. Хабарлама өрісін түртіп, AI Reply пернетақтасындағы скриншот жолағында «Жауап беру» басыңыз."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tayyor, xabarlar: %lld. Xabar maydoniga teging va AI Reply klaviaturasidagi skrinshot qatorida «Javob berish»ni bosing."
-          }
-        }
-      }
-    },
-    "AI Reply could not read this screenshot. Try again, or choose the screenshot in AI Reply." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI Reply could not read this screenshot. Try again, or choose the screenshot in AI Reply."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI Reply не смог прочитать этот скриншот. Попробуйте снова или выберите скриншот в AI Reply."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI Reply бұл скриншотты оқи алмады. Қайталап көріңіз немесе скриншотты AI Reply ішінде таңдаңыз."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI Reply bu skrinshotni oʻqiy olmadi. Qayta urinib koʻring yoki skrinshotni AI Reply’da tanlang."
-          }
-        }
-      }
-    },
-    "Open AI Reply Screenshot" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open AI Reply Screenshot"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Открыть AI Reply Screenshot"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI Reply Screenshot ашу"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI Reply Screenshot’ni ochish"
-          }
-        }
-      }
-    },
-    "Open AI Reply to answer a screenshot of a chat." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open AI Reply to answer a screenshot of a chat."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Открыть AI Reply, чтобы ответить по скриншоту переписки."
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Хат алмасу скриншотына жауап беру үшін AI Reply ашу."
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Yozishma skrinshotiga javob berish uchun AI Reply’ni ochish."
-          }
-        }
-      }
-    },
-    "AI Reply screen" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI Reply screen"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Экран AI Reply"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI Reply экраны"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI Reply ekrani"
-          }
-        }
-      }
-    },
-    "Screenshot reply" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Screenshot reply"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ответ по скриншоту"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Скриншот бойынша жауап"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Skrinshot boʻyicha javob"
-          }
-        }
-      }
-    },
-    "Screen" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Screen"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Экран"
-          }
-        },
-        "kk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Экран"
-          }
-        },
-        "uz" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ekran"
+        "uz": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chatda AI Reply klaviaturasini oching, qoralamani tekshiring va «Kiritish» tugmasini bosing."
           }
         }
       }
@@ -9248,6 +6493,209 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Foydalanishni boshlash"
+          }
+        }
+      }
+    },
+    "onboarding.voice.microphone.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dictation needs microphone access on your iPhone. Recording starts only when you start dictation."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Айтып жазу үшін iPhone микрофонына рұқсат қажет. Жазу айтып жазуды өзіңіз бастағанда ғана қосылады."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Диктовке нужен доступ к микрофону в iOS. Запись начинается, только когда вы запускаете диктовку."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aytib yozish uchun iPhone mikrofonidan foydalanishga ruxsat kerak. Yozuv faqat aytib yozishni oʻzingiz boshlaganingizda yoqiladi."
+          }
+        }
+      }
+    },
+    "onboarding.voice.microphone.denied.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can continue setup and enable microphone access later in iPhone Settings."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Баптауды жалғастырып, микрофонға рұқсатты кейін iPhone баптауларында бере аласыз."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вы можете продолжить настройку и включить доступ к микрофону позже в настройках iPhone."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sozlashni davom ettirishingiz va keyinroq iPhone sozlamalarida mikrofonga ruxsat berishingiz mumkin."
+          }
+        }
+      }
+    },
+    "onboarding.voice.microphone.denied.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Microphone access is off"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Микрофонға рұқсат берілмеген"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Доступ к микрофону отключён"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mikrofonga ruxsat berilmagan"
+          }
+        }
+      }
+    },
+    "onboarding.voice.microphone.granted.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If you haven’t already given consent, AI Reply will ask separately about OpenAI voice processing when you start dictation."
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Бұрын келісім бермесеңіз, айтып жазуды бастағанда AI Reply OpenAI қызметінің дауысты өңдеуіне бөлек келісім сұрайды."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Если вы ещё не дали согласия, при запуске диктовки AI Reply отдельно спросит, согласны ли вы на обработку голоса в OpenAI."
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agar avval rozilik bermagan boʻlsangiz, aytib yozishni boshlaganingizda AI Reply OpenAI ovozni qayta ishlashi uchun alohida rozilik soʻraydi."
+          }
+        }
+      }
+    },
+    "onboarding.voice.microphone.granted.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Microphone access is on"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Микрофонға рұқсат берілді"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Микрофон подключён"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mikrofonga ruxsat berildi"
+          }
+        }
+      }
+    },
+    "onboarding.voice.microphone.setup" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set up microphone"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Микрофонды баптау"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Настроить микрофон"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mikrofonni sozlash"
+          }
+        }
+      }
+    },
+    "onboarding.voice.microphone.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set up voice dictation"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Айтып жазуды баптаңыз"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Настройте голосовую диктовку"
+          }
+        },
+        "uz" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aytib yozishni sozlang"
           }
         }
       }

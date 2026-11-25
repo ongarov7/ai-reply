@@ -163,6 +163,12 @@ extension AILimits {
         AppGroup.defaults.bool(forKey: Key.voiceRealtimeTranscription)
     }
 
+    static var hasCachedVoiceConfiguration: Bool {
+        let defaults = AppGroup.defaults
+        return defaults.object(forKey: Key.voiceTranscription) != nil
+            && defaults.object(forKey: Key.voiceRealtimeTranscription) != nil
+    }
+
     /// The server takes `instruction_source: "voice"` and gives a dictated
     /// instruction the room of a 40-second turn.
     static var serverSupportsVoiceInstruction: Bool {
@@ -204,7 +210,6 @@ extension AILimits {
             defaults: defaults
         )
         storeFeatures(config.features, defaults: defaults)
-        ScreenshotFeature.store(features: config.features, config: config.screenshot, defaults: defaults)
         defaults.set(config.maxVoiceInstructionLength ?? 0, forKey: Key.voiceInstructionCharacters)
         LegalConsentStore.storeCurrentVersions(config.legal ?? .production, defaults: defaults)
     }

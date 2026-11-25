@@ -273,9 +273,6 @@ enum ReplyContextSource: Equatable, Sendable {
     case clipboard
     /// Text the user typed into the source field themselves.
     case typed
-    /// The message a screenshot reply answers, read from a screenshot the
-    /// person chose (the conversation travels in `ReplySession.screenshot`).
-    case screenshot
 }
 
 /// The THREE texts a reply involves, deliberately kept apart.
@@ -300,10 +297,6 @@ struct ReplySession: Equatable {
     var flow = ReplyComposerFlow()
     /// What a Watch command asked for beyond the instruction.
     var watch: WatchRequestOverrides?
-    /// A screenshot reply: the conversation read from the screenshot (its
-    /// target is `sourceMessage`) and the price the person approved.
-    var screenshot: ScreenshotConversation?
-    var screenshotApprovedUnits = 1
 
     var usableSource: String? {
         let trimmed = sourceMessage.trimmingCharacters(in: .whitespacesAndNewlines)

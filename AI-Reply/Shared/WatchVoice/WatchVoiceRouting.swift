@@ -210,8 +210,7 @@ extension WatchVoiceFailure {
         case .consentRequired:                self = .consentRequired
         case .noInstruction:                  self = .instructionEmpty
         case .instructionTooLong:             self = .instructionTooLong
-        case .cancelled, .emptyResponse, .serviceUnavailable,
-             .screenshotCostConfirmation, .screenshotCostTooHigh: self = .serviceUnavailable
+        case .cancelled, .emptyResponse, .serviceUnavailable: self = .serviceUnavailable
         }
     }
 }

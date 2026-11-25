@@ -171,14 +171,16 @@ struct PersonaRowLayout: Equatable, Sendable {
     ///   - textWidths: each persona's measured title width, in order.
     ///   - iconWidths: each persona's icon plus the gap before its title, in
     ///     the same order; empty for a row without icons.
-    ///   - trailingActionWidth: the Apple Watch control's width, 0 without
-    ///     one. Nothing else about the row changes when there is none.
+    ///   - trailingActionWidth: total width reserved for trailing controls.
+    ///   - showsCreateAction: whether the row reserves space for the AI button.
     init(width: CGFloat, height: CGFloat = PersonaRowLayout.height, textWidths: [CGFloat], iconWidths: [CGFloat] = [],
-         trailingActionWidth: CGFloat = 0) {
+         trailingActionWidth: CGFloat = 0, showsCreateAction: Bool = true) {
         let width = max(width, 0)
         let y = ((height - Self.pillHeight) / 2).rounded()
-        createFrame = CGRect(x: Self.edgeInset, y: y, width: Self.actionWidth, height: Self.pillHeight)
-        let viewportX = createFrame.maxX + Self.spacing / 2
+        createFrame = showsCreateAction
+            ? CGRect(x: Self.edgeInset, y: y, width: Self.actionWidth, height: Self.pillHeight)
+            : .zero
+        let viewportX = showsCreateAction ? createFrame.maxX + Self.spacing / 2 : Self.edgeInset
         let trailingSpace = trailingActionWidth > 0 ? trailingActionWidth + Self.edgeInset : 0
         personasFrame = CGRect(x: viewportX, y: 0, width: max(0, width - viewportX - trailingSpace), height: height)
         trailingFrame = trailingActionWidth > 0

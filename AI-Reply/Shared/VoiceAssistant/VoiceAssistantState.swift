@@ -11,6 +11,7 @@ enum VoiceAssistantPhase: String, Codable, CaseIterable, Sendable {
     case responseReady, paused, stopped, error
 
     var isRecording: Bool { self == .listening || self == .speechDetected }
+    var isInProgress: Bool { self == .ready || isRecording || self == .transcribing || self == .generating }
     var isActive: Bool { self != .stopped && self != .error }
 }
 
@@ -31,9 +32,6 @@ struct VoiceAssistantSnapshot: Codable, Equatable, Sendable {
     var error: String?
     var sourceMessage: String = ""
     var templateID: String?
-    /// The screenshot this turn answers (`ScreenshotContext.id`): the reply
-    /// is written from its whole conversation, `sourceMessage` is its target.
-    var screenshotID: String?
 
     func isFresh(now: Date = Date()) -> Bool {
         now < expiresAt && updatedAt <= now.addingTimeInterval(10)
@@ -49,11 +47,11 @@ struct VoiceAssistantSnapshot: Codable, Equatable, Sendable {
 
     /// The keyboard is an active-session surface, not a launcher. A killed
     /// recording owner cannot leave a misleading microphone for the full
-    /// result lifetime; listening therefore requires a recent heartbeat.
+    /// result lifetime; preparation and listening require recent updates.
     func isVisibleInKeyboard(now: Date = Date()) -> Bool {
         guard isFresh(now: now) else { return false }
         switch phase {
-        case .listening, .speechDetected:
+        case .ready, .listening, .speechDetected:
             return now.timeIntervalSince(updatedAt) <= 10
         case .transcribing, .generating:
             return now.timeIntervalSince(updatedAt) <= 90
@@ -62,7 +60,7 @@ struct VoiceAssistantSnapshot: Codable, Equatable, Sendable {
         case .error:
             return now.timeIntervalSince(updatedAt) < 10 &&
                 !(error?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
-        case .ready, .paused, .stopped:
+        case .paused, .stopped:
             return false
         }
     }

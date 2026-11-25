@@ -413,7 +413,7 @@ private struct VoiceConsentScreen: View {
                     .font(.headline)
                 Text("watch.consent.body")
                     .font(.footnote)
-                Button("watch.consent.allow", action: model.acceptVoiceConsent)
+                Button("watch.consent.continue", action: model.acceptVoiceConsent)
                     .buttonStyle(.borderedProminent)
                 Button("watch.consent.decline", action: model.declineVoiceConsent)
             }

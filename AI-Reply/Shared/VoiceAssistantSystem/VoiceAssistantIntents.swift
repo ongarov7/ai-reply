@@ -166,11 +166,5 @@ struct AIReplyVoiceShortcuts: AppShortcutsProvider {
             shortTitle: "Set up AI Reply Voice",
             systemImageName: "mic.fill"
         )
-        AppShortcut(
-            intent: OpenScreenshotReplyIntent(),
-            phrases: ["Reply to a screenshot in \(.applicationName)", "Open screenshot reply in \(.applicationName)"],
-            shortTitle: "AI Reply Screenshot",
-            systemImageName: "camera.viewfinder"
-        )
     }
 }
