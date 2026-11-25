@@ -251,13 +251,20 @@ class BillingTest {
     }
 
     @Test
-    fun `a matching price is not a mismatch`() = runBlocking {
-        sells(subscription(price = 99900))
-        store.prices["play.base.month"] = "999 ₸"
-        store.periods["play.base.month"] = "month"
-        store.micros["play.base.month"] = 999_000_000L
+    fun `monthly Pro is purchasable at Play's matching 999 tenge price`() = runBlocking {
+        val id = "kz.aireply.pro.monthly"
+        sells(subscription(id = id, kind = "unlimited", monthly = 0, price = 99_900)
+            .copy(code = "pro_monthly", name = "Pro", planId = "pro_monthly"))
+        store.prices[id] = "999 ₸"
+        store.periods[id] = "month"
+        store.micros[id] = 999_000_000L
         billing.load()
-        assertFalse(state.subscriptions.single().hasPriceMismatch)
+        val offer = state.subscriptions.single()
+        assertEquals("999 ₸", offer.price)
+        assertEquals("unlimited", offer.entitlementKind)
+        assertFalse(offer.hasPriceMismatch)
+        billing.buy(activity, offer)
+        assertEquals(listOf(id to TOKEN), store.launched)
     }
 
     @Test
@@ -459,6 +466,34 @@ class BillingTest {
             ),
             state.products
         )
+    }
+
+    @Test
+    fun `a stale catalogue cannot sell the retired pack but paid purchases still go to the server`() = runBlocking {
+        val retired = "kz.aireply.pack500"
+        val available = "kz.aireply.pack30"
+        sells(
+            IapProductDto("pack500", "pack", 500, 0, retired, "500 ответов"),
+            IapProductDto("pack30", "pack", 30, 0, available, "30 ответов", price = 13_000, currency = "KZT")
+        )
+        store.prices[retired] = "990 ₸"
+        store.prices[available] = "130 ₸"
+        store.micros[available] = 130_000_000L
+        store.held += StorePurchase(listOf(retired), "paid-before-retirement", StorePurchaseState.PURCHASED, TOKEN)
+
+        billing.load()
+
+        val offer = state.packs.single()
+        assertEquals(available, offer.storeProductId)
+        assertEquals(30, offer.units)
+        assertEquals("130 ₸", offer.price)
+        assertEquals(listOf(retired to "paid-before-retirement"), api.verified)
+        assertEquals(listOf(USAGE), usages)
+
+        billing.buy(activity, OfferedProduct("pack500", OfferedProduct.Kind.PACK, 500, 0, retired, "500 ответов", "990 ₸"))
+        assertTrue(store.launched.isEmpty())
+        billing.buy(activity, offer)
+        assertEquals(listOf(available to TOKEN), store.launched)
     }
 
     @Test

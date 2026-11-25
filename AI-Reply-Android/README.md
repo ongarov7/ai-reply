@@ -98,10 +98,10 @@ for IDE, JDK and default build-tools compatibility.
 ```
 
 Each Play upload needs a higher `versionCode`. The current release defaults are
-7 / "1.2.3". A subsequent upload can override them:
+9 / "1.2.5". A subsequent upload can override them:
 
 ```bash
-./gradlew bundleRelease -Paireply.versionCode=8 -Paireply.versionName=1.2.4
+./gradlew bundleRelease -Paireply.versionCode=10 -Paireply.versionName=1.2.6
 ```
 
 A release build without `app/google-services.json` warns that push is absent.
@@ -110,7 +110,7 @@ the repository's known iOS ID stops packaging. Debug, lint and unit tests can
 run without one. The public production Web client ID is the checked-in
 default, so a clean checkout does not need local OAuth configuration.
 
-For the public 1.2.3 hotfix, the guarded helper forces production/code 7,
+For the public 1.2.5 release, the guarded helper forces production/code 9,
 preserves older bundles and checks the existing upload certificate:
 
 ```bash

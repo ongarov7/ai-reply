@@ -223,7 +223,8 @@ class BillingRepository(
                 else -> false
             }
         OfferedProduct.Kind.PASS -> product.units > 0 && product.durationHours > 0
-        OfferedProduct.Kind.PACK -> product.units > 0
+        OfferedProduct.Kind.PACK -> product.units > 0 &&
+            product.code != "pack500" && product.storeProductId != "kz.aireply.pack500"
         null -> false
     }
 
@@ -261,7 +262,10 @@ class BillingRepository(
     /** «Купить»: Play's sheet for [product]. The outcome arrives through the store's listener. */
     fun buy(activity: Activity, product: OfferedProduct) {
         val token = accountToken ?: return
-        if (_state.value.busyProductId != null || product.hasPriceMismatch) return
+        val current = _state.value
+        if (current.phase != BillingState.Phase.READY || current.busyProductId != null ||
+            product.hasPriceMismatch || product !in current.products
+        ) return
         _state.update { it.copy(busyProductId = product.storeProductId, notice = null) }
         val replacing = if (product.kind == OfferedProduct.Kind.SUBSCRIPTION) {
             held.firstOrNull {
