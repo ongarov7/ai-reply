@@ -374,6 +374,8 @@ type IAP struct {
 	AppleBundleID string
 	// AppleProMonthlyKZTPriceMinor is an optional iOS catalogue price in tiyn.
 	AppleProMonthlyKZTPriceMinor int64
+	// AppleProYearlyKZTPriceMinor is an optional iOS catalogue price in tiyn.
+	AppleProYearlyKZTPriceMinor int64
 	// AppleAcceptSandbox — Sandbox транзакциялары (TestFlight, App Review) қабылдана ма.
 	// Әр сервер тек бір ортаны қабылдайды: production-да false, тест ортасында true.
 	// TestFlight / App Review Sandbox бөлек API мен дерекқорға бағытталуы керек.
@@ -973,6 +975,7 @@ func iapFromEnv(appEnv string) IAP {
 		price *int64
 	}{
 		{"IAP_APPLE_PRO_MONTHLY_KZT_PRICE_MINOR", &i.AppleProMonthlyKZTPriceMinor},
+		{"IAP_APPLE_PRO_YEARLY_KZT_PRICE_MINOR", &i.AppleProYearlyKZTPriceMinor},
 		{"IAP_GOOGLE_PRO_MONTHLY_KZT_PRICE_MINOR", &i.GoogleProMonthlyKZTPriceMinor},
 		{"IAP_GOOGLE_PRO_YEARLY_KZT_PRICE_MINOR", &i.GoogleProYearlyKZTPriceMinor},
 	} {

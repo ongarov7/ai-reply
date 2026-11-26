@@ -530,8 +530,11 @@ func newHarness(t *testing.T, opts ...harnessOption) *harness {
 		WithQuotaEvents(events).WithPolishDailyLimit(cfg.Limits.PolishPerDay).
 		WithTranscriber(ai.NewOpenAI(speechConfig)).WithTranscribeDailyLimit(cfg.Limits.TranscribePerDay).
 		WithProDevices(proDeviceSvc).WithMacContext(cfg.MacContext)
-	screenshotSvc := screenshot.New(store).WithTTL(0)
-	aiSvc.WithScreenshotPolicy(screenshotSvc)
+	var screenshotSvc *screenshot.Service
+	if env["TEST_LEGACY_SCREENSHOTS"] == "true" {
+		screenshotSvc = screenshot.New(store).WithTTL(0)
+		aiSvc.WithScreenshotPolicy(screenshotSvc)
+	}
 	paymentSvc := payments.New(store, subSvc, payments.DemoProvider{}, cfg.Payments.Mode).WithEvents(events).
 		WithDemoCheckout(cfg.Payments.DemoCheckout).WithProduction(cfg.App.IsProduction())
 	eventSvc := productevents.New(store, log).WithClock(clock)

@@ -21,6 +21,29 @@ import (
 // afterwards, the rest refunded. The test model's price row makes one output
 // token count as 4 input tokens: one credit = 1 500 + 4 × 180 = 2 220.
 
+func newLegacyScreenshotHarness(t *testing.T, opts ...harnessOption) *harness {
+	t.Helper()
+	return newHarness(t, append(opts, withEnv("TEST_LEGACY_SCREENSHOTS", "true"))...)
+}
+
+func TestScreenshotRoutesAreUnavailableInTheDefaultServer(t *testing.T) {
+	h := newHarness(t)
+	config := h.do(http.MethodGet, "/api/v1/config", nil, nil)
+	mustStatus(t, config, http.StatusOK, "")
+	features := mapAt(config, "features")
+	if features["screenshot_reply"] != false || features["screenshot_image"] != false ||
+		config.body["screenshot"] != nil || config.str("legal", "screenshot_consent_version") != "" {
+		t.Fatalf("retired screenshot mode is still advertised: %s", config.raw)
+	}
+
+	user := h.signIn("retired-screenshot@example.com")
+	mustStatus(t, h.screenshotEstimate(user.access, screenshotBody(nil)), http.StatusNotFound, "")
+	mustStatus(t, h.screenshotReply(user.access, screenshotBody(nil), "shot-retired-0001"), http.StatusNotFound, "")
+	if h.providerCalls() != 0 || h.usedToday(user.userID) != 0 {
+		t.Fatal("a retired route used provider or reply quota")
+	}
+}
+
 const screenshotSecret = "We really need your help with the project."
 
 func projectConversation() map[string]any {
@@ -94,7 +117,7 @@ func screenshotPNG(t *testing.T, w, h int) string {
 }
 
 func TestScreenshotReplyOfAShortChatCostsOneReply(t *testing.T) {
-	h := newHarness(t)
+	h := newLegacyScreenshotHarness(t)
 	s := h.signIn("shot-one@example.com")
 
 	quote := h.screenshotEstimate(s.access, screenshotBody(nil))
@@ -131,7 +154,7 @@ func TestScreenshotReplyOfAShortChatCostsOneReply(t *testing.T) {
 }
 
 func TestScreenshotReplyAsksBeforeChargingMoreAndChargesRealTokens(t *testing.T) {
-	h := newHarness(t)
+	h := newLegacyScreenshotHarness(t)
 	s := h.signIn("shot-more@example.com")
 	body := screenshotBody(map[string]any{"conversation": longConversation()})
 
@@ -177,7 +200,7 @@ func TestScreenshotReplyAsksBeforeChargingMoreAndChargesRealTokens(t *testing.T)
 }
 
 func TestScreenshotReplyRefusesWhenTheBalanceCannotPayTheMaximum(t *testing.T) {
-	h := newHarness(t)
+	h := newLegacyScreenshotHarness(t)
 	s := h.signIn("shot-poor@example.com")
 	date, month := h.todayKeys()
 	h.exec(`INSERT INTO usage_daily (user_id, usage_date, used, updated_at) VALUES (?, ?, 6, 0)`, s.userID, date)
@@ -198,7 +221,7 @@ func TestScreenshotReplyRefusesWhenTheBalanceCannotPayTheMaximum(t *testing.T) {
 }
 
 func TestScreenshotReplyRefundsEverythingWhenTheProviderFails(t *testing.T) {
-	h := newHarness(t)
+	h := newLegacyScreenshotHarness(t)
 	s := h.signIn("shot-fail@example.com")
 	h.provider.mu.Lock()
 	h.provider.err = domain.ErrProviderTimeout
@@ -214,7 +237,7 @@ func TestScreenshotReplyRefundsEverythingWhenTheProviderFails(t *testing.T) {
 }
 
 func TestScreenshotReplyKeyIsChargedOnce(t *testing.T) {
-	h := newHarness(t)
+	h := newLegacyScreenshotHarness(t)
 	s := h.signIn("shot-key@example.com")
 	first := h.screenshotReply(s.access, screenshotBody(nil), "shot-key-0001")
 	again := h.screenshotReply(s.access, screenshotBody(nil), "shot-key-0001")
@@ -228,7 +251,7 @@ func TestScreenshotReplyKeyIsChargedOnce(t *testing.T) {
 }
 
 func TestScreenshotImageModeNeedsConsentAndAValidImage(t *testing.T) {
-	h := newHarness(t)
+	h := newLegacyScreenshotHarness(t)
 	s := h.signIn("shot-image@example.com")
 	data := screenshotPNG(t, 300, 640)
 	image := map[string]any{"data": data, "width": 300, "height": 640}
@@ -282,7 +305,7 @@ func TestScreenshotImageModeNeedsConsentAndAValidImage(t *testing.T) {
 }
 
 func TestScreenshotProPaysOneReplyWithADailyImageCap(t *testing.T) {
-	h := newHarness(t, withEnv("TEST_APPROVED_ENTITLEMENTS", "true"))
+	h := newLegacyScreenshotHarness(t, withEnv("TEST_APPROVED_ENTITLEMENTS", "true"))
 	s := h.signIn("shot-pro@example.com")
 	now := h.clock.Now()
 	h.bankPro("shot-pro-1", s.userID, now.Add(-time.Hour), now.Add(30*24*time.Hour))
@@ -310,7 +333,7 @@ func TestScreenshotProPaysOneReplyWithADailyImageCap(t *testing.T) {
 }
 
 func TestScreenshotPolicyIsAnAuditedAdminSetting(t *testing.T) {
-	h := newHarness(t)
+	h := newLegacyScreenshotHarness(t)
 	admin := h.signInAdmin()
 	settings := h.adminCall(admin, http.MethodGet, "/settings", nil)
 	if settings.num("screenshot", "current", "ref_input_tokens") != 1500 || settings.str("screenshot", "policy_version") == "" ||
@@ -347,7 +370,7 @@ func TestScreenshotPolicyIsAnAuditedAdminSetting(t *testing.T) {
 }
 
 func TestScreenshotRequestsAreValidated(t *testing.T) {
-	h := newHarness(t)
+	h := newLegacyScreenshotHarness(t)
 	s := h.signIn("shot-valid@example.com")
 	empty := h.screenshotReply(s.access, map[string]any{"mode": "text", "conversation": map[string]any{"messages": []any{}}}, "")
 	mustStatus(t, empty, http.StatusBadRequest, "INVALID_REQUEST")
@@ -368,7 +391,7 @@ func TestScreenshotRequestsAreValidated(t *testing.T) {
 // reservation is all or none per request, so the balance never goes below
 // zero and the refused request costs nothing.
 func TestScreenshotRepliesFromTwoDevicesNeverOverspend(t *testing.T) {
-	h := newHarness(t)
+	h := newLegacyScreenshotHarness(t)
 	s := h.signIn("shot-race@example.com")
 	date, month := h.todayKeys()
 	h.exec(`INSERT INTO usage_daily (user_id, usage_date, used, updated_at) VALUES (?, ?, 4, 0)`, s.userID, date)

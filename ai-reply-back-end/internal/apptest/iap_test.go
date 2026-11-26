@@ -198,6 +198,71 @@ func TestAppleProMonthlyKZTPriceOverrideOnlyChangesIOSCatalogue(t *testing.T) {
 	}
 }
 
+func TestAppleProYearlyKZTPriceOverrideOnlyChangesIOSCatalogue(t *testing.T) {
+	const sharedYearlyPrice = 3999000
+	const appleYearlyPrice = 1199000
+	const yearlySKU = "kz.aireply.pro.yearly"
+
+	for _, tc := range []struct {
+		name        string
+		override    string
+		appleSKU    string
+		currency    string
+		period      string
+		entitlement string
+		iosPrice    int
+	}{
+		{name: "unset", appleSKU: yearlySKU, currency: "KZT", period: "year", entitlement: "unlimited", iosPrice: sharedYearlyPrice},
+		{name: "override", override: "1199000", appleSKU: yearlySKU, currency: "KZT", period: "year", entitlement: "unlimited", iosPrice: appleYearlyPrice},
+		{name: "plan currency fallback", override: "1199000", appleSKU: yearlySKU, period: "year", entitlement: "unlimited", iosPrice: appleYearlyPrice},
+		{name: "other currency", override: "1199000", appleSKU: yearlySKU, currency: "USD", period: "year", entitlement: "unlimited", iosPrice: sharedYearlyPrice},
+		{name: "other sku", override: "1199000", appleSKU: "different.pro.yearly", currency: "KZT", period: "year", entitlement: "unlimited", iosPrice: sharedYearlyPrice},
+		{name: "other period", override: "1199000", appleSKU: yearlySKU, currency: "KZT", period: "month", entitlement: "unlimited", iosPrice: sharedYearlyPrice},
+		{name: "limited plan", override: "1199000", appleSKU: yearlySKU, currency: "KZT", period: "year", entitlement: "monthly", iosPrice: sharedYearlyPrice},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := googleHarness(t, withEnv("IAP_APPLE_PRO_YEARLY_KZT_PRICE_MINOR", tc.override),
+				withEnv("IAP_GOOGLE_PRO_MONTHLY_KZT_PRICE_MINOR", "0"),
+				withEnv("IAP_GOOGLE_PRO_YEARLY_KZT_PRICE_MINOR", "0"))
+			h.exec(`UPDATE iap_products SET apple_product_id=?,google_product_id=?,billing_period=?,currency=?,is_active=1,off_ios=0,off_android=0 WHERE code='pro_yearly'`,
+				tc.appleSKU, yearlySKU, tc.period, tc.currency)
+			h.exec(`UPDATE plans SET entitlement_kind=? WHERE code='pro_yearly'`, tc.entitlement)
+			h.exec(`UPDATE iap_products SET google_product_id=?,is_active=1,off_android=0 WHERE code='pack30'`, googlePack)
+			s := h.signIn("ios-yearly-price-scope@example.com")
+
+			for _, offer := range []struct {
+				platform string
+				sku      string
+				price    int
+			}{
+				{platform: "ios", sku: tc.appleSKU, price: tc.iosPrice},
+				{platform: "android", sku: yearlySKU, price: sharedYearlyPrice},
+			} {
+				res := h.products(s.access, offer.platform)
+				mustStatus(t, res, http.StatusOK, "")
+				var yearly map[string]any
+				for _, entry := range res.body["products"].([]any) {
+					product := entry.(map[string]any)
+					if product["code"] == "pro_yearly" {
+						yearly = product
+					}
+					if product["code"] == "pro_monthly" && product["price"] != float64(399000) {
+						t.Fatalf("%s: monthly offer changed: %v", offer.platform, product)
+					}
+				}
+				if yearly["price"] != float64(offer.price) || yearly["store_product_id"] != offer.sku ||
+					yearly["billing_period"] != tc.period || yearly["entitlement_kind"] != tc.entitlement {
+					t.Fatalf("%s: got %v; want %s at %d", offer.platform, yearly, offer.sku, offer.price)
+				}
+			}
+
+			if price := h.scalar(`SELECT price FROM plans WHERE code='pro_yearly'`); price != sharedYearlyPrice {
+				t.Fatalf("shared Pro Yearly plan price = %d; want %d", price, sharedYearlyPrice)
+			}
+		})
+	}
+}
+
 func TestGoogleProMonthlyKZTPriceOverrideOnlyChangesAndroidCatalogue(t *testing.T) {
 	const sharedPrice = 399000
 	const applePrice = 123456

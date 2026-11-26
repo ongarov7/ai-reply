@@ -2,8 +2,10 @@ package apptest
 
 import (
 	"context"
+	"io"
 	"io/fs"
 	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -83,6 +85,38 @@ func TestProductEventsKeepOnlyCatalogEvents(t *testing.T) {
 	if none.status != http.StatusOK || none.num("accepted") != 0 || none.num("rejected") != 1 {
 		t.Fatalf("all rejected: %d %s", none.status, none.raw)
 	}
+}
+
+func TestProductEventsFinishAfterRequestCancellation(t *testing.T) {
+	h := newHarness(t)
+	session := h.signIn("+7 707 620 30 01")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	body := strings.NewReader(`{"platform":"ios","app_version":"2.0.1","events":[{"name":"onboarding_reopened"}]}`)
+	req := httptest.NewRequestWithContext(ctx, http.MethodPost, "/api/v1/analytics/events", body)
+	req.Body = &cancelAfterRead{ReadCloser: req.Body, cancel: cancel}
+	req.Header.Set("Authorization", "Bearer "+session.access)
+	res := httptest.NewRecorder()
+	h.server.Config.Handler.ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf("events: %d %s", res.Code, res.Body.String())
+	}
+	if got := h.storedEvents(session.userID); len(got) != 1 || got[0] != `onboarding_reopened {} ios 2.0.1` {
+		t.Fatalf("stored events: %v", got)
+	}
+}
+
+type cancelAfterRead struct {
+	io.ReadCloser
+	cancel context.CancelFunc
+}
+
+func (r *cancelAfterRead) Read(p []byte) (int, error) {
+	n, err := r.ReadCloser.Read(p)
+	r.cancel()
+	return n, err
 }
 
 // Еркін мәтін ешқашан дерекқорға да, журналға да түспейді.

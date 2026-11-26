@@ -115,7 +115,9 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /api/v1/admin/settings/pricing", s.guard(s.handleSavePricing))
 	mux.Handle("POST /api/v1/admin/settings/limits", s.guard(s.handleSaveLimits))
 	mux.Handle("POST /api/v1/admin/settings/ai-context", s.guard(s.handleSaveAIContextPricing))
-	mux.Handle("POST /api/v1/admin/settings/screenshot", s.guard(s.handleSaveScreenshotPolicy))
+	if s.shots != nil {
+		mux.Handle("POST /api/v1/admin/settings/screenshot", s.guard(s.handleSaveScreenshotPolicy))
+	}
 	mux.Handle("POST /api/v1/admin/settings/purchases", s.guard(s.handleSavePurchases))
 	mux.Handle("GET /api/v1/admin/reports", s.guard(s.handleReports))
 	mux.Handle("POST /api/v1/admin/reports/{id}/resolve", s.guard(s.handleResolveReport))

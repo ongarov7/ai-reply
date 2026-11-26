@@ -1,0 +1,62 @@
+{
+  "live_activities": {
+    "ru": "Настройки → Приложения → AI Reply. Убедитесь, что «Эфир активности» включён.",
+    "en": "Open iPhone Settings → Apps → AI Reply. Keep Live Activities enabled.",
+    "kk": "iPhone баптаулары → Қолданбалар → AI Reply бөлімін ашыңыз. Live Activities қосулы болсын.",
+    "uz": "iPhone Sozlamalar → Ilovalar → AI Reply boʻlimini oching. Live Activities yoqilgan boʻlsin."
+  },
+  "control_center": {
+    "ru": "На iOS 18 и новее смахните вниз от правого верхнего угла — откроется Пункт управления.",
+    "en": "On iOS 18 or later, swipe down from the top-right corner to open Control Center.",
+    "kk": "iOS 18 немесе жаңасында Басқару орталығын ашу үшін жоғарғы оң жақ бұрыштан төмен сырғытыңыз.",
+    "uz": "iOS 18 yoki yangiroqda Boshqaruv markazini ochish uchun yuqori oʻng burchakdan pastga suring."
+  },
+  "edit_controls": {
+    "ru": "Удерживайте свободное место и нажмите «Добавить элемент управления».",
+    "en": "Touch and hold an empty area, then tap “Add a Control”.",
+    "kk": "Бос жерді басып тұрып, «Басқару элементін қосу» түймесін түртіңіз.",
+    "uz": "Boʻsh joyni bosib turing, soʻng «Boshqaruv qoʻshish»ni bosing."
+  },
+  "find_voice": {
+    "ru": "Найдите AI Reply Voice и нажмите на элемент с микрофоном, чтобы добавить его.",
+    "en": "Find AI Reply Voice and tap its microphone control to add it.",
+    "kk": "AI Reply Voice тауып, қосу үшін микрофонды басқару элементін түртіңіз.",
+    "uz": "AI Reply Voiceʼni toping va qoʻshish uchun mikrofonli elementni bosing."
+  },
+  "start_control": {
+    "ru": "Закройте редактирование. Нажмите AI Reply Voice — после первой настройки начнётся запись. iOS может попросить разблокировку.",
+    "en": "Finish editing. Tap AI Reply Voice to start recording after first-time setup. iOS may ask you to unlock.",
+    "kk": "Өңдеуді аяқтаңыз. Алғашқы баптаудан кейін AI Reply Voice түрту жазуды бастайды. iOS құлыпты ашуды сұрауы мүмкін.",
+    "uz": "Tahrirlashni tugating. Ilk sozlashdan keyin AI Reply Voiceʼni bosish yozishni boshlaydi. iOS qulfni ochishni soʻrashi mumkin."
+  },
+  "dynamic_island": {
+    "ru": "Удерживайте Dynamic Island, чтобы увидеть действия. «Готово» завершает запись; пауза сохраняет слова, отмена удаляет попытку.",
+    "en": "Touch and hold Dynamic Island to see the controls. Done finishes recording; Pause keeps your words; Cancel discards the turn.",
+    "kk": "Әрекеттерді көру үшін Dynamic Island басып тұрыңыз. «Дайын» жазуды аяқтайды; кідірту сөздерді сақтайды; бас тарту әрекетті жояды.",
+    "uz": "Amallarni koʻrish uchun Dynamic Islandʼni bosib turing. «Tayyor» yozishni tugatadi; pauza soʻzlarni saqlaydi; bekor qilish urinishni oʻchiradi."
+  },
+  "edit_controls_plus": {
+    "ru": "Нажмите «+» вверху, затем «Добавить элемент управления».",
+    "en": "Tap “+” at the top, then “Add a Control”.",
+    "kk": "Жоғарғы «+» белгісін, содан кейін «Басқару элементін қосу» түймесін түртіңіз.",
+    "uz": "Tepadagi «+»ni, soʻng «Boshqaruv qoʻshish»ni bosing."
+  },
+  "find_voice_by_name": {
+    "ru": "В поиске введите AI Reply. Нажмите элемент AI Reply Voice.",
+    "en": "Search for AI Reply. Tap the AI Reply Voice control.",
+    "kk": "Іздеуге AI Reply енгізіңіз. AI Reply Voice басқару элементін түртіңіз.",
+    "uz": "Qidiruvga AI Reply yozing. AI Reply Voice elementini bosing."
+  },
+  "resize_control": {
+    "ru": "При желании увеличьте кнопку за нижний правый угол. Нажмите свободное место, чтобы закончить настройку.",
+    "en": "Optionally enlarge the control using its bottom-right corner. Tap an empty area to finish editing.",
+    "kk": "Қажет болса, төменгі оң жақ бұрышынан тартып, түймені үлкейтіңіз. Өңдеуді аяқтау үшін бос жерді түртіңіз.",
+    "uz": "Xohlasangiz, pastki oʻng burchakdan tortib tugmani kattalashtiring. Tugatish uchun boʻsh joyni bosing."
+  },
+  "finish_setup": {
+    "ru": "Готово: AI Reply Voice добавлен в Пункт управления. Если iOS сохранила старый значок, удалите элемент и добавьте заново.",
+    "en": "AI Reply Voice is now in Control Center. If iOS cached an older icon, remove the control and add it again.",
+    "kk": "AI Reply Voice Басқару орталығына қосылды. Егер iOS ескі белгішені сақтаса, элементті жойып, қайта қосыңыз.",
+    "uz": "AI Reply Voice Boshqaruv markaziga qoʻshildi. iOS eski belgini saqlagan boʻlsa, elementni olib tashlab, qayta qoʻshing."
+  }
+}

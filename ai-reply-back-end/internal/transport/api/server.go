@@ -97,7 +97,7 @@ type Deps struct {
 	// AIContext — the account AI context (website cabinet) added to every
 	// generation, /api/v1/me/ai-context and features.ai_context (nil — off).
 	AIContext *aicontext.Service
-	// Screenshots — the screenshot reply credit policy (nil — code defaults).
+	// Screenshots enables the legacy screenshot endpoints when supplied.
 	Screenshots *screenshot.Service
 }
 
@@ -241,11 +241,11 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /api/v1/ai/reply", s.requireUser(s.requireConsent(aiLimit(http.HandlerFunc(s.handleReply)))))
 	// Нұсқау бойынша жаңа хабарлама («Create»). Сол квота, сол rate limit.
 	mux.Handle("POST /api/v1/ai/compose", s.requireUser(s.requireConsent(aiLimit(http.HandlerFunc(s.handleCompose)))))
-	// Скриншоттағы чатқа жауап: алдымен баға (провайдерге ештеңе кетпейді),
-	// содан кейін жауап — нақты токендер бойынша, max_units-тан аспай.
-	screenshotEstimateLimit := middleware.RateLimit(s.limiter, "screenshot_estimate", limits.AIPerMinute*3, time.Minute, perUser)
-	mux.Handle("POST /api/v1/ai/screenshot/estimate", s.requireUser(s.requireConsent(screenshotEstimateLimit(http.HandlerFunc(s.handleScreenshotEstimate)))))
-	mux.Handle("POST /api/v1/ai/screenshot/reply", s.requireUser(s.requireConsent(aiLimit(http.HandlerFunc(s.handleScreenshotReply)))))
+	if s.screenshots != nil {
+		screenshotEstimateLimit := middleware.RateLimit(s.limiter, "screenshot_estimate", limits.AIPerMinute*3, time.Minute, perUser)
+		mux.Handle("POST /api/v1/ai/screenshot/estimate", s.requireUser(s.requireConsent(screenshotEstimateLimit(http.HandlerFunc(s.handleScreenshotEstimate)))))
+		mux.Handle("POST /api/v1/ai/screenshot/reply", s.requireUser(s.requireConsent(aiLimit(http.HandlerFunc(s.handleScreenshotReply)))))
+	}
 	// Нұсқауды түзету ұсынысы. Квотасыз; өшірулі болса 404 NOT_FOUND.
 	mux.Handle("POST /api/v1/ai/polish", s.requireUser(s.requireConsent(polishLimit(http.HandlerFunc(s.handlePolish)))))
 	// Пернетақтадағы дауыс → мәтін (multipart). Квотасыз; күндік шегі өзінікі; өшірулі болса 404.

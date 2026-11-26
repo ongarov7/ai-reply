@@ -278,6 +278,9 @@ func (s *Server) handleScreenshotReply(w http.ResponseWriter, r *http.Request) {
 
 // screenshotConfig — what the apps need before offering screenshot replies.
 func (s *Server) screenshotConfig(r *http.Request) map[string]any {
+	if s.screenshots == nil {
+		return nil
+	}
 	policy := s.screenshots.Policy(r.Context())
 	return map[string]any{
 		"image_enabled":            policy.ImageEnabled,

@@ -1,5 +1,8 @@
 # Screenshot replies
 
+The iPhone beta feature was retired on 20 November 2026. The deployed server does
+not register these routes. Existing usage and billing history remains available.
+
 A reply to the conversation in a screenshot. The iPhone recognises the chat
 itself (Apple Vision) and sends only the text, or — after a separate consent —
 the screenshot itself for analysis. Code: `internal/screenshot` (request model,

@@ -106,11 +106,15 @@ func (s *Server) handleIAPProducts(w http.ResponseWriter, r *http.Request) {
 					product.Price = price
 				}
 			}
-			if price := s.cfg.IAP.GoogleProYearlyKZTPriceMinor; price > 0 && platform == domain.PlatformAndroid &&
-				product.Code == "pro_yearly" && product.StoreProductID == "kz.aireply.pro.yearly" &&
+			if product.Code == "pro_yearly" && product.StoreProductID == "kz.aireply.pro.yearly" &&
 				product.BillingPeriod == "year" && product.Currency == "KZT" &&
 				plan.Code == "pro_yearly" && plan.Unlimited() {
-				product.Price = price
+				if price := s.cfg.IAP.AppleProYearlyKZTPriceMinor; price > 0 && platform == domain.PlatformIOS {
+					product.Price = price
+				}
+				if price := s.cfg.IAP.GoogleProYearlyKZTPriceMinor; price > 0 && platform == domain.PlatformAndroid {
+					product.Price = price
+				}
 			}
 		}
 		out = append(out, product)

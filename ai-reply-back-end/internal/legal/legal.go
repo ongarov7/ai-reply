@@ -7,8 +7,8 @@ const (
 	PrivacyVersion = "2026-10-14"
 	// The edition dates shown on the pages. A wording change that needs no
 	// new acceptance moves only these.
-	TermsUpdatedDate   = "2026-11-19"
-	PrivacyUpdatedDate = "2026-11-19"
+	TermsUpdatedDate   = "2026-11-20"
+	PrivacyUpdatedDate = "2026-11-20"
 )
 
 // AIProvider — жауаптарды жазатын AI провайдері (келісім экраны мен құпиялық саясаты оны атайды).

@@ -23,11 +23,14 @@ the widget's metadata implementation never touches audio hardware. On iOS 26,
 the intent explicitly declares background supported mode. The first suggested
 shortcut on iOS 18 is AI Reply Voice; Set up AI Reply Voice opens the app.
 
-Before the first recording, a separate permission alert identifies OpenAI
-(USA), explains the audio/text processing, and offers Allow and Start or Not
-Now. iOS microphone permission is requested separately. Voice permission can be
-withdrawn in Settings → Privacy; this stops capture and clears private session
-context. Account sign-out and withdrawal of general AI consent also clear it.
+If microphone access is unset, tapping Start dictation opens the iOS prompt.
+After the user allows access, a separate first-use consent alert identifies
+OpenAI (USA), explains audio and text processing, and offers Agree or Cancel.
+Recording starts after both permissions are in place. If the user denies
+microphone access, the voice screen links to the app's system settings.
+Withdrawing voice-processing consent in Settings → Privacy stops capture and
+clears private session context. Signing out or withdrawing general AI consent
+also clears it.
 
 Capture uses AVAudioEngine, the existing audio-session lifecycle helper, and
 PCM16 mono audio at 24 kHz. Tap Done in the app, keyboard or expanded Dynamic
@@ -42,8 +45,10 @@ media-services resets release microphone resources.
 
 Realtime transcription uses the authenticated AI Reply backend. Provider
 partials update the prominent app transcript card while capture continues.
-The app publishes its protected snapshot at a bounded 0.5-second interval;
-the keyboard shows a two-line live caption with the newest text visible.
+The app publishes its protected snapshot at a bounded 0.5-second interval.
+During recording, the keyboard hides its AI button to show more of the latest
+dictated text across two lines. Done stays available, and the AI button
+returns when recording ends.
 Before any text arrives, both interfaces prompt the user to speak. The compact
 app status/timer, transcript and explicit Done/Cancel controls precede context
 options, keeping capture controls near the top of the sheet. Once the final
@@ -58,10 +63,12 @@ physical-device evaluation; no accuracy guarantee is implied.
 
 ## Control Center, Dynamic Island and Live Activities
 
-On iOS 18+, open Control Center, hold an empty area, choose Add a Control and
-select AI Reply Voice. The app cannot install this control automatically. It
-can also be selected as a supported Lock Screen control; the AI Reply Voice
-shortcut can be assigned to the Action Button through system settings.
+The Microphone and Control Center guide opens below Start dictation. On iOS 18
+or later, open Control Center, tap +, choose Add a Control, and search for
+AI Reply. Select AI Reply Voice and drag it to the desired position while
+editing. If Shazam is already there, the guide explains how to place the
+microphone beside it. AI Reply Voice is also available as a supported Lock
+Screen control and as a shortcut for the Action Button.
 
 The control uses `AIReplyVoiceControl`, a monochrome custom symbol: AI Reply's
 overlapping conversation bubbles with a microphone in the front bubble. It is a
@@ -284,8 +291,9 @@ SDK warning did not prevent this upload.
    AI Reply keyboard. Confirm normal typing with Full Access off, then enable
    Full Access for network/shared features.
 2. Open Home's microphone. Paste a short copied incoming message, select a
-   template and speech language, and start. Verify first-use OpenAI disclosure,
-   Not Now, allowed/denied microphone permission and retry after Settings change.
+   template and speech language, and start. Verify that the system prompt
+   appears first, denial offers Settings, and granting access opens the OpenAI
+   consent alert. Check Cancel, Agree, and retry after changing access in Settings.
 3. Say a Russian, Kazakh and English instruction in separate turns, then mixed
    speech, names, numbers, short/long commands and background noise. Confirm
    the result is an AI-written response, not a verbatim instruction.

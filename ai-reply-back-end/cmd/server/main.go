@@ -20,7 +20,6 @@ import (
 	"github.com/aireply/ai-reply-back-end/internal/admin"
 	"github.com/aireply/ai-reply-back-end/internal/ai"
 	"github.com/aireply/ai-reply-back-end/internal/aicontext"
-	"github.com/aireply/ai-reply-back-end/internal/screenshot"
 	"github.com/aireply/ai-reply-back-end/internal/alerts"
 	"github.com/aireply/ai-reply-back-end/internal/auth"
 	"github.com/aireply/ai-reply-back-end/internal/auth/appleid"
@@ -344,9 +343,6 @@ func buildApplication(ctx context.Context, cfg config.Config, log *slog.Logger, 
 	// The account AI context (website cabinet): added to every generation,
 	// priced by the admin surcharge settings (docs/web-cabinet-ai-context.md).
 	aiContextSvc := aicontext.New(store)
-	// Screenshot replies: priced by their real tokens in standard replies,
-	// with the admin credit policy (docs/SCREENSHOT_REPLIES.md).
-	screenshotSvc := screenshot.New(store)
 	limitSvc := limits.New(store, limits.Limits{
 		SourceChars:      cfg.Limits.SourceTextChars,
 		InstructionChars: cfg.Limits.InstructionChars,
@@ -355,8 +351,7 @@ func buildApplication(ctx context.Context, cfg config.Config, log *slog.Logger, 
 	aiSvc := ai.New(store, subSvc, provider, limitSvc, log).WithProDevices(proDeviceSvc).WithMacContext(cfg.MacContext).WithRepair(cfg.AI.RepairEnabled).WithQuotaEvents(notifyEvents).
 		WithPolishDailyLimit(cfg.Limits.PolishPerDay).
 		// The same OpenAI client and key: /audio/transcriptions with OPENAI_TRANSCRIBE_MODEL.
-		WithTranscriber(provider).WithTranscribeDailyLimit(cfg.Limits.TranscribePerDay).
-		WithScreenshotPolicy(screenshotSvc)
+		WithTranscriber(provider).WithTranscribeDailyLimit(cfg.Limits.TranscribePerDay)
 	// No live provider exists yet (StoreKit / Play Billing come later), so
 	// nothing can be bought unless a development server opts into demo checkout.
 	paymentSvc := payments.New(store, subSvc, payments.DemoProvider{}, cfg.Payments.Mode).
@@ -401,7 +396,6 @@ func buildApplication(ctx context.Context, cfg config.Config, log *slog.Logger, 
 		Limiter: limiter, Log: log,
 		Ping:       func(ctx context.Context) error { return db.Reader().PingContext(ctx) },
 		ProDevices: proDeviceSvc, Credits: creditSvc, IAP: iapSvc, AIContext: aiContextSvc,
-		Screenshots: screenshotSvc,
 	})
 	apiServer.Register(mux)
 	apiServer.RegisterBCC(mux, bccCheckout)
@@ -412,7 +406,7 @@ func buildApplication(ctx context.Context, cfg config.Config, log *slog.Logger, 
 		Bank:    bccCheckout,
 		Config:  cfg, Admin: adminSvc, Limits: limitSvc, Notifications: notifySvc, Payments: paymentSvc,
 		Reports: reportSvc, Credits: creditSvc, Support: supportSvc, IAP: iapSvc, AIContext: aiContextSvc,
-		Screenshots: screenshotSvc, Limiter: limiter, Log: log,
+		Limiter: limiter, Log: log,
 	}).Register(mux)
 
 	simulatorapi.New(simulatorapi.Deps{

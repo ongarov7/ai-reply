@@ -877,6 +877,7 @@ func TestStoreProKZTPriceOverrideConfig(t *testing.T) {
 		price func(IAP) int64
 	}{
 		{"IAP_APPLE_PRO_MONTHLY_KZT_PRICE_MINOR", func(i IAP) int64 { return i.AppleProMonthlyKZTPriceMinor }},
+		{"IAP_APPLE_PRO_YEARLY_KZT_PRICE_MINOR", func(i IAP) int64 { return i.AppleProYearlyKZTPriceMinor }},
 		{"IAP_GOOGLE_PRO_MONTHLY_KZT_PRICE_MINOR", func(i IAP) int64 { return i.GoogleProMonthlyKZTPriceMinor }},
 		{"IAP_GOOGLE_PRO_YEARLY_KZT_PRICE_MINOR", func(i IAP) int64 { return i.GoogleProYearlyKZTPriceMinor }},
 	} {

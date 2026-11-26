@@ -424,6 +424,9 @@ type screenshotPolicyPayload struct {
 }
 
 func (s *Server) screenshotPayload(r *http.Request) *screenshotPolicyPayload {
+	if s.shots == nil {
+		return nil
+	}
 	out := &screenshotPolicyPayload{
 		Current: s.shots.Policy(r.Context()), Defaults: screenshot.DefaultPolicy(), Ranges: screenshot.Ranges(),
 		PolicyVersion: screenshot.PolicyVersion, Measured: map[string]repository.UsageAverage{},

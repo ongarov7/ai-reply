@@ -7,14 +7,18 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/aireply/ai-reply-back-end/internal/domain"
+	"github.com/aireply/ai-reply-back-end/internal/logging"
 	"github.com/aireply/ai-reply-back-end/internal/repository"
 	"github.com/aireply/ai-reply-back-end/internal/traits"
 )
 
 // MaxEvents — the most events one request may carry.
 const MaxEvents = 20
+
+const insertTimeout = 5 * time.Second
 
 // Platforms — платформа коды: тек қолданбалар оқиға жібереді.
 var Platforms = []string{"ios", "android"}
@@ -108,8 +112,11 @@ func (s *Service) Record(ctx context.Context, b Batch) (Result, error) {
 	if len(rows) == 0 {
 		return result, nil
 	}
-	if err := s.repo.InsertProductEvents(ctx, b.UserID, platform, appVersion, rows, s.clock.Now()); err != nil {
-		s.log.Error("product events insert failed", "user_id", b.UserID, "error", err.Error())
+	// Finish writing a validated batch even if the client disconnects.
+	writeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), insertTimeout)
+	defer cancel()
+	if err := s.repo.InsertProductEvents(writeCtx, b.UserID, platform, appVersion, rows, s.clock.Now()); err != nil {
+		logging.FromContext(ctx, s.log).Error("product events insert failed", "user_id", b.UserID, "error", err.Error())
 		return Result{}, err
 	}
 	return result, nil
